@@ -1,9 +1,11 @@
 import type { OrganizationAlertType } from '@/lib/organizations/alerts/organization-alerts';
+import { lowBalanceAlertClientDefinition } from './low-balance/low-balance.definition.client';
 import { monthlySpendingAlertClientDefinition } from './monthly-spending/monthly-spending.definition.client';
 import type { OrganizationAlertClientDefinition } from './types';
 
 export const organizationAlertClientRegistry = {
   monthly_spending: monthlySpendingAlertClientDefinition,
+  low_balance: lowBalanceAlertClientDefinition,
 } satisfies { [T in OrganizationAlertType]: OrganizationAlertClientDefinition<T> };
 
 /** Every type a user may create today, in dropdown order. */

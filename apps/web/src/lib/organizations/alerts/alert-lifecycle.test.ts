@@ -35,6 +35,7 @@ async function createEnabledAlert(organizationId: string) {
       configuration: {
         thresholdMicrodollars: 1_000_000,
         period: CALENDAR_MONTH_UTC_V1,
+        scope: { type: 'organization' },
         recipients: ['finance@example.com'],
       },
     })
@@ -50,7 +51,7 @@ async function claimPendingDelivery(alertId: string) {
     channel: 'email',
     claimed_configuration_version: 1,
     threshold_microdollars: 1_000_000,
-    measured_spend_microdollars: 1_000_000,
+    measured_value_microdollars: 1_000_000,
   });
 }
 

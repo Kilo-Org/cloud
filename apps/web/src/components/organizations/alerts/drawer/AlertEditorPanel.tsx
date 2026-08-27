@@ -1,7 +1,6 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import type { DrawerStackHelpers } from '@/components/drawer';
@@ -171,12 +170,6 @@ export function AlertEditorPanel({
                   {candidate.label}
                 </SelectItem>
               ))}
-              {/* Monthly spending is the only type today, so the dropdown says so
-                  rather than implying another choice is selectable. */}
-              <SelectItem value="more-coming-soon" disabled>
-                <Sparkles />
-                More coming soon
-              </SelectItem>
             </SelectContent>
           </Select>
           <p className="type-label text-muted-foreground">{definition.description}</p>
@@ -189,6 +182,7 @@ export function AlertEditorPanel({
         key={`${definition.type}:${alert?.id ?? 'new'}`}
         context={{
           mode: alert ? 'edit' : 'create',
+          organizationId,
           definition:
             storedDefinition ??
             definition.createInitialDefinition({

@@ -19,6 +19,9 @@ export const monthlySpendingAlertClientDefinition = {
         // than a threshold nobody chose.
         thresholdMicrodollars: 0,
         period: CALENDAR_MONTH_UTC_V1,
+        // Whole-organization is the default scope; a group is an explicit,
+        // deliberate narrowing the editor offers, not a suggestion.
+        scope: { type: 'organization' },
         recipients: suggestedRecipient ? [suggestedRecipient] : [],
       },
     };

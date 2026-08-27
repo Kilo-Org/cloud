@@ -3,10 +3,10 @@ import 'server-only';
 import {
   organization_alert_deliveries,
   organization_alerts,
+  organization_groups,
+  type MonthlySpendingAlertScope,
   type OrganizationAlert,
-  type OrganizationAlertConfiguration,
   type OrganizationAlertStatus,
-  type OrganizationAlertType,
 } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
@@ -18,8 +18,11 @@ import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { cancelPendingDeliveriesForAlerts } from './alert-deliveries';
+import { currentLowBalanceOccurrenceIds } from './low-balance/low-balance-evaluator';
 import {
   EnabledOrganizationAlertDefinitionSchema,
+  LOW_BALANCE_ALERT_TYPE,
+  MONTHLY_SPENDING_ALERT_TYPE,
   OrganizationAlertDefinitionSchema,
   RECIPIENT_DISCLOSURE_REQUIRED_MESSAGE,
   resolveOrganizationAlertPeriodOccurrence,
@@ -34,13 +37,17 @@ export type OrganizationAlertActor = { id: string; email: string; name: string }
  * One alert as the Alerts surface reads it. Recipient addresses are part of the
  * configuration and are only ever returned to callers the alert router has
  * authorized for organization billing.
+ *
+ * Intersected with `OrganizationAlertDefinition` (rather than declaring its own
+ * separate `type`/`configuration` fields) so `type` keeps discriminating
+ * `configuration` for every consumer, the same as everywhere else in this
+ * feature: switching on `view.type` narrows `view.configuration` without a
+ * cast.
  */
-export type OrganizationAlertView = {
+export type OrganizationAlertView = OrganizationAlertDefinition & {
   id: string;
   organizationId: string;
-  type: OrganizationAlertType;
   status: OrganizationAlertStatus;
-  configuration: OrganizationAlertConfiguration;
   configurationVersion: number;
   createdAt: string;
   updatedAt: string;
@@ -57,6 +64,14 @@ export type OrganizationAlertView = {
    * counting done inside the claim-insert transaction.
    */
   admittedRecipientCount: number;
+  /**
+   * The current name of the group a `monthly_spending` alert's `scope`
+   * references, resolved fresh on every read since a group can be renamed.
+   * `null` for an organization-wide alert, and for a group-scoped alert whose
+   * group has been deleted (the alert keeps its stored `groupId`; the
+   * evaluator treats a missing group as invalid rather than as zero spend).
+   */
+  groupName: string | null;
 };
 
 export type OrganizationAlertPage = {
@@ -115,6 +130,68 @@ function parseAlertDefinition(
 }
 
 /**
+ * Sentinel occurrence for a `low_balance` alert that has never claimed a
+ * delivery. It matches no real delivery row, so it always reports zero admitted
+ * recipients, which is the correct count for an alert that has never crossed.
+ */
+const NO_LOW_BALANCE_OCCURRENCE_YET = 'low_balance:crossing:v1:none';
+
+/**
+ * Resolves the occurrence identity each alert is being read for, so
+ * `admittedRecipientCounts` can scope its count the same way a claim would.
+ * `monthly_spending` resolves this from `now` alone, the same as a claim
+ * always will. `low_balance` has no such formula: its occurrence is minted only
+ * when a crossing is detected (see `low-balance-evaluator.ts`), so reading it
+ * back means looking up the most recent one instead of computing it.
+ */
+async function currentOccurrenceIds(
+  client: AlertClient,
+  alerts: OrganizationAlert[],
+  definitions: OrganizationAlertDefinition[],
+  now: Date
+): Promise<string[]> {
+  const lowBalanceAlertIds = alerts
+    .filter((_, index) => definitions[index].type === LOW_BALANCE_ALERT_TYPE)
+    .map(alert => alert.id);
+  const lowBalanceOccurrenceIds = await currentLowBalanceOccurrenceIds(client, lowBalanceAlertIds);
+  return alerts.map((alert, index) => {
+    const definition = definitions[index];
+    if (definition.type === MONTHLY_SPENDING_ALERT_TYPE) {
+      return resolveOrganizationAlertPeriodOccurrence(definition.configuration.period, now)
+        .occurrenceId;
+    }
+    return lowBalanceOccurrenceIds.get(alert.id) ?? NO_LOW_BALANCE_OCCURRENCE_YET;
+  });
+}
+
+/**
+ * Current names of every group a `monthly_spending` alert's `scope`
+ * references, in one query. Omitted from the result when the group no longer
+ * exists, so the caller can distinguish "no such group" from "named an empty
+ * string".
+ */
+async function currentGroupNames(
+  client: AlertClient,
+  definitions: OrganizationAlertDefinition[]
+): Promise<Map<string, string>> {
+  const groupIds = [
+    ...new Set(
+      definitions
+        .filter(definition => definition.type === MONTHLY_SPENDING_ALERT_TYPE)
+        .map(definition => definition.configuration.scope)
+        .filter(scope => scope.type === 'group')
+        .map(scope => scope.groupId)
+    ),
+  ];
+  if (groupIds.length === 0) return new Map();
+  const rows = await client
+    .select({ id: organization_groups.id, name: organization_groups.name })
+    .from(organization_groups)
+    .where(inArray(organization_groups.id, groupIds));
+  return new Map(rows.map(row => [row.id, row.name]));
+}
+
+/**
  * Reads a batch of alerts as the Alerts surface sees them, resolving each
  * alert's own period occurrence and its admitted recipient count. Reads and
  * writes share this so a mutation result is shaped exactly like a list row.
@@ -124,25 +201,34 @@ async function toAlertViews(
   alerts: OrganizationAlert[]
 ): Promise<OrganizationAlertView[]> {
   const now = new Date();
-  const occurrenceIds = alerts.map(
-    alert =>
-      resolveOrganizationAlertPeriodOccurrence(parseStoredAlert(alert).configuration.period, now)
-        .occurrenceId
-  );
+  const definitions = alerts.map(alert => parseStoredAlert(alert));
+  const occurrenceIds = await currentOccurrenceIds(client, alerts, definitions, now);
   const admitted = await admittedRecipientCounts(client, alerts, occurrenceIds);
-  return alerts.map((alert, index) => ({
-    id: alert.id,
-    organizationId: alert.organization_id,
-    type: alert.type,
-    status: alert.status,
-    configuration: alert.configuration,
-    configurationVersion: alert.configuration_version,
-    createdAt: alert.created_at,
-    updatedAt: alert.updated_at,
-    archivedAt: alert.archived_at,
-    periodOccurrenceId: occurrenceIds[index],
-    admittedRecipientCount: admitted.get(alert.id) ?? 0,
-  }));
+  const groupNames = await currentGroupNames(client, definitions);
+  return alerts.map((alert, index) => {
+    const definition = definitions[index];
+    const groupName =
+      definition.type === MONTHLY_SPENDING_ALERT_TYPE &&
+      definition.configuration.scope.type === 'group'
+        ? (groupNames.get(definition.configuration.scope.groupId) ?? null)
+        : null;
+    return {
+      // Spread of a validated `OrganizationAlertDefinition` rather than the raw
+      // row's independently-typed `type`/`configuration`, so `type` keeps
+      // discriminating `configuration` on the returned view.
+      ...definition,
+      id: alert.id,
+      organizationId: alert.organization_id,
+      status: alert.status,
+      configurationVersion: alert.configuration_version,
+      createdAt: alert.created_at,
+      updatedAt: alert.updated_at,
+      archivedAt: alert.archived_at,
+      periodOccurrenceId: occurrenceIds[index],
+      admittedRecipientCount: admitted.get(alert.id) ?? 0,
+      groupName,
+    };
+  });
 }
 
 async function toAlertView(
@@ -292,7 +378,7 @@ async function requireOrganizationAlertEntitlement(organizationId: string): Prom
   if (organization.plan !== 'enterprise') {
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: 'Monthly Spending alerts are available to Enterprise organizations.',
+      message: 'Organization alerts are available to Enterprise organizations.',
     });
   }
   await requireActiveSubscriptionOrTrial(organizationId);
@@ -350,11 +436,20 @@ function assertExpectedConfigurationVersion(
 }
 
 type AlertConfigurationChange = {
-  changed: ('threshold' | 'period' | 'recipients')[];
+  changed: ('threshold' | 'period' | 'scope' | 'recipients')[];
   addedRecipientCount: number;
   recipientCount: number;
   previousRecipientCount: number;
 };
+
+/** Structural equality for a scope discriminated union of plain values. */
+function scopeChanged(
+  previous: MonthlySpendingAlertScope,
+  next: MonthlySpendingAlertScope
+): boolean {
+  if (previous.type !== next.type) return true;
+  return previous.type === 'group' && next.type === 'group' && previous.groupId !== next.groupId;
+}
 
 function describeConfigurationChange(
   previous: OrganizationAlertDefinition,
@@ -367,11 +462,19 @@ function describeConfigurationChange(
   if (previous.configuration.thresholdMicrodollars !== next.configuration.thresholdMicrodollars) {
     changed.push('threshold');
   }
-  if (
-    previous.configuration.period.type !== next.configuration.period.type ||
-    previous.configuration.period.version !== next.configuration.period.version
-  ) {
-    changed.push('period');
+  // `period` and `scope` only exist on `monthly_spending`. The caller already
+  // rejects a changed type before this runs, so `previous.type === next.type`
+  // always holds; the check below is what lets TypeScript narrow both sides.
+  if (previous.type === MONTHLY_SPENDING_ALERT_TYPE && next.type === MONTHLY_SPENDING_ALERT_TYPE) {
+    if (
+      previous.configuration.period.type !== next.configuration.period.type ||
+      previous.configuration.period.version !== next.configuration.period.version
+    ) {
+      changed.push('period');
+    }
+    if (scopeChanged(previous.configuration.scope, next.configuration.scope)) {
+      changed.push('scope');
+    }
   }
   if (addedRecipients.length > 0 || recipients.length !== previousRecipients.size) {
     changed.push('recipients');
@@ -468,14 +571,16 @@ export async function updateOrganizationAlert(params: {
   if (change.addedRecipientCount > 0) {
     requireDisclosureConfirmation(params.recipientDisclosureConfirmed);
   }
-  // Adding an address, or changing threshold or period, is gated. Removing
-  // addresses is not, so losing entitlement cannot trap a disclosure. A
-  // threshold reduction is gated too: the spec gates any threshold or period
-  // change, not only ones that widen the disclosure.
+  // Adding an address, or changing threshold, period, or scope, is gated.
+  // Removing addresses is not, so losing entitlement cannot trap a
+  // disclosure. A threshold reduction is gated too: the spec gates any
+  // threshold, period, or scope change, not only ones that widen the
+  // disclosure.
   const requiresEntitlement =
     change.addedRecipientCount > 0 ||
     change.changed.includes('threshold') ||
-    change.changed.includes('period');
+    change.changed.includes('period') ||
+    change.changed.includes('scope');
   if (requiresEntitlement) {
     await requireOrganizationAlertEntitlement(params.organizationId);
   }

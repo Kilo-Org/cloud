@@ -1,6 +1,5 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, Info, X } from 'lucide-react';
 import { useState } from 'react';
 import { AlertEditorFooter } from '@/components/organizations/alerts/AlertEditorFooter';
@@ -10,49 +9,20 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { MAX_ORGANIZATION_ALERT_RECIPIENTS } from '@/lib/organizations/alerts/organization-alerts';
-import { useTRPC } from '@/lib/trpc/utils';
 import {
-  addMonthlySpendingRecipient,
-  buildMonthlySpendingSubmission,
-  monthlySpendingAdmissionNotice,
-  monthlySpendingDisclosureRequired,
-  monthlySpendingFormState,
-  type MonthlySpendingFormErrors,
-  type MonthlySpendingFormState,
-} from './monthly-spending-form';
+  addLowBalanceRecipient,
+  buildLowBalanceSubmission,
+  lowBalanceAdmissionNotice,
+  lowBalanceDisclosureRequired,
+  lowBalanceFormState,
+  type LowBalanceFormErrors,
+  type LowBalanceFormState,
+} from './low-balance-form';
 
-const THRESHOLD_ID = 'monthly-spending-threshold';
-const SCOPE_ID = 'monthly-spending-scope';
-const GROUP_ID = 'monthly-spending-group';
-const RECIPIENT_ID = 'monthly-spending-recipient';
-const DISCLOSURE_ID = 'monthly-spending-disclosure';
-
-/**
- * `organizations.groups.list` returns a different shape for a manager (every
- * group in the organization, with extra fields this picker does not need)
- * than for an ordinary member (only the groups they belong to, already
- * `{id, name, description}`). Normalized to one flat list here rather than in
- * the router, since that role-scoping is the groups feature's own access
- * model and this picker only needs to read it, not change it. A caller with
- * the `admin` role is inheriting that same member-shaped restriction today, so
- * they see only their own groups here too.
- */
-function useOrganizationGroupOptions(
-  organizationId: string
-): { id: string; name: string }[] | undefined {
-  const trpc = useTRPC();
-  const groupsQuery = useQuery(trpc.organizations.groups.list.queryOptions({ organizationId }));
-  if (!groupsQuery.data) return undefined;
-  return groupsQuery.data.groups.map(group => ({ id: group.id, name: group.name }));
-}
+const THRESHOLD_ID = 'low-balance-threshold';
+const RECIPIENT_ID = 'low-balance-recipient';
+const DISCLOSURE_ID = 'low-balance-disclosure';
 
 function FieldError({ id, message }: { id: string; message: string | undefined }) {
   if (!message) return null;
@@ -64,40 +34,37 @@ function FieldError({ id, message }: { id: string; message: string | undefined }
 }
 
 /**
- * Owns every Monthly Spending field and its validation. The shell contributes
- * only the generic lifecycle chrome, so a future alert type brings its own editor
+ * Owns every Low Balance field and its validation. The shell contributes only
+ * the generic lifecycle chrome, so a future alert type brings its own editor
  * instead of adding optional fields here.
  */
-export function MonthlySpendingAlertEditor({
+export function LowBalanceAlertEditor({
   context,
   onSave,
   isSaving,
   error,
   onCancel,
   lifecycle,
-}: OrganizationAlertEditorProps<'monthly_spending'>) {
+}: OrganizationAlertEditorProps<'low_balance'>) {
   const saved = context.definition.configuration;
-  const [state, setState] = useState<MonthlySpendingFormState>(() =>
-    monthlySpendingFormState(saved)
-  );
-  const [errors, setErrors] = useState<MonthlySpendingFormErrors>({});
+  const [state, setState] = useState<LowBalanceFormState>(() => lowBalanceFormState(saved));
+  const [errors, setErrors] = useState<LowBalanceFormErrors>({});
 
   // A new alert is saved enabled, so it needs a recipient; an existing alert
   // keeps whichever state it is already in.
   const willBeEnabled = lifecycle?.isEnabled ?? true;
-  const disclosureRequired = monthlySpendingDisclosureRequired({
+  const disclosureRequired = lowBalanceDisclosureRequired({
     state,
     mode: context.mode,
     saved,
   });
-  const admissionNotice = monthlySpendingAdmissionNotice(context.admittedRecipientCount);
+  const admissionNotice = lowBalanceAdmissionNotice(context.admittedRecipientCount);
   // Without entitlement the editor still saves, but only shrinking changes:
   // removing a recipient must never be trapped by a downgrade.
   const canExpand = context.canExpand;
-  const groupOptions = useOrganizationGroupOptions(context.organizationId);
 
   function addRecipient() {
-    const result = addMonthlySpendingRecipient(state);
+    const result = addLowBalanceRecipient(state);
     if (!result.ok) {
       setErrors(current => ({ ...current, pendingRecipient: result.error }));
       return;
@@ -115,7 +82,7 @@ export function MonthlySpendingAlertEditor({
   }
 
   function save() {
-    const submission = buildMonthlySpendingSubmission({
+    const submission = buildLowBalanceSubmission({
       state,
       mode: context.mode,
       saved,
@@ -140,10 +107,8 @@ export function MonthlySpendingAlertEditor({
           <AlertTitle>This alert only notifies people</AlertTitle>
           <AlertDescription>
             <p>
-              Kilo emails the recipients below when the measured AI usage spend of whatever this
-              alert measures reaches your amount during a UTC calendar month. It does not stop
-              usage, block models, or cap charges, and the amount excludes seats, Kilo Pass,
-              KiloClaw compute, Exa, and Coding Plans.
+              Kilo emails the recipients below as soon as this organization&apos;s AI usage balance
+              drops below your amount. It does not stop usage, block models, or cap charges.
             </p>
           </AlertDescription>
         </Alert>
@@ -166,7 +131,7 @@ export function MonthlySpendingAlertEditor({
             <AlertDescription>
               <p>
                 {context.mode === 'create'
-                  ? 'Monthly spending alerts can only be created by Enterprise organizations.'
+                  ? 'Low balance alerts can only be created by Enterprise organizations.'
                   : 'The amount and new recipients are locked while this organization is not on the Enterprise plan. Removing recipients, disabling, and archiving stay available.'}
               </p>
             </AlertDescription>
@@ -174,12 +139,12 @@ export function MonthlySpendingAlertEditor({
         )}
 
         <div className="grid gap-1.5">
-          <Label htmlFor={THRESHOLD_ID}>Notify at this month-to-date spend (USD)</Label>
+          <Label htmlFor={THRESHOLD_ID}>Notify when balance drops below (USD)</Label>
           <Input
             id={THRESHOLD_ID}
             className="tabular-nums"
             inputMode="decimal"
-            placeholder="500.00"
+            placeholder="50.00"
             value={state.thresholdUsd}
             disabled={!canExpand}
             aria-invalid={Boolean(errors.thresholdUsd)}
@@ -191,65 +156,10 @@ export function MonthlySpendingAlertEditor({
             }
           />
           <p id={`${THRESHOLD_ID}-help`} className="type-label text-muted-foreground">
-            Dollars and cents, measured from 00:00 UTC on the first of the month until the first of
-            the next month. Usage earlier in the current month already counts.
+            Dollars and cents. Kilo checks this every time usage is recorded, so notification
+            happens close to the moment the balance crosses below it.
           </p>
           <FieldError id={`${THRESHOLD_ID}-error`} message={errors.thresholdUsd} />
-        </div>
-
-        <div className="grid gap-1.5">
-          <Label htmlFor={SCOPE_ID}>Measure</Label>
-          <Select
-            value={state.scopeType}
-            disabled={!canExpand}
-            onValueChange={value => {
-              const scopeType = value as MonthlySpendingFormState['scopeType'];
-              setState(current => ({ ...current, scopeType }));
-              setErrors(current => ({ ...current, scope: undefined }));
-            }}
-          >
-            <SelectTrigger id={SCOPE_ID} className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="organization">Whole organization</SelectItem>
-              <SelectItem value="group">A specific group</SelectItem>
-            </SelectContent>
-          </Select>
-          <p id={`${SCOPE_ID}-help`} className="type-label text-muted-foreground">
-            A group measures whoever currently belongs to it: changing the group&apos;s members
-            changes what this alert measures, including for the rest of the current month.
-          </p>
-
-          {state.scopeType === 'group' && (
-            <>
-              <Select
-                value={state.groupId ?? undefined}
-                disabled={!canExpand}
-                onValueChange={groupId => {
-                  setState(current => ({ ...current, groupId }));
-                  setErrors(current => ({ ...current, scope: undefined }));
-                }}
-              >
-                <SelectTrigger
-                  id={GROUP_ID}
-                  className="w-full"
-                  aria-invalid={Boolean(errors.scope)}
-                  aria-describedby={errors.scope ? `${SCOPE_ID}-error` : undefined}
-                >
-                  <SelectValue placeholder="Choose a group" />
-                </SelectTrigger>
-                <SelectContent>
-                  {groupOptions?.map(group => (
-                    <SelectItem key={group.id} value={group.id}>
-                      {group.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldError id={`${SCOPE_ID}-error`} message={errors.scope} />
-            </>
-          )}
         </div>
 
         <div className="grid gap-1.5">
@@ -319,7 +229,7 @@ export function MonthlySpendingAlertEditor({
           {admissionNotice && (
             <Alert>
               <Info />
-              <AlertTitle>This month&apos;s recipients are already used up</AlertTitle>
+              <AlertTitle>This crossing&apos;s recipients are already used up</AlertTitle>
               <AlertDescription>
                 <p>{admissionNotice}</p>
               </AlertDescription>
@@ -343,19 +253,13 @@ export function MonthlySpendingAlertEditor({
                 }
               />
               <span className="type-body">
-                I confirm every address above may receive this organization&apos;s name and the
-                measured month-to-date AI usage spend this alert covers.
+                I confirm every address above may receive this organization&apos;s name and its
+                measured AI usage balance.
               </span>
             </label>
             <FieldError id={`${DISCLOSURE_ID}-error`} message={errors.disclosure} />
           </div>
         )}
-
-        <p className="type-label text-muted-foreground">
-          When you save, Kilo evaluates the full current month in the background and may queue email
-          right away if the amount has already been reached. Saving does not wait for that
-          evaluation, and measured amounts may lag recent usage.
-        </p>
       </div>
 
       <AlertEditorFooter

@@ -85,8 +85,20 @@ export function useQuickChat(model: string) {
     nextCursorRef.current = null;
     setOlderError(null);
     setIsLoadingOlder(false);
+    olderLoadingRef.current = false;
     pageResetRef.current += 1;
   }, [scopeKey]);
+
+  // A plain unmount (flag-off redirect, tab teardown) leaves no scope-change:
+  // the effect above returns early on the first mount, so it never registers a
+  // cleanup. Abort the in-flight stream here so a completion never outlives the
+  // screen.
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+    },
+    []
+  );
 
   // Resolve the thread id for the transcript list's reset key. The id is
   // cosmetic: listMessages/appendMessages resolve the thread server-side. The
@@ -129,6 +141,11 @@ export function useQuickChat(model: string) {
       setOlderRows([]);
       nextCursorRef.current = data.nextCursor;
       setNextCursor(data.nextCursor);
+      // A reset bumps `pageResetRef`, which makes an in-flight older load drop
+      // its result and skip releasing the lock in its `finally`. Release the
+      // lock here so pagination is not stuck behind the stale load.
+      olderLoadingRef.current = false;
+      setIsLoadingOlder(false);
     }
   }, [listQuery.data]);
 
@@ -161,8 +178,13 @@ export function useQuickChat(model: string) {
         }
         setOlderError({ kind: 'retryable' });
       } finally {
-        olderLoadingRef.current = false;
-        setIsLoadingOlder(false);
+        // Only the load that still owns the reset generation clears the lock:
+        // a stale load's finally must not clobber a newer load's
+        // `olderLoadingRef`/loading indicator.
+        if (pageResetRef.current === resetGen) {
+          olderLoadingRef.current = false;
+          setIsLoadingOlder(false);
+        }
       }
     })();
   };

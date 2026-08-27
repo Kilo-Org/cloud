@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useFocusEffect, useNavigation } from 'expo-router';
 
 import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
@@ -30,6 +31,7 @@ const noopCreateSession = () => {
  */
 export function SessionHistoryScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const {
@@ -98,6 +100,33 @@ export function SessionHistoryScreen() {
     isSearching,
     isFetching: search.isFetching,
   });
+
+  // Pushed-sibling focus refetch: fires on first push and on return from a
+  // pushed detail screen, so a session that ended on the live tab appears in
+  // history without a manual pull. Runs through the wrapped stored refetch.
+  const handleRefetchRef = useRef(handleRefetch);
+  useEffect(() => {
+    handleRefetchRef.current = handleRefetch;
+  }, [handleRefetch]);
+  useFocusEffect(
+    useCallback(() => {
+      void handleRefetchRef.current();
+    }, [])
+  );
+
+  // App-foreground refresh for stored history. `navigation.isFocused()` is
+  // read live because a frozen (unfocused) tab does not re-render. History
+  // shows no tray, so only stored queries are touched.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active' && navigation.isFocused()) {
+        void handleRefetchRef.current();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [navigation]);
 
   const navigateToSession = useAgentSessionNavigator();
 

@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as session-list-screen.mounted.test.tsx) */
+/* eslint-disable max-lines, typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; max-lines holds the focus and foreground refetch tests beside the existing render-branch assertions in one mount test. */
 import { createElement, type ReactElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,8 +11,41 @@ const listState = vi.hoisted(() => ({
   isSearching: false,
 }));
 
+const appState = vi.hoisted(() => {
+  const listeners = new Set<(state: string) => void>();
+  return {
+    listeners,
+    addEventListener: (_event: string, listener: (state: string) => void) => {
+      listeners.add(listener);
+      return {
+        remove: () => {
+          listeners.delete(listener);
+        },
+      };
+    },
+    emit: (state: string): void => {
+      for (const listener of listeners) {
+        listener(state);
+      }
+    },
+  };
+});
+
+const focusState = vi.hoisted(() => ({ current: true as boolean }));
+const focusCallbacks = vi.hoisted(() => ({
+  current: [] as (() => void)[],
+}));
+const handleRefetchSpy = vi.hoisted(() => vi.fn());
+
 vi.mock('react-native', () => ({
   View: 'View',
+  AppState: { addEventListener: appState.addEventListener },
+}));
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ isFocused: () => focusState.current }),
+  useFocusEffect: (effect: () => void) => {
+    focusCallbacks.current.push(effect);
+  },
 }));
 vi.mock('@/components/agents/session-list-content', () => ({
   AgentSessionListContent: 'AgentSessionListContent',
@@ -65,7 +98,7 @@ vi.mock('@/components/agents/use-agent-session-list-data', () => ({
     },
     refetch: vi.fn(),
     handleRetry: vi.fn(),
-    handleRefetch: vi.fn(),
+    handleRefetch: handleRefetchSpy,
     isSearching: listState.isSearching,
     search: { isFetching: false, isPending: false },
     projectOptions: [],
@@ -114,6 +147,12 @@ function findNodeByType(
   return renderer.root.find(node => typeof node.type === 'string' && node.type === type);
 }
 
+function fireFocus(): void {
+  for (const effect of focusCallbacks.current) {
+    effect();
+  }
+}
+
 async function renderScreen(): Promise<TestRenderer.ReactTestRenderer> {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
@@ -135,6 +174,10 @@ describe('SessionHistoryScreen', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     listState.storedSessions = [];
     listState.isSearching = false;
+    focusState.current = true;
+    focusCallbacks.current = [];
+    handleRefetchSpy.mockClear();
+    handleRefetchSpy.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -144,6 +187,7 @@ describe('SessionHistoryScreen', () => {
       }
     });
     mountedRenderers.length = 0;
+    appState.listeners.clear();
     vi.restoreAllMocks();
   });
 
@@ -196,5 +240,46 @@ describe('SessionHistoryScreen', () => {
     const content = findNodeByType(renderer, 'AgentSessionListContent');
     expect(content.props.hasActiveQuery).toBe(true);
     expect(content.props.hasAnySessions).toBe(true);
+  });
+
+  it('refetches stored sessions through the wrapped refetch on route focus', async () => {
+    await renderScreen();
+
+    act(() => {
+      fireFocus();
+    });
+    expect(handleRefetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetches stored sessions on foreground while focused', async () => {
+    await renderScreen();
+
+    act(() => {
+      fireFocus();
+    });
+    expect(handleRefetchSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      appState.emit('background');
+    });
+    act(() => {
+      appState.emit('active');
+    });
+
+    expect(handleRefetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not refetch stored sessions on foreground while unfocused', async () => {
+    focusState.current = false;
+    await renderScreen();
+
+    act(() => {
+      appState.emit('background');
+    });
+    act(() => {
+      appState.emit('active');
+    });
+
+    expect(handleRefetchSpy).not.toHaveBeenCalled();
   });
 });

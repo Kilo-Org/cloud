@@ -47,10 +47,10 @@ export function useAgentSessionListData(options: {
     organizationId,
     enabled: ready,
     sortBy,
-    // The Agents screen drives app-foreground refresh through the AppState
-    // 'active' listener and the wrapped `refetch`, so the stored query opts
-    // out of React Query's native window-focus refetch (Home and the Share
-    // Gate keep the native default through `buildStoredSessionsQueryOptions`).
+    // The history screen drives focus and app-foreground refresh through the
+    // AppState 'active' listener and the wrapped `handleRefetch`, so the stored
+    // query opts out of React Query's native window-focus refetch (Home and the
+    // Share Gate keep the native default through `buildStoredSessionsQueryOptions`).
     refetchOnWindowFocus: false,
   });
   const isSearching = searchQuery.length > 0;

@@ -77,7 +77,9 @@ function parseStoredSnapshot(raw: string): GlanceableAgentsSnapshot | null {
 /**
  * Restore the in-memory state from SecureStore after a JS restart. Best
  * effort: a failed read keeps the null in-memory state. A live write during
- * the read owns the state, so the stale persisted record is skipped.
+ * the read owns the state, so the stale persisted record is skipped. An
+ * already-set in-memory state (a remount) is never overwritten: only a real
+ * JS restart starts null and must restore from the persisted record.
  */
 export async function restorePersistedGlanceable(): Promise<void> {
   const startEpoch = persistEpoch;
@@ -90,13 +92,16 @@ export async function restorePersistedGlanceable(): Promise<void> {
     if (persistEpoch !== startEpoch) {
       return;
     }
-    if (rawSnapshot !== null) {
+    // A remount keeps the module alive, so a logout or privacy blank written
+    // before restore owns the state and must not be clobbered by a stale disk
+    // record from the prior session.
+    if (rawSnapshot !== null && lastSnapshot === null) {
       const parsed = parseStoredSnapshot(rawSnapshot);
       if (parsed !== null) {
         lastSnapshot = parsed;
       }
     }
-    if (rawScope !== null) {
+    if (rawScope !== null && localScopeKey === null) {
       localScopeKey = rawScope;
     }
   } catch {

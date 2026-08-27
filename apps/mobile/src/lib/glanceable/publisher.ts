@@ -149,6 +149,9 @@ export class GlanceablePublisher {
     if (this.applyExpiry(now, ctx) || this.current === null) {
       return;
     }
+    // A fetch error supersedes any pending coalesced happy emit: otherwise the
+    // pre-error snapshot would fire later and overwrite the stale counts.
+    this.cancelCoalesce();
     const snapshot = withStatus(this.current, 'stale', now);
     this.publish(snapshot);
     this.current = snapshot;
@@ -159,9 +162,16 @@ export class GlanceablePublisher {
    * are discarded; the local account epoch is applied by the caller.
    */
   applySnapshot(incoming: GlanceableAgentsSnapshot, ctx: GlanceablePublisherContext): void {
+    if (this.isGated()) {
+      return;
+    }
     if (this.current !== null && shouldDiscardGlanceableRevision(incoming, this.current)) {
       return;
     }
+    // A late background delivery supersedes a pending coalesced emit and any
+    // pending 8 s terminal, so neither can fire after the newer snapshot.
+    this.cancelCoalesce();
+    this.cancelTerminal();
     if (isEligibleGlanceableWork(incoming)) {
       this.emit(incoming, ctx);
       this.activityStarted = true;

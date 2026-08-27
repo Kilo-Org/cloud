@@ -282,6 +282,7 @@ export type GetSessionOutput = {
 
   // Repository info (no tokens)
   githubRepo?: string;
+  githubIntegrationId?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
 

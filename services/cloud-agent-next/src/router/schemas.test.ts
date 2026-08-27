@@ -628,6 +628,17 @@ describe('message ID schema validation', () => {
       }).success
     ).toBe(true);
     expect(
+      GetSessionOutput.safeParse({
+        sessionId: validSessionId,
+        userId: 'user_test',
+        githubRepo: 'acme/repo',
+        githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+        execution: null,
+        timestamp: 1,
+        version: 1,
+      }).success
+    ).toBe(true);
+    expect(
       ExecutionResponse.safeParse({
         cloudAgentSessionId: validSessionId,
         status: 'started',

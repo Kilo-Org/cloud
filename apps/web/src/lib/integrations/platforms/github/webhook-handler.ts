@@ -466,7 +466,11 @@ export async function handleGitHubWebhook(
       ? await getIntegrationForOrganization(integration.owned_by_organization_id, PLATFORM.GITHUB)
       : integration;
     const isSecondaryOrganizationInstallation = primaryIntegration?.id !== integration.id;
-    if (isSecondaryOrganizationInstallation && eventType !== GITHUB_EVENT.PULL_REQUEST) {
+    if (
+      isSecondaryOrganizationInstallation &&
+      eventType !== GITHUB_EVENT.PULL_REQUEST &&
+      eventType !== GITHUB_EVENT.PULL_REQUEST_REVIEW
+    ) {
       logExceptInTest('Secondary GitHub installation event suppressed', {
         integration_id: integration.id,
         event_type: eventType,
@@ -529,21 +533,19 @@ export async function handleGitHubWebhook(
       // to avoid blocking the webhook response — when a matching session is on
       // a supported platform the function makes an outbound GitHub GraphQL
       // call, which can add significant latency.
-      const upsertOwner = isSecondaryOrganizationInstallation
-        ? null
-        : integration.owned_by_organization_id
+      const upsertOwner = integration.owned_by_organization_id
+        ? ({
+            kind: 'organization',
+            organizationId: integration.owned_by_organization_id,
+            platformIntegrationId: integration.id,
+          } as const)
+        : integration.owned_by_user_id
           ? ({
-              kind: 'organization',
-              organizationId: integration.owned_by_organization_id,
+              kind: 'user',
+              userId: integration.owned_by_user_id,
               platformIntegrationId: integration.id,
             } as const)
-          : integration.owned_by_user_id
-            ? ({
-                kind: 'user',
-                userId: integration.owned_by_user_id,
-                platformIntegrationId: integration.id,
-              } as const)
-            : null;
+          : null;
 
       // `closed` events are not routed to the code-review pipeline.
       if (action === GITHUB_ACTION.CLOSED) {
@@ -614,9 +616,17 @@ export async function handleGitHubWebhook(
       }
 
       const upsertOwner = integration.owned_by_organization_id
-        ? ({ kind: 'organization', organizationId: integration.owned_by_organization_id } as const)
+        ? ({
+            kind: 'organization',
+            organizationId: integration.owned_by_organization_id,
+            platformIntegrationId: integration.id,
+          } as const)
         : integration.owned_by_user_id
-          ? ({ kind: 'user', userId: integration.owned_by_user_id } as const)
+          ? ({
+              kind: 'user',
+              userId: integration.owned_by_user_id,
+              platformIntegrationId: integration.id,
+            } as const)
           : null;
 
       if (upsertOwner) {

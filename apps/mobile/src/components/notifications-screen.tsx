@@ -455,9 +455,14 @@ export function NotificationsScreen() {
     setIsTogglingPermission(true);
     try {
       const result = await Notifications.requestPermissionsAsync();
-      const granted =
-        result.status === Notifications.PermissionStatus.GRANTED || result.granted;
-      emitNotificationPermissionResponded(granted);
+      const granted = result.status === Notifications.PermissionStatus.GRANTED || result.granted;
+      // Only a live permission request emits an outcome. A pre-granted status
+      // returns without prompting, so emitting here would report a spurious
+      // `notification_permission_responded: granted`. This matches the
+      // invariant `registerForPushNotifications` enforces for its own request.
+      if (currentStatus !== 'granted') {
+        emitNotificationPermissionResponded(granted);
+      }
       void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
       if (granted) {
         // Keep `isTogglingPermission` set through token registration so the

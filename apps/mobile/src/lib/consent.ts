@@ -181,8 +181,10 @@ export async function setOptionalConsent(userId: string, optional: boolean): Pro
     // Enable-side: queue the outcome and let the ready listener capture it.
     pendingConsentOutcome = { action: 'optional_changed', optional: true };
   } else {
-    // Disable-side: capture and flush before notifying so the turn-off lands
-    // while optional telemetry is still allowed.
+    // Disable-side: clear a queued enable outcome so it can never fire after
+    // the user disabled, then capture and flush before notifying so the
+    // turn-off lands while optional telemetry is still allowed.
+    pendingConsentOutcome = null;
     captureEvent(CONSENT_OUTCOME_EVENT, { action: 'optional_changed', optional: false });
     await flushLastPostHogEvent();
   }

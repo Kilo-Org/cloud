@@ -514,6 +514,20 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(texts).toContain('No transcript for this review.');
   });
 
+  it('shows empty copy when a completed non-v2 review has stale stream info', () => {
+    spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'running', agentVersion: 'v1' });
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'completed' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain('No transcript for this review.');
+    expect(texts).not.toContain('Waiting for the review transcript.');
+  });
+
   it('shows Retry when stream info fails', () => {
     spectatorQueries.streamInfo.data = { success: false, error: 'boom' };
     detail.data = {

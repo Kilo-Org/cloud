@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { useWindowDimensions, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 
-import { isInFlightReviewStatus } from '@kilocode/app-shared/code-review';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import { CompactRetry } from '@/components/code-reviewer/review-spectator-retry';
 import {
   appendSpectatorRow,
   formatSpectatorTime,
@@ -20,7 +20,6 @@ import {
 } from '@/components/code-reviewer/review-spectator-stream';
 import { useRefetchSessionMessagesOnTerminal } from '@/components/code-reviewer/review-spectator-terminal-refetch';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useTRPC } from '@/lib/trpc';
 
@@ -94,7 +93,8 @@ export function ReviewSpectator({
 
   const info = streamInfo.data?.success ? streamInfo.data : null;
   const effectiveStatus = info?.status ?? status;
-  const isTerminal = TERMINAL_REVIEW_STATUSES.has(effectiveStatus);
+  const isTerminal =
+    TERMINAL_REVIEW_STATUSES.has(effectiveStatus) || TERMINAL_REVIEW_STATUSES.has(status);
   const isHistorical = info !== null && info.agentVersion !== 'v2';
   const shouldLoadHistory = info !== null && (isHistorical || isTerminal) && liveRows.length === 0;
   const cloudAgentSessionId = info?.cloudAgentSessionId ?? null;
@@ -182,12 +182,20 @@ export function ReviewSpectator({
 
   const transcriptRows = shouldLoadHistory ? historicalRows : liveRows;
   const transcriptHeight = Math.min(360, Math.max(200, windowHeight * 0.35));
-  const isInFlight = isInFlightReviewStatus(effectiveStatus);
 
   function renderSkeletonSlot() {
     return (
       <View style={{ height: transcriptHeight }}>
         <SessionSkeletonMessages />
+      </View>
+    );
+  }
+
+  function renderRowsWithRetry(onRetry: () => void) {
+    return (
+      <View>
+        {renderRowsSlot()}
+        <CompactRetry onPress={onRetry} />
       </View>
     );
   }
@@ -204,18 +212,12 @@ export function ReviewSpectator({
           </View>
         ) : null}
         {liveError && isLiveCloud ? (
-          <View className="items-center px-4 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onPress={() => {
-                setLiveError(false);
-                setRetryNonce(count => count + 1);
-              }}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          </View>
+          <CompactRetry
+            onPress={() => {
+              setLiveError(false);
+              setRetryNonce(count => count + 1);
+            }}
+          />
         ) : null}
         <SessionMessageList<SpectatorRow>
           sessionId={reviewId}
@@ -238,22 +240,9 @@ export function ReviewSpectator({
     }
     if (streamInfo.isError || (streamInfo.data && !streamInfo.data.success)) {
       if (liveRows.length > 0) {
-        return (
-          <View>
-            {renderRowsSlot()}
-            <View className="items-center px-4 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onPress={() => {
-                  void streamInfo.refetch();
-                }}
-              >
-                <Text>{t('common.retry')}</Text>
-              </Button>
-            </View>
-          </View>
-        );
+        return renderRowsWithRetry(() => {
+          void streamInfo.refetch();
+        });
       }
       return (
         <QueryError
@@ -272,6 +261,11 @@ export function ReviewSpectator({
         return renderSkeletonSlot();
       }
       if (sessionMessages.isError || !sessionMessages.data?.success) {
+        if (historicalRows.length > 0) {
+          return renderRowsWithRetry(() => {
+            void sessionMessages.refetch();
+          });
+        }
         return (
           <QueryError
             variant="server"
@@ -289,9 +283,9 @@ export function ReviewSpectator({
       return (
         <SpectatorCopy
           message={
-            isInFlight
-              ? t('codeReviewer.reviewDetail.transcriptWaiting')
-              : t('codeReviewer.reviewDetail.transcriptEmpty')
+            isTerminal
+              ? t('codeReviewer.reviewDetail.transcriptEmpty')
+              : t('codeReviewer.reviewDetail.transcriptWaiting')
           }
         />
       );

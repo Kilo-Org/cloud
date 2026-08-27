@@ -28,6 +28,7 @@ export type RestoreResult =
       step: 'download' | 'import' | 'diffs';
       subtype?: WorkspaceFailureSubtype;
       detail?: string;
+      emptySnapshot?: true;
     };
 
 type SnapshotDiff = {
@@ -44,6 +45,7 @@ export type RestoreSessionOptions = {
 };
 
 const KILO_IMPORT_TIMEOUT_MS = 120_000;
+const EMPTY_SESSION_INGEST_EXPORT = '{"info":{},"messages":[],"sessionDiff":[]}';
 const JQ_SANITIZE_TOKEN_COUNTS_FILTER =
   'walk(if type == "object" and ((.tokens? | type) == "object") then .tokens |= walk(if type == "number" and . < 0 then 0 else . end) else . end)';
 // Drop leftover CLI UI progress parts (metadata.kilocode.lifecycle == "transient").
@@ -75,7 +77,7 @@ function fail(
   step: Extract<RestoreResult, { ok: false }>['step'],
   subtype?: WorkspaceFailureSubtype,
   detail?: string
-): RestoreResult {
+): Extract<RestoreResult, { ok: false }> {
   return {
     ok: false,
     error,
@@ -756,12 +758,20 @@ export async function restoreSession(
         return fail('snapshot not found (empty export)', 404, 'download');
       }
       if (snapshotInfoValidation.validation === 'missing') {
-        log('snapshot missing info.id — likely an error response');
-        return fail(
+        const result = fail(
           `snapshot missing info.id (${bytesWritten} bytes); session-ingest may have returned an error body`,
           null,
           'download'
         );
+        if (
+          bytesWritten === EMPTY_SESSION_INGEST_EXPORT.length &&
+          (await Bun.file(tmpPath).text()) === EMPTY_SESSION_INGEST_EXPORT
+        ) {
+          log('snapshot contains no session metadata or history');
+          return { ...result, emptySnapshot: true };
+        }
+        log('snapshot missing info.id — likely an error response');
+        return result;
       }
     } catch {
       tryUnlink(tmpPath);

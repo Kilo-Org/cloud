@@ -268,9 +268,9 @@ function signTerminalTicket(overrides: Record<string, unknown> = {}): string {
   );
 }
 
-function terminalRequest(ticket: string): Request {
+function terminalRequest(ticket: string, sessionId = 'session-1'): Request {
   return new Request(
-    `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty-1&ticket=${encodeURIComponent(ticket)}`,
+    `http://worker.test/terminal?cloudAgentSessionId=${encodeURIComponent(sessionId)}&ptyId=pty-1&ticket=${encodeURIComponent(ticket)}`,
     { headers: { Upgrade: 'websocket' } }
   );
 }
@@ -418,6 +418,58 @@ describe('server /terminal ticket nonce consume', () => {
     expect(replay.status).toBe(401);
     await expect(replay.text()).resolves.toBe('Ticket nonce already used');
     expect(connectTerminal).toHaveBeenCalledTimes(1);
+  });
+
+  it('consumes a control-plane terminal nonce exactly once before forwarding the browser upgrade', async () => {
+    const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const env = createEnv();
+    const consumedNonces = installNonceStore(env);
+    const sessionFetch = vi.fn().mockResolvedValue(new Response('bridged', { status: 200 }));
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: sessionFetch });
+    const ticket = signTerminalTicket({ cloudAgentSessionId: sessionId });
+
+    const first = await fetchWorker(terminalRequest(ticket, sessionId), env);
+
+    expect(first.status).toBe(200);
+    expect(consumedNonces).toEqual(new Set(['nonce-1']));
+    expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(`user-1:${sessionId}`);
+    expect(sessionFetch).toHaveBeenCalledOnce();
+    const forwarded = sessionFetch.mock.calls[0]?.[0] as Request;
+    expect(new URL(forwarded.url).search).toBe('?ptyId=pty-1');
+
+    const replay = await fetchWorker(terminalRequest(ticket, sessionId), env);
+
+    expect(replay.status).toBe(401);
+    await expect(replay.text()).resolves.toBe('Ticket nonce already used');
+    expect(consumedNonces).toEqual(new Set(['nonce-1']));
+    expect(sessionFetch).toHaveBeenCalledOnce();
+  });
+
+  it('does not consume a control-plane terminal nonce when current session access is denied', async () => {
+    const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const env = createEnv();
+    const consumedNonces = installNonceStore(env);
+    const sessionFetch = vi.fn().mockResolvedValue(new Response('bridged', { status: 200 }));
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: sessionFetch });
+    requireCurrentSessionAccessMock.mockRejectedValueOnce(
+      Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
+    );
+    const ticket = signTerminalTicket({ cloudAgentSessionId: sessionId });
+
+    const denied = await fetchWorker(terminalRequest(ticket, sessionId), env);
+
+    expect(denied.status).toBe(403);
+    expect(consumedNonces.size).toBe(0);
+    expect(env.STREAM_TICKET_NONCE_DO.idFromName).not.toHaveBeenCalled();
+    expect(sessionFetch).not.toHaveBeenCalled();
+
+    const authorized = await fetchWorker(terminalRequest(ticket, sessionId), env);
+
+    expect(authorized.status).toBe(200);
+    expect(consumedNonces).toEqual(new Set(['nonce-1']));
+    expect(sessionFetch).toHaveBeenCalledOnce();
   });
 });
 

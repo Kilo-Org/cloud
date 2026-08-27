@@ -6,6 +6,7 @@ import {
   _resetGlanceablePersistForTests,
   _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
+  persistGlanceableSink,
 } from '@/lib/glanceable/persist';
 import { registerGlanceableSink, unregisterGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -344,6 +345,10 @@ describe('applyGlanceablePushData', () => {
     mockSecureStoreKeys();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('discards a remote snapshot that is not newer than the last applied snapshot', async () => {
     _setLastGlanceableSnapshotForTests(
       glanceableSnapshot({
@@ -392,6 +397,97 @@ describe('applyGlanceablePushData', () => {
       userId: 'u1',
       organizationId: 'org-9',
     });
+
+    unregisterGlanceableSink(sink);
+  });
+
+  it('ends the sinks after the terminal window for a non-eligible remote snapshot', async () => {
+    vi.useFakeTimers();
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({
+        scopeKey: 'scope-1',
+        revision: 3,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    );
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+
+    const result = await applyGlanceablePushData(
+      activeGlanceablePush({
+        scopeKey: 'scope-1',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        status: 'empty',
+        running: 0,
+        needsInput: 0,
+        reconnecting: 0,
+        eligibleStartedAt: null,
+      })
+    );
+
+    expect(result).toBe(true);
+    // The empty snapshot is published (widgets keep the latest counts), but
+    // the Live Activity / ongoing is not ended until the terminal window.
+    expect(sink.publish).toHaveBeenCalledTimes(1);
+    expect(sink.startOrUpdate).not.toHaveBeenCalled();
+    expect(sink.endImmediate).not.toHaveBeenCalled();
+
+    // The persist sink writes the empty snapshot before the terminal fires, so
+    // the fire-time eligibility guard sees non-eligible work and ends it.
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({
+        scopeKey: 'scope-1',
+        revision: 4,
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        status: 'empty',
+        running: 0,
+        needsInput: 0,
+        reconnecting: 0,
+        eligibleStartedAt: null,
+      })
+    );
+
+    vi.advanceTimersByTime(8000);
+    expect(sink.endImmediate).toHaveBeenCalledTimes(1);
+
+    unregisterGlanceableSink(sink);
+  });
+
+  it('cancels the pending terminal when a newer eligible snapshot arrives', async () => {
+    vi.useFakeTimers();
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({
+        scopeKey: 'scope-1',
+        revision: 3,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    );
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+
+    await applyGlanceablePushData(
+      activeGlanceablePush({
+        scopeKey: 'scope-1',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        status: 'empty',
+        running: 0,
+        needsInput: 0,
+        reconnecting: 0,
+        eligibleStartedAt: null,
+      })
+    );
+    await applyGlanceablePushData(
+      activeGlanceablePush({
+        scopeKey: 'scope-1',
+        updatedAt: '2026-01-03T00:00:00.000Z',
+        organizationBound: true,
+      })
+    );
+
+    vi.advanceTimersByTime(8000);
+    // The later eligible snapshot cancelled the 8s terminal: work restarted,
+    // so the activity must not end.
+    expect(sink.endImmediate).not.toHaveBeenCalled();
 
     unregisterGlanceableSink(sink);
   });

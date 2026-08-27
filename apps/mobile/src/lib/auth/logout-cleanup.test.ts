@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive logout-cleanup suite: runLogoutCleanup and the account/org-switch activity unregister share the SecureStore and delivery mocks */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
@@ -53,7 +54,11 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   clearScopePrefix: vi.fn(),
 }));
 
-import { readLogoutCleanupTombstone, runLogoutCleanup } from '@/lib/auth/logout-cleanup';
+import {
+  readLogoutCleanupTombstone,
+  runLogoutCleanup,
+  unregisterActivityTokensAndTombstone,
+} from '@/lib/auth/logout-cleanup';
 import { getDevicePushTokenOutcome } from '@/lib/notifications';
 import { getActiveToken } from '@/lib/auth/token-owner';
 import { queryClient } from '@/lib/query-client';
@@ -320,5 +325,72 @@ describe('runLogoutCleanup', () => {
     store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify(persisted));
 
     await expect(readLogoutCleanupTombstone()).resolves.toEqual(expected);
+  });
+});
+
+describe('unregisterActivityTokensAndTombstone', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.clear();
+    seedUser('u1');
+    deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: [] });
+  });
+
+  it('unregisters the activity tokens and writes no tombstone on success', async () => {
+    deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: ['a1', 'a2'] });
+
+    await expect(unregisterActivityTokensAndTombstone()).resolves.toBeUndefined();
+
+    expect(deliveryMock.unregisterTokens).toHaveBeenCalledTimes(1);
+    expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
+  });
+
+  it('tombstones the recorded activity tokens when the unregister fails', async () => {
+    deliveryMock.unregisterTokens.mockResolvedValue({
+      ok: false,
+      tokens: ['activity-token-1', 'activity-token-2'],
+    });
+
+    await unregisterActivityTokensAndTombstone();
+
+    const tombstone = await readLogoutCleanupTombstone();
+    expect(tombstone).toMatchObject({
+      userId: 'u1',
+      pushToken: null,
+      needsPushUnregister: false,
+      needsActivityUnregister: true,
+      activityTokens: ['activity-token-1', 'activity-token-2'],
+    });
+  });
+
+  it('leaves an existing tombstone untouched on success so a pending push unregister survives', async () => {
+    store.set(
+      LOGOUT_CLEANUP_TOMBSTONE_KEY,
+      JSON.stringify({
+        userId: 'u1',
+        pushToken: 'push-1',
+        needsPushUnregister: true,
+        needsActivityUnregister: false,
+        activityTokens: [],
+        failedAt: 1_700_000_000_000,
+      })
+    );
+    deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: ['a1'] });
+
+    await unregisterActivityTokensAndTombstone();
+
+    const tombstone = await readLogoutCleanupTombstone();
+    expect(tombstone).toMatchObject({
+      needsPushUnregister: true,
+      pushToken: 'push-1',
+      needsActivityUnregister: false,
+    });
+  });
+
+  it('never throws when the unregister itself rejects', async () => {
+    deliveryMock.unregisterTokens.mockRejectedValue(new Error('network down'));
+
+    await expect(unregisterActivityTokensAndTombstone()).resolves.toBeUndefined();
+    expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
   });
 });

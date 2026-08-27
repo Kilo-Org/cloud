@@ -14,11 +14,13 @@ import {
   pushDataSchema,
 } from '@kilocode/notifications';
 import {
+  GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import {
   getLastGlanceableSnapshot,
   getLocalScopeKey,
@@ -62,6 +64,43 @@ export function parseNotificationData(data: unknown): PushData | null {
   return parsed.success ? parsed.data : null;
 }
 
+// Pending 8 s terminal end for a non-eligible remote snapshot. Mirrors the
+// in-app publisher's terminal window: publish the empty counts, then end the
+// Live Activity / Android ongoing after GLANCEABLE_TERMINAL_MS. A newer
+// eligible snapshot cancels it, and the terminal-blank epoch gate skips a
+// stale end after a logout/org switch already ended the surface.
+let glanceableTerminalTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelGlanceableTerminalEnd(): void {
+  if (glanceableTerminalTimer !== null) {
+    clearTimeout(glanceableTerminalTimer);
+    glanceableTerminalTimer = null;
+  }
+}
+
+function scheduleGlanceableTerminalEnd(): void {
+  cancelGlanceableTerminalEnd();
+  const blankEpoch = getTerminalBlankEpoch();
+  glanceableTerminalTimer = setTimeout(() => {
+    glanceableTerminalTimer = null;
+    // A terminal blank (logout/org switch) that landed during the window
+    // already ended the surface; do not end the new scope's activity.
+    if (getTerminalBlankEpoch() !== blankEpoch) {
+      return;
+    }
+    // Eligible work published during the window restarted the activity (the
+    // in-app publisher owns the foreground path and never cancels this timer);
+    // do not end a restarted activity.
+    const last = getLastGlanceableSnapshot();
+    if (last !== null && isEligibleGlanceableWork(last)) {
+      return;
+    }
+    for (const sink of getGlanceableSinks()) {
+      sink.endImmediate();
+    }
+  }, GLANCEABLE_TERMINAL_MS);
+}
+
 /**
  * Apply an `active_agents_glanceable` background push to the glanceable sinks
  * (widgets, Android ongoing, iOS Live Activity). Returns false when the push
@@ -102,6 +141,7 @@ export async function applyGlanceablePushData(
 
   const ctx = { userId, organizationId };
   if (isEligibleGlanceableWork(snapshot)) {
+    cancelGlanceableTerminalEnd();
     for (const sink of getGlanceableSinks()) {
       sink.publish(snapshot);
       sink.startOrUpdate(snapshot, ctx);
@@ -110,6 +150,10 @@ export async function applyGlanceablePushData(
     for (const sink of getGlanceableSinks()) {
       sink.publish(snapshot);
     }
+    // A remote snapshot with no eligible work must end the Live Activity and
+    // the Android ongoing after the terminal window; widgets keep the last
+    // published counts (their endImmediate is a no-op).
+    scheduleGlanceableTerminalEnd();
   }
   return true;
 }

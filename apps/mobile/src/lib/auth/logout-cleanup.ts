@@ -161,3 +161,43 @@ export async function runLogoutCleanup(): Promise<void> {
     });
   }
 }
+
+/**
+ * Unregister the recorded activity tokens (Live Activity / push-to-start) and
+ * tombstone a failure, WITHOUT revoking the device session or unregistering
+ * the Expo push token (those are logout-only). Never throws by contract.
+ *
+ * Called on account switch (`signIn`) and org switch (`setOrganizationId`),
+ * where the prior scope's activity tokens must stop receiving APNs before the
+ * new scope registers its own. The cached user id is read before any switch
+ * clears it, so a failed unregister tombstones the prior account's identity —
+ * the same ordering `runLogoutCleanup` relies on. A successful unregister
+ * leaves any existing tombstone untouched: only a full logout deletes it, so a
+ * pending push unregister survives a switch.
+ */
+export async function unregisterActivityTokensAndTombstone(): Promise<void> {
+  try {
+    const userId = readCachedUserId(queryClient);
+    const result = await getGlanceableDelivery().unregisterTokens();
+    if (result.ok) {
+      return;
+    }
+    await writeLogoutCleanupTombstone({
+      userId,
+      pushToken: null,
+      needsPushUnregister: false,
+      needsActivityUnregister: true,
+      activityTokens: result.tokens,
+      failedAt: Date.now(),
+    });
+  } catch (error) {
+    // Never throw: a failed unregister or tombstone write must not block the
+    // account or org switch.
+    Sentry.captureException(error, {
+      tags: {
+        'error.subsystem': 'auth',
+        'error.operation': 'unregister_activity_tokens',
+      },
+    });
+  }
+}

@@ -11,6 +11,7 @@ import {
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import { writePrivacySnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
@@ -70,6 +71,11 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       // Blank the current surface before the selection changes so the prior
       // org's counts are never shown under the next org.
       writePrivacySnapshotAndEnd();
+      // Unregister the prior org's activity tokens (Live Activity /
+      // push-to-start) so APNs stops targeting this device for the old scope.
+      // Same-account switch: never revokes the device session or unregisters
+      // the Expo push token (logout-only).
+      void unregisterActivityTokensAndTombstone();
       setOrgState(id);
       if (id) {
         void setAccountMetadata(ORGANIZATION_STORAGE_KEY, id);

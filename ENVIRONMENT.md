@@ -328,6 +328,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `APNS_KEY_ID` - APNs key identifier (`kid`) for the Live Activity push key. [SERVER]
 - `APNS_PRIVATE_KEY` - PKCS#8 ES256 `.p8` private key contents for APNs provider-token signing. `[SECRET]`
 - `APNS_TOPIC` - iOS app bundle id (`com.kilocode.kiloapp`); Live Activity pushes use `<topic>.push-type.liveactivity`. [SERVER]
+- `KILO_WEB_API_BASE_URL` - Base origin of the web app, used to reach the internal `glanceable-agents-snapshot` route; `https://app.kilo.ai` in production. [SERVER]
 
 ### KiloClaw Controller
 

@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  _resetGlanceablePersistForTests,
+  _setLastGlanceableSnapshotForTests,
+} from '@/lib/glanceable/persist';
+import { registerGlanceableSink, unregisterGlanceableSink } from '@/lib/glanceable/sink-registry';
+import { applyGlanceablePushData } from './notifications';
+
 const mocks = vi.hoisted(() => {
   const platform = { OS: 'android' as string };
   return {
@@ -14,6 +22,7 @@ const mocks = vi.hoisted(() => {
     notificationPathForData: vi.fn(),
     setPendingDeepLink: vi.fn(),
     safeParse: vi.fn(),
+    getItemAsync: vi.fn(),
   };
 });
 
@@ -40,6 +49,12 @@ vi.mock('@sentry/react-native', () => ({
 
 vi.mock('expo-constants', () => ({
   default: { expoConfig: { extra: { eas: { projectId: 'proj-1' } } } },
+}));
+
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: mocks.getItemAsync,
+  setItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
 }));
 
 vi.mock('@kilocode/notifications', () => ({
@@ -236,5 +251,102 @@ describe('setupNotificationResponseHandler', () => {
 
     expect(mocks.setPendingDeepLink).not.toHaveBeenCalled();
     expect(mocks.clearLastNotificationResponse).not.toHaveBeenCalled();
+  });
+});
+
+function glanceableSnapshot(
+  overrides: Partial<GlanceableAgentsSnapshot> = {}
+): GlanceableAgentsSnapshot {
+  return {
+    schemaVersion: 1,
+    revision: 1,
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    expiresAt: '2026-01-01T08:00:00.000Z',
+    scopeKey: 'scope-1',
+    organizationBound: false,
+    status: 'happy',
+    running: 1,
+    needsInput: 0,
+    reconnecting: 0,
+    eligibleStartedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+type GlanceablePushData = Parameters<typeof applyGlanceablePushData>[0];
+
+function activeGlanceablePush(
+  overrides: Partial<GlanceableAgentsSnapshot> = {}
+): GlanceablePushData {
+  return {
+    type: 'active_agents_glanceable',
+    ...glanceableSnapshot(overrides),
+  };
+}
+
+function makeFakeSink() {
+  return {
+    publish: vi.fn(),
+    endImmediate: vi.fn(),
+    startOrUpdate: vi.fn(),
+  };
+}
+
+describe('applyGlanceablePushData', () => {
+  beforeEach(() => {
+    _resetGlanceablePersistForTests();
+    mocks.getItemAsync.mockResolvedValue(null);
+  });
+
+  it('discards a remote snapshot that is not newer than the last applied snapshot', async () => {
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({
+        scopeKey: 'scope-1',
+        revision: 3,
+        updatedAt: '2026-01-02T00:00:00.000Z',
+      })
+    );
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+
+    const result = await applyGlanceablePushData(
+      activeGlanceablePush({ scopeKey: 'scope-1', updatedAt: '2026-01-01T00:00:00.000Z' })
+    );
+
+    expect(result).toBe(false);
+    expect(sink.publish).not.toHaveBeenCalled();
+    expect(sink.startOrUpdate).not.toHaveBeenCalled();
+
+    unregisterGlanceableSink(sink);
+  });
+
+  it('applies a newer remote snapshot and re-registers under the selected organization', async () => {
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({
+        scopeKey: 'scope-1',
+        revision: 3,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    );
+    mocks.getItemAsync.mockResolvedValue('org-9');
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+
+    const result = await applyGlanceablePushData(
+      activeGlanceablePush({
+        scopeKey: 'scope-1',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        organizationBound: true,
+      })
+    );
+
+    expect(result).toBe(true);
+    // The rebased revision continues the local monotonic sequence.
+    expect(sink.publish).toHaveBeenCalledWith(expect.objectContaining({ revision: 4 }));
+    expect(sink.startOrUpdate).toHaveBeenCalledWith(expect.objectContaining({ revision: 4 }), {
+      organizationId: 'org-9',
+    });
+
+    unregisterGlanceableSink(sink);
   });
 });

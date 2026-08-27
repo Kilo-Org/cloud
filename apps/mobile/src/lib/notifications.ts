@@ -1,5 +1,6 @@
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { z } from 'zod';
 
@@ -13,12 +14,12 @@ import {
 import {
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
-  shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getLastGlanceableSnapshot, getLocalScopeKey } from '@/lib/glanceable/persist';
 import { getGlanceableSinks } from '@/lib/glanceable/sink-registry';
+import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
 import { notificationPathForData } from './notification-path';
@@ -58,30 +59,40 @@ export function parseNotificationData(data: unknown): PushData | null {
  * Apply an `active_agents_glanceable` background push to the glanceable sinks
  * (widgets, Android ongoing, iOS Live Activity). Returns false when the push
  * must be dropped: its opaque scope key does not match the persisted local
- * scope key, or its revision is older than the last applied snapshot.
+ * scope key, or it is not newer than the last applied snapshot.
+ *
+ * The server builds every remote snapshot with revision 1 (it never chains
+ * `previousRevision` across requests), so the revision cannot fence against the
+ * local monotonic sequence. Fence on `updatedAt` instead and rebase the remote
+ * revision onto the local sequence so the sinks' monotonic guards keep
+ * accepting it.
  *
  * The server omits `accountEpoch`, so it is set to the current local epoch
  * before publishing. Never opens a session chat.
  */
-export function applyGlanceablePushData(
+export async function applyGlanceablePushData(
   data: Extract<PushData, { type: 'active_agents_glanceable' }>
-): boolean {
+): Promise<boolean> {
   if (data.scopeKey !== getLocalScopeKey()) {
     return false;
   }
 
   const { type: _type, ...fields } = data;
-  const snapshot: GlanceableAgentsSnapshot = {
-    ...fields,
-    accountEpoch: currentAuthEpoch(),
-  };
-
   const current = getLastGlanceableSnapshot();
-  if (current !== null && shouldDiscardGlanceableRevision(snapshot, current)) {
+
+  if (current !== null && fields.updatedAt < current.updatedAt) {
     return false;
   }
 
-  const ctx = { organizationId: null };
+  const snapshot: GlanceableAgentsSnapshot = {
+    ...fields,
+    revision: current === null ? fields.revision : current.revision + 1,
+    accountEpoch: currentAuthEpoch(),
+  };
+
+  const organizationId = await getSelectedOrganizationId();
+
+  const ctx = { organizationId };
   if (isEligibleGlanceableWork(snapshot)) {
     for (const sink of getGlanceableSinks()) {
       sink.publish(snapshot);
@@ -93,6 +104,20 @@ export function applyGlanceablePushData(
     }
   }
   return true;
+}
+
+/**
+ * Read the selected organization id from SecureStore. The scope-key fence above
+ * already proved the incoming snapshot belongs to the current scope, so this id
+ * (a string for an org scope, null for personal) keeps org-scoped APNs token
+ * lookups finding the token when `startOrUpdate` re-registers it.
+ */
+async function getSelectedOrganizationId(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
 }
 
 const shown = {
@@ -111,7 +136,6 @@ const suppressed = {
 
 export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
-    // eslint-disable-next-line require-await -- expo-notifications requires async callback type but logic is synchronous
     handleNotification: async notification => {
       const data = parseNotificationData(notification.request.content.data);
 
@@ -119,7 +143,7 @@ export function setupNotificationHandler() {
         // The aggregate glanceable push is a data carrier for the ongoing
         // notification/widgets, never a visible banner: the local ongoing owns
         // the display. Apply it to the sinks regardless of the discard outcome.
-        applyGlanceablePushData(data);
+        await applyGlanceablePushData(data);
         return suppressed;
       }
 

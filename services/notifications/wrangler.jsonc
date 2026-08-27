@@ -8,7 +8,10 @@
   "dev": { "port": 8804 },
   "placement": { "mode": "smart" },
   "observability": { "enabled": true },
-  "vars": { "WORKER_ENV": "production" },
+  "vars": {
+    "WORKER_ENV": "production",
+    "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
+  },
 
   "routes": [
     {

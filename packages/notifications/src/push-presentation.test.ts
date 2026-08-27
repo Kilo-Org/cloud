@@ -19,6 +19,20 @@ const variants = [
   { type: 'low_balance', organizationId: 'org1' },
   { type: 'security_finding', findingId: 'f1', scope: 'org' },
   { type: 'security_lifecycle', event: 'analysis_completed', findingId: 'f1', scope: 'org' },
+  {
+    type: 'active_agents_glanceable',
+    schemaVersion: 1,
+    revision: 1,
+    scopeKey: 'scope-1',
+    organizationBound: false,
+    status: 'happy',
+    running: 1,
+    needsInput: 0,
+    reconnecting: 0,
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    expiresAt: '2026-01-01T08:00:00.000Z',
+    eligibleStartedAt: '2026-01-01T00:00:00.000Z',
+  },
 ] as const;
 
 describe('androidChannelIdForPushData', () => {
@@ -44,6 +58,7 @@ describe('androidChannelIdForPushData', () => {
       low_balance: 'balance',
       security_finding: 'security',
       security_lifecycle: 'security',
+      active_agents_glanceable: 'active-agents',
     };
 
     for (const variant of variants) {

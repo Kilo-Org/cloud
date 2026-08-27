@@ -78,10 +78,7 @@ describe('upsertPartDroppingStaleSyntheticParts', () => {
     const existingSynthetic = { ...makePart('msg-1-text', 'optimistic'), synthetic: true };
     const incomingSynthetic = { ...makePart('prt-synthetic', 'new'), synthetic: true };
 
-    const result = upsertPartDroppingStaleSyntheticParts(
-      [existingSynthetic],
-      incomingSynthetic
-    );
+    const result = upsertPartDroppingStaleSyntheticParts([existingSynthetic], incomingSynthetic);
 
     expect(result.map(part => part.id)).toEqual(['msg-1-text', 'prt-synthetic']);
   });

@@ -33,7 +33,8 @@ function upsertPartDroppingStaleSyntheticParts(arr: Part[], part: Part): Part[] 
   // A non-synthetic text or file part drops the synthetic placeholder parts of
   // the same type on its message: the optimistic text row and the optimistic
   // file placeholders both reconcile to one authoritative part set.
-  const shouldDropSynthetic = !incomingIsSynthetic && (part.type === 'text' || part.type === 'file');
+  const shouldDropSynthetic =
+    !incomingIsSynthetic && (part.type === 'text' || part.type === 'file');
   const filtered = shouldDropSynthetic
     ? arr.filter(
         existing =>

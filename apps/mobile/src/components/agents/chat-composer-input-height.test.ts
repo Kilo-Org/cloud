@@ -46,7 +46,7 @@ describe('resolveComposerTextContentWidth', () => {
 
 describe('composer chrome budgets', () => {
   it('reserve the starter-row height inside both chrome budgets', () => {
-    // 120 (composer chrome) + 56 (starter row) = 176, and 176 + 56 = 232.
+    // 120 (composer chrome) + STARTER_ROW_HEIGHT = 176, and 176 + STARTER_ROW_HEIGHT = 232.
     expect(COMPOSER_CHROME_HEIGHT - STARTER_ROW_HEIGHT).toBe(120);
     expect(NEW_SESSION_PROMPT_CHROME_HEIGHT - STARTER_ROW_HEIGHT).toBe(176);
   });

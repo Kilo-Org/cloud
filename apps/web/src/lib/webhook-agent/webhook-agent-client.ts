@@ -18,6 +18,7 @@ export type TriggerConfigResponse = {
   mode: string | null;
   model: string | null;
   variant?: string | null;
+  sandboxAllocation?: 'isolated-standard';
   promptTemplate: string;
   profileId?: string | null;
   autoCommit?: boolean;
@@ -42,6 +43,7 @@ export type CreateTriggerInput = {
   mode?: string;
   model?: string;
   variant?: string;
+  sandboxAllocation?: 'isolated-standard';
   promptTemplate: string;
   profileId?: string;
   autoCommit?: boolean;
@@ -64,6 +66,7 @@ export type UpdateTriggerInput = {
   mode?: string;
   model?: string;
   variant?: string | null;
+  sandboxAllocation?: 'isolated-standard' | null;
   promptTemplate?: string;
   isActive?: boolean;
   profileId?: string;

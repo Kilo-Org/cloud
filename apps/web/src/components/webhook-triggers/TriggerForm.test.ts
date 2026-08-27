@@ -31,6 +31,74 @@ jest.mock('@/components/ui/label', () => ({
 }));
 jest.mock('@/components/ui/switch', () => ({ Switch: () => null }));
 jest.mock('@/components/ui/checkbox', () => ({ Checkbox: () => null }));
+type SelectInjectedProps = {
+  onValueChange?: (value: string) => void;
+  selectDisabled?: boolean;
+};
+
+jest.mock('@/components/ui/select', () => ({
+  Select: ({
+    children,
+    value,
+    onValueChange,
+    disabled,
+  }: {
+    children: React.ReactNode;
+    value: string;
+    onValueChange: (value: string) => void;
+    disabled?: boolean;
+  }) =>
+    createElement(
+      'div',
+      { 'data-container-allocation': value, 'data-disabled': String(disabled) },
+      React.Children.map(children, child => {
+        if (!React.isValidElement<SelectInjectedProps>(child)) return child;
+        return React.cloneElement(child, { onValueChange, selectDisabled: disabled });
+      })
+    ),
+  SelectTrigger: ({ children }: { children: React.ReactNode }) =>
+    createElement(React.Fragment, {}, children),
+  SelectValue: () => null,
+  SelectContent: ({
+    children,
+    onValueChange,
+    selectDisabled,
+  }: {
+    children: React.ReactNode;
+    onValueChange?: (value: string) => void;
+    selectDisabled?: boolean;
+  }) =>
+    createElement(
+      React.Fragment,
+      {},
+      React.Children.map(children, child => {
+        if (!React.isValidElement<SelectInjectedProps>(child)) return child;
+        return React.cloneElement(child, { onValueChange, selectDisabled });
+      })
+    ),
+  SelectItem: ({
+    children,
+    value,
+    disabled,
+    onValueChange,
+    selectDisabled,
+  }: {
+    children: React.ReactNode;
+    value: string;
+    disabled?: boolean;
+    onValueChange?: (value: string) => void;
+    selectDisabled?: boolean;
+  }) =>
+    createElement(
+      'button',
+      {
+        type: 'button',
+        disabled: disabled || selectDisabled,
+        onClick: () => onValueChange?.(value),
+      },
+      children
+    ),
+}));
 jest.mock('@/components/ui/inline-delete-confirmation', () => ({
   InlineDeleteConfirmation: () => null,
 }));
@@ -192,6 +260,21 @@ function expectSubmittedVariantToBeOmitted(onSubmit: jest.Mock<TriggerFormProps[
   expect(Object.hasOwn(submission, 'variant')).toBe(false);
 }
 
+function selectContainerAllocation(
+  container: HTMLElement,
+  value: 'automatic' | 'isolated-standard'
+) {
+  click(container, value === 'automatic' ? 'Automatic' : 'Dedicated Standard');
+}
+
+function expectSubmittedSandboxAllocationToBeOmitted(
+  onSubmit: jest.Mock<TriggerFormProps['onSubmit']>
+) {
+  const [submission] = onSubmit.mock.calls.at(-1) ?? [];
+  if (!submission) throw new Error('form submission missing');
+  expect(Object.hasOwn(submission, 'sandboxAllocation')).toBe(false);
+}
+
 let TriggerForm!: typeof TriggerFormComponent;
 
 beforeAll(async () => {
@@ -333,5 +416,151 @@ describe('TriggerForm variants', () => {
         item => item.textContent === 'high'
       )
     ).toHaveProperty('disabled', true);
+  });
+});
+
+describe('TriggerForm container allocation', () => {
+  let root: Root | undefined;
+  let cleanup: (() => void) | undefined;
+
+  afterEach(() => {
+    if (root) act(() => root?.unmount());
+    root = undefined;
+    cleanup?.();
+    cleanup = undefined;
+  });
+
+  function render(props: Partial<TriggerFormProps>) {
+    const dom = installDom();
+    cleanup = dom.cleanup;
+    root = createRoot(dom.container);
+    const onSubmit = jest.fn<TriggerFormProps['onSubmit']>();
+    onSubmit.mockResolvedValue(undefined);
+    const allProps: TriggerFormProps = {
+      mode: 'edit',
+      initialData: initialData(),
+      repositories: [],
+      models,
+      onSubmit,
+      canSetSandboxAllocation: true,
+      ...props,
+    };
+    act(() => root?.render(createElement(TriggerForm, allProps)));
+    return { container: dom.container, onSubmit, allProps };
+  }
+
+  it('omits Automatic and submits Dedicated Standard in create mode', async () => {
+    const mounted = render({ mode: 'create', initialData: initialData() });
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
+
+    selectContainerAllocation(mounted.container, 'isolated-standard');
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sandboxAllocation: 'isolated-standard' })
+    );
+  });
+
+  it('omits unchanged edit allocation and supports set, clear, and restoring the saved value', async () => {
+    const unset = render({ initialData: initialData() });
+    submit(unset.container);
+    await act(async () => Promise.resolve());
+    expectSubmittedSandboxAllocationToBeOmitted(unset.onSubmit);
+
+    selectContainerAllocation(unset.container, 'isolated-standard');
+    submit(unset.container);
+    await act(async () => Promise.resolve());
+    expect(unset.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sandboxAllocation: 'isolated-standard' })
+    );
+
+    act(() => root?.unmount());
+    const saved = { ...initialData(), sandboxAllocation: 'isolated-standard' as const };
+    const mounted = render({ initialData: saved });
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
+
+    selectContainerAllocation(mounted.container, 'automatic');
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expect(mounted.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sandboxAllocation: null })
+    );
+
+    selectContainerAllocation(mounted.container, 'isolated-standard');
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
+  });
+
+  it('hides fresh allocation from ineligible users but preserves a saved allocation and clearing it', async () => {
+    const fresh = render({ canSetSandboxAllocation: false });
+    expect(fresh.container.querySelector('[data-container-allocation]')).toBeNull();
+
+    act(() => root?.unmount());
+    const saved = render({
+      canSetSandboxAllocation: false,
+      initialData: { ...initialData(), sandboxAllocation: 'isolated-standard' },
+    });
+    expect(saved.container.querySelector('[data-container-allocation]')).not.toBeNull();
+    selectContainerAllocation(saved.container, 'automatic');
+    submit(saved.container);
+    await act(async () => Promise.resolve());
+    expect(saved.onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sandboxAllocation: null })
+    );
+  });
+
+  it('blocks a pending allocation selection after eligibility is revoked until Automatic is restored', async () => {
+    const mounted = render({ mode: 'create' });
+    selectContainerAllocation(mounted.container, 'isolated-standard');
+    act(() =>
+      root?.render(
+        createElement(TriggerForm, { ...mounted.allProps, canSetSandboxAllocation: false })
+      )
+    );
+    submit(mounted.container);
+    expect(mounted.onSubmit).not.toHaveBeenCalled();
+
+    expect(mounted.container.querySelector('[data-container-allocation]')).not.toBeNull();
+    selectContainerAllocation(mounted.container, 'automatic');
+    submit(mounted.container);
+    await act(async () => Promise.resolve());
+    expectSubmittedSandboxAllocationToBeOmitted(mounted.onSubmit);
+  });
+
+  it('blocks a new Dedicated Standard selection while capabilities are loading', () => {
+    const mounted = render({ mode: 'create', isLoadingCapabilities: true });
+    act(() =>
+      root?.render(
+        createElement(TriggerForm, { ...mounted.allProps, isLoadingCapabilities: false })
+      )
+    );
+    selectContainerAllocation(mounted.container, 'isolated-standard');
+    act(() =>
+      root?.render(createElement(TriggerForm, { ...mounted.allProps, isLoadingCapabilities: true }))
+    );
+    submit(mounted.container);
+    expect(mounted.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('resets from refreshed initial data and disables while capabilities load', () => {
+    const mounted = render({});
+    selectContainerAllocation(mounted.container, 'isolated-standard');
+    act(() =>
+      root?.render(
+        createElement(TriggerForm, {
+          ...mounted.allProps,
+          initialData: { ...initialData(), sandboxAllocation: null },
+          isLoadingCapabilities: true,
+        })
+      )
+    );
+    const select = mounted.container.querySelector('[data-container-allocation]');
+    expect(select?.getAttribute('data-container-allocation')).toBe('automatic');
+    expect(select?.getAttribute('data-disabled')).toBe('true');
   });
 });

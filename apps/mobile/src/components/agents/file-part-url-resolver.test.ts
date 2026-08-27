@@ -1,5 +1,6 @@
 /* eslint-disable import/first -- mocks must be defined before the module under test is imported */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom) */
+/* eslint-disable max-lines -- cohesive resolver suite: cache seeding, sweeper, renew-on-read, and refresh coalescing share one harness */
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { createElement, type FC } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -327,5 +328,52 @@ describe('refreshFilePartUrl', () => {
 
     expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
     expect(getFilePartCacheEntry('part-1')?.renewing).toBe(true);
+  });
+
+  it('no-ops a retry during an in-flight sweep presign without clearing renewing early', async () => {
+    const uuid1 = '11111111-1111-4111-8111-111111111111';
+    // part-1 is already due, so the sweep re-presigns it.
+    cacheRenewableEntry(
+      'part-1',
+      { uuid: uuid1, filename: 'a.png' },
+      { url: 'https://r2.example/old', urlExpiresAt: Date.now() - 1000 }
+    );
+    // Mount an unrelated, non-due part so the shared sweeper starts without
+    // touching part-1 on the read path.
+    cacheRenewableEntry(
+      'part-2',
+      { uuid: '22222222-2222-4222-8222-222222222222', filename: 'b.png' },
+      { url: 'https://r2.example/old2', urlExpiresAt: Date.now() + 900_000 }
+    );
+    await mountProbe(makeFilePart('part-2', '22222222-2222-4222-8222-222222222222', 'b.png'));
+
+    // The sweep presign stays in flight.
+    const sweepHolder: { reject?: (error: Error) => void } = {};
+    getAttachmentDownloadUrlMutate.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        sweepHolder.reject = reject;
+      })
+    );
+
+    advance(30_000);
+
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+    expect(getFilePartCacheEntry('part-1')?.renewing).toBe(true);
+
+    // A retry during the in-flight sweep presign must be a no-op: no second
+    // mutate and no early clearFilePartRenewing.
+    await expect(refreshFilePartUrl('part-1')).resolves.toBe(false);
+
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+    expect(getFilePartCacheEntry('part-1')?.renewing).toBe(true);
+
+    // The renewing mark clears only when the in-flight presign settles.
+    await act(async () => {
+      sweepHolder.reject?.(new Error('presign failed'));
+      await Promise.resolve();
+    });
+
+    expect(getFilePartCacheEntry('part-1')).not.toHaveProperty('renewing');
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
   });
 });

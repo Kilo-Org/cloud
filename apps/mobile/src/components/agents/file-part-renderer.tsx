@@ -236,9 +236,10 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   if (kind === 'image') {
     if (url) {
       // Keep the unavailable chip hidden while a renew is in flight (no
-      // flicker), but show it after a failed renew: a failed renew only
-      // clears `renewing` and keeps the URL, so `imageFailed` stays set.
-      if (imageFailed && !resolved.renewing) {
+      // flicker), but show it after a failed renew once the viewer closes: a
+      // failed renew only clears `renewing` and keeps the URL, so `imageFailed`
+      // stays set, but an open viewer must stay mounted.
+      if (imageFailed && !resolved.renewing && !viewerVisible) {
         return (
           <Pressable
             onPress={() => {

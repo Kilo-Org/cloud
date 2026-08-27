@@ -222,6 +222,9 @@ export async function refreshFilePartUrl(partId: string): Promise<boolean> {
   if (!entry || !ref) {
     return false;
   }
+  if (inFlight.has(partId)) {
+    return false;
+  }
   markFilePartRenewing(partId);
   inFlight.add(partId);
   try {

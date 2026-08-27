@@ -2127,6 +2127,7 @@ describe('cli-sessions-v2-router', () => {
     beforeEach(async () => {
       await db.insert(cli_sessions_v2).values({
         session_id: sessionId,
+        cloud_agent_session_id: 'agent_refresh_pr_canonical',
         kilo_user_id: regularUser.id,
         created_on_platform: 'cloud-agent',
         git_url: SESSION_GIT_URL,
@@ -2143,6 +2144,8 @@ describe('cli-sessions-v2-router', () => {
           platform: 'github',
           integration_type: 'app',
           platform_installation_id: '12345',
+          platform_account_login: 'kilo',
+          repository_access: 'all',
           github_app_type: 'standard',
           integration_status: 'active',
         })
@@ -2150,6 +2153,7 @@ describe('cli-sessions-v2-router', () => {
       integrationId = integration.id;
 
       mockedFetchPullRequestByNumber.mockReset();
+      mockGetSession.mockReset().mockResolvedValue({ githubIntegrationId: integrationId });
     });
 
     afterEach(async () => {
@@ -2205,10 +2209,73 @@ describe('cli-sessions-v2-router', () => {
         git_branch: SESSION_BRANCH,
         owned_by_user_id: regularUser.id,
         owned_by_organization_id: null,
+        platform_integration_id: integrationId,
         pr_url: SESSION_PR_URL,
         pr_number: 7,
         pr_state: 'open',
       });
+    });
+
+    it('uses the exact Cloud Agent session installation and app type', async () => {
+      const [liteIntegration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: regularUser.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '54321',
+          platform_account_login: 'kilo',
+          repository_access: 'all',
+          github_app_type: 'lite',
+          integration_status: 'active',
+        })
+        .returning({ id: platform_integrations.id });
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_session_id: 'agent_refresh_pr_pinned' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      mockGetSession.mockResolvedValue({ githubIntegrationId: liteIntegration.id });
+      mockedFetchPullRequestByNumber.mockResolvedValue({
+        number: 7,
+        htmlUrl: SESSION_PR_URL,
+        state: 'open',
+        title: 'Pinned installation',
+        headSha: 'pinned-sha',
+        updatedAt: '2026-01-01T00:00:00Z',
+      });
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+        expect(mockGetSession).toHaveBeenCalledWith('agent_refresh_pr_pinned');
+        expect(mockedFetchPullRequestByNumber).toHaveBeenCalledWith(
+          expect.objectContaining({ installationId: 54321, appType: 'lite' })
+        );
+        expect((await readCacheRows())[0]?.platform_integration_id).toBe(liteIntegration.id);
+      } finally {
+        await db
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_session_id: null })
+          .where(eq(cli_sessions_v2.session_id, sessionId));
+        await db
+          .delete(platform_integrations)
+          .where(eq(platform_integrations.id, liteIntegration.id));
+      }
+    });
+
+    it('fails closed for an old session with no canonical or cached integration', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_session_id: null })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockGetSession).not.toHaveBeenCalled();
+      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
     });
 
     it('writes one cache row per (url, branch, tenant) across repeated refreshes', async () => {
@@ -2367,6 +2434,7 @@ describe('cli-sessions-v2-router', () => {
         git_url: SESSION_GIT_URL,
         git_branch: SESSION_BRANCH,
         owned_by_user_id: regularUser.id,
+        platform_integration_id: integrationId,
         pr_url: SESSION_PR_URL,
         pr_number: 7,
         pr_state: 'open',
@@ -2381,6 +2449,35 @@ describe('cli-sessions-v2-router', () => {
 
       expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
       expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
+    });
+
+    it('uses a known cache integration when Cloud Agent metadata is unavailable', async () => {
+      await db.insert(github_branch_pull_requests).values({
+        git_url: SESSION_GIT_URL,
+        git_branch: SESSION_BRANCH,
+        owned_by_user_id: regularUser.id,
+        platform_integration_id: integrationId,
+        pr_url: SESSION_PR_URL,
+        pr_number: 7,
+        pr_state: 'open',
+        pr_last_synced_at: new Date(Date.now() - 90_000).toISOString(),
+      });
+      mockGetSession.mockRejectedValue(new Error('Cloud Agent unavailable'));
+      mockedFetchPullRequestByNumber.mockResolvedValue({
+        number: 7,
+        htmlUrl: SESSION_PR_URL,
+        state: 'open',
+        title: 'Cached installation',
+        headSha: 'cached-integration-sha',
+        updatedAt: '2026-01-01T00:00:00Z',
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(mockedFetchPullRequestByNumber).toHaveBeenCalledWith(
+        expect.objectContaining({ installationId: 12345, appType: 'standard' })
+      );
     });
 
     it('updates the matching cache row when the stored link has a trailing subpath', async () => {

@@ -109,7 +109,9 @@ beforeEach(() => {
     },
     repository_selection: installationId === 'installation-lite' ? 'selected' : 'all',
   }));
-  mockGetInstallationSettingsUrl.mockResolvedValue('https://github.com/settings/installations/1');
+  mockGetInstallationSettingsUrl.mockImplementation(
+    async (installationId: unknown) => `https://github.com/settings/installations/${installationId}`
+  );
   mockFetchRepositories.mockImplementation(async (installationId: unknown) =>
     installationId === 'installation-lite'
       ? [
@@ -147,12 +149,98 @@ describe('App Builder GitHub integration identity', () => {
         platformIntegrationId: standardIntegrationId,
       }),
     ]);
+    expect(result.migrationTargets).toEqual([
+      expect.objectContaining({
+        platformIntegrationId: standardIntegrationId,
+        platformAccountLogin: 'acme-core',
+        githubAppType: 'standard',
+        newRepoUrl: 'https://github.com/organizations/acme-core/repositories/new',
+        installationSettingsUrl: 'https://github.com/settings/installations/installation-standard',
+        repositorySelection: 'all',
+        availableRepos: [
+          expect.objectContaining({
+            fullName: 'acme-core/primary',
+            platformIntegrationId: standardIntegrationId,
+            platformAccountLogin: 'acme-core',
+          }),
+        ],
+      }),
+      expect.objectContaining({
+        platformIntegrationId: liteIntegrationId,
+        platformAccountLogin: 'acme-apps',
+        githubAppType: 'lite',
+        installationSettingsUrl: 'https://github.com/settings/installations/installation-lite',
+        repositorySelection: 'selected',
+        availableRepos: [
+          expect.objectContaining({
+            fullName: 'acme-apps/secondary',
+            platformIntegrationId: liteIntegrationId,
+            platformAccountLogin: 'acme-apps',
+          }),
+        ],
+      }),
+    ]);
     expect(mockFetchRepositories).toHaveBeenCalledWith('installation-standard', 'standard');
     expect(mockFetchRepositories).toHaveBeenCalledWith('installation-lite', 'lite');
     expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith(
       liteIntegrationId,
       expect.arrayContaining([expect.objectContaining({ full_name: 'acme-apps/secondary' })])
     );
+  });
+
+  it('keeps duplicate repository names distinct across migration targets', async () => {
+    mockFetchInstallationDetails.mockResolvedValue({
+      account: { login: 'acme', type: 'Organization' },
+      repository_selection: 'selected',
+    });
+    mockFetchRepositories.mockResolvedValue([
+      {
+        id: 3,
+        name: 'shared',
+        full_name: 'acme/shared',
+        private: true,
+        created_at: '2026-08-27T11:00:00.000Z',
+      },
+    ]);
+
+    const result = await canMigrateToGitHub(project.id, { type: 'org', id: organizationId });
+
+    expect(result.migrationTargets).toHaveLength(2);
+    expect(result.migrationTargets.map(target => target.availableRepos[0])).toEqual([
+      expect.objectContaining({
+        fullName: 'acme/shared',
+        platformIntegrationId: standardIntegrationId,
+      }),
+      expect.objectContaining({
+        fullName: 'acme/shared',
+        platformIntegrationId: liteIntegrationId,
+      }),
+    ]);
+  });
+
+  it('excludes unhealthy organization installations from migration targets', async () => {
+    const unhealthyIntegration = {
+      ...integration(
+        '123e4567-e89b-12d3-a456-426614174005',
+        'installation-unhealthy',
+        'standard',
+        'acme-legacy'
+      ),
+      auth_invalid_at: '2026-08-27T09:00:00.000Z',
+    };
+    mockGetIntegrationsByOrganization.mockResolvedValue([
+      standardIntegration,
+      unhealthyIntegration,
+      liteIntegration,
+    ]);
+
+    const result = await canMigrateToGitHub(project.id, { type: 'org', id: organizationId });
+
+    expect(result.migrationTargets.map(target => target.platformIntegrationId)).toEqual([
+      standardIntegrationId,
+      liteIntegrationId,
+    ]);
+    expect(mockFetchRepositories).not.toHaveBeenCalledWith('installation-unhealthy', 'standard');
   });
 
   it('uses the exact secondary integration for validation and worker migration', async () => {

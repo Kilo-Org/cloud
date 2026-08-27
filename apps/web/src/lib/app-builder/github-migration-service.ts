@@ -24,6 +24,7 @@ import type {
   MigrateToGitHubResult,
   MigrateToGitHubErrorCode,
   CanMigrateToGitHubResult,
+  GitHubMigrationTarget,
 } from '@/lib/app-builder/types';
 
 class MigrationError extends Error {
@@ -38,6 +39,12 @@ class MigrationError extends Error {
 
 function getGitHubAppType(integration: PlatformIntegration): 'standard' | 'lite' {
   return integration.github_app_type ?? 'standard';
+}
+
+function getNewRepositoryUrl(accountLogin: string, accountType: string): string {
+  return accountType === 'Organization'
+    ? `https://github.com/organizations/${accountLogin}/repositories/new`
+    : 'https://github.com/new';
 }
 
 async function getMigrationIntegrations(owner: Owner): Promise<PlatformIntegration[]> {
@@ -93,6 +100,7 @@ export async function canMigrateToGitHub(
     installationSettingsUrl: '',
     availableRepos: [],
     repositorySelection: 'all',
+    migrationTargets: [],
   };
 
   // Check if already migrated
@@ -106,6 +114,7 @@ export async function canMigrateToGitHub(
       installationSettingsUrl: '',
       availableRepos: [],
       repositorySelection: 'all',
+      migrationTargets: [],
     };
   }
 
@@ -118,10 +127,6 @@ export async function canMigrateToGitHub(
   // Fetch installation details and available repos in parallel
   let targetAccountName = integration.platform_account_login ?? null;
   let installationSettingsUrl = '';
-  let availableRepos: CanMigrateToGitHubResult['availableRepos'] = [];
-  let accountType = 'User';
-  let repositorySelection: 'all' | 'selected' = 'all';
-
   const integrationData = await Promise.all(
     integrations.map(async candidate => {
       const candidateInstallationId = candidate.platform_installation_id;
@@ -142,57 +147,62 @@ export async function canMigrateToGitHub(
     })
   );
 
-  const primaryData = integrationData[0];
-  if (primaryData) {
-    targetAccountName = primaryData.installationDetails.account.login || targetAccountName;
-    accountType = primaryData.installationDetails.account.type;
-    repositorySelection =
-      primaryData.installationDetails.repository_selection === 'selected' ? 'selected' : 'all';
-    installationSettingsUrl = primaryData.settingsUrl;
-  }
+  const migrationTargets = integrationData.flatMap<GitHubMigrationTarget>(data => {
+    if (!data) return [];
 
-  const reposByFullName = new Map<string, CanMigrateToGitHubResult['availableRepos']>();
-  for (const data of integrationData) {
-    if (!data) continue;
-    for (const repo of data.repos) {
-      const key = repo.full_name.toLowerCase();
-      const matches = reposByFullName.get(key) ?? [];
-      matches.push({
+    const platformAccountLogin =
+      data.installationDetails.account.login || data.integration.platform_account_login;
+    if (!platformAccountLogin) return [];
+
+    const availableRepos = data.repos
+      .map(repo => ({
         fullName: repo.full_name,
         createdAt: repo.created_at,
         isPrivate: repo.private,
         platformIntegrationId: data.integration.id,
-      });
-      reposByFullName.set(key, matches);
-    }
+        platformAccountLogin,
+      }))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10);
+
+    return [
+      {
+        platformIntegrationId: data.integration.id,
+        platformAccountLogin,
+        githubAppType: getGitHubAppType(data.integration),
+        newRepoUrl: getNewRepositoryUrl(
+          platformAccountLogin,
+          data.installationDetails.account.type
+        ),
+        installationSettingsUrl: data.settingsUrl,
+        availableRepos,
+        repositorySelection:
+          data.installationDetails.repository_selection === 'selected' ? 'selected' : 'all',
+      },
+    ];
+  });
+
+  const primaryTarget = migrationTargets[0];
+  if (primaryTarget) {
+    targetAccountName = primaryTarget.platformAccountLogin;
+    installationSettingsUrl = primaryTarget.installationSettingsUrl;
   }
-  availableRepos = [...reposByFullName.values()]
-    .map(matches => {
-      const [repo] = matches;
-      if (!repo) return null;
-      return matches.length === 1 ? repo : { ...repo, platformIntegrationId: undefined };
-    })
-    .filter(repo => repo !== null)
+
+  const availableRepos = migrationTargets
+    .flatMap(target => target.availableRepos)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 10);
-
-  // Build the URL for creating a new repo
-  // For orgs: https://github.com/organizations/{org}/repositories/new
-  // For users: https://github.com/new
-  const newRepoUrl =
-    accountType === 'Organization' && targetAccountName
-      ? `https://github.com/organizations/${targetAccountName}/repositories/new`
-      : 'https://github.com/new';
 
   return {
     hasGitHubIntegration: true,
     targetAccountName,
     alreadyMigrated: false,
     suggestedRepoName,
-    newRepoUrl,
+    newRepoUrl: primaryTarget?.newRepoUrl ?? 'https://github.com/new',
     installationSettingsUrl,
     availableRepos,
-    repositorySelection,
+    repositorySelection: primaryTarget?.repositorySelection ?? 'all',
+    migrationTargets,
   };
 }
 

@@ -36,8 +36,21 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
-import type { CanMigrateToGitHubResult, MigrateToGitHubErrorCode } from '@/lib/app-builder/types';
+import type {
+  CanMigrateToGitHubResult,
+  GitHubMigrationTarget,
+  MigrateToGitHubErrorCode,
+} from '@/lib/app-builder/types';
+import { getMigrationTargetLabel, resolveMigrationTarget } from './migration-target-selector';
 
 type MigrateToGitHubDialogProps = {
   projectId: string;
@@ -72,6 +85,7 @@ export function MigrateToGitHubDialog({
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<Step>('create');
   const [selectedRepo, setSelectedRepo] = useState<string>('');
+  const [pinnedTarget, setPinnedTarget] = useState<GitHubMigrationTarget>();
 
   const [migrationResult, setMigrationResult] = useState<{
     success: true;
@@ -98,6 +112,9 @@ export function MigrateToGitHubDialog({
 
   const canMigrateQuery = organizationId ? orgCanMigrateQuery : personalCanMigrateQuery;
   const canMigrateData: CanMigrateToGitHubResult | undefined = canMigrateQuery.data;
+  const migrationTargets = canMigrateData?.migrationTargets ?? [];
+  const { target: selectedTarget, isUnavailable: selectedTargetIsUnavailable } =
+    resolveMigrationTarget(migrationTargets, pinnedTarget);
 
   // Migration mutations for personal/org context
   const handleMigrationSuccess = useCallback(
@@ -150,14 +167,29 @@ export function MigrateToGitHubDialog({
   // Map available repos to RepositoryCombobox format
   const repositoryOptions: RepositoryOption[] = useMemo(
     () =>
-      (canMigrateData?.availableRepos ?? []).map(repo => ({
-        id: `${repo.platformIntegrationId ?? 'legacy'}:${repo.fullName}`,
+      (selectedTargetIsUnavailable ? [] : (selectedTarget?.availableRepos ?? [])).map(repo => ({
+        id: `${selectedTarget?.platformIntegrationId}:${repo.fullName}`,
         fullName: repo.fullName,
         private: repo.isPrivate,
         platform: 'github' as const,
-        platformIntegrationId: repo.platformIntegrationId,
+        platformIntegrationId: selectedTarget?.platformIntegrationId,
+        platformAccountLogin: selectedTarget?.platformAccountLogin,
       })),
-    [canMigrateData?.availableRepos]
+    [selectedTarget, selectedTargetIsUnavailable]
+  );
+
+  const handleTargetChange = useCallback(
+    (platformIntegrationId: string) => {
+      const target = migrationTargets.find(
+        candidate => candidate.platformIntegrationId === platformIntegrationId
+      );
+      if (!target) return;
+
+      setPinnedTarget(target);
+      setSelectedRepo('');
+      setMigrationError(null);
+    },
+    [migrationTargets]
   );
 
   const handleOpenChange = useCallback(
@@ -167,6 +199,7 @@ export function MigrateToGitHubDialog({
         // Reset state when closing
         setStep('create');
         setSelectedRepo('');
+        setPinnedTarget(undefined);
         setMigrationResult(null);
         setMigrationError(null);
         reset();
@@ -191,12 +224,10 @@ export function MigrateToGitHubDialog({
   }, [organizationId, queryClient, trpc, projectId]);
 
   const handleMigrate = useCallback(() => {
-    if (!selectedRepo) return;
+    if (!selectedRepo || !selectedTarget || selectedTargetIsUnavailable) return;
 
     setMigrationError(null);
-    const expectedPlatformIntegrationId = repositoryOptions.find(
-      repo => repo.fullName === selectedRepo
-    )?.platformIntegrationId;
+    const expectedPlatformIntegrationId = selectedTarget.platformIntegrationId;
 
     if (organizationId) {
       orgMigrate({
@@ -206,21 +237,30 @@ export function MigrateToGitHubDialog({
         expectedPlatformIntegrationId,
       });
     } else {
-      personalMigrate({ projectId, repoFullName: selectedRepo });
+      personalMigrate({ projectId, repoFullName: selectedRepo, expectedPlatformIntegrationId });
     }
-  }, [organizationId, orgMigrate, personalMigrate, projectId, repositoryOptions, selectedRepo]);
+  }, [
+    organizationId,
+    orgMigrate,
+    personalMigrate,
+    projectId,
+    selectedRepo,
+    selectedTarget,
+    selectedTargetIsUnavailable,
+  ]);
 
   // Skip grant-access step if user has "all repositories" access
-  const needsGrantAccess = canMigrateData?.repositorySelection === 'selected';
+  const needsGrantAccess = selectedTarget?.repositorySelection === 'selected';
 
   const handleNext = useCallback(() => {
     if (step === 'create') {
+      if (selectedTarget) setPinnedTarget(selectedTarget);
       // Skip grant-access step if user has access to all repos
       setStep(needsGrantAccess ? 'grant-access' : 'select');
     } else if (step === 'grant-access') {
       setStep('select');
     }
-  }, [step, needsGrantAccess]);
+  }, [step, needsGrantAccess, selectedTarget]);
 
   const handleBack = useCallback(() => {
     if (step === 'grant-access') {
@@ -255,7 +295,7 @@ export function MigrateToGitHubDialog({
             {step === 'create' && 'Step 1: Create an empty repository on GitHub'}
             {step === 'grant-access' && 'Step 2: Grant access to your repository'}
             {step === 'select' && `Step ${needsGrantAccess ? '3' : '2'}: Select your repository`}
-            {step === 'success' && 'Migration complete!'}
+            {step === 'success' && 'Migration complete'}
           </DialogDescription>
         </DialogHeader>
 
@@ -264,7 +304,9 @@ export function MigrateToGitHubDialog({
           {canMigrateQuery.isPending && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
-              <span className="text-muted-foreground ml-2 text-sm">Loading...</span>
+              <span className="text-muted-foreground ml-2 text-sm">
+                Loading migration options...
+              </span>
             </div>
           )}
 
@@ -319,6 +361,41 @@ export function MigrateToGitHubDialog({
           {/* Step 1: Create Repository */}
           {canMigrate && step === 'create' && (
             <div className="space-y-4">
+              {(migrationTargets.length > 1 || selectedTargetIsUnavailable) && selectedTarget && (
+                <div className="space-y-2">
+                  <Label htmlFor="github-migration-target">GitHub installation</Label>
+                  <Select
+                    value={selectedTarget.platformIntegrationId}
+                    onValueChange={handleTargetChange}
+                  >
+                    <SelectTrigger
+                      id="github-migration-target"
+                      className="h-11 w-full font-mono sm:h-control-default"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedTargetIsUnavailable && (
+                        <SelectItem value={selectedTarget.platformIntegrationId} disabled>
+                          {getMigrationTargetLabel(selectedTarget, migrationTargets)} (unavailable)
+                        </SelectItem>
+                      )}
+                      {migrationTargets.map(target => (
+                        <SelectItem
+                          key={target.platformIntegrationId}
+                          value={target.platformIntegrationId}
+                        >
+                          {getMigrationTargetLabel(target, migrationTargets)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs">
+                    Choose where to create and migrate the repository.
+                  </p>
+                </div>
+              )}
+
               <div className="rounded-md border p-4">
                 <h4 className="font-medium">Create an empty repository</h4>
                 <p className="text-muted-foreground mt-1 text-sm">
@@ -344,7 +421,11 @@ export function MigrateToGitHubDialog({
               </div>
 
               <Button asChild className="w-full gap-2">
-                <a href={canMigrateData.newRepoUrl} target="_blank" rel="noopener noreferrer">
+                <a
+                  href={selectedTarget?.newRepoUrl ?? canMigrateData.newRepoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <Github className="h-4 w-4" />
                   Create Repository on GitHub
                   <ExternalLink className="h-3 w-3" />
@@ -368,10 +449,14 @@ export function MigrateToGitHubDialog({
                 </p>
               </div>
 
-              {canMigrateData.installationSettingsUrl && (
+              {(selectedTarget?.installationSettingsUrl ??
+                canMigrateData.installationSettingsUrl) && (
                 <Button asChild variant="outline" className="w-full gap-2">
                   <a
-                    href={canMigrateData.installationSettingsUrl}
+                    href={
+                      selectedTarget?.installationSettingsUrl ??
+                      canMigrateData.installationSettingsUrl
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -391,7 +476,44 @@ export function MigrateToGitHubDialog({
               {migrationError && (
                 <div className="flex items-start gap-3 rounded-md bg-red-500/10 p-4 text-sm text-red-400">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{errorMessages[migrationError]}</span>
+                  <div>
+                    <p>{errorMessages[migrationError]}</p>
+                    {migrationError === 'github_integration_unavailable' &&
+                      selectedTarget?.installationSettingsUrl && (
+                        <a
+                          href={selectedTarget.installationSettingsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1 underline underline-offset-4"
+                        >
+                          Manage affected GitHub installation
+                          <ExternalLink className="size-3" />
+                        </a>
+                      )}
+                  </div>
+                </div>
+              )}
+
+              {selectedTargetIsUnavailable && (
+                <div className="flex items-start gap-3 rounded-md bg-yellow-500/10 p-4 text-sm text-yellow-400">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <p>The selected GitHub installation is no longer available.</p>
+                    <p className="text-muted-foreground mt-1">
+                      Refresh the repository list after restoring this installation.
+                    </p>
+                    {selectedTarget?.installationSettingsUrl && (
+                      <a
+                        href={selectedTarget.installationSettingsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 underline underline-offset-4"
+                      >
+                        Manage affected GitHub installation
+                        <ExternalLink className="size-3" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -418,7 +540,8 @@ export function MigrateToGitHubDialog({
                   onClick={handleRefreshRepos}
                   disabled={canMigrateQuery.isFetching || isPending}
                   title="Refresh repository list"
-                  className="mb-6 shrink-0"
+                  aria-label="Refresh repository list"
+                  className="mb-6 size-11 shrink-0 sm:size-control-default"
                 >
                   <RefreshCw
                     className={`h-4 w-4 ${canMigrateQuery.isFetching ? 'animate-spin' : ''}`}
@@ -434,7 +557,7 @@ export function MigrateToGitHubDialog({
               <div className="flex items-start gap-3 rounded-md bg-green-500/10 p-4 text-sm text-green-400">
                 <Check className="mt-0.5 h-4 w-4 shrink-0" />
                 <div>
-                  <p className="font-medium">Export successful!</p>
+                  <p className="font-medium">Project exported</p>
                   <p className="text-muted-foreground mt-1">
                     Your project has been exported to GitHub. You can now clone, push, and
                     collaborate using Git.
@@ -472,7 +595,7 @@ export function MigrateToGitHubDialog({
             {step === 'select' ? (
               <Button
                 onClick={handleMigrate}
-                disabled={isPending || !selectedRepo}
+                disabled={isPending || !selectedRepo || selectedTargetIsUnavailable}
                 className="gap-2"
               >
                 {isPending ? (
@@ -483,12 +606,16 @@ export function MigrateToGitHubDialog({
                 ) : (
                   <>
                     <Github className="h-4 w-4" />
-                    Export
+                    Export project
                   </>
                 )}
               </Button>
             ) : (
-              <Button onClick={handleNext} className="gap-1">
+              <Button
+                variant={step === 'create' ? 'outline' : 'default'}
+                onClick={handleNext}
+                className="gap-1"
+              >
                 Next
                 <ChevronRight className="h-4 w-4" />
               </Button>

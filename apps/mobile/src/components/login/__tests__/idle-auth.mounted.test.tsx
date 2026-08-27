@@ -9,7 +9,7 @@ import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 import { IdleAuth } from '../idle-auth';
 import '@/i18n';
 
-type StartFn = (mode: 'signin' | 'signup' | 'sso', ssoEmail?: string) => Promise<void>;
+type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
 
 const ssoRecovery = vi.hoisted(() => {
   const value: { email: string; ssoOrganizationId: string | undefined } | null = {

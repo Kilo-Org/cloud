@@ -466,7 +466,6 @@ describe('organizations.kiloclaw.getKiloCliRunStatus', () => {
       prompt: 'diagnose gateway issue',
     });
   });
-
 });
 
 // ── Org router: organizations.kiloclaw.listKiloCliRuns ────────────────────

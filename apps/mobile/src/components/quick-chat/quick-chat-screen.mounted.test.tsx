@@ -113,6 +113,18 @@ vi.mock('@/lib/auth/token-owner', () => ({
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: organizationId.value, isLoaded: orgLoaded.value }),
 }));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({
+    userId: 'u-1',
+    email: null,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/persist/use-draft-load', () => ({
+  useFencedDraftLoad: () => ({ settled: true, value: null }),
+}));
 vi.mock('@/lib/analytics/posthog', () => ({
   FEATURE_FLAG_QUICK_CHAT: 'mobile-quick-chat',
   useFeatureFlag: () => quickChatFlagEnabled.value,

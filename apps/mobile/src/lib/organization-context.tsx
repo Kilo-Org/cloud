@@ -11,6 +11,7 @@ import {
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { writePrivacySnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 type OrganizationContextValue = {
@@ -58,14 +59,26 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     };
   }, [token]);
 
-  const setOrganizationId = useCallback((id: string | null) => {
-    setOrgState(id);
-    if (id) {
-      void setAccountMetadata(ORGANIZATION_STORAGE_KEY, id);
-    } else {
-      void deleteAccountMetadata(ORGANIZATION_STORAGE_KEY);
-    }
-  }, []);
+  const setOrganizationId = useCallback(
+    (id: string | null) => {
+      // A same-value selection is a no-op: blanking it would bump the terminal
+      // epoch and permanently gate the publisher, because React bails out of the
+      // state update and no effect re-runs to rebuild it.
+      if (id === organizationId) {
+        return;
+      }
+      // Blank the current surface before the selection changes so the prior
+      // org's counts are never shown under the next org.
+      writePrivacySnapshotAndEnd();
+      setOrgState(id);
+      if (id) {
+        void setAccountMetadata(ORGANIZATION_STORAGE_KEY, id);
+      } else {
+        void deleteAccountMetadata(ORGANIZATION_STORAGE_KEY);
+      }
+    },
+    [organizationId]
+  );
 
   const value = useMemo<OrganizationContextValue>(
     () => ({ organizationId, isLoaded, setOrganizationId }),

@@ -15,6 +15,7 @@ import {
 import { discardPostHog } from '@/lib/analytics/posthog';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
+import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup } from '@/lib/auth/logout-cleanup';
 import { queryClient } from '@/lib/query-client';
@@ -204,6 +205,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // session out (documented, correct FIFO semantics).
       await chainSave('auth-transition', async () => {
         bumpAuthEpoch();
+        // Blank the prior account's glanceable surface before any credential
+        // persist, so a direct account switch never shows the previous account.
+        writeSignedOutSnapshotAndEnd();
         setAuthEpoch(currentAuthEpoch());
         // Bind the pending deep-link slot to the new user id at the same
         // place the auth epoch advances, so a destination captured while this
@@ -232,6 +236,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         setSignOutActive(false);
         trackEvent('login');
         resetPurchaseErrorToastDedup();
+        // A direct account switch must not keep the prior account's query
+        // cache: the org list is keyed account-independently, so a stale list
+        // would otherwise drive a false lost-org blank in the org fence.
+        queryClient.clear();
         setToken(tokenValue);
         // A direct account switch must not keep the prior account's session
         // state: trusted hosts, image confirms, media caches, temp copies.
@@ -264,6 +272,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // the read-cache mount unsubscribes and cannot resubscribe while the old
       // user id is still cached.
       setSignOutActive(true);
+      // Blank the glanceable surface synchronously, before the first await, so
+      // widgets/activities never outlive the session.
+      writeSignedOutSnapshotAndEnd();
       // Drop an account-bound pending deep-link destination synchronously,
       // before the first await, so a different account signed in later in this
       // process cannot navigate to the previous account's destination. A

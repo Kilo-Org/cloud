@@ -67,9 +67,7 @@ export function getKiloPassSubscriptionCardAccessibility(
     accessibilityHint = i18n.t('kiloPass.opensManagementOnWeb');
   } else if (cardState.action === 'open-store-management') {
     accessibilityHint = i18n.t(
-      platformOS === 'android'
-        ? 'kiloPass.opensPlayManagement'
-        : 'kiloPass.opensAppStoreManagement'
+      platformOS === 'android' ? 'kiloPass.opensPlayManagement' : 'kiloPass.opensAppStoreManagement'
     );
   } else if (cardState.action === 'open-native') {
     accessibilityHint = i18n.t('kiloPass.opensPlans');
@@ -201,7 +199,11 @@ export function getKiloPassSubscriptionCardContentState(params: {
 
   return {
     kind: 'card',
-    state: getActiveSubscriptionCardState(subscription, presentation.statusClass, params.platformOS),
+    state: getActiveSubscriptionCardState(
+      subscription,
+      presentation.statusClass,
+      params.platformOS
+    ),
   };
 }
 
@@ -249,6 +251,21 @@ function getActiveSubscriptionCardState(
   const title = getStatusClassTitle(statusClass, subscription.cancelAtPeriodEnd);
 
   if (subscription.paymentProvider === 'google_play') {
+    if (platformOS !== 'android') {
+      // A Play-owned pass on an iOS device is managed in Google Play, which the
+      // iOS device cannot open — show it inert.
+      return {
+        action: 'none',
+        actionLabel: null,
+        description: subscription.cancelAtPeriodEnd
+          ? `${credits} · ${i18n.t('kiloPass.ends', {
+              date: formatSubscriptionEndDate(subscription.refillAt),
+            })} · ${i18n.t('kiloPass.managedOnGooglePlay')}`
+          : `${credits} · ${i18n.t('kiloPass.managedOnGooglePlay')}`,
+        title,
+      };
+    }
+
     return {
       action: 'open-store-management',
       actionLabel: i18n.t('kiloPass.manage'),

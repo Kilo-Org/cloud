@@ -584,6 +584,28 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
+  it('shows Play copy for an Android preflight owned by another account', async () => {
+    setAndroidNativeIapPresentation();
+    const androidProduct = { ...product, googleProductId: 'kilopass_tier49' };
+    mocks.nativeIap.products = [androidProduct];
+    mocks.preflightMutateAsync.mockResolvedValue({
+      allowed: false,
+      statusClass: 'terminal',
+      reason: 'owned_by_another_account',
+    });
+
+    const renderer = await renderScreen();
+    await press(first(productTiles(renderer)));
+
+    expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
+    expect(allText(renderer)).toContain(
+      'The Kilo Pass on this Google Play account belongs to a different Kilo account. Sign in to that Kilo account to manage it.'
+    );
+    expect(allText(renderer)).not.toContain('Apple Account');
+
+    renderer.unmount();
+  });
+
   it('disables the product tiles while preflight is pending', async () => {
     setNativeIapPresentation();
     mocks.nativeIap.products = [product];

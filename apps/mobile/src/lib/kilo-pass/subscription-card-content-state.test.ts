@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the test file covers every payment provider and platform pairing */
 import { describe, expect, it, vi } from 'vitest';
 
 import { formatDate } from '@/lib/format';
@@ -240,6 +241,62 @@ describe('getKiloPassSubscriptionCardContentState', () => {
         action: 'open-store-management',
         actionLabel: 'Manage',
         description: `$49 monthly credits · Ends ${endDate}`,
+        title: 'Kilo Pass canceling',
+      },
+    });
+  });
+
+  it('renders a Google Play subscription owned on an iOS device as inert', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        presentation: { kind: 'native_iap', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: {
+          cancelAtPeriodEnd: false,
+          currentPeriodBaseCreditsUsd: 49,
+          paymentProvider: 'google_play',
+          refillAt: '2026-06-08T15:21:05.000Z',
+          status: 'active',
+        },
+        stateIsError: false,
+        stateIsPending: false,
+        platformOS: 'ios',
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'none',
+        actionLabel: null,
+        description: '$49 monthly credits · Managed on Google Play',
+        title: 'Kilo Pass active',
+      },
+    });
+  });
+
+  it('renders a canceling Google Play subscription owned on an iOS device as inert', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        presentation: { kind: 'native_iap', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: {
+          cancelAtPeriodEnd: true,
+          currentPeriodBaseCreditsUsd: 49,
+          paymentProvider: 'google_play',
+          refillAt: '2026-06-08T15:21:05.000Z',
+          status: 'active',
+        },
+        stateIsError: false,
+        stateIsPending: false,
+        platformOS: 'ios',
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'none',
+        actionLabel: null,
+        description: `$49 monthly credits · Ends ${endDate} · Managed on Google Play`,
         title: 'Kilo Pass canceling',
       },
     });

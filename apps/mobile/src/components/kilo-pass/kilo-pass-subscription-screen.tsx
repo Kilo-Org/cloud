@@ -38,12 +38,12 @@ type PreflightFailure =
   | { kind: 'retryable'; message: string; product: AppStoreKiloPassProduct }
   | { kind: 'nonRetryable'; message: string };
 
-function getPreflightFailureMessage(reason: string | null): string {
+function getPreflightFailureMessage(reason: string | null, isAndroid: boolean): string {
   if (reason === 'already_subscribed') {
     return i18n.t('kiloPass.alreadySubscribed');
   }
   if (reason === 'owned_by_another_account') {
-    return i18n.t('kiloPass.otherAccountCopy');
+    return i18n.t(isAndroid ? 'kiloPass.otherAccountCopyPlay' : 'kiloPass.otherAccountCopy');
   }
   return i18n.t('kiloPass.purchaseUnavailable');
 }
@@ -258,7 +258,7 @@ function KiloPassNativeIapContent() {
     if (!preflight.allowed) {
       setPreflightFailure({
         kind: 'nonRetryable',
-        message: getPreflightFailureMessage(preflight.reason),
+        message: getPreflightFailureMessage(preflight.reason, isAndroid),
       });
       return;
     }

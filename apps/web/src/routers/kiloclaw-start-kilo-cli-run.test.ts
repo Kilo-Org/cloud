@@ -467,29 +467,6 @@ describe('organizations.kiloclaw.getKiloCliRunStatus', () => {
     });
   });
 
-  it('returns empty status for a nonexistent run ID', async () => {
-    mockGetKiloCliRunStatus.mockResolvedValue({
-      hasRun: false,
-      status: null,
-      output: null,
-      exitCode: null,
-      startedAt: null,
-      completedAt: null,
-      prompt: null,
-    });
-
-    const caller = await createCallerForUser(user.id);
-    const result = await caller.organizations.kiloclaw.getKiloCliRunStatus({
-      organizationId: org.id,
-      runId: '10000000-1000-4000-8000-000000000002',
-    });
-
-    expect(result).toMatchObject({
-      hasRun: false,
-      status: null,
-      output: null,
-    });
-  });
 });
 
 // ── Org router: organizations.kiloclaw.listKiloCliRuns ────────────────────

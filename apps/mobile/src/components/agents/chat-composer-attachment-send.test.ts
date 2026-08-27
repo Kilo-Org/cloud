@@ -65,8 +65,14 @@ vi.mock('react-native', () => ({
   AppState: {
     addEventListener: () => ({ remove: vi.fn() }),
   },
-  Keyboard: { dismiss: vi.fn() },
+  Keyboard: {
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+    dismiss: vi.fn(),
+  },
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  Text: 'Text',
+  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
   View: 'View',
 }));
 
@@ -103,6 +109,11 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useReducedMotion: () => false,
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -184,6 +195,14 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'u1' }),
+}));
+
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: false,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
+  }),
 }));
 
 vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({

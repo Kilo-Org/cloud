@@ -6195,6 +6195,9 @@ export const github_branch_pull_requests = pgTable(
     git_branch: text().notNull(),
     owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
     owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    platform_integration_id: uuid().references(() => platform_integrations.id, {
+      onDelete: 'set null',
+    }),
     // pr_url/pr_number/pr_state are nullable so we can persist a "no PR exists
     // for this branch" sentinel row: pr_last_synced_at then throttles repeated
     // refresh attempts even when GitHub has no matching PR.

@@ -273,6 +273,30 @@ describe('GitHub session creation preflight', () => {
     expect(getTokenForRepo).not.toHaveBeenCalled();
   });
 
+  it('treats an invalid undefined canonical result as access denial without legacy fallback', async () => {
+    const legacyResolver = vi.fn();
+    const getTokenForRepo = vi.fn();
+    const env = {
+      SESSION_INGEST: {
+        resolveAuthorizedSessionSource: vi.fn().mockResolvedValue(undefined),
+        resolveCloudAgentRootSessionForKiloSession: legacyResolver,
+      },
+      GIT_TOKEN_SERVICE: { getTokenForRepo },
+    };
+
+    await expect(
+      canonicalizeRepositoryBeforeSessionCreation({
+        env: env as never,
+        userId: 'user-1',
+        request: githubRequest({
+          clone: { cloneFromKiloSessionId: 'ses_12345678901234567890123456' },
+        }),
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'source_access_denied' });
+    expect(legacyResolver).not.toHaveBeenCalled();
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+  });
+
   it('rejects a source organization mismatch before live GitHub resolution', async () => {
     const getTokenForRepo = vi.fn();
     const env = {

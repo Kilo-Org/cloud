@@ -108,6 +108,7 @@ async function resolveCloneSourceGitHubRepository(input: {
   const sessionIngest = input.env.SESSION_INGEST;
   if (typeof sessionIngest?.resolveAuthorizedSessionSource === 'function') {
     let source;
+    let methodUnavailable = false;
     try {
       source = await sessionIngest.resolveAuthorizedSessionSource({
         kiloUserId: input.userId,
@@ -117,9 +118,9 @@ async function resolveCloneSourceGitHubRepository(input: {
       if (!isMissingAuthorizedSessionSourceRpc(error)) {
         throw githubRepositoryAuthorizationError('source_unavailable');
       }
-      source = undefined;
+      methodUnavailable = true;
     }
-    if (source !== undefined) {
+    if (!methodUnavailable) {
       if (!source) throw sourceAccessDenied();
       if (source.organizationId !== (input.orgId ?? null)) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'organization_mismatch' });

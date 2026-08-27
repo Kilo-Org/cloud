@@ -549,14 +549,14 @@ describe('createMobileAgentSessionManager api.cancelQueuedMessage', () => {
 
   it('adds organizationId to the org mutation payload', async () => {
     cancelQueuedMessageMutate.mockReset();
-    cancelQueuedMessageMutate.mockResolvedValue({ dropped: true });
+    cancelQueuedMessageMutate.mockResolvedValue({ dropped: false });
     const config = setup('org-1');
     const cancel = config.api.cancelQueuedMessage;
     if (!cancel) {
       throw new Error('expected cancelQueuedMessage api');
     }
     const input = { sessionId: 'c-1', messageId: 'm-1' };
-    await expect(cancel(input as never)).resolves.toEqual({ dropped: true });
+    await expect(cancel(input as never)).resolves.toEqual({ dropped: false });
 
     expect(cancelQueuedMessageMutate).toHaveBeenCalledTimes(1);
     expect(cancelQueuedMessageMutate).toHaveBeenCalledWith(

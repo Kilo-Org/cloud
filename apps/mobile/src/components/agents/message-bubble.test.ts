@@ -27,10 +27,15 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 
+// Hoisted so the iOS size test can flip the platform OS and re-evaluate the
+// QUEUED_CONTROL_MIN_HEIGHT module constant via vi.resetModules().
+const { reactNativeMock } = vi.hoisted(() => ({
+  reactNativeMock: { Platform: { OS: 'android' } },
+}));
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
-  Platform: { OS: 'android' },
+  Platform: reactNativeMock.Platform,
 }));
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('expo-haptics', () => ({
@@ -394,6 +399,41 @@ describe('MessageBubble cancel queued and restore', () => {
     expect(restore).not.toBeNull();
     expect(restore?.props.className).toBe('min-h-12');
     expect(restore?.props.size).toBe('sm');
+  });
+
+  it('sizes the controls to the iOS 44pt minimum touch target', async () => {
+    reactNativeMock.Platform.OS = 'ios';
+    vi.resetModules();
+    try {
+      const cancelTree = await renderBubbleWithHandlers(userMessage('m-size-cancel-ios'), {
+        deliveryState: { status: 'queued' },
+        onCancelQueued: vi.fn<(message: StoredMessage) => void>(),
+      });
+      const cancel = findElementByType(
+        cancelTree,
+        'Button',
+        p => p.accessibilityLabel === 'Cancel queued message'
+      );
+      expect(cancel).not.toBeNull();
+      // The Platform mock reports ios, so the controls reach 44pt.
+      expect(cancel?.props.className).toBe('min-h-11');
+      expect(cancel?.props.size).toBe('sm');
+
+      const restoreTree = await renderBubbleWithHandlers(userMessage('m-size-restore-ios'), {
+        onRestoreQueued: vi.fn<(message: StoredMessage) => void>(),
+      });
+      const restore = findElementByType(
+        restoreTree,
+        'Button',
+        p => p.accessibilityLabel === 'Restore canceled message to the composer'
+      );
+      expect(restore).not.toBeNull();
+      expect(restore?.props.className).toBe('min-h-11');
+      expect(restore?.props.size).toBe('sm');
+    } finally {
+      reactNativeMock.Platform.OS = 'android';
+      vi.resetModules();
+    }
   });
 
   it('presses Cancel and Restore to call their handlers with the message', async () => {

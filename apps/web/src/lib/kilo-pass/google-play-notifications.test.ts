@@ -17,7 +17,7 @@ import { KiloPassIssuanceItemKind, KiloPassPaymentProvider } from './enums';
 import type * as GooglePlayNotifications from './google-play-notifications';
 import { toMicrodollars } from '@/lib/utils';
 
-const mockGetGooglePlaySubscriptionPurchase = jest.fn<Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>, [string]>();
+const mockGetGooglePlaySubscriptionPurchase = jest.fn<(purchaseToken: string) => Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>>();
 
 jest.mock('./google-play-sdk', () => ({
   getGooglePlaySubscriptionPurchase: mockGetGooglePlaySubscriptionPurchase,

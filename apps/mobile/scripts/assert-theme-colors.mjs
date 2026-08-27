@@ -34,7 +34,10 @@ if (expected === actual) {
 }
 
 const { light, dark } = readThemeColors();
-const disk = { light: extractObject(actual, 'lightColors'), dark: extractObject(actual, 'darkColors') };
+const disk = {
+  light: extractObject(actual, 'lightColors'),
+  dark: extractObject(actual, 'darkColors'),
+};
 
 const drift = [];
 for (const [jsKey, cssVar] of TOKEN_KEYS) {
@@ -46,7 +49,9 @@ for (const [jsKey, cssVar] of TOKEN_KEYS) {
   }
 }
 
-console.error(`Theme colors drifted from src/global.css. Run "node scripts/generate-theme-colors.mjs".`);
+console.error(
+  `Theme colors drifted from src/global.css. Run "node scripts/generate-theme-colors.mjs".`
+);
 for (const entry of drift) {
   console.error(`  - ${entry}`);
 }

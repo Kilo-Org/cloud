@@ -111,7 +111,7 @@ export function parseSseDataLine(line: string): SseParseResult {
  * an abort. Lines split across chunk boundaries are buffered so a partial
  * `data:` event is still parsed whole.
  */
-export async function* readSseContent(
+async function* readSseContent(
   body: ReadableStream<Uint8Array>,
   signal?: AbortSignal
 ): AsyncGenerator<string> {

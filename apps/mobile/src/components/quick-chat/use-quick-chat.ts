@@ -46,6 +46,7 @@ export function useQuickChat(model: string) {
   const [olderError, setOlderError] = useState<OlderMessagesError | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+  const stopRef = useRef<(() => void) | null>(null);
   const nextCursorRef = useRef<string | null>(null);
   const olderLoadingRef = useRef(false);
   // Bumped every time the newest page resets (or the scope changes), so an
@@ -53,15 +54,17 @@ export function useQuickChat(model: string) {
   // of prepending rows contiguous with the old first page.
   const pageResetRef = useRef(0);
 
-  const listQueryOptions = trpc.quickChat.listMessages.queryOptions({ organizationId });
   const listQuery = useQuery({
-    ...listQueryOptions,
     // Key the page by the auth epoch so a sign-in can never render the previous
     // account's cached page, and keep it disabled until the org scope hydrates
     // (the context starts as null while SecureStore loads, so an early fetch
     // would resolve the personal thread first and then swap when the stored org
     // arrives).
-    queryKey: [...listQueryOptions.queryKey, authEpoch],
+    queryKey: [...trpc.quickChat.listMessages.queryKey({ organizationId }), authEpoch],
+    queryFn: async () => {
+      const page = await trpcClient.quickChat.listMessages.query({ organizationId });
+      return page;
+    },
     enabled: orgLoaded,
   });
 
@@ -77,6 +80,7 @@ export function useQuickChat(model: string) {
     scopeKeyRef.current = scopeKey;
     abortRef.current?.abort();
     abortRef.current = null;
+    stopRef.current = null;
     setLocalTurns([]);
     setIsStreaming(false);
     setThreadId(null);
@@ -96,6 +100,8 @@ export function useQuickChat(model: string) {
   useEffect(
     () => () => {
       abortRef.current?.abort();
+      abortRef.current = null;
+      stopRef.current = null;
     },
     []
   );
@@ -237,18 +243,33 @@ export function useQuickChat(model: string) {
     userRow: QuickChatRow,
     history: QuickChatGatewayMessage[]
   ) {
-    // A send while a stream is in flight must not start a second unstoppable
-    // stream: abort the previous completion first, then own the ref.
-    abortRef.current?.abort();
+    onStop();
     const controller = new AbortController();
     abortRef.current = controller;
     setIsStreaming(true);
     const assistantId = `local-${clientId}-assistant`;
+    let assistantText = '';
+
+    const finishTurn = () => {
+      if (abortRef.current !== controller) {
+        return;
+      }
+      abortRef.current = null;
+      stopRef.current = null;
+      setIsStreaming(false);
+      void appendTurn(clientId, userRow.content, assistantText);
+    };
+    stopRef.current = () => {
+      controller.abort();
+      finishTurn();
+    };
 
     void (async () => {
-      let assistantText = '';
       try {
         const authToken = await getAuthTokenForRequest();
+        if (abortRef.current !== controller) {
+          return;
+        }
         if (!authToken) {
           throw new Error('Missing auth token');
         }
@@ -259,6 +280,9 @@ export function useQuickChat(model: string) {
           authToken,
           signal: controller.signal,
         })) {
+          if (abortRef.current !== controller) {
+            return;
+          }
           assistantText += delta;
           const content = assistantText;
           setLocalTurns(prev =>
@@ -277,24 +301,12 @@ export function useQuickChat(model: string) {
             )
           );
         }
-        void appendTurn(clientId, userRow.content, assistantText);
       } catch {
-        // On an explicit Stop the signal is aborted: keep the user bubble and
-        // any partial assistant text, no error toast. Any other failure keeps
-        // the user bubble too (the draft is never restored), and toasts a
-        // localized, generic message (the gateway's raw error strings are
-        // technical and never user-facing).
         if (!controller.signal.aborted) {
           toast.error(i18n.t('quickChat.sendError'));
         }
       } finally {
-        // Only the stream that still owns the ref clears it and the streaming
-        // flag: a superseded stream's finally must not clobber the newer
-        // controller (or clear a newer stream's `isStreaming`).
-        if (abortRef.current === controller) {
-          abortRef.current = null;
-          setIsStreaming(false);
-        }
+        finishTurn();
       }
     })();
   }
@@ -325,9 +337,7 @@ export function useQuickChat(model: string) {
   }
 
   function onStop(): void {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setIsStreaming(false);
+    stopRef.current?.();
   }
 
   return {

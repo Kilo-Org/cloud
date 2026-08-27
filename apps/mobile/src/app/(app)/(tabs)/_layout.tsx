@@ -78,7 +78,7 @@ export default function TabsLayout() {
 
   // If the flag flips off while the Chat tab is focused, its `href` becomes
   // null but the route is still mounted — move to Home instead.
-  const onChatTab = segments.includes('(4_chat)');
+  const onChatTab = segments.some(segment => segment === '(4_chat)');
   useEffect(() => {
     if (!showQuickChatTab && onChatTab) {
       router.replace('/(app)/(tabs)/(0_home)' as Href);

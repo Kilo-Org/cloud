@@ -52,6 +52,12 @@ async function noopExitSession(): Promise<void> {}
 /* eslint-enable require-await, @typescript-eslint/require-await, no-empty-function */
 
 export function QuickChatScreen() {
+  const { organizationId } = useOrganization();
+  const { authEpoch } = useAuth();
+  return <ScopedQuickChatScreen key={`${authEpoch}:${organizationId ?? 'personal'}`} />;
+}
+
+function ScopedQuickChatScreen() {
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
   const { authEpoch } = useAuth();
@@ -102,14 +108,6 @@ export function QuickChatScreen() {
   const composerScope = `${authEpoch}:${organizationId ?? 'personal'}`;
   const draftKey = `quick-chat:${composerScope}`;
   const composerDraft = useFencedDraftLoad({ userId, isIdentityLoading, entityKey: draftKey });
-  // A scope switch remounts the composer (`key={composerScope}`) but would
-  // leave the picked model id in place, so the chip would keep the prior org's
-  // model and send that stale id. Reset the pick so the chip falls back to the
-  // new catalog default.
-  useEffect(() => {
-    setPickedModel(null);
-    setPickedVariant('');
-  }, [composerScope]);
   const composerBottomPadding = keyboardVisible ? 0 : tabBarBottomPadding;
   // Passthrough aliases keep the JSX handler values in the `handle*` convention.
   const handleSend = chat.onSend;

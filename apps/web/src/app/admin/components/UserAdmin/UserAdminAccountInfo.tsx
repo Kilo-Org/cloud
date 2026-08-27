@@ -203,7 +203,7 @@ export function UserLoginMethods({ methods }: { methods: UserDetailProps['login_
               </span>
             ) : null}
             {diagnostic.hasConflict ? (
-              <span className="text-[10px] uppercase tracking-wide">conflict</span>
+              <span className="sr-only">Cross-account conflict</span>
             ) : null}
           </Badge>
         );

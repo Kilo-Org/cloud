@@ -9,7 +9,7 @@ import {
   insertSorted,
   isSupportedDeltaField,
   notify,
-  upsertPartDroppingStaleSyntheticTextParts,
+  upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
 function makePart(id: string, text = '', messageID = 'm'): Part {
@@ -55,12 +55,12 @@ describe('insertPartSorted', () => {
   });
 });
 
-describe('upsertPartDroppingStaleSyntheticTextParts', () => {
+describe('upsertPartDroppingStaleSyntheticParts', () => {
   test('removes stale synthetic text part when real text part arrives', () => {
     const syntheticPart = { ...makePart('msg-1-text', 'optimistic'), synthetic: true };
     const realPart = makePart('prt-real', 'authoritative');
 
-    const result = upsertPartDroppingStaleSyntheticTextParts([syntheticPart], realPart);
+    const result = upsertPartDroppingStaleSyntheticParts([syntheticPart], realPart);
 
     expect(result).toEqual([realPart]);
   });
@@ -69,7 +69,7 @@ describe('upsertPartDroppingStaleSyntheticTextParts', () => {
     const existingSynthetic = { ...makePart('msg-1-text', 'optimistic', 'msg-1'), synthetic: true };
     const realPart = makePart('prt-real', 'authoritative', 'msg-2');
 
-    const result = upsertPartDroppingStaleSyntheticTextParts([existingSynthetic], realPart);
+    const result = upsertPartDroppingStaleSyntheticParts([existingSynthetic], realPart);
 
     expect(result.map(part => part.id)).toEqual(['msg-1-text', 'prt-real']);
   });
@@ -78,7 +78,7 @@ describe('upsertPartDroppingStaleSyntheticTextParts', () => {
     const existingSynthetic = { ...makePart('msg-1-text', 'optimistic'), synthetic: true };
     const incomingSynthetic = { ...makePart('prt-synthetic', 'new'), synthetic: true };
 
-    const result = upsertPartDroppingStaleSyntheticTextParts(
+    const result = upsertPartDroppingStaleSyntheticParts(
       [existingSynthetic],
       incomingSynthetic
     );
@@ -90,9 +90,57 @@ describe('upsertPartDroppingStaleSyntheticTextParts', () => {
     const syntheticPart = { ...makePart('msg-1-text', 'optimistic'), synthetic: true };
     const toolPart = { id: 'tool-1', sessionID: 's', messageID: 'm', type: 'tool' } as Part;
 
-    const result = upsertPartDroppingStaleSyntheticTextParts([syntheticPart], toolPart);
+    const result = upsertPartDroppingStaleSyntheticParts([syntheticPart], toolPart);
 
     expect(result.map(part => part.id)).toEqual(['msg-1-text', 'tool-1']);
+  });
+
+  test('removes stale synthetic file part when a real file part arrives', () => {
+    const syntheticFile = {
+      id: 'msg-1-file-0',
+      sessionID: 's',
+      messageID: 'msg-1',
+      type: 'file',
+      mime: '',
+      url: '',
+      synthetic: true,
+    } as Part;
+    const realFile = {
+      id: 'prt-file',
+      sessionID: 's',
+      messageID: 'msg-1',
+      type: 'file',
+      mime: 'image/png',
+      url: 'https://cdn/file.png',
+    } as Part;
+
+    const result = upsertPartDroppingStaleSyntheticParts([syntheticFile], realFile);
+
+    expect(result.map(part => part.id)).toEqual(['prt-file']);
+  });
+
+  test('preserves synthetic file part for a different message', () => {
+    const syntheticFile = {
+      id: 'msg-1-file-0',
+      sessionID: 's',
+      messageID: 'msg-1',
+      type: 'file',
+      mime: '',
+      url: '',
+      synthetic: true,
+    } as Part;
+    const realFile = {
+      id: 'prt-file',
+      sessionID: 's',
+      messageID: 'msg-2',
+      type: 'file',
+      mime: 'image/png',
+      url: 'https://cdn/file.png',
+    } as Part;
+
+    const result = upsertPartDroppingStaleSyntheticParts([syntheticFile], realFile);
+
+    expect(result.map(part => part.id)).toEqual(['msg-1-file-0', 'prt-file']);
   });
 });
 

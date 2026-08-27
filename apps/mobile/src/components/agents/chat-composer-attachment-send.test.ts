@@ -341,7 +341,11 @@ describe('ChatComposer attachment-only send', () => {
     await settle();
 
     expect(onSendMock).toHaveBeenCalledTimes(1);
-    expect(onSendMock).toHaveBeenCalledWith('', { path: 'path-1', files: ['file.png'] }, undefined);
+    expect(onSendMock).toHaveBeenCalledWith('', {
+      attachments: { path: 'path-1', files: ['file.png'] },
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
   });
 
   it('does not send an empty draft with no attachments', async () => {

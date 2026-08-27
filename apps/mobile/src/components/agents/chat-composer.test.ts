@@ -366,7 +366,11 @@ describe('ChatComposer draft restore', () => {
       return;
     }
     expect(onSendMock).toHaveBeenCalledTimes(1);
-    expect(onSendMock).toHaveBeenCalledWith(sent, undefined, undefined);
+    expect(onSendMock).toHaveBeenCalledWith(sent, {
+      attachments: undefined,
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
   });
 
   // The host mounts the composer before identity (`user.getMe`) and the draft
@@ -381,7 +385,11 @@ describe('ChatComposer draft restore', () => {
     requireInputRowOnSubmit(settled)();
     await settle();
 
-    expect(onSendMock).toHaveBeenCalledWith('Restored draft text', undefined, undefined);
+    expect(onSendMock).toHaveBeenCalledWith('Restored draft text', {
+      attachments: undefined,
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
   });
 
   it('keeps text typed before the draft settles instead of restoring over it', async () => {
@@ -396,10 +404,10 @@ describe('ChatComposer draft restore', () => {
     requireInputRowOnSubmit(settled)();
     await settle();
 
-    expect(onSendMock).toHaveBeenCalledWith(
-      'typed while identity was loading',
-      undefined,
-      undefined
-    );
+    expect(onSendMock).toHaveBeenCalledWith('typed while identity was loading', {
+      attachments: undefined,
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
   });
 });

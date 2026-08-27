@@ -16,6 +16,7 @@ import {
   classifyAttachment,
   describeClassificationFailure,
   mimeForExtension,
+  normalizeAttachmentExtension,
 } from '@/lib/agent-attachments/validate';
 import {
   type AgentAttachment,
@@ -117,6 +118,12 @@ type UseAgentAttachmentUploadReturn = {
   reset: () => void;
   /** Release every admitted-but-unsent key (leave/abandon). Never blocks or throws. */
   releaseUnclaimedUploads: () => void;
+  /** Re-attach recoverable canceled-message file parts as already-uploaded chips. */
+  restoreFileParts: (parts: readonly { filename?: string; mime: string; url: string }[]) => void;
+  /** Clear chips for an optimistic send without deleting their local files. */
+  clearOptimistic: () => void;
+  /** Re-add chips after a failed optimistic send. */
+  restoreChips: (chips: readonly AgentAttachment[]) => void;
   isUploading: boolean;
   hasFailedAttachments: boolean;
   hasUnclaimedAttachments: boolean;
@@ -647,6 +654,66 @@ export function useAgentAttachmentUpload(
   const hasFailedAttachments = hasAnyFailedAttachment(attachments);
   const hasUnclaimedAttachments = hasAnyUnclaimedAttachment(attachments);
 
+  // Re-attach the recoverable file parts of a canceled queued message as
+  // already-uploaded chips (their remote objects already exist). A file part
+  // without a URL is not recoverable and is skipped.
+  const restoreFileParts = useCallback(
+    (parts: readonly { filename?: string; mime: string; url: string }[]) => {
+      const recoverable = parts.filter(part => part.url !== '');
+      if (recoverable.length === 0) {
+        return;
+      }
+      const additions: AgentAttachment[] = recoverable.map(part => {
+        const extension = normalizeAttachmentExtension(part.filename ?? 'file');
+        const filename = normalizeFilename(part.filename ?? 'file', extension);
+        const kind = part.mime.startsWith('image/') ? 'image' : 'document';
+        return {
+          id: Crypto.randomUUID(),
+          filename,
+          remoteFilename: filename,
+          kind,
+          extension,
+          mimeType:
+            part.mime !== ''
+              ? (part.mime as AgentAttachment['mimeType'])
+              : mimeForExtension(extension),
+          size: 0,
+          localUri: part.url,
+          localFileOwned: false,
+          status: 'uploaded',
+          progress: null,
+        };
+      });
+      commitAttachments(current => [...current, ...additions]);
+    },
+    [commitAttachments]
+  );
+
+  // Optimistic-send chip clear: like `reset` but keeps the local cache files
+  // so a transport failure can restore the same chips. Orphaned files on a
+  // successful send are reclaimed by the temp-file reaper.
+  const clearOptimistic = useCallback(() => {
+    generationRef.current += 1;
+    for (const id of liveIdsRef.current) {
+      cancelUpload(id);
+    }
+    liveIdsRef.current.clear();
+    commitAttachments(() => []);
+    pathRef.current = Crypto.randomUUID();
+    messageUuidRef.current = Crypto.randomUUID();
+  }, [cancelUpload, commitAttachments]);
+
+  // Re-add chips after a failed optimistic send (restore recoverable attachments).
+  const restoreChips = useCallback(
+    (chips: readonly AgentAttachment[]) => {
+      if (chips.length === 0) {
+        return;
+      }
+      commitAttachments(current => [...current, ...chips]);
+    },
+    [commitAttachments]
+  );
+
   return useMemo(
     () => ({
       attachments,
@@ -657,6 +724,9 @@ export function useAgentAttachmentUpload(
       reorderAttachments,
       reset,
       releaseUnclaimedUploads,
+      restoreFileParts,
+      clearOptimistic,
+      restoreChips,
       isUploading,
       hasFailedAttachments,
       hasUnclaimedAttachments,
@@ -671,6 +741,9 @@ export function useAgentAttachmentUpload(
       reorderAttachments,
       reset,
       releaseUnclaimedUploads,
+      restoreFileParts,
+      clearOptimistic,
+      restoreChips,
       isUploading,
       hasFailedAttachments,
       hasUnclaimedAttachments,

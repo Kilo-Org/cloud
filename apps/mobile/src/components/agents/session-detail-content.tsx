@@ -5,6 +5,7 @@ import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
+import * as Haptics from 'expo-haptics';
 import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +13,11 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
-import { ChatComposer, type ChatComposerControl } from '@/components/agents/chat-composer';
+import {
+  ChatComposer,
+  type ChatComposerControl,
+  type ChatComposerSendOptions,
+} from '@/components/agents/chat-composer';
 import {
   type AgentMode,
   customModeOptionsFromRuntimeAgents,
@@ -42,6 +47,11 @@ import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
+import {
+  isCancelQueuedUpgradeRequired,
+  resolveCancelQueuedRestoreOutcome,
+} from '@/components/agents/mobile-session-manager';
+import { firstHumanText, isFilePart } from './part-types';
 import {
   buildRemoteAttachmentPartsWithRetryableFeedback,
   resolveSendAttachmentKind,
@@ -101,11 +111,10 @@ import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
-import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import {
   type AnalyticsSurface,
   captureEvent,
@@ -669,9 +678,51 @@ export function SessionDetailContent({
     }
   }, [clearChildSheetReleaseTimeout]);
 
+  // Canceled queued rows: `droppedQueuedIds` filters a canceled (empty-composer)
+  // row out of the transcript before merge; `canceledQueuedMessages` keeps the
+  // full row with a Restore action when the composer was occupied (the SDK
+  // deletes the row on cloud.message.canceled, so the local copy re-inserts it).
+  // `cancelQueuedStatus` surfaces the outcome through `AccessibleStatus`. All
+  // three reset on switch.
+  const EMPTY_CANCELED: ReadonlyMap<string, StoredMessage> = new Map();
+  const [droppedQueuedIds, setDroppedQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  const [canceledQueuedMessages, setCanceledQueuedMessages] =
+    useState<ReadonlyMap<string, StoredMessage>>(EMPTY_CANCELED);
+  const [cancelQueuedStatus, setCancelQueuedStatus] = useState<{
+    tone: 'status' | 'error';
+    message: string;
+  } | null>(null);
+
+  const visibleMessages = useMemo(() => {
+    const base =
+      droppedQueuedIds.size === 0
+        ? messages
+        : messages.filter(m => !droppedQueuedIds.has(m.info.id));
+    if (canceledQueuedMessages.size === 0) {
+      return base;
+    }
+    // Re-insert the canceled-but-kept rows the SDK already removed, in their
+    // original id-sorted position (the SDK orders messages by id).
+    const kept = [...canceledQueuedMessages.values()].filter(
+      m => !base.some(b => b.info.id === m.info.id)
+    );
+    if (kept.length === 0) {
+      return base;
+    }
+    return [...base, ...kept].toSorted((a, b) => {
+      if (a.info.id < b.info.id) {
+        return -1;
+      }
+      if (a.info.id > b.info.id) {
+        return 1;
+      }
+      return 0;
+    });
+  }, [messages, droppedQueuedIds, canceledQueuedMessages]);
+
   const transcript = useMemo(
-    () => mergeSessionTranscript(messages, preparationAttempts),
-    [messages, preparationAttempts]
+    () => mergeSessionTranscript(visibleMessages, preparationAttempts),
+    [visibleMessages, preparationAttempts]
   );
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
@@ -682,6 +733,9 @@ export function SessionDetailContent({
   if (prevSessionId !== sessionId) {
     setPrevSessionId(sessionId);
     setHeldQueuedIds(EMPTY_IDS);
+    setDroppedQueuedIds(EMPTY_IDS);
+    setCanceledQueuedMessages(EMPTY_CANCELED);
+    setCancelQueuedStatus(null);
   } else {
     const next = nextHeldQueuedIds(heldQueuedIds, pendingMessages, isStreaming);
     if (next !== heldQueuedIds) {
@@ -692,11 +746,8 @@ export function SessionDetailContent({
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
 
   const handleSend = useCallback(
-    async (
-      text: string,
-      attachments?: AgentAttachmentWire,
-      submission?: AgentAttachmentSubmissionPayload
-    ) => {
+    async (text: string, options?: ChatComposerSendOptions) => {
+      const { attachments, submission, onOptimisticSend } = options ?? {};
       if (requiresModel && !(pinned.model ?? currentModel)) {
         toast.error(t('agentChat.composer.selectModelBeforeSending'));
         return;
@@ -764,6 +815,7 @@ export function SessionDetailContent({
         },
         ...(kind === 'cloud' && attachments ? { attachments } : {}),
         ...(kind === 'remote-capable' && attachmentParts ? { attachmentParts } : {}),
+        ...(onOptimisticSend ? { onOptimisticSend } : {}),
       });
       if (!sent) {
         throw new Error('Failed to send message');
@@ -813,6 +865,68 @@ export function SessionDetailContent({
     [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
   );
 
+  const handleCancelQueued = useCallback(
+    async (message: StoredMessage) => {
+      try {
+        await manager.cancelQueuedMessage(message.info.id);
+      } catch (cancelError) {
+        const upgrade = isCancelQueuedUpgradeRequired(cancelError);
+        setCancelQueuedStatus({
+          tone: 'error',
+          message: upgrade
+            ? t('agentChat.session.cancelQueuedUpgradeRequired')
+            : t('agentChat.session.cancelQueuedFailed'),
+        });
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        return;
+      }
+      const composerHasContent = composerControlRef.current?.hasContent() ?? false;
+      const outcome = resolveCancelQueuedRestoreOutcome(composerHasContent);
+      const prompt = firstHumanText(message.parts);
+      if (outcome === 'restore') {
+        if (prompt !== '') {
+          composerControlRef.current?.setText(prompt);
+        }
+        composerControlRef.current?.restoreAttachments(message.parts.filter(isFilePart));
+        setDroppedQueuedIds(prev => new Set(prev).add(message.info.id));
+        setCancelQueuedStatus({
+          tone: 'status',
+          message: t('agentChat.session.cancelQueuedRestored'),
+        });
+      } else {
+        setCanceledQueuedMessages(prev => new Map(prev).set(message.info.id, message));
+        setCancelQueuedStatus({
+          tone: 'status',
+          message: t('agentChat.session.cancelQueuedRestoreAvailable'),
+        });
+      }
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    [manager, t]
+  );
+
+  const handleRestoreQueued = useCallback(
+    (message: StoredMessage) => {
+      const stored = canceledQueuedMessages.get(message.info.id) ?? message;
+      const prompt = firstHumanText(stored.parts);
+      if (prompt !== '') {
+        composerControlRef.current?.setText(prompt);
+      }
+      composerControlRef.current?.restoreAttachments(stored.parts.filter(isFilePart));
+      setCanceledQueuedMessages(prev => {
+        const next = new Map(prev);
+        next.delete(message.info.id);
+        return next;
+      });
+      setCancelQueuedStatus({
+        tone: 'status',
+        message: t('agentChat.session.cancelQueuedRestored'),
+      });
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    [canceledQueuedMessages, t]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: SessionTranscriptItem }) => {
       if (item.type === 'preparation') {
@@ -843,6 +957,10 @@ export function SessionDetailContent({
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
           onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
           onCopyToComposer={handleCopyToComposer}
+          onCancelQueued={deliveryState?.status === 'queued' ? handleCancelQueued : undefined}
+          onRestoreQueued={
+            canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
+          }
         />
       );
     },
@@ -858,6 +976,9 @@ export function SessionDetailContent({
       messages,
       handleRetryMessage,
       handleCopyToComposer,
+      handleCancelQueued,
+      handleRestoreQueued,
+      canceledQueuedMessages,
     ]
   );
 
@@ -1272,6 +1393,12 @@ export function SessionDetailContent({
           />
           {renderContent()}
         </View>
+
+        <AccessibleStatus
+          message={cancelQueuedStatus?.message ?? null}
+          tone={cancelQueuedStatus?.tone ?? 'status'}
+          className="px-4 text-center text-sm"
+        />
 
         {/* Fixed indicator row — lives outside the FlashList so per-token
             content-size changes during streaming cannot reposition it.

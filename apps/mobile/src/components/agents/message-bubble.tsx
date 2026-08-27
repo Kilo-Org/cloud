@@ -43,6 +43,10 @@ type MessageBubbleProps = {
   onRetryMessage?: (message: StoredMessage) => void;
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
+  /** Cancels a queued (not yet accepted) user message. Rendered only while queued. */
+  onCancelQueued?: (message: StoredMessage) => void | Promise<void>;
+  /** Restores a canceled queued message's prompt back into the composer. */
+  onRestoreQueued?: (message: StoredMessage) => void;
 };
 
 function MessageBubbleImpl({
@@ -58,6 +62,8 @@ function MessageBubbleImpl({
   holdQueuedSlot,
   onRetryMessage,
   onCopyToComposer,
+  onCancelQueued,
+  onRestoreQueued,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
@@ -178,28 +184,56 @@ function MessageBubbleImpl({
                 ))}
               </InMessageBubbleContext.Provider>
             </Bubble>
-            {hasBadgeSlot ? (
+            {hasBadgeSlot || onRestoreQueued ? (
               <View className="flex-row items-center gap-2 self-end pr-1">
-                <View
-                  accessibilityRole={isQueued ? 'text' : undefined}
-                  accessibilityLabel={
-                    isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
-                  }
-                  accessible={isQueued}
-                  {...(!isQueued
-                    ? {
-                        accessibilityElementsHidden: true as const,
-                        importantForAccessibility: 'no-hide-descendants' as const,
-                      }
-                    : {})}
-                  pointerEvents={isQueued ? 'auto' : 'none'}
-                  className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
-                >
-                  <Clock size={12} color={colors.mutedForeground} />
-                  <Text className="text-xs text-muted-foreground">
-                    {t('agentChat.messageBubble.queued')}
-                  </Text>
-                </View>
+                {hasBadgeSlot ? (
+                  <View
+                    accessibilityRole={isQueued ? 'text' : undefined}
+                    accessibilityLabel={
+                      isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
+                    }
+                    accessible={isQueued}
+                    {...(!isQueued
+                      ? {
+                          accessibilityElementsHidden: true as const,
+                          importantForAccessibility: 'no-hide-descendants' as const,
+                        }
+                      : {})}
+                    pointerEvents={isQueued ? 'auto' : 'none'}
+                    className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
+                  >
+                    <Clock size={12} color={colors.mutedForeground} />
+                    <Text className="text-xs text-muted-foreground">
+                      {t('agentChat.messageBubble.queued')}
+                    </Text>
+                  </View>
+                ) : null}
+                {isQueued && onCancelQueued ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    accessibilityRole="button"
+                    accessibilityLabel={t('agentChat.messageBubble.cancelQueuedAccessibility')}
+                    onPress={() => {
+                      void onCancelQueued(message);
+                    }}
+                  >
+                    <Text>{t('agentChat.messageBubble.cancelQueued')}</Text>
+                  </Button>
+                ) : null}
+                {!isQueued && onRestoreQueued ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    accessibilityRole="button"
+                    accessibilityLabel={t('agentChat.messageBubble.restoreQueuedAccessibility')}
+                    onPress={() => {
+                      onRestoreQueued(message);
+                    }}
+                  >
+                    <Text>{t('agentChat.messageBubble.restoreQueued')}</Text>
+                  </Button>
+                ) : null}
               </View>
             ) : null}
           </View>

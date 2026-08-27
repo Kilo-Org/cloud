@@ -570,7 +570,7 @@ describe('useAgentAttachmentUpload — attachment reorder (attachment reorder)',
     await act(async () => {
       result = await hookApi().uploadPending();
     });
-    return result as Awaited<ReturnType<HookApi['uploadPending']>>;
+    return result as unknown as Awaited<ReturnType<HookApi['uploadPending']>>;
   }
 
   it('moves a chip one slot and keeps submission order in sync', async () => {

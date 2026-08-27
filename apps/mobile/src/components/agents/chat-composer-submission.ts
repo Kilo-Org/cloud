@@ -26,7 +26,6 @@ type ChatComposerSubmissionHandlers = {
 
 type ChatComposerSubmissionCleanup = {
   clearDraft: () => void;
-  resetAttachments: () => void;
   dismiss: () => void;
 };
 
@@ -82,8 +81,10 @@ export async function executeChatComposerSubmission(
     return;
   }
 
+  // Optimistic prompt send: the caller clears the composer via the SDK's
+  // onOptimisticSend signal (fired synchronously after the optimistic row is
+  // inserted). Clearing here would clobber any new text typed during the
+  // transport round-trip, so this branch only awaits and lets the caller
+  // restore the draft on failure.
   await handlers.onSendPrompt(submission.prompt);
-  cleanup.clearDraft();
-  cleanup.resetAttachments();
-  cleanup.dismiss();
 }

@@ -52,6 +52,9 @@ import type {
   MessageDeliveryState,
   MessageInfo,
   Part,
+  FilePart,
+  TextPart,
+  UserMessage,
   OlderMessagesError,
   PreparationAttempt,
 } from './types';
@@ -439,6 +442,12 @@ type SessionManager = {
      * reach the transport.
      */
     attachmentParts?: RemoteAttachmentPart[];
+    /**
+     * Fired synchronously after the optimistic user row is inserted, before the
+     * transport round-trip. The composer uses it to clear the draft and unlock
+     * so the prompt never renders in both the transcript and the input.
+     */
+    onOptimisticSend?: () => void;
   }): Promise<boolean>;
   setRemoteModelOverride(override: RemoteModelOverride | null): void;
   setCloudAgentModelOverride(override: CloudAgentModelOverride | null): void;
@@ -535,6 +544,82 @@ function isMessageStreaming(msg: StoredMessage): boolean {
   });
 }
 
+/**
+ * Build optimistic file parts for a just-sent user message. Remote sessions
+ * carry full `RemoteAttachmentPart` info (mime/filename/url); cloud-agent
+ * `attachments` carry only filenames, so those parts render as filename-only
+ * placeholders until the server echoes the authoritative parts.
+ */
+function buildOptimisticFileParts(
+  messageId: string,
+  sessionId: string,
+  input: { attachments?: CloudAgentAttachments; attachmentParts?: RemoteAttachmentPart[] }
+): FilePart[] {
+  if (input.attachmentParts && input.attachmentParts.length > 0) {
+    return input.attachmentParts.map((part, index) => ({
+      id: `${messageId}-file-${index}`,
+      sessionID: sessionId,
+      messageID: messageId,
+      type: 'file',
+      mime: part.mime,
+      filename: part.filename,
+      url: part.url,
+      synthetic: true,
+    }));
+  }
+  if (input.attachments && input.attachments.files.length > 0) {
+    return input.attachments.files.map((filename, index) => ({
+      id: `${messageId}-file-${index}`,
+      sessionID: sessionId,
+      messageID: messageId,
+      type: 'file',
+      mime: '',
+      filename,
+      url: '',
+      synthetic: true,
+    }));
+  }
+  return [];
+}
+
+/**
+ * Materialize the optimistic user message row at send time so the transcript
+ * renders the prompt (and files) before the server or CLI echoes it back.
+ * Mirrors `synthesizeQueuedUserMessage`'s shape so the authoritative
+ * `message.updated` overwrites it by id.
+ */
+function insertOptimisticUserMessage(input: {
+  storage: JotaiSessionStorage;
+  sessionId: string;
+  messageId: string;
+  messageText: string;
+  attachments?: CloudAgentAttachments;
+  attachmentParts?: RemoteAttachmentPart[];
+}): void {
+  const { storage, sessionId, messageId, messageText } = input;
+  const syntheticMessage: UserMessage = {
+    id: messageId,
+    sessionID: sessionId,
+    role: 'user',
+    time: { created: Date.now() },
+    agent: '',
+    model: { providerID: '', modelID: '' },
+  };
+  storage.upsertMessage(syntheticMessage);
+  const textPart: TextPart = {
+    id: `${messageId}-text`,
+    sessionID: sessionId,
+    messageID: messageId,
+    type: 'text',
+    text: messageText,
+    synthetic: true,
+  };
+  storage.upsertPart(messageId, textPart);
+  for (const filePart of buildOptimisticFileParts(messageId, sessionId, input)) {
+    storage.upsertPart(messageId, filePart);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Status → indicator mapping
 // ---------------------------------------------------------------------------
@@ -602,6 +687,12 @@ function removePendingRequest<T extends { requestId: string }>(
 
 function createSessionManager(config: SessionManagerConfig): SessionManager {
   const { store } = config;
+
+  // In-flight optimistic user-message ids for the active remote session. New
+  // CLIs echo our generated id back; old CLIs assign their own, so this Set
+  // (not a single flag) lets us retarget each optimistic row to the
+  // authoritative message exactly once.
+  const remoteOptimisticIds = new Set<string>();
 
   // Internal atoms
   const sessionStorageAtom = atom<JotaiSessionStorage | null>(null);
@@ -1496,6 +1587,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // Clean slate immediately — the user asked to switch, so clear all
     // previous session state and show a loading indicator.
     clearAllAtoms();
+    remoteOptimisticIds.clear();
     store.set(rootSessionIdAtom, kiloSessionId);
     store.set(isLoadingAtom, true);
 
@@ -1727,6 +1819,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           store.set(availableCommandsAtom, event.commands);
           return;
         }
+        if (event.type === 'queue.changed' && activeSessionType === 'remote') {
+          // The CLI's authoritative FIFO snapshot omits an optimistic id when
+          // it assigned its own id (old CLI) or already dequeued it. Drop any
+          // optimistic row the snapshot no longer includes so a retarget can
+          // never leave a ghost prompt behind.
+          if (remoteOptimisticIds.size > 0) {
+            const queued = new Set(event.queued);
+            for (const id of [...remoteOptimisticIds]) {
+              if (!queued.has(id)) {
+                remoteOptimisticIds.delete(id);
+                session.storage.deleteMessage(id);
+              }
+            }
+          }
+          return;
+        }
         if (event.type === 'message.updated') {
           const rootSessionId = store.get(rootSessionIdAtom);
           if (rootSessionId !== null && event.info.sessionID !== rootSessionId) return;
@@ -1743,6 +1851,23 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           const canApplyMessageObservation =
             !remoteHistoryReplaying || observedModelSource !== 'session';
           if (event.info.role === 'user') {
+            // Remote optimistic retarget (per-id Set, never prompt text).
+            // Reconcile the synthetic row inserted at send() with the
+            // authoritative user message the CLI produced. Same id (new CLI
+            // echoes messageID) → keep the row (the upsert just overwrote it)
+            // and clear the id. Different id (old CLI) → the synthetic row is
+            // orphaned; drop the oldest optimistic row and its id.
+            if (activeSessionType === 'remote' && remoteOptimisticIds.size > 0) {
+              if (remoteOptimisticIds.has(event.info.id)) {
+                remoteOptimisticIds.delete(event.info.id);
+              } else {
+                const oldest = remoteOptimisticIds.values().next().value;
+                if (oldest !== undefined) {
+                  remoteOptimisticIds.delete(oldest);
+                  session.storage.deleteMessage(oldest);
+                }
+              }
+            }
             if (canApplyMessageObservation) {
               const selection = toModelSelection(event.info.model, event.info.variant);
               updateObservedModel(selection, 'message');
@@ -1819,6 +1944,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     attachments?: CloudAgentAttachments;
     images?: Images;
     attachmentParts?: RemoteAttachmentPart[];
+    onOptimisticSend?: () => void;
   }): Promise<boolean> {
     store.set(errorAtom, null);
     if (store.get(agentStatusAtom).type !== 'disconnected') {
@@ -1888,6 +2014,33 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       };
     }
 
+    // Optimistic local insert: render the user's prompt (plus any file parts)
+    // as soon as the transport send is attempted, before the server or CLI
+    // echoes it back. Reconciliation differs by session type:
+    //   - cloud-agent: the server honors `messageId`, so the later
+    //     `cloud.message.queued` synthesize is a no-op (existing-id guard) and
+    //     the authoritative `message.updated` overwrites this row by id.
+    //   - remote: new CLIs echo `messageId` back; old CLIs assign their own,
+    //     so we track the id in `remoteOptimisticIds` and retarget when the
+    //     authoritative user message lands (see the onEvent handler).
+    const optimisticStorage = store.get(sessionStorageAtom);
+    const optimisticSessionId = store.get(rootSessionIdAtom) ?? kiloSessionId;
+    if (sessionAtSend && optimisticStorage && optimisticSessionId) {
+      insertOptimisticUserMessage({
+        storage: optimisticStorage,
+        sessionId: optimisticSessionId,
+        messageId,
+        messageText,
+        attachments: input.attachments,
+        attachmentParts: input.attachmentParts,
+      });
+      if (sessionType === 'remote') {
+        remoteOptimisticIds.add(messageId);
+      }
+      // Signal the composer exactly once, after the row is in the transcript.
+      input.onOptimisticSend?.();
+    }
+
     try {
       if (!sessionAtSend) throw new Error('No active session');
       if (input.attachments && sessionType !== 'cloud-agent') {
@@ -1935,6 +2088,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       return true;
     } catch (err) {
       if (currentSession !== sessionAtSend || activeSessionId !== kiloSessionId) return false;
+      // Delete the optimistic row on failure so the transcript does not keep a
+      // ghost prompt. The composer keeps the draft for a retry.
+      optimisticStorage?.deleteMessage(messageId);
+      remoteOptimisticIds.delete(messageId);
       store.set(failedPromptAtom, messageText);
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
       const message = formatError(err);
@@ -2148,6 +2305,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       indicatorTimer = null;
     }
     clearAllAtoms();
+    remoteOptimisticIds.clear();
     activeSessionId = null;
     activeSessionType = null;
   }

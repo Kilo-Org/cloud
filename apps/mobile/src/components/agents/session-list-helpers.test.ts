@@ -14,7 +14,6 @@ import {
   excludeActiveFromGroups,
   expandPlatformFilter,
   formatMeta,
-  platformLabel,
   remoteAgentLabel,
   remoteMeta,
   remoteSessionEyebrowLabel,
@@ -572,18 +571,6 @@ describe('remoteMeta', () => {
     expect(remoteMeta(busyRow)).toBeUndefined();
     expect(remoteMeta(retryRow)).toBeUndefined();
     expect(remoteMeta(noStatusRow)).toBeUndefined();
-  });
-});
-
-describe('platformLabel (moved helper, regression guard)', () => {
-  it('matches the original mapping', () => {
-    expect(platformLabel('cloud-agent')).toBe('CLOUD AGENT');
-    expect(platformLabel('cloud-agent-web')).toBe('CLOUD AGENT');
-    expect(platformLabel('vscode')).toBe('VSCODE');
-    expect(platformLabel('agent-manager')).toBe('VSCODE');
-    expect(platformLabel('slack')).toBe('SLACK');
-    expect(platformLabel('cli')).toBe('CLI');
-    expect(platformLabel('my-new-platform')).toBe('MY-NEW-PLATFORM');
   });
 });
 

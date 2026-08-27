@@ -8,11 +8,6 @@ import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-se
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
-// Re-exported so existing importers of `platformLabel` from this module keep
-// working while `@/lib/platform-label` stays the single source of truth for
-// the platform→label mapping (no duplicate definition to drift).
-export { platformLabel };
-
 /**
  * One stored-history section. Exclusivity against the "Active now" tray is
  * enforced on the history side via `excludeActiveFromGroups`; active sessions

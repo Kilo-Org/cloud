@@ -47,7 +47,10 @@ import type { Env } from '../../types.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
-import { assertRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
+import {
+  assertRepositoryAccessBeforeSessionCreation,
+  canonicalizeRepositoryBeforeSessionCreation,
+} from '../../session/validate-repository-access.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 
 type SessionPrepareHandlers = {
@@ -339,14 +342,24 @@ const prepareSessionHandler = internalApiProtectedProcedure
           input.kilocodeOrganizationId
         );
       }
+      const canonicalRequest = await canonicalizeRepositoryBeforeSessionCreation({
+        env: ctx.env,
+        userId: ctx.userId,
+        orgId: input.kilocodeOrganizationId,
+        request,
+      });
       await assertRepositoryAccessBeforeSessionCreation({
         env: ctx.env,
         userId: ctx.userId,
         orgId: input.kilocodeOrganizationId,
-        repository: request.repository,
+        repository: canonicalRequest.repository,
       });
       const policy = profileResolutionPolicyForSessionCreateOrigin(input.createdOnPlatform);
-      const requestWithProfile = await resolveEffectiveSessionConfiguration(ctx, request, policy);
+      const requestWithProfile = await resolveEffectiveSessionConfiguration(
+        ctx,
+        canonicalRequest,
+        policy
+      );
       assertModeAvailableForProfile(
         requestWithProfile.agent.mode,
         requestWithProfile.profile?.resolved ?? {}

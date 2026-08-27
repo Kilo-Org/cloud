@@ -1,5 +1,31 @@
 import { describe, expect, it, vi } from 'vitest';
-import { assertRepositoryAccessBeforeSessionCreation } from './validate-repository-access.js';
+import {
+  assertRepositoryAccessBeforeSessionCreation,
+  canonicalizeRepositoryBeforeSessionCreation,
+} from './validate-repository-access.js';
+import { sessionCreateIntentFingerprint } from './session-registration.js';
+
+const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+
+function githubResolution(platformIntegrationId = githubIntegrationId) {
+  return {
+    success: true as const,
+    token: 'token',
+    platformIntegrationId,
+    installationId: '123',
+    accountLogin: 'acme',
+    appType: 'standard' as const,
+  };
+}
+
+function githubRequest(overrides: Record<string, unknown> = {}) {
+  return {
+    initialTurn: { type: 'prompt' as const, prompt: 'Build it' },
+    agent: { mode: 'code', model: 'model' },
+    repository: { type: 'github' as const, repo: 'acme/repo' },
+    ...overrides,
+  };
+}
 
 const repository = {
   type: 'bitbucket' as const,
@@ -9,47 +35,63 @@ const repository = {
 };
 
 describe('GitHub session creation preflight', () => {
-  it('skips legacy GitHub repositories without an integration pin', async () => {
-    const getTokenForRepo = vi.fn();
+  it('canonicalizes an unpinned GitHub repository to the live resolved integration', async () => {
+    const getTokenForRepo = vi.fn().mockResolvedValue(githubResolution());
 
     await expect(
-      assertRepositoryAccessBeforeSessionCreation({
+      canonicalizeRepositoryBeforeSessionCreation({
         env: { GIT_TOKEN_SERVICE: { getTokenForRepo } } as never,
         userId: 'user-1',
-        repository: { type: 'github', repo: 'acme/repo' },
+        request: githubRequest(),
       })
-    ).resolves.toBeUndefined();
-    expect(getTokenForRepo).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({
+      repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+    });
+    expect(getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'user-1',
+    });
   });
 
-  it('preflights a pinned GitHub repository against the exact integration', async () => {
-    const getTokenForRepo = vi.fn().mockResolvedValue({
-      success: true,
-      token: 'token',
-      installationId: '123',
-      accountLogin: 'acme',
-      appType: 'standard',
+  it('includes the canonical integration in the operation fingerprint', async () => {
+    const getTokenForRepo = vi.fn().mockResolvedValue(githubResolution());
+    const canonical = await canonicalizeRepositoryBeforeSessionCreation({
+      env: { GIT_TOKEN_SERVICE: { getTokenForRepo } } as never,
+      userId: 'user-1',
+      request: githubRequest(),
     });
+    const alternate = {
+      ...canonical,
+      repository: {
+        ...canonical.repository,
+        githubIntegrationId: '123e4567-e89b-12d3-a456-426614174099',
+      },
+    };
+
+    expect(await sessionCreateIntentFingerprint(canonical)).not.toBe(
+      await sessionCreateIntentFingerprint(alternate)
+    );
+  });
+
+  it('canonicalizes a pinned GitHub repository against the exact integration', async () => {
+    const getTokenForRepo = vi.fn().mockResolvedValue(githubResolution());
     const orgId = '123e4567-e89b-12d3-a456-426614174030';
-    const expectedIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
 
     await expect(
-      assertRepositoryAccessBeforeSessionCreation({
+      canonicalizeRepositoryBeforeSessionCreation({
         env: { GIT_TOKEN_SERVICE: { getTokenForRepo } } as never,
         userId: 'user-1',
         orgId,
-        repository: {
-          type: 'github',
-          repo: 'acme/repo',
-          githubIntegrationId: expectedIntegrationId,
-        },
+        request: githubRequest({
+          repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+        }),
       })
-    ).resolves.toBeUndefined();
+    ).resolves.toMatchObject({ repository: { githubIntegrationId } });
     expect(getTokenForRepo).toHaveBeenCalledWith({
       githubRepo: 'acme/repo',
       userId: 'user-1',
       orgId,
-      expectedIntegrationId,
+      expectedIntegrationId: githubIntegrationId,
     });
   });
 
@@ -60,19 +102,154 @@ describe('GitHub session creation preflight', () => {
     });
 
     await expect(
-      assertRepositoryAccessBeforeSessionCreation({
+      canonicalizeRepositoryBeforeSessionCreation({
         env: { GIT_TOKEN_SERVICE: { getTokenForRepo } } as never,
         userId: 'user-1',
-        repository: {
-          type: 'github',
-          repo: 'acme/repo',
-          githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
-        },
+        request: githubRequest({
+          repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+        }),
       })
     ).rejects.toMatchObject({
       code: 'BAD_REQUEST',
       message: 'GitHub repository authorization failed (integration_mismatch)',
     });
+  });
+
+  it.each([
+    ['ambiguous_installation', 'BAD_REQUEST'],
+    ['repository_not_installed', 'BAD_REQUEST'],
+    ['temporarily_unavailable', 'SERVICE_UNAVAILABLE'],
+    ['database_not_configured', 'SERVICE_UNAVAILABLE'],
+  ])('maps %s to %s before allocation', async (reason, code) => {
+    const getTokenForRepo = vi.fn().mockResolvedValue({ success: false, reason });
+
+    await expect(
+      canonicalizeRepositoryBeforeSessionCreation({
+        env: { GIT_TOKEN_SERVICE: { getTokenForRepo } } as never,
+        userId: 'user-1',
+        request: githubRequest(),
+      })
+    ).rejects.toMatchObject({ code });
+  });
+
+  it('inherits the source GitHub pin and accepts repository case differences', async () => {
+    const getTokenForRepo = vi.fn().mockResolvedValue(githubResolution());
+    const getMetadata = vi.fn().mockResolvedValue({
+      repository: { type: 'github', repo: 'Acme/Repo', githubIntegrationId },
+    });
+    const env = {
+      SESSION_INGEST: {
+        resolveCloudAgentRootSessionForKiloSession: vi.fn().mockResolvedValue({
+          cloudAgentSessionId: 'agent-source',
+          repository: { type: 'github', repo: 'Acme/Repo' },
+        }),
+      },
+      CLOUD_AGENT_SESSION: {
+        idFromName: vi.fn(name => name),
+        get: vi.fn(() => ({ getMetadata })),
+      },
+      GIT_TOKEN_SERVICE: { getTokenForRepo },
+    };
+
+    await expect(
+      canonicalizeRepositoryBeforeSessionCreation({
+        env: env as never,
+        userId: 'user-1',
+        request: githubRequest({
+          repository: { type: 'github', repo: 'acme/repo' },
+          clone: { cloneFromKiloSessionId: 'ses_12345678901234567890123456' },
+        }),
+      })
+    ).resolves.toMatchObject({
+      repository: { repo: 'Acme/Repo', githubIntegrationId },
+    });
+    expect(getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'Acme/Repo',
+      userId: 'user-1',
+      expectedIntegrationId: githubIntegrationId,
+    });
+  });
+
+  it.each([
+    [
+      'repository',
+      { type: 'github', repo: 'Acme/Repo', githubIntegrationId },
+      { type: 'github', repo: 'other/repo', githubIntegrationId },
+      'clone_repository_mismatch',
+    ],
+    [
+      'integration',
+      { type: 'github', repo: 'acme/repo', githubIntegrationId },
+      {
+        type: 'github',
+        repo: 'Acme/Repo',
+        githubIntegrationId: '123e4567-e89b-12d3-a456-426614174099',
+      },
+      'clone_integration_mismatch',
+    ],
+  ])(
+    'rejects a clone %s mismatch before live resolution',
+    async (_kind, sourceRepo, submitted, message) => {
+      const getTokenForRepo = vi.fn();
+      const env = {
+        SESSION_INGEST: {
+          resolveCloudAgentRootSessionForKiloSession: vi.fn().mockResolvedValue({
+            cloudAgentSessionId: 'agent-source',
+            repository: { type: 'github', repo: 'Acme/Repo' },
+          }),
+        },
+        CLOUD_AGENT_SESSION: {
+          idFromName: vi.fn(name => name),
+          get: vi.fn(() => ({
+            getMetadata: vi.fn().mockResolvedValue({ repository: sourceRepo }),
+          })),
+        },
+        GIT_TOKEN_SERVICE: { getTokenForRepo },
+      };
+
+      await expect(
+        canonicalizeRepositoryBeforeSessionCreation({
+          env: env as never,
+          userId: 'user-1',
+          request: githubRequest({
+            repository: submitted,
+            clone: { cloneFromKiloSessionId: 'ses_12345678901234567890123456' },
+          }),
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message });
+      expect(getTokenForRepo).not.toHaveBeenCalled();
+    }
+  );
+
+  it('uses live resolution for a legacy source without an integration pin', async () => {
+    const getTokenForRepo = vi.fn().mockResolvedValue(githubResolution());
+    const env = {
+      SESSION_INGEST: {
+        resolveCloudAgentRootSessionForKiloSession: vi.fn().mockResolvedValue({
+          cloudAgentSessionId: 'agent-source',
+        }),
+      },
+      CLOUD_AGENT_SESSION: {
+        idFromName: vi.fn(name => name),
+        get: vi.fn(() => ({
+          getMetadata: vi.fn().mockResolvedValue({
+            repository: { type: 'github', repo: 'acme/repo' },
+          }),
+        })),
+      },
+      GIT_TOKEN_SERVICE: { getTokenForRepo },
+    };
+
+    await expect(
+      canonicalizeRepositoryBeforeSessionCreation({
+        env: env as never,
+        userId: 'user-1',
+        request: githubRequest({
+          clone: { cloneFromKiloSessionId: 'ses_12345678901234567890123456' },
+        }),
+      })
+    ).resolves.toMatchObject({ repository: { githubIntegrationId } });
+    expect(getTokenForRepo).toHaveBeenCalledWith({ githubRepo: 'acme/repo', userId: 'user-1' });
   });
 });
 

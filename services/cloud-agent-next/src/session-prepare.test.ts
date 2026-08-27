@@ -171,6 +171,7 @@ function createInternalApiContext(options: {
   doStub?: ReturnType<typeof createMockDOStub>;
   getTokenForRepo?: ReturnType<typeof vi.fn>;
   getBitbucketToken?: ReturnType<typeof vi.fn>;
+  resolveCloudAgentRootSessionForKiloSession?: ReturnType<typeof vi.fn>;
   githubTokenContainmentOrgIds?: string;
   gitlabTokenContainmentOrgIds?: string;
   kilocodeTokenContainmentOrgIds?: string;
@@ -222,6 +223,8 @@ function createInternalApiContext(options: {
         fetch: vi.fn(),
         createSessionForCloudAgent: vi.fn().mockResolvedValue({ created: true }),
         deleteSessionForCloudAgent: vi.fn().mockResolvedValue({ deleted: true }),
+        resolveCloudAgentRootSessionForKiloSession:
+          options.resolveCloudAgentRootSessionForKiloSession ?? vi.fn().mockResolvedValue(null),
       } as unknown as TRPCContext['env']['SESSION_INGEST'],
       INTERNAL_API_SECRET: effectiveInternalApiSecret,
       NEXTAUTH_SECRET: 'test-secret',
@@ -233,6 +236,7 @@ function createInternalApiContext(options: {
           vi.fn().mockResolvedValue({
             success: true,
             token: 'managed-github-token',
+            platformIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
             installationId: '123',
             accountLogin: 'acme',
             appType: 'standard',
@@ -544,6 +548,7 @@ describe('prepareSession endpoint', () => {
         repository: {
           type: 'github',
           repo: 'acme/repo',
+          githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
           branch: 'feature/test-branch',
         },
         profile: {
@@ -1415,6 +1420,7 @@ describe('start endpoint', () => {
     const getTokenForRepo = vi.fn().mockResolvedValue({
       success: true,
       token: 'managed-github-token',
+      platformIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
       installationId: '123',
       accountLogin: 'acme',
       appType: 'standard',
@@ -1436,6 +1442,36 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+      })
+    );
+  });
+
+  it('canonicalizes unpinned grouped starts before persisting session metadata', async () => {
+    const doStub = createMockDOStub();
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'managed-github-token',
+      platformIntegrationId: '123e4567-e89b-12d3-a456-426614174099',
+      installationId: '456',
+      accountLogin: 'acme',
+      appType: 'standard',
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub, getTokenForRepo }));
+
+    await caller.start({
+      message: { prompt: 'Resolve this repository server-side' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+    });
+
+    expect(getTokenForRepo).toHaveBeenCalledOnce();
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId: '123e4567-e89b-12d3-a456-426614174099',
+        },
       })
     );
   });

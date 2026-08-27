@@ -20,6 +20,7 @@ const {
   mergeProfileConfigurationMock,
   assertKiloModelAvailableMock,
   assertBitbucketRepositoryAccessMock,
+  canonicalizeRepositoryMock,
   assertOrganizationMembershipMock,
   registerNewSessionMock,
   startNewSessionMock,
@@ -28,6 +29,7 @@ const {
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
   assertKiloModelAvailableMock: vi.fn().mockResolvedValue(undefined),
   assertBitbucketRepositoryAccessMock: vi.fn().mockResolvedValue(undefined),
+  canonicalizeRepositoryMock: vi.fn(async ({ request }) => request),
   assertOrganizationMembershipMock: vi.fn().mockResolvedValue(undefined),
   registerNewSessionMock: vi.fn().mockResolvedValue({
     cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
@@ -76,6 +78,7 @@ vi.mock('../../model-validation.js', () => ({
 
 vi.mock('../../session/validate-repository-access.js', () => ({
   assertRepositoryAccessBeforeSessionCreation: assertBitbucketRepositoryAccessMock,
+  canonicalizeRepositoryBeforeSessionCreation: canonicalizeRepositoryMock,
 }));
 
 vi.mock('./organization-membership.js', () => ({
@@ -126,6 +129,7 @@ describe('prepareSession operation-ledger admission gate', () => {
     mergeProfileConfigurationMock.mockResolvedValue({});
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertBitbucketRepositoryAccessMock.mockResolvedValue(undefined);
+    canonicalizeRepositoryMock.mockImplementation(async ({ request }) => request);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
     registerNewSessionMock.mockResolvedValue({
       cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',

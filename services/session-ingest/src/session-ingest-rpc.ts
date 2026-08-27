@@ -31,7 +31,7 @@ import {
 import type { Env } from './env';
 import { getSessionIngestDO, type InspectCloneStageResult } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
-import { normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
+import { normalizeGitUrl, parseGitUrl, withDORetry } from '@kilocode/worker-utils';
 import { app } from './app';
 import { mapSessionEventRow, notifyUserSessionEvent } from './session-events';
 import { cloneSessionIntoDestination } from './clone/session-clone';
@@ -351,7 +351,20 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
   ): Promise<ResolveCloudAgentRootSessionForKiloSessionResult> {
     const parsed = resolveCloudAgentRootSessionSchema.parse(params);
     const mapping = await this.findOwnedRootCloudAgentMapping(parsed);
-    return mapping ? { cloudAgentSessionId: mapping.cloudAgentSessionId } : null;
+    if (!mapping) return null;
+
+    const parsedRepository = mapping.gitUrl ? parseGitUrl(mapping.gitUrl) : null;
+    return {
+      cloudAgentSessionId: mapping.cloudAgentSessionId,
+      ...(parsedRepository?.platform === 'github'
+        ? {
+            repository: {
+              type: 'github' as const,
+              repo: `${parsedRepository.owner}/${parsedRepository.repo}`,
+            },
+          }
+        : {}),
+    };
   }
 
   async getCloudAgentRootSessionSnapshot(
@@ -504,10 +517,13 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
   private async findOwnedRootCloudAgentMapping(params: {
     kiloUserId: string;
     kiloSessionId: string;
-  }): Promise<{ cloudAgentSessionId: string } | null> {
+  }): Promise<{ cloudAgentSessionId: string; gitUrl: string | null } | null> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     const rows = await db
-      .select({ cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id })
+      .select({
+        cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+        gitUrl: cli_sessions_v2.git_url,
+      })
       .from(cli_sessions_v2)
       .leftJoin(organization_memberships, organizationMembershipJoinCondition(params.kiloUserId))
       .where(
@@ -522,7 +538,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       .limit(1);
 
     const cloudAgentSessionId = rows[0]?.cloudAgentSessionId;
-    return cloudAgentSessionId ? { cloudAgentSessionId } : null;
+    return cloudAgentSessionId ? { cloudAgentSessionId, gitUrl: rows[0]?.gitUrl ?? null } : null;
   }
 
   /**

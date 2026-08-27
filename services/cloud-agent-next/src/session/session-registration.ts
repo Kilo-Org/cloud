@@ -9,9 +9,9 @@
  * one grouped operation. Legacy
  * `prepareSession` retains registration-only behavior and can queue later.
  *
- * Managed git-token resolution (GitHub App installation, managed GitLab) is
- * NOT performed here; it happens lazily in the flusher's workspace preparation
- * path. Provider credentials are intentionally not stored in registration
+ * GitHub repository identity is canonicalized by the handler before entering
+ * this module. Managed credentials are still resolved lazily in the flusher's
+ * workspace preparation path and are intentionally not stored in registration
  * metadata; generic git repositories may still carry an explicit token.
  */
 import { TRPCError } from '@trpc/server';

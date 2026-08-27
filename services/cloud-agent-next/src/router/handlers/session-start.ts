@@ -24,7 +24,10 @@ import {
 } from './session-prepare.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
-import { assertRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
+import {
+  assertRepositoryAccessBeforeSessionCreation,
+  canonicalizeRepositoryBeforeSessionCreation,
+} from '../../session/validate-repository-access.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 
 type SessionStartHandlers = {
@@ -106,11 +109,17 @@ const startSessionHandler = protectedProcedure
         db = getPgDb(ctx.env);
         await assertOrganizationMembership(db, ctx.userId, organizationId);
       }
+      const canonicalRequest = await canonicalizeRepositoryBeforeSessionCreation({
+        env: ctx.env,
+        userId: ctx.userId,
+        orgId: organizationId,
+        request,
+      });
       await assertRepositoryAccessBeforeSessionCreation({
         env: ctx.env,
         userId: ctx.userId,
         orgId: organizationId,
-        repository: request.repository,
+        repository: canonicalRequest.repository,
       });
 
       const policy = profileResolutionPolicyForSessionCreateOrigin(
@@ -118,7 +127,7 @@ const startSessionHandler = protectedProcedure
       );
       const requestWithProfile = await resolveEffectiveSessionConfiguration(
         ctx,
-        request,
+        canonicalRequest,
         policy,
         db
       );

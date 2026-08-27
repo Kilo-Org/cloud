@@ -164,13 +164,18 @@ api.delete('/triggers/org/:orgId/:triggerId', async c => {
 
 type RouteContext = Context<HonoContext>;
 
-const TriggerConfigInput = z
+export const TriggerConfigInput = z
   .object({
     targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
     kiloclawInstanceId: z.string().uuid().optional(),
     githubRepo: z.string().trim().min(1, 'githubRepo is required').optional(),
     mode: z.string().trim().min(1, 'mode is required').optional(),
     model: z.string().trim().min(1, 'model is required').optional(),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
     profileId: z.string().uuid().optional(),
     autoCommit: z.boolean().optional(),
@@ -264,10 +269,16 @@ const TriggerConfigInput = z
 // null = explicitly clear the field, undefined = leave unchanged
 // Note: targetType and kiloclawInstanceId are intentionally excluded — they are
 // immutable after creation. To change target type or instance, delete and recreate.
-const TriggerConfigUpdateInput = z
+export const TriggerConfigUpdateInput = z
   .object({
     mode: z.string().trim().min(1).optional(),
     model: z.string().trim().min(1).optional(),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .nullable()
+      .optional(),
     promptTemplate: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
     profileId: z.string().uuid().optional(),

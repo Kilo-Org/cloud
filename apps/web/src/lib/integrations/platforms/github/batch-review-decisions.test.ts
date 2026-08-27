@@ -11,12 +11,26 @@ import {
   triggerBatchReviewDecisionFetchIfNeeded,
   type TenantOwner,
 } from './batch-review-decisions';
+import type { getPinnedCliSessionGitHubIntegration } from './cli-session-integration';
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchBatchedReviewDecisions: jest.fn(),
 }));
 
 import { fetchBatchedReviewDecisions } from '@/lib/integrations/platforms/github/adapter';
+
+const mockGetPinnedIntegration = jest.fn();
+jest.mock('./cli-session-integration', () => {
+  const actual = jest.requireActual('./cli-session-integration') as {
+    getPinnedCliSessionGitHubIntegration: typeof getPinnedCliSessionGitHubIntegration;
+  };
+  return {
+    ...actual,
+    getPinnedCliSessionGitHubIntegration: (
+      ...args: Parameters<typeof actual.getPinnedCliSessionGitHubIntegration>
+    ) => mockGetPinnedIntegration(...args),
+  };
+});
 
 const mockFetchBatch = fetchBatchedReviewDecisions as jest.MockedFunction<
   typeof fetchBatchedReviewDecisions
@@ -33,7 +47,7 @@ describe('batch-review-decisions', () => {
   let integrationId: string;
   let counter = 0;
 
-  async function seedSession(branch: string) {
+  async function seedSession(branch: string, pinnedIntegrationId = integrationId) {
     const sessionId = `ses_batch_test_${Date.now()}_${counter++}`;
     await db.insert(cli_sessions_v2).values({
       session_id: sessionId,
@@ -41,6 +55,7 @@ describe('batch-review-decisions', () => {
       organization_id: null,
       git_url: GIT_URL,
       git_branch: branch,
+      github_integration_id: pinnedIntegrationId,
       created_on_platform: 'cloud-agent-web',
     });
     sessionIdsToCleanup.push(sessionId);
@@ -114,6 +129,10 @@ describe('batch-review-decisions', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    const actual = jest.requireActual('./cli-session-integration') as {
+      getPinnedCliSessionGitHubIntegration: typeof getPinnedCliSessionGitHubIntegration;
+    };
+    mockGetPinnedIntegration.mockImplementation(actual.getPinnedCliSessionGitHubIntegration);
   });
 
   beforeEach(async () => {
@@ -155,7 +174,10 @@ describe('batch-review-decisions', () => {
       await seedSession(branch);
       await seedPrRow(branch, 2, { pending: true });
 
-      await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
+      await db
+        .update(platform_integrations)
+        .set({ integration_status: 'disconnected' })
+        .where(eq(platform_integrations.id, integrationId));
 
       await executeBatchReviewDecisionFetch(testOwner);
 
@@ -265,7 +287,7 @@ describe('batch-review-decisions', () => {
         appType: 'lite',
       });
       await seedSession(standardBranch);
-      await seedSession(liteBranch);
+      await seedSession(liteBranch, liteIntegrationId);
       await seedPrRow(standardBranch, 41, { integrationId });
       await seedPrRow(liteBranch, 42, { integrationId: liteIntegrationId });
       mockFetchBatch.mockImplementation(
@@ -293,6 +315,18 @@ describe('batch-review-decisions', () => {
 
       expect(mockFetchBatch).not.toHaveBeenCalled();
       expect((await readRow(branch))?.review_decision_pending).toBe(false);
+    });
+
+    it('leaves the claim pending when integration lookup fails transiently', async () => {
+      const branch = 'batch/transient-integration-lookup';
+      await seedSession(branch);
+      await seedPrRow(branch, 44);
+      mockGetPinnedIntegration.mockRejectedValueOnce(new Error('database unavailable'));
+
+      await executeBatchReviewDecisionFetch(testOwner);
+
+      expect(mockFetchBatch).not.toHaveBeenCalled();
+      expect((await readRow(branch))?.review_decision_pending).toBe(true);
     });
   });
 

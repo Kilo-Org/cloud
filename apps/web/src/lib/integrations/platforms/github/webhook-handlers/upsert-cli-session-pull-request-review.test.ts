@@ -69,6 +69,7 @@ describe('upsertCliSessionPullRequestReviewFromWebhook', () => {
       organization_id: null,
       git_url: NORMALIZED_GIT_URL,
       git_branch: branch,
+      github_integration_id: testOwner.platformIntegrationId,
       created_on_platform: platform,
     });
     sessionIdsToCleanup.push(sessionId);

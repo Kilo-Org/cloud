@@ -87,6 +87,7 @@ function destinationIdentityConflicts(
     | 'cloud_agent_session_id'
     | 'cloud_agent_session_scope_id'
     | 'organization_id'
+    | 'github_integration_id'
   >,
   parsed: CreateSessionForCloudAgentParams
 ): boolean {
@@ -95,7 +96,10 @@ function destinationIdentityConflicts(
     existing.cloud_agent_session_id !== parsed.cloudAgentSessionId ||
     (existing.cloud_agent_session_scope_id !== null &&
       existing.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId) ||
-    existing.organization_id !== (parsed.organizationId ?? null)
+    existing.organization_id !== (parsed.organizationId ?? null) ||
+    (parsed.githubIntegrationId !== undefined &&
+      existing.github_integration_id !== null &&
+      existing.github_integration_id !== parsed.githubIntegrationId)
   );
 }
 
@@ -208,7 +212,8 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
 
     const hasMeaningfulChange = existingRow
       ? existingRow.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId ||
-        (inputGitUrl !== undefined && existingRow.git_url == null)
+        (inputGitUrl !== undefined && existingRow.git_url == null) ||
+        (parsed.githubIntegrationId !== undefined && existingRow.github_integration_id == null)
       : true;
 
     if (existingRow && hasMeaningfulChange && persistedRow) {
@@ -318,6 +323,9 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           created_on_platform: parsed.createdOnPlatform,
           ...(parsed.title !== undefined ? { title: parsed.title } : {}),
           ...(inputGitUrl !== undefined ? { git_url: inputGitUrl } : {}),
+          ...(parsed.githubIntegrationId !== undefined
+            ? { github_integration_id: parsed.githubIntegrationId }
+            : {}),
           version: 0,
         })
         .onConflictDoNothing({
@@ -343,6 +351,8 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
 
       // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
       const repositoryHealed = inputGitUrl !== undefined && existing.git_url == null;
+      const integrationHealed =
+        parsed.githubIntegrationId !== undefined && existing.github_integration_id == null;
       if (
         inputGitUrl !== undefined &&
         existing.git_url != null &&
@@ -356,6 +366,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         .set({
           cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
           ...(repositoryHealed ? { git_url: inputGitUrl } : {}),
+          ...(integrationHealed ? { github_integration_id: parsed.githubIntegrationId } : {}),
         })
         .where(
           and(

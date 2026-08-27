@@ -70,6 +70,7 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
       organization_id: null,
       git_url: NORMALIZED_GIT_URL,
       git_branch: branch,
+      github_integration_id: integrationId,
       created_on_platform: 'cloud-agent-web',
     });
     sessionIdsToCleanup.push(sessionId);
@@ -307,6 +308,7 @@ describe('handleGitHubWebhook — pull_request_review dispatch to upsertCliSessi
       organization_id: null,
       git_url: NORMALIZED_GIT_URL,
       git_branch: branch,
+      github_integration_id: integrationId,
       created_on_platform: platform,
     });
     sessionIdsToCleanup.push(sessionId);
@@ -318,6 +320,7 @@ describe('handleGitHubWebhook — pull_request_review dispatch to upsertCliSessi
       git_url: NORMALIZED_GIT_URL,
       git_branch: branch,
       owned_by_user_id: testUserId,
+      platform_integration_id: integrationId,
       pr_url: `https://github.com/${REPO}/pull/1`,
       pr_number: 1,
       pr_state: 'open',

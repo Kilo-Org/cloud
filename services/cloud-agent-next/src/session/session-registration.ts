@@ -579,6 +579,8 @@ async function allocateNewSession(
 
   const defaultTitle = `New session - ${new Date().toISOString()}`;
   const canonicalRepositoryUrl = deriveCanonicalRepositoryUrl(input.repository);
+  const githubIntegrationId =
+    input.repository.type === 'github' ? input.repository.githubIntegrationId : undefined;
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
   let ingestResult: Awaited<ReturnType<SessionService['createCliSessionViaSessionIngest']>>;
   try {
@@ -591,7 +593,8 @@ async function allocateNewSession(
       createdOnPlatform,
       defaultTitle,
       canonicalRepositoryUrl,
-      cloneFromKiloSessionId
+      cloneFromKiloSessionId,
+      githubIntegrationId
     );
   } catch (error) {
     await recordPostSetupFailure(() =>
@@ -1601,6 +1604,8 @@ async function resumeCloneCreate(
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
   const defaultTitle = `New session - ${new Date().toISOString()}`;
   const canonicalRepositoryUrl = deriveCanonicalRepositoryUrl(input.repository);
+  const githubIntegrationId =
+    input.repository.type === 'github' ? input.repository.githubIntegrationId : undefined;
 
   let ingestResult: Awaited<ReturnType<SessionService['createCliSessionViaSessionIngest']>>;
   try {
@@ -1613,7 +1618,8 @@ async function resumeCloneCreate(
       createdOnPlatform,
       defaultTitle,
       canonicalRepositoryUrl,
-      cloneFromKiloSessionId
+      cloneFromKiloSessionId,
+      githubIntegrationId
     );
   } catch (error) {
     await recordPostSetupFailure(() =>

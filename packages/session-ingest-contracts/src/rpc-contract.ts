@@ -24,6 +24,8 @@ export const createSessionForCloudAgentSchema = z.object({
   title: z.string().optional(),
   // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
   gitUrl: z.string().optional(),
+  // Compatibility: old Cloud Agent workers omit the canonical GitHub integration.
+  githubIntegrationId: z.string().uuid().optional(),
   // Compatibility: old callers omit this field and create empty destination
   // storage. Remove that path only when all deployed callers require cloning.
   cloneFromKiloSessionId: sessionIdSchema.optional(),

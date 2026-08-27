@@ -12,7 +12,10 @@ import {
   type GitHubInstallReturnOutcome,
   subscribeToGitHubInstallReturnOutcome,
 } from '@/lib/github-install-return';
-import { showActivityKitDisabledAlertOnce } from '@/lib/glanceable/activity-kit-prompt';
+import {
+  recoverGlanceableActivityKit,
+  showActivityKitDisabledAlertOnce,
+} from '@/lib/glanceable/activity-kit-prompt';
 import { trpcClient } from '@/lib/trpc';
 
 export type GitHubInstallOutcomeAlertButton = {
@@ -138,11 +141,13 @@ export default function AgentSessionList() {
   }, [consumeReturnOutcome]);
 
   // Show the one-time "turn on Live Activities" alert when the Agents tab
-  // regains focus and ActivityKit is unavailable. Never auto-alerts from the
-  // publisher; this tab focus is the single prompt site.
+  // regains focus and ActivityKit is unavailable, and recover the surface when
+  // it became available again. Never auto-alerts from the publisher; this tab
+  // focus is the single prompt and recovery site.
   useFocusEffect(
     useCallback(() => {
       showActivityKitDisabledAlertOnce();
+      void recoverGlanceableActivityKit();
     }, [])
   );
 

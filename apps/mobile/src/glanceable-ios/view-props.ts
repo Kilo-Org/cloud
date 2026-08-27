@@ -1,9 +1,12 @@
-import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  type GlanceableAgentsSnapshot,
+  isEligibleGlanceableWork,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import {
   glanceableCountLines,
-  glanceableSpokenLabelKeys,
+  glanceableSpokenLabel,
   glanceableStatusCopyKey,
   type GlanceableSurfaceFlags,
   primaryGlanceableCount,
@@ -27,13 +30,13 @@ export type GlanceableViewProps = {
   primaryLabel: string | null;
   /** Top-ranked count value for compact surfaces; 0 when no eligible work. */
   primaryCount: number;
-  /** ISO anchor for the elapsed timer; only happy with eligible work. */
+  /** ISO anchor for the elapsed timer; shows while eligible work runs, incl. stale. */
   elapsedAnchor: string | null;
   /** Translated "Open agents" affordance. */
   openAgentsLabel: string;
   /** True for happy and stale — the only statuses that show counts. */
   showOpenAgents: boolean;
-  /** Spoken label: status words, counts, then Open agents. Never a title or id. */
+  /** Spoken label: status word, numeric counts, then Open agents. Never a title or id. */
   accessibilityLabel: string;
 };
 
@@ -55,12 +58,10 @@ export function buildGlanceableViewProps(
     })),
     primaryLabel: primary === null ? null : translate(primary.key),
     primaryCount: primary === null ? 0 : primary.count,
-    elapsedAnchor: status === 'happy' ? snapshot.eligibleStartedAt : null,
+    elapsedAnchor: isEligibleGlanceableWork(snapshot) ? snapshot.eligibleStartedAt : null,
     openAgentsLabel: translate('glanceable.openAgents'),
     showOpenAgents: status === 'happy' || status === 'stale',
-    accessibilityLabel: glanceableSpokenLabelKeys(snapshot, flags)
-      .map(key => translate(key))
-      .join(', '),
+    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, translate),
   };
 }
 

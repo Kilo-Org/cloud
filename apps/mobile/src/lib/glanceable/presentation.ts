@@ -105,3 +105,26 @@ export function glanceableSpokenLabelKeys(
   parts.push('glanceable.openAgents');
   return parts;
 }
+
+/**
+ * The full spoken label with numbers: the status word (for non-happy statuses,
+ * including stale), then each non-zero count as "N label", then Open agents.
+ * `translate` resolves the copy keys, so the iOS widget (`view-props.ts`) can
+ * speak translated copy. Never a title, organization name, or id.
+ */
+export function glanceableSpokenLabel(
+  snapshot: GlanceableAgentsSnapshot,
+  flags: GlanceableSurfaceFlags,
+  translate: (key: string) => string
+): string {
+  const status = resolveGlanceableStatus(snapshot, flags);
+  const parts: string[] = [];
+  if (status !== 'happy') {
+    parts.push(translate(GLANCEABLE_STATUS_COPY_KEY[status]));
+  }
+  for (const { key, count } of glanceableCountLines(snapshot)) {
+    parts.push(`${count} ${translate(key)}`);
+  }
+  parts.push(translate('glanceable.openAgents'));
+  return parts.join(', ');
+}

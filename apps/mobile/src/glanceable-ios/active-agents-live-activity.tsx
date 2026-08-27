@@ -4,6 +4,7 @@ import {
   accessibilityLabel,
   font,
   foregroundStyle,
+  frame,
 } from '@expo/ui/swift-ui/modifiers';
 import { createLiveActivity } from 'expo-widgets';
 import { PlatformColor } from 'react-native';
@@ -47,12 +48,18 @@ export const ActiveAgentsLiveActivity = createLiveActivity<
   const primary = countLines[0] ?? null;
   const primaryLabel = primary === null ? null : primary.label;
   const primaryCount = String(primary === null ? 0 : primary.count);
-  const elapsedAnchor = status === 'happy' ? (props.eligibleStartedAt ?? null) : null;
+  // Elapsed time shows while eligible counts exist, including the stale status,
+  // so the running work keeps its elapsed timer when updates stop.
+  const elapsedAnchor = hasCounts ? (props.eligibleStartedAt ?? null) : null;
 
-  const spokenParts =
-    status === 'happy' || status === 'stale'
-      ? [...countLines.map(line => line.label), 'Open agents']
-      : [statusLine ?? '', 'Open agents'].filter(part => part !== '');
+  // Spoken label: status word, numeric counts, then Open agents. Stale keeps
+  // its status word; happy (no status line) speaks counts then Open agents.
+  const openAgentsCopy = 'Open agents';
+  const spokenParts = [
+    ...(statusLine !== null ? [statusLine] : []),
+    ...countLines.map(line => `${line.count} ${line.label}`),
+    openAgentsCopy,
+  ];
   const accessibility = spokenParts.join(', ');
 
   const primaryForeground = foregroundStyle(PlatformColor('label'));
@@ -65,6 +72,19 @@ export const ActiveAgentsLiveActivity = createLiveActivity<
       {`${line.count} ${line.label}`}
     </Text>
   ));
+
+  const showOpenAgents = status === 'happy' || status === 'stale';
+  const openAgentsControl = (
+    <Text
+      modifiers={[
+        font({ textStyle: 'body', weight: 'semibold' }),
+        primaryForeground,
+        frame({ minHeight: 44, alignment: 'leading' }),
+      ]}
+    >
+      {openAgentsCopy}
+    </Text>
+  );
 
   return {
     banner: (
@@ -82,30 +102,49 @@ export const ActiveAgentsLiveActivity = createLiveActivity<
         {elapsedAnchor !== null ? (
           <Text date={new Date(elapsedAnchor)} dateStyle="relative" modifiers={[mutedForeground]} />
         ) : null}
+        {showOpenAgents ? openAgentsControl : null}
       </VStack>
     ),
     compactLeading: (
-      <Text modifiers={[font({ textStyle: 'headline', weight: 'bold' }), primaryForeground]}>
+      <Text
+        modifiers={[
+          font({ textStyle: 'headline', weight: 'bold' }),
+          primaryForeground,
+          accessibilityLabel(accessibility),
+        ]}
+      >
         {hasCounts ? primaryCount : statusLine}
       </Text>
     ),
     compactTrailing: (
-      <Text modifiers={[font({ textStyle: 'footnote' }), primaryForeground]}>
+      <Text
+        modifiers={[
+          font({ textStyle: 'footnote' }),
+          primaryForeground,
+          accessibilityLabel(accessibility),
+        ]}
+      >
         {hasCounts ? (primaryLabel ?? primaryCount) : ''}
       </Text>
     ),
     minimal: (
-      <Text modifiers={[font({ textStyle: 'headline', weight: 'bold' }), primaryForeground]}>
+      <Text
+        modifiers={[
+          font({ textStyle: 'headline', weight: 'bold' }),
+          primaryForeground,
+          accessibilityLabel(accessibility),
+        ]}
+      >
         {hasCounts ? primaryCount : ''}
       </Text>
     ),
     expandedLeading: (
-      <VStack alignment="leading" spacing={2}>
+      <VStack alignment="leading" spacing={2} modifiers={[accessibilityLabel(accessibility)]}>
         {countRows}
       </VStack>
     ),
     expandedTrailing: (
-      <VStack alignment="leading" spacing={2}>
+      <VStack alignment="leading" spacing={2} modifiers={[accessibilityLabel(accessibility)]}>
         {statusLine !== null ? <Text modifiers={[mutedForeground]}>{statusLine}</Text> : null}
         {elapsedAnchor !== null ? (
           <Text date={new Date(elapsedAnchor)} dateStyle="relative" modifiers={[mutedForeground]} />
@@ -113,10 +152,11 @@ export const ActiveAgentsLiveActivity = createLiveActivity<
       </VStack>
     ),
     expandedBottom: (
-      <VStack alignment="leading" spacing={2}>
+      <VStack alignment="leading" spacing={2} modifiers={[accessibilityLabel(accessibility)]}>
         {statusLine !== null && !hasCounts ? (
           <Text modifiers={[mutedForeground]}>{statusLine}</Text>
         ) : null}
+        {showOpenAgents ? openAgentsControl : null}
       </VStack>
     ),
   };

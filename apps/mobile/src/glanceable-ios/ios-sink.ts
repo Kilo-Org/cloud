@@ -24,7 +24,8 @@ type Activity = LiveActivity<Partial<GlanceableLiveActivityContentState>>;
 let activityKitDeniedState = false;
 let activity: Activity | null = null;
 let revision = 0;
-let lastUpdatedAt: string | null = null;
+/** In-flight native `update`; `end` awaits it so its contentDate is never older. */
+let inFlightUpdate: Promise<void> | null = null;
 let lastProps: Partial<GlanceableLiveActivityContentState> | null = null;
 
 function translate(key: string): string {
@@ -76,18 +77,32 @@ function buildExpiredProps(snapshot: GlanceableAgentsSnapshot): Partial<Glanceab
   );
 }
 
-function endNow(): void {
+async function endNow(): Promise<void> {
+  // Unregister push-to-start tokens even when no Live Activity handle exists:
+  // an account or org switch with no live handle must not keep the prior
+  // scope's token registered.
+  void getGlanceableDelivery().unregisterTokens();
   // A process restart leaves the JS handle null while ActivityKit still
   // holds the activity; adopt it so the end actually clears the Lock Screen.
   activity ??= adoptExistingActivity();
   if (activity === null) {
     return;
   }
-  const contentDate = lastUpdatedAt === null ? undefined : new Date(lastUpdatedAt);
-  void activity.end('immediate', lastProps ?? undefined, contentDate);
+  // ActivityKit (iOS 17.2+) discards an end whose contentDate is older than the
+  // last content write. Native `update` stamps its own later wall-clock, so wait
+  // for the in-flight update and pass a fresh `Date()` — never the earlier JS
+  // stamp or the snapshot's logical `updatedAt`, which is recorded beforehand.
+  if (inFlightUpdate !== null) {
+    try {
+      await inFlightUpdate;
+    } catch {
+      // A rejected update must not block the end; the contentDate still advances.
+    }
+  }
+  void activity.end('immediate', lastProps ?? undefined, new Date());
+  inFlightUpdate = null;
   activity = null;
   revision = 0;
-  void getGlanceableDelivery().unregisterTokens();
 }
 
 /** True once ActivityKit reported the surface unavailable (see slice psh for the alert). */
@@ -95,12 +110,33 @@ export function getActivityKitDenied(): boolean {
   return activityKitDeniedState;
 }
 
+/**
+ * Re-probe ActivityKit after the user may have re-enabled it in Settings.
+ * Clears the denied latch when the surface is available again and returns true;
+ * keeps the latch and returns false when it is still unavailable (or the probe
+ * is a transient read failure). The caller then re-emits eligible work through
+ * `startOrUpdate`, whose `start` re-checks availability authoritatively.
+ */
+export function clearActivityKitDeniedIfAvailable(): boolean {
+  if (!activityKitDeniedState) {
+    return false;
+  }
+  try {
+    ActiveAgentsLiveActivity.getInstances();
+    activityKitDeniedState = false;
+    return true;
+  } catch {
+    // Still unavailable (or transient): keep the latch.
+    return false;
+  }
+}
+
 /** Test-only: drop all sink state between cases. */
 export function _resetIosSinkForTests(): void {
   activityKitDeniedState = false;
   activity = null;
   revision = 0;
-  lastUpdatedAt = null;
+  inFlightUpdate = null;
   lastProps = null;
 }
 
@@ -115,16 +151,15 @@ export const iosSink: GlanceableSink = {
     // Mirror the published snapshot onto a present Live Activity so the empty
     // "No work in progress" and stale "Can't update now" copy shows during the
     // terminal window before `endImmediate` ends it. Never start an activity
-    // here: start is reserved for the first eligible emit. Record the applied
-    // snapshot so a later `end` carries a contentDate that is not older than
-    // this update (ActivityKit ignores an end older than the last update).
-    // Adopt a leftover instance first: after a process restart the JS handle is
-    // null while ActivityKit still holds the activity.
+    // here: start is reserved for the first eligible emit. Track the update's
+    // promise so a later `end` awaits it and carries a contentDate not older
+    // than the native write (ActivityKit ignores an older end). Adopt a
+    // leftover instance first: after a process restart the JS handle is null
+    // while ActivityKit still holds the activity.
     activity ??= adoptExistingActivity();
     if (activity !== null) {
-      lastUpdatedAt = snapshot.updatedAt;
       lastProps = buildGlanceableLiveActivityContentState(snapshot);
-      void activity.update(lastProps);
+      inFlightUpdate = activity.update(lastProps);
     }
   },
 
@@ -144,6 +179,7 @@ export const iosSink: GlanceableSink = {
         const newest = instances.at(-1);
         if (newest !== undefined) {
           activity = newest;
+          inFlightUpdate = null;
           adopted = true;
         }
       } catch (error) {
@@ -158,6 +194,7 @@ export const iosSink: GlanceableSink = {
       if (activity === null) {
         try {
           activity = ActiveAgentsLiveActivity.start(contentState, OPEN_AGENTS_URL);
+          inFlightUpdate = null;
         } catch (error) {
           // Only ActivityKit unavailability is permanent; a transient
           // StartLiveActivityException leaves denial unset so a later emit retries.
@@ -169,12 +206,11 @@ export const iosSink: GlanceableSink = {
         }
       }
 
-      lastUpdatedAt = snapshot.updatedAt;
       lastProps = contentState;
       revision = snapshot.revision;
       getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId);
       if (adopted) {
-        void activity.update(contentState);
+        inFlightUpdate = activity.update(contentState);
       }
       return;
     }
@@ -184,13 +220,12 @@ export const iosSink: GlanceableSink = {
     if (snapshot.revision <= revision) {
       return;
     }
-    lastUpdatedAt = snapshot.updatedAt;
     lastProps = contentState;
-    void activity.update(contentState);
+    inFlightUpdate = activity.update(contentState);
     revision = snapshot.revision;
   },
 
   endImmediate() {
-    endNow();
+    void endNow();
   },
 };

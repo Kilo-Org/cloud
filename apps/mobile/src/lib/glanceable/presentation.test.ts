@@ -6,6 +6,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
+  glanceableSpokenLabel,
   glanceableSpokenLabelKeys,
   glanceableStatusCopyKey,
   primaryGlanceableCount,
@@ -104,5 +105,38 @@ describe('spoken label shape', () => {
       'glanceable.signedOut',
       'glanceable.openAgents',
     ]);
+  });
+});
+
+describe('numeric spoken label', () => {
+  it('speaks numeric counts then Open agents for happy', () => {
+    const happy = snapshot({
+      sessions: [{ status: 'busy' }, { status: 'busy' }, { status: 'question' }],
+    });
+    expect(glanceableSpokenLabel(happy, {}, key => key)).toBe(
+      '1 glanceable.needsInput, 2 glanceable.running, glanceable.openAgents'
+    );
+  });
+
+  it('speaks the status word, numeric counts, then Open agents for stale', () => {
+    const stale = snapshot({ sessions: [{ status: 'busy' }], status: 'stale' });
+    expect(glanceableSpokenLabel(stale, {}, key => key)).toBe(
+      'glanceable.stale, 1 glanceable.running, glanceable.openAgents'
+    );
+  });
+
+  it('speaks the status word then Open agents when no counts exist', () => {
+    expect(glanceableSpokenLabel(snapshot({ status: 'empty' }), {}, key => key)).toBe(
+      'glanceable.empty, glanceable.openAgents'
+    );
+  });
+
+  it('never speaks a title, organization name, or raw id', () => {
+    const spoken = glanceableSpokenLabel(
+      snapshot({ sessions: [{ status: 'busy' }] }),
+      {},
+      key => key
+    );
+    expect(spoken).not.toContain('u1');
   });
 });

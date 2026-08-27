@@ -1064,9 +1064,11 @@ describe('CliLiveTransport unified user web connection', () => {
 
   it('includes messageID on send_message when the client assigns a message id', async () => {
     const connection = createConnection();
-    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) =>
-      Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
-    );
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
+      );
     const { transport } = createTransportWithSinks({ connection });
 
     transport.connect();
@@ -1096,9 +1098,11 @@ describe('CliLiveTransport unified user web connection', () => {
 
   it('relays drop_queued_message with messageID without sending interrupt', async () => {
     const connection = createConnection();
-    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) =>
-      Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
-    );
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
+      );
     const { transport } = createTransportWithSinks({ connection });
 
     transport.connect();

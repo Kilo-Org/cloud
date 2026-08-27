@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +33,13 @@ export function AdminTestingCard(props: Props) {
   const queryClient = useQueryClient();
 
   const [issueUrl, setIssueUrl] = useState('');
+  const { data: repositoriesData } = useQuery(
+    props.owner.type === 'org'
+      ? trpc.organizations.autoTriage.listGitHubRepositories.queryOptions({
+          organizationId: props.owner.organizationId,
+        })
+      : trpc.personalAutoTriage.listGitHubRepositories.queryOptions()
+  );
 
   const mutation = useMutation(
     trpc.autoTriage.adminSubmitForTriage.mutationOptions({
@@ -62,9 +69,22 @@ export function AdminTestingCard(props: Props) {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const match = issueUrl
+      .trim()
+      .match(/^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/issues\/\d+(?:[/?#].*)?$/);
+    const repoFullName = match ? `${match[1]}/${match[2]}` : null;
+    const matchingRepositories = repoFullName
+      ? (repositoriesData?.repositories.filter(
+          repository => repository.fullName.toLowerCase() === repoFullName.toLowerCase()
+        ) ?? [])
+      : [];
+    const platformIntegrationId =
+      matchingRepositories.length === 1 ? matchingRepositories[0].platformIntegrationId : undefined;
+
     mutation.mutate({
       issueUrl,
       owner: props.owner,
+      ...(platformIntegrationId ? { platformIntegrationId } : {}),
     });
   };
 

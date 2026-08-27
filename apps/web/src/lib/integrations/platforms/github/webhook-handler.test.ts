@@ -8,6 +8,7 @@ const mockGetIntegrationForOrganization = jest.fn();
 const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
 const mockHandlePullRequest = jest.fn();
+const mockHandleIssue = jest.fn();
 const mockHandlePRReviewComment = jest.fn();
 const mockHandleGitHubReviewCommentReply = jest.fn();
 const mockHandleInstallationTargetRenamed = jest.fn();
@@ -16,6 +17,10 @@ const mockHandleInstallationDeleted = jest.fn();
 const mockHandleInstallationSuspend = jest.fn();
 const mockHandleInstallationUnsuspend = jest.fn();
 const mockHandleInstallationRepositories = jest.fn();
+
+jest.mock('@/lib/utils.server', () => ({
+  logExceptInTest: jest.fn(),
+}));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -55,7 +60,8 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
     mockHandleInstallationUnsuspend(payload, appType),
   handleInstallationTargetRenamed: (payload: unknown, integrationId: string, appType: string) =>
     mockHandleInstallationTargetRenamed(payload, integrationId, appType),
-  handleIssue: jest.fn(),
+  handleIssue: (payload: unknown, platformIntegration: unknown) =>
+    mockHandleIssue(payload, platformIntegration),
   handlePRReviewComment: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePRReviewComment(payload, platformIntegration),
   handlePullRequest: (payload: unknown, platformIntegration: unknown) =>
@@ -184,6 +190,30 @@ function issueCommentPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function issuePayload(overrides: Record<string, unknown> = {}) {
+  return {
+    action: 'opened',
+    installation: { id: 98765 },
+    repository: {
+      id: 123,
+      name: 'widgets',
+      full_name: 'acme/widgets',
+      private: false,
+      owner: { login: 'acme' },
+    },
+    issue: {
+      number: 7,
+      html_url: 'https://github.com/acme/widgets/issues/7',
+      title: 'Broken widget',
+      body: 'The widget is broken.',
+      user: { login: 'alice', type: 'User' },
+      labels: [],
+    },
+    sender: { login: 'alice', type: 'User' },
+    ...overrides,
+  };
+}
+
 async function waitForAfterTask() {
   await new Promise(resolve => setTimeout(resolve, 0));
 }
@@ -197,6 +227,7 @@ describe('handleGitHubWebhook', () => {
     mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: false });
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
+    mockHandleIssue.mockResolvedValue(Response.json({ message: 'triage queued' }));
     mockHandlePRReviewComment.mockResolvedValue(undefined);
     mockHandleGitHubReviewCommentReply.mockResolvedValue({
       recorded: false,
@@ -336,6 +367,31 @@ describe('handleGitHubWebhook', () => {
       'we_1',
       expect.objectContaining({ handlers_triggered: ['code_review', 'cli_session_pr_upsert'] })
     );
+  });
+
+  it.each(['opened', 'reopened'])(
+    'routes secondary %s issues with delivering identity',
+    async action => {
+      mockGetIntegrationForOrganization.mockResolvedValue({ ...integration, id: 'pi_primary' });
+      const payload = issuePayload({ action });
+
+      const response = await handleGitHubWebhook(signedGitHubRequest('issues', payload), 'lite');
+
+      expect(response.status).toBe(200);
+      expect(mockHandleIssue).toHaveBeenCalledWith(expect.objectContaining(payload), integration);
+    }
+  );
+
+  it('keeps secondary labeled issues suppressed for Auto Fix isolation', async () => {
+    mockGetIntegrationForOrganization.mockResolvedValue({ ...integration, id: 'pi_primary' });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('issues', issuePayload({ action: 'labeled' })),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockHandleIssue).not.toHaveBeenCalled();
   });
 
   it('keeps pull_request_review_comment created events on the legacy auto-fix path', async () => {

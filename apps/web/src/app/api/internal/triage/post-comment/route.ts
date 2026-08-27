@@ -67,7 +67,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No platform installation found' }, { status: 400 });
     }
 
-    const tokenData = await generateGitHubInstallationToken(integration.platform_installation_id);
+    const tokenData = await generateGitHubInstallationToken(
+      integration.platform_installation_id,
+      integration.github_app_type ?? 'standard'
+    );
 
     logExceptInTest('[post-comment] Posting comment on GitHub issue', {
       ticketId,

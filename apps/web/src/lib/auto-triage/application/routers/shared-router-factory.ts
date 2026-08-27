@@ -45,6 +45,8 @@ type GitHubRepositoriesResult = {
     name: string;
     fullName: string;
     private: boolean;
+    platformIntegrationId?: string;
+    platformAccountLogin?: string;
   }[];
   errorMessage?: string;
 };

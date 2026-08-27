@@ -1,5 +1,5 @@
 /**
- * Fetch a GitHub issue via an owner's platform installation.
+ * Fetch a GitHub issue with repository-scoped authorization.
  *
  * Used by the admin "submit issue for triage" form to populate the
  * `issue_title` / `issue_body` / `issue_author` / `issue_labels` fields
@@ -8,9 +8,6 @@
  */
 
 import 'server-only';
-import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
-import type { Owner } from '../core';
 
 export type ParsedIssueUrl = {
   repoOwner: string;
@@ -57,32 +54,17 @@ export type FetchedIssue = {
 };
 
 /**
- * Fetch an issue via the GitHub REST API using the installation token
- * associated with the given owner. Returns the subset of fields we need
- * to build a triage ticket.
+ * Fetch an issue via the GitHub REST API using authorization already resolved
+ * for this exact repository.
  *
  * Throws with a user-facing message for the common failure modes
  * (no installation, not found, etc.) so the admin UI can surface them.
  */
-export async function fetchIssueForOwner(owner: Owner, url: ParsedIssueUrl): Promise<FetchedIssue> {
-  const integration = await getIntegrationForOwner(owner, 'github');
-  if (!integration) {
-    throw new Error(
-      'No GitHub App installation found for this owner. Install the Kilo GitHub App first.'
-    );
-  }
-  if (!integration.platform_installation_id) {
-    throw new Error(
-      'GitHub integration is missing an installation id. Reinstall the Kilo GitHub App.'
-    );
-  }
-
-  const tokenData = await generateGitHubInstallationToken(integration.platform_installation_id);
-
+export async function fetchIssue(url: ParsedIssueUrl, githubToken: string): Promise<FetchedIssue> {
   const apiUrl = `https://api.github.com/repos/${url.repoOwner}/${url.repoName}/issues/${url.issueNumber}`;
   const response = await fetch(apiUrl, {
     headers: {
-      Authorization: `Bearer ${tokenData.token}`,
+      Authorization: `Bearer ${githubToken}`,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
     },

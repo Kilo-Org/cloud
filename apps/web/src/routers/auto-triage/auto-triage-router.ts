@@ -34,9 +34,15 @@ import {
 } from '@/lib/auto-triage/db/triage-tickets';
 import { getAgentConfig, upsertAgentConfig } from '@/lib/agent-config/db/agent-configs';
 import { DEFAULT_AUTO_TRIAGE_CONFIG } from '@/lib/auto-triage';
-import { parseGitHubIssueUrl, fetchIssueForOwner } from '@/lib/auto-triage/github/fetch-issue';
+import { parseGitHubIssueUrl, fetchIssue } from '@/lib/auto-triage/github/fetch-issue';
 import { tryDispatchPendingTickets } from '@/lib/auto-triage/dispatch/dispatch-pending-tickets';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import {
+  getAllIntegrationsForOwner,
+  getGitHubIntegrationById,
+} from '@/lib/integrations/db/platform-integrations';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
+import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 
 export const autoTriageRouter = createTRPCRouter({
@@ -333,6 +339,7 @@ export const autoTriageRouter = createTRPCRouter({
     .input(
       z.object({
         issueUrl: z.string().min(1),
+        platformIntegrationId: z.string().uuid().optional(),
         owner: z.discriminatedUnion('type', [
           z.object({ type: z.literal('org'), organizationId: z.string() }),
           z.object({ type: z.literal('user') }),
@@ -350,24 +357,51 @@ export const autoTriageRouter = createTRPCRouter({
         });
       }
 
+      const integrationOwner =
+        input.owner.type === 'org'
+          ? { type: 'org' as const, id: input.owner.organizationId }
+          : { type: 'user' as const, id: ctx.user.id };
+      let integration;
+      if (input.platformIntegrationId) {
+        integration = await getGitHubIntegrationById(integrationOwner, input.platformIntegrationId);
+      } else {
+        const healthyIntegrations = (await getAllIntegrationsForOwner(integrationOwner)).filter(
+          candidate => candidate.platform === 'github' && isPlatformIntegrationHealthy(candidate)
+        );
+        integration = healthyIntegrations.length === 1 ? healthyIntegrations[0] : null;
+      }
+      if (!integration || !isPlatformIntegrationHealthy(integration)) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: input.platformIntegrationId
+            ? 'The selected GitHub App installation is not available for this owner.'
+            : 'Select a repository from one exact GitHub App installation before submitting.',
+        });
+      }
+      if (!integration.platform_installation_id) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'The selected GitHub integration is missing its installation ID.',
+        });
+      }
+      const repositories = requireNumericPlatformRepositories(integration.repositories);
+      if (
+        !repositories?.some(
+          repository => repository.full_name.toLowerCase() === parsedUrl.repoFullName.toLowerCase()
+        )
+      ) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'The selected GitHub App installation does not include this repository.',
+        });
+      }
+
       // Resolve the Owner we'll store on the ticket and use for dispatch.
       // For orgs we mirror issue-webhook-processor.resolveOwner() by
       // preferring the bot user id with a fallback to the integration
       // creator. For personal we use the admin's own user id.
       let owner: Owner;
       if (input.owner.type === 'org') {
-        // `getIntegrationForOwner` takes the integrations-module `Owner`
-        // which only needs { type, id } — don't synthesise a userId here.
-        const integration = await getIntegrationForOwner(
-          { type: 'org', id: input.owner.organizationId },
-          'github'
-        );
-        if (!integration) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'No GitHub App installation found for this organization.',
-          });
-        }
         const botUserId = await getBotUserId(input.owner.organizationId, 'auto-triage');
         const fallbackUserId = botUserId ?? integration.kilo_requester_user_id;
         if (!fallbackUserId) {
@@ -386,10 +420,15 @@ export const autoTriageRouter = createTRPCRouter({
         owner = { type: 'user', id: ctx.user.id, userId: ctx.user.id };
       }
 
-      // Pull title/body/labels from GitHub via the owner's installation.
+      const tokenData = await generateGitHubInstallationToken(
+        integration.platform_installation_id,
+        integration.github_app_type ?? 'standard'
+      );
+
+      // The GitHub fetch is the authoritative proof that this installation still has access.
       let issue;
       try {
-        issue = await fetchIssueForOwner(owner, parsedUrl);
+        issue = await fetchIssue(parsedUrl, tokenData.token);
       } catch (error) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -397,13 +436,9 @@ export const autoTriageRouter = createTRPCRouter({
         });
       }
 
-      // Look up the integration again for owner.type==='user' to attach
-      // platformIntegrationId on the ticket for parity with the webhook path.
-      const integration = await getIntegrationForOwner(owner, 'github');
-
       const ticketId = await createTriageTicket({
         owner,
-        platformIntegrationId: integration?.id,
+        platformIntegrationId: integration.id,
         repoFullName: parsedUrl.repoFullName,
         issueNumber: parsedUrl.issueNumber,
         issueUrl: parsedUrl.issueUrl,

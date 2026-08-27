@@ -66,7 +66,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No platform installation found' }, { status: 400 });
     }
 
-    const tokenData = await generateGitHubInstallationToken(integration.platform_installation_id);
+    const tokenData = await generateGitHubInstallationToken(
+      integration.platform_installation_id,
+      integration.github_app_type ?? 'standard'
+    );
 
     // Add labels to the GitHub issue in parallel (best-effort: partial failures don't abort the batch)
     logExceptInTest('[auto-triage:labels] Applying labels to GitHub issue', {

@@ -73,7 +73,8 @@ export async function POST(req: NextRequest) {
 
         if (integration?.platform_installation_id) {
           const tokenData = await generateGitHubInstallationToken(
-            integration.platform_installation_id
+            integration.platform_installation_id,
+            integration.github_app_type ?? 'standard'
           );
           githubToken = tokenData.token;
 

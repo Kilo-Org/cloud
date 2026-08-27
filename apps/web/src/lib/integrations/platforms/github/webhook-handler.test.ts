@@ -16,6 +16,8 @@ const mockHandleInstallationDeleted = jest.fn();
 const mockHandleInstallationSuspend = jest.fn();
 const mockHandleInstallationUnsuspend = jest.fn();
 const mockHandleInstallationRepositories = jest.fn();
+const mockHandlePushEvent = jest.fn();
+const mockHandleIssue = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -55,12 +57,14 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
     mockHandleInstallationUnsuspend(payload, appType),
   handleInstallationTargetRenamed: (payload: unknown, integrationId: string, appType: string) =>
     mockHandleInstallationTargetRenamed(payload, integrationId, appType),
-  handleIssue: jest.fn(),
+  handleIssue: (payload: unknown, platformIntegration: unknown) =>
+    mockHandleIssue(payload, platformIntegration),
   handlePRReviewComment: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePRReviewComment(payload, platformIntegration),
   handlePullRequest: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePullRequest(payload, platformIntegration),
-  handlePushEvent: jest.fn(),
+  handlePushEvent: (payload: unknown, platformIntegration: unknown) =>
+    mockHandlePushEvent(payload, platformIntegration),
   upsertCliSessionPullRequestsFromWebhook: jest.fn(),
   upsertCliSessionPullRequestReviewFromWebhook: jest.fn(),
 }));
@@ -184,6 +188,16 @@ function issueCommentPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function pushPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    installation: { id: 98765 },
+    ref: 'refs/heads/main',
+    repository: { full_name: 'acme/widgets' },
+    deleted: false,
+    ...overrides,
+  };
+}
+
 async function waitForAfterTask() {
   await new Promise(resolve => setTimeout(resolve, 0));
 }
@@ -218,6 +232,8 @@ describe('handleGitHubWebhook', () => {
     mockHandleInstallationRepositories.mockResolvedValue(
       Response.json({ message: 'Repositories updated' })
     );
+    mockHandlePushEvent.mockResolvedValue(undefined);
+    mockHandleIssue.mockResolvedValue(Response.json({ message: 'issue handled' }));
   });
 
   it('routes installation_target renamed events through authoritative login synchronization', async () => {
@@ -317,6 +333,38 @@ describe('handleGitHubWebhook', () => {
 
     expect(response.status).toBe(200);
     expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
+  });
+
+  it('dispatches push events from a secondary organization installation', async () => {
+    mockGetIntegrationForOrganization.mockResolvedValueOnce({ ...integration, id: 'pi_primary' });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('push', pushPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockHandlePushEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ repository: { full_name: 'acme/widgets' } }),
+      integration
+    );
+  });
+
+  it('continues to suppress unrelated events from a secondary organization installation', async () => {
+    mockGetIntegrationForOrganization.mockResolvedValueOnce({ ...integration, id: 'pi_primary' });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('issues', {
+        installation: { id: 98765 },
+        action: 'opened',
+      }),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Event received' });
+    expect(mockHandleIssue).not.toHaveBeenCalled();
+    expect(mockHandlePushEvent).not.toHaveBeenCalled();
   });
 
   it('keeps pull_request webhooks on the code review path', async () => {

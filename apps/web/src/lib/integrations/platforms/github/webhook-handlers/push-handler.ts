@@ -1,14 +1,8 @@
 import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
-import {
-  deployments,
-  platform_integrations,
-  app_builder_projects,
-  type PlatformIntegration,
-} from '@kilocode/db/schema';
+import { deployments, app_builder_projects, type PlatformIntegration } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { redeploy } from '@/lib/user-deployments/deployments-service';
-import { PLATFORM } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import type { PushEventPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { extractBranchNameFromRef } from '@/lib/integrations/platforms/github/utils';
@@ -19,28 +13,25 @@ export async function handlePushEvent(event: PushEventPayload, integration: Plat
   const repositoryFullName = event.repository.full_name;
 
   await Promise.allSettled([
-    redeployMatchingDeployments(repositoryFullName, branchName),
+    redeployMatchingDeployments(repositoryFullName, branchName, integration),
     rebuildMatchingAppBuilderPreviews(repositoryFullName, branchName, integration),
   ]);
 }
 
-async function redeployMatchingDeployments(repositoryFullName: string, branchName: string) {
+async function redeployMatchingDeployments(
+  repositoryFullName: string,
+  branchName: string,
+  integration: PlatformIntegration
+) {
   const githubDeployments = await db
-    .select({
-      deployment: deployments,
-      integration: platform_integrations,
-    })
+    .select({ deployment: deployments })
     .from(deployments)
-    .innerJoin(
-      platform_integrations,
-      eq(deployments.platform_integration_id, platform_integrations.id)
-    )
     .where(
       and(
         eq(deployments.repository_source, repositoryFullName),
         eq(deployments.branch, branchName),
         eq(deployments.source_type, 'github'),
-        eq(platform_integrations.platform, PLATFORM.GITHUB)
+        eq(deployments.platform_integration_id, integration.id)
       )
     );
 

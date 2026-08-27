@@ -384,7 +384,8 @@ async function getGithubTokenFromIntegrationId(
     integration[0].platform_installation_id
   ) {
     const tokenData = await generateGitHubInstallationToken(
-      integration[0].platform_installation_id
+      integration[0].platform_installation_id,
+      integration[0].github_app_type ?? 'standard'
     );
     return tokenData.token;
   }
@@ -553,7 +554,8 @@ async function resolveGitHubSource(
 
   // Generate GitHub installation token
   const tokenData = await generateGitHubInstallationToken(
-    platformIntegration.platform_installation_id
+    platformIntegration.platform_installation_id,
+    platformIntegration.github_app_type ?? 'standard'
   );
 
   return {

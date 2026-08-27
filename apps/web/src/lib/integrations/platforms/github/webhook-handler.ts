@@ -466,7 +466,11 @@ export async function handleGitHubWebhook(
       ? await getIntegrationForOrganization(integration.owned_by_organization_id, PLATFORM.GITHUB)
       : integration;
     const isSecondaryOrganizationInstallation = primaryIntegration?.id !== integration.id;
-    if (isSecondaryOrganizationInstallation && eventType !== GITHUB_EVENT.PULL_REQUEST) {
+    if (
+      isSecondaryOrganizationInstallation &&
+      eventType !== GITHUB_EVENT.PULL_REQUEST &&
+      eventType !== GITHUB_EVENT.PUSH
+    ) {
       logExceptInTest('Secondary GitHub installation event suppressed', {
         integration_id: integration.id,
         event_type: eventType,

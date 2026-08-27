@@ -44,6 +44,7 @@ import {
   isTmuxAvailable,
   findServicePane,
   paneHasRunningService,
+  paneHasRunningChild,
   captureServicePane,
   pipeServicePane,
 } from './tmux';
@@ -375,6 +376,11 @@ const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
 const GREEN = '\x1b[32m';
 const CAPTURE_TIMEOUT_MS = 30_000;
+
+function isCaptureServiceRunning(sessionName: string, serviceName: string): boolean {
+  const pane = findServicePane(sessionName, serviceName);
+  return pane !== undefined && paneHasRunningChild(sessionName, pane);
+}
 
 // ---------------------------------------------------------------------------
 // Commands
@@ -794,21 +800,24 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
             'KILOCODE_API_BASE_URL',
             oldValues.get('tunnel'),
             CAPTURE_TIMEOUT_MS,
-            oldMtimes.get('tunnel')
+            oldMtimes.get('tunnel'),
+            () => isCaptureServiceRunning(sessionName, 'kiloclaw-tunnel')
           ),
           waitForEnvValueChange(
             path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
             'KILOCLAW_CHECKIN_URL',
             oldValues.get('checkin'),
             CAPTURE_TIMEOUT_MS,
-            oldMtimes.get('checkin')
+            oldMtimes.get('checkin'),
+            () => isCaptureServiceRunning(sessionName, 'kiloclaw-tunnel')
           ),
           waitForEnvValueChange(
             path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
             'KILOCHAT_BASE_URL',
             oldValues.get('kilochat'),
             CAPTURE_TIMEOUT_MS,
-            oldMtimes.get('kilochat')
+            oldMtimes.get('kilochat'),
+            () => isCaptureServiceRunning(sessionName, 'kiloclaw-tunnel')
           ),
         ]).then(([gatewayReady, checkinReady, kiloChatReady]) => {
           kiloclawTunnelCaptured = gatewayReady && checkinReady && kiloChatReady;
@@ -843,7 +852,8 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
           'STRIPE_WEBHOOK_SECRET',
           oldValues.get('stripe'),
           CAPTURE_TIMEOUT_MS,
-          oldMtimes.get('stripe')
+          oldMtimes.get('stripe'),
+          () => isCaptureServiceRunning(sessionName, 'stripe')
         ).then(ready => {
           if (ready) {
             console.log('  Stripe webhook secret captured');
@@ -861,7 +871,8 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
           'BUILDER_HOSTNAME',
           oldValues.get('app-builder-tunnel'),
           CAPTURE_TIMEOUT_MS,
-          oldMtimes.get('app-builder-tunnel')
+          oldMtimes.get('app-builder-tunnel'),
+          () => isCaptureServiceRunning(sessionName, 'app-builder-tunnel')
         ).then(ready => {
           if (ready) {
             console.log('  App builder tunnel URL captured');
@@ -881,7 +892,8 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
           'BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL',
           oldValues.get('bitbucket-webhook-tunnel'),
           CAPTURE_TIMEOUT_MS,
-          oldMtimes.get('bitbucket-webhook-tunnel')
+          oldMtimes.get('bitbucket-webhook-tunnel'),
+          () => isCaptureServiceRunning(sessionName, 'bitbucket-webhook-tunnel')
         ).then(ready => {
           if (ready) {
             console.log('  Bitbucket webhook tunnel URL captured');

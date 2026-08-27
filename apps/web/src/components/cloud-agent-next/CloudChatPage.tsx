@@ -21,6 +21,12 @@ import {
   type CustomModeOption,
 } from './session-config';
 import { useCombinedProfiles, useProfiles, useProfile } from '@/hooks/useCloudAgentProfiles';
+import {
+  formatSessionCost,
+  getSessionCostBreakdown,
+  getSessionTotalCostUsd,
+  isRenderableSessionCost,
+} from './session-cost-breakdown';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { MessageBubble } from './MessageBubble';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
@@ -69,6 +75,7 @@ import { useCliSessionPresence } from '@/hooks/useCliSessionPresence';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 
 import { SetPageTitle } from '@/components/SetPageTitle';
+import { Button } from '@/components/ui/button';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import type { AgentMode } from './types';
 import type {
@@ -250,6 +257,8 @@ export default function CloudChatPage({
   const { mutateAsync: orgUploadUrl } = useMutation(
     trpc.organizations.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
+  const [sessionInfoOpen, setSessionInfoOpen] = useState(false);
+  const sessionInfoTriggerRef = useRef<HTMLElement | null>(null);
   const [childSessionStack, setChildSessionStack] = useState<ChildSessionDrawerEntry[]>([]);
   const [childSessionDrawerContainer, setChildSessionDrawerContainer] =
     useState<HTMLDivElement | null>(null);
@@ -289,7 +298,7 @@ export default function CloudChatPage({
   const staticMessages = useAtomValue(manager.atoms.staticMessages);
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
-  const totalCost = useAtomValue(manager.atoms.totalCost);
+  const liveTotalCostUsd = useAtomValue(manager.atoms.totalCost);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
@@ -301,6 +310,26 @@ export default function CloudChatPage({
   const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
   const olderMessagesError = useAtomValue(manager.atoms.olderMessagesError);
   const olderMessagesOmittedItemCount = useAtomValue(manager.atoms.olderMessagesOmittedItemCount);
+  const isCurrentSession =
+    sessionIdFromParams === null || fetchedSessionData?.kiloSessionId === sessionIdFromParams;
+  const totalCostUsd = isCurrentSession
+    ? getSessionTotalCostUsd(fetchedSessionData?.totalCostMicrodollars, liveTotalCostUsd)
+    : 0;
+  const getCurrentSessionCostBreakdown = useCallback(
+    () =>
+      getSessionCostBreakdown(
+        isCurrentSession ? [...staticMessages, ...dynamicMessages] : [],
+        isCurrentSession ? fetchedSessionData?.totalCostMicrodollars : null,
+        isCurrentSession ? liveTotalCostUsd : 0
+      ),
+    [
+      dynamicMessages,
+      fetchedSessionData?.totalCostMicrodollars,
+      isCurrentSession,
+      liveTotalCostUsd,
+      staticMessages,
+    ]
+  );
 
   useCliSessionPresence(fetchedSessionData?.kiloSessionId ?? null);
 
@@ -924,7 +953,10 @@ export default function CloudChatPage({
       gitUrl={fetchedSessionData?.gitUrl}
       model={sessionConfig?.model}
       modelDisplayName={modelDisplayName}
-      tokenUsage={totalCost}
+      getSessionCostBreakdown={getCurrentSessionCostBreakdown}
+      sessionInfoOpen={sessionInfoOpen}
+      onSessionInfoOpenChange={setSessionInfoOpen}
+      sessionInfoTriggerRef={sessionInfoTriggerRef}
       soundEnabled={soundEnabled}
       onToggleSound={handleToggleSound}
       sessionActive={isStreaming || activity.type === 'busy' || activity.type === 'retrying'}
@@ -953,11 +985,22 @@ export default function CloudChatPage({
             <SetPageTitle
               title={fetchedSessionData?.title || sessionConfig?.repository || 'Cloud Agent'}
             >
-              {totalCost > 0 && (
-                <span className="text-muted-foreground text-sm">
+              {isRenderableSessionCost(totalCostUsd) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground h-11 gap-1 px-2 text-sm font-normal"
+                  aria-haspopup="dialog"
+                  aria-expanded={sessionInfoOpen}
+                  onClick={event => {
+                    sessionInfoTriggerRef.current = event.currentTarget;
+                    setSessionInfoOpen(true);
+                  }}
+                >
                   Token Usage{' '}
-                  <span className="font-mono tabular-nums">${totalCost.toFixed(4)}</span>
-                </span>
+                  <span className="font-mono tabular-nums">{formatSessionCost(totalCostUsd)}</span>
+                </Button>
               )}
             </SetPageTitle>
             {showChatInterface ? (

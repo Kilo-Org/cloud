@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Clock } from '@/components/ui/icons';
-import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
+import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Bubble } from '@/components/ui/bubble';
@@ -20,6 +20,13 @@ import { PartRenderer } from './part-renderer';
 import { firstHumanText, isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
 import { type OpenChildSession } from './child-session-section';
+
+/**
+ * Queued Cancel/Restore controls are compact `size="sm"` buttons (36pt +
+ * 4pt hitSlop). The platform minimum touch target is 48dp on Android and
+ * 44pt on iOS, so these two controls raise their min-height accordingly.
+ */
+const QUEUED_CONTROL_MIN_HEIGHT = Platform.OS === 'android' ? 'min-h-12' : 'min-h-11';
 
 type MessageBubbleProps = {
   message: StoredMessage;
@@ -212,6 +219,7 @@ function MessageBubbleImpl({
                   <Button
                     variant="outline"
                     size="sm"
+                    className={QUEUED_CONTROL_MIN_HEIGHT}
                     accessibilityRole="button"
                     accessibilityLabel={t('agentChat.messageBubble.cancelQueuedAccessibility')}
                     onPress={() => {
@@ -225,6 +233,7 @@ function MessageBubbleImpl({
                   <Button
                     variant="outline"
                     size="sm"
+                    className={QUEUED_CONTROL_MIN_HEIGHT}
                     accessibilityRole="button"
                     accessibilityLabel={t('agentChat.messageBubble.restoreQueuedAccessibility')}
                     onPress={() => {

@@ -608,7 +608,7 @@ describe('SessionDetailContent cancel/restore', () => {
 
   it('keeps the Restore action after canceling a queued message while the composer is occupied', async () => {
     seedQueuedMessage();
-    currentManager.cancelQueuedMessage.mockResolvedValue(undefined);
+    currentManager.cancelQueuedMessage.mockResolvedValue({ dropped: true });
     hoisted.chatComposer.control.hasContent.mockReturnValue(true);
 
     const renderer = mount();
@@ -630,10 +630,41 @@ describe('SessionDetailContent cancel/restore', () => {
     });
   });
 
+  it('keeps the queued row and shows a failure status when cancel reports dropped=false', async () => {
+    seedQueuedMessage();
+    currentManager.cancelQueuedMessage.mockResolvedValue({ dropped: false });
+    hoisted.chatComposer.control.hasContent.mockReturnValue(false);
+
+    const renderer = mount();
+    const onCancelQueued = bubbleProps(renderer, 'msg-queued-1').onCancelQueued as
+      | ((message: StoredMessage) => Promise<void>)
+      | undefined;
+    expect(onCancelQueued).toBeInstanceOf(Function);
+
+    await act(async () => {
+      await onCancelQueued?.(queuedMessage());
+    });
+
+    // The queue did not drop the message: the row stays queued (still wired
+    // for Cancel, no Restore) and the prompt is not restored into the composer.
+    expect(bubbleProps(renderer, 'msg-queued-1').onCancelQueued).toBeInstanceOf(Function);
+    expect(bubbleProps(renderer, 'msg-queued-1').onRestoreQueued).toBeUndefined();
+    expect(hoisted.chatComposer.control.setText).not.toHaveBeenCalled();
+    expect(hoisted.chatComposer.control.restoreAttachments).not.toHaveBeenCalled();
+
+    const statuses = findByType(renderer, 'AccessibleStatus');
+    const messages = statuses.map(instance => instance.props.message as string | null);
+    expect(messages).toContain('agentChat.session.cancelQueuedFailed');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('restores the prompt and file parts into an empty composer after cancel', async () => {
     const message = queuedMessage([TEXT_PART, FILE_PART]);
     seedQueuedMessage(message);
-    currentManager.cancelQueuedMessage.mockResolvedValue(undefined);
+    currentManager.cancelQueuedMessage.mockResolvedValue({ dropped: true });
     hoisted.chatComposer.control.hasContent.mockReturnValue(false);
 
     const renderer = mount();

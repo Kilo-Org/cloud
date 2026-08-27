@@ -32,6 +32,7 @@ import type {
 } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { parseFixCommand } from '@kilocode/app-shared/code-review';
 import { isLikelyKiloBotActor } from '@/lib/code-reviews/review-memory/github-feedback';
+import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 
 /**
  * author_association values that imply write access.
@@ -54,6 +55,7 @@ export class ReviewCommentWebhookProcessor {
   ): Promise<void> {
     const { comment, pull_request, repository, installation } = payload;
     const installationId = installation.id.toString();
+    const appType = integration.github_app_type ?? 'standard';
     const [repoOwner, repoName] = repository.full_name.split('/');
 
     if (!repoOwner || !repoName) {
@@ -99,6 +101,27 @@ export class ReviewCommentWebhookProcessor {
       return;
     }
 
+    const existingTicket = await findExistingReviewCommentFixTicket(
+      repository.full_name,
+      comment.id
+    );
+    if (
+      existingTicket?.platform_integration_id &&
+      existingTicket.platform_integration_id !== integration.id
+    ) {
+      return;
+    }
+    if (
+      existingTicket &&
+      !existingTicket.platform_integration_id &&
+      integration.owned_by_organization_id
+    ) {
+      const primary = await getPrimaryGitHubIntegrationForOrganization(
+        integration.owned_by_organization_id
+      );
+      if (primary?.id !== integration.id) return;
+    }
+
     // 2. Check author permissions for write access
     //    author_association from the webhook payload is checked first, but it is
     //    unreliable (e.g. org members may appear as CONTRIBUTOR). When the fast
@@ -108,7 +131,8 @@ export class ReviewCommentWebhookProcessor {
         installationId,
         repoOwner,
         repoName,
-        comment.user.login
+        comment.user.login,
+        appType
       );
 
       if (!permission || !WRITE_PERMISSION_LEVELS.has(permission)) {
@@ -120,7 +144,14 @@ export class ReviewCommentWebhookProcessor {
         });
         // Add thumbs-down reaction to indicate permission denied
         try {
-          await addReactionToPRReviewComment(installationId, repoOwner, repoName, comment.id, '-1');
+          await addReactionToPRReviewComment(
+            installationId,
+            repoOwner,
+            repoName,
+            comment.id,
+            '-1',
+            appType
+          );
         } catch {
           // Best-effort reaction
         }
@@ -203,13 +234,7 @@ export class ReviewCommentWebhookProcessor {
       }
     }
 
-    // 7. Check for existing fix ticket (dedup by comment ID)
-    const existingTicket = await findExistingReviewCommentFixTicket(
-      repository.full_name,
-      comment.id
-    );
-
-    // 8. Resolve dispatch owner (org bot user or personal owner)
+    // 7. Resolve dispatch owner (org bot user or personal owner)
     let dispatchOwner: Owner;
     if (owner.type === 'org') {
       const botUserId = await getBotUserId(owner.id, 'auto-fix');
@@ -224,7 +249,8 @@ export class ReviewCommentWebhookProcessor {
             repoOwner,
             repoName,
             comment.id,
-            'confused'
+            'confused',
+            appType
           );
         } catch {
           // Best-effort reaction
@@ -240,7 +266,7 @@ export class ReviewCommentWebhookProcessor {
       dispatchOwner = owner;
     }
 
-    // 9. Handle existing ticket before creating a new one
+    // 8. Handle existing ticket before creating a new one
     if (existingTicket) {
       if (existingTicket.status === 'pending' || existingTicket.status === 'running') {
         logExceptInTest(
@@ -252,7 +278,14 @@ export class ReviewCommentWebhookProcessor {
           }
         );
         try {
-          await addReactionToPRReviewComment(installationId, repoOwner, repoName, comment.id, '+1');
+          await addReactionToPRReviewComment(
+            installationId,
+            repoOwner,
+            repoName,
+            comment.id,
+            '+1',
+            appType
+          );
         } catch {
           // Best-effort reaction
         }
@@ -274,7 +307,8 @@ export class ReviewCommentWebhookProcessor {
             repoOwner,
             repoName,
             comment.id,
-            'eyes'
+            'eyes',
+            appType
           );
         } catch (reactionError) {
           errorExceptInTest(
@@ -302,7 +336,8 @@ export class ReviewCommentWebhookProcessor {
             repoOwner,
             repoName,
             comment.id,
-            'confused'
+            'confused',
+            appType
           );
         } catch {
           // Best-effort reaction
@@ -312,9 +347,16 @@ export class ReviewCommentWebhookProcessor {
       return;
     }
 
-    // 10. Add eyes reaction to acknowledge the mention
+    // 9. Add eyes reaction to acknowledge the mention
     try {
-      await addReactionToPRReviewComment(installationId, repoOwner, repoName, comment.id, 'eyes');
+      await addReactionToPRReviewComment(
+        installationId,
+        repoOwner,
+        repoName,
+        comment.id,
+        'eyes',
+        appType
+      );
     } catch (reactionError) {
       errorExceptInTest(
         '[ReviewCommentWebhookProcessor] Failed to add eyes reaction:',
@@ -323,7 +365,7 @@ export class ReviewCommentWebhookProcessor {
       // Continue — reaction failure is not critical
     }
 
-    // 11. Create fix ticket with review comment context
+    // 10. Create fix ticket with review comment context
     // Populate issue fields with PR-level data to satisfy NOT NULL constraints
     try {
       const ticketId = await createFixTicket({
@@ -352,7 +394,7 @@ export class ReviewCommentWebhookProcessor {
         commentId: comment.id,
       });
 
-      // 12. Dispatch to Auto Fix worker
+      // 11. Dispatch to Auto Fix worker
       await tryDispatchPendingFixes(dispatchOwner);
     } catch (error) {
       errorExceptInTest('[ReviewCommentWebhookProcessor] Error creating fix ticket:', error);
@@ -372,7 +414,8 @@ export class ReviewCommentWebhookProcessor {
           repoOwner,
           repoName,
           comment.id,
-          'confused'
+          'confused',
+          appType
         );
       } catch {
         // Best-effort reaction

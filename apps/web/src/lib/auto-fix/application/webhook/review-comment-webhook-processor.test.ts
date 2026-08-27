@@ -16,29 +16,34 @@ import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { PullRequestReviewCommentPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 
 const mockGetAgentConfigForOwner = jest.fn();
+const mockCreateFixTicket = jest.fn();
 const mockFindExistingReviewCommentFixTicket = jest.fn();
+const mockResetFixTicketForRetry = jest.fn();
+const mockTryDispatchPendingFixes = jest.fn();
+const mockGetBotUserId = jest.fn();
 const mockParseFixCommand = jest.fn();
 const mockAddReactionToPRReviewComment = jest.fn().mockResolvedValue(undefined);
 const mockGetCollaboratorPermissionLevel = jest.fn();
 const mockIsLikelyKiloBotActor = jest.fn();
+const mockGetPrimaryGitHubIntegrationForOrganization = jest.fn();
 
 jest.mock('@/lib/agent-config/db/agent-configs', () => ({
   getAgentConfigForOwner: (...args: unknown[]) => mockGetAgentConfigForOwner(...args),
 }));
 
 jest.mock('../../db/fix-tickets', () => ({
-  createFixTicket: jest.fn(),
+  createFixTicket: (...args: unknown[]) => mockCreateFixTicket(...args),
   findExistingReviewCommentFixTicket: (...args: unknown[]) =>
     mockFindExistingReviewCommentFixTicket(...args),
-  resetFixTicketForRetry: jest.fn(),
+  resetFixTicketForRetry: (...args: unknown[]) => mockResetFixTicketForRetry(...args),
 }));
 
 jest.mock('../../dispatch/dispatch-pending-fixes', () => ({
-  tryDispatchPendingFixes: jest.fn().mockResolvedValue(undefined),
+  tryDispatchPendingFixes: (...args: unknown[]) => mockTryDispatchPendingFixes(...args),
 }));
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
-  getBotUserId: jest.fn(),
+  getBotUserId: (...args: unknown[]) => mockGetBotUserId(...args),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -57,6 +62,11 @@ jest.mock('@kilocode/app-shared/code-review', () => ({
 
 jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
   isLikelyKiloBotActor: (...args: unknown[]) => mockIsLikelyKiloBotActor(...args),
+}));
+
+jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  getPrimaryGitHubIntegrationForOrganization: (...args: unknown[]) =>
+    mockGetPrimaryGitHubIntegrationForOrganization(...args),
 }));
 
 import { ReviewCommentWebhookProcessor } from './review-comment-webhook-processor';
@@ -98,12 +108,32 @@ function buildPayload(body: string): PullRequestReviewCommentPayload {
   };
 }
 
+const integrationId = '123e4567-e89b-12d3-a456-426614174001';
 const integration = {
-  id: 'integration-1',
+  id: integrationId,
   owned_by_user_id: 'user-1',
   owned_by_organization_id: null,
   github_app_type: 'standard',
 } as unknown as PlatformIntegration;
+
+const enabledConfig = {
+  is_enabled: true,
+  config: {
+    enabled_for_issues: true,
+    enabled_for_review_comments: true,
+    repository_selection_mode: 'all',
+    selected_repository_ids: [],
+    skip_labels: [],
+    required_labels: [],
+    model_slug: 'anthropic/claude-sonnet-4.5',
+    custom_instructions: null,
+    pr_title_template: 'Fix #{issue_number}: {issue_title}',
+    pr_body_template: null,
+    pr_base_branch: 'main',
+    max_pr_creation_time_minutes: 15,
+    max_concurrent_per_owner: 3,
+  },
+};
 
 describe('ReviewCommentWebhookProcessor admission', () => {
   let processor: ReviewCommentWebhookProcessor;
@@ -112,6 +142,11 @@ describe('ReviewCommentWebhookProcessor admission', () => {
     jest.clearAllMocks();
     // Default: comments are authored by humans, so admission proceeds.
     mockIsLikelyKiloBotActor.mockReturnValue(false);
+    mockFindExistingReviewCommentFixTicket.mockResolvedValue(null);
+    mockResetFixTicketForRetry.mockResolvedValue(undefined);
+    mockTryDispatchPendingFixes.mockResolvedValue(undefined);
+    mockCreateFixTicket.mockResolvedValue('ticket-1');
+    mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(integration);
     processor = new ReviewCommentWebhookProcessor();
   });
 
@@ -185,5 +220,64 @@ describe('ReviewCommentWebhookProcessor admission', () => {
     expect(mockGetCollaboratorPermissionLevel).not.toHaveBeenCalled();
     expect(mockAddReactionToPRReviewComment).not.toHaveBeenCalled();
     expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
+  });
+
+  it('keeps legacy retry GitHub API operations on the delivering installation', async () => {
+    mockParseFixCommand.mockReturnValue(true);
+    mockGetAgentConfigForOwner.mockResolvedValue(enabledConfig);
+    mockFindExistingReviewCommentFixTicket.mockResolvedValue({
+      id: 'ticket-existing',
+      status: 'failed',
+      platform_integration_id: null,
+    });
+
+    await processor.process(buildPayload('@kilo fix'), integration);
+
+    expect(mockResetFixTicketForRetry).toHaveBeenCalledWith('ticket-existing');
+    expect(mockAddReactionToPRReviewComment).toHaveBeenCalledWith(
+      '123',
+      'acme',
+      'widgets',
+      1,
+      'eyes',
+      'standard'
+    );
+  });
+
+  it('does not retry through a sibling installation', async () => {
+    mockParseFixCommand.mockReturnValue(true);
+    mockGetAgentConfigForOwner.mockResolvedValue(enabledConfig);
+    mockFindExistingReviewCommentFixTicket.mockResolvedValue({
+      id: 'ticket-existing',
+      status: 'failed',
+      platform_integration_id: '123e4567-e89b-12d3-a456-426614174002',
+    });
+
+    await processor.process(buildPayload('@kilo fix'), integration);
+
+    expect(mockResetFixTicketForRetry).not.toHaveBeenCalled();
+    expect(mockTryDispatchPendingFixes).not.toHaveBeenCalled();
+  });
+
+  it('does not infer a secondary installation for an unpinned legacy ticket', async () => {
+    const organizationIntegration = {
+      ...integration,
+      owned_by_user_id: null,
+      owned_by_organization_id: 'organization-1',
+    } as PlatformIntegration;
+    mockParseFixCommand.mockReturnValue(true);
+    mockFindExistingReviewCommentFixTicket.mockResolvedValue({
+      id: 'ticket-existing',
+      status: 'failed',
+      platform_integration_id: null,
+    });
+    mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue({
+      id: '123e4567-e89b-12d3-a456-426614174003',
+    });
+
+    await processor.process(buildPayload('@kilo fix'), organizationIntegration);
+
+    expect(mockResetFixTicketForRetry).not.toHaveBeenCalled();
+    expect(mockTryDispatchPendingFixes).not.toHaveBeenCalled();
   });
 });

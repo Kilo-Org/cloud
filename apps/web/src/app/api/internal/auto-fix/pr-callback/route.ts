@@ -30,8 +30,7 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { postIssueComment } from '@/lib/auto-fix/github/post-comment';
-import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
-import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { getAutoFixTicketGitHubToken } from '@/lib/auto-fix/github/get-fix-config';
 import {
   handleCommentReply,
   sanitizePublicErrorMessage,
@@ -206,23 +205,16 @@ export async function POST(req: NextRequest) {
       // Review-comment-triggered tickets are notified on their original review thread.
       if (!isReviewCommentTrigger) {
         try {
-          if (ticket.platform_integration_id) {
-            const integration = await getIntegrationById(ticket.platform_integration_id);
+          const githubToken = await getAutoFixTicketGitHubToken(ticket);
+          if (githubToken) {
+            await postIssueComment({
+              repoFullName: ticket.repo_full_name,
+              issueNumber: ticket.issue_number,
+              body: `🤖 **Auto-Fix Update**\n\nI attempted to create a pull request to fix this issue, but encountered an error:\n\n\`\`\`\n${sanitizePublicErrorMessage(failureMessage)}\n\`\`\`\n\nThis issue may require manual attention.`,
+              githubToken,
+            });
 
-            if (integration?.platform_installation_id) {
-              const tokenData = await generateGitHubInstallationToken(
-                integration.platform_installation_id
-              );
-
-              await postIssueComment({
-                repoFullName: ticket.repo_full_name,
-                issueNumber: ticket.issue_number,
-                body: `🤖 **Auto-Fix Update**\n\nI attempted to create a pull request to fix this issue, but encountered an error:\n\n\`\`\`\n${sanitizePublicErrorMessage(failureMessage)}\n\`\`\`\n\nThis issue may require manual attention.`,
-                githubToken: tokenData.token,
-              });
-
-              logExceptInTest('[auto-fix-pr-callback] Posted failure comment', { ticketId });
-            }
+            logExceptInTest('[auto-fix-pr-callback] Posted failure comment', { ticketId });
           }
         } catch (commentError) {
           errorExceptInTest('[auto-fix-pr-callback] Failed to post failure comment:', commentError);

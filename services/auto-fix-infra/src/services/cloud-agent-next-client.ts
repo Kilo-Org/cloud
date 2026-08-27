@@ -10,11 +10,11 @@ type CallbackTarget = {
 
 type PrepareSessionInput = {
   githubRepo: string;
+  githubIntegrationId?: string;
   kilocodeOrganizationId?: string;
   prompt: string;
   mode: 'ask' | 'code';
   model: string;
-  githubToken?: string;
   autoCommit?: boolean;
   upstreamBranch?: string;
   createdOnPlatform?: string;

@@ -360,6 +360,7 @@ export const DispatchFixRequestSchema = z.object({
   triggerSource: TriggerSourceSchema.optional(),
   sessionInput: z.object({
     repoFullName: z.string(),
+    platformIntegrationId: z.string().uuid().optional(),
     issueNumber: z.number().int().positive(),
     issueTitle: z.string(),
     issueBody: z.string().nullable(),

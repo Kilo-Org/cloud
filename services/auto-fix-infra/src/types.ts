@@ -24,6 +24,7 @@ export type TriggerSource = 'label' | 'review_comment';
 
 export interface SessionInput {
   repoFullName: string;
+  platformIntegrationId?: string;
   issueNumber: number;
   issueTitle: string;
   issueBody: string | null;
@@ -31,7 +32,6 @@ export interface SessionInput {
   confidence?: number;
   intentSummary?: string;
   relatedFiles?: string[];
-  githubToken?: string;
   kilocodeOrganizationId?: string;
   customInstructions?: string | null;
   modelSlug: string;

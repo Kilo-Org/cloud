@@ -68,6 +68,7 @@ export async function prepareFixPayload(params: PreparePayloadParams): Promise<D
     // 6. Prepare session input
     const sessionInput: DispatchFixRequest['sessionInput'] = {
       repoFullName: ticket.repo_full_name,
+      platformIntegrationId: ticket.platform_integration_id ?? undefined,
       issueNumber: ticket.issue_number,
       issueTitle: ticket.issue_title,
       issueBody: ticket.issue_body,

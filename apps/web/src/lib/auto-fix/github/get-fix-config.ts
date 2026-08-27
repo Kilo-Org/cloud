@@ -12,7 +12,10 @@ import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
-import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import {
+  getIntegrationById,
+  getIntegrationForOwner,
+} from '@/lib/integrations/db/platform-integrations';
 import { AutoFixAgentConfigSchema } from '@/lib/auto-fix/core/schemas';
 import type { Owner } from '@/lib/auto-fix/core/schemas';
 
@@ -30,6 +33,35 @@ type GetFixConfigResult =
       };
     }
   | { ok: false; error: string; status: number };
+
+type TicketGitHubIdentity = Pick<
+  AutoFixTicket,
+  'owned_by_organization_id' | 'owned_by_user_id' | 'platform_integration_id'
+>;
+
+export async function getAutoFixTicketGitHubInstallation(ticket: TicketGitHubIdentity) {
+  const integration = ticket.platform_integration_id
+    ? await getIntegrationById(ticket.platform_integration_id)
+    : await getIntegrationForOwner(
+        ticket.owned_by_organization_id
+          ? { type: 'org', id: ticket.owned_by_organization_id }
+          : { type: 'user', id: ticket.owned_by_user_id ?? '' },
+        'github'
+      );
+  if (!integration?.platform_installation_id) return null;
+
+  return {
+    installationId: integration.platform_installation_id,
+    appType: integration.github_app_type ?? 'standard',
+  };
+}
+
+export async function getAutoFixTicketGitHubToken(ticket: TicketGitHubIdentity) {
+  const integration = await getAutoFixTicketGitHubInstallation(ticket);
+  if (!integration) return null;
+  return (await generateGitHubInstallationToken(integration.installationId, integration.appType))
+    .token;
+}
 
 export async function getFixConfig(ticketId: string): Promise<GetFixConfigResult> {
   if (!ticketId) {
@@ -49,13 +81,10 @@ export async function getFixConfig(ticketId: string): Promise<GetFixConfigResult
 
   if (ticket.platform_integration_id) {
     try {
-      const integration = await getIntegrationById(ticket.platform_integration_id);
+      const token = await getAutoFixTicketGitHubToken(ticket);
 
-      if (integration?.platform_installation_id) {
-        const tokenData = await generateGitHubInstallationToken(
-          integration.platform_installation_id
-        );
-        githubToken = tokenData.token;
+      if (token) {
+        githubToken = token;
 
         logExceptInTest('[auto-fix-config] GitHub token obtained', {
           ticketId,

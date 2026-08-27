@@ -18,7 +18,7 @@ import {
   addReactionToPRReviewComment,
   getPRHeadCommit,
 } from '@/lib/integrations/platforms/github/adapter';
-import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { getAutoFixTicketGitHubInstallation } from './get-fix-config';
 import { z } from 'zod';
 
 export const CommentReplyPayloadSchema = z.object({
@@ -172,19 +172,9 @@ export async function handleCommentReply(
     return { ok: true, action: 'skipped_terminal' };
   }
 
-  // Resolve GitHub installation ID
-  let installationId: string | undefined;
-  if (ticket.platform_integration_id) {
-    try {
-      const integration = await getIntegrationById(ticket.platform_integration_id);
-      installationId = integration?.platform_installation_id ?? undefined;
-    } catch (error) {
-      errorExceptInTest('[auto-fix-comment-reply] Failed to get integration:', error);
-    }
-  }
-
-  if (!installationId) {
-    errorExceptInTest('[auto-fix-comment-reply] No installation ID found', { ticketId });
+  const github = await getAutoFixTicketGitHubInstallation(ticket);
+  if (!github) {
+    errorExceptInTest('[auto-fix-comment-reply] No GitHub installation found', { ticketId });
     return { ok: false, error: 'GitHub installation not found', status: 500 };
   }
 
@@ -199,11 +189,12 @@ export async function handleCommentReply(
       // +1 reaction on the review comment
       try {
         await addReactionToPRReviewComment(
-          installationId,
+          github.installationId,
           repoOwner,
           repoName,
           ticket.review_comment_id,
-          '+1'
+          '+1',
+          github.appType
         );
         logExceptInTest('[auto-fix-comment-reply] Added +1 reaction on review comment', {
           ticketId,
@@ -222,10 +213,11 @@ export async function handleCommentReply(
 
       try {
         const headCommitSha = await getPRHeadCommit(
-          installationId,
+          github.installationId,
           repoOwner,
           repoName,
-          ticket.issue_number
+          ticket.issue_number,
+          github.appType
         );
         const shortSha = headCommitSha.slice(0, 8);
         const commitUrl = `https://github.com/${repoOwner}/${repoName}/commit/${headCommitSha}`;
@@ -239,12 +231,13 @@ export async function handleCommentReply(
 
       try {
         await replyToReviewComment(
-          installationId,
+          github.installationId,
           repoOwner,
           repoName,
           ticket.issue_number,
           ticket.review_comment_id,
-          successReplyBody
+          successReplyBody,
+          github.appType
         );
         logExceptInTest('[auto-fix-comment-reply] Posted success reply on review thread', {
           ticketId,
@@ -295,12 +288,13 @@ export async function handleCommentReply(
     ].join('\n');
 
     await replyToReviewComment(
-      installationId,
+      github.installationId,
       repoOwner,
       repoName,
       ticket.issue_number,
       ticket.review_comment_id,
-      replyBody
+      replyBody,
+      github.appType
     );
 
     logExceptInTest('[auto-fix-comment-reply] Posted failure reply on review thread', {
@@ -312,11 +306,12 @@ export async function handleCommentReply(
     // confused reaction on failure (best effort)
     try {
       await addReactionToPRReviewComment(
-        installationId,
+        github.installationId,
         repoOwner,
         repoName,
         ticket.review_comment_id,
-        'confused'
+        'confused',
+        github.appType
       );
     } catch {
       // Best-effort reaction
@@ -339,11 +334,12 @@ export async function handleCommentReply(
     // Try to add failure reaction
     try {
       await addReactionToPRReviewComment(
-        installationId,
+        github.installationId,
         repoOwner,
         repoName,
         ticket.review_comment_id,
-        'confused'
+        'confused',
+        github.appType
       );
     } catch {
       // Best-effort reaction

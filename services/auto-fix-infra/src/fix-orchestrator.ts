@@ -139,13 +139,11 @@ export class AutoFixOrchestrator extends DurableObject<Env> {
     }
 
     const configData: {
-      githubToken?: string;
       config: {
         model_slug: string;
         custom_instructions?: string | null;
       };
     } = await configResponse.json();
-    const githubToken = configData.githubToken;
     const config = configData.config;
 
     // Build callback target for Cloud Agent
@@ -212,7 +210,6 @@ export class AutoFixOrchestrator extends DurableObject<Env> {
     await this.createFixWithCloudAgentNext({
       prompt,
       model: config.model_slug,
-      githubToken,
       callbackTarget,
       upstreamBranch: reviewCommentUpstreamBranch,
     });
@@ -221,7 +218,6 @@ export class AutoFixOrchestrator extends DurableObject<Env> {
   private async createFixWithCloudAgentNext(params: {
     prompt: string;
     model: string;
-    githubToken?: string;
     callbackTarget: AutoFixPrCallbackTarget;
     upstreamBranch?: string;
   }): Promise<void> {
@@ -236,11 +232,11 @@ export class AutoFixOrchestrator extends DurableObject<Env> {
 
     const prepareInput = {
       githubRepo: this.state.sessionInput.repoFullName,
+      githubIntegrationId: this.state.sessionInput.platformIntegrationId,
       kilocodeOrganizationId: this.state.owner.type === 'org' ? this.state.owner.id : undefined,
       prompt: params.prompt,
       mode: 'code' as const,
       model: params.model,
-      githubToken: params.githubToken,
       autoCommit: true,
       createdOnPlatform: 'autofix',
       ...(params.upstreamBranch ? { upstreamBranch: params.upstreamBranch } : {}),

@@ -4,7 +4,7 @@ import {
   organizationMemberMutationProcedure,
   organizationBillingMutationProcedure,
 } from './utils';
-import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
+import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   getAgentConfigForOwner,
   upsertAgentConfigForOwner,
@@ -42,7 +42,7 @@ const ToggleAutoFixAgentInputSchema = z
 
 export const organizationAutoFixRouter = createTRPCRouter({
   listGitHubRepositories: organizationMemberProcedure.query(async ({ input }) => {
-    return await fetchGitHubRepositoriesForOrganization(input.organizationId);
+    return await fetchAllGitHubRepositoriesForOrganization(input.organizationId);
   }),
 
   getAutoFixConfig: organizationMemberProcedure.query(async ({ input, ctx }) => {

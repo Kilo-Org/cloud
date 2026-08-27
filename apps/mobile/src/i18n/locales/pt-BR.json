@@ -2399,8 +2399,6 @@
     "opensAppStoreManagement": "Abre o gerenciamento de assinatura da App Store.",
     "opensPlans": "Abre os planos do Kilo Pass.",
     "tryAgainFromProfile": "Tente novamente no Perfil.",
-    "unavailableDescription": "O Kilo Pass não está disponível como compra no app no Android. Gerencie-o na web.",
-    "webManagementDescription": "Este Kilo Pass é gerenciado na web.",
     "legalDisclosure": "O Kilo Pass é uma assinatura mensal com renovação automática. O pagamento é cobrado na sua Apple ID na confirmação da compra. As assinaturas são renovadas automaticamente todos os meses pelo preço exibido, a menos que sejam canceladas pelo menos 24 horas antes do fim do período atual. Gerencie ou cancele a qualquer momento nas configurações da sua conta na App Store.",
     "legalPrivacyPolicy": "Política de Privacidade",
     "legalTermsOfUse": "Termos de Uso (EULA)",

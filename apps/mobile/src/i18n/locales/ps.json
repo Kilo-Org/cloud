@@ -2840,8 +2840,6 @@
     "opensAppStoreManagement": "د App Store د ګډون مدیریت پرانیزي.",
     "opensPlans": "د Kilo Pass پلانونه پرانیزي.",
     "tryAgainFromProfile": "له پروفایل څخه بیا هڅه وکړئ.",
-    "unavailableDescription": "Kilo Pass په Android کې د in-app پیرود په توګه نه شته. دا په ویب کې اداره کړئ.",
-    "webManagementDescription": "دا Kilo Pass په ویب کې اداره کیږي.",
     "legalDisclosure": "Kilo Pass یو خودکار تازه کېدونکی میاشتنی ګډون دی. پیسې ستاسو Apple ID ته د پیرود د تایید په وخت کې اخیستل کیږي. ګډونونه هر میاشت په ښودل شوي نرخ باندې په اتوماتیک ډول نوي کیږي، پرته له دې چې د اوسنۍ مودې له پای ته رسېدو ۲۴ ساعته مخکې لغوه شي. هر وخت د خپل App Store حساب تنظیماتو کې اداره یا لغوه کړئ.",
     "legalPrivacyPolicy": "د محرمیت پالیسي",
     "legalTermsOfUse": "د استعمال شرایط (EULA)",

@@ -2386,8 +2386,6 @@
     "opensAppStoreManagement": "App Storeのサブスクリプション管理を開きます。",
     "opensPlans": "Kilo Passのプランを開きます。",
     "tryAgainFromProfile": "プロフィールからもう一度お試しください。",
-    "unavailableDescription": "Kilo Pass は Android のアプリ内課金では利用できません。Web で管理してください。",
-    "webManagementDescription": "この Kilo Pass は Web で管理されています。",
     "legalDisclosure": "Kilo Pass は自動更新の月額サブスクリプションです。購入の確認時に、お支払いは Apple ID に請求されます。サブスクリプションは、現在の期間終了の 24 時間前までに解約しない限り、表示された価格で毎月自動更新されます。App Store のアカウント設定でいつでも管理または解約できます。",
     "legalPrivacyPolicy": "プライバシーポリシー",
     "legalTermsOfUse": "利用規約 (EULA)",

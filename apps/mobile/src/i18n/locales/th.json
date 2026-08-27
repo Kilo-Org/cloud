@@ -2840,8 +2840,6 @@
     "opensAppStoreManagement": "เปิดการจัดการการสมัครสมาชิก App Store",
     "opensPlans": "เปิดแผน Kilo Pass",
     "tryAgainFromProfile": "ลองอีกครั้งจากโปรไฟล์",
-    "unavailableDescription": "ไม่สามารถซื้อ Kilo Pass ภายในแอปบน Android ได้ จัดการได้บนเว็บ",
-    "webManagementDescription": "Kilo Pass นี้ถูกจัดการบนเว็บ",
     "legalDisclosure": "Kilo Pass เป็นการสมัครสมาชิกรายเดือนที่ต่ออายุอัตโนมัติ ค่าธรรมเนียมจะถูกเรียกเก็บจาก Apple ID ของคุณเมื่อยืนยันการซื้อ การสมัครสมาชิกจะต่ออายุอัตโนมัติทุกเดือนในราคาที่แสดง เว้นแต่จะยกเลิกอย่างน้อย 24 ชั่วโมงก่อนสิ้นสุดรอบปัจจุบัน จัดการหรือยกเลิกได้ทุกเมื่อในการตั้งค่าบัญชี App Store",
     "legalPrivacyPolicy": "นโยบายความเป็นส่วนตัว",
     "legalTermsOfUse": "ข้อกำหนดการใช้งาน (EULA)",

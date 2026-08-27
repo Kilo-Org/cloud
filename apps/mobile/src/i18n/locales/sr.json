@@ -2860,8 +2860,6 @@
     "opensAppStoreManagement": "Otvara upravljanje pretplatom u App Store-u.",
     "opensPlans": "Otvara Kilo Pass planove.",
     "tryAgainFromProfile": "Pokušajte ponovo iz Profila.",
-    "unavailableDescription": "Kilo Pass nije dostupan kao kupovina u aplikaciji na Androidu. Upravljajte njime na webu.",
-    "webManagementDescription": "Ovim Kilo Pass-om se upravlja na webu.",
     "legalDisclosure": "Kilo Pass je pretplata na mesec dana koja se automatski obnavlja. Plaćanje se naplaćuje sa vašeg Apple ID-ja pri potvrdi kupovine. Pretplate se automatski obnavljaju svakog meseca po prikazanoj ceni, osim ako ih ne otkažete najmanje 24 sata pre kraja tekućeg perioda. Upravljajte ili otkažite u svakom trenutku u podešavanjima naloga u App Store-u.",
     "legalPrivacyPolicy": "Politika privatnosti",
     "legalTermsOfUse": "Uslovi korišćenja (EULA)",

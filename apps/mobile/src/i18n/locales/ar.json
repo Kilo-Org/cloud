@@ -2438,8 +2438,6 @@
     "opensAppStoreManagement": "يفتح إدارة اشتراك App Store.",
     "opensPlans": "يفتح خطط Kilo Pass.",
     "tryAgainFromProfile": "حاول مرة أخرى من الملف الشخصي.",
-    "unavailableDescription": "Kilo Pass غير متاح كعملية شراء داخل التطبيق على Android. يمكنك إدارته على الويب.",
-    "webManagementDescription": "تتم إدارة Kilo Pass هذا على الويب.",
     "legalDisclosure": "Kilo Pass اشتراك شهري متجدد تلقائيًا. يتم خصم الدفعة من Apple ID الخاص بك عند تأكيد الشراء. تتجدد الاشتراكات تلقائيًا كل شهر بالسعر المعروض ما لم يتم الإلغاء قبل 24 ساعة على الأقل من نهاية الفترة الحالية. يمكنك الإدارة أو الإلغاء في أي وقت من إعدادات حسابك في App Store.",
     "legalPrivacyPolicy": "سياسة الخصوصية",
     "legalTermsOfUse": "شروط الاستخدام (EULA)",

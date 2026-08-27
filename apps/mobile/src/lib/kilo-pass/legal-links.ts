@@ -1,7 +1,9 @@
 import { i18n } from '@/i18n';
 
-export function kiloPassLegalDisclosure(): string {
-  return i18n.t('kiloPass.legalDisclosure');
+export function kiloPassLegalDisclosure(platformOS: string): string {
+  return i18n.t(
+    platformOS === 'android' ? 'kiloPass.legalDisclosurePlay' : 'kiloPass.legalDisclosure'
+  );
 }
 
 type KiloPassLegalLink = {

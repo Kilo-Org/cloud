@@ -2840,8 +2840,6 @@
     "opensAppStoreManagement": "Åbner App Store-abonnementsadministration.",
     "opensPlans": "Åbner Kilo Pass-planer.",
     "tryAgainFromProfile": "Prøv igen fra Profil.",
-    "unavailableDescription": "Kilo Pass er ikke tilgængelig som et køb i appen på Android. Administrér det på nettet.",
-    "webManagementDescription": "Denne Kilo Pass administreres på nettet.",
     "legalDisclosure": "Kilo Pass er et automatisk fornyeligt månedligt abonnement. Betaling opkræves på din Apple ID ved bekræftelse af købet. Abonnementer fornyes automatisk hver måned til den viste pris, medmindre de annulleres mindst 24 timer før udløbet af den aktuelle periode. Administrér eller annullér når som helst i dine App Store-kontoindstillinger.",
     "legalPrivacyPolicy": "Privatlivspolitik",
     "legalTermsOfUse": "Vilkår for brug (EULA)",

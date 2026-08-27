@@ -2840,8 +2840,6 @@
     "opensAppStoreManagement": "Avaa App Store -tilauksen hallinnan.",
     "opensPlans": "Avaa Kilo Pass -suunnitelmat.",
     "tryAgainFromProfile": "Yritä uudelleen profiilista.",
-    "unavailableDescription": "Kilo Pass ei ole saatavilla sovelluksen sisäisenä ostoksena Androidissa. Hallinnoi sitä verkossa.",
-    "webManagementDescription": "Tätä Kilo Pass -tilausta hallinnoidaan verkossa.",
     "legalDisclosure": "Kilo Pass on automaattisesti uusiutuva kuukausitilaus. Maksu veloitetaan Apple ID:stäsi oston vahvistuksen yhteydessä. Tilaus uusiutuu automaattisesti joka kuukausi näytettyyn hintaan, ellei sitä peruuteta vähintään 24 tuntia ennen nykyisen jakson päättymistä. Hallinnoi tai peruuta milloin tahansa App Store -tilin asetuksissa.",
     "legalPrivacyPolicy": "Tietosuojakäytäntö",
     "legalTermsOfUse": "Käyttöehdot (EULA)",

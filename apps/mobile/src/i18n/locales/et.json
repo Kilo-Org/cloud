@@ -2840,8 +2840,6 @@
     "opensAppStoreManagement": "Avaneb App Store tellimuse haldus.",
     "opensPlans": "Avaneb Kilo Passi plaanid.",
     "tryAgainFromProfile": "Proovige uuesti profiili kaudu.",
-    "unavailableDescription": "Kilo Pass pole Androidis rakendusesiseselt ostetav. Halda seda veebis.",
-    "webManagementDescription": "Seda Kilo Passi hallatakse veebis.",
     "legalDisclosure": "Kilo Pass on automaatselt uuenev igakuine tellimus. Makse võetakse sinu Apple ID-lt ostu kinnitamisel. Tellimus uueneb iga kuu automaatselt näidatud hinnaga, kui sa seda ei tühista vähemalt 24 tundi enne jooksva perioodi lõppu. Halda või tühista tellimust igal ajal oma App Store konto seadetes.",
     "legalPrivacyPolicy": "Privaatsuspoliitika",
     "legalTermsOfUse": "Kasutustingimused (EULA)",

@@ -2386,8 +2386,6 @@
     "opensAppStoreManagement": "App Store 구독 관리를 엽니다.",
     "opensPlans": "Kilo Pass 요금제를 엽니다.",
     "tryAgainFromProfile": "프로필에서 다시 시도하세요.",
-    "unavailableDescription": "Kilo Pass는 Android에서 인앱 구매로 이용할 수 없습니다. 웹에서 관리하세요.",
-    "webManagementDescription": "이 Kilo Pass는 웹에서 관리됩니다.",
     "legalDisclosure": "Kilo Pass는 자동 갱신되는 월간 구독입니다. 결제는 구매 확인 시 Apple ID로 청구됩니다. 구독은 현재 기간 종료 24시간 전까지 취소하지 않으면 표시된 가격으로 매월 자동 갱신됩니다. App Store 계정 설정에서 언제든지 관리하거나 취소할 수 있습니다.",
     "legalPrivacyPolicy": "개인정보 처리방침",
     "legalTermsOfUse": "이용 약관 (EULA)",

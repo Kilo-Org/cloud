@@ -16,6 +16,7 @@ import {
   fetchProducts as fetchIapProducts,
   getAvailablePurchases as getAvailableIapPurchases,
   type ProductOrSubscription,
+  type ProductSubscription,
   useIAP,
 } from 'expo-iap';
 
@@ -41,6 +42,18 @@ import {
 } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { useTRPC } from '@/lib/trpc';
 
+const isIapPlatform = Platform.OS === 'ios' || Platform.OS === 'android';
+const isAndroid = Platform.OS === 'android';
+
+function getSubscriptionOfferToken(product: ProductSubscription): string | undefined {
+  if (product.platform !== 'android') {
+    return undefined;
+  }
+  const offers = product.subscriptionOffers;
+  const monthly = offers.find(offer => offer.basePlanIdAndroid === 'monthly-v1');
+  return (monthly ?? offers[0])?.offerTokenAndroid ?? undefined;
+}
+
 function toStoreKiloPassProduct(product: ProductOrSubscription): StoreKiloPassProduct | null {
   if (product.type !== 'subs') {
     return null;
@@ -51,6 +64,7 @@ function toStoreKiloPassProduct(product: ProductOrSubscription): StoreKiloPassPr
     displayPrice: product.displayPrice,
     title: product.title,
     description: product.description,
+    offerToken: getSubscriptionOfferToken(product),
   };
 }
 
@@ -90,13 +104,17 @@ export type KiloPassNativeIapContextValue = {
   isRestoringPurchases: boolean;
   errorMessage: string | null;
   clearError: () => void;
-  /** True when the App Store account already owns a pass on another Kilo account. */
+  /** True when the store account already owns a pass on another Kilo account. */
   ownedByAnotherAccount: boolean;
   /** Apple product ID of a Kilo Pass this device already owns, if any. */
   ownedAppleProductId: string | null;
   /** Original transaction ID of that owned purchase, for server-side preflight. */
   ownedOriginalTransactionId: string | null;
-  /** False until StoreKit has answered once with what this device owns. */
+  /** Google product ID of a Kilo Pass this device already owns, if any. */
+  ownedGoogleProductId: string | null;
+  /** Play purchase token of that owned purchase, for server-side preflight. */
+  ownedGooglePurchaseToken: string | null;
+  /** False until the store has answered once with what this device owns. */
   ownershipChecked: boolean;
 };
 
@@ -113,8 +131,8 @@ export function useKiloPassNativeIap(): KiloPassNativeIapContextValue {
 
 /**
  * The single `useIAP` call site. Mounted only when the purchase presentation is
- * `native_iap` on iOS, so Android never initializes StoreKit and there is never
- * more than one IAP owner on the Kilo Pass route.
+ * `native_iap` on iOS or Android, so there is never more than one IAP owner on
+ * the Kilo Pass route.
  */
 export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const trpc = useTRPC();
@@ -135,6 +153,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const completeAppStorePurchase = useMutation(
     trpc.kiloPass.completeAppStorePurchase.mutationOptions()
   );
+  const completePlayPurchase = useMutation(trpc.kiloPass.completePlayPurchase.mutationOptions());
 
   const releasePurchaseRequest = useCallback(() => {
     activePurchaseRequestRef.current = null;
@@ -155,13 +174,15 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       }
     },
     onPurchaseSuccess: purchase => {
-      if (!isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds)) {
+      if (
+        !isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds, enabledGoogleProductIds)
+      ) {
         releasePurchaseRequest();
         return;
       }
 
       if (activePurchaseRequestRef.current?.sku !== purchase.productId) {
-        // StoreKit answered the in-flight request with a transaction for another
+        // The store answered the in-flight request with a transaction for another
         // SKU (an upgrade it refused re-delivers the current subscription), and no
         // purchase error follows. Release the request or the screen keeps its
         // "Completing purchase" state forever. The recovery effect below still
@@ -191,7 +212,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     getAvailablePurchases: refreshAvailablePurchases,
   } = actionsRef;
 
-  // Server-backed fallback for the recovery SKU list: when the StoreKit fetch
+  // Server-backed fallback for the recovery SKU list: when the store fetch
   // fails or returns no products, recovery still needs the enabled product IDs
   // so charged-but-uncompleted transactions are completed instead of released.
   const serverProductsQuery = useQuery(trpc.kiloPass.getMobileStoreProducts.queryOptions());
@@ -205,21 +226,29 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     }
     return serverProductsQuery.data?.products.map(product => product.appleProductId) ?? [];
   }, [productsQuery.products, serverProductsQuery.data]);
+  const enabledGoogleProductIds = useMemo(() => {
+    if (productsQuery.products.length > 0) {
+      return productsQuery.products.map(product => product.googleProductId);
+    }
+    return serverProductsQuery.data?.products.map(product => product.googleProductId) ?? [];
+  }, [productsQuery.products, serverProductsQuery.data]);
 
   const ownedPurchase = useMemo(() => {
-    if (Platform.OS !== 'ios') {
+    if (!isIapPlatform) {
       return null;
     }
     return (
       availablePurchases.find(purchase =>
-        isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds)
+        isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds, enabledGoogleProductIds)
       ) ?? null
     );
-  }, [availablePurchases, enabledAppleProductIds]);
-  const ownedAppleProductId = ownedPurchase?.productId ?? null;
+  }, [availablePurchases, enabledAppleProductIds, enabledGoogleProductIds]);
+  const ownedAppleProductId = isAndroid ? null : (ownedPurchase?.productId ?? null);
+  const ownedGoogleProductId = isAndroid ? (ownedPurchase?.productId ?? null) : null;
   const ownedOriginalTransactionId =
     (ownedPurchase as { originalTransactionIdentifierIOS?: string | null } | null)
       ?.originalTransactionIdentifierIOS ?? null;
+  const ownedGooglePurchaseToken = isAndroid ? (ownedPurchase?.purchaseToken ?? null) : null;
 
   const ownedByAnotherAccount = useMemo(
     () =>
@@ -227,9 +256,10 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         availablePurchases,
         currentAppAccountToken: serverProductsQuery.data?.appAccountToken,
         enabledAppleProductIds,
+        enabledGoogleProductIds,
         platformOS: Platform.OS,
       }) === 'owned-by-another-account',
-    [availablePurchases, enabledAppleProductIds, serverProductsQuery.data]
+    [availablePurchases, enabledAppleProductIds, enabledGoogleProductIds, serverProductsQuery.data]
   );
 
   const invalidateAfterCompletion = useCallback(async () => {
@@ -245,21 +275,30 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const actions = useMemo(
     () =>
       createAppStoreKiloPassPurchaseActions({
+        storefront: isAndroid ? 'play' : 'app_store',
         requestPurchase,
         getAvailablePurchases: getAvailableIapPurchases,
         restorePurchases: restoreStorePurchases,
         completeAppStorePurchase: completeAppStorePurchase.mutateAsync,
+        completePlayPurchase: completePlayPurchase.mutateAsync,
         enabledAppleProductIds,
+        enabledGoogleProductIds,
         loadEnabledAppleProductIds: async () => {
           const result = await queryClient.fetchQuery(
             trpc.kiloPass.getMobileStoreProducts.queryOptions()
           );
           return result.products.map(product => product.appleProductId);
         },
+        loadEnabledGoogleProductIds: async () => {
+          const result = await queryClient.fetchQuery(
+            trpc.kiloPass.getMobileStoreProducts.queryOptions()
+          );
+          return result.products.map(product => product.googleProductId);
+        },
         finishTransaction,
         invalidateAfterCompletion,
         onPurchaseCompleted: () => {
-          // Completed is emitted server-side by completeAppStorePurchase — do not
+          // Completed is emitted server-side by the completion mutation — do not
           // re-add a client capture (double counting).
           setErrorMessage(null);
           const onCompleted = pendingPurchaseCompletedCallbackRef.current;
@@ -276,7 +315,9 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       }),
     [
       completeAppStorePurchase.mutateAsync,
+      completePlayPurchase.mutateAsync,
       enabledAppleProductIds,
+      enabledGoogleProductIds,
       finishTransaction,
       invalidateAfterCompletion,
       queryClient,
@@ -288,11 +329,17 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
 
   const startPurchase = useCallback(
     async (product: AppStoreKiloPassProduct, options: StoreKiloPassPurchaseOptions = {}) => {
-      if (activePurchaseRequestRef.current || completeAppStorePurchase.isPending) {
+      if (
+        activePurchaseRequestRef.current ||
+        completeAppStorePurchase.isPending ||
+        completePlayPurchase.isPending
+      ) {
         return;
       }
 
-      activePurchaseRequestRef.current = { sku: product.appleProductId };
+      activePurchaseRequestRef.current = {
+        sku: isAndroid ? product.googleProductId : product.appleProductId,
+      };
       setIsRequestingPurchase(true);
       setErrorMessage(null);
       captureEvent(KILO_PASS_PURCHASE_STARTED_EVENT);
@@ -306,14 +353,20 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [actions, completeAppStorePurchase.isPending, releasePurchaseRequest]
+    [
+      actions,
+      completeAppStorePurchase.isPending,
+      completePlayPurchase.isPending,
+      releasePurchaseRequest,
+    ]
   );
 
   const restorePurchases = useCallback(async (): Promise<StoreKiloPassRestorePurchasesResult> => {
     if (
       activePurchaseRequestRef.current ||
       isRestoringPurchases ||
-      completeAppStorePurchase.isPending
+      completeAppStorePurchase.isPending ||
+      completePlayPurchase.isPending
     ) {
       return 'failed';
     }
@@ -325,14 +378,19 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     } finally {
       setIsRestoringPurchases(false);
     }
-  }, [actions, completeAppStorePurchase.isPending, isRestoringPurchases]);
+  }, [
+    actions,
+    completeAppStorePurchase.isPending,
+    completePlayPurchase.isPending,
+    isRestoringPurchases,
+  ]);
 
   useEffect(() => {
     queryClient.removeQueries({ queryKey: ['kilo-pass', 'app-store-products'] });
   }, [authEpoch, queryClient]);
 
   useEffect(() => {
-    if (Platform.OS !== 'ios') {
+    if (!isIapPlatform) {
       setOwnershipChecked(true);
       return;
     }
@@ -344,7 +402,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       try {
         await refreshAvailablePurchases();
       } finally {
-        // Purchases are only known after StoreKit answers. Until then the screen
+        // Purchases are only known after the store answers. Until then the screen
         // must not start a purchase: a device subscription owned by another Kilo
         // account would otherwise charge the user before any check can see it.
         setOwnershipChecked(true);
@@ -353,7 +411,10 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   }, [connected, refreshAvailablePurchases]);
 
   useEffect(() => {
-    if (availablePurchases.length === 0 || enabledAppleProductIds.length === 0) {
+    if (
+      availablePurchases.length === 0 ||
+      (enabledAppleProductIds.length === 0 && enabledGoogleProductIds.length === 0)
+    ) {
       return;
     }
 
@@ -385,7 +446,12 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         }
       })();
     }
-  }, [actions, availablePurchases, enabledAppleProductIds.length]);
+  }, [
+    actions,
+    availablePurchases,
+    enabledAppleProductIds.length,
+    enabledGoogleProductIds.length,
+  ]);
 
   const value = useMemo<KiloPassNativeIapContextValue>(
     () => ({
@@ -396,23 +462,32 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       productsRefetch: productsQuery.refetch,
       purchase: startPurchase,
       restorePurchases,
-      isPending: isRequestingPurchase || completeAppStorePurchase.isPending || isRestoringPurchases,
+      isPending:
+        isRequestingPurchase ||
+        completeAppStorePurchase.isPending ||
+        completePlayPurchase.isPending ||
+        isRestoringPurchases,
       isRestoringPurchases,
       errorMessage,
       clearError,
       ownedByAnotherAccount,
       ownedAppleProductId,
       ownedOriginalTransactionId,
+      ownedGoogleProductId,
+      ownedGooglePurchaseToken,
       ownershipChecked,
     }),
     [
       clearError,
       completeAppStorePurchase.isPending,
+      completePlayPurchase.isPending,
       errorMessage,
       isRequestingPurchase,
       isRestoringPurchases,
       ownedAppleProductId,
       ownedByAnotherAccount,
+      ownedGoogleProductId,
+      ownedGooglePurchaseToken,
       ownedOriginalTransactionId,
       ownershipChecked,
       productsQuery.errorMessage,

@@ -2386,8 +2386,6 @@
     "opensAppStoreManagement": "App Store abonelik yönetimini açar.",
     "opensPlans": "Kilo Pass planlarını açar.",
     "tryAgainFromProfile": "Profilden tekrar deneyin.",
-    "unavailableDescription": "Kilo Pass, Android'de uygulama içi satın alma olarak kullanılamaz. Web üzerinden yönetin.",
-    "webManagementDescription": "Bu Kilo Pass web üzerinden yönetiliyor.",
     "legalDisclosure": "Kilo Pass, otomatik yenilenen aylık bir aboneliktir. Ödeme, satın alma onayında Apple Kimliğinize yansıtılır. Abonelikler, geçerli dönemin bitiminden en az 24 saat önce iptal edilmediği sürece her ay gösterilen fiyattan otomatik yenilenir. App Store hesap ayarlarınızdan istediğiniz zaman yönetin veya iptal edin.",
     "legalPrivacyPolicy": "Gizlilik Politikası",
     "legalTermsOfUse": "Kullanım Koşulları (EULA)",

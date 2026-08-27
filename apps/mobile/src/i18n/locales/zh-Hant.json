@@ -2386,8 +2386,6 @@
     "opensAppStoreManagement": "開啟 App Store 訂閱管理。",
     "opensPlans": "開啟 Kilo Pass 方案。",
     "tryAgainFromProfile": "請從個人資料頁再試一次。",
-    "unavailableDescription": "Kilo Pass 無法在 Android 上以應用程式內購買的方式取得。請在網頁上管理。",
-    "webManagementDescription": "此 Kilo Pass 是在網頁上管理的。",
     "legalDisclosure": "Kilo Pass 是自動續訂的每月訂閱。款項會在購買確認時從您的 Apple ID 扣款。除非在目前週期結束前至少 24 小時取消，否則訂閱會以顯示的價格每月自動續訂。您可以隨時在 App Store 帳戶設定中管理或取消。",
     "legalPrivacyPolicy": "隱私權政策",
     "legalTermsOfUse": "使用條款 (EULA)",

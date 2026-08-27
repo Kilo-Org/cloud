@@ -27,6 +27,9 @@ import { KILO_PASS_TITLE, type PurchasePresentationKind } from '@kilocode/app-sh
 import { KiloPassNativeIapOwner, useKiloPassNativeIap } from './kilo-pass-native-iap-owner';
 import { RestorePurchasesButton } from './restore-purchases-button';
 
+const isIapPlatform = Platform.OS === 'ios' || Platform.OS === 'android';
+const isAndroid = Platform.OS === 'android';
+
 type SubscriptionScreenFeedback = { type: 'success' | 'info' | 'error'; text: string };
 
 /**
@@ -105,7 +108,6 @@ function KiloPassPresentationErrorScreen({ onRetry }: { onRetry: () => void }) {
 /**
  * Rendered when the server presentation is not `native_iap`. Shows truthful
  * copy and, for `web_management`, a Manage action that opens the web URL.
- * Never imports `expo-iap`, so Android never initializes Play Billing here.
  */
 function KiloPassUnavailableScreen({
   presentation,
@@ -115,8 +117,8 @@ function KiloPassUnavailableScreen({
   const { t } = useTranslation();
   const isWebManagement = presentation.kind === 'web_management';
   const description = isWebManagement
-    ? t('kiloPass.webManagementDescription')
-    : t('kiloPass.unavailableDescription');
+    ? t('kiloPass.managedOnWeb')
+    : t('kiloPass.purchaseUnavailable');
 
   return (
     <View className="flex-1 bg-background">
@@ -176,6 +178,8 @@ function KiloPassNativeIapContent() {
     ownedByAnotherAccount,
     ownedAppleProductId,
     ownedOriginalTransactionId,
+    ownedGoogleProductId,
+    ownedGooglePurchaseToken,
     ownershipChecked,
   } = useKiloPassNativeIap();
   useInlinePurchaseErrorOwnership();
@@ -192,7 +196,10 @@ function KiloPassNativeIapContent() {
   const [preflightFailure, setPreflightFailure] = useState<PreflightFailure | null>(null);
   let feedback: SubscriptionScreenFeedback | null = restoreFeedback;
   if (ownedByAnotherAccount) {
-    feedback = { type: 'error', text: t('kiloPass.otherAccountCopy') };
+    feedback = {
+      type: 'error',
+      text: t(isAndroid ? 'kiloPass.otherAccountCopyPlay' : 'kiloPass.otherAccountCopy'),
+    };
   } else if (errorMessage) {
     feedback = { type: 'error', text: errorMessage };
   } else if (preflightFailure) {
@@ -227,11 +234,19 @@ function KiloPassNativeIapContent() {
     let preflight: Awaited<ReturnType<typeof preflightPurchase.mutateAsync>>;
     try {
       preflight = await preflightPurchase.mutateAsync({
-        platform: 'ios',
-        storefront: 'app_store',
+        platform: isAndroid ? 'android' : 'ios',
+        storefront: isAndroid ? 'play' : 'app_store',
         product: 'kilo_pass',
+        supportsNativePlayKiloPass: true,
         appleProductId: product.appleProductId,
-        appleOriginalTransactionId: ownedOriginalTransactionId,
+        ...(isAndroid
+          ? {
+              googleProductId: product.googleProductId,
+              googlePurchaseToken: ownedGooglePurchaseToken,
+            }
+          : {
+              appleOriginalTransactionId: ownedOriginalTransactionId,
+            }),
       });
     } catch {
       setPreflightFailure({
@@ -264,11 +279,21 @@ function KiloPassNativeIapContent() {
   const handleProductPress = (product: AppStoreKiloPassProduct) => {
     void Haptics.selectionAsync();
 
-    // Apple owns tier changes inside a subscription group: requesting another SKU
-    // while this device already owns one is refused by StoreKit, and the app cannot
-    // show the proration Apple applies. Send those taps to App Store management.
-    if (ownedAppleProductId && ownedAppleProductId !== product.appleProductId) {
+    // The store owns tier changes inside a subscription group: requesting another
+    // SKU while this device already owns one is refused, and the app cannot show
+    // the proration the store applies. Send those taps to store management.
+    const ownedProductId = isAndroid ? ownedGoogleProductId : ownedAppleProductId;
+    const productId = isAndroid ? product.googleProductId : product.appleProductId;
+    if (ownedProductId && ownedProductId !== productId) {
       void (async () => {
+        if (isAndroid) {
+          const { openPlaySubscriptionManagement } = await import('./kilo-pass-play-manage');
+          await openPlaySubscriptionManagement({
+            skuAndroid: ownedProductId,
+            invalidateAfter: invalidateAfterManagement,
+          });
+          return;
+        }
         const { openAppStoreManagement } = await import('./kilo-pass-ios-manage');
         await openAppStoreManagement({ invalidateAfter: invalidateAfterManagement });
       })();
@@ -279,7 +304,7 @@ function KiloPassNativeIapContent() {
   };
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" testID="kilo-pass-native-iap">
       <ScreenHeader title={t('kiloPass.title')} modal />
       <View className="flex-1 px-5">
         <DetailScreenScrollView
@@ -336,10 +361,11 @@ function KiloPassNativeIapContent() {
               }}
             >
               <Text className="font-semibold text-foreground">
-                {t('kiloPass.productsUnavailable')}
+                {t(isAndroid ? 'kiloPass.productsUnavailablePlay' : 'kiloPass.productsUnavailable')}
               </Text>
               <Text className="mt-1 text-sm text-muted-foreground">
-                {productsError ?? t('kiloPass.productsCouldNotLoad')}
+                {productsError ??
+                  t(isAndroid ? 'kiloPass.productsCouldNotLoadPlay' : 'kiloPass.productsCouldNotLoad')}
               </Text>
               <Text className="mt-3 text-sm font-medium text-primary">
                 {productsIsRefetching ? t('kiloPass.tryingAgain') : t('common.tryAgain')}
@@ -402,7 +428,7 @@ function KiloPassNativeIapContent() {
           />
 
           <Text className="px-1 pt-1 text-xs leading-5 text-muted-foreground">
-            {kiloPassLegalDisclosure()}
+            {kiloPassLegalDisclosure(Platform.OS)}
             {t('kiloPass.legalConnectorTerms')}
             <Text
               accessibilityRole="link"
@@ -454,6 +480,7 @@ export function KiloPassSubscriptionScreen() {
       platform,
       storefront,
       product: 'kilo_pass',
+      supportsNativePlayKiloPass: true,
     })
   );
 
@@ -472,7 +499,7 @@ export function KiloPassSubscriptionScreen() {
   }
 
   const presentation = presentationQuery.data;
-  if (presentation.kind !== 'native_iap' || Platform.OS !== 'ios') {
+  if (presentation.kind !== 'native_iap' || !isIapPlatform) {
     return <KiloPassUnavailableScreen presentation={presentation} />;
   }
 

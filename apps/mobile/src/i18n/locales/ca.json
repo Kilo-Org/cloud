@@ -2860,8 +2860,6 @@
     "opensAppStoreManagement": "Obre la gestió de la subscripció de l'App Store.",
     "opensPlans": "Obre els plans de Kilo Pass.",
     "tryAgainFromProfile": "Torna-ho a provar des del Perfil.",
-    "unavailableDescription": "Kilo Pass no està disponible com a compra dins de l'aplicació a Android. Gestioneu-lo al web.",
-    "webManagementDescription": "Aquest Kilo Pass es gestiona al web.",
     "legalDisclosure": "Kilo Pass és una subscripció mensual de renovació automàtica. El pagament es carrega al vostre Apple ID en confirmar la compra. Les subscripcions es renoven automàticament cada mes al preu mostrat tret que es cancel·lin com a mínim 24 hores abans del final del període actual. Gestioneu-les o cancel·leu-les en qualsevol moment a la configuració del compte de l'App Store.",
     "legalPrivacyPolicy": "Política de privadesa",
     "legalTermsOfUse": "Condicions d'ús (EULA)",

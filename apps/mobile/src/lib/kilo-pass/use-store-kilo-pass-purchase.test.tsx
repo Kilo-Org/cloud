@@ -10,6 +10,7 @@ import {
 } from '@/components/kilo-pass/kilo-pass-native-iap-owner';
 import {
   createAppStoreKiloPassPurchaseActions,
+  getKiloPassPurchaseErrorMessage,
   resetInlinePurchaseErrorOwnership,
   resetPurchaseErrorToastDedup,
   useInlinePurchaseErrorOwnership,
@@ -137,6 +138,7 @@ vi.mock('@/lib/trpc', () => ({
     return {
       kiloPass: {
         completeAppStorePurchase: { mutationOptions: () => ({}) },
+        completePlayPurchase: { mutationOptions: () => ({}) },
         getCreditHistory: { pathFilter: () => ({ queryKey: ['credit-history'] }) },
         getMobileStoreProducts: { queryOptions: () => ({ queryKey: ['mobile-products'] }) },
         getPurchasePresentation: { pathFilter: () => ({ queryKey: ['purchase-presentation'] }) },
@@ -306,8 +308,11 @@ function createActions(
   overrides: Partial<Parameters<typeof createAppStoreKiloPassPurchaseActions>[0]> = {}
 ) {
   return createAppStoreKiloPassPurchaseActions({
+    storefront: 'app_store',
     completeAppStorePurchase: vi.fn(),
+    completePlayPurchase: vi.fn(),
     enabledAppleProductIds: [product.appleProductId],
+    enabledGoogleProductIds: [],
     finishTransaction: vi.fn(),
     getAvailablePurchases: vi.fn().mockResolvedValue([]),
     invalidateAfterCompletion: vi.fn(),
@@ -683,8 +688,11 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const onPurchaseCompleted = vi.fn();
     const purchase = createPurchase();
     const recoveryActions = createAppStoreKiloPassPurchaseActions({
+      storefront: 'app_store',
       completeAppStorePurchase: completeFromRecovery,
+      completePlayPurchase: vi.fn(),
       enabledAppleProductIds: [product.appleProductId],
+      enabledGoogleProductIds: [],
       finishTransaction: finishFromRecovery,
       getAvailablePurchases: vi.fn().mockResolvedValue([]),
       invalidateAfterCompletion: vi.fn(),
@@ -693,8 +701,11 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       showError: () => undefined,
     });
     const sheetActions = createAppStoreKiloPassPurchaseActions({
+      storefront: 'app_store',
       completeAppStorePurchase: completeFromSheet,
+      completePlayPurchase: vi.fn(),
       enabledAppleProductIds: [product.appleProductId],
+      enabledGoogleProductIds: [],
       finishTransaction: finishFromSheet,
       getAvailablePurchases: vi.fn().mockResolvedValue([]),
       invalidateAfterCompletion: vi.fn(),
@@ -858,6 +869,163 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
     expect(result).toBe('failed');
     expect(showError).toHaveBeenCalledWith('Failed to restore purchases. Try again.');
+  });
+
+  it('requests a Google Play subscription purchase', async () => {
+    const requestPurchase = vi.fn().mockResolvedValue(null);
+    const actions = createActions({
+      storefront: 'play',
+      requestPurchase,
+    });
+    const playProduct = {
+      ...product,
+      storeProduct: { ...product.storeProduct, offerToken: 'offer-123' },
+    };
+
+    await actions.purchase(playProduct);
+
+    expect(requestPurchase).toHaveBeenCalledWith({
+      request: {
+        google: {
+          obfuscatedAccountId: product.appAccountToken,
+          skus: [product.googleProductId],
+          subscriptionOffers: [{ sku: product.googleProductId, offerToken: 'offer-123' }],
+        },
+      },
+      type: 'subs',
+    });
+  });
+
+  it('shows a missing-offer-token error without requesting a Play purchase', async () => {
+    const requestPurchase = vi.fn();
+    const showError = vi.fn();
+    const actions = createActions({
+      storefront: 'play',
+      requestPurchase,
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    const result = await actions.purchase(product);
+
+    expect(result).toBe(false);
+    expect(requestPurchase).not.toHaveBeenCalled();
+    expect(showError).toHaveBeenCalledWith(
+      'Google Play purchase is missing an offer token. Try again.'
+    );
+  });
+
+  it('reports a missing Play purchase token without completing', async () => {
+    const finishTransaction = vi.fn();
+    const completePlayPurchase = vi.fn();
+    const showError = vi.fn();
+    const purchase = createPurchase({
+      store: 'google',
+      platform: 'android',
+      productId: product.googleProductId,
+      purchaseToken: null,
+    });
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      enabledAppleProductIds: [],
+      enabledGoogleProductIds: [product.googleProductId],
+      finishTransaction,
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    const completed = await actions.handlePurchaseSuccess(purchase);
+
+    expect(completed).toBe(false);
+    expect(completePlayPurchase).not.toHaveBeenCalled();
+    expect(finishTransaction).not.toHaveBeenCalled();
+    expect(showError).toHaveBeenCalledWith(
+      'Google Play purchase did not include a purchase token.'
+    );
+  });
+
+  it('finishes the transaction after Play backend completion succeeds', async () => {
+    const finishTransaction = vi.fn();
+    const completePlayPurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const purchase = createPurchase({
+      store: 'google',
+      platform: 'android',
+      productId: product.googleProductId,
+      purchaseToken: 'play-token',
+    });
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      enabledAppleProductIds: [],
+      enabledGoogleProductIds: [product.googleProductId],
+      finishTransaction,
+    });
+
+    await actions.handlePurchaseSuccess(purchase);
+
+    expect(completePlayPurchase).toHaveBeenCalledWith({
+      purchaseToken: 'play-token',
+      platform: 'android',
+      storefront: 'play',
+      product: 'kilo_pass',
+    });
+    expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
+  });
+
+  it('restores an unfinished Kilo Pass Google Play purchase', async () => {
+    const purchase = createPurchase({
+      store: 'google',
+      platform: 'android',
+      productId: product.googleProductId,
+      purchaseToken: 'play-token',
+    });
+    const completePlayPurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn();
+    const invalidateAfterCompletion = vi.fn();
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      enabledAppleProductIds: [],
+      enabledGoogleProductIds: [product.googleProductId],
+      finishTransaction,
+      getAvailablePurchases: vi.fn().mockResolvedValue([purchase]),
+      invalidateAfterCompletion,
+      restorePurchases: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const result = await actions.restorePurchases();
+
+    expect(result).toBe('restored');
+    expect(completePlayPurchase).toHaveBeenCalledWith({
+      purchaseToken: 'play-token',
+      platform: 'android',
+      storefront: 'play',
+      product: 'kilo_pass',
+    });
+    expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
+    expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps Google Play account mismatch strings to Play-specific copy', () => {
+    expect(
+      getKiloPassPurchaseErrorMessage(
+        new Error('Google Play purchase account token does not match the signed-in user.'),
+        'fallback'
+      )
+    ).toBe('The Kilo Pass on this Google Play account belongs to a different Kilo account.');
+    expect(
+      getKiloPassPurchaseErrorMessage(
+        new Error(
+          "This Google Play purchase isn't linked to your Kilo account. Make sure you're signed in to the Google account that made the purchase, then try again."
+        ),
+        'fallback'
+      )
+    ).toBe(
+      "This Google Play purchase isn't linked to your Kilo account. Sign in to the Google account used for the purchase, then try again."
+    );
   });
 });
 

@@ -1,6 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Linking, Platform, Pressable, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { AppState, Linking, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -15,6 +16,12 @@ import {
   getKiloPassSubscriptionCardContentState,
 } from '@/lib/kilo-pass/subscription-card-state';
 
+const GOOGLE_PRODUCT_ID_BY_TIER = {
+  tier_19: 'kilopass_tier19',
+  tier_49: 'kilopass_tier49',
+  tier_199: 'kilopass_tier199',
+} as const;
+
 export function KiloPassSubscriptionCard() {
   const colors = useThemeColors();
   const router = useRouter();
@@ -28,6 +35,7 @@ export function KiloPassSubscriptionCard() {
       platform,
       storefront,
       product: 'kilo_pass',
+      supportsNativePlayKiloPass: true,
     })
   );
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
@@ -60,6 +68,31 @@ export function KiloPassSubscriptionCard() {
       queryClient.invalidateQueries(trpc.kiloPass.getCreditHistory.pathFilter()),
     ]);
   };
+
+  // Returning to the app may follow a store-management trip (App Store or Play);
+  // refetch both the presentation and state so the card reflects any change.
+  const refetchRef = useRef({
+    presentation: presentationQuery.refetch,
+    state: stateQuery.refetch,
+  });
+  useEffect(() => {
+    refetchRef.current = {
+      presentation: presentationQuery.refetch,
+      state: stateQuery.refetch,
+    };
+  }, [presentationQuery.refetch, stateQuery.refetch]);
+  useEffect(() => {
+    const appStateSubscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        void refetchRef.current.presentation();
+        void refetchRef.current.state();
+      }
+    });
+    return () => {
+      appStateSubscription.remove();
+    };
+  }, []);
+
   const handlePress = () => {
     if (contentState.kind !== 'card') {
       return;
@@ -79,7 +112,15 @@ export function KiloPassSubscriptionCard() {
       return;
     }
     if (cardState.action === 'open-store-management') {
-      if (Platform.OS !== 'ios') {
+      if (Platform.OS === 'android') {
+        const tier = subscription?.tier;
+        const skuAndroid =
+          (tier != null ? GOOGLE_PRODUCT_ID_BY_TIER[tier as keyof typeof GOOGLE_PRODUCT_ID_BY_TIER] : undefined) ??
+          'kilopass_tier19';
+        void (async () => {
+          const { openPlaySubscriptionManagement } = await import('./kilo-pass-play-manage');
+          await openPlaySubscriptionManagement({ skuAndroid, invalidateAfter: invalidateKiloPassState });
+        })();
         return;
       }
       void (async () => {
@@ -176,10 +217,12 @@ export function KiloPassSubscriptionCard() {
       {contentState.kind === 'card' && contentState.state.action !== 'none' ? (
         <Pressable
           accessibilityHint={
-            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityHint
+            getKiloPassSubscriptionCardAccessibility(contentState.state, Platform.OS)
+              .accessibilityHint
           }
           accessibilityLabel={
-            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityLabel
+            getKiloPassSubscriptionCardAccessibility(contentState.state, Platform.OS)
+              .accessibilityLabel
           }
           accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"

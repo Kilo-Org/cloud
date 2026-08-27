@@ -2386,8 +2386,6 @@
     "opensAppStoreManagement": "Öffnet die Abonnementverwaltung des App Store.",
     "opensPlans": "Öffnet die Kilo Pass-Pläne.",
     "tryAgainFromProfile": "Versuche es erneut über das Profil.",
-    "unavailableDescription": "Kilo Pass ist auf Android nicht als In-App-Kauf verfügbar. Verwalte ihn im Web.",
-    "webManagementDescription": "Dieser Kilo Pass wird im Web verwaltet.",
     "legalDisclosure": "Kilo Pass ist ein automatisch verlängerbares Monatsabonnement. Die Zahlung wird bei Kaufbestätigung deiner Apple-ID belastet. Abonnements verlängern sich automatisch jeden Monat zum angezeigten Preis, sofern sie nicht mindestens 24 Stunden vor Ende des aktuellen Zeitraums gekündigt werden. Jederzeit in deinen App-Store-Kontoeinstellungen verwalten oder kündigen.",
     "legalPrivacyPolicy": "Datenschutzrichtlinie",
     "legalTermsOfUse": "Nutzungsbedingungen (EULA)",

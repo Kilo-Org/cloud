@@ -2412,8 +2412,6 @@
     "opensAppStoreManagement": "Otwiera zarządzanie subskrypcją w App Store.",
     "opensPlans": "Otwiera plany Kilo Pass.",
     "tryAgainFromProfile": "Spróbuj ponownie z profilu.",
-    "unavailableDescription": "Kilo Pass nie jest dostępny jako zakup w aplikacji na Androidzie. Zarządzaj nim w sieci.",
-    "webManagementDescription": "Ten Kilo Pass jest zarządzany w sieci.",
     "legalDisclosure": "Kilo Pass to automatycznie odnawiana subskrypcja miesięczna. Płatność jest pobierana z Twojego Apple ID przy potwierdzeniu zakupu. Subskrypcja odnawia się automatycznie co miesiąc po podanej cenie, chyba że anulujesz ją co najmniej 24 godziny przed końcem bieżącego okresu. Zarządzaj nią lub anuluj ją w dowolnym momencie w ustawieniach konta App Store.",
     "legalPrivacyPolicy": "Polityka prywatności",
     "legalTermsOfUse": "Warunki korzystania (EULA)",

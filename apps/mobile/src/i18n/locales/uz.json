@@ -2840,8 +2840,6 @@
     "opensAppStoreManagement": "App Store obuna boshqaruvini ochadi.",
     "opensPlans": "Kilo Pass rejalarini ochadi.",
     "tryAgainFromProfile": "Profildan qayta urinib ko'ring.",
-    "unavailableDescription": "Kilo Pass Android’da ilova ichidagi xarid sifatida mavjud emas. Uni veb-saytda boshqaring.",
-    "webManagementDescription": "Bu Kilo Pass veb-saytda boshqariladi.",
     "legalDisclosure": "Kilo Pass avtomatik yangilanadigan oylik obuna hisoblanadi. To‘lov xaridni tasdiqlashda Apple ID hisobingizdan undiriladi. Obunalar har oy ko‘rsatilgan narxda avtomatik yangilanadi, agar joriy davr tugashidan kamida 24 soat oldin bekor qilinmasa. Istiagan paytda App Store hisob sozlamalaringizda boshqaring yoki bekor qiling.",
     "legalPrivacyPolicy": "Maxfiylik siyosati",
     "legalTermsOfUse": "Foydalanish shartlari (EULA)",

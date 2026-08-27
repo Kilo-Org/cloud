@@ -2840,8 +2840,6 @@
     "opensAppStoreManagement": "Megnyitja az App Store előfizetés-kezelést.",
     "opensPlans": "Megnyitja a Kilo Pass csomagokat.",
     "tryAgainFromProfile": "Próbáld újra a Profilból.",
-    "unavailableDescription": "A Kilo Pass nem érhető el alkalmazáson belüli vásárlásként Androidon. Kezelje a weben.",
-    "webManagementDescription": "Ez a Kilo Pass a weben van kezelve.",
     "legalDisclosure": "A Kilo Pass automatikusan megújuló havi előfizetés. A fizetés az Apple ID-hoz kerül felszámításra a vásárlás megerősítésekor. Az előfizetés minden hónapban automatikusan megújul a megjelenített áron, hacsak nem mondja le legalább 24 órával az aktuális időszak vége előtt. Kezelje vagy mondja le bármikor az App Store fiókbeállításaiban.",
     "legalPrivacyPolicy": "Adatvédelmi irányelvek",
     "legalTermsOfUse": "Felhasználási feltételek (EULA)",

@@ -2,12 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { formatDate } from '@/lib/format';
 import { parseTimestamp } from '@/lib/utils';
-import {
-  KILO_PASS_MANAGE_CTA_LABEL,
-  KILO_PASS_TITLE,
-  KILO_PASS_UNAVAILABLE_DESCRIPTION,
-  KILO_PASS_WEB_MANAGEMENT_DESCRIPTION,
-} from '@kilocode/app-shared/commerce';
+import { KILO_PASS_MANAGE_CTA_LABEL, KILO_PASS_TITLE } from '@kilocode/app-shared/commerce';
 
 import { getKiloPassSubscriptionCardContentState } from './subscription-card-state';
 
@@ -100,7 +95,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
       state: {
         action: 'open-native',
         actionLabel: null,
-        description: KILO_PASS_UNAVAILABLE_DESCRIPTION,
+        description: 'Kilo Pass purchase is not available right now.',
         title: KILO_PASS_TITLE,
       },
     });
@@ -122,7 +117,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
       state: {
         action: 'open-web',
         actionLabel: KILO_PASS_MANAGE_CTA_LABEL,
-        description: KILO_PASS_WEB_MANAGEMENT_DESCRIPTION,
+        description: 'This Kilo Pass is managed on web',
         title: KILO_PASS_TITLE,
       },
     });
@@ -194,7 +189,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
     });
   });
 
-  it('renders Google Play subscriptions as inert status cards', () => {
+  it('renders Google Play subscriptions as actionable management cards', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
         presentation: { kind: 'native_iap', statusClass: 'healthy' },
@@ -214,9 +209,59 @@ describe('getKiloPassSubscriptionCardContentState', () => {
     ).toEqual({
       kind: 'card',
       state: {
+        action: 'open-store-management',
+        actionLabel: 'Manage',
+        description: '$49 monthly credits · Managed on Google Play',
+        title: 'Kilo Pass active',
+      },
+    });
+  });
+
+  it('renders canceling Google Play subscriptions with an end date', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        presentation: { kind: 'native_iap', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: {
+          cancelAtPeriodEnd: true,
+          currentPeriodBaseCreditsUsd: 49,
+          paymentProvider: 'google_play',
+          refillAt: '2026-06-08T15:21:05.000Z',
+          status: 'active',
+        },
+        stateIsError: false,
+        stateIsPending: false,
+        platformOS: 'android',
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'open-store-management',
+        actionLabel: 'Manage',
+        description: `$49 monthly credits · Ends ${endDate}`,
+        title: 'Kilo Pass canceling',
+      },
+    });
+  });
+
+  it('renders an App Store subscription owned on a Play device as inert', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        presentation: { kind: 'native_iap', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: activeAppStoreSubscription,
+        stateIsError: false,
+        stateIsPending: false,
+        platformOS: 'android',
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
         action: 'none',
         actionLabel: null,
-        description: '$49 monthly credits · Managed on Google Play',
+        description: '$19 monthly credits · Managed in App Store',
         title: 'Kilo Pass active',
       },
     });

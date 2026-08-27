@@ -10,13 +10,19 @@ import { getStoreKiloPassProductsState } from './store-products-state';
 import { loadAppStoreKiloPassProducts } from './store-products-loader';
 
 const STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS = 5 * 60 * 1000;
-// Fixed bound on the App Store connection handshake — raise if real
+// Fixed bound on the store connection handshake — raise if real
 // devices routinely need longer than this to connect.
-const APP_STORE_CONNECTION_TIMEOUT_MS = 8000;
+const STORE_CONNECTION_TIMEOUT_MS = 8000;
 const APP_STORE_CONNECTION_TIMEOUT_MESSAGE = 'kiloPass.couldNotConnectToAppStore';
+const PLAY_CONNECTION_TIMEOUT_MESSAGE = 'kiloPass.couldNotConnectToPlay';
+
+const isIapPlatform = Platform.OS === 'ios' || Platform.OS === 'android';
+const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
+const storeConnectionTimeoutMessage =
+  Platform.OS === 'ios' ? APP_STORE_CONNECTION_TIMEOUT_MESSAGE : PLAY_CONNECTION_TIMEOUT_MESSAGE;
 
 export type StoreKiloPassProductsOptions = {
-  /** Whether the App Store connection (from the IAP owner) is established. */
+  /** Whether the store connection (from the IAP owner) is established. */
   connected: boolean;
   /** Fetches store SKUs. Injected by the IAP owner so this module never imports `expo-iap`. */
   fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreKiloPassProduct[]>;
@@ -29,15 +35,15 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
   const [storeErrorMessage, setStoreErrorMessage] = useState<string | null>(null);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
 
-  // Bounded wait for the StoreKit connection — without this, a stuck
+  // Bounded wait for the store connection — without this, a stuck
   // connection leaves the screen showing loading skeletons forever.
   useEffect(() => {
-    if (Platform.OS !== 'ios' || options.connected) {
+    if (!isIapPlatform || options.connected) {
       return undefined;
     }
     const timer = setTimeout(() => {
-      setStoreErrorMessage(current => current ?? i18n.t(APP_STORE_CONNECTION_TIMEOUT_MESSAGE));
-    }, APP_STORE_CONNECTION_TIMEOUT_MS);
+      setStoreErrorMessage(current => current ?? i18n.t(storeConnectionTimeoutMessage));
+    }, STORE_CONNECTION_TIMEOUT_MS);
     return () => {
       clearTimeout(timer);
     };
@@ -54,10 +60,11 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
           );
           return backendResponse;
         },
+        storefront,
       });
       return loadedProducts;
     },
-    enabled: Platform.OS === 'ios' && options.connected && userId != null,
+    enabled: isIapPlatform && options.connected && userId != null,
     staleTime: STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS,
   });
 
@@ -88,7 +95,7 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
     products: productsState.products,
     isLoading:
       storeErrorMessage === null &&
-      (productsQuery.isLoading || (Platform.OS === 'ios' && !options.connected)),
+      (productsQuery.isLoading || (isIapPlatform && !options.connected)),
     isRefetching: productsQuery.isRefetching,
     isError: productsState.isError,
     errorMessage: productsState.errorMessage,

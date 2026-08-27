@@ -8,6 +8,7 @@ import {
 } from './store-products';
 
 export const NO_MATCHING_KILO_PASS_PRODUCTS_KEY = 'kiloPass.noMatchingProducts';
+export const NO_MATCHING_KILO_PASS_PRODUCTS_PLAY_KEY = 'kiloPass.noMatchingProductsPlay';
 
 export async function loadAppStoreKiloPassProducts(params: {
   fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreKiloPassProduct[]>;
@@ -15,10 +16,13 @@ export async function loadAppStoreKiloPassProducts(params: {
     appAccountToken: string;
     products: readonly BackendStoreKiloPassProduct[];
   }>;
+  storefront: 'app_store' | 'play';
 }): Promise<AppStoreKiloPassProduct[]> {
   const backendResponse = await params.loadBackendProducts();
   const backendProducts = backendResponse.products;
-  const productSkus = backendProducts.map(product => product.appleProductId);
+  const productSkus = backendProducts.map(product =>
+    params.storefront === 'play' ? product.googleProductId : product.appleProductId
+  );
 
   if (productSkus.length === 0) {
     return [];
@@ -29,10 +33,17 @@ export async function loadAppStoreKiloPassProducts(params: {
     appAccountToken: backendResponse.appAccountToken,
     backendProducts,
     storeProducts,
+    storefront: params.storefront,
   });
 
   if (products.length === 0) {
-    throw new Error(i18n.t(NO_MATCHING_KILO_PASS_PRODUCTS_KEY));
+    throw new Error(
+      i18n.t(
+        params.storefront === 'play'
+          ? NO_MATCHING_KILO_PASS_PRODUCTS_PLAY_KEY
+          : NO_MATCHING_KILO_PASS_PRODUCTS_KEY
+      )
+    );
   }
 
   return products;

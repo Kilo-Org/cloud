@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { FlatList, Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -108,20 +108,27 @@ export default function FolderPickerScreen() {
   const title = current?.title ?? bridge.projectName;
   const currentState = state?.path === current?.path ? state : null;
 
-  let body: ReactNode = null;
+  // One long-lived FlatList renders in every phase. Non-ready states go
+  // through ListEmptyComponent so the scroll view instance never changes:
+  // react-native-screens sizes a formSheet's scroll view once per bounds
+  // change and binds the correction to one instance, so swapping the body
+  // between a View and a FlatList breaks the header's frames.
+  const data = currentState?.phase === 'ready' ? currentState.directories : [];
+  const listContentStyle = { flexGrow: 1, paddingBottom: bottom } satisfies ViewStyle;
+  let empty: ReactNode = null;
   if (currentState === null || currentState.phase === 'skeleton') {
-    body = (
-      <View className="flex-1 bg-background" style={{ paddingBottom: bottom }}>
+    empty = (
+      <>
         {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
           <View key={i} className="px-4 py-3">
             <Skeleton className="h-6 w-2/3 rounded-md" />
           </View>
         ))}
-      </View>
+      </>
     );
   } else if (currentState.phase === 'retryable') {
-    body = (
-      <View className="flex-1 items-center justify-center" style={{ paddingBottom: bottom }}>
+    empty = (
+      <View className="flex-1 items-center justify-center">
         <EmptyState
           icon={FolderOpen}
           placement="center"
@@ -142,8 +149,8 @@ export default function FolderPickerScreen() {
       </View>
     );
   } else if (currentState.phase === 'unsupported') {
-    body = (
-      <View className="flex-1 items-center justify-center" style={{ paddingBottom: bottom }}>
+    empty = (
+      <View className="flex-1 items-center justify-center">
         <EmptyState
           icon={FolderOpen}
           placement="center"
@@ -153,15 +160,33 @@ export default function FolderPickerScreen() {
       </View>
     );
   } else {
-    const directories = currentState.directories;
-    body = (
+    empty = (
+      <View className="items-center justify-center px-6 pt-10">
+        <EmptyState
+          icon={FolderOpen}
+          placement="top"
+          title={t('agentChat.folderPicker.emptyTitle')}
+          description={t('agentChat.folderPicker.emptyDescription')}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <PickerSheet
+      title={title}
+      onDone={handleDone}
+      onCancel={isNested ? goBack : undefined}
+      cancelLabel={isNested ? t('common.back') : undefined}
+      scrollable={false}
+    >
       <FlatList
         className="flex-1 bg-background"
-        data={directories}
+        data={data}
         keyExtractor={entry => entry.path}
-        contentContainerStyle={{ paddingBottom: bottom }}
+        contentContainerStyle={listContentStyle}
         ListHeaderComponent={
-          directories.length > 0 ? (
+          data.length > 0 ? (
             <View className="px-4 pb-2 pt-3">
               <Text variant="muted" className="text-sm">
                 {t('agentChat.folderPicker.tapToListHint')}
@@ -169,16 +194,8 @@ export default function FolderPickerScreen() {
             </View>
           ) : null
         }
-        ListEmptyComponent={
-          <View className="items-center justify-center px-6 pt-10">
-            <EmptyState
-              icon={FolderOpen}
-              placement="top"
-              title={t('agentChat.folderPicker.emptyTitle')}
-              description={t('agentChat.folderPicker.emptyDescription')}
-            />
-          </View>
-        }
+        ListEmptyComponent={empty}
+        scrollEnabled={data.length > 0}
         renderItem={({ item }) => (
           <Pressable
             className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
@@ -204,18 +221,6 @@ export default function FolderPickerScreen() {
           </Pressable>
         )}
       />
-    );
-  }
-
-  return (
-    <PickerSheet
-      title={title}
-      onDone={handleDone}
-      onCancel={isNested ? goBack : undefined}
-      cancelLabel={isNested ? t('common.back') : undefined}
-      scrollable={false}
-    >
-      {body}
     </PickerSheet>
   );
 }

@@ -71,6 +71,7 @@ import { kiloTokenPayload } from '@kilocode/worker-utils';
 import { jwtVerify } from 'jose';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
+import { extractGitHubRepo } from '../util/repository-integration.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
 import { logger, withLogTags } from '../util/log.util';
 import {
@@ -158,10 +159,6 @@ function generateId(): string {
 
 function now(): string {
   return new Date().toISOString();
-}
-
-function extractGithubRepo(gitUrl: string): string | null {
-  return gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1] ?? null;
 }
 
 // ── Rig config stored per-rig in KV (mirrors what was in Rig DO) ────
@@ -1384,7 +1381,7 @@ export class TownDO extends DurableObject<Env> {
       env: this.env,
       townId: this.townId,
       getTownConfig: () => Promise.resolve(townConfig),
-      githubRepo: extractGithubRepo(rigConfig.gitUrl) ?? undefined,
+      githubRepo: extractGitHubRepo(rigConfig.gitUrl),
       userId: townConfig.owner_user_id ?? rigConfig.userId,
       orgId: townConfig.organization_id,
       platformIntegrationId: rigConfig.platformIntegrationId,
@@ -1442,7 +1439,7 @@ export class TownDO extends DurableObject<Env> {
       env: this.env,
       townId: this.townId,
       getTownConfig: () => Promise.resolve(townConfig),
-      githubRepo: rig ? (extractGithubRepo(rig.git_url) ?? undefined) : undefined,
+      githubRepo: rig ? extractGitHubRepo(rig.git_url) : undefined,
       userId: townConfig.owner_user_id ?? rigConfig?.userId,
       orgId: townConfig.organization_id,
       platformIntegrationId: rigConfig?.platformIntegrationId,
@@ -2915,7 +2912,7 @@ export class TownDO extends DurableObject<Env> {
           env: this.env,
           townId: this.townId,
           getTownConfig: () => Promise.resolve(townConfig),
-          githubRepo: extractGithubRepo(r.git_url) ?? undefined,
+          githubRepo: extractGitHubRepo(r.git_url),
           userId: townConfig.owner_user_id ?? rc?.userId,
           orgId: townConfig.organization_id,
           platformIntegrationId: rc?.platformIntegrationId,
@@ -3820,7 +3817,7 @@ export class TownDO extends DurableObject<Env> {
             env: this.env,
             townId: this.townId,
             getTownConfig: () => Promise.resolve(townConfig),
-            githubRepo: extractGithubRepo(rig.git_url) ?? undefined,
+            githubRepo: extractGitHubRepo(rig.git_url),
             userId: townConfig.owner_user_id ?? rigConfig?.userId,
             orgId: townConfig.organization_id,
             platformIntegrationId: rigConfig?.platformIntegrationId,

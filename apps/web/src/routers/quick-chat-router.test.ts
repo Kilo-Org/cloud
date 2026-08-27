@@ -97,7 +97,8 @@ describe('quickChatRouter', () => {
 
     const page1 = await caller.quickChat.listMessages({ organizationId: null, limit: 2 });
     expect(page1.messages.map(message => message.content)).toEqual(['msg-3', 'msg-4']);
-    expect(page1.nextCursor).toBe(times[3]);
+    expect(page1.nextCursor).not.toBeNull();
+    expect(page1.nextCursor).not.toBe(times[3]);
 
     const page2 = await caller.quickChat.listMessages({
       organizationId: null,
@@ -105,7 +106,7 @@ describe('quickChatRouter', () => {
       cursor: page1.nextCursor!,
     });
     expect(page2.messages.map(message => message.content)).toEqual(['msg-1', 'msg-2']);
-    expect(page2.nextCursor).toBe(times[1]);
+    expect(page2.nextCursor).not.toBeNull();
 
     const page3 = await caller.quickChat.listMessages({
       organizationId: null,
@@ -114,6 +115,39 @@ describe('quickChatRouter', () => {
     });
     expect(page3.messages.map(message => message.content)).toEqual(['msg-0']);
     expect(page3.nextCursor).toBeNull();
+  });
+
+  it('pages two messages that share a created_at without skipping one', async () => {
+    const user = await insertTestUser();
+    const caller = createCaller({ user });
+
+    const thread = await caller.quickChat.getOrCreateThread({ organizationId: null });
+    const sharedTime = '2026-02-02T00:00:00.000Z';
+    const ids = ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'];
+    for (let i = 0; i < ids.length; i++) {
+      await db.insert(quick_chat_messages).values({
+        id: ids[i],
+        thread_id: thread.id,
+        role: 'user',
+        content: `msg-${i}`,
+        created_at: sharedTime,
+      });
+    }
+
+    const page1 = await caller.quickChat.listMessages({ organizationId: null, limit: 1 });
+    expect(page1.messages).toHaveLength(1);
+    expect(page1.nextCursor).not.toBeNull();
+
+    const page2 = await caller.quickChat.listMessages({
+      organizationId: null,
+      limit: 1,
+      cursor: page1.nextCursor!,
+    });
+    expect(page2.messages).toHaveLength(1);
+    expect(page2.nextCursor).toBeNull();
+
+    const contents = [page1.messages[0]!.content, page2.messages[0]!.content].sort();
+    expect(contents).toEqual(['msg-0', 'msg-1']);
   });
 
   it('does not let a second user read the first user thread', async () => {

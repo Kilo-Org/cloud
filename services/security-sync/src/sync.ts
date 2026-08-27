@@ -220,6 +220,7 @@ const SyncRunProgressSchema = z.object({
   runId: z.string().min(1),
   completedRepos: z.array(z.string().min(1)),
   staleRepos: z.array(z.string()),
+  staleSelections: z.array(z.string()).optional(),
   authInvalidRepos: z.array(z.string()),
   synced: z.number().int().nonnegative(),
   errors: z.number().int().nonnegative(),
@@ -292,12 +293,14 @@ function applySyncRunProgress(result: SyncResult, progress: SyncRunProgress): vo
 function toSyncRunProgress(
   runId: string,
   result: SyncResult,
-  completedRepos: string[]
+  completedRepos: string[],
+  staleSelections: string[]
 ): SyncRunProgress {
   return {
     runId,
     completedRepos,
     staleRepos: result.staleRepos,
+    staleSelections,
     authInvalidRepos: result.authInvalidRepos,
     synced: result.synced,
     errors: result.errors,
@@ -1811,7 +1814,8 @@ async function pruneStaleReposFromConfig(
   db: WorkerDb,
   owner: SecurityReviewOwner,
   staleRepoNames: string[],
-  repoNameToId: Map<string, number>
+  repoNameToId: Map<string, number>,
+  staleSelectionKeys: Set<string>
 ): Promise<void> {
   if (staleRepoNames.length === 0) return;
 
@@ -1853,14 +1857,27 @@ async function pruneStaleReposFromConfig(
   }
 
   const prunedIds = config.selected_repository_ids.filter(id => !staleIds.has(id));
-  if (prunedIds.length === config.selected_repository_ids.length) return;
-
   const prunedSelections = config.selected_repositories?.filter(
-    selection => !staleIds.has(selection.repositoryId)
+    selection =>
+      !staleSelectionKeys.has(`${selection.repositoryId}:${selection.platformIntegrationId}`)
   );
+  const survivingCompositeIds = new Set(
+    prunedSelections?.map(selection => selection.repositoryId) ?? []
+  );
+  const compatibilityIds = prunedSelections
+    ? config.selected_repository_ids.filter(
+        id => !staleIds.has(id) || survivingCompositeIds.has(id)
+      )
+    : prunedIds;
+  if (
+    compatibilityIds.length === config.selected_repository_ids.length &&
+    (!prunedSelections || prunedSelections.length === config.selected_repositories?.length)
+  ) {
+    return;
+  }
   const updatedConfig = {
     ...config,
-    selected_repository_ids: prunedIds,
+    selected_repository_ids: compatibilityIds,
     ...(prunedSelections ? { selected_repositories: prunedSelections } : {}),
   };
   await db
@@ -1868,9 +1885,7 @@ async function pruneStaleReposFromConfig(
     .set({ config: updatedConfig, updated_at: sql`now()` })
     .where(eq(agent_configs.id, rows[0].id));
 
-  console.warn(
-    `Pruned ${config.selected_repository_ids.length - prunedIds.length} stale repo(s) from config`
-  );
+  console.warn('Pruned stale repository selection(s) from config');
 }
 
 /** Remove selected_repository_ids that are no longer present on any owner installation.
@@ -2009,6 +2024,7 @@ export async function syncOwner(params: {
     plan => !completedRepos.has(repositoryPlanKey(plan))
   );
   const totalResult = createEmptySyncResult();
+  const staleSelectionKeys = new Set(previousProgress?.staleSelections ?? []);
   if (previousProgress) {
     applySyncRunProgress(totalResult, previousProgress);
     console.info('Resuming security sync owner run', {
@@ -2066,6 +2082,7 @@ export async function syncOwner(params: {
       totalResult.reauthRequired = totalResult.reauthRequired || repoResult.result.reauthRequired;
       totalResult.staleRepos.push(...repoResult.result.staleRepos);
       totalResult.commandResultCode ??= repoResult.result.commandResultCode;
+      if (repoResult.staleSelectionKey) staleSelectionKeys.add(repoResult.staleSelectionKey);
       successfulRepos++;
       completedRepos.add(planKey);
       processedThisPass++;
@@ -2097,7 +2114,7 @@ export async function syncOwner(params: {
     await writeSyncRunProgress(
       database,
       owner,
-      toSyncRunProgress(runId, totalResult, [...completedRepos])
+      toSyncRunProgress(runId, totalResult, [...completedRepos], [...staleSelectionKeys])
     );
     console.info('Security sync owner budget exhausted; continuation required', {
       runId,
@@ -2118,7 +2135,13 @@ export async function syncOwner(params: {
   // sync do not disagree about owner configuration after GitHub reports permanent loss.
   if (totalResult.staleRepos.length > 0) {
     try {
-      await pruneStaleReposFromConfig(database, owner, totalResult.staleRepos, config.repoNameToId);
+      await pruneStaleReposFromConfig(
+        database,
+        owner,
+        totalResult.staleRepos,
+        config.repoNameToId,
+        staleSelectionKeys
+      );
     } catch (error) {
       console.error('Failed to prune stale repos from config', {
         error: error instanceof Error ? error.message : String(error),
@@ -2260,7 +2283,11 @@ async function syncRepo(params: {
   autoAnalysisEnabledAt: string | null;
   authInvalidIntegrationIds: Set<string>;
   integrationsById: Map<string, IntegrationCandidate>;
-}): Promise<{ result: SyncResult; resolvedIntegrationId?: string }> {
+}): Promise<{
+  result: SyncResult;
+  resolvedIntegrationId?: string;
+  staleSelectionKey?: string;
+}> {
   const {
     db: database,
     gitTokenService,
@@ -2302,7 +2329,16 @@ async function syncRepo(params: {
     });
     result.commandResultCode = failureCode;
     if (resolved.reason === 'repository_not_installed') result.staleRepos.push(repoFullName);
-    return { result };
+    return {
+      result,
+      ...(resolved.reason === 'repository_not_installed' &&
+      repositoryPlan.repositoryId !== undefined &&
+      repositoryPlan.platformIntegrationId
+        ? {
+            staleSelectionKey: `${repositoryPlan.repositoryId}:${repositoryPlan.platformIntegrationId}`,
+          }
+        : {}),
+    };
   }
   const { token, installationId, platformIntegrationId } = resolved;
 
@@ -2357,7 +2393,13 @@ async function syncRepo(params: {
       repoFullName,
       failureCode: 'REPOSITORY_UNAVAILABLE',
     });
-    return { result, resolvedIntegrationId: platformIntegrationId };
+    return {
+      result,
+      resolvedIntegrationId: platformIntegrationId,
+      ...(repositoryPlan.repositoryId !== undefined
+        ? { staleSelectionKey: `${repositoryPlan.repositoryId}:${platformIntegrationId}` }
+        : {}),
+    };
   }
 
   if (fetchResult.status === 'alerts_disabled') {
@@ -2379,7 +2421,13 @@ async function syncRepo(params: {
       repoFullName,
       failureCode: 'REPOSITORY_UNAVAILABLE',
     });
-    return { result, resolvedIntegrationId: platformIntegrationId };
+    return {
+      result,
+      resolvedIntegrationId: platformIntegrationId,
+      ...(repositoryPlan.repositoryId !== undefined
+        ? { staleSelectionKey: `${repositoryPlan.repositoryId}:${platformIntegrationId}` }
+        : {}),
+    };
   }
 
   await clearIntegrationAuthInvalid(database, platformIntegrationId);

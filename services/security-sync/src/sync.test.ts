@@ -74,7 +74,7 @@ function createFakeDb(options: FakeDbOptions = {}) {
     select: () => {
       selectCount++;
       const rows =
-        selectCount === 1
+        selectCount === 1 || selectCount === 4
           ? [
               {
                 id: 'agent-config',
@@ -514,6 +514,61 @@ describe('Worker GitHub repository integration planning', () => {
     ).resolves.toMatchObject({ staleRepos: [], commandResultCode: 'REPOSITORY_UNAVAILABLE' });
     expect(sets).not.toContainEqual(
       expect.objectContaining({ config: expect.objectContaining({ selected_repository_ids: [] }) })
+    );
+  });
+
+  it('prunes only the stale explicit installation when duplicate IDs remain selected', async () => {
+    const firstIntegrationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const secondIntegrationId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const { db, sets } = createFakeDb({
+      config: {
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [1],
+        selected_repositories: [
+          { repositoryId: 1, platformIntegrationId: firstIntegrationId },
+          { repositoryId: 1, platformIntegrationId: secondIntegrationId },
+        ],
+      },
+      integrations: [
+        {
+          id: firstIntegrationId,
+          installationId: 'installation-1',
+          repositories: [{ id: 1, fullName: 'acme/widgets' }],
+        },
+        {
+          id: secondIntegrationId,
+          installationId: 'installation-2',
+          repositories: [{ id: 1, fullName: 'acme/widgets' }],
+        },
+      ],
+    });
+    const gitTokenService = createGitTokenService();
+    gitTokenService.getTokenForRepo
+      .mockResolvedValueOnce({ success: false, reason: 'repository_not_installed' })
+      .mockResolvedValueOnce({
+        success: true,
+        token: 'healthy-token',
+        platformIntegrationId: secondIntegrationId,
+        installationId: 'installation-2',
+        accountLogin: 'acme',
+        appType: 'standard',
+      });
+    stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { organizationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+      runId: 'run-stale-duplicate',
+    });
+
+    expect(sets).toContainEqual(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          selected_repository_ids: [1],
+          selected_repositories: [{ repositoryId: 1, platformIntegrationId: secondIntegrationId }],
+        }),
+      })
     );
   });
 

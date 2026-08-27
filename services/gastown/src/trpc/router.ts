@@ -39,18 +39,15 @@ import {
 } from './schemas';
 import type { TRPCContext } from './init';
 import { ContainerBillingError } from '../billing/ContainerBilling.error';
-import { resolveRepositoryIntegration } from '../util/repository-integration.util';
+import {
+  extractGitHubRepo,
+  resolveRepositoryIntegration,
+} from '../util/repository-integration.util';
 
 // rpcSafe wrapper for TownConfigSchema (imported from ../types, not ./schemas)
 const RpcTownConfigSchema = z.any().pipe(TownConfigSchema);
 
 // ── Git credential helpers ─────────────────────────────────────────────
-
-/** Extract 'owner/repo' from a GitHub URL, or null if not a GitHub URL. */
-function extractGithubRepo(gitUrl: string): string | null {
-  const m = gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/);
-  return m ? m[1] : null;
-}
 
 /** Resolve and optionally fence the GitHub integration that can access a repository. */
 async function resolvePlatformIntegration(
@@ -1071,7 +1068,7 @@ export const gastownRouter = router({
       const credentialUserId = townConfig.owner_user_id ?? ctx.userId;
       const rigList = await ownerStub.listRigs(input.townId);
       for (const rig of rigList) {
-        if (extractGithubRepo(rig.git_url) && rig.platform_integration_id) {
+        if (extractGitHubRepo(rig.git_url) && rig.platform_integration_id) {
           await resolvePlatformIntegration(
             ctx.env,
             rig.git_url,

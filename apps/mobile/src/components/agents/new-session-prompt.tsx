@@ -315,7 +315,7 @@ export function NewSessionPrompt({
           {voiceInput.available ? (
             <VoiceInputButton
               disabled={control.voiceDisabled}
-              size="md"
+              size="lg"
               status={voiceInput.status}
               onPress={handleVoiceToggle}
             />

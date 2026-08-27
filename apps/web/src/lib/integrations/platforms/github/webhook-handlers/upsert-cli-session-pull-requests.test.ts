@@ -1,5 +1,10 @@
 import { db } from '@/lib/drizzle';
-import { cli_sessions_v2, github_branch_pull_requests, organizations } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  github_branch_pull_requests,
+  organizations,
+  platform_integrations,
+} from '@kilocode/db/schema';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -101,6 +106,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
   let testOwner: WebhookInstallationOwner;
   const userIdsToCleanup: string[] = [];
   const orgIdsToCleanup: string[] = [];
+  const integrationIdsToCleanup: string[] = [];
   const sessionIdsToCleanup: string[] = [];
   let sessionCounter = 0;
 
@@ -164,6 +170,11 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         .delete(github_branch_pull_requests)
         .where(inArray(github_branch_pull_requests.owned_by_organization_id, orgIdsToCleanup));
       await db.delete(organizations).where(inArray(organizations.id, orgIdsToCleanup));
+    }
+    if (integrationIdsToCleanup.length > 0) {
+      await db
+        .delete(platform_integrations)
+        .where(inArray(platform_integrations.id, integrationIdsToCleanup));
     }
   });
 
@@ -1112,7 +1123,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       expect(countRows[0].c).toBe(1);
     });
 
-    it('partial unique indexes prevent duplicate rows for the same (url, branch, owner)', async () => {
+    it('partial unique indexes prevent duplicate legacy rows for the same tenant branch', async () => {
       // Sanity check that the XOR-partial-unique design is doing its job:
       // inserting two distinct payloads for the same tenant collapses into
       // one row — and that row has exactly one of the owner columns set.
@@ -1146,6 +1157,78 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         );
       expect(rows).toHaveLength(1);
       expect(rows[0].owned_by_organization_id).toBeNull();
+    });
+
+    it('keeps one pinned row per integration alongside the legacy null row', async () => {
+      const user = await insertTestUser();
+      userIdsToCleanup.push(user.id);
+      const integrations = await db
+        .insert(platform_integrations)
+        .values([
+          {
+            owned_by_user_id: user.id,
+            platform: 'github',
+            integration_type: 'app',
+            platform_installation_id: `cache-${crypto.randomUUID()}`,
+            github_app_type: 'standard',
+          },
+          {
+            owned_by_user_id: user.id,
+            platform: 'github',
+            integration_type: 'app',
+            platform_installation_id: `cache-${crypto.randomUUID()}`,
+            github_app_type: 'lite',
+          },
+        ])
+        .returning({ id: platform_integrations.id });
+      if (!integrations[0] || !integrations[1]) throw new Error('Expected two integrations');
+      integrationIdsToCleanup.push(...integrations.map(integration => integration.id));
+      await seedSession({
+        branch: SHARED_BRANCH,
+        owner: { kind: 'user', userId: user.id },
+        gitUrl: SHARED_NORMALIZED,
+      });
+
+      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(), {
+        kind: 'user',
+        userId: user.id,
+      });
+      for (const integration of integrations) {
+        await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(), {
+          kind: 'user',
+          userId: user.id,
+          platformIntegrationId: integration.id,
+        });
+      }
+      await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'synchronize',
+          prNumber: 9001,
+          state: 'open',
+          headRef: SHARED_BRANCH,
+          headSha: 'sha-first-pin-update',
+          repo: SHARED_REPO,
+        }),
+        {
+          kind: 'user',
+          userId: user.id,
+          platformIntegrationId: integrations[0].id,
+        }
+      );
+
+      const rows = await readUserRow({
+        userId: user.id,
+        gitUrl: SHARED_NORMALIZED,
+        branch: SHARED_BRANCH,
+      });
+      expect(rows).toHaveLength(3);
+      expect(rows.filter(row => row.platform_integration_id === null)).toHaveLength(1);
+      expect(rows.filter(row => row.platform_integration_id === integrations[0].id)).toHaveLength(
+        1
+      );
+      expect(rows.filter(row => row.platform_integration_id === integrations[1].id)).toHaveLength(
+        1
+      );
     });
   });
 

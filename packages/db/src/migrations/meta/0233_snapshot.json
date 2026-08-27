@@ -1,5 +1,5 @@
 {
-  "id": "0438049e-e05e-43d6-912f-3d2d31718cf1",
+  "id": "9eb82b4d-9642-4c2e-9107-5628c7065554",
   "prevId": "f163064f-7b94-4a48-90ce-f052c836dd79",
   "version": "7",
   "dialect": "postgresql",
@@ -11925,8 +11925,76 @@
         }
       },
       "indexes": {
-        "UQ_github_branch_prs_org": {
-          "name": "UQ_github_branch_prs_org",
+        "UQ_github_branch_prs_org_integration": {
+          "name": "UQ_github_branch_prs_org_integration",
+          "columns": [
+            {
+              "expression": "git_url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "git_branch",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_integration_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"github_branch_pull_requests\".\"owned_by_organization_id\" IS NOT NULL AND \"github_branch_pull_requests\".\"platform_integration_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_github_branch_prs_user_integration": {
+          "name": "UQ_github_branch_prs_user_integration",
+          "columns": [
+            {
+              "expression": "git_url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "git_branch",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_integration_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"github_branch_pull_requests\".\"owned_by_user_id\" IS NOT NULL AND \"github_branch_pull_requests\".\"platform_integration_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_github_branch_prs_org_legacy": {
+          "name": "UQ_github_branch_prs_org_legacy",
           "columns": [
             {
               "expression": "git_url",
@@ -11948,13 +12016,13 @@
             }
           ],
           "isUnique": true,
-          "where": "\"github_branch_pull_requests\".\"owned_by_organization_id\" is not null",
+          "where": "\"github_branch_pull_requests\".\"owned_by_organization_id\" IS NOT NULL AND \"github_branch_pull_requests\".\"platform_integration_id\" IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
         },
-        "UQ_github_branch_prs_user": {
-          "name": "UQ_github_branch_prs_user",
+        "UQ_github_branch_prs_user_legacy": {
+          "name": "UQ_github_branch_prs_user_legacy",
           "columns": [
             {
               "expression": "git_url",
@@ -11976,7 +12044,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"github_branch_pull_requests\".\"owned_by_user_id\" is not null",
+          "where": "\"github_branch_pull_requests\".\"owned_by_user_id\" IS NOT NULL AND \"github_branch_pull_requests\".\"platform_integration_id\" IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -12040,7 +12108,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

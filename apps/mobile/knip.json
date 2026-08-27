@@ -10,7 +10,12 @@
     "@sentry/cli"
   ],
   "ignoreBinaries": ["oxfmt", "oxlint"],
-  "ignore": ["src/components/ui/**"],
+  "ignore": ["src/components/ui/**", "src/lib/glanceable/open-agents.ts"],
+  "ignoreIssues": {
+    "src/lib/glanceable/presentation.ts": ["exports", "types"],
+    "src/lib/glanceable/publisher.ts": ["exports"],
+    "src/lib/glanceable/sink-registry.ts": ["exports", "types"]
+  },
   "postcss": {
     "config": ["postcss.config.mjs"]
   },

@@ -2055,6 +2055,42 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return { success: true, executionId: undefined };
   }
 
+  /**
+   * Drop one pending (not yet accepted) queued message by id without touching
+   * the accepted/current run. The queue terminalizes the queued durable state
+   * and removes the pending row; this method then persists a
+   * `cloud.message.canceled` replay event after the queued event so a
+   * reconnecting client nets empty after replaying queued then canceled.
+   */
+  async cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }> {
+    const result = await this.getSessionMessageQueue().cancelQueuedMessage(messageId);
+    if (!result.dropped) {
+      return { dropped: false };
+    }
+
+    const sessionId = await this.requireSessionId();
+    const payload = JSON.stringify({ messageId });
+    const eventId = this.eventQueries.insertUnique({
+      executionId: '' as EventSourceId,
+      entityId: `canceled-message/${messageId}`,
+      sessionId,
+      streamEventType: 'cloud.message.canceled',
+      payload,
+      timestamp: Date.now(),
+    });
+    if (eventId !== null) {
+      this.broadcastEvent({
+        id: eventId,
+        execution_id: '' as EventSourceId,
+        session_id: sessionId,
+        stream_event_type: 'cloud.message.canceled',
+        payload,
+        timestamp: Date.now(),
+      });
+    }
+    return { dropped: true };
+  }
+
   private async getTerminalClient(): Promise<OperationResult<{ client: TerminalWrapperClient }>> {
     const sessionId = await this.requireSessionId();
     const terminal = await resolveTerminalWrapperClient({

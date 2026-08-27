@@ -45,6 +45,7 @@ import {
   createQueuedSessionMessageState,
   getSessionMessageState,
   listReconnectVisibleTerminalQueuedMessages,
+  markMessageInterrupted,
   putSessionMessageState,
   type SessionMessageFailureCode,
   type SessionMessageStorage,
@@ -125,6 +126,15 @@ export type SessionMessageQueue = {
   interruptPendingQueuedMessages(
     afterTransition?: (messages: PendingSessionMessage[]) => Promise<void>
   ): Promise<PendingSessionMessage[]>;
+  /**
+   * Delete one pending (not yet accepted) queued message by id without
+   * interrupting the accepted/current run. A successful drop also terminalizes
+   * the message's queued `SessionMessageState` so a later re-admit treats the
+   * id as terminal instead of ACKing it as still queued. Returns whether a
+   * pending row was removed; a missing id or the accepted current message
+   * returns false.
+   */
+  cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }>;
   recoverPendingInterruption(
     afterTransition?: (messages: PendingSessionMessage[]) => Promise<void>
   ): Promise<boolean>;
@@ -1211,6 +1221,37 @@ export function createSessionMessageQueue(
     return capturedMessages;
   }
 
+  async function cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }> {
+    // Only pending rows are candidates: an accepted/current message has no
+    // `pending_message:*` row, so canceling by id never touches the active run.
+    const pendingMessage = await findPendingSessionMessageByMessageId(storage, messageId);
+    if (!pendingMessage) return { dropped: false };
+
+    // `admitIntent` wrote a queued `SessionMessageState` alongside the pending
+    // row. Terminalize it so `getExistingAdmissionAckForMessageId` rejects a
+    // later re-admit instead of ACKing the id as still queued. Terminalize
+    // without the outbox `cloud.message.failed` effect: the caller persists the
+    // `cloud.message.canceled` replay event instead, and the `canceled`
+    // completion source keeps the dropped id out of the reconnect catch-up
+    // snapshot so a reconnecting client nets empty after queued then canceled.
+    let existing = await getSessionMessageState(storage, messageId);
+    if (!existing) {
+      await repairMissingQueuedStateFromPendingMessage(pendingMessage);
+      existing = await getSessionMessageState(storage, messageId);
+    }
+    if (existing?.status === 'queued') {
+      await markMessageInterrupted(storage, messageId, {
+        error: 'Queued message canceled by user',
+        completionSource: 'canceled',
+        failureStage: 'interruption',
+        failureCode: 'user_interrupt',
+      });
+    }
+
+    await deletePendingSessionMessageByMessageId(storage, messageId);
+    return { dropped: true };
+  }
+
   return {
     hasMessageAdmission,
     admitSubmittedMessage,
@@ -1218,6 +1259,7 @@ export function createSessionMessageQueue(
     drainNextPendingMessage,
     snapshotForStreamConnect,
     interruptPendingQueuedMessages,
+    cancelQueuedMessage,
     recoverPendingInterruption,
     requestPendingDrain,
     requestPendingDrainIfNeeded,

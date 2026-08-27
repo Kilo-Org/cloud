@@ -66,6 +66,7 @@ function createMockApi() {
   return {
     send: jest.fn(() => Promise.resolve('sent')),
     interrupt: jest.fn(() => Promise.resolve('interrupted')),
+    cancelQueuedMessage: jest.fn(() => Promise.resolve({ dropped: true })),
     answer: jest.fn(() => Promise.resolve('answered')),
     reject: jest.fn(() => Promise.resolve('rejected')),
     respondToPermission: jest.fn(() => Promise.resolve('responded')),
@@ -527,6 +528,20 @@ describe('CloudAgentTransport command delegation', () => {
     void transport.interrupt!();
 
     expect(api.interrupt).toHaveBeenCalledWith({ sessionId: 'ses-1' });
+
+    transport.destroy();
+  });
+
+  it('dropQueuedMessage() delegates to api.cancelQueuedMessage with bound sessionId', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await transport.dropQueuedMessage!('msg-queued-1');
+
+    expect(api.cancelQueuedMessage).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      messageId: 'msg-queued-1',
+    });
 
     transport.destroy();
   });

@@ -447,6 +447,8 @@ type SessionManager = {
   createRemoteSession(input?: CreateRemoteSessionInput): Promise<KiloSessionId>;
   exitRemoteSession(): Promise<void>;
   interrupt(): Promise<void>;
+  /** Drop one queued (not yet accepted) message by id without interrupting the active run. */
+  cancelQueuedMessage(messageId: string): Promise<void>;
   /**
    * Clear the active session's local transcript view only. Server-side history
    * is untouched and reappears on re-entry (`switchSession`). No-op without an
@@ -2007,6 +2009,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  async function cancelQueuedMessage(messageId: string): Promise<void> {
+    if (!currentSession) return;
+    // Delegate to the session: the cloud-agent transport calls the
+    // `cancelQueuedMessage` tRPC mutation and the remote transport relays
+    // `drop_queued_message`. A remote CLI_UPGRADE_REQUIRED rejection surfaces
+    // to the caller verbatim; this path never falls back to `interrupt()`.
+    await currentSession.cancelQueuedMessage(messageId);
+  }
+
   function clearTranscript(): void {
     if (!currentSession) return;
     currentSession.storage.clear();
@@ -2156,6 +2167,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     createRemoteSession,
     exitRemoteSession,
     interrupt,
+    cancelQueuedMessage,
     clearTranscript,
     answerQuestion,
     rejectQuestion,

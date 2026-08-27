@@ -176,13 +176,21 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return errorMessageSchema.safeParse(error).data?.message ?? fallback;
 }
 
-export function getKiloPassPurchaseErrorMessage(error: unknown, fallback: string): string | null {
+export function getKiloPassPurchaseErrorMessage(
+  error: unknown,
+  fallback: string,
+  storefront: 'app_store' | 'play'
+): string | null {
   if (isUserCancelledPurchaseError(error)) {
     return null;
   }
 
   if (isAlreadyOwnedPurchaseError(error)) {
-    return i18n.t('kiloPass.purchaseOwnedByAnotherAccount');
+    return i18n.t(
+      storefront === 'play'
+        ? 'kiloPass.purchaseOwnedByAnotherAccountPlay'
+        : 'kiloPass.purchaseOwnedByAnotherAccount'
+    );
   }
 
   const message = getErrorMessage(error, fallback);
@@ -249,7 +257,11 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       await deps.finishTransaction({ purchase, isConsumable: false });
       return { completed: true };
     } catch (error) {
-      const message = getKiloPassPurchaseErrorMessage(error, i18n.t('kiloPass.purchaseFailed'));
+      const message = getKiloPassPurchaseErrorMessage(
+        error,
+        i18n.t('kiloPass.purchaseFailed'),
+        deps.storefront
+      );
       return { completed: false, errorMessage: message };
     }
   }
@@ -315,8 +327,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     options: RecoverPurchasesOptions = {}
   ): Promise<Purchase[]> {
     const enabledAppleProductIds = options.enabledAppleProductIds ?? deps.enabledAppleProductIds;
-    const enabledGoogleProductIds =
-      options.enabledGoogleProductIds ?? deps.enabledGoogleProductIds;
+    const enabledGoogleProductIds = options.enabledGoogleProductIds ?? deps.enabledGoogleProductIds;
     const recoveryResults = await Promise.all(
       purchases
         .filter(purchase =>
@@ -381,7 +392,8 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
             deps.storefront === 'play'
               ? 'kiloPass.purchaseStartFailedPlay'
               : 'kiloPass.purchaseStartFailed'
-          )
+          ),
+          deps.storefront
         );
         if (message) {
           deps.showError(message);

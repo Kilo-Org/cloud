@@ -166,7 +166,11 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       pendingPurchaseCompletedCallbackRef.current = null;
       releasePurchaseRequest();
       // A null message means the user cancelled — not a failure.
-      const message = getKiloPassPurchaseErrorMessage(error, error.message);
+      const message = getKiloPassPurchaseErrorMessage(
+        error,
+        error.message,
+        isAndroid ? 'play' : 'app_store'
+      );
       if (message) {
         captureEvent(KILO_PASS_PURCHASE_FAILED_EVENT);
         showDedupedPurchaseError(message);
@@ -446,12 +450,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         }
       })();
     }
-  }, [
-    actions,
-    availablePurchases,
-    enabledAppleProductIds.length,
-    enabledGoogleProductIds.length,
-  ]);
+  }, [actions, availablePurchases, enabledAppleProductIds.length, enabledGoogleProductIds.length]);
 
   const value = useMemo<KiloPassNativeIapContextValue>(
     () => ({

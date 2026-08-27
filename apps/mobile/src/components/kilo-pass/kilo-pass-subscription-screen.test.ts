@@ -543,6 +543,47 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
+  it('renders the native IAP screen under the kilo-pass-native-iap testID on Android', async () => {
+    setAndroidNativeIapPresentation();
+    mocks.nativeIap.products = [];
+
+    const renderer = await renderScreen();
+
+    expect(
+      renderer.root.findAll(
+        node => (node.props as { testID?: string }).testID === 'kilo-pass-native-iap'
+      )
+    ).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('sends the Android preflight payload with platform, storefront, googleProductId, and googlePurchaseToken', async () => {
+    setAndroidNativeIapPresentation();
+    const androidProduct = { ...product, googleProductId: 'kilopass_tier49' };
+    mocks.nativeIap.products = [androidProduct];
+    mocks.nativeIap.ownedGooglePurchaseToken = 'play-token-123';
+    mocks.preflightMutateAsync.mockResolvedValue({
+      allowed: true,
+      statusClass: 'healthy',
+      reason: null,
+    });
+
+    const renderer = await renderScreen();
+    await press(first(productTiles(renderer)));
+
+    expect(mocks.preflightMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: 'android',
+        storefront: 'play',
+        googleProductId: 'kilopass_tier49',
+        googlePurchaseToken: 'play-token-123',
+      })
+    );
+
+    renderer.unmount();
+  });
+
   it('disables the product tiles while preflight is pending', async () => {
     setNativeIapPresentation();
     mocks.nativeIap.products = [product];

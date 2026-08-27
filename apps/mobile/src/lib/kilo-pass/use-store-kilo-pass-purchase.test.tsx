@@ -1013,7 +1013,8 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(
       getKiloPassPurchaseErrorMessage(
         new Error('Google Play purchase account token does not match the signed-in user.'),
-        'fallback'
+        'fallback',
+        'play'
       )
     ).toBe('The Kilo Pass on this Google Play account belongs to a different Kilo account.');
     expect(
@@ -1021,10 +1022,53 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
         new Error(
           "This Google Play purchase isn't linked to your Kilo account. Make sure you're signed in to the Google account that made the purchase, then try again."
         ),
-        'fallback'
+        'fallback',
+        'play'
       )
     ).toBe(
       "This Google Play purchase isn't linked to your Kilo account. Sign in to the Google account used for the purchase, then try again."
+    );
+  });
+
+  it('maps AlreadyOwned to Play copy on the Play storefront and Apple copy on the App Store', () => {
+    expect(
+      getKiloPassPurchaseErrorMessage(
+        { code: 'already-owned', message: 'Item already owned' },
+        'fallback',
+        'play'
+      )
+    ).toBe('The Kilo Pass on this Google Play account belongs to a different Kilo account.');
+    expect(
+      getKiloPassPurchaseErrorMessage(
+        { code: 'already-owned', message: 'Item already owned' },
+        'fallback',
+        'app_store'
+      )
+    ).toBe('The Kilo Pass on this Apple Account belongs to a different Kilo account.');
+  });
+
+  it('shows Play copy when the Google Play account already owns the subscription', async () => {
+    const showError = vi.fn();
+    const actions = createActions({
+      storefront: 'play',
+      requestPurchase: vi.fn().mockRejectedValue({
+        code: 'already-owned',
+        message: 'Item already owned',
+      }),
+      showError: message => {
+        showError(message);
+      },
+    });
+    const playProduct = {
+      ...product,
+      storeProduct: { ...product.storeProduct, offerToken: 'offer-123' },
+    };
+
+    await actions.purchase(playProduct);
+
+    expect(showError).toHaveBeenCalledTimes(1);
+    expect(showError).toHaveBeenCalledWith(
+      'The Kilo Pass on this Google Play account belongs to a different Kilo account.'
     );
   });
 });

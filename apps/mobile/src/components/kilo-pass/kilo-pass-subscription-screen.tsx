@@ -27,9 +27,6 @@ import { KILO_PASS_TITLE, type PurchasePresentationKind } from '@kilocode/app-sh
 import { KiloPassNativeIapOwner, useKiloPassNativeIap } from './kilo-pass-native-iap-owner';
 import { RestorePurchasesButton } from './restore-purchases-button';
 
-const isIapPlatform = Platform.OS === 'ios' || Platform.OS === 'android';
-const isAndroid = Platform.OS === 'android';
-
 type SubscriptionScreenFeedback = { type: 'success' | 'info' | 'error'; text: string };
 
 /**
@@ -160,6 +157,7 @@ function KiloPassUnavailableScreen({
 }
 
 function KiloPassNativeIapContent() {
+  const isAndroid = Platform.OS === 'android';
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -365,7 +363,11 @@ function KiloPassNativeIapContent() {
               </Text>
               <Text className="mt-1 text-sm text-muted-foreground">
                 {productsError ??
-                  t(isAndroid ? 'kiloPass.productsCouldNotLoadPlay' : 'kiloPass.productsCouldNotLoad')}
+                  t(
+                    isAndroid
+                      ? 'kiloPass.productsCouldNotLoadPlay'
+                      : 'kiloPass.productsCouldNotLoad'
+                  )}
               </Text>
               <Text className="mt-3 text-sm font-medium text-primary">
                 {productsIsRefetching ? t('kiloPass.tryingAgain') : t('common.tryAgain')}
@@ -475,6 +477,7 @@ export function KiloPassSubscriptionScreen() {
   const trpc = useTRPC();
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
   const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
+  const isIapPlatform = Platform.OS === 'ios' || Platform.OS === 'android';
   const presentationQuery = useQuery(
     trpc.kiloPass.getPurchasePresentation.queryOptions({
       platform,

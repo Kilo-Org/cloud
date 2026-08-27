@@ -1504,8 +1504,8 @@ export const cliSessionsV2Router = createTRPCRouter({
             ];
 
         const conflictTargetWhere = session.organization_id
-          ? sql`${github_branch_pull_requests.owned_by_organization_id} IS NOT NULL`
-          : sql`${github_branch_pull_requests.owned_by_user_id} IS NOT NULL`;
+          ? sql`${github_branch_pull_requests.owned_by_organization_id} IS NOT NULL AND ${github_branch_pull_requests.platform_integration_id} IS NULL`
+          : sql`${github_branch_pull_requests.owned_by_user_id} IS NOT NULL AND ${github_branch_pull_requests.platform_integration_id} IS NULL`;
 
         // Only mark pending when there is a PR whose review decision we still
         // need. Writing a sentinel (no-PR) row with pending=true would cause the

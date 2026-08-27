@@ -6196,7 +6196,7 @@ export const github_branch_pull_requests = pgTable(
     owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
     owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
     platform_integration_id: uuid().references(() => platform_integrations.id, {
-      onDelete: 'set null',
+      onDelete: 'cascade',
     }),
     // pr_url/pr_number/pr_state are nullable so we can persist a "no PR exists
     // for this branch" sentinel row: pr_last_synced_at then throttles repeated
@@ -6217,17 +6217,35 @@ export const github_branch_pull_requests = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Partial unique indexes serve as ON CONFLICT targets for the webhook
-    // upsert. Identity columns (git_url, git_branch) lead; tenant column
-    // trails since all hot-path reads supply every column anyway.
-    uniqueIndex('UQ_github_branch_prs_org')
+    // Pinned cache rows are unique per integration. Separate null-only indexes
+    // preserve the legacy row identity without merging it into a new pin.
+    uniqueIndex('UQ_github_branch_prs_org_integration')
+      .on(
+        table.git_url,
+        table.git_branch,
+        table.owned_by_organization_id,
+        table.platform_integration_id
+      )
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.platform_integration_id} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_github_branch_prs_user_integration')
+      .on(table.git_url, table.git_branch, table.owned_by_user_id, table.platform_integration_id)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.platform_integration_id} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_github_branch_prs_org_legacy')
       .on(table.git_url, table.git_branch, table.owned_by_organization_id)
-      .where(isNotNull(table.owned_by_organization_id)),
-    uniqueIndex('UQ_github_branch_prs_user')
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.platform_integration_id} IS NULL`
+      ),
+    uniqueIndex('UQ_github_branch_prs_user_legacy')
       .on(table.git_url, table.git_branch, table.owned_by_user_id)
-      .where(isNotNull(table.owned_by_user_id)),
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.platform_integration_id} IS NULL`
+      ),
     // The session-to-PR LEFT JOIN matches (git_url, git_branch) and picks the
-    // tenant column with an OR. Neither partial unique index above can serve
+    // tenant column with an OR. None of the partial unique indexes above can serve
     // that join: the planner cannot prove `owned_by_*_id IS NOT NULL` per row,
     // so it falls back to a hash join and sequentially scans this whole table
     // on every session list and search. This plain index restores the nested

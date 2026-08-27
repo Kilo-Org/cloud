@@ -519,20 +519,42 @@ describe('User', () => {
       }
     );
 
-    it('does not infer a provider from an unknown legacy hosted domain', async () => {
+    it('recovers email discovery for a rowless UUID-era account', async () => {
       const user = await insertTestUser({
-        google_user_email: 'unknown-legacy@example.com',
-        google_user_name: 'Unknown Legacy User',
-        normalized_email: 'unknown-legacy@example.com',
-        hosted_domain: 'unknown.example.com',
+        id: randomUUID(),
+        google_user_email: 'rowless-email@example.com',
+        google_user_name: 'Rowless Email User',
+        normalized_email: 'rowless-email@example.com',
+        hosted_domain: 'example.com',
       });
 
-      await expect(getAllUserProviders('unknown-legacy@example.com')).resolves.toEqual({
+      await expect(getAllUserProviders('rowless-email@example.com')).resolves.toEqual({
         kind: 'found',
         user: {
           kiloUserId: user.id,
-          providers: [],
-          primaryEmail: 'unknown-legacy@example.com',
+          providers: ['email'],
+          primaryEmail: 'rowless-email@example.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
+    it('uses the canonical UUID validator for rowless Email recovery', async () => {
+      const email = 'nil-uuid-email@example.com';
+      const user = await insertTestUser({
+        id: '00000000-0000-0000-0000-000000000000',
+        google_user_email: email,
+        google_user_name: 'Nil UUID Email User',
+        normalized_email: email,
+        hosted_domain: 'example.com',
+      });
+
+      await expect(getAllUserProviders(email)).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['email'],
+          primaryEmail: email,
           workosHostedDomain: undefined,
         },
       });

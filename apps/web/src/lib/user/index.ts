@@ -126,6 +126,7 @@ import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import { hosted_domain_specials } from '@/lib/auth/constants';
+import * as z from 'zod';
 import {
   generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
@@ -1944,7 +1945,7 @@ async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult
 
   const workosProvider = providers.find(p => p.provider === 'workos');
   const discoveredProviders =
-    providers.length > 0 ? providers.map(p => p.provider) : legacyProviderFromHostedDomain(user);
+    providers.length > 0 ? providers.map(p => p.provider) : inferRowlessAuthProviders(user);
 
   return {
     kind: 'found',
@@ -1957,7 +1958,9 @@ async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult
   };
 }
 
-function legacyProviderFromHostedDomain(user: User): AuthProviderId[] {
+export function inferRowlessAuthProviders(
+  user: Pick<User, 'id' | 'hosted_domain'>
+): AuthProviderId[] {
   const legacyOAuthProvider = parseLegacyOAuthProvider(user.id);
   if (legacyOAuthProvider) return [legacyOAuthProvider];
 
@@ -1979,7 +1982,7 @@ function legacyProviderFromHostedDomain(user: User): AuthProviderId[] {
     case hosted_domain_specials.email:
       return ['email'];
     default:
-      return [];
+      return isUuidUserId(user.id) ? ['email'] : [];
   }
 }
 
@@ -1993,6 +1996,10 @@ function parseLegacyOAuthProvider(userId: string): AuthProviderId | null {
     default:
       return null;
   }
+}
+
+function isUuidUserId(userId: string): boolean {
+  return z.uuid().safeParse(userId).success;
 }
 
 /**

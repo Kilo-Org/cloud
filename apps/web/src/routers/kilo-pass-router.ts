@@ -94,7 +94,6 @@ import {
   PURCHASE_PRODUCTS,
   PURCHASE_STATUS_CLASSES,
   PURCHASE_STOREFRONTS,
-  isNativeIapMutationAllowed,
 } from '@kilocode/app-shared/commerce';
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
 import { verifyGooglePlayKiloPassPurchase } from '@/lib/kilo-pass/google-play-verifier';

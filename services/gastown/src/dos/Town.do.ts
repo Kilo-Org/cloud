@@ -160,6 +160,11 @@ function now(): string {
   return new Date().toISOString();
 }
 
+function extractGithubRepo(gitUrl: string): string | null {
+  const match = gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/);
+  return match?.[1] ?? null;
+}
+
 // ── Rig config stored per-rig in KV (mirrors what was in Rig DO) ────
 type RigConfig = {
   townId: string;
@@ -169,9 +174,32 @@ type RigConfig = {
   userId: string;
   kilocodeToken?: string;
   platformIntegrationId?: string;
+  platform_integration_id?: string;
   /** Per-rig merge strategy override. When unset, inherits from town config. */
   merge_strategy?: MergeStrategy;
 };
+
+const RigConfigSchema = z.object({
+  townId: z.string(),
+  rigId: z.string(),
+  gitUrl: z.string(),
+  defaultBranch: z.string(),
+  userId: z.string(),
+  kilocodeToken: z.string().optional(),
+  platformIntegrationId: z.string().optional(),
+  platform_integration_id: z.string().optional(),
+  merge_strategy: z.enum(['direct', 'pr']).optional(),
+});
+
+function normalizeRigConfig(value: unknown): RigConfig | null {
+  const parsed = RigConfigSchema.safeParse(value);
+  if (!parsed.success) return null;
+  const { platform_integration_id, ...config } = parsed.data;
+  return {
+    ...config,
+    platformIntegrationId: config.platformIntegrationId ?? platform_integration_id,
+  };
+}
 
 // ── Escalation API type (derived from EscalationBeadRecord) ─────────
 type EscalationEntry = {
@@ -387,21 +415,54 @@ export class TownDO extends DurableObject<Env> {
       stopAgent: async agentId => {
         await dispatch.stopAgentInContainer(this.env, this.townId, agentId);
       },
-      checkPRStatus: async prUrl => {
+      checkPRStatus: async (prUrl, rigId) => {
+        const rig = rigs.getRig(this.sql, rigId);
+        const rigConfig = await this.getRigConfig(rigId);
+        const townConfig = await this.getTownConfig();
         return scm.checkPRStatus(
-          { env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() },
+          {
+            env: this.env,
+            townId: this.townId,
+            getTownConfig: () => Promise.resolve(townConfig),
+            githubRepo: rig ? (extractGithubRepo(rig.git_url) ?? undefined) : undefined,
+            userId: townConfig.owner_user_id ?? rigConfig?.userId,
+            orgId: townConfig.organization_id,
+            platformIntegrationId: rigConfig?.platformIntegrationId,
+          },
           prUrl
         );
       },
-      checkPRFeedback: async prUrl => {
+      checkPRFeedback: async (prUrl, rigId) => {
+        const rig = rigs.getRig(this.sql, rigId);
+        const rigConfig = await this.getRigConfig(rigId);
+        const townConfig = await this.getTownConfig();
         return scm.checkPRFeedback(
-          { env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() },
+          {
+            env: this.env,
+            townId: this.townId,
+            getTownConfig: () => Promise.resolve(townConfig),
+            githubRepo: rig ? (extractGithubRepo(rig.git_url) ?? undefined) : undefined,
+            userId: townConfig.owner_user_id ?? rigConfig?.userId,
+            orgId: townConfig.organization_id,
+            platformIntegrationId: rigConfig?.platformIntegrationId,
+          },
           prUrl
         );
       },
-      mergePR: async prUrl => {
+      mergePR: async (prUrl, rigId) => {
+        const rig = rigs.getRig(this.sql, rigId);
+        const rigConfig = await this.getRigConfig(rigId);
+        const townConfig = await this.getTownConfig();
         return scm.mergePR(
-          { env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() },
+          {
+            env: this.env,
+            townId: this.townId,
+            getTownConfig: () => Promise.resolve(townConfig),
+            githubRepo: rig ? (extractGithubRepo(rig.git_url) ?? undefined) : undefined,
+            userId: townConfig.owner_user_id ?? rigConfig?.userId,
+            orgId: townConfig.organization_id,
+            platformIntegrationId: rigConfig?.platformIntegrationId,
+          },
           prUrl
         );
       },
@@ -1135,22 +1196,9 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await this.getTownConfig();
     const container = getTownContainerStub(this.env, townId);
 
-    // Resolve a fresh GitHub token here too — this method runs both at
-    // initial config push and on every config change, so the persisted
-    // GIT_TOKEN must be live rather than the stale value stored in
-    // git_auth.github_token from rig creation. The container's
-    // syncTownConfigToProcessEnv path reads `git_auth.github_token`
-    // from the X-Town-Config header on every request, so the in-process
-    // GIT_TOKEN follows the same source-of-truth as the persisted one.
-    const githubToken = await scm.resolveGitHubTokenString({
-      env: this.env,
-      townId,
-      getTownConfig: () => Promise.resolve(townConfig),
-    });
-
     // Phase 1: Persist to DO storage for next boot.
     const envMapping: Array<[string, string | undefined]> = [
-      ['GIT_TOKEN', githubToken ?? undefined],
+      ['GIT_TOKEN', undefined],
       ['GITLAB_TOKEN', townConfig.git_auth?.gitlab_token],
       ['GITLAB_INSTANCE_URL', townConfig.git_auth?.gitlab_instance_url],
       ['GITHUB_CLI_PAT', townConfig.github_cli_pat],
@@ -1317,6 +1365,9 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private async _configureRig(rigConfig: RigConfig): Promise<void> {
+    const normalizedRigConfig = normalizeRigConfig(rigConfig);
+    if (!normalizedRigConfig) throw new Error('Invalid rig config');
+    rigConfig = normalizedRigConfig;
     logger.setTags({ rigId: rigConfig.rigId, userId: rigConfig.userId });
     logger.info('configureRig: start', { hasKilocodeToken: !!rigConfig.kilocodeToken });
     await this.ctx.storage.put(`rig:${rigConfig.rigId}:config`, rigConfig);
@@ -1380,6 +1431,9 @@ export class TownDO extends DurableObject<Env> {
       env: this.env,
       townId: this.townId,
       getTownConfig: () => Promise.resolve(townConfig),
+      githubRepo: extractGithubRepo(rigConfig.gitUrl) ?? undefined,
+      userId: townConfig.owner_user_id ?? rigConfig.userId,
+      orgId: townConfig.organization_id,
       platformIntegrationId: rigConfig.platformIntegrationId,
     });
     if (githubToken) {
@@ -1431,7 +1485,7 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async getRigConfig(rigId: string): Promise<RigConfig | null> {
-    return (await this.ctx.storage.get<RigConfig>(`rig:${rigId}:config`)) ?? null;
+    return normalizeRigConfig(await this.ctx.storage.get(`rig:${rigId}:config`));
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -3805,12 +3859,16 @@ export class TownDO extends DurableObject<Env> {
     const rig = rigs.getRig(this.sql, input.rigId);
     if (rig) {
       const rigConfig = await this.getRigConfig(input.rigId);
+      const townConfig = await this.getTownConfig();
       await scm
         .createConvoyBranch(
           {
             env: this.env,
             townId: this.townId,
-            getTownConfig: () => this.getTownConfig(),
+            getTownConfig: () => Promise.resolve(townConfig),
+            githubRepo: extractGithubRepo(rig.git_url) ?? undefined,
+            userId: townConfig.owner_user_id ?? rigConfig?.userId,
+            orgId: townConfig.organization_id,
             platformIntegrationId: rigConfig?.platformIntegrationId,
           },
           {

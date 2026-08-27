@@ -43,17 +43,18 @@ const RPC_TYPES = `\
 type GetTokenForRepoSuccess = {
 \tsuccess: true;
 \ttoken: string;
+\tplatformIntegrationId: string;
 \tinstallationId: string;
 \taccountLogin: string;
 \tappType: 'standard' | 'lite';
 };
 type GetTokenForRepoFailure = {
 \tsuccess: false;
-\treason: 'database_not_configured' | 'invalid_repo_format' | 'no_installation_found' | 'invalid_org_id';
+\treason: 'database_not_configured' | 'invalid_repo_format' | 'no_installation_found' | 'ambiguous_installation' | 'repository_not_installed' | 'invalid_org_id' | 'integration_mismatch';
 };
 type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;
 type GitTokenService = {
-\tgetTokenForRepo(params: { githubRepo: string; userId: string; orgId?: string }): Promise<GetTokenForRepoResult>;
+\tgetTokenForRepo(params: { githubRepo: string; userId: string; orgId?: string; expectedIntegrationId?: string }): Promise<GetTokenForRepoResult>;
 \tgetToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
 };
 type WastelandRpcSuccess<T> = { success: true; data: T };

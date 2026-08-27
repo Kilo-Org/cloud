@@ -65,7 +65,7 @@ describe('resolveGitHubToken', () => {
     const result = await resolveGitHubToken(ctx);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.tried).toContain('town platform integration');
+      expect(result.tried).toContain('rig platform integration');
     }
   });
 
@@ -92,7 +92,7 @@ describe('resolveGitHubToken', () => {
     const result = await resolveGitHubToken(ctx);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.tried).toContain('town platform integration (GIT_TOKEN_SERVICE not bound)');
+      expect(result.tried).toContain('rig platform integration (GIT_TOKEN_SERVICE not bound)');
     }
   });
 });

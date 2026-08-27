@@ -15,6 +15,7 @@ export type FindInstallationParams = {
 };
 
 const InstallationLookupResultSchema = z.object({
+  id: z.string().uuid().optional(),
   platform_installation_id: z.string(),
   platform_account_login: z.string().nullable(),
   github_app_type: z.enum(['standard', 'lite']).nullable().optional(),
@@ -47,6 +48,7 @@ const MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES = 10;
 
 export type InstallationLookupSuccess = {
   success: true;
+  platformIntegrationId: string;
   installationId: string;
   accountLogin: string;
   githubAppType: 'standard' | 'lite';
@@ -112,13 +114,17 @@ function buildAuthorizedInstallationsQuery(
   const exactIntegrationOwner =
     params.expectedIntegrationId === undefined
       ? undefined
-      : params.orgId === undefined
-        ? sql`false`
-        : and(
+      : params.orgId !== undefined
+        ? and(
             eq(platform_integrations.id, params.expectedIntegrationId),
             eq(platform_integrations.owned_by_organization_id, params.orgId),
             isNull(platform_integrations.owned_by_user_id),
             isNotNull(organization_memberships.id)
+          )
+        : and(
+            eq(platform_integrations.id, params.expectedIntegrationId),
+            eq(platform_integrations.owned_by_user_id, params.userId),
+            isNull(platform_integrations.owned_by_organization_id)
           );
   const legacyAuthorizedOwner =
     params.expectedIntegrationId === undefined
@@ -228,8 +234,7 @@ export class InstallationLookupService {
 
     if (
       params.expectedIntegrationId !== undefined &&
-      (params.orgId === undefined ||
-        !z.string().uuid().safeParse(params.expectedIntegrationId).success)
+      !z.string().uuid().safeParse(params.expectedIntegrationId).success
     ) {
       return { success: false, reason: 'integration_mismatch' };
     }
@@ -258,6 +263,7 @@ export class InstallationLookupService {
 
       return {
         success: true,
+        platformIntegrationId: selected.data.id,
         installationId: selected.data.platform_installation_id,
         accountLogin: selected.data.platform_account_login ?? '',
         githubAppType: selected.data.github_app_type ?? 'standard',
@@ -282,8 +288,12 @@ export class InstallationLookupService {
       return { success: false, reason: 'ambiguous_installation' };
     }
 
+    if (!selected.id) {
+      return { success: false, reason: 'no_installation_found' };
+    }
     return {
       success: true,
+      platformIntegrationId: selected.id,
       installationId: selected.platform_installation_id,
       accountLogin: selected.platform_account_login ?? '',
       githubAppType: selected.github_app_type ?? 'standard',
@@ -348,6 +358,7 @@ export class InstallationLookupService {
 
       return {
         success: true,
+        platformIntegrationId: selected.data.id,
         installationId: selected.data.platform_installation_id,
         accountLogin: selected.data.platform_account_login ?? '',
         githubAppType: selected.data.github_app_type ?? 'standard',
@@ -383,8 +394,12 @@ export class InstallationLookupService {
       return { success: false, reason: 'repository_not_installed' };
     }
 
+    if (!selected.id) {
+      return { success: false, reason: 'no_installation_found' };
+    }
     return {
       success: true,
+      platformIntegrationId: selected.id,
       installationId: selected.platform_installation_id,
       accountLogin: selected.platform_account_login ?? '',
       githubAppType: selected.github_app_type ?? 'standard',
@@ -400,10 +415,22 @@ export class InstallationLookupService {
     if (
       selected.id !== params.expectedIntegrationId ||
       selected.integration_status !== 'active' ||
-      selected.owned_by_organization_id !== params.orgId ||
-      selected.owned_by_user_id !== null ||
       selected.platform_account_login?.toLowerCase() !==
         params.githubRepo.split('/')[0]?.toLowerCase()
+    ) {
+      return false;
+    }
+
+    if (params.orgId !== undefined) {
+      if (
+        selected.owned_by_organization_id !== params.orgId ||
+        selected.owned_by_user_id !== null
+      ) {
+        return false;
+      }
+    } else if (
+      selected.owned_by_user_id !== params.userId ||
+      selected.owned_by_organization_id !== null
     ) {
       return false;
     }

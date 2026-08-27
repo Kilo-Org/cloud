@@ -297,11 +297,9 @@ export function resolveRigConfig(
  * Build the ContainerConfig payload for X-Town-Config header.
  * Sent with every fetch() to the container.
  *
- * The container's `syncTownConfigToProcessEnv` reads `git_auth.github_token`
- * from this payload on every request and writes it to `process.env.GIT_TOKEN`,
- * which the SDK server's `gh` CLI inherits via `GH_TOKEN`. To prevent serving
- * an expired installation token (TTL ~1h) we resolve through `resolveGitHubToken`
- * so a configured platform integration always returns a fresh value.
+ * Legacy containers read `git_auth.github_token` into `process.env.GIT_TOKEN`.
+ * New containers honor `rig_scoped_git_identity` and keep GitHub credentials
+ * on each agent/repository request instead of mutating process-global state.
  *
  * `townId` is required so we can always perform the integration lookup.
  * Making it optional was a foot-gun — a forgotten arg silently re-introduces
@@ -342,6 +340,7 @@ export async function buildContainerConfig(
     git_author_name: config.git_author_name,
     git_author_email: config.git_author_email,
     disable_ai_coauthor: config.disable_ai_coauthor,
+    rig_scoped_git_identity: true,
     kilo_api_url: env.KILO_API_URL ?? '',
     gastown_api_url: env.GASTOWN_API_URL ?? '',
     organization_id: config.organization_id,

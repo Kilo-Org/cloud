@@ -19,6 +19,7 @@
   "durable_objects": {
     "bindings": [
       { "name": "GASTOWN_USER", "class_name": "GastownUserDO" },
+      { "name": "GASTOWN_ORG", "class_name": "GastownOrgDO" },
       { "name": "AGENT_IDENTITY", "class_name": "AgentIdentityDO" },
       { "name": "TOWN", "class_name": "TownDO" },
       { "name": "TOWN_CONTAINER", "class_name": "TownContainerDO" },
@@ -32,6 +33,7 @@
     { "tag": "v3", "new_sqlite_classes": ["MayorDO"] },
     { "tag": "v4", "new_sqlite_classes": ["TownDO"] },
     { "tag": "v5", "new_sqlite_classes": ["AgentDO"], "deleted_classes": ["RigDO", "MayorDO"] },
+    { "tag": "v6", "new_sqlite_classes": ["GastownOrgDO"] },
   ],
 
   // Test secrets — plain text vars used in place of secrets_store_secrets

@@ -518,6 +518,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
   it('mints repository-scoped tokens after resolving an authorized installation', async () => {
     serviceMocks.findInstallationId.mockResolvedValue({
       success: true,
+      platformIntegrationId: '00000000-0000-4000-8000-000000000003',
       installationId: '123',
       accountLogin: 'old-owner',
       githubAppType: 'lite',
@@ -533,6 +534,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
     expect(result).toEqual({
       success: true,
       token: 'scoped-token',
+      platformIntegrationId: '00000000-0000-4000-8000-000000000003',
       installationId: '123',
       accountLogin: 'old-owner',
       appType: 'lite',
@@ -546,6 +548,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
       .mockResolvedValueOnce({ success: false, reason: 'no_installation_found' })
       .mockResolvedValueOnce({
         success: true,
+        platformIntegrationId: '00000000-0000-4000-8000-000000000003',
         installationId: '123',
         accountLogin: 'renamed-owner',
         githubAppType: 'standard',
@@ -671,7 +674,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
       userId: 'user-1',
     });
 
-    expect(result).toEqual({ success: false, reason: 'no_installation_found' });
+    expect(result).toEqual({ success: false, reason: 'ambiguous_installation' });
     expect(serviceMocks.findRefreshCandidates).not.toHaveBeenCalled();
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
@@ -694,6 +697,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
   it('does not fall back to an installation-wide token when scoped minting fails', async () => {
     serviceMocks.findInstallationId.mockResolvedValue({
       success: true,
+      platformIntegrationId: '00000000-0000-4000-8000-000000000003',
       installationId: '123',
       accountLogin: 'old-owner',
       githubAppType: 'standard',
@@ -717,6 +721,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
       .mockResolvedValueOnce({ success: false, reason: 'integration_mismatch' })
       .mockResolvedValueOnce({
         success: true,
+        platformIntegrationId: params.expectedIntegrationId,
         installationId: '123',
         accountLogin: 'acme',
         githubAppType: 'standard',

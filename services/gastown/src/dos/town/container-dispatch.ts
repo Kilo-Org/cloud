@@ -449,6 +449,9 @@ export async function startAgentInContainer(
       env,
       townId: params.townId,
       getTownConfig: () => Promise.resolve(params.townConfig),
+      githubRepo: params.gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1],
+      userId: params.userId,
+      orgId: params.townConfig.organization_id,
       platformIntegrationId: params.platformIntegrationId,
     });
     if (githubToken) {
@@ -633,6 +636,7 @@ export async function startMergeInContainer(
     gitUrl: string;
     kilocodeToken?: string;
     townConfig: TownConfig;
+    platformIntegrationId?: string;
   }
 ): Promise<boolean> {
   try {
@@ -667,6 +671,10 @@ export async function startMergeInContainer(
       env,
       townId: params.townId,
       getTownConfig: () => Promise.resolve(params.townConfig),
+      githubRepo: params.gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1],
+      userId,
+      orgId: params.townConfig.organization_id,
+      platformIntegrationId: params.platformIntegrationId,
     });
     if (mergeGithubToken) {
       envVars.GIT_TOKEN = mergeGithubToken;

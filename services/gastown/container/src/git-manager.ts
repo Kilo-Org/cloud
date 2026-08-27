@@ -199,8 +199,7 @@ async function assertInsideWorkspace(targetPath: string): Promise<void> {
 
 /**
  * Call the worker's refresh-git-token endpoint to obtain a fresh GitHub
- * App installation token. Updates process.env.GIT_TOKEN and rewrites
- * per-repo credential-store files so subsequent git operations (including
+ * App installation token. Rewrites per-repo credential-store files so subsequent git operations (including
  * the agent's own `git push`) pick up the new token.
  *
  * Returns the new token on success, or null if the refresh failed (no
@@ -246,10 +245,6 @@ export async function refreshGitToken(rigId: string): Promise<string | null> {
       return null;
     }
     const freshToken = (raw.data as { token: string }).token;
-
-    // Update process.env so subsequent exec() calls (which inherit
-    // process.env) see the new token via authenticateGitUrl.
-    process.env.GIT_TOKEN = freshToken;
 
     // Rewrite the per-rig /tmp/.git-credentials* files that currently
     // store a token. The credential helper reads these verbatim, so the

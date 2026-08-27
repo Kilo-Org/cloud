@@ -101,6 +101,7 @@ export type GetTokenForRepoParams = {
 export type GetTokenForRepoSuccess = {
   success: true;
   token: string;
+  platformIntegrationId: string;
   installationId: string;
   accountLogin: string;
   appType: GitHubAppType;
@@ -112,6 +113,7 @@ export type GetTokenForRepoFailure = {
     | 'database_not_configured'
     | 'invalid_repo_format'
     | 'no_installation_found'
+    | 'ambiguous_installation'
     | 'repository_not_installed'
     | 'invalid_org_id'
     | 'integration_mismatch';
@@ -810,7 +812,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     if (!installation.success) {
       switch (installation.reason) {
         case 'ambiguous_installation':
-          return { success: false, reason: 'no_installation_found' };
+          return { success: false, reason: installation.reason };
         case 'database_not_configured':
         case 'invalid_repo_format':
         case 'no_installation_found':
@@ -834,6 +836,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return {
       success: true,
       token,
+      platformIntegrationId: installation.platformIntegrationId,
       installationId: installation.installationId,
       accountLogin: installation.accountLogin,
       appType: installation.githubAppType,

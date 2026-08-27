@@ -58,6 +58,7 @@ describe('InstallationLookupService', () => {
   it('fails closed when multiple active personal installations match the requested owner', async () => {
     const service = createService([
       {
+        id: '00000000-0000-4000-8000-000000000003',
         platform_installation_id: '100',
         platform_account_login: 'old-owner',
         github_app_type: 'standard',
@@ -142,6 +143,7 @@ describe('InstallationLookupService', () => {
   it('resolves an exact-login integration using the legacy standard app type', async () => {
     const service = createService([
       {
+        id: '00000000-0000-4000-8000-000000000003',
         platform_installation_id: '100',
         platform_account_login: 'renamed-owner',
         github_app_type: null,
@@ -156,6 +158,7 @@ describe('InstallationLookupService', () => {
 
     expect(result).toEqual({
       success: true,
+      platformIntegrationId: '00000000-0000-4000-8000-000000000003',
       installationId: '100',
       accountLogin: 'renamed-owner',
       githubAppType: 'standard',
@@ -260,6 +263,7 @@ describe('InstallationLookupService', () => {
       })
     ).resolves.toEqual({
       success: true,
+      platformIntegrationId: integrationId,
       installationId: '100',
       accountLogin: 'renamed-owner',
       githubAppType: 'standard',
@@ -306,17 +310,34 @@ describe('InstallationLookupService', () => {
     ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
   });
 
-  it('does not accept an expected integration without an organization', async () => {
-    const service = createService([]);
+  it('resolves an exact personal integration without an organization', async () => {
+    const integrationId = '00000000-0000-4000-8000-000000000002';
+    const service = createService([
+      {
+        id: integrationId,
+        platform_installation_id: '100',
+        platform_account_login: 'renamed-owner',
+        github_app_type: 'standard',
+        integration_status: 'active',
+        owned_by_organization_id: null,
+        owned_by_user_id: 'user-1',
+        repository_access: 'all',
+        repositories: null,
+        permissions: null,
+      },
+    ]);
 
     await expect(
       service.findManagedInstallationForRepo({
         githubRepo: 'renamed-owner/repository',
         userId: 'user-1',
-        expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+        expectedIntegrationId: integrationId,
       })
-    ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
-    expect(getWorkerDb).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({
+      success: true,
+      platformIntegrationId: integrationId,
+      installationId: '100',
+    });
   });
 
   it('returns integration_mismatch when the expected row is not visible to the fenced query', async () => {

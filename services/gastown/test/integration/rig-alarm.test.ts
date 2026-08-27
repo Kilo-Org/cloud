@@ -1,4 +1,4 @@
-import { env, runDurableObjectAlarm } from 'cloudflare:test';
+import { abortAllDurableObjects, env, runDurableObjectAlarm } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
 
 function getTownStub(name = 'test-town') {
@@ -36,6 +36,47 @@ describe('Town DO Alarm', () => {
     it('should return null when no rig config is set', async () => {
       const retrieved = await town.getRigConfig('nonexistent');
       expect(retrieved).toBeNull();
+    });
+
+    it('stores independent integration identities for two rigs across object reconstruction', async () => {
+      const first = testRigConfig('rig-one');
+      const second = testRigConfig('rig-two');
+      await town.configureRig({ ...first, platformIntegrationId: 'integration-one' });
+      await town.configureRig({ ...second, platformIntegrationId: 'integration-two' });
+
+      expect(await town.getRigConfig(first.rigId)).toMatchObject({
+        ...first,
+        platformIntegrationId: 'integration-one',
+      });
+      expect(await town.getRigConfig(second.rigId)).toMatchObject({
+        ...second,
+        platformIntegrationId: 'integration-two',
+      });
+
+      await abortAllDurableObjects();
+      const reconstructed = getTownStub(townName);
+      expect(await reconstructed.getRigConfig(first.rigId)).toMatchObject({
+        ...first,
+        platformIntegrationId: 'integration-one',
+      });
+      expect(await reconstructed.getRigConfig(second.rigId)).toMatchObject({
+        ...second,
+        platformIntegrationId: 'integration-two',
+      });
+    });
+
+    it('reads legacy snake-case integration identity as platformIntegrationId', async () => {
+      const legacyRigId = 'legacy-rig';
+      await town.configureRig({
+        ...testRigConfig(legacyRigId),
+        platformIntegrationId: undefined,
+        platform_integration_id: 'legacy-integration',
+      });
+
+      expect(await town.getRigConfig(legacyRigId)).toMatchObject({
+        rigId: legacyRigId,
+        platformIntegrationId: 'legacy-integration',
+      });
     });
   });
 

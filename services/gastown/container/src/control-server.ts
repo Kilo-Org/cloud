@@ -113,11 +113,16 @@ function syncTownConfigToProcessEnv(): void {
   const gitAuth = cfg.git_auth;
   if (typeof gitAuth === 'object' && gitAuth !== null) {
     const auth = gitAuth as Record<string, unknown>;
-    for (const [authKey, envKey] of [
-      ['github_token', 'GIT_TOKEN'],
+    const authMapping: Array<[string, string]> = [
       ['gitlab_token', 'GITLAB_TOKEN'],
       ['gitlab_instance_url', 'GITLAB_INSTANCE_URL'],
-    ] as const) {
+    ];
+    if (cfg.rig_scoped_git_identity !== true) {
+      authMapping.unshift(['github_token', 'GIT_TOKEN']);
+    } else {
+      delete process.env.GIT_TOKEN;
+    }
+    for (const [authKey, envKey] of authMapping) {
       const val = auth[authKey];
       if (typeof val === 'string' && val) {
         process.env[envKey] = val;

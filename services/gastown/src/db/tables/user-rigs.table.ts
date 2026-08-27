@@ -30,3 +30,14 @@ export function createTableUserRigs(): string {
     updated_at: `text not null`,
   });
 }
+
+export function migrateUserRigs(sql: SqlStorage): void {
+  const columns = z
+    .object({ name: z.string() })
+    .array()
+    .parse([...sql.exec(/* sql */ `PRAGMA table_info(${user_rigs})`)]);
+  if (columns.some(column => column.name === user_rigs.columns.platform_integration_id)) return;
+  sql.exec(
+    /* sql */ `ALTER TABLE ${user_rigs} ADD COLUMN ${user_rigs.columns.platform_integration_id} text`
+  );
+}

@@ -44,12 +44,20 @@ export async function handleRefreshGitToken(
 
   const town = getTownDOStub(c.env, params.townId);
   const rigConfig = await town.getRigConfig(params.rigId);
+  if (!rigConfig) {
+    return c.json(resError('Rig not found'), 404);
+  }
+  const townConfig = await town.getTownConfig();
+  const githubRepo = rigConfig.gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1];
 
   const freshToken = await resolveGitHubToken({
     env: c.env,
     townId: params.townId,
-    getTownConfig: () => town.getTownConfig(),
-    platformIntegrationId: rigConfig?.platformIntegrationId,
+    getTownConfig: () => Promise.resolve(townConfig),
+    githubRepo,
+    userId: townConfig.owner_user_id ?? rigConfig.userId,
+    orgId: townConfig.organization_id,
+    platformIntegrationId: rigConfig.platformIntegrationId,
   });
 
   if (!freshToken.ok) {

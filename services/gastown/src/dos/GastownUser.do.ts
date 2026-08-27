@@ -1,6 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
 import { createTableUserTowns, user_towns, UserTownRecord } from '../db/tables/user-towns.table';
-import { createTableUserRigs, user_rigs, UserRigRecord } from '../db/tables/user-rigs.table';
+import {
+  createTableUserRigs,
+  migrateUserRigs,
+  user_rigs,
+  UserRigRecord,
+} from '../db/tables/user-rigs.table';
 import { query } from '../util/query.util';
 import { getTownDOStub } from './Town.do';
 
@@ -53,6 +58,7 @@ export class GastownUserDO extends DurableObject<Env> {
   private async initializeDatabase(): Promise<void> {
     query(this.sql, createTableUserTowns(), []);
     query(this.sql, createTableUserRigs(), []);
+    migrateUserRigs(this.sql);
     // Arm the watchdog on every initialization so existing users (who
     // created towns before the watchdog was added) get health checks.
     await this.armWatchdogIfNeeded();

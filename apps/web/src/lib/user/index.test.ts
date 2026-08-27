@@ -610,6 +610,60 @@ describe('User', () => {
       });
     });
 
+    it('recovers a reset UUID account through mailbox-verified Email linking', async () => {
+      const email = 'reset-recovery@example.com';
+      const user = await insertTestUser({
+        id: randomUUID(),
+        google_user_email: email,
+        google_user_name: 'Reset Recovery User',
+        normalized_email: email,
+        hosted_domain: hosted_domain_specials.github,
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: user.id,
+        provider: 'github',
+        provider_account_id: 'synthetic-reset-github',
+        email,
+        avatar_url: '',
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      await db.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, user.id));
+      await expect(getAllUserProviders(email)).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['email'],
+          primaryEmail: email,
+          workosHostedDomain: undefined,
+        },
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Reset Recovery User',
+          google_user_image_url: '',
+          hosted_domain: 'example.com',
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(user.id);
+      expect(result.isNew).toBe(false);
+      await expect(
+        db
+          .select({ provider: user_auth_provider.provider })
+          .from(user_auth_provider)
+          .where(eq(user_auth_provider.kilo_user_id, user.id))
+      ).resolves.toEqual([{ provider: 'email' }]);
+    });
+
     it('uses the canonical UUID validator for rowless Email recovery', async () => {
       const email = 'nil-uuid-email@example.com';
       const user = await insertTestUser({

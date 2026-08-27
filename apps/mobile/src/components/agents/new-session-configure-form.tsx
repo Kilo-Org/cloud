@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { InstanceSelector } from '@/components/agents/instance-selector';
+import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import {
@@ -61,6 +62,9 @@ type NewSessionConfigureFormProps = {
   isLoadingInstances: boolean;
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   showInstanceDisconnectedNote: boolean;
+  // Launch folder (remote CLI only). `""` means the launch directory.
+  folderPath: string;
+  onChangeFolderPath: (path: string) => void;
   // Repository (Cloud Agent only).
   groups: RepositoryGroup[];
   isRetrying: boolean;
@@ -121,6 +125,8 @@ export function NewSessionConfigureForm({
   isLoadingInstances,
   onChangeRunOnInstance,
   showInstanceDisconnectedNote,
+  folderPath,
+  onChangeFolderPath,
   groups,
   isRetrying,
   onChangeRepo,
@@ -258,6 +264,15 @@ export function NewSessionConfigureForm({
       />
 
       {runTargetBlock}
+
+      {isRemote ? (
+        <LaunchFolderField
+          folderPath={folderPath}
+          runOnInstance={runOnInstance}
+          onChangeFolderPath={onChangeFolderPath}
+          disabled={isStarting}
+        />
+      ) : null}
 
       <Text className="mt-2 text-xs text-muted-foreground">
         {t('agentChat.newSession.remoteHint')}

@@ -18,6 +18,8 @@ type UseNewSessionShareRemoteArgs = {
   setRunOnInstance: (next: InstancePickerInstance | null) => void;
   refetchInstances: InstancesRefetch;
   instanceList: InstancePickerInstance[];
+  /** Relative launch folder from the folder picker (`""` = launch directory). */
+  folderPath: string;
   /** Live composer draft owned by `useNewSessionCreator`. */
   promptRef: RefObject<string>;
   /** Live attachment list owned by `useAgentAttachmentUpload`. */
@@ -49,6 +51,7 @@ export function useNewSessionShareRemote({
   setRunOnInstance,
   refetchInstances,
   instanceList,
+  folderPath,
   promptRef,
   attachments,
   selection,
@@ -78,6 +81,7 @@ export function useNewSessionShareRemote({
     setRunOnInstance,
     refetchInstances,
     instanceList,
+    directory: folderPath || undefined,
     getSubmitPayload,
     onSpawnAdmitted,
     onSpawnFailed,

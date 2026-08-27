@@ -63,6 +63,11 @@ type UseRemoteSpawnDispatchArgs = {
    */
   instanceList: InstancePickerInstance[];
   /**
+   * Relative launch folder for the new remote session (`""` means the CLI's
+   * own launch directory). Omitted from the wire when empty (undefined).
+   */
+  directory?: string;
+  /**
    * Snapshot of the composer, read once at press time. When it returns a
    * payload the ready path stages it, and the destination composer submits it
    * once. Optional: a caller with no composer omits it.
@@ -141,6 +146,7 @@ export function useRemoteSpawnDispatch({
   setRunOnInstance,
   refetchInstances,
   instanceList,
+  directory,
   getSubmitPayload,
   onSpawnAdmitted,
   onSpawnFailed,
@@ -184,15 +190,23 @@ export function useRemoteSpawnDispatch({
   // Read the press-time inputs through refs so `onStart` stays stable across
   // renders while always seeing the route's latest values.
   const getSubmitPayloadRef = useRef(getSubmitPayload);
-  const spawnFieldsRef = useRef({ mode, selection, organizationId });
+  const spawnFieldsRef = useRef({ mode, selection, organizationId, directory });
   const onSpawnAdmittedRef = useRef(onSpawnAdmitted);
   const onSpawnFailedRef = useRef(onSpawnFailed);
   useEffect(() => {
     getSubmitPayloadRef.current = getSubmitPayload;
-    spawnFieldsRef.current = { mode, selection, organizationId };
+    spawnFieldsRef.current = { mode, selection, organizationId, directory };
     onSpawnAdmittedRef.current = onSpawnAdmitted;
     onSpawnFailedRef.current = onSpawnFailed;
-  }, [getSubmitPayload, mode, selection, organizationId, onSpawnAdmitted, onSpawnFailed]);
+  }, [
+    getSubmitPayload,
+    mode,
+    selection,
+    organizationId,
+    directory,
+    onSpawnAdmitted,
+    onSpawnFailed,
+  ]);
 
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
@@ -217,6 +231,7 @@ export function useRemoteSpawnDispatch({
       mode: fields.mode,
       selection: fields.selection,
       organizationId: fields.organizationId,
+      directory: fields.directory,
     });
     void (async () => {
       setIsResolvingInstance(true);
@@ -253,6 +268,7 @@ export function useRemoteSpawnDispatch({
             mode: fields.mode,
             selection: fields.selection,
             organizationId: fields.organizationId,
+            directory: fields.directory,
           })
         );
         const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput, {

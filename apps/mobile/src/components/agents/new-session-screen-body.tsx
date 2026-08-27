@@ -24,6 +24,7 @@ import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-and
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
+import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
@@ -61,6 +62,8 @@ export function NewSessionScreenBody() {
   const [hasPrompt, setHasPrompt] = useState(false);
   // Commit choice for the cloud session: Leave changes (false) is the default.
   const [autoCommit, setAutoCommit] = useState(false);
+  // Relative launch folder the folder picker confirmed (`""` = launch directory).
+  const [folderPath, setFolderPath] = useLaunchFolder(runOnInstance?.connectionId);
   const submissionLockRef = useRef(false);
   const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
   // Armed right before a successful Start/spawn navigation so the discard
@@ -298,6 +301,7 @@ export function NewSessionScreenBody() {
     setRunOnInstance,
     refetchInstances,
     instanceList,
+    folderPath,
     promptRef,
     attachments: attachments.attachments,
     selection: modelView.spawnSelection,
@@ -481,6 +485,8 @@ export function NewSessionScreenBody() {
         isLoadingInstances={isLoadingInstances}
         onChangeRunOnInstance={handleRunOnChange}
         showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
+        folderPath={folderPath}
+        onChangeFolderPath={setFolderPath}
         groups={groups}
         isRetrying={isRetrying}
         onChangeRepo={setSelectedRepo}

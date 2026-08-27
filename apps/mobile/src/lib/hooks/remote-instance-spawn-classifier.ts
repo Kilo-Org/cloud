@@ -163,6 +163,8 @@ export function buildCreateRemoteSessionInput(fields: {
   mode?: string;
   selection?: ModelSelection;
   organizationId?: string | null;
+  /** Relative launch directory; omitted when empty (the CLI falls back to its launch directory). */
+  directory?: string;
 }): CreateRemoteSessionInput | undefined {
   const input: CreateRemoteSessionInput = {};
   if (fields.mode) {
@@ -178,7 +180,13 @@ export function buildCreateRemoteSessionInput(fields: {
   if (fields.organizationId) {
     input.orgId = fields.organizationId;
   }
-  return input.agent !== undefined || input.model !== undefined || input.orgId !== undefined
+  if (fields.directory) {
+    input.directory = fields.directory;
+  }
+  return input.agent !== undefined ||
+    input.model !== undefined ||
+    input.orgId !== undefined ||
+    input.directory !== undefined
     ? input
     : undefined;
 }

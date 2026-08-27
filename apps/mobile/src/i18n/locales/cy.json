@@ -2179,13 +2179,10 @@
       "scrollToBottom": "Sgrolio i'r gwaelod",
       "emptyTitle": "Dim negeseuon eto",
       "renameAccessibility": "Ailenwi sesiwn: {{title}}",
-      "connectRepository": "Cysylltu ystorfa",
       "cloningSession": "Yn clonio sesiwn",
       "continue": "Parhau",
       "couldNotLoadThisSession": "Methwyd llwytho'r sesiwn hon",
-      "cloneFailed": "Methwyd clonio'r sesiwn hon.",
       "cloneFailedRetry": "Methwyd clonio'r sesiwn hon. Ceisiwch eto.",
-      "connectRepositoryToContinue": "Cysylltwch ystorfa i barhau.",
       "notEnoughCredits": "Dim digon o gredydau i redeg Cloud Agent. Ychwanegwch gredydau a cheisiwch eto.",
       "previousTaskFinishing": "Mae'r dasg flaenorol yn dal i orffen. Arhoswch funud.",
       "serviceUnavailable": "Nid yw'r gwasanaeth ar gael ar hyn o bryd. Ceisiwch eto.",
@@ -2258,7 +2255,11 @@
       "noRepositoriesVisibleGitlab": "Dim ystorfeydd yn weladwy. Gwiriwch fynediad i'r ystorfeydd ar gyfer GitLab, yna adnewyddwch.",
       "openBitbucket": "Agor Bitbucket",
       "openGitlab": "Agor GitLab",
-      "recentlyUsed": "Defnyddiwyd yn ddiweddar"
+      "recentlyUsed": "Defnyddiwyd yn ddiweddar",
+      "continueFrom": "Parhau gyda {{title}}",
+      "importingSession": "Mewnforio sesiwn",
+      "cliCannotContinue": "Ni all y CLI hwn barhau sesiwn. Dewiswch Cloud Agent neu CLI arall.",
+      "importFailed": "Ni ellid mewnforio'r sesiwn hon."
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil",

@@ -1673,13 +1673,10 @@
       "scrollToBottom": "Desplazarse al final",
       "emptyTitle": "Aún no hay mensajes",
       "renameAccessibility": "Renombrar sesión: {{title}}",
-      "connectRepository": "Conectar repositorio",
       "cloningSession": "Clonando sesión",
       "continue": "Continuar",
       "couldNotLoadThisSession": "No se pudo cargar esta sesión",
-      "cloneFailed": "No se pudo clonar esta sesión.",
       "cloneFailedRetry": "No se pudo clonar esta sesión. Inténtalo de nuevo.",
-      "connectRepositoryToContinue": "Conecta un repositorio para continuar.",
       "notEnoughCredits": "No hay suficientes créditos para ejecutar Cloud Agent. Añade créditos e inténtalo de nuevo.",
       "previousTaskFinishing": "La tarea anterior aún está finalizando. Espera un momento.",
       "serviceUnavailable": "El servicio no está disponible en este momento. Inténtalo de nuevo.",
@@ -1752,7 +1749,11 @@
       "noRepositoriesVisibleGitlab": "No hay repositorios visibles. Comprueba el acceso a los repositorios de GitLab y actualiza.",
       "openBitbucket": "Abrir Bitbucket",
       "openGitlab": "Abrir GitLab",
-      "recentlyUsed": "Usados recientemente"
+      "recentlyUsed": "Usados recientemente",
+      "continueFrom": "Continuando {{title}}",
+      "importingSession": "Importando sesión",
+      "cliCannotContinue": "Esta CLI no puede continuar una sesión. Elige Cloud Agent u otra CLI.",
+      "importFailed": "No se pudo importar esta sesión."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} archivo actualizado",

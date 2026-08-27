@@ -2119,13 +2119,10 @@
       "scrollToBottom": "Rolleer na onder",
       "emptyTitle": "Nog geen boodskappe nie",
       "renameAccessibility": "Hernoem sessie: {{title}}",
-      "connectRepository": "Koppel bewaarplek",
       "cloningSession": "Sessie kloning",
       "continue": "Gaan voort",
       "couldNotLoadThisSession": "Kon hierdie sessie nie laai nie",
-      "cloneFailed": "Kon hierdie sessie nie klone nie.",
       "cloneFailedRetry": "Kon hierdie sessie nie klone nie. Probeer weer.",
-      "connectRepositoryToContinue": "Koppel 'n bewaarplek om voort te gaan.",
       "notEnoughCredits": "Nie genoeg krediete om Cloud Agent te laat loop nie. Voeg krediete by en probeer weer.",
       "previousTaskFinishing": "Die vorige taak is nog besig. Wag asseblief 'n oomblik.",
       "serviceUnavailable": "Die diens is tans onbeskikbaar. Probeer asseblief weer.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "Geen bewaarplekke sigbaar nie. Gaan GitLab-bewaarplektoegang na, en verfris dan.",
       "openBitbucket": "Maak Bitbucket oop",
       "openGitlab": "Maak GitLab oop",
-      "recentlyUsed": "Onlangs gebruik"
+      "recentlyUsed": "Onlangs gebruik",
+      "continueFrom": "Gaan voort met {{title}}",
+      "importingSession": "Sessie word ingevoer",
+      "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortgaan nie. Kies Cloud Agent of 'n ander CLI.",
+      "importFailed": "Kon hierdie sessie nie invoer nie."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer bygewerk",

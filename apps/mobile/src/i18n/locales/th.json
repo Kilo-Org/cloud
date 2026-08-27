@@ -2119,13 +2119,10 @@
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
       "renameAccessibility": "เปลี่ยนชื่อ session: {{title}}",
-      "connectRepository": "เชื่อมต่อ repository",
       "cloningSession": "กำลังคัดลอก session",
       "continue": "ดำเนินการต่อ",
       "couldNotLoadThisSession": "ไม่สามารถโหลด session นี้ได้",
-      "cloneFailed": "ไม่สามารถคัดลอก session นี้ได้",
       "cloneFailedRetry": "ไม่สามารถคัดลอก session นี้ได้ ลองอีกครั้ง",
-      "connectRepositoryToContinue": "เชื่อมต่อ repository เพื่อดำเนินการต่อ",
       "notEnoughCredits": "เครดิตไม่เพียงพอสำหรับเรียกใช้ Cloud Agent โปรดเพิ่มเครดิตแล้วลองอีกครั้ง",
       "previousTaskFinishing": "งานก่อนหน้ายังไม่เสร็จสิ้น โปรดรอสักครู่",
       "serviceUnavailable": "ขณะนี้บริการไม่พร้อมใช้งาน โปรดลองอีกครั้ง",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "ไม่พบที่เก็บที่แสดง ตรวจสอบสิทธิ์การเข้าถึงที่เก็บสำหรับ GitLab แล้วรีเฟรช",
       "openBitbucket": "เปิด Bitbucket",
       "openGitlab": "เปิด GitLab",
-      "recentlyUsed": "ใช้ล่าสุด"
+      "recentlyUsed": "ใช้ล่าสุด",
+      "continueFrom": "กำลังดำเนินการต่อ {{title}}",
+      "importingSession": "กำลังนำเข้าเซสชัน",
+      "cliCannotContinue": "CLI นี้ไม่สามารถดำเนินการต่อเซสชันได้ เลือก Cloud Agent หรือ CLI อื่น",
+      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดต {{displayCount}} ไฟล์",

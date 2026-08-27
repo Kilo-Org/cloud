@@ -2119,13 +2119,10 @@
       "scrollToBottom": "Aşağı sürüşdür",
       "emptyTitle": "Hələ mesaj yoxdur",
       "renameAccessibility": "Sessiyanın adını dəyişin: {{title}}",
-      "connectRepository": "Repozitoriyaya qoşul",
       "cloningSession": "Sessiya klonlanır",
       "continue": "Davam et",
       "couldNotLoadThisSession": "Bu sessiya yüklənə bilmədi",
-      "cloneFailed": "Bu sessiya klonlana bilmədi.",
       "cloneFailedRetry": "Bu sessiya klonlana bilmədi. Yenidən cəhd edin.",
-      "connectRepositoryToContinue": "Davam etmək üçün repozitoriyaya qoşulun.",
       "notEnoughCredits": "Cloud Agent işə salmaq üçün kifayət qədər kredit yoxdur. Kredit əlavə edin və yenidən cəhd edin.",
       "previousTaskFinishing": "Əvvəlki tapşırıq hələ də tamamlanır. Bir an gözləyin.",
       "serviceUnavailable": "Xidmət hazırda əlçatan deyil. Yenidən cəhd edin.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "Depo görünmür. GitLab üçün depo girişini yoxlayın, sonra yeniləyin.",
       "openBitbucket": "Bitbucket-ı aç",
       "openGitlab": "GitLab-ı aç",
-      "recentlyUsed": "Son istifadə olunanlar"
+      "recentlyUsed": "Son istifadə olunanlar",
+      "continueFrom": "{{title}} davam etdirilir",
+      "importingSession": "Sessiya idxal edilir",
+      "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seçin.",
+      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi",

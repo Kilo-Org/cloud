@@ -2119,13 +2119,10 @@
       "scrollToBottom": "Төменге айналдыру",
       "emptyTitle": "Әзірге хабарламалар жоқ",
       "renameAccessibility": "Сессияның атын өзгерту: {{title}}",
-      "connectRepository": "Репозиторийді қосу",
       "cloningSession": "Сессияны клондау",
       "continue": "Жалғастыру",
       "couldNotLoadThisSession": "Бұл сессияны жүктеу мүмкін болмады",
-      "cloneFailed": "Бұл сессияны клондау мүмкін болмады.",
       "cloneFailedRetry": "Бұл сессияны клондау мүмкін болмады. Қайталап көріңіз.",
-      "connectRepositoryToContinue": "Жалғастыру үшін репозиторийді қосыңыз.",
       "notEnoughCredits": "Cloud Agent іске қосуға кредит жеткіліксіз. Кредит қосып, қайта көріңіз.",
       "previousTaskFinishing": "Алдыңғы тапсырма әлі аяқталуда. Сәл күте тұрыңыз.",
       "serviceUnavailable": "Қызмет қазір қолжетімсіз. Қайталап көріңіз.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "Репозиторийлер көрінбейді. GitLab үшін репозиторий қолжетімділігін тексеріңіз, содан кейін жаңартыңыз.",
       "openBitbucket": "Bitbucket-ті ашу",
       "openGitlab": "GitLab-ді ашу",
-      "recentlyUsed": "Жақында қолданылған"
+      "recentlyUsed": "Жақында қолданылған",
+      "continueFrom": "Жалғастыру {{title}}",
+      "importingSession": "Сессияны импорттау",
+      "cliCannotContinue": "Бұл CLI сессияны жалғастыра алмайды. Cloud Agent немесе басқа CLI таңдаңыз.",
+      "importFailed": "Бұл сессияны импорттау мүмкін болмады."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды",

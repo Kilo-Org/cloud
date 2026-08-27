@@ -1665,13 +1665,10 @@
       "transcriptAccessibility": "सत्र ट्रांसक्रिप्ट",
       "emptyTitle": "अभी कोई संदेश नहीं",
       "renameAccessibility": "सत्र का नाम बदलें: {{title}}",
-      "connectRepository": "रेपॉज़िटरी कनेक्ट करें",
       "cloningSession": "सत्र क्लोन किया जा रहा है",
       "continue": "जारी रखें",
       "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका",
-      "cloneFailed": "यह सत्र क्लोन नहीं हो सका।",
       "cloneFailedRetry": "यह सत्र क्लोन नहीं हो सका। फिर से कोशिश करें।",
-      "connectRepositoryToContinue": "जारी रखने के लिए एक रिपॉज़िटरी कनेक्ट करें।",
       "notEnoughCredits": "Cloud Agent चलाने के लिए पर्याप्त क्रेडिट नहीं हैं. क्रेडिट जोड़ें और फिर से प्रयास करें.",
       "previousTaskFinishing": "पिछला कार्य अभी भी पूरा हो रहा है. कृपया थोड़ा इंतज़ार करें.",
       "serviceUnavailable": "सेवा अभी उपलब्ध नहीं है. कृपया फिर से प्रयास करें.",
@@ -1744,7 +1741,11 @@
       "noRepositoriesVisibleGitlab": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। GitLab के लिए रिपॉज़िटरी एक्सेस जाँचें, फिर रिफ़्रेश करें।",
       "openBitbucket": "Bitbucket खोलें",
       "openGitlab": "GitLab खोलें",
-      "recentlyUsed": "हाल में उपयोग की गईं"
+      "recentlyUsed": "हाल में उपयोग की गईं",
+      "cliCannotContinue": "यह CLI सत्र जारी नहीं रख सकता। Cloud Agent या कोई अन्य CLI चुनें।",
+      "continueFrom": "{{title}} जारी रखा जा रहा है",
+      "importFailed": "यह सत्र आयात नहीं हो सका।",
+      "importingSession": "सत्र आयात किया जा रहा है"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई",

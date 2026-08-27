@@ -2119,13 +2119,10 @@
       "scrollToBottom": "Pastga aylantirish",
       "emptyTitle": "Hali xabarlar yo'q",
       "renameAccessibility": "Sessiyani qayta nomlash: {{title}}",
-      "connectRepository": "Repozitoriyaga ulanish",
       "cloningSession": "Sessiya klonlanmoqda",
       "continue": "Davom etish",
       "couldNotLoadThisSession": "Ushbu sessiyani yuklab bo'lmadi",
-      "cloneFailed": "Ushbu sessiyani klonlab bo'lmadi.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
-      "connectRepositoryToContinue": "Davom etish uchun repozitoriyaga ulaning.",
       "notEnoughCredits": "Cloud Agent ishga tushirish uchun kredit yetarli emas. Kredit qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali ham tugamoqda. Iltimos, bir oz kuting.",
       "serviceUnavailable": "Xizmat hozir mavjud emas. Iltimos, qayta urinib ko'ring.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "Hech qanday repozitoriy ko'rinmayapti. GitLab uchun repozitoriy kirishini tekshiring, keyin yangilang.",
       "openBitbucket": "Bitbucket'ni ochish",
       "openGitlab": "GitLab'ni ochish",
-      "recentlyUsed": "Yaqinda ishlatilgan"
+      "recentlyUsed": "Yaqinda ishlatilgan",
+      "continueFrom": "{{title}} ni davom ettirish",
+      "importingSession": "Sessiyani import qilish",
+      "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent yoki boshqa CLI'ni tanlang.",
+      "importFailed": "Bu sessiyani import qilib bo'lmadi."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi",

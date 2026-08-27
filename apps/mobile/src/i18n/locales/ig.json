@@ -2119,13 +2119,10 @@
       "scrollToBottom": "Pịgharịa ruo n'ala",
       "emptyTitle": "Enweghị ozi aka",
       "renameAccessibility": "Gbanwee aha nzukọ: {{title}}",
-      "connectRepository": "Jikọọ ebe nchekwa",
       "cloningSession": "Na-emepụta oyiri nzukọ",
       "continue": "Gaa n'ihu",
       "couldNotLoadThisSession": "Enweghị ike ibudata nzukọ a",
-      "cloneFailed": "Enweghị ike imepụta oyiri nzukọ a.",
       "cloneFailedRetry": "Enweghị ike imepụta oyiri nzukọ a. Nwaa ọzọ.",
-      "connectRepositoryToContinue": "Jikọọ ebe nchekwa iji gaa n'ihu.",
       "notEnoughCredits": "Kredit ezughị ezu ịgba Cloud Agent. Tinye kredit ma nwaa ọzọ.",
       "previousTaskFinishing": "Ọrụ gara aga ka na-agwụcha. Biko chere obere oge.",
       "serviceUnavailable": "Ọrụ ahụ adịghị ugbu a. Biko nwaa ọzọ.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "Ọ dịghị ebe nchekwa a na-ahụ. Lelee ohere ebe nchekwa maka GitLab, wee melite.",
       "openBitbucket": "Meghee Bitbucket",
       "openGitlab": "Meghee GitLab",
-      "recentlyUsed": "Ejiri ya nso nso a"
+      "recentlyUsed": "Ejiri ya nso nso a",
+      "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
+      "continueFrom": "Na-aga n'ihu na {{title}}",
+      "importFailed": "Enweghị ike ibubata nnọkọ a.",
+      "importingSession": "Na-ebubata nnọkọ"
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere {{displayCount}} faịlụ",

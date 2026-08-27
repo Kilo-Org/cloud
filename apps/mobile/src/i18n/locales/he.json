@@ -1673,13 +1673,10 @@
       "scrollToBottom": "גלול לתחתית",
       "emptyTitle": "אין עדיין הודעות",
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
-      "connectRepository": "חיבור מאגר",
       "cloningSession": "משכפל סשן",
       "continue": "המשך",
       "couldNotLoadThisSession": "לא ניתן היה לטעון הפעלה זו",
-      "cloneFailed": "לא ניתן היה לשכפל הפעלה זו.",
       "cloneFailedRetry": "לא ניתן היה לשכפל הפעלה זו. נסה שוב.",
-      "connectRepositoryToContinue": "חבר מאגר כדי להמשיך.",
       "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין מסתיימת. אנא המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. אנא נסה שוב.",
@@ -1752,7 +1749,11 @@
       "noRepositoriesVisibleGitlab": "אין מאגרים גלויים. בדוק את הגישה למאגרים של GitLab, ואז רענן.",
       "openBitbucket": "פתח את Bitbucket",
       "openGitlab": "פתח את GitLab",
-      "recentlyUsed": "בשימוש לאחרונה"
+      "recentlyUsed": "בשימוש לאחרונה",
+      "cliCannotContinue": "CLI זה אינו יכול להמשיך הפעלה. בחר Cloud Agent או CLI אחר.",
+      "continueFrom": "ממשיך {{title}}",
+      "importFailed": "לא ניתן היה לייבא את ההפעלה הזו.",
+      "importingSession": "מייבא הפעלה"
     },
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",

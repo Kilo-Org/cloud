@@ -2119,13 +2119,10 @@
       "scrollToBottom": "U dhaadhac xagga hoose",
       "emptyTitle": "Weli ma jiraan farriimo",
       "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",
-      "connectRepository": "Ku xidh kaydka",
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
       "continue": "Sii wad",
       "couldNotLoadThisSession": "Kalfadhigan lama shubay",
-      "cloneFailed": "Kalfadhigan lama nuqulin.",
       "cloneFailedRetry": "Kalfadhigan lama nuqulin. Mar kale isku day.",
-      "connectRepositoryToContinue": "Ku xidh kayd si aad u sii waddo.",
       "notEnoughCredits": "Kuma filna dheeraadka si loo shideeyo Cloud Agent. Ku dar dheeraadka oo mar kale isku day.",
       "previousTaskFinishing": "Hawsha hore weli way dhammaanaysaa. Fadlan sug daqiiqad.",
       "serviceUnavailable": "Adeeggu hadda ma jiro. Fadlan mar kale isku day.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "Ma jiraan keyd la arki karo. Hubi gelitaanka keydka ee GitLab, ka dibna cusbooneysii.",
       "openBitbucket": "Fur Bitbucket",
       "openGitlab": "Fur GitLab",
-      "recentlyUsed": "Markii dhaw la isticmaalay"
+      "recentlyUsed": "Markii dhaw la isticmaalay",
+      "continueFrom": "Sii wadaya {{title}}",
+      "importingSession": "Soo dejinta kalfadhiga",
+      "cliCannotContinue": "CLI-kan kuma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",
+      "importFailed": "Kalfadhigan lama soo dejin karin."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay",

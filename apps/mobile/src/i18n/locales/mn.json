@@ -2119,13 +2119,10 @@
       "scrollToBottom": "Доод тал руу гүйлгэх",
       "emptyTitle": "Хараахан мессеж байхгүй",
       "renameAccessibility": "Сессийн нэр өөрчлөх: {{title}}",
-      "connectRepository": "Репозиторийг холбох",
       "cloningSession": "Сессийг клонлож байна",
       "continue": "Үргэлжлүүлэх",
       "couldNotLoadThisSession": "Энэ сессийг ачаалж чадсангүй",
-      "cloneFailed": "Энэ сессийг клонлож чадсангүй.",
       "cloneFailedRetry": "Энэ сессийг клонлож чадсангүй. Дахин оролдоно уу.",
-      "connectRepositoryToContinue": "Үргэлжлүүлэхийн тулд репозиторийг холбоно уу.",
       "notEnoughCredits": "Cloud Agent ажиллуулахад хангалттай кредит байхгүй. Кредит нэмээд дахин оролдоно уу.",
       "previousTaskFinishing": "Өмнөх ажил дуусаагүй байна. Түр хүлээнэ үү.",
       "serviceUnavailable": "Үйлчилгээ яг одоо боломжгүй байна. Дахин оролдоно уу.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "Харагдах repository байхгүй. GitLab-ийн repository хандалтыг шалгаад, шинэчилнэ үү.",
       "openBitbucket": "Bitbucket нээх",
       "openGitlab": "GitLab нээх",
-      "recentlyUsed": "Сүүлд ашигласан"
+      "recentlyUsed": "Сүүлд ашигласан",
+      "continueFrom": "{{title}} үргэлжлүүлж байна",
+      "importingSession": "Сесс импортлож байна",
+      "cliCannotContinue": "Энэ CLI сесс үргэлжлүүлэх боломжгүй. Cloud Agent эсвэл өөр CLI сонгоно уу.",
+      "importFailed": "Энэ сессийг импортлох боломжгүй."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл шинэчлэгдсэн",

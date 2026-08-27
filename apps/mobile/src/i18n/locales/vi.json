@@ -1665,13 +1665,10 @@
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
       "renameAccessibility": "Đổi tên phiên: {{title}}",
-      "connectRepository": "Kết nối kho lưu trữ",
       "cloningSession": "Đang sao chép phiên",
       "continue": "Tiếp tục",
       "couldNotLoadThisSession": "Không thể tải phiên này",
-      "cloneFailed": "Không thể sao chép phiên này.",
       "cloneFailedRetry": "Không thể sao chép phiên này. Hãy thử lại.",
-      "connectRepositoryToContinue": "Kết nối một kho lưu trữ để tiếp tục.",
       "notEnoughCredits": "Không đủ tín dụng để chạy Cloud Agent. Hãy nạp tín dụng và thử lại.",
       "previousTaskFinishing": "Tác vụ trước vẫn đang hoàn tất. Vui lòng chờ một chút.",
       "serviceUnavailable": "Dịch vụ hiện không khả dụng. Vui lòng thử lại.",
@@ -1744,7 +1741,11 @@
       "noRepositoriesVisibleGitlab": "Không có kho lưu trữ hiển thị. Kiểm tra quyền truy cập kho lưu trữ cho GitLab, rồi làm mới.",
       "openBitbucket": "Mở Bitbucket",
       "openGitlab": "Mở GitLab",
-      "recentlyUsed": "Đã dùng gần đây"
+      "recentlyUsed": "Đã dùng gần đây",
+      "continueFrom": "Đang tiếp tục {{title}}",
+      "importingSession": "Đang nhập phiên",
+      "cliCannotContinue": "CLI này không thể tiếp tục một phiên. Hãy chọn Tác nhân đám mây hoặc CLI khác.",
+      "importFailed": "Không thể nhập phiên này."
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp",

@@ -2119,13 +2119,10 @@
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Akukho mlayezo okwamanje",
       "renameAccessibility": "Qamba kabusha iseshini: {{title}}",
-      "connectRepository": "Xhuma i-repository",
       "cloningSession": "Iklonywa iseshini",
       "continue": "Qhubeka",
       "couldNotLoadThisSession": "Akukwazanga ukulayisha lesi seshini",
-      "cloneFailed": "Akukwazanga ukuklona lesi seshini.",
       "cloneFailedRetry": "Akukwazanga ukuklona lesi seshini. Zama futhi.",
-      "connectRepositoryToContinue": "Xhuma i-repository ukuze uqhubeke.",
       "notEnoughCredits": "Azikho amakhredithi anele ukusebenzisa i-Cloud Agent. Engeza amakhredithi bese uzama futhi.",
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaqhubeka. Uyacelwa ukuthi ulinde isikhashana.",
       "serviceUnavailable": "Inkonzo ayitholakali njengamanje. Uyacelwa ukuthi uzame futhi.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "Awekho ama-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-GitLab, bese uvuselela.",
       "openBitbucket": "Vula i-Bitbucket",
       "openGitlab": "Vula i-GitLab",
-      "recentlyUsed": "Esetshenziswe muva nje"
+      "recentlyUsed": "Esetshenziswe muva nje",
+      "continueFrom": "Ukuqhubeka {{title}}",
+      "importingSession": "Ukungenisa iseshini",
+      "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka iseshini. Khetha I-Cloud Agent noma enye i-CLI.",
+      "importFailed": "Ayikwazanga ukungenisa lesi seshini."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}",

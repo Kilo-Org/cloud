@@ -2149,13 +2149,10 @@
       "scrollToBottom": "Posunout dolů",
       "emptyTitle": "Zatím žádné zprávy",
       "renameAccessibility": "Přejmenovat relaci: {{title}}",
-      "connectRepository": "Připojit repozitář",
       "cloningSession": "Klonování relace",
       "continue": "Pokračovat",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst",
-      "cloneFailed": "Tuto relaci se nepodařilo klonovat.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
-      "connectRepositoryToContinue": "Pro pokračování připojte repozitář.",
       "notEnoughCredits": "Nemáte dost kreditů ke spuštění Cloud Agent. Přidejte kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úloha stále běží. Počkejte prosím chvíli.",
       "serviceUnavailable": "Služba je právě nedostupná. Zkuste to prosím znovu.",
@@ -2228,7 +2225,11 @@
       "noRepositoriesVisibleGitlab": "Nebyla viditelná žádná úložiště. Zkontrolujte přístup k úložištím pro GitLab a pak obnovte.",
       "openBitbucket": "Otevřít Bitbucket",
       "openGitlab": "Otevřít GitLab",
-      "recentlyUsed": "Nedávno použité"
+      "recentlyUsed": "Nedávno použité",
+      "cliCannotContinue": "Toto CLI nemůže pokračovat v relaci. Vyberte Cloud Agent nebo jiné CLI.",
+      "continueFrom": "Pokračování {{title}}",
+      "importFailed": "Tuto relaci se nepodařilo importovat.",
+      "importingSession": "Importování relace"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizován {{displayCount}} soubor",

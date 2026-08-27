@@ -1697,13 +1697,10 @@
       "scrollToBottom": "التمرير إلى الأسفل",
       "emptyTitle": "لا توجد رسائل بعد",
       "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
-      "connectRepository": "ربط المستودع",
       "cloningSession": "جارٍ استنساخ الجلسة",
       "continue": "متابعة",
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة",
-      "cloneFailed": "تعذّر استنساخ هذه الجلسة.",
       "cloneFailedRetry": "تعذّر استنساخ هذه الجلسة. حاول مرة أخرى.",
-      "connectRepositoryToContinue": "اربط مستودعًا للمتابعة.",
       "notEnoughCredits": "لا توجد ائتمانات كافية لتشغيل Cloud Agent. أضف ائتمانات وحاول مرة أخرى.",
       "previousTaskFinishing": "لا تزال المهمة السابقة قيد الإنجاز. يرجى الانتظار لحظة.",
       "serviceUnavailable": "الخدمة غير متاحة الآن. يرجى المحاولة مرة أخرى.",
@@ -1776,7 +1773,11 @@
       "noRepositoriesVisibleGitlab": "لا توجد مستودعات ظاهرة. تحقق من وصول المستودعات لـ GitLab، ثم حدّث.",
       "openBitbucket": "فتح Bitbucket",
       "openGitlab": "فتح GitLab",
-      "recentlyUsed": "مستخدم مؤخرًا"
+      "recentlyUsed": "مستخدم مؤخرًا",
+      "continueFrom": "متابعة {{title}}",
+      "importingSession": "جارٍ استيراد الجلسة",
+      "cliCannotContinue": "لا يمكن لهذه CLI متابعة جلسة. اختر وكيل سحابي أو CLI آخر.",
+      "importFailed": "تعذر استيراد هذه الجلسة."
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث {{displayCount}} ملف",

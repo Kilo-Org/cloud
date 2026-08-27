@@ -2119,13 +2119,10 @@
       "scrollToBottom": "Μετάβαση στο κάτω μέρος",
       "emptyTitle": "Δεν υπάρχουν ακόμα μηνύματα",
       "renameAccessibility": "Μετονομασία συνεδρίας: {{title}}",
-      "connectRepository": "Σύνδεση αποθετηρίου",
       "cloningSession": "Κλωνοποίηση συνεδρίας",
       "continue": "Συνέχεια",
       "couldNotLoadThisSession": "Δεν ήταν δυνατή η φόρτωση αυτής της συνεδρίας",
-      "cloneFailed": "Δεν ήταν δυνατή η κλωνοποίηση αυτής της συνεδρίας.",
       "cloneFailedRetry": "Δεν ήταν δυνατή η κλωνοποίηση αυτής της συνεδρίας. Δοκιμάστε ξανά.",
-      "connectRepositoryToContinue": "Συνδέστε ένα αποθετήριο για να συνεχίσετε.",
       "notEnoughCredits": "Δεν υπάρχουν αρκετά credits για εκτέλεση του Cloud Agent. Προσθέστε credits και δοκιμάστε ξανά.",
       "previousTaskFinishing": "Η προηγούμενη εργασία ολοκληρώνεται ακόμα. Περιμένετε μια στιγμή.",
       "serviceUnavailable": "Η υπηρεσία δεν είναι διαθέσιμη αυτή τη στιγμή. Δοκιμάστε ξανά.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "Δεν υπάρχουν ορατά αποθετήρια. Ελέγξτε την πρόσβαση στα αποθετήρια του GitLab και ανανεώστε.",
       "openBitbucket": "Άνοιγμα Bitbucket",
       "openGitlab": "Άνοιγμα GitLab",
-      "recentlyUsed": "Πρόσφατη χρήση"
+      "recentlyUsed": "Πρόσφατη χρήση",
+      "continueFrom": "Συνέχιση του {{title}}",
+      "importingSession": "Εισαγωγή συνεδρίας",
+      "cliCannotContinue": "Αυτό το CLI δεν μπορεί να συνεχίσει μια συνεδρία. Επιλέξτε Cloud Agent ή άλλο CLI.",
+      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο",

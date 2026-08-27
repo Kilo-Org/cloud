@@ -2119,13 +2119,10 @@
       "scrollToBottom": "ڕاچوون بۆ خوارەوە",
       "emptyTitle": "هێشتا هیچ پەیامێک نییە",
       "renameAccessibility": "ناوگۆڕینی سێشن: {{title}}",
-      "connectRepository": "بەستنی کۆگا",
       "cloningSession": "کۆپیکردنی سێشن",
       "continue": "بەردەوامبوون",
       "couldNotLoadThisSession": "نەتوانرا ئەم سێشنە بار بکرێت",
-      "cloneFailed": "نەتوانرا ئەم سێشنە کۆپی بکرێت.",
       "cloneFailedRetry": "نەتوانرا ئەم سێشنە کۆپی بکرێت. دووبارە هەوڵ بدە.",
-      "connectRepositoryToContinue": "بۆ بەردەوامبوون کۆگایەک ببەستە.",
       "notEnoughCredits": "کرێدیتەکەت بەس نییە بۆ کارکردنی Cloud Agent. کرێدیت زیاد بکە و دووبارە هەوڵ بدەرەوە.",
       "previousTaskFinishing": "ئەرکی پێشوو هێشتا تەواو دەبێت. تکایە کەمێک چاوەڕێ بکە.",
       "serviceUnavailable": "خزمەتگوزارییەکە ئێستا بەردەست نییە. تکایە دووبارە هەوڵ بدەرەوە.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "هیچ ڕیپۆیەک نەبینراوە. دەستگەیشتن بە ڕیپۆکانی GitLab بپشکنە، ئینجا نوێ بکەوە",
       "openBitbucket": "کردنەوەی Bitbucket",
       "openGitlab": "کردنەوەی GitLab",
-      "recentlyUsed": "بەم دواییە بەکارهاتووە"
+      "recentlyUsed": "بەم دواییە بەکارهاتووە",
+      "continueFrom": "بەردەوامبوونی {{title}}",
+      "importingSession": "هاوردەکردنی دانیشتن",
+      "cliCannotContinue": "ئەم CLIـیە ناتوانێت بەردەوام لە دانیشتنێک بێت. Cloud Agent یان CLIـیەکی دیکە هەڵبژێرە.",
+      "importFailed": "نەتوانرا ئەم دانیشتنە هاوردە بکرێت."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} پەڕگە نوێکرایەوە",

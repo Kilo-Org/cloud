@@ -2119,13 +2119,10 @@
       "scrollToBottom": "Rull til bunnen",
       "emptyTitle": "Ingen meldinger ennå",
       "renameAccessibility": "Gi økten nytt navn: {{title}}",
-      "connectRepository": "Koble til repository",
       "cloningSession": "Kloner økt",
       "continue": "Fortsett",
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten",
-      "cloneFailed": "Kunne ikke klone denne økten.",
       "cloneFailedRetry": "Kunne ikke klone denne økten. Prøv igjen.",
-      "connectRepositoryToContinue": "Koble til et repository for å fortsette.",
       "notEnoughCredits": "Ikke nok kreditt til å kjøre Cloud Agent. Legg til kreditt og prøv igjen.",
       "previousTaskFinishing": "Den forrige oppgaven er fortsatt i gang. Vent et øyeblikk.",
       "serviceUnavailable": "Tjenesten er utilgjengelig akkurat nå. Prøv igjen.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "Ingen repositorier synlig. Kontroller tilgangen til GitLab-repositorier, og oppdater deretter.",
       "openBitbucket": "Åpne Bitbucket",
       "openGitlab": "Åpne GitLab",
-      "recentlyUsed": "Nylig brukt"
+      "recentlyUsed": "Nylig brukt",
+      "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",
+      "continueFrom": "Fortsetter {{title}}",
+      "importFailed": "Kunne ikke importere denne økten.",
+      "importingSession": "Importerer økt"
     },
     "partRenderer": {
       "updatedFileCount_one": "Oppdaterte {{displayCount}} fil",

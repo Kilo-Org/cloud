@@ -2134,13 +2134,10 @@
       "scrollToBottom": "Pomakni na dno",
       "emptyTitle": "Još nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
-      "connectRepository": "Poveži repozitorij",
       "cloningSession": "Kloniranje sesije",
       "continue": "Nastavi",
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju",
-      "cloneFailed": "Nije moguće klonirati ovu sesiju.",
       "cloneFailedRetry": "Nije moguće klonirati ovu sesiju. Pokušajte ponovo.",
-      "connectRepositoryToContinue": "Povežite repozitorij za nastavak.",
       "notEnoughCredits": "Nedovoljno kredita za pokretanje Cloud Agent. Dodajte kredite i pokušajte ponovo.",
       "previousTaskFinishing": "Prethodni zadatak se još uvijek završava. Pričekajte trenutak.",
       "serviceUnavailable": "Usluga trenutno nije dostupna. Pokušajte ponovo.",
@@ -2213,7 +2210,11 @@
       "noRepositoriesVisibleGitlab": "Nema vidljivih spremišta. Provjeri pristup spremištima za GitLab, zatim osvježi.",
       "openBitbucket": "Otvori Bitbucket",
       "openGitlab": "Otvori GitLab",
-      "recentlyUsed": "Nedavno korišteno"
+      "recentlyUsed": "Nedavno korišteno",
+      "continueFrom": "Nastavljanje {{title}}",
+      "importingSession": "Uvoz sesije",
+      "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberite Cloud Agent ili drugi CLI.",
+      "importFailed": "Nije moguće uvesti ovu sesiju."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirano {{displayCount}} datoteka",

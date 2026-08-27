@@ -1665,13 +1665,10 @@
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
       "renameAccessibility": "重命名会话：{{title}}",
-      "connectRepository": "连接仓库",
       "cloningSession": "正在克隆会话",
       "continue": "继续",
       "couldNotLoadThisSession": "无法加载此会话",
-      "cloneFailed": "无法克隆此会话。",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
-      "connectRepositoryToContinue": "连接一个仓库以继续。",
       "notEnoughCredits": "运行 Cloud Agent 的积分不足。请添加积分后重试。",
       "previousTaskFinishing": "上一个任务仍在进行中。请稍等片刻。",
       "serviceUnavailable": "服务当前不可用。请重试。",
@@ -1744,7 +1741,11 @@
       "noRepositoriesVisibleGitlab": "没有可见的仓库。请检查 GitLab 的仓库访问权限，然后刷新。",
       "openBitbucket": "打开 Bitbucket",
       "openGitlab": "打开 GitLab",
-      "recentlyUsed": "最近使用"
+      "recentlyUsed": "最近使用",
+      "continueFrom": "正在继续 {{title}}",
+      "importingSession": "正在导入会话",
+      "cliCannotContinue": "此 CLI 无法继续会话。请选择云端代理或其他 CLI。",
+      "importFailed": "无法导入此会话。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件",

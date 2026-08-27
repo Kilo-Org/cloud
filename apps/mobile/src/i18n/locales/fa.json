@@ -2119,13 +2119,10 @@
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
       "renameAccessibility": "تغییر نام نشست: {{title}}",
-      "connectRepository": "اتصال مخزن",
       "cloningSession": "در حال شبیهسازی نشست",
       "continue": "ادامه",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد",
-      "cloneFailed": "شبیهسازی این نشست ممکن نشد.",
       "cloneFailedRetry": "شبیهسازی این نشست ممکن نشد. دوباره تلاش کنید.",
-      "connectRepositoryToContinue": "برای ادامه یک مخزن را وصل کنید.",
       "notEnoughCredits": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
       "previousTaskFinishing": "وظیفه قبلی هنوز در حال پایان است. لطفاً لحظهای صبر کنید.",
       "serviceUnavailable": "سرویس در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن را برای GitLab بررسی کنید، سپس تازه‌سازی کنید.",
       "openBitbucket": "باز کردن Bitbucket",
       "openGitlab": "باز کردن GitLab",
-      "recentlyUsed": "اخیراً استفاده‌شده"
+      "recentlyUsed": "اخیراً استفاده‌شده",
+      "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
+      "continueFrom": "در حال ادامهٔ {{title}}",
+      "importFailed": "وارد کردن این نشست ممکن نشد.",
+      "importingSession": "در حال وارد کردن نشست"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل بهروزرسانی شد",

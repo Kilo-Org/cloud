@@ -2119,13 +2119,10 @@
       "scrollToBottom": "အောက်ခြေသို့ ဆွဲချပါ",
       "emptyTitle": "မက်ဆေ့ခ်ျ မရှိသေးပါ",
       "renameAccessibility": "စက်ရှင်အမည်ပြောင်းပါ- {{title}}",
-      "connectRepository": "သိုလှောင်မှု ချိတ်ဆက်ပါ",
       "cloningSession": "စက်ရှင် ကော်ပီပြုလုပ်နေသည်",
       "continue": "ဆက်လုပ်မည်",
       "couldNotLoadThisSession": "ဤစက်ရှင်ကို မဖွင့်နိုင်ခဲ့ပါ",
-      "cloneFailed": "ဤစက်ရှင်ကို ကော်ပီပြုလုပ်၍မရခဲ့ပါ။",
       "cloneFailedRetry": "ဤစက်ရှင်ကို ကော်ပီပြုလုပ်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
-      "connectRepositoryToContinue": "ဆက်လုပ်ရန် သိုလှောင်မှုတစ်ခု ချိတ်ဆက်ပါ။",
       "notEnoughCredits": "Cloud Agent လည်ပတ်ရန် ခရက်ဒစ် မလုံလောက်ပါ။ ခရက်ဒစ်ထည့်ပြီး ထပ်စမ်းကြည့်ပါ။",
       "previousTaskFinishing": "ယခင်လုပ်ငန်း ပြီးဆုံးနေဆဲဖြစ်သည်။ ခဏ စောင့်ပါ။",
       "serviceUnavailable": "ဝန်ဆောင်မှုသည် ယခုအခါ မရရှိနိုင်ပါ။ ထပ်စမ်းကြည့်ပါ။",
@@ -2198,7 +2195,11 @@
       "noRepositoriesVisibleGitlab": "repository များ မမြင်ရပါ။ GitLab အတွက် repository ဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး၊ ပြန်လည်စတင်ပါ။",
       "openBitbucket": "Bitbucket ဖွင့်ပါ",
       "openGitlab": "GitLab ဖွင့်ပါ",
-      "recentlyUsed": "မကြာသေးမီအသုံးပြုထားသော"
+      "recentlyUsed": "မကြာသေးမီအသုံးပြုထားသော",
+      "continueFrom": "{{title}} ကို ဆက်လုပ်နေသည်",
+      "importingSession": "ဆက်ရှင် တင်သွင်းနေသည်",
+      "cliCannotContinue": "ဤ CLI သည် ဆက်ရှင်ကို ဆက်လုပ်နိုင်မည် မဟုတ်ပါ။ Cloud Agent သို့မဟုတ် အခြား CLI တစ်ခုကို ရွေးပါ။",
+      "importFailed": "ဤဆက်ရှင်ကို တင်သွင်း၍မရပါ။"
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခု မွမ်းမံပြီး",

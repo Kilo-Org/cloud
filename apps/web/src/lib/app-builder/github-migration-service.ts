@@ -228,26 +228,43 @@ export async function migrateProjectToGitHub(
   // 0. Validate ownership (throws NOT_FOUND if project doesn't exist or wrong owner)
   await getProjectWithOwnershipCheck(projectId, owner);
 
-  // 1. Atomically claim this project for migration (prevents concurrent migrations)
-  // Sets migrated_at as a claim — only one concurrent caller can win.
-  // We also require git_repo_full_name IS NULL so that a crashed previous attempt
-  // (migrated_at set but git_repo_full_name never written) doesn't permanently block retries.
+  // 1. Atomically claim this project for migration (prevents concurrent migrations).
+  // Keep the claim after any successful Worker response because the push cannot be rolled back.
+  const claimStartedAt = new Date().toISOString();
   const [project] = await db
     .update(app_builder_projects)
-    .set({ migrated_at: new Date().toISOString() })
+    .set({ migrated_at: claimStartedAt })
     .where(
-      and(eq(app_builder_projects.id, projectId), isNull(app_builder_projects.git_repo_full_name))
+      and(
+        eq(app_builder_projects.id, projectId),
+        isNull(app_builder_projects.migrated_at),
+        isNull(app_builder_projects.git_repo_full_name)
+      )
     )
     .returning();
 
   if (!project) {
+    const currentProject = await getProjectWithOwnershipCheck(projectId, owner);
+    if (
+      currentProject.git_repo_full_name === repoFullName &&
+      (!params.expectedPlatformIntegrationId ||
+        currentProject.git_platform_integration_id === params.expectedPlatformIntegrationId)
+    ) {
+      return {
+        success: true,
+        githubRepoUrl: `https://github.com/${repoFullName}`,
+        newSessionId: currentProject.session_id ?? '',
+      };
+    }
     return { success: false, error: 'already_migrated' };
   }
 
+  let releaseClaimOnFailure = true;
   try {
     // 2. Resolve access authoritatively and migrate on the Worker that performs the Git push.
     let platformIntegrationId: string;
     try {
+      releaseClaimOnFailure = false;
       const migrateResult = await appBuilderClient.migrateToGithub(projectId, {
         githubRepo: repoFullName,
         userId,
@@ -256,6 +273,10 @@ export async function migrateProjectToGitHub(
       });
 
       if (!migrateResult.success) {
+        releaseClaimOnFailure =
+          migrateResult.error === 'token_failed' ||
+          migrateResult.error === 'repo_not_found' ||
+          migrateResult.error === 'repo_not_empty';
         const error =
           migrateResult.error === 'repo_not_found' ||
           migrateResult.error === 'repo_not_empty' ||
@@ -270,26 +291,38 @@ export async function migrateProjectToGitHub(
       throw new MigrationError('push_failed', { cause: error });
     }
 
-    // 3. Update deployment if exists
-    if (project.deployment_id) {
-      await db
-        .update(deployments)
-        .set({
-          source_type: 'github',
-          repository_source: repoFullName,
-          platform_integration_id: platformIntegrationId,
-        })
-        .where(eq(deployments.id, project.deployment_id));
-    }
+    // 3. Commit all database state only if this operation still owns the claim.
+    await db.transaction(async tx => {
+      if (project.deployment_id) {
+        await tx
+          .update(deployments)
+          .set({
+            source_type: 'github',
+            repository_source: repoFullName,
+            platform_integration_id: platformIntegrationId,
+          })
+          .where(eq(deployments.id, project.deployment_id));
+      }
 
-    // 4. Finalize project record (migrated_at already set by the atomic claim)
-    await db
-      .update(app_builder_projects)
-      .set({
-        git_repo_full_name: repoFullName,
-        git_platform_integration_id: platformIntegrationId,
-      })
-      .where(eq(app_builder_projects.id, projectId));
+      const [finalizedProject] = await tx
+        .update(app_builder_projects)
+        .set({
+          git_repo_full_name: repoFullName,
+          git_platform_integration_id: platformIntegrationId,
+        })
+        .where(
+          and(
+            eq(app_builder_projects.id, projectId),
+            eq(app_builder_projects.migrated_at, claimStartedAt),
+            isNull(app_builder_projects.git_repo_full_name)
+          )
+        )
+        .returning({ id: app_builder_projects.id });
+
+      if (!finalizedProject) {
+        throw new Error('GitHub migration claim was lost before finalization');
+      }
+    });
 
     return {
       success: true,
@@ -297,11 +330,18 @@ export async function migrateProjectToGitHub(
       newSessionId: project.session_id ?? '',
     };
   } catch (error) {
-    // Release the migration claim on any failure
-    await db
-      .update(app_builder_projects)
-      .set({ migrated_at: null })
-      .where(eq(app_builder_projects.id, projectId));
+    if (releaseClaimOnFailure) {
+      await db
+        .update(app_builder_projects)
+        .set({ migrated_at: null })
+        .where(
+          and(
+            eq(app_builder_projects.id, projectId),
+            eq(app_builder_projects.migrated_at, claimStartedAt),
+            isNull(app_builder_projects.git_repo_full_name)
+          )
+        );
+    }
 
     if (error instanceof MigrationError) {
       if (error.cause) {

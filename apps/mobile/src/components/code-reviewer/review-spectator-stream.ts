@@ -5,6 +5,7 @@ import {
   type StreamError,
 } from '@kilocode/cloud-agent-sdk';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 
 export type { Connection };
@@ -107,6 +108,7 @@ export async function createReviewSpectatorStream(input: {
     onDisconnected: input.onDisconnected,
     onError: input.onError,
     websocketHeaders: { Origin: WEB_BASE_URL },
+    lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
     onRefreshTicket: async () => {
       const ticket = await postReviewSpectatorStreamTicket(
         input.cloudAgentSessionId,

@@ -5,12 +5,16 @@ import { createReviewSpectatorStream } from './review-spectator-stream';
 const createConnectionMock = vi.hoisted(() => vi.fn());
 const getAuthTokenForRequestMock = vi.hoisted(() => vi.fn());
 const fetchMock = vi.hoisted(() => vi.fn());
+const lifecycleHooksMock = vi.hoisted(() => ({ onVisibilityChange: vi.fn(), onOnline: vi.fn() }));
 
 vi.mock('@kilocode/cloud-agent-sdk', () => ({
   createConnection: createConnectionMock,
 }));
 vi.mock('@/lib/auth/token-owner', () => ({
   getAuthTokenForRequest: getAuthTokenForRequestMock,
+}));
+vi.mock('@/lib/user-web-connection-lifecycle', () => ({
+  createNativeUserWebConnectionLifecycleHooks: () => lifecycleHooksMock,
 }));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
@@ -64,6 +68,7 @@ describe('createReviewSpectatorStream', () => {
       websocketUrl: string;
       ticket: unknown;
       websocketHeaders: Record<string, string>;
+      lifecycleHooks: unknown;
       onRefreshTicket: () => Promise<unknown>;
     };
 
@@ -73,6 +78,8 @@ describe('createReviewSpectatorStream', () => {
     expect(wsUrl.searchParams.get('ticket')).toBeNull();
     expect(config.websocketHeaders).toEqual({ Origin: 'https://web.test' });
     expect(config.ticket).toEqual(ticketResponse);
+    // Without these the stream misses AppState resume and offline-to-online recovery.
+    expect(config.lifecycleHooks).toBe(lifecycleHooksMock);
 
     const refreshed = await config.onRefreshTicket();
     expect(refreshed).toEqual(ticketResponse);

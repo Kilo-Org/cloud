@@ -13,6 +13,8 @@ import { runBot } from '@/lib/bots/core/run-bot';
 import {
   formatGitHubRepositoriesForPrompt,
   getGitHubRepositoryContext,
+  resolveDisplayedGitHubIntegrationId,
+  type GitHubRepositoryContext,
 } from '@/lib/slack-bot/github-repository-context';
 import {
   formatDiscordConversationContextForPrompt,
@@ -175,6 +177,7 @@ async function spawnCloudAgentSession(
   model: string,
   authToken: string,
   ticketUserId: string,
+  githubRepositoryContext: GitHubRepositoryContext,
   requesterInfo?: DiscordRequesterInfo
 ): Promise<{ response: string; sessionId?: string }> {
   console.log(
@@ -189,12 +192,22 @@ async function spawnCloudAgentSession(
   const promptWithSignature = requesterInfo
     ? args.prompt + buildPrSignature(requesterInfo)
     : args.prompt;
+  let githubIntegrationId: string | undefined;
+  try {
+    githubIntegrationId = resolveDisplayedGitHubIntegrationId(
+      githubRepositoryContext,
+      args.githubRepo,
+      args.githubIntegrationId
+    );
+  } catch (error) {
+    return { response: `Error: ${error instanceof Error ? error.message : String(error)}` };
+  }
 
   const result = await runSessionToCompletion({
     client: createCloudAgentNextClient(authToken, { skipBalanceCheck: true }),
     prepareInput: {
       githubRepo: args.githubRepo,
-      githubIntegrationId: args.githubIntegrationId,
+      githubIntegrationId,
       prompt: promptWithSignature,
       mode: args.mode || 'code',
       model,
@@ -339,6 +352,7 @@ export async function processDiscordBotMessage(
         selectedModel,
         authToken,
         authUserId,
+        repoContext,
         requesterInfo
       );
 

@@ -13,6 +13,7 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
 
 let formatGitHubRepositoriesForPrompt: typeof GitHubRepositoryContextModule.formatGitHubRepositoriesForPrompt;
 let getGitHubRepositoryContext: typeof GitHubRepositoryContextModule.getGitHubRepositoryContext;
+let resolveDisplayedGitHubIntegrationId: typeof GitHubRepositoryContextModule.resolveDisplayedGitHubIntegrationId;
 
 function integration(overrides: Partial<PlatformIntegration>): PlatformIntegration {
   return {
@@ -32,8 +33,11 @@ function integration(overrides: Partial<PlatformIntegration>): PlatformIntegrati
 
 describe('GitHub repository context for chat bots', () => {
   beforeAll(async () => {
-    ({ formatGitHubRepositoriesForPrompt, getGitHubRepositoryContext } =
-      await import('./github-repository-context'));
+    ({
+      formatGitHubRepositoriesForPrompt,
+      getGitHubRepositoryContext,
+      resolveDisplayedGitHubIntegrationId,
+    } = await import('./github-repository-context'));
   });
 
   it('shows repositories from every healthy organization installation', async () => {
@@ -89,5 +93,55 @@ describe('GitHub repository context for chat bots', () => {
     expect(context.installations).toEqual([
       expect.objectContaining({ platformIntegrationId: personalIntegration.id }),
     ]);
+  });
+});
+
+describe('displayed GitHub repository identity', () => {
+  const firstId = '123e4567-e89b-12d3-a456-426614174022';
+  const secondId = '123e4567-e89b-12d3-a456-426614174023';
+  const repository = { id: 1, name: 'web', full_name: 'acme/web', private: true };
+
+  it('omits an integration ID when the displayed repository is unique', () => {
+    expect(
+      resolveDisplayedGitHubIntegrationId(
+        {
+          installations: [
+            {
+              platformIntegrationId: firstId,
+              accountLogin: 'acme',
+              repositoryAccess: 'selected',
+              repositoriesSyncedAt: null,
+              repositories: [repository],
+            },
+          ],
+        },
+        'acme/web',
+        firstId
+      )
+    ).toBeUndefined();
+  });
+
+  it('keeps only an ID belonging to a displayed duplicate choice', () => {
+    const context = {
+      installations: [firstId, secondId].map(platformIntegrationId => ({
+        platformIntegrationId,
+        accountLogin: 'acme',
+        repositoryAccess: 'selected',
+        repositoriesSyncedAt: null,
+        repositories: [repository],
+      })),
+    };
+
+    expect(resolveDisplayedGitHubIntegrationId(context, 'acme/web', secondId)).toBe(secondId);
+    expect(() =>
+      resolveDisplayedGitHubIntegrationId(
+        context,
+        'acme/web',
+        '123e4567-e89b-12d3-a456-426614174024'
+      )
+    ).toThrow('does not match a displayed duplicate repository choice');
+    expect(() => resolveDisplayedGitHubIntegrationId(context, 'other/repo', firstId)).toThrow(
+      'does not match a displayed duplicate repository choice'
+    );
   });
 });

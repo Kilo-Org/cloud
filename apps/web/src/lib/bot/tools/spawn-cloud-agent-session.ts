@@ -18,6 +18,10 @@ import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';
+import {
+  getGitHubRepositoryContext,
+  resolveDisplayedGitHubIntegrationId,
+} from '@/lib/slack-bot/github-repository-context';
 import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
@@ -190,6 +194,10 @@ export default async function spawnCloudAgentSession(
       attachments: options?.attachments,
     };
   } else {
+    const githubRepo = args.githubRepo;
+    if (!githubRepo) {
+      return { response: 'Error: You must specify a githubRepo.' };
+    }
     // Cloud Agent resolves organization repository access and persists its canonical identity.
     // Personal sessions keep their existing token path.
     const githubToken = owner.type === 'user' ? await getGitHubTokenForUser(owner.id) : undefined;
@@ -201,9 +209,21 @@ export default async function spawnCloudAgentSession(
       };
     }
 
+    const githubRepositoryContext = await getGitHubRepositoryContext(owner);
+    let githubIntegrationId: string | undefined;
+    try {
+      githubIntegrationId = resolveDisplayedGitHubIntegrationId(
+        githubRepositoryContext,
+        githubRepo,
+        args.githubIntegrationId
+      );
+    } catch (error) {
+      return { response: `Error: ${error instanceof Error ? error.message : String(error)}` };
+    }
+
     prepareInput = {
-      githubRepo: args.githubRepo,
-      githubIntegrationId: args.githubIntegrationId,
+      githubRepo,
+      githubIntegrationId,
       prompt,
       mode,
       model,

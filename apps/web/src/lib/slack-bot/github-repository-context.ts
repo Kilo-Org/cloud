@@ -22,6 +22,30 @@ export type GitHubRepositoryContext = {
   installations: GitHubInstallationRepositoryContext[];
 };
 
+export function resolveDisplayedGitHubIntegrationId(
+  context: GitHubRepositoryContext,
+  repositoryFullName: string,
+  requestedIntegrationId: string | undefined
+): string | undefined {
+  if (!requestedIntegrationId) return undefined;
+
+  const matchingInstallations = context.installations.filter(installation =>
+    installation.repositories?.some(
+      repository => repository.full_name.toLowerCase() === repositoryFullName.toLowerCase()
+    )
+  );
+  const matchingIntegrationIds = new Set(
+    matchingInstallations.map(installation => installation.platformIntegrationId)
+  );
+
+  if (matchingIntegrationIds.size === 1) return undefined;
+  if (matchingIntegrationIds.has(requestedIntegrationId)) return requestedIntegrationId;
+
+  throw new Error(
+    'The selected GitHub integration does not match a displayed duplicate repository choice.'
+  );
+}
+
 type GitHubRepositoryContextLoaders = {
   getIntegrationForOwner: typeof getIntegrationForOwner;
   getIntegrationsByOrganization: typeof getIntegrationsByOrganization;

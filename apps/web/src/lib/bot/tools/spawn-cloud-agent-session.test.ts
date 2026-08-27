@@ -9,6 +9,18 @@ import type {
   getGitLabTokenForUser as GetGitLabTokenForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type SpawnCloudAgentSession from './spawn-cloud-agent-session';
+import type { GitHubRepositoryContext } from '@/lib/slack-bot/github-repository-context';
+
+const mockGetGitHubRepositoryContext =
+  jest.fn<(...args: unknown[]) => Promise<GitHubRepositoryContext>>();
+const mockResolveDisplayedGitHubIntegrationId =
+  jest.fn<
+    (
+      context: GitHubRepositoryContext,
+      repositoryFullName: string,
+      requestedIntegrationId: string | undefined
+    ) => string | undefined
+  >();
 
 jest.mock('@/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'callback-secret',
@@ -24,6 +36,15 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 
 jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
   getGitHubTokenForUser: jest.fn(),
+}));
+
+jest.mock('@/lib/slack-bot/github-repository-context', () => ({
+  getGitHubRepositoryContext: (...args: unknown[]) => mockGetGitHubRepositoryContext(...args),
+  resolveDisplayedGitHubIntegrationId: (
+    context: GitHubRepositoryContext,
+    repositoryFullName: string,
+    requestedIntegrationId: string | undefined
+  ) => mockResolveDisplayedGitHubIntegrationId(context, repositoryFullName, requestedIntegrationId),
 }));
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
@@ -101,9 +122,62 @@ describe('spawnCloudAgentSession delegation', () => {
     });
     mockInitiateFromPreparedSession.mockResolvedValue({});
     mockGetGitHubTokenForUser.mockResolvedValue('github-token');
+    mockResolveDisplayedGitHubIntegrationId.mockImplementation(
+      (_context, _repository, requestedIntegrationId) => requestedIntegrationId
+    );
+    mockGetGitHubRepositoryContext.mockResolvedValue({
+      installations: [
+        {
+          platformIntegrationId: githubIntegrationId,
+          accountLogin: 'owner',
+          repositoryAccess: 'selected',
+          repositoriesSyncedAt: null,
+          repositories: [{ id: 1, name: 'repo', full_name: 'owner/repo', private: true }],
+        },
+        {
+          platformIntegrationId: '123e4567-e89b-12d3-a456-426614174023',
+          accountLogin: 'owner',
+          repositoryAccess: 'selected',
+          repositoriesSyncedAt: null,
+          repositories: [{ id: 1, name: 'repo', full_name: 'owner/repo', private: true }],
+        },
+      ],
+    });
     mockGetGitLabTokenForUser.mockResolvedValue('gitlab-token');
     mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.com');
     mockBuildGitLabCloneUrl.mockReturnValue('https://gitlab.com/group/repo.git');
+  });
+
+  it('omits a supplied integration ID when the displayed repository choice is unique', async () => {
+    mockResolveDisplayedGitHubIntegrationId.mockReturnValueOnce(undefined);
+    mockGetGitHubRepositoryContext.mockResolvedValueOnce({
+      installations: [
+        {
+          platformIntegrationId: githubIntegrationId,
+          accountLogin: 'owner',
+          repositoryAccess: 'selected',
+          repositoriesSyncedAt: null,
+          repositories: [{ id: 1, name: 'repo', full_name: 'owner/repo', private: true }],
+        },
+      ],
+    });
+
+    await spawnCloudAgentSession(
+      {
+        githubRepo: 'owner/repo',
+        githubIntegrationId,
+        prompt: 'Inspect the repository',
+        mode: 'ask',
+      },
+      'model',
+      organizationIntegration,
+      'auth-token',
+      'request-unique'
+    );
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ githubRepo: 'owner/repo', githubIntegrationId: undefined })
+    );
   });
 
   it('delegates GitHub profile resolution while preserving repository and organization context', async () => {

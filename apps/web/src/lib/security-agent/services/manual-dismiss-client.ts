@@ -14,7 +14,6 @@ type SubmitManualFindingDismissalParams = {
   owner: ManualFindingDismissalOwner;
   actor: { id: string; email?: string | null };
   findingId: string;
-  installationId: string;
   reason: DismissReason;
   comment?: string;
   /** Stable per-intent operation key; the Worker reuses the original command on a same-key retry. */
@@ -33,7 +32,6 @@ export async function submitManualFindingDismissal(
       owner: params.owner,
       actor: params.actor,
       findingId: params.findingId,
-      installationId: params.installationId,
       reason: params.reason,
       comment: params.comment,
       ...(params.operationKey !== undefined ? { operationKey: params.operationKey } : {}),

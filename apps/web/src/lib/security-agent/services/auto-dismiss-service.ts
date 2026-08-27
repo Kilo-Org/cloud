@@ -17,7 +17,7 @@ import { captureException } from '@sentry/nextjs';
 import { trackSecurityAgentAutoDismiss } from '../posthog-tracking';
 import { updateSecurityFindingStatus, getSecurityFindingById } from '../db/security-findings';
 import { getSecurityAgentConfig } from '../db/security-config';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import { resolveGitHubIntegrationForRepository } from '@/lib/integrations/db/platform-integrations';
 import { dismissDependabotAlert } from '../github/dependabot-api';
 import type { Owner } from '@/lib/code-reviews/core';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
@@ -207,20 +207,24 @@ export async function writebackDependabotDismissal(
     return;
   }
 
-  const integration = await getIntegrationForOwner(owner, 'github');
-  const installationId = integration?.platform_installation_id;
-  if (!installationId) {
+  const resolution = await resolveGitHubIntegrationForRepository({
+    owner,
+    repositoryFullName: finding.repo_full_name,
+    expectedPlatformIntegrationId: finding.platform_integration_id ?? undefined,
+  });
+  if (!resolution.success || !resolution.integration.platform_installation_id) {
     log('Skipping Dependabot writeback — no GitHub installation ID', { findingId });
     return;
   }
 
   await dismissDependabotAlert(
-    installationId,
+    resolution.integration.platform_installation_id,
     target.repoOwner,
     target.repoName,
     target.alertNumber,
     'not_used',
-    `[Kilo Code auto-dismiss] ${dismissedComment}`
+    `[Kilo Code auto-dismiss] ${dismissedComment}`,
+    resolution.integration.github_app_type ?? 'standard'
   );
 
   log('Wrote back Dependabot dismissal', { findingId, alertNumber: target.alertNumber });

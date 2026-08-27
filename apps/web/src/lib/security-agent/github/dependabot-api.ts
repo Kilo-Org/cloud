@@ -555,9 +555,10 @@ export async function dismissDependabotAlert(
   repo: string,
   alertNumber: number,
   dismissedReason: DependabotDismissReason,
-  dismissedComment?: string
+  dismissedComment?: string,
+  appType: GitHubAppType = 'standard'
 ): Promise<void> {
-  const tokenData = await generateGitHubInstallationToken(installationId);
+  const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
 
   // GitHub API limits dismissed_comment to 280 characters

@@ -1,9 +1,5 @@
 import type { WorkerDb } from '@kilocode/db/client';
-import {
-  platform_integrations,
-  security_findings,
-  type SecurityFinding,
-} from '@kilocode/db/schema';
+import { security_findings, type SecurityFinding } from '@kilocode/db/schema';
 import {
   SecurityAuditLogAction,
   SecurityFindingAuditSourceContext,
@@ -61,33 +57,40 @@ async function writeBackDependabotDismissal(params: {
   db: WorkerDb;
   env: CloudflareEnv;
   finding: SecurityFindingRecord;
+  actorUserId: string;
   comment: string;
 }): Promise<void> {
-  if (params.finding.source !== 'dependabot' || !params.finding.platform_integration_id) {
-    return;
-  }
+  if (params.finding.source !== 'dependabot') return;
+  if (!params.actorUserId) return;
   const target = parseDependabotDismissalTarget({
     sourceId: params.finding.source_id,
     repoFullName: params.finding.repo_full_name,
   });
   if (!target) return;
 
-  const rows = await params.db
-    .select({ installationId: platform_integrations.platform_installation_id })
-    .from(platform_integrations)
-    .where(eq(platform_integrations.id, params.finding.platform_integration_id))
-    .limit(1);
-  const installationId = rows[0]?.installationId;
-  if (!installationId) return;
+  const owner = findingOwner(params.finding);
+  if (!owner) return;
 
   try {
-    const token = await params.env.GIT_TOKEN_SERVICE.getToken(installationId);
+    const tokenResult = await params.env.GIT_TOKEN_SERVICE.getTokenForRepo({
+      githubRepo: params.finding.repo_full_name,
+      userId: params.actorUserId,
+      orgId: owner.type === 'org' ? owner.id : undefined,
+      expectedIntegrationId: params.finding.platform_integration_id ?? undefined,
+    });
+    if (!tokenResult.success) {
+      logger.warn('Dependabot auto-dismiss integration unavailable', {
+        finding_id: params.finding.id,
+        reason: tokenResult.reason,
+      });
+      return;
+    }
     const response = await fetch(
       `https://api.github.com/repos/${target.repoOwner}/${target.repoName}/dependabot/alerts/${target.alertNumber}`,
       {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${tokenResult.token}`,
           Accept: 'application/vnd.github+json',
           'Content-Type': 'application/json',
           'X-GitHub-Api-Version': '2022-11-28',
@@ -217,6 +220,7 @@ export async function maybeAutoDismissCompletedAnalysis(params: {
       db: params.db,
       env: params.env,
       finding: dismissedFinding,
+      actorUserId: params.analysis.triggeredByUserId ?? '',
       comment: sandbox.exploitabilityReasoning,
     });
     return;
@@ -248,6 +252,7 @@ export async function maybeAutoDismissCompletedAnalysis(params: {
     db: params.db,
     env: params.env,
     finding: dismissedFinding,
+    actorUserId: params.analysis.triggeredByUserId ?? '',
     comment: triage.needsSandboxReasoning,
   });
 }

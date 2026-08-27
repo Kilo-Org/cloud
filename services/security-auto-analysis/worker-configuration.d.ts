@@ -37,7 +37,9 @@ declare type GitTokenForRepoResult =
         | 'database_not_configured'
         | 'invalid_repo_format'
         | 'no_installation_found'
-        | 'invalid_org_id';
+        | 'repository_not_installed'
+        | 'invalid_org_id'
+        | 'integration_mismatch';
     };
 
 declare type GitTokenService = {
@@ -45,6 +47,7 @@ declare type GitTokenService = {
     githubRepo: string;
     userId: string;
     orgId?: string;
+    expectedIntegrationId?: string;
   }): Promise<GitTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
 };

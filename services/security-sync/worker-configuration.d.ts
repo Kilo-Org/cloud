@@ -24,6 +24,21 @@ declare type Queue<T> = {
 };
 
 declare type GitTokenService = {
+  getTokenForRepo?(params: {
+    githubRepo: string;
+    userId: string;
+    orgId?: string;
+    expectedIntegrationId?: string;
+  }): Promise<
+    | {
+        success: true;
+        token: string;
+        installationId: string;
+        accountLogin: string;
+        appType: 'standard' | 'lite';
+      }
+    | { success: false; reason: string }
+  >;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
 };
 

@@ -152,6 +152,7 @@ export async function processManualAnalysisStart(params: {
           githubRepo: finding.repo_full_name,
           userId: actor.id,
           orgId: owner.type === 'org' ? owner.id : undefined,
+          expectedIntegrationId: finding.platform_integration_id ?? undefined,
         }),
         getSecurityAgentConfigForOwner(params.db, owner),
         params.env.NEXTAUTH_SECRET.get(),
@@ -192,6 +193,7 @@ export async function processManualAnalysisStart(params: {
       githubRepo: finding.repo_full_name,
       userId: actor.id,
       orgId: owner.type === 'org' ? owner.id : undefined,
+      expectedIntegrationId: finding.platform_integration_id ?? undefined,
     });
     if (!tokenResult.success) {
       await transitionManualAnalysisQueueFromStart(params.db, {

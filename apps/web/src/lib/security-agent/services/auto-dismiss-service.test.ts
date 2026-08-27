@@ -25,8 +25,8 @@ const mockUpdateSecurityFindingStatus = jest.fn() as jest.MockedFunction<
 const mockGetSecurityAgentConfig = jest.fn() as jest.MockedFunction<
   typeof securityConfigModule.getSecurityAgentConfig
 >;
-const mockGetIntegrationForOwner = jest.fn() as jest.MockedFunction<
-  typeof platformIntegrationsModule.getIntegrationForOwner
+const mockResolveGitHubIntegrationForRepository = jest.fn() as jest.MockedFunction<
+  typeof platformIntegrationsModule.resolveGitHubIntegrationForRepository
 >;
 const mockDismissDependabotAlert = jest.fn() as jest.MockedFunction<
   typeof dependabotApiModule.dismissDependabotAlert
@@ -49,7 +49,7 @@ jest.mock('@/lib/security-agent/db/security-config', () => ({
 }));
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  getIntegrationForOwner: mockGetIntegrationForOwner,
+  resolveGitHubIntegrationForRepository: mockResolveGitHubIntegrationForRepository,
 }));
 
 jest.mock('@/lib/security-agent/github/dependabot-api', () => ({
@@ -173,8 +173,12 @@ function makeFinding(overrides: Partial<SecurityFinding> = {}): SecurityFinding 
 
 function makeIntegration(installationId: string) {
   return {
-    platform_installation_id: installationId,
-  } as NonNullable<Awaited<ReturnType<typeof platformIntegrationsModule.getIntegrationForOwner>>>;
+    success: true as const,
+    integration: {
+      platform_installation_id: installationId,
+      github_app_type: 'lite' as const,
+    },
+  } as Awaited<ReturnType<typeof platformIntegrationsModule.resolveGitHubIntegrationForRepository>>;
 }
 
 const userOwner = { type: 'user' as const, id: 'user-1', userId: 'user-1' };
@@ -192,19 +196,48 @@ beforeEach(() => {
 describe('writebackDependabotDismissal', () => {
   it('dismisses a Dependabot alert on GitHub', async () => {
     mockGetSecurityFindingById.mockResolvedValue(makeFinding());
-    mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
+    mockResolveGitHubIntegrationForRepository.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
 
     await writebackDependabotDismissal('finding-1', userOwner, 'Not exploitable');
 
+    expect(mockResolveGitHubIntegrationForRepository).toHaveBeenCalledWith({
+      owner: userOwner,
+      repositoryFullName: 'acme/repo',
+      expectedPlatformIntegrationId: 'integration-1',
+    });
     expect(mockDismissDependabotAlert).toHaveBeenCalledWith(
       'inst-123',
       'acme',
       'repo',
       42,
       'not_used',
-      '[Kilo Code auto-dismiss] Not exploitable'
+      '[Kilo Code auto-dismiss] Not exploitable',
+      'lite'
     );
+  });
+
+  it('uses unique repository fallback for legacy findings only', async () => {
+    mockGetSecurityFindingById.mockResolvedValue(makeFinding({ platform_integration_id: null }));
+    mockResolveGitHubIntegrationForRepository.mockResolvedValue(makeIntegration('legacy-inst'));
+
+    await writebackDependabotDismissal('finding-1', userOwner, 'Legacy finding');
+
+    expect(mockResolveGitHubIntegrationForRepository).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedPlatformIntegrationId: undefined })
+    );
+  });
+
+  it('fails closed when the pinned integration is unavailable', async () => {
+    mockGetSecurityFindingById.mockResolvedValue(makeFinding());
+    mockResolveGitHubIntegrationForRepository.mockResolvedValue({
+      success: false,
+      reason: 'no_installation_found',
+    });
+
+    await writebackDependabotDismissal('finding-1', userOwner, 'Not exploitable');
+
+    expect(mockDismissDependabotAlert).not.toHaveBeenCalled();
   });
 
   it('skips non-dependabot findings', async () => {
@@ -233,7 +266,7 @@ describe('writebackDependabotDismissal', () => {
 
   it('skips partially numeric Dependabot alert IDs', async () => {
     mockGetSecurityFindingById.mockResolvedValue(makeFinding({ source_id: '42junk' }));
-    mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
+    mockResolveGitHubIntegrationForRepository.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
 
     await writebackDependabotDismissal('finding-1', userOwner, 'reason');
@@ -253,7 +286,7 @@ describe('writebackDependabotDismissal', () => {
     mockGetSecurityFindingById.mockResolvedValue(
       makeFinding({ repo_full_name: 'acme/repo/extra' })
     );
-    mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
+    mockResolveGitHubIntegrationForRepository.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
 
     await writebackDependabotDismissal('finding-1', userOwner, 'reason');
@@ -263,9 +296,10 @@ describe('writebackDependabotDismissal', () => {
 
   it('skips when no GitHub installation ID is available', async () => {
     mockGetSecurityFindingById.mockResolvedValue(makeFinding());
-    mockGetIntegrationForOwner.mockResolvedValue(
-      makeIntegration(undefined as unknown as string) // simulate missing installation ID
-    );
+    mockResolveGitHubIntegrationForRepository.mockResolvedValue({
+      success: false,
+      reason: 'no_installation_found',
+    });
 
     await writebackDependabotDismissal('finding-1', userOwner, 'reason');
 
@@ -308,7 +342,7 @@ describe('maybeAutoDismissAnalysis', () => {
       auto_dismiss_confidence_threshold: 'high',
     } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
     mockGetSecurityFindingById.mockResolvedValue(makeFinding());
-    mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
+    mockResolveGitHubIntegrationForRepository.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
     mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
 
@@ -326,7 +360,8 @@ describe('maybeAutoDismissAnalysis', () => {
       'repo',
       42,
       'not_used',
-      expect.stringContaining('[Kilo Code auto-dismiss]')
+      expect.stringContaining('[Kilo Code auto-dismiss]'),
+      'lite'
     );
   });
 
@@ -336,7 +371,7 @@ describe('maybeAutoDismissAnalysis', () => {
       auto_dismiss_confidence_threshold: 'high',
     } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
     mockGetSecurityFindingById.mockResolvedValue(makeFinding());
-    mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
+    mockResolveGitHubIntegrationForRepository.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockResolvedValue(undefined);
     mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
 
@@ -354,7 +389,8 @@ describe('maybeAutoDismissAnalysis', () => {
       'repo',
       42,
       'not_used',
-      expect.stringContaining('[Kilo Code auto-dismiss]')
+      expect.stringContaining('[Kilo Code auto-dismiss]'),
+      'lite'
     );
   });
 
@@ -439,7 +475,7 @@ describe('maybeAutoDismissAnalysis', () => {
       auto_dismiss_confidence_threshold: 'high',
     } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
     mockGetSecurityFindingById.mockResolvedValue(makeFinding());
-    mockGetIntegrationForOwner.mockResolvedValue(makeIntegration('inst-123'));
+    mockResolveGitHubIntegrationForRepository.mockResolvedValue(makeIntegration('inst-123'));
     mockDismissDependabotAlert.mockRejectedValue(new Error('GitHub API error'));
     mockUpdateSecurityFindingStatus.mockResolvedValue(undefined);
 
@@ -481,7 +517,10 @@ describe('maybeAutoDismissAnalysis', () => {
         auto_dismiss_confidence_threshold: 'high',
       } as Awaited<ReturnType<typeof securityConfigModule.getSecurityAgentConfig>>);
       mockGetSecurityFindingById.mockResolvedValue(makeFinding());
-      mockGetIntegrationForOwner.mockResolvedValue(makeIntegration(undefined as unknown as string));
+      mockResolveGitHubIntegrationForRepository.mockResolvedValue({
+        success: false,
+        reason: 'no_installation_found',
+      });
 
       await expect(
         autoDismissEligibleFindings(

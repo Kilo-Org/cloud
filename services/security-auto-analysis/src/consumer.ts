@@ -220,11 +220,13 @@ async function resolveGitHubToken(params: {
   owner: QueueOwner;
   actorUserId: string;
   githubRepo: string;
+  expectedIntegrationId?: string;
 }): Promise<string | undefined> {
   const lookup = await params.env.GIT_TOKEN_SERVICE.getTokenForRepo({
     githubRepo: params.githubRepo,
     userId: params.actorUserId,
     orgId: params.owner.type === 'org' ? params.owner.id : undefined,
+    expectedIntegrationId: params.expectedIntegrationId,
   });
 
   if (!lookup.success) {
@@ -403,6 +405,7 @@ async function processOwnerMessage(params: {
           owner: launchOwner,
           actorUserId: actorResolution.user.id,
           githubRepo: finding.repo_full_name,
+          expectedIntegrationId: finding.platform_integration_id ?? undefined,
         });
       } catch (error) {
         await markQueuePendingState({

@@ -41,6 +41,8 @@ const ExactManagedInstallationLookupResultSchema = ManagedInstallationLookupResu
   id: z.string().uuid(),
   integration_status: z.string(),
   owned_by_user_id: z.string().nullable(),
+  suspended_at: z.string().nullable().optional(),
+  auth_invalid_at: z.string().nullable().optional(),
 });
 
 const MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES = 10;
@@ -112,14 +114,19 @@ function buildAuthorizedInstallationsQuery(
   const exactIntegrationOwner =
     params.expectedIntegrationId === undefined
       ? undefined
-      : params.orgId === undefined
-        ? sql`false`
-        : and(
-            eq(platform_integrations.id, params.expectedIntegrationId),
-            eq(platform_integrations.owned_by_organization_id, params.orgId),
-            isNull(platform_integrations.owned_by_user_id),
-            isNotNull(organization_memberships.id)
-          );
+      : and(
+          eq(platform_integrations.id, params.expectedIntegrationId),
+          params.orgId === undefined
+            ? and(
+                eq(platform_integrations.owned_by_user_id, params.userId),
+                isNull(platform_integrations.owned_by_organization_id)
+              )
+            : and(
+                eq(platform_integrations.owned_by_organization_id, params.orgId),
+                isNull(platform_integrations.owned_by_user_id),
+                isNotNull(organization_memberships.id)
+              )
+        );
   const legacyAuthorizedOwner =
     params.expectedIntegrationId === undefined
       ? or(
@@ -142,6 +149,8 @@ function buildAuthorizedInstallationsQuery(
       platform_account_login: platform_integrations.platform_account_login,
       github_app_type: platform_integrations.github_app_type,
       integration_status: platform_integrations.integration_status,
+      suspended_at: platform_integrations.suspended_at,
+      auth_invalid_at: platform_integrations.auth_invalid_at,
       owned_by_organization_id: platform_integrations.owned_by_organization_id,
       owned_by_user_id: platform_integrations.owned_by_user_id,
       repository_access: platform_integrations.repository_access,
@@ -168,6 +177,8 @@ function buildAuthorizedInstallationsQuery(
         eq(platform_integrations.platform, 'github'),
         eq(platform_integrations.integration_type, 'app'),
         eq(platform_integrations.integration_status, 'active'),
+        isNull(platform_integrations.suspended_at),
+        isNull(platform_integrations.auth_invalid_at),
         accountLoginFilter,
         isNotNull(platform_integrations.platform_installation_id),
         requestedOrganizationMembership,
@@ -228,8 +239,7 @@ export class InstallationLookupService {
 
     if (
       params.expectedIntegrationId !== undefined &&
-      (params.orgId === undefined ||
-        !z.string().uuid().safeParse(params.expectedIntegrationId).success)
+      !z.string().uuid().safeParse(params.expectedIntegrationId).success
     ) {
       return { success: false, reason: 'integration_mismatch' };
     }
@@ -400,8 +410,12 @@ export class InstallationLookupService {
     if (
       selected.id !== params.expectedIntegrationId ||
       selected.integration_status !== 'active' ||
-      selected.owned_by_organization_id !== params.orgId ||
-      selected.owned_by_user_id !== null ||
+      selected.suspended_at != null ||
+      selected.auth_invalid_at != null ||
+      (params.orgId === undefined
+        ? selected.owned_by_user_id !== params.userId || selected.owned_by_organization_id !== null
+        : selected.owned_by_organization_id !== params.orgId ||
+          selected.owned_by_user_id !== null) ||
       selected.platform_account_login?.toLowerCase() !==
         params.githubRepo.split('/')[0]?.toLowerCase()
     ) {

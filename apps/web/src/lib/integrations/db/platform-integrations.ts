@@ -94,7 +94,7 @@ export async function getPrimaryGitHubIntegrationForOrganization(organizationId:
   return integration ?? null;
 }
 
-export type OrganizationGitHubIntegrationResolution =
+export type GitHubIntegrationResolution =
   | { success: true; integration: PlatformIntegration }
   | { success: false; reason: 'no_installation_found' | 'ambiguous_installation' };
 
@@ -106,20 +106,41 @@ export async function resolveOrganizationGitHubIntegrationForRepository(input: {
   organizationId: string;
   repositoryFullName: string;
   expectedPlatformIntegrationId?: string;
-}): Promise<OrganizationGitHubIntegrationResolution> {
+}): Promise<GitHubIntegrationResolution> {
+  return resolveGitHubIntegrationForRepository({
+    owner: { type: 'org', id: input.organizationId },
+    repositoryFullName: input.repositoryFullName,
+    expectedPlatformIntegrationId: input.expectedPlatformIntegrationId,
+  });
+}
+
+export async function resolveGitHubIntegrationForRepository(input: {
+  owner: Owner;
+  repositoryFullName: string;
+  expectedPlatformIntegrationId?: string;
+}): Promise<GitHubIntegrationResolution> {
   const repositoryParts = input.repositoryFullName.split('/');
   if (repositoryParts.length !== 2 || repositoryParts.some(part => part.length === 0)) {
     return { success: false, reason: 'no_installation_found' };
   }
   const [repositoryOwner] = repositoryParts;
 
+  const ownershipCondition =
+    input.owner.type === 'org'
+      ? and(
+          eq(platform_integrations.owned_by_organization_id, input.owner.id),
+          isNull(platform_integrations.owned_by_user_id)
+        )
+      : and(
+          eq(platform_integrations.owned_by_user_id, input.owner.id),
+          isNull(platform_integrations.owned_by_organization_id)
+        );
   const integrations = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
-        eq(platform_integrations.owned_by_organization_id, input.organizationId),
-        isNull(platform_integrations.owned_by_user_id),
+        ownershipCondition,
         eq(platform_integrations.platform, PLATFORM.GITHUB),
         eq(platform_integrations.integration_type, 'app'),
         isNotNull(platform_integrations.platform_installation_id),

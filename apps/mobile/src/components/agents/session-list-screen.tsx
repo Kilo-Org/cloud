@@ -26,6 +26,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useOrganization } from '@/lib/organization-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getRevisionSnapshot } from '@/lib/session-attention';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 
@@ -69,6 +70,20 @@ export function AgentSessionListScreen() {
 
   const listRef = useRef<FlatList<ActiveSession>>(null);
   useScrollToTop(listRef);
+
+  // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
+  // is pushed the live Agents list is frozen. On return, each row re-reads the
+  // ack store via its own `useSyncExternalStore` subscription
+  // (`useSessionAttentionRevision`). Snapshot the attention revision when the
+  // tab (re)gains focus via `useFocusEffect` (fires after unfreeze) and pass
+  // it as `extraData` so visible cells re-render without remounting the list —
+  // preserving scroll.
+  const [attentionFocusRevision, setAttentionFocusRevision] = useState(getRevisionSnapshot);
+  useFocusEffect(
+    useCallback(() => {
+      setAttentionFocusRevision(getRevisionSnapshot());
+    }, [])
+  );
 
   // App-foreground refresh for the live Agents list. The live query keeps its
   // own poll interval; an OS foreground transition re-reads focus live via
@@ -205,6 +220,7 @@ export function AgentSessionListScreen() {
         data={activeSessions}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
+        extraData={attentionFocusRevision}
         contentContainerStyle={listPadding}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}

@@ -28,8 +28,8 @@ const appState = vi.hoisted(() => {
 });
 
 const focusState = vi.hoisted(() => ({ current: true as boolean }));
-const focusCallback = vi.hoisted(() => ({
-  current: undefined as (() => void) | undefined,
+const focusCallbacks = vi.hoisted(() => ({
+  current: [] as (() => void)[],
 }));
 const refetchSpy = vi.hoisted(() => vi.fn());
 const routerPushSpy = vi.hoisted(() => vi.fn());
@@ -66,7 +66,7 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => focusState.current }),
   useFocusEffect: (effect: () => void) => {
-    focusCallback.current = effect;
+    focusCallbacks.current.push(effect);
   },
   useRouter: () => ({ push: routerPushSpy, dismissTo: routerDismissToSpy }),
   useScrollToTop: () => undefined,
@@ -179,11 +179,17 @@ function findTypeCount(renderer: MountedRenderer, type: string): number {
   return renderer.root.findAll(node => typeof node.type === 'string' && node.type === type).length;
 }
 
+function fireFocus(): void {
+  for (const effect of focusCallbacks.current) {
+    effect();
+  }
+}
+
 describe('AgentSessionListScreen live tab', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     focusState.current = true;
-    focusCallback.current = undefined;
+    focusCallbacks.current = [];
     orgState.organizationId = null;
     orgState.isLoaded = true;
     sessionListState.activeSessions = [];
@@ -372,6 +378,17 @@ describe('AgentSessionListScreen live tab', () => {
     expect(list.props.data).toHaveLength(1);
   });
 
+  it('passes a numeric attention revision as extraData to the live FlatList', async () => {
+    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
+
+    const renderer = await renderScreen();
+
+    const list = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
+    );
+    expect(typeof list.props.extraData).toBe('number');
+  });
+
   it('announces a refresh failure once on a failed pull with cached rows', async () => {
     sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
     refetchSpy.mockResolvedValue(false);
@@ -421,7 +438,7 @@ describe('AgentSessionListScreen live tab', () => {
     await renderScreen();
 
     act(() => {
-      focusCallback.current?.();
+      fireFocus();
     });
     expect(refetchSpy).toHaveBeenCalledTimes(1);
   });
@@ -430,7 +447,7 @@ describe('AgentSessionListScreen live tab', () => {
     await renderScreen();
 
     act(() => {
-      focusCallback.current?.();
+      fireFocus();
     });
     expect(refetchSpy).toHaveBeenCalledTimes(1);
 
@@ -464,7 +481,7 @@ describe('AgentSessionListScreen live tab', () => {
     await renderScreen();
 
     act(() => {
-      focusCallback.current?.();
+      fireFocus();
     });
     expect(refetchSpy).toHaveBeenCalledTimes(1);
 

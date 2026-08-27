@@ -2191,6 +2191,17 @@
       "hostConfirmMessage": "Questo link apre {{host}} nel tuo browser.",
       "open": "Apri",
       "trustThisHost": "Considera attendibile questo host"
+    },
+    "folderPicker": {
+      "accessibility": "Cartella: {{label}}",
+      "emptyDescription": "Fatto usa questa cartella.",
+      "emptyTitle": "Nessuna cartella all'interno",
+      "fieldLabel": "Cartella",
+      "retryableDescription": "Controlla la connessione e Riprova. Fatto conferma comunque questa cartella.",
+      "retryableTitle": "Impossibile elencare le cartelle",
+      "tapToListHint": "Tocca una cartella per elencarne i contenuti",
+      "unsupportedDescription": "Questa CLI non può elencare le cartelle. Fatto mantiene la cartella di avvio e Avvia sessione inizia lì.",
+      "unsupportedTitle": "Impossibile elencare le cartelle"
     }
   },
   "bootstrap": {

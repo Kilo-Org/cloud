@@ -2688,6 +2688,17 @@
       "hostConfirmMessage": "Tento odkaz otvorí {{host}} vo vašom prehliadači.",
       "open": "Otvoriť",
       "trustThisHost": "Dôverovať tomuto hostiteľovi"
+    },
+    "folderPicker": {
+      "accessibility": "Priečinok: {{label}}",
+      "emptyDescription": "Hotovo používa tento priečinok.",
+      "emptyTitle": "Vnútri nie sú žiadne priečinky",
+      "fieldLabel": "Priečinok",
+      "retryableDescription": "Skontrolujte pripojenie a skúste to znova. Hotovo stále potvrdí tento priečinok.",
+      "retryableTitle": "Nepodarilo sa zobraziť priečinky",
+      "tapToListHint": "Klepnutím na priečinok zobrazíte jeho obsah",
+      "unsupportedDescription": "Toto CLI nedokáže zobraziť priečinky. Hotovo ponechá priečinok spustenia a Spustiť sedenie začne tam.",
+      "unsupportedTitle": "Priečinky sa nedajú zobraziť"
     }
   },
   "bootstrap": {

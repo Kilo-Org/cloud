@@ -3,6 +3,7 @@ import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { InstanceSelector } from '@/components/agents/instance-selector';
+import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import {
@@ -61,6 +62,9 @@ type NewSessionConfigureFormProps = {
   isLoadingInstances: boolean;
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   showInstanceDisconnectedNote: boolean;
+  // Launch folder (remote CLI only). `""` means the launch directory.
+  folderPath: string;
+  onChangeFolderPath: (path: string) => void;
   /** Continue-form inline reason shown under "Run on" (e.g. an incapable CLI or a failed clone/import). */
   runOnInlineNote?: string | null;
   /** True for the Continue clone entry: hides Changes and Environment. */
@@ -125,6 +129,8 @@ export function NewSessionConfigureForm({
   isLoadingInstances,
   onChangeRunOnInstance,
   showInstanceDisconnectedNote,
+  folderPath,
+  onChangeFolderPath,
   runOnInlineNote,
   isCloneEntry = false,
   groups,
@@ -184,51 +190,50 @@ export function NewSessionConfigureForm({
     if (isProfileLoading) {
       return null;
     }
-    if (isProfileError) {
-      return (
-        <View className="mt-5">
-          <Text className="mb-2 text-sm font-medium text-muted-foreground">
-            {t('agentChat.newSession.environment')}
-          </Text>
-          <View className="flex-row items-center gap-2">
-            <Text className="text-sm text-destructive">
-              {t('agentChat.newSession.couldNotLoadEnvironment')}
-            </Text>
-            <Button
-              variant="link"
-              size="sm"
-              onPress={onRetryProfile}
-              accessibilityLabel={t('agentChat.newSession.retryLoadingEnvironment')}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          </View>
-        </View>
-      );
-    }
     return (
       <View className="mt-5">
         <Text className="mb-2 text-sm font-medium text-muted-foreground">
           {t('agentChat.newSession.environment')}
         </Text>
-        {profile ? (
-          <View className="gap-1">
-            <Text className="text-sm font-semibold text-foreground">{profile.name}</Text>
-            <Text className="text-sm text-muted-foreground">
-              {t('agentChat.newSession.environmentSummary', {
-                commands: profile.commandCount,
-                mcp: profile.mcpServerCount,
-                skills: profile.skillCount,
-                agents: profile.agentCount,
-              })}
-            </Text>
-          </View>
-        ) : (
-          <Text className="text-sm text-foreground">
-            {t('agentChat.newSession.defaultEnvironment')}
-          </Text>
-        )}
+        {renderProfileBody()}
       </View>
+    );
+  }
+
+  function renderProfileBody(): ReactNode {
+    if (isProfileError) {
+      return (
+        <View className="flex-row items-center gap-2">
+          <Text className="text-sm text-destructive">
+            {t('agentChat.newSession.couldNotLoadEnvironment')}
+          </Text>
+          <Button
+            variant="link"
+            size="sm"
+            onPress={onRetryProfile}
+            accessibilityLabel={t('agentChat.newSession.retryLoadingEnvironment')}
+          >
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        </View>
+      );
+    }
+    return profile ? (
+      <View className="gap-1">
+        <Text className="text-sm font-semibold text-foreground">{profile.name}</Text>
+        <Text className="text-sm text-muted-foreground">
+          {t('agentChat.newSession.environmentSummary', {
+            commands: profile.commandCount,
+            mcp: profile.mcpServerCount,
+            skills: profile.skillCount,
+            agents: profile.agentCount,
+          })}
+        </Text>
+      </View>
+    ) : (
+      <Text className="text-sm text-foreground">
+        {t('agentChat.newSession.defaultEnvironment')}
+      </Text>
     );
   }
 
@@ -267,6 +272,15 @@ export function NewSessionConfigureForm({
       />
 
       {runTargetBlock}
+
+      {isRemote ? (
+        <LaunchFolderField
+          folderPath={folderPath}
+          runOnInstance={runOnInstance}
+          onChangeFolderPath={onChangeFolderPath}
+          disabled={isStarting}
+        />
+      ) : null}
 
       <Text className="mt-2 text-xs text-muted-foreground">
         {t('agentChat.newSession.remoteHint')}

@@ -2256,6 +2256,17 @@
       "instanceOnProjectSuffix": "{{name}} on {{project}} ({{suffix}})",
       "runOnCloudAgent": "Run on Cloud Agent"
     },
+    "folderPicker": {
+      "fieldLabel": "Folder",
+      "accessibility": "Folder: {{label}}",
+      "tapToListHint": "Tap a folder to list its contents",
+      "emptyTitle": "No folders inside",
+      "emptyDescription": "Done uses this folder.",
+      "retryableTitle": "Couldn't list folders",
+      "retryableDescription": "Check your connection and Retry. Done still confirms this folder.",
+      "unsupportedTitle": "Can't list folders",
+      "unsupportedDescription": "This CLI can't list folders. Done keeps the launch folder and Start session starts there."
+    },
     "modePicker": {
       "title": "Select mode",
       "modeLabel": "{{label}}: {{description}}",

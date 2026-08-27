@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Linkkani wuxuu ku furaa {{host}} browser-kaaga.",
       "open": "Fur",
       "trustThisHost": "Amin ku qaado host-kan"
+    },
+    "folderPicker": {
+      "accessibility": "Galloos: {{label}}",
+      "emptyDescription": "Waa la dhammeeyay wuxuu isticmaalaa gallooskan.",
+      "emptyTitle": "Galloosyo gudaha kuma jiraan",
+      "fieldLabel": "Galloos",
+      "retryableDescription": "Hubi xiriirkaaga oo mar kale isku day. Waa la dhammeeyay wuxuu weli xaqiijiyaa gallooskan.",
+      "retryableTitle": "Galloosyada lama liixin karin",
+      "tapToListHint": "Taabo galloos si aad u liixatid waxa ku jira",
+      "unsupportedDescription": "CLI-kan liixin ma karo galloosyada. Waa la dhammeeyay wuxuu hayaa gallooskii laga bilaabay, Bilow kalfadhiga ayaana halkaas ka bilaabma.",
+      "unsupportedTitle": "Galloosyada lama liixin karo"
     }
   },
   "bootstrap": {

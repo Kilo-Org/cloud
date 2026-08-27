@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "دا لینک ستاسو په براوزر کې {{host}} خلاصوي.",
       "open": "خلاص کړئ",
       "trustThisHost": "دې هوسټ باور وکړئ"
+    },
+    "folderPicker": {
+      "accessibility": "فولډر: {{label}}",
+      "emptyDescription": "ترسره شو دا فولډر کاروي.",
+      "emptyTitle": "دننه هېڅ فولډر نشته",
+      "fieldLabel": "فولډر",
+      "retryableDescription": "خپله اړیکه وګورئ او بیا هڅه وکړئ. ترسره شو بیا هم دا فولډر تاییدوي.",
+      "retryableTitle": "فولډرونه نه شو لېست کولای",
+      "tapToListHint": "د منځپانګې د لېست لپاره یو فولډر ټایپ کړئ",
+      "unsupportedDescription": "دا CLI فولډرونه نه شي لېست کولای. ترسره شو د پیل فولډر ساتي او ناسته پیل کړئ هلته پیلېږي.",
+      "unsupportedTitle": "فولډرونه نه شي لېست کېدلای"
     }
   },
   "bootstrap": {

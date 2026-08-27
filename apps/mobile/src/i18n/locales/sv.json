@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Den här länken öppnar {{host}} i din webbläsare.",
       "open": "Öppna",
       "trustThisHost": "Lita på den här värden"
+    },
+    "folderPicker": {
+      "accessibility": "Mapp: {{label}}",
+      "emptyDescription": "Klar använder den här mappen.",
+      "emptyTitle": "Inga mappar inuti",
+      "fieldLabel": "Mapp",
+      "retryableDescription": "Kontrollera anslutningen och försök igen. Klar bekräftar fortfarande den här mappen.",
+      "retryableTitle": "Det gick inte att lista mappar",
+      "tapToListHint": "Tryck på en mapp för att lista dess innehåll",
+      "unsupportedDescription": "Den här CLI:n kan inte lista mappar. Klar behåller startmappen och Starta session startar där.",
+      "unsupportedTitle": "Kan inte lista mappar"
     }
   },
   "bootstrap": {

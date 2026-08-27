@@ -2220,6 +2220,17 @@
       "hostConfirmMessage": "Ten link otwiera {{host}} w Twojej przeglądarce.",
       "open": "Otwórz",
       "trustThisHost": "Zaufaj temu hostowi"
+    },
+    "folderPicker": {
+      "accessibility": "Folder: {{label}}",
+      "emptyDescription": "Gotowe używa tego folderu.",
+      "emptyTitle": "Brak folderów w środku",
+      "fieldLabel": "Folder",
+      "retryableDescription": "Sprawdź połączenie i spróbuj ponownie. Gotowe nadal potwierdza ten folder.",
+      "retryableTitle": "Nie można wyświetlić folderów",
+      "tapToListHint": "Kliknij folder, aby wyświetlić jego zawartość",
+      "unsupportedDescription": "To CLI nie może wyświetlić folderów. Gotowe zachowuje folder uruchomienia, a Rozpocznij sesję zaczyna tam.",
+      "unsupportedTitle": "Nie można wyświetlić folderów"
     }
   },
   "bootstrap": {

@@ -2668,6 +2668,17 @@
       "hostConfirmMessage": "Ova veza otvara {{host}} u vašem pregledniku.",
       "open": "Otvori",
       "trustThisHost": "Vjeruj ovom poslužitelju"
+    },
+    "folderPicker": {
+      "accessibility": "Mapa: {{label}}",
+      "emptyDescription": "Gotovo koristi ovu mapu.",
+      "emptyTitle": "Unutra nema mapa",
+      "fieldLabel": "Mapa",
+      "retryableDescription": "Provjerite vezu i pokušajte ponovno. Gotovo i dalje potvrđuje ovu mapu.",
+      "retryableTitle": "Nije moguće prikazati mape",
+      "tapToListHint": "Dodirnite mapu za prikaz njezinog sadržaja",
+      "unsupportedDescription": "Ovaj CLI ne može prikazati mape. Gotovo zadržava mapu pokretanja, a Započni sesiju tamo započinje.",
+      "unsupportedTitle": "Nije moguće prikazati mape"
     }
   },
   "bootstrap": {

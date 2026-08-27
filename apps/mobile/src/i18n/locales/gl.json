@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Esta ligazón abre {{host}} no teu navegador.",
       "open": "Abrir",
       "trustThisHost": "Confiar neste servidor"
+    },
+    "folderPicker": {
+      "accessibility": "Cartafol: {{label}}",
+      "emptyDescription": "Feito usa este cartafol.",
+      "emptyTitle": "Non hai cartafoles dentro",
+      "fieldLabel": "Cartafol",
+      "retryableDescription": "Comproba a túa conexión e Reintentar. Feito aínda confirma este cartafol.",
+      "retryableTitle": "Non se puideron listar os cartafoles",
+      "tapToListHint": "Toca un cartafol para ver o seu contido",
+      "unsupportedDescription": "Este CLI non pode listar cartafoles. Feito mantén o cartafol de inicio e Iniciar sesión comeza alí.",
+      "unsupportedTitle": "Non se poden listar os cartafoles"
     }
   },
   "bootstrap": {

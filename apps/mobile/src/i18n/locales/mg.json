@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Ity rohy ity dia manokatra ny {{host}} ao amin'ny navigateur-nao.",
       "open": "Sokafy",
       "trustThisHost": "Iokano ity mpisakafoana ity"
+    },
+    "folderPicker": {
+      "fieldLabel": "Sosona",
+      "accessibility": "Sosona: {{label}}",
+      "tapToListHint": "Tsindrio ny sosona iray hahitana ny ao anatiny",
+      "emptyTitle": "Tsy misy sosona ao anatiny",
+      "emptyDescription": "Vita no mampiasa ity sosona ity.",
+      "retryableTitle": "Tsy afaka nitanisa sosona",
+      "retryableDescription": "Jereo ny fifandraisanao ary Andramana indray. Vita mbola manamarina ity sosona ity.",
+      "unsupportedTitle": "Tsy afaka mitanisa sosona",
+      "unsupportedDescription": "Ity CLI ity tsy afaka mitanisa sosona. Vita mitahiry ny sosona fanombohana, ary Atombohy ny session no manomboka any."
     }
   },
   "bootstrap": {

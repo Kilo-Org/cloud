@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "ይህ አገናኝ {{host}} በአሳሽዎ ይከፍታል።",
       "open": "ክፈት",
       "trustThisHost": "ይህን አስተናጋጅ እመኑ"
+    },
+    "folderPicker": {
+      "fieldLabel": "አቃፊ",
+      "accessibility": "አቃፊ፦ {{label}}",
+      "tapToListHint": "ዝርዝሩን ለማየት አቃፊ ይንኩ",
+      "emptyTitle": "በውስጥ አቃፊ የለም",
+      "emptyDescription": "ተከናውኗል ይህን አቃፊ ይጠቀማል።",
+      "retryableTitle": "አቃፊዎችን መዘርዘር አልተቻለም",
+      "retryableDescription": "ግንኙነትዎን ያረጋግጡ እና ደግሞ ሞክር። ተከናውኗል አሁንም ይህን አቃፊ ያረጋግጣል።",
+      "unsupportedTitle": "አቃፊዎችን መዘርዘር አይቻልም",
+      "unsupportedDescription": "ይህ CLI አቃፊዎችን መዘርዘር አይችልም። ተከናውኗል የመነሻ አቃፊውን ይይዛል እና ክፍለ ጊዜውን ያስጀምሩ እዚያ ይጀምራል።"
     }
   },
   "bootstrap": {

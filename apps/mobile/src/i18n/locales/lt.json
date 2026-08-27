@@ -2688,6 +2688,17 @@
       "hostConfirmMessage": "Ši nuoroda atidaro {{host}} jūsų naršyklėje.",
       "open": "Atidaryti",
       "trustThisHost": "Pasitikėti šiuo serveriu"
+    },
+    "folderPicker": {
+      "accessibility": "Aplankas: {{label}}",
+      "emptyDescription": "Atlikta naudoja šį aplanką.",
+      "emptyTitle": "Viduje aplankų nėra",
+      "fieldLabel": "Aplankas",
+      "retryableDescription": "Patikrinkite ryšį ir bandykite dar kartą. Atlikta vis tiek patvirtina šį aplanką.",
+      "retryableTitle": "Nepavyko išvardyti aplankų",
+      "tapToListHint": "Bakstelėkite aplanką, kad pamatytumėte jo turinį",
+      "unsupportedDescription": "Šis CLI negali išvardyti aplankų. Atlikta palieka paleidimo aplanką, o Pradėti sesiją prasideda ten.",
+      "unsupportedTitle": "Negalima išvardyti aplankų"
     }
   },
   "bootstrap": {

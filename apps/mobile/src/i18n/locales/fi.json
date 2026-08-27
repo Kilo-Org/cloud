@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Tämä linkki avaa {{host}} selaimessasi.",
       "open": "Avaa",
       "trustThisHost": "Luota tähän isäntään"
+    },
+    "folderPicker": {
+      "accessibility": "Kansio: {{label}}",
+      "emptyDescription": "Valmis käyttää tätä kansiota.",
+      "emptyTitle": "Ei kansioita sisällä",
+      "fieldLabel": "Kansio",
+      "retryableDescription": "Tarkista yhteys ja yritä uudelleen. Valmis vahvistaa silti tämän kansion.",
+      "retryableTitle": "Kansioita ei voitu luetella",
+      "tapToListHint": "Napauta kansiota luetellaksesi sen sisällön",
+      "unsupportedDescription": "Tämä CLI ei voi luetella kansioita. Valmis säilyttää käynnistyskansion, ja Aloita istunto alkaa siitä.",
+      "unsupportedTitle": "Kansioita ei voi luetella"
     }
   },
   "bootstrap": {

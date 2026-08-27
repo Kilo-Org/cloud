@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Kjo lidhje hap {{host}} në shfletuesin tuaj.",
       "open": "Hap",
       "trustThisHost": "Beso këtë host"
+    },
+    "folderPicker": {
+      "accessibility": "Dosja: {{label}}",
+      "emptyDescription": "U krye përdor këtë dosje.",
+      "emptyTitle": "Asnjë dosje brenda",
+      "fieldLabel": "Dosja",
+      "retryableDescription": "Kontrolloni lidhjen tuaj dhe Riprovo. U krye ende e konfirmon këtë dosje.",
+      "retryableTitle": "Nuk u arrit të listoheshin dosjet",
+      "tapToListHint": "Prekni një dosje për të listuar përmbajtjen e saj",
+      "unsupportedDescription": "Ky CLI nuk mund të listojë dosje. U krye ruan dosjen e nisjes dhe Filloni seancën fillon atje.",
+      "unsupportedTitle": "Nuk mund të listohen dosjet"
     }
   },
   "bootstrap": {

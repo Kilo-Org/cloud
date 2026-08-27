@@ -2688,6 +2688,17 @@
       "hostConfirmMessage": "Ta povezava v brskalniku odpre {{host}}.",
       "open": "Odpri",
       "trustThisHost": "Zaupaj temu gostitelju"
+    },
+    "folderPicker": {
+      "accessibility": "Mapa: {{label}}",
+      "emptyDescription": "Končano uporabi to mapo.",
+      "emptyTitle": "V mapi ni map",
+      "fieldLabel": "Mapa",
+      "retryableDescription": "Preveri povezavo in poskusi znova. Končano še vedno potrdi to mapo.",
+      "retryableTitle": "Map ni bilo mogoče prikazati",
+      "tapToListHint": "Dotakni se mape za prikaz njene vsebine",
+      "unsupportedDescription": "Ta CLI ne more prikazati map. Končano ohrani začetno mapo, Začni sejo pa se začne tam.",
+      "unsupportedTitle": "Map ni mogoče prikazati"
     }
   },
   "bootstrap": {

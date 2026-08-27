@@ -93,6 +93,19 @@ export type InstancePickerBridge = {
   onSelect: (instance: InstancePickerInstance | null) => void;
 };
 
+/**
+ * Bridge for the new-session folder picker. `currentPath` is `""` at launch
+ * (the CLI's launch directory) and a relative path once the user has drilled
+ * into — and confirmed — a child directory. `onSelect` reports that path back
+ * to the form, which passes it as `create_session.directory`.
+ */
+export type FolderPickerBridge = {
+  connectionId: string;
+  projectName: string;
+  currentPath: string;
+  onSelect: (path: string) => void;
+};
+
 type LanguagePickerBridge = {
   beforeReload?: () => Promise<void>;
   onApplied?: () => void;

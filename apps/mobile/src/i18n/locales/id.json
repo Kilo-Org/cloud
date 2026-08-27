@@ -2194,6 +2194,17 @@
       "hostConfirmMessage": "Tautan ini membuka {{host}} di browser Anda.",
       "open": "Buka",
       "trustThisHost": "Percayai host ini"
+    },
+    "folderPicker": {
+      "accessibility": "Folder: {{label}}",
+      "emptyDescription": "Selesai menggunakan folder ini.",
+      "emptyTitle": "Tidak ada folder di dalamnya",
+      "fieldLabel": "Folder",
+      "retryableDescription": "Periksa koneksi Anda dan Coba lagi. Selesai tetap mengonfirmasi folder ini.",
+      "retryableTitle": "Tidak dapat menampilkan daftar folder",
+      "tapToListHint": "Ketuk folder untuk melihat isinya",
+      "unsupportedDescription": "CLI ini tidak dapat menampilkan daftar folder. Selesai menyimpan folder peluncuran dan Mulai sesi dimulai di sana.",
+      "unsupportedTitle": "Tidak dapat menampilkan daftar folder"
     }
   },
   "bootstrap": {

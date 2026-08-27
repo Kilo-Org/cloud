@@ -2207,6 +2207,17 @@
       "hostConfirmMessage": "Este enlace abre {{host}} en tu navegador.",
       "open": "Abrir",
       "trustThisHost": "Confiar en este host"
+    },
+    "folderPicker": {
+      "accessibility": "Carpeta: {{label}}",
+      "emptyDescription": "Hecho usa esta carpeta.",
+      "emptyTitle": "No hay carpetas dentro",
+      "fieldLabel": "Carpeta",
+      "retryableDescription": "Comprueba tu conexión y reintenta. Hecho aún confirma esta carpeta.",
+      "retryableTitle": "No se pudieron listar las carpetas",
+      "tapToListHint": "Toca una carpeta para listar su contenido",
+      "unsupportedDescription": "Esta CLI no puede listar carpetas. Hecho conserva la carpeta de lanzamiento e Iniciar sesión comienza allí.",
+      "unsupportedTitle": "No se pueden listar las carpetas"
     }
   },
   "bootstrap": {

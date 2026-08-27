@@ -2668,6 +2668,17 @@
       "hostConfirmMessage": "Šī saite atver {{host}} pārlūkā.",
       "open": "Atvērt",
       "trustThisHost": "Uzticēties šim resursdatoram"
+    },
+    "folderPicker": {
+      "accessibility": "Mape: {{label}}",
+      "emptyDescription": "Gatavs izmanto šo mapi.",
+      "emptyTitle": "Iekšā nav mapju",
+      "fieldLabel": "Mape",
+      "retryableDescription": "Pārbaudiet savienojumu un mēģiniet vēlreiz. Gatavs joprojām apstiprinās šo mapi.",
+      "retryableTitle": "Neizdevās uzskaitīt mapes",
+      "tapToListHint": "Pieskarieties mapei, lai uzskaitītu tās saturu",
+      "unsupportedDescription": "Šis CLI nevar uzskaitīt mapes. Gatavs patur palaišanas mapi, un Sākt sesiju tur sāksies.",
+      "unsupportedTitle": "Nevar uzskaitīt mapes"
     }
   },
   "bootstrap": {

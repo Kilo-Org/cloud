@@ -2207,6 +2207,17 @@
       "hostConfirmMessage": "קישור זה פותח את {{host}} בדפדפן שלך.",
       "open": "פתח",
       "trustThisHost": "בטח במארח זה"
+    },
+    "folderPicker": {
+      "accessibility": "תיקייה: {{label}}",
+      "emptyDescription": "סיום משתמש בתיקייה זו.",
+      "emptyTitle": "אין תיקיות בפנים",
+      "fieldLabel": "תיקייה",
+      "retryableDescription": "בדוק את החיבור ונסה שוב. סיום עדיין מאשר את התיקייה הזו.",
+      "retryableTitle": "לא ניתן היה לרשום את התיקיות",
+      "tapToListHint": "הקש על תיקייה כדי לרשום את תוכנה",
+      "unsupportedDescription": "CLI זה לא יכול לרשום תיקיות. סיום שומר על תיקיית ההשקה והתחל הפעלה מתחיל שם.",
+      "unsupportedTitle": "לא ניתן לרשום תיקיות"
     }
   },
   "bootstrap": {

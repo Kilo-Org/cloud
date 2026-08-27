@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Liinkiin kun {{host}} brawzarii kee keessatti bana.",
       "open": "Bani",
       "trustThisHost": "Hosii kana amani"
+    },
+    "folderPicker": {
+      "accessibility": "Falduru: {{label}}",
+      "emptyDescription": "Xumure falduru kana fayyadama.",
+      "emptyTitle": "Keessaa falduru hin jiru",
+      "fieldLabel": "Falduru",
+      "retryableDescription": "Walqabxii kee sakatta'iitii Irra deebi'i. Xumure falduru kana amma iyyuu mirkaneessa.",
+      "retryableTitle": "Faldurrota tarreefachuu hin dandeenye",
+      "tapToListHint": "Falduru tokko tuqii wantoota isaa tarreefachuuf",
+      "unsupportedDescription": "CLI kun faldurrota tarreefachuu hin danda'u. Xumure faldura jalqabaa qaba, Xalayyii jalqabi achitti jalqaba.",
+      "unsupportedTitle": "Faldurrota tarreefachuu hin danda'u"
     }
   },
   "bootstrap": {

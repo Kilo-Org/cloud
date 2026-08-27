@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Hierdie skakel maak {{host}} in jou blaaier oop.",
       "open": "Maak oop",
       "trustThisHost": "Vertrou hierdie gasheer"
+    },
+    "folderPicker": {
+      "accessibility": "Map: {{label}}",
+      "emptyDescription": "Klaar gebruik hierdie map.",
+      "emptyTitle": "Geen mappe binne nie",
+      "fieldLabel": "Map",
+      "retryableDescription": "Kontroleer jou verbinding en probeer weer. Klaar bevestig steeds hierdie map.",
+      "retryableTitle": "Kon nie mappe lys nie",
+      "tapToListHint": "Tik op 'n map om die inhoud daarvan te lys",
+      "unsupportedDescription": "Hierdie CLI kan nie mappe lys nie. Klaar hou die lanseringsmap en Begin sessie begin daar.",
+      "unsupportedTitle": "Kan nie mappe lys nie"
     }
   },
   "bootstrap": {

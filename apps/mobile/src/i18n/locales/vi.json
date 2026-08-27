@@ -2194,6 +2194,17 @@
       "hostConfirmMessage": "Liên kết này mở {{host}} trong trình duyệt của bạn.",
       "open": "Mở",
       "trustThisHost": "Tin cậy máy chủ này"
+    },
+    "folderPicker": {
+      "accessibility": "Thư mục: {{label}}",
+      "emptyDescription": "Xong sử dụng thư mục này.",
+      "emptyTitle": "Không có thư mục bên trong",
+      "fieldLabel": "Thư mục",
+      "retryableDescription": "Kiểm tra kết nối và Thử lại. Xong vẫn xác nhận thư mục này.",
+      "retryableTitle": "Không thể liệt kê thư mục",
+      "tapToListHint": "Chạm vào thư mục để xem nội dung của nó",
+      "unsupportedDescription": "CLI này không thể liệt kê thư mục. Xong giữ thư mục khởi chạy và Bắt đầu phiên bắt đầu tại đó.",
+      "unsupportedTitle": "Không thể liệt kê thư mục"
     }
   },
   "bootstrap": {

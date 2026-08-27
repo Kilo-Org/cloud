@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Ez a link a(z) {{host}} oldalt nyitja meg a böngészőjében.",
       "open": "Megnyitás",
       "trustThisHost": "Megbízás ebben a hostban"
+    },
+    "folderPicker": {
+      "accessibility": "Mappa: {{label}}",
+      "emptyDescription": "A Kész ezt a mappát használja.",
+      "emptyTitle": "Nincs mappa benne",
+      "fieldLabel": "Mappa",
+      "retryableDescription": "Ellenőrizze a kapcsolatot, majd érintse meg az Újra gombot. A Kész továbbra is megerősíti ezt a mappát.",
+      "retryableTitle": "Nem sikerült listázni a mappákat",
+      "tapToListHint": "Érintsen meg egy mappát a tartalmának listázásához",
+      "unsupportedDescription": "Ez a CLI nem tudja listázni a mappákat. A Kész megtartja az indítási mappát, és a Munkamenet indítása ott indul.",
+      "unsupportedTitle": "Nem lehet listázni a mappákat"
     }
   },
   "bootstrap": {

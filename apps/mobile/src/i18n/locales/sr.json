@@ -2668,6 +2668,17 @@
       "hostConfirmMessage": "Ova veza otvara {{host}} u vašem pregledaču.",
       "open": "Otvori",
       "trustThisHost": "Veruj ovom hostu"
+    },
+    "folderPicker": {
+      "fieldLabel": "Fascikla",
+      "accessibility": "Fascikla: {{label}}",
+      "tapToListHint": "Dodirni fasciklu da prikažeš njen sadržaj",
+      "emptyTitle": "Nema fascikli unutar",
+      "emptyDescription": "Gotovo koristi ovu fasciklu.",
+      "retryableTitle": "Nije moguće prikazati fascikle",
+      "retryableDescription": "Proveri svoju vezu i pokušaj ponovo. Gotovo i dalje potvrđuje ovu fasciklu.",
+      "unsupportedTitle": "Ne mogu da prikažem fascikle",
+      "unsupportedDescription": "Ovaj CLI ne može da prikaže fascikle. Gotovo zadržava fasciklu za pokretanje i Pokreni sesiju počinje odatle."
     }
   },
   "bootstrap": {

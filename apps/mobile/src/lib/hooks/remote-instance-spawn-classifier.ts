@@ -215,6 +215,8 @@ export function buildCreateRemoteSessionInput(fields: {
   mode?: string;
   selection?: ModelSelection;
   organizationId?: string | null;
+  /** Relative launch directory; omitted when empty (the CLI falls back to its launch directory). */
+  directory?: string;
   cloneFromKiloSessionId?: string | null;
 }): CreateRemoteSessionInput | undefined {
   const input: CreateRemoteSessionInput = {};
@@ -231,12 +233,16 @@ export function buildCreateRemoteSessionInput(fields: {
   if (fields.organizationId) {
     input.orgId = fields.organizationId;
   }
+  if (fields.directory) {
+    input.directory = fields.directory;
+  }
   if (fields.cloneFromKiloSessionId) {
     input.cloneFromKiloSessionId = fields.cloneFromKiloSessionId;
   }
   return input.agent !== undefined ||
     input.model !== undefined ||
     input.orgId !== undefined ||
+    input.directory !== undefined ||
     input.cloneFromKiloSessionId !== undefined
     ? input
     : undefined;

@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Leli isixhumanisi livula {{host}} kubrawuza yakho.",
       "open": "Vula",
       "trustThisHost": "Themba leli host"
+    },
+    "folderPicker": {
+      "fieldLabel": "Ifolda",
+      "accessibility": "Ifolda: {{label}}",
+      "tapToListHint": "Thepha ifolda ukuhlisa okuqukethwe kwayo",
+      "emptyTitle": "Azikho amafolda ngaphakathi",
+      "emptyDescription": "Kwenziwe kusebenzisa le folda.",
+      "retryableTitle": "Akukwazanga ukuhlisa amafolda",
+      "retryableDescription": "Bheka ukuxhumana kwakho bese uzama futhi. Kwenziwe kusaqinisekisa le folda.",
+      "unsupportedTitle": "Ayikwazi ukuhlisa amafolda",
+      "unsupportedDescription": "Le CLI ayikwazi ukuhlisa amafolda. Kwenziwe kugcina ifolda yokugalisa futhi i-Qala iseshini iqala lapho."
     }
   },
   "bootstrap": {

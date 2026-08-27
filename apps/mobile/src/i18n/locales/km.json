@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "តំណនេះបើក {{host}} នៅក្នុងកម្មវិធីរុករករបស់អ្នក។",
       "open": "បើក",
       "trustThisHost": "ជឿទុកចិត្តម៉ាស៊ីននេះ"
+    },
+    "folderPicker": {
+      "accessibility": "ថត: {{label}}",
+      "emptyDescription": "រួចរាល់ប្រើថតនេះ។",
+      "emptyTitle": "គ្មានថតនៅខាងក្នុងទេ",
+      "fieldLabel": "ថត",
+      "retryableDescription": "ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។ រួចរាល់នៅតែបញ្ជាក់ថតនេះ។",
+      "retryableTitle": "មិនអាចបង្ហាញថតបានទេ",
+      "tapToListHint": "ប៉ះថតមួយដើម្បីបង្ហាញមាតិការបស់វា",
+      "unsupportedDescription": "CLI នេះមិនអាចបង្ហាញថតបានទេ។ រួចរាល់រក្សាថតចាប់ផ្តើម ហើយចាប់ផ្តើមវគ្គពីទីនោះ។",
+      "unsupportedTitle": "មិនអាចបង្ហាញថតបានទេ"
     }
   },
   "bootstrap": {

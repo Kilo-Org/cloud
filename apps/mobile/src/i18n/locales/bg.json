@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Тази връзка отваря {{host}} в браузъра ви.",
       "open": "Отвори",
       "trustThisHost": "Доверявай се на този хост"
+    },
+    "folderPicker": {
+      "accessibility": "Папка: {{label}}",
+      "emptyDescription": "Готово използва тази папка.",
+      "emptyTitle": "Няма папки вътре",
+      "fieldLabel": "Папка",
+      "retryableDescription": "Провери връзката си и опитай отново. Готово пак потвърждава тази папка.",
+      "retryableTitle": "Не можаха да се изброят папките",
+      "tapToListHint": "Докосни папка, за да изброиш съдържанието ѝ",
+      "unsupportedDescription": "Този CLI не може да изброи папките. Готово запазва стартовата папка и Започни сесия започва от нея.",
+      "unsupportedTitle": "Не може да се изброят папките"
     }
   },
   "bootstrap": {

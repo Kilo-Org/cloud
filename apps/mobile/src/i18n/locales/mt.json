@@ -2708,6 +2708,17 @@
       "hostConfirmMessage": "Dan il-link jiftaħ {{host}} fil-browser tiegħek.",
       "open": "Iftaħ",
       "trustThisHost": "Afda f'dan il-host"
+    },
+    "folderPicker": {
+      "accessibility": "Folder: {{label}}",
+      "emptyDescription": "Lest juża dan il-folder.",
+      "emptyTitle": "L-ebda folder ġewwa",
+      "fieldLabel": "Folder",
+      "retryableDescription": "Iċċekkja l-konnessjoni tiegħek u Erġa' pprova. Lest xorta jikkonferma dan il-folder.",
+      "retryableTitle": "Ma setax jelenka l-folders",
+      "tapToListHint": "Agħfas fuq folder biex jelenka l-kontenut tiegħu",
+      "unsupportedDescription": "Dan il-CLI ma jistax jelenka l-folders. Lest iżomm il-folder tat-tnedija u Ibda s-sessjoni jibda minn hemm.",
+      "unsupportedTitle": "Ma jistax jelenka l-folders"
     }
   },
   "bootstrap": {

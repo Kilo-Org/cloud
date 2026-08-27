@@ -61,6 +61,10 @@ vi.mock('@/components/agents/new-session-repository-section', () => ({
   NewSessionRepositorySection: 'NewSessionRepositorySection',
 }));
 
+vi.mock('@/components/agents/folder-selector', () => ({
+  LaunchFolderField: 'LaunchFolderField',
+}));
+
 vi.mock('@/components/agents/new-session-start-button', () => ({
   NewSessionStartButton: 'NewSessionStartButton',
 }));
@@ -164,6 +168,8 @@ function defaultProps() {
     isLoadingInstances: false,
     onChangeRunOnInstance: vi.fn(),
     showInstanceDisconnectedNote: false,
+    folderPath: '',
+    onChangeFolderPath: vi.fn(),
     groups: [] as RepositoryGroup[],
     isRetrying: false,
     onChangeRepo: vi.fn(),

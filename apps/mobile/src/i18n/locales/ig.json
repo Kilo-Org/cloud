@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Njikọ a na-emeghe {{host}} na ihe nchọgharị gị.",
       "open": "Meghe",
       "trustThisHost": "Tụkwasị obi n'onye nlekọta a"
+    },
+    "folderPicker": {
+      "accessibility": "Fọlda: {{label}}",
+      "emptyDescription": "Emere na-eji fọlda a.",
+      "emptyTitle": "Enweghị fọlda n'ime",
+      "fieldLabel": "Fọlda",
+      "retryableDescription": "Lelee njikọ gị ma nwaa ọzọ. Emere ka na-ekwado fọlda a.",
+      "retryableTitle": "Enweghị ike ịdepụta fọlda",
+      "tapToListHint": "Pịa fọlda ka ị depụta ọdịnaya ya",
+      "unsupportedDescription": "CLI a enweghị ike ịdepụta fọlda. Emere na-edobe fọlda mmalite ma Malite nzukọ na-amalite ebe ahụ.",
+      "unsupportedTitle": "Enweghị ike ịdepụta fọlda"
     }
   },
   "bootstrap": {

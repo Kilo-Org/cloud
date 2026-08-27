@@ -2708,6 +2708,17 @@
       "hostConfirmMessage": "Osclaíonn an nasc seo {{host}} i do bhrabhsálaí.",
       "open": "Oscail",
       "trustThisHost": "Muinín as an óstaigh seo"
+    },
+    "folderPicker": {
+      "fieldLabel": "Fillteán",
+      "accessibility": "Fillteán: {{label}}",
+      "tapToListHint": "Tapáil ar fhillteán chun a bhfuil ann a liostú",
+      "emptyTitle": "Níl aon fhillteán taobh istigh",
+      "emptyDescription": "Úsáideann \"Déanta\" an fillteán seo.",
+      "retryableTitle": "Níorbh fhéidir na fillteáin a liostú",
+      "retryableDescription": "Seiceáil do nasc agus bain triail as arís. Deimhníonn \"Déanta\" an fillteán seo fós.",
+      "unsupportedTitle": "Ní féidir fillteáin a liostú",
+      "unsupportedDescription": "Ní féidir leis an CLI seo fillteáin a liostú. Coimeádann \"Déanta\" an fillteán seolta agus tosaíonn \"Tosaigh seisiún\" ann."
     }
   },
   "bootstrap": {

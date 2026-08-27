@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Þessi tengill opnar {{host}} í vafranum þínum.",
       "open": "Opna",
       "trustThisHost": "Treysta þessum gestgjafa"
+    },
+    "folderPicker": {
+      "accessibility": "Mappa: {{label}}",
+      "emptyDescription": "Lokið notar þessa möppu.",
+      "emptyTitle": "Engar möppur inni",
+      "fieldLabel": "Mappa",
+      "retryableDescription": "Athugaðu tenginguna og reyndu aftur. Lokið staðfestir samt þessa möppu.",
+      "retryableTitle": "Ekki tókst að lista möppur",
+      "tapToListHint": "Ýttu á möppu til að lista innihald hennar",
+      "unsupportedDescription": "Þessi CLI getur ekki listað möppur. Lokið heldur ræsimöppunni og Byrja lotu byrjar þar.",
+      "unsupportedTitle": "Ekki er hægt að lista möppur"
     }
   },
   "bootstrap": {

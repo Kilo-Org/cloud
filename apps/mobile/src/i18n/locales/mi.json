@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Ka tuwhera tēnei hono i a {{host}} i tō pūtirotiro.",
       "open": "Tuwhera",
       "trustThisHost": "Whakawhirinaki ki tēnei kaihautū"
+    },
+    "folderPicker": {
+      "accessibility": "Kōpaki: {{label}}",
+      "emptyDescription": "Ka whakamahi a Done i tēnei kōpaki.",
+      "emptyTitle": "Kāore he kōpaki i roto",
+      "fieldLabel": "Kōpaki",
+      "retryableDescription": "Tirohia tō hononga, ka whakamātau anō. Ka whakaū tonu a Done i tēnei kōpaki.",
+      "retryableTitle": "Kāore i taea te rārangi ngā kōpaki",
+      "tapToListHint": "Pāwhiria tētahi kōpaki ki te rārangi i ōna kōrero",
+      "unsupportedDescription": "Kāore e taea e tēnei CLI te rārangi i ngā kōpaki. Ka puritia e Done te kōpaki whakarewatanga, ā, ka tīmata a Tīmata te wātūtū ki reira.",
+      "unsupportedTitle": "Kāore e taea te rārangi ngā kōpaki"
     }
   },
   "bootstrap": {

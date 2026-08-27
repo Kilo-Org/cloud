@@ -2688,6 +2688,17 @@
       "hostConfirmMessage": "Гэтая спасылка адкрые {{host}} у вашым браўзеры.",
       "open": "Адкрыць",
       "trustThisHost": "Давяраць гэтаму хосту"
+    },
+    "folderPicker": {
+      "accessibility": "Папка: {{label}}",
+      "emptyDescription": "Гатова выкарыстоўвае гэтую папку.",
+      "emptyTitle": "Унутры няма папак",
+      "fieldLabel": "Папка",
+      "retryableDescription": "Праверце падключэнне і паўтарыце. Гатова ўсё ж пацвердзіць гэтую папку.",
+      "retryableTitle": "Не атрымалася паказаць спіс папак",
+      "tapToListHint": "Націсніце на папку, каб паказаць яе змесціва",
+      "unsupportedDescription": "Гэта CLI не можа паказаць спіс папак. Гатова захавае папку запуску, а Пачаць сеанс пачнецца там.",
+      "unsupportedTitle": "Нельга паказаць спіс папак"
     }
   },
   "bootstrap": {

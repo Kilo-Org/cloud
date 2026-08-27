@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "આ લિંક તમારા બ્રાઉઝરમાં {{host}} ખોલે છે.",
       "open": "ખોલો",
       "trustThisHost": "આ હોસ્ટ પર ભરોસો રાખો"
+    },
+    "folderPicker": {
+      "accessibility": "ફોલ્ડર: {{label}}",
+      "emptyDescription": "થઈ ગયું આ ફોલ્ડર વાપરે છે.",
+      "emptyTitle": "અંદર કોઈ ફોલ્ડર નથી",
+      "fieldLabel": "ફોલ્ડર",
+      "retryableDescription": "તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો. થઈ ગયું હજુ પણ આ ફોલ્ડરની પુષ્ટિ કરે છે.",
+      "retryableTitle": "ફોલ્ડર્સ સૂચિબદ્ધ કરી શકાયા નહીં",
+      "tapToListHint": "તેની સામગ્રી સૂચિબદ્ધ કરવા ફોલ્ડરને ટેપ કરો",
+      "unsupportedDescription": "આ CLI ફોલ્ડર્સ સૂચિબદ્ધ કરી શકતું નથી. થઈ ગયું લોન્ચ ફોલ્ડર રાખે છે અને સત્ર શરૂ કરો ત્યાં શરૂ થાય છે.",
+      "unsupportedTitle": "ફોલ્ડર્સ સૂચિબદ્ધ કરી શકાતા નથી"
     }
   },
   "bootstrap": {

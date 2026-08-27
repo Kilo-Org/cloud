@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Pautan ini membuka {{host}} dalam pelayar anda.",
       "open": "Buka",
       "trustThisHost": "Percayai hos ini"
+    },
+    "folderPicker": {
+      "accessibility": "Folder: {{label}}",
+      "emptyDescription": "Selesai menggunakan folder ini.",
+      "emptyTitle": "Tiada folder di dalam",
+      "fieldLabel": "Folder",
+      "retryableDescription": "Semak sambungan anda dan Cuba lagi. Selesai masih mengesahkan folder ini.",
+      "retryableTitle": "Tidak dapat menyenaraikan folder",
+      "tapToListHint": "Ketuk folder untuk menyenaraikan kandungannya",
+      "unsupportedDescription": "CLI ini tidak dapat menyenaraikan folder. Selesai mengekalkan folder pelancaran dan Mulakan sesi bermula di situ.",
+      "unsupportedTitle": "Tidak dapat menyenaraikan folder"
     }
   },
   "bootstrap": {

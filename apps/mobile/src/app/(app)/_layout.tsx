@@ -171,6 +171,15 @@ export default function AppLayout() {
               }}
             />
             <Stack.Screen
+              name="agent-chat/folder-picker"
+              options={{
+                presentation: 'formSheet',
+                sheetAllowedDetents: [0.5, fullSheetDetent],
+                sheetGrabberVisible: true,
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
               name="share-gate"
               options={{
                 presentation: 'formSheet',

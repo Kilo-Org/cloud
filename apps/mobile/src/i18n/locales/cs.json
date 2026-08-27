@@ -2688,6 +2688,17 @@
       "hostConfirmMessage": "Tento odkaz otevře {{host}} ve vašem prohlížeči.",
       "open": "Otevřít",
       "trustThisHost": "Důvěřovat tomuto hostiteli"
+    },
+    "folderPicker": {
+      "accessibility": "Složka: {{label}}",
+      "emptyDescription": "Hotovo použije tuto složku.",
+      "emptyTitle": "Uvnitř nejsou žádné složky",
+      "fieldLabel": "Složka",
+      "retryableDescription": "Zkontrolujte připojení a stiskněte Zkusit znovu. Hotovo tuto složku i tak potvrdí.",
+      "retryableTitle": "Složky se nepodařilo zobrazit",
+      "tapToListHint": "Klepnutím na složku zobrazíte její obsah",
+      "unsupportedDescription": "Toto CLI neumí zobrazit složky. Hotovo ponechá spouštěcí složku a Spustit relaci začne tam.",
+      "unsupportedTitle": "Složky nelze zobrazit"
     }
   },
   "bootstrap": {

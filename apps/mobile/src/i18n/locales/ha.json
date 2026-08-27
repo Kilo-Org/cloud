@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Wannan hanyar tana buɗe {{host}} a cikin burauzar ka.",
       "open": "Buɗe",
       "trustThisHost": "Amince da wannan mazaba"
+    },
+    "folderPicker": {
+      "accessibility": "Jaka: {{label}}",
+      "emptyDescription": "An yi yana amfani da wannan jaka.",
+      "emptyTitle": "Babu jakuna a ciki",
+      "fieldLabel": "Jaka",
+      "retryableDescription": "Duba haɗinka kuma sake gwadawa. An yi har yanzu yana tabbatar da wannan jaka.",
+      "retryableTitle": "An kasa jera jakuna",
+      "tapToListHint": "Danna jaka don jera abubuwan da ke cikinta",
+      "unsupportedDescription": "Wannan CLI ba zai iya jera jakuna ba. An yi yana riƙe jakar fara kuma Fara zaman yana farawa a can.",
+      "unsupportedTitle": "Ba za a iya jera jakuna ba"
     }
   },
   "bootstrap": {

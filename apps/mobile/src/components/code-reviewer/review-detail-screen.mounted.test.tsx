@@ -8,7 +8,9 @@
 
 import { createElement, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { emitPrivacyCover } from '@/lib/privacy-cover-events';
 
 import { ReviewDetailScreen } from './review-detail-screen';
 
@@ -35,8 +37,10 @@ const buttons = vi.hoisted(() => ({
 }));
 
 const viewRenders = vi.hoisted(() => ({
-  list: [] as { style?: unknown; children?: unknown }[],
+  list: [] as { style?: unknown; className?: string; children?: unknown }[],
 }));
+const modalRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
+const nativePlatform = vi.hoisted(() => ({ OS: 'ios' }));
 const sessionListRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
 const composerRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
 const spectatorQueries = vi.hoisted(() => ({
@@ -62,13 +66,24 @@ const spectatorStream = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
-  View: (props: { style?: unknown; children?: ReactNode }) => {
+  View: (props: { style?: unknown; className?: string; children?: ReactNode }) => {
     viewRenders.list.push(props);
-    return createElement('View', null, props.children);
+    return createElement('View', props, props.children);
   },
+  Modal: (props: { visible?: boolean; children?: ReactNode }) => {
+    modalRenders.list.push(props);
+    return props.visible ? createElement('Modal', props, props.children) : null;
+  },
+  Pressable: 'Pressable',
+  Platform: nativePlatform,
+  AppState: { addEventListener: () => ({ remove: vi.fn() }) },
   Alert: { alert: vi.fn() },
-  useWindowDimensions: () => ({ height: 800, width: 400, fontScale: 1, scale: 1 }),
 }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),
+}));
+vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn() },
@@ -222,7 +237,17 @@ function makeReview(over: Record<string, unknown> = {}) {
   };
 }
 
-function renderScreen(): string[] {
+const renderers: TestRenderer.ReactTestRenderer[] = [];
+
+function openTranscriptSheet() {
+  const open = buttons.rendered.findLast(button => buttonText(button) === 'Session transcript');
+  if (!open?.onPress) {
+    throw new Error('Transcript button was not rendered');
+  }
+  act(open.onPress);
+}
+
+function mountScreen(openTranscript = false) {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
@@ -233,8 +258,24 @@ function renderScreen(): string[] {
   if (!renderer) {
     throw new Error('renderer was not created');
   }
-  return collectText(renderer.toJSON());
+  renderers.push(renderer);
+  if (openTranscript) {
+    openTranscriptSheet();
+  }
+  return renderer;
 }
+
+function renderScreen(openTranscript = false): string[] {
+  return collectText(mountScreen(openTranscript).toJSON());
+}
+
+afterEach(() => {
+  act(() => {
+    for (const renderer of renderers.splice(0)) {
+      renderer.unmount();
+    }
+  });
+});
 
 beforeEach(() => {
   detail.isLoading = false;
@@ -246,6 +287,8 @@ beforeEach(() => {
   queryErrors.errors = [];
   buttons.rendered = [];
   viewRenders.list = [];
+  modalRenders.list = [];
+  nativePlatform.OS = 'ios';
   sessionListRenders.list = [];
   composerRenders.list = [];
   statusHelpers.cancellable = false;
@@ -383,16 +426,7 @@ describe('ReviewDetailScreen findings pagination', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-    act(() => {
-      ref.current = TestRenderer.create(
-        createElement(ReviewDetailScreen, { scope: 'personal', reviewId: 'rev-1' })
-      );
-    });
-    const renderer = ref.current;
-    if (!renderer) {
-      throw new Error('renderer was not created');
-    }
+    const renderer = mountScreen();
 
     const before = collectText(renderer.toJSON());
     expect(before).toContain('f0.ts');
@@ -460,6 +494,124 @@ function buttonText(button: { children?: unknown }) {
   return (button.children as { props?: { children?: unknown } } | null)?.props?.children;
 }
 
+describe('ReviewDetailScreen transcript sheet', () => {
+  beforeEach(() => {
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    spectatorQueries.streamInfo.data = makeStreamInfo({ cloudAgentSessionId: 'agent-1' });
+  });
+
+  it('shows a transcript button without mounting the transcript inline', () => {
+    const texts = renderScreen();
+
+    expect(texts).toContain('Session transcript');
+    expect(texts).not.toContain('Waiting for the review transcript.');
+    expect(texts).not.toContain('Done');
+    expect(modalRenders.list.at(-1)?.visible).toBe(false);
+    expect(sessionListRenders.list).toHaveLength(0);
+    expect(spectatorStream.createReviewSpectatorStream).not.toHaveBeenCalled();
+  });
+
+  it.each(['ios', 'android'])(
+    'opens and closes the native transcript sheet on %s',
+    async platform => {
+      nativePlatform.OS = platform;
+      const connection = { connect: vi.fn(), destroy: vi.fn() };
+      spectatorStream.createReviewSpectatorStream.mockResolvedValue(connection);
+      const renderer = mountScreen();
+
+      openTranscriptSheet();
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const modal = modalRenders.list.at(-1);
+      expect(modal?.visible).toBe(true);
+      expect(modal?.animationType).toBe('slide');
+      expect(modal?.presentationStyle).toBe(platform === 'ios' ? 'pageSheet' : undefined);
+      expect(collectText(renderer.toJSON())).toContain('Done');
+      expect(connection.connect).toHaveBeenCalledTimes(1);
+      expect(composerRenders.list).toHaveLength(0);
+
+      act(() => {
+        (modal?.onRequestClose as (() => void) | undefined)?.();
+      });
+      expect(modalRenders.list.at(-1)?.visible).toBe(false);
+      expect(connection.destroy).toHaveBeenCalledTimes(1);
+
+      openTranscriptSheet();
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(connection.connect).toHaveBeenCalledTimes(2);
+      const done = renderer.root.findAll(
+        node => (node.type as string) === 'Pressable' && node.props.accessibilityLabel === 'Done'
+      )[0];
+      expect(done).toBeDefined();
+      act(() => {
+        (done?.props.onPress as (() => void) | undefined)?.();
+      });
+      expect(modalRenders.list.at(-1)?.visible).toBe(false);
+      expect(connection.destroy).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it('closes the transcript and destroys the stream when the privacy cover activates', async () => {
+    const connection = { connect: vi.fn(), destroy: vi.fn() };
+    spectatorStream.createReviewSpectatorStream.mockResolvedValue(connection);
+    mountScreen(true);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(emitPrivacyCover);
+
+    expect(modalRenders.list.at(-1)?.visible).toBe(false);
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('destroys a pending stream connection if the sheet closes before it arrives', async () => {
+    const connection = { connect: vi.fn(), destroy: vi.fn() };
+    let resolveConnection: ((value: typeof connection) => void) | undefined = undefined;
+    const pendingConnection = new Promise<typeof connection>(resolve => {
+      resolveConnection = resolve;
+    });
+    spectatorStream.createReviewSpectatorStream.mockReturnValue(pendingConnection);
+    mountScreen(true);
+
+    act(() => {
+      (modalRenders.list.at(-1)?.onRequestClose as (() => void) | undefined)?.();
+    });
+    await act(async () => {
+      resolveConnection?.(connection);
+      await pendingConnection;
+    });
+
+    expect(connection.connect).not.toHaveBeenCalled();
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the previous sheet when the review changes', async () => {
+    const connection = { connect: vi.fn(), destroy: vi.fn() };
+    spectatorStream.createReviewSpectatorStream.mockResolvedValue(connection);
+    const renderer = mountScreen(true);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      renderer.update(createElement(ReviewDetailScreen, { scope: 'personal', reviewId: 'rev-2' }));
+    });
+
+    expect(modalRenders.list.at(-1)?.visible).toBe(false);
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(spectatorStream.createReviewSpectatorStream).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('ReviewDetailScreen spectator transcript', () => {
   it('renders no composer (no reply controls) beside the transcript', () => {
     detail.data = {
@@ -468,7 +620,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    renderScreen();
+    renderScreen(true);
 
     expect(composerRenders.list).toHaveLength(0);
   });
@@ -496,7 +648,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    const texts = renderScreen();
+    const texts = renderScreen(true);
 
     expect(texts).toContain('Waiting for the review transcript.');
   });
@@ -509,7 +661,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    const texts = renderScreen();
+    const texts = renderScreen(true);
 
     expect(texts).toContain('No transcript for this review.');
   });
@@ -522,7 +674,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    const texts = renderScreen();
+    const texts = renderScreen(true);
 
     expect(texts).toContain('No transcript for this review.');
     expect(texts).not.toContain('Waiting for the review transcript.');
@@ -536,7 +688,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    renderScreen();
+    renderScreen(true);
 
     const spectatorError = queryErrors.errors.find(
       error => error.title === 'Could not load the review transcript.'
@@ -546,7 +698,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(spectatorError?.placement).toBe('top');
   });
 
-  it('wraps the transcript list in an explicit height when rows exist', () => {
+  it('fills the sheet with the transcript and clears the bottom safe area', () => {
     spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'completed' });
     spectatorQueries.sessionMessages.data = {
       success: true,
@@ -558,7 +710,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    renderScreen();
+    renderScreen(true);
 
     expect(sessionListRenders.list).toHaveLength(1);
     const items = sessionListRenders.list[0]?.items as
@@ -572,9 +724,9 @@ describe('ReviewDetailScreen spectator transcript', () => {
       const style = view.style as { height?: unknown } | undefined;
       return style && typeof style.height === 'number';
     });
-    expect(heightView).toBeDefined();
-    const heightStyle = heightView?.style as { height: number } | undefined;
-    expect(heightStyle?.height).toBe(280);
+    expect(heightView).toBeUndefined();
+    expect(viewRenders.list.some(view => view.className === 'flex-1 gap-2')).toBe(true);
+    expect(sessionListRenders.list[0]?.contentBottomInset).toBe(34);
   });
 
   it('shows QueryError plus Retry when the session snapshot fails', () => {
@@ -586,7 +738,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    renderScreen();
+    renderScreen(true);
 
     const snapshotError = queryErrors.errors.find(
       error => error.title === 'Could not load the review transcript.'
@@ -629,7 +781,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    renderScreen();
+    renderScreen(true);
 
     expect(captured.onEvent).toBeDefined();
     act(() => {
@@ -680,16 +832,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-    act(() => {
-      ref.current = TestRenderer.create(
-        createElement(ReviewDetailScreen, { scope: 'personal', reviewId: 'rev-1' })
-      );
-    });
-    const renderer = ref.current;
-    if (!renderer) {
-      throw new Error('renderer was not created');
-    }
+    const renderer = mountScreen(true);
 
     expect(captured.onEvent).toBeDefined();
     act(() => {
@@ -742,7 +885,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       tokenUsage: { input: 0, output: 0 },
     };
 
-    renderScreen();
+    renderScreen(true);
 
     expect(captured.onError).toBeDefined();
     act(() => {

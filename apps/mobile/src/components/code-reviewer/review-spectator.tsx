@@ -1,7 +1,8 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 
 import { SessionMessageList } from '@/components/agents/session-message-list';
@@ -67,7 +68,7 @@ export function ReviewSpectator({
 }: Readonly<ReviewSpectatorProps>) {
   const { t } = useTranslation();
   const trpc = useTRPC();
-  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const streamInfo = useQuery({
     ...trpc.codeReviews.getReviewStreamInfo.queryOptions({ reviewId }),
@@ -181,19 +182,10 @@ export function ReviewSpectator({
   );
 
   const transcriptRows = shouldLoadHistory ? historicalRows : liveRows;
-  const transcriptHeight = Math.min(360, Math.max(200, windowHeight * 0.35));
-
-  function renderSkeletonSlot() {
-    return (
-      <View style={{ height: transcriptHeight }}>
-        <SessionSkeletonMessages />
-      </View>
-    );
-  }
 
   function renderRowsWithRetry(onRetry: () => void) {
     return (
-      <View>
+      <View className="flex-1 pb-4">
         {renderRowsSlot()}
         <CompactRetry onPress={onRetry} />
       </View>
@@ -203,7 +195,7 @@ export function ReviewSpectator({
   function renderRowsSlot() {
     const isLive = isLiveCloud && !liveError;
     return (
-      <View style={{ height: transcriptHeight }}>
+      <View className="flex-1">
         {isLive ? (
           <View className="px-4 pt-2">
             <Text variant="muted" className="text-xs">
@@ -229,6 +221,7 @@ export function ReviewSpectator({
           olderMessagesOmittedItemCount={0}
           onLoadOlderMessages={onLoadOlderMessagesNoop}
           renderItem={renderSpectatorRow}
+          contentBottomInset={Math.max(insets.bottom, 16)}
         />
       </View>
     );
@@ -236,7 +229,7 @@ export function ReviewSpectator({
 
   function renderTranscriptSlot() {
     if (streamInfo.isLoading) {
-      return renderSkeletonSlot();
+      return <SessionSkeletonMessages />;
     }
     if (streamInfo.isError || (streamInfo.data && !streamInfo.data.success)) {
       if (liveRows.length > 0) {
@@ -258,7 +251,7 @@ export function ReviewSpectator({
 
     if (shouldLoadHistory) {
       if (sessionMessages.isLoading) {
-        return renderSkeletonSlot();
+        return <SessionSkeletonMessages />;
       }
       if (sessionMessages.isError || !sessionMessages.data?.success) {
         if (historicalRows.length > 0) {
@@ -312,7 +305,7 @@ export function ReviewSpectator({
   }
 
   return (
-    <View className="gap-2">
+    <View className="flex-1 gap-2">
       <View className="flex-row items-center gap-2 px-4 pt-2">
         <Text className="flex-1 text-base font-medium" numberOfLines={1}>
           {prTitle}

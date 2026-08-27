@@ -14,7 +14,7 @@ import {
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
 import { flattenCouncilFindings } from '@/components/code-reviewer/review-detail-helpers';
-import { ReviewSpectator } from '@/components/code-reviewer/review-spectator';
+import { ReviewSpectatorSheet } from '@/components/code-reviewer/review-spectator-sheet';
 import {
   CouncilSection,
   FindingCard,
@@ -141,7 +141,8 @@ export function ReviewDetailScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.reviewDetail.title')} eyebrow={review.repo_full_name} />
-      <ReviewSpectator
+      <ReviewSpectatorSheet
+        key={reviewId}
         reviewId={reviewId}
         status={review.status}
         prTitle={review.pr_title}

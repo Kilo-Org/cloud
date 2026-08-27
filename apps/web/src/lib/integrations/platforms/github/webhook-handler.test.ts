@@ -16,6 +16,7 @@ const mockHandleInstallationDeleted = jest.fn();
 const mockHandleInstallationSuspend = jest.fn();
 const mockHandleInstallationUnsuspend = jest.fn();
 const mockHandleInstallationRepositories = jest.fn();
+const mockUpsertCliSessionPullRequestsFromWebhook = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -61,7 +62,8 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
   handlePullRequest: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePullRequest(payload, platformIntegration),
   handlePushEvent: jest.fn(),
-  upsertCliSessionPullRequestsFromWebhook: jest.fn(),
+  upsertCliSessionPullRequestsFromWebhook: (payload: unknown, owner: unknown) =>
+    mockUpsertCliSessionPullRequestsFromWebhook(payload, owner),
   upsertCliSessionPullRequestReviewFromWebhook: jest.fn(),
 }));
 
@@ -332,6 +334,14 @@ describe('handleGitHubWebhook', () => {
       integration
     );
     expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
+    expect(mockUpsertCliSessionPullRequestsFromWebhook).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      {
+        kind: 'organization',
+        organizationId: integration.owned_by_organization_id,
+        platformIntegrationId: integration.id,
+      }
+    );
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
       expect.objectContaining({ handlers_triggered: ['code_review', 'cli_session_pr_upsert'] })

@@ -1,5 +1,12 @@
 import * as SecureStore from 'expo-secure-store';
 
+import {
+  captureEvent,
+  CONSENT_OUTCOME_EVENT,
+  flushLastPostHogEvent,
+  isPostHogReady,
+  subscribeToPostHogReady,
+} from '@/lib/analytics/posthog';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { CONSENT_USER_KEY_PREFIX, encodeStorageKey } from '@/lib/storage-keys';
 
@@ -14,6 +21,33 @@ type ConsentChange = {
 type ConsentChangeListener = (change: ConsentChange) => void;
 
 const listeners = new Set<ConsentChangeListener>();
+
+type PendingConsentOutcome = {
+  action: 'accepted' | 'optional_changed' | 'revoked';
+  optional: boolean;
+};
+
+// A consent outcome queued before PostHog became ready. The ready listener
+// below captures it once (and only once) the client exists. `revokeConsent`
+// clears it so a queued enable can never fire after a revoke.
+let pendingConsentOutcome: PendingConsentOutcome | null = null;
+
+// Register once at module load: when PostHog becomes ready and an outcome is
+// pending, capture it and clear the pending slot. A not-ready transition
+// leaves the pending outcome in place for the next ready transition.
+subscribeToPostHogReady(() => {
+  if (isPostHogReady() && pendingConsentOutcome) {
+    captureEvent(CONSENT_OUTCOME_EVENT, pendingConsentOutcome);
+    pendingConsentOutcome = null;
+  }
+});
+
+// Clear a queued outcome so it cannot survive sign-out and drain onto a later
+// account's client. `revokeConsent` clears it for the revoke path; sign-out
+// calls this during its telemetry teardown.
+export function clearPendingConsentOutcome(): void {
+  pendingConsentOutcome = null;
+}
 
 function keyFor(userId: string): string {
   return encodeStorageKey(CONSENT_USER_KEY_PREFIX, userId);
@@ -105,10 +139,17 @@ export async function hasAcceptedConsent(userId: string): Promise<boolean> {
 
 export async function acceptConsent(userId: string, optional = false): Promise<void> {
   await chainSave(keyFor(userId), async () => {
+    const prior = await readCurrentConsent(userId);
     await SecureStore.setItemAsync(
       keyFor(userId),
       JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional })
     );
+    // Queue an enable-side outcome only for a real optional-accept change.
+    // Duplicate accepts with the same optional value do not re-queue.
+    const alreadyAcceptedWithSameOptional = prior.mandatory && prior.optional === optional;
+    if (optional && !alreadyAcceptedWithSameOptional) {
+      pendingConsentOutcome = { action: 'accepted', optional: true };
+    }
   });
   notifyConsentChange({ userId, hasAccepted: true, optional });
 }
@@ -117,18 +158,34 @@ export async function setOptionalConsent(userId: string, optional: boolean): Pro
   // Read and write decision inside the same per-user chain: the update reads
   // the record left by the previous serialized write, so a concurrent revoke
   // queued ahead of it deletes first and cannot be undone by a stale update.
-  const wrote = await chainSave(keyFor(userId), async () => {
+  const { wrote, priorOptional } = await chainSave(keyFor(userId), async () => {
     const stored = await readCurrentConsent(userId);
     if (!stored.mandatory) {
-      return false;
+      return { wrote: false, priorOptional: false };
     }
     await SecureStore.setItemAsync(
       keyFor(userId),
       JSON.stringify({ v: CURRENT_CONSENT_VERSION, optional })
     );
-    return true;
+    return { wrote: true, priorOptional: stored.optional };
   });
-  if (wrote) {
+  if (!wrote) {
+    return;
+  }
+  if (priorOptional === optional) {
+    // No real change: notify as today and emit nothing.
+    notifyConsentChange({ userId, hasAccepted: true, optional });
+    return;
+  }
+  if (optional) {
+    // Enable-side: queue the outcome and let the ready listener capture it.
+    pendingConsentOutcome = { action: 'optional_changed', optional: true };
+    notifyConsentChange({ userId, hasAccepted: true, optional });
+  } else {
+    // Disable-side: capture and flush before notifying so the turn-off lands
+    // while optional telemetry is still allowed.
+    captureEvent(CONSENT_OUTCOME_EVENT, { action: 'optional_changed', optional: false });
+    await flushLastPostHogEvent();
     notifyConsentChange({ userId, hasAccepted: true, optional });
   }
 }
@@ -138,5 +195,9 @@ export async function revokeConsent(userId: string): Promise<void> {
     await SecureStore.deleteItemAsync(keyFor(userId));
     await SecureStore.deleteItemAsync(legacyKeyFor(userId));
   });
+  // A queued enable outcome must never fire after revoke.
+  pendingConsentOutcome = null;
+  captureEvent(CONSENT_OUTCOME_EVENT, { action: 'revoked', optional: false });
+  await flushLastPostHogEvent();
   notifyConsentChange({ userId, hasAccepted: false, optional: false });
 }

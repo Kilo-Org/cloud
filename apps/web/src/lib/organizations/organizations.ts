@@ -36,6 +36,7 @@ import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client
 import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { captureOrganizationMemberJoined } from '@/lib/organizations/organization-member-analytics';
 import { failureResult, successResult } from '@/lib/maybe-result';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
@@ -786,6 +787,9 @@ export async function acceptOrganizationInvite(
   authentication: InvitationAuthenticationContext = {}
 ): Promise<AcceptInviteResult> {
   try {
+    // The accepting user's google_user_email, read inside the transaction and
+    // used as the PostHog distinct id after a successful membership insert.
+    let joinedDistinctId: string | null = null;
     const result = await db.transaction(async tx => {
       // Find and lock the invitation to prevent race conditions
       const [invitation] = await tx
@@ -823,6 +827,8 @@ export async function acceptOrganizationInvite(
       if (!acceptingUser) {
         return failureResult('User not found');
       }
+
+      joinedDistinctId = acceptingUser.email;
 
       const acceptedEmail = acceptingUser.normalizedEmail ?? normalizeEmail(acceptingUser.email);
       if (acceptedEmail !== normalizeEmail(invitation.email)) {
@@ -971,6 +977,9 @@ export async function acceptOrganizationInvite(
           },
         ],
       });
+      if (joinedDistinctId) {
+        captureOrganizationMemberJoined(joinedDistinctId, result.role);
+      }
     }
 
     return result;

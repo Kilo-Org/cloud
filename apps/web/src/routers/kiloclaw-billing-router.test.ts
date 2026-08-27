@@ -2780,7 +2780,7 @@ describe('createSubscriptionCheckout', () => {
 });
 
 describe('createKiloPassUpsellCheckout', () => {
-  it('shares checkout coordination with the generic Kilo Pass entrypoint', async () => {
+  it('expires a generic checkout before creating an upsell checkout with hosting intent', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -2791,37 +2791,40 @@ describe('createKiloPassUpsellCheckout', () => {
       trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
       kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
     });
-    let createdSession: Record<string, unknown> | undefined;
+    const createdSessions: Record<string, unknown>[] = [];
     stripeMock.checkout.sessions.create.mockImplementation(async input => {
-      createdSession = {
-        id: 'cs_shared_kilo_pass',
+      const session = {
+        id: `cs_shared_kilo_pass_${createdSessions.length + 1}`,
         status: 'open',
         url: 'https://checkout.stripe.com/shared',
         metadata: input.metadata,
       };
-      return createdSession;
+      createdSessions.push(session);
+      return session;
     });
     stripeMock.checkout.sessions.list.mockImplementation(async () => ({
-      data: createdSession ? [createdSession] : [],
+      data: createdSessions,
       has_more: false,
     }));
 
     const caller = await createCallerForUser(user.id);
-    const results = await Promise.all([
-      caller.kiloPass.createCheckoutSession({ tier: 'tier_19', cadence: 'monthly' }),
-      caller.kiloclaw.createKiloPassUpsellCheckout({
-        instanceId: instance.id,
-        tier: '19',
-        cadence: 'monthly',
-        hostingPlan: 'standard',
-      }),
-    ]);
+    const genericResult = await caller.kiloPass.createCheckoutSession({
+      tier: 'tier_19',
+      cadence: 'monthly',
+    });
+    const upsellResult = await caller.kiloclaw.createKiloPassUpsellCheckout({
+      instanceId: instance.id,
+      tier: '19',
+      cadence: 'monthly',
+      hostingPlan: 'standard',
+    });
 
-    expect(results).toEqual([
-      { url: 'https://checkout.stripe.com/shared' },
-      { url: 'https://checkout.stripe.com/shared' },
-    ]);
-    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(1);
+    expect(genericResult).toEqual({ url: 'https://checkout.stripe.com/shared' });
+    expect(upsellResult).toEqual({ url: 'https://checkout.stripe.com/shared' });
+    expect(stripeMock.checkout.sessions.expire).toHaveBeenCalledWith('cs_shared_kilo_pass_1', {
+      timeout: 10_000,
+    });
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(2);
   });
 
   it('rejects Commit hosting intent after the cutoff before creating Kilo Pass checkout', async () => {
@@ -3072,7 +3075,8 @@ describe('createKiloPassUpsellCheckout', () => {
           cadence: 'monthly',
           affiliateTrackingId: '',
         }),
-      })
+      }),
+      { timeout: 10_000 }
     );
   });
 
@@ -3122,7 +3126,8 @@ describe('createKiloPassUpsellCheckout', () => {
           cadence: 'monthly',
           affiliateTrackingId: 'impact-click-123',
         }),
-      })
+      }),
+      { timeout: 10_000 }
     );
   });
 

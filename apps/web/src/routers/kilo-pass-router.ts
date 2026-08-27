@@ -2662,28 +2662,32 @@ export const kiloPassRouter = createTRPCRouter({
       return createOrReuseKiloPassCheckoutSession({
         userId: ctx.user.id,
         stripeCustomerId,
+        metadata: sessionMetadata,
         createSession: () =>
-          stripe.checkout.sessions.create({
-            mode: 'subscription',
-            customer: stripeCustomerId,
-            allow_promotion_codes: true,
-            billing_address_collection: 'required',
-            line_items: [{ price: priceId, quantity: 1 }],
-            customer_update: {
-              name: 'auto',
-              address: 'auto',
-            },
-            tax_id_collection: {
-              enabled: true,
-              required: 'never',
-            },
-            success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${APP_URL}/profile?kilo_pass_checkout=cancelled`,
-            subscription_data: {
+          stripe.checkout.sessions.create(
+            {
+              mode: 'subscription',
+              customer: stripeCustomerId,
+              allow_promotion_codes: true,
+              billing_address_collection: 'required',
+              line_items: [{ price: priceId, quantity: 1 }],
+              customer_update: {
+                name: 'auto',
+                address: 'auto',
+              },
+              tax_id_collection: {
+                enabled: true,
+                required: 'never',
+              },
+              success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}`,
+              cancel_url: `${APP_URL}/profile?kilo_pass_checkout=cancelled`,
+              subscription_data: {
+                metadata: sessionMetadata,
+              },
               metadata: sessionMetadata,
             },
-            metadata: sessionMetadata,
-          }),
+            { timeout: 10_000 }
+          ),
       });
     }),
 

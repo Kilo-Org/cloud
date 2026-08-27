@@ -81,6 +81,7 @@ type StripeMock = {
   checkout: {
     sessions: {
       create: ReturnType<typeof jest.fn>;
+      expire: ReturnType<typeof jest.fn>;
       list: ReturnType<typeof jest.fn>;
       retrieve: ReturnType<typeof jest.fn>;
     };
@@ -370,6 +371,7 @@ jest.mock('@/lib/stripe-client', () => {
     checkout: {
       sessions: {
         create: jest.fn(),
+        expire: jest.fn(),
         list: jest.fn(),
         retrieve: jest.fn(),
       },
@@ -696,6 +698,8 @@ describe('kiloPassRouter', () => {
     stripeMock.subscriptionSchedules.release.mockReset();
     stripeMock.subscriptionSchedules.retrieve.mockReset();
     stripeMock.checkout.sessions.create.mockReset();
+    stripeMock.checkout.sessions.expire.mockReset();
+    stripeMock.checkout.sessions.expire.mockResolvedValue({});
     stripeMock.checkout.sessions.list.mockReset();
     stripeMock.checkout.sessions.list.mockResolvedValue({ data: [] });
     stripeMock.checkout.sessions.retrieve.mockReset();
@@ -5305,6 +5309,29 @@ describe('kiloPassRouter', () => {
       ).rejects.toThrow('You already have an active Kilo Pass subscription.');
     });
 
+    it('rejects when an active store subscription already exists', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-create-session-store-active@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerSubscriptionId: 'app-store-active-subscription',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.createCheckoutSession({
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Monthly,
+        })
+      ).rejects.toThrow('You already have an active Kilo Pass subscription.');
+      expect(getStripeMock().checkout.sessions.list).not.toHaveBeenCalled();
+    });
+
     it('reuses one open Stripe session for concurrent initial checkout requests', async () => {
       const stripeMock = getStripeMock();
       const user = await insertTestUser({
@@ -5316,6 +5343,8 @@ describe('kiloPassRouter', () => {
         metadata: {
           type: 'kilo-pass',
           kiloUserId: user.id,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
         },
       };
       stripeMock.checkout.sessions.create.mockResolvedValue(session);
@@ -5330,14 +5359,89 @@ describe('kiloPassRouter', () => {
           cadence: KiloPassCadence.Monthly,
         }),
         caller.kiloPass.createCheckoutSession({
-          tier: KiloPassTier.Tier49,
-          cadence: KiloPassCadence.Yearly,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
         }),
       ]);
 
       expect(results).toEqual([{ url: session.url }, { url: session.url }]);
       expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(1);
       expect(stripeMock.checkout.sessions.list).toHaveBeenCalledTimes(2);
+    });
+
+    it('expires a checkout for another tier before creating the requested product', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-create-session-tier-change@example.com',
+      });
+      stripeMock.checkout.sessions.list.mockResolvedValue({
+        data: [
+          {
+            id: 'cs_tier_19',
+            status: 'open',
+            url: 'https://stripe.example.test/checkout/tier-19',
+            metadata: {
+              type: 'kilo-pass',
+              kiloUserId: user.id,
+              tier: KiloPassTier.Tier19,
+              cadence: KiloPassCadence.Monthly,
+            },
+          },
+        ],
+        has_more: false,
+      });
+      stripeMock.checkout.sessions.create.mockResolvedValue({
+        url: 'https://stripe.example.test/checkout/tier-49',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.createCheckoutSession({
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Yearly,
+        })
+      ).resolves.toEqual({ url: 'https://stripe.example.test/checkout/tier-49' });
+      expect(stripeMock.checkout.sessions.expire).toHaveBeenCalledWith('cs_tier_19', {
+        timeout: 10_000,
+      });
+      expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('expires a matching checkout without a reusable URL', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-create-session-null-url@example.com',
+      });
+      stripeMock.checkout.sessions.list.mockResolvedValue({
+        data: [
+          {
+            id: 'cs_null_url',
+            status: 'open',
+            url: null,
+            metadata: {
+              type: 'kilo-pass',
+              kiloUserId: user.id,
+              tier: KiloPassTier.Tier19,
+              cadence: KiloPassCadence.Monthly,
+            },
+          },
+        ],
+        has_more: false,
+      });
+      stripeMock.checkout.sessions.create.mockResolvedValue({
+        url: 'https://stripe.example.test/checkout/replacement',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.createCheckoutSession({
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+        })
+      ).resolves.toEqual({ url: 'https://stripe.example.test/checkout/replacement' });
+      expect(stripeMock.checkout.sessions.expire).toHaveBeenCalledWith('cs_null_url', {
+        timeout: 10_000,
+      });
     });
 
     it('finds an open Kilo Pass session on a later Stripe page', async () => {
@@ -5354,7 +5458,12 @@ describe('kiloPassRouter', () => {
           data: [
             {
               id: 'cs_kilo_pass',
-              metadata: { type: 'kilo-pass', kiloUserId: user.id },
+              metadata: {
+                type: 'kilo-pass',
+                kiloUserId: user.id,
+                tier: KiloPassTier.Tier19,
+                cadence: KiloPassCadence.Monthly,
+              },
               status: 'open',
               url: 'https://stripe.example.test/checkout/existing',
             },
@@ -5369,12 +5478,16 @@ describe('kiloPassRouter', () => {
           cadence: KiloPassCadence.Monthly,
         })
       ).resolves.toEqual({ url: 'https://stripe.example.test/checkout/existing' });
-      expect(stripeMock.checkout.sessions.list).toHaveBeenNthCalledWith(2, {
-        customer: user.stripe_customer_id,
-        status: 'open',
-        limit: 100,
-        starting_after: 'cs_other',
-      });
+      expect(stripeMock.checkout.sessions.list).toHaveBeenNthCalledWith(
+        2,
+        {
+          customer: user.stripe_customer_id,
+          status: 'open',
+          limit: 100,
+          starting_after: 'cs_other',
+        },
+        { timeout: 10_000 }
+      );
       expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
     });
 
@@ -5431,12 +5544,16 @@ describe('kiloPassRouter', () => {
           cadence: KiloPassCadence.Monthly,
         })
       ).rejects.toThrow('You already have an active Kilo Pass subscription.');
-      expect(stripeMock.subscriptions.list).toHaveBeenNthCalledWith(2, {
-        customer: user.stripe_customer_id,
-        status: 'all',
-        limit: 100,
-        starting_after: 'sub_other',
-      });
+      expect(stripeMock.subscriptions.list).toHaveBeenNthCalledWith(
+        2,
+        {
+          customer: user.stripe_customer_id,
+          status: 'all',
+          limit: 100,
+          starting_after: 'sub_other',
+        },
+        { timeout: 10_000 }
+      );
       expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
     });
 
@@ -5521,7 +5638,8 @@ describe('kiloPassRouter', () => {
             cadence: 'yearly',
             affiliateTrackingId: '',
           },
-        })
+        }),
+        { timeout: 10_000 }
       );
     });
 
@@ -5564,7 +5682,8 @@ describe('kiloPassRouter', () => {
             cadence: 'yearly',
             affiliateTrackingId: 'impact-click-123',
           },
-        })
+        }),
+        { timeout: 10_000 }
       );
     });
 

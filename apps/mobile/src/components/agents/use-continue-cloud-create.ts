@@ -22,7 +22,7 @@ export function useContinueCloudCreate(
   organizationId: string | undefined
 ): (
   sessionId: KiloSessionId,
-  dest: { repo: string; model: string; variant: string },
+  dest: { repo: string; model: string; variant: string; githubIntegrationId?: string },
   mode: string
 ) => Promise<void> {
   const router = useRouter();
@@ -43,12 +43,13 @@ export function useContinueCloudCreate(
   return useCallback(
     async (
       sessionId: KiloSessionId,
-      dest: { repo: string; model: string; variant: string },
+      dest: { repo: string; model: string; variant: string; githubIntegrationId?: string },
       mode: string
     ) => {
       const intentFingerprint = JSON.stringify({
         cloneFromKiloSessionId: sessionId,
         repo: dest.repo,
+        githubIntegrationId: dest.githubIntegrationId ?? null,
         model: dest.model,
         variant: dest.variant || undefined,
         mode,
@@ -73,6 +74,7 @@ export function useContinueCloudCreate(
         model: dest.model,
         variant: dest.variant || undefined,
         githubRepo: dest.repo,
+        ...(dest.githubIntegrationId ? { githubIntegrationId: dest.githubIntegrationId } : {}),
         autoCommit: false,
         autoInitiate: true as const,
         operationKey,

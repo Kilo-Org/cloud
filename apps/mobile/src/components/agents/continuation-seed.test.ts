@@ -88,4 +88,52 @@ describe('resolveContinuationResolution', () => {
 
     expect(result).toEqual({ kind: 'unresolved-model' });
   });
+
+  it('preserves unique repository integration provenance when continuing', () => {
+    const result = resolveContinuationResolution({
+      gitUrl: GIT_URL,
+      mode: 'code',
+      model: 'test-model',
+      variant: 'default',
+      repositories: [{ fullName: 'owner/repo', platformIntegrationId: 'integration-1' }],
+      models: MODELS,
+    });
+
+    expect(result).toEqual({
+      kind: 'cloud-agent',
+      repo: 'owner/repo',
+      model: 'test-model',
+      variant: 'default',
+      githubIntegrationId: 'integration-1',
+    });
+  });
+
+  it('omits repository integration provenance for a unique legacy repository', () => {
+    const result = resolveContinuationResolution({
+      gitUrl: GIT_URL,
+      mode: 'code',
+      model: 'test-model',
+      variant: 'default',
+      repositories: REPOS,
+      models: MODELS,
+    });
+
+    expect(result).not.toHaveProperty('githubIntegrationId');
+  });
+
+  it('rejects an ambiguous repository match across installations', () => {
+    const result = resolveContinuationResolution({
+      gitUrl: GIT_URL,
+      mode: 'code',
+      model: 'test-model',
+      variant: 'default',
+      repositories: [
+        { fullName: 'owner/repo', platformIntegrationId: 'integration-1' },
+        { fullName: 'OWNER/REPO', platformIntegrationId: 'integration-2' },
+      ],
+      models: MODELS,
+    });
+
+    expect(result).toEqual({ kind: 'unmatched-repository' });
+  });
 });

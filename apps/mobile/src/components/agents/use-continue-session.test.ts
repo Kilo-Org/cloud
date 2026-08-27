@@ -306,6 +306,36 @@ describe('useContinueSession cloud clone wiring', () => {
     expect(input.initialMessageId).toBeUndefined();
   });
 
+  it('forwards repository integration provenance into the continued session', async () => {
+    resolutionRef.value = { ...CLOUD_RESOLUTION, githubIntegrationId: 'integration-1' };
+    prepareSessionMutate.mockResolvedValueOnce({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    const mount = mountContinueSession({ sessionId: SESSION_ID, organizationId: 'org-1' });
+
+    await mount.result.continueSession(FIELDS);
+
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({
+      cloneFromKiloSessionId: SESSION_ID,
+      githubRepo: 'owner/repo',
+      githubIntegrationId: 'integration-1',
+    });
+    expect(input.prompt).toBeUndefined();
+    expect(input.initialMessageId).toBeUndefined();
+  });
+
+  it('omits repository integration provenance from legacy clone input', async () => {
+    prepareSessionMutate.mockResolvedValueOnce({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    const mount = mountContinueSession({ sessionId: SESSION_ID, organizationId: 'org-1' });
+
+    await mount.result.continueSession(FIELDS);
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('githubIntegrationId');
+  });
+
   it('never drains history and never queries instances: only the repository list is fetched', async () => {
     prepareSessionMutate.mockResolvedValueOnce({
       kiloSessionId: 'ses_12345678901234567890123456',
@@ -423,6 +453,24 @@ describe('useContinueSession cloud clone wiring', () => {
     );
     expect(fingerprints).toHaveLength(2);
     expect(fingerprints[0]).toBe(fingerprints[1]);
+  });
+
+  it('includes repository integration provenance in the operation fingerprint', async () => {
+    resolutionRef.value = { ...CLOUD_RESOLUTION, githubIntegrationId: 'integration-1' };
+    prepareSessionMutate.mockResolvedValueOnce({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    const mount = mountContinueSession({ sessionId: SESSION_ID, organizationId: 'org-1' });
+
+    await mount.result.continueSession(FIELDS);
+
+    const row = outboxMock.writeSafeRetry.mock.calls[0]?.[0] as { fingerprint: string } | undefined;
+    const fingerprint = row?.fingerprint ?? '';
+    expect(JSON.parse(fingerprint)).toMatchObject({
+      cloneFromKiloSessionId: SESSION_ID,
+      repo: 'owner/repo',
+      githubIntegrationId: 'integration-1',
+    });
   });
 
   it('surfaces connect-repository guidance and does not navigate when the repository is unmatched', async () => {

@@ -1,0 +1,3 @@
+ALTER TABLE "cloud_agent_webhook_triggers" ADD COLUMN "github_integration_id" uuid;--> statement-breakpoint
+ALTER TABLE "cloud_agent_webhook_triggers" ADD CONSTRAINT "cloud_agent_webhook_triggers_github_integration_id_platform_integrations_id_fk" FOREIGN KEY ("github_integration_id") REFERENCES "public"."platform_integrations"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "IDX_cloud_agent_webhook_triggers_github_integration" ON "cloud_agent_webhook_triggers" USING btree ("github_integration_id");

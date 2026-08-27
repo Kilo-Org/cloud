@@ -1,10 +1,14 @@
 import { logger } from './logger';
+import { z } from 'zod';
 
-export type WebhookDeliveryMessage = {
-  namespace: string;
-  triggerId: string;
-  requestId: string;
-};
+export const WebhookDeliveryMessageSchema = z.object({
+  namespace: z.string().min(1),
+  triggerId: z.string().min(1),
+  requestId: z.string().min(1),
+  githubIntegrationId: z.string().uuid().optional(),
+});
+
+export type WebhookDeliveryMessage = z.infer<typeof WebhookDeliveryMessageSchema>;
 
 export async function enqueueWebhookDelivery(
   queue: Queue<WebhookDeliveryMessage>,

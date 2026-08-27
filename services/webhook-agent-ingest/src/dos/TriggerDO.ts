@@ -40,6 +40,7 @@ export const TriggerConfig = z.object({
   targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
   kiloclawInstanceId: z.string().nullable().optional(),
   githubRepo: z.string().nullable().optional(),
+  githubIntegrationId: z.string().uuid().nullable().optional(),
   mode: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
   promptTemplate: z.string(),
@@ -83,6 +84,7 @@ type ConfigureInput = {
   targetType?: 'cloud_agent' | 'kiloclaw_chat';
   kiloclawInstanceId?: string;
   githubRepo?: string;
+  githubIntegrationId?: string;
   mode?: string;
   model?: string;
   promptTemplate: string;
@@ -106,6 +108,7 @@ type UpdateConfigInput = {
   promptTemplate?: string;
   isActive?: boolean;
   profileId?: string;
+  githubIntegrationId?: string;
   autoCommit?: boolean | null;
   condenseOnComplete?: boolean | null;
   webhookAuth?: WebhookAuthUpdateInput;
@@ -147,6 +150,7 @@ export class TriggerDO extends DurableObject<Env> {
       targetType: configOverrides.targetType ?? 'cloud_agent',
       kiloclawInstanceId: configOverrides.kiloclawInstanceId ?? null,
       githubRepo: configOverrides.githubRepo ?? null,
+      githubIntegrationId: configOverrides.githubIntegrationId ?? null,
       mode: configOverrides.mode ?? null,
       model: configOverrides.model ?? null,
       promptTemplate: configOverrides.promptTemplate,
@@ -172,6 +176,7 @@ export class TriggerDO extends DurableObject<Env> {
       target_type: config.targetType,
       kiloclaw_instance_id: config.kiloclawInstanceId ?? null,
       github_repo: config.githubRepo ?? null,
+      github_integration_id: config.githubIntegrationId ?? null,
       mode: config.mode ?? null,
       model: config.model ?? null,
       prompt_template: config.promptTemplate,
@@ -238,6 +243,7 @@ export class TriggerDO extends DurableObject<Env> {
       targetType: record.target_type === 'kiloclaw_chat' ? 'kiloclaw_chat' : 'cloud_agent',
       kiloclawInstanceId: record.kiloclaw_instance_id ?? null,
       githubRepo: record.github_repo ?? null,
+      githubIntegrationId: record.github_integration_id ?? null,
       mode: record.mode ?? null,
       model: record.model ?? null,
       promptTemplate: record.prompt_template,
@@ -293,6 +299,7 @@ export class TriggerDO extends DurableObject<Env> {
       promptTemplate: updates.promptTemplate ?? existingConfig.promptTemplate,
       isActive: updates.isActive ?? existingConfig.isActive,
       profileId: updates.profileId ?? existingConfig.profileId,
+      githubIntegrationId: updates.githubIntegrationId ?? existingConfig.githubIntegrationId,
       autoCommit: resolveNullable(updates.autoCommit, existingConfig.autoCommit),
       condenseOnComplete: resolveNullable(
         updates.condenseOnComplete,
@@ -314,6 +321,7 @@ export class TriggerDO extends DurableObject<Env> {
         prompt_template: updatedConfig.promptTemplate,
         is_active: updatedConfig.isActive ? 1 : 0,
         profile_id: updatedConfig.profileId,
+        github_integration_id: updatedConfig.githubIntegrationId,
         auto_commit:
           updatedConfig.autoCommit !== undefined ? (updatedConfig.autoCommit ? 1 : 0) : null,
         condense_on_complete:
@@ -546,6 +554,7 @@ export class TriggerDO extends DurableObject<Env> {
       namespace: config.namespace,
       triggerId: config.triggerId,
       requestId,
+      ...(config.githubIntegrationId ? { githubIntegrationId: config.githubIntegrationId } : {}),
     };
 
     try {
@@ -695,6 +704,7 @@ export class TriggerDO extends DurableObject<Env> {
         namespace: config.namespace,
         triggerId: config.triggerId,
         requestId,
+        ...(config.githubIntegrationId ? { githubIntegrationId: config.githubIntegrationId } : {}),
       });
     } catch (enqueueError) {
       logger.error('Failed to enqueue scheduled delivery, marking request as failed', {

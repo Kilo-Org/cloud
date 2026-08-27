@@ -4966,6 +4966,12 @@ export const cloud_agent_webhook_triggers = pgTable(
     cron_timezone: text('cron_timezone').default('UTC'),
     // Cloud Agent target fields (nullable — only required when target_type = 'cloud_agent')
     github_repo: text('github_repo'),
+    github_integration_id: uuid('github_integration_id').references(
+      () => platform_integrations.id,
+      {
+        onDelete: 'set null',
+      }
+    ),
     is_active: boolean('is_active').notNull().default(true),
     // Profile reference - resolved at runtime in the worker via Hyperdrive
     // ON DELETE RESTRICT prevents deletion of profiles referenced by triggers
@@ -4994,6 +5000,7 @@ export const cloud_agent_webhook_triggers = pgTable(
     index('IDX_cloud_agent_webhook_triggers_org').on(table.organization_id),
     index('IDX_cloud_agent_webhook_triggers_active').on(table.is_active),
     index('IDX_cloud_agent_webhook_triggers_profile').on(table.profile_id),
+    index('IDX_cloud_agent_webhook_triggers_github_integration').on(table.github_integration_id),
     // Owner check constraint - exactly one must be set
     check(
       'CHK_cloud_agent_webhook_triggers_owner',

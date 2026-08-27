@@ -15,6 +15,7 @@ export type TriggerConfigResponse = {
   targetType: 'cloud_agent' | 'kiloclaw_chat';
   kiloclawInstanceId?: string | null;
   githubRepo: string | null;
+  githubIntegrationId?: string | null;
   mode: string | null;
   model: string | null;
   promptTemplate: string;
@@ -38,6 +39,7 @@ export type CreateTriggerInput = {
   targetType?: 'cloud_agent' | 'kiloclaw_chat';
   kiloclawInstanceId?: string;
   githubRepo?: string;
+  githubIntegrationId?: string;
   mode?: string;
   model?: string;
   promptTemplate: string;
@@ -64,6 +66,7 @@ export type UpdateTriggerInput = {
   promptTemplate?: string;
   isActive?: boolean;
   profileId?: string;
+  githubIntegrationId?: string;
   autoCommit?: boolean | null;
   condenseOnComplete?: boolean | null;
   webhookAuth?: {

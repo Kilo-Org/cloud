@@ -9,6 +9,7 @@ import {
   agent_environment_profiles,
   kiloclaw_instances,
 } from '@kilocode/db/schema';
+import { assertWebhookTriggerGitHubIntegrationAccess } from '@/lib/webhook-trigger-github-integration';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
 import { triggerIdSchema, triggerIdCreateSchema } from '@/lib/webhook-trigger-validation';
 import {
@@ -36,6 +37,7 @@ const WebhookTriggerCreateInput = z
     kiloclawInstanceId: z.string().uuid().optional(),
     // Cloud Agent target fields (optional — required only when targetType = 'cloud_agent')
     githubRepo: z.string().min(1, 'GitHub repo is required').optional(),
+    githubIntegrationId: z.string().uuid().optional(),
     mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
     model: z.string().min(1, 'Model is required').optional(),
     profileId: z.string().uuid().optional(),
@@ -113,6 +115,20 @@ const WebhookTriggerCreateInput = z
           path: ['kiloclawInstanceId'],
         });
     }
+    if (data.githubIntegrationId && data.targetType !== 'cloud_agent') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'GitHub integration is only valid for Cloud Agent triggers',
+        path: ['githubIntegrationId'],
+      });
+    }
+    if (data.githubIntegrationId && !data.organizationId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'GitHub integration selection requires an organization trigger',
+        path: ['githubIntegrationId'],
+      });
+    }
   });
 
 // Note: targetType and kiloclawInstanceId are immutable after creation.
@@ -125,6 +141,7 @@ const WebhookTriggerUpdateInput = z
     model: z.string().min(1).optional(),
     promptTemplate: z.string().min(1).max(10000).optional(),
     profileId: z.string().uuid().optional(),
+    githubIntegrationId: z.string().uuid().optional(),
     autoCommit: z.boolean().nullable().optional(),
     condenseOnComplete: z.boolean().nullable().optional(),
     isActive: z.boolean().optional(),
@@ -160,6 +177,13 @@ const WebhookTriggerUpdateInput = z
         code: 'custom',
         message: 'Invalid timezone',
         path: ['cronTimezone'],
+      });
+    }
+    if (data.githubIntegrationId && !data.organizationId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'GitHub integration selection requires an organization trigger',
+        path: ['githubIntegrationId'],
       });
     }
   });
@@ -293,6 +317,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           triggerId: cloud_agent_webhook_triggers.trigger_id,
           targetType: cloud_agent_webhook_triggers.target_type,
           githubRepo: cloud_agent_webhook_triggers.github_repo,
+          githubIntegrationId: cloud_agent_webhook_triggers.github_integration_id,
           kiloclawInstanceId: cloud_agent_webhook_triggers.kiloclaw_instance_id,
           isActive: cloud_agent_webhook_triggers.is_active,
           activationMode: cloud_agent_webhook_triggers.activation_mode,
@@ -408,6 +433,19 @@ export const webhookTriggersRouter = createTRPCRouter({
         });
       }
       await assertProfileOwnership(userId, input.organizationId, input.profileId);
+      if (input.githubIntegrationId && input.githubRepo) {
+        if (!input.organizationId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'GitHub integration selection requires an organization trigger',
+          });
+        }
+        await assertWebhookTriggerGitHubIntegrationAccess({
+          organizationId: input.organizationId,
+          githubIntegrationId: input.githubIntegrationId,
+          githubRepo: input.githubRepo,
+        });
+      }
     }
     if (input.targetType === 'kiloclaw_chat') {
       if (!input.kiloclawInstanceId) {
@@ -446,6 +484,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           activation_mode: input.activationMode,
           kiloclaw_instance_id: input.kiloclawInstanceId ?? null,
           github_repo: input.githubRepo ?? null,
+          github_integration_id: input.githubIntegrationId ?? null,
           is_active: true,
           profile_id: input.profileId ?? null,
           cron_expression: input.cronExpression ?? null,
@@ -476,6 +515,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           targetType: input.targetType,
           kiloclawInstanceId: input.kiloclawInstanceId,
           githubRepo: input.githubRepo,
+          githubIntegrationId: input.githubIntegrationId,
           mode: input.mode,
           model: input.model,
           promptTemplate: input.promptTemplate,
@@ -538,6 +578,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       targetType: input.targetType,
       activationMode: input.activationMode,
       githubRepo: input.githubRepo ?? null,
+      githubIntegrationId: input.githubIntegrationId ?? null,
       isActive: true,
       createdAt: dbRecord.created_at,
       inboundUrl,
@@ -564,12 +605,29 @@ export const webhookTriggersRouter = createTRPCRouter({
     if (input.profileId) {
       await assertProfileOwnership(userId, input.organizationId, input.profileId);
     }
+    if (input.githubIntegrationId) {
+      if (!dbTrigger.github_repo) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Trigger has no GitHub repository' });
+      }
+      if (!input.organizationId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'GitHub integration selection requires an organization trigger',
+        });
+      }
+      await assertWebhookTriggerGitHubIntegrationAccess({
+        organizationId: input.organizationId,
+        githubIntegrationId: input.githubIntegrationId,
+        githubRepo: dbTrigger.github_repo,
+      });
+    }
 
     const hasUpdates = [
       input.mode,
       input.model,
       input.promptTemplate,
       input.profileId,
+      input.githubIntegrationId,
       input.autoCommit,
       input.condenseOnComplete,
       input.isActive,
@@ -595,6 +653,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       promptTemplate: input.promptTemplate,
       isActive: input.isActive,
       profileId: input.profileId,
+      githubIntegrationId: input.githubIntegrationId,
       autoCommit: input.autoCommit,
       condenseOnComplete: input.condenseOnComplete,
       webhookAuth: input.webhookAuth,
@@ -631,6 +690,9 @@ export const webhookTriggersRouter = createTRPCRouter({
       .set({
         ...(input.isActive !== undefined ? { is_active: input.isActive } : {}),
         ...(input.profileId !== undefined ? { profile_id: input.profileId } : {}),
+        ...(input.githubIntegrationId !== undefined
+          ? { github_integration_id: input.githubIntegrationId }
+          : {}),
         ...(isScheduledTrigger && input.cronExpression !== undefined
           ? { cron_expression: input.cronExpression }
           : {}),

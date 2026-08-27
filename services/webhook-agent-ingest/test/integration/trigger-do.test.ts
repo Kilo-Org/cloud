@@ -40,6 +40,7 @@ describe('TriggerDO', () => {
 
       await stub.configure(testOrgNamespace, testTriggerId, {
         githubRepo: 'owner/repo',
+        githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
         mode: 'code',
         model: 'openai/gpt-4.1',
         promptTemplate: 'Process this webhook:\n\n{{body}}',
@@ -53,10 +54,44 @@ describe('TriggerDO', () => {
         orgId: testOrgId,
         isActive: true,
         githubRepo: 'owner/repo',
+        githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
         mode: 'code',
         model: 'openai/gpt-4.1',
         promptTemplate: 'Process this webhook:\n\n{{body}}',
       });
+    });
+
+    it('keeps legacy config without an integration identity readable', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/legacy-trigger`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, 'legacy-trigger', {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: '{{body}}',
+      });
+
+      await expect(stub.getConfig()).resolves.toMatchObject({
+        githubRepo: 'owner/repo',
+        githubIntegrationId: null,
+      });
+    });
+
+    it('updates and persists GitHub integration identity', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testOrgNamespace}/updated-trigger`);
+      const stub = env.TRIGGER_DO.get(id);
+      const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+
+      await stub.configure(testOrgNamespace, 'updated-trigger', {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: '{{body}}',
+      });
+      await stub.updateConfig({ githubIntegrationId });
+
+      await expect(stub.getConfig()).resolves.toMatchObject({ githubIntegrationId });
     });
   });
 

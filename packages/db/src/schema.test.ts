@@ -863,6 +863,66 @@ describe('database schema', () => {
     expect(Object.hasOwn(schema, 'kilo_pass_store_purchases')).toBe(true);
   });
 
+  it('keeps webhook triggers readable when their selected GitHub integration is deleted', async () => {
+    const userId = `schema-webhook-trigger-${crypto.randomUUID()}`;
+    await schemaTestDb.db.insert(schema.kilocode_users).values({
+      id: userId,
+      google_user_email: `${userId}@example.com`,
+      google_user_name: 'Schema Webhook Trigger User',
+      google_user_image_url: 'https://example.com/avatar.png',
+      stripe_customer_id: `cus_${crypto.randomUUID()}`,
+    });
+
+    try {
+      const [integration] = await schemaTestDb.db
+        .insert(schema.platform_integrations)
+        .values({
+          owned_by_user_id: userId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `installation-${crypto.randomUUID()}`,
+          platform_account_login: 'acme',
+          repository_access: 'all',
+          integration_status: 'active',
+        })
+        .returning({ id: schema.platform_integrations.id });
+      const [profile] = await schemaTestDb.db
+        .insert(schema.agent_environment_profiles)
+        .values({ owned_by_user_id: userId, name: `Webhook ${crypto.randomUUID()}` })
+        .returning({ id: schema.agent_environment_profiles.id });
+      if (!integration || !profile) throw new Error('Failed to create webhook trigger test data');
+
+      const [trigger] = await schemaTestDb.db
+        .insert(schema.cloud_agent_webhook_triggers)
+        .values({
+          trigger_id: `trigger-${crypto.randomUUID()}`,
+          user_id: userId,
+          github_repo: 'acme/repository',
+          github_integration_id: integration.id,
+          profile_id: profile.id,
+        })
+        .returning({ id: schema.cloud_agent_webhook_triggers.id });
+      if (!trigger) throw new Error('Failed to create webhook trigger test row');
+
+      await schemaTestDb.db
+        .delete(schema.platform_integrations)
+        .where(eq(schema.platform_integrations.id, integration.id));
+
+      await expect(
+        schemaTestDb.db
+          .select({
+            githubIntegrationId: schema.cloud_agent_webhook_triggers.github_integration_id,
+          })
+          .from(schema.cloud_agent_webhook_triggers)
+          .where(eq(schema.cloud_agent_webhook_triggers.id, trigger.id))
+      ).resolves.toEqual([{ githubIntegrationId: null }]);
+    } finally {
+      await schemaTestDb.db
+        .delete(schema.kilocode_users)
+        .where(eq(schema.kilocode_users.id, userId));
+    }
+  });
+
   it('enforces one live Coding Plan subscription per user and provider', async () => {
     await withCodingPlanSchemaUser(async ({ userId }) => {
       const plusInventoryId = await insertCodingPlanInventoryKey({

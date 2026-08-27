@@ -1,4 +1,4 @@
-import type { WebhookDeliveryMessage } from './util/queue';
+import { WebhookDeliveryMessageSchema, type WebhookDeliveryMessage } from './util/queue';
 import type { TriggerConfig, TriggerDO } from './dos/TriggerDO';
 import { renderPromptTemplate } from './util/prompt-template';
 import { logger } from './util/logger';
@@ -254,7 +254,13 @@ async function processWebhookMessage(
   message: Message<WebhookDeliveryMessage>,
   env: Env
 ): Promise<void> {
-  const webhook = message.body;
+  const parsedWebhook = WebhookDeliveryMessageSchema.safeParse(message.body);
+  if (!parsedWebhook.success) {
+    logger.error('Invalid webhook delivery message', { issues: parsedWebhook.error.issues });
+    message.ack();
+    return;
+  }
+  const webhook = parsedWebhook.data;
   let sessionCreated = false;
   let canRetryInitiate = false;
   let cloudAgentSessionId: string | null = null;
@@ -361,6 +367,8 @@ async function processWebhookMessage(
     ]);
 
     if (!cloudAgentSessionId) {
+      const githubIntegrationId =
+        webhook.githubIntegrationId ?? triggerConfig.githubIntegrationId ?? undefined;
       const renderedPrompt = renderPromptTemplate(triggerConfig.promptTemplate, {
         body: request.body,
         method: request.method,
@@ -412,6 +420,7 @@ async function processWebhookMessage(
         mode: string;
         model: string;
         githubRepo: string;
+        githubIntegrationId?: string;
         kilocodeOrganizationId?: string;
         callbackTarget: { url: string; headers: Record<string, string> };
         profileId: string;
@@ -423,6 +432,7 @@ async function processWebhookMessage(
         mode: triggerMode,
         model: triggerModel,
         githubRepo: triggerGithubRepo,
+        ...(githubIntegrationId ? { githubIntegrationId } : {}),
         callbackTarget,
         profileId: triggerProfileId,
         createdOnPlatform: request.method === 'SCHEDULED' ? 'scheduled' : 'webhook',

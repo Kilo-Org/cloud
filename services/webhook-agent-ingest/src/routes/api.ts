@@ -164,11 +164,12 @@ api.delete('/triggers/org/:orgId/:triggerId', async c => {
 
 type RouteContext = Context<HonoContext>;
 
-const TriggerConfigInput = z
+export const TriggerConfigInput = z
   .object({
     targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
     kiloclawInstanceId: z.string().uuid().optional(),
     githubRepo: z.string().trim().min(1, 'githubRepo is required').optional(),
+    githubIntegrationId: z.string().uuid().optional(),
     mode: z.string().trim().min(1, 'mode is required').optional(),
     model: z.string().trim().min(1, 'model is required').optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
@@ -257,6 +258,12 @@ const TriggerConfigInput = z
           message: 'kiloclawInstanceId is required for kiloclaw_chat triggers',
           path: ['kiloclawInstanceId'],
         });
+      if (data.githubIntegrationId)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'githubIntegrationId is only valid for cloud_agent triggers',
+          path: ['githubIntegrationId'],
+        });
     }
   });
 
@@ -264,13 +271,14 @@ const TriggerConfigInput = z
 // null = explicitly clear the field, undefined = leave unchanged
 // Note: targetType and kiloclawInstanceId are intentionally excluded — they are
 // immutable after creation. To change target type or instance, delete and recreate.
-const TriggerConfigUpdateInput = z
+export const TriggerConfigUpdateInput = z
   .object({
     mode: z.string().trim().min(1).optional(),
     model: z.string().trim().min(1).optional(),
     promptTemplate: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
     profileId: z.string().uuid().optional(),
+    githubIntegrationId: z.string().uuid().optional(),
     autoCommit: z.boolean().nullable().optional(),
     condenseOnComplete: z.boolean().nullable().optional(),
     webhookAuth: z
@@ -329,6 +337,9 @@ async function handleCreateTrigger(
   }
 
   const config = parsedConfig.data;
+  if (config.githubIntegrationId && namespace.startsWith('user/')) {
+    return c.json(resError('githubIntegrationId requires an organization trigger'), 400);
+  }
 
   try {
     const result = await withDORetry(
@@ -420,6 +431,9 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
   }
 
   const updates = parsedUpdates.data;
+  if (updates.githubIntegrationId && namespace.startsWith('user/')) {
+    return c.json(resError('githubIntegrationId requires an organization trigger'), 400);
+  }
 
   // Check if there are any updates to apply
   if (Object.keys(updates).length === 0) {

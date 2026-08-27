@@ -324,7 +324,66 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
     expect(prepareBody).not.toMatchObject({
       callbackTarget: { headers: { 'x-internal-api-key': expect.any(String) } },
     });
+    expect(prepareBody).not.toHaveProperty('githubIntegrationId');
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });
+
+  it.each(['queue', 'config'] as const)(
+    'forwards the GitHub integration identity from %s state to Cloud Agent',
+    async source => {
+      const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+      const webhook = {
+        ...makeWebhook(),
+        ...(source === 'queue' ? { githubIntegrationId } : {}),
+      };
+      const prepareRequests: Request[] = [];
+      const stub = {
+        getRequest: vi.fn(async () => makeRequest()),
+        getConfig: vi.fn(async () =>
+          makeTriggerConfig({
+            targetType: 'cloud_agent',
+            mode: 'code',
+            model: 'model-1',
+            githubRepo: 'owner/repo',
+            profileId: 'profile-1',
+            ...(source === 'config' ? { githubIntegrationId } : {}),
+          })
+        ),
+        updateRequest: vi.fn(async () => ({ success: true })),
+      };
+      const env = {
+        WEBHOOK_AGENT_URL: 'https://hooks.test',
+        WEBHOOK_TOKEN_CACHE: {
+          get: vi.fn(async () => 'api-token'),
+          put: vi.fn(async () => undefined),
+        },
+        INTERNAL_API_SECRET: { get: vi.fn(async () => 'internal-secret') },
+        CALLBACK_TOKEN_SECRET: { get: vi.fn(async () => 'callback-secret') },
+        TRIGGER_DO: {
+          idFromName: vi.fn((name: string) => name),
+          get: vi.fn(() => stub),
+        },
+        CLOUD_AGENT: {
+          fetch: vi.fn(async (request: Request) => {
+            if (request.url.includes('/trpc/prepareSession')) {
+              prepareRequests.push(request);
+              return Response.json({
+                result: { data: { cloudAgentSessionId: 'cloud-session-1' } },
+              });
+            }
+            return Response.json({ result: { data: { status: 'running' } } });
+          }),
+        },
+      } as unknown as Env;
+      const batch = {
+        queue: 'webhook-delivery',
+        messages: [{ body: webhook, attempts: 1, ack: vi.fn(), retry: vi.fn() }],
+      } as unknown as MessageBatch<typeof webhook>;
+
+      await handleWebhookDeliveryBatch(batch, env);
+
+      await expect(prepareRequests[0]?.json()).resolves.toMatchObject({ githubIntegrationId });
+    }
+  );
 });

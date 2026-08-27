@@ -1,0 +1,1 @@
+ALTER TABLE `trigger_config` ADD `github_integration_id` text;

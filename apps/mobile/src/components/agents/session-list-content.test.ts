@@ -7,7 +7,6 @@ function surface(overrides: Partial<Parameters<typeof selectSessionListContentSu
     isLoading: false,
     isError: false,
     hasAnySessions: true,
-    hasPinnedActive: false,
     hasHistoryContent: true,
     ...overrides,
   });
@@ -22,20 +21,6 @@ describe('selectSessionListContentSurface', () => {
         surface({
           isLoading: true,
           hasAnySessions: false,
-          hasPinnedActive: false,
-          hasHistoryContent: false,
-        })
-      ).toEqual({ kind: 'section-list', listEmpty: 'loading-skeletons' });
-    });
-
-    it('shows skeletons under a populated tray while history is still loading', () => {
-      // Active query resolved first: tray visible via ListHeaderComponent,
-      // history still loading → skeletons, NOT "No past sessions".
-      expect(
-        surface({
-          isLoading: true,
-          hasAnySessions: true,
-          hasPinnedActive: true,
           hasHistoryContent: false,
         })
       ).toEqual({ kind: 'section-list', listEmpty: 'loading-skeletons' });
@@ -47,7 +32,6 @@ describe('selectSessionListContentSurface', () => {
           isLoading: true,
           isError: true,
           hasAnySessions: false,
-          hasPinnedActive: false,
           hasHistoryContent: false,
         })
       ).toEqual({ kind: 'section-list', listEmpty: 'loading-skeletons' });
@@ -61,23 +45,9 @@ describe('selectSessionListContentSurface', () => {
           isLoading: false,
           isError: true,
           hasAnySessions: false,
-          hasPinnedActive: false,
           hasHistoryContent: false,
         })
       ).toEqual({ kind: 'full-screen-error' });
-    });
-
-    it('suppresses full-screen error when the tray alone is on screen', () => {
-      // Populated tray counts as content; body empty goes into the list.
-      expect(
-        surface({
-          isLoading: false,
-          isError: true,
-          hasAnySessions: true,
-          hasPinnedActive: true,
-          hasHistoryContent: false,
-        })
-      ).toEqual({ kind: 'section-list', listEmpty: 'body-empty' });
     });
 
     it('shows history-empty only after load with no sessions at all', () => {
@@ -85,7 +55,6 @@ describe('selectSessionListContentSurface', () => {
         surface({
           isLoading: false,
           hasAnySessions: false,
-          hasPinnedActive: false,
           hasHistoryContent: false,
         })
       ).toEqual({ kind: 'history-empty' });
@@ -104,12 +73,11 @@ describe('selectSessionListContentSurface', () => {
     });
 
     it('uses body-empty ListEmptyComponent when history is empty but sessions exist', () => {
-      // Tray-only (or filtered empty) — body model decides the empty kind.
+      // Filtered empty — body model decides the empty kind.
       expect(
         surface({
           isLoading: false,
           hasAnySessions: true,
-          hasPinnedActive: true,
           hasHistoryContent: false,
         })
       ).toEqual({ kind: 'section-list', listEmpty: 'body-empty' });
@@ -123,13 +91,11 @@ describe('selectSessionListContentSurface', () => {
       const loading = surface({
         isLoading: true,
         hasAnySessions: true,
-        hasPinnedActive: true,
         hasHistoryContent: false,
       });
       const loaded = surface({
         isLoading: false,
         hasAnySessions: true,
-        hasPinnedActive: true,
         hasHistoryContent: false,
       });
       expect(loading).toEqual({ kind: 'section-list', listEmpty: 'loading-skeletons' });

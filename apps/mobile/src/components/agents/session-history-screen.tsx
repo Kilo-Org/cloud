@@ -113,21 +113,16 @@ export function SessionHistoryScreen() {
   // query — never the active set.
   const hasAnySessions = storedSessions.length > 0 || hasActiveQuery;
 
-  // Same pure selector as the live screen, but the history view never feeds
-  // the active-set flags: the inline error line only reflects content errors.
+  // The inline error line only reflects content errors.
   const showInlineError = useMemo(
     () =>
       selectSessionListBodyModel({
         hasHistoryContent: sections.length > 0,
-        hasStoredSessions: storedSessions.length > 0,
-        hasMoreHistory: paging.hasNextPage,
-        hasPinnedActive: false,
         hasActiveQuery,
         isSearching,
         isError: contentIsError,
-        activeIsError: false,
       }).showInlineError,
-    [contentIsError, hasActiveQuery, isSearching, paging.hasNextPage, sections, storedSessions]
+    [contentIsError, hasActiveQuery, isSearching, sections]
   );
 
   const handleClearQuery = useCallback(() => {
@@ -182,12 +177,8 @@ export function SessionHistoryScreen() {
           searchInputRef={searchInputRef}
           sections={sections}
           hasAnySessions={hasAnySessions}
-          hasPinnedActive={false}
           isLoading={isLoading}
           isError={contentIsError}
-          activeIsError={false}
-          hasStoredSessions={storedSessions.length > 0}
-          hasMoreHistory={paging.hasNextPage}
           isFetchingNextPage={paging.isFetchingNextPage}
           refetch={handleRefetch}
           onRetry={handleRetry}
@@ -199,7 +190,6 @@ export function SessionHistoryScreen() {
           onClearQuery={handleClearQuery}
           onCreateSession={noopCreateSession}
           sortBy={sortBy}
-          activeNowSection={null}
         />
       </View>
       {showFilterModal && (

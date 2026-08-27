@@ -16,14 +16,13 @@ export function selectSessionListContentSurface(input: {
   isLoading: boolean;
   isError: boolean;
   hasAnySessions: boolean;
-  hasPinnedActive: boolean;
   hasHistoryContent: boolean;
 }): SessionListContentSurface {
-  const { isLoading, isError, hasAnySessions, hasPinnedActive, hasHistoryContent } = input;
+  const { isLoading, isError, hasAnySessions, hasHistoryContent } = input;
 
   // Gate non-list surfaces on !isLoading so a cold open (empty cache for the
   // whole load) cannot flash history-empty or full-screen error.
-  if (!isLoading && isError && !hasAnySessions && !hasPinnedActive) {
+  if (!isLoading && isError && !hasAnySessions) {
     return { kind: 'full-screen-error' };
   }
   // No stored rows and no active query: render the history-empty body (the

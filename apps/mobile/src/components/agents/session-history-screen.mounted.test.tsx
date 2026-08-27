@@ -54,7 +54,6 @@ vi.mock('@/components/agents/use-agent-session-list-data', () => ({
   useAgentSessionListData: () => ({
     storedSessions: listState.storedSessions,
     activeSessions: [],
-    activeIsError: false,
     isLoading: false,
     storedIsFetching: false,
     storedLoadedPageCount: 1,
@@ -172,15 +171,6 @@ describe('SessionHistoryScreen', () => {
     expect(
       renderer.root.findAll(node => node.props.testID === 'agents-new-session-fab').length
     ).toBe(0);
-  });
-
-  it('passes a null tray, no pinned active, and no active error into the list content', async () => {
-    const renderer = await renderScreen();
-    const content = findNodeByType(renderer, 'AgentSessionListContent');
-
-    expect(content.props.activeNowSection).toBeNull();
-    expect(content.props.hasPinnedActive).toBe(false);
-    expect(content.props.activeIsError).toBe(false);
   });
 
   it('keeps the search header unmounted when there are no stored rows and no active query', async () => {

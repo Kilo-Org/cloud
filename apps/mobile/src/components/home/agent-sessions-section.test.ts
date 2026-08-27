@@ -172,8 +172,8 @@ describe('Home See-all navigation', () => {
     expect(href).not.toContain('history');
     expect(dismissHref).toBe('/(app)/(tabs)/(2_agents)/');
     expect(dismissHref).not.toContain('history');
-    expect(navigateSpy.mock.invocationCallOrder[0]).toBeLessThan(
-      dismissToSpy.mock.invocationCallOrder[0]
+    expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      dismissToSpy.mock.invocationCallOrder[0] ?? 0
     );
 
     renderer.unmount();

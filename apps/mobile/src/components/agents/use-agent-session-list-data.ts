@@ -147,7 +147,6 @@ export function useAgentSessionListData(options: {
 
   return {
     storedSessions,
-    activeIsError,
     storedIsFetching,
     storedLoadedPageCount,
     paging,
@@ -159,6 +158,5 @@ export function useAgentSessionListData(options: {
     projectOptions,
     contentIsError,
     sections,
-    effectiveSearchQuery,
   };
 }

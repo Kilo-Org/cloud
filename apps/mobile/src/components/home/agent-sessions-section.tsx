@@ -17,12 +17,8 @@ import { cn, parseTimestamp } from '@/lib/utils';
 
 export const HOME_LIVE_SLOT_MIN_CLASS = 'min-h-[72px]';
 
-/**
- * Agents tab index href, used by Home See-all. Kept as a named export so the
- * section test can assert this lands on the live index, never the history
- * subpage. The trailing slash pins the index route of the Agents stack.
- */
-export const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
+// The trailing slash pins the index route.
+const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
 
 const MAX_ROWS = 3;
 const CLOUD_AGENT_PLATFORMS = new Set(expandPlatformFilter(['cloud-agent']));

@@ -1,14 +1,6 @@
 /* eslint-disable max-lines -- Session-list content and its error/empty surfaces are kept together. */
 import { useFocusEffect, useScrollToTop } from 'expo-router';
-import {
-  type ReactElement,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -48,25 +40,10 @@ type AgentSessionListContentProps = {
   searchInputRef: Parameters<typeof moveA11yFocus>[0];
   sections: SessionSection[];
   hasAnySessions: boolean;
-  /** True when the pinned "Active now" tray is non-empty. Used by the
-   * render model to keep the inline "Couldn't refresh" line visible and
-   * to suppress the full-screen QueryError when the tray is the only
-   * thing on screen. */
-  hasPinnedActive: boolean;
   isLoading: boolean;
   /** Body-driving error flag — a search failure (when searching) OR a
-   * stored/history failure. Active-only failures are surfaced separately
-   * via the body's `showInlineError` output, NEVER as the empty-state
-   * message. */
+   * stored/history failure. */
   isError: boolean;
-  /** Active-poll failure — drives ONLY the inline staleness line. */
-  activeIsError: boolean;
-  /** Accepted for the history screen's call-site compatibility; unused after
-   * the combined-list removal. */
-  hasStoredSessions: boolean;
-  /** Accepted for the history screen's call-site compatibility; unused after
-   * the bounded backfill removal. */
-  hasMoreHistory: boolean;
   isFetchingNextPage: boolean;
   refetch: () => Promise<void>;
   onRetry: () => void;
@@ -80,21 +57,14 @@ type AgentSessionListContentProps = {
   /** Optional no-op accepted for the history screen's call-site compatibility. */
   onCreateSession?: () => void;
   sortBy: AgentSessionSortBy;
-  /**
-   * Accepted for the history screen's call-site compatibility; no longer
-   * mounted as `ListHeaderComponent`.
-   */
-  activeNowSection: ReactElement | null;
 };
 
 export function AgentSessionListContent({
   searchInputRef,
   sections,
   hasAnySessions,
-  hasPinnedActive,
   isLoading,
   isError,
-  activeIsError,
   isFetchingNextPage,
   refetch,
   onRetry,
@@ -147,18 +117,15 @@ export function AgentSessionListContent({
   // Pure body decision — see `session-list-body-model.ts`.
   const bodyModel = selectSessionListBodyModel({
     hasHistoryContent: sections.length > 0,
-    hasPinnedActive,
     hasActiveQuery,
     isSearching,
     isError,
-    activeIsError,
   });
 
   const surface = selectSessionListContentSurface({
     isLoading,
     isError,
     hasAnySessions,
-    hasPinnedActive,
     hasHistoryContent: sections.length > 0,
   });
 
@@ -234,7 +201,6 @@ export function AgentSessionListContent({
   // Full-screen error only when there is nothing cached to fall back on —
   // a background refetch/search failure with stale sessions already in
   // cache (keepPreviousData) must never blank out what's already rendered.
-  // A populated tray counts as "something on screen" and also suppresses.
   // Gated on !isLoading so a cold-open load never flashes this surface.
   if (surface.kind === 'full-screen-error') {
     return (

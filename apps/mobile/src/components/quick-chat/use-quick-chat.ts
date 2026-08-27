@@ -89,10 +89,17 @@ export function useQuickChat(model: string) {
   }, [scopeKey]);
 
   // Resolve the thread id for the transcript list's reset key. The id is
-  // cosmetic: listMessages/appendMessages resolve the thread server-side.
+  // cosmetic: listMessages/appendMessages resolve the thread server-side. The
+  // create is gated on the same org-hydration flag as listMessages, so a mount
+  // before SecureStore loads cannot write the personal thread by accident.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      // The create is gated on the same org-hydration flag as listMessages, so
+      // a mount before SecureStore loads cannot write the personal thread.
+      if (!orgLoaded) {
+        return;
+      }
       try {
         const thread = await trpcClient.quickChat.getOrCreateThread.mutate({ organizationId });
         // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition -- `cancelled` flips in the cleanup when the scope changes mid-flight
@@ -106,7 +113,7 @@ export function useQuickChat(model: string) {
     return () => {
       cancelled = true;
     };
-  }, [scopeKey, organizationId]);
+  }, [scopeKey, organizationId, orgLoaded]);
 
   // A first-page refetch (send → append → refetch, or Retry) shifts the newest
   // window, so the older rows and the cursor must reset together: keeping old
@@ -180,6 +187,12 @@ export function useQuickChat(model: string) {
   }
 
   async function appendTurn(clientId: string, userContent: string, assistantContent: string) {
+    // Defensive last line: a stream that completed just as the scope swapped
+    // out (or before hydration ever finished) must never persist to the wrong
+    // thread.
+    if (!orgLoaded) {
+      return;
+    }
     const outgoing: { role: 'user' | 'assistant'; content: string; clientId?: string }[] = [
       { role: 'user', content: userContent, clientId },
     ];
@@ -261,6 +274,12 @@ export function useQuickChat(model: string) {
   }
 
   function onSend(text: string): void {
+    if (!orgLoaded) {
+      // The org scope has not hydrated. Accepting would persist to the personal
+      // thread before the stored org swaps in. Throw so the composer preserves
+      // the draft (a plain return would clear it).
+      throw new Error('Organization scope not loaded');
+    }
     if (!model) {
       toast.error(i18n.t('quickChat.catalogRetry'));
       throw new Error('No model selected');
@@ -288,7 +307,8 @@ export function useQuickChat(model: string) {
   return {
     threadId,
     messages,
-    isLoading: listQuery.isLoading,
+    // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition -- the query is disabled while the org scope hydrates, but the screen must still treat that window as loading
+    isLoading: listQuery.isLoading || !orgLoaded,
     isError: listQuery.isError,
     error: listQuery.error,
     refetch: listQuery.refetch,

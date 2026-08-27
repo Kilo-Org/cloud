@@ -110,10 +110,11 @@ export function QuickChatScreen() {
     listErrorCode === 'NOT_FOUND' ||
     listErrorCode === 'FORBIDDEN' ||
     listErrorCode === 'UNAUTHORIZED';
-  // The model catalog has no other error surface, so its Retry renders above
-  // the composer for every transcript state — including an empty one, which
-  // would otherwise show only an enabled composer with no way to retry.
-  const showRetryAboveComposer = catalogError || (chat.messages.length > 0 && chat.isError);
+  // A compact Retry only renders above the composer once rows exist: an empty
+  // transcript shows either the full-region catalog QueryError or the history
+  // error, each with its own Retry.
+  const showRetryAboveComposer =
+    (catalogError && chat.messages.length > 0) || (chat.messages.length > 0 && chat.isError);
 
   const handleModelSelect = (modelId: string, variantId: string) => {
     setPickedModel(modelId);
@@ -136,6 +137,18 @@ export function QuickChatScreen() {
           title={t('quickChat.historyRetry')}
           onRetry={() => {
             void chat.refetch();
+          }}
+        />
+      );
+    }
+
+    if (catalogError && chat.messages.length === 0) {
+      return (
+        <QueryError
+          variant="server"
+          title={t('quickChat.catalogRetry')}
+          onRetry={() => {
+            void refetchModels();
           }}
         />
       );
@@ -181,14 +194,16 @@ export function QuickChatScreen() {
           </View>
         ) : null}
 
-        {/* Compact retry above the composer when the history refetch failed
-            after rows were already shown, or when the model catalog failed
-            (including with an empty transcript). */}
+        {/* Compact retry above the composer, only once rows exist: a history
+            refetch or model-catalog failure after messages were already shown. */}
         {showRetryAboveComposer ? (
           <View className="px-4 pb-2">
             <Button
               variant="outline"
               size="sm"
+              accessibilityLabel={
+                catalogError ? t('quickChat.catalogRetry') : t('quickChat.historyRetry')
+              }
               onPress={() => {
                 void chat.refetch();
                 void refetchModels();

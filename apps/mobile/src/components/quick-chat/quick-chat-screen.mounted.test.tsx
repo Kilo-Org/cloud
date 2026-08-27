@@ -5,10 +5,14 @@
 // puts a user bubble into the transcript, a first history failure with no rows
 // shows Retry (a permanent code shows none), a refetch failure keeps existing
 // rows with an inline retry, and a missing or failed model catalog never
-// disables the composer. Four-state coverage adds the assistant reply after a
-// stream (happy), the stream-failure-after-accept outcome, the empty copy, and
-// the flag-off replace to Home. The hook also must not fetch history before the
-// org scope hydrates, and a send must abort an in-flight stream.
+// disables the composer. A failed catalog with no rows shows the catalog
+// QueryError, not the happy empty copy; its compact retry only appears once
+// rows exist and names the failure for screen readers. Four-state coverage adds
+// the assistant reply after a stream (happy), the stream-failure-after-accept
+// outcome, the empty copy, and the flag-off replace to Home. The hook also must
+// not fetch history, create a thread, or accept a send before the org scope
+// hydrates (showing the skeleton, not EmptyState), and a send must abort an
+// in-flight stream.
 
 import { createElement } from 'react';
 import { act } from 'react-test-renderer';
@@ -51,8 +55,11 @@ const modelOptionsState = vi.hoisted(() => ({
 const composerRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
 const sessionListRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
 const queryErrors = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
-const buttonRenders = vi.hoisted(() => ({ list: [] as { onPress?: () => void }[] }));
+const buttonRenders = vi.hoisted(() => ({
+  list: [] as { onPress?: () => void; accessibilityLabel?: string }[],
+}));
 const emptyStateRenders = vi.hoisted(() => ({ list: [] as { title?: string }[] }));
+const skeletonRenders = vi.hoisted(() => ({ count: 0 }));
 
 // Feature-flag / router / org-hydration knobs shared by the flag-gate and
 // org-loading tests.
@@ -164,7 +171,10 @@ vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
-  SessionSkeletonMessages: () => null,
+  SessionSkeletonMessages: () => {
+    skeletonRenders.count += 1;
+    return null;
+  },
 }));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -188,7 +198,7 @@ vi.mock('@/components/query-error', () => ({
   },
 }));
 vi.mock('@/components/ui/button', () => ({
-  Button: (props: { onPress?: () => void; children?: unknown }) => {
+  Button: (props: { onPress?: () => void; accessibilityLabel?: string; children?: unknown }) => {
     buttonRenders.list.push(props);
     return createElement('View', null, props.children);
   },
@@ -268,6 +278,7 @@ beforeEach(() => {
   queryErrors.list = [];
   buttonRenders.list = [];
   emptyStateRenders.list = [];
+  skeletonRenders.count = 0;
   quickChatFlagEnabled.value = true;
   kiloclawVisible.value = false;
   focusedSegments.value = ['(app)', '(tabs)', '(0_home)'];
@@ -313,14 +324,18 @@ describe('QuickChatScreen composer', () => {
     expect(latestComposer()?.model).toBe('');
   });
 
-  it('shows a Retry CTA when the catalog errors with an empty transcript', async () => {
+  it('shows the catalog QueryError when the catalog errors with an empty transcript', async () => {
     modelsState.isError = true;
 
     await mountScreen();
-    await waitFor(() => buttonRenders.list.length > 0);
+    await waitFor(() => queryErrors.list.length > 0);
 
     expect(latestComposer()?.disabled).toBeUndefined();
-    expect(buttonRenders.list.some(button => typeof button.onPress === 'function')).toBe(true);
+    const error = queryErrors.list[0];
+    expect(error?.variant).toBe('server');
+    expect(error?.title).toBe(i18n.t('quickChat.catalogRetry'));
+    expect(error?.onRetry).toBeDefined();
+    expect(emptyStateRenders.list).toHaveLength(0);
   });
 });
 
@@ -518,6 +533,8 @@ describe('QuickChatScreen history errors', () => {
       transcriptItems().some(item => item.info.role === 'user' && item.parts[0]?.text === 'kept')
     ).toBe(true);
     expect(buttonRenders.list.length).toBeGreaterThan(0);
+    const retryButton = buttonRenders.list.find(button => typeof button.onPress === 'function');
+    expect(retryButton?.accessibilityLabel).toBe(i18n.t('quickChat.historyRetry'));
   });
 });
 
@@ -539,6 +556,29 @@ describe('QuickChatScreen org hydration', () => {
     await mountScreen();
 
     expect(listMessagesQueryFn).not.toHaveBeenCalled();
+  });
+
+  it('shows the skeleton, not EmptyState, and rejects a send until the org scope is loaded', async () => {
+    orgLoaded.value = false;
+
+    await mountScreen();
+    await waitFor(() => composerRenders.list.length > 0);
+
+    expect(skeletonRenders.count).toBeGreaterThan(0);
+    expect(emptyStateRenders.list).toHaveLength(0);
+
+    await act(async () => {
+      expect(() => {
+        pressSend('hello');
+      }).toThrow('Organization scope not loaded');
+      await Promise.resolve();
+    });
+
+    expect(getOrCreateThreadMutate).not.toHaveBeenCalled();
+    expect(listMessagesQueryFn).not.toHaveBeenCalled();
+    expect(appendMessagesMutate).not.toHaveBeenCalled();
+    expect(streamMock).not.toHaveBeenCalled();
+    expect(transcriptItems()).toHaveLength(0);
   });
 });
 

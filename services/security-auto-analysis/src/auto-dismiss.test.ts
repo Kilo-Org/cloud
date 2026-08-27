@@ -62,6 +62,7 @@ function sandboxAnalysis(
 ): SecurityFindingAnalysis {
   return {
     analyzedAt: '2026-05-18T10:00:00.000Z',
+    triggeredByUserId: 'user-123',
     correlationId,
     sandboxAnalysis: {
       isExploitable: false,
@@ -82,7 +83,6 @@ function createDbHarness(
   options: {
     finding?: SecurityFinding;
     config?: Record<string, unknown>;
-    installationId?: string;
     auditError?: Error;
   } = {}
 ) {
@@ -92,25 +92,18 @@ function createDbHarness(
     committedUpdates: [] as Array<Record<string, unknown>>,
     transactionCalls: 0,
   };
-  let rootSelectCount = 0;
-
   const db = {
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: async () => {
-            rootSelectCount += 1;
-            return rootSelectCount === 1
-              ? [
-                  {
-                    config: options.config ?? {
-                      auto_dismiss_enabled: true,
-                      auto_dismiss_confidence_threshold: 'high',
-                    },
-                  },
-                ]
-              : [{ installationId: options.installationId ?? 'installation-123' }];
-          },
+          limit: async () => [
+            {
+              config: options.config ?? {
+                auto_dismiss_enabled: true,
+                auto_dismiss_confidence_threshold: 'high',
+              },
+            },
+          ],
         }),
       }),
     }),
@@ -170,13 +163,17 @@ describe('maybeAutoDismissCompletedAnalysis', () => {
 
   it('commits sandbox dismissal with canonical current audit evidence before writeback', async () => {
     const { db, state } = createDbHarness();
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'github-token',
+    });
     const fetchSpy = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
     vi.stubGlobal('fetch', fetchSpy);
 
     await maybeAutoDismissCompletedAnalysis({
       db: db as never,
       env: {
-        GIT_TOKEN_SERVICE: { getToken: async () => 'github-token' },
+        GIT_TOKEN_SERVICE: { getTokenForRepo },
       } as unknown as CloudflareEnv,
       findingId: FINDING_ID,
       finding: makeFinding() as never,
@@ -223,6 +220,12 @@ describe('maybeAutoDismissCompletedAnalysis', () => {
         }),
       })
     );
+    expect(getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'kilo/repo',
+      userId: 'user-123',
+      orgId: ORGANIZATION_ID,
+      expectedIntegrationId: INTEGRATION_ID,
+    });
   });
 
   it('keeps canonical local dismissal when upstream writeback fails', async () => {
@@ -233,7 +236,9 @@ describe('maybeAutoDismissCompletedAnalysis', () => {
     await maybeAutoDismissCompletedAnalysis({
       db: db as never,
       env: {
-        GIT_TOKEN_SERVICE: { getToken: async () => 'github-token' },
+        GIT_TOKEN_SERVICE: {
+          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+        },
       } as unknown as CloudflareEnv,
       findingId: FINDING_ID,
       finding: makeFinding() as never,
@@ -257,7 +262,9 @@ describe('maybeAutoDismissCompletedAnalysis', () => {
     await maybeAutoDismissCompletedAnalysis({
       db: db as never,
       env: {
-        GIT_TOKEN_SERVICE: { getToken: async () => 'github-token' },
+        GIT_TOKEN_SERVICE: {
+          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+        },
       } as unknown as CloudflareEnv,
       findingId: FINDING_ID,
       finding: finding as never,
@@ -278,7 +285,9 @@ describe('maybeAutoDismissCompletedAnalysis', () => {
     await maybeAutoDismissCompletedAnalysis({
       db: db as never,
       env: {
-        GIT_TOKEN_SERVICE: { getToken: async () => 'github-token' },
+        GIT_TOKEN_SERVICE: {
+          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+        },
       } as unknown as CloudflareEnv,
       findingId: FINDING_ID,
       finding: finding as never,
@@ -296,6 +305,7 @@ describe('maybeAutoDismissCompletedAnalysis', () => {
     vi.stubGlobal('fetch', fetchSpy);
     const analysis: SecurityFindingAnalysis = {
       analyzedAt: '2026-05-18T10:00:00.000Z',
+      triggeredByUserId: 'user-123',
       correlationId: 'correlation-456',
       triage: {
         needsSandboxAnalysis: false,
@@ -309,7 +319,9 @@ describe('maybeAutoDismissCompletedAnalysis', () => {
     await maybeAutoDismissCompletedAnalysis({
       db: db as never,
       env: {
-        GIT_TOKEN_SERVICE: { getToken: async () => 'github-token' },
+        GIT_TOKEN_SERVICE: {
+          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+        },
       } as unknown as CloudflareEnv,
       findingId: FINDING_ID,
       finding: makeFinding() as never,
@@ -355,7 +367,9 @@ describe('maybeAutoDismissCompletedAnalysis', () => {
       await maybeAutoDismissCompletedAnalysis({
         db: db as never,
         env: {
-          GIT_TOKEN_SERVICE: { getToken: async () => 'github-token' },
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+          },
         } as unknown as CloudflareEnv,
         findingId: FINDING_ID,
         finding: makeFinding() as never,
@@ -433,7 +447,9 @@ describe('maybeAutoDismissCompletedAnalysis', () => {
       maybeAutoDismissCompletedAnalysis({
         db: db as never,
         env: {
-          GIT_TOKEN_SERVICE: { getToken: async () => 'github-token' },
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+          },
         } as unknown as CloudflareEnv,
         findingId: FINDING_ID,
         finding: makeFinding() as never,
@@ -455,7 +471,9 @@ describe('maybeAutoDismissCompletedAnalysis', () => {
       maybeAutoDismissCompletedAnalysis({
         db: db as never,
         env: {
-          GIT_TOKEN_SERVICE: { getToken: async () => 'github-token' },
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+          },
         } as unknown as CloudflareEnv,
         findingId: FINDING_ID,
         finding: makeFinding() as never,

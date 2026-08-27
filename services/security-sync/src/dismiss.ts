@@ -120,6 +120,7 @@ export async function processSecurityFindingDismissal(params: {
     params.db
       .select({
         id: security_findings.id,
+        platform_integration_id: security_findings.platform_integration_id,
         source: security_findings.source,
         source_id: security_findings.source_id,
         repo_full_name: security_findings.repo_full_name,
@@ -170,6 +171,10 @@ export async function processSecurityFindingDismissal(params: {
     };
   }
 
+  const actor = await timedDismissalStage('load_actor', stageContext, () =>
+    getDismissalAuditActor(params.db, params.message.actor.id)
+  );
+
   if (finding.source === 'dependabot') {
     const target = parseDependabotDismissalTarget({
       sourceId: finding.source_id,
@@ -190,13 +195,23 @@ export async function processSecurityFindingDismissal(params: {
     }
 
     await timedDismissalStage('github_writeback', stageContext, async () => {
-      const token = await params.gitTokenService.getToken(params.message.installationId);
+      const tokenResult = await params.gitTokenService.getTokenForRepo({
+        githubRepo: finding.repo_full_name,
+        userId: actor.id,
+        orgId: params.message.owner.organizationId,
+        expectedIntegrationId: finding.platform_integration_id ?? undefined,
+      });
+      if (!tokenResult.success) {
+        throw new Error(
+          `GitHub integration unavailable for finding ${finding.id}: ${tokenResult.reason}`
+        );
+      }
       const response = await fetch(
         `https://api.github.com/repos/${target.repoOwner}/${target.repoName}/dependabot/alerts/${target.alertNumber}`,
         {
           method: 'PATCH',
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${tokenResult.token}`,
             Accept: 'application/vnd.github+json',
             'Content-Type': 'application/json',
             'X-GitHub-Api-Version': '2022-11-28',
@@ -217,10 +232,6 @@ export async function processSecurityFindingDismissal(params: {
       }
     });
   }
-
-  const actor = await timedDismissalStage('load_actor', stageContext, () =>
-    getDismissalAuditActor(params.db, params.message.actor.id)
-  );
 
   await timedDismissalStage('persist_dismissal', stageContext, () =>
     params.db.transaction(async tx => {

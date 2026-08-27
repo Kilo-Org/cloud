@@ -538,6 +538,7 @@ export function buildRemediationPrepareSessionBody(params: {
   model: string;
   repoFullName: string;
   organizationId: string | undefined;
+  platformIntegrationId: string | null;
   callbackTarget: { url: string; headers: Record<string, string> };
 }) {
   return {
@@ -545,6 +546,7 @@ export function buildRemediationPrepareSessionBody(params: {
     mode: 'code',
     model: params.model,
     githubRepo: params.repoFullName,
+    githubIntegrationId: params.platformIntegrationId ?? undefined,
     kilocodeOrganizationId: params.organizationId,
     createdOnPlatform: 'security-remediation',
     autoCommit: false,
@@ -1201,6 +1203,7 @@ async function launchAttempt(params: {
           model: params.attempt.remediation_model_slug,
           repoFullName: params.finding.repo_full_name,
           organizationId: params.owner.type === 'org' ? params.owner.id : undefined,
+          platformIntegrationId: params.finding.platform_integration_id,
           callbackTarget,
         })
       ),
@@ -1446,6 +1449,7 @@ async function getGitHubTokenForAttempt(params: {
   db: WorkerDb;
   attempt: SecurityRemediationAttempt;
   owner: QueueOwner;
+  finding: SecurityFindingRecord;
 }): Promise<string | null> {
   const actor = await actorForAttempt(params);
   if (!actor) return null;
@@ -1453,6 +1457,7 @@ async function getGitHubTokenForAttempt(params: {
     githubRepo: params.attempt.repo_full_name,
     userId: actor.id,
     orgId: params.owner.type === 'org' ? params.owner.id : undefined,
+    expectedIntegrationId: params.finding.platform_integration_id ?? undefined,
   });
   return result.success ? result.token : null;
 }
@@ -1462,6 +1467,7 @@ async function verifyPr(params: {
   db: WorkerDb;
   attempt: SecurityRemediationAttempt;
   owner: QueueOwner;
+  finding: SecurityFindingRecord;
   result: StructuredRemediationResult;
 }): Promise<StructuredRemediationResult | null> {
   const parsedUrl = parsePrUrl(params.result.prUrl);
@@ -1508,6 +1514,7 @@ async function recoverPrByExpectedBranch(params: {
   db: WorkerDb;
   attempt: SecurityRemediationAttempt;
   owner: QueueOwner;
+  finding: SecurityFindingRecord;
 }): Promise<StructuredRemediationResult | null> {
   const token = await getGitHubTokenForAttempt(params);
   if (!token) return null;
@@ -2135,10 +2142,10 @@ export async function finalizeRemediationCallbackFromEnv(params: {
   const parsed = parseStructuredRemediationResult(params.payload.lastAssistantMessageText);
   let result = parsed;
   if (result?.status === 'pr_opened') {
-    result = await verifyPr({ env: params.env, db, attempt, owner, result });
+    result = await verifyPr({ env: params.env, db, attempt, owner, finding, result });
   }
   if (!result) {
-    result = await recoverPrByExpectedBranch({ env: params.env, db, attempt, owner });
+    result = await recoverPrByExpectedBranch({ env: params.env, db, attempt, owner, finding });
   }
   if (!result) {
     await finalizeAttemptAsFailed({

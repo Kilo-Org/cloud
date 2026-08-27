@@ -23,6 +23,7 @@ const finding = {
   fixed_at: null,
   sla_due_at: '2026-05-24 08:30:00.000+00',
   session_id: null,
+  platform_integration_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   owned_by_user_id: null,
 };
@@ -113,12 +114,16 @@ describe('processSecurityFindingDismissal', () => {
 
   it('updates local finding state and audit only after upstream Dependabot dismissal succeeds', async () => {
     const { db, updates, auditRows } = createDb();
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'github-token',
+    });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
 
     await expect(
       processSecurityFindingDismissal({
         db,
-        gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+        gitTokenService: { getTokenForRepo } as unknown as GitTokenService,
         message: createMessage(),
       })
     ).resolves.toEqual({
@@ -132,6 +137,12 @@ describe('processSecurityFindingDismissal', () => {
       status: 'ignored',
       ignored_reason: 'not_used',
       ignored_by: 'owner@example.com',
+    });
+    expect(getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'kilo/repo',
+      userId: 'user-123',
+      orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      expectedIntegrationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     });
     expect(auditRows[0]).toMatchObject({
       actor_id: 'user-123',
@@ -156,6 +167,52 @@ describe('processSecurityFindingDismissal', () => {
     });
   });
 
+  it('does not trust an old command installation when the finding moved integrations', async () => {
+    const { db, updates, auditRows } = createDb();
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: false,
+      reason: 'integration_mismatch',
+    });
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getTokenForRepo } as unknown as GitTokenService,
+        message: { ...createMessage(), installationId: 'old-installation' },
+      })
+    ).rejects.toThrow('integration_mismatch');
+
+    expect(getTokenForRepo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedIntegrationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      })
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(auditRows).toEqual([]);
+  });
+
+  it('uses unique repository fallback only for legacy findings without integration identity', async () => {
+    const { db } = createDb({ ...finding, platform_integration_id: null } as never);
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'legacy-token',
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+
+    await processSecurityFindingDismissal({
+      db,
+      gitTokenService: { getTokenForRepo } as unknown as GitTokenService,
+      message: createMessage(),
+    });
+
+    expect(getTokenForRepo).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedIntegrationId: undefined })
+    );
+  });
+
   it('classifies the actor from authoritative user state at event-write time', async () => {
     const { db, auditRows } = createDb(finding, {
       actor: {
@@ -169,7 +226,9 @@ describe('processSecurityFindingDismissal', () => {
 
     await processSecurityFindingDismissal({
       db,
-      gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+      gitTokenService: {
+        getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+      } as unknown as GitTokenService,
       message: createMessage(),
     });
 
@@ -187,7 +246,9 @@ describe('processSecurityFindingDismissal', () => {
     await expect(
       processSecurityFindingDismissal({
         db,
-        gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+        gitTokenService: {
+          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+        } as unknown as GitTokenService,
         message: createMessage(),
       })
     ).rejects.toThrow('GitHub Dependabot dismissal failed with 503');
@@ -203,7 +264,9 @@ describe('processSecurityFindingDismissal', () => {
     await expect(
       processSecurityFindingDismissal({
         db,
-        gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+        gitTokenService: {
+          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+        } as unknown as GitTokenService,
         message: createMessage(),
       })
     ).rejects.toThrow('audit insert failed');
@@ -214,14 +277,14 @@ describe('processSecurityFindingDismissal', () => {
 
   it('does not mutate local state when Dependabot source metadata is malformed', async () => {
     const { db, updates, auditRows } = createDb({ ...finding, source_id: '42junk' });
-    const getToken = vi.fn().mockResolvedValue('github-token');
+    const getTokenForRepo = vi.fn().mockResolvedValue({ success: true, token: 'github-token' });
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
 
     await expect(
       processSecurityFindingDismissal({
         db,
-        gitTokenService: { getToken } as unknown as GitTokenService,
+        gitTokenService: { getTokenForRepo } as unknown as GitTokenService,
         message: createMessage(),
       })
     ).resolves.toEqual({
@@ -231,7 +294,7 @@ describe('processSecurityFindingDismissal', () => {
       resultCode: 'INVALID_DISMISS_TARGET',
     });
 
-    expect(getToken).not.toHaveBeenCalled();
+    expect(getTokenForRepo).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(updates).toHaveLength(0);
     expect(auditRows).toHaveLength(0);
@@ -239,14 +302,14 @@ describe('processSecurityFindingDismissal', () => {
 
   it('dismisses non-Dependabot findings locally without upstream writeback', async () => {
     const { db, updates, auditRows } = createDb({ ...finding, source: 'pnpm_audit' });
-    const getToken = vi.fn().mockResolvedValue('github-token');
+    const getTokenForRepo = vi.fn().mockResolvedValue({ success: true, token: 'github-token' });
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
 
     await expect(
       processSecurityFindingDismissal({
         db,
-        gitTokenService: { getToken } as unknown as GitTokenService,
+        gitTokenService: { getTokenForRepo } as unknown as GitTokenService,
         message: createMessage(),
       })
     ).resolves.toEqual({
@@ -256,7 +319,7 @@ describe('processSecurityFindingDismissal', () => {
       resultCode: 'FINDING_DISMISSED',
     });
 
-    expect(getToken).not.toHaveBeenCalled();
+    expect(getTokenForRepo).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(updates[0]).toMatchObject({
       status: 'ignored',
@@ -271,14 +334,14 @@ describe('processSecurityFindingDismissal', () => {
 
   it('leaves already ignored findings untouched', async () => {
     const { db, updates, auditRows } = createDb({ ...finding, status: 'ignored' });
-    const getToken = vi.fn().mockResolvedValue('github-token');
+    const getTokenForRepo = vi.fn().mockResolvedValue({ success: true, token: 'github-token' });
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
 
     await expect(
       processSecurityFindingDismissal({
         db,
-        gitTokenService: { getToken } as unknown as GitTokenService,
+        gitTokenService: { getTokenForRepo } as unknown as GitTokenService,
         message: createMessage(),
       })
     ).resolves.toEqual({
@@ -288,7 +351,7 @@ describe('processSecurityFindingDismissal', () => {
       resultCode: 'ALREADY_IGNORED',
     });
 
-    expect(getToken).not.toHaveBeenCalled();
+    expect(getTokenForRepo).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(updates).toHaveLength(0);
     expect(auditRows).toHaveLength(0);
@@ -299,14 +362,14 @@ describe('processSecurityFindingDismissal', () => {
       ...finding,
       owned_by_organization_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     });
-    const getToken = vi.fn().mockResolvedValue('github-token');
+    const getTokenForRepo = vi.fn().mockResolvedValue({ success: true, token: 'github-token' });
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
 
     await expect(
       processSecurityFindingDismissal({
         db,
-        gitTokenService: { getToken } as unknown as GitTokenService,
+        gitTokenService: { getTokenForRepo } as unknown as GitTokenService,
         message: createMessage(),
       })
     ).resolves.toEqual({
@@ -316,7 +379,7 @@ describe('processSecurityFindingDismissal', () => {
       resultCode: 'FINDING_UNAVAILABLE',
     });
 
-    expect(getToken).not.toHaveBeenCalled();
+    expect(getTokenForRepo).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(updates).toHaveLength(0);
     expect(auditRows).toHaveLength(0);

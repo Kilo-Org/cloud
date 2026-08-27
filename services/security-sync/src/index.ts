@@ -95,7 +95,7 @@ const ManualFindingDismissalCommandSchema = z.object({
   owner: SecuritySyncOwnerSchema,
   actor: SecuritySyncActorSchema,
   findingId: z.string().uuid(),
-  installationId: z.string().min(1),
+  installationId: z.string().min(1).optional(),
   reason: DependabotDismissReasonSchema,
   comment: z.string().optional(),
   /** Stable web operation key (P1-A-08e); same-key retries reuse the original command. */

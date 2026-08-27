@@ -53,6 +53,7 @@ const command: ManualAnalysisStartCommand = {
 
 const finding = {
   id: command.findingId,
+  platform_integration_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
   owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   owned_by_user_id: null,
   repo_full_name: 'kilo/repo',
@@ -211,6 +212,49 @@ describe('processManualAnalysisStart', () => {
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(startSecurityAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('pins manual analysis token resolution to the finding integration', async () => {
+    let selectCount = 0;
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: false,
+      reason: 'integration_mismatch',
+    });
+    const db = {
+      select: () => {
+        selectCount += 1;
+        if (selectCount === 1) {
+          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
+        }
+        if (selectCount === 2) return { from: () => ({ where: async () => [{ total: 0 }] }) };
+        return {
+          from: () => ({
+            where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
+          }),
+        };
+      },
+      insert: () => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({ returning: async () => [{ id: 'queue-row' }] }),
+        }),
+      }),
+      execute: vi.fn().mockResolvedValue({ rows: [] }),
+    };
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        env: { GIT_TOKEN_SERVICE: { getTokenForRepo } } as unknown as CloudflareEnv,
+        command,
+      })
+    ).resolves.toEqual({ status: 'token-missing' });
+
+    expect(getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'kilo/repo',
+      userId: 'user-123',
+      orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      expectedIntegrationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    });
   });
 
   it('persists actor-selected model context in Worker launch and audit metadata', async () => {

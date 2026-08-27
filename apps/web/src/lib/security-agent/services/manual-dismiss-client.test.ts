@@ -33,7 +33,6 @@ describe('submitManualFindingDismissal', () => {
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         actor: { id: 'user-123', email: 'owner@example.com' },
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        installationId: 'installation-123',
         reason: 'not_used',
         comment: 'No production usage',
       })
@@ -79,7 +78,6 @@ describe('submitManualFindingDismissal', () => {
       owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
       actor: { id: 'user-123' },
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-      installationId: 'installation-123',
       reason: 'not_used',
       operationKey: 'retry-safe-key-123',
     });
@@ -98,7 +96,6 @@ describe('submitManualFindingDismissal', () => {
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         actor: { id: 'user-123' },
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        installationId: 'installation-123',
         reason: 'not_used',
       })
     ).rejects.toMatchObject({
@@ -120,7 +117,6 @@ describe('submitManualFindingDismissal', () => {
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         actor: { id: 'user-123' },
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        installationId: 'installation-123',
         reason: 'not_used',
       });
       throw new Error('expected throw');
@@ -149,7 +145,6 @@ describe('submitManualFindingDismissal', () => {
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         actor: { id: 'user-123' },
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        installationId: 'installation-123',
         reason: 'not_used',
       });
       throw new Error('expected throw');
@@ -178,7 +173,6 @@ describe('submitManualFindingDismissal', () => {
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         actor: { id: 'user-123' },
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        installationId: 'installation-123',
         reason: 'not_used',
       });
       throw new Error('expected throw');
@@ -203,7 +197,6 @@ describe('submitManualFindingDismissal', () => {
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         actor: { id: 'user-123' },
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        installationId: 'installation-123',
         reason: 'not_used',
       });
       throw new Error('expected throw');
@@ -230,7 +223,6 @@ describe('submitManualFindingDismissal', () => {
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         actor: { id: 'user-123' },
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        installationId: 'installation-123',
         reason: 'not_used',
       });
       throw new Error('expected throw');
@@ -254,7 +246,6 @@ describe('submitManualFindingDismissal', () => {
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         actor: { id: 'user-123' },
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        installationId: 'installation-123',
         reason: 'not_used',
       });
       throw new Error('expected throw');
@@ -286,7 +277,6 @@ describe('submitManualFindingDismissal env configuration', () => {
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         actor: { id: 'user-123' },
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        installationId: 'installation-123',
         reason: 'not_used',
       });
     } catch (e) {
@@ -312,7 +302,6 @@ describe('submitManualFindingDismissal env configuration', () => {
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
         actor: { id: 'user-123' },
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        installationId: 'installation-123',
         reason: 'not_used',
       });
     } catch (e) {

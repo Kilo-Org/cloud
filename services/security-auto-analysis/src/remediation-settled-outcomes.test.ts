@@ -57,6 +57,7 @@ const personalFinding = {
   id: FINDING_ID,
   owned_by_user_id: 'user-1',
   owned_by_organization_id: null,
+  platform_integration_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
 } as never;
 
 /** A fake db whose `select` resolves rows by the queried table. */
@@ -470,6 +471,11 @@ describe('security remediation callback settle wiring', () => {
     });
 
     expect(result).toEqual({ status: 'pr_opened-finalized' });
+    expect(getTokenForRepo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedIntegrationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      })
+    );
     expect(settleOperation).toHaveBeenCalledWith(expect.anything(), settleCallMatcher('completed'));
   });
 

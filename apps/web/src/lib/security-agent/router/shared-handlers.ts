@@ -1658,28 +1658,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Get integration for GitHub API call
-        const integration = await deps.getIntegration(ctx, input);
-        if (!integration || integration.integration_status !== 'active') {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub integration not found or inactive',
-          });
-        }
-
-        const installationId = integration.platform_installation_id;
-        if (!installationId) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub installation ID not found',
-          });
-        }
-
         const submitParams = {
           owner: securityOwner,
           actor: { id: ctx.user.id, email: ctx.user.google_user_email },
           findingId: input.findingId,
-          installationId,
           reason: input.reason,
           comment: input.comment,
           operationKey: input.operationKey,

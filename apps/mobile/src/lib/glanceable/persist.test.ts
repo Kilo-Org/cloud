@@ -7,6 +7,7 @@ import {
 
 import {
   _resetGlanceablePersistForTests,
+  _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
   getLastGlanceableSnapshot,
   getLocalScopeKey,
@@ -101,6 +102,30 @@ describe('restorePersistedGlanceable', () => {
     await restorePersistedGlanceable();
 
     expect(getLastGlanceableSnapshot()).toBeNull();
+  });
+
+  it('does not clobber an in-memory state already set before the restore read', async () => {
+    // A stale persisted record from a prior session sits on disk.
+    const stale = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stale));
+    store.set(SCOPE_KEY, 'stale-scope');
+
+    // A logout blank landed in memory before restore started (a remount, not a
+    // JS restart). Its SecureStore mirror is not part of this test, so the
+    // disk still holds the stale record.
+    const blank = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+      status: 'signed_out',
+    });
+    _setLastGlanceableSnapshotForTests(blank);
+
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toEqual(blank);
+    expect(getLocalScopeKey()).toBe(blank.scopeKey);
   });
 
   it('restores a schema-valid stored record', async () => {

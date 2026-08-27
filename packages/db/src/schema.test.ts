@@ -411,6 +411,70 @@ async function expectPlatformCredentialConstraintViolation(
   });
 }
 
+/**
+ * Creates one organization owning two independently identified Monthly Spending
+ * alerts, then removes the organization so the alert cascade is exercised too.
+ */
+async function withOrganizationAlerts<T>(
+  testFn: (params: { alertId: string; otherAlertId: string }) => Promise<T>
+): Promise<T> {
+  const [organization] = await schemaTestDb.db
+    .insert(schema.organizations)
+    .values({ name: `Schema Alerts Org ${crypto.randomUUID()}`, plan: 'enterprise' })
+    .returning({ id: schema.organizations.id });
+
+  if (!organization) {
+    throw new Error('Failed to insert organization alert test organization');
+  }
+
+  const alertValues: schema.NewOrganizationAlert[] = [500_000_000, 1_000_000_000].map(
+    thresholdMicrodollars => ({
+      organization_id: organization.id,
+      type: 'monthly_spending',
+      status: 'enabled',
+      configuration: {
+        thresholdMicrodollars,
+        period: { type: 'calendar_month_utc', version: 1 },
+        recipients: ['billing@example.com'],
+      },
+    })
+  );
+
+  try {
+    const alerts = await schemaTestDb.db
+      .insert(schema.organization_alerts)
+      .values(alertValues)
+      .returning({ id: schema.organization_alerts.id });
+
+    if (!alerts[0] || !alerts[1]) {
+      throw new Error('Failed to insert organization alerts');
+    }
+
+    return await testFn({ alertId: alerts[0].id, otherAlertId: alerts[1].id });
+  } finally {
+    await schemaTestDb.db
+      .delete(schema.organizations)
+      .where(eq(schema.organizations.id, organization.id));
+  }
+}
+
+function deliveryClaimValues(
+  values: { alertId: string } & Partial<schema.NewOrganizationAlertDelivery>
+): schema.NewOrganizationAlertDelivery {
+  const { alertId, ...overrides } = values;
+
+  return {
+    alert_id: alertId,
+    period_occurrence_id: 'calendar_month_utc:v1:2026-08',
+    recipient_identity_hmac: `hmac-${crypto.randomUUID()}`,
+    channel: 'email',
+    claimed_configuration_version: 1,
+    threshold_microdollars: 500_000_000,
+    measured_value_microdollars: 500_000_000,
+    ...overrides,
+  };
+}
+
 describe('database schema', () => {
   it("should be up to date with migrations (run 'pnpm drizzle generate' if this fails)", async () => {
     const migrationsDir = path.join(__dirname, 'migrations');
@@ -861,6 +925,113 @@ describe('database schema', () => {
   it('exposes provider-aware Kilo Pass store tables', () => {
     expect(Object.hasOwn(schema, 'kilo_pass_store_events')).toBe(true);
     expect(Object.hasOwn(schema, 'kilo_pass_store_purchases')).toBe(true);
+  });
+
+  it('deduplicates alert delivery claims per period without linking separate alerts', async () => {
+    await withOrganizationAlerts(async ({ alertId, otherAlertId }) => {
+      const claim = {
+        period_occurrence_id: 'calendar_month_utc:v1:2026-08',
+        recipient_identity_hmac: `hmac-${crypto.randomUUID()}`,
+      };
+
+      await schemaTestDb.db
+        .insert(schema.organization_alert_deliveries)
+        .values(deliveryClaimValues({ alertId, ...claim }));
+
+      // Repeated or concurrent evaluation of one alert cannot claim the same
+      // recipient twice in one period.
+      await expect(
+        schemaTestDb.db
+          .insert(schema.organization_alert_deliveries)
+          .values(deliveryClaimValues({ alertId, ...claim }))
+      ).rejects.toMatchObject({
+        cause: { constraint: 'UQ_organization_alert_deliveries_identity' },
+      });
+
+      // A separate alert is a separate customer instruction, so the same
+      // recipient stays independently eligible there.
+      await schemaTestDb.db
+        .insert(schema.organization_alert_deliveries)
+        .values(deliveryClaimValues({ alertId: otherAlertId, ...claim }));
+
+      // The measured value's relationship to the threshold is type-specific
+      // (`monthly_spending` claims only when it is at or above the threshold,
+      // `low_balance` only when it is below), so this table only rejects a
+      // negative measured value or a non-positive threshold; direction is each
+      // type's own claim function's responsibility, not the schema's.
+      await expect(
+        schemaTestDb.db
+          .insert(schema.organization_alert_deliveries)
+          .values(deliveryClaimValues({ alertId, measured_value_microdollars: -1 }))
+      ).rejects.toMatchObject({
+        cause: { constraint: 'organization_alert_deliveries_measured_value_check' },
+      });
+    });
+  });
+
+  it('keeps alert delivery leases and submission evidence consistent', async () => {
+    await withOrganizationAlerts(async ({ alertId }) => {
+      const now = new Date().toISOString();
+      const insertClaim = (overrides: Partial<schema.NewOrganizationAlertDelivery>) =>
+        schemaTestDb.db
+          .insert(schema.organization_alert_deliveries)
+          .values(deliveryClaimValues({ alertId, ...overrides }));
+      const expectSubmissionViolation = (insertPromise: Promise<unknown>) =>
+        expect(insertPromise).rejects.toMatchObject({
+          cause: { constraint: 'organization_alert_deliveries_submission_check' },
+        });
+
+      // Only submitting work holds a lease, so an expired lease always means an
+      // ambiguous provider outcome rather than reclaimable pre-submission work.
+      await expectSubmissionViolation(insertClaim({ lease_expires_at: now }));
+      await expectSubmissionViolation(insertClaim({ status: 'submitting', submitting_at: now }));
+      await expectSubmissionViolation(
+        insertClaim({ status: 'ambiguous', submitting_at: now, lease_expires_at: now })
+      );
+
+      // Outcomes that are terminal for automatic dispatch must record that
+      // submission began.
+      await expectSubmissionViolation(insertClaim({ status: 'accepted' }));
+
+      // A definitive failure before provider acceptance drops the lease and
+      // becomes retryable again, while retaining that submission was attempted.
+      await insertClaim({ status: 'submitting', submitting_at: now, lease_expires_at: now });
+      const retryable = await schemaTestDb.db
+        .update(schema.organization_alert_deliveries)
+        .set({
+          status: 'pending',
+          lease_expires_at: null,
+          attempt_count: 1,
+          last_error_code: 'provider_rejected',
+        })
+        .where(eq(schema.organization_alert_deliveries.alert_id, alertId))
+        .returning({ submitting_at: schema.organization_alert_deliveries.submitting_at });
+
+      expect(retryable).toHaveLength(1);
+      expect(retryable[0]?.submitting_at).not.toBeNull();
+    });
+  });
+
+  it('drops alerts and their delivery claims when the organization is deleted', async () => {
+    const deletedAlertId = await withOrganizationAlerts(async ({ alertId }) => {
+      await schemaTestDb.db
+        .insert(schema.organization_alert_deliveries)
+        .values(deliveryClaimValues({ alertId }));
+      return alertId;
+    });
+
+    expect(
+      await schemaTestDb.db
+        .select({ id: schema.organization_alerts.id })
+        .from(schema.organization_alerts)
+        .where(eq(schema.organization_alerts.id, deletedAlertId))
+    ).toEqual([]);
+    expect(
+      await schemaTestDb.db
+        .select({ id: schema.organization_alert_deliveries.id })
+        .from(schema.organization_alert_deliveries)
+        .where(eq(schema.organization_alert_deliveries.alert_id, deletedAlertId))
+    ).toEqual([]);
   });
 
   it('enforces one live Coding Plan subscription per user and provider', async () => {

@@ -36,6 +36,7 @@ import {
 import { client as stripeClient } from '@/lib/stripe-client';
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+import { disableOrganizationAlertsForDowngrade } from '@/lib/organizations/alerts/alert-lifecycle';
 
 const sentryError = sentryLogger('organization_seats', 'error');
 
@@ -361,6 +362,11 @@ async function handleSubscriptionEventInternal(
     if (plan !== null) {
       await bumpOrganizationGroupPolicyRevision(tx, meta.organizationId, meta.kiloUserId);
       await tx.update(organizations).set({ plan }).where(eq(organizations.id, meta.organizationId));
+      // Spending alerts are Enterprise-only, so leaving Enterprise disables them
+      // in the same transaction that changes the plan.
+      if (plan !== 'enterprise') {
+        await disableOrganizationAlertsForDowngrade(tx, meta.organizationId);
+      }
     }
 
     // if the subscription is ended, set seat count to 0 and do nothing else

@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { exa_monthly_usage, exa_usage_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import { scheduleOrganizationLowBalanceAlert } from '@/lib/organizations/organization-usage';
+import {
+  scheduleLowBalanceOrganizationAlerts,
+  scheduleOrganizationLowBalanceAlert,
+} from '@/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
 import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
@@ -121,6 +124,7 @@ export async function recordExaUsage(params: {
 
   if (organizationId && organizationUsage) {
     scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage);
+    scheduleLowBalanceOrganizationAlerts(organizationId, organizationUsage);
   }
 }
 

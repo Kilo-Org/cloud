@@ -1,0 +1,1 @@
+ALTER TABLE "organization_alert_deliveries" DROP COLUMN "measured_spend_microdollars";

@@ -3220,6 +3220,189 @@ export const organizations = pgTable(
 
 export type Organization = typeof organizations.$inferSelect;
 
+// Collection-backed organization alerts. Lifecycle actor attribution and audit
+// history live in `organization_audit_logs` (the organization audit surface,
+// already PII-managed by `softDeleteUser`), not in a bespoke per-alert log.
+/**
+ * What the measured spend covers. Explicit rather than defaulted, the same as
+ * `period`: an alert with no `scope` is not "organization-wide by default", it
+ * is an invalid configuration. `group` is a live-membership join against
+ * `organization_group_memberships` at evaluation time, not a persisted
+ * attribution: it measures whoever currently belongs to the group, so a
+ * roster change today changes what an earlier month's measured spend would
+ * report if it were recomputed, and a member of several groups is measured
+ * independently by each one.
+ */
+export type MonthlySpendingAlertScope =
+  | { type: 'organization' }
+  | { type: 'group'; groupId: string };
+
+export type MonthlySpendingAlertConfiguration = {
+  thresholdMicrodollars: number;
+  // Explicit, versioned period definition: monthly behavior is never inferred
+  // from a missing field, and a semantics change gets a new version.
+  period: {
+    type: 'calendar_month_utc';
+    version: 1;
+  };
+  scope: MonthlySpendingAlertScope;
+  recipients: string[];
+};
+
+// Unlike `monthly_spending`, this type has no period: it watches the
+// organization's current balance continuously and has no calendar reset. Its
+// occurrence identity instead comes from the crossing event itself (see
+// `low-balance-evaluator.ts`), which is also why it has no `period` field.
+export type LowBalanceAlertConfiguration = {
+  thresholdMicrodollars: number;
+  recipients: string[];
+};
+
+export type OrganizationAlertConfiguration =
+  | MonthlySpendingAlertConfiguration
+  | LowBalanceAlertConfiguration;
+export type OrganizationAlertType = 'monthly_spending' | 'low_balance';
+export type OrganizationAlertStatus = 'enabled' | 'disabled' | 'archived';
+
+export const organization_alerts = pgTable(
+  'organization_alerts',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    type: text().notNull().$type<OrganizationAlertType>(),
+    status: text().notNull().$type<OrganizationAlertStatus>(),
+    configuration: jsonb().notNull().$type<OrganizationAlertConfiguration>(),
+    configuration_version: integer().notNull().default(1),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    archived_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('IDX_organization_alerts_organization_status_created_id').on(
+      table.organization_id,
+      table.status,
+      table.created_at,
+      table.id
+    ),
+    index('IDX_organization_alerts_enabled_organization_id')
+      .on(table.organization_id, table.id)
+      .where(sql`${table.status} = 'enabled'`),
+    check(
+      'organization_alerts_type_check',
+      sql`${table.type} IN ('monthly_spending', 'low_balance')`
+    ),
+    check(
+      'organization_alerts_status_check',
+      sql`${table.status} IN ('enabled', 'disabled', 'archived')`
+    ),
+    check(
+      'organization_alerts_configuration_version_check',
+      sql`${table.configuration_version} > 0`
+    ),
+    check(
+      'organization_alerts_archive_check',
+      sql`(${table.status} = 'archived') = (${table.archived_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type OrganizationAlert = typeof organization_alerts.$inferSelect;
+export type NewOrganizationAlert = typeof organization_alerts.$inferInsert;
+
+// One row per delivery claim: alert, period occurrence, keyed recipient identity
+// and channel. Creating the row admits that recipient toward the alert-period
+// recipient cap, so rows are retained (including `canceled`) for the period.
+// `pending` covers both never-attempted and retry-after-failure work; the retry
+// is scheduled by `next_attempt_at` and described by `attempt_count`.
+export type OrganizationAlertDeliveryStatus =
+  | 'pending'
+  | 'submitting'
+  | 'accepted'
+  | 'ambiguous'
+  | 'canceled';
+
+export const organization_alert_deliveries = pgTable(
+  'organization_alert_deliveries',
+  {
+    id: idPrimaryKeyColumn,
+    alert_id: uuid()
+      .notNull()
+      .references(() => organization_alerts.id, { onDelete: 'cascade' }),
+    period_occurrence_id: text().notNull(),
+    // Keyed digest of the normalized recipient. Never the address itself: the
+    // address is read from the alert configuration at dispatch time.
+    recipient_identity_hmac: text().notNull(),
+    channel: text().notNull().$type<'email'>(),
+    status: text().notNull().default('pending').$type<OrganizationAlertDeliveryStatus>(),
+    claimed_configuration_version: integer().notNull(),
+    // Fencing token: refreshing a claim for current configuration bumps it so a
+    // stale worker's compare-and-set can no longer submit that claim.
+    claim_version: integer().notNull().default(1),
+    threshold_microdollars: bigint({ mode: 'number' }).notNull(),
+    // The value measured against the threshold at claim time. Its relationship
+    // to the threshold is type-specific (`monthly_spending` claims only when
+    // this is `>=` the threshold; `low_balance` claims only when it is `<`), so
+    // this table only constrains it to be non-negative and leaves direction to
+    // each type's own claim function.
+    measured_value_microdollars: bigint({ mode: 'number' }).notNull(),
+    attempt_count: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    submitting_at: timestamp({ withTimezone: true, mode: 'string' }),
+    provider_message_id: text(),
+    last_error_code: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_organization_alert_deliveries_identity').on(
+      table.alert_id,
+      table.period_occurrence_id,
+      table.recipient_identity_hmac,
+      table.channel
+    ),
+    index('IDX_organization_alert_deliveries_dispatch').on(
+      table.status,
+      table.next_attempt_at,
+      table.id
+    ),
+    check(
+      'organization_alert_deliveries_identity_fields_check',
+      sql`length(${table.period_occurrence_id}) > 0 AND length(${table.recipient_identity_hmac}) > 0`
+    ),
+    check('organization_alert_deliveries_channel_check', sql`${table.channel} = 'email'`),
+    check(
+      'organization_alert_deliveries_status_check',
+      sql`${table.status} IN ('pending', 'submitting', 'accepted', 'ambiguous', 'canceled')`
+    ),
+    check(
+      'organization_alert_deliveries_counters_check',
+      sql`${table.claimed_configuration_version} > 0 AND ${table.claim_version} > 0 AND ${table.attempt_count} >= 0`
+    ),
+    check(
+      'organization_alert_deliveries_measured_value_check',
+      sql`${table.threshold_microdollars} > 0 AND ${table.measured_value_microdollars} >= 0`
+    ),
+    // A lease exists exactly while a worker is submitting, and submission time is
+    // retained once submission has begun, including across pre-acceptance retries.
+    check(
+      'organization_alert_deliveries_submission_check',
+      sql`(${table.status} = 'submitting') = (${table.lease_expires_at} IS NOT NULL) AND (${table.status} NOT IN ('submitting', 'accepted', 'ambiguous') OR ${table.submitting_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type OrganizationAlertDelivery = typeof organization_alert_deliveries.$inferSelect;
+export type NewOrganizationAlertDelivery = typeof organization_alert_deliveries.$inferInsert;
+
 export type OrganizationDomainClaimStatus = 'pending' | 'verified';
 
 export const organization_domain_claims = pgTable(

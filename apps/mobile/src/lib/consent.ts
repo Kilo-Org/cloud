@@ -180,14 +180,13 @@ export async function setOptionalConsent(userId: string, optional: boolean): Pro
   if (optional) {
     // Enable-side: queue the outcome and let the ready listener capture it.
     pendingConsentOutcome = { action: 'optional_changed', optional: true };
-    notifyConsentChange({ userId, hasAccepted: true, optional });
   } else {
     // Disable-side: capture and flush before notifying so the turn-off lands
     // while optional telemetry is still allowed.
     captureEvent(CONSENT_OUTCOME_EVENT, { action: 'optional_changed', optional: false });
     await flushLastPostHogEvent();
-    notifyConsentChange({ userId, hasAccepted: true, optional });
   }
+  notifyConsentChange({ userId, hasAccepted: true, optional });
 }
 
 export async function revokeConsent(userId: string): Promise<void> {

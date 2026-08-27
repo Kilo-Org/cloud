@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = vi.hoisted(() => new Map<string, string>());
@@ -482,7 +483,7 @@ describe('consent outcome analytics', () => {
     posthogMock.captureEvent.mockClear();
     posthogMock.flushLastPostHogEvent.mockClear();
 
-    const listener = vi.fn();
+    const listener = vi.fn<() => void>();
     subscribeToConsentChanges(listener);
 
     await setOptionalConsent('user-1', false);
@@ -492,12 +493,15 @@ describe('consent outcome analytics', () => {
       optional: false,
     });
     expect(posthogMock.flushLastPostHogEvent).toHaveBeenCalledTimes(1);
-    expect(posthogMock.captureEvent.mock.invocationCallOrder![0]!).toBeLessThan(
-      posthogMock.flushLastPostHogEvent.mock.invocationCallOrder![0]!
-    );
-    expect(posthogMock.flushLastPostHogEvent.mock.invocationCallOrder![0]!).toBeLessThan(
-      listener.mock.invocationCallOrder![0]!
-    );
+
+    const captureCall = posthogMock.captureEvent.mock.invocationCallOrder[0];
+    const flushCall = posthogMock.flushLastPostHogEvent.mock.invocationCallOrder[0];
+    const listenerCall = listener.mock.invocationCallOrder[0];
+    if (captureCall === undefined || flushCall === undefined || listenerCall === undefined) {
+      throw new Error('expected consent change call order to be recorded');
+    }
+    expect(captureCall).toBeLessThan(flushCall);
+    expect(flushCall).toBeLessThan(listenerCall);
   });
 
   it('revokeConsent captures revoked then flushes', async () => {

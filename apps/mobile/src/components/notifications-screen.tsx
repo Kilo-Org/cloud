@@ -456,7 +456,7 @@ export function NotificationsScreen() {
     try {
       const result = await Notifications.requestPermissionsAsync();
       const granted =
-        result.status === Notifications.PermissionStatus.GRANTED || result.granted === true;
+        result.status === Notifications.PermissionStatus.GRANTED || result.granted;
       emitNotificationPermissionResponded(granted);
       void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
       if (granted) {

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- sign-out teardown ordering, stale sign-in fencing, and the consent-outcome clear are kept together with the provider mount */
 import * as SecureStore from 'expo-secure-store';
 import { z } from 'zod';
 import {

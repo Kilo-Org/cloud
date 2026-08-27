@@ -55,7 +55,7 @@ import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-wo
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
+import { getCodeReviewActionRequiredStateForScope } from '@/lib/code-reviews/action-required';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
@@ -669,7 +669,10 @@ export const codeReviewRouter = createTRPCRouter({
 
         if (!manualConfig) {
           const agentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
-          const actionRequiredState = getCodeReviewActionRequiredState(agentConfig);
+          const actionRequiredState = getCodeReviewActionRequiredStateForScope(agentConfig, {
+            integrationId: review.platform_integration_id,
+            repositoryFullName: review.repo_full_name,
+          });
           if (actionRequiredState) {
             throw new TRPCError({
               code: 'BAD_REQUEST',

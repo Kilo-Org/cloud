@@ -24,6 +24,7 @@ import { logExceptInTest } from '@/lib/utils.server';
 import {
   clearCodeReviewActionRequiredState,
   getCodeReviewActionRequiredState,
+  getCodeReviewScopedActionRequiredStates,
 } from '@/lib/code-reviews/action-required';
 import { getReviewMemoryEnabledFromConfig } from '@/lib/code-reviews/review-memory/settings';
 import {
@@ -304,7 +305,10 @@ export const personalReviewAgentRouter = createTRPCRouter({
         council: cfg.council ?? null,
         councilEnabledRepositoryIds: cfg.council_enabled_repository_ids ?? [],
         reviewMemoryEnabled: getReviewMemoryEnabledFromConfig(config.config),
-        actionRequired: getCodeReviewActionRequiredState(config),
+        actionRequired:
+          getCodeReviewActionRequiredState(config) ??
+          getCodeReviewScopedActionRequiredStates(config)[0] ??
+          null,
       };
     }),
 

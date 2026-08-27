@@ -195,7 +195,7 @@ describe('PlatformOverviewScreen actionRequired banner', () => {
 
     expect(texts).toContain('Code Reviewer needs attention');
     expect(texts).toContain(
-      'Code Reviewer was disabled because Kilo cannot access this repository with an active GitHub App installation. Update the GitHub App installation, then enable Code Reviewer again.'
+      'Kilo cannot access this repository with its GitHub App installation. Update the affected GitHub App installation before retrying this review.'
     );
     expect(texts).toContain('Update GitHub App');
   });

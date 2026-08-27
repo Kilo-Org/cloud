@@ -15,11 +15,14 @@ import {
 import { and, eq } from 'drizzle-orm';
 import {
   classifyCodeReviewActionRequiredFailure,
+  clearScopedCodeReviewActionRequiredState,
   disableCodeReviewForActionRequiredFailure,
   disableCodeReviewForRepeatedCloneTimeoutsToday,
   getCodeReviewActionRequiredCopy,
   getCodeReviewActionRequiredRecoveryHref,
   getCodeReviewActionRequiredState,
+  getCodeReviewActionRequiredStateForScope,
+  getCodeReviewScopedActionRequiredStates,
 } from './action-required';
 import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from './action-required-shared';
 
@@ -172,12 +175,12 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
   });
 
   it.each(CODE_REVIEW_ACTION_REQUIRED_REASONS)(
-    'uses disabled-state copy for %s',
+    'uses actionable copy for %s',
     actionRequiredReason => {
       const copy = getCodeReviewActionRequiredCopy(actionRequiredReason);
 
-      expect(copy.emailReason).toMatch(/Code Reviewer was disabled/);
-      expect(copy.checkSummary).toMatch(/Code Reviewer was disabled/);
+      expect(copy.emailReason.trim()).not.toBe('');
+      expect(copy.checkSummary).toBe(copy.emailReason);
       expect(copy.recoveryLabel.trim()).not.toBe('');
       expect(copy.checkTitle.trim()).not.toBe('');
       expect(copy.gitlabDescription.trim()).not.toBe('');
@@ -326,6 +329,87 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
     expect(state?.emailSentAt).toBeTruthy();
     expect(JSON.stringify(config?.runtime_state)).not.toContain(testUser.google_user_email);
     expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('isolates a repository access failure to its GitHub integration and repository', async () => {
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+
+    await disableCodeReviewForActionRequiredFailure({
+      owner,
+      platform: 'github',
+      reviewId: 'review-1',
+      reason: 'github_installation_required',
+      errorMessage:
+        'GitHub token or active app installation required for this repository (repository_not_installed)',
+      integrationId: 'integration-unhealthy',
+      repositoryFullName: 'acme/private-repo',
+    });
+
+    const config = await getStoredConfig();
+    expect(config?.is_enabled).toBe(true);
+    expect(getCodeReviewActionRequiredState(config)).toBeNull();
+    expect(getCodeReviewScopedActionRequiredStates(config)).toEqual([
+      expect.objectContaining({
+        reason: 'github_installation_required',
+        integrationId: 'integration-unhealthy',
+        repositoryFullName: 'acme/private-repo',
+        triggeringReviewId: 'review-1',
+      }),
+    ]);
+    expect(
+      getCodeReviewActionRequiredStateForScope(config, {
+        integrationId: 'integration-unhealthy',
+        repositoryFullName: 'acme/private-repo',
+      })
+    ).toEqual(expect.objectContaining({ reason: 'github_installation_required' }));
+    expect(
+      getCodeReviewActionRequiredStateForScope(config, {
+        integrationId: 'integration-healthy',
+        repositoryFullName: 'acme/healthy-repo',
+      })
+    ).toBeNull();
+    expect(
+      getCodeReviewActionRequiredStateForScope(config, {
+        integrationId: 'integration-unhealthy',
+        repositoryFullName: 'acme/other-repo',
+      })
+    ).toBeNull();
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
+
+    await clearScopedCodeReviewActionRequiredState({
+      owner,
+      platform: 'github',
+      integrationId: 'integration-unhealthy',
+    });
+    expect(getCodeReviewScopedActionRequiredStates(await getStoredConfig())).toEqual([]);
+  });
+
+  it('isolates a GitHub IP allow-list failure to the affected integration', async () => {
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+
+    await disableCodeReviewForActionRequiredFailure({
+      owner,
+      platform: 'github',
+      reason: 'github_ip_allow_list',
+      errorMessage:
+        'Although you appear to have the correct authorization credentials, the organization has an IP allow list enabled.',
+      integrationId: 'integration-blocked',
+      repositoryFullName: 'acme/repo',
+    });
+
+    const config = await getStoredConfig();
+    expect(
+      getCodeReviewActionRequiredStateForScope(config, {
+        integrationId: 'integration-blocked',
+        repositoryFullName: 'acme/another-repo',
+      })
+    ).toEqual(expect.objectContaining({ reason: 'github_ip_allow_list' }));
+    expect(
+      getCodeReviewActionRequiredStateForScope(config, {
+        integrationId: 'integration-healthy',
+        repositoryFullName: 'acme/repo',
+      })
+    ).toBeNull();
   });
 
   it('retries email when notification delivery fails', async () => {

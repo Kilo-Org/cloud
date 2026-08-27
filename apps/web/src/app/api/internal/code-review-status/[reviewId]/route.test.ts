@@ -893,7 +893,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'abc123',
         'failed',
         expect.objectContaining({
-          description: 'Code Reviewer disabled: GitLab token setup required',
+          description: 'Code Reviewer needs GitLab token access',
         }),
         'https://gitlab.com'
       );
@@ -935,6 +935,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         reviewId: REVIEW_ID,
         reason: 'selected_model_unavailable',
         errorMessage,
+        integrationId: 'int-1',
+        repositoryFullName: 'owner/repo',
       });
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockSetCommitStatus).not.toHaveBeenCalled();

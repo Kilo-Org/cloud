@@ -36,6 +36,7 @@ import {
 } from '@/lib/integrations/platforms/github/user-authorization';
 import { seedUserGithubToken } from '@/lib/github-pr-review/dev-seed';
 import { createInstallState } from '@/lib/integrations/github/install-state';
+import { clearScopedCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
 
 export const githubAppsRouter = createTRPCRouter({
   // List all integrations
@@ -463,6 +464,11 @@ export const githubAppsRouter = createTRPCRouter({
 
       const repositories = await fetchGitHubRepositories(installationId, appType);
       await updateRepositoriesForIntegration(integration.id, repositories);
+      await clearScopedCodeReviewActionRequiredState({
+        owner,
+        platform: 'github',
+        integrationId: integration.id,
+      });
 
       if (input?.organizationId) {
         await createAuditLog({

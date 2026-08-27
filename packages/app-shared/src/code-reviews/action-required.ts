@@ -20,6 +20,8 @@ export type CodeReviewActionRequiredState = {
   detectedAt: string;
   lastSeenAt: string;
   triggeringReviewId?: string;
+  integrationId?: string;
+  repositoryFullName?: string;
   lastErrorMessage: string;
   emailSentAt?: string;
 };
@@ -34,19 +36,19 @@ const COPY_BY_REASON: Record<CodeReviewActionRequiredReason, CodeReviewActionReq
   github_installation_required: {
     title: 'Code Reviewer needs attention',
     description:
-      'Code Reviewer was disabled because Kilo cannot access this repository with an active GitHub App installation. Update the GitHub App installation, then enable Code Reviewer again.',
+      'Kilo cannot access this repository with its GitHub App installation. Update the affected GitHub App installation before retrying this review.',
     recoveryLabel: 'Update GitHub App',
   },
   github_ip_allow_list: {
     title: 'Code Reviewer needs attention',
     description:
-      'Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
+      'This repository belongs to a GitHub organization whose IP allow list blocks Kilo. Contact hi@kilocode.ai for help before retrying this review.',
     recoveryLabel: 'Contact support',
   },
   gitlab_project_access_required: {
     title: 'Code Reviewer needs attention',
     description:
-      'Code Reviewer was disabled because Kilo cannot create a GitLab Project Access Token for this project. Grant Maintainer access or enable Project Access Tokens, then enable Code Reviewer again.',
+      'Kilo cannot create a GitLab Project Access Token for this project. Grant Maintainer access or enable Project Access Tokens before retrying this review.',
     recoveryLabel: 'Update GitLab integration',
   },
   byok_invalid_key: {

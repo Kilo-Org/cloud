@@ -154,7 +154,11 @@ export function OrganizationGitHubInstallations({
                   : `${selectedCount} selected ${selectedCount === 1 ? 'repository' : 'repositories'}`;
               const accountName = installation.accountLogin ?? 'GitHub organization';
               return (
-                <Collapsible key={installation.id}>
+                <Collapsible
+                  key={installation.id}
+                  id={`github-installation-${installation.id}`}
+                  className="scroll-mt-6"
+                >
                   <div className="flex min-w-0 items-center gap-3 px-4 py-4 sm:px-5">
                     <Github className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                     <div className="min-w-0 flex-1">

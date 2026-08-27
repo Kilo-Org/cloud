@@ -514,7 +514,7 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockDispatchReview).toHaveBeenCalledTimes(1);
   });
 
-  it('disables Code Reviewer for pre-worker GitHub installation failures', async () => {
+  it('keeps Code Reviewer enabled for a repository-specific GitHub installation failure', async () => {
     const recentTimestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
     const agentConfig = await insertAgentConfigForUser();
@@ -557,8 +557,18 @@ describe('tryDispatchPendingReviews', () => {
         dispatchReservationId: null,
       })
     );
-    expect(storedConfig?.is_enabled).toBe(false);
-    expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(1);
+    expect(storedConfig?.is_enabled).toBe(true);
+    expect(storedConfig?.runtime_state).toEqual(
+      expect.objectContaining({
+        code_review_scoped_action_required: [
+          expect.objectContaining({
+            reason: 'github_installation_required',
+            repositoryFullName: REPO,
+          }),
+        ],
+      })
+    );
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
   });
 
   it('disables Code Reviewer for selected-model worker status failures', async () => {

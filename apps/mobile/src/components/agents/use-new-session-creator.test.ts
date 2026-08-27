@@ -144,8 +144,10 @@ const FAKE_ATTACHMENTS: CreatorInput['attachments'] = {
   removeAttachment: vi.fn(() => undefined),
   retryAttachment: vi.fn(() => undefined),
   reset: vi.fn(() => undefined),
+  releaseUnclaimedUploads: vi.fn(() => undefined),
   isUploading: false,
   hasFailedAttachments: false,
+  hasUnclaimedAttachments: false,
   uploadPending: vi.fn(async () => ({
     ok: true as const,
     wire: undefined,
@@ -648,6 +650,33 @@ describe('useNewSessionCreator onCreated', () => {
     expect(prepareSessionMutate).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
+  });
+});
+
+describe('useNewSessionCreator upload gate', () => {
+  it('does not prepare and resets the creating flag when uploadPending reports a blocked chip', async () => {
+    const setIsCreating = vi.fn(() => undefined);
+    const blockedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      // A failed (retryable or terminal) or in-flight chip reports `{ ok: false }`
+      // from the upload hook; the creator must treat both as "not ready".
+      uploadPending: vi.fn(async () => ({ ok: false as const })),
+    };
+    const resultRef = mountCreator(
+      createInput({ organizationId: 'org-1', setIsCreating, attachments: blockedAttachments })
+    );
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'Hello agent';
+
+    await act(async () => {
+      await createSessionFromDraft();
+    });
+
+    expect(blockedAttachments.uploadPending).toHaveBeenCalledTimes(1);
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    // The Start button un-blocks: the creating flag is cleared on the blocked path.
+    expect(setIsCreating).toHaveBeenCalledWith(false);
   });
 });
 

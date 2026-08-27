@@ -30,6 +30,7 @@ const hoisted = vi.hoisted(() => {
   return {
     randomUUID: vi.fn(() => `uuid-${(idCounter += 1)}`),
     uploadOne: vi.fn(),
+    releasePendingUploads: vi.fn(() => undefined),
     announceForA11y: vi.fn(),
     announcingToastError: vi.fn(),
     measureLocalSize: vi.fn(),
@@ -59,6 +60,7 @@ vi.mock('@/lib/agent-attachments/upload-task', () => ({
   measureLocalSize: hoisted.measureLocalSize,
   describeTerminalReason: () => "This file can't be uploaded.",
   uploadOne: hoisted.uploadOne,
+  releasePendingUploads: hoisted.releasePendingUploads,
 }));
 vi.mock('expo-file-system', () => {
   class FileMock {
@@ -408,17 +410,48 @@ async function settle(): Promise<void> {
   await Promise.resolve();
 }
 
-describe('addCandidates defers document uploads', () => {
+describe('addCandidates uploads documents at selection (Step 2)', () => {
   beforeEach(() => {
     hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
     hoisted.measureLocalSize.mockReset();
     hoisted.measureLocalSize.mockResolvedValue(1024);
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+    const controlled = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValue(controlled);
   });
 
-  it('adds a pending chip without starting an upload', async () => {
+  it('starts the upload for a document at selection time and flips the chip to uploading', async () => {
     const renderer = await mountHook();
     await addDocument();
-    expect(hookApi().attachments[0]?.status).toBe('pending');
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    expect(hookApi().attachments[0]?.status).toBe('uploading');
+    renderer.unmount();
+  });
+
+  it('never uploads a strip-failed image and marks it a terminal chip', async () => {
+    vi.mocked(ImageManipulator.manipulateAsync).mockReset();
+    // A strip failure returns the original URI, which the hook reads as
+    // metadataStripFailed.
+    vi.mocked(ImageManipulator.manipulateAsync).mockResolvedValue({
+      uri: 'file:///cache/IMG_0001.HEIC',
+      width: 100,
+      height: 100,
+    });
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+    });
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('error');
+    expect(chip?.terminal).toBe(true);
+    expect(chip?.metadataStripFailed).toBe(true);
     expect(hoisted.uploadOne).not.toHaveBeenCalled();
     renderer.unmount();
   });
@@ -427,6 +460,7 @@ describe('addCandidates defers document uploads', () => {
 describe('uploadPending', () => {
   beforeEach(() => {
     hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
     hoisted.announceForA11y.mockReset();
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
@@ -440,19 +474,31 @@ describe('uploadPending', () => {
     hoisted.uploadOne.mockReturnValue(controlled);
   });
 
-  it('resolves { ok: false } on a terminal upload failure and short-circuits a later call', async () => {
+  it('resolves { ok: false } while a selection-time upload is still in flight', async () => {
+    const renderer = await mountHook();
+    // Starts the upload; the chip is 'uploading'.
+    await addDocument();
+
+    let result: Awaited<ReturnType<HookApi['uploadPending']>> | undefined = undefined;
+    await act(async () => {
+      result = await hookApi().uploadPending();
+    });
+    expect(result).toEqual({ ok: false });
+    // The in-flight upload is not re-triggered by uploadPending.
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
+
+  it('resolves { ok: false } after a terminal upload failure and short-circuits a later call', async () => {
     const renderer = await mountHook();
     await addDocument();
 
     await act(async () => {
-      const pending = hookApi().uploadPending();
       rejectUpload?.({ data: { code: 'BAD_REQUEST', message: 'extension not allowed' } });
-      const result = await pending;
-      expect(result).toEqual({ ok: false });
+      await settle();
     });
     expect(hookApi().attachments[0]?.terminal).toBe(true);
 
-    // The terminal chip now short-circuits a second uploadPending.
     await act(async () => {
       const result = await hookApi().uploadPending();
       expect(result).toEqual({ ok: false });
@@ -461,15 +507,18 @@ describe('uploadPending', () => {
     renderer.unmount();
   });
 
-  it('resolves { ok: true, wire, submission } on full success', async () => {
+  it('resolves { ok: true, wire, submission } once the select-time upload settles', async () => {
     const renderer = await mountHook();
     await addDocument();
 
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
     let result: Awaited<ReturnType<HookApi['uploadPending']>> | undefined = undefined;
     await act(async () => {
-      const pending = hookApi().uploadPending();
-      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
-      result = await pending;
+      result = await hookApi().uploadPending();
     });
 
     expect(result).toEqual({
@@ -580,6 +629,7 @@ describe('selection-time image upload (Step 2)', () => {
 describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => {
   beforeEach(() => {
     hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
     hoisted.announceForA11y.mockReset();
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
@@ -596,10 +646,15 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       resolveUpload = resolve;
       rejectUpload = reject;
     });
-    // The mock mirrors `uploadOne`'s real contract: it hands the created
-    // task's `cancelAsync` back through `onTask` before the upload settles.
+    // The mock mirrors `uploadOne`'s real contract: it admits the key through
+    // `onAdmitted` and hands the created task's `cancelAsync` back through
+    // `onTask` before the upload settles.
     hoisted.uploadOne.mockImplementation(
-      async (args: { onTask?: (task: { cancelAsync: () => Promise<void> }) => void }) => {
+      async (args: {
+        onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+        onAdmitted?: (key: string) => void;
+      }) => {
+        args.onAdmitted?.('org/2026/08/uuid/doc.pdf');
         args.onTask?.({ cancelAsync: hoisted.cancelAsync });
         const result = await controlled;
         return result;
@@ -610,13 +665,10 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
   it('announces success exactly once when the upload resolves', async () => {
     const renderer = await mountHook();
     await addDocument();
-    expect(hookApi().attachments[0]?.status).toBe('pending');
+    expect(hookApi().attachments[0]?.status).toBe('uploading');
 
     await act(async () => {
-      const pending = hookApi().uploadPending();
-      await Promise.resolve();
       resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
-      await pending;
       await settle();
     });
 
@@ -633,9 +685,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     await addDocument();
 
     await act(async () => {
-      const pending = hookApi().uploadPending();
       rejectUpload?.(new TypeError('Network request failed'));
-      await pending;
       await settle();
     });
 
@@ -656,9 +706,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     await addDocument();
 
     await act(async () => {
-      const pending = hookApi().uploadPending();
       rejectUpload?.({ data: { code: 'BAD_REQUEST', message: 'extension not allowed' } });
-      await pending;
       await settle();
     });
 
@@ -675,9 +723,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     const renderer = await mountHook();
     await addDocument();
     await act(async () => {
-      const pending = hookApi().uploadPending();
       rejectUpload?.(new TypeError('Network request failed'));
-      await pending;
       await settle();
     });
     expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
@@ -715,12 +761,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       throw new Error('attachment id missing');
     }
 
-    // Start the upload, then remove the chip while it is in flight.
-    let pending: Promise<unknown> | undefined = undefined;
-    await act(async () => {
-      pending = hookApi().uploadPending();
-      await Promise.resolve();
-    });
+    // The upload is already in flight; remove the chip before it settles.
     await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
@@ -729,7 +770,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
 
     await act(async () => {
       resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
-      await pending;
       await settle();
     });
 
@@ -769,11 +809,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     const renderer = await mountHook();
     await addDocument();
 
-    let pending: Promise<unknown> | undefined = undefined;
-    await act(async () => {
-      pending = hookApi().uploadPending();
-      await Promise.resolve();
-    });
     await act(async () => {
       hookApi().reset();
       await settle();
@@ -782,7 +817,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
 
     await act(async () => {
       resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
-      await pending;
       await settle();
     });
 
@@ -838,12 +872,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -876,12 +904,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     if (!id) {
       throw new Error('attachment id missing');
     }
-
-    await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
 
     await act(async () => {
       hookApi().removeAttachment(id);
@@ -925,12 +947,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -957,12 +973,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -984,12 +994,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -1004,12 +1008,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     await addDocument();
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().reset();
       await settle();
     });
@@ -1022,12 +1020,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
   it('cancels every in-flight upload on unmount with no toast and no state flip', async () => {
     const renderer = await mountHook();
     await addDocument();
-
-    await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
 
     await act(async () => {
       renderer.unmount();
@@ -1057,12 +1049,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -1076,6 +1062,178 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     expect(hoisted.announcingToastError).not.toHaveBeenCalled();
     expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     expect(hookApi().attachments).toHaveLength(0);
+    renderer.unmount();
+  });
+});
+
+describe('useAgentAttachmentUpload — release of admitted keys (Steps 4/5)', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
+    hoisted.announceForA11y.mockReset();
+    hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.cancelAsync.mockReset();
+    hoisted.fileDelete.mockReset();
+    hoisted.deletedUris.clear();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+    const controlled = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockImplementation(
+      async (args: {
+        onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+        onAdmitted?: (key: string) => void;
+      }) => {
+        args.onAdmitted?.('org/2026/08/uuid/doc.pdf');
+        args.onTask?.({ cancelAsync: hoisted.cancelAsync });
+        const result = await controlled;
+        return result;
+      }
+    );
+  });
+
+  it('releases the admitted key when the chip is removed', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+    expect(hookApi().attachments[0]?.status).toBe('uploaded');
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledTimes(1);
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledWith({
+      organizationId: undefined,
+      objectKeys: ['org/2026/08/uuid/doc.pdf'],
+    });
+    renderer.unmount();
+  });
+
+  it('does not release after a retryable failure (the chip stays recoverable)', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('error');
+    expect(chip?.terminal).toBe(false);
+    // The admitted key is retained for the retry, and nothing was released.
+    expect(chip?.remoteKey).toBe('org/2026/08/uuid/doc.pdf');
+    expect(hoisted.releasePendingUploads).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('releases the prior admitted key before re-presigning on Retry', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+    const chip = hookApi().attachments[0];
+    const id = chip?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+    expect(chip.remoteKey).toBe('org/2026/08/uuid/doc.pdf');
+    expect(hoisted.releasePendingUploads).not.toHaveBeenCalled();
+
+    // The retried attempt gets a fresh pending promise to resolve.
+    const retried = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValueOnce(retried);
+
+    // Record how many presigns had already run when the release fires: the
+    // release must precede the retry's re-presign, or the stale row is still
+    // pending when the replacement row is admitted and the cap can trip.
+    let presignsBeforeRelease = -1;
+    hoisted.releasePendingUploads.mockImplementation(() => {
+      presignsBeforeRelease = hoisted.uploadOne.mock.calls.length;
+    });
+
+    await act(async () => {
+      hookApi().retryAttachment(id);
+      await settle();
+    });
+
+    // One released row (the prior key) plus one fresh presign: the pending
+    // count stays the same instead of growing one row per retry.
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledTimes(1);
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledWith({
+      organizationId: undefined,
+      objectKeys: ['org/2026/08/uuid/doc.pdf'],
+    });
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(2);
+    expect(presignsBeforeRelease).toBe(1);
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+    expect(hookApi().attachments[0]?.status).toBe('uploaded');
+    expect(hookApi().attachments[0]?.remoteKey).toBe('org/2026/08/uuid/doc.pdf');
+    renderer.unmount();
+  });
+
+  it('ignores a Retry tap when the chip is not in the error state', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+    const presigns = hoisted.uploadOne.mock.calls.length;
+
+    await act(async () => {
+      hookApi().retryAttachment(id);
+      await settle();
+    });
+
+    // A successful chip is not retryable: Retry must not presign again.
+    expect(hoisted.uploadOne.mock.calls.length).toBe(presigns);
+    renderer.unmount();
+  });
+
+  it('releases every admitted key on leave via releaseUnclaimedUploads', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
+    await act(async () => {
+      hookApi().releaseUnclaimedUploads();
+      await settle();
+    });
+
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledTimes(1);
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledWith({
+      organizationId: undefined,
+      objectKeys: ['org/2026/08/uuid/doc.pdf'],
+    });
     renderer.unmount();
   });
 });

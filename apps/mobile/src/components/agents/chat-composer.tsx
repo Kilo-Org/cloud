@@ -18,6 +18,7 @@ import {
   useState,
 } from 'react';
 import {
+  Alert,
   AppState,
   type GestureResponderEvent,
   Keyboard,
@@ -30,6 +31,7 @@ import {
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useNavigation } from 'expo-router';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
@@ -37,6 +39,8 @@ import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-s
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import {
   createMobileSlashCommandList,
   getSlashCommandCandidate,
@@ -289,6 +293,33 @@ export function ChatComposer({
     },
   } satisfies { current: boolean };
   const upload = useAgentAttachmentUpload({ organizationId });
+
+  // Leave confirm for unsent uploads. The composer registers its own
+  // `beforeRemove` listener so header back, the iOS swipe-back gesture, and
+  // Android back all confirm the same way. Slash-command navigation (/new,
+  // /restart, /exit) is already rejected while attachments are present, so no
+  // bypass flag is needed; a successful send clears the chips and disarms.
+  const navigation = useNavigation();
+  const releaseUnclaimedRef = useRef(upload.releaseUnclaimedUploads);
+  releaseUnclaimedRef.current = upload.releaseUnclaimedUploads;
+  usePreventRemove(upload.hasUnclaimedAttachments, ({ data }) => {
+    const action = data.action;
+    Alert.alert(
+      i18n.t('agentChat.composer.discardAttachmentsTitle'),
+      i18n.t('agentChat.composer.discardAttachmentsMessage'),
+      [
+        { text: i18n.t('agentChat.newSession.keepEditing'), style: 'cancel' },
+        {
+          text: i18n.t('agentChat.newSession.discard'),
+          style: 'destructive',
+          onPress: () => {
+            releaseUnclaimedRef.current();
+            navigation.dispatch(action);
+          },
+        },
+      ]
+    );
+  });
 
   const measure = useTextHeight({
     minHeight: TEXT_INPUT_MIN_HEIGHT,
@@ -764,11 +795,6 @@ export function ChatComposer({
       // `uploaded` is a plain object; `{ ok: false }` is truthy, so test `ok`.
       let uploaded: Extract<UploadPendingResult, { ok: true }> | undefined = undefined;
       if (submission.type === 'prompt') {
-        // Warn (never block) when a chip kept its original image because
-        // metadata stripping failed: the photo may still carry EXIF/GPS.
-        if (upload.attachments.some(attachment => attachment.metadataStripFailed === true)) {
-          toast.warning(i18n.t('agentChat.composer.photoMetadataNotRemoved'));
-        }
         const result = await upload.uploadPending();
         if (!result.ok) {
           // An in-flight retry blocks send; a terminal chip is already guarded
@@ -956,6 +982,14 @@ export function ChatComposer({
           attachments={upload.attachments}
           onRemove={removeAttachment}
           onRetry={retryAttachment}
+        />
+      ) : null}
+
+      {upload.attachments.some(attachment => attachment.metadataStripFailed === true) ? (
+        <AccessibleStatus
+          tone="error"
+          message={i18n.t('agentChat.composer.photoMetadataNotRemoved')}
+          className="mb-2 px-4 text-xs"
         />
       ) : null}
 

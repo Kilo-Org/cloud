@@ -4,6 +4,7 @@ import { type AgentMode, type ModeOption } from '@/components/agents/mode-normal
 import {
   type AgentAttachment,
   type AgentAttachmentCandidate,
+  type AttachmentMoveDirection,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -36,6 +37,8 @@ export type NewSessionPromptProps = {
   onAddAttachment: () => void;
   onRemoveAttachment: (id: string) => void;
   onRetryAttachment: (id: string) => void;
+  onMoveAttachment: (id: string, direction: AttachmentMoveDirection) => void;
+  onReorderAttachments: (fromIndex: number, toIndex: number) => void;
   onRefetchModels: () => void;
   onPrefillAttachments: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
   shareId?: string;

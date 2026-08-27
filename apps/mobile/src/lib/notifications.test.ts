@@ -8,6 +8,7 @@ import {
   _setSecureStoreForTests,
 } from '@/lib/glanceable/persist';
 import { registerGlanceableSink, unregisterGlanceableSink } from '@/lib/glanceable/sink-registry';
+import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   _setGlanceableSinksLoaderForTests,
   applyGlanceablePushData,
@@ -306,6 +307,21 @@ function makeFakeSink() {
   };
 }
 
+// Key-aware expo-secure-store surface: `applyGlanceablePushData` reads both the
+// selected-organization id and the active-user id hint through the module-level
+// `SecureStore.getItemAsync`, so the mock must answer each key separately.
+function mockSecureStoreKeys() {
+  mocks.getItemAsync.mockImplementation(async (key: string) => {
+    if (key === ACTIVE_USER_ID_KEY) {
+      return 'u1';
+    }
+    if (key === ORGANIZATION_STORAGE_KEY) {
+      return 'org-9';
+    }
+    return null;
+  });
+}
+
 // Map-backed SecureStore surface for the persist module's restore path. The
 // persist module lazy-`require`s `expo-secure-store` (a native module), which
 // cannot load in the pure-vitest suite, so the restore tests inject this store
@@ -325,7 +341,7 @@ const secureStoreMock = {
 describe('applyGlanceablePushData', () => {
   beforeEach(() => {
     _resetGlanceablePersistForTests();
-    mocks.getItemAsync.mockResolvedValue(null);
+    mockSecureStoreKeys();
   });
 
   it('discards a remote snapshot that is not newer than the last applied snapshot', async () => {
@@ -358,7 +374,6 @@ describe('applyGlanceablePushData', () => {
         updatedAt: '2026-01-01T00:00:00.000Z',
       })
     );
-    mocks.getItemAsync.mockResolvedValue('org-9');
     const sink = makeFakeSink();
     registerGlanceableSink(sink);
 
@@ -374,6 +389,7 @@ describe('applyGlanceablePushData', () => {
     // The rebased revision continues the local monotonic sequence.
     expect(sink.publish).toHaveBeenCalledWith(expect.objectContaining({ revision: 4 }));
     expect(sink.startOrUpdate).toHaveBeenCalledWith(expect.objectContaining({ revision: 4 }), {
+      userId: 'u1',
       organizationId: 'org-9',
     });
 
@@ -400,7 +416,7 @@ describe('setupNotificationBackgroundHandler', () => {
     _resetGlanceablePersistForTests();
     _setSecureStoreForTests(secureStoreMock);
     secureStore.clear();
-    mocks.getItemAsync.mockResolvedValue(null);
+    mockSecureStoreKeys();
     mocks.defineTask.mockReset();
     mocks.registerTaskAsync.mockResolvedValue(null);
   });
@@ -464,7 +480,8 @@ describe('setupNotificationBackgroundHandler', () => {
     // path ran, not a duplicated one.
     expect(sink.publish).toHaveBeenCalledWith(expect.objectContaining({ revision: 2 }));
     expect(sink.startOrUpdate).toHaveBeenCalledWith(expect.objectContaining({ revision: 2 }), {
-      organizationId: null,
+      userId: 'u1',
+      organizationId: 'org-9',
     });
 
     unregisterGlanceableSink(sink);

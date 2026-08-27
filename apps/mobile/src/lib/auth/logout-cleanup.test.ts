@@ -21,8 +21,17 @@ const trpcMock = vi.hoisted(() => ({
   unregisterPushToken: { mutate: vi.fn() },
 }));
 
+const deliveryMock = vi.hoisted(() => ({
+  registerTokens: vi.fn(),
+  unregisterTokens: vi.fn(),
+}));
+
 vi.mock('@/lib/trpc', () => ({
   trpcClient: { user: trpcMock },
+}));
+
+vi.mock('@/lib/glanceable/sink-registry', () => ({
+  getGlanceableDelivery: () => deliveryMock,
 }));
 
 vi.mock('@/lib/notifications', () => ({
@@ -86,6 +95,7 @@ describe('runLogoutCleanup', () => {
       expiresAtMs: null,
     });
     seedUser('u1');
+    deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: [] });
   });
 
   it('revokes the session and unregisters the token, then deletes any existing tombstone on full success', async () => {
@@ -127,6 +137,8 @@ describe('runLogoutCleanup', () => {
       userId: 'u1',
       pushToken: 'push-1',
       needsPushUnregister: true,
+      needsActivityUnregister: false,
+      activityTokens: [],
       failedAt: expect.any(Number),
     });
   });
@@ -179,6 +191,55 @@ describe('runLogoutCleanup', () => {
 
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
+  });
+
+  it('awaits the activity unregister and tombstones its recorded tokens when it fails', async () => {
+    pushOutcome('none');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    deliveryMock.unregisterTokens.mockResolvedValue({
+      ok: false,
+      tokens: ['activity-token-1', 'activity-token-2'],
+    });
+
+    await runLogoutCleanup();
+
+    expect(deliveryMock.unregisterTokens).toHaveBeenCalledTimes(1);
+    const tombstone = await readLogoutCleanupTombstone();
+    expect(tombstone).toMatchObject({
+      needsPushUnregister: false,
+      needsActivityUnregister: true,
+      activityTokens: ['activity-token-1', 'activity-token-2'],
+    });
+  });
+
+  it('does not write the tombstone until the activity unregister settles', async () => {
+    pushOutcome('none');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    const gate = { release: null as (() => void) | null };
+    const unregisterGate = new Promise<void>(resolve => {
+      gate.release = resolve;
+    });
+    deliveryMock.unregisterTokens.mockImplementation(async () => {
+      await unregisterGate;
+      return { ok: false, tokens: ['activity-token-1'] };
+    });
+
+    const run = runLogoutCleanup();
+    // Flush microtasks and a macrotask: the activity unregister is still in
+    // flight, so the tombstone must not be written yet.
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+    expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
+
+    gate.release?.();
+    await run;
+
+    const tombstone = await readLogoutCleanupTombstone();
+    expect(tombstone).toMatchObject({
+      needsActivityUnregister: true,
+      activityTokens: ['activity-token-1'],
+    });
   });
 
   it('still resolves when a tombstone write fails and reports it to Sentry', async () => {
@@ -234,12 +295,26 @@ describe('runLogoutCleanup', () => {
     [
       'is fully valid',
       { userId: 'u1', pushToken: null, needsPushUnregister: false, failedAt: 1_700_000_000_000 },
-      { userId: 'u1', pushToken: null, needsPushUnregister: false, failedAt: 1_700_000_000_000 },
+      {
+        userId: 'u1',
+        pushToken: null,
+        needsPushUnregister: false,
+        needsActivityUnregister: false,
+        activityTokens: [],
+        failedAt: 1_700_000_000_000,
+      },
     ],
     [
       'is valid with a null userId (identity unknown)',
       { userId: null, pushToken: 'push-1', needsPushUnregister: true, failedAt: 1_700_000_000_000 },
-      { userId: null, pushToken: 'push-1', needsPushUnregister: true, failedAt: 1_700_000_000_000 },
+      {
+        userId: null,
+        pushToken: 'push-1',
+        needsPushUnregister: true,
+        needsActivityUnregister: false,
+        activityTokens: [],
+        failedAt: 1_700_000_000_000,
+      },
     ],
   ])('reads a persisted tombstone that %s', async (_label, persisted, expected) => {
     store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify(persisted));

@@ -9,6 +9,9 @@ import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-a
 export type GlanceableSinkContext = {
   /** For token registration only; must never enter the snapshot. */
   organizationId: string | null;
+  /** For token registration only; must never enter the snapshot. `null` in
+   * the headless background apply when the active-user hint is unavailable. */
+  userId: string | null;
 };
 
 export type GlanceableSink = {
@@ -31,18 +34,28 @@ export function getGlanceableSinks(): readonly GlanceableSink[] {
   return [...sinks];
 }
 
-/** Activity-token registrar, set by a later token slice. No-op by default. */
+/**
+ * Activity-token registrar, set by a later token slice. No-op by default.
+ * `unregisterTokens` reports success plus the tokens it attempted, so logout
+ * can tombstone a failed unregister and retry those exact tokens later.
+ */
 export type GlanceableDelivery = {
-  registerTokens(snapshot: GlanceableAgentsSnapshot, organizationId: string | null): void;
-  unregisterTokens(): void;
+  registerTokens(
+    snapshot: GlanceableAgentsSnapshot,
+    organizationId: string | null,
+    userId: string | null
+  ): void;
+  unregisterTokens(): Promise<{ ok: boolean; tokens: string[] }>;
 };
 
 const noopDelivery: GlanceableDelivery = {
   registerTokens() {
     // No-op until a token slice registers a delivery.
   },
-  unregisterTokens() {
+  async unregisterTokens() {
     // No-op until a token slice registers a delivery.
+    await Promise.resolve();
+    return { ok: true, tokens: [] };
   },
 };
 

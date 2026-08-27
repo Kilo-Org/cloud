@@ -5,6 +5,7 @@ import { type LogoutCleanupTombstone } from '@/lib/auth/logout-cleanup';
 const cleanupMock = vi.hoisted(() => ({
   readLogoutCleanupTombstone: vi.fn<() => Promise<LogoutCleanupTombstone | null>>(),
   deleteLogoutCleanupTombstone: vi.fn().mockResolvedValue(undefined),
+  writeLogoutCleanupTombstone: vi.fn().mockResolvedValue(undefined),
   isNotFoundTrpcError: (error: unknown) => {
     if (typeof error !== 'object' || error === null) {
       return false;
@@ -16,6 +17,7 @@ const cleanupMock = vi.hoisted(() => ({
 
 const trpcMock = vi.hoisted(() => ({
   unregisterPushToken: { mutate: vi.fn() },
+  unregisterActivityToken: { mutate: vi.fn() },
 }));
 
 const notificationsMock = vi.hoisted(() => ({
@@ -44,6 +46,8 @@ function makeTombstone(overrides: Partial<LogoutCleanupTombstone> = {}): LogoutC
     userId: 'u1',
     pushToken: 'push-stored',
     needsPushUnregister: true,
+    needsActivityUnregister: false,
+    activityTokens: [],
     failedAt: Date.now(),
     ...overrides,
   };
@@ -146,6 +150,75 @@ describe('attemptLogoutReconciliation', () => {
     const outcome = await attemptLogoutReconciliation('u1');
 
     expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: false });
+  });
+
+  it('unregisters each recorded activity token and deletes the tombstone when all succeed', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+      makeTombstone({
+        needsPushUnregister: false,
+        needsActivityUnregister: true,
+        activityTokens: ['activity-1', 'activity-2'],
+      })
+    );
+    trpcMock.unregisterActivityToken.mutate.mockResolvedValue({ success: true });
+
+    const outcome = await attemptLogoutReconciliation('u1');
+
+    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: true });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({ token: 'activity-1' });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({ token: 'activity-2' });
+    expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
+    expect(cleanupMock.deleteLogoutCleanupTombstone).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the tombstone when any recorded activity token unregister rejects', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+      makeTombstone({
+        needsPushUnregister: false,
+        needsActivityUnregister: true,
+        activityTokens: ['activity-1', 'activity-2'],
+      })
+    );
+    trpcMock.unregisterActivityToken.mutate
+      .mockResolvedValueOnce({ success: true })
+      .mockRejectedValueOnce(new Error('server 500'));
+
+    const outcome = await attemptLogoutReconciliation('u1');
+
+    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: false });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledTimes(2);
+    expect(cleanupMock.deleteLogoutCleanupTombstone).not.toHaveBeenCalled();
+  });
+
+  it('clears the activity part after success while the push part stays outstanding', async () => {
+    const failedAt = Date.now();
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+      makeTombstone({
+        pushToken: 'push-stored',
+        needsPushUnregister: true,
+        needsActivityUnregister: true,
+        activityTokens: ['activity-1'],
+        failedAt,
+      })
+    );
+    trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
+    trpcMock.unregisterActivityToken.mutate.mockResolvedValue({ success: true });
+
+    const outcome = await attemptLogoutReconciliation('u1');
+
+    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: false });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({ token: 'activity-1' });
+    expect(cleanupMock.deleteLogoutCleanupTombstone).not.toHaveBeenCalled();
+    // The activity part is cleared so a later retry never re-unregisters the
+    // same token, while the push part stays for the next attempt.
+    expect(cleanupMock.writeLogoutCleanupTombstone).toHaveBeenCalledWith({
+      userId: 'u1',
+      pushToken: 'push-stored',
+      needsPushUnregister: true,
+      needsActivityUnregister: false,
+      activityTokens: [],
+      failedAt,
+    });
   });
 
   it('skips a second attempt within the 60 s spacing window', async () => {

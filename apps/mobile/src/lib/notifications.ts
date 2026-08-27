@@ -26,7 +26,7 @@ import {
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
 import { getGlanceableSinks, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
-import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
 import { notificationPathForData } from './notification-path';
@@ -98,8 +98,9 @@ export async function applyGlanceablePushData(
   };
 
   const organizationId = await getSelectedOrganizationId();
+  const userId = await getActiveUserId();
 
-  const ctx = { organizationId };
+  const ctx = { userId, organizationId };
   if (isEligibleGlanceableWork(snapshot)) {
     for (const sink of getGlanceableSinks()) {
       sink.publish(snapshot);
@@ -122,6 +123,20 @@ export async function applyGlanceablePushData(
 async function getSelectedOrganizationId(): Promise<string | null> {
   try {
     return await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the active-user id hint from SecureStore. Null when the hint is
+ * unavailable (headless background apply before the identity resolves, or a
+ * failed read). It only feeds logout reconciliation ordering, never the
+ * snapshot.
+ */
+async function getActiveUserId(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(ACTIVE_USER_ID_KEY);
   } catch {
     return null;
   }

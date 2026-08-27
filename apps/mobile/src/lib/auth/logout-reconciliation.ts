@@ -3,6 +3,7 @@ import {
   deleteLogoutCleanupTombstone,
   type LogoutCleanupTombstone,
   readLogoutCleanupTombstone,
+  writeLogoutCleanupTombstone,
 } from '@/lib/auth/logout-cleanup';
 import { getDevicePushTokenOutcome } from '@/lib/notifications';
 import { trpcClient } from '@/lib/trpc';
@@ -102,12 +103,48 @@ async function runReconciliation(userId: string): Promise<ReconciliationAttemptO
     return { kind: 'different-user-discarded' };
   }
 
-  const allDone = await reconcilePushUnregister(tombstone);
-  if (allDone) {
+  const [pushDone, activityDone] = await Promise.all([
+    reconcilePushUnregister(tombstone),
+    reconcileActivityUnregister(tombstone),
+  ]);
+  if (pushDone && activityDone) {
     const deleted = await deleteTombstone(epoch);
     return { kind: 'attempted', tombstoneDeleted: deleted };
   }
+  if (activityDone) {
+    // The activity part succeeded while the push part still needs a retry:
+    // clear the recorded activity tokens now so a later attempt never
+    // re-unregisters tokens the new session has already re-registered.
+    await markActivityPartDone(epoch, tombstone);
+  }
   return { kind: 'attempted', tombstoneDeleted: false };
+}
+
+/**
+ * Rewrites the tombstone with the activity part marked done, unless the auth
+ * epoch moved: a sign-out or sign-in during the attempt owns the record now,
+ * so a stale reconciliation must not touch it.
+ *
+ * Never throws: a storage rejection keeps the old tombstone so the next
+ * attempt retries (and re-runs the activity unregister, which the server
+ * treats as idempotent).
+ */
+async function markActivityPartDone(
+  epoch: number,
+  tombstone: LogoutCleanupTombstone
+): Promise<void> {
+  if (!isCurrentAuthEpoch(epoch)) {
+    return;
+  }
+  try {
+    await writeLogoutCleanupTombstone({
+      ...tombstone,
+      needsActivityUnregister: false,
+      activityTokens: [],
+    });
+  } catch {
+    // Storage failure keeps the part for the next attempt.
+  }
 }
 
 /**
@@ -162,6 +199,30 @@ async function reconcilePushUnregister(tombstone: LogoutCleanupTombstone): Promi
   }
   try {
     await trpcClient.user.unregisterPushToken.mutate({ token: pushToken });
+    return true;
+  } catch {
+    // Retryable failure keeps the part.
+    return false;
+  }
+}
+
+/**
+ * Attempts the outstanding activity-token unregisters recorded in the
+ * tombstone at logout. Returns true when every recorded token unregistered.
+ * Only the tombstone's `activityTokens` are retried — never the current
+ * session's live tokens, which a later sign-in re-registers under its own
+ * ownership. A retryable failure keeps the part and the tombstone.
+ */
+async function reconcileActivityUnregister(tombstone: LogoutCleanupTombstone): Promise<boolean> {
+  if (!tombstone.needsActivityUnregister || tombstone.activityTokens.length === 0) {
+    return true;
+  }
+  try {
+    await Promise.all(
+      tombstone.activityTokens.map(async token => {
+        await trpcClient.user.unregisterActivityToken.mutate({ token });
+      })
+    );
     return true;
   } catch {
     // Retryable failure keeps the part.

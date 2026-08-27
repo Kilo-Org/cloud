@@ -39,7 +39,7 @@ vi.mock('react-native-android-widget', () => ({
 }));
 
 const NOW = 1_750_000_000_000;
-const CTX = { organizationId: null };
+const CTX = { organizationId: null, userId: 'u1' };
 
 function snapshotFor(
   sessions: { status: string }[],

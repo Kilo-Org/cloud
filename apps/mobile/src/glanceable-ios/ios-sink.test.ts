@@ -86,7 +86,7 @@ const CTX = { userId: 'u1', organizationId: null };
 
 const delivery = {
   registerTokens: vi.fn(),
-  unregisterTokens: vi.fn(),
+  unregisterTokens: vi.fn().mockResolvedValue({ ok: true, tokens: [] }),
 };
 
 function snapshotFor(

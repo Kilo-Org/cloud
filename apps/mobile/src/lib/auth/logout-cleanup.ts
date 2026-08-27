@@ -36,6 +36,13 @@ const logoutCleanupTombstoneSchema = z.object({
   /** Device push token at logout; null when lookup failed or permission missing. */
   pushToken: z.string().nullable(),
   needsPushUnregister: z.boolean(),
+  /**
+   * Activity-token unregister (Live Activity / push-to-start) outstanding at
+   * logout. Defaults keep pre-change tombstones parseable.
+   */
+  needsActivityUnregister: z.boolean().default(false),
+  /** The exact activity tokens captured at logout; retried verbatim, never the current session's. */
+  activityTokens: z.array(z.string()).default([]),
   /** Epoch ms of the failed logout; reconciliation discards past 30 days. */
   failedAt: z.number(),
 });
@@ -67,7 +74,9 @@ export async function deleteLogoutCleanupTombstone(): Promise<void> {
   await SecureStore.deleteItemAsync(LOGOUT_CLEANUP_TOMBSTONE_KEY);
 }
 
-async function writeLogoutCleanupTombstone(tombstone: LogoutCleanupTombstone): Promise<void> {
+export async function writeLogoutCleanupTombstone(
+  tombstone: LogoutCleanupTombstone
+): Promise<void> {
   await SecureStore.setItemAsync(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify(tombstone));
 }
 
@@ -80,8 +89,8 @@ async function writeLogoutCleanupTombstone(tombstone: LogoutCleanupTombstone): P
  * - Revokes the current device session and unregisters the device push token
  *   concurrently, bounded at 15 s each by the tRPC client's `deadlineFetch`.
  * - A failed revoke is not recorded: see the tombstone type for why. A failed
- *   push unregister writes a tombstone; a successful one deletes any existing
- *   tombstone, and is never retried later.
+ *   push or activity-token unregister writes a tombstone; a fully successful
+ *   one deletes any existing tombstone, and is never retried later.
  */
 export async function runLogoutCleanup(): Promise<void> {
   try {
@@ -112,10 +121,10 @@ export async function runLogoutCleanup(): Promise<void> {
     ]);
 
     // Unregister activity tokens (Live Activity / push-to-start) before the
-    // epoch bump. Best-effort: the delivery re-registers tokens on the next
-    // activity start, so a failed unregister is not tombstoned — a tombstone
-    // has no reconciliation retry for activity tokens.
-    getGlanceableDelivery().unregisterTokens();
+    // epoch bump. A failed unregister is tombstoned and retried at the next
+    // authenticated opportunity against the recorded tokens only.
+    const activityResult = await getGlanceableDelivery().unregisterTokens();
+    const needsActivityUnregister = !activityResult.ok;
 
     const unregister = results[1];
 
@@ -127,11 +136,13 @@ export async function runLogoutCleanup(): Promise<void> {
     }
 
     try {
-      await (needsPushUnregister
+      await (needsPushUnregister || needsActivityUnregister
         ? writeLogoutCleanupTombstone({
             userId,
             pushToken,
             needsPushUnregister,
+            needsActivityUnregister,
+            activityTokens: activityResult.tokens,
             failedAt: Date.now(),
           })
         : deleteLogoutCleanupTombstone());

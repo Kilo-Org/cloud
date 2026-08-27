@@ -87,7 +87,7 @@ function endNow(): void {
   void activity.end('immediate', lastProps ?? undefined, contentDate);
   activity = null;
   revision = 0;
-  getGlanceableDelivery().unregisterTokens();
+  void getGlanceableDelivery().unregisterTokens();
 }
 
 /** True once ActivityKit reported the surface unavailable (see slice psh for the alert). */
@@ -172,7 +172,7 @@ export const iosSink: GlanceableSink = {
       lastUpdatedAt = snapshot.updatedAt;
       lastProps = contentState;
       revision = snapshot.revision;
-      getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId);
+      getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId);
       if (adopted) {
         void activity.update(contentState);
       }

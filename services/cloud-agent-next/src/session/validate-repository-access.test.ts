@@ -199,6 +199,80 @@ describe('GitHub session creation preflight', () => {
     expect(getMetadata).not.toHaveBeenCalled();
   });
 
+  it('falls back to the legacy resolver when an old deployment rejects the canonical RPC method', async () => {
+    const getTokenForRepo = vi.fn().mockResolvedValue(githubResolution());
+    const resolveAuthorizedSessionSource = vi
+      .fn()
+      .mockRejectedValue(
+        new TypeError(
+          'The RPC receiver does not implement the method "resolveAuthorizedSessionSource".'
+        )
+      );
+    const resolveCloudAgentRootSessionForKiloSession = vi.fn().mockResolvedValue({
+      cloudAgentSessionId: 'agent-source',
+      repository: { type: 'github', repo: 'Acme/Repo' },
+    });
+    const env = {
+      SESSION_INGEST: {
+        resolveAuthorizedSessionSource,
+        resolveCloudAgentRootSessionForKiloSession,
+      },
+      CLOUD_AGENT_SESSION: {
+        idFromName: vi.fn(name => name),
+        get: vi.fn(() => ({
+          getMetadata: vi.fn().mockResolvedValue({
+            repository: { type: 'github', repo: 'Acme/Repo', githubIntegrationId },
+          }),
+        })),
+      },
+      GIT_TOKEN_SERVICE: { getTokenForRepo },
+    };
+
+    await expect(
+      canonicalizeRepositoryBeforeSessionCreation({
+        env: env as never,
+        userId: 'user-1',
+        request: githubRequest({
+          clone: { cloneFromKiloSessionId: 'ses_12345678901234567890123456' },
+        }),
+      })
+    ).resolves.toMatchObject({
+      repository: { repo: 'Acme/Repo', githubIntegrationId },
+    });
+    expect(resolveAuthorizedSessionSource).toHaveBeenCalledOnce();
+    expect(resolveCloudAgentRootSessionForKiloSession).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    new Error('Provider failed while calling resolveAuthorizedSessionSource'),
+    new TypeError('The RPC receiver does not implement the method "anotherMethod".'),
+  ])('does not mask a true canonical resolver failure: %s', async error => {
+    const legacyResolver = vi.fn();
+    const getTokenForRepo = vi.fn();
+    const env = {
+      SESSION_INGEST: {
+        resolveAuthorizedSessionSource: vi.fn().mockRejectedValue(error),
+        resolveCloudAgentRootSessionForKiloSession: legacyResolver,
+      },
+      GIT_TOKEN_SERVICE: { getTokenForRepo },
+    };
+
+    await expect(
+      canonicalizeRepositoryBeforeSessionCreation({
+        env: env as never,
+        userId: 'user-1',
+        request: githubRequest({
+          clone: { cloneFromKiloSessionId: 'ses_12345678901234567890123456' },
+        }),
+      })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'GitHub repository authorization failed (source_unavailable)',
+    });
+    expect(legacyResolver).not.toHaveBeenCalled();
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+  });
+
   it('rejects a source organization mismatch before live GitHub resolution', async () => {
     const getTokenForRepo = vi.fn();
     const env = {

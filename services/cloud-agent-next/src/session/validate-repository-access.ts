@@ -59,6 +59,15 @@ function sourceAccessDenied(): TRPCError {
   return new TRPCError({ code: 'BAD_REQUEST', message: 'source_access_denied' });
 }
 
+function isMissingAuthorizedSessionSourceRpc(error: unknown): boolean {
+  return (
+    error instanceof TypeError &&
+    /^The RPC receiver does not implement the method ["']resolveAuthorizedSessionSource["']\.?$/.test(
+      error.message
+    )
+  );
+}
+
 async function readOptionalCloudAgentGitHubPin(input: {
   env: PersistenceEnv;
   userId: string;
@@ -104,25 +113,30 @@ async function resolveCloneSourceGitHubRepository(input: {
         kiloUserId: input.userId,
         kiloSessionId: sourceKiloSessionId,
       });
-    } catch {
-      throw githubRepositoryAuthorizationError('source_unavailable');
+    } catch (error) {
+      if (!isMissingAuthorizedSessionSourceRpc(error)) {
+        throw githubRepositoryAuthorizationError('source_unavailable');
+      }
+      source = undefined;
     }
-    if (!source) throw sourceAccessDenied();
-    if (source.organizationId !== (input.orgId ?? null)) {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'organization_mismatch' });
-    }
+    if (source !== undefined) {
+      if (!source) throw sourceAccessDenied();
+      if (source.organizationId !== (input.orgId ?? null)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'organization_mismatch' });
+      }
 
-    const repo = source.repository?.type === 'github' ? source.repository.repo : undefined;
-    const githubIntegrationId = await readOptionalCloudAgentGitHubPin({
-      env: input.env,
-      userId: input.userId,
-      cloudAgentSessionId: source.cloudAgentSessionId,
-      authoritativeRepo: repo,
-    });
-    return {
-      ...(repo ? { repo } : {}),
-      ...(githubIntegrationId ? { githubIntegrationId } : {}),
-    };
+      const repo = source.repository?.type === 'github' ? source.repository.repo : undefined;
+      const githubIntegrationId = await readOptionalCloudAgentGitHubPin({
+        env: input.env,
+        userId: input.userId,
+        cloudAgentSessionId: source.cloudAgentSessionId,
+        authoritativeRepo: repo,
+      });
+      return {
+        ...(repo ? { repo } : {}),
+        ...(githubIntegrationId ? { githubIntegrationId } : {}),
+      };
+    }
   }
 
   // Rolling-deploy compatibility: an older Session Ingest worker can only

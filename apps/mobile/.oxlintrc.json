@@ -215,6 +215,13 @@
   },
   "overrides": [
     {
+      "files": ["src/lib/expo-router-linking.mounted.test.tsx"],
+      "rules": {
+        "import/no-nodejs-modules": "off",
+        "@typescript-eslint/no-deprecated": "off"
+      }
+    },
+    {
       "files": ["src/components/ui/image.tsx"],
       "rules": {
         "no-restricted-imports": "off"

@@ -2396,7 +2396,20 @@
     "purchaseOwnedByAnotherAccount": "Bu Apple Hesabındaki Kilo Pass farklı bir Kilo hesabına ait.",
     "couldNotConnectToAppStore": "App Store'a bağlanılamadı. Bağlantınızı kontrol edin ve tekrar deneyin.",
     "noMatchingProducts": "App Store eşleşen Kilo Pass ürünü döndürmedi.",
-    "purchaseMissingSignedTransaction": "App Store satın alımı imzalı bir işlem JWS'si içermiyor."
+    "purchaseMissingSignedTransaction": "App Store satın alımı imzalı bir işlem JWS'si içermiyor.",
+    "couldNotConnectToPlay": "Google Play'e bağlanılamadı. Bağlantınızı kontrol edin ve tekrar deneyin.",
+    "legalDisclosurePlay": "Kilo Pass, otomatik yenilenen aylık bir aboneliktir. Ödeme, satın alma onayında Google Play hesabınıza yansıtılır. Abonelikler, geçerli dönemin bitiminden en az 24 saat önce iptal edilmediği sürece her ay gösterilen fiyattan otomatik yenilenir. Google Play hesap ayarlarınızdan istediğiniz zaman yönetin veya iptal edin.",
+    "manageFailedPlay": "Google Play abonelik yönetimi açılamadı.",
+    "noMatchingProductsPlay": "Google Play eşleşen Kilo Pass ürünü döndürmedi.",
+    "opensPlayManagement": "Google Play abonelik yönetimini açar.",
+    "otherAccountCopyPlay": "Bu Google Play hesabındaki Kilo Pass farklı bir Kilo hesabına ait. Yönetmek için o Kilo hesabıyla oturum açın.",
+    "productsCouldNotLoadPlay": "Kilo Pass ürünleri Google Play'den yüklenemedi.",
+    "productsUnavailablePlay": "Google Play ürünleri kullanılamıyor",
+    "purchaseDifferentAccountPlay": "Bu Google Play satın alımı Kilo hesabınıza bağlı değil. Satın alım için kullanılan Google hesabıyla oturum açın, sonra tekrar deneyin.",
+    "purchaseMissingOfferToken": "Google Play satın alımında bir teklif tokeni eksik. Tekrar deneyin.",
+    "purchaseMissingPurchaseToken": "Google Play satın alımı bir satın alma tokeni içermiyor.",
+    "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındaki Kilo Pass farklı bir Kilo hesabına ait.",
+    "purchaseStartFailedPlay": "Google Play satın alımı başlatılamadı."
   },
   "consent": {
     "kilo": "Kilo",

@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Selle Apple kontoga seotud Kilo Pass kuulub teisele Kilo kontole.",
     "couldNotConnectToAppStore": "App Store'iga ühendamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
     "noMatchingProducts": "App Store ei tagastanud ühtegi sobivat Kilo Passi toodet.",
-    "purchaseMissingSignedTransaction": "App Store'i ost ei sisaldanud allkirjastatud tehingu JWS-i."
+    "purchaseMissingSignedTransaction": "App Store'i ost ei sisaldanud allkirjastatud tehingu JWS-i.",
+    "couldNotConnectToPlay": "Google Playga ühendamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
+    "legalDisclosurePlay": "Kilo Pass on automaatselt uuenev igakuine tellimus. Makse võetakse sinu Google Play kontolt ostu kinnitamisel. Tellimus uueneb iga kuu automaatselt näidatud hinnaga, kui sa seda ei tühista vähemalt 24 tundi enne jooksva perioodi lõppu. Halda või tühista tellimust igal ajal oma Google Play konto seadetes.",
+    "manageFailedPlay": "Google Play tellimuse haldust ei õnnestunud avada.",
+    "noMatchingProductsPlay": "Google Play ei tagastanud ühtegi sobivat Kilo Passi toodet.",
+    "opensPlayManagement": "Avaneb Google Play tellimuse haldus.",
+    "otherAccountCopyPlay": "Selle Google Play kontoga seotud Kilo Pass kuulub teisele Kilo kontole. Selle haldamiseks logi sisse sellesse Kilo kontosse.",
+    "productsCouldNotLoadPlay": "Kilo Passi tooteid ei õnnestunud Google Playst laadida.",
+    "productsUnavailablePlay": "Google Play tooted pole saadaval",
+    "purchaseDifferentAccountPlay": "See Google Play ost pole sinu Kilo kontoga seotud. Logi sisse ostuks kasutatud Google kontoga ja proovi uuesti.",
+    "purchaseMissingOfferToken": "Google Play ostul puudub pakkumise token. Proovi uuesti.",
+    "purchaseMissingPurchaseToken": "Google Play ost ei sisaldanud ostu tokenit.",
+    "purchaseOwnedByAnotherAccountPlay": "Selle Google Play kontoga seotud Kilo Pass kuulub teisele Kilo kontole.",
+    "purchaseStartFailedPlay": "Google Play ostu alustamine ebaõnnestus."
   },
   "consent": {
     "kilo": "Kilo",

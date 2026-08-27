@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass na Akaụntụ Apple a bụ nke akaụntụ Kilo ọzọ.",
     "couldNotConnectToAppStore": "Enweghị ike ijikọ na App Store. Lelee njikọ gị wee nwaa ọzọ.",
     "noMatchingProducts": "App Store eweghachiteghị ngwaahịa Kilo Pass dakọtara.",
-    "purchaseMissingSignedTransaction": "Ịzụrụ ihe na App Store agụnyeghị JWS azụmahịa edere aka."
+    "purchaseMissingSignedTransaction": "Ịzụrụ ihe na App Store agụnyeghị JWS azụmahịa edere aka.",
+    "couldNotConnectToPlay": "Enweghị ike ịjikọọ na Google Play. Lelee njikọ gị wee nwaa ọzọ.",
+    "legalDisclosurePlay": "Kilo Pass bụ ndenye aha kwa ọnwa nke na-emegharị onwe ya. A na-ana ụgwọ na Akaụntụ Google Play gị mgbe ị kwadoro ịzụta. Ndenye aha na-emegharị kwa ọnwa na ọnụahịa egosiri belụsọ na ị kagburu ya ọ dịkarịa ala awa 24 tupu njedebe nke oge ugbu a. Jikwaa ma ọ bụ kagbuo ya mgbe ọ bụla na ntọala akaụntụ Google Play gị.",
+    "manageFailedPlay": "Ịmepe njikwa ndenye aha Google Play dara.",
+    "noMatchingProductsPlay": "Enweghị ngwaahịa Kilo Pass dabara adaba nke Google Play weghachitere.",
+    "opensPlayManagement": "Na-emepe njikwa ndenye aha Google Play.",
+    "otherAccountCopyPlay": "Kilo Pass na Akaụntụ Google Play a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ ka ijikwa ya.",
+    "productsCouldNotLoadPlay": "Enweghị ike ibunye ngwaahịa Kilo Pass site na Google Play.",
+    "productsUnavailablePlay": "Ngwaahịa Google Play adịghị",
+    "purchaseDifferentAccountPlay": "Ịzụrụ Google Play a ejikọghị na akaụntụ Kilo gị. Banye na Akaụntụ Google e ji zụọ ya, wee nwaa ọzọ.",
+    "purchaseMissingOfferToken": "Ịzụrụ Google Play enweghị token onyinye. Nwaa ọzọ.",
+    "purchaseMissingPurchaseToken": "Ịzụrụ Google Play agụnyeghị token ịzụrụ.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass na Akaụntụ Google Play a bụ nke akaụntụ Kilo ọzọ.",
+    "purchaseStartFailedPlay": "Ịmalite azụrụ Google Play dara."
   },
   "consent": {
     "kilo": "Kilo",

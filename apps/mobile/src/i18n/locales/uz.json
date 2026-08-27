@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Bu Apple hisobidagi Kilo Pass boshqa Kilo hisobiga tegishli.",
     "couldNotConnectToAppStore": "App Store'ga ulanib bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring.",
     "noMatchingProducts": "App Store tomonidan mos Kilo Pass mahsulotlari qaytarilmadi.",
-    "purchaseMissingSignedTransaction": "App Store xaridi imzolangan tranzaksiya JWS'ini o'z ichiga olmadi."
+    "purchaseMissingSignedTransaction": "App Store xaridi imzolangan tranzaksiya JWS'ini o'z ichiga olmadi.",
+    "couldNotConnectToPlay": "Google Play'ga ulanib bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring.",
+    "legalDisclosurePlay": "Kilo Pass avtomatik yangilanadigan oylik obuna hisoblanadi. To'lov xaridni tasdiqlashda Google Play hisobingizdan undiriladi. Obunalar har oy ko'rsatilgan narxda avtomatik yangilanadi, agar joriy davr tugashidan kamida 24 soat oldin bekor qilinmasa. Istiagan paytda Google Play hisob sozlamalaringizda boshqaring yoki bekor qiling.",
+    "manageFailedPlay": "Google Play obuna boshqaruvini ochib bo'lmadi.",
+    "noMatchingProductsPlay": "Google Play tomonidan mos Kilo Pass mahsulotlari qaytarilmadi.",
+    "opensPlayManagement": "Google Play obuna boshqaruvini ochadi.",
+    "otherAccountCopyPlay": "Bu Google Play hisobidagi Kilo Pass boshqa Kilo hisobiga tegishli. Uni boshqarish uchun o'sha Kilo hisobiga kiring.",
+    "productsCouldNotLoadPlay": "Kilo Pass mahsulotlarini Google Play'dan yuklab bo'lmadi.",
+    "productsUnavailablePlay": "Google Play mahsulotlari mavjud emas",
+    "purchaseDifferentAccountPlay": "Bu Google Play xaridi Kilo hisobingizga bog'lanmagan. Xarid uchun ishlatilgan Google hisobiga kiring va qayta urinib ko'ring.",
+    "purchaseMissingOfferToken": "Google Play xaridida taklif tokeni yo'q. Qayta urinib ko'ring.",
+    "purchaseMissingPurchaseToken": "Google Play xaridi xarid tokenini o'z ichiga olmadi.",
+    "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi Kilo Pass boshqa Kilo hisobiga tegishli.",
+    "purchaseStartFailedPlay": "Google Play xaridini boshlab bo'lmadi."
   },
   "consent": {
     "kilo": "Kilo",

@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "ଏହି Apple ଆକାଉଣ୍ଟରେ ଥିବା Kilo Pass ଅନ୍ୟ ଏକ Kilo ଆକାଉଣ୍ଟର ଅଟେ।",
     "couldNotConnectToAppStore": "App Store ସହିତ ସଂଯୋଗ ହୋଇପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "noMatchingProducts": "App Store ଦ୍ୱାରା କୌଣସି ମେଳ ଖାଉଥିବା Kilo Pass ଉତ୍ପାଦ ଫେରସ୍ତ କରାଯାଇ ନାହିଁ।",
-    "purchaseMissingSignedTransaction": "App Store କ୍ରୟରେ ଏକ ସ୍ୱାକ୍ଷରିତ ଲେଣଦେଣ JWS ଅନ୍ତର୍ଭୁକ୍ତ ନଥିଲା।"
+    "purchaseMissingSignedTransaction": "App Store କ୍ରୟରେ ଏକ ସ୍ୱାକ୍ଷରିତ ଲେଣଦେଣ JWS ଅନ୍ତର୍ଭୁକ୍ତ ନଥିଲା।",
+    "couldNotConnectToPlay": "Google Play ସହିତ ସଂଯୋଗ ହୋଇପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "legalDisclosurePlay": "Kilo Pass ଏକ ସ୍ୱୟଂ-ନବୀକରଣୀୟ ମାସିକ ସବସ୍କ୍ରିପ୍ସନ୍। କ୍ରୟ ନିଶ୍ଚିତ ହେବା ସମୟରେ ଆପଣଙ୍କ Google Play ଆକାଉଣ୍ଟରୁ ଭୁକ୍ତାନ ଆଦାୟ ହୁଏ। ସବସ୍କ୍ରିପ୍ସନ୍ ପ୍ରତି ମାସରେ ଦର୍ଶାଯାଇଥିବା ମୂଲ୍ୟରେ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ନବୀକରଣ ହୁଏ, ଯଦି ବର୍ତ୍ତମାନର ଅବଧି ସମାପ୍ତ ହେବାର ଅତି କମରେ ୨୪ ଘଣ୍ଟା ପୂର୍ବରୁ ବାତିଲ କରାନଯାଏ। ଆପଣଙ୍କ Google Play ଆକାଉଣ୍ଟ ସେଟିଂସରେ ଯେକୌଣସି ସମୟରେ ପରିଚାଳନା କିମ୍ବା ବାତିଲ କରନ୍ତୁ।",
+    "manageFailedPlay": "Google Play ସବସ୍କ୍ରିପସନ୍ ପରିଚାଳନା ଖୋଲିବାରେ ବିଫଳ।",
+    "noMatchingProductsPlay": "Google Play ଦ୍ୱାରା କୌଣସି ମେଳ ଖାଉଥିବା Kilo Pass ଉତ୍ପାଦ ଫେରସ୍ତ କରାଯାଇ ନାହିଁ।",
+    "opensPlayManagement": "Google Play ସବସ୍କ୍ରିପସନ୍ ପରିଚାଳନା ଖୋଲେ।",
+    "otherAccountCopyPlay": "ଏହି Google Play ଆକାଉଣ୍ଟରେ ଥିବା Kilo Pass ଅନ୍ୟ ଏକ Kilo ଆକାଉଣ୍ଟର ଅଟେ। ଏହାକୁ ପରିଚାଳନା କରିବାକୁ ସେହି Kilo ଆକାଉଣ୍ଟରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
+    "productsCouldNotLoadPlay": "Kilo Pass ଉତ୍ପାଦଗୁଡ଼ିକ Google Play ରୁ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "productsUnavailablePlay": "Google Play ଉତ୍ପାଦଗୁଡ଼ିକ ଅନୁପଲବ୍ଧ",
+    "purchaseDifferentAccountPlay": "ଏହି Google Play କ୍ରୟ ଆପଣଙ୍କ Kilo ଆକାଉଣ୍ଟ ସହିତ ଲିଙ୍କ୍ ହୋଇନାହିଁ। କ୍ରୟ ପାଇଁ ବ୍ୟବହୃତ Google ଆକାଉଣ୍ଟରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "purchaseMissingOfferToken": "Google Play କ୍ରୟରେ ଏକ ଅଫର୍ ଟୋକେନ୍ ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "purchaseMissingPurchaseToken": "Google Play କ୍ରୟରେ ଏକ କ୍ରୟ ଟୋକେନ୍ ଅନ୍ତର୍ଭୁକ୍ତ ନଥିଲା।",
+    "purchaseOwnedByAnotherAccountPlay": "ଏହି Google Play ଆକାଉଣ୍ଟରେ ଥିବା Kilo Pass ଅନ୍ୟ ଏକ Kilo ଆକାଉଣ୍ଟର ଅଟେ।",
+    "purchaseStartFailedPlay": "Google Play କ୍ରୟ ଆରମ୍ଭ କରିବାରେ ବିଫଳ।"
   },
   "consent": {
     "kilo": "Kilo",

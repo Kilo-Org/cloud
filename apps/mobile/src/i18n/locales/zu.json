@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "I-Kilo Pass kule Apple Account ingeyenye i-akhawunti ye-Kilo.",
     "couldNotConnectToAppStore": "Asikwazanga ukuxhuma ku-App Store. Bheka ukuxhumana kwakho bese uzama futhi.",
     "noMatchingProducts": "Akukho mikhiqizo ye-Kilo Pass ehambisanayo ebuyiswe yi-App Store.",
-    "purchaseMissingSignedTransaction": "Ukuthenga kwe-App Store akuzange kufake i-JWS esayiniwe yenqubo."
+    "purchaseMissingSignedTransaction": "Ukuthenga kwe-App Store akuzange kufake i-JWS esayiniwe yenqubo.",
+    "couldNotConnectToPlay": "Ayikwazanga ukuxhuma ku-Google Play. Bheka ukuxhumana kwakho bese uzama futhi.",
+    "legalDisclosurePlay": "I-Kilo Pass iwukubhalisela kwanyanga ngalinye okuzivuselelayo ngokuzenzakalelayo. Inkokhelo ikhokhiswa ku-akhawunti yakho ye-Google Play lapho kuqinisekiswa ukuthenga. Ukubhalisela kuzivuselela ngokuzenzakalelayo nyanga zonke ngentengo ebonisiwe ngaphandle uma kukhanselwe okungenani amahora angu-24 ngaphambi kokuphela kwesikhathi samanje. Lawula noma ukhansela noma nini kuzilungiselelo zekhawunti yakho ye-Google Play.",
+    "manageFailedPlay": "Ukwenza ngaphandle ukuphathwa kokubhalisa kwe-Google Play kwehlulekile.",
+    "noMatchingProductsPlay": "Akukho mikhiqizo ye-Kilo Pass ehambisanayo ebuyiswe yi-Google Play.",
+    "opensPlayManagement": "Ivula ukuphathwa kokubhalisa kwe-Google Play.",
+    "otherAccountCopyPlay": "I-Kilo Pass kule akhawunti ye-Google Play ingeyenye i-akhawunti ye-Kilo. Ngena kuleyo akhawunti ye-Kilo ukuze uyiphathe.",
+    "productsCouldNotLoadPlay": "Imikhiqizo ye-Kilo Pass ayikwazanga ukulayishwa ku-Google Play.",
+    "productsUnavailablePlay": "Imikhiqizo ye-Google Play ayitholakali",
+    "purchaseDifferentAccountPlay": "Lokhu kuthengwa kwe-Google Play akuxhunyiwe ku-akhawunti yakho ye-Kilo. Ngena nge-Google Account esetshenziselwe ukuthenga, bese uzama futhi.",
+    "purchaseMissingOfferToken": "Ukuthenga kwe-Google Play akunayo i-otha token. Zama futhi.",
+    "purchaseMissingPurchaseToken": "Ukuthenga kwe-Google Play akufakanga i-purchase token.",
+    "purchaseOwnedByAnotherAccountPlay": "I-Kilo Pass kule akhawunti ye-Google Play ingeyenye i-akhawunti ye-Kilo.",
+    "purchaseStartFailedPlay": "Ukusetha ukuthenga kwe-Google Play kwehlulekile."
   },
   "consent": {
     "kilo": "I-Kilo",

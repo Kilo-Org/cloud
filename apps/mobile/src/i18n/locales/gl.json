@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "O Kilo Pass desta conta de Apple pertence a outra conta de Kilo.",
     "couldNotConnectToAppStore": "Non se puido conectar coa App Store. Comproba a túa conexión e téntao de novo.",
     "noMatchingProducts": "A App Store non devolveu ningún produto de Kilo Pass coincidente.",
-    "purchaseMissingSignedTransaction": "A compra da App Store non incluíu unha transacción asinada en JWS."
+    "purchaseMissingSignedTransaction": "A compra da App Store non incluíu unha transacción asinada en JWS.",
+    "couldNotConnectToPlay": "Non se puido conectar con Google Play. Comproba a túa conexión e tenta de novo.",
+    "legalDisclosurePlay": "Kilo Pass é unha subscrición mensual con renovación automática. O pagamento cárgase na túa conta de Google Play ao confirmar a compra. As subscricións renóvanse automaticamente cada mes ao prezo indicado a menos que se cancelen polo menos 24 horas antes do final do período actual. Xestiona ou cancela en calquera momento na configuración da túa conta de Google Play.",
+    "manageFailedPlay": "Non se puido abrir a xestión de subscricións de Google Play.",
+    "noMatchingProductsPlay": "Google Play non devolveu produtos de Kilo Pass que coincidan.",
+    "opensPlayManagement": "Abre a xestión de subscricións de Google Play.",
+    "otherAccountCopyPlay": "O Kilo Pass desta conta de Google Play pertence a outra conta de Kilo. Inicia sesión nesa conta de Kilo para xestionalo.",
+    "productsCouldNotLoadPlay": "Non se puideron cargar os produtos de Kilo Pass desde Google Play.",
+    "productsUnavailablePlay": "Produtos de Google Play non dispoñibles",
+    "purchaseDifferentAccountPlay": "Esta compra de Google Play non está ligada á túa conta de Kilo. Inicia sesión na conta de Google usada para a compra e tenta de novo.",
+    "purchaseMissingOfferToken": "Á compra de Google Play fáltalle un token de oferta. Tenta de novo.",
+    "purchaseMissingPurchaseToken": "A compra de Google Play non incluíu un token de compra.",
+    "purchaseOwnedByAnotherAccountPlay": "O Kilo Pass desta conta de Google Play pertence a outra conta de Kilo.",
+    "purchaseStartFailedPlay": "Non se puido iniciar a compra en Google Play."
   },
   "consent": {
     "kilo": "Kilo",

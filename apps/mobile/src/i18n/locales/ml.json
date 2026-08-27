@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "ഈ Apple അക്കൗണ്ടിലെ Kilo Pass മറ്റൊരു Kilo അക്കൗണ്ടിന്റേതാണ്.",
     "couldNotConnectToAppStore": "App Store-ലേക്ക് കണക്റ്റുചെയ്യാൻ കഴിഞ്ഞില്ല. നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
     "noMatchingProducts": "App Store-ൽ നിന്ന് പൊരുത്തപ്പെടുന്ന Kilo Pass ഉൽപ്പന്നങ്ങളൊന്നും ലഭിച്ചില്ല.",
-    "purchaseMissingSignedTransaction": "App Store വാങ്ങലിൽ ഒപ്പിട്ട ഇടപാട് JWS ഉൾപ്പെടുത്തിയിട്ടില്ല."
+    "purchaseMissingSignedTransaction": "App Store വാങ്ങലിൽ ഒപ്പിട്ട ഇടപാട് JWS ഉൾപ്പെടുത്തിയിട്ടില്ല.",
+    "couldNotConnectToPlay": "Google Play കണക്ട് ചെയ്യാൻ കഴിഞ്ഞില്ല. നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
+    "legalDisclosurePlay": "Kilo Pass എന്നത് ഓട്ടോ-റിന്യൂവബിൾ മാസിക സബ്സ്ക്രിപ്ഷനാണ്. വാങ്ങൽ സ്ഥിരീകരിക്കുമ്പോൾ നിങ്ങളുടെ Google Play അക്കൗണ്ടിൽ നിന്ന് പേയ്മെന്റ് ഈടാക്കും. നിലവിലെ കാലയളവ് അവസാനിക്കുന്നതിന് കുറഞ്ഞത് 24 മണിക്കൂർ മുമ്പ് റദ്ദാക്കിയില്ലെങ്കിൽ, സബ്സ്ക്രിപ്ഷനുകൾ എല്ലാ മാസവും കാണിച്ചിരിക്കുന്ന വിലയ്ക്ക് സ്വയം പുതുക്കുന്നു. നിങ്ങളുടെ Google Play അക്കൗണ്ട് ക്രമീകരണങ്ങളിൽ എപ്പോൾ വേണമെങ്കിലും കൈകാര്യം ചെയ്യുക അല്ലെങ്കിൽ റദ്ദാക്കുക.",
+    "manageFailedPlay": "Google Play സബ്സ്ക്രിപ്ഷൻ മാനേജ്മെന്റ് തുറക്കാൻ പരാജയപ്പെട്ടു.",
+    "noMatchingProductsPlay": "Google Play-ൽ നിന്ന് പൊരുത്തപ്പെടുന്ന Kilo Pass ഉൽപ്പന്നങ്ങൾ ഒന്നും ലഭിച്ചില്ല.",
+    "opensPlayManagement": "Google Play സബ്സ്ക്രിപ്ഷൻ മാനേജ്മെന്റ് തുറക്കുന്നു.",
+    "otherAccountCopyPlay": "ഈ Google Play അക്കൗണ്ടിലെ Kilo Pass മറ്റൊരു Kilo അക്കൗണ്ടിന്റേതാണ്. അത് കൈകാര്യം ചെയ്യാൻ ആ Kilo അക്കൗണ്ടിൽ സൈൻ ഇൻ ചെയ്യുക.",
+    "productsCouldNotLoadPlay": "Google Play-ൽ നിന്ന് Kilo Pass ഉൽപ്പന്നങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
+    "productsUnavailablePlay": "Google Play ഉൽപ്പന്നങ്ങൾ ലഭ്യമല്ല",
+    "purchaseDifferentAccountPlay": "ഈ Google Play വാങ്ങൽ നിങ്ങളുടെ Kilo അക്കൗണ്ടുമായി ലിങ്ക് ചെയ്തിട്ടില്ല. വാങ്ങലിന് ഉപയോഗിച്ച Google അക്കൗണ്ടിൽ സൈൻ ഇൻ ചെയ്ത് വീണ്ടും ശ്രമിക്കുക.",
+    "purchaseMissingOfferToken": "Google Play വാങ്ങലിൽ ഓഫർ ടോക്കൺ ഇല്ല. വീണ്ടും ശ്രമിക്കുക.",
+    "purchaseMissingPurchaseToken": "Google Play വാങ്ങലിൽ പർച്ചേസ് ടോക്കൺ ഉൾപ്പെട്ടില്ല.",
+    "purchaseOwnedByAnotherAccountPlay": "ഈ Google Play അക്കൗണ്ടിലെ Kilo Pass മറ്റൊരു Kilo അക്കൗണ്ടിന്റേതാണ്.",
+    "purchaseStartFailedPlay": "Google Play വാങ്ങൽ ആരംഭിക്കാൻ പരാജയപ്പെട്ടു."
   },
   "consent": {
     "kilo": "Kilo",

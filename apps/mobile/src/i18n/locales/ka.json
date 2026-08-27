@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "ეს Apple ანგარიშზე არსებული Kilo Pass სხვა Kilo ანგარიშს ეკუთვნის.",
     "couldNotConnectToAppStore": "App Store-თან დაკავშირება ვერ მოხერხდა. შეამოწმეთ თქვენი კავშირი და სცადეთ კიდევ.",
     "noMatchingProducts": "App Store-მა არ დააბრუნა შესაბამისი Kilo Pass პროდუქტები.",
-    "purchaseMissingSignedTransaction": "App Store-ის შესყიდვა არ შეიცავდა ხელმოწერილ ტრანზაქციის JWS-ს."
+    "purchaseMissingSignedTransaction": "App Store-ის შესყიდვა არ შეიცავდა ხელმოწერილ ტრანზაქციის JWS-ს.",
+    "couldNotConnectToPlay": "Google Play-თან დაკავშირება ვერ მოხერხდა. შეამოწმეთ თქვენი კავშირი და სცადეთ კიდევ.",
+    "legalDisclosurePlay": "Kilo Pass არის ავტომატურად განახლებადი ყოველთვიური გამოწერა. გადახდა ჩამოიჭრება თქვენი Google Play ანგარიშიდან შეძენის დადასტურებისას. გამოწერა ავტომატურად განახლდება ყოველთვიურად მითითებულ ფასად, თუ არ გააუქმებთ მიმდინარე პერიოდის დასრულებამდე სულ მცირე 24 საათით ადრე. მართეთ ან გააუქმეთ ნებისმიერ დროს თქვენი Google Play ანგარიშის პარამეტრებში.",
+    "manageFailedPlay": "Google Play გამოწერის მართვის გახსნა ვერ მოხერხდა.",
+    "noMatchingProductsPlay": "Google Play-მა არ დააბრუნა შესაბამისი Kilo Pass პროდუქტები.",
+    "opensPlayManagement": "Google Play გამოწერის მართვას ხსნის.",
+    "otherAccountCopyPlay": "ეს Google Play ანგარიშზე არსებული Kilo Pass სხვა Kilo ანგარიშს ეკუთვნის. შედით ამ Kilo ანგარიშში მის სამართავად.",
+    "productsCouldNotLoadPlay": "Kilo Pass პროდუქტების Google Play-იდან ჩატვირთვა ვერ მოხერხდა.",
+    "productsUnavailablePlay": "Google Play პროდუქტები მიუწვდომელია",
+    "purchaseDifferentAccountPlay": "ეს Google Play შესყიდვა არ არის დაკავშირებული თქვენს Kilo ანგარიშთან. შედით იმ Google ანგარიშით, რომელიც გამოიყენებოდა შესყიდვისთვის, შემდეგ კვლავ სცადეთ.",
+    "purchaseMissingOfferToken": "Google Play შესყიდვას აკლია შეთავაზების ტოკენი. სცადეთ კიდევ.",
+    "purchaseMissingPurchaseToken": "Google Play-ის შესყიდვა არ შეიცავდა შესყიდვის ტოკენს.",
+    "purchaseOwnedByAnotherAccountPlay": "ეს Google Play ანგარიშზე არსებული Kilo Pass სხვა Kilo ანგარიშს ეკუთვნის.",
+    "purchaseStartFailedPlay": "Google Play შესყიდვის დაწყება ვერ მოხერხდა."
   },
   "consent": {
     "kilo": "Kilo",

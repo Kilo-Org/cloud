@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass på denne Apple-kontoen tilhører en annen Kilo-konto.",
     "couldNotConnectToAppStore": "Kunne ikke koble til App Store. Sjekk tilkoblingen og prøv igjen.",
     "noMatchingProducts": "App Store returnerte ingen samsvarende Kilo Pass-produkter.",
-    "purchaseMissingSignedTransaction": "App Store-kjøpet inneholdt ikke en signert transaksjons-JWS."
+    "purchaseMissingSignedTransaction": "App Store-kjøpet inneholdt ikke en signert transaksjons-JWS.",
+    "couldNotConnectToPlay": "Kunne ikke koble til Google Play. Sjekk tilkoblingen og prøv igjen.",
+    "legalDisclosurePlay": "Kilo Pass er et automatisk fornybart månedsabonnement. Betaling belastes Google Play-kontoen din ved bekreftelse av kjøpet. Abonnementet fornyes automatisk hver måned til prisen som vises, med mindre det kanselleres minst 24 timer før slutten av gjeldende periode. Administrer eller kanseller når som helst i Google Play-kontoinnstillingene.",
+    "manageFailedPlay": "Kunne ikke åpne Google Play-abonnementsadministrasjonen.",
+    "noMatchingProductsPlay": "Google Play returnerte ingen samsvarende Kilo Pass-produkter.",
+    "opensPlayManagement": "Åpner Google Play-abonnementsadministrasjon.",
+    "otherAccountCopyPlay": "Kilo Pass på denne Google Play-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å administrere den.",
+    "productsCouldNotLoadPlay": "Kilo Pass-produktene kunne ikke lastes fra Google Play.",
+    "productsUnavailablePlay": "Google Play-produkter utilgjengelig",
+    "purchaseDifferentAccountPlay": "Dette Google Play-kjøpet er ikke knyttet til Kilo-kontoen din. Logg inn på Google-kontoen som ble brukt til kjøpet, og prøv igjen.",
+    "purchaseMissingOfferToken": "Google Play-kjøpet mangler et offer token. Prøv igjen.",
+    "purchaseMissingPurchaseToken": "Google Play-kjøpet inneholdt ikke et purchase token.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass på denne Google Play-kontoen tilhører en annen Kilo-konto.",
+    "purchaseStartFailedPlay": "Kunne ikke starte Google Play-kjøpet."
   },
   "consent": {
     "kilo": "Kilo",

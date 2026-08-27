@@ -2870,7 +2870,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass šajā Apple kontā pieder citam Kilo kontam.",
     "couldNotConnectToAppStore": "Neizdevās savienoties ar App Store. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
     "noMatchingProducts": "App Store neatgrieza atbilstošus Kilo Pass produktus.",
-    "purchaseMissingSignedTransaction": "App Store pirkums neietvēra parakstītu darījuma JWS."
+    "purchaseMissingSignedTransaction": "App Store pirkums neietvēra parakstītu darījuma JWS.",
+    "couldNotConnectToPlay": "Neizdevās savienoties ar Google Play. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
+    "legalDisclosurePlay": "Kilo Pass ir automātiski atjaunojams mēneša abonements. Maksājums tiek iekasēts no jūsu Google Play konta pirkuma apstiprināšanas brīdī. Abonements katru mēnesi atjaunojas automātiski par norādīto cenu, ja vien tas netiek atcelts vismaz 24 stundas pirms pašreizējā perioda beigām. Pārvaldiet vai atceliet to jebkurā laikā sava Google Play konta iestatījumos.",
+    "manageFailedPlay": "Neizdevās atvērt Google Play abonementu pārvaldību.",
+    "noMatchingProductsPlay": "Google Play neatgrieza atbilstošus Kilo Pass produktus.",
+    "opensPlayManagement": "Atver Google Play abonementu pārvaldību.",
+    "otherAccountCopyPlay": "Kilo Pass šajā Google Play kontā pieder citam Kilo kontam. Piesakieties tajā Kilo kontā, lai to pārvaldītu.",
+    "productsCouldNotLoadPlay": "Kilo Pass produktus nevarēja ielādēt no Google Play.",
+    "productsUnavailablePlay": "Google Play produkti nav pieejami",
+    "purchaseDifferentAccountPlay": "Šis Google Play pirkums nav saistīts ar jūsu Kilo kontu. Pierakstieties ar Google kontu, kas tika izmantots pirkumam, un mēģiniet vēlreiz.",
+    "purchaseMissingOfferToken": "Google Play pirkumam trūkst piedāvājuma marķiera. Mēģiniet vēlreiz.",
+    "purchaseMissingPurchaseToken": "Google Play pirkums neietvēra pirkuma marķieri.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass šajā Google Play kontā pieder citam Kilo kontam.",
+    "purchaseStartFailedPlay": "Neizdevās sākt Google Play pirkumu."
   },
   "consent": {
     "kilo": "Kilo",

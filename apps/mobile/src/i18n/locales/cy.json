@@ -2930,7 +2930,20 @@
     "purchaseOwnedByAnotherAccount": "Mae'r Kilo Pass ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol.",
     "couldNotConnectToAppStore": "Ni ellid cysylltu â'r App Store. Gwiriwch eich cysylltiad a cheisiwch eto.",
     "noMatchingProducts": "Ni ddychwelodd yr App Store unrhyw gynhyrchion Kilo Pass cyfatebol.",
-    "purchaseMissingSignedTransaction": "Ni chynhwysodd y pryniant App Store drafodiad JWS wedi'i lofnodi."
+    "purchaseMissingSignedTransaction": "Ni chynhwysodd y pryniant App Store drafodiad JWS wedi'i lofnodi.",
+    "couldNotConnectToPlay": "Ni ellid cysylltu â Google Play. Gwiriwch eich cysylltiad a cheisiwch eto.",
+    "legalDisclosurePlay": "Tanysgrifiad misol sy'n adnewyddu'n awtomatig yw Kilo Pass. Codir y taliad i'ch cyfrif Google Play ar gadarnhad o'r pryniant. Mae tanysgrifiadau'n adnewyddu'n awtomatig bob mis am y pris a ddangosir oni bai eich bod yn canslo o leiaf 24 awr cyn diwedd y cyfnod cyfredol. Rheolwch neu ganslwch unrhyw bryd yng ngosodiadau cyfrif eich Google Play.",
+    "manageFailedPlay": "Methodd agor rheolaeth tanysgrifiad Google Play.",
+    "noMatchingProductsPlay": "Ni ddychwelodd Google Play unrhyw gynhyrchion Kilo Pass cyfatebol.",
+    "opensPlayManagement": "Yn agor rheolaeth tanysgrifiad Google Play.",
+    "otherAccountCopyPlay": "Mae'r Kilo Pass ar y cyfrif Google Play hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w reoli.",
+    "productsCouldNotLoadPlay": "Ni ellid llwytho cynhyrchion Kilo Pass o Google Play.",
+    "productsUnavailablePlay": "Cynhyrchion Google Play ar gael",
+    "purchaseDifferentAccountPlay": "Nid yw'r pryniant Google Play hwn wedi'i gysylltu â'ch cyfrif Kilo. Mewngofnodwch i'r Google Account a ddefnyddiwyd ar gyfer y pryniant, yna rhowch gynnig arall arni.",
+    "purchaseMissingOfferToken": "Mae'r pryniant Google Play yn colli token cynnig. Ceisiwch eto.",
+    "purchaseMissingPurchaseToken": "Ni chynhwysodd y pryniant Google Play token pryniant.",
+    "purchaseOwnedByAnotherAccountPlay": "Mae'r Kilo Pass ar y cyfrif Google Play hwn yn perthyn i gyfrif Kilo gwahanol.",
+    "purchaseStartFailedPlay": "Methodd cychwyn pryniant Google Play."
   },
   "consent": {
     "kilo": "Kilo",

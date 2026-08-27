@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass akan wannan Apple Account na wani asusun Kilo ne daban.",
     "couldNotConnectToAppStore": "Ba a iya haɗawa da App Store ba. Duba haɗinka ka sake gwadawa.",
     "noMatchingProducts": "Babu samfuran Kilo Pass da suka dace da App Store ya dawo da su.",
-    "purchaseMissingSignedTransaction": "Siyayyar App Store ba ta haɗa da JWS na ma'amala mai sa hannu ba."
+    "purchaseMissingSignedTransaction": "Siyayyar App Store ba ta haɗa da JWS na ma'amala mai sa hannu ba.",
+    "couldNotConnectToPlay": "Ba a iya haɗawa da Google Play ba. Duba haɗinka ka sake gwadawa.",
+    "legalDisclosurePlay": "Kilo Pass biyan kuɗi ne na wata-wata wanda ke sabunta kansa. Ana cajin biyan kuɗi ga Google Play account ɗinka a lokacin tabbatar da siyayya. Biyan kuɗi yana sabuntawa kowace wata a farashin da aka nuna sai dai idan an soke shi aƙalla sa'o'i 24 kafin ƙarshen lokaci na yanzu. Sarrafa ko soke a kowane lokaci a saitunan asusunka na Google Play.",
+    "manageFailedPlay": "An kasa buɗe sarrafa biyan kuɗi na Google Play.",
+    "noMatchingProductsPlay": "Babu samfuran Kilo Pass da suka dace da Google Play ya dawo da su.",
+    "opensPlayManagement": "Yana buɗe sarrafa biyan kuɗi na Google Play.",
+    "otherAccountCopyPlay": "Kilo Pass akan wannan Google Play account na wani asusun Kilo ne daban. Shiga wannan asusun Kilo don sarrafa shi.",
+    "productsCouldNotLoadPlay": "Ba a iya ɗora samfuran Kilo Pass daga Google Play ba.",
+    "productsUnavailablePlay": "Samfuran Google Play ba su nan",
+    "purchaseDifferentAccountPlay": "Wannan sayayyar Google Play ba a haɗa ta da asusunka na Kilo ba. Shiga da Google Play account ɗin da aka yi amfani da shi don sayayyar, sannan sake gwadawa.",
+    "purchaseMissingOfferToken": "Sayayyar Google Play ba ta haɗa da alamar tayin ba. Sake gwadawa.",
+    "purchaseMissingPurchaseToken": "Sayayyar Google Play ba ta haɗa da alamar sayayya ba.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass akan wannan Google Play account na wani asusun Kilo ne daban.",
+    "purchaseStartFailedPlay": "An kasa fara sayayyar Google Play."
   },
   "consent": {
     "kilo": "Kilo",

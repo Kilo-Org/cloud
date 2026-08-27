@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass នៅលើ Apple Account នេះជារបស់គណនី Kilo ផ្សេង។",
     "couldNotConnectToAppStore": "មិនអាចភ្ជាប់ទៅ App Store បានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
     "noMatchingProducts": "App Store មិនបានប្រគល់ផលិតផល Kilo Pass ដែលត្រូវគ្នាទេ។",
-    "purchaseMissingSignedTransaction": "ការទិញ App Store មិនបានរួមបញ្ចូល JWS ប្រតិបត្តិការដែលបានចុះហត្ថលេខាទេ។"
+    "purchaseMissingSignedTransaction": "ការទិញ App Store មិនបានរួមបញ្ចូល JWS ប្រតិបត្តិការដែលបានចុះហត្ថលេខាទេ។",
+    "couldNotConnectToPlay": "មិនអាចភ្ជាប់ទៅ Google Play បានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
+    "legalDisclosurePlay": "Kilo Pass គឺជាការជាវប្រចាំខែដែលអាចបន្តដោយស្វ័យប្រវត្តិបាន។ ការទូទាត់នឹងត្រូវគិតលើគណនី Google Play របស់អ្នកនៅពេលបញ្ជាក់ការទិញ។ ការជាវត្រូវបន្តដោយស្វ័យប្រវត្តិរៀងរាល់ខែក្នុងតម្លៃដែលបង្ហាញ លុះត្រាតែលុបចោលយ៉ាងហោចណាស់ 24 ម៉ោងមុនចុងបញ្ចប់នៃរយៈពេលបច្ចុប្បន្ន។ គ្រប់គ្រង ឬលុបចោលនៅពេលណាក៏បាននៅក្នុងការកំណត់គណនី Google Play របស់អ្នក។",
+    "manageFailedPlay": "មិនអាចបើកការគ្រប់គ្រងការជាវ Google Play បានទេ។",
+    "noMatchingProductsPlay": "Google Play មិនបានប្រគល់ផលិតផល Kilo Pass ដែលត្រូវគ្នាទេ។",
+    "opensPlayManagement": "បើកការគ្រប់គ្រងការជាវ Google Play ។",
+    "otherAccountCopyPlay": "Kilo Pass នៅលើគណនី Google Play នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីគ្រប់គ្រងវា។",
+    "productsCouldNotLoadPlay": "មិនអាចផ្ទុកផលិតផល Kilo Pass ពី Google Play បានទេ។",
+    "productsUnavailablePlay": "ផលិតផល Google Play មិនអាចប្រើបានទេ។",
+    "purchaseDifferentAccountPlay": "ការទិញ Google Play នេះមិនត្រូវបានភ្ជាប់ទៅគណនី Kilo របស់អ្នកទេ។ ចូលជាមួយគណនី Google ដែលបានប្រើសម្រាប់ការទិញ បន្ទាប់មកព្យាយាមម្តងទៀត។",
+    "purchaseMissingOfferToken": "ការទិញ Google Play ខ្វះ offer token ។ ព្យាយាមម្តងទៀត។",
+    "purchaseMissingPurchaseToken": "ការទិញ Google Play មិនបានរួមបញ្ចូល purchase token ទេ។",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass នៅលើគណនី Google Play នេះជារបស់គណនី Kilo ផ្សេង។",
+    "purchaseStartFailedPlay": "បរាជ័យក្នុងការចាប់ផ្ដើមការទិញ Google Play។"
   },
   "consent": {
     "kilo": "Kilo",

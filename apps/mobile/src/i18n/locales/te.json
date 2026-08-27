@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "ఈ యాపిల్ ఖాతాలోని Kilo Pass వేరే Kilo ఖాతాకు చెందుతుంది.",
     "couldNotConnectToAppStore": "App Storeకు కనెక్ట్ చేయలేకపోయింది. మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
     "noMatchingProducts": "App Store సరిపోలే Kilo Pass ఉత్పత్తులను ఏవీ తిరిగి ఇవ్వలేదు.",
-    "purchaseMissingSignedTransaction": "App Store కొనుగోలులో సంతకం చేసిన లావాదేవీ JWS చేర్చబడలేదు."
+    "purchaseMissingSignedTransaction": "App Store కొనుగోలులో సంతకం చేసిన లావాదేవీ JWS చేర్చబడలేదు.",
+    "couldNotConnectToPlay": "Google Playకి కనెక్ట్ చేయలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+    "legalDisclosurePlay": "Kilo Pass అనేది స్వయంచాలకంగా పునరుద్ధరించబడే నెలవారీ చందా. కొనుగోలు నిర్ధారణ సమయంలో చెల్లింపు మీ Google Play ఖాతాకు వసూలు చేయబడుతుంది. ప్రస్తుత వ్యవధి ముగిసే 24 గంటల కంటే ముందు రద్దు చేయకపోతే చందాలు ప్రదర్శించిన ధరకు ప్రతి నెల స్వయంచాలకంగా పునరుద్ధరించబడతాయి. మీ Google Play ఖాతా సెట్టింగులలో ఎప్పుడైనా నిర్వహించండి లేదా రద్దు చేయండి.",
+    "manageFailedPlay": "Google Play చందా నిర్వహణను తెరవడంలో విఫలమైంది.",
+    "noMatchingProductsPlay": "Google Play సరిపోలే Kilo Pass ఉత్పత్తులను ఏవీ తిరిగి ఇవ్వలేదు.",
+    "opensPlayManagement": "Google Play చందా నిర్వహణను తెరుస్తుంది.",
+    "otherAccountCopyPlay": "ఈ Google Play ఖాతాలోని Kilo Pass వేరే Kilo ఖాతాకు చెందుతుంది. దానిని నిర్వహించడానికి ఆ Kilo ఖాతాతో సైన్ ఇన్ చేయండి.",
+    "productsCouldNotLoadPlay": "Google Play నుండి Kilo Pass ఉత్పత్తులను లోడ్ చేయలేకపోయాము.",
+    "productsUnavailablePlay": "Google Play ఉత్పత్తులు అందుబాటులో లేవు",
+    "purchaseDifferentAccountPlay": "ఈ Google Play కొనుగోలు మీ Kilo ఖాతాతో లింక్ చేయబడలేదు. కొనుగోలు కోసం ఉపయోగించిన Google ఖాతాతో సైన్ ఇన్ చేసి, మళ్లీ ప్రయత్నించండి.",
+    "purchaseMissingOfferToken": "Google Play కొనుగోలులో ఆఫర్ టోకెన్ లేదు. మళ్లీ ప్రయత్నించండి.",
+    "purchaseMissingPurchaseToken": "Google Play కొనుగోలులో కొనుగోలు టోకెన్ చేర్చబడలేదు.",
+    "purchaseOwnedByAnotherAccountPlay": "ఈ Google Play ఖాతాలోని Kilo Pass వేరే Kilo ఖాతాకు చెందుతుంది.",
+    "purchaseStartFailedPlay": "Google Play కొనుగోలును ప్రారంభించడంలో విఫలమైంది."
   },
   "consent": {
     "kilo": "Kilo",

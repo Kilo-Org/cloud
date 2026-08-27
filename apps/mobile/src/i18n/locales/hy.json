@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Այս Apple Account-ի Kilo Pass-ը պատկանում է մեկ այլ Kilo հաշվին:",
     "couldNotConnectToAppStore": "Չհաջողվեց միանալ App Store-ին: Ստուգեք կապը և կրկին փորձեք:",
     "noMatchingProducts": "App Store-ը չվերադարձրեց համապատասխան Kilo Pass ապրանքներ:",
-    "purchaseMissingSignedTransaction": "App Store-ի գնումը չներառեց ստորագրված JWS գործարք:"
+    "purchaseMissingSignedTransaction": "App Store-ի գնումը չներառեց ստորագրված JWS գործարք:",
+    "couldNotConnectToPlay": "Չհաջողվեց միանալ Google Play-ին: Ստուգեք ձեր կապը և նորից փորձեք:",
+    "legalDisclosurePlay": "Kilo Pass-ը ավտոմատ թարմացվող ամսական բաժանորդագրություն է: Վճարումը գանձվում է ձեր Google Play հաշվից գնումը հաստատելիս: Բաժանորդագրությունները թարմացվում են ավտոմատ ամեն ամիս նշված գնով, եթե չեղարկեք ընթացիկ ժամանակաշրջանի ավարտից առնվազն 24 ժամ առաջ: Կառավարեք կամ չեղարկեք ցանկացած պահի ձեր Google Play հաշվի կարգավորումներում:",
+    "manageFailedPlay": "Չհաջողվեց բացել Google Play բաժանորդագրության կառավարումը:",
+    "noMatchingProductsPlay": "Google Play-ը չվերադարձրեց համապատասխան Kilo Pass ապրանքներ:",
+    "opensPlayManagement": "Բացում է Google Play բաժանորդագրության կառավարումը:",
+    "otherAccountCopyPlay": "Այս Google Play հաշվի Kilo Pass-ը պատկանում է մեկ այլ Kilo հաշվին: Մուտք գործեք այդ Kilo հաշիվ՝ այն կառավարելու համար:",
+    "productsCouldNotLoadPlay": "Kilo Pass ապրանքները չհաջողվեց բեռնել Google Play-ից:",
+    "productsUnavailablePlay": "Google Play ապրանքները հասանելի չեն",
+    "purchaseDifferentAccountPlay": "Այս Google Play գնումը կապված չէ ձեր Kilo հաշվին: Մուտք գործեք գնման համար օգտագործված Google հաշիվ, ապա նորից փորձեք:",
+    "purchaseMissingOfferToken": "Google Play գնումը չունի offer token: Նորից փորձեք:",
+    "purchaseMissingPurchaseToken": "Google Play գնումը չէր ներառում purchase token:",
+    "purchaseOwnedByAnotherAccountPlay": "Այս Google Play հաշվի Kilo Pass-ը պատկանում է մեկ այլ Kilo հաշվին:",
+    "purchaseStartFailedPlay": "Չհաջողվեց սկսել Google Play գնումը:"
   },
   "consent": {
     "kilo": "Kilo",

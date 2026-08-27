@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "دا Apple Account باندې Kilo Pass د بل Kilo حساب پورې اړه لري.",
     "couldNotConnectToAppStore": "له App Store سره اړیکه نشوه نیول کېدای. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
     "noMatchingProducts": "د App Store لخوا کوم ورته Kilo Pass محصولات بیرته نه دي راستانه شوي.",
-    "purchaseMissingSignedTransaction": "د App Store پیرود لاسلیک شوی JWS لیږد نه درلود."
+    "purchaseMissingSignedTransaction": "د App Store پیرود لاسلیک شوی JWS لیږد نه درلود.",
+    "couldNotConnectToPlay": "له Google Play سره اړیکه نشوه نیول کېدای. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+    "legalDisclosurePlay": "Kilo Pass یو خودکار تازه کېدونکی میاشتنی ګډون دی. پیسې ستاسو Google Play حساب ته د پیرود د تایید په وخت کې اخیستل کیږي. ګډونونه هر میاشت په ښودل شوي نرخ باندې په اتوماتیک ډول نوي کیږي، پرته له دې چې د اوسنۍ مودې له پای ته رسېدو ۲۴ ساعته مخکې لغوه شي. هر وخت د خپل Google Play حساب تنظیماتو کې اداره یا لغوه کړئ.",
+    "manageFailedPlay": "د Google Play د ګډون مدیریت نه شو خلاصېدلای.",
+    "noMatchingProductsPlay": "د Google Play لخوا کوم ورته Kilo Pass محصولات بیرته نه دي راستانه شوي.",
+    "opensPlayManagement": "د Google Play د ګډون مدیریت پرانیزي.",
+    "otherAccountCopyPlay": "دا Google Play حساب باندې Kilo Pass د بل Kilo حساب پورې اړه لري. د مدیریت لپاره هغه Kilo حساب ته ننوځئ.",
+    "productsCouldNotLoadPlay": "د Kilo Pass محصولات له Google Play څخه نه شول پورته کېدلای.",
+    "productsUnavailablePlay": "د Google Play محصولات شتون نلري",
+    "purchaseDifferentAccountPlay": "دا د Google Play پیرود ستاسو د Kilo حساب سره تړلی نه دی. د پیرود لپاره کارول شوي Google Account ته ننوځئ، بیا هڅه وکړئ.",
+    "purchaseMissingOfferToken": "د Google Play پیرود د وړاندیز ټوکن نلري. بیا هڅه وکړئ.",
+    "purchaseMissingPurchaseToken": "د Google Play پیرود د پیرود ټوکن نه درلود.",
+    "purchaseOwnedByAnotherAccountPlay": "دا Google Play حساب باندې Kilo Pass د بل Kilo حساب پورې اړه لري.",
+    "purchaseStartFailedPlay": "د Google Play پیرود پیل کول ناکام شول."
   },
   "consent": {
     "kilo": "Kilo",

@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Ny Kilo Pass amin'ity Apple Account ity dia an'ny kaonty Kilo hafa.",
     "couldNotConnectToAppStore": "Tsy afaka nifandray tamin'ny App Store. Jereo ny fifandraisanao ary andramana indray.",
     "noMatchingProducts": "Tsy niverina avy amin'ny App Store ny vokatra Kilo Pass mifanaraka.",
-    "purchaseMissingSignedTransaction": "Tsy nampidirina tamin'ny fividianana App Store ny JWS transaction sonia."
+    "purchaseMissingSignedTransaction": "Tsy nampidirina tamin'ny fividianana App Store ny JWS transaction sonia.",
+    "couldNotConnectToPlay": "Tsy afaka nifandray tamin'ny Google Play. Jereo ny fifandraisanao ary andramo indray.",
+    "legalDisclosurePlay": "Kilo Pass dia famandrihana isam-bolana azo havaozina ho azy. Alaina amin'ny kaonty Google Play anao ny fandoavam-bola rehefa hamafisina ny fividianana. Havaozina ho azy ny famandrihana isam-bolana amin'ny vidiny aseho raha tsy foanana 24 ora farafahakeliny alohan'ny fiafaran'ny fe-potoana ankehitriny. Tantano na foano isaky ny te ianao amin'ny fikandrana kaonty Google Play anao.",
+    "manageFailedPlay": "Tsy nahomby ny fanokafana ny fitantanana famandrihana Google Play.",
+    "noMatchingProductsPlay": "Tsy niverina avy amin'ny Google Play ny vokatra Kilo Pass mifanaraka.",
+    "opensPlayManagement": "Misokatra ny fitantanana famandrihana Google Play.",
+    "otherAccountCopyPlay": "Ny Kilo Pass amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany raha hitantana azy.",
+    "productsCouldNotLoadPlay": "Tsy afaka nampidirina avy amin'ny Google Play ny vokatra Kilo Pass.",
+    "productsUnavailablePlay": "Tsy misy ny vokatra Google Play",
+    "purchaseDifferentAccountPlay": "Ity fividianana Google Play ity dia tsy mifandray amin'ny kaonty Kilo anao. Midira amin'ny kaonty Google nampiasaina tamin'ny fividianana, avy eo andramo indray.",
+    "purchaseMissingOfferToken": "Tsy misy ny offer token amin'ny fividianana Google Play. Andramo indray.",
+    "purchaseMissingPurchaseToken": "Tsy nampidirina ny purchase token tamin'ny fividianana Google Play.",
+    "purchaseOwnedByAnotherAccountPlay": "Ny Kilo Pass amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa.",
+    "purchaseStartFailedPlay": "Tsy nahomby ny fanombohana ny fividianana Google Play."
   },
   "consent": {
     "kilo": "Kilo",

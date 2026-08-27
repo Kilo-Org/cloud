@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "આ Apple ખાતા પરનું Kilo Pass એ અલગ Kilo ખાતા સાથે સંબંધિત છે.",
     "couldNotConnectToAppStore": "App Store થી કનેક્ટ થઈ શકાયું નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
     "noMatchingProducts": "App Store દ્વારા કોઈ મેળ ખાતા Kilo Pass ઉત્પાદનો પરત આપવામાં આવ્યા નથી.",
-    "purchaseMissingSignedTransaction": "App Store ખરીદીમાં સહી કરેલ ટ્રાન્ઝેક્શન JWS સમાવિષ્ટ ન હતું."
+    "purchaseMissingSignedTransaction": "App Store ખરીદીમાં સહી કરેલ ટ્રાન્ઝેક્શન JWS સમાવિષ્ટ ન હતું.",
+    "couldNotConnectToPlay": "Google Play સાથે કનેક્ટ થઈ શક્યું નહીં. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
+    "legalDisclosurePlay": "Kilo Pass એ આપમેળે રિન્યુ થતું માસિક સબ્સ્ક્રિપ્શન છે. ખરીદીની પુષ્ટિ પર તમારા Google Play એકાઉન્ટ પર ચુકવણી કરવામાં આવે છે. જ્યાં સુધી વર્તમાન સમયગાળાના અંતના 24 કલાક પહેલાં રદ ન કરવામાં આવે ત્યાં સુધી સબ્સ્ક્રિપ્શન દર મહિને દર્શાવેલ કિંમતે આપમેળે રિન્યુ થાય છે. તમારી Google Play એકાઉન્ટ સેટિંગ્સમાં ગમે ત્યારે મેનેજ કરો અથવા રદ કરો.",
+    "manageFailedPlay": "Google Play સબ્સ્ક્રિપ્શન મેનેજમેન્ટ ખોલવામાં નિષ્ફળ ગયું.",
+    "noMatchingProductsPlay": "Google Play દ્વારા કોઈ મેળ ખાતા Kilo Pass ઉત્પાદનો પરત આપવામાં આવ્યા નથી.",
+    "opensPlayManagement": "Google Play સબ્સ્ક્રિપ્શન મેનેજમેન્ટ ખોલે છે.",
+    "otherAccountCopyPlay": "આ Google Play એકાઉન્ટ પરનું Kilo Pass એ અલગ Kilo ખાતા સાથે સંબંધિત છે. તેને મેનેજ કરવા માટે તે Kilo ખાતામાં સાઇન ઇન કરો.",
+    "productsCouldNotLoadPlay": "Kilo Pass ઉત્પાદનો Google Play માંથી લોડ કરી શકાયા નહીં.",
+    "productsUnavailablePlay": "Google Play ઉત્પાદનો ઉપલબ્ધ નથી",
+    "purchaseDifferentAccountPlay": "આ Google Play ખરીદી તમારા Kilo ખાતા સાથે લિંક થયેલી નથી. ખરીદી માટે વપરાયેલ Google એકાઉન્ટમાં સાઇન ઇન કરો, પછી ફરી પ્રયાસ કરો.",
+    "purchaseMissingOfferToken": "Google Play ખરીદીમાં ઓફર ટોકન ગુમ છે. ફરી પ્રયાસ કરો.",
+    "purchaseMissingPurchaseToken": "Google Play ખરીદીમાં ખરીદી ટોકન શામેલ ન હતું.",
+    "purchaseOwnedByAnotherAccountPlay": "આ Google Play ખાતા પરનું Kilo Pass એ અલગ Kilo ખાતા સાથે સંબંધિત છે.",
+    "purchaseStartFailedPlay": "Google Play ખરીદી શરૂ કરવામાં નિષ્ફળ ગયું."
   },
   "consent": {
     "kilo": "Kilo",

@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "या Apple खात्यावरील Kilo Pass वेगळ्या Kilo खात्याशी संबंधित आहे.",
     "couldNotConnectToAppStore": "App Store शी कनेक्ट होता आले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
     "noMatchingProducts": "App Store ने जुळणारी Kilo Pass उत्पादने परत केली नाहीत.",
-    "purchaseMissingSignedTransaction": "App Store खरेदीत स्वाक्षरी केलेले व्यवहार JWS समाविष्ट नव्हते."
+    "purchaseMissingSignedTransaction": "App Store खरेदीत स्वाक्षरी केलेले व्यवहार JWS समाविष्ट नव्हते.",
+    "couldNotConnectToPlay": "Google Play ला कनेक्ट होऊ शकले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+    "legalDisclosurePlay": "Kilo Pass हे स्वयं-नूतनीकरण करणारे मासिक सदस्यत्व आहे. खरेदीच्या पुष्टीकरणावर तुमच्या Google Play खात्यावरून पेमेंट घेतले जाते. सध्याच्या कालावधीच्या समाप्तीच्या किमान 24 तास आधी रद्द केल्याशिवाय दर्शविलेल्या किमतीवर सदस्यत्वे दर महिन्याला स्वयंचलितपणे नूतनीकरण होतात. तुमच्या Google Play खात्याच्या सेटिंग्जमध्ये कधीही व्यवस्थापित किंवा रद्द करा.",
+    "manageFailedPlay": "Google Play सदस्यत्व व्यवस्थापन उघडण्यात अयशस्वी.",
+    "noMatchingProductsPlay": "Google Play कडून जुळणारी Kilo Pass उत्पादने परत आली नाहीत.",
+    "opensPlayManagement": "Google Play सदस्यत्व व्यवस्थापन उघडते.",
+    "otherAccountCopyPlay": "या Google Play खात्यावरील Kilo Pass वेगळ्या Kilo खात्याचे आहे. ते व्यवस्थापित करण्यासाठी त्या Kilo खात्यावर साइन इन करा.",
+    "productsCouldNotLoadPlay": "Google Play वरून Kilo Pass उत्पादने लोड करता आली नाहीत.",
+    "productsUnavailablePlay": "Google Play उत्पादने अनुपलब्ध",
+    "purchaseDifferentAccountPlay": "ही Google Play खरेदी तुमच्या Kilo खात्याशी लिंक केलेली नाही. खरेदीसाठी वापरलेल्या Google खात्यावर साइन इन करा, नंतर पुन्हा प्रयत्न करा.",
+    "purchaseMissingOfferToken": "Google Play खरेदीमध्ये ऑफर टोकन नाही. पुन्हा प्रयत्न करा.",
+    "purchaseMissingPurchaseToken": "Google Play खरेदीमध्ये खरेदी टोकन समाविष्ट नव्हते.",
+    "purchaseOwnedByAnotherAccountPlay": "या Google Play खात्यावरील Kilo Pass वेगळ्या Kilo खात्याचे आहे.",
+    "purchaseStartFailedPlay": "Google Play खरेदी सुरू करण्यात अयशस्वी."
   },
   "consent": {
     "kilo": "Kilo",

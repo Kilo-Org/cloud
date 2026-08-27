@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Bu Apple Hesabındakı Kilo Pass başqa Kilo hesabına aiddir.",
     "couldNotConnectToAppStore": "App Store-a qoşulmaq mümkün olmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
     "noMatchingProducts": "App Store uyğun Kilo Pass məhsulu qaytarmadı.",
-    "purchaseMissingSignedTransaction": "App Store alışı imzalanmış əməliyyat JWS-i daxil etmədi."
+    "purchaseMissingSignedTransaction": "App Store alışı imzalanmış əməliyyat JWS-i daxil etmədi.",
+    "couldNotConnectToPlay": "Google Play-ə qoşulmaq mümkün olmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
+    "legalDisclosurePlay": "Kilo Pass avtomatik yenilənən aylıq abunədir. Ödəniş alışın təsdiqində Google Play hesabınızdan çıxılır. Abunəliklər cari dövrün sonuna ən azı 24 saat qalmış ləğv edilmədiyi halda hər ay göstərilən qiymətlə avtomatik yenilənir. İstənilən vaxt Google Play hesabınızın parametrlərində idarə edin və ya ləğv edin.",
+    "manageFailedPlay": "Google Play abunəlik idarəetməsini açmaq mümkün olmadı.",
+    "noMatchingProductsPlay": "Google Play tərəfindən uyğun Kilo Pass məhsulları qaytarılmadı.",
+    "opensPlayManagement": "Google Play abunəlik idarəetməsini açır.",
+    "otherAccountCopyPlay": "Bu Google Play hesabındakı Kilo Pass başqa Kilo hesabına aiddir. Onu idarə etmək üçün həmin Kilo hesabına daxil olun.",
+    "productsCouldNotLoadPlay": "Kilo Pass məhsulları Google Play-dən yüklənə bilmədi.",
+    "productsUnavailablePlay": "Google Play məhsulları mövcud deyil",
+    "purchaseDifferentAccountPlay": "Bu Google Play alışı Kilo hesabınızla əlaqələndirilməyib. Alış üçün istifadə olunan Google hesabına daxil olun və yenidən cəhd edin.",
+    "purchaseMissingOfferToken": "Google Play alışında təklif tokeni yoxdur. Yenidən cəhd edin.",
+    "purchaseMissingPurchaseToken": "Google Play alışına alış tokeni daxil edilməyib.",
+    "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı Kilo Pass başqa Kilo hesabına aiddir.",
+    "purchaseStartFailedPlay": "Google Play alışına başlamaq mümkün olmadı."
   },
   "consent": {
     "kilo": "Kilo",

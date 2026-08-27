@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass ໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ.",
     "couldNotConnectToAppStore": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບ App Store ໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງອີກຄັ້ງ.",
     "noMatchingProducts": "App Store ບໍ່ໄດ້ສົ່ງຄືນສິນຄ້າ Kilo Pass ທີ່ກົງກັນ.",
-    "purchaseMissingSignedTransaction": "ການຊື້ App Store ບໍ່ໄດ້ລວມມີ JWS ລາຍການທີ່ມີລາຍເຊັນ."
+    "purchaseMissingSignedTransaction": "ການຊື້ App Store ບໍ່ໄດ້ລວມມີ JWS ລາຍການທີ່ມີລາຍເຊັນ.",
+    "couldNotConnectToPlay": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບ Google Play ໄດ້. ກະລຸນາກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງອີກຄັ້ງ.",
+    "legalDisclosurePlay": "Kilo Pass ເປັນການສະໝັກສະມາຊິກລາຍເດືອນທີ່ຕໍ່ອາຍຸອັດຕະໂນມັດ. ຄ່າຊຳລະຈະຖືກຫັກຈາກບັນຊີ Google Play ຂອງທ່ານເມື່ອຢືນຢັນການຊື້. ການສະໝັກສະມາຊິກຈະຕໍ່ອາຍຸອັດຕະໂນມັດທຸກເດືອນຕາມລາຄາທີ່ສະແດງ ເວັ້ນເສຍແຕ່ຖືກຍົກເລີກຢ່າງໜ້ອຍ 24 ຊົ່ວໂມງກ່ອນສິ້ນສຸດຮອບປັດຈຸບັນ. ຈັດການ ຫຼື ຍົກເລີກໄດ້ທຸກເວລາໃນການຕັ້ງຄ່າບັນຊີ Google Play ຂອງທ່ານ.",
+    "manageFailedPlay": "ບໍ່ສາມາດເປີດການຈັດການການສະໝັກສະມາຊິກ Google Play ໄດ້.",
+    "noMatchingProductsPlay": "Google Play ບໍ່ໄດ້ສົ່ງຄືນຜະລິດຕະພັນ Kilo Pass ທີ່ກົງກັນ.",
+    "opensPlayManagement": "ເປີດການຈັດການການສະໝັກສະມາຊິກ Google Play.",
+    "otherAccountCopyPlay": "Kilo Pass ໃນບັນຊີ Google Play ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອຈັດການມັນ.",
+    "productsCouldNotLoadPlay": "ບໍ່ສາມາດໂຫຼດຜະລິດຕະພັນ Kilo Pass ຈາກ Google Play ໄດ້.",
+    "productsUnavailablePlay": "ບໍ່ສາມາດໃຊ້ຜະລິດຕະພັນ Google Play ໄດ້",
+    "purchaseDifferentAccountPlay": "ການຊື້ Google Play ນີ້ບໍ່ກ່ຽວຂ້ອງກັບບັນຊີ Kilo ຂອງທ່ານ. ເຂົ້າສູ່ລະບົບບັນຊີ Google ທີ່ໃຊ້ສຳລັບການຊື້, ຈາກນັ້ນລອງອີກຄັ້ງ.",
+    "purchaseMissingOfferToken": "ການຊື້ Google Play ຂາດ token ຂໍ້ສະເໜີ. ລອງອີກຄັ້ງ.",
+    "purchaseMissingPurchaseToken": "ການຊື້ Google Play ບໍ່ລວມມີ token ການຊື້.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass ໃນບັນຊີ Google Play ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ.",
+    "purchaseStartFailedPlay": "ບໍ່ສາມາດເລີ່ມການຊື້ Google Play ໄດ້."
   },
   "consent": {
     "kilo": "Kilo",

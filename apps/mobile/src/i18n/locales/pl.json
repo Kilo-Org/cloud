@@ -2422,7 +2422,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass na tym koncie Apple należy do innego konta Kilo.",
     "couldNotConnectToAppStore": "Nie udało się połączyć z App Store. Sprawdź połączenie i spróbuj ponownie.",
     "noMatchingProducts": "App Store nie zwróciła pasujących produktów Kilo Pass.",
-    "purchaseMissingSignedTransaction": "Zakup w App Store nie zawierał podpisanej transakcji JWS."
+    "purchaseMissingSignedTransaction": "Zakup w App Store nie zawierał podpisanej transakcji JWS.",
+    "couldNotConnectToPlay": "Nie udało się połączyć z Google Play. Sprawdź połączenie i spróbuj ponownie.",
+    "legalDisclosurePlay": "Kilo Pass to automatycznie odnawiana subskrypcja miesięczna. Płatność jest pobierana z Twojego konta Google Play przy potwierdzeniu zakupu. Subskrypcja odnawia się automatycznie co miesiąc po podanej cenie, chyba że anulujesz ją co najmniej 24 godziny przed końcem bieżącego okresu. Zarządzaj nią lub anuluj ją w dowolnym momencie w ustawieniach konta Google Play.",
+    "manageFailedPlay": "Nie udało się otworzyć zarządzania subskrypcjami w Google Play.",
+    "noMatchingProductsPlay": "Google Play nie zwrócił pasujących produktów Kilo Pass.",
+    "opensPlayManagement": "Otwiera zarządzanie subskrypcją w Google Play.",
+    "otherAccountCopyPlay": "Kilo Pass na tym koncie Google Play należy do innego konta Kilo. Zaloguj się na to konto Kilo, aby nim zarządzać.",
+    "productsCouldNotLoadPlay": "Nie udało się załadować produktów Kilo Pass z Google Play.",
+    "productsUnavailablePlay": "Produkty Google Play niedostępne",
+    "purchaseDifferentAccountPlay": "Ten zakup w Google Play nie jest powiązany z Twoim kontem Kilo. Zaloguj się na konto Google użyte do zakupu, a następnie spróbuj ponownie.",
+    "purchaseMissingOfferToken": "Zakup w Google Play nie zawiera tokenu oferty. Spróbuj ponownie.",
+    "purchaseMissingPurchaseToken": "Zakup w Google Play nie zawierał tokenu zakupu.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass na tym koncie Google Play należy do innego konta Kilo.",
+    "purchaseStartFailedPlay": "Nie udało się rozpocząć zakupu w Google Play."
   },
   "consent": {
     "kilo": "Kilo",

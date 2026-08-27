@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Passـی ئەم هەژمارەی Apple سەر بە هەژمارەیەکی دیکەی Kilo یە.",
     "couldNotConnectToAppStore": "نەتوانرا پەیوەندی بە App Store بکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵبدەرەوە.",
     "noMatchingProducts": "هیچ بەرهەمێکی گونجاوی Kilo Pass لەلایەن App Storeوە نەگەڕێندرایەوە.",
-    "purchaseMissingSignedTransaction": "کڕینەکەی App Store مامەڵەیەکی واژووکراوی JWSی لەخۆ نەگرتبوو."
+    "purchaseMissingSignedTransaction": "کڕینەکەی App Store مامەڵەیەکی واژووکراوی JWSی لەخۆ نەگرتبوو.",
+    "couldNotConnectToPlay": "نەتوانرا پەیوەندی بە Google Play بکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵبدەرەوە.",
+    "legalDisclosurePlay": "Kilo Pass بەشداربوونێکی مانگانەیە کە خۆکارانە نوێ دەبێتەوە. لە کاتی پشتڕاستکردنەوەی کڕینەکە، پارە لە هەژماری Google Playـی تۆ دەبەسترێت. بەشداربوونەکان هەر مانگێک بە بەهای نیشاندراو خۆکارانە نوێ دەبنەوە مەگەر لانیکەم ٢٤ کاتژمێر پێش کۆتایی ماوەی ئێستا هەڵنەوەشێنرێنەوە. لە هەر کاتێکدا لە ڕێکخستنەکانی هەژماری Google Play بەڕێوەی ببە یان هەڵیبوەشێنەوە.",
+    "manageFailedPlay": "کردنەوەی بەڕێوەبردنی بەشداربوونی Google Play سەرکەوتوو نەبوو.",
+    "noMatchingProductsPlay": "هیچ بەرهەمێکی گونجاوی Kilo Pass لەلایەن Google Playوە نەگەڕێندرایەوە.",
+    "opensPlayManagement": "بەڕێوەبردنی بەشداربوونی Google Play دەکاتەوە.",
+    "otherAccountCopyPlay": "Kilo Passـی ئەم هەژمارەی Google Play سەر بە هەژمارەیەکی دیکەی Kilo یە. بچۆ ژوورەوە لەو هەژمارەی Kilo بۆ بەڕێوەبردنی.",
+    "productsCouldNotLoadPlay": "بەرهەمەکانی Kilo Pass نەتوانران لە Google Play باربکرێن.",
+    "productsUnavailablePlay": "بەرهەمەکانی Google Play بەردەست نین",
+    "purchaseDifferentAccountPlay": "ئەم کڕینەی Google Play بە هەژماری Kiloـی تۆ نەبەستراوە. بەو هەژمارەی Google بچۆ ژوورەوە کە بۆ کڕینەکە بەکارهاتووە، پاشان دووبارە هەوڵبدەرەوە.",
+    "purchaseMissingOfferToken": "کڕینەکەی Google Play نیشانەیەکی پێشنیاری (offer token)ی تێدا نییە. دووبارە هەوڵبدەرەوە.",
+    "purchaseMissingPurchaseToken": "کڕینەکەی Google Play تۆکێنی کڕینی لەخۆ نەگرتبوو.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Passـی ئەم هەژمارەی Google Play سەر بە هەژمارەیەکی دیکەی Kilo یە.",
+    "purchaseStartFailedPlay": "دەستپێکردنی کڕینی Google Play شکستی هێنا."
   },
   "consent": {
     "kilo": "Kilo",

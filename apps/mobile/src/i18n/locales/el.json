@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Το Kilo Pass σε αυτόν τον Λογαριασμό Apple ανήκει σε διαφορετικό λογαριασμό Kilo.",
     "couldNotConnectToAppStore": "Δεν ήταν δυνατή η σύνδεση με το App Store. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
     "noMatchingProducts": "Το App Store δεν επέστρεψε προϊόντα Kilo Pass που να ταιριάζουν.",
-    "purchaseMissingSignedTransaction": "Η αγορά στο App Store δεν περιλάμβανε υπογεγραμμένη JWS συναλλαγής."
+    "purchaseMissingSignedTransaction": "Η αγορά στο App Store δεν περιλάμβανε υπογεγραμμένη JWS συναλλαγής.",
+    "couldNotConnectToPlay": "Δεν ήταν δυνατή η σύνδεση με το Google Play. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
+    "legalDisclosurePlay": "Το Kilo Pass είναι μια συνδρομή με αυτόματη ανανέωση σε μηνιαία βάση. Η πληρωμή χρεώνεται στον λογαριασμό σας στο Google Play κατά την επιβεβαίωση της αγοράς. Οι συνδρομές ανανεώνονται αυτόματα κάθε μήνα στην τιμή που εμφανίζεται, εκτός εάν ακυρωθούν τουλάχιστον 24 ώρες πριν από το τέλος της τρέχουσας περιόδου. Διαχειριστείτε ή ακυρώστε ανά πάσα στιγμή στις ρυθμίσεις του λογαριασμού σας στο Google Play.",
+    "manageFailedPlay": "Αποτυχία ανοίγματος της διαχείρισης συνδρομών του Google Play.",
+    "noMatchingProductsPlay": "Το Google Play δεν επέστρεψε προϊόντα Kilo Pass που να ταιριάζουν.",
+    "opensPlayManagement": "Ανοίγει τη διαχείριση συνδρομών του Google Play.",
+    "otherAccountCopyPlay": "Το Kilo Pass σε αυτόν τον λογαριασμό Google Play ανήκει σε διαφορετικό λογαριασμό Kilo. Συνδεθείτε σε αυτόν τον λογαριασμό Kilo για να τον διαχειριστείτε.",
+    "productsCouldNotLoadPlay": "Δεν ήταν δυνατή η φόρτωση των προϊόντων Kilo Pass από το Google Play.",
+    "productsUnavailablePlay": "Τα προϊόντα του Google Play δεν είναι διαθέσιμα",
+    "purchaseDifferentAccountPlay": "Αυτή η αγορά από το Google Play δεν συνδέεται με τον λογαριασμό σας στο Kilo. Συνδεθείτε με τον λογαριασμό Google που χρησιμοποιήθηκε για την αγορά και δοκιμάστε ξανά.",
+    "purchaseMissingOfferToken": "Η αγορά στο Google Play δεν περιλαμβάνει διακριτικό προσφοράς. Δοκιμάστε ξανά.",
+    "purchaseMissingPurchaseToken": "Η αγορά στο Google Play δεν περιλάμβανε διακριτικό αγοράς.",
+    "purchaseOwnedByAnotherAccountPlay": "Το Kilo Pass σε αυτόν τον λογαριασμό Google Play ανήκει σε διαφορετικό λογαριασμό Kilo.",
+    "purchaseStartFailedPlay": "Δεν ήταν δυνατή η έναρξη της αγοράς από το Google Play."
   },
   "consent": {
     "kilo": "Kilo",

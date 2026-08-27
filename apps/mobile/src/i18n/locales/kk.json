@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Бұл Apple Аккаунтындағы Kilo Pass басқа Kilo аккаунтына тиесілі.",
     "couldNotConnectToAppStore": "App Store-ға қосылу мүмкін болмады. Қосылымды тексеріп, қайта көріңіз.",
     "noMatchingProducts": "App Store сәйкес Kilo Pass өнімдерін қайтармады.",
-    "purchaseMissingSignedTransaction": "App Store сатып алуы қол қойылған транзакция JWS қамтымады."
+    "purchaseMissingSignedTransaction": "App Store сатып алуы қол қойылған транзакция JWS қамтымады.",
+    "couldNotConnectToPlay": "Google Play-ге қосылу мүмкін болмады. Қосылымды тексеріп, қайта көріңіз.",
+    "legalDisclosurePlay": "Kilo Pass — автоматты жаңартылатын айлық жазылым. Төлем сатып алуды растау кезінде Google Play тіркелгіңізге есептеледі. Ағымдағы кезең аяқталмастан кемінде 24 сағат бұрын тоқтатылмаса, жазылымдар көрсетілген баға бойынша әр ай сайын автоматты түрде жаңартылады. Оны Google Play тіркелгі баптауларында кез келген уақытта басқарыңыз немесе тоқтатыңыз.",
+    "manageFailedPlay": "Google Play жазылым басқаруын ашу сәтсіз аяқталды.",
+    "noMatchingProductsPlay": "Google Play сәйкес Kilo Pass өнімдерін қайтармады.",
+    "opensPlayManagement": "Google Play жазылым басқаруын ашады.",
+    "otherAccountCopyPlay": "Бұл Google Play Аккаунтындағы Kilo Pass басқа Kilo аккаунтына тиесілі. Оны басқару үшін сол Kilo аккаунтына кіріңіз.",
+    "productsCouldNotLoadPlay": "Kilo Pass өнімдерін Google Play-ден жүктеу мүмкін болмады.",
+    "productsUnavailablePlay": "Google Play өнімдері қолжетімсіз",
+    "purchaseDifferentAccountPlay": "Бұл Google Play сатып алуы Kilo аккаунтыңызға байланыспаған. Сатып алу үшін пайдаланылған Google Аккаунты арқылы кіріңіз де, қайта көріңіз.",
+    "purchaseMissingOfferToken": "Google Play сатып алуында ұсыныс таңбасы жоқ. Қайта көріңіз.",
+    "purchaseMissingPurchaseToken": "Google Play сатып алуы сатып алу таңбасын қамтымады.",
+    "purchaseOwnedByAnotherAccountPlay": "Бұл Google Play Аккаунтындағы Kilo Pass басқа Kilo аккаунтына тиесілі.",
+    "purchaseStartFailedPlay": "Google Play сатып алуын бастау мүмкін болмады."
   },
   "consent": {
     "kilo": "Kilo",

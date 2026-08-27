@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Энэ Apple Account дээрх Kilo Pass нь өөр Kilo бүртгэлд харьяалагдана.",
     "couldNotConnectToAppStore": "App Store-д холбогдох боломжгүй. Холболтоо шалгаад дахин оролдоно уу.",
     "noMatchingProducts": "App Store тохирох Kilo Pass бүтээгдэхүүн буцаасангүй.",
-    "purchaseMissingSignedTransaction": "App Store худалдан авалтад гарын үсэгтэй transaction JWS ороогүй байна."
+    "purchaseMissingSignedTransaction": "App Store худалдан авалтад гарын үсэгтэй transaction JWS ороогүй байна.",
+    "couldNotConnectToPlay": "Google Play-д холбогдох боломжгүй. Холболтоо шалгаад дахин оролдоно уу.",
+    "legalDisclosurePlay": "Kilo Pass нь автоматаар шинэчлэгддэг сарын захиалга юм. Худалдан авалтыг баталгаажуулснаар төлбөрийг таны Google Play бүртгэлээс авна. Захиалга нь одоогийн хугацаа дуусахаас дор хаяж 24 цагийн өмнө цуцлахгүй бол харуулсан үнээр сар бүр автоматаар шинэчлэгддэг. Google Play бүртгэлийн тохиргооноос хүссэн үедээ удирдах эсвэл цуцлах боломжтой.",
+    "manageFailedPlay": "Google Play захиалгын удирдлагыг нээж чадсангүй.",
+    "noMatchingProductsPlay": "Google Play тохирох Kilo Pass бүтээгдэхүүн буцаасангүй.",
+    "opensPlayManagement": "Google Play захиалгын удирдлагыг нээнэ.",
+    "otherAccountCopyPlay": "Энэ Google Play бүртгэл дээрх Kilo Pass нь өөр Kilo бүртгэлд харьяалагдана. Удирдахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү.",
+    "productsCouldNotLoadPlay": "Kilo Pass бүтээгдэхүүнийг Google Play-оос ачааллах боломжгүй.",
+    "productsUnavailablePlay": "Google Play бүтээгдэхүүн боломжгүй",
+    "purchaseDifferentAccountPlay": "Энэ Google Play худалдан авалт таны Kilo бүртгэлтэй холбогдоогүй байна. Худалдан авалтад ашигласан Google бүртгэлд нэвтэрч, дахин оролдоно уу.",
+    "purchaseMissingOfferToken": "Google Play худалдан авалтад offer token ороогүй байна. Дахин оролдоно уу.",
+    "purchaseMissingPurchaseToken": "Google Play худалдан авалтад purchase token ороогүй байна.",
+    "purchaseOwnedByAnotherAccountPlay": "Энэ Google Play бүртгэл дээрх Kilo Pass нь өөр Kilo бүртгэлд харьяалагдана.",
+    "purchaseStartFailedPlay": "Google Play худалдан авалтыг эхлүүлж чадсангүй."
   },
   "consent": {
     "kilo": "Kilo",

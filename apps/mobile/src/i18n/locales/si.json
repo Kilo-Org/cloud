@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "මෙම Apple ගිණුමේ Kilo Pass වෙනත් Kilo ගිණුමකට අයත් වේ.",
     "couldNotConnectToAppStore": "App Store වෙත සම්බන්ධ වීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
     "noMatchingProducts": "App Store විසින් ගැළපෙන Kilo Pass නිෂ්පාදන ලබා දුන්නේ නැත.",
-    "purchaseMissingSignedTransaction": "App Store මිලදී ගැනීමේදී අත්සන් කළ JWS ගනුදෙනුවක් ඇතුළත් නොවීය."
+    "purchaseMissingSignedTransaction": "App Store මිලදී ගැනීමේදී අත්සන් කළ JWS ගනුදෙනුවක් ඇතුළත් නොවීය.",
+    "couldNotConnectToPlay": "Google Play වෙත සම්බන්ධ විය නොහැකි විය. ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+    "legalDisclosurePlay": "Kilo Pass යනු ස්වයංක්රීයව අලුත් වන මාසික දායකත්වයකි. මිලදී ගැනීම තහවුරු වූ විට ගෙවීම ඔබේ Google Play ගිණුමට අය කෙරේ. වත්මන් කාල සීමාව අවසන් වීමට අවම වශයෙන් පැය 24කට පෙර අවලංගු නොකළහොත් දායකත්ව සෑම මාසයකම දක්වා ඇති මිලට ස්වයංක්රීයව අලුත් වේ. ඔබේ Google Play ගිණුම් සැකසුම් තුළ ඕනෑම වේලාවක කළමනාකරණය කරන්න හෝ අවලංගු කරන්න.",
+    "manageFailedPlay": "Google Play දායකත්ව කළමනාකරණය විවෘත කිරීමට අසමත් විය.",
+    "noMatchingProductsPlay": "Google Play විසින් ගැළපෙන Kilo Pass නිෂ්පාදන කිසිවක් ආපසු ලබා දුන්නේ නැත.",
+    "opensPlayManagement": "Google Play දායකත්ව කළමනාකරණය විවෘත කරයි.",
+    "otherAccountCopyPlay": "මෙම Google Play ගිණුමේ Kilo Pass වෙනත් Kilo ගිණුමකට අයත් වේ. එය කළමනාකරණය කිරීමට එම Kilo ගිණුමට පුරනය වන්න.",
+    "productsCouldNotLoadPlay": "Kilo Pass නිෂ්පාදන Google Play වෙතින් පූරණය කළ නොහැකි විය.",
+    "productsUnavailablePlay": "Google Play නිෂ්පාදන ලබා ගත නොහැක",
+    "purchaseDifferentAccountPlay": "මෙම Google Play මිලදී ගැනීම ඔබේ Kilo ගිණුමට සම්බන්ධ කර නොමැත. මිලදී ගැනීම සඳහා භාවිතා කළ Google ගිණුමට පුරනය වන්න, ඉන්පසු නැවත උත්සාහ කරන්න.",
+    "purchaseMissingOfferToken": "Google Play මිලදී ගැනීමේ offer token එකක් අඩුය. නැවත උත්සාහ කරන්න.",
+    "purchaseMissingPurchaseToken": "Google Play මිලදී ගැනීමේදී purchase token එකක් ඇතුළත් නොවීය.",
+    "purchaseOwnedByAnotherAccountPlay": "මෙම Google Play ගිණුමේ Kilo Pass වෙනත් Kilo ගිණුමකට අයත් වේ.",
+    "purchaseStartFailedPlay": "Google Play මිලදී ගැනීම ආරම්භ කිරීමට අසමත් විය."
   },
   "consent": {
     "kilo": "Kilo",

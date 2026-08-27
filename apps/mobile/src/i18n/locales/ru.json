@@ -2422,7 +2422,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass на этом Apple Account принадлежит другому аккаунту Kilo.",
     "couldNotConnectToAppStore": "Не удалось подключиться к App Store. Проверьте подключение и попробуйте снова.",
     "noMatchingProducts": "App Store не вернул подходящих продуктов Kilo Pass.",
-    "purchaseMissingSignedTransaction": "Покупка в App Store не включала подписанную транзакцию JWS."
+    "purchaseMissingSignedTransaction": "Покупка в App Store не включала подписанную транзакцию JWS.",
+    "couldNotConnectToPlay": "Не удалось подключиться к Google Play. Проверьте подключение и попробуйте снова.",
+    "legalDisclosurePlay": "Kilo Pass — это ежемесячная подписка с автоматическим продлением. Платёж списывается с вашего Google Play аккаунта при подтверждении покупки. Подписка продлевается автоматически каждый месяц по указанной цене, если её не отменить не менее чем за 24 часа до конца текущего периода. Управляйте подпиской или отменяйте её в любой момент в настройках учётной записи Google Play.",
+    "manageFailedPlay": "Не удалось открыть управление подписками Google Play.",
+    "noMatchingProductsPlay": "Google Play не вернул подходящих продуктов Kilo Pass.",
+    "opensPlayManagement": "Открывает управление подпиской в Google Play.",
+    "otherAccountCopyPlay": "Kilo Pass на этом Google Play аккаунте принадлежит другому аккаунту Kilo. Войдите в тот аккаунт Kilo, чтобы управлять им.",
+    "productsCouldNotLoadPlay": "Не удалось загрузить продукты Kilo Pass из Google Play.",
+    "productsUnavailablePlay": "Товары Google Play недоступны",
+    "purchaseDifferentAccountPlay": "Эта покупка в Google Play не привязана к вашему аккаунту Kilo. Войдите в Google аккаунт, использованный для покупки, и попробуйте снова.",
+    "purchaseMissingOfferToken": "В покупке Google Play отсутствует маркер предложения. Попробуйте снова.",
+    "purchaseMissingPurchaseToken": "Покупка Google Play не включала маркер покупки.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass на этом Google Play аккаунте принадлежит другому аккаунту Kilo.",
+    "purchaseStartFailedPlay": "Не удалось начать покупку в Google Play."
   },
   "consent": {
     "kilo": "Kilo",

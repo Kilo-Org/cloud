@@ -2396,7 +2396,20 @@
     "purchaseOwnedByAnotherAccount": "이 Apple 계정의 Kilo Pass는 다른 Kilo 계정에 속합니다.",
     "couldNotConnectToAppStore": "App Store에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
     "noMatchingProducts": "App Store에서 일치하는 Kilo Pass 상품이 반환되지 않았습니다.",
-    "purchaseMissingSignedTransaction": "App Store 구매에 서명된 거래 JWS가 포함되지 않았습니다."
+    "purchaseMissingSignedTransaction": "App Store 구매에 서명된 거래 JWS가 포함되지 않았습니다.",
+    "couldNotConnectToPlay": "Google Play에 연결하지 못했습니다. 연결을 확인하고 다시 시도하세요.",
+    "legalDisclosurePlay": "Kilo Pass는 자동 갱신되는 월간 구독입니다. 결제는 구매 확인 시 Google Play 계정으로 청구됩니다. 구독은 현재 기간 종료 24시간 전까지 취소하지 않으면 표시된 가격으로 매월 자동 갱신됩니다. Google Play 계정 설정에서 언제든지 관리하거나 취소할 수 있습니다.",
+    "manageFailedPlay": "Google Play 구독 관리를 열지 못했습니다.",
+    "noMatchingProductsPlay": "Google Play에서 일치하는 Kilo Pass 제품이 반환되지 않았습니다.",
+    "opensPlayManagement": "Google Play 구독 관리를 엽니다.",
+    "otherAccountCopyPlay": "이 Google Play 계정의 Kilo Pass는 다른 Kilo 계정에 속합니다. 해당 Kilo 계정으로 로그인하여 관리하세요.",
+    "productsCouldNotLoadPlay": "Google Play에서 Kilo Pass 제품을 불러올 수 없습니다.",
+    "productsUnavailablePlay": "Google Play 제품을 사용할 수 없음",
+    "purchaseDifferentAccountPlay": "이 Google Play 구매가 Kilo 계정에 연결되어 있지 않습니다. 구매에 사용한 Google 계정으로 로그인한 후 다시 시도하세요.",
+    "purchaseMissingOfferToken": "Google Play 구매에 오퍼 토큰이 없습니다. 다시 시도하세요.",
+    "purchaseMissingPurchaseToken": "Google Play 구매에 구매 토큰이 포함되지 않았습니다.",
+    "purchaseOwnedByAnotherAccountPlay": "이 Google Play 계정의 Kilo Pass는 다른 Kilo 계정에 속합니다.",
+    "purchaseStartFailedPlay": "Google Play 구매를 시작하지 못했습니다."
   },
   "consent": {
     "kilo": "Kilo",

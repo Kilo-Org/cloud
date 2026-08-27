@@ -2870,7 +2870,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass na ovom Apple računu pripada drugom Kilo računu.",
     "couldNotConnectToAppStore": "Nije moguće povezati se s App Storeom. Provjerite vezu i pokušajte ponovno.",
     "noMatchingProducts": "App Store nije vratio odgovarajuće Kilo Pass proizvode.",
-    "purchaseMissingSignedTransaction": "Kupnja u App Storeu nije uključivala potpisani transakcijski JWS."
+    "purchaseMissingSignedTransaction": "Kupnja u App Storeu nije uključivala potpisani transakcijski JWS.",
+    "couldNotConnectToPlay": "Nije moguće povezati se s Google Playom. Provjerite svoju vezu i pokušajte ponovno.",
+    "legalDisclosurePlay": "Kilo Pass je mjesečna pretplata s automatskim obnavljanjem. Plaćanje se naplaćuje s vašeg Google Play računa pri potvrdi kupnje. Pretplate se automatski obnavljaju svakog mjeseca po prikazanoj cijeni osim ako ne otkažete najmanje 24 sata prije kraja tekućeg razdoblja. Upravljajte ili otkažite u bilo kojem trenutku u postavkama svog Google Play računa.",
+    "manageFailedPlay": "Nije moguće otvoriti upravljanje pretplatama na Google Playu.",
+    "noMatchingProductsPlay": "Google Play nije vratio nijedan odgovarajući Kilo Pass proizvod.",
+    "opensPlayManagement": "Otvara upravljanje pretplatama na Google Playu.",
+    "otherAccountCopyPlay": "Kilo Pass na ovom Google Play računu pripada drugom Kilo računu. Prijavite se na taj Kilo račun da biste njime upravljali.",
+    "productsCouldNotLoadPlay": "Nije moguće učitati Kilo Pass proizvode s Google Playa.",
+    "productsUnavailablePlay": "Google Play proizvodi nisu dostupni",
+    "purchaseDifferentAccountPlay": "Ova kupnja na Google Playu nije povezana s vašim Kilo računom. Prijavite se na Google račun korišten za kupnju, a zatim pokušajte ponovno.",
+    "purchaseMissingOfferToken": "Kupnji na Google Playu nedostaje token ponude. Pokušajte ponovno.",
+    "purchaseMissingPurchaseToken": "Kupnja na Google Playu nije uključivala token kupnje.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass na ovom Google Play računu pripada drugom Kilo računu.",
+    "purchaseStartFailedPlay": "Nije moguće započeti kupnju na Google Playu."
   },
   "consent": {
     "kilo": "Kilo",

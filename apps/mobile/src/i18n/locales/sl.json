@@ -2890,7 +2890,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass na tem Apple računu pripada drugemu Kilo računu.",
     "couldNotConnectToAppStore": "Ni se bilo mogoče povezati z App Store. Preveri svojo povezavo in poskusi znova.",
     "noMatchingProducts": "App Store ni vrnil ustreznih izdelkov Kilo Pass.",
-    "purchaseMissingSignedTransaction": "Nakup v App Store ni vključeval podpisanega zapisa transakcije JWS."
+    "purchaseMissingSignedTransaction": "Nakup v App Store ni vključeval podpisanega zapisa transakcije JWS.",
+    "couldNotConnectToPlay": "Ni se bilo mogoče povezati z Google Play. Preverite svojo povezavo in poskusite znova.",
+    "legalDisclosurePlay": "Kilo Pass je samodejno obnovljiva mesečna naročnina. Plačilo se bremeni vaš Google Play račun ob potrditvi nakupa. Naročnine se samodejno obnovijo vsak mesec po prikazani ceni, razen če jih prekličete vsaj 24 ur pred koncem trenutnega obdobja. Upravljajte ali prekličite kadar koli v nastavitvah svojega Google Play računa.",
+    "manageFailedPlay": "Upravljanja naročnin Google Play ni bilo mogoče odpreti.",
+    "noMatchingProductsPlay": "Google Play ni vrnil ustreznih izdelkov Kilo Pass.",
+    "opensPlayManagement": "Odpre upravljanje naročnin Google Play.",
+    "otherAccountCopyPlay": "Kilo Pass na tem Google Play računu pripada drugemu Kilo računu. Prijavite se v ta Kilo račun, da ga upravljate.",
+    "productsCouldNotLoadPlay": "Izdelkov Kilo Passa ni bilo mogoče naložiti iz Google Play.",
+    "productsUnavailablePlay": "Izdelki v Google Play niso na voljo",
+    "purchaseDifferentAccountPlay": "Ta nakup v Google Play ni povezan z vašim Kilo računom. Prijavite se v Google račun, s katerim je bil nakup opravljen, nato poskusite znova.",
+    "purchaseMissingOfferToken": "Nakupu v Google Play manjka žeton ponudbe. Poskusite znova.",
+    "purchaseMissingPurchaseToken": "Nakup v Google Play ni vključeval žetona nakupa.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass na tem Google Play računu pripada drugemu Kilo računu.",
+    "purchaseStartFailedPlay": "Nakupa v Google Play ni bilo mogoče začeti."
   },
   "consent": {
     "kilo": "Kilo",

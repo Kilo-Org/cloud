@@ -2396,7 +2396,20 @@
     "purchaseOwnedByAnotherAccount": "De Kilo Pass op dit Apple-account hoort bij een ander Kilo-account.",
     "couldNotConnectToAppStore": "Kan geen verbinding maken met de App Store. Controleer je verbinding en probeer het opnieuw.",
     "noMatchingProducts": "De App Store gaf geen overeenkomende Kilo Pass-producten terug.",
-    "purchaseMissingSignedTransaction": "De App Store-aankoop bevatte geen ondertekende transactie-JWS."
+    "purchaseMissingSignedTransaction": "De App Store-aankoop bevatte geen ondertekende transactie-JWS.",
+    "couldNotConnectToPlay": "Kan geen verbinding maken met Google Play. Controleer je verbinding en probeer het opnieuw.",
+    "legalDisclosurePlay": "Kilo Pass is een maandelijks abonnement dat automatisch wordt verlengd. De betaling wordt bij bevestiging van de aankoop in rekening gebracht op je Google Play-account. Abonnementen worden elke maand automatisch verlengd voor de weergegeven prijs, tenzij je ten minste 24 uur voor het einde van de huidige periode opzegt. Beheer of annuleer op elk moment in de accountinstellingen van Google Play.",
+    "manageFailedPlay": "Abonnementsbeheer van Google Play kon niet worden geopend.",
+    "noMatchingProductsPlay": "Google Play gaf geen overeenkomende Kilo Pass-producten terug.",
+    "opensPlayManagement": "Opent het abonnementsbeheer van Google Play.",
+    "otherAccountCopyPlay": "De Kilo Pass op dit Google Play-account hoort bij een ander Kilo-account. Meld je aan bij dat Kilo-account om het te beheren.",
+    "productsCouldNotLoadPlay": "Kilo Pass-producten konden niet uit Google Play worden geladen.",
+    "productsUnavailablePlay": "Google Play-producten niet beschikbaar",
+    "purchaseDifferentAccountPlay": "Deze Google Play-aankoop is niet gekoppeld aan je Kilo-account. Meld je aan bij het Google-account dat voor de aankoop is gebruikt en probeer het opnieuw.",
+    "purchaseMissingOfferToken": "Bij de Google Play-aankoop ontbreekt een aanbodtoken. Probeer opnieuw.",
+    "purchaseMissingPurchaseToken": "De Google Play-aankoop bevatte geen aankooptoken.",
+    "purchaseOwnedByAnotherAccountPlay": "De Kilo Pass op dit Google Play-account hoort bij een ander Kilo-account.",
+    "purchaseStartFailedPlay": "De Google Play-aankoop kon niet worden gestart."
   },
   "consent": {
     "kilo": "Kilo",

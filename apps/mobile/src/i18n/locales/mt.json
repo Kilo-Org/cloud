@@ -2910,7 +2910,20 @@
     "purchaseOwnedByAnotherAccount": "Il-Kilo Pass fuq dan l-Apple Account jappartjeni għal kont ieħor ta' Kilo.",
     "couldNotConnectToAppStore": "Ma setgħetx tikkonnettja mal-App Store. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
     "noMatchingProducts": "L-ebda prodott ta' Kilo Pass li jaqbel ma rritorna l-App Store.",
-    "purchaseMissingSignedTransaction": "Ix-xiri tal-App Store ma kienx jinkludi JWS ta' transazzjoni ffirmata."
+    "purchaseMissingSignedTransaction": "Ix-xiri tal-App Store ma kienx jinkludi JWS ta' transazzjoni ffirmata.",
+    "couldNotConnectToPlay": "Ma setax jikkonnettja ma' Google Play. Iċċekkja l-konnessjoni tiegħek u erġa' ipprova.",
+    "legalDisclosurePlay": "Kilo Pass huwa abbonament mensili li jiġġedded awtomatikament. Il-ħlas jitħallas mill-kont tiegħek ta' Google Play fil-konferma tax-xiri. L-abbonamenti jiġġeddu awtomatikament kull xahar bil-prezz muri sakemm ma jitħassrux mill-inqas 24 siegħa qabel it-tmiem tal-perjodu attwali. Immaniġġja jew ikkanċella fi kwalunkwe ħin fis-settings tal-kont ta' Google Play tiegħek.",
+    "manageFailedPlay": "Ma fetaħx il-ġestjoni tas-sottoskrizzjonijiet ta' Google Play.",
+    "noMatchingProductsPlay": "L-ebda prodott ta' Kilo Pass li jaqbel ma rritorna Google Play.",
+    "opensPlayManagement": "Jiftaħ il-ġestjoni tas-sottoskrizzjonijiet ta' Google Play.",
+    "otherAccountCopyPlay": "Il-Kilo Pass fuq dan il-kont ta' Google Play jappartjeni għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex timmaniġġjah.",
+    "productsCouldNotLoadPlay": "Il-prodotti ta' Kilo Pass ma setgħux jitgħabbew minn Google Play.",
+    "productsUnavailablePlay": "Il-prodotti ta' Google Play mhux disponibbli",
+    "purchaseDifferentAccountPlay": "Dan ix-xiri ta' Google Play mhux marbut mal-kont tiegħek ta' Kilo. Idħol fil-kont ta' Google użat għax-xiri, imbagħad erġa' ipprova.",
+    "purchaseMissingOfferToken": "Ix-xiri ta' Google Play m'għandux token ta' offerta. Erġa' ipprova.",
+    "purchaseMissingPurchaseToken": "Ix-xiri ta' Google Play ma kienx jinkludi token tax-xiri.",
+    "purchaseOwnedByAnotherAccountPlay": "Il-Kilo Pass fuq dan il-kont ta' Google Play jappartjeni għal kont ieħor ta' Kilo.",
+    "purchaseStartFailedPlay": "Ma bediex ix-xiri ta' Google Play."
   },
   "consent": {
     "kilo": "Kilo",

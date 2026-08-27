@@ -2890,7 +2890,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass šioje Apple paskyroje priklauso kitai Kilo paskyrai.",
     "couldNotConnectToAppStore": "Nepavyko prisijungti prie App Store. Patikrinkite ryšį ir bandykite dar kartą.",
     "noMatchingProducts": "App Store negrąžino jokių atitinkančių Kilo Pass produktų.",
-    "purchaseMissingSignedTransaction": "App Store pirkinys neapėmė pasirašytos operacijos JWS."
+    "purchaseMissingSignedTransaction": "App Store pirkinys neapėmė pasirašytos operacijos JWS.",
+    "couldNotConnectToPlay": "Nepavyko prisijungti prie Google Play. Patikrinkite ryšį ir bandykite dar kartą.",
+    "legalDisclosurePlay": "„Kilo Pass“ yra automatiškai atnaujinama mėnesinė prenumerata. Mokėjimas nuskaitomas iš jūsų „Google Play“ paskyros patvirtinus pirkimą. Prenumeratos atnaujinamos automatiškai kiekvieną mėnesį nurodyta kaina, nebent atšauksite ne vėliau kaip likus 24 valandoms iki einamojo laikotarpio pabaigos. Tvarkykite arba atšaukite bet kada „Google Play“ paskyros nustatymuose.",
+    "manageFailedPlay": "Nepavyko atidaryti Google Play prenumeratos valdymo.",
+    "noMatchingProductsPlay": "Google Play negrąžino jokių atitinkančių Kilo Pass produktų.",
+    "opensPlayManagement": "Atidaro Google Play prenumeratos valdymą.",
+    "otherAccountCopyPlay": "Kilo Pass šioje Google Play paskyroje priklauso kitai Kilo paskyrai. Prisijunkite prie tos Kilo paskyros, kad ją valdytumėte.",
+    "productsCouldNotLoadPlay": "Nepavyko įkelti Kilo Pass produktų iš Google Play.",
+    "productsUnavailablePlay": "Google Play produktai neprieinami",
+    "purchaseDifferentAccountPlay": "Šis Google Play pirkinys nesusietas su jūsų Kilo paskyra. Prisijunkite prie Google paskyros, naudotos pirkinį atlikti, tada bandykite dar kartą.",
+    "purchaseMissingOfferToken": "Google Play pirkinys neturi pasiūlymo ženklo. Bandykite dar kartą.",
+    "purchaseMissingPurchaseToken": "Google Play pirkinys neapėmė pirkimo ženklo.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass šioje Google Play paskyroje priklauso kitai Kilo paskyrai.",
+    "purchaseStartFailedPlay": "Nepavyko pradėti Google Play pirkinio."
   },
   "consent": {
     "kilo": "Kilo",

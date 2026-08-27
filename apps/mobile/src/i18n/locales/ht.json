@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass la sou Kont Apple sa a fè pati yon lòt kont Kilo.",
     "couldNotConnectToAppStore": "Pa t ka konekte ak App Store. Tcheke koneksyon ou epi eseye ankò.",
     "noMatchingProducts": "App Store pa t retounen pwodwi Kilo Pass ki matche yo.",
-    "purchaseMissingSignedTransaction": "Acha nan App Store pa t enkli yon JWS transaksyon siyen."
+    "purchaseMissingSignedTransaction": "Acha nan App Store pa t enkli yon JWS transaksyon siyen.",
+    "couldNotConnectToPlay": "Pa t ka konekte ak Google Play. Tcheke koneksyon ou epi eseye ankò.",
+    "legalDisclosurePlay": "Kilo Pass se yon abònman chak mwa ki renouvle otomatikman. Peman an chaje sou kont Google Play ou lè acha a konfime. Abònman yo renouvle otomatikman chak mwa nan pri ki montre a sòf si yo anile omwen 24 èdtan anvan fen peryòd aktyèl la. Jere oswa anile nenpòt lè nan paramèt kont Google Play ou.",
+    "manageFailedPlay": "Echèk pou louvri jesyon abònman Google Play.",
+    "noMatchingProductsPlay": "Google Play pa t retounen okenn pwodui Kilo Pass ki koresponn.",
+    "opensPlayManagement": "Louvri jesyon abònman Google Play.",
+    "otherAccountCopyPlay": "Kilo Pass la sou kont Google Play sa a fè pati yon lòt kont Kilo. Siyen nan kont Kilo sa a pou jere li.",
+    "productsCouldNotLoadPlay": "Pwodui Kilo Pass yo pa t ka chaje sot nan Google Play.",
+    "productsUnavailablePlay": "Pwodui Google Play pa disponib",
+    "purchaseDifferentAccountPlay": "Acha Google Play sa a pa lye ak kont Kilo ou. Konekte ak kont Google yo te itilize pou acha a, epi eseye ankò.",
+    "purchaseMissingOfferToken": "Acha Google Play a manke yon tokèn ofr. Eseye ankò.",
+    "purchaseMissingPurchaseToken": "Acha Google Play a pa t enkli yon tokèn acha.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass la sou kont Google Play sa a fè pati yon lòt kont Kilo.",
+    "purchaseStartFailedPlay": "Echèk pou kòmanse acha Google Play."
   },
   "consent": {
     "kilo": "Kilo",

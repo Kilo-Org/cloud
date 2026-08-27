@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass på denne Apple-konto tilhører en anden Kilo-konto.",
     "couldNotConnectToAppStore": "Kunne ikke oprette forbindelse til App Store. Tjek din forbindelse, og prøv igen.",
     "noMatchingProducts": "App Store returnerede ingen matchende Kilo Pass-produkter.",
-    "purchaseMissingSignedTransaction": "App Store-købet inkluderede ikke en signeret transaktions-JWS."
+    "purchaseMissingSignedTransaction": "App Store-købet inkluderede ikke en signeret transaktions-JWS.",
+    "couldNotConnectToPlay": "Kunne ikke oprette forbindelse til Google Play. Tjek din forbindelse, og prøv igen.",
+    "legalDisclosurePlay": "Kilo Pass er et automatisk fornyeligt månedligt abonnement. Betaling opkræves på din Google Play-konto ved bekræftelse af købet. Abonnementer fornyes automatisk hver måned til den viste pris, medmindre de annulleres mindst 24 timer før udløbet af den aktuelle periode. Administrér eller annullér når som helst i dine Google Play-kontoindstillinger.",
+    "manageFailedPlay": "Kunne ikke åbne Google Play-abonnementsadministration.",
+    "noMatchingProductsPlay": "Der blev ikke fundet nogen matchende Kilo Pass-produkter fra Google Play.",
+    "opensPlayManagement": "Åbner Google Play-abonnementsadministration.",
+    "otherAccountCopyPlay": "Kilo Pass på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at administrere den.",
+    "productsCouldNotLoadPlay": "Kilo Pass-produkter kunne ikke indlæses fra Google Play.",
+    "productsUnavailablePlay": "Google Play-produkter er utilgængelige",
+    "purchaseDifferentAccountPlay": "Dette Google Play-køb er ikke knyttet til din Kilo-konto. Log ind på den Google-konto, der blev brugt til købet, og prøv igen.",
+    "purchaseMissingOfferToken": "Google Play-købet mangler en tilbudstoken. Prøv igen.",
+    "purchaseMissingPurchaseToken": "Google Play-købet indeholdt ikke en købstoken.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass på denne Google Play-konto tilhører en anden Kilo-konto.",
+    "purchaseStartFailedPlay": "Kunne ikke starte Google Play-købet."
   },
   "consent": {
     "kilo": "Kilo",

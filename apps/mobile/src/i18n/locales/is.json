@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass á þessum Apple-reikningi tilheyrir öðrum Kilo-reikningi.",
     "couldNotConnectToAppStore": "Gat ekki tengst App Store. Athugaðu tenginguna og reyndu aftur.",
     "noMatchingProducts": "Engar samsvarandi Kilo Pass-vörur komu frá App Store.",
-    "purchaseMissingSignedTransaction": "App Store-kaup innihéldu ekki undirritaða færslu JWS."
+    "purchaseMissingSignedTransaction": "App Store-kaup innihéldu ekki undirritaða færslu JWS.",
+    "couldNotConnectToPlay": "Ekki tókst að tengjast Google Play. Athugaðu tenginguna og reyndu aftur.",
+    "legalDisclosurePlay": "Kilo Pass er sjálfvirkt endurnýjandi mánaðarleg áskrift. Greiðsla er rukkuð á Google Play-reikninginn þinn við staðfestingu kaupa. Áskriftir endurnýjast sjálfkrafa í hverjum mánuði á því verði sem sýnt er nema hætt sé við að minnsta kosti 24 klukkustundum fyrir lok núverandi tímabils. Stjórnaðu eða hættu við hvenær sem er í stillingum Google Play-reikningsins þíns.",
+    "manageFailedPlay": "Ekki tókst að opna Google Play-áskriftarstjórnun.",
+    "noMatchingProductsPlay": "Engar samsvarandi Kilo Pass-vörur voru skilaðar af Google Play.",
+    "opensPlayManagement": "Opnar Google Play-áskriftarstjórnun.",
+    "otherAccountCopyPlay": "Kilo Pass á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að stjórna honum.",
+    "productsCouldNotLoadPlay": "Ekki tókst að hlaða Kilo Pass-vörur frá Google Play.",
+    "productsUnavailablePlay": "Google Play-vörur ótiltækar",
+    "purchaseDifferentAccountPlay": "Þessi Google Play-kaup eru ekki tengd Kilo-reikningnum þínum. Skráðu þig inn á Google-reikninginn sem notaður var við kaupin, og reyndu svo aftur.",
+    "purchaseMissingOfferToken": "Google Play-kaup vantar tilboðslykil. Reyndu aftur.",
+    "purchaseMissingPurchaseToken": "Google Play-kaup innihéldu ekki kauplykil.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi.",
+    "purchaseStartFailedPlay": "Mistókst að hefja Google Play-kaup."
   },
   "consent": {
     "kilo": "Kilo",

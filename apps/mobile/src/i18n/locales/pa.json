@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "ਇਸ Apple ਖਾਤੇ 'ਤੇ Kilo Pass ਵੱਖਰੇ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹੈ।",
     "couldNotConnectToAppStore": "App Store ਨਾਲ ਕਨੈਕਟ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "noMatchingProducts": "App Store ਦੁਆਰਾ ਕੋਈ ਮੇਲ ਖਾਂਦੇ Kilo Pass ਉਤਪਾਦ ਵਾਪਸ ਨਹੀਂ ਕੀਤੇ ਗਏ।",
-    "purchaseMissingSignedTransaction": "App Store ਖਰੀਦ ਵਿੱਚ ਦਸਤਖਤ ਕੀਤਾ ਟ੍ਰਾਂਜ਼ੈਕਸ਼ਨ JWS ਸ਼ਾਮਲ ਨਹੀਂ ਸੀ।"
+    "purchaseMissingSignedTransaction": "App Store ਖਰੀਦ ਵਿੱਚ ਦਸਤਖਤ ਕੀਤਾ ਟ੍ਰਾਂਜ਼ੈਕਸ਼ਨ JWS ਸ਼ਾਮਲ ਨਹੀਂ ਸੀ।",
+    "couldNotConnectToPlay": "Google Play ਨਾਲ ਕਨੈਕਟ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਅਜ਼ਮਾਓ।",
+    "legalDisclosurePlay": "Kilo Pass ਇੱਕ ਆਟੋ-ਰੀਨਿਊ ਹੋਣ ਵਾਲੀ ਮਾਸਿਕ ਗਾਹਕੀ ਹੈ। ਖਰੀਦ ਦੀ ਪੁਸ਼ਟੀ 'ਤੇ ਭੁਗਤਾਨ ਤੁਹਾਡੇ Google Play ਖਾਤੇ ਤੋਂ ਲਿਆ ਜਾਂਦਾ ਹੈ। ਗਾਹਕੀਆਂ ਹਰ ਮਹੀਨੇ ਦਿਖਾਈ ਗਈ ਕੀਮਤ 'ਤੇ ਆਪਣੇ ਆਪ ਰੀਨਿਊ ਹੁੰਦੀਆਂ ਹਨ, ਜਦੋਂ ਤੱਕ ਮੌਜੂਦਾ ਮਿਆਦ ਖਤਮ ਹੋਣ ਤੋਂ ਘੱਟੋ ਘੱਟ 24 ਘੰਟੇ ਪਹਿਲਾਂ ਰੱਦ ਨਾ ਕੀਤੀ ਜਾਵੇ। ਆਪਣੀ Google Play ਖਾਤਾ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਕਿਸੇ ਵੀ ਸਮੇਂ ਪ੍ਰਬੰਧਿਤ ਕਰੋ ਜਾਂ ਰੱਦ ਕਰੋ।",
+    "manageFailedPlay": "Google Play ਗਾਹਕੀ ਪ੍ਰਬੰਧਨ ਖੋਲ੍ਹਣ ਵਿੱਚ ਅਸਫਲ।",
+    "noMatchingProductsPlay": "Google Play ਦੁਆਰਾ ਕੋਈ ਮੇਲ ਖਾਂਦੇ Kilo Pass ਉਤਪਾਦ ਵਾਪਸ ਨਹੀਂ ਕੀਤੇ ਗਏ।",
+    "opensPlayManagement": "Google Play ਗਾਹਕੀ ਪ੍ਰਬੰਧਨ ਖੋਲ੍ਹਦਾ ਹੈ।",
+    "otherAccountCopyPlay": "ਇਸ Google Play ਖਾਤੇ 'ਤੇ Kilo Pass ਇੱਕ ਵੱਖਰੇ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹੈ। ਇਸ ਨੂੰ ਪ੍ਰਬੰਧਿਤ ਕਰਨ ਲਈ ਉਸ Kilo ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ।",
+    "productsCouldNotLoadPlay": "Kilo Pass ਉਤਪਾਦ Google Play ਤੋਂ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
+    "productsUnavailablePlay": "Google Play ਉਤਪਾਦ ਉਪਲਬਧ ਨਹੀਂ",
+    "purchaseDifferentAccountPlay": "ਇਹ Google Play ਖਰੀਦ ਤੁਹਾਡੇ Kilo ਖਾਤੇ ਨਾਲ ਲਿੰਕ ਨਹੀਂ ਹੈ। ਖਰੀਦ ਲਈ ਵਰਤੇ ਗਏ Google ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਅਜ਼ਮਾਓ।",
+    "purchaseMissingOfferToken": "Google Play ਖਰੀਦ ਵਿੱਚ ਇੱਕ offer token ਗੁੰਮ ਹੈ। ਦੁਬਾਰਾ ਅਜ਼ਮਾਓ।",
+    "purchaseMissingPurchaseToken": "Google Play ਖਰੀਦ ਵਿੱਚ ਇੱਕ purchase token ਸ਼ਾਮਲ ਨਹੀਂ ਸੀ।",
+    "purchaseOwnedByAnotherAccountPlay": "ਇਸ Google Play ਖਾਤੇ 'ਤੇ Kilo Pass ਇੱਕ ਵੱਖਰੇ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹੈ।",
+    "purchaseStartFailedPlay": "Google Play ਖਰੀਦ ਸ਼ੁਰੂ ਕਰਨ ਵਿੱਚ ਅਸਫਲ।"
   },
   "consent": {
     "kilo": "Kilo",

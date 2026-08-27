@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው Kilo Pass የሌላ የKilo መለያ ነው።",
     "couldNotConnectToAppStore": "ከApp Store ጋር መገናኘት አልተቻለም። ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።",
     "noMatchingProducts": "App Store የሚዛመዱ የKilo Pass ምርቶችን አልመለሰም።",
-    "purchaseMissingSignedTransaction": "የApp Store ግዢ የተፈረመ የግብይት JWS አላካተተም።"
+    "purchaseMissingSignedTransaction": "የApp Store ግዢ የተፈረመ የግብይት JWS አላካተተም።",
+    "couldNotConnectToPlay": "ከGoogle Play ጋር መገናኘት አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
+    "legalDisclosurePlay": "Kilo Pass በራስ-ሰር የሚታደስ ወርሃዊ ምዝገባ ነው። ግዢው ሲጸድቅ ክፍያው ከGoogle Play መለያዎ ይከፈላል። ምዝገባዎች አሁን ያለው ጊዜ ከማብቃቱ ቢያንስ ከ24 ሰዓታት በፊት ካልተሰረዙ በስተቀር በሚታየው ዋጋ በየወሩ በራስ-ሰር ይታደሳሉ። በመለያ ቅንብሮችዎ ውስጥ በማንኛውም ጊዜ ያስተዳድሩ ወይም ይሰርዙ።",
+    "manageFailedPlay": "የGoogle Play ምዝገባ አስተዳደር መክፈት አልተሳካም።",
+    "noMatchingProductsPlay": "ተዛማጅ የKilo Pass ምርቶች በGoogle Play አልተመለሱም።",
+    "opensPlayManagement": "የGoogle Play ምዝገባ አስተዳደርን ይከፍታል።",
+    "otherAccountCopyPlay": "በዚህ Google Play መለያ ላይ ያለው Kilo Pass የተለየ የKilo መለያ ነው። ለማስተዳደር ወደዚያ የKilo መለያ ይግቡ።",
+    "productsCouldNotLoadPlay": "የKilo Pass ምርቶች ከGoogle Play መጫን አልተቻለም።",
+    "productsUnavailablePlay": "የGoogle Play ምርቶች የማይገኙ ናቸው",
+    "purchaseDifferentAccountPlay": "ይህ የGoogle Play ግዢ ከKilo መለያዎ ጋር የተገናኘ አይደለም። ለግዢው ጥቅም ላይ የዋለውን የGoogle መለያ ይግቡ፣ ከዚያ እንደገና ይሞክሩ።",
+    "purchaseMissingOfferToken": "የGoogle Play ግዢ የኦፈር ቶከን ይጎድለዋል። እንደገና ይሞክሩ።",
+    "purchaseMissingPurchaseToken": "የGoogle Play ግዢ የግዢ ቶከን አላካተተም።",
+    "purchaseOwnedByAnotherAccountPlay": "በዚህ Google Play መለያ ላይ ያለው Kilo Pass የተለየ የKilo መለያ ነው።",
+    "purchaseStartFailedPlay": "የGoogle Play ግዢ መጀመር አልተሳካም።"
   },
   "consent": {
     "kilo": "Kilo",

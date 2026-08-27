@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Ang Kilo Pass sa Apple Account na ito ay kabilang sa ibang Kilo account.",
     "couldNotConnectToAppStore": "Hindi makakonekta sa App Store. Suriin ang iyong koneksyon at subukan muli.",
     "noMatchingProducts": "Walang tumugmang Kilo Pass product na ibinalik ng App Store.",
-    "purchaseMissingSignedTransaction": "Hindi kasama sa App Store purchase ang naka-sign na transaction JWS."
+    "purchaseMissingSignedTransaction": "Hindi kasama sa App Store purchase ang naka-sign na transaction JWS.",
+    "couldNotConnectToPlay": "Hindi makakonekta sa Google Play. Suriin ang iyong koneksyon at subukan muli.",
+    "legalDisclosurePlay": "Ang Kilo Pass ay isang auto-renewable na buwanang subscription. Babayaran ang bayad sa iyong Google Play account kapag nakumpirma ang pagbili. Awtomatikong nire-renew ang mga subscription bawat buwan sa ipinapakitang presyo maliban kung kinansela nang hindi bababa sa 24 na oras bago matapos ang kasalukuyang panahon. Pamahalaan o kanselahin anumang oras sa iyong mga setting ng Google Play account.",
+    "manageFailedPlay": "Nabigong buksan ang pamamahala ng subscription sa Google Play.",
+    "noMatchingProductsPlay": "Walang tumugmang Kilo Pass product na ibinalik ng Google Play.",
+    "opensPlayManagement": "Bubuksan ang pamamahala ng subscription sa Google Play.",
+    "otherAccountCopyPlay": "Ang Kilo Pass sa Google Play account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para pamahalaan ito.",
+    "productsCouldNotLoadPlay": "Hindi ma-load ang mga Kilo Pass product mula sa Google Play.",
+    "productsUnavailablePlay": "Hindi available ang mga product sa Google Play",
+    "purchaseDifferentAccountPlay": "Hindi naka-link ang pagbiling ito sa Google Play sa iyong Kilo account. Mag-sign in sa Google account na ginamit sa pagbili, pagkatapos subukan muli.",
+    "purchaseMissingOfferToken": "Kulang ng offer token ang pagbili sa Google Play. Subukan muli.",
+    "purchaseMissingPurchaseToken": "Hindi kasama ang purchase token sa pagbili sa Google Play.",
+    "purchaseOwnedByAnotherAccountPlay": "Ang Kilo Pass sa Google Play account na ito ay kabilang sa ibang Kilo account.",
+    "purchaseStartFailedPlay": "Nabigong simulan ang pagbili sa Google Play."
   },
   "consent": {
     "kilo": "Kilo",

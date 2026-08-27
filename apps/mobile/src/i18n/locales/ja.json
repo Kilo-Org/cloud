@@ -2396,7 +2396,20 @@
     "purchaseOwnedByAnotherAccount": "このAppleアカウントのKilo Passは別のKiloアカウントに属しています。",
     "couldNotConnectToAppStore": "App Storeに接続できませんでした。接続を確認して、もう一度お試しください。",
     "noMatchingProducts": "App Storeから一致するKilo Pass製品は返されませんでした。",
-    "purchaseMissingSignedTransaction": "App Storeの購入に署名済みトランザクションJWSが含まれていませんでした。"
+    "purchaseMissingSignedTransaction": "App Storeの購入に署名済みトランザクションJWSが含まれていませんでした。",
+    "couldNotConnectToPlay": "Google Playに接続できませんでした。接続を確認して、もう一度お試しください。",
+    "legalDisclosurePlay": "Kilo Pass は自動更新の月額サブスクリプションです。購入の確認時に、お支払いは Google Play アカウントに請求されます。サブスクリプションは、現在の期間終了の 24 時間前までに解約しない限り、表示された価格で毎月自動更新されます。Google Play のアカウント設定でいつでも管理または解約できます。",
+    "manageFailedPlay": "Google Playのサブスクリプション管理を開けませんでした。",
+    "noMatchingProductsPlay": "Google Playから一致するKilo Pass製品は返されませんでした。",
+    "opensPlayManagement": "Google Playのサブスクリプション管理を開きます。",
+    "otherAccountCopyPlay": "このGoogle PlayアカウントのKilo Passは別のKiloアカウントに属しています。管理するにはそのKiloアカウントにサインインしてください。",
+    "productsCouldNotLoadPlay": "Google PlayからKilo Pass製品を読み込めませんでした。",
+    "productsUnavailablePlay": "Google Play製品を利用できません",
+    "purchaseDifferentAccountPlay": "このGoogle Play購入はKiloアカウントにリンクされていません。購入に使用したGoogle Accountにサインインして、もう一度お試しください。",
+    "purchaseMissingOfferToken": "Google Playの購入にオファートークンがありません。もう一度お試しください。",
+    "purchaseMissingPurchaseToken": "Google Playの購入に購入トークンが含まれていませんでした。",
+    "purchaseOwnedByAnotherAccountPlay": "このGoogle PlayアカウントのKilo Passは別のKiloアカウントに属しています。",
+    "purchaseStartFailedPlay": "Google Playでの購入を開始できませんでした。"
   },
   "consent": {
     "kilo": "Kilo",

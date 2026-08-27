@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass kwenye Akaunti hii ya Apple ni ya akaunti nyingine ya Kilo.",
     "couldNotConnectToAppStore": "Imeshindwa kuunganishwa kwenye App Store. Angalia muunganisho wako na ujaribu tena.",
     "noMatchingProducts": "App Store haikurudisha bidhaa zinazolingana za Kilo Pass.",
-    "purchaseMissingSignedTransaction": "Ununuzi wa App Store haukujumuisha JWS ya muamala iliyotiwa saini."
+    "purchaseMissingSignedTransaction": "Ununuzi wa App Store haukujumuisha JWS ya muamala iliyotiwa saini.",
+    "couldNotConnectToPlay": "Imeshindwa kuunganishwa kwenye Google Play. Angalia muunganisho wako na ujaribu tena.",
+    "legalDisclosurePlay": "Kilo Pass ni usajili wa kila mwezi unaofanywa upya kiotomatiki. Malipo yanakatwa kwenye akaunti yako ya Google Play unapothibitisha ununuzi. Usajili unafanywa upya kiotomatiki kila mwezi kwa bei inayoonyeshwa isipokuwa umeghairi angalau saa 24 kabla ya mwisho wa kipindi cha sasa. Simamia au ghairi wakati wowote katika mipangilio ya akaunti yako ya Google Play.",
+    "manageFailedPlay": "Imeshindwa kufungua usimamizi wa usajili wa Google Play.",
+    "noMatchingProductsPlay": "Google Play haikurudisha bidhaa zinazolingana za Kilo Pass.",
+    "opensPlayManagement": "Hufungua usimamizi wa usajili wa Google Play.",
+    "otherAccountCopyPlay": "Kilo Pass kwenye Akaunti hii ya Google Play ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili uisimamie.",
+    "productsCouldNotLoadPlay": "Bidhaa za Kilo Pass hazikuweza kupakiwa kutoka Google Play.",
+    "productsUnavailablePlay": "Bidhaa za Google Play hazipatikani",
+    "purchaseDifferentAccountPlay": "Ununuzi huu wa Google Play haujaunganishwa na akaunti yako ya Kilo. Ingia na Akaunti ya Google iliyotumika kwa ununuzi, kisha ujaribu tena.",
+    "purchaseMissingOfferToken": "Ununuzi wa Google Play hauna tokeni ya ofa. Jaribu tena.",
+    "purchaseMissingPurchaseToken": "Ununuzi wa Google Play haukujumuisha tokeni ya ununuzi.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass kwenye Akaunti hii ya Google Play ni ya akaunti nyingine ya Kilo.",
+    "purchaseStartFailedPlay": "Imeshindwa kuanza ununuzi wa Google Play."
   },
   "consent": {
     "kilo": "Kilo",

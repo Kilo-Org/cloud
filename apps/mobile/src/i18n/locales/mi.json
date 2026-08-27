@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Ko te Kilo Pass o tēnei Pūkete Apple nō tētahi atu pūkete Kilo.",
     "couldNotConnectToAppStore": "Kāore i taea te hono ki te App Store. Tirohia tō hononga, whakamātau anō.",
     "noMatchingProducts": "Kāore he hua Kilo Pass i hoki mai i te App Store e ōrite ana.",
-    "purchaseMissingSignedTransaction": "Kāore i whakauruhia he JWS tauwhitinga kua hainatia ki te hokonga App Store."
+    "purchaseMissingSignedTransaction": "Kāore i whakauruhia he JWS tauwhitinga kua hainatia ki te hokonga App Store.",
+    "couldNotConnectToPlay": "Kāore i taea te hono ki Google Play. Tirohia tō hononga, whakamātau anō.",
+    "legalDisclosurePlay": "He ohinga ā-marama e hoko aunoatia ana a Kilo Pass. Ka utua te utu ki tō pūkete Google Play i te whakaaetanga o te hoko. Ka whakahoutia aunoatia ngā ohinga ia marama ki te utu e whakaaturia ana ki te kore e whakakorengia kia 24 hāora i mua i te mutunga o te wā o nāianei. Whakahaerehia, whakakorea rānei i ngā wā katoa i roto i tō tautuhinga pūkete Google Play.",
+    "manageFailedPlay": "I rahua te whakatuwhera i te whakahaere ohaurunga Google Play.",
+    "noMatchingProductsPlay": "Kāore he hua Kilo Pass i hoki mai i Google Play e ōrite ana.",
+    "opensPlayManagement": "Ka whakatuwhera i te whakahaere ohaurunga Google Play.",
+    "otherAccountCopyPlay": "Ko te Kilo Pass o tēnei pūkete Google Play nō tētahi atu pūkete Kilo. Whakauru ki taua pūkete Kilo kia whakahaere.",
+    "productsCouldNotLoadPlay": "Kāore i taea te uta ngā hua Kilo Pass mai i Google Play.",
+    "productsUnavailablePlay": "Kāore e wātea ana ngā hua Google Play",
+    "purchaseDifferentAccountPlay": "Kāore tēnei hokonga Google Play i hono ki tō pūkete Kilo. Takiuru ki te pūkete Google i whakamahia mō te hokonga, kātahi ka whakamātau anō.",
+    "purchaseMissingOfferToken": "Kāore he tohu tuku i te hokonga Google Play. Whakamātau anō.",
+    "purchaseMissingPurchaseToken": "Kāore i whakauruhia he tohu hokonga ki te hokonga Google Play.",
+    "purchaseOwnedByAnotherAccountPlay": "Ko te Kilo Pass o tēnei pūkete Google Play nō tētahi atu pūkete Kilo.",
+    "purchaseStartFailedPlay": "I rahua te tīmata i te hokonga Google Play."
   },
   "consent": {
     "kilo": "Kilo",

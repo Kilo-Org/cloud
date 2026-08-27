@@ -2910,7 +2910,20 @@
     "purchaseOwnedByAnotherAccount": "Baineann an Kilo Pass ar an Apple Account seo le cuntas Kilo éagsúil.",
     "couldNotConnectToAppStore": "Níorbh fhéidir ceangal le App Store. Seiceáil do cheangal agus bain triail as arís.",
     "noMatchingProducts": "Níor fhill App Store aon táirgí Kilo Pass comhoiriúnacha.",
-    "purchaseMissingSignedTransaction": "Ní raibh idirbheart sínithe JWS san áireamh i gceannach App Store."
+    "purchaseMissingSignedTransaction": "Ní raibh idirbheart sínithe JWS san áireamh i gceannach App Store.",
+    "couldNotConnectToPlay": "Níorbh fhéidir ceangal le Google Play. Seiceáil do cheangal agus bain triail as arís.",
+    "legalDisclosurePlay": "Is síntiús míosúil uath-fhionnuaire é Kilo Pass. Gearrtar an táille ar do chuntas Google Play ag deimhniú an cheannaigh. Déanann síntiúis athnuachan go huathoibríoch gach mí ar an bpraghas a thaispeántar mura gcuirtear ceal orthu 24 uair an chloig ar a laghad roimh dheireadh na tréimhse reatha. Bainistigh nó cuir ceal orthu am ar bith i do shocruithe cuntais Google Play.",
+    "manageFailedPlay": "Theip ar bhainistíocht sintiúis Google Play a oscailt.",
+    "noMatchingProductsPlay": "Níor fhill Google Play aon táirgí Kilo Pass comhoiriúnacha.",
+    "opensPlayManagement": "Osclaíonn bainistíocht sintiúis Google Play.",
+    "otherAccountCopyPlay": "Baineann an Kilo Pass ar an gcuntas Google Play seo le cuntas Kilo éagsúil. Sínigh isteach sa chuntas Kilo sin le bainistiú a dhéanamh air.",
+    "productsCouldNotLoadPlay": "Níorbh fhéidir táirgí Kilo Pass a lódáil ó Google Play.",
+    "productsUnavailablePlay": "Táirgí Google Play gan fáil",
+    "purchaseDifferentAccountPlay": "Níl an ceannach Google Play seo nasctha le do chuntas Kilo. Sínigh isteach leis an Google account a úsáideadh don cheannach, ansin bain triail as arís.",
+    "purchaseMissingOfferToken": "Tá comhartha tairisceana ar iarraidh ó cheannach Google Play. Bain triail as arís.",
+    "purchaseMissingPurchaseToken": "Ní raibh comhartha ceannaigh san áireamh i gceannach Google Play.",
+    "purchaseOwnedByAnotherAccountPlay": "Baineann an Kilo Pass ar an gcuntas Google Play seo le cuntas Kilo éagsúil.",
+    "purchaseStartFailedPlay": "Theip ar cheannach Google Play a thosú."
   },
   "consent": {
     "kilo": "Kilo",

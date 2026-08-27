@@ -2396,7 +2396,20 @@
     "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的 Kilo Pass 屬於另一個 Kilo 帳戶。",
     "couldNotConnectToAppStore": "無法連線到 App Store。請檢查連線後再試一次。",
     "noMatchingProducts": "App Store 沒有傳回相符的 Kilo Pass 產品。",
-    "purchaseMissingSignedTransaction": "App Store 購買未包含已簽署的交易 JWS。"
+    "purchaseMissingSignedTransaction": "App Store 購買未包含已簽署的交易 JWS。",
+    "couldNotConnectToPlay": "無法連線至 Google Play。請檢查連線後再試一次。",
+    "legalDisclosurePlay": "Kilo Pass 是自動續訂的每月訂閱。款項會在購買確認時從您的 Google Play 帳戶扣款。除非在目前週期結束前至少 24 小時取消，否則訂閱會以顯示的價格每月自動續訂。您可以隨時在 Google Play 帳戶設定中管理或取消。",
+    "manageFailedPlay": "無法開啟 Google Play 訂閱管理。",
+    "noMatchingProductsPlay": "Google Play 沒有傳回相符的 Kilo Pass 產品。",
+    "opensPlayManagement": "開啟 Google Play 訂閱管理。",
+    "otherAccountCopyPlay": "此 Google Play 帳戶上的 Kilo Pass 屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以進行管理。",
+    "productsCouldNotLoadPlay": "無法從 Google Play 載入 Kilo Pass 產品。",
+    "productsUnavailablePlay": "Google Play 產品無法使用",
+    "purchaseDifferentAccountPlay": "此 Google Play 購買未連結至您的 Kilo 帳戶。請登入用於購買的 Google 帳戶，然後再試一次。",
+    "purchaseMissingOfferToken": "Google Play 購買缺少優惠代碼。請再試一次。",
+    "purchaseMissingPurchaseToken": "Google Play 購買未包含購買權杖。",
+    "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的 Kilo Pass 屬於另一個 Kilo 帳戶。",
+    "purchaseStartFailedPlay": "無法開始 Google Play 購買。"
   },
   "consent": {
     "kilo": "Kilo",

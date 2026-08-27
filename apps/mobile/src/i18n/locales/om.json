@@ -2850,7 +2850,20 @@
     "purchaseOwnedByAnotherAccount": "Kilo Pass akkaawuntii Apple kana irratti jiru akkaawuntii Kilo adda biraa keessaa.",
     "couldNotConnectToAppStore": "App Store waliin walqabachuu hin dandeenye. Walqabii kee ilaaliitii irra deebi'ii yaali.",
     "noMatchingProducts": "App Store bu'aa Kilo Pass waliin walmaddan hin deebise.",
-    "purchaseMissingSignedTransaction": "Bittaan App Store JWS daldalaa mallatteeffame hin qabu ture."
+    "purchaseMissingSignedTransaction": "Bittaan App Store JWS daldalaa mallatteeffame hin qabu ture.",
+    "couldNotConnectToPlay": "Google Play wajjin walitti qabamuu hin dandeenye. Walqabannaa kee sakatta'iitii deebi'ii yaali.",
+    "legalDisclosurePlay": "Kilo Pass dubbii ji'oottii ofumaan haara'u dha. Kaffaltiin akaawuntii Google Play keetti yeroo gurgurtaan mirkanaa'utti itti baafama. Dubbiiwwan ji'a ji'aatti gatii agarsiifameen ofumaan haara'u, yoo yeroo xiqqaate sa'aatii 24 osoo xumura yeroo ammaa hin ga'in dura dhaabamanii malee. Yeroo kamuu sirreeffama akaawuntii Google Play keetti bulchi ykn dhaabi.",
+    "manageFailedPlay": "Bulleessaa dubbii Google Play baneessuun hin milkoofne.",
+    "noMatchingProductsPlay": "Bu'aan Kilo Pass walsimatu Google Play irraa hin deebi'e.",
+    "opensPlayManagement": "Bulleessaa dubbii Google Play bana.",
+    "otherAccountCopyPlay": "Kilo Pass akaawuntii Google Play kana irratti jiru akaawuntii Kilo adda tokko kan ta'e dha. Itti bulchuuf akaawuntii Kilo sana seeni.",
+    "productsCouldNotLoadPlay": "Bu'aan Kilo Pass Google Play irraa baachuu hin dandeenye.",
+    "productsUnavailablePlay": "Bu'aan Google Play hin jiru",
+    "purchaseDifferentAccountPlay": "Gurgurri Google Play kun akaawuntii Kilo keetti hin hidhamne. Akaawuntii Google gurgurtaaf fayyadame sanatti seenii, sana booda deebi'ii yaali.",
+    "purchaseMissingOfferToken": "Gurgurri Google Play token kennaa tokko hin qabu. Deebi'ii yaali.",
+    "purchaseMissingPurchaseToken": "Gurgurri Google Play token gurgurtaa hin daballe.",
+    "purchaseOwnedByAnotherAccountPlay": "Kilo Pass akaawuntii Google Play kana irratti jiru akaawuntii Kilo adda tokko kan ta'e dha.",
+    "purchaseStartFailedPlay": "Gurgurtaa Google Play jalqabuun hin milkoofne."
   },
   "consent": {
     "kilo": "Kilo",

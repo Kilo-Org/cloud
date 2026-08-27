@@ -5,11 +5,15 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
-import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
+import {
+  buildGastownRepositoryRigInput,
+  findGastownRepository,
+  GastownRepositorySelector,
+  type GastownRepositoryOption,
+} from '@/components/gastown/GastownRepositorySelector';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, GitBranch } from 'lucide-react';
 import { useOnboarding } from './OnboardingContext';
-import { resolveGitUrlFromRepo } from './onboarding.domain';
 import { buildGitHubInstallState } from '@/components/integrations/github-install-state';
 
 export function OnboardingStepRepo() {
@@ -18,7 +22,7 @@ export function OnboardingStepRepo() {
 
   const mintInstallState = useMutation(mainTrpc.githubApps.mintInstallState.mutationOptions());
 
-  const [selectedRepoFullName, setSelectedRepoFullName] = useState(state.repo?.fullName ?? '');
+  const [selectedRepoKey, setSelectedRepoKey] = useState(state.repo?.selectionKey ?? '');
 
   // Use org-scoped endpoints when onboarding within an org, personal otherwise
   const orgId = state.orgId;
@@ -41,12 +45,15 @@ export function OnboardingStepRepo() {
       : mainTrpc.cloudAgentNext.listGitLabRepositories.queryOptions({ forceRefresh: false })),
   });
 
-  const unifiedRepositories = useMemo<RepositoryOption[]>(() => {
+  const unifiedRepositories = useMemo<GastownRepositoryOption[]>(() => {
     const github = (githubReposQuery.data?.repositories ?? []).map(repo => ({
       id: repo.id,
       fullName: repo.fullName,
       private: repo.private,
       platform: 'github' as const,
+      defaultBranch: repo.defaultBranch,
+      platformIntegrationId: repo.platformIntegrationId,
+      platformAccountLogin: repo.platformAccountLogin,
     }));
     const gitlab = (gitlabReposQuery.data?.repositories ?? []).map(repo => ({
       id: repo.id,
@@ -58,6 +65,7 @@ export function OnboardingStepRepo() {
   }, [githubReposQuery.data, gitlabReposQuery.data]);
 
   const isLoadingRepos = githubReposQuery.isLoading || gitlabReposQuery.isLoading;
+  const selectedRepository = findGastownRepository(unifiedRepositories, selectedRepoKey);
   // Derive integration availability from repo results (works for both personal and org scope)
   const hasAnyIntegration =
     (githubReposQuery.data?.repositories?.length ?? 0) > 0 ||
@@ -91,10 +99,16 @@ export function OnboardingStepRepo() {
     }
   }, [githubInstallParam, refetchGithubRepos]);
 
+  useEffect(() => {
+    if (isLoadingRepos || !selectedRepoKey || selectedRepository) return;
+    setSelectedRepoKey('');
+    setRepo(null);
+  }, [isLoadingRepos, selectedRepoKey, selectedRepository, setRepo]);
+
   const handleRepoSelect = useCallback(
-    (fullName: string) => {
-      setSelectedRepoFullName(fullName);
-      const repo = unifiedRepositories.find(r => r.fullName === fullName);
+    (selectionKey: string) => {
+      setSelectedRepoKey(selectionKey);
+      const repo = findGastownRepository(unifiedRepositories, selectionKey);
       if (!repo) return;
 
       const platform = repo.platform ?? 'github';
@@ -104,20 +118,20 @@ export function OnboardingStepRepo() {
       }
       const gitlabInstanceUrl = (gitlabReposQuery.data as { instanceUrl?: string } | undefined)
         ?.instanceUrl;
-      const gitUrl = resolveGitUrlFromRepo(platform, fullName, gitlabInstanceUrl);
+      const rigInput = buildGastownRepositoryRigInput(repo, gitlabInstanceUrl);
+      if (!rigInput) return;
 
       // Auto-derive town name from repo name, but only if the user hasn't explicitly edited it
-      const repoName = fullName.split('/').pop() ?? fullName;
+      const repoName = repo.fullName.split('/').pop() ?? repo.fullName;
       if (!state.townNameSetByUser) {
         setTownName(repoName);
       }
 
       setRepo({
         platform,
-        fullName,
-        gitUrl,
-        defaultBranch: 'main',
-        platformIntegrationId: undefined,
+        selectionKey,
+        fullName: repo.fullName,
+        ...rigInput,
       });
     },
     [unifiedRepositories, gitlabReposQuery.data, state.townNameSetByUser, setTownName, setRepo]
@@ -133,19 +147,16 @@ export function OnboardingStepRepo() {
           {/* Repo picker */}
           {isLoadingRepos ? (
             <div className="space-y-2">
-              <div className="h-9 w-full animate-pulse rounded-md bg-white/[0.06]" />
+              <div className="h-11 w-full animate-pulse rounded-md bg-white/[0.06] sm:h-9" />
               <p className="text-xs text-white/30">Loading repositories...</p>
             </div>
           ) : hasAnyIntegration ? (
-            <RepositoryCombobox
+            <GastownRepositorySelector
               repositories={unifiedRepositories}
-              value={selectedRepoFullName}
+              value={selectedRepoKey}
               onValueChange={handleRepoSelect}
               isLoading={isLoadingRepos}
               placeholder="Select a repository..."
-              searchPlaceholder="Search repositories..."
-              groupByPlatform
-              hideLabel
             />
           ) : (
             <div className="space-y-3">
@@ -173,8 +184,12 @@ export function OnboardingStepRepo() {
           {state.repo && state.repo.platform !== 'manual' && (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-400/80">
               <GitBranch className="size-4" />
-              <span className="truncate">{state.repo.fullName}</span>
-              <span className="ml-auto text-xs text-white/30">main</span>
+              <span className="min-w-0 truncate" title={state.repo.fullName}>
+                {state.repo.fullName}
+              </span>
+              <span className="ml-auto shrink-0 text-xs text-white/30">
+                {state.repo.defaultBranch}
+              </span>
             </div>
           )}
         </div>

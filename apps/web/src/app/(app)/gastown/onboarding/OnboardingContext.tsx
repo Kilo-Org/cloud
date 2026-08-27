@@ -11,6 +11,7 @@ import { presetToConfig } from './onboarding.domain';
 
 type OnboardingRepo = {
   platform: 'github' | 'gitlab' | 'manual';
+  selectionKey: string;
   fullName: string;
   gitUrl: string;
   defaultBranch: string;

@@ -14,6 +14,7 @@ export type Repository<TId extends RepositoryId = number> = {
   name: string;
   full_name: string;
   private: boolean;
+  group?: { id: string; label: string };
 };
 
 export type RepositoryMultiSelectProps<TId extends RepositoryId = number> = {
@@ -37,6 +38,16 @@ export function RepositoryMultiSelect<TId extends RepositoryId = number>({
     const query = searchQuery.toLowerCase();
     return repositories.filter(repo => repo.full_name.toLowerCase().includes(query));
   }, [repositories, searchQuery]);
+  const repositoryGroups = useMemo(() => {
+    const groups = new Map<string, { label: string; repositories: Repository<TId>[] }>();
+    for (const repository of filteredRepositories) {
+      const group = repository.group ?? { id: '', label: '' };
+      const current = groups.get(group.id);
+      if (current) current.repositories.push(repository);
+      else groups.set(group.id, { label: group.label, repositories: [repository] });
+    }
+    return [...groups.entries()];
+  }, [filteredRepositories]);
 
   const handleToggle = (repoId: TId) => {
     const newSelection = selectedIds.includes(repoId)
@@ -100,37 +111,46 @@ export function RepositoryMultiSelect<TId extends RepositoryId = number>({
               {searchQuery ? 'No repositories match your search' : 'No repositories available'}
             </div>
           ) : (
-            filteredRepositories.map(repo => {
-              const isChecked = selectedIds.includes(repo.id);
+            repositoryGroups.map(([groupId, group]) => (
+              <div key={groupId || 'repositories'} className="space-y-1">
+                {group.label ? (
+                  <div className="text-muted-foreground px-2 pt-1 pb-2 text-xs font-medium">
+                    {group.label}
+                  </div>
+                ) : null}
+                {group.repositories.map(repo => {
+                  const isChecked = selectedIds.includes(repo.id);
 
-              return (
-                <div
-                  key={repo.id}
-                  className={cn(
-                    'hover:bg-accent flex items-center gap-3 rounded-md p-2 transition-colors',
-                    isChecked && 'bg-accent text-accent-foreground'
-                  )}
-                >
-                  <Checkbox
-                    id={`repo-${repo.id}`}
-                    checked={isChecked}
-                    onCheckedChange={() => handleToggle(repo.id)}
-                  />
-                  <label
-                    htmlFor={`repo-${repo.id}`}
-                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm"
-                  >
-                    {repo.private ? (
-                      <Lock className="text-primary h-3.5 w-3.5 shrink-0" />
-                    ) : (
-                      <Unlock className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                    )}
-                    <span className="truncate font-mono">{repo.full_name}</span>
-                    {renderRepositoryAccessory?.(repo)}
-                  </label>
-                </div>
-              );
-            })
+                  return (
+                    <div
+                      key={repo.id}
+                      className={cn(
+                        'hover:bg-accent flex items-center gap-3 rounded-md p-2 transition-colors',
+                        isChecked && 'bg-accent text-accent-foreground'
+                      )}
+                    >
+                      <Checkbox
+                        id={`repo-${repo.id}`}
+                        checked={isChecked}
+                        onCheckedChange={() => handleToggle(repo.id)}
+                      />
+                      <label
+                        htmlFor={`repo-${repo.id}`}
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm"
+                      >
+                        {repo.private ? (
+                          <Lock className="text-primary h-3.5 w-3.5 shrink-0" />
+                        ) : (
+                          <Unlock className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                        )}
+                        <span className="truncate font-mono">{repo.full_name}</span>
+                        {renderRepositoryAccessory?.(repo)}
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
           )}
         </div>
       </div>

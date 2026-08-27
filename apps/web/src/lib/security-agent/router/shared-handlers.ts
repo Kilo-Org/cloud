@@ -6,6 +6,7 @@ import {
 } from '@/lib/admin/admin-access-log';
 import { TRPCError } from '@trpc/server';
 import {
+  type getAllIntegrationsForOwner,
   type getIntegrationForOwner,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
@@ -146,7 +147,8 @@ import {
 
 type Owner = { type: 'user' | 'org'; id: string; userId: string };
 
-type Integration = Awaited<ReturnType<typeof getIntegrationForOwner>> | null;
+type Integration = NonNullable<Awaited<ReturnType<typeof getIntegrationForOwner>>>;
+type Integrations = Awaited<ReturnType<typeof getAllIntegrationsForOwner>>;
 
 /**
  * TExtra represents additional input fields injected by the tRPC procedure middleware.
@@ -158,16 +160,19 @@ type SecurityAgentDeps<TExtra = {}> = {
   resolveSecurityOwner: (ctx: TRPCContext, input: TExtra) => SecurityReviewOwner;
   resolveResourceId: (ctx: TRPCContext, input: TExtra) => string;
   verifyFindingOwnership: (finding: SecurityFinding, ctx: TRPCContext, input: TExtra) => boolean;
-  getIntegration: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
-  getStatusIntegration?: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
+  getIntegration: (ctx: TRPCContext, input: TExtra) => Promise<Integration | null>;
+  getStatusIntegration?: (ctx: TRPCContext, input: TExtra) => Promise<Integration | null>;
+  getIntegrations?: (ctx: TRPCContext, input: TExtra) => Promise<Integrations>;
   trackingExtras: (ctx: TRPCContext, input: TExtra) => { organizationId?: string };
 };
 
 function getRepoFullNamesInScope(
-  integration: Integration,
+  integrations: Integration[],
   config: { repository_selection_mode?: 'all' | 'selected'; selected_repository_ids?: number[] }
 ): string[] {
-  const repositories = requireNumericPlatformRepositories(integration?.repositories ?? null) ?? [];
+  const repositories = integrations.flatMap(
+    integration => requireNumericPlatformRepositories(integration.repositories) ?? []
+  );
   if (config.repository_selection_mode === 'all') {
     return repositories.map(repo => repo.full_name).filter((name): name is string => !!name);
   }
@@ -176,6 +181,18 @@ function getRepoFullNamesInScope(
     .filter(repo => selectedIds.has(repo.id))
     .map(repo => repo.full_name)
     .filter((name): name is string => !!name);
+}
+
+function isIntegrationHealthy(integration: Integration): boolean {
+  return (
+    integration.integration_status === 'active' &&
+    !integration.suspended_at &&
+    !integration.auth_invalid_at
+  );
+}
+
+function isSecurityIntegrationReady(integration: Integration): boolean {
+  return isIntegrationHealthy(integration) && hasSecurityReviewPermissions(integration);
 }
 
 async function resolveAuditReportOwner(
@@ -701,6 +718,12 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const toExtra = (input: unknown): TExtra => (input ?? {}) as any;
 
+  const getIntegrations = async (ctx: TRPCContext, input: TExtra): Promise<Integration[]> => {
+    if (deps.getIntegrations) return deps.getIntegrations(ctx, input);
+    const integration = await deps.getIntegration(ctx, input);
+    return integration ? [integration] : [];
+  };
+
   return {
     trackUiInteraction: {
       inputSchema: TrackSecurityAgentUiInteractionInputSchema,
@@ -727,35 +750,46 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     // -----------------------------------------------------------------------
     getPermissionStatus: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
-      const integration = await (deps.getStatusIntegration ?? deps.getIntegration)(ctx, extra);
-
-      if (!integration || integration.integration_status !== 'active') {
+      const integrations = deps.getIntegrations
+        ? await deps.getIntegrations(ctx, extra)
+        : await (async () => {
+            const integration = await (deps.getStatusIntegration ?? deps.getIntegration)(
+              ctx,
+              extra
+            );
+            return integration ? [integration] : [];
+          })();
+      const installations = integrations.map(integration => {
+        const active = integration.integration_status === 'active' && !integration.suspended_at;
+        const hasPermissions = active && isSecurityIntegrationReady(integration);
         return {
-          hasIntegration: false,
-          hasPermissions: false,
-          integrationId: null,
-          reauthorizeUrl: null,
-          authInvalidAt: integration?.auth_invalid_at ?? null,
-          authInvalidReason: integration?.auth_invalid_reason ?? null,
+          integrationId: integration.id,
+          accountLogin: integration.platform_account_login ?? null,
+          active,
+          hasPermissions,
+          reauthorizeUrl:
+            active && !hasPermissions && integration.platform_installation_id
+              ? getReauthorizeUrl(integration.platform_installation_id)
+              : null,
+          authInvalidAt: integration.auth_invalid_at ?? null,
+          authInvalidReason: integration.auth_invalid_reason ?? null,
         };
-      }
-
-      const hasPermissions = hasSecurityReviewPermissions(integration);
-      // UI reauthorization state is intentionally time-invariant: once GitHub returns
-      // auth-invalid, keep prompting until a sync or install-refresh path clears the flag.
-      const hasEffectivePermissions = hasPermissions && !integration.auth_invalid_at;
+      });
+      const activeInstallations = installations.filter(installation => installation.active);
+      const authorizedInstallation = activeInstallations.find(
+        installation => installation.hasPermissions
+      );
+      const fallbackInstallation = activeInstallations[0];
 
       return {
-        hasIntegration: true,
-        integrationId: integration.id,
-        hasPermissions: hasEffectivePermissions,
-        reauthorizeUrl: hasEffectivePermissions
-          ? null
-          : integration.platform_installation_id
-            ? getReauthorizeUrl(integration.platform_installation_id)
-            : null,
-        authInvalidAt: integration.auth_invalid_at,
-        authInvalidReason: integration.auth_invalid_reason,
+        hasIntegration: activeInstallations.length > 0,
+        integrationId:
+          authorizedInstallation?.integrationId ?? fallbackInstallation?.integrationId ?? null,
+        hasPermissions: authorizedInstallation !== undefined,
+        reauthorizeUrl: fallbackInstallation?.reauthorizeUrl ?? null,
+        authInvalidAt: fallbackInstallation?.authInvalidAt ?? null,
+        authInvalidReason: fallbackInstallation?.authInvalidReason ?? null,
+        installations,
       };
     },
 
@@ -1143,12 +1177,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
         const resourceId = deps.resolveResourceId(ctx, input);
 
-        // Get integration (needed for both permission check and sync)
-        const integration = await deps.getIntegration(ctx, input);
+        const integrations = (await getIntegrations(ctx, input)).filter(isSecurityIntegrationReady);
 
         // Check permissions before enabling
         if (input.isEnabled) {
-          if (!integration || !hasSecurityReviewPermissions(integration)) {
+          if (integrations.length === 0) {
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',
               message: 'GitHub App does not have vulnerability_alerts permission',
@@ -1168,7 +1201,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         // Refuse enabling with an empty effective repo set: no repository would
         // be synced or analyzed, so an enabled state would be misleading.
         if (input.isEnabled) {
-          const effectiveRepos = getRepoFullNamesInScope(integration, {
+          const effectiveRepos = getRepoFullNamesInScope(integrations, {
             repository_selection_mode: selectionMode,
             selected_repository_ids: selectedIds,
           });
@@ -1195,74 +1228,75 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         await setSecurityAgentEnabled(owner, input.isEnabled);
 
         // When enabling, trigger an initial sync of repositories
-        if (input.isEnabled && integration) {
-          const installationId = integration.platform_installation_id;
-          if (installationId) {
-            const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
+        if (input.isEnabled && integrations.length > 0) {
+          const allRepos = integrations.flatMap(
+            integration => requireNumericPlatformRepositories(integration.repositories) ?? []
+          );
 
-            let repositoriesToSync: string[];
+          let repositoriesToSync: string[];
 
-            if (selectionMode === 'all') {
-              repositoriesToSync = allRepos
-                .map(r => r.full_name)
-                .filter((name): name is string => !!name);
-            } else {
-              repositoriesToSync = allRepos
-                .filter(r => selectedIds.includes(r.id))
-                .map(r => r.full_name)
-                .filter((name): name is string => !!name);
-            }
+          if (selectionMode === 'all') {
+            repositoriesToSync = allRepos
+              .map(r => r.full_name)
+              .filter((name): name is string => !!name);
+          } else {
+            repositoriesToSync = allRepos
+              .filter(r => selectedIds.includes(r.id))
+              .map(r => r.full_name)
+              .filter((name): name is string => !!name);
+          }
 
-            if (repositoriesToSync.length > 0) {
-              let initialSync: Awaited<ReturnType<typeof submitManualSecuritySync>> | undefined;
-              let initialSyncAdmissionFailed = false;
-              try {
-                initialSync = await submitManualSecuritySync({
-                  owner: securityOwner,
-                  actor: {
-                    id: ctx.user.id,
-                    email: ctx.user.google_user_email,
-                    name: ctx.user.google_user_name,
-                  },
-                  origin: 'enable_initial_sync',
-                });
-              } catch (error) {
-                initialSyncAdmissionFailed = true;
-                console.error('Security Agent enabled but initial sync admission failed', error);
-              }
-
-              trackSecurityAgentEnabled({
-                distinctId: ctx.user.id,
-                userId: ctx.user.id,
-                ...deps.trackingExtras(ctx, input),
-                isEnabled: input.isEnabled,
-                repositorySelectionMode: selectionMode,
-                selectedRepoCount: repositoriesToSync.length,
-              });
-
-              logSecurityAudit({
+          if (repositoriesToSync.length > 0) {
+            let initialSync: Awaited<ReturnType<typeof submitManualSecuritySync>> | undefined;
+            let initialSyncAdmissionFailed = false;
+            try {
+              initialSync = await submitManualSecuritySync({
                 owner: securityOwner,
-                actor_id: ctx.user.id,
-                actor_email: ctx.user.google_user_email,
-                actor_name: ctx.user.google_user_name,
-                action: SecurityAuditLogAction.ConfigEnabled,
-                resource_type: 'agent_config',
-                resource_id: resourceId,
-                after_state: { isEnabled: true, repositorySelectionMode: selectionMode },
+                actor: {
+                  id: ctx.user.id,
+                  email: ctx.user.google_user_email,
+                  name: ctx.user.google_user_name,
+                },
+                origin: 'enable_initial_sync',
               });
-
-              return {
-                success: true,
-                initialSync,
-                initialSyncAdmissionFailed,
-              };
+            } catch (error) {
+              initialSyncAdmissionFailed = true;
+              console.error('Security Agent enabled but initial sync admission failed', error);
             }
+
+            trackSecurityAgentEnabled({
+              distinctId: ctx.user.id,
+              userId: ctx.user.id,
+              ...deps.trackingExtras(ctx, input),
+              isEnabled: input.isEnabled,
+              repositorySelectionMode: selectionMode,
+              selectedRepoCount: repositoriesToSync.length,
+            });
+
+            logSecurityAudit({
+              owner: securityOwner,
+              actor_id: ctx.user.id,
+              actor_email: ctx.user.google_user_email,
+              actor_name: ctx.user.google_user_name,
+              action: SecurityAuditLogAction.ConfigEnabled,
+              resource_type: 'agent_config',
+              resource_id: resourceId,
+              after_state: { isEnabled: true, repositorySelectionMode: selectionMode },
+            });
+
+            return {
+              success: true,
+              initialSync,
+              initialSyncAdmissionFailed,
+            };
           }
         }
 
         const effectiveRepoCount =
           selectionMode === 'all'
-            ? (integration?.repositories || []).filter(r => !!r.full_name).length
+            ? integrations.flatMap(
+                integration => requireNumericPlatformRepositories(integration.repositories) ?? []
+              ).length
             : selectedIds.length;
 
         trackSecurityAgentEnabled({
@@ -1296,61 +1330,62 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     // -----------------------------------------------------------------------
     getRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
-      const integration = await deps.getIntegration(ctx, extra);
+      const integrations = (await getIntegrations(ctx, extra)).filter(isSecurityIntegrationReady);
+      const repositoryGroups = await Promise.all(
+        integrations.map(async integration => {
+          const installationId = integration.platform_installation_id;
+          if (!installationId) return [];
 
-      if (!integration || integration.integration_status !== 'active') {
-        return [];
-      }
+          const appType = integration.github_app_type || 'standard';
+          let repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
+          if (repos.length === 0) {
+            try {
+              repos = await fetchGitHubRepositories(installationId, appType);
+              await updateRepositoriesForIntegration(integration.id, repos);
+            } catch (error) {
+              console.error('Failed to load repositories for GitHub installation', {
+                integrationId: integration.id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+              return [];
+            }
+          }
 
-      // Auto-fetch repositories from GitHub if not cached
-      let repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
-      if (repos.length === 0 && integration.platform_installation_id) {
-        const appType = integration.github_app_type || 'standard';
-        const fetchedRepos = await fetchGitHubRepositories(
-          integration.platform_installation_id,
-          appType
-        );
-        await updateRepositoriesForIntegration(integration.id, fetchedRepos);
-        repos = fetchedRepos;
-      }
+          const repositories = repos.map(repo => ({
+            id: repo.id,
+            fullName: repo.full_name,
+            name: repo.name,
+            private: repo.private,
+            integrationId: integration.id,
+            accountLogin: integration.platform_account_login ?? null,
+          }));
+          try {
+            const availability = await checkDependabotAlertsAvailability(
+              installationId,
+              appType,
+              repositories
+            );
+            const availabilityById = new Map(
+              availability.map(result => [result.id, result.status])
+            );
+            return repositories.map(repository => ({
+              ...repository,
+              dependabotAlerts: availabilityById.get(repository.id) ?? ('unknown' as const),
+            }));
+          } catch (error) {
+            console.error('Failed to check Dependabot alerts availability', {
+              integrationId: integration.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            return repositories.map(repository => ({
+              ...repository,
+              dependabotAlerts: 'unknown' as const,
+            }));
+          }
+        })
+      );
 
-      const repositoryDetails = repos.map(repo => ({
-        id: repo.id,
-        fullName: repo.full_name,
-        name: repo.name,
-        private: repo.private,
-      }));
-      const installationId = integration.platform_installation_id;
-      if (!installationId || !hasSecurityReviewPermissions(integration)) {
-        return repositoryDetails.map(repository => ({
-          ...repository,
-          dependabotAlerts: 'unknown' as const,
-        }));
-      }
-
-      const appType = integration.github_app_type || 'standard';
-      let availability: Awaited<ReturnType<typeof checkDependabotAlertsAvailability>>;
-      try {
-        availability = await checkDependabotAlertsAvailability(
-          installationId,
-          appType,
-          repositoryDetails
-        );
-      } catch (error) {
-        console.error('Failed to check Dependabot alerts availability', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return repositoryDetails.map(repository => ({
-          ...repository,
-          dependabotAlerts: 'unknown' as const,
-        }));
-      }
-      const availabilityById = new Map(availability.map(result => [result.id, result.status]));
-
-      return repositoryDetails.map(repository => ({
-        ...repository,
-        dependabotAlerts: availabilityById.get(repository.id) ?? ('unknown' as const),
-      }));
+      return repositoryGroups.flat();
     },
 
     // -----------------------------------------------------------------------
@@ -1382,16 +1417,19 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
 
         const concurrencyCheck = await canStartAnalysis(securityOwner);
-        const [configWithStatus, integration] = await Promise.all([
+        const [configWithStatus, integrations] = await Promise.all([
           getSecurityAgentConfigWithStatus(owner),
-          deps.getIntegration(ctx, input),
+          getIntegrations(ctx, input),
         ]);
         const config = configWithStatus?.config ?? DEFAULT_SECURITY_AGENT_CONFIG;
         const decoratedFindings = await decorateFindingsWithRemediation({
           findings,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(
+            integrations.filter(isSecurityIntegrationReady),
+            config
+          ),
         });
 
         return {
@@ -1433,16 +1471,19 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        const [configWithStatus, integration] = await Promise.all([
+        const [configWithStatus, integrations] = await Promise.all([
           getSecurityAgentConfigWithStatus(owner),
-          deps.getIntegration(ctx, input),
+          getIntegrations(ctx, input),
         ]);
         const config = configWithStatus?.config ?? DEFAULT_SECURITY_AGENT_CONFIG;
         return decorateFindingWithRemediation({
           finding,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(
+            integrations.filter(isSecurityIntegrationReady),
+            config
+          ),
         });
       },
     },
@@ -1495,32 +1536,17 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
         const resourceId = deps.resolveResourceId(ctx, input);
 
-        // Get integration
-        const integration = await deps.getIntegration(ctx, input);
-        if (!integration || integration.integration_status !== 'active') {
+        const integrations = (await getIntegrations(ctx, input)).filter(isSecurityIntegrationReady);
+        if (integrations.length === 0) {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
             message: 'GitHub integration not found or inactive',
           });
         }
 
-        // Check permissions
-        if (!hasSecurityReviewPermissions(integration)) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub App does not have vulnerability_alerts permission',
-          });
-        }
-
-        const installationId = integration.platform_installation_id;
-        if (!installationId) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'GitHub installation ID not found',
-          });
-        }
-
-        const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
+        const allRepos = integrations.flatMap(
+          integration => requireNumericPlatformRepositories(integration.repositories) ?? []
+        );
 
         // Resolve the sync scope (a specific repo, or every enabled repo).
         let syncScope:
@@ -1658,8 +1684,14 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Get integration for GitHub API call
-        const integration = await deps.getIntegration(ctx, input);
+        const integrations = (await getIntegrations(ctx, input)).filter(isSecurityIntegrationReady);
+        const integration =
+          integrations.find(candidate => candidate.id === finding.platform_integration_id) ??
+          integrations.find(candidate =>
+            (requireNumericPlatformRepositories(candidate.repositories) ?? []).some(
+              repository => repository.full_name === finding.repo_full_name
+            )
+          );
         if (!integration || integration.integration_status !== 'active') {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
@@ -1975,10 +2007,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         }
 
         const owner = deps.resolveOwner(ctx, input);
-        const [configWithStatus, integration, remediationAttempts, remediationTimeline] =
+        const [configWithStatus, integrations, remediationAttempts, remediationTimeline] =
           await Promise.all([
             getSecurityAgentConfigWithStatus(owner),
-            deps.getIntegration(ctx, input),
+            getIntegrations(ctx, input),
             getRemediationAttemptHistory(input.findingId),
             getRemediationTimeline(input.findingId),
           ]);
@@ -1987,7 +2019,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           finding,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(
+            integrations.filter(isSecurityIntegrationReady),
+            config
+          ),
         });
 
         return {
@@ -2075,11 +2110,11 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
 
       // Get the current GitHub integration
-      const integration = await deps.getIntegration(ctx, extra);
+      const integrations = (await getIntegrations(ctx, extra)).filter(isSecurityIntegrationReady);
 
       // Get list of accessible repository full names
       const accessibleRepoFullNames: string[] = [];
-      if (integration && integration.integration_status === 'active') {
+      for (const integration of integrations) {
         const repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
         for (const repo of repos) {
           if (repo.full_name) {

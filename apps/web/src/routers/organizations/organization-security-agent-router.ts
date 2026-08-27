@@ -8,6 +8,7 @@ import {
 } from './utils';
 
 import {
+  getAllIntegrationsForOwner,
   getIntegrationForOrganization,
   getPrimaryGitHubIntegrationForOrganization,
 } from '@/lib/integrations/db/platform-integrations';
@@ -29,6 +30,10 @@ const handlers = createSecurityAgentHandlers<{ organizationId: string }>({
     await getPrimaryGitHubIntegrationForOrganization(input.organizationId),
   getStatusIntegration: async (_ctx, input) =>
     await getIntegrationForOrganization(input.organizationId, 'github'),
+  getIntegrations: async (_ctx, input) =>
+    (await getAllIntegrationsForOwner({ type: 'org', id: input.organizationId })).filter(
+      integration => integration.platform === 'github'
+    ),
   trackingExtras: (_ctx, input) => ({
     organizationId: input.organizationId,
   }),

@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
+import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { trpcClient } from '@/lib/trpc';
@@ -32,11 +33,21 @@ import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
+  useSecurityAgentPermissionStatus,
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { type FlattenedSecurityAgentConfig, type SecurityAgentConfig } from '@/lib/security-agent';
 
 type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
+
+function installationStatusLabel(input: { active: boolean; hasPermissions: boolean }): string {
+  if (!input.active) {
+    return i18n.t('securityAgent.dashboard.syncStatusUnavailable');
+  }
+  return input.hasPermissions
+    ? i18n.t('securityAgent.settingsOverview.enabled')
+    : i18n.t('securityAgent.scopeEntry.reauthorizeTitle');
+}
 
 function RepositorySettingsSkeleton() {
   const { t } = useTranslation();
@@ -58,6 +69,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
+  const permission = useSecurityAgentPermissionStatus(scope);
   const save = useSaveSecurityAgentConfig(scope);
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
@@ -120,6 +132,21 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
       current.includes(id) ? current.filter(existing => existing !== id) : [...current, id]
     );
   };
+  const repositoryGroups = new Map<
+    string,
+    { accountLogin: string | null; repositories: NonNullable<typeof repositories.data> }
+  >();
+  for (const repository of repositories.data ?? []) {
+    const group = repositoryGroups.get(repository.integrationId);
+    if (group) {
+      group.repositories.push(repository);
+    } else {
+      repositoryGroups.set(repository.integrationId, {
+        accountLogin: repository.accountLogin,
+        repositories: [repository],
+      });
+    }
+  }
 
   return (
     <View className="flex-1 bg-background">
@@ -162,6 +189,45 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
             />
           ))}
         </RadioGroup>
+
+        {(permission.data?.installations.length ?? 0) > 0 ? (
+          <View className="mt-6 rounded-lg bg-secondary px-3">
+            {permission.data?.installations.map((installation, index, installations) => (
+              <View
+                key={installation.integrationId}
+                className={`min-h-14 flex-row items-center justify-between gap-3 py-3 ${
+                  index < installations.length - 1 ? 'border-b-[0.5px] border-hair-soft' : ''
+                }`}
+              >
+                <View className="min-w-0 flex-1">
+                  <Text className="text-sm font-medium" numberOfLines={1}>
+                    {installation.accountLogin ?? installation.integrationId}
+                  </Text>
+                  <Text variant="muted" className="text-xs">
+                    {installationStatusLabel(installation)}
+                  </Text>
+                </View>
+                {installation.reauthorizeUrl ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => {
+                      const reauthorizeUrl = installation.reauthorizeUrl;
+                      if (!reauthorizeUrl) {
+                        return;
+                      }
+                      void openExternalUrl(reauthorizeUrl, {
+                        label: t('securityAgent.scopeEntry.reauthorizeButton'),
+                      });
+                    }}
+                  >
+                    <Text>{t('securityAgent.scopeEntry.reauthorizeButton')}</Text>
+                  </Button>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {mode === 'selected' && (
           <View className="mt-6">
@@ -219,17 +285,24 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
             ) : null}
             {!repositories.isLoading &&
               !repositories.isError &&
-              (repositories.data ?? []).map(repo => (
-                <RepoToggleRow
-                  key={repo.id}
-                  repo={repo}
-                  selected={selectedIds.includes(repo.id)}
-                  disabled={!canManage}
-                  className="border-b-[0.5px] border-hair-soft"
-                  onPress={() => {
-                    toggleRepo(repo.id);
-                  }}
-                />
+              [...repositoryGroups.entries()].map(([integrationId, group]) => (
+                <View key={integrationId} className="mb-4">
+                  <Text className="min-h-11 py-3 text-sm font-medium" numberOfLines={1}>
+                    {group.accountLogin ?? integrationId}
+                  </Text>
+                  {group.repositories.map(repo => (
+                    <RepoToggleRow
+                      key={`${integrationId}:${repo.id}`}
+                      repo={repo}
+                      selected={selectedIds.includes(repo.id)}
+                      disabled={!canManage}
+                      className="border-b-[0.5px] border-hair-soft"
+                      onPress={() => {
+                        toggleRepo(repo.id);
+                      }}
+                    />
+                  ))}
+                </View>
               ))}
             {!repositories.isLoading &&
               !repositories.isError &&

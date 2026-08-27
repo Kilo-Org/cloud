@@ -21,6 +21,7 @@ export function SecurityConfigPage() {
     isEnabled,
     configData,
     allRepositories,
+    installationStatuses,
     handleSaveConfig,
     handleToggleEnabled,
     handleDeleteFindings,
@@ -92,6 +93,7 @@ export function SecurityConfigPage() {
         organizationId={organizationId}
         initialConfig={initialConfig}
         repositories={allRepositories}
+        installationStatuses={installationStatuses}
         viewState={{
           enabled: isEnabled ?? false,
           isSaving: isSavingConfig,

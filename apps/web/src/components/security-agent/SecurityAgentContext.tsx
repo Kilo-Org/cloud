@@ -17,11 +17,14 @@ import {
   type SecurityCommandType,
 } from '@kilocode/app-shared/security-agent';
 import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
-import type { DependabotAlertsAvailability } from '@/lib/security-agent/core/types';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
 import { getRemediationUnavailableCopy } from './remediation-unavailable-copy';
-import type { SlaConfig } from './security-config-types';
+import type {
+  SecurityInstallationStatus,
+  SecurityRepository,
+  SlaConfig,
+} from './security-config-types';
 import {
   getSecurityAgentCommandFailureTitle,
   getSecurityAgentDismissalTerminalTitle,
@@ -44,6 +47,7 @@ type SecurityAgentContextValue = {
   isLoadingPermission: boolean;
   isLoadingConfig: boolean;
   reauthorizeUrl: string | undefined;
+  installationStatuses: SecurityInstallationStatus[];
   isEnabled: boolean | undefined;
   hasConfig: boolean;
   configData:
@@ -82,20 +86,8 @@ type SecurityAgentContextValue = {
   refetchConfig: () => Promise<unknown>;
 
   // Repositories
-  allRepositories: Array<{
-    id: number;
-    fullName: string;
-    name: string;
-    private: boolean;
-    dependabotAlerts: DependabotAlertsAvailability;
-  }>;
-  filteredRepositories: Array<{
-    id: number;
-    fullName: string;
-    name: string;
-    private: boolean;
-    dependabotAlerts: DependabotAlertsAvailability;
-  }>;
+  allRepositories: SecurityRepository[];
+  filteredRepositories: SecurityRepository[];
 
   // Mutation handlers
   trackUiInteraction: (interaction: SecurityAgentUiInteraction) => void;
@@ -204,6 +196,7 @@ export function refetchConfigOnConflictError(
 
 const COMMAND_POLL_INTERVAL_MS = 3000;
 const EMPTY_REPOSITORIES: SecurityAgentContextValue['allRepositories'] = [];
+const EMPTY_INSTALLATION_STATUSES: SecurityInstallationStatus[] = [];
 const EMPTY_REPOSITORY_IDS: number[] = [];
 const EMPTY_ORPHANED_REPOSITORIES: SecurityAgentContextValue['orphanedRepositories'] = [];
 
@@ -1385,6 +1378,7 @@ function useSecurityAgentProviderValue(
   const hasPermission = permissionData?.hasPermissions ?? false;
   const integrationId = permissionData?.integrationId ?? null;
   const reauthorizeUrl = permissionData?.reauthorizeUrl ?? undefined;
+  const installationStatuses = permissionData?.installations ?? EMPTY_INSTALLATION_STATUSES;
   const isEnabled = configData ? configData.isEnabled : undefined;
   const hasConfig = configData?.hasConfig ?? false;
   const allRepositories = reposData ?? EMPTY_REPOSITORIES;
@@ -1413,6 +1407,7 @@ function useSecurityAgentProviderValue(
       isLoadingPermission,
       isLoadingConfig,
       reauthorizeUrl,
+      installationStatuses,
       isEnabled,
       hasConfig,
       configData: configData
@@ -1477,6 +1472,7 @@ function useSecurityAgentProviderValue(
       isLoadingPermission,
       isLoadingConfig,
       reauthorizeUrl,
+      installationStatuses,
       isEnabled,
       hasConfig,
       configData,

@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   buildSecurityConfigFormState,
   buildSecurityConfigSavePayload,
+  toRepositoryOptions,
   type SecurityConfigFormState,
 } from './security-config-types';
 
@@ -48,5 +49,26 @@ describe('SecurityConfigForm config round-trip', () => {
     const formState = buildSecurityConfigFormState(undefined);
 
     expect(formState.autoRemediationRequireApproval).toBe(true);
+  });
+
+  it('preserves installation provenance for repository grouping and selection', () => {
+    expect(
+      toRepositoryOptions([
+        {
+          id: 42,
+          fullName: 'acme-labs/app',
+          name: 'app',
+          private: true,
+          dependabotAlerts: 'enabled',
+          integrationId: 'integration-labs',
+          accountLogin: 'acme-labs',
+        },
+      ])
+    ).toEqual([
+      expect.objectContaining({
+        id: 42,
+        group: { id: 'integration-labs', label: 'acme-labs' },
+      }),
+    ]);
   });
 });

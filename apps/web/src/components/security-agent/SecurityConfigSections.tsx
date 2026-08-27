@@ -30,6 +30,7 @@ import type {
   AutoRemediationMinSeverity,
   NotificationMinSeverity,
   SecurityConfigFormState,
+  SecurityInstallationStatus,
   SecurityRepository,
   SlaConfig,
 } from './security-config-types';
@@ -451,6 +452,7 @@ export function AgentStatusSection({
   availableRepositoryCount,
   repositoryCount,
   slaEnabled,
+  installationStatuses,
   onToggle,
 }: {
   enabled: boolean;
@@ -458,6 +460,7 @@ export function AgentStatusSection({
   availableRepositoryCount: number;
   repositoryCount: number;
   slaEnabled: boolean;
+  installationStatuses: SecurityInstallationStatus[];
   onToggle: (enabled: boolean) => void;
 }) {
   const description = enabled
@@ -474,7 +477,7 @@ export function AgentStatusSection({
         icon={Settings}
         title="Security Agent"
         description={description}
-        hasContent={false}
+        hasContent={installationStatuses.length > 0}
         action={
           <SectionToggle
             id="security-agent-enabled"
@@ -485,6 +488,44 @@ export function AgentStatusSection({
           />
         }
       />
+      {installationStatuses.length > 0 ? (
+        <CardContent>
+          <div className="border-border divide-border divide-y rounded-lg border">
+            {installationStatuses.map(installation => {
+              const status = !installation.active
+                ? 'Installation unavailable'
+                : installation.hasPermissions
+                  ? 'Ready to sync'
+                  : installation.authInvalidAt
+                    ? 'Re-authorization required'
+                    : 'Additional permission required';
+              return (
+                <div
+                  key={installation.integrationId}
+                  className="flex min-h-11 flex-wrap items-center justify-between gap-3 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {installation.accountLogin ?? 'GitHub account'}
+                    </p>
+                    <p className="text-muted-foreground text-xs">{status}</p>
+                  </div>
+                  {installation.reauthorizeUrl ? (
+                    <a
+                      href={installation.reauthorizeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary focus-visible:ring-ring rounded-sm text-xs font-medium underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
+                    >
+                      Re-authorize GitHub App
+                    </a>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      ) : null}
     </Card>
   );
 }

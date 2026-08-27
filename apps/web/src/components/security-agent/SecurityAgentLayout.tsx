@@ -302,6 +302,7 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
     hasIntegration,
     hasPermission,
     integrationId,
+    installationStatuses,
     isLoadingPermission,
     isLoadingConfig,
     isEnabled,
@@ -361,6 +362,9 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
   };
 
   const showPermissionRequired = hasIntegration && !hasPermission && !isLoadingPermission;
+  const installationsNeedingAttention = installationStatuses.filter(
+    installation => installation.active && !installation.hasPermissions
+  );
 
   function isActive(href: string) {
     if (href === basePath) {
@@ -462,6 +466,41 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
             </AlertDescription>
           </Alert>
         )}
+
+        {!showPermissionRequired && installationsNeedingAttention.length > 0 ? (
+          <Alert variant="warning">
+            <AlertTriangle className="size-4" aria-hidden="true" />
+            <AlertTitle>
+              {installationsNeedingAttention.length}{' '}
+              {installationsNeedingAttention.length === 1
+                ? 'installation needs'
+                : 'installations need'}{' '}
+              attention
+            </AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p>
+                Healthy GitHub installations continue syncing. Update the affected installation
+                permissions to include its repositories.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {installationsNeedingAttention.map(installation =>
+                  installation.reauthorizeUrl ? (
+                    <Button key={installation.integrationId} variant="outline" size="sm" asChild>
+                      <a
+                        href={installation.reauthorizeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <ExternalLink className="size-4" aria-hidden="true" />
+                        Re-authorize {installation.accountLogin ?? 'GitHub App'}
+                      </a>
+                    </Button>
+                  ) : null
+                )}
+              </div>
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
         {children}
       </div>

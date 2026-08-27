@@ -99,6 +99,7 @@ const sdkStoredMessageFixture = { info: sdkUserMessageFixture, parts: [sdkTextPa
 type MappingRow = {
   kiloSessionId?: string;
   cloudAgentSessionId?: string | null;
+  organizationId?: string | null;
   gitUrl?: string | null;
   title?: string | null;
   createdAt?: string;
@@ -661,6 +662,7 @@ describe('createSessionForCloudAgent clone path', () => {
 
   function makeCloneDb(options: {
     sourceRows: Array<{ sessionId: string; organizationId: string | null }>;
+    transactionSourceRows?: Array<{ organizationId: string | null }>;
     destinationRows?: Array<Record<string, unknown>>;
     created?: Record<string, unknown>;
     existing?: Record<string, unknown>;
@@ -698,8 +700,12 @@ describe('createSessionForCloudAgent clone path', () => {
     };
     const txSelect = {
       from: vi.fn(() => txSelect),
+      leftJoin: vi.fn(() => txSelect),
       where: vi.fn(() => txSelect),
       limit: vi.fn(() => txSelect),
+      then: vi.fn((resolve: (value: unknown) => unknown) =>
+        resolve(options.transactionSourceRows ?? options.sourceRows)
+      ),
       for: vi.fn(async () => (options.existing ? [options.existing] : [])),
     };
     const update = {
@@ -888,6 +894,24 @@ describe('createSessionForCloudAgent clone path', () => {
     });
     expect(values).not.toHaveBeenCalled();
     expect(sourceStub.exportCloneBatch).not.toHaveBeenCalled();
+  });
+
+  it('revalidates source access in the final insert transaction', async () => {
+    const sourceStub = makePagedSourceStub([sourceSessionItem()], 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, values } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      transactionSourceRows: [],
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'source_access_denied',
+    });
+    expect(values).not.toHaveBeenCalled();
+    expect(dest.stub.resetCloneStage).toHaveBeenCalled();
   });
 
   it('rejects with malformed_source_data and resets the destination stage', async () => {
@@ -1508,6 +1532,72 @@ describe('SessionIngestRPC.resolveCloudAgentRootSessionForKiloSession', () => {
       })
     ).rejects.toThrow();
     expect(db.select).not.toHaveBeenCalled();
+  });
+});
+
+describe('SessionIngestRPC.resolveAuthorizedSessionSource', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('returns organization, sanitized repository, and optional Cloud Agent mapping', async () => {
+    const { db } = makeDbFakes([
+      {
+        kiloSessionId: 'ses_12345678901234567890123456',
+        organizationId: '11111111-1111-4111-8111-111111111111',
+        gitUrl: 'git@github.com:Acme/Repo.git',
+        cloudAgentSessionId: 'agent_owned_root',
+      },
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.resolveAuthorizedSessionSource({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: 'ses_12345678901234567890123456',
+      })
+    ).resolves.toEqual({
+      organizationId: '11111111-1111-4111-8111-111111111111',
+      repository: { type: 'github', repo: 'Acme/Repo' },
+      cloudAgentSessionId: 'agent_owned_root',
+    });
+  });
+
+  it('supports child and remote CLI sources without a Cloud Agent mapping', async () => {
+    const { db } = makeDbFakes([
+      {
+        kiloSessionId: 'ses_12345678901234567890123456',
+        organizationId: null,
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        cloudAgentSessionId: null,
+      },
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.resolveAuthorizedSessionSource({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: 'ses_12345678901234567890123456',
+      })
+    ).resolves.toEqual({
+      organizationId: null,
+      repository: {
+        type: 'git',
+        url: 'https://gitlab.com/acme/repo',
+        platform: 'gitlab',
+      },
+    });
+  });
+
+  it('returns null for both missing and inaccessible sources', async () => {
+    const { db } = makeDbFakes([]);
+    const rpc = makeRpc(db);
+    await expect(
+      rpc.resolveAuthorizedSessionSource({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: 'ses_12345678901234567890123456',
+      })
+    ).resolves.toBeNull();
   });
 });
 

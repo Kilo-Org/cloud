@@ -14,6 +14,7 @@ const TEMPORARY_GITHUB_RESOLUTION_REASONS = new Set([
   'service_not_configured',
   'temporarily_unavailable',
   'rpc_error',
+  'service_incompatible',
   'source_unavailable',
 ]);
 
@@ -49,63 +50,115 @@ function readGitHubRepository(
   };
 }
 
+type CloneSourceRepository = {
+  repo?: string;
+  githubIntegrationId?: string;
+};
+
+function sourceAccessDenied(): TRPCError {
+  return new TRPCError({ code: 'BAD_REQUEST', message: 'source_access_denied' });
+}
+
+async function readOptionalCloudAgentGitHubPin(input: {
+  env: PersistenceEnv;
+  userId: string;
+  cloudAgentSessionId: string | undefined;
+  authoritativeRepo: string | undefined;
+}): Promise<string | undefined> {
+  if (!input.cloudAgentSessionId) return undefined;
+  const cloudAgentSessionId = input.cloudAgentSessionId;
+  try {
+    const sourceMetadata = await withDORetry(
+      () => resolveSessionStub(input.env, input.userId, cloudAgentSessionId),
+      stub => stub.getMetadata(),
+      'CloudAgentSession.getMetadataForCloneRepository'
+    );
+    const metadataRepository = readGitHubRepository(sourceMetadata);
+    if (
+      !metadataRepository ||
+      (input.authoritativeRepo &&
+        !repositoriesMatch(input.authoritativeRepo, metadataRepository.repo))
+    ) {
+      return undefined;
+    }
+    return metadataRepository.githubIntegrationId;
+  } catch {
+    return undefined;
+  }
+}
+
 async function resolveCloneSourceGitHubRepository(input: {
   env: PersistenceEnv;
   userId: string;
+  orgId?: string;
   request: SessionCreateRequest;
-}): Promise<{ repo: string; githubIntegrationId?: string } | null> {
+}): Promise<CloneSourceRepository | null> {
   const sourceKiloSessionId = input.request.clone?.cloneFromKiloSessionId;
   if (!sourceKiloSessionId) return null;
 
+  const sessionIngest = input.env.SESSION_INGEST;
+  if (typeof sessionIngest?.resolveAuthorizedSessionSource === 'function') {
+    let source;
+    try {
+      source = await sessionIngest.resolveAuthorizedSessionSource({
+        kiloUserId: input.userId,
+        kiloSessionId: sourceKiloSessionId,
+      });
+    } catch {
+      throw githubRepositoryAuthorizationError('source_unavailable');
+    }
+    if (!source) throw sourceAccessDenied();
+    if (source.organizationId !== (input.orgId ?? null)) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'organization_mismatch' });
+    }
+
+    const repo = source.repository?.type === 'github' ? source.repository.repo : undefined;
+    const githubIntegrationId = await readOptionalCloudAgentGitHubPin({
+      env: input.env,
+      userId: input.userId,
+      cloudAgentSessionId: source.cloudAgentSessionId,
+      authoritativeRepo: repo,
+    });
+    return {
+      ...(repo ? { repo } : {}),
+      ...(githubIntegrationId ? { githubIntegrationId } : {}),
+    };
+  }
+
+  // Rolling-deploy compatibility: an older Session Ingest worker can only
+  // expose Cloud Agent roots. A missing mapping is not an authorization
+  // decision; the final clone RPC retains the generic source access check.
   let source;
+  if (!sessionIngest?.resolveCloudAgentRootSessionForKiloSession) return {};
   try {
-    source = await input.env.SESSION_INGEST.resolveCloudAgentRootSessionForKiloSession({
+    source = await sessionIngest.resolveCloudAgentRootSessionForKiloSession({
       kiloUserId: input.userId,
       kiloSessionId: sourceKiloSessionId,
     });
   } catch {
     throw githubRepositoryAuthorizationError('source_unavailable');
   }
-  if (!source) {
-    throw new TRPCError({ code: 'BAD_REQUEST', message: 'source_access_denied' });
-  }
-
-  let sourceMetadata: unknown;
-  try {
-    sourceMetadata = await withDORetry(
-      () => resolveSessionStub(input.env, input.userId, source.cloudAgentSessionId),
-      stub => stub.getMetadata(),
-      'CloudAgentSession.getMetadataForCloneRepository'
-    );
-  } catch {
-    throw githubRepositoryAuthorizationError('source_unavailable');
-  }
-
-  const metadataRepository = readGitHubRepository(sourceMetadata);
-  if (!metadataRepository) {
-    throw githubRepositoryAuthorizationError('source_unavailable');
-  }
+  if (!source) return {};
   const mappedRepository = readGitHubRepository(source);
-  if (
-    mappedRepository &&
-    metadataRepository &&
-    !repositoriesMatch(mappedRepository.repo, metadataRepository.repo)
-  ) {
-    throw githubRepositoryAuthorizationError('source_unavailable');
-  }
-
-  const repo = mappedRepository?.repo ?? metadataRepository.repo;
+  const githubIntegrationId = await readOptionalCloudAgentGitHubPin({
+    env: input.env,
+    userId: input.userId,
+    cloudAgentSessionId: source.cloudAgentSessionId,
+    authoritativeRepo: mappedRepository?.repo,
+  });
   return {
-    repo,
-    ...(metadataRepository.githubIntegrationId
-      ? { githubIntegrationId: metadataRepository.githubIntegrationId }
-      : {}),
+    ...(mappedRepository?.repo ? { repo: mappedRepository.repo } : {}),
+    ...(githubIntegrationId ? { githubIntegrationId } : {}),
   };
 }
 
 /**
  * Resolves and pins GitHub repository identity before any operation-ledger or
- * session allocation work. The returned request contains no resolved token.
+ * session allocation work on non-ledger paths. Ledger-backed creates call this
+ * only after admission and persist the pin with allocation progress. The token
+ * is deliberately discarded: creation proves repository access, while delayed
+ * workspace preparation reauthorizes the persisted integration exactly because
+ * credentials may expire or access may be revoked between those phases.
  */
 export async function canonicalizeRepositoryBeforeSessionCreation(input: {
   env: PersistenceEnv;
@@ -117,7 +170,7 @@ export async function canonicalizeRepositoryBeforeSessionCreation(input: {
 
   const submitted = input.request.repository;
   const source = await resolveCloneSourceGitHubRepository(input);
-  if (source && !repositoriesMatch(submitted.repo, source.repo)) {
+  if (source?.repo && !repositoriesMatch(submitted.repo, source.repo)) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'clone_repository_mismatch' });
   }
   if (
@@ -141,7 +194,7 @@ export async function canonicalizeRepositoryBeforeSessionCreation(input: {
     ...input.request,
     repository: {
       ...submitted,
-      ...(source ? { repo: source.repo } : {}),
+      ...(source?.repo ? { repo: source.repo } : {}),
       githubIntegrationId: result.value.platformIntegrationId,
     },
   };

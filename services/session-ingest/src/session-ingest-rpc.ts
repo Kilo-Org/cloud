@@ -10,6 +10,7 @@ import {
   kiloSdkSessionSnapshotOutcomeSchema,
   listCloudAgentRootSessionsSchema,
   persistedKiloSdkMessageHistorySchema,
+  resolveAuthorizedSessionSourceSchema,
   resolveCloudAgentRootSessionSchema,
   type CloudAgentRootSessionSnapshot,
   type CloudAgentRootSessionSummary,
@@ -25,6 +26,8 @@ import {
   type ListCloudAgentRootSessionsParams,
   type ResolveCloudAgentRootSessionForKiloSessionParams,
   type ResolveCloudAgentRootSessionForKiloSessionResult,
+  type ResolveAuthorizedSessionSourceParams,
+  type ResolveAuthorizedSessionSourceResult,
   type SessionIngestRpcMethods,
 } from '@kilocode/session-ingest-contracts';
 
@@ -43,6 +46,13 @@ import {
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
   'Cloud Agent root session identity conflict';
+
+class ClonePublicationError extends Error {
+  constructor(readonly code: 'source_access_denied' | 'organization_mismatch') {
+    super(code);
+    this.name = 'ClonePublicationError';
+  }
+}
 
 type CliSessionsV2Row = typeof cli_sessions_v2.$inferSelect;
 
@@ -167,6 +177,18 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         // Never clear that other session's Durable Object data.
         return { status: 'rejected', code: 'destination_conflict' };
       }
+      if (error instanceof ClonePublicationError) {
+        await withDORetry(
+          () =>
+            getSessionIngestDO(this.env, {
+              kiloUserId: parsed.kiloUserId,
+              sessionId: parsed.sessionId,
+            }),
+          stub => stub.resetCloneStage(),
+          'SessionIngestDO.resetCloneStage'
+        );
+        return { status: 'rejected', code: error.code };
+      }
       if (await this.findMatchingCommittedRootSession(parsed)) {
         return { status: 'ready', clone: { sessionId: parsed.sessionId, copiedItemCount } };
       }
@@ -260,6 +282,29 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     return db.transaction(async tx => {
       if (!(await canCreateCliSessionForUser(tx, parsed.kiloUserId))) {
         throw new Error(USER_SESSION_ADMISSION_ERROR);
+      }
+
+      const cloneSourceSessionId = parsed.cloneFromKiloSessionId;
+      if (cloneSourceSessionId !== undefined) {
+        const [source] = await tx
+          .select({ organizationId: cli_sessions_v2.organization_id })
+          .from(cli_sessions_v2)
+          .leftJoin(
+            organization_memberships,
+            organizationMembershipJoinCondition(parsed.kiloUserId)
+          )
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, cloneSourceSessionId),
+              eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId),
+              personalOrAccessibleOrganizationCondition()
+            )
+          )
+          .limit(1);
+        if (!source) throw new ClonePublicationError('source_access_denied');
+        if (source.organizationId !== (parsed.organizationId ?? null)) {
+          throw new ClonePublicationError('organization_mismatch');
+        }
       }
 
       const [created] = await tx
@@ -364,6 +409,37 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
             },
           }
         : {}),
+    };
+  }
+
+  async resolveAuthorizedSessionSource(
+    params: ResolveAuthorizedSessionSourceParams
+  ): Promise<ResolveAuthorizedSessionSourceResult> {
+    const parsed = resolveAuthorizedSessionSourceSchema.parse(params);
+    const source = await this.findOwnedAccessibleSession(parsed);
+    if (!source) return null;
+
+    const parsedRepository = source.gitUrl ? parseGitUrl(source.gitUrl) : null;
+    const repository =
+      parsedRepository?.platform === 'github'
+        ? {
+            type: 'github' as const,
+            repo: `${parsedRepository.owner}/${parsedRepository.repo}`,
+          }
+        : source.gitUrl
+          ? {
+              type: 'git' as const,
+              url: normalizeGitUrl(source.gitUrl),
+              ...(parsedRepository?.platform === 'gitlab' ||
+              parsedRepository?.platform === 'bitbucket'
+                ? { platform: parsedRepository.platform }
+                : {}),
+            }
+          : undefined;
+    return {
+      organizationId: source.organizationId,
+      ...(repository ? { repository } : {}),
+      ...(source.cloudAgentSessionId ? { cloudAgentSessionId: source.cloudAgentSessionId } : {}),
     };
   }
 
@@ -550,12 +626,19 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
   private async findOwnedAccessibleSession(params: {
     kiloUserId: string;
     kiloSessionId: string;
-  }): Promise<{ kiloSessionId: string; organizationId: string | null } | null> {
+  }): Promise<{
+    kiloSessionId: string;
+    organizationId: string | null;
+    gitUrl: string | null;
+    cloudAgentSessionId: string | null;
+  } | null> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     const rows = await db
       .select({
         sessionId: cli_sessions_v2.session_id,
         organizationId: cli_sessions_v2.organization_id,
+        gitUrl: cli_sessions_v2.git_url,
+        cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
       })
       .from(cli_sessions_v2)
       .leftJoin(organization_memberships, organizationMembershipJoinCondition(params.kiloUserId))
@@ -568,7 +651,12 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       )
       .limit(1);
     return rows[0]
-      ? { kiloSessionId: rows[0].sessionId, organizationId: rows[0].organizationId }
+      ? {
+          kiloSessionId: rows[0].sessionId,
+          organizationId: rows[0].organizationId,
+          gitUrl: rows[0].gitUrl,
+          cloudAgentSessionId: rows[0].cloudAgentSessionId,
+        }
       : null;
   }
 

@@ -24,6 +24,7 @@ import {
   sessionCreateIntentFingerprint,
   SESSION_CREATE_ABANDON_AFTER_SECONDS,
   SESSION_CREATE_ABANDONED_OUTCOME_CODE,
+  SESSION_CREATE_CANONICAL_REPOSITORY_KEY,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
   SESSION_CREATE_TOMBSTONED_IDS_KEY,
   type SessionRegistrationContext,
@@ -48,7 +49,7 @@ const {
   admitOperationMock: vi.fn(),
   settleOperationMock: vi.fn().mockResolvedValue({ settled: true }),
   markReconcilePendingMock: vi.fn().mockResolvedValue({}),
-  recordOperationProgressMock: vi.fn().mockResolvedValue(undefined),
+  recordOperationProgressMock: vi.fn().mockResolvedValue({}),
   getPgDbMock: vi.fn(),
   createCliSessionMock: vi.fn().mockResolvedValue(undefined),
   deleteCliSessionMock: vi.fn().mockResolvedValue(undefined),
@@ -126,6 +127,7 @@ const WORKSPACE_SESSION_ID = 'workspace_12345678-1234-1234-1234-123456789abc';
 const KILO_SESSION_ID = 'ses_12345678901234567890123456';
 const INITIAL_MESSAGE_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const ROW_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+const GITHUB_INTEGRATION_ID = '123e4567-e89b-12d3-a456-426614174022';
 
 function makeLedgerRow(overrides: Partial<OperationLedgerRow> = {}): OperationLedgerRow {
   return {
@@ -213,6 +215,22 @@ function makeEnv(doStub: ReturnType<typeof makeDoStub>): Env {
     HYPERDRIVE: {
       connectionString: 'postgres://session-create-test',
     } as Env['HYPERDRIVE'],
+    GIT_TOKEN_SERVICE: {
+      getTokenForRepo: vi.fn().mockResolvedValue({
+        success: true,
+        token: 'github-token',
+        platformIntegrationId: GITHUB_INTEGRATION_ID,
+        installationId: '123',
+        accountLogin: 'acme',
+        appType: 'standard',
+      }),
+    } as unknown as Env['GIT_TOKEN_SERVICE'],
+    SESSION_INGEST: {
+      resolveAuthorizedSessionSource: vi.fn().mockResolvedValue({
+        organizationId: null,
+        repository: { type: 'github', repo: 'acme/repo' },
+      }),
+    } as unknown as Env['SESSION_INGEST'],
   } as unknown as Env;
 }
 
@@ -262,13 +280,13 @@ describe('createSessionWithLedger admission ladder', () => {
       kind: 'isolated',
       sandboxId: 'sb-test-123',
     });
-    admitOperationMock.mockResolvedValue({
+    admitOperationMock.mockReset().mockResolvedValue({
       admission: 'admitted',
       row: makeLedgerRow({}),
     });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
-    recordOperationProgressMock.mockResolvedValue(undefined);
+    recordOperationProgressMock.mockReset().mockResolvedValue({});
   });
 
   it('admits with the operation identity and settles completed with canonical IDs', async () => {
@@ -672,6 +690,11 @@ describe('createSessionWithLedger admission ladder', () => {
       kiloSessionId: KILO_SESSION_ID,
       initialMessageId: INITIAL_MESSAGE_ID,
       createIntentFingerprint: expect.any(String),
+      canonicalRepository: {
+        type: 'github',
+        repo: 'acme/repo',
+        githubIntegrationId: GITHUB_INTEGRATION_ID,
+      },
     });
   });
 
@@ -790,7 +813,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
-    recordOperationProgressMock.mockResolvedValue(undefined);
+    recordOperationProgressMock.mockReset().mockResolvedValue({});
   });
 
   const canonicalIds = {
@@ -1432,6 +1455,11 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       kiloSessionId: KILO_SESSION_ID,
       initialMessageId: INITIAL_MESSAGE_ID,
       createIntentFingerprint: expect.any(String),
+      canonicalRepository: {
+        type: 'github',
+        repo: 'acme/repo',
+        githubIntegrationId: GITHUB_INTEGRATION_ID,
+      },
     });
     expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), {
       rowId: ROW_ID,
@@ -1472,13 +1500,13 @@ describe('createSessionWithLedger changed-intent rejection', () => {
       kind: 'isolated',
       sandboxId: 'sb-test-123',
     });
-    admitOperationMock.mockResolvedValue({
+    admitOperationMock.mockReset().mockResolvedValue({
       admission: 'admitted',
       row: makeLedgerRow({}),
     });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
-    recordOperationProgressMock.mockResolvedValue(undefined);
+    recordOperationProgressMock.mockReset().mockResolvedValue({});
   });
 
   const ORIGINAL_OPTIONS = {
@@ -1536,6 +1564,11 @@ describe('createSessionWithLedger changed-intent rejection', () => {
       kiloSessionId: KILO_SESSION_ID,
       initialMessageId: INITIAL_MESSAGE_ID,
       createIntentFingerprint: await sessionCreateIntentFingerprint(request),
+      canonicalRepository: {
+        type: 'github',
+        repo: 'acme/repo',
+        githubIntegrationId: GITHUB_INTEGRATION_ID,
+      },
     });
     expect(result).toEqual({
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
@@ -1561,6 +1594,86 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     });
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('replays a settled GitHub create without live canonicalization', async () => {
+    const request = originalRequest();
+    const row = await completedRowFor(request);
+    row.canonical_result = {
+      ...row.canonical_result,
+      [SESSION_CREATE_CANONICAL_REPOSITORY_KEY]: {
+        type: 'github',
+        repo: 'acme/repo',
+        githubIntegrationId: GITHUB_INTEGRATION_ID,
+      },
+    };
+    admitOperationMock.mockResolvedValueOnce({ admission: 'duplicate_settled', row });
+    const ctx = makeContext(makeDoStub());
+    const getTokenForRepo = vi.spyOn(ctx.env.GIT_TOKEN_SERVICE, 'getTokenForRepo');
+    getTokenForRepo.mockRejectedValue(new Error('provider unavailable'));
+
+    await expect(runCreate(ctx, request)).resolves.toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('reconciles with the stored GitHub pin without live canonicalization', async () => {
+    const request = originalRequest();
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({
+        canonical_result: {
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          initialMessageId: INITIAL_MESSAGE_ID,
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+          [SESSION_CREATE_CANONICAL_REPOSITORY_KEY]: {
+            type: 'github',
+            repo: 'acme/repo',
+            githubIntegrationId: GITHUB_INTEGRATION_ID,
+          },
+        },
+      }),
+    });
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
+    );
+    const ctx = makeContext(makeDoStub());
+    const getTokenForRepo = vi.spyOn(ctx.env.GIT_TOKEN_SERVICE, 'getTokenForRepo');
+    getTokenForRepo.mockRejectedValue(new Error('provider unavailable'));
+
+    await expect(runCreate(ctx, request)).resolves.toEqual({
+      cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('admits the operation before the first live GitHub resolution', async () => {
+    const order: string[] = [];
+    admitOperationMock.mockImplementationOnce(async () => {
+      order.push('admit');
+      return { admission: 'admitted', row: makeLedgerRow({}) };
+    });
+    const ctx = makeContext(makeDoStub());
+    vi.spyOn(ctx.env.GIT_TOKEN_SERVICE, 'getTokenForRepo').mockImplementationOnce(async () => {
+      order.push('resolve');
+      return {
+        success: true,
+        token: 'github-token',
+        platformIntegrationId: GITHUB_INTEGRATION_ID,
+        installationId: '123',
+        accountLogin: 'acme',
+        appType: 'standard',
+      };
+    });
+
+    await runCreate(ctx, originalRequest());
+    expect(order).toEqual(['admit', 'resolve']);
   });
 
   /**
@@ -1893,13 +2006,13 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       kind: 'isolated',
       sandboxId: 'sb-test-123',
     });
-    admitOperationMock.mockResolvedValue({
+    admitOperationMock.mockReset().mockResolvedValue({
       admission: 'admitted',
       row: makeLedgerRow({}),
     });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
-    recordOperationProgressMock.mockResolvedValue(undefined);
+    recordOperationProgressMock.mockReset().mockResolvedValue({});
     createCliSessionMock.mockResolvedValue(undefined);
   });
 
@@ -2235,6 +2348,11 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
       createIntentFingerprint: await sessionCreateIntentFingerprint(cloneRequest()),
+      canonicalRepository: {
+        type: 'github',
+        repo: 'acme/repo',
+        githubIntegrationId: GITHUB_INTEGRATION_ID,
+      },
     });
     // A clone-only create has no synthetic initial turn, so no initialMessageId
     // is recorded and the fingerprint differs from a prompt create.
@@ -2261,7 +2379,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
     });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
-    recordOperationProgressMock.mockResolvedValue(undefined);
+    recordOperationProgressMock.mockReset().mockResolvedValue({});
     createCliSessionMock.mockResolvedValue(undefined);
   });
 

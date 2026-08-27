@@ -1,4 +1,5 @@
 import { logger } from '../logger.js';
+import { z } from 'zod';
 import type {
   BitbucketTokenFailureReason,
   GitAuthorConfig,
@@ -10,6 +11,25 @@ import type {
 type GitTokenServiceEnv = {
   GIT_TOKEN_SERVICE?: GitTokenService;
 };
+
+const platformIntegrationIdSchema = z.string().uuid();
+
+function incompatibleGitHubServiceResult(): {
+  success: false;
+  error: ResolveGitHubTokenError;
+} {
+  return {
+    success: false,
+    error: {
+      reason: 'service_incompatible',
+      message: 'git-token-service returned an incompatible success response',
+    },
+  };
+}
+
+function validPlatformIntegrationId(value: unknown): value is string {
+  return platformIntegrationIdSchema.safeParse(value).success;
+}
 
 export type ResolvedGitHubToken = {
   token: string;
@@ -44,6 +64,10 @@ export async function resolveGitHubTokenForRepo(
     }
     const result = await env.GIT_TOKEN_SERVICE.getTokenForRepo(params);
     if (result.success) {
+      if (!validPlatformIntegrationId(result.platformIntegrationId)) {
+        logger.warn('GitHub token RPC success omitted a valid platform integration ID');
+        return incompatibleGitHubServiceResult();
+      }
       logger
         .withFields({
           installationId: result.installationId,
@@ -184,6 +208,10 @@ export async function resolveCloudAgentGitHubAuthForRepo(
         },
       };
     }
+    if (!validPlatformIntegrationId(result.platformIntegrationId)) {
+      logger.warn('Managed GitHub auth RPC success omitted a valid platform integration ID');
+      return incompatibleGitHubServiceResult();
+    }
     logger
       .withFields({
         installationId: result.installationId,
@@ -259,6 +287,10 @@ export async function issueCloudAgentGitHubSessionCapability(
           message: `GitHub managed auth lookup failed (${result.reason})`,
         },
       };
+    }
+    if (!validPlatformIntegrationId(result.platformIntegrationId)) {
+      logger.warn('GitHub capability RPC success omitted a valid platform integration ID');
+      return incompatibleGitHubServiceResult();
     }
     logger
       .withFields({

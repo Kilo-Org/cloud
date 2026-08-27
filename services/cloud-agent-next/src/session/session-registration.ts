@@ -61,6 +61,7 @@ import type {
 } from '../execution/types.js';
 import { throwAdmissionError } from './queue-message.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
+import { canonicalizeRepositoryBeforeSessionCreation } from './validate-repository-access.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
 
@@ -194,12 +195,19 @@ type SessionLedgerFailureStage =
 type SessionCreationLedgerHooks = {
   db: WorkerDb;
   rowId: string;
+  intentFingerprint?: string;
+  canonicalRepository?: Extract<SessionRepositoryRequest, { type: 'github' }>;
   /** Settle the row `failed` at the given stage. */
   onFailure: (stage: SessionLedgerFailureStage, outcomeCode: string) => Promise<void>;
   /** The DO RPC threw; the commit outcome is unknown. */
   onTransportFailure: () => Promise<void>;
   /** The DO confirmed registration (and initial admission when one exists). */
   onSuccess: (result: { cloudAgentSessionId: string; kiloSessionId: string }) => Promise<void>;
+};
+
+type CanonicalCreateProgress = {
+  intentFingerprint?: string;
+  canonicalRepository?: Extract<SessionRepositoryRequest, { type: 'github' }>;
 };
 
 /** Result returned to the prepare handler for ledger-guarded creates. */
@@ -241,6 +249,9 @@ export const SESSION_CREATE_ABANDONED_OUTCOME_CODE = 'create_rpc_abandoned';
  * the next intent allocates fresh IDs.
  */
 export const SESSION_CREATE_TOMBSTONED_IDS_KEY = 'tombstonedDestinationIds';
+
+/** Canonical GitHub repository selected after ledger admission. */
+export const SESSION_CREATE_CANONICAL_REPOSITORY_KEY = 'canonicalRepository';
 
 /** Carries the allocation failure stage so the ledger can settle it. */
 class SessionAllocationStageError extends Error {
@@ -465,7 +476,12 @@ async function allocateNewSession(
         cloudAgentSessionId,
         kiloSessionId,
         ...(initialTurn ? { initialMessageId: initialTurn.messageId } : {}),
-        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
+        ...(ledger.intentFingerprint
+          ? { [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: ledger.intentFingerprint }
+          : {}),
+        ...(ledger.canonicalRepository
+          ? { [SESSION_CREATE_CANONICAL_REPOSITORY_KEY]: ledger.canonicalRepository }
+          : {}),
       });
     }
 
@@ -1285,6 +1301,7 @@ export async function createSessionWithLedger(
 ): Promise<LedgerSessionCreateResult> {
   assertSupportedSandboxAllocation(input, ctx, { billingOrigin: options.billingOrigin });
   const db = getPgDb(ctx.env);
+  const intentFingerprint = await sessionCreateIntentFingerprint(input);
   const admission = await admitOperation(db, {
     userId: ctx.userId,
     orgId: input.options?.kilocodeOrganizationId,
@@ -1296,8 +1313,17 @@ export async function createSessionWithLedger(
   });
 
   switch (admission.admission) {
-    case 'admitted':
-      return executeLedgerCreate(input, ctx, options, db, admission.row, 'new');
+    case 'admitted': {
+      const canonicalInput = await canonicalizeCreateInput(input, ctx).catch(async error => {
+        await bestEffortLedgerWrite(() => markReconcilePending(db, { rowId: admission.row.id }));
+        throw error;
+      });
+      return executeLedgerCreate(canonicalInput, ctx, options, db, admission.row, 'new', {
+        intentFingerprint,
+        canonicalRepository:
+          canonicalInput.repository.type === 'github' ? canonicalInput.repository : undefined,
+      });
+    }
     case 'duplicate_settled':
       return replaySettledCreate(admission.row, input);
     case 'duplicate_in_flight':
@@ -1305,8 +1331,77 @@ export async function createSessionWithLedger(
       throw creationInProgressError();
     case 'takeover':
     case 'duplicate_reconcile_pending':
-      return reconcileLedgerCreate(input, ctx, options, db, admission.row);
+      return reconcileLedgerCreate(
+        await resolveRecordedCanonicalCreateInput(input, ctx, db, admission.row),
+        input,
+        ctx,
+        options,
+        db,
+        admission.row
+      );
   }
+}
+
+function readCanonicalGitHubRepository(
+  row: OperationLedgerRow
+): Extract<SessionRepositoryRequest, { type: 'github' }> | undefined {
+  const value = row.canonical_result?.[SESSION_CREATE_CANONICAL_REPOSITORY_KEY];
+  if (typeof value !== 'object' || value === null) return undefined;
+  const repository = value as Record<string, unknown>;
+  if (
+    repository.type !== 'github' ||
+    typeof repository.repo !== 'string' ||
+    typeof repository.githubIntegrationId !== 'string'
+  ) {
+    return undefined;
+  }
+  return {
+    type: 'github',
+    repo: repository.repo,
+    githubIntegrationId: repository.githubIntegrationId,
+    ...(typeof repository.branch === 'string' ? { branch: repository.branch } : {}),
+  };
+}
+
+async function canonicalizeCreateInput(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext
+): Promise<SessionRegistrationInput> {
+  return canonicalizeRepositoryBeforeSessionCreation({
+    env: ctx.env,
+    userId: ctx.userId,
+    orgId: input.options?.kilocodeOrganizationId,
+    request: input,
+  });
+}
+
+async function resolveRecordedCanonicalCreateInput(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  db: WorkerDb,
+  row: OperationLedgerRow
+): Promise<SessionRegistrationInput> {
+  await assertCreateIntentUnchanged(input, row);
+  if (input.repository.type !== 'github') return input;
+
+  const recorded = readCanonicalGitHubRepository(row);
+  if (recorded) {
+    return { ...input, repository: recorded };
+  }
+
+  // Compatibility for operations admitted before canonical repository pins
+  // were recorded. New operations never rediscover GitHub identity on replay.
+  const canonicalInput = await canonicalizeCreateInput(input, ctx).catch(async error => {
+    await bestEffortLedgerWrite(() => markReconcilePending(db, { rowId: row.id }));
+    throw error;
+  });
+  if (canonicalInput.repository.type === 'github') {
+    const progress = await recordOperationProgress(db, row.id, {
+      [SESSION_CREATE_CANONICAL_REPOSITORY_KEY]: canonicalInput.repository,
+    });
+    if (progress === null) throw creationInProgressError();
+  }
+  return canonicalInput;
 }
 
 async function replaySettledCreate(
@@ -1358,7 +1453,8 @@ async function buildLedgerHooks(
   options: SessionLedgerCreateOptions,
   db: WorkerDb,
   row: OperationLedgerRow,
-  admissionKind: 'new' | 'takeover'
+  admissionKind: 'new' | 'takeover',
+  canonical?: CanonicalCreateProgress
 ): Promise<SessionCreationLedgerHooks> {
   const distinctId = await resolveSessionCreateDistinctId(db, ctx.userId);
   const inOrganization = input.options?.kilocodeOrganizationId != null;
@@ -1366,6 +1462,7 @@ async function buildLedgerHooks(
   return {
     db,
     rowId: row.id,
+    ...canonical,
     onFailure: (stage, outcomeCode) =>
       bestEffortLedgerWrite(() =>
         settleOperation(db, {
@@ -1417,9 +1514,10 @@ async function executeLedgerCreate(
   options: SessionLedgerCreateOptions,
   db: WorkerDb,
   row: OperationLedgerRow,
-  admissionKind: 'new' | 'takeover'
+  admissionKind: 'new' | 'takeover',
+  canonical?: CanonicalCreateProgress
 ): Promise<LedgerSessionCreateResult> {
-  const hooks = await buildLedgerHooks(input, ctx, options, db, row, admissionKind);
+  const hooks = await buildLedgerHooks(input, ctx, options, db, row, admissionKind, canonical);
   const billingOrigin = { billingOrigin: options.billingOrigin };
   let result: { cloudAgentSessionId: string; kiloSessionId: string };
   if (input.initialTurn === undefined) {
@@ -1626,6 +1724,7 @@ function isCreateAbandonable(row: OperationLedgerRow): boolean {
  */
 async function reconcileLedgerCreate(
   input: SessionRegistrationInput,
+  intentInput: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions,
   db: WorkerDb,
@@ -1633,13 +1732,20 @@ async function reconcileLedgerCreate(
 ): Promise<LedgerSessionCreateResult> {
   // A changed same-key create intent is rejected before ANY reconcile step: no
   // fresh create, no ownership-row lookup, and no DO metadata read.
-  await assertCreateIntentUnchanged(input, row);
+  await assertCreateIntentUnchanged(intentInput, row);
+
+  const canonicalProgress = {
+    ...(typeof row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY] === 'string'
+      ? {}
+      : { intentFingerprint: await sessionCreateIntentFingerprint(intentInput) }),
+    ...(input.repository.type === 'github' ? { canonicalRepository: input.repository } : {}),
+  };
 
   const ids = canonicalSessionIds(row);
 
   // (a) No progress IDs recorded → nothing external happened.
   if (!ids) {
-    return executeLedgerCreate(input, ctx, options, db, row, 'takeover');
+    return executeLedgerCreate(input, ctx, options, db, row, 'takeover', canonicalProgress);
   }
 
   // (b) Ownership row lookup by kiloSessionId.
@@ -1648,7 +1754,7 @@ async function reconcileLedgerCreate(
     // A tombstoned destination must never be resumed: the clone was explicitly
     // rejected and its IDs are dead, so fall through to a fresh allocation.
     if (hasTombstoneForIds(row, ids)) {
-      return executeLedgerCreate(input, ctx, options, db, row, 'takeover');
+      return executeLedgerCreate(input, ctx, options, db, row, 'takeover', canonicalProgress);
     }
     // A clone create with no ownership row resumes the stored destination IDs
     // instead of allocating fresh ones.
@@ -1658,7 +1764,7 @@ async function reconcileLedgerCreate(
     // Old non-clone create: the ownership row is absent, so the DO never
     // registered. Keep the existing fresh allocation. Remove this path only
     // once every non-clone create is tombstoned on rejection (out of scope).
-    return executeLedgerCreate(input, ctx, options, db, row, 'takeover');
+    return executeLedgerCreate(input, ctx, options, db, row, 'takeover', canonicalProgress);
   }
 
   const confirm = () =>

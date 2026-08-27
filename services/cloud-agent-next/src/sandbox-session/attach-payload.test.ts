@@ -119,23 +119,34 @@ describe('buildSessionAttachPayload', () => {
       },
       auth: { kiloSessionId: 'kilo_1' },
       agent: { mode: 'code', model: 'kilo/test' },
-      repository: { type: 'github', repo: 'acme/demo' },
+      repository: {
+        type: 'github',
+        repo: 'acme/demo',
+        githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+      },
       workspace: { workspacePath: '/workspace/a' },
       lifecycle: { version: 1, timestamp: 1 },
     });
     const payload = buildSessionAttachPayload(metadata);
     expect(payload.git?.token).toBeUndefined();
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'ghs_resolved',
+      platformIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+      installationId: '1',
+      appType: 'standard',
+      accountLogin: 'acme',
+    });
     const filled = await fillAttachGitToken(metadata, payload, {
       GIT_TOKEN_SERVICE: {
-        getTokenForRepo: vi.fn().mockResolvedValue({
-          success: true,
-          token: 'ghs_resolved',
-          installationId: '1',
-          appType: 'standard',
-          accountLogin: 'acme',
-        }),
+        getTokenForRepo,
       } as never,
     });
     expect(filled.git?.token).toBe('ghs_resolved');
+    expect(getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'acme/demo',
+      userId: 'user-1',
+      expectedIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+    });
   });
 });

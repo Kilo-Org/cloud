@@ -86,6 +86,9 @@ export async function fillAttachGitToken(
     githubRepo: repository.repo,
     userId: metadata.identity.userId,
     ...(metadata.identity.orgId ? { orgId: metadata.identity.orgId } : {}),
+    ...(repository.githubIntegrationId
+      ? { expectedIntegrationId: repository.githubIntegrationId }
+      : {}),
   });
   if (!resolved.success) return payload;
   return { ...payload, git: { ...payload.git, token: resolved.value.token } };

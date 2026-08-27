@@ -93,6 +93,19 @@ export type ResolveCloudAgentRootSessionForKiloSessionResult = {
   repository?: { type: 'github'; repo: string };
 } | null;
 
+export const resolveAuthorizedSessionSourceSchema = resolveCloudAgentRootSessionSchema;
+export type ResolveAuthorizedSessionSourceParams = z.input<
+  typeof resolveAuthorizedSessionSourceSchema
+>;
+export type AuthorizedSessionSourceDescriptor = {
+  organizationId: string | null;
+  repository?:
+    | { type: 'github'; repo: string }
+    | { type: 'git'; url: string; platform?: 'gitlab' | 'bitbucket' };
+  cloudAgentSessionId?: string;
+};
+export type ResolveAuthorizedSessionSourceResult = AuthorizedSessionSourceDescriptor | null;
+
 export const kiloSdkSessionInfoSchema = z.object({
   id: sessionIdSchema,
   slug: z.string(),
@@ -746,6 +759,10 @@ export type SessionIngestRpcMethods = {
   resolveCloudAgentRootSessionForKiloSession: (
     params: ResolveCloudAgentRootSessionForKiloSessionParams
   ) => Promise<ResolveCloudAgentRootSessionForKiloSessionResult>;
+  /** Optional while older Session Ingest deployments remain in service. */
+  resolveAuthorizedSessionSource?: (
+    params: ResolveAuthorizedSessionSourceParams
+  ) => Promise<ResolveAuthorizedSessionSourceResult>;
   getCloudAgentRootSessionSnapshot: (
     params: GetCloudAgentRootSessionSnapshotParams
   ) => Promise<GetCloudAgentRootSessionSnapshotResult>;

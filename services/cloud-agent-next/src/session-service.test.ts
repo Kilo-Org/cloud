@@ -585,6 +585,18 @@ function createCloneMetadata(): CloudAgentSessionState {
 describe('SessionService.resolveWorkspaceTokens', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockResolvedValue({
+      success: true,
+      value: {
+        githubToken: 'resolved-gh-token',
+        platformIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+        installationId: '123',
+        accountLogin: 'acme',
+        appType: 'standard',
+        source: 'installation',
+        gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+      },
+    });
     tokenMocks.resolveManagedBitbucketToken.mockResolvedValue({
       success: true,
       token: 'opaque-workspace-token',
@@ -664,6 +676,38 @@ describe('SessionService.resolveWorkspaceTokens', () => {
       retryable: true,
       message: 'Bitbucket repository authorization failed (service_not_configured).',
     });
+  });
+
+  it('keeps rolling-deploy GitHub service incompatibility retryable', async () => {
+    tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockResolvedValueOnce({
+      success: false,
+      error: {
+        reason: 'service_incompatible',
+        message: 'git-token-service returned an incompatible success response',
+      },
+    });
+    const integrationId = '123e4567-e89b-12d3-a456-426614174022';
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_test', userId: 'user_test' },
+      auth: { kiloSessionId: 'kilo-session', kilocodeToken: 'kilo-token' },
+      agent: { mode: 'code', model: 'kilo/test-model' },
+      repository: { type: 'github', repo: 'acme/repo', githubIntegrationId: integrationId },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    await expect(
+      new SessionService().resolveWorkspaceTokens(createEnv(), metadata, 'ses-abcdef')
+    ).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      retryable: true,
+      message:
+        'GitHub token or active app installation required for this repository (service_incompatible)',
+    });
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ expectedIntegrationId: integrationId })
+    );
   });
 });
 

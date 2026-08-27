@@ -5,9 +5,12 @@ import {
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentGitLabSessionCapability,
   resolveCloudAgentGitHubAuthForRepo,
+  resolveGitHubTokenForRepo,
   resolveManagedBitbucketToken,
   resolveManagedGitLabToken,
 } from './git-token-service-client.js';
+
+const platformIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
 
 vi.mock('../logger.js', () => ({
   logger: {
@@ -35,6 +38,31 @@ function createGitTokenService() {
 function createEnv(service: Partial<GitTokenService>) {
   return { GIT_TOKEN_SERVICE: service as GitTokenService };
 }
+
+describe('resolveGitHubTokenForRepo', () => {
+  it('returns a retryable incompatibility when a rolling-deploy success omits its UUID pin', async () => {
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'installation-token',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+    });
+
+    await expect(
+      resolveGitHubTokenForRepo(createEnv({ getTokenForRepo }), {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+      })
+    ).resolves.toEqual({
+      success: false,
+      error: {
+        reason: 'service_incompatible',
+        message: 'git-token-service returned an incompatible success response',
+      },
+    });
+  });
+});
 
 describe('resolveManagedBitbucketToken', () => {
   const repositoryParams = {
@@ -196,6 +224,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
     const getTokenForRepo = vi.fn().mockResolvedValue({
       success: true,
       token: 'installation-token',
+      platformIntegrationId,
       installationId: '123',
       accountLogin: 'acme',
       appType: 'standard',
@@ -213,6 +242,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
       success: true,
       value: {
         githubToken: 'installation-token',
+        platformIntegrationId,
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
@@ -225,6 +255,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
     const issueGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: true,
       capability: 'kgh2.opaque',
+      platformIntegrationId,
       installationId: '123',
       accountLogin: 'acme',
       appType: 'standard',
@@ -267,6 +298,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
     const issueGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: true,
       capability: 'kgh2.opaque',
+      platformIntegrationId,
       installationId: '123',
       accountLogin: 'acme',
       appType: 'standard',
@@ -328,6 +360,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
     const getCloudAgentAuthForRepo = vi.fn().mockResolvedValue({
       success: true,
       githubToken: 'user-token',
+      platformIntegrationId,
       installationId: '123',
       accountLogin: 'acme',
       appType: 'standard',
@@ -350,6 +383,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
       success: true,
       value: {
         githubToken: 'user-token',
+        platformIntegrationId,
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
@@ -460,6 +494,7 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
     const getCloudAgentAuthForRepo = vi.fn().mockResolvedValue({
       success: true,
       githubToken: 'user-token',
+      platformIntegrationId,
       installationId: '123',
       accountLogin: 'acme',
       appType: 'standard',
@@ -494,6 +529,7 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
     const getCloudAgentAuthForRepo = vi.fn().mockResolvedValue({
       success: true,
       githubToken: 'installation-token',
+      platformIntegrationId,
       installationId: '123',
       accountLogin: 'acme',
       appType: 'standard',
@@ -517,6 +553,7 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
       success: true,
       value: {
         githubToken: 'installation-token',
+        platformIntegrationId,
         installationId: '123',
         accountLogin: 'acme',
         appType: 'standard',
@@ -534,6 +571,7 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
     const getTokenForRepo = vi.fn().mockResolvedValue({
       success: true,
       token: 'installation-token',
+      platformIntegrationId,
       installationId: '123',
       accountLogin: 'acme',
       appType: 'standard',
@@ -572,6 +610,7 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
     const getTokenForRepo = vi.fn().mockResolvedValue({
       success: true,
       token: 'installation-token',
+      platformIntegrationId,
       installationId: '123',
       accountLogin: 'acme',
       appType: 'standard',

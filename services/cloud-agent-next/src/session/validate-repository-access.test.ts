@@ -170,6 +170,81 @@ describe('GitHub session creation preflight', () => {
     });
   });
 
+  it('continues from an authorized remote CLI source without requiring a Cloud Agent mapping', async () => {
+    const getTokenForRepo = vi.fn().mockResolvedValue(githubResolution());
+    const getMetadata = vi.fn();
+    const env = {
+      SESSION_INGEST: {
+        resolveAuthorizedSessionSource: vi.fn().mockResolvedValue({
+          organizationId: null,
+          repository: { type: 'github', repo: 'Acme/Repo' },
+        }),
+      },
+      CLOUD_AGENT_SESSION: {
+        idFromName: vi.fn(),
+        get: vi.fn(() => ({ getMetadata })),
+      },
+      GIT_TOKEN_SERVICE: { getTokenForRepo },
+    };
+
+    await expect(
+      canonicalizeRepositoryBeforeSessionCreation({
+        env: env as never,
+        userId: 'user-1',
+        request: githubRequest({
+          clone: { cloneFromKiloSessionId: 'ses_12345678901234567890123456' },
+        }),
+      })
+    ).resolves.toMatchObject({ repository: { repo: 'Acme/Repo', githubIntegrationId } });
+    expect(getMetadata).not.toHaveBeenCalled();
+  });
+
+  it('rejects a source organization mismatch before live GitHub resolution', async () => {
+    const getTokenForRepo = vi.fn();
+    const env = {
+      SESSION_INGEST: {
+        resolveAuthorizedSessionSource: vi.fn().mockResolvedValue({
+          organizationId: '123e4567-e89b-12d3-a456-426614174099',
+          repository: { type: 'github', repo: 'acme/repo' },
+        }),
+      },
+      GIT_TOKEN_SERVICE: { getTokenForRepo },
+    };
+
+    await expect(
+      canonicalizeRepositoryBeforeSessionCreation({
+        env: env as never,
+        userId: 'user-1',
+        orgId: '123e4567-e89b-12d3-a456-426614174030',
+        request: githubRequest({
+          clone: { cloneFromKiloSessionId: 'ses_12345678901234567890123456' },
+        }),
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'organization_mismatch' });
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('preserves indistinguishable source access denial before live GitHub resolution', async () => {
+    const getTokenForRepo = vi.fn();
+    const env = {
+      SESSION_INGEST: {
+        resolveAuthorizedSessionSource: vi.fn().mockResolvedValue(null),
+      },
+      GIT_TOKEN_SERVICE: { getTokenForRepo },
+    };
+
+    await expect(
+      canonicalizeRepositoryBeforeSessionCreation({
+        env: env as never,
+        userId: 'user-1',
+        request: githubRequest({
+          clone: { cloneFromKiloSessionId: 'ses_12345678901234567890123456' },
+        }),
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'source_access_denied' });
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
       'repository',

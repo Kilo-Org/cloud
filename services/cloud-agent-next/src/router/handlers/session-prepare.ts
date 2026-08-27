@@ -342,12 +342,15 @@ const prepareSessionHandler = internalApiProtectedProcedure
           input.kilocodeOrganizationId
         );
       }
-      const canonicalRequest = await canonicalizeRepositoryBeforeSessionCreation({
-        env: ctx.env,
-        userId: ctx.userId,
-        orgId: input.kilocodeOrganizationId,
-        request,
-      });
+      const ledgerBackedCreate = input.autoInitiate === true && request.options?.operationKey;
+      const canonicalRequest = ledgerBackedCreate
+        ? request
+        : await canonicalizeRepositoryBeforeSessionCreation({
+            env: ctx.env,
+            userId: ctx.userId,
+            orgId: input.kilocodeOrganizationId,
+            request,
+          });
       await assertRepositoryAccessBeforeSessionCreation({
         env: ctx.env,
         userId: ctx.userId,

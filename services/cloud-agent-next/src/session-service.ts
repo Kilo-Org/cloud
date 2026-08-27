@@ -151,7 +151,8 @@ function isRetryableKiloCapabilityIssuanceFailure(reason: string): boolean {
   return (
     reason === 'rpc_error' ||
     reason === 'service_not_configured' ||
-    reason === 'temporarily_unavailable'
+    reason === 'temporarily_unavailable' ||
+    reason === 'service_incompatible'
   );
 }
 
@@ -1748,9 +1749,10 @@ export class SessionService {
           })
         : await resolveCloudAgentGitHubAuthForRepo(env, authParams);
       if (!result.success) {
-        throw ExecutionError.invalidRequest(
-          `GitHub token or active app installation required for this repository (${result.error.reason})`
-        );
+        const message = `GitHub token or active app installation required for this repository (${result.error.reason})`;
+        throw isRetryableKiloCapabilityIssuanceFailure(result.error.reason)
+          ? ExecutionError.workspaceSetupFailed(message)
+          : ExecutionError.invalidRequest(message);
       }
       githubToken =
         'capability' in result.value ? result.value.capability : result.value.githubToken;

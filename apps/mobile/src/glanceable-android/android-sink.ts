@@ -5,7 +5,11 @@ import {
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
-import { type GlanceableSink, type GlanceableSinkContext } from '@/lib/glanceable/sink-registry';
+import {
+  getGlanceableDelivery,
+  type GlanceableSink,
+  type GlanceableSinkContext,
+} from '@/lib/glanceable/sink-registry';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
 import {
@@ -32,6 +36,7 @@ import {
 type TimerHandle = ReturnType<typeof setTimeout>;
 
 const NOTIFICATION_TITLE_KEY = 'glanceable.channelName';
+const OPEN_AGENTS_LABEL_KEY = 'glanceable.openAgents';
 
 function translate(key: string): string {
   return i18n.t(key);
@@ -95,9 +100,10 @@ async function tryStartOrUpdate(
   }
   const title = translate(NOTIFICATION_TITLE_KEY);
   const text = buildOngoingNotificationText(snapshot, {}, translate);
+  const openAgentsLabel = translate(OPEN_AGENTS_LABEL_KEY);
 
   if (notificationActive) {
-    updateLiveUpdate(title, text);
+    updateLiveUpdate(title, text, openAgentsLabel);
     revision = snapshot.revision;
     return;
   }
@@ -111,15 +117,16 @@ async function tryStartOrUpdate(
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
     if (notificationActive) {
       if (snapshot.revision > revision) {
-        updateLiveUpdate(title, text);
+        updateLiveUpdate(title, text, openAgentsLabel);
         revision = snapshot.revision;
       }
       return;
     }
-    startLiveUpdate(title, text);
+    startLiveUpdate(title, text, openAgentsLabel);
     notificationActive = true;
     revision = snapshot.revision;
     pending = null;
+    getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId);
     return;
   }
   pending = { snapshot, ctx };
@@ -132,10 +139,22 @@ export function retryPendingStart(): void {
     return;
   }
   const title = translate(NOTIFICATION_TITLE_KEY);
-  startLiveUpdate(title, buildOngoingNotificationText(p.snapshot, {}, translate));
+  const openAgentsLabel = translate(OPEN_AGENTS_LABEL_KEY);
+  startLiveUpdate(title, buildOngoingNotificationText(p.snapshot, {}, translate), openAgentsLabel);
   notificationActive = true;
   revision = p.snapshot.revision;
   pending = null;
+  getGlanceableDelivery().registerTokens(p.snapshot, p.ctx.organizationId, p.ctx.userId);
+}
+
+/** Retry a pending start when the app returns to the foreground with permission granted. */
+export async function handleAppStateActive(): Promise<void> {
+  if (pending === null) {
+    return;
+  }
+  if (await isNotificationPermissionGranted()) {
+    retryPendingStart();
+  }
 }
 
 /**
@@ -167,7 +186,8 @@ export const androidSink: GlanceableSink = {
     if (notificationActive && snapshot.revision > revision) {
       updateLiveUpdate(
         translate(NOTIFICATION_TITLE_KEY),
-        buildOngoingNotificationText(snapshot, {}, translate)
+        buildOngoingNotificationText(snapshot, {}, translate),
+        translate(OPEN_AGENTS_LABEL_KEY)
       );
       revision = snapshot.revision;
     }
@@ -184,6 +204,7 @@ export const androidSink: GlanceableSink = {
     revision = 0;
     pending = null;
     startEpoch += 1;
+    void getGlanceableDelivery().unregisterTokens();
     // Widget props intentionally kept: the Home widget stays truthful.
   },
 };

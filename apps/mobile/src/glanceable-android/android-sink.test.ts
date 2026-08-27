@@ -5,7 +5,14 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { _resetAndroidSinkForTests, androidSink, getCurrentWidgetProps } from './android-sink';
+import { setGlanceableDelivery } from '@/lib/glanceable/sink-registry';
+
+import {
+  _resetAndroidSinkForTests,
+  androidSink,
+  getCurrentWidgetProps,
+  handleAppStateActive,
+} from './android-sink';
 import { _setPermissionReaderForTests, type NotificationPermissionStatus } from './permission';
 import { _resetAndroidPermissionAlertForTests } from './permission-alert';
 
@@ -40,6 +47,11 @@ vi.mock('react-native-android-widget', () => ({
 
 const NOW = 1_750_000_000_000;
 const CTX = { organizationId: null, userId: 'u1' };
+
+const delivery = {
+  registerTokens: vi.fn(),
+  unregisterTokens: vi.fn().mockResolvedValue({ ok: true, tokens: [] }),
+};
 
 function snapshotFor(
   sessions: { status: string }[],
@@ -84,6 +96,9 @@ beforeEach(() => {
   _resetAndroidPermissionAlertForTests();
   // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
   _setPermissionReaderForTests(() => Promise.resolve('granted'));
+  setGlanceableDelivery(delivery);
+  delivery.registerTokens.mockClear();
+  delivery.unregisterTokens.mockClear();
   mocks.native.isPromotionCapable.mockReturnValue(true);
   mocks.native.start.mockClear();
   mocks.native.update.mockClear();
@@ -105,8 +120,18 @@ describe('androidSink start and update', () => {
 
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
     expect(mocks.native.update).toHaveBeenCalledTimes(1);
-    expect(mocks.native.start).toHaveBeenCalledWith('Active agents', '1 Running', true);
-    expect(mocks.native.update).toHaveBeenCalledWith('Active agents', '1 Running', true);
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      '1 Running',
+      'Open agents',
+      true
+    );
+    expect(mocks.native.update).toHaveBeenCalledWith(
+      'Active agents',
+      '1 Running',
+      'Open agents',
+      true
+    );
   });
 
   it('passes promotion false when the device is not capable', async () => {
@@ -115,7 +140,12 @@ describe('androidSink start and update', () => {
     await flushAsync();
 
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
-    expect(mocks.native.start).toHaveBeenCalledWith(expect.any(String), expect.any(String), false);
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      false
+    );
   });
 
   it('does not start ongoing when notification permission is denied', async () => {
@@ -177,6 +207,55 @@ describe('androidSink start and update', () => {
     expect(mocks.native.start).not.toHaveBeenCalled();
     expect(mocks.native.update).not.toHaveBeenCalled();
   });
+
+  it('registers the android_ongoing token on a successful start', async () => {
+    const snapshot = snapshotFor([{ status: 'busy' }], 0);
+    androidSink.startOrUpdate(snapshot, CTX);
+    await flushAsync();
+
+    expect(delivery.registerTokens).toHaveBeenCalledTimes(1);
+    expect(delivery.registerTokens).toHaveBeenCalledWith(snapshot, CTX.organizationId, CTX.userId);
+    expect(delivery.unregisterTokens).not.toHaveBeenCalled();
+  });
+
+  it('does not register tokens when permission is denied', async () => {
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('denied'));
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    await flushAsync();
+
+    expect(delivery.registerTokens).not.toHaveBeenCalled();
+  });
+});
+
+describe('androidSink app-state retry', () => {
+  it('restarts pending work and registers tokens once permission is granted', async () => {
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('denied'));
+    const snapshot = snapshotFor([{ status: 'busy' }], 0);
+    androidSink.startOrUpdate(snapshot, CTX);
+    await flushAsync();
+    expect(mocks.native.start).not.toHaveBeenCalled();
+
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('granted'));
+    await handleAppStateActive();
+
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(delivery.registerTokens).toHaveBeenCalledWith(snapshot, CTX.organizationId, CTX.userId);
+  });
+
+  it('does not restart pending work while permission is still denied', async () => {
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('denied'));
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    await flushAsync();
+
+    await handleAppStateActive();
+
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(delivery.registerTokens).not.toHaveBeenCalled();
+  });
 });
 
 describe('androidSink widget publish and end', () => {
@@ -199,7 +278,12 @@ describe('androidSink widget publish and end', () => {
     androidSink.publish(snapshotFor([], 1, 'privacy'));
     expect(getCurrentWidgetProps()?.statusLine).toBe('Agents hidden');
     expect(getCurrentWidgetProps()?.countLines).toEqual([]);
-    expect(mocks.native.update).toHaveBeenCalledWith('Active agents', 'Agents hidden', true);
+    expect(mocks.native.update).toHaveBeenCalledWith(
+      'Active agents',
+      'Agents hidden',
+      'Open agents',
+      true
+    );
 
     androidSink.endImmediate();
     expect(mocks.native.end).toHaveBeenCalledTimes(1);
@@ -220,6 +304,15 @@ describe('androidSink widget publish and end', () => {
     expect(mocks.native.end).toHaveBeenCalledTimes(1);
     expect(getCurrentWidgetProps()).not.toBeNull();
     expect(getCurrentWidgetProps()?.primaryCount).toBe(1);
+  });
+
+  it('unregisters the token on endImmediate', async () => {
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    await flushAsync();
+    expect(delivery.registerTokens).toHaveBeenCalledTimes(1);
+
+    androidSink.endImmediate();
+    expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
   });
 
   it('schedules a single future redraw at expiresAt with expired copy', () => {

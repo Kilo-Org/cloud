@@ -70,8 +70,10 @@ describe('webhook trigger GitHub integration access', () => {
     return integration;
   }
 
-  it('accepts the selected healthy integration for its repository', async () => {
-    const integration = await insertIntegration();
+  it('accepts a selected healthy integration without using cached repository membership', async () => {
+    const integration = await insertIntegration({
+      repositories: [{ id: 2, name: 'other', full_name: 'acme/other', private: true }],
+    });
 
     await expect(
       assertWebhookTriggerGitHubIntegrationAccess({
@@ -83,16 +85,22 @@ describe('webhook trigger GitHub integration access', () => {
   });
 
   it.each([
-    ['another owner', 'owner', 'acme/repository'],
-    ['another repository', 'repository', 'acme/other'],
+    ['another organization', 'organization', 'acme/repository'],
+    ['another GitHub account owner', 'account', 'other/repository'],
+    ['a non-GitHub integration', 'platform', 'acme/repository'],
     ['an unhealthy integration', 'health', 'acme/repository'],
+    ['an integration without an installation ID', 'installation', 'acme/repository'],
   ] as const)('rejects %s', async (_case, mismatch, githubRepo) => {
     const overrides =
-      mismatch === 'owner'
+      mismatch === 'organization'
         ? { owned_by_organization_id: otherOrganizationId }
-        : mismatch === 'health'
-          ? { integration_status: 'suspended' }
-          : {};
+        : mismatch === 'platform'
+          ? { platform: 'gitlab' }
+          : mismatch === 'health'
+            ? { integration_status: 'suspended' }
+            : mismatch === 'installation'
+              ? { platform_installation_id: null }
+              : {};
     const integration = await insertIntegration(overrides);
 
     await expect(
@@ -103,4 +111,19 @@ describe('webhook trigger GitHub integration access', () => {
       })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
+
+  it.each(['acme', 'acme/repository/extra', '/repository', 'acme/'])(
+    'rejects malformed repository input %s',
+    async githubRepo => {
+      const integration = await insertIntegration();
+
+      await expect(
+        assertWebhookTriggerGitHubIntegrationAccess({
+          organizationId,
+          githubIntegrationId: integration.id,
+          githubRepo,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    }
+  );
 });

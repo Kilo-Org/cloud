@@ -4,13 +4,21 @@ import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import { platform_integrations } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
-import { z } from 'zod';
+
+const GITHUB_REPOSITORY_PATTERN = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
 
 export async function assertWebhookTriggerGitHubIntegrationAccess(input: {
   organizationId: string;
   githubIntegrationId: string;
   githubRepo: string;
 }): Promise<void> {
+  if (!GITHUB_REPOSITORY_PATTERN.test(input.githubRepo)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'GitHub repository must use owner/repo format',
+    });
+  }
+
   const [integration] = await db
     .select()
     .from(platform_integrations)
@@ -24,20 +32,12 @@ export async function assertWebhookTriggerGitHubIntegrationAccess(input: {
     )
     .limit(1);
 
-  const repositories = z
-    .array(z.object({ full_name: z.string() }))
-    .safeParse(integration?.repositories).data;
   const [repoOwner] = input.githubRepo.split('/');
-  const repositoryIsAuthorized =
-    integration?.platform_installation_id !== null &&
-    integration?.platform_account_login?.toLowerCase() === repoOwner?.toLowerCase() &&
-    (integration?.repository_access === 'all' ||
-      (integration?.repository_access === 'selected' &&
-        repositories?.some(
-          repository => repository.full_name.toLowerCase() === input.githubRepo.toLowerCase()
-        )));
+  const integrationMatchesRepositoryOwner =
+    !!integration?.platform_installation_id &&
+    integration?.platform_account_login?.toLowerCase() === repoOwner?.toLowerCase();
 
-  if (!isPlatformIntegrationHealthy(integration) || !repositoryIsAuthorized) {
+  if (!isPlatformIntegrationHealthy(integration) || !integrationMatchesRepositoryOwner) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'GitHub integration not found or does not provide access to this repository',

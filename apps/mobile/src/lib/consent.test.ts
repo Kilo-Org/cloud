@@ -492,11 +492,11 @@ describe('consent outcome analytics', () => {
       optional: false,
     });
     expect(posthogMock.flushLastPostHogEvent).toHaveBeenCalledTimes(1);
-    expect(posthogMock.captureEvent.mock.invocationCallOrder[0]).toBeLessThan(
-      posthogMock.flushLastPostHogEvent.mock.invocationCallOrder[0]
+    expect(posthogMock.captureEvent.mock.invocationCallOrder![0]!).toBeLessThan(
+      posthogMock.flushLastPostHogEvent.mock.invocationCallOrder![0]!
     );
-    expect(posthogMock.flushLastPostHogEvent.mock.invocationCallOrder[0]).toBeLessThan(
-      listener.mock.invocationCallOrder[0]
+    expect(posthogMock.flushLastPostHogEvent.mock.invocationCallOrder![0]!).toBeLessThan(
+      listener.mock.invocationCallOrder![0]!
     );
   });
 

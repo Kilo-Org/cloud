@@ -11,6 +11,7 @@ import { buildMayorSystemPrompt } from '../../prompts/mayor-system.prompt';
 import type { TownConfig, RigOverrideConfig } from '../../types';
 import { buildContainerConfig, resolveModel, resolveSmallModel, resolveRigConfig } from './config';
 import { writeEvent } from '../../util/analytics.util';
+import { extractGitHubRepo } from '../../util/repository-integration.util';
 import { resolveGitHubTokenString } from './town-scm';
 
 const TOWN_LOG = '[Town.do]';
@@ -449,7 +450,7 @@ export async function startAgentInContainer(
       env,
       townId: params.townId,
       getTownConfig: () => Promise.resolve(params.townConfig),
-      githubRepo: params.gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1],
+      githubRepo: extractGitHubRepo(params.gitUrl),
       userId: params.userId,
       orgId: params.townConfig.organization_id,
       platformIntegrationId: params.platformIntegrationId,
@@ -670,7 +671,7 @@ export async function startMergeInContainer(
       env,
       townId: params.townId,
       getTownConfig: () => Promise.resolve(params.townConfig),
-      githubRepo: params.gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1],
+      githubRepo: extractGitHubRepo(params.gitUrl),
       userId,
       orgId: params.townConfig.organization_id,
       platformIntegrationId: params.platformIntegrationId,

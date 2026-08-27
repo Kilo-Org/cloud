@@ -2018,6 +2018,8 @@
       "viewTable": "צפה בטבלה",
       "title": "טבלה",
       "close": "סגור טבלה",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "עמודה",
       "columnCount": "עמודות",
       "columnCount_other": "עמודות",

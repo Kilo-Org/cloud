@@ -2462,6 +2462,8 @@
       "viewTable": "ცხრილის ნახვა",
       "title": "ცხრილი",
       "close": "ცხრილის დახურვა",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "სვეტი",
       "columnCount": "სვეტი",
       "columnCount_other": "სვეტი",

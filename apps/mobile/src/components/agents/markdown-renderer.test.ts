@@ -65,9 +65,6 @@ vi.mock('react-native-svg', () => ({
   Rect: 'Rect',
   Circle: 'Circle',
 }));
-vi.mock('./markdown-table', () => ({
-  MarkdownTable: 'MarkdownTable',
-}));
 vi.mock('./code-block', () => ({
   CodeBlock: 'CodeBlock',
 }));
@@ -102,22 +99,12 @@ const palette: MarkdownPalette = {
   borderColor: '#cccccc',
   surfaceColor: '#ffffff',
 };
-const emptyStyle = undefined;
 async function createRenderer() {
   const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
   return new RendererClass(palette, true, {});
 }
 function keySequence(renderer: { getKey: () => string }, count: number): string[] {
   return Array.from({ length: count }, () => renderer.getKey());
-}
-
-function tableHostKey(
-  renderer: MarkdownRenderer,
-  header: ReactNode[][],
-  rows: ReactNode[][][]
-): string | null {
-  const element = renderer.table(header, rows, emptyStyle, emptyStyle, emptyStyle) as ReactElement;
-  return element.key ?? null;
 }
 
 function imageHostKey(renderer: MarkdownRenderer, uri: string): string | null {
@@ -164,33 +151,11 @@ describe('MarkdownRenderer key stability', () => {
     const second = keySequence(renderer, 5);
     expect(first).not.toEqual(second);
   });
-  it('table hosts are keyed ordinally in call order', async () => {
+  it('table() returns null (tables render through splitMarkdownTables)', async () => {
     const renderer = await createRenderer();
     const header: ReactNode[][] = [['H']];
     const rows: ReactNode[][][] = [[['r1']]];
-    expect(tableHostKey(renderer, header, rows)).toBe('md-table-0');
-    expect(tableHostKey(renderer, header, rows)).toBe('md-table-1');
-    expect(tableHostKey(renderer, header, rows)).toBe('md-table-2');
-  });
-  it('table host key is independent of preceding getKey() consumption', async () => {
-    const a = await createRenderer();
-    const b = await createRenderer();
-    keySequence(a, 2);
-    keySequence(b, 11);
-    const header: ReactNode[][] = [['H']];
-    const rows: ReactNode[][][] = [[['r1']]];
-    expect(tableHostKey(a, header, rows)).toBe('md-table-0');
-    expect(tableHostKey(b, header, rows)).toBe('md-table-0');
-  });
-  it('table host key is independent of row/cell counts', async () => {
-    const a = await createRenderer();
-    const b = await createRenderer();
-    const smallHeader: ReactNode[][] = [['A']];
-    const smallRows: ReactNode[][][] = [[['1']]];
-    const largeHeader: ReactNode[][] = [['A', 'B', 'C']];
-    const largeRows: ReactNode[][][] = [[['1', '2', '3']], [['4', '5', '6']], [['7', '8', '9']]];
-    expect(tableHostKey(a, smallHeader, smallRows)).toBe('md-table-0');
-    expect(tableHostKey(b, largeHeader, largeRows)).toBe('md-table-0');
+    expect(renderer.table(header, rows, undefined, undefined, undefined)).toBeNull();
   });
   it('image() host keys are ordinal in call order', async () => {
     const renderer = await createRenderer();

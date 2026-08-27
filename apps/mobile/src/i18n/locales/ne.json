@@ -2462,6 +2462,8 @@
       "viewTable": "तालिका हेर्नुहोस्",
       "title": "तालिका",
       "close": "तालिका बन्द गर्नुहोस्",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "स्तम्भ",
       "columnCount": "स्तम्भहरू",
       "columnCount_other": "स्तम्भहरू",

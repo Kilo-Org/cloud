@@ -2462,6 +2462,8 @@
       "viewTable": "ເບິ່ງຕາຕະລາງ",
       "title": "ຕາຕະລາງ",
       "close": "ປິດຕາຕະລາງ",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "ຖັນ",
       "columnCount": "ຖັນ",
       "columnCount_other": "ຖັນ",

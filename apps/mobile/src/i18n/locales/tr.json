@@ -2008,6 +2008,8 @@
       "viewTable": "Tabloyu görüntüle",
       "title": "Tablo",
       "close": "Tabloyu kapat",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "sütun",
       "columnCount": "sütunlar",
       "columnCount_other": "sütunlar",

@@ -2462,6 +2462,8 @@
       "viewTable": "មើលតារាង",
       "title": "តារាង",
       "close": "បិទតារាង",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "ជួរឈរ",
       "columnCount": "ជួរឈរ",
       "columnCount_other": "ជួរឈរ",

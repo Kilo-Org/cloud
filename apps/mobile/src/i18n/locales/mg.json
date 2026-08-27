@@ -2462,6 +2462,8 @@
       "viewTable": "Jereo ny tabilao",
       "title": "Tabilao",
       "close": "Hanidy tabilao",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "tsanganana",
       "columnCount": "tsanganana",
       "columnCount_other": "tsanganana",

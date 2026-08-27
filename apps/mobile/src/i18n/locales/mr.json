@@ -2462,6 +2462,8 @@
       "viewTable": "टेबल पहा",
       "title": "टेबल",
       "close": "टेबल बंद करा",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "स्तंभ",
       "columnCount": "स्तंभ",
       "columnCount_other": "स्तंभ",

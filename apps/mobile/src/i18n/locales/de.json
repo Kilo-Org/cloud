@@ -2008,6 +2008,8 @@
       "viewTable": "Tabelle ansehen",
       "title": "Tabelle",
       "close": "Tabelle schließen",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "Spalte",
       "columnCount": "Spalten",
       "columnCount_other": "Spalten",

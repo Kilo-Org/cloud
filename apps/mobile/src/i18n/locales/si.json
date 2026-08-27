@@ -2462,6 +2462,8 @@
       "viewTable": "වගුව බලන්න",
       "title": "වගුව",
       "close": "වගුව වසන්න",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "තීරුව",
       "columnCount": "තීරු",
       "columnCount_other": "තීරු",

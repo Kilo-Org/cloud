@@ -1981,6 +1981,8 @@
       "viewTable": "तालिका देखें",
       "title": "तालिका",
       "close": "तालिका बंद करें",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "कॉलम",
       "columnCount": "कॉलम",
       "columnCount_other": "कॉलम",

@@ -2462,6 +2462,8 @@
       "viewTable": "مشاهده جدول",
       "title": "جدول",
       "close": "بستن جدول",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "ستون",
       "columnCount": "ستون‌ها",
       "columnCount_other": "ستون‌ها",

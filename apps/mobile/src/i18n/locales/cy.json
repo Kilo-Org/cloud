@@ -2530,6 +2530,8 @@
       "viewTable": "Gweld y tabl",
       "title": "Tabl",
       "close": "Cau'r tabl",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "colofn",
       "columnCount": "colofnau",
       "columnCount_other": "colofnau",

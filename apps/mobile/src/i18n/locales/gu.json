@@ -2462,6 +2462,8 @@
       "viewTable": "કોષ્ટક જુઓ",
       "title": "કોષ્ટક",
       "close": "કોષ્ટક બંધ કરો",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "કૉલમ",
       "columnCount": "કૉલમ્સ",
       "columnCount_other": "કૉલમ્સ",

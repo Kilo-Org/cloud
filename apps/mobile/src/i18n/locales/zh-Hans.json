@@ -2008,6 +2008,8 @@
       "viewTable": "查看表格",
       "title": "表格",
       "close": "关闭表格",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "列",
       "columnCount": "列",
       "columnCount_other": "列",

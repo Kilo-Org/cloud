@@ -2462,6 +2462,8 @@
       "viewTable": "Ver a táboa",
       "title": "Táboa",
       "close": "Pechar a táboa",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "columna",
       "columnCount": "columnas",
       "columnCount_other": "columnas",

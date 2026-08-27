@@ -2462,6 +2462,8 @@
       "viewTable": "Tazama jedwali",
       "title": "Jedwali",
       "close": "Funga jedwali",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "safu",
       "columnCount": "safu",
       "columnCount_other": "safu",

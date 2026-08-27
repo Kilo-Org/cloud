@@ -2496,6 +2496,8 @@
       "viewTable": "Peržiūrėti lentelę",
       "title": "Lentelė",
       "close": "Uždaryti lentelę",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "stulpelis",
       "columnCount": "stulpeliai",
       "columnCount_other": "stulpeliai",

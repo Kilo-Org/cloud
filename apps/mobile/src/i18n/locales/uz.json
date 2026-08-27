@@ -2462,6 +2462,8 @@
       "viewTable": "Jadvalni ko'rish",
       "title": "Jadval",
       "close": "Jadvalni yopish",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "ustun",
       "columnCount": "ustunlar",
       "columnCount_other": "ustunlar",

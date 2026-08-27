@@ -2462,6 +2462,8 @@
       "viewTable": "ٹیبل دیکھیں",
       "title": "ٹیبل",
       "close": "ٹیبل بند کریں",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "کالم",
       "columnCount": "کالمز",
       "columnCount_other": "کالمز",

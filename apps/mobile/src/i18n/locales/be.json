@@ -2496,6 +2496,8 @@
       "viewTable": "Праглядзець табліцу",
       "title": "Табліца",
       "close": "Закрыць табліцу",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "слупок",
       "columnCount": "слупкі",
       "columnCount_other": "слупкі",

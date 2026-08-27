@@ -2479,6 +2479,8 @@
       "viewTable": "Pogledaj tabelu",
       "title": "Tabela",
       "close": "Zatvori tabelu",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "kolona",
       "columnCount": "kolone",
       "columnCount_other": "kolone",

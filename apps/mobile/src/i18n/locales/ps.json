@@ -2462,6 +2462,8 @@
       "viewTable": "جدول وګورئ",
       "title": "جدول",
       "close": "جدول وتړئ",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "ستن",
       "columnCount": "ستنې",
       "columnCount_other": "ستنې",

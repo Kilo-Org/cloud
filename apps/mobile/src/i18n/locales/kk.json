@@ -2462,6 +2462,8 @@
       "viewTable": "Кестені қарау",
       "title": "Кесте",
       "close": "Кестені жабу",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "баған",
       "columnCount": "баған",
       "columnCount_other": "баған",

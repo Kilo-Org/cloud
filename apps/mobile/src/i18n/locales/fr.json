@@ -1933,6 +1933,8 @@
       "viewTable": "Voir le tableau",
       "title": "Tableau",
       "close": "Fermer le tableau",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "colonne",
       "columnCount": "colonnes",
       "columnCount_other": "colonnes",

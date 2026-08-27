@@ -2462,6 +2462,8 @@
       "viewTable": "Táblázat megtekintése",
       "title": "Táblázat",
       "close": "Táblázat bezárása",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "oszlop",
       "columnCount": "oszlop",
       "columnCount_other": "oszlop",

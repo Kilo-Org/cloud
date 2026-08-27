@@ -2462,6 +2462,8 @@
       "viewTable": "Vis tabell",
       "title": "Tabell",
       "close": "Lukk tabell",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "kolonne",
       "columnCount": "kolonner",
       "columnCount_other": "kolonner",

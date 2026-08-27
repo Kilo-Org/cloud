@@ -2479,6 +2479,8 @@
       "viewTable": "Vezi tabelul",
       "title": "Tabel",
       "close": "Închide tabelul",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "coloană",
       "columnCount": "coloane",
       "columnCount_other": "coloane",

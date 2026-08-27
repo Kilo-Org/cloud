@@ -2462,6 +2462,8 @@
       "viewTable": "Ikusi taula",
       "title": "Taula",
       "close": "Itxi taula",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "zutabea",
       "columnCount": "zutabeak",
       "columnCount_other": "zutabeak",

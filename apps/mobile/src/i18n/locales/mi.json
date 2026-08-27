@@ -2462,6 +2462,8 @@
       "viewTable": "Tirohia te tēpu",
       "title": "Tēpu",
       "close": "Katia te tēpu",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "tīwae",
       "columnCount": "ngā tīwae",
       "columnCount_other": "ngā tīwae",

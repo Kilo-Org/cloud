@@ -2462,6 +2462,8 @@
       "viewTable": "ဇယားကြည့်ရန်",
       "title": "ဇယား",
       "close": "ဇယားပိတ်ရန်",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "ကော်လံ",
       "columnCount": "ကော်လံများ",
       "columnCount_other": "ကော်လံများ",

@@ -2513,6 +2513,8 @@
       "viewTable": "Ara t-tabella",
       "title": "Tabella",
       "close": "Agħlaq it-tabella",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "kolonna",
       "columnCount": "kolonni",
       "columnCount_other": "kolonni",

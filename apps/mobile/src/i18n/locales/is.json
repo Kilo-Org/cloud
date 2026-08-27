@@ -2462,6 +2462,8 @@
       "viewTable": "Skoða töflu",
       "title": "Tafla",
       "close": "Loka töflu",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "dálkur",
       "columnCount": "dálkar",
       "columnCount_other": "dálkar",

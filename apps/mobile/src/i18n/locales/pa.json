@@ -2462,6 +2462,8 @@
       "viewTable": "ਸਾਰਣੀ ਵੇਖੋ",
       "title": "ਸਾਰਣੀ",
       "close": "ਸਾਰਣੀ ਬੰਦ ਕਰੋ",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "ਕਾਲਮ",
       "columnCount": "ਕਾਲਮ",
       "columnCount_other": "ਕਾਲਮ",

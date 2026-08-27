@@ -2462,6 +2462,8 @@
       "viewTable": "Fiiri shaxda",
       "title": "Shax",
       "close": "Xidh shaxda",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "tiir",
       "columnCount": "tiirar",
       "columnCount_other": "tiirar",

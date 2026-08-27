@@ -2462,6 +2462,8 @@
       "viewTable": "Bekyk tabel",
       "title": "Tabel",
       "close": "Maak tabel toe",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "kolom",
       "columnCount": "kolomme",
       "columnCount_other": "kolomme",

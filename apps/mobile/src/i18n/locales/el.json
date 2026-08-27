@@ -2462,6 +2462,8 @@
       "viewTable": "Προβολή πίνακα",
       "title": "Πίνακας",
       "close": "Κλείσιμο πίνακα",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "στήλη",
       "columnCount": "στήλες",
       "columnCount_other": "στήλες",

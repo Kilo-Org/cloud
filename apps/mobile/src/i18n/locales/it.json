@@ -2002,6 +2002,8 @@
       "viewTable": "Visualizza tabella",
       "title": "Tabella",
       "close": "Chiudi tabella",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "colonna",
       "columnCount": "colonne",
       "columnCount_other": "colonne",

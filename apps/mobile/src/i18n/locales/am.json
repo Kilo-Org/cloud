@@ -2462,6 +2462,8 @@
       "viewTable": "ሰንጠረዥ ይመልከቱ",
       "title": "ሰንጠረዥ",
       "close": "ሰንጠረዥ ይዝጉ",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "ዓምድ",
       "columnCount": "ዓምዶች",
       "columnCount_other": "ዓምዶች",

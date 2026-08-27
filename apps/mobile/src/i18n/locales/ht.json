@@ -2462,6 +2462,8 @@
       "viewTable": "Wè tablo a",
       "title": "Tablo",
       "close": "Fèmen tablo a",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "kolòn",
       "columnCount": "kolòn",
       "columnCount_other": "kolòn",

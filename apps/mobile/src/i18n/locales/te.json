@@ -2462,6 +2462,8 @@
       "viewTable": "పట్టికను వీక్షించండి",
       "title": "పట్టిక",
       "close": "పట్టికను మూసివేయండి",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "నిలువు వరుస",
       "columnCount": "నిలువు వరుసలు",
       "columnCount_other": "నిలువు వరుసలు",

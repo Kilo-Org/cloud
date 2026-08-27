@@ -2462,6 +2462,8 @@
       "viewTable": "Прикажи табела",
       "title": "Табела",
       "close": "Затвори табела",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "колона",
       "columnCount": "колони",
       "columnCount_other": "колони",

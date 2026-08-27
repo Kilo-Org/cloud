@@ -2513,6 +2513,8 @@
       "viewTable": "Féach ar an tábla",
       "title": "Tábla",
       "close": "Dún an tábla",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "colún",
       "columnCount": "colúin",
       "columnCount_other": "colúin",

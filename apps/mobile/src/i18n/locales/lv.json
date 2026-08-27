@@ -2479,6 +2479,8 @@
       "viewTable": "Skatīt tabulu",
       "title": "Tabula",
       "close": "Aizvērt tabulu",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "kolonna",
       "columnCount": "kolonnas",
       "columnCount_other": "kolonnas",

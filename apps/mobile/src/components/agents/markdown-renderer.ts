@@ -33,7 +33,6 @@ import {
   resolveLinkAccessibilityLabel,
 } from './markdown-link';
 import { type MarkdownPalette } from './markdown-palette';
-import { MarkdownTable } from './markdown-table';
 
 export type MarkdownLinkLongPressHandler = (href: string, event?: GestureResponderEvent) => void;
 
@@ -127,11 +126,6 @@ export class MarkdownRenderer extends Renderer {
   private readonly selectable: boolean;
   private readonly onLongPressLink?: MarkdownLinkLongPressHandler;
   private readonly onPressLink?: MarkdownLinkPressHandler;
-  // Ordinal host key: Parser parses every header/body cell (each consuming
-  // getKey()) before table() returns, so a slugger-based host key would shift
-  // as rows/cells grow. A fresh renderer per parse restarts this counter, so
-  // the k-th table keeps `md-table-(k-1)` across re-parses regardless of size.
-  private tableIndex = 0;
   private imageIndex = 0;
 
   constructor(palette: MarkdownPalette, selectable: boolean, handlers: MarkdownRendererHandlers) {
@@ -382,21 +376,18 @@ export class MarkdownRenderer extends Renderer {
     return elements.length === 1 ? elements[0] : elements;
   }
 
-  // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
+  // eslint-disable-next-line eslint/max-params, eslint/class-methods-use-this -- max-params fixed by react-native-marked's RendererInterface; table returns null because cells render via MarkdownTable, not renderer state
   override table(
-    header: ReactNode[][],
-    rows: ReactNode[][][],
+    _header: ReactNode[][],
+    _rows: ReactNode[][][],
     _tableStyle: ViewStyle | undefined,
     _rowStyle: ViewStyle | undefined,
     _cellStyle: ViewStyle | undefined
   ): ReactNode {
-    const key = `md-table-${this.tableIndex}`;
-    this.tableIndex += 1;
-    return createElement(MarkdownTable, {
-      key,
-      palette: this.palette,
-      header,
-      rows,
-    });
+    // Tables are extracted before useMarkdown by splitMarkdownTables and
+    // rendered on demand by MarkdownTable. The parser's default cell-tree
+    // build still runs, but nothing inline is emitted: this path returns null
+    // so a table never renders inside the bubble.
+    return null;
   }
 }

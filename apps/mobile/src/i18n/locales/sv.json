@@ -2462,6 +2462,8 @@
       "viewTable": "Visa tabell",
       "title": "Tabell",
       "close": "Stäng tabell",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "kolumn",
       "columnCount": "kolumner",
       "columnCount_other": "kolumner",

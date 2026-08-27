@@ -2462,6 +2462,8 @@
       "viewTable": "Taabala ilaali",
       "title": "Taabala",
       "close": "Taabala cufi",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "haatara",
       "columnCount": "haataraawwan",
       "columnCount_other": "haataraawwan",

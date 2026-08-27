@@ -2018,6 +2018,8 @@
       "viewTable": "Ver tabla",
       "title": "Tabla",
       "close": "Cerrar tabla",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "columna",
       "columnCount": "columnas",
       "columnCount_other": "columnas",

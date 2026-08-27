@@ -1,15 +1,70 @@
 /* eslint-disable max-lines -- Table semantics and modal tests share the direct-invocation tree-walk harness. */
-import { describe, expect, it, vi } from 'vitest';
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount RN trees under vitest (same pattern as code-block.test.ts) */
 import { createElement } from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+// eslint-disable-next-line import/no-nodejs-modules -- patching the CJS loader is the only way to stub react-native for the externalized react-native-marked; the library under test stays real
+import Module from 'node:module';
 
 import { moveA11yFocus } from '@/lib/a11y/announce';
 
-import { MarkdownTable, TableRow } from './markdown-table';
+import { MarkdownTable, MarkdownTableBodyRenderer, TableRow } from './markdown-table';
 
 import { type MarkdownPalette } from './markdown-palette';
+import { useMarkdown } from 'react-native-marked';
 
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
+
+// The press-path suite un-mocks react-native-marked so the real parser builds
+// the cell tree. That library is externalized by vitest, so vi.mock('react-native')
+// does not intercept its nested requires; patch Module._load here (before any
+// dynamic import) so the real Renderer/useMarkdown can construct under node.
+// The link-press observation uses a real Linking stub: a regression back to the
+// library Renderer would call openURL through this spy instead of the confirm
+// helper.
+const linkingOpenURL = vi.fn();
+const rnLibStub = {
+  Text: 'Text',
+  View: 'View',
+  Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
+  TouchableHighlight: 'TouchableHighlight',
+  Image: 'Image',
+  Linking: { openURL: linkingOpenURL },
+  StyleSheet: {
+    create: (styles: Record<string, unknown>) => styles,
+    hairlineWidth: 1,
+    flatten: (style: unknown) =>
+      Array.isArray(style)
+        ? Object.assign({}, ...(style.filter(Boolean) as Record<string, unknown>[]))
+        : style,
+  },
+  Dimensions: {
+    get: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+    addEventListener: () => ({ remove: () => undefined }),
+  },
+  Platform: {
+    OS: 'ios',
+    select: (spec: { ios?: unknown; default?: unknown }) => spec.ios ?? spec.default,
+  },
+  I18nManager: { isRTL: false },
+  PixelRatio: { get: () => 3 },
+  NativeModules: {},
+  requireNativeComponent: () => 'NativeComponent',
+};
+type CjsLoad = (request: string, parent: NodeJS.Module | null, isMain: boolean) => unknown;
+const ModuleWithLoad = Module as unknown as { _load: CjsLoad };
+const originalLoad = ModuleWithLoad._load.bind(ModuleWithLoad);
+ModuleWithLoad._load = (request: string, parent: NodeJS.Module | null, isMain: boolean) => {
+  if (request === 'react-native') {
+    return rnLibStub;
+  }
+  if (request === 'react-native-svg') {
+    return { default: 'Svg', Svg: 'Svg', Path: 'Path', G: 'G', Rect: 'Rect', Circle: 'Circle' };
+  }
+  return originalLoad(request, parent, isMain);
+};
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -22,36 +77,37 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 
-// Stub native modules that markdown-table.tsx imports at module scope. Without
-// a stub, the reanimated / gesture-handler / worklets entry points reach this
-// `node` project as Flow source and the suite dies on `SyntaxError: Unexpected
-// token 'typeof'`.
-// `useState` returns `true` so the modal renders its children, exposing the
-// rows, title, and close Pressable in the element tree for direct-call
-// assertions. `useEffect` runs its callback so the zoom-reset effect is
-// exercised; with the modal open it is a no-op. Focus moves through the Modal
-// `onShow` callback, which the tests invoke directly.
-vi.mock('react', async () => {
-  const actual = await vi.importActual('react');
-  return {
-    ...actual,
-    useCallback: (fn: unknown) => fn,
-    useEffect: (fn: unknown) => {
-      if (typeof fn === 'function') {
-        (fn as () => void)();
-      }
-    },
-    useRef: () => ({ current: null }),
-    useState: () => [true, vi.fn()],
-  };
-});
+// The body parse is mocked here: tests drive MarkdownTableBody's open/empty/
+// wait states through `useMarkdown`'s return value, and assert the cell tree
+// is only ever requested after the modal opens.
+vi.mock('react-native-marked', () => ({
+  useMarkdown: vi.fn(() => []),
+  // eslint-disable-next-line typescript-eslint/no-extraneous-class -- minimal base class so MarkdownTableBodyRenderer can extend it under the mocked module
+  Renderer: class Renderer {},
+}));
+
 vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Modal: 'Modal',
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ width: 390, height: 844 }),
+}));
+// MarkdownTableBodyRenderer extends the real MarkdownRenderer, whose module
+// imports CodeBlock / MarkdownImage / the link-confirm helper. Be inert here:
+// the renderer's link press-path is asserted against the confirm helper, and
+// the other suites never mount those subtrees.
+vi.mock('./code-block', () => ({
+  CodeBlock: 'CodeBlock',
+}));
+vi.mock('./markdown-image', () => ({
+  MarkdownImage: 'MarkdownImage',
+}));
+vi.mock('./markdown-link-confirm', () => ({
+  confirmAndOpenMarkdownLink: vi.fn(),
 }));
 vi.mock('react-native-gesture-handler', () => {
   // RNGH's builder API chains without a fixed shape: `Gesture.Pinch()
@@ -84,6 +140,9 @@ vi.mock('@/components/ui/icons', () => ({
   Table2: 'Table2',
   X: 'X',
 }));
+vi.mock('@/components/ui/accessible-status', () => ({
+  AccessibleStatus: 'AccessibleStatus',
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     foreground: '#000000',
@@ -102,7 +161,15 @@ const mockPalette: MarkdownPalette = {
 };
 
 const header: React.ReactNode[][] = [['Column 1']];
-const rows: React.ReactNode[][][] = [[['Row 1']]];
+
+const defaultProps = {
+  palette: mockPalette,
+  raw: '| Column 1 |\n| --- |\n| Row 1 |',
+  tableKey: 'md-table-0',
+  columnCount: 1,
+  rowCount: 1,
+  selectable: true,
+};
 
 /** Rendered element shape from direct-call component tests (mocked native primitives). */
 type RenderedElement = {
@@ -181,54 +248,227 @@ function isTableCell(node: RenderedElement): boolean {
   return typeof node.props.hiddenFromA11y === 'boolean';
 }
 
-/**
- * The chip Pressable that opens the modal. Its accessible name is the linear
- * table summary ("Table, 1 column, 1 row, opens full screen"), so match on the
- * "Table," prefix; the visible chip text stays "View table".
- */
-function findTriggerPressable(element: unknown): RenderedElement | null {
-  return findFirst(
-    element,
-    node => node.type === 'Pressable' && accessibilityLabelOf(node).startsWith('Table,')
-  );
+function renderTable(overrides: Partial<typeof defaultProps> = {}): TestRenderer.ReactTestRenderer {
+  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+  act(() => {
+    renderer = TestRenderer.create(createElement(MarkdownTable, { ...defaultProps, ...overrides }));
+  });
+  // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- act callback assignment, not statically guaranteed
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
 }
 
-/** Walk the element tree for a Text node rendering exactly the summary string. */
-function findSummaryText(element: unknown, summary: string): RenderedElement | null {
-  return findFirst(element, node => node.type === 'Text' && node.props.children === summary);
+function chipNode(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const chip = renderer.root.findAll(
+    node => node.type === 'Pressable' && node.props.testID === 'md-table-0'
+  );
+  expect(chip).toHaveLength(1);
+  const first = chip[0];
+  if (!first) {
+    throw new Error('chip Pressable missing');
+  }
+  return first;
 }
+
+function closeNode(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const close = renderer.root.findAll(
+    node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Close table'
+  );
+  expect(close).toHaveLength(1);
+  const first = close[0];
+  if (!first) {
+    throw new Error('close Pressable missing');
+  }
+  return first;
+}
+
+function openTable(renderer: TestRenderer.ReactTestRenderer): void {
+  act(() => {
+    (chipNode(renderer).props.onPress as (() => void) | undefined)?.();
+  });
+}
+
+beforeEach(() => {
+  vi.mocked(useMarkdown).mockReset();
+  vi.mocked(useMarkdown).mockReturnValue([]);
+  vi.mocked(moveA11yFocus).mockClear();
+});
+
+describe('MarkdownTable closed tree', () => {
+  it('renders the chip and no modal chrome when closed', () => {
+    const renderer = renderTable();
+
+    expect(chipNode(renderer)).toBeTruthy();
+    expect(renderer.root.findAll(node => node.type === 'Modal')).toHaveLength(0);
+    expect(
+      renderer.root.findAll(
+        node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Close table'
+      )
+    ).toHaveLength(0);
+  });
+
+  it('chip label states columns, rows, and the full-screen action', () => {
+    const renderer = renderTable();
+    expect(chipNode(renderer).props.accessibilityLabel).toBe(
+      'Table, 1 column, 1 row, opens full screen'
+    );
+  });
+
+  it('summarizes the existing 1-by-1 fixture as "1 column · 1 row"', () => {
+    const renderer = renderTable();
+    expect(
+      renderer.root.findAll(
+        node => node.type === 'Text' && node.props.children === '1 column · 1 row'
+      )
+    ).toHaveLength(1);
+  });
+
+  it('summarizes a 2-by-3 fixture as "2 columns · 3 rows"', () => {
+    const renderer = renderTable({ columnCount: 2, rowCount: 3 });
+    expect(
+      renderer.root.findAll(
+        node => node.type === 'Text' && node.props.children === '2 columns · 3 rows'
+      )
+    ).toHaveLength(1);
+  });
+
+  it('does not parse the table until the chip opens the modal', () => {
+    renderTable();
+    expect(useMarkdown).not.toHaveBeenCalled();
+  });
+});
+
+describe('MarkdownTable open path', () => {
+  it('opens the modal and renders title, Close, then the parsed cells', () => {
+    vi.mocked(useMarkdown).mockReturnValue([
+      createElement('View', { testID: 'body-cells' }, 'cells'),
+    ]);
+    const renderer = renderTable();
+    openTable(renderer);
+
+    expect(renderer.root.findAll(node => node.type === 'Modal')).toHaveLength(1);
+    const title = renderer.root.findAll(
+      node => node.type === 'Text' && node.props.accessibilityRole === 'header'
+    );
+    expect(title).toHaveLength(1);
+    expect(title[0]?.props.children).toBe('Table');
+    expect(closeNode(renderer)).toBeTruthy();
+    expect(renderer.root.findAll(node => node.props.testID === 'body-cells')).toHaveLength(1);
+    expect(useMarkdown).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the modal open and re-parses when raw changes under the same key', () => {
+    vi.mocked(useMarkdown).mockReturnValue([
+      createElement('View', { testID: 'body-cells' }, 'cells'),
+    ]);
+    const renderer = renderTable();
+    openTable(renderer);
+    expect(renderer.root.findAll(node => node.type === 'Modal')).toHaveLength(1);
+
+    act(() => {
+      renderer.update(
+        createElement(MarkdownTable, {
+          ...defaultProps,
+          raw: '| Column 2 |\n| --- |\n| Row 2 |',
+        })
+      );
+    });
+
+    expect(renderer.root.findAll(node => node.type === 'Modal')).toHaveLength(1);
+    expect(useMarkdown).toHaveBeenLastCalledWith(
+      '| Column 2 |\n| --- |\n| Row 2 |',
+      expect.anything()
+    );
+  });
+
+  it('shows the empty status for a zero-row table and keeps Close available', () => {
+    const renderer = renderTable({ rowCount: 0 });
+    openTable(renderer);
+
+    const status = renderer.root.findAll(node => node.type === 'AccessibleStatus');
+    expect(status).toHaveLength(1);
+    expect(status[0]?.props.message).toBe('This table has no rows.');
+    expect(closeNode(renderer)).toBeTruthy();
+  });
+
+  it('shows the loading wait before first cells and Close still works', () => {
+    const renderer = renderTable({ rowCount: 2 });
+    openTable(renderer);
+
+    expect(renderer.root.findAll(node => node.type === 'ActivityIndicator')).toHaveLength(1);
+    const status = renderer.root.findAll(node => node.type === 'AccessibleStatus');
+    expect(status).toHaveLength(1);
+    expect(status[0]?.props.message).toBe('Loading table');
+
+    act(() => {
+      (closeNode(renderer).props.onPress as (() => void) | undefined)?.();
+    });
+    expect(renderer.root.findAll(node => node.type === 'Modal')).toHaveLength(0);
+  });
+
+  it('close button is a button with accessibilityLabel "Close table"', () => {
+    vi.mocked(useMarkdown).mockReturnValue([
+      createElement('View', { testID: 'body-cells' }, 'cells'),
+    ]);
+    const renderer = renderTable();
+    openTable(renderer);
+
+    const close = closeNode(renderer);
+    expect(close.props.accessibilityRole).toBe('button');
+    expect(close.props.accessibilityLabel).toBe('Close table');
+  });
+
+  it('moves focus to the title on modal show', () => {
+    vi.mocked(useMarkdown).mockReturnValue([
+      createElement('View', { testID: 'body-cells' }, 'cells'),
+    ]);
+    const renderer = renderTable();
+    openTable(renderer);
+
+    const modal = renderer.root.findAll(node => node.type === 'Modal')[0];
+    expect(modal).toBeTruthy();
+    expect(moveA11yFocus).not.toHaveBeenCalled();
+    act(() => {
+      (modal.props.onShow as (() => void) | undefined)?.();
+    });
+    expect(moveA11yFocus).toHaveBeenCalled();
+  });
+});
+
+describe('MarkdownTableBodyRenderer table()', () => {
+  it('returns null for a header with no rows', () => {
+    const renderer = new MarkdownTableBodyRenderer(mockPalette, 200, 1, true, {});
+    expect(renderer.table([['A']], [], undefined, undefined, undefined)).toBeNull();
+  });
+
+  it('builds the header and body TableRow tree with headerTexts from extractNodeText', () => {
+    const renderer = new MarkdownTableBodyRenderer(mockPalette, 200, 1, true, {});
+    const element = renderer.table([['Column 1']], [[['Row 1']]], undefined, undefined, undefined);
+
+    const tableRows = findAll(element, node => node.type === TableRow);
+    expect(tableRows).toHaveLength(2);
+    expect(tableRows[0]?.props.headerTexts).toEqual(['Column 1']);
+    expect(tableRows[0]?.props.isHeader).toBe(true);
+    expect(tableRows[0]?.props.columnWidth).toBe(200);
+    expect(tableRows[1]?.props.isHeader).toBeUndefined();
+    expect(tableRows[1]?.props.cells).toEqual([['Row 1']]);
+  });
+});
 
 describe('MarkdownTable close button', () => {
-  it('renders a close Pressable with accessibilityLabel "Close table"', () => {
-    // eslint-disable-next-line new-cap
-    const element = MarkdownTable({ palette: mockPalette, header, rows });
-    const closeButton = findFirst(
-      element,
-      node => node.type === 'Pressable' && accessibilityLabelOf(node) === 'Close table'
-    );
-
-    expect(closeButton).not.toBeNull();
-    if (!closeButton) {
-      throw new Error('closeButton should not be null');
-    }
-    expect(closeButton.props.accessibilityLabel).toBe('Close table');
-    expect(closeButton.props.accessibilityRole).toBe('button');
+  it('does not render a Close control while closed', () => {
+    const renderer = renderTable();
+    expect(
+      renderer.root.findAll(
+        node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Close table'
+      )
+    ).toHaveLength(0);
   });
 });
 
 describe('MarkdownTable table semantics', () => {
-  it('chip label states columns, rows, and the full-screen action', () => {
-    // eslint-disable-next-line new-cap
-    const element = MarkdownTable({ palette: mockPalette, header, rows });
-    const chip = findFirst(
-      element,
-      node => node.type === 'Pressable' && accessibilityLabelOf(node).startsWith('Table,')
-    );
-
-    expect(chip).not.toBeNull();
-    expect(chip?.props.accessibilityLabel).toBe('Table, 1 column, 1 row, opens full screen');
-  });
-
   it('header row exposes its linear label as one accessible element', () => {
     // eslint-disable-next-line new-cap
     const element = TableRow({
@@ -327,18 +567,20 @@ describe('MarkdownTable table semantics', () => {
   });
 
   it('modal title is a header and onShow moves focus to it after presentation', () => {
-    // eslint-disable-next-line new-cap
-    const element = MarkdownTable({ palette: mockPalette, header, rows });
-    const title = findFirst(
-      element,
+    vi.mocked(useMarkdown).mockReturnValue([
+      createElement('View', { testID: 'body-cells' }, 'cells'),
+    ]);
+    const renderer = renderTable();
+    openTable(renderer);
+
+    const title = renderer.root.findAll(
       node => node.type === 'Text' && node.props.accessibilityRole === 'header'
     );
-    const modal = findFirst(element, node => node.type === 'Modal');
+    const modal = renderer.root.findAll(node => node.type === 'Modal')[0];
     const onShow = modal?.props.onShow as (() => void) | undefined;
 
-    expect(title).not.toBeNull();
-    expect(title?.props.children).toBe('Table');
-    expect(modal).not.toBeNull();
+    expect(title[0]?.props.children).toBe('Table');
+    expect(modal).toBeTruthy();
     expect(typeof onShow).toBe('function');
     expect(moveA11yFocus).not.toHaveBeenCalled();
     onShow?.();
@@ -346,40 +588,59 @@ describe('MarkdownTable table semantics', () => {
   });
 });
 
-describe('MarkdownTable trigger and two-axis modal', () => {
-  it('renders the "View table" trigger Pressable', () => {
-    // eslint-disable-next-line new-cap
-    const element = MarkdownTable({ palette: mockPalette, header, rows });
-    const trigger = findTriggerPressable(element);
+describe('MarkdownTable cell inline press path (real parser)', () => {
+  // Every other suite mocks useMarkdown and asserts its return value, so a
+  // cell link built by a regression to the library Renderer (Linking.openURL,
+  // no host confirm) would still pass. This suite un-mocks react-native-marked
+  // and re-imports the component graph so the real Parser builds the cell tree
+  // through MarkdownTableBodyRenderer, whose link press must run the confirm
+  // helper and never Linking.openURL.
+  beforeEach(() => {
+    vi.doUnmock('react-native-marked');
+    vi.resetModules();
+  });
 
-    expect(trigger).not.toBeNull();
-    if (!trigger) {
-      throw new Error('trigger should not be null');
+  it('a cell link press runs the confirm handler, never Linking.openURL', async () => {
+    const tableModule = await import('./markdown-table');
+    const { confirmAndOpenMarkdownLink } = await import('./markdown-link-confirm');
+    const confirm = vi.mocked(confirmAndOpenMarkdownLink);
+    confirm.mockClear();
+    linkingOpenURL.mockClear();
+
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(
+        createElement(tableModule.MarkdownTable, {
+          ...defaultProps,
+          raw: '| Link |\n| --- |\n| [link](https://example.com) |',
+        })
+      );
+    });
+    const renderer = rendererRef.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
     }
-    expect(trigger.props.accessibilityRole).toBe('button');
-  });
 
-  it('summarizes the existing 1-by-1 fixture as "1 column · 1 row"', () => {
-    // eslint-disable-next-line new-cap
-    const element = MarkdownTable({ palette: mockPalette, header, rows });
+    openTable(renderer);
 
-    expect(findSummaryText(element, '1 column · 1 row')).not.toBeNull();
-  });
+    const links = renderer.root.findAll(
+      node => node.props.accessibilityRole === 'link' && typeof node.props.onPress === 'function'
+    );
+    expect(links.length).toBeGreaterThan(0);
 
-  it('summarizes a 2-by-3 fixture as "2 columns · 3 rows"', () => {
-    const twoByThreeHeader: React.ReactNode[][] = [['A'], ['B']];
-    const twoByThreeRows: React.ReactNode[][][] = [
-      [['1'], ['2']],
-      [['3'], ['4']],
-      [['5'], ['6']],
-    ];
-    // eslint-disable-next-line new-cap
-    const element = MarkdownTable({
-      palette: mockPalette,
-      header: twoByThreeHeader,
-      rows: twoByThreeRows,
+    act(() => {
+      (links[0]?.props.onPress as (() => void) | undefined)?.();
     });
 
-    expect(findSummaryText(element, '2 columns · 3 rows')).not.toBeNull();
+    expect(confirm).toHaveBeenCalledWith('https://example.com', { label: 'link' });
+    expect(linkingOpenURL).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.unmount();
+    });
   });
 });

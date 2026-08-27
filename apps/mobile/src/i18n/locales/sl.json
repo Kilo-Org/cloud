@@ -2496,6 +2496,8 @@
       "viewTable": "Prikaži tabelo",
       "title": "Tabela",
       "close": "Zapri tabelo",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "stolpec",
       "columnCount": "stolpci",
       "columnCount_other": "stolpci",

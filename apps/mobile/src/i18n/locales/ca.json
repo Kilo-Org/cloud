@@ -2479,6 +2479,8 @@
       "viewTable": "Mostra la taula",
       "title": "Taula",
       "close": "Tanca la taula",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "columna",
       "columnCount": "columnes",
       "columnCount_other": "columnes",

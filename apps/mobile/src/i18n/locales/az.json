@@ -2462,6 +2462,8 @@
       "viewTable": "Cədvələ bax",
       "title": "Cədvəl",
       "close": "Cədvəli bağla",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "sütun",
       "columnCount": "sütun",
       "columnCount_other": "sütun",

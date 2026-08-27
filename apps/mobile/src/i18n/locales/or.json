@@ -2462,6 +2462,8 @@
       "viewTable": "ଟେବୁଲ ଦେଖନ୍ତୁ",
       "title": "ଟେବୁଲ",
       "close": "ଟେବୁଲ ବନ୍ଦ କରନ୍ତୁ",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "ସ୍ତମ୍ଭ",
       "columnCount": "ସ୍ତମ୍ଭ",
       "columnCount_other": "ସ୍ତମ୍ଭ",

@@ -2028,6 +2028,8 @@
       "viewTable": "Переглянути таблицю",
       "title": "Таблиця",
       "close": "Закрити таблицю",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "стовпець",
       "columnCount": "стовпці",
       "columnCount_other": "стовпці",

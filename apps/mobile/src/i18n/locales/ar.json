@@ -2048,6 +2048,8 @@
       "viewTable": "عرض الجدول",
       "title": "جدول",
       "close": "إغلاق الجدول",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "عمود",
       "columnCount": "أعمدة",
       "columnCount_other": "أعمدة",

@@ -2462,6 +2462,8 @@
       "viewTable": "Wo tabili",
       "title": "Tabili",
       "close": "Pa tabili",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "iwe-ẹsẹ",
       "columnCount": "awọn iwe-ẹsẹ",
       "columnCount_other": "awọn iwe-ẹsẹ",

@@ -2462,6 +2462,8 @@
       "viewTable": "പട്ടിക കാണുക",
       "title": "പട്ടിക",
       "close": "പട്ടിക അടയ്ക്കുക",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "നിര",
       "columnCount": "നിരകൾ",
       "columnCount_other": "നിരകൾ",

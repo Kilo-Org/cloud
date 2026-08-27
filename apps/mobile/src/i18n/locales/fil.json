@@ -2462,6 +2462,8 @@
       "viewTable": "Tingnan ang table",
       "title": "Table",
       "close": "Isara ang table",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "column",
       "columnCount": "mga column",
       "columnCount_other": "mga column",

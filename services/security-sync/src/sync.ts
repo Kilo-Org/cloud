@@ -132,6 +132,7 @@ type SecurityAgentConfig = {
   sla_low_days: number;
   repository_selection_mode: 'all' | 'selected';
   selected_repository_ids?: number[];
+  selected_repositories?: Array<{ repositoryId: number; platformIntegrationId: string }>;
   auto_analysis_enabled: boolean;
   auto_analysis_min_severity: AutoAnalysisMinSeverity;
   auto_analysis_include_existing: boolean;
@@ -144,6 +145,14 @@ const securityAgentConfigSchema = z.object({
   sla_low_days: z.number(),
   repository_selection_mode: z.enum(['all', 'selected']),
   selected_repository_ids: z.array(z.number()).optional(),
+  selected_repositories: z
+    .array(
+      z.object({
+        repositoryId: z.number().int().positive(),
+        platformIntegrationId: z.string().uuid(),
+      })
+    )
+    .optional(),
   auto_analysis_enabled: z.boolean(),
   auto_analysis_min_severity: z.enum(['critical', 'high', 'medium', 'all']),
   auto_analysis_include_existing: z.boolean(),
@@ -211,6 +220,7 @@ const SyncRunProgressSchema = z.object({
   runId: z.string().min(1),
   completedRepos: z.array(z.string().min(1)),
   staleRepos: z.array(z.string()),
+  staleSelections: z.array(z.string()).optional(),
   authInvalidRepos: z.array(z.string()),
   synced: z.number().int().nonnegative(),
   errors: z.number().int().nonnegative(),
@@ -283,12 +293,14 @@ function applySyncRunProgress(result: SyncResult, progress: SyncRunProgress): vo
 function toSyncRunProgress(
   runId: string,
   result: SyncResult,
-  completedRepos: string[]
+  completedRepos: string[],
+  staleSelections: string[]
 ): SyncRunProgress {
   return {
     runId,
     completedRepos,
     staleRepos: result.staleRepos,
+    staleSelections,
     authInvalidRepos: result.authInvalidRepos,
     synced: result.synced,
     errors: result.errors,
@@ -402,9 +414,8 @@ function findingOwnerPartitionColumn(owner: SecurityReviewOwner) {
 type RepositorySyncPlan = {
   repoFullName: string;
   repositoryId?: number;
+  /** Explicit persisted/request selection; cache membership never authorizes a repository. */
   platformIntegrationId?: string;
-  installationId?: string;
-  appType?: GitHubAppType;
   authInvalidAt: string | null;
 };
 
@@ -422,9 +433,10 @@ type IntegrationCandidate = {
 type EnabledOwnerConfig = {
   repositories: string[];
   repoNameToId: Map<string, number>;
-  repositoryPlanByName: Map<string, RepositorySyncPlan>;
+  repositoryPlans: RepositorySyncPlan[];
   integrationsById: Map<string, IntegrationCandidate>;
   knownRepositoryIds: Set<number>;
+  knownRepositorySelectionKeys: Set<string>;
   resolverUserId: string;
   slaConfig: SecurityAgentConfig;
   notificationPolicy: SecurityNotificationPolicy | null;
@@ -471,17 +483,23 @@ function buildRepositorySyncPlan(
   EnabledOwnerConfig,
   | 'repositories'
   | 'repoNameToId'
-  | 'repositoryPlanByName'
+  | 'repositoryPlans'
   | 'knownRepositoryIds'
+  | 'knownRepositorySelectionKeys'
   | 'missingSelectedRepoCount'
 > {
   const knownRepositoryIds = new Set<number>();
+  const knownRepositorySelectionKeys = new Set<string>();
   const candidatesByName = new Map<string, RepositorySyncPlan[]>();
   const candidatesById = new Map<number, RepositorySyncPlan[]>();
+  const candidatesBySelection = new Map<string, RepositorySyncPlan>();
 
   for (const integration of integrations) {
     const repositories = validIntegrationRepositories(integration);
-    for (const repository of repositories) knownRepositoryIds.add(repository.id);
+    for (const repository of repositories) {
+      knownRepositoryIds.add(repository.id);
+      knownRepositorySelectionKeys.add(`${repository.id}:${integration.id}`);
+    }
     if (
       !integration.platform_installation_id ||
       !hasSecuritySyncPermission(integration) ||
@@ -499,8 +517,6 @@ function buildRepositorySyncPlan(
         repoFullName: repository.full_name,
         repositoryId: repository.id,
         platformIntegrationId: integration.id,
-        installationId: integration.platform_installation_id,
-        appType: integration.appType ?? 'standard',
         authInvalidAt: integration.authInvalidAt,
       };
       candidatesByName.set(normalizedName, [
@@ -508,59 +524,62 @@ function buildRepositorySyncPlan(
         candidate,
       ]);
       candidatesById.set(repository.id, [...(candidatesById.get(repository.id) ?? []), candidate]);
+      candidatesBySelection.set(`${repository.id}:${integration.id}`, candidate);
     }
   }
 
-  const repositoryPlanByName = new Map<string, RepositorySyncPlan>();
+  const repositoryPlans: RepositorySyncPlan[] = [];
   const repoNameToId = new Map<string, number>();
-  const addCandidates = (candidates: RepositorySyncPlan[]) => {
+  const selectedPlanKeys = new Set<string>();
+  const addUnpinnedCandidates = (candidates: RepositorySyncPlan[]) => {
     const candidate = candidates[0];
     if (!candidate || candidate.repositoryId === undefined) return;
     const normalizedName = normalizedRepoName(candidate.repoFullName);
-    if (repositoryPlanByName.has(normalizedName)) return;
+    if (selectedPlanKeys.has(normalizedName)) return;
+    selectedPlanKeys.add(normalizedName);
     repoNameToId.set(candidate.repoFullName, candidate.repositoryId);
-    repositoryPlanByName.set(
-      normalizedName,
-      candidates.length === 1
-        ? candidate
-        : {
-            repoFullName: candidate.repoFullName,
-            repositoryId: candidate.repositoryId,
-            authInvalidAt: null,
-          }
-    );
+    repositoryPlans.push({
+      repoFullName: candidate.repoFullName,
+      repositoryId: candidate.repositoryId,
+      authInvalidAt: null,
+    });
   };
 
-  for (const candidates of candidatesByName.values()) addCandidates(candidates);
-
-  const repositories: string[] = [];
-  const selectedNames = new Set<string>();
   let missingSelectedRepoCount = 0;
   if (securityConfig.repository_selection_mode === 'selected') {
-    for (const selectedId of new Set(securityConfig.selected_repository_ids ?? [])) {
-      const candidates = candidatesById.get(selectedId) ?? [];
-      if (candidates.length === 0) {
-        if (!knownRepositoryIds.has(selectedId)) missingSelectedRepoCount++;
-        continue;
+    if (securityConfig.selected_repositories !== undefined) {
+      for (const selection of securityConfig.selected_repositories) {
+        const selectionKey = `${selection.repositoryId}:${selection.platformIntegrationId}`;
+        if (selectedPlanKeys.has(selectionKey)) continue;
+        selectedPlanKeys.add(selectionKey);
+        const candidate = candidatesBySelection.get(selectionKey);
+        if (!candidate) {
+          if (!knownRepositorySelectionKeys.has(selectionKey)) missingSelectedRepoCount++;
+          continue;
+        }
+        repoNameToId.set(candidate.repoFullName, selection.repositoryId);
+        repositoryPlans.push(candidate);
       }
-      const candidate = candidates[0];
-      if (!candidate) continue;
-      const normalizedName = normalizedRepoName(candidate.repoFullName);
-      const planned = repositoryPlanByName.get(normalizedName);
-      if (planned && !selectedNames.has(normalizedName)) {
-        repositories.push(planned.repoFullName);
-        selectedNames.add(normalizedName);
+    } else {
+      for (const selectedId of new Set(securityConfig.selected_repository_ids ?? [])) {
+        const candidates = candidatesById.get(selectedId) ?? [];
+        if (candidates.length === 0) {
+          if (!knownRepositoryIds.has(selectedId)) missingSelectedRepoCount++;
+          continue;
+        }
+        addUnpinnedCandidates(candidates);
       }
     }
   } else {
-    repositories.push(...[...repositoryPlanByName.values()].map(plan => plan.repoFullName));
+    for (const candidates of candidatesByName.values()) addUnpinnedCandidates(candidates);
   }
 
   return {
-    repositories,
+    repositories: repositoryPlans.map(plan => plan.repoFullName),
     repoNameToId,
-    repositoryPlanByName,
+    repositoryPlans,
     knownRepositoryIds,
+    knownRepositorySelectionKeys,
     missingSelectedRepoCount,
   };
 }
@@ -568,7 +587,7 @@ function buildRepositorySyncPlan(
 function mergeReceivedRepositoryPlans(
   config: Pick<
     EnabledOwnerConfig,
-    'repositories' | 'repositoryPlanByName' | 'repoNameToId' | 'integrationsById'
+    'repositories' | 'repositoryPlans' | 'repoNameToId' | 'integrationsById'
   >,
   plans: RepositoryInstallationPlan[]
 ): void {
@@ -577,8 +596,6 @@ function mergeReceivedRepositoryPlans(
     if (
       !integration ||
       !integration.platform_installation_id ||
-      integration.platform_installation_id !== plan.installationId ||
-      (integration.appType ?? 'standard') !== plan.appType ||
       !hasSecuritySyncPermission(integration) ||
       integration.integrationStatus !== 'active' ||
       integration.suspendedAt !== null
@@ -587,15 +604,17 @@ function mergeReceivedRepositoryPlans(
     }
 
     const normalizedName = normalizedRepoName(plan.repoFullName);
-    config.repositoryPlanByName.set(normalizedName, {
-      ...plan,
+    const receivedPlan: RepositorySyncPlan = {
+      repoFullName: plan.repoFullName,
+      repositoryId: plan.repositoryId,
+      platformIntegrationId: plan.platformIntegrationId,
       authInvalidAt: integration.authInvalidAt,
-    });
-    if (
-      !config.repositories.some(repository => normalizedRepoName(repository) === normalizedName)
-    ) {
-      config.repositories.push(plan.repoFullName);
-    }
+    };
+    config.repositoryPlans = config.repositoryPlans.filter(
+      existing => normalizedRepoName(existing.repoFullName) !== normalizedName
+    );
+    config.repositoryPlans.push(receivedPlan);
+    config.repositories = config.repositoryPlans.map(existing => existing.repoFullName);
     if (plan.repositoryId !== undefined) {
       config.repoNameToId.set(plan.repoFullName, plan.repositoryId);
     }
@@ -1795,7 +1814,8 @@ async function pruneStaleReposFromConfig(
   db: WorkerDb,
   owner: SecurityReviewOwner,
   staleRepoNames: string[],
-  repoNameToId: Map<string, number>
+  repoNameToId: Map<string, number>,
+  staleSelectionKeys: Set<string>
 ): Promise<void> {
   if (staleRepoNames.length === 0) return;
 
@@ -1837,17 +1857,35 @@ async function pruneStaleReposFromConfig(
   }
 
   const prunedIds = config.selected_repository_ids.filter(id => !staleIds.has(id));
-  if (prunedIds.length === config.selected_repository_ids.length) return;
-
-  const updatedConfig = { ...config, selected_repository_ids: prunedIds };
+  const prunedSelections = config.selected_repositories?.filter(
+    selection =>
+      !staleSelectionKeys.has(`${selection.repositoryId}:${selection.platformIntegrationId}`)
+  );
+  const survivingCompositeIds = new Set(
+    prunedSelections?.map(selection => selection.repositoryId) ?? []
+  );
+  const compatibilityIds = prunedSelections
+    ? config.selected_repository_ids.filter(
+        id => !staleIds.has(id) || survivingCompositeIds.has(id)
+      )
+    : prunedIds;
+  if (
+    compatibilityIds.length === config.selected_repository_ids.length &&
+    (!prunedSelections || prunedSelections.length === config.selected_repositories?.length)
+  ) {
+    return;
+  }
+  const updatedConfig = {
+    ...config,
+    selected_repository_ids: compatibilityIds,
+    ...(prunedSelections ? { selected_repositories: prunedSelections } : {}),
+  };
   await db
     .update(agent_configs)
     .set({ config: updatedConfig, updated_at: sql`now()` })
     .where(eq(agent_configs.id, rows[0].id));
 
-  console.warn(
-    `Pruned ${config.selected_repository_ids.length - prunedIds.length} stale repo(s) from config`
-  );
+  console.warn('Pruned stale repository selection(s) from config');
 }
 
 /** Remove selected_repository_ids that are no longer present on any owner installation.
@@ -1856,7 +1894,8 @@ async function pruneStaleReposFromConfig(
 async function pruneMissingSelectedRepos(
   db: WorkerDb,
   owner: SecurityReviewOwner,
-  accessibleRepoIds: Set<number>
+  accessibleRepoIds: Set<number>,
+  accessibleRepositorySelectionKeys: Set<string>
 ): Promise<void> {
   const rows = await db
     .select({
@@ -1879,19 +1918,32 @@ async function pruneMissingSelectedRepos(
   if (!parsed.success) return;
   const config = parsed.data;
 
+  if (config.repository_selection_mode !== 'selected') {
+    return;
+  }
+
+  const selectedIds = config.selected_repository_ids ?? [];
+  const selectedRepositories = config.selected_repositories ?? [];
+  const prunedIds = selectedIds.filter(id => accessibleRepoIds.has(id));
+  const prunedSelections = selectedRepositories.filter(selection =>
+    accessibleRepositorySelectionKeys.has(
+      `${selection.repositoryId}:${selection.platformIntegrationId}`
+    )
+  );
   if (
-    config.repository_selection_mode !== 'selected' ||
-    !config.selected_repository_ids ||
-    config.selected_repository_ids.length === 0
+    prunedIds.length === selectedIds.length &&
+    prunedSelections.length === selectedRepositories.length
   ) {
     return;
   }
 
-  const prunedIds = config.selected_repository_ids.filter(id => accessibleRepoIds.has(id));
-  if (prunedIds.length === config.selected_repository_ids.length) return;
-
-  const removedCount = config.selected_repository_ids.length - prunedIds.length;
-  const updatedConfig = { ...config, selected_repository_ids: prunedIds };
+  const removedCount =
+    selectedIds.length - prunedIds.length + selectedRepositories.length - prunedSelections.length;
+  const updatedConfig = {
+    ...config,
+    selected_repository_ids: prunedIds,
+    ...(config.selected_repositories ? { selected_repositories: prunedSelections } : {}),
+  };
   await db
     .update(agent_configs)
     .set({ config: updatedConfig, updated_at: sql`now()` })
@@ -1901,14 +1953,30 @@ async function pruneMissingSelectedRepos(
 }
 
 export function selectRepositoriesForSync(
-  config: Pick<EnabledOwnerConfig, 'repositories' | 'repoNameToId'> &
-    Partial<Pick<EnabledOwnerConfig, 'repositoryPlanByName'>>,
+  config: Pick<EnabledOwnerConfig, 'repositories' | 'repoNameToId'>,
   repoFullName?: string
 ): string[] {
   if (!repoFullName) return config.repositories;
-  const plannedRepository = config.repositoryPlanByName?.get(normalizedRepoName(repoFullName));
-  if (plannedRepository) return [plannedRepository.repoFullName];
+  const configuredRepository = config.repositories.find(
+    repository => normalizedRepoName(repository) === normalizedRepoName(repoFullName)
+  );
+  if (configuredRepository) return [configuredRepository];
   return config.repoNameToId.has(repoFullName) ? [repoFullName] : [];
+}
+
+function repositoryPlanKey(plan: RepositorySyncPlan): string {
+  const repoName = normalizedRepoName(plan.repoFullName);
+  return plan.platformIntegrationId ? `${repoName}:${plan.platformIntegrationId}` : repoName;
+}
+
+function selectRepositoryPlansForSync(
+  config: Pick<EnabledOwnerConfig, 'repositoryPlans'>,
+  repoFullName?: string
+): RepositorySyncPlan[] {
+  if (!repoFullName) return config.repositoryPlans;
+  return config.repositoryPlans.filter(
+    plan => normalizedRepoName(plan.repoFullName) === normalizedRepoName(repoFullName)
+  );
 }
 
 export async function syncOwner(params: {
@@ -1939,25 +2007,30 @@ export async function syncOwner(params: {
 
   if (params.repositoryPlans) mergeReceivedRepositoryPlans(config, params.repositoryPlans);
 
-  let repositories = selectRepositoriesForSync(config, repoFullName);
-  if (repoFullName && repositories.length === 0) {
-    config.repositoryPlanByName.set(normalizedRepoName(repoFullName), {
-      repoFullName,
-      authInvalidAt: null,
-    });
-    repositories = [repoFullName];
+  let repositoryPlans = selectRepositoryPlansForSync(config, repoFullName);
+  if (repoFullName && repositoryPlans.length === 0) {
+    repositoryPlans = [
+      {
+        repoFullName,
+        authInvalidAt: null,
+      },
+    ];
   }
+  const repositories = repositoryPlans.map(plan => plan.repoFullName);
 
   const previousProgress = repoFullName ? null : readSyncRunProgress(config.runtimeState, runId);
   const completedRepos = new Set(previousProgress?.completedRepos ?? []);
-  const remainingRepositories = repositories.filter(name => !completedRepos.has(name));
+  const remainingRepositoryPlans = repositoryPlans.filter(
+    plan => !completedRepos.has(repositoryPlanKey(plan))
+  );
   const totalResult = createEmptySyncResult();
+  const staleSelectionKeys = new Set(previousProgress?.staleSelections ?? []);
   if (previousProgress) {
     applySyncRunProgress(totalResult, previousProgress);
     console.info('Resuming security sync owner run', {
       runId,
       completedRepoCount: completedRepos.size,
-      remainingRepoCount: remainingRepositories.length,
+      remainingRepoCount: remainingRepositoryPlans.length,
     });
   }
   let firstError: Error | null = null;
@@ -1973,7 +2046,9 @@ export async function syncOwner(params: {
     ? await resolveNotificationRecipientUserIds(database, owner)
     : [];
 
-  for (const selectedRepoFullName of remainingRepositories) {
+  for (const repositoryPlan of remainingRepositoryPlans) {
+    const selectedRepoFullName = repositoryPlan.repoFullName;
+    const planKey = repositoryPlanKey(repositoryPlan);
     if (
       processedThisPass > 0 &&
       params.budgetMs !== undefined &&
@@ -1984,31 +2059,6 @@ export async function syncOwner(params: {
     }
 
     try {
-      const repositoryPlan = config.repositoryPlanByName.get(
-        normalizedRepoName(selectedRepoFullName)
-      );
-      if (!repositoryPlan) {
-        throw new Error(`No GitHub integration plan for ${selectedRepoFullName}`);
-      }
-
-      if (
-        (repositoryPlan.platformIntegrationId &&
-          authInvalidIntegrationIds.has(repositoryPlan.platformIntegrationId)) ||
-        isRecentTimestamp(repositoryPlan.authInvalidAt, AUTH_INVALID_SHORT_CIRCUIT_MS)
-      ) {
-        await recordSecurityAgentRepositorySyncFailure(database, {
-          owner: toSecurityAgentCommandOwner(owner),
-          repoFullName: selectedRepoFullName,
-          failureCode: 'GITHUB_AUTH_INVALID',
-        });
-        totalResult.authInvalid++;
-        totalResult.authInvalidRepos.push(selectedRepoFullName);
-        totalResult.reauthRequired = true;
-        completedRepos.add(selectedRepoFullName);
-        processedThisPass++;
-        continue;
-      }
-
       const repoResult = await syncRepo({
         db: database,
         gitTokenService,
@@ -2021,21 +2071,24 @@ export async function syncOwner(params: {
         notificationPolicy,
         notificationRecipientUserIds,
         autoAnalysisEnabledAt: config.autoAnalysisEnabledAt,
+        authInvalidIntegrationIds,
+        integrationsById: config.integrationsById,
       });
-      totalResult.synced += repoResult.synced;
-      totalResult.errors += repoResult.errors;
-      totalResult.skipped += repoResult.skipped;
-      totalResult.authInvalid += repoResult.authInvalid;
-      totalResult.authInvalidRepos.push(...repoResult.authInvalidRepos);
-      totalResult.reauthRequired = totalResult.reauthRequired || repoResult.reauthRequired;
-      totalResult.staleRepos.push(...repoResult.staleRepos);
-      totalResult.commandResultCode ??= repoResult.commandResultCode;
+      totalResult.synced += repoResult.result.synced;
+      totalResult.errors += repoResult.result.errors;
+      totalResult.skipped += repoResult.result.skipped;
+      totalResult.authInvalid += repoResult.result.authInvalid;
+      totalResult.authInvalidRepos.push(...repoResult.result.authInvalidRepos);
+      totalResult.reauthRequired = totalResult.reauthRequired || repoResult.result.reauthRequired;
+      totalResult.staleRepos.push(...repoResult.result.staleRepos);
+      totalResult.commandResultCode ??= repoResult.result.commandResultCode;
+      if (repoResult.staleSelectionKey) staleSelectionKeys.add(repoResult.staleSelectionKey);
       successfulRepos++;
-      completedRepos.add(selectedRepoFullName);
+      completedRepos.add(planKey);
       processedThisPass++;
 
-      if (repoResult.reauthRequired && repositoryPlan.platformIntegrationId) {
-        authInvalidIntegrationIds.add(repositoryPlan.platformIntegrationId);
+      if (repoResult.result.reauthRequired && repoResult.resolvedIntegrationId) {
+        authInvalidIntegrationIds.add(repoResult.resolvedIntegrationId);
       }
     } catch (error) {
       incompleteFailures++;
@@ -2054,12 +2107,14 @@ export async function syncOwner(params: {
     }
   }
 
-  const remainingRepoCount = repositories.filter(name => !completedRepos.has(name)).length;
+  const remainingRepoCount = repositoryPlans.filter(
+    plan => !completedRepos.has(repositoryPlanKey(plan))
+  ).length;
   if (exhaustedBudget && remainingRepoCount > 0) {
     await writeSyncRunProgress(
       database,
       owner,
-      toSyncRunProgress(runId, totalResult, [...completedRepos])
+      toSyncRunProgress(runId, totalResult, [...completedRepos], [...staleSelectionKeys])
     );
     console.info('Security sync owner budget exhausted; continuation required', {
       runId,
@@ -2080,7 +2135,13 @@ export async function syncOwner(params: {
   // sync do not disagree about owner configuration after GitHub reports permanent loss.
   if (totalResult.staleRepos.length > 0) {
     try {
-      await pruneStaleReposFromConfig(database, owner, totalResult.staleRepos, config.repoNameToId);
+      await pruneStaleReposFromConfig(
+        database,
+        owner,
+        totalResult.staleRepos,
+        config.repoNameToId,
+        staleSelectionKeys
+      );
     } catch (error) {
       console.error('Failed to prune stale repos from config', {
         error: error instanceof Error ? error.message : String(error),
@@ -2092,7 +2153,12 @@ export async function syncOwner(params: {
   // inspection already loaded full accessible repositories for both sync scopes.
   if (config.missingSelectedRepoCount > 0) {
     try {
-      await pruneMissingSelectedRepos(database, owner, config.knownRepositoryIds);
+      await pruneMissingSelectedRepos(
+        database,
+        owner,
+        config.knownRepositoryIds,
+        config.knownRepositorySelectionKeys
+      );
     } catch (error) {
       console.error('Failed to prune missing selected repos from config', {
         error: error instanceof Error ? error.message : String(error),
@@ -2215,7 +2281,13 @@ async function syncRepo(params: {
   notificationPolicy: SecurityNotificationPolicy | null;
   notificationRecipientUserIds: string[];
   autoAnalysisEnabledAt: string | null;
-}): Promise<SyncResult> {
+  authInvalidIntegrationIds: Set<string>;
+  integrationsById: Map<string, IntegrationCandidate>;
+}): Promise<{
+  result: SyncResult;
+  resolvedIntegrationId?: string;
+  staleSelectionKey?: string;
+}> {
   const {
     db: database,
     gitTokenService,
@@ -2256,10 +2328,37 @@ async function syncRepo(params: {
       failureCode,
     });
     result.commandResultCode = failureCode;
-    if (failureCode === 'REPOSITORY_UNAVAILABLE') result.staleRepos.push(repoFullName);
-    return result;
+    if (resolved.reason === 'repository_not_installed') result.staleRepos.push(repoFullName);
+    return {
+      result,
+      ...(resolved.reason === 'repository_not_installed' &&
+      repositoryPlan.repositoryId !== undefined &&
+      repositoryPlan.platformIntegrationId
+        ? {
+            staleSelectionKey: `${repositoryPlan.repositoryId}:${repositoryPlan.platformIntegrationId}`,
+          }
+        : {}),
+    };
   }
   const { token, installationId, platformIntegrationId } = resolved;
+
+  if (
+    params.authInvalidIntegrationIds.has(platformIntegrationId) ||
+    isRecentTimestamp(
+      params.integrationsById.get(platformIntegrationId)?.authInvalidAt,
+      AUTH_INVALID_SHORT_CIRCUIT_MS
+    )
+  ) {
+    await recordSecurityAgentRepositorySyncFailure(database, {
+      owner: commandOwner,
+      repoFullName,
+      failureCode: 'GITHUB_AUTH_INVALID',
+    });
+    return {
+      result: createAuthInvalidSyncResult([repoFullName]),
+      resolvedIntegrationId: platformIntegrationId,
+    };
+  }
 
   const [repoOwner, repoName] = repoFullName.split('/');
   if (!repoOwner || !repoName) {
@@ -2280,7 +2379,10 @@ async function syncRepo(params: {
       repoFullName,
       failureCode: 'GITHUB_AUTH_INVALID',
     });
-    return createAuthInvalidSyncResult([repoFullName]);
+    return {
+      result: createAuthInvalidSyncResult([repoFullName]),
+      resolvedIntegrationId: platformIntegrationId,
+    };
   }
 
   if (fetchResult.status === 'repo_not_found') {
@@ -2291,7 +2393,13 @@ async function syncRepo(params: {
       repoFullName,
       failureCode: 'REPOSITORY_UNAVAILABLE',
     });
-    return result;
+    return {
+      result,
+      resolvedIntegrationId: platformIntegrationId,
+      ...(repositoryPlan.repositoryId !== undefined
+        ? { staleSelectionKey: `${repositoryPlan.repositoryId}:${platformIntegrationId}` }
+        : {}),
+    };
   }
 
   if (fetchResult.status === 'alerts_disabled') {
@@ -2302,7 +2410,7 @@ async function syncRepo(params: {
       repoFullName,
       failureCode: 'DEPENDABOT_ALERTS_DISABLED',
     });
-    return result;
+    return { result, resolvedIntegrationId: platformIntegrationId };
   }
 
   if (fetchResult.status === 'access_blocked') {
@@ -2313,7 +2421,13 @@ async function syncRepo(params: {
       repoFullName,
       failureCode: 'REPOSITORY_UNAVAILABLE',
     });
-    return result;
+    return {
+      result,
+      resolvedIntegrationId: platformIntegrationId,
+      ...(repositoryPlan.repositoryId !== undefined
+        ? { staleSelectionKey: `${repositoryPlan.repositoryId}:${platformIntegrationId}` }
+        : {}),
+    };
   }
 
   await clearIntegrationAuthInvalid(database, platformIntegrationId);
@@ -2425,7 +2539,7 @@ async function syncRepo(params: {
   } else {
     await recordSecurityAgentRepositorySyncSuccess(database, { owner: commandOwner, repoFullName });
   }
-  return result;
+  return { result, resolvedIntegrationId: platformIntegrationId };
 }
 
 type ResolvedRepositoryToken = {
@@ -2443,24 +2557,6 @@ async function resolveRepositoryToken(params: {
   repoFullName: string;
   resolverUserId: string;
 }): Promise<ResolvedRepositoryToken | Extract<GitTokenForRepoResult, { success: false }>> {
-  const { repositoryPlan } = params;
-  if (
-    repositoryPlan.platformIntegrationId &&
-    repositoryPlan.installationId &&
-    repositoryPlan.appType
-  ) {
-    return {
-      success: true,
-      token: await params.gitTokenService.getToken(
-        repositoryPlan.installationId,
-        repositoryPlan.appType
-      ),
-      platformIntegrationId: repositoryPlan.platformIntegrationId,
-      installationId: repositoryPlan.installationId,
-      appType: repositoryPlan.appType,
-    };
-  }
-
   if (!params.gitTokenService.getTokenForRepo) {
     throw new Error('Git Token Service does not support repository resolution');
   }
@@ -2468,5 +2564,8 @@ async function resolveRepositoryToken(params: {
     githubRepo: params.repoFullName,
     userId: params.resolverUserId,
     ...(isOrgOwner(params.owner) ? { orgId: params.owner.organizationId } : {}),
+    ...(params.repositoryPlan.platformIntegrationId
+      ? { expectedIntegrationId: params.repositoryPlan.platformIntegrationId }
+      : {}),
   });
 }

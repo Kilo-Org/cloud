@@ -1,18 +1,23 @@
+/* eslint-disable max-lines -- The new-session prompt owns its uncontrolled input, starter chips, counter, newline control, voice dictation, and attachment strip end-to-end in one cohesive surface. */
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  Keyboard,
   type LayoutChangeEvent,
   Platform,
   Pressable,
   TextInput as RNTextInput,
+  Text,
   type TextInput,
   type TextInputSelectionChangeEvent,
   type TextStyle,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { Paperclip } from '@/components/ui/icons';
+import { CornerDownLeft, Paperclip } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
@@ -23,6 +28,12 @@ import {
 } from '@/components/agents/composer-paste-text';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
+import {
+  NEW_SESSION_PROMPT_CHROME_HEIGHT,
+  resolveComposerMaxHeight,
+  SESSION_HEADER_HEIGHT,
+} from '@/components/agents/chat-composer-input-height';
+import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
 import { QueryError } from '@/components/query-error';
@@ -38,29 +49,34 @@ import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-con
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { AGENT_ATTACHMENT_MAX_BYTES } from '@/lib/agent-attachments/constants';
 import {
+  hasAnyFailedAttachment,
+  isAnyAttachmentUploading,
+} from '@/lib/agent-attachments/agent-attachment-types';
+import {
   clipboardPasteEmptyMessage,
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
-const PROMPT_INPUT_MAX_LINES = 6;
 const PROMPT_INPUT_LINE_HEIGHT = 24;
+const PROMPT_INPUT_FONT_SIZE = 16;
 // Must mirror the TextInput's actual padding: py-2 (16 total) and px-2 on
 // iOS (16 total) / the 24pt-per-side Android inset (48 total).
 const PROMPT_INPUT_VERTICAL_PADDING = 16;
 const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
-const PROMPT_INPUT_MIN_HEIGHT =
-  PROMPT_INPUT_LINE_HEIGHT * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
-const PROMPT_INPUT_MAX_HEIGHT =
-  PROMPT_INPUT_LINE_HEIGHT * PROMPT_INPUT_MAX_LINES + PROMPT_INPUT_VERTICAL_PADDING;
+/** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
+const PROMPT_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
 
-const promptInputStyle = {
-  includeFontPadding: false,
-  lineHeight: PROMPT_INPUT_LINE_HEIGHT,
-  textAlignVertical: 'top',
-} satisfies TextStyle;
+type NewSessionPromptComponentProps = NewSessionPromptProps & {
+  /**
+   * Return (when the Return-sends preference is on) triggers the host's Start
+   * flow. Omitted by hosts that have not wired the preference, so Return is a
+   * no-op there rather than starting on its own.
+   */
+  onStartSession?: () => void;
+};
 
 /**
  * New-session prompt surface: attachment strip, full-width multiline text
@@ -96,9 +112,16 @@ export function NewSessionPrompt({
   shareId,
   voiceInputSettlerRef,
   initialPrompt,
-}: Readonly<NewSessionPromptProps>) {
+  onStartSession,
+}: Readonly<NewSessionPromptComponentProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { height: windowHeight, fontScale } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const { returnSendsMessage } = useReturnSendsMessagePreference();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [hasPromptText, setHasPromptText] = useState((initialPrompt ?? '').trim().length > 0);
+  const [promptCharacterCount, setPromptCharacterCount] = useState(initialPrompt?.length ?? 0);
   const promptRef = useRef(initialPrompt ?? '');
   const initialPromptRef = useRef(initialPrompt ?? '');
   const promptInputRef = useRef<TextInput>(null);
@@ -118,13 +141,50 @@ export function NewSessionPrompt({
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
+  const promptLineHeight = PROMPT_INPUT_LINE_HEIGHT * fontScale;
+  const promptMinHeight =
+    promptLineHeight * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
+  const promptMaxHeight = resolveComposerMaxHeight({
+    windowHeight,
+    safeAreaInsetTop: insets.top,
+    safeAreaInsetBottom: insets.bottom,
+    keyboardHeight,
+    sessionHeaderHeight: SESSION_HEADER_HEIGHT * fontScale,
+    composerChromeHeight: NEW_SESSION_PROMPT_CHROME_HEIGHT * fontScale,
+    minHeight: promptMinHeight,
+  });
+
+  // Track the keyboard's reported height so the remaining-space cap follows it.
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, event => {
+      setKeyboardHeight(Math.max(event.endCoordinates.height, 0));
+    });
+    const hide = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  const promptInputStyle = {
+    includeFontPadding: false,
+    fontSize: PROMPT_INPUT_FONT_SIZE * fontScale,
+    lineHeight: promptLineHeight,
+    textAlignVertical: 'top',
+  } satisfies TextStyle;
+
   const promptMeasure = useTextHeight({
-    minHeight: PROMPT_INPUT_MIN_HEIGHT,
-    maxHeight: PROMPT_INPUT_MAX_HEIGHT,
+    minHeight: promptMinHeight,
+    maxHeight: promptMaxHeight,
     verticalPadding: PROMPT_INPUT_VERTICAL_PADDING,
     textContentWidth: promptInputWidth - PROMPT_INPUT_HORIZONTAL_PADDING,
-    fontSize: 16,
+    fontSize: PROMPT_INPUT_FONT_SIZE,
     lineHeight: PROMPT_INPUT_LINE_HEIGHT,
+    fontScale,
   });
 
   const promptMeasureSetTextRef = useRef(promptMeasure.setText);
@@ -136,6 +196,8 @@ export function NewSessionPrompt({
     (text: string) => {
       promptRef.current = text;
       promptMeasure.setText(text);
+      setHasPromptText(text.trim().length > 0);
+      setPromptCharacterCount(text.length);
       onChangeText(text);
     },
     [onChangeText, promptMeasure]
@@ -238,6 +300,55 @@ export function NewSessionPrompt({
     promptSelectionRef.current = event.nativeEvent.selection;
   }
 
+  // Starter chips insert text and focus the input; they never start a session.
+  const starterChips = [
+    t('agentChat.composer.starterChipBuild'),
+    t('agentChat.composer.starterChipFix'),
+    t('agentChat.composer.starterChipWriteTests'),
+  ];
+  const showStarters = !hasPromptText && !isCreating;
+
+  function applyStarter(chip: string) {
+    promptInputRef.current?.setNativeProps({
+      text: chip,
+      selection: { start: chip.length, end: chip.length },
+    });
+    promptInputRef.current?.focus();
+    handlePromptChange(chip);
+  }
+
+  function handleInsertNewline() {
+    if (!control.inputEditable) {
+      return;
+    }
+    promptSelectionRef.current = pasteTextIntoComposer('\n', {
+      input: promptInputRef.current,
+      draft: promptRef.current,
+      selection: promptSelectionRef.current,
+      maxLength: PROMPT_INPUT_MAX_CHARS,
+      onChangeText: handlePromptChange,
+    });
+  }
+
+  // Return (with the Return-sends preference on) starts the session with the
+  // same gates as the Start button: a non-empty prompt, an idle form, and no
+  // failed or in-flight attachments. A blocked start shows the same error the
+  // composer shows for a failed attachment. Voice settlement and the host's
+  // model/repository/profile gates run inside `onStartSession` itself.
+  function handleReturnSubmit() {
+    if (control.createDisabled || promptRef.current.trim().length === 0) {
+      return;
+    }
+    if (hasAnyFailedAttachment(attachments)) {
+      toast.error(t('agentChat.composer.removeOrRetryFailed'));
+      return;
+    }
+    if (isAnyAttachmentUploading(attachments)) {
+      return;
+    }
+    onStartSession?.();
+  }
+
   function handlePaperclipPress() {
     onAddAttachment();
   }
@@ -275,14 +386,43 @@ export function NewSessionPrompt({
           onChangeText={handlePromptChange}
           onSelectionChange={handlePromptSelectionChange}
           onLayout={handlePromptInputLayout}
-          scrollEnabled={promptMeasure.height >= PROMPT_INPUT_MAX_HEIGHT}
+          scrollEnabled={promptMeasure.height >= promptMaxHeight}
           editable={control.inputEditable}
           maxLength={PROMPT_INPUT_MAX_CHARS}
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
+          returnKeyType={returnSendsMessage ? 'send' : 'default'}
+          submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
+          onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
+          maxFontSizeMultiplier={1}
           // A shared payload prefills this input, so raising the keyboard on
           // arrival hides the attachment strip and the Start button.
           autoFocus={shareId === undefined || shareId === ''}
         />
+        {showStarters ? (
+          <View className="flex-row flex-wrap gap-2 px-1 pb-2">
+            {starterChips.map(chip => (
+              <Pressable
+                key={chip}
+                onPress={() => {
+                  applyStarter(chip);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={chip}
+                style={{ minHeight: PROMPT_HIT_TARGET }}
+                className="min-h-11 items-center justify-center rounded-full border border-border bg-card px-3 py-2 active:opacity-70"
+              >
+                <Text className="text-sm text-muted-foreground">{chip}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        {promptCharacterCount > 0 ? (
+          <View className="flex-row justify-end px-1 pb-1">
+            <Text className="text-xs text-muted-foreground">
+              {PROMPT_INPUT_MAX_CHARS - promptCharacterCount}
+            </Text>
+          </View>
+        ) : null}
         <View className="flex-row items-center justify-between pb-2">
           <View className="flex-row items-center gap-1">
             <Pressable
@@ -306,6 +446,25 @@ export function NewSessionPrompt({
           {voiceInput.available ? (
             <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
               <VoiceInputStatus status={voiceInput.status} />
+            </View>
+          ) : null}
+          {returnSendsMessage ? (
+            <View className="ml-1">
+              <Pressable
+                onPress={handleInsertNewline}
+                disabled={!control.inputEditable}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('agentChat.composer.insertNewline')}
+                accessibilityState={{ disabled: !control.inputEditable }}
+                style={{ minHeight: PROMPT_HIT_TARGET, minWidth: PROMPT_HIT_TARGET }}
+                className={cn(
+                  'items-center justify-center rounded-full active:opacity-70',
+                  !control.inputEditable && 'opacity-50'
+                )}
+              >
+                <CornerDownLeft size={18} color={colors.mutedForeground} />
+              </Pressable>
             </View>
           ) : null}
           {voiceInput.available ? (

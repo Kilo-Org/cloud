@@ -255,6 +255,7 @@ export function NewSessionConfigureForm({
         shareId={shareId}
         voiceInputSettlerRef={voiceInputSettlerRef}
         initialPrompt={initialPrompt}
+        onStartSession={isStartDisabled ? undefined : onStartSession}
       />
 
       {runTargetBlock}

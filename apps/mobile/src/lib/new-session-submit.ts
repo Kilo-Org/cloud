@@ -135,12 +135,14 @@ export function resolveContinueStartDisabled(input: {
   instanceCatalogLoading: boolean;
   instanceHasSessionClone: boolean;
   cloneImportFailureKey: string | null;
+  isModelUnavailable: boolean;
 }): boolean {
   if (input.isRemoteTargetSelected) {
     return (
       input.isSpawningRemote ||
       input.isSubmitting ||
       input.model === '' ||
+      input.isModelUnavailable ||
       input.instanceCatalogLoading ||
       !input.instanceHasSessionClone ||
       input.cloneImportFailureKey !== null

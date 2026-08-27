@@ -522,6 +522,7 @@ export function NewSessionScreenBody() {
         instanceCatalogLoading: instanceCatalog.isLoading,
         instanceHasSessionClone,
         cloneImportFailureKey,
+        isModelUnavailable: modelView.isSelectionUnavailable,
       });
     }
     if (isRemoteTargetSelected) {

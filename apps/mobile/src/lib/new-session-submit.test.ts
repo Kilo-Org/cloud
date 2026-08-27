@@ -37,6 +37,7 @@ function continueInput(
     instanceCatalogLoading: false,
     instanceHasSessionClone: true,
     cloneImportFailureKey: null,
+    isModelUnavailable: false,
     ...overrides,
   };
 }
@@ -208,6 +209,14 @@ describe('resolveContinueStartDisabled', () => {
         continueInput({ isRemoteTargetSelected: true, selectedRepo: '' })
       )
     ).toBe(false);
+  });
+
+  it('clone CLI with an unavailable model is disabled', () => {
+    expect(
+      resolveContinueStartDisabled(
+        continueInput({ isRemoteTargetSelected: true, isModelUnavailable: true })
+      )
+    ).toBe(true);
   });
 
   it('clone CLI without sessionClone is disabled', () => {

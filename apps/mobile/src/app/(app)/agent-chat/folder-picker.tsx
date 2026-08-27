@@ -29,9 +29,25 @@ export default function FolderPickerScreen() {
   const [bridge] = useState(() => folderPickerSlot.get(UNFENCED_ROUTE_KEY));
   const bridgeRef = useRef(bridge);
   useRouteRegistry(UNFENCED_ROUTE_KEY);
-  const [stack, setStack] = useState<NavFrame[]>(() =>
-    bridge ? [{ path: bridge.currentPath, title: bridge.projectName }] : []
-  );
+  // Build the drill stack from the bridge so a reopen at a child shows the
+  // child's name as the title and Back returns to its parent, while a reopen
+  // at launch stays a single frame (Back hidden). The CLI returns each entry's
+  // `path` as a POSIX-relative path whose last segment is its `name`, so the
+  // segment is the correct frame title.
+  const [stack, setStack] = useState<NavFrame[]>(() => {
+    if (!bridge) {
+      return [];
+    }
+    const frames: NavFrame[] = [{ path: '', title: bridge.projectName }];
+    if (bridge.currentPath) {
+      let prefix = '';
+      for (const segment of bridge.currentPath.split('/')) {
+        prefix = prefix ? `${prefix}/${segment}` : segment;
+        frames.push({ path: prefix, title: segment });
+      }
+    }
+    return frames;
+  });
   const { state, list } = useListDirectories(bridge?.connectionId ?? null);
 
   // List the launch (or last confirmed) path once on mount. `bridge` and

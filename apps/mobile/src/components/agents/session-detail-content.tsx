@@ -125,7 +125,10 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
-import { buildContinueHref, buildContinuePrefillParams } from '@/components/agents/new-session-prefill';
+import {
+  buildContinueHref,
+  buildContinuePrefillParams,
+} from '@/components/agents/new-session-prefill';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,

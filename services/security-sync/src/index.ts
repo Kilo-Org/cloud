@@ -449,6 +449,9 @@ function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>)
   if (result.commandResultCode === 'CONFIG_DISABLED') {
     return { status: 'no_op', resultCode: 'CONFIG_DISABLED' };
   }
+  if (result.commandResultCode === 'AMBIGUOUS_GITHUB_INTEGRATION') {
+    return { status: 'failed', resultCode: 'AMBIGUOUS_GITHUB_INTEGRATION' };
+  }
   if (result.commandResultCode === 'REPOSITORY_UNAVAILABLE' || result.staleRepos.length > 0) {
     return { status: 'failed', resultCode: 'REPOSITORY_UNAVAILABLE' };
   }

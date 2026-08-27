@@ -14,6 +14,7 @@
  * (`unsupported`) from a transient transport failure worth retrying
  * (`transport`).
  */
+import { RETRYABLE_RELAY_CODES } from './instance-model-catalog';
 import { listDirectoriesV1Schema } from './schemas';
 import type { ListDirectoriesV1 } from './schemas';
 import {
@@ -23,18 +24,6 @@ import {
 } from './user-web-connection';
 
 export type { ListDirectoriesV1 } from './schemas';
-
-/**
- * Relay codes whose failure is transient for this connection. Every other
- * structured relay error repeats identically on retry, so it must not be
- * retried.
- */
-const RETRYABLE_RELAY_CODES = new Set([
-  'SESSION_OWNER_CHANGED',
-  'CATALOG_REQUEST_PENDING',
-  'COMMAND_EXPIRED',
-  'PENDING_COMMAND_LIMIT',
-]);
 
 /**
  * Delivered error strings that mean the CLI cannot serve this command at all.

@@ -526,8 +526,8 @@ export type CreateSessionResponseV1 = z.infer<typeof createSessionResponseV1Sche
 // Remote CLI directory listing (list_directories)
 // ---------------------------------------------------------------------------
 
-export const REMOTE_DIRECTORY_MAX_ENTRIES = 256;
-export const REMOTE_DIRECTORY_MAX_STRING_LENGTH = 2_000;
+const REMOTE_DIRECTORY_MAX_ENTRIES = 256;
+const REMOTE_DIRECTORY_MAX_STRING_LENGTH = 2_000;
 
 const remoteDirectoryEntrySchema = z
   .object({

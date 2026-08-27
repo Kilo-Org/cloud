@@ -19,7 +19,7 @@ type FolderSelectorProps = {
   disabled?: boolean;
 };
 
-export function FolderSelector({
+function FolderSelector({
   folderPath,
   projectName,
   runOnInstance,

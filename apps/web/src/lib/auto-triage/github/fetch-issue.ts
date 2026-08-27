@@ -1,5 +1,5 @@
 /**
- * Fetch a GitHub issue via an owner's platform installation.
+ * Fetch a GitHub issue via an exact platform installation.
  *
  * Used by the admin "submit issue for triage" form to populate the
  * `issue_title` / `issue_body` / `issue_author` / `issue_labels` fields
@@ -8,9 +8,14 @@
  */
 
 import 'server-only';
-import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
-import type { Owner } from '../core';
+import type { PlatformIntegration } from '@kilocode/db/schema';
+import type { Owner as IntegrationOwner } from '@/lib/integrations/core/types';
+import {
+  getIntegrationForOwner,
+  resolveOrganizationGitHubIntegrationForRepository,
+  type OrganizationGitHubIntegrationResolution,
+} from '@/lib/integrations/db/platform-integrations';
+import { generateAutoTriageInstallationToken } from './installation-token';
 
 export type ParsedIssueUrl = {
   repoOwner: string;
@@ -56,28 +61,41 @@ export type FetchedIssue = {
   labels: string[];
 };
 
+export async function resolveIssueIntegration(
+  owner: IntegrationOwner,
+  repositoryFullName: string
+): Promise<OrganizationGitHubIntegrationResolution> {
+  if (owner.type === 'org') {
+    return resolveOrganizationGitHubIntegrationForRepository({
+      organizationId: owner.id,
+      repositoryFullName,
+    });
+  }
+
+  const integration = await getIntegrationForOwner(owner, 'github');
+  return integration
+    ? { success: true, integration }
+    : { success: false, reason: 'no_installation_found' };
+}
+
 /**
- * Fetch an issue via the GitHub REST API using the installation token
- * associated with the given owner. Returns the subset of fields we need
- * to build a triage ticket.
+ * Fetch an issue via the GitHub REST API using the resolved installation.
+ * Returns the subset of fields we need to build a triage ticket.
  *
  * Throws with a user-facing message for the common failure modes
  * (no installation, not found, etc.) so the admin UI can surface them.
  */
-export async function fetchIssueForOwner(owner: Owner, url: ParsedIssueUrl): Promise<FetchedIssue> {
-  const integration = await getIntegrationForOwner(owner, 'github');
-  if (!integration) {
-    throw new Error(
-      'No GitHub App installation found for this owner. Install the Kilo GitHub App first.'
-    );
-  }
+export async function fetchIssueForIntegration(
+  integration: PlatformIntegration,
+  url: ParsedIssueUrl
+): Promise<FetchedIssue> {
   if (!integration.platform_installation_id) {
     throw new Error(
       'GitHub integration is missing an installation id. Reinstall the Kilo GitHub App.'
     );
   }
 
-  const tokenData = await generateGitHubInstallationToken(integration.platform_installation_id);
+  const tokenData = await generateAutoTriageInstallationToken(integration);
 
   const apiUrl = `https://api.github.com/repos/${url.repoOwner}/${url.repoName}/issues/${url.issueNumber}`;
   const response = await fetch(apiUrl, {

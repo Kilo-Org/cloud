@@ -20,8 +20,8 @@ import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { addIssueLabel } from '@/lib/auto-triage/github/add-label';
-import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { generateAutoTriageInstallationToken } from '@/lib/auto-triage/github/installation-token';
 
 const addLabelRequestSchema = z.object({
   ticketId: z.string().uuid(),
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No platform installation found' }, { status: 400 });
     }
 
-    const tokenData = await generateGitHubInstallationToken(integration.platform_installation_id);
+    const tokenData = await generateAutoTriageInstallationToken(integration);
 
     // Add labels to the GitHub issue in parallel (best-effort: partial failures don't abort the batch)
     logExceptInTest('[auto-triage:labels] Applying labels to GitHub issue', {

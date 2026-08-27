@@ -19,9 +19,9 @@ import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { postIssueComment } from '@/lib/auto-triage/github/post-comment';
-import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { z } from 'zod';
+import { generateAutoTriageInstallationToken } from '@/lib/auto-triage/github/installation-token';
 
 const postCommentRequestSchema = z.object({
   ticketId: z.string().uuid(),
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No platform installation found' }, { status: 400 });
     }
 
-    const tokenData = await generateGitHubInstallationToken(integration.platform_installation_id);
+    const tokenData = await generateAutoTriageInstallationToken(integration);
 
     logExceptInTest('[post-comment] Posting comment on GitHub issue', {
       ticketId,

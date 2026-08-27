@@ -22,8 +22,8 @@ import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import type { Owner } from '@/lib/auto-triage/db/types';
 import type { AutoTriageAgentConfig } from '@/lib/auto-triage/core/schemas';
-import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { generateAutoTriageInstallationToken } from '@/lib/auto-triage/github/installation-token';
 
 interface ClassifyConfigRequest {
   ticketId: string;
@@ -72,9 +72,7 @@ export async function POST(req: NextRequest) {
         const integration = await getIntegrationById(ticket.platform_integration_id);
 
         if (integration?.platform_installation_id) {
-          const tokenData = await generateGitHubInstallationToken(
-            integration.platform_installation_id
-          );
+          const tokenData = await generateAutoTriageInstallationToken(integration);
           githubToken = tokenData.token;
 
           logExceptInTest('[classify-config] GitHub token obtained', {

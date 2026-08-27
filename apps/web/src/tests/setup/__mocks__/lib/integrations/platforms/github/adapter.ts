@@ -9,7 +9,8 @@ export function verifyGitHubWebhookSignature(_payload: string, _signature: strin
 }
 
 export async function generateGitHubInstallationToken(
-  _installationId: string
+  _installationId: string,
+  _appType: GitHubAppType = 'standard'
 ): Promise<{ token: string; expires_at: string }> {
   return { token: `mock-token-${_installationId}`, expires_at: '2099-01-01T00:00:00.000Z' };
 }

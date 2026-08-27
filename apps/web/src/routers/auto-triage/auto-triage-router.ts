@@ -34,9 +34,12 @@ import {
 } from '@/lib/auto-triage/db/triage-tickets';
 import { getAgentConfig, upsertAgentConfig } from '@/lib/agent-config/db/agent-configs';
 import { DEFAULT_AUTO_TRIAGE_CONFIG } from '@/lib/auto-triage';
-import { parseGitHubIssueUrl, fetchIssueForOwner } from '@/lib/auto-triage/github/fetch-issue';
+import {
+  parseGitHubIssueUrl,
+  fetchIssueForIntegration,
+  resolveIssueIntegration,
+} from '@/lib/auto-triage/github/fetch-issue';
 import { tryDispatchPendingTickets } from '@/lib/auto-triage/dispatch/dispatch-pending-tickets';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 
 export const autoTriageRouter = createTRPCRouter({
@@ -354,20 +357,24 @@ export const autoTriageRouter = createTRPCRouter({
       // For orgs we mirror issue-webhook-processor.resolveOwner() by
       // preferring the bot user id with a fallback to the integration
       // creator. For personal we use the admin's own user id.
+      const integrationOwner =
+        input.owner.type === 'org'
+          ? { type: 'org' as const, id: input.owner.organizationId }
+          : { type: 'user' as const, id: ctx.user.id };
+      const resolution = await resolveIssueIntegration(integrationOwner, parsedUrl.repoFullName);
+      if (!resolution.success) {
+        throw new TRPCError({
+          code: resolution.reason === 'ambiguous_installation' ? 'CONFLICT' : 'PRECONDITION_FAILED',
+          message:
+            resolution.reason === 'ambiguous_installation'
+              ? 'Multiple GitHub App installations can access this repository. Update the installations so exactly one has access.'
+              : 'No GitHub App installation for this owner can access this repository.',
+        });
+      }
+      const integration = resolution.integration;
+
       let owner: Owner;
       if (input.owner.type === 'org') {
-        // `getIntegrationForOwner` takes the integrations-module `Owner`
-        // which only needs { type, id } — don't synthesise a userId here.
-        const integration = await getIntegrationForOwner(
-          { type: 'org', id: input.owner.organizationId },
-          'github'
-        );
-        if (!integration) {
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: 'No GitHub App installation found for this organization.',
-          });
-        }
         const botUserId = await getBotUserId(input.owner.organizationId, 'auto-triage');
         const fallbackUserId = botUserId ?? integration.kilo_requester_user_id;
         if (!fallbackUserId) {
@@ -389,7 +396,7 @@ export const autoTriageRouter = createTRPCRouter({
       // Pull title/body/labels from GitHub via the owner's installation.
       let issue;
       try {
-        issue = await fetchIssueForOwner(owner, parsedUrl);
+        issue = await fetchIssueForIntegration(integration, parsedUrl);
       } catch (error) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -397,13 +404,9 @@ export const autoTriageRouter = createTRPCRouter({
         });
       }
 
-      // Look up the integration again for owner.type==='user' to attach
-      // platformIntegrationId on the ticket for parity with the webhook path.
-      const integration = await getIntegrationForOwner(owner, 'github');
-
       const ticketId = await createTriageTicket({
         owner,
-        platformIntegrationId: integration?.id,
+        platformIntegrationId: integration.id,
         repoFullName: parsedUrl.repoFullName,
         issueNumber: parsedUrl.issueNumber,
         issueUrl: parsedUrl.issueUrl,

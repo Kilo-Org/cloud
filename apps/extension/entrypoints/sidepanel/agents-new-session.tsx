@@ -89,7 +89,65 @@ interface RepoOption {
   readonly name: string;
   readonly fullName: string;
   readonly private: boolean;
+  readonly platformIntegrationId?: string;
+  readonly platformAccountLogin?: string;
 }
+
+export const getRepoOptionKey = (repo: RepoOption): string =>
+  repo.platformIntegrationId === undefined || repo.platformIntegrationId === ''
+    ? repo.fullName
+    : `${repo.platformIntegrationId}:${repo.fullName}`;
+
+export const findRepoOption = (repos: RepoOption[], selectedRepo: string): RepoOption | undefined =>
+  repos.find(repository => getRepoOptionKey(repository) === selectedRepo);
+
+export const getGitHubIntegrationIdForSubmit = (
+  repos: RepoOption[],
+  selectedRepository: RepoOption
+): string | undefined => {
+  if (
+    selectedRepository.platformIntegrationId === undefined ||
+    selectedRepository.platformIntegrationId === ''
+  ) {
+    return undefined;
+  }
+
+  const normalizedFullName = selectedRepository.fullName.toLowerCase();
+  const matchingRepositories = repos.filter(
+    repository => repository.fullName.toLowerCase() === normalizedFullName
+  );
+  return matchingRepositories.length > 1 ? selectedRepository.platformIntegrationId : undefined;
+};
+
+export const filterRepoOptions = (repos: RepoOption[], search: string): RepoOption[] => {
+  const normalized = search.toLowerCase().trim();
+  if (normalized.length === 0) {
+    return repos;
+  }
+  return repos.filter(
+    repo =>
+      repo.fullName.toLowerCase().includes(normalized) ||
+      repo.name.toLowerCase().includes(normalized) ||
+      repo.platformAccountLogin?.toLowerCase().includes(normalized) === true
+  );
+};
+
+export const groupRepoOptions = (
+  repos: RepoOption[]
+): [accountLogin: string | undefined, repositories: RepoOption[]][] => {
+  const groups = new Map<string | undefined, RepoOption[]>();
+  for (const repository of repos) {
+    const trimmedAccountLogin = repository.platformAccountLogin?.trim();
+    const accountLogin =
+      trimmedAccountLogin === undefined || trimmedAccountLogin === ''
+        ? undefined
+        : trimmedAccountLogin;
+    const group = groups.get(accountLogin) ?? [];
+    group.push(repository);
+    groups.set(accountLogin, group);
+  }
+  return [...groups];
+};
 
 interface LastSelected {
   readonly model: string;
@@ -120,6 +178,7 @@ export const buildPrepareSessionInput = (
 const trimValue = (value: string): string => value.trim();
 
 export const buildSubmitInput = ({
+  githubIntegrationId,
   initialMessageId,
   prompt,
   selectedModel,
@@ -130,11 +189,15 @@ export const buildSubmitInput = ({
   selectedModel: string;
   selectedVariant: string;
   selectedRepo: string;
+  githubIntegrationId?: string;
   initialMessageId: string;
 }) => ({
   autoCommit: true,
   autoInitiate: true,
   githubRepo: selectedRepo,
+  ...(githubIntegrationId === undefined || githubIntegrationId === ''
+    ? {}
+    : { githubIntegrationId }),
   initialMessageId,
   mode: MODE,
   model: selectedModel,
@@ -351,6 +414,10 @@ export const AgentsNewSession = ({
   const repoDropdownRef = useRef<HTMLDivElement>(null);
 
   const isCloudTarget = runTarget === 'cloud';
+  const selectedRepository = useMemo(
+    () => findRepoOption(repos, selectedRepo),
+    [repos, selectedRepo]
+  );
   const selectedInstance = useMemo(
     () => instances.find(instance => instance.connectionId === runTarget),
     [instances, runTarget]
@@ -407,7 +474,8 @@ export const AgentsNewSession = ({
     if (selectedRepo || repos.length !== 1) {
       return;
     }
-    setSelectedRepo(repos[0]?.fullName ?? '');
+    const [repository] = repos;
+    setSelectedRepo(repository ? getRepoOptionKey(repository) : '');
   }, [repos, selectedRepo]);
 
   // ---- Picker values per run target ----
@@ -431,7 +499,7 @@ export const AgentsNewSession = ({
   /* A CLI instance inherits the repo from the CLI and defaults to its own
      model; cloud needs both picked. */
   const isFormValid = isCloudTarget
-    ? isPromptValid && selectedModel !== '' && selectedRepo !== ''
+    ? isPromptValid && selectedModel !== '' && selectedRepository !== undefined
     : isPromptValid;
   const repoStatus = (() => {
     if (isRepoLoading) {
@@ -443,18 +511,8 @@ export const AgentsNewSession = ({
     return 'ready';
   })();
 
-  // Filter repos by search term
-  const filteredRepos = useMemo(() => {
-    const normalized = repoSearch.toLowerCase().trim();
-    if (normalized.length === 0) {
-      return repos;
-    }
-    return repos.filter(
-      repo =>
-        repo.fullName.toLowerCase().includes(normalized) ||
-        repo.name.toLowerCase().includes(normalized)
-    );
-  }, [repos, repoSearch]);
+  const filteredRepos = useMemo(() => filterRepoOptions(repos, repoSearch), [repos, repoSearch]);
+  const groupedRepos = useMemo(() => groupRepoOptions(filteredRepos), [filteredRepos]);
 
   const blockedReason = submitBlockedReason({
     hasModels: modelOptions.length > 0,
@@ -463,7 +521,7 @@ export const AgentsNewSession = ({
     isLoading: isRepoLoading || isModelsLoading,
     isPromptValid,
     repoCount: repos.length,
-    selectedRepo,
+    selectedRepo: selectedRepository ? selectedRepo : '',
   });
 
   const isCreditsError = submitError?.toLowerCase().includes('insufficient credits') ?? false;
@@ -540,11 +598,16 @@ export const AgentsNewSession = ({
     }
 
     const messageId = generateMessageId();
+    const githubIntegrationId =
+      selectedRepository === undefined
+        ? undefined
+        : getGitHubIntegrationIdForSubmit(repos, selectedRepository);
     const input = buildSubmitInput({
+      ...(githubIntegrationId === undefined ? {} : { githubIntegrationId }),
       initialMessageId: messageId,
       prompt: trimmed,
       selectedModel,
-      selectedRepo,
+      selectedRepo: selectedRepository?.fullName ?? '',
       selectedVariant,
     });
 
@@ -596,7 +659,8 @@ export const AgentsNewSession = ({
     trimmed,
     selectedModel,
     selectedVariant,
-    selectedRepo,
+    selectedRepository,
+    repos,
     organizationId,
     trpcClient,
     queryClient,
@@ -831,9 +895,9 @@ export const AgentsNewSession = ({
               >
                 <FolderGit2 className="size-3.5 shrink-0 text-foreground-muted" />
                 <span
-                  className={`max-w-[120px] truncate ${selectedRepo ? 'text-foreground' : 'text-foreground-muted'}`}
+                  className={`max-w-[120px] truncate ${selectedRepository ? 'text-foreground' : 'text-foreground-muted'}`}
                 >
-                  {selectedRepo || 'Repository'}
+                  {selectedRepository?.fullName ?? 'Repository'}
                 </span>
                 {repoStatus === 'loading' ? (
                   <Loader2 className="size-3.5 shrink-0 animate-spin" />
@@ -923,26 +987,42 @@ export const AgentsNewSession = ({
                             No repositories match your search
                           </p>
                         ) : (
-                          filteredRepos.map(repo => (
-                            <button
-                              className="flex w-full items-center gap-2 px-3 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:bg-surface-hover"
-                              key={repo.id}
-                              onClick={() => {
-                                setSelectedRepo(repo.fullName);
-                                setRepoDropdownOpen(false);
-                                setRepoSearch('');
-                              }}
-                              type="button"
+                          groupedRepos.map(([accountLogin, repositories]) => (
+                            <div
+                              key={
+                                accountLogin === undefined ? 'legacy' : `account:${accountLogin}`
+                              }
                             >
-                              <FolderGit2 className="size-3.5 shrink-0 text-foreground-muted" />
-                              <span className="truncate flex-1">{repo.fullName}</span>
-                              {repo.private ? (
-                                <Lock className="size-3 shrink-0 text-foreground-muted" />
-                              ) : null}
-                              {repo.fullName === selectedRepo ? (
-                                <Check className="size-3.5 shrink-0 text-brand-primary" />
-                              ) : null}
-                            </button>
+                              {accountLogin === undefined ? null : (
+                                <p className="px-3 pb-1 pt-2 type-label font-semibold uppercase tracking-wide text-foreground-muted">
+                                  {accountLogin}
+                                </p>
+                              )}
+                              {repositories.map(repo => {
+                                const repoKey = getRepoOptionKey(repo);
+                                return (
+                                  <button
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left type-body transition hover:bg-surface-hover outline-none focus-visible:bg-surface-hover"
+                                    key={repoKey}
+                                    onClick={() => {
+                                      setSelectedRepo(repoKey);
+                                      setRepoDropdownOpen(false);
+                                      setRepoSearch('');
+                                    }}
+                                    type="button"
+                                  >
+                                    <FolderGit2 className="size-3.5 shrink-0 text-foreground-muted" />
+                                    <span className="truncate flex-1">{repo.fullName}</span>
+                                    {repo.private ? (
+                                      <Lock className="size-3 shrink-0 text-foreground-muted" />
+                                    ) : null}
+                                    {repoKey === selectedRepo ? (
+                                      <Check className="size-3.5 shrink-0 text-brand-primary" />
+                                    ) : null}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           ))
                         )}
                       </>

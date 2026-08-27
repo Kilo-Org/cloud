@@ -1,9 +1,15 @@
+/* eslint-disable max-lines -- Focused coverage for the new-session form's exported helpers */
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildPrepareSessionInput,
   buildSubmitInput,
+  filterRepoOptions,
+  findRepoOption,
+  getGitHubIntegrationIdForSubmit,
+  getRepoOptionKey,
+  groupRepoOptions,
   isModelPreferencesGetResult,
   MODE,
   PROMPT_MAX_LENGTH,
@@ -133,11 +139,85 @@ describe('buildSubmitInput helper', () => {
     const result = buildSubmitInput(baseParams);
     expect(result).not.toHaveProperty('organizationId');
   });
+
+  it('includes an explicitly selected repository integration', () => {
+    const result = buildSubmitInput({ ...baseParams, githubIntegrationId: 'integration-1' });
+    expect(result['githubIntegrationId']).toBe('integration-1');
+  });
+
+  it('omits repository integration provenance when it is not needed', () => {
+    expect(buildSubmitInput(baseParams)).not.toHaveProperty('githubIntegrationId');
+  });
 });
 
-// ---------------------------------------------------------------------------
-// BuildPrepareSessionInput
-// ---------------------------------------------------------------------------
+describe('repository selector helpers', () => {
+  const acmeRepository = {
+    fullName: 'acme/widgets',
+    id: 1,
+    name: 'widgets',
+    platformAccountLogin: 'Acme',
+    platformIntegrationId: 'integration-1',
+    private: true,
+  };
+  const securityRepository = {
+    fullName: 'ACME/Widgets',
+    id: 2,
+    name: 'Widgets',
+    platformAccountLogin: 'Acme Security',
+    platformIntegrationId: 'integration-2',
+    private: true,
+  };
+  const legacyRepository = {
+    fullName: 'octocat/Hello-World',
+    id: 3,
+    name: 'Hello-World',
+    private: false,
+  };
+  const repositories = [acmeRepository, securityRepository, legacyRepository];
+
+  it('uses integration-qualified keys while retaining the legacy full-name fallback', () => {
+    expect(getRepoOptionKey(acmeRepository)).toBe('integration-1:acme/widgets');
+    expect(getRepoOptionKey(securityRepository)).toBe('integration-2:ACME/Widgets');
+    expect(getRepoOptionKey(legacyRepository)).toBe('octocat/Hello-World');
+  });
+
+  it('finds only the exact integration-qualified selection and rejects stale keys', () => {
+    expect(findRepoOption(repositories, getRepoOptionKey(securityRepository))).toBe(
+      securityRepository
+    );
+    expect(findRepoOption(repositories, 'integration-stale:acme/widgets')).toBeUndefined();
+    expect(findRepoOption(repositories, 'acme/widgets')).toBeUndefined();
+  });
+
+  it('searches canonical names and GitHub accounts case-insensitively', () => {
+    expect(filterRepoOptions(repositories, 'hello')).toStrictEqual([legacyRepository]);
+    expect(filterRepoOptions(repositories, 'SECURITY')).toStrictEqual([securityRepository]);
+  });
+
+  it('retains duplicate full-name rows in search results', () => {
+    expect(filterRepoOptions(repositories, 'acme/widgets')).toStrictEqual([
+      acmeRepository,
+      securityRepository,
+    ]);
+  });
+
+  it('groups by GitHub account and keeps repositories without provenance in a legacy group', () => {
+    expect(groupRepoOptions(repositories)).toStrictEqual([
+      ['Acme', [acmeRepository]],
+      ['Acme Security', [securityRepository]],
+      [undefined, [legacyRepository]],
+    ]);
+  });
+
+  it('pins the exact integration for case-insensitive duplicate full names', () => {
+    expect(getGitHubIntegrationIdForSubmit(repositories, securityRepository)).toBe('integration-2');
+  });
+
+  it('omits the integration for an ordinary unique owner/repo', () => {
+    expect(getGitHubIntegrationIdForSubmit(repositories, legacyRepository)).toBeUndefined();
+    expect(getGitHubIntegrationIdForSubmit([acmeRepository], acmeRepository)).toBeUndefined();
+  });
+});
 
 describe('buildPrepareSessionInput helper', () => {
   const baseInput = {

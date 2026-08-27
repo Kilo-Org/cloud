@@ -85,6 +85,12 @@ export type ResolveCloudAgentRootSessionForKiloSessionParams = z.input<
 >;
 export type ResolveCloudAgentRootSessionForKiloSessionResult = {
   cloudAgentSessionId: string;
+  /**
+   * Sanitized repository identity recorded for the authorized root. Optional
+   * for compatibility with roots and Session Ingest workers created before
+   * repository identity was returned by this RPC.
+   */
+  repository?: { type: 'github'; repo: string };
 } | null;
 
 export const kiloSdkSessionInfoSchema = z.object({

@@ -99,6 +99,7 @@ const sdkStoredMessageFixture = { info: sdkUserMessageFixture, parts: [sdkTextPa
 type MappingRow = {
   kiloSessionId?: string;
   cloudAgentSessionId?: string | null;
+  gitUrl?: string | null;
   title?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -1435,7 +1436,12 @@ describe('SessionIngestRPC.resolveCloudAgentRootSessionForKiloSession', () => {
   });
 
   it('returns the Cloud Agent session ID for an owned root Kilo session mapping', async () => {
-    const { db, select } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
+    const { db, select } = makeDbFakes([
+      {
+        cloudAgentSessionId: 'agent_owned_root',
+        gitUrl: 'https://github.com/Acme/Repo',
+      },
+    ]);
     const rpc = makeRpc(db);
 
     const result = await rpc.resolveCloudAgentRootSessionForKiloSession({
@@ -1443,10 +1449,28 @@ describe('SessionIngestRPC.resolveCloudAgentRootSessionForKiloSession', () => {
       kiloSessionId: 'ses_12345678901234567890123456',
     });
 
-    expect(result).toEqual({ cloudAgentSessionId: 'agent_owned_root' });
-    expect(db.select).toHaveBeenCalledWith({ cloudAgentSessionId: expect.anything() });
+    expect(result).toEqual({
+      cloudAgentSessionId: 'agent_owned_root',
+      repository: { type: 'github', repo: 'Acme/Repo' },
+    });
+    expect(db.select).toHaveBeenCalledWith({
+      cloudAgentSessionId: expect.anything(),
+      gitUrl: expect.anything(),
+    });
     expect(select.leftJoin).toHaveBeenCalledWith(organization_memberships, expect.anything());
     expect(or).toHaveBeenCalled();
+  });
+
+  it('keeps the legacy result shape when the root has no sanitized GitHub repository', async () => {
+    const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_legacy_root', gitUrl: null }]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.resolveCloudAgentRootSessionForKiloSession({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: 'ses_12345678901234567890123456',
+      })
+    ).resolves.toEqual({ cloudAgentSessionId: 'agent_legacy_root' });
   });
 
   it('returns null when no owned Cloud Agent root mapping is found', async () => {

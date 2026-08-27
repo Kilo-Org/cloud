@@ -138,7 +138,7 @@ describe('InstallationLookupService', () => {
     expect(db.updateQuery.where).toHaveBeenCalled();
   });
 
-  it('prioritizes a selected-repository cache match without dropping other candidates', async () => {
+  it('returns authorized rows without treating cached repository metadata as proof', async () => {
     const service = createService([
       {
         platform_installation_id: '100',
@@ -163,8 +163,8 @@ describe('InstallationLookupService', () => {
     });
 
     expect(result.success && result.candidates.map(candidate => candidate.installationId)).toEqual([
-      '200',
       '100',
+      '200',
     ]);
   });
 

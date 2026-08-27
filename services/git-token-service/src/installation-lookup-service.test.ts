@@ -34,8 +34,9 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.sql).toContain('"organization_memberships"."kilo_user_id" =');
     expect(query.sql).toContain('"organization_memberships"."id" is not null');
     expect(query.sql).toContain('"platform_integrations"."owned_by_organization_id" =');
-    expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" =');
-    expect(query.params.filter(param => param === 'user-1')).toHaveLength(4);
+    expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" is null');
+    expect(query.sql).not.toContain('"platform_integrations"."owned_by_user_id" =');
+    expect(query.params.filter(param => param === 'user-1')).toHaveLength(3);
     expect(query.params).toContain('00000000-0000-4000-8000-000000000001');
     expect(query.sql).not.toContain(' limit ');
   });
@@ -45,7 +46,7 @@ describe('buildInstallationLookupQuery', () => {
 
     expect(query.sql).toContain('exists (select');
     expect(query.params.filter(param => param === params.orgId)).toHaveLength(2);
-    expect(query.params.filter(param => param === params.userId)).toHaveLength(4);
+    expect(query.params.filter(param => param === params.userId)).toHaveLength(3);
   });
 
   it('loads up to ten authorized repair candidates without relying on stale account login metadata', () => {
@@ -76,5 +77,27 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.params).toContain(params.orgId);
     expect(query.params).toContain('renamed-owner');
     expect(query.sql).not.toContain(' limit ');
+  });
+
+  it('selects only organization-owned rows for unpinned organization sessions', () => {
+    const query = buildInstallationRefreshCandidatesQuery(
+      getWorkerDb('postgres://unused:unused@localhost:0/unused'),
+      params
+    ).toSQL();
+
+    expect(query.sql).toContain('"platform_integrations"."owned_by_organization_id" =');
+    expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" is null');
+    expect(query.sql).not.toContain('"platform_integrations"."owned_by_user_id" =');
+  });
+
+  it('selects only user-owned rows for unpinned personal sessions', () => {
+    const query = buildInstallationRefreshCandidatesQuery(
+      getWorkerDb('postgres://unused:unused@localhost:0/unused'),
+      { githubRepo: 'renamed-owner/repository', userId: 'user-1' }
+    ).toSQL();
+
+    expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" =');
+    expect(query.sql).toContain('"platform_integrations"."owned_by_organization_id" is null');
+    expect(query.params).not.toContain(params.orgId);
   });
 });

@@ -11,7 +11,7 @@ const serviceMocks = vi.hoisted(() => ({
   findRefreshCandidates: vi.fn(),
   updateAccountLogin: vi.fn(),
   getTokenForRepo: vi.fn(),
-  tryGetTokenForRepo: vi.fn(),
+  findRepositoryInstallation: vi.fn(),
   refreshInstallationAccountLoginIfDue: vi.fn(),
   selectUserAuthorization: vi.fn(),
   disconnectUserAuthorization: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('cloudflare:workers', () => ({
 vi.mock('./github-token-service.js', () => ({
   GitHubTokenService: class GitHubTokenService {
     getTokenForRepo = serviceMocks.getTokenForRepo;
-    tryGetTokenForRepo = serviceMocks.tryGetTokenForRepo;
+    findRepositoryInstallation = serviceMocks.findRepositoryInstallation;
     refreshInstallationAccountLoginIfDue = serviceMocks.refreshInstallationAccountLoginIfDue;
   },
 }));
@@ -100,16 +100,10 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
         ],
       };
     });
-    serviceMocks.tryGetTokenForRepo.mockImplementation(
-      async (installationId, githubRepo, appType) => ({
-        status: 'available',
-        token: await serviceMocks.getTokenForRepo(
-          installationId,
-          githubRepo.split('/')[1],
-          appType
-        ),
-      })
-    );
+    serviceMocks.findRepositoryInstallation.mockResolvedValue({
+      status: 'installed',
+      installationId: '123',
+    });
     serviceMocks.selectUserAuthorization.mockResolvedValue({
       selected: true,
       token: 'user-token',

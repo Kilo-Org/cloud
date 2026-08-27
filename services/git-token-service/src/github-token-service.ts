@@ -20,8 +20,8 @@ type GitHubAppCredentials = {
  */
 export type GitHubAppType = 'standard' | 'lite';
 
-export type GitHubRepositoryTokenResult =
-  | { status: 'available'; token: string }
+export type GitHubRepositoryInstallationResult =
+  | { status: 'installed'; installationId: string }
   | { status: 'not_installed' }
   | { status: 'temporarily_unavailable' };
 
@@ -31,6 +31,12 @@ const MIN_TTL_SECONDS = 60;
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 const INSTALLATION_LOGIN_REFRESH_CACHE_KEY_PREFIX = 'gh-installation-login-refresh:v1:';
 const INSTALLATION_LOGIN_REFRESH_TTL_SECONDS = 15 * 60;
+const REPOSITORY_INSTALLATION_LOOKUP_TIMEOUT_MS = 10_000;
+const REPOSITORY_INSTALLATION_MAX_RESPONSE_BYTES = 64_000;
+
+const GitHubRepositoryInstallationSchema = z.object({
+  id: z.number().int().positive().safe(),
+});
 
 const GitHubInstallationAccountSchema = z.object({
   account: z.object({
@@ -85,39 +91,58 @@ export class GitHubTokenService {
     return token;
   }
 
-  async tryGetTokenForRepo(
-    installationId: string,
+  async findRepositoryInstallation(
     githubRepo: string,
     appType: GitHubAppType = 'standard'
-  ): Promise<GitHubRepositoryTokenResult> {
+  ): Promise<GitHubRepositoryInstallationResult> {
     const [owner, repoName] = githubRepo.split('/');
     if (!owner || !repoName) return { status: 'temporarily_unavailable' };
+
+    const endpoint = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}/installation`;
+    const signal = AbortSignal.timeout(REPOSITORY_INSTALLATION_LOOKUP_TIMEOUT_MS);
     try {
-      const numericId = this.validateInstallationId(installationId);
       const credentials = this.getCredentials(appType);
-      const { token, expiresAt } = await this.generateToken(numericId, credentials, [repoName]);
-      const response = await fetch(
-        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`,
-        {
-          method: 'GET',
-          headers: {
-            Accept: 'application/vnd.github+json',
-            Authorization: `Bearer ${token}`,
-            'User-Agent': 'Kilo-Git-Token-Service',
-          },
-        }
-      );
-      await response.body?.cancel();
-      if (response.status === 404) return { status: 'not_installed' };
-      if (!response.ok) return { status: 'temporarily_unavailable' };
-      await this.cacheToken(`${installationId}:${appType}:${repoName}`, token, expiresAt);
+      const auth = createAppAuth({
+        appId: credentials.appId,
+        privateKey: credentials.privateKey,
+      });
+      const { token } = await auth({ type: 'app' });
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'User-Agent': 'Kilo-Git-Token-Service',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+        redirect: 'manual',
+        signal,
+      });
+      if (
+        (response.status >= 300 && response.status < 400) ||
+        response.redirected ||
+        (response.url !== '' && response.url !== endpoint)
+      ) {
+        await this.cancelResponse(response);
+        return { status: 'temporarily_unavailable' };
+      }
+      if (response.status === 404) {
+        await this.cancelResponse(response);
+        return { status: 'not_installed' };
+      }
+      if (response.status !== 200 || !this.isBoundedJsonResponse(response)) {
+        await this.cancelResponse(response);
+        return { status: 'temporarily_unavailable' };
+      }
+
+      const payload = await this.readBoundedJson(response, signal);
+      const installation = GitHubRepositoryInstallationSchema.safeParse(payload);
+      if (!installation.success) return { status: 'temporarily_unavailable' };
       return {
-        status: 'available',
-        token,
+        status: 'installed',
+        installationId: String(installation.data.id),
       };
-    } catch (error) {
-      const status = this.getProviderStatus(error);
-      if (status === 404 || status === 422) return { status: 'not_installed' };
+    } catch {
       return { status: 'temporarily_unavailable' };
     }
   }
@@ -229,6 +254,56 @@ export class GitHubTokenService {
   private getProviderStatus(error: unknown): number | null {
     if (typeof error !== 'object' || error === null || !('status' in error)) return null;
     return typeof error.status === 'number' ? error.status : null;
+  }
+
+  private isBoundedJsonResponse(response: Response): boolean {
+    const contentType = response.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
+    if (contentType !== 'application/json') return false;
+
+    const contentLength = response.headers.get('Content-Length');
+    return (
+      contentLength === null ||
+      (/^[0-9]+$/.test(contentLength) &&
+        Number(contentLength) <= REPOSITORY_INSTALLATION_MAX_RESPONSE_BYTES)
+    );
+  }
+
+  private async readBoundedJson(response: Response, signal: AbortSignal): Promise<unknown> {
+    if (!response.body) throw new Error('Invalid GitHub response');
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        const value: unknown = chunk.value;
+        if (!(value instanceof Uint8Array)) throw new Error('Invalid GitHub response');
+        totalBytes += value.byteLength;
+        if (totalBytes > REPOSITORY_INSTALLATION_MAX_RESPONSE_BYTES) {
+          await reader.cancel().catch(() => undefined);
+          throw new Error('GitHub response too large');
+        }
+        chunks.push(value);
+      }
+    } catch {
+      throw new Error(signal.aborted ? 'GitHub request timed out' : 'Invalid GitHub response');
+    } finally {
+      reader.releaseLock();
+    }
+
+    const body = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      body.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body));
+  }
+
+  private async cancelResponse(response: Response): Promise<void> {
+    await response.body?.cancel().catch(() => undefined);
   }
 
   private async getCachedToken(cacheKey: string): Promise<string | null> {

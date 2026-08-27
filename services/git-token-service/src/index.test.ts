@@ -11,7 +11,7 @@ const serviceMocks = vi.hoisted(() => ({
   updateAccountLogin: vi.fn(),
   getToken: vi.fn(),
   getTokenForRepo: vi.fn(),
-  tryGetTokenForRepo: vi.fn(),
+  findRepositoryInstallation: vi.fn(),
   refreshInstallationAccountLoginIfDue: vi.fn(),
   selectUserAuthorization: vi.fn(),
   findGitLabIntegration: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock('./github-token-service.js', () => ({
   GitHubTokenService: class GitHubTokenService {
     getToken = serviceMocks.getToken;
     getTokenForRepo = serviceMocks.getTokenForRepo;
-    tryGetTokenForRepo = serviceMocks.tryGetTokenForRepo;
+    findRepositoryInstallation = serviceMocks.findRepositoryInstallation;
     refreshInstallationAccountLoginIfDue = serviceMocks.refreshInstallationAccountLoginIfDue;
   },
 }));
@@ -125,12 +125,10 @@ beforeEach(() => {
       ],
     };
   });
-  serviceMocks.tryGetTokenForRepo.mockImplementation(
-    async (installationId, githubRepo, appType) => ({
-      status: 'available',
-      token: await serviceMocks.getTokenForRepo(installationId, githubRepo.split('/')[1], appType),
-    })
-  );
+  serviceMocks.findRepositoryInstallation.mockResolvedValue({
+    status: 'installed',
+    installationId: '123',
+  });
   serviceMocks.hasGitLabProjectCredentialCandidates.mockReset().mockResolvedValue(false);
   serviceMocks.resolveGitLabCredential.mockReset().mockImplementation(async (actor, selector) => {
     const latestIntegrationLookup = serviceMocks.findGitLabIntegration.mock.results.at(-1)?.value;
@@ -545,16 +543,10 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     serviceMocks.getTokenForRepo.mockReset();
-    serviceMocks.tryGetTokenForRepo.mockImplementation(
-      async (installationId, githubRepo, appType) => ({
-        status: 'available',
-        token: await serviceMocks.getTokenForRepo(
-          installationId,
-          githubRepo.split('/')[1],
-          appType
-        ),
-      })
-    );
+    serviceMocks.findRepositoryInstallation.mockResolvedValue({
+      status: 'installed',
+      installationId: '123',
+    });
   });
 
   it('mints repository-scoped tokens after resolving an authorized installation', async () => {
@@ -622,7 +614,9 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
       accountLogin: 'old-owner',
       githubAppType: 'standard',
     });
-    serviceMocks.tryGetTokenForRepo.mockResolvedValueOnce({ status: 'temporarily_unavailable' });
+    serviceMocks.findRepositoryInstallation.mockResolvedValueOnce({
+      status: 'temporarily_unavailable',
+    });
 
     await expect(
       createService().getTokenForRepo({ githubRepo: 'renamed-owner/repository', userId: 'user-1' })
@@ -658,9 +652,10 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
         },
       ],
     });
-    serviceMocks.tryGetTokenForRepo
+    serviceMocks.findRepositoryInstallation
       .mockResolvedValueOnce({ status: 'not_installed' })
-      .mockResolvedValueOnce({ status: 'available', token: 'lite-token' });
+      .mockResolvedValueOnce({ status: 'installed', installationId: '200' });
+    serviceMocks.getTokenForRepo.mockResolvedValueOnce('lite-token');
 
     await expect(
       createService().getTokenForRepo({ githubRepo: 'acme/repository', userId: 'user-1' })
@@ -692,20 +687,55 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
           ...candidate,
           integrationId: '00000000-0000-4000-8000-000000000002',
           installationId: '200',
+          githubAppType: 'lite',
         },
       ],
     });
-    serviceMocks.tryGetTokenForRepo
-      .mockResolvedValueOnce({ status: 'available', token: 'first-token' })
-      .mockResolvedValueOnce({ status: 'available', token: 'second-token' });
+    serviceMocks.findRepositoryInstallation
+      .mockResolvedValueOnce({ status: 'installed', installationId: '100' })
+      .mockResolvedValueOnce({ status: 'installed', installationId: '200' });
 
     await expect(
       createService().getTokenForRepo({ githubRepo: 'acme/repository', userId: 'user-1' })
     ).resolves.toEqual({ success: false, reason: 'ambiguous_installation' });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('matches the authoritative provider installation ID instead of a public same-name repo', async () => {
+    const candidate = {
+      success: true as const,
+      integrationId: '00000000-0000-4000-8000-000000000001',
+      installationId: '100',
+      accountLogin: 'acme',
+      githubAppType: 'standard' as const,
+      repoName: 'repository',
+      permissions: null,
+      repositoryAccess: 'all',
+      repositories: null,
+    };
+    serviceMocks.findAuthorizedInstallationsForRepo.mockResolvedValue({
+      success: true,
+      candidates: [candidate, { ...candidate, installationId: '200' }],
+    });
+    serviceMocks.findRepositoryInstallation.mockResolvedValue({
+      status: 'installed',
+      installationId: '200',
+    });
+    serviceMocks.getTokenForRepo.mockResolvedValue('matched-token');
+
+    await expect(
+      createService().getTokenForRepo({ githubRepo: 'acme/repository', userId: 'user-1' })
+    ).resolves.toMatchObject({
+      success: true,
+      token: 'matched-token',
+      installationId: '200',
+    });
+    expect(serviceMocks.findRepositoryInstallation).toHaveBeenCalledOnce();
+    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledWith('200', 'repository', 'standard');
   });
 
   it('returns repository_not_installed when every candidate definitively lacks access', async () => {
-    serviceMocks.tryGetTokenForRepo.mockResolvedValue({ status: 'not_installed' });
+    serviceMocks.findRepositoryInstallation.mockResolvedValue({ status: 'not_installed' });
 
     await expect(
       createService().getTokenForRepo({ githubRepo: 'acme/repository', userId: 'user-1' })
@@ -728,9 +758,9 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
       success: true,
       candidates: [candidate, { ...candidate, installationId: '200' }],
     });
-    serviceMocks.tryGetTokenForRepo
-      .mockResolvedValueOnce({ status: 'available', token: 'first-token' })
-      .mockResolvedValueOnce({ status: 'temporarily_unavailable' });
+    serviceMocks.findRepositoryInstallation.mockResolvedValueOnce({
+      status: 'temporarily_unavailable',
+    });
 
     await expect(
       createService().getTokenForRepo({ githubRepo: 'acme/repository', userId: 'user-1' })
@@ -767,6 +797,40 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
       token: 'scoped-token',
     });
     expect(serviceMocks.findAuthorizedInstallationsForRepo).toHaveBeenCalledWith(params);
+    expect(serviceMocks.findRepositoryInstallation).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an exact integration when GitHub returns a different provider installation ID', async () => {
+    const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';
+    serviceMocks.findAuthorizedInstallationsForRepo.mockResolvedValue({
+      success: true,
+      candidates: [
+        {
+          integrationId: expectedIntegrationId,
+          installationId: '123',
+          accountLogin: 'acme',
+          githubAppType: 'lite',
+          repoName: 'repository',
+          permissions: null,
+          repositoryAccess: 'all',
+          repositories: null,
+        },
+      ],
+    });
+    serviceMocks.findRepositoryInstallation.mockResolvedValue({
+      status: 'installed',
+      installationId: '999',
+    });
+
+    await expect(
+      createService().getTokenForRepo({
+        githubRepo: 'acme/repository',
+        userId: 'user-1',
+        expectedIntegrationId,
+      })
+    ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+    expect(serviceMocks.findRepositoryInstallation).toHaveBeenCalledWith('acme/repository', 'lite');
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 });
 
@@ -1411,6 +1475,10 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       githubAppType: 'standard',
       repoName: 'repo',
       permissions: { contents: 'write', pull_requests: 'write' },
+    });
+    serviceMocks.findRepositoryInstallation.mockResolvedValueOnce({
+      status: 'installed',
+      installationId: '456',
     });
 
     await expect(

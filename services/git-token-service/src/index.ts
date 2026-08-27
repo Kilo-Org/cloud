@@ -721,29 +721,54 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       await this.installationLookupService.findAuthorizedInstallationsForRepo(params);
     if (!installations.success) return installations;
 
-    let selected: ((typeof installations.candidates)[number] & { token: string }) | undefined;
+    let selected: (typeof installations.candidates)[number] | undefined;
     let providerUncertain = false;
-    for (const candidate of installations.candidates) {
-      const tokenResult = await this.githubService.tryGetTokenForRepo(
-        candidate.installationId,
+    const appTypes = [
+      ...new Set(installations.candidates.map(candidate => candidate.githubAppType)),
+    ];
+    for (const appType of appTypes) {
+      const installationResult = await this.githubService.findRepositoryInstallation(
         params.githubRepo,
-        candidate.githubAppType
+        appType
       );
-      if (tokenResult.status === 'temporarily_unavailable') {
+      if (installationResult.status === 'temporarily_unavailable') {
         providerUncertain = true;
         continue;
       }
-      if (tokenResult.status === 'not_installed') continue;
-      if (selected) return { success: false as const, reason: 'ambiguous_installation' as const };
-      selected = { ...candidate, token: tokenResult.token };
+      if (installationResult.status === 'not_installed') continue;
+
+      const matches = installations.candidates.filter(
+        candidate =>
+          candidate.githubAppType === appType &&
+          candidate.installationId === installationResult.installationId
+      );
+      if (matches.length > 1 || (matches.length === 1 && selected)) {
+        return { success: false as const, reason: 'ambiguous_installation' as const };
+      }
+      if (matches[0]) selected = matches[0];
     }
     if (providerUncertain) {
       return { success: false as const, reason: 'temporarily_unavailable' as const };
     }
     if (!selected) {
-      return { success: false as const, reason: 'repository_not_installed' as const };
+      return {
+        success: false as const,
+        reason:
+          params.expectedIntegrationId === undefined
+            ? ('repository_not_installed' as const)
+            : ('integration_mismatch' as const),
+      };
     }
-    return { success: true as const, installation: selected };
+    try {
+      const token = await this.githubService.getTokenForRepo(
+        selected.installationId,
+        selected.repoName,
+        selected.githubAppType
+      );
+      return { success: true as const, installation: { ...selected, token } };
+    } catch {
+      return { success: false as const, reason: 'temporarily_unavailable' as const };
+    }
   }
 
   /**

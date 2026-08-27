@@ -5,7 +5,7 @@ import {
   organization_memberships,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { eq, and, exists, isNull, isNotNull, or, sql } from 'drizzle-orm';
+import { eq, and, exists, isNull, isNotNull, sql } from 'drizzle-orm';
 
 export type FindInstallationParams = {
   githubRepo: string;
@@ -136,17 +136,16 @@ function buildAuthorizedInstallationsQuery(
         );
   const legacyAuthorizedOwner =
     params.expectedIntegrationId === undefined
-      ? or(
-          and(
-            isNotNull(platform_integrations.owned_by_organization_id),
-            eq(platform_integrations.owned_by_organization_id, sql`${params.orgId ?? null}::uuid`),
-            isNotNull(organization_memberships.id)
-          ),
-          and(
-            isNotNull(platform_integrations.owned_by_user_id),
-            eq(platform_integrations.owned_by_user_id, params.userId)
+      ? params.orgId === undefined
+        ? and(
+            eq(platform_integrations.owned_by_user_id, params.userId),
+            isNull(platform_integrations.owned_by_organization_id)
           )
-        )
+        : and(
+            eq(platform_integrations.owned_by_organization_id, sql`${params.orgId}::uuid`),
+            isNull(platform_integrations.owned_by_user_id),
+            isNotNull(organization_memberships.id)
+          )
       : undefined;
 
   return db
@@ -444,17 +443,6 @@ export class InstallationLookupService {
         repositoryAccess: parsed.repository_access,
         repositories: parsed.repositories,
       };
-    });
-    const normalizedRepo = params.githubRepo.toLowerCase();
-    candidates.sort((left, right) => {
-      const cachedForRepo = (candidate: AuthorizedInstallationCandidate) =>
-        candidate.repositoryAccess === 'selected' &&
-        candidate.repositories?.some(
-          repository => repository.full_name.toLowerCase() === normalizedRepo
-        )
-          ? 0
-          : 1;
-      return cachedForRepo(left) - cachedForRepo(right);
     });
     return { success: true, candidates };
   }

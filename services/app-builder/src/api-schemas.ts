@@ -141,8 +141,9 @@ export type DeleteErrorResponse = z.infer<typeof DeleteErrorResponseSchema>;
 
 export const MigrateToGithubRequestSchema = z.object({
   githubRepo: z.string().regex(/^[^/]+\/[^/]+$/, 'Must be in "owner/repo" format'),
-  userId: z.string().uuid(),
+  userId: z.string().min(1),
   orgId: z.string().uuid().optional(),
+  expectedPlatformIntegrationId: z.string().uuid().optional(),
 });
 
 export type MigrateToGithubRequest = z.infer<typeof MigrateToGithubRequestSchema>;

@@ -137,6 +137,7 @@ export type MigrateToGitHubInput = {
   /** Kilo user ID - needed by preview DO to resolve GitHub tokens */
   userId: string;
   repoFullName: string; // e.g., "org/my-repo" - user-created repo
+  expectedPlatformIntegrationId?: string;
 };
 
 /**
@@ -148,6 +149,7 @@ export type MigrateToGitHubResult =
 
 export type MigrateToGitHubErrorCode =
   | 'github_app_not_installed'
+  | 'github_integration_unavailable'
   | 'already_migrated'
   | 'repo_not_found' // Specified repo doesn't exist or not accessible
   | 'repo_not_empty' // Repo has commits, must be empty
@@ -162,6 +164,7 @@ export type AvailableRepo = {
   fullName: string;
   createdAt: string;
   isPrivate: boolean;
+  platformIntegrationId?: string;
 };
 
 /**

@@ -235,6 +235,7 @@ export const appBuilderRouter = createTRPCRouter({
       owner,
       userId: ctx.user.id,
       repoFullName: input.repoFullName,
+      expectedPlatformIntegrationId: input.expectedPlatformIntegrationId,
     });
   }),
 });

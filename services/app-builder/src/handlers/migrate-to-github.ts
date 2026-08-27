@@ -57,10 +57,15 @@ export async function handleMigrateToGithub(
       );
     }
 
-    const { githubRepo, userId, orgId } = result.data;
+    const { githubRepo, userId, orgId, expectedPlatformIntegrationId } = result.data;
 
     // 1. Fetch a GitHub token via git-token-service
-    const tokenResult = await env.GIT_TOKEN_SERVICE.getTokenForRepo({ githubRepo, userId, orgId });
+    const tokenResult = await env.GIT_TOKEN_SERVICE.getTokenForRepo({
+      githubRepo,
+      userId,
+      orgId,
+      expectedIntegrationId: expectedPlatformIntegrationId,
+    });
     if (!tokenResult.success) {
       logger.error({ source: 'MigrateToGithubHandler', appId }, 'Failed to get GitHub token', {
         reason: tokenResult.reason,
@@ -123,7 +128,12 @@ export async function handleMigrateToGithub(
     const previewId = env.PREVIEW.idFromName(appId);
     const previewStub = env.PREVIEW.get(previewId);
 
-    await previewStub.setGitHubSource({ githubRepo, userId, orgId });
+    await previewStub.setGitHubSource({
+      githubRepo,
+      userId,
+      orgId,
+      expectedPlatformIntegrationId,
+    });
 
     // Schedule internal git repo deletion after a 7-day grace period (for rollback safety)
     await gitStub.scheduleDelete(7 * 24 * 60 * 60 * 1000);

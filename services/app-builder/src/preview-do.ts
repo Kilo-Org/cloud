@@ -201,13 +201,15 @@ export class PreviewDO extends DurableObject<Env> {
   private async getRepoUrl(repoId: string): Promise<string> {
     // Check if project is migrated to GitHub
     if (this.persistedState.githubSource) {
-      const { githubRepo, userId, orgId } = this.persistedState.githubSource;
+      const { githubRepo, userId, orgId, expectedPlatformIntegrationId } =
+        this.persistedState.githubSource;
 
       // Get fresh token from git-token-service
       const result: GetTokenForRepoResult = await this.env.GIT_TOKEN_SERVICE.getTokenForRepo({
         githubRepo,
         userId,
         orgId,
+        expectedIntegrationId: expectedPlatformIntegrationId,
       });
 
       if (!result.success) {

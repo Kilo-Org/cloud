@@ -34,7 +34,9 @@ export type GetTokenForRepoResult =
         | 'database_not_configured'
         | 'invalid_repo_format'
         | 'no_installation_found'
-        | 'invalid_org_id';
+        | 'repository_not_installed'
+        | 'invalid_org_id'
+        | 'integration_mismatch';
     };
 
 /**
@@ -50,6 +52,7 @@ type GitTokenService = {
     githubRepo: string;
     userId: string;
     orgId?: string;
+    expectedIntegrationId?: string;
   }): Promise<GetTokenForRepoResult>;
 
   /**
@@ -168,6 +171,7 @@ export type GitHubSourceConfig = {
   githubRepo: string; // "owner/repo" format
   userId: string; // Kilo user ID for token lookup
   orgId?: string; // Kilo org ID (if org-owned project)
+  expectedPlatformIntegrationId?: string;
 };
 
 /**

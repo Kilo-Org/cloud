@@ -51,6 +51,8 @@ type Step = 'create' | 'grant-access' | 'select' | 'success';
 
 const errorMessages: Record<MigrateToGitHubErrorCode, string> = {
   github_app_not_installed: 'GitHub App is not installed. Please install the GitHub App first.',
+  github_integration_unavailable:
+    'The GitHub installation selected for this repository is no longer available.',
   already_migrated: 'This project has already been migrated to GitHub.',
   repo_not_found:
     "Repository not found or not accessible. Make sure you've granted the Kilo GitHub App access to this repository.",
@@ -149,10 +151,11 @@ export function MigrateToGitHubDialog({
   const repositoryOptions: RepositoryOption[] = useMemo(
     () =>
       (canMigrateData?.availableRepos ?? []).map(repo => ({
-        id: repo.fullName,
+        id: `${repo.platformIntegrationId ?? 'legacy'}:${repo.fullName}`,
         fullName: repo.fullName,
         private: repo.isPrivate,
         platform: 'github' as const,
+        platformIntegrationId: repo.platformIntegrationId,
       })),
     [canMigrateData?.availableRepos]
   );
@@ -191,13 +194,21 @@ export function MigrateToGitHubDialog({
     if (!selectedRepo) return;
 
     setMigrationError(null);
+    const expectedPlatformIntegrationId = repositoryOptions.find(
+      repo => repo.fullName === selectedRepo
+    )?.platformIntegrationId;
 
     if (organizationId) {
-      orgMigrate({ projectId, organizationId, repoFullName: selectedRepo });
+      orgMigrate({
+        projectId,
+        organizationId,
+        repoFullName: selectedRepo,
+        expectedPlatformIntegrationId,
+      });
     } else {
       personalMigrate({ projectId, repoFullName: selectedRepo });
     }
-  }, [organizationId, orgMigrate, personalMigrate, projectId, selectedRepo]);
+  }, [organizationId, orgMigrate, personalMigrate, projectId, repositoryOptions, selectedRepo]);
 
   // Skip grant-access step if user has "all repositories" access
   const needsGrantAccess = canMigrateData?.repositorySelection === 'selected';

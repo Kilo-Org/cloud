@@ -40,6 +40,9 @@ export function EditWebhookTriggerContent({
 
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
+  const integrationsPath = organizationId
+    ? `/organizations/${organizationId}/integrations`
+    : '/integrations';
 
   // Fetch trigger configuration
   const {
@@ -81,6 +84,8 @@ export function EditWebhookTriggerContent({
       fullName: repo.fullName,
       private: repo.private,
       platform: 'github' as const,
+      platformIntegrationId: repo.platformIntegrationId,
+      platformAccountLogin: repo.platformAccountLogin,
     }));
   }, [githubRepoData?.repositories]);
 
@@ -106,6 +111,7 @@ export function EditWebhookTriggerContent({
       cronExpression: triggerData.cronExpression,
       cronTimezone: triggerData.cronTimezone,
       githubRepo: triggerData.githubRepo ?? '',
+      githubIntegrationId: triggerData.githubIntegrationId ?? undefined,
       mode: (triggerData.mode ?? 'code') as AgentMode,
       model: triggerData.model ?? '',
       promptTemplate: triggerData.promptTemplate,
@@ -161,6 +167,7 @@ export function EditWebhookTriggerContent({
         model: formData.model,
         promptTemplate: formData.promptTemplate,
         profileId: formData.profileId,
+        githubIntegrationId: formData.githubIntegrationId,
         autoCommit: formData.autoCommit ?? null,
         condenseOnComplete: formData.condenseOnComplete ?? null,
         isActive: formData.isActive,
@@ -376,6 +383,7 @@ export function EditWebhookTriggerContent({
           repositories={repositories}
           isLoadingRepositories={isLoadingRepos}
           repositoriesError={repoError?.message}
+          integrationsPath={integrationsPath}
           models={modelOptions}
           isLoadingModels={isLoadingModels}
           onSubmit={handleSubmit}

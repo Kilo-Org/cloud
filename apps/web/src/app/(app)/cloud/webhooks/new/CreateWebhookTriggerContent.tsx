@@ -67,6 +67,8 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
       fullName: repo.fullName,
       private: repo.private,
       platform: 'github' as const,
+      platformIntegrationId: repo.platformIntegrationId,
+      platformAccountLogin: repo.platformAccountLogin,
     }));
   }, [githubRepoData?.repositories]);
 
@@ -114,6 +116,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         cronExpression: formData.cronExpression,
         cronTimezone: formData.cronTimezone,
         githubRepo: formData.githubRepo,
+        githubIntegrationId: formData.githubIntegrationId,
         mode: formData.mode,
         model: formData.model,
         promptTemplate: formData.promptTemplate,
@@ -199,6 +202,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         repositories={repositories}
         isLoadingRepositories={isLoadingRepos}
         repositoriesError={repoError?.message}
+        integrationsPath={integrationsPath}
         models={modelOptions}
         isLoadingModels={isLoadingModels}
         onSubmit={handleSubmit}

@@ -9,4 +9,6 @@ export type GitHubRepository = {
   id: number;
   fullName: string;
   private: boolean;
+  platformIntegrationId?: string;
+  platformAccountLogin?: string;
 };

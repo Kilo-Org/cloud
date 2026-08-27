@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ProfileSelector } from '@/components/cloud-agent/ProfileSelector';
-import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
+import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import { ModeCombobox } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
@@ -33,6 +33,11 @@ import { cn } from '@/lib/utils';
 import { AlertCircle, Check, Clock, Copy, Loader2, Webhook } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AgentMode } from '@/components/cloud-agent/types';
+import { GitHubRepositorySelector } from './GitHubRepositorySelector';
+import {
+  findSelectedRepository,
+  type GitHubRepositorySelection,
+} from './github-repository-selection';
 
 export type TriggerFormData = {
   triggerId: string;
@@ -40,6 +45,8 @@ export type TriggerFormData = {
   cronExpression?: string;
   cronTimezone?: string;
   githubRepo: string;
+  githubIntegrationId?: string;
+  githubAccountLogin?: string;
   mode: AgentMode;
   model: string;
   promptTemplate: string;
@@ -63,6 +70,8 @@ export type TriggerFormProps = {
     cronExpression?: string | null;
     cronTimezone?: string | null;
     githubRepo: string;
+    githubIntegrationId?: string;
+    githubAccountLogin?: string;
     mode: AgentMode;
     model: string;
     promptTemplate: string;
@@ -77,6 +86,7 @@ export type TriggerFormProps = {
   repositories: RepositoryOption[];
   isLoadingRepositories?: boolean;
   repositoriesError?: string;
+  integrationsPath: string;
   /** Models available for selection (should be fetched by parent) */
   models: ModelOption[];
   isLoadingModels?: boolean;
@@ -105,6 +115,7 @@ export function TriggerForm({
   repositories,
   isLoadingRepositories,
   repositoriesError,
+  integrationsPath,
   models,
   isLoadingModels,
   onSubmit,
@@ -127,6 +138,8 @@ export function TriggerForm({
   const [triggerId, setTriggerId] = useState(initialData?.triggerId ?? '');
   const [triggerIdError, setTriggerIdError] = useState<string | null>(null);
   const [githubRepo, setGithubRepo] = useState(initialData?.githubRepo ?? '');
+  const [githubIntegrationId, setGithubIntegrationId] = useState(initialData?.githubIntegrationId);
+  const [githubAccountLogin, setGithubAccountLogin] = useState(initialData?.githubAccountLogin);
   const [agentMode, setAgentMode] = useState<AgentMode>((initialData?.mode as AgentMode) ?? 'ask');
   const [model, setModel] = useState(initialData?.model ?? '');
   const WEBHOOK_DEFAULT_PROMPT = 'Describe this webhook request payload:\n\n{{body}}';
@@ -156,6 +169,10 @@ export function TriggerForm({
       setCronTimezone(initialData.cronTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
       setTriggerId(initialData.triggerId);
       setGithubRepo(initialData.githubRepo);
+      setGithubIntegrationId(initialData.githubIntegrationId);
+      if (initialData.githubAccountLogin !== undefined) {
+        setGithubAccountLogin(initialData.githubAccountLogin);
+      }
       setAgentMode(initialData.mode ?? 'ask');
       setModel(initialData.model);
       setPromptTemplate(initialData.promptTemplate);
@@ -172,6 +189,26 @@ export function TriggerForm({
     }
     setWebhookAuthSecret('');
   }, [initialData]);
+
+  const githubSelection: GitHubRepositorySelection = {
+    repository: githubRepo,
+    platformIntegrationId: githubIntegrationId,
+    platformAccountLogin: githubAccountLogin,
+  };
+
+  const handleGitHubSelectionChange = useCallback((selection: GitHubRepositorySelection) => {
+    setGithubRepo(selection.repository);
+    setGithubIntegrationId(selection.platformIntegrationId);
+    setGithubAccountLogin(selection.platformAccountLogin);
+  }, []);
+
+  useEffect(() => {
+    if (githubAccountLogin || !githubIntegrationId) return;
+    const account = repositories.find(
+      repository => repository.platformIntegrationId === githubIntegrationId
+    )?.platformAccountLogin;
+    if (account) setGithubAccountLogin(account);
+  }, [githubAccountLogin, githubIntegrationId, repositories]);
 
   // Update default prompt when activation mode toggles (create mode only)
   useEffect(() => {
@@ -264,6 +301,23 @@ export function TriggerForm({
       errors.push('Repository is required');
     }
 
+    if (organizationId && !githubIntegrationId) {
+      errors.push('GitHub installation is required');
+    }
+
+    if (
+      organizationId &&
+      githubIntegrationId &&
+      !isLoadingRepositories &&
+      !repositoriesError &&
+      !findSelectedRepository(repositories, {
+        repository: githubRepo,
+        platformIntegrationId: githubIntegrationId,
+      })
+    ) {
+      errors.push('The saved GitHub installation is unavailable');
+    }
+
     if (!model) {
       errors.push('Model is required');
     }
@@ -291,6 +345,11 @@ export function TriggerForm({
     isScheduled,
     cronExpression,
     githubRepo,
+    organizationId,
+    githubIntegrationId,
+    isLoadingRepositories,
+    repositoriesError,
+    repositories,
     model,
     promptTemplate,
     profileId,
@@ -325,6 +384,8 @@ export function TriggerForm({
         cronExpression: isScheduled ? cronExpression.trim() : undefined,
         cronTimezone: isScheduled ? cronTimezone : undefined,
         githubRepo,
+        githubIntegrationId,
+        githubAccountLogin,
         mode: agentMode,
         model,
         promptTemplate: promptTemplate.trim(),
@@ -345,6 +406,8 @@ export function TriggerForm({
       cronTimezone,
       isScheduled,
       githubRepo,
+      githubIntegrationId,
+      githubAccountLogin,
       agentMode,
       model,
       promptTemplate,
@@ -470,7 +533,7 @@ export function TriggerForm({
               <Label>
                 Repository <span className="text-red-400">*</span>
               </Label>
-              {isEditMode ? (
+              {isEditMode && (
                 <>
                   <div className="bg-muted truncate rounded-md border px-3 py-2 font-mono text-sm">
                     {githubRepo || 'No repository selected'}
@@ -479,18 +542,16 @@ export function TriggerForm({
                     Repository cannot be changed after creation
                   </p>
                 </>
-              ) : (
-                <RepositoryCombobox
-                  repositories={repositories}
-                  value={githubRepo}
-                  onValueChange={setGithubRepo}
-                  isLoading={isLoadingRepositories}
-                  error={repositoriesError}
-                  placeholder="Select a repository"
-                  emptyStateText="Requires a GitHub integration — configure in Integrations"
-                  hideLabel
-                />
               )}
+              <GitHubRepositorySelector
+                repositories={repositories}
+                value={githubSelection}
+                onValueChange={handleGitHubSelectionChange}
+                isLoading={isLoadingRepositories}
+                error={repositoriesError}
+                repositoryReadOnly={isEditMode}
+                integrationsPath={integrationsPath}
+              />
             </div>
 
             {/* Mode and Model Row */}
@@ -697,7 +758,7 @@ export function TriggerForm({
               <div className="flex gap-2">
                 <Button
                   type="submit"
-                  disabled={!isFormValid || isLoading}
+                  disabled={!isFormValid || isLoading || isLoadingRepositories}
                   className="min-w-[120px]"
                 >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

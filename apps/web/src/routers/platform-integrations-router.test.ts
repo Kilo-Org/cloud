@@ -148,6 +148,34 @@ describe('platformIntegrationsRouter', () => {
     ]);
   });
 
+  test('summarizes multiple organization GitHub installations without an arbitrary account', async () => {
+    await insertPlatformIntegration({
+      organizationId: organization.id,
+      platform: PLATFORM.GITHUB,
+      platformAccountLogin: 'acme-secondary',
+      status: INTEGRATION_STATUS.SUSPENDED,
+    });
+    await insertPlatformIntegration({
+      organizationId: organization.id,
+      platform: PLATFORM.GITHUB,
+      platformAccountLogin: 'acme-primary',
+      status: INTEGRATION_STATUS.ACTIVE,
+    });
+
+    const caller = await createCallerForUser(memberUser.id);
+    const result = await caller.platformIntegrations.listSetupStatus({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual([
+      {
+        platform: PLATFORM.GITHUB,
+        installed: true,
+        installation: { installationCount: 2 },
+      },
+    ]);
+  });
+
   test('rejects organization setup status reads for non-members', async () => {
     const caller = await createCallerForUser(nonMemberUser.id);
 

@@ -1,5 +1,6 @@
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import type { Owner } from '@/lib/integrations/core/types';
 
 export const SETUP_STATUS_PLATFORMS = [
   PLATFORM.SLACK,
@@ -19,6 +20,7 @@ export type PlatformIntegrationSetupStatus = {
   installation: {
     accountLogin?: string | null;
     guildName?: string | null;
+    installationCount?: number;
     teamName?: string | null;
     workspaceName?: string | null;
   } | null;
@@ -80,13 +82,18 @@ function shouldPreferStatus(
 }
 
 export function summarizePlatformIntegrationsForSetupStatus(
-  integrations: PlatformIntegration[]
+  integrations: PlatformIntegration[],
+  ownerType: Owner['type']
 ): PlatformIntegrationSetupStatus[] {
   const byPlatform = new Map<SetupStatusPlatform, PlatformIntegrationSetupStatus>();
+  let githubInstallationCount = 0;
 
   for (const integration of integrations) {
     const status = toSetupStatus(integration);
     if (!status) continue;
+    if (ownerType === 'org' && status.platform === PLATFORM.GITHUB) {
+      githubInstallationCount += 1;
+    }
 
     const current = byPlatform.get(status.platform);
     if (!current || shouldPreferStatus(current, status)) {
@@ -96,6 +103,9 @@ export function summarizePlatformIntegrationsForSetupStatus(
 
   return SETUP_STATUS_PLATFORMS.flatMap(platform => {
     const status = byPlatform.get(platform);
+    if (status && platform === PLATFORM.GITHUB && githubInstallationCount > 1) {
+      return [{ ...status, installation: { installationCount: githubInstallationCount } }];
+    }
     return status ? [status] : [];
   });
 }

@@ -298,9 +298,14 @@ export async function listBranches(
  */
 export async function updateModel(
   owner: Owner,
-  modelSlug: string
+  modelSlug: string,
+  integrationId?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const integration = await getInstallation(owner);
+  const integration = integrationId
+    ? await getGitHubIntegrationById(owner, integrationId)
+    : owner.type === 'user'
+      ? await getInstallation(owner)
+      : null;
 
   if (!integration) {
     return { success: false, error: 'No GitHub App installation found' };

@@ -23,8 +23,6 @@ type ImageViewerModalProps = {
   sharing?: boolean;
   /** Share failure message. Rendered inline — the toast layer sits behind this modal. */
   shareError?: string | null;
-  /** While a background renew is in flight, record onError but keep the last-good image. */
-  renewing?: boolean;
   onClose: () => void;
 };
 
@@ -34,7 +32,6 @@ export function ImageViewerModal({
   filename,
   sharing = false,
   shareError = null,
-  renewing = false,
   onClose,
   onShare,
 }: ImageViewerModalProps) {
@@ -46,8 +43,8 @@ export function ImageViewerModal({
   // Reset a prior decode error in render when the URL changes. A successful
   // renew writes a NEW signed URL; the reset must land in the same commit so
   // the refreshed image, not the "Image unavailable" row, renders. A failed
-  // renew keeps the same URL, so `imageError` survives and the row shows once
-  // `renewing` clears.
+  // renew keeps the same URL, so `imageError` survives and the row stays until
+  // a new URL lands.
   const [previousUri, setPreviousUri] = useState(uri);
   if (uri !== previousUri) {
     setPreviousUri(uri);
@@ -175,7 +172,7 @@ export function ImageViewerModal({
             GestureHandlerRootView does not reach a Modal's native view hierarchy. */}
         <GestureHandlerRootView className="flex-1">
           <View className="flex-1 items-center justify-center overflow-hidden bg-black">
-            {uri && (!imageError || renewing) ? (
+            {uri && !imageError ? (
               <GestureDetector gesture={zoomGesture}>
                 <Animated.View className="h-full w-full" style={imageStyle}>
                   <Image
@@ -190,7 +187,7 @@ export function ImageViewerModal({
                 </Animated.View>
               </GestureDetector>
             ) : null}
-            {uri && imageError && !renewing ? (
+            {uri && imageError ? (
               <View className="flex-row items-center gap-2">
                 <AlertCircle size={14} color="#ffffff" />
                 <Text className="text-xs text-white">{t('imageViewer.imageUnavailable')}</Text>

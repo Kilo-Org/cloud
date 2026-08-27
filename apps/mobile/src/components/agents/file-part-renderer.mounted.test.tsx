@@ -328,7 +328,7 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
-  it('shows the retry chip after an image error during a failed renew, not during it', async () => {
+  it('keeps the retry chip through a failed renew', async () => {
     const uuid = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
     cacheFilePart('part-1', {
       url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
@@ -357,7 +357,8 @@ describe('FilePartRenderer mounted', () => {
 
     await flushAsync();
 
-    // The renew is in flight; the image stays and the chip is not shown.
+    // The image errors while the renew is in flight: the retry chip shows at
+    // once and must not be hidden by the renew.
     const image = findByType(root, 'Image')[0];
     if (!image) {
       throw new Error('image not found');
@@ -367,7 +368,8 @@ describe('FilePartRenderer mounted', () => {
       (image.props.onError as () => void)();
     });
 
-    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(0);
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
+    expect(texts(root)).toContain('Image unavailable');
 
     await act(async () => {
       renewHolder.reject?.(new Error('renew failed'));
@@ -375,13 +377,14 @@ describe('FilePartRenderer mounted', () => {
     });
     await flushAsync();
 
+    // The renew failed and the URL is unchanged, so the retry chip stays.
     expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
     expect(texts(root)).toContain('Image unavailable');
 
     await unmount(renderer);
   });
 
-  it('keeps the image and clears the error after a successful renew that follows an image error', async () => {
+  it('clears the retry chip after a successful renew that follows an image error', async () => {
     const uuid = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
     cacheFilePart('part-1', {
       url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
@@ -412,7 +415,7 @@ describe('FilePartRenderer mounted', () => {
 
     await flushAsync();
 
-    // The renew is in flight; the image errors but the chip stays hidden.
+    // The image errors while the renew is in flight; the chip shows at once.
     const image = findByType(root, 'Image')[0];
     if (!image) {
       throw new Error('image not found');
@@ -422,10 +425,10 @@ describe('FilePartRenderer mounted', () => {
       (image.props.onError as () => void)();
     });
 
-    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(0);
+    expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(1);
 
-    // The renew succeeds with a fresh signed URL: the error must clear in the
-    // same render, keeping the image (no chip) with the new URL.
+    // The renew succeeds with a fresh signed URL: the error clears in the same
+    // render, so the chip disappears and the image shows the new URL.
     await act(async () => {
       renewHolder.resolve?.({
         signedUrl: 'https://r2.example/fresh',

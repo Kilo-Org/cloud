@@ -130,8 +130,8 @@ describe('ImageViewerModal mounted', () => {
     renderer.unmount();
   });
 
-  it('keeps the last-good image on error while renewing, then shows unavailable after it clears', async () => {
-    const renderer = await mountViewer({ renewing: true });
+  it('shows the unavailable row immediately on decode error and clears it in the same commit a renewed uri lands', async () => {
+    const renderer = await mountViewer({});
 
     const image = findByType(renderer.root, 'Image')[0];
     if (!image) {
@@ -142,55 +142,15 @@ describe('ImageViewerModal mounted', () => {
       (image.props.onError as () => void)();
     });
 
-    // The error is recorded but the last-good image stays while renewing.
-    expect(findByType(renderer.root, 'Image')).toHaveLength(1);
-    expect(
-      findByType(renderer.root, 'Text').filter(node => node.props.children === 'Image unavailable')
-    ).toHaveLength(0);
-
-    // Once the renew ends with the error still set, the unavailable row shows.
-    await act(async () => {
-      await Promise.resolve();
-      renderer.update(
-        createElement(ImageViewerModal, {
-          visible: true,
-          uri: 'file:///cache/photo.png',
-          filename: 'photo.png',
-          onClose: () => undefined,
-          renewing: false,
-        })
-      );
-    });
-
+    // The error replaces the image with the unavailable row at once, and the
+    // row persists while the URL is unchanged.
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
     expect(
       findByType(renderer.root, 'Text').filter(node => node.props.children === 'Image unavailable')
     ).toHaveLength(1);
 
-    renderer.unmount();
-  });
-
-  it('clears the recorded error in the same commit a renewed uri lands, with no unavailable flash', async () => {
-    const renderer = await mountViewer({ renewing: true });
-
-    const image = findByType(renderer.root, 'Image')[0];
-    if (!image) {
-      throw new Error('viewer Image missing');
-    }
-    await act(async () => {
-      await Promise.resolve();
-      (image.props.onError as () => void)();
-    });
-
-    // The error is recorded but the last-good image stays while renewing.
-    expect(findByType(renderer.root, 'Image')).toHaveLength(1);
-    expect(
-      findByType(renderer.root, 'Text').filter(node => node.props.children === 'Image unavailable')
-    ).toHaveLength(0);
-
-    // The renew succeeds: a new uri lands and `renewing` clears in one commit.
-    // The recorded error must clear in the same render so the refreshed image
-    // shows with no "Image unavailable" flash.
+    // A renewed uri clears the recorded error in the same commit, so the
+    // refreshed image shows with no "Image unavailable" flash.
     await act(async () => {
       await Promise.resolve();
       renderer.update(
@@ -199,7 +159,6 @@ describe('ImageViewerModal mounted', () => {
           uri: 'file:///cache/renewed.png',
           filename: 'photo.png',
           onClose: () => undefined,
-          renewing: false,
         })
       );
     });

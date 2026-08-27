@@ -113,7 +113,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   // renew writes a NEW signed URL; the reset must land in the same commit so
   // the refreshed image, not the retry chip, renders (and no open viewer is
   // unmounted). A failed renew keeps the same URL, so `imageFailed` survives
-  // and the retry chip shows once `renewing` clears.
+  // and the retry chip stays until a new URL lands.
   const [previousUrl, setPreviousUrl] = useState(url);
   if (url !== previousUrl) {
     setPreviousUrl(url);
@@ -235,11 +235,12 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
 
   if (kind === 'image') {
     if (url) {
-      // Keep the unavailable chip hidden while a renew is in flight (no
-      // flicker), but show it after a failed renew once the viewer closes: a
-      // failed renew only clears `renewing` and keeps the URL, so `imageFailed`
-      // stays set, but an open viewer must stay mounted.
-      if (imageFailed && !resolved.renewing && !viewerVisible) {
+      // Show the retry chip while the image is failed and the viewer is closed.
+      // A renew must not hide the chip: `imageFailed` stays set until a NEW URL
+      // lands (the render-phase reset above), so the failed UI persists through
+      // a retry tap or a 30s sweep and clears atomically on success. An open
+      // viewer must stay mounted.
+      if (imageFailed && !viewerVisible) {
         return (
           <Pressable
             onPress={() => {
@@ -287,11 +288,9 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
                   : t('agentChat.filePart.imageOutput')
               }
               onError={() => {
-                // A renew keeps the last URL served while a fresh one is in
-                // flight, so a transient failure must not swap the image. Still
-                // record the flag: a failed renew keeps the URL unchanged, so
-                // this leaves `imageFailed` set and the retry chip shows once
-                // `renewing` clears.
+                // Record the failure: `imageFailed` stays set until the URL
+                // changes, so the retry chip persists through a renew and
+                // clears atomically when a fresh signed URL lands.
                 setImageFailed(true);
               }}
             />
@@ -309,7 +308,6 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
               }}
               sharing={sharing}
               shareError={shareError}
-              renewing={resolved.renewing === true}
               onClose={closeViewer}
             />
           )}

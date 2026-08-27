@@ -66,9 +66,7 @@ export type GlanceableCounts = {
  * `question`/`permission` → needs-input, `retry` → reconnecting. `idle` and
  * any unknown status are ignored. Do not call `isCompletedStatus` here.
  */
-export function countGlanceableSessions(
-  sessions: readonly { status: string }[]
-): GlanceableCounts {
+export function countGlanceableSessions(sessions: readonly { status: string }[]): GlanceableCounts {
   let running = 0;
   let needsInput = 0;
   let reconnecting = 0;
@@ -140,7 +138,9 @@ export type BuildGlanceableSnapshotInput = {
  * stays eligible, starts at `now` when work becomes eligible, and is null
  * otherwise.
  */
-export function buildGlanceableSnapshot(input: BuildGlanceableSnapshotInput): GlanceableAgentsSnapshot {
+export function buildGlanceableSnapshot(
+  input: BuildGlanceableSnapshotInput
+): GlanceableAgentsSnapshot {
   const counts = countGlanceableSessions(input.sessions);
   const eligible = counts.running + counts.needsInput + counts.reconnecting > 0;
   const now = input.now;

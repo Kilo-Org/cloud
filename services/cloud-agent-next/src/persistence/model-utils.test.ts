@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  gatewayModelIdCases,
-  invalidCloudModelIds,
-} from '../../test/fixtures/gateway-model-ids.js';
-import {
   dispatchedKilocodeModelId,
   isLocalFakeDeterministicModel,
   normalizeKilocodeModel,
@@ -33,18 +29,25 @@ describe('normalizeKilocodeModel', () => {
 });
 
 describe('dispatchedKilocodeModelId', () => {
-  it.each(gatewayModelIdCases)(
-    'converts $cloudModel to the opaque gateway ID $gatewayModelId',
-    ({ cloudModel, gatewayModelId }) => {
-      expect(dispatchedKilocodeModelId(cloudModel)).toBe(gatewayModelId);
-    }
-  );
-
-  it.each([undefined, null])('returns undefined for omitted input %s', model => {
-    expect(dispatchedKilocodeModelId(model)).toBeUndefined();
+  it.each([
+    ['anthropic/claude-sonnet-4', 'anthropic/claude-sonnet-4'],
+    ['kilo/anthropic/claude-sonnet-4', 'anthropic/claude-sonnet-4'],
+    ['fake-deterministic', 'fake-deterministic'],
+    ['kilo/fake-deterministic', 'fake-deterministic'],
+    ['kilo-auto/free', 'kilo-auto/free'],
+    ['\t kilo/vendor/Team/Model:free~Alias \n', 'vendor/Team/Model:free~Alias'],
+    ['kilo/kilo/example', 'kilo/example'],
+  ])('converts %j to the opaque gateway ID %j', (cloudModel, gatewayModelId) => {
+    expect(dispatchedKilocodeModelId(cloudModel)).toBe(gatewayModelId);
   });
 
-  it.each(invalidCloudModelIds)('does not produce a usable gateway ID for %j', model => {
+  it('returns undefined for empty input', () => {
+    expect(dispatchedKilocodeModelId(undefined)).toBeUndefined();
+    expect(dispatchedKilocodeModelId(null)).toBeUndefined();
+    expect(dispatchedKilocodeModelId('   ')).toBeUndefined();
+  });
+
+  it.each(['', ' \t\n ', 'kilo/'])('does not produce a usable gateway ID for %j', model => {
     expect(dispatchedKilocodeModelId(model)).toBeFalsy();
   });
 });

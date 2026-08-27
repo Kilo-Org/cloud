@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
-import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm';
+import { platform_integrations, type PlatformIntegration } from '@kilocode/db/schema';
+import { eq, and, isNull, isNotNull, asc, desc, sql } from 'drizzle-orm';
 import type {
   GitHubRequester,
   IntegrationPermissions,
@@ -92,6 +92,69 @@ export async function getPrimaryGitHubIntegrationForOrganization(organizationId:
     .limit(1);
 
   return integration ?? null;
+}
+
+export type OrganizationGitHubIntegrationResolution =
+  | { success: true; integration: PlatformIntegration }
+  | { success: false; reason: 'no_installation_found' | 'ambiguous_installation' };
+
+/**
+ * Resolves the one healthy organization installation authorized for a GitHub repository.
+ * Repository-specific resolution is intentionally separate from deterministic primary selection.
+ */
+export async function resolveOrganizationGitHubIntegrationForRepository(input: {
+  organizationId: string;
+  repositoryFullName: string;
+  expectedPlatformIntegrationId?: string;
+}): Promise<OrganizationGitHubIntegrationResolution> {
+  const repositoryParts = input.repositoryFullName.split('/');
+  if (repositoryParts.length !== 2 || repositoryParts.some(part => part.length === 0)) {
+    return { success: false, reason: 'no_installation_found' };
+  }
+  const [repositoryOwner] = repositoryParts;
+
+  const integrations = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.owned_by_organization_id, input.organizationId),
+        isNull(platform_integrations.owned_by_user_id),
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        eq(platform_integrations.integration_type, 'app'),
+        isNotNull(platform_integrations.platform_installation_id),
+        sql`lower(${platform_integrations.platform_account_login}) = lower(${repositoryOwner})`,
+        platformIntegrationHealthSql(),
+        input.expectedPlatformIntegrationId !== undefined
+          ? eq(platform_integrations.id, input.expectedPlatformIntegrationId)
+          : undefined
+      )
+    );
+
+  const repositoryFullName = input.repositoryFullName.toLowerCase();
+  const matchingIntegrations = integrations.filter(integration => {
+    if (integration.repository_access === 'all') return true;
+    if (integration.repository_access !== 'selected') return false;
+    return Boolean(
+      integration.repositories?.some(
+        repository =>
+          typeof repository.full_name === 'string' &&
+          repository.full_name.toLowerCase() === repositoryFullName
+      )
+    );
+  });
+
+  if (matchingIntegrations.length === 0) {
+    return { success: false, reason: 'no_installation_found' };
+  }
+  if (matchingIntegrations.length > 1) {
+    return { success: false, reason: 'ambiguous_installation' };
+  }
+  const [integration] = matchingIntegrations;
+  if (!integration) {
+    return { success: false, reason: 'no_installation_found' };
+  }
+  return { success: true, integration };
 }
 
 export async function getAllIntegationsForOrganization(organizationId: string) {

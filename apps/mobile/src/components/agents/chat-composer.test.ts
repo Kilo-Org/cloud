@@ -24,6 +24,11 @@ const onSendMock = vi.fn(async () => undefined);
 // applied-draft flag — intact, and start a fresh instance with `mount`.
 const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor: 0 }));
 
+// The strip wire-lock test asserts the composer forwards the upload hook's
+// move/reorder callbacks by identity, so both mocks must be hoisted and shared.
+const uploadMoveAttachmentMock = vi.hoisted(() => vi.fn());
+const uploadReorderAttachmentsMock = vi.hoisted(() => vi.fn());
+
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
   return {
@@ -103,8 +108,10 @@ vi.mock('sonner-native', () => ({
 }));
 
 // ── sub-components (presentation only; the composer logic is under test) ───
+const MockAttachmentPreviewStrip = () => null;
+
 vi.mock('@/components/agents/attachment-preview-strip', () => ({
-  AttachmentPreviewStrip: () => null,
+  AttachmentPreviewStrip: MockAttachmentPreviewStrip,
 }));
 
 vi.mock('@/components/agents/attachment-paste-hint', () => ({
@@ -192,6 +199,8 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     addCandidates: vi.fn(async () => undefined),
     removeAttachment: vi.fn(() => undefined),
     retryAttachment: vi.fn(() => undefined),
+    moveAttachment: uploadMoveAttachmentMock,
+    reorderAttachments: uploadReorderAttachmentsMock,
     reset: vi.fn(() => undefined),
     commitSent: vi.fn(() => undefined),
     isUploading: false,
@@ -285,6 +294,24 @@ function findInputRowProps(node: Node): Record<string, unknown> | null {
   const children = (node as { props?: { children?: unknown } }).props?.children;
   for (const child of Array.isArray(children) ? children : [children]) {
     const found = findInputRowProps(child as Node);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+function findStripProps(node: Node): Record<string, unknown> | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const type = (node as { type?: unknown }).type;
+  if (type === MockAttachmentPreviewStrip) {
+    return (node as { props?: Record<string, unknown> }).props ?? {};
+  }
+  const children = (node as { props?: { children?: unknown } }).props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findStripProps(child as Node);
     if (found) {
       return found;
     }
@@ -410,5 +437,18 @@ describe('ChatComposer draft restore', () => {
       submission: undefined,
       onOptimisticSend: expect.any(Function),
     });
+  });
+});
+
+describe('ChatComposer attachment strip wiring', () => {
+  it('wires onMove and onReorder from the upload hook into the attachment strip', async () => {
+    const render = await mount(makeProps({}));
+
+    const stripProps = findStripProps(render);
+    if (stripProps === null) {
+      throw new Error('AttachmentPreviewStrip element not found');
+    }
+    expect(stripProps.onMove).toBe(uploadMoveAttachmentMock);
+    expect(stripProps.onReorder).toBe(uploadReorderAttachmentsMock);
   });
 });

@@ -170,8 +170,8 @@ async function mount(
         attachments,
         onRemove: handlers.onRemove ?? (() => undefined),
         onRetry: handlers.onRetry ?? (() => undefined),
-        onMove: handlers.onMove,
-        onReorder: handlers.onReorder,
+        onMove: handlers.onMove ?? (() => undefined),
+        onReorder: handlers.onReorder ?? (() => undefined),
       })
     );
   });
@@ -1009,6 +1009,50 @@ describe('AttachmentPreviewStrip — drag reorder', () => {
 
     expect(onReorder).not.toHaveBeenCalled();
     expect(a11yMock.moveA11yFocus).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — control hit targets', () => {
+  // The Remove control renders a 28pt visible badge (h-7 w-7) and reaches the
+  // platform minimum through its hitSlop. This catches a revert to the old
+  // fixed 8pt slop, which leaves Android at 44dp instead of 48dp.
+  function removeHitSlop(root: TestRenderer.ReactTestInstance): {
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+  } {
+    const remove = pressableByLabel(root, 'Remove attachment doc.pdf');
+    if (!remove) {
+      throw new Error('Remove button missing');
+    }
+    return remove.props.hitSlop as {
+      top: number;
+      bottom: number;
+      left: number;
+      right: number;
+    };
+  }
+
+  it('keeps the Remove target at the 44pt minimum on iOS', async () => {
+    const renderer = await mount([makeAttachment({})]);
+
+    const hitSlop = removeHitSlop(renderer.root);
+    expect(28 + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(44);
+    expect(28 + hitSlop.left + hitSlop.right).toBeGreaterThanOrEqual(44);
+
+    renderer.unmount();
+  });
+
+  it('keeps the Remove target at the 48dp minimum on Android', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const renderer = await mount([makeAttachment({})]);
+
+    const hitSlop = removeHitSlop(renderer.root);
+    expect(28 + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(48);
+    expect(28 + hitSlop.left + hitSlop.right).toBeGreaterThanOrEqual(48);
 
     renderer.unmount();
   });

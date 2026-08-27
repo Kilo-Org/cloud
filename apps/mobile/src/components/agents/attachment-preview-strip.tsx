@@ -5,6 +5,7 @@ import {
   type AccessibilityActionInfo,
   ActivityIndicator,
   type LayoutChangeEvent,
+  Platform,
   Pressable,
   ScrollView,
   View,
@@ -50,13 +51,20 @@ type Props = {
   onRemove: (id: string) => void;
   onRetry: (id: string) => void;
   /** Move a chip one position. The composer wires this to `useAgentAttachmentUpload.moveAttachment`. */
-  onMove?: (id: string, direction: AttachmentMoveDirection) => void;
+  onMove: (id: string, direction: AttachmentMoveDirection) => void;
   /** Reorder a chip by index (drag). The composer wires this to `useAgentAttachmentUpload.reorderAttachments`. */
-  onReorder?: (fromIndex: number, toIndex: number) => void;
+  onReorder: (fromIndex: number, toIndex: number) => void;
 };
 
-/** 28pt visible button + 8pt slop on every side = 44pt effective target. */
-const REMOVE_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+/**
+ * Remove's 28pt visible badge (h-7 w-7) plus slop on every side must reach the
+ * platform minimum touch target. Read at render time so it follows the
+ * platform, never captured once at module load.
+ */
+function removeHitSlop() {
+  const slop = ((Platform.OS === 'android' ? 48 : 44) - 28) / 2;
+  return { top: slop, bottom: slop, left: slop, right: slop };
+}
 
 /** Drag arms only after a long press, so ordinary horizontal scroll still wins. */
 const LONG_PRESS_MS = 300;
@@ -323,8 +331,8 @@ function AttachmentChip({
           className={cn(
             'h-full w-full flex-row items-center gap-2',
             // Row 3.3: the Retry control sits in the bottom-LEFT corner, so
-            // the retryable chip's file content shifts right of its 44pt
-            // target instead of being hidden underneath it.
+            // the retryable chip's file content shifts right of its badge
+            // instead of being hidden underneath it.
             description.showRetry ? 'pl-10 pr-2' : 'px-2'
           )}
         >
@@ -364,7 +372,7 @@ function AttachmentChip({
           the absolute Retry/Remove controls. It has NO overflow-hidden, so a
           parent never clips the controls' hitSlop; the rounded-image clipping
           lives on the surface view below, which is not their ancestor. Each
-          control keeps its full 44pt effective target at runtime. */}
+          control keeps its full platform-minimum effective target at runtime. */}
       <GestureDetector gesture={panGesture}>
         <View
           className="relative mr-2"
@@ -443,7 +451,7 @@ function AttachmentChip({
           {description.showRemove ? (
             <Pressable
               onPress={onRemove}
-              hitSlop={REMOVE_HIT_SLOP}
+              hitSlop={removeHitSlop()}
               className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.attachmentPreview.removeAttachment', {
@@ -495,8 +503,8 @@ export function AttachmentPreviewStrip({
   attachments,
   onRemove,
   onRetry,
-  onMove = () => undefined,
-  onReorder = () => undefined,
+  onMove,
+  onReorder,
 }: Readonly<Props>) {
   // Per-chip measured widths keyed by id, so a drag can map its translation to
   // a target slot even when image (w-20) and document (w-48) chips interleave.

@@ -679,7 +679,8 @@
     "profile": "Профіль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, укладка, {{position}} з {{total}}"
+    "position": "{{name}}, укладка, {{position}} з {{total}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -1317,7 +1318,23 @@
       "checkRun": "Запуск праверкі",
       "status": "Статус",
       "threshold": "Парогавае значэнне",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Чаканне стэнаграмы праверкі.",
+      "transcriptEmpty": "Няма стэнаграмы для гэтай праверкі.",
+      "transcriptRetry": "Не ўдалося загрузіць стэнаграму праверкі.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Агент бяздзейнічае",
+      "agentWorking": "Агент працуе...",
+      "anErrorOccurred": "Узнікла памылка",
+      "errorWithMessage": "Памылка: {{message}}",
+      "executionStarted": "Выкананне пачата",
+      "reviewCompleted": "Прагляд завершаны",
+      "reviewInterrupted": "Прагляд перапынены",
+      "sessionError": "Памылка сеанса: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Інструмент: {{name}}",
+      "toolNameError": "Інструмент: {{name}} — памылка",
+      "unknownError": "Невядомая памылка"
     },
     "reviewMemory": {
       "title": "Памяць праверкі",
@@ -2059,7 +2076,6 @@
     }
   },
   "agents": {
-    "activeNow": "Актыўны зараз",
     "search": {
       "searching": "Пошук…",
       "searchSessions": "Пошук сеансаў",
@@ -2070,13 +2086,11 @@
     "sessionList": {
       "couldNotLoad": "Не атрымалася загрузіць сеансы",
       "couldNotLoadActive": "Не атрымалася загрузіць актыўныя сеансы",
-      "noSessionsYet": "Сеансаў яшчэ няма",
       "noSessionsYetDescription": "Пачніце задачу кадавання з тэлефона. Вашы сеансы з'явяцца тут.",
       "noMatches": "Ніводны сеанс не адпавядае",
       "tryDifferentSearch": "Паспрабуйце іншы пошукавы запыт.",
       "tryAdjustFilters": "Паспрабуйце змяніць або ачысціць фільтры.",
       "couldNotSearch": "Не атрымалася выканаць пошук па сеансах",
-      "allActive": "Усе сеансы актыўныя",
       "completedWillAppear": "Завершаныя сеансы з'явяцца тут.",
       "noPastSessions": "Няма мінулых сеансаў",
       "live": "LIVE"
@@ -2149,13 +2163,10 @@
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",
       "renameAccessibility": "Перайменаваць сеанс: {{title}}",
-      "connectRepository": "Падключыць рэпазіторый",
       "cloningSession": "Кланаванне сеанса",
       "continue": "Працягнуць",
       "couldNotLoadThisSession": "Не атрымалася загрузіць гэты сеанс",
-      "cloneFailed": "Не атрымалася кланаваць гэты сеанс.",
       "cloneFailedRetry": "Не атрымалася кланаваць гэты сеанс. Паспрабуйце зноў.",
-      "connectRepositoryToContinue": "Падключыце рэпазіторый, каб працягнуць.",
       "notEnoughCredits": "Недастаткова крэдытаў для запуску Cloud Agent. Дадайце крэдыты і паспрабуйце зноў.",
       "previousTaskFinishing": "Папярэдняя задача ўсё яшчэ выконваецца. Пачакайце імгненне.",
       "serviceUnavailable": "Сэрвіс зараз недаступны. Паспрабуйце зноў.",
@@ -2228,7 +2239,11 @@
       "noRepositoriesVisibleGitlab": "Няма бачных рэпазіторыяў. Праверце доступ да рэпазіторыяў GitLab і абнавіце.",
       "openBitbucket": "Адкрыць Bitbucket",
       "openGitlab": "Адкрыць GitLab",
-      "recentlyUsed": "Нядаўна выкарыстаныя"
+      "recentlyUsed": "Нядаўна выкарыстаныя",
+      "continueFrom": "Працяг {{title}}",
+      "importingSession": "Імпартаванне сеанса",
+      "cliCannotContinue": "Гэты CLI не можа працягнуць сеанс. Выберыце Cloud Agent або іншы CLI.",
+      "importFailed": "Не атрымалася імпартаваць гэты сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл",
@@ -2496,6 +2511,8 @@
       "viewTable": "Праглядзець табліцу",
       "title": "Табліца",
       "close": "Закрыць табліцу",
+      "loading": "Загрузка табліцы",
+      "empty": "У гэтай табліцы няма радкоў.",
       "columnCount_one": "слупок",
       "columnCount": "слупкі",
       "columnCount_other": "слупкі",
@@ -2690,6 +2707,17 @@
       "hostConfirmMessage": "Гэтая спасылка адкрые {{host}} у вашым браўзеры.",
       "open": "Адкрыць",
       "trustThisHost": "Давяраць гэтаму хосту"
+    },
+    "folderPicker": {
+      "accessibility": "Папка: {{label}}",
+      "emptyDescription": "Гатова выкарыстоўвае гэтую папку.",
+      "emptyTitle": "Унутры няма папак",
+      "fieldLabel": "Папка",
+      "retryableDescription": "Праверце падключэнне і паўтарыце. Гатова ўсё ж пацвердзіць гэтую папку.",
+      "retryableTitle": "Не атрымалася паказаць спіс папак",
+      "tapToListHint": "Націсніце на папку, каб паказаць яе змесціва",
+      "unsupportedDescription": "Гэта CLI не можа паказаць спіс папак. Гатова захавае папку запуску, а Пачаць сеанс пачнецца там.",
+      "unsupportedTitle": "Нельга паказаць спіс папак"
     }
   },
   "bootstrap": {
@@ -3191,5 +3219,19 @@
     "emptyDescription": "Калі вы даверыцеся хосту спасылкі, яна адкрыецца без наступных запытаў.",
     "revoke": "Адабраць {{host}}",
     "backToPreferences": "Назад да наладаў"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Паведамленне"
+    },
+    "empty": {
+      "title": "Пачаць чат",
+      "description": "Адпраўце паведамленне, каб паразмаўляць з мадэллю."
+    },
+    "working": "Працуе",
+    "historyRetry": "Не атрымалася загрузіць гісторыю чата.",
+    "catalogRetry": "Не атрымалася загрузіць мадэлі",
+    "sendError": "Не атрымалася адправіць паведамленне. Паспрабуйце яшчэ раз."
   }
 }

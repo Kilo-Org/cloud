@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { applySessionAttach } from './apply-attach';
 import type { WrapperKiloClient } from '../kilo-api';
 import type { PreparingEventDataV2 } from '../../../src/shared/protocol.js';
+import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 
 const session = {
   sessionId: 'workspace_1',
@@ -356,6 +357,62 @@ describe('applySessionAttach', () => {
     expect(ensured).toEqual([[session.kiloSessionId, session.directory]]);
   });
 
+  it('creates an empty shell for an explicitly identified empty session export', async () => {
+    const ensured: Array<[string, string]> = [];
+    const result = await applySessionAttach(
+      session,
+      {},
+      {
+        kiloClient: fakeKilo({
+          ensureSession: async (sessionId, directory) => {
+            ensured.push([sessionId, directory]);
+          },
+        }),
+        sessionExists: async () => false,
+        restoreSession: async () => ({
+          ok: false,
+          error:
+            'snapshot missing info.id (42 bytes); session-ingest may have returned an error body',
+          code: null,
+          step: 'download',
+          emptySnapshot: true,
+        }),
+        ...noFs,
+      }
+    );
+
+    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(ensured).toEqual([[session.kiloSessionId, session.directory]]);
+  });
+
+  it('fails attach when snapshot metadata is missing without an empty-export marker', async () => {
+    let ensured = false;
+    const result = await applySessionAttach(
+      session,
+      {},
+      {
+        kiloClient: fakeKilo({
+          ensureSession: async () => {
+            ensured = true;
+          },
+        }),
+        sessionExists: async () => false,
+        restoreSession: async () => ({
+          ok: false,
+          error:
+            'snapshot missing info.id (42 bytes); session-ingest may have returned an error body',
+          code: null,
+          step: 'download',
+        }),
+        ...noFs,
+      }
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('not_ready');
+    expect(ensured).toBe(false);
+  });
+
   it('fails attach when restore fails with a non-404', async () => {
     let ensured = false;
     const result = await applySessionAttach(
@@ -458,4 +515,52 @@ describe('applySessionAttach', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('protocol_error');
   });
+
+  for (const key of CONTROL_RUNTIME_RESERVED_ENV_VARS) {
+    it(`rejects ${key} before preparation, filesystem, or subprocess side effects`, async () => {
+      const sideEffects: string[] = [];
+      const sensitiveValue = 'must-not-appear-in-error';
+      const result = await applySessionAttach(
+        session,
+        {
+          env: { [key]: sensitiveValue },
+          git: { url: 'https://github.com/acme/demo.git' },
+          setupCommands: ['pnpm install'],
+          preparation: { attemptId: 'att_1', triggerMessageId: 'msg_1' },
+        },
+        {
+          kiloClient: fakeKilo(),
+          hasBootstrapMarker: async () => {
+            sideEffects.push('bootstrap');
+            return false;
+          },
+          mkdir: async () => {
+            sideEffects.push('mkdir');
+          },
+          runGit: async () => {
+            sideEffects.push('git');
+            return { stdout: '', stderr: '', exitCode: 0 };
+          },
+          runSetup: async () => {
+            sideEffects.push('setup');
+            return { stdout: '', stderr: '', exitCode: 0 };
+          },
+          emitPreparing: () => {
+            sideEffects.push('preparing');
+          },
+        }
+      );
+
+      expect(result).toEqual({
+        ok: false,
+        error: {
+          code: 'protocol_error',
+          message: 'Reserved control runtime environment variable',
+          retryable: false,
+        },
+      });
+      expect(sideEffects).toEqual([]);
+      expect(JSON.stringify(result)).not.toContain(sensitiveValue);
+    });
+  }
 });

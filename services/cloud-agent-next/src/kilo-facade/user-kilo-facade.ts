@@ -671,6 +671,10 @@ function promptAdmissionError(
   switch (result.code) {
     case 'BAD_REQUEST':
       return facadeError(400, 'KILO_PROMPT_ADMISSION_REJECTED', result.error);
+    case 'FORBIDDEN':
+      return facadeError(403, 'KILO_PROMPT_ADMISSION_REJECTED', result.error);
+    case 'MODEL_VALIDATION_UNAVAILABLE':
+      return facadeError(503, result.code, result.error);
     case 'NOT_FOUND':
       return missingRootKiloSessionResponse();
     case 'PENDING_QUEUE_FULL':

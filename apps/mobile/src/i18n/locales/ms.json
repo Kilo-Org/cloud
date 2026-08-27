@@ -665,7 +665,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} daripada {{total}}"
+    "position": "{{name}}, tab, {{position}} daripada {{total}}",
+    "chat": "Sembang"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Jalankan semakan",
       "status": "Status",
       "threshold": "Ambang",
-      "pullRequest": "permintaan tarik"
+      "pullRequest": "permintaan tarik",
+      "transcriptWaiting": "Menunggu transkrip semakan.",
+      "transcriptEmpty": "Tiada transkrip untuk semakan ini.",
+      "transcriptRetry": "Tidak dapat memuatkan transkrip semakan.",
+      "transcriptLive": "LANGSUNG",
+      "agentIdle": "Ejen melahu",
+      "agentWorking": "Ejen bekerja...",
+      "anErrorOccurred": "Ralat berlaku",
+      "errorWithMessage": "Ralat: {{message}}",
+      "executionStarted": "Pelaksanaan dimulakan",
+      "reviewCompleted": "Semakan selesai",
+      "reviewInterrupted": "Semakan terganggu",
+      "sessionError": "Ralat sesi: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Alat: {{name}}",
+      "toolNameError": "Alat: {{name}} — ralat",
+      "unknownError": "Ralat tidak diketahui"
     },
     "reviewMemory": {
       "title": "Memori semakan",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktif sekarang",
     "search": {
       "searching": "Mencari",
       "searchSessions": "Cari sesi",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Tidak dapat memuatkan sesi",
       "couldNotLoadActive": "Tidak dapat memuatkan sesi aktif",
-      "noSessionsYet": "Belum ada sesi",
       "noSessionsYetDescription": "Mulakan tugasan pengekodan dari telefon anda. Sesi anda akan muncul di sini.",
       "noMatches": "Tiada sesi sepadan",
       "tryDifferentSearch": "Cuba istilah carian yang berbeza.",
       "tryAdjustFilters": "Cuba laraskan atau kosongkan penapis anda.",
       "couldNotSearch": "Tidak dapat mencari sesi",
-      "allActive": "Semua sesi aktif",
       "completedWillAppear": "Sesi yang selesai akan muncul di sini.",
       "noPastSessions": "Tiada sesi lalu",
       "live": "LANGSUNG"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Skrol ke bawah",
       "emptyTitle": "Belum ada mesej",
       "renameAccessibility": "Nama semula sesi: {{title}}",
-      "connectRepository": "Sambungkan repositori",
       "cloningSession": "Mengklon sesi",
       "continue": "Teruskan",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini",
-      "cloneFailed": "Tidak dapat mengklon sesi ini.",
       "cloneFailedRetry": "Tidak dapat mengklon sesi ini. Cuba lagi.",
-      "connectRepositoryToContinue": "Sambungkan repositori untuk meneruskan.",
       "notEnoughCredits": "Kredit tidak mencukupi untuk menjalankan Cloud Agent. Tambah kredit dan cuba semula.",
       "previousTaskFinishing": "Tugas sebelumnya masih selesai. Sila tunggu sebentar.",
       "serviceUnavailable": "Perkhidmatan tidak tersedia buat masa ini. Sila cuba semula.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Tiada repositori kelihatan. Semak akses repositori untuk GitLab, kemudian muat semula.",
       "openBitbucket": "Buka Bitbucket",
       "openGitlab": "Buka GitLab",
-      "recentlyUsed": "Baru digunakan"
+      "recentlyUsed": "Baru digunakan",
+      "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Ejen Awan atau CLI lain.",
+      "continueFrom": "Meneruskan {{title}}",
+      "importFailed": "Tidak dapat mengimport sesi ini.",
+      "importingSession": "Mengimport sesi"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fail dikemas kini",
@@ -2462,6 +2477,8 @@
       "viewTable": "Lihat jadual",
       "title": "Jadual",
       "close": "Tutup jadual",
+      "loading": "Memuat jadual",
+      "empty": "Jadual ini tiada baris.",
       "columnCount_one": "lajur",
       "columnCount": "lajur",
       "columnCount_other": "lajur",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Pautan ini membuka {{host}} dalam pelayar anda.",
       "open": "Buka",
       "trustThisHost": "Percayai hos ini"
+    },
+    "folderPicker": {
+      "accessibility": "Folder: {{label}}",
+      "emptyDescription": "Selesai menggunakan folder ini.",
+      "emptyTitle": "Tiada folder di dalam",
+      "fieldLabel": "Folder",
+      "retryableDescription": "Semak sambungan anda dan Cuba lagi. Selesai masih mengesahkan folder ini.",
+      "retryableTitle": "Tidak dapat menyenaraikan folder",
+      "tapToListHint": "Ketuk folder untuk menyenaraikan kandungannya",
+      "unsupportedDescription": "CLI ini tidak dapat menyenaraikan folder. Selesai mengekalkan folder pelancaran dan Mulakan sesi bermula di situ.",
+      "unsupportedTitle": "Tidak dapat menyenaraikan folder"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Apabila anda mempercayai hos pautan, ia dibuka tanpa bertanya lagi.",
     "revoke": "Tarik balik {{host}}",
     "backToPreferences": "Kembali ke keutamaan"
+  },
+  "quickChat": {
+    "title": "Sembang",
+    "composer": {
+      "placeholder": "Mesej"
+    },
+    "empty": {
+      "title": "Mulakan sembang",
+      "description": "Hantar mesej untuk bercakap dengan model."
+    },
+    "working": "Memproses…",
+    "historyRetry": "Tidak dapat memuatkan sejarah sembang.",
+    "catalogRetry": "Tidak dapat memuatkan model",
+    "sendError": "Mesej tidak dapat dihantar. Cuba lagi."
   }
 }

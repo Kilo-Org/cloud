@@ -42,6 +42,7 @@ export const TriggerConfig = z.object({
   githubRepo: z.string().nullable().optional(),
   mode: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
+  variant: z.string().optional(),
   promptTemplate: z.string(),
   profileId: z.string().nullable().optional(),
   autoCommit: z.boolean().optional(),
@@ -85,6 +86,7 @@ type ConfigureInput = {
   githubRepo?: string;
   mode?: string;
   model?: string;
+  variant?: string;
   promptTemplate: string;
   profileId?: string;
   autoCommit?: boolean;
@@ -103,6 +105,7 @@ type WebhookAuthUpdateInput = {
 type UpdateConfigInput = {
   mode?: string;
   model?: string;
+  variant?: string | null;
   promptTemplate?: string;
   isActive?: boolean;
   profileId?: string;
@@ -149,6 +152,7 @@ export class TriggerDO extends DurableObject<Env> {
       githubRepo: configOverrides.githubRepo ?? null,
       mode: configOverrides.mode ?? null,
       model: configOverrides.model ?? null,
+      variant: configOverrides.variant,
       promptTemplate: configOverrides.promptTemplate,
       profileId: configOverrides.profileId ?? null,
       autoCommit: configOverrides.autoCommit,
@@ -174,6 +178,7 @@ export class TriggerDO extends DurableObject<Env> {
       github_repo: config.githubRepo ?? null,
       mode: config.mode ?? null,
       model: config.model ?? null,
+      variant: config.variant ?? null,
       prompt_template: config.promptTemplate,
       profile_id: config.profileId ?? null,
       auto_commit: config.autoCommit !== undefined ? (config.autoCommit ? 1 : 0) : null,
@@ -240,6 +245,7 @@ export class TriggerDO extends DurableObject<Env> {
       githubRepo: record.github_repo ?? null,
       mode: record.mode ?? null,
       model: record.model ?? null,
+      variant: record.variant ?? undefined,
       promptTemplate: record.prompt_template,
       profileId: record.profile_id ?? null,
       autoCommit: record.auto_commit !== null ? record.auto_commit === 1 : undefined,
@@ -290,6 +296,7 @@ export class TriggerDO extends DurableObject<Env> {
       ...existingConfig,
       mode: updates.mode ?? existingConfig.mode,
       model: updates.model ?? existingConfig.model,
+      variant: resolveNullable(updates.variant, existingConfig.variant),
       promptTemplate: updates.promptTemplate ?? existingConfig.promptTemplate,
       isActive: updates.isActive ?? existingConfig.isActive,
       profileId: updates.profileId ?? existingConfig.profileId,
@@ -311,6 +318,7 @@ export class TriggerDO extends DurableObject<Env> {
       .set({
         mode: updatedConfig.mode,
         model: updatedConfig.model,
+        variant: updatedConfig.variant ?? null,
         prompt_template: updatedConfig.promptTemplate,
         is_active: updatedConfig.isActive ? 1 : 0,
         profile_id: updatedConfig.profileId,

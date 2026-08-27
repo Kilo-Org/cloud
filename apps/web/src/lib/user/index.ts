@@ -7,7 +7,10 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
-import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
+import {
+  createSoftDeletedBlockedReason,
+  isSoftDeletedBlockedReason,
+} from '@kilocode/db/user-soft-delete';
 import { reportAuthEvent, reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
   payment_methods,
@@ -113,8 +116,10 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
+  quick_chat_threads,
+  quick_chat_messages,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count, ne } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
@@ -126,6 +131,7 @@ import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import { hosted_domain_specials } from '@/lib/auth/constants';
+import * as z from 'zod';
 import {
   generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
@@ -1045,7 +1051,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   device_auth_requests, auto_top_up_configs,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
- *   user_notification_preferences)
+ *   user_notification_preferences, quick_chat_threads, quick_chat_messages)
  * - operation_ledgers (keyed by kilo_user_id)
  * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
  *   writer's email lookup failed, the user id)
@@ -1068,6 +1074,7 @@ export async function anonymizeCloudUserData(
   if (!user) return;
 
   const originalEmail = user.google_user_email;
+  const deletedEmail = `deleted+${userId}@deleted.invalid`;
   const originalAppStoreAccountToken = user.app_store_account_token;
 
   // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────
@@ -1089,10 +1096,12 @@ export async function anonymizeCloudUserData(
   // Fall back to google_user_email so the tombstone hash still gets recorded
   // before the row below anonymizes both columns; otherwise a previously
   // deleted user could re-register and qualify as a referee.
-  await createDeletedUserEmailTombstone({
-    database: tx,
-    normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
-  });
+  if (originalEmail !== deletedEmail) {
+    await createDeletedUserEmailTombstone({
+      database: tx,
+      normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
+    });
+  }
 
   // ── Gateway cleanup ───────────────────────────────────────────────────
   await revokeGatewayStateForUser(tx, userId);
@@ -1115,7 +1124,7 @@ export async function anonymizeCloudUserData(
   await tx
     .update(kilocode_users)
     .set({
-      google_user_email: `deleted+${userId}@deleted.invalid`,
+      google_user_email: deletedEmail,
       normalized_email: null,
       email_domain: null,
       google_user_name: 'Deleted User',
@@ -1128,7 +1137,9 @@ export async function anonymizeCloudUserData(
       web_session_pepper: randomUUID(),
       app_store_account_token: randomUUID(),
       default_model: null,
-      blocked_reason: createSoftDeletedBlockedReason(),
+      blocked_reason: isSoftDeletedBlockedReason(user.blocked_reason)
+        ? user.blocked_reason
+        : createSoftDeletedBlockedReason(),
       blocked_at: null,
       blocked_by_kilo_user_id: null,
       auto_top_up_enabled: false,
@@ -1474,6 +1485,22 @@ export async function anonymizeCloudUserData(
   await tx.delete(user_moderation_mutes).where(eq(user_moderation_mutes.blocker_user_id, userId));
   await tx.delete(user_terms_acceptances).where(eq(user_terms_acceptances.kilo_user_id, userId));
 
+  // Quick chat threads and messages are user-owned, so they are hard-deleted
+  // with the account. Messages go first so the thread delete below cannot race
+  // a cascade that would leave them behind.
+  await tx
+    .delete(quick_chat_messages)
+    .where(
+      inArray(
+        quick_chat_messages.thread_id,
+        tx
+          .select({ id: quick_chat_threads.id })
+          .from(quick_chat_threads)
+          .where(eq(quick_chat_threads.user_id, userId))
+      )
+    );
+  await tx.delete(quick_chat_threads).where(eq(quick_chat_threads.user_id, userId));
+
   // Code indexing data
   await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));
   await tx.delete(code_indexing_search).where(eq(code_indexing_search.kilo_user_id, userId));
@@ -1595,7 +1622,7 @@ export async function anonymizeCloudUserData(
   await tx
     .update(payment_methods)
     .set({
-      deleted_at: sql`now()`,
+      deleted_at: sql`coalesce(${payment_methods.deleted_at}, now())`,
       name: null,
       address_line1: null,
       address_line2: null,
@@ -1887,11 +1914,8 @@ export type UserProviderLookupResult =
   | { kind: 'not_found' }
   | { kind: 'ambiguous' };
 
-export async function getAllUserProviders(email: string): Promise<UserProviderLookupResult> {
+async function getEmailAccountCandidates(email: string) {
   const lowerEmail = email.toLowerCase().trim();
-
-  // A submitted email only determines discovery options; provider callbacks
-  // and magic-link verification remain the authentication authority.
   const linkedProviders = await db
     .selectDistinct({ kilo_user_id: user_auth_provider.kilo_user_id })
     .from(user_auth_provider)
@@ -1914,6 +1938,69 @@ export async function getAllUserProviders(email: string): Promise<UserProviderLo
     ...linkedProviders.map(provider => provider.kilo_user_id),
     ...normalizedUsers.map(user => user.id),
   ]);
+
+  return { candidateUserIds, normalizedUsers };
+}
+
+export async function getCrossAccountEmailConflicts(
+  emails: string[],
+  currentUserId: string
+): Promise<Map<string, boolean>> {
+  const uniqueEmails = [...new Set(emails)];
+  if (uniqueEmails.length === 0) return new Map();
+
+  const lowerEmails = [...new Set(uniqueEmails.map(email => email.toLowerCase().trim()))];
+  const normalizedEmails = [...new Set(uniqueEmails.map(normalizeEmail))];
+  const [linkedProviderMatches, primaryEmailMatches] = await Promise.all([
+    db
+      .select({ email: user_auth_provider.email })
+      .from(user_auth_provider)
+      .where(
+        and(
+          inArray(sql`lower(${user_auth_provider.email})`, lowerEmails),
+          ne(user_auth_provider.kilo_user_id, currentUserId)
+        )
+      ),
+    db
+      .select({
+        normalizedEmail: kilocode_users.normalized_email,
+        primaryEmail: kilocode_users.google_user_email,
+      })
+      .from(kilocode_users)
+      .where(
+        and(
+          ne(kilocode_users.id, currentUserId),
+          or(
+            inArray(kilocode_users.normalized_email, normalizedEmails),
+            and(
+              isNull(kilocode_users.normalized_email),
+              inArray(sql`lower(${kilocode_users.google_user_email})`, lowerEmails)
+            )
+          )
+        )
+      ),
+  ]);
+
+  return new Map(
+    uniqueEmails.map(email => {
+      const lowerEmail = email.toLowerCase().trim();
+      const normalizedEmail = normalizeEmail(email);
+      const hasConflict =
+        linkedProviderMatches.some(match => match.email.toLowerCase() === lowerEmail) ||
+        primaryEmailMatches.some(match =>
+          match.normalizedEmail
+            ? match.normalizedEmail === normalizedEmail
+            : match.primaryEmail.toLowerCase() === lowerEmail
+        );
+      return [email, hasConflict];
+    })
+  );
+}
+
+export async function getAllUserProviders(email: string): Promise<UserProviderLookupResult> {
+  // A submitted email only determines discovery options; provider callbacks
+  // and magic-link verification remain the authentication authority.
+  const { candidateUserIds, normalizedUsers } = await getEmailAccountCandidates(email);
   if (candidateUserIds.size > 1) {
     return { kind: 'ambiguous' };
   }
@@ -1944,7 +2031,7 @@ async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult
 
   const workosProvider = providers.find(p => p.provider === 'workos');
   const discoveredProviders =
-    providers.length > 0 ? providers.map(p => p.provider) : legacyProviderFromHostedDomain(user);
+    providers.length > 0 ? providers.map(p => p.provider) : inferRowlessAuthProviders(user);
 
   return {
     kind: 'found',
@@ -1957,9 +2044,12 @@ async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult
   };
 }
 
-function legacyProviderFromHostedDomain(user: User): AuthProviderId[] {
+export function inferRowlessAuthProviders(
+  user: Pick<User, 'id' | 'hosted_domain'>
+): AuthProviderId[] {
   const legacyOAuthProvider = parseLegacyOAuthProvider(user.id);
   if (legacyOAuthProvider) return [legacyOAuthProvider];
+  if (isUuidUserId(user.id)) return ['email'];
 
   switch (user.hosted_domain) {
     case hosted_domain_specials.non_workspace_google_account:
@@ -1993,6 +2083,10 @@ function parseLegacyOAuthProvider(userId: string): AuthProviderId | null {
     default:
       return null;
   }
+}
+
+function isUuidUserId(userId: string): boolean {
+  return z.uuid().safeParse(userId).success;
 }
 
 /**

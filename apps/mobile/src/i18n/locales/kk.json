@@ -665,7 +665,8 @@
     "profile": "Профиль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, қойынды, {{total}} ішінде {{position}}"
+    "position": "{{name}}, қойынды, {{total}} ішінде {{position}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Тексеруді орындау",
       "status": "Күй",
       "threshold": "Шек",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Шолу транскрипті күтілуде.",
+      "transcriptEmpty": "Бұл шолу үшін транскрипт жоқ.",
+      "transcriptRetry": "Шолу транскриптін жүктеу мүмкін болмады.",
+      "transcriptLive": "ТІКІ",
+      "agentIdle": "Агент бос тұр",
+      "agentWorking": "Агент орындалуда...",
+      "anErrorOccurred": "Қате орын алды",
+      "errorWithMessage": "Қате: {{message}}",
+      "executionStarted": "Орындалу басталды",
+      "reviewCompleted": "Шолу аяқталды",
+      "reviewInterrupted": "Шолу үзілді",
+      "sessionError": "Сессия қатесі: {{error}}",
+      "statusWithValue": "Күй: {{status}}",
+      "toolName": "Құрал: {{name}}",
+      "toolNameError": "Құрал: {{name}} — қате",
+      "unknownError": "Белгісіз қате"
     },
     "reviewMemory": {
       "title": "Шолу жады",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Қазір белсенді",
     "search": {
       "searching": "Ізделуде",
       "searchSessions": "Сессияларды іздеу",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Сессияларды жүктеу мүмкін болмады",
       "couldNotLoadActive": "Белсенді сессияларды жүктеу мүмкін болмады",
-      "noSessionsYet": "Әзірге сессиялар жоқ",
       "noSessionsYetDescription": "Телефоныңыздан кодтау тапсырмасын бастаңыз. Сессияларыңыз осында пайда болады.",
       "noMatches": "Сессиялар сәйкес келмейді",
       "tryDifferentSearch": "Басқа іздеу сөзін қолданып көріңіз.",
       "tryAdjustFilters": "Сүзгілерді реттеп немесе тазалап көріңіз.",
       "couldNotSearch": "Сессияларды іздеу мүмкін болмады",
-      "allActive": "Барлық сессиялар белсенді",
       "completedWillAppear": "Аяқталған сессиялар осында пайда болады.",
       "noPastSessions": "Өткен сессиялар жоқ",
       "live": "ТІКІ"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Төменге айналдыру",
       "emptyTitle": "Әзірге хабарламалар жоқ",
       "renameAccessibility": "Сессияның атын өзгерту: {{title}}",
-      "connectRepository": "Репозиторийді қосу",
       "cloningSession": "Сессияны клондау",
       "continue": "Жалғастыру",
       "couldNotLoadThisSession": "Бұл сессияны жүктеу мүмкін болмады",
-      "cloneFailed": "Бұл сессияны клондау мүмкін болмады.",
       "cloneFailedRetry": "Бұл сессияны клондау мүмкін болмады. Қайталап көріңіз.",
-      "connectRepositoryToContinue": "Жалғастыру үшін репозиторийді қосыңыз.",
       "notEnoughCredits": "Cloud Agent іске қосуға кредит жеткіліксіз. Кредит қосып, қайта көріңіз.",
       "previousTaskFinishing": "Алдыңғы тапсырма әлі аяқталуда. Сәл күте тұрыңыз.",
       "serviceUnavailable": "Қызмет қазір қолжетімсіз. Қайталап көріңіз.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Репозиторийлер көрінбейді. GitLab үшін репозиторий қолжетімділігін тексеріңіз, содан кейін жаңартыңыз.",
       "openBitbucket": "Bitbucket-ті ашу",
       "openGitlab": "GitLab-ді ашу",
-      "recentlyUsed": "Жақында қолданылған"
+      "recentlyUsed": "Жақында қолданылған",
+      "continueFrom": "Жалғастыру {{title}}",
+      "importingSession": "Сессияны импорттау",
+      "cliCannotContinue": "Бұл CLI сессияны жалғастыра алмайды. Cloud Agent немесе басқа CLI таңдаңыз.",
+      "importFailed": "Бұл сессияны импорттау мүмкін болмады."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды",
@@ -2462,6 +2477,8 @@
       "viewTable": "Кестені қарау",
       "title": "Кесте",
       "close": "Кестені жабу",
+      "loading": "Кестені жүктеу",
+      "empty": "Бұл кестеде жолдар жоқ.",
       "columnCount_one": "баған",
       "columnCount": "баған",
       "columnCount_other": "баған",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Бұл сілтеме {{host}} браузеріңізде ашылады.",
       "open": "Ашу",
       "trustThisHost": "Бұл хостқа сену"
+    },
+    "folderPicker": {
+      "accessibility": "Папка: {{label}}",
+      "emptyDescription": "Дайын бұл папканы пайдаланады.",
+      "emptyTitle": "Ішінде папка жоқ",
+      "fieldLabel": "Папка",
+      "retryableDescription": "Қосылымды тексеріп, Қайталау түймесін басыңыз. Дайын бұл папканы әлі де растайды.",
+      "retryableTitle": "Папкаларды тізімдеу мүмкін болмады",
+      "tapToListHint": "Мазмұнын көру үшін папканы түртіңіз",
+      "unsupportedDescription": "Бұл CLI папкаларды тізімдей алмайды. Дайын іске қосу папкасын сақтайды, ал Сессияны бастау сол жерден басталады.",
+      "unsupportedTitle": "Папкаларды тізімдеу мүмкін емес"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Сілтеме хостына сенсеңіз, ол қайта сұрамай ашылады.",
     "revoke": "{{host}} кері қайтару",
     "backToPreferences": "Баптауларға оралу"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Хабарлама"
+    },
+    "empty": {
+      "title": "Чатты бастаңыз",
+      "description": "Модельмен сөйлесу үшін хабарлама жіберіңіз."
+    },
+    "working": "Орындалуда",
+    "historyRetry": "Чат тарихын жүктеу мүмкін болмады.",
+    "catalogRetry": "Модельдерді жүктеу мүмкін болмады",
+    "sendError": "Хабарламаны жіберу мүмкін болмады. Қайта көріңіз."
   }
 }

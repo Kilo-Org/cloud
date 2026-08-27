@@ -61,7 +61,6 @@ import {
   hydrateEmptyChildSessions,
   resolveRetryPrompt,
   retryMessageAndClear,
-  runConnectRepository,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
@@ -126,8 +125,10 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
-import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
-import { useContinueSession } from '@/components/agents/use-continue-session';
+import {
+  buildContinueHref,
+  buildContinuePrefillParams,
+} from '@/components/agents/new-session-prefill';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -299,21 +300,6 @@ export function SessionDetailContent({
     organizationId,
   });
   const modelOptions = sessionModels.options;
-  const {
-    continueSession,
-    isContinuing,
-    guidance: continueGuidance,
-    clearGuidance,
-  } = useContinueSession({
-    sessionId,
-    organizationId,
-    models: modelOptions,
-    modelsLoading: gatewayModelsLoading,
-  });
-  const { openGitHubIntegration } = useGitHubReposRefresh({
-    organizationId,
-    integrationInstalled: undefined,
-  });
   const contextInfo = useMemo(
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
     [contextUsage, sessionModels.options]
@@ -873,10 +859,6 @@ export function SessionDetailContent({
     router.replace('/(app)/(tabs)/(2_agents)' as Href);
   }, [router]);
 
-  const handleConnectRepository = useCallback(() => {
-    runConnectRepository(openGitHubIntegration, clearGuidance);
-  }, [openGitHubIntegration, clearGuidance]);
-
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
       if (activeSessionType === 'remote') {
@@ -1116,13 +1098,29 @@ export function SessionDetailContent({
   );
 
   const handleContinueInNewSession = useCallback(() => {
-    void continueSession({
-      gitUrl: fetchedData?.gitUrl,
-      mode: currentMode,
-      model: currentModel,
-      variant: currentVariant,
-    });
-  }, [continueSession, fetchedData?.gitUrl, currentMode, currentModel, currentVariant]);
+    router.push(
+      buildContinueHref({
+        organizationId,
+        cloneFromKiloSessionId: sessionId,
+        cloneSourceTitle: rename.title,
+        prefill: buildContinuePrefillParams({
+          gitUrl: fetchedData?.gitUrl,
+          mode: currentMode,
+          model: currentModel,
+          variant: currentVariant,
+        }),
+      }) as Href
+    );
+  }, [
+    router,
+    organizationId,
+    sessionId,
+    rename.title,
+    fetchedData?.gitUrl,
+    currentMode,
+    currentModel,
+    currentVariant,
+  ]);
 
   const isFocused = useIsFocused();
   const keepScreenAwake = shouldKeepSessionAwake({
@@ -1328,58 +1326,14 @@ export function SessionDetailContent({
             <Text className="text-center text-sm text-muted-foreground">
               {t('agentChat.session.readOnly')}
             </Text>
-            {continueGuidance?.kind === 'terminal' ? (
-              <>
-                <Text className="text-center text-sm text-muted-foreground">
-                  {continueGuidance.message}
-                </Text>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  accessibilityLabel={
-                    continueGuidance.action === 'connect-repository'
-                      ? t('agentChat.session.connectRepository')
-                      : t('agentChat.session.backToSessions')
-                  }
-                  onPress={
-                    continueGuidance.action === 'connect-repository'
-                      ? handleConnectRepository
-                      : handleBackToSessions
-                  }
-                >
-                  <Text>
-                    {continueGuidance.action === 'connect-repository'
-                      ? t('agentChat.session.connectRepository')
-                      : t('agentChat.session.backToSessions')}
-                  </Text>
-                </Button>
-              </>
-            ) : (
-              <>
-                {continueGuidance?.kind === 'retry' ? (
-                  <Text className="text-center text-sm text-muted-foreground">
-                    {continueGuidance.message}
-                  </Text>
-                ) : null}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  accessibilityLabel={
-                    isContinuing
-                      ? t('agentChat.session.cloningSession')
-                      : t('agentChat.session.continue')
-                  }
-                  loading={isContinuing}
-                  onPress={handleContinueInNewSession}
-                >
-                  <Text>
-                    {isContinuing
-                      ? t('agentChat.session.cloningSession')
-                      : t('agentChat.session.continue')}
-                  </Text>
-                </Button>
-              </>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              accessibilityLabel={t('agentChat.session.continue')}
+              onPress={handleContinueInNewSession}
+            >
+              <Text>{t('agentChat.session.continue')}</Text>
+            </Button>
           </View>
         ) : null}
 

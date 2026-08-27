@@ -665,7 +665,8 @@
     "profile": "પ્રોફાઇલ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ટેબ, {{position}} માંથી {{total}}"
+    "position": "{{name}}, ટેબ, {{position}} માંથી {{total}}",
+    "chat": "ચેટ"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "ચેક રન",
       "status": "સ્થિતિ",
       "threshold": "થ્રેશોલ્ડ",
-      "pullRequest": "પુલ રિક્વેસ્ટ"
+      "pullRequest": "પુલ રિક્વેસ્ટ",
+      "transcriptWaiting": "સમીક્ષા ટ્રાન્સક્રિપ્ટની રાહ જોઈ રહ્યું છે.",
+      "transcriptEmpty": "આ સમીક્ષા માટે કોઈ ટ્રાન્સક્રિપ્ટ નથી.",
+      "transcriptRetry": "સમીક્ષા ટ્રાન્સક્રિપ્ટ લોડ કરી શકાઈ નહીં.",
+      "transcriptLive": "લાઇવ",
+      "agentIdle": "એજન્ટ નિષ્ક્રિય",
+      "agentWorking": "એજન્ટ કામ કરી રહ્યું છે...",
+      "anErrorOccurred": "ભૂલ થઈ",
+      "errorWithMessage": "ભૂલ: {{message}}",
+      "executionStarted": "એક્ઝેક્યુશન શરૂ થયું",
+      "reviewCompleted": "સમીક્ષા પૂર્ણ",
+      "reviewInterrupted": "સમીક્ષા વિક્ષિપ્ત થઈ",
+      "sessionError": "સત્ર ભૂલ: {{error}}",
+      "statusWithValue": "સ્થિતિ: {{status}}",
+      "toolName": "ટૂલ: {{name}}",
+      "toolNameError": "ટૂલ: {{name}} — ભૂલ",
+      "unknownError": "અજ્ઞાત ભૂલ"
     },
     "reviewMemory": {
       "title": "સમીક્ષા મેમરી",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "હવે સક્રિય",
     "search": {
       "searching": "શોધી રહ્યું છે",
       "searchSessions": "સત્રો શોધો",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "સત્રો લોડ કરી શકાયા નહીં",
       "couldNotLoadActive": "સક્રિય સત્રો લોડ થઈ શક્યા નથી",
-      "noSessionsYet": "હજુ કોઈ સત્ર નથી",
       "noSessionsYetDescription": "તમારા ફોન પરથી કોડિંગ કાર્ય શરૂ કરો. તમારા સત્રો અહીં દેખાશે.",
       "noMatches": "કોઈ સત્ર મેળ ખાતું નથી",
       "tryDifferentSearch": "અલગ શોધ શબ્દ અજમાવો.",
       "tryAdjustFilters": "તમારા ફિલ્ટર ગોઠવવાનો અથવા સાફ કરવાનો પ્રયાસ કરો.",
       "couldNotSearch": "સત્રો શોધી શકાયા નથી",
-      "allActive": "બધા સત્રો સક્રિય છે",
       "completedWillAppear": "પૂર્ણ થયેલ સત્રો અહીં દેખાશે.",
       "noPastSessions": "કોઈ ભૂતકાળના સત્ર નથી",
       "live": "લાઇવ"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "નીચે સ્ક્રોલ કરો",
       "emptyTitle": "હજુ કોઈ સંદેશ નથી",
       "renameAccessibility": "સત્રનું નામ બદલો: {{title}}",
-      "connectRepository": "રિપોઝિટરી કનેક્ટ કરો",
       "cloningSession": "સત્ર ક્લોન કરી રહ્યું છે",
       "continue": "ચાલુ રાખો",
       "couldNotLoadThisSession": "આ સત્ર લોડ થઈ શક્યું નથી",
-      "cloneFailed": "આ સત્ર ક્લોન થઈ શક્યું નથી.",
       "cloneFailedRetry": "આ સત્ર ક્લોન થઈ શક્યું નથી. ફરી પ્રયાસ કરો.",
-      "connectRepositoryToContinue": "ચાલુ રાખવા રિપોઝિટરી કનેક્ટ કરો.",
       "notEnoughCredits": "Cloud Agent ચલાવવા માટે પૂરતા ક્રેડિટ નથી. ક્રેડિટ ઉમેરીને ફરી પ્રયાસ કરો.",
       "previousTaskFinishing": "પાછલું કાર્ય હજી પૂરું થઈ રહ્યું છે. થોડી રાહ જુઓ.",
       "serviceUnavailable": "સેવા હાલ ઉપલબ્ધ નથી. ફરી પ્રયાસ કરો.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "કોઈ રિપોઝિટરી દેખાતી નથી. GitLab માટે રિપોઝિટરી એક્સેસ તપાસો, પછી રિફ્રેશ કરો.",
       "openBitbucket": "Bitbucket ખોલો",
       "openGitlab": "GitLab ખોલો",
-      "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું"
+      "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું",
+      "continueFrom": "{{title}} ચાલુ કરી રહ્યાં છીએ",
+      "importingSession": "સત્ર આયાત કરી રહ્યાં છીએ",
+      "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
+      "importFailed": "આ સત્ર આયાત કરી શક્યા નથી."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ કરેલ",
@@ -2462,6 +2477,8 @@
       "viewTable": "કોષ્ટક જુઓ",
       "title": "કોષ્ટક",
       "close": "કોષ્ટક બંધ કરો",
+      "loading": "કોષ્ટક લોડ થઈ રહ્યું છે",
+      "empty": "આ કોષ્ટકમાં કોઈ પંક્તિઓ નથી.",
       "columnCount_one": "કૉલમ",
       "columnCount": "કૉલમ્સ",
       "columnCount_other": "કૉલમ્સ",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "આ લિંક તમારા બ્રાઉઝરમાં {{host}} ખોલે છે.",
       "open": "ખોલો",
       "trustThisHost": "આ હોસ્ટ પર ભરોસો રાખો"
+    },
+    "folderPicker": {
+      "accessibility": "ફોલ્ડર: {{label}}",
+      "emptyDescription": "થઈ ગયું આ ફોલ્ડર વાપરે છે.",
+      "emptyTitle": "અંદર કોઈ ફોલ્ડર નથી",
+      "fieldLabel": "ફોલ્ડર",
+      "retryableDescription": "તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો. થઈ ગયું હજુ પણ આ ફોલ્ડરની પુષ્ટિ કરે છે.",
+      "retryableTitle": "ફોલ્ડર્સ સૂચિબદ્ધ કરી શકાયા નહીં",
+      "tapToListHint": "તેની સામગ્રી સૂચિબદ્ધ કરવા ફોલ્ડરને ટેપ કરો",
+      "unsupportedDescription": "આ CLI ફોલ્ડર્સ સૂચિબદ્ધ કરી શકતું નથી. થઈ ગયું લોન્ચ ફોલ્ડર રાખે છે અને સત્ર શરૂ કરો ત્યાં શરૂ થાય છે.",
+      "unsupportedTitle": "ફોલ્ડર્સ સૂચિબદ્ધ કરી શકાતા નથી"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "જ્યારે તમે લિંકના હોસ્ટ પર ભરોસો રાખો છો, ત્યારે તે ફરીથી પૂછ્યા વિના ખુલે છે.",
     "revoke": "{{host}} રદ કરો",
     "backToPreferences": "પસંદગીઓ પર પાછા જાઓ"
+  },
+  "quickChat": {
+    "title": "ચેટ",
+    "composer": {
+      "placeholder": "સંદેશ"
+    },
+    "empty": {
+      "title": "વાતચીત શરૂ કરો",
+      "description": "મોડેલ સાથે વાત કરવા સંદેશ મોકલો."
+    },
+    "working": "કામ થઈ રહ્યું છે",
+    "historyRetry": "વાતચીત ઇતિહાસ લોડ કરી શકાયો નહીં.",
+    "catalogRetry": "મોડેલ લોડ કરી શકાયા નહીં",
+    "sendError": "સંદેશો મોકલી શકાયો નથી. ફરી પ્રયાસ કરો."
   }
 }

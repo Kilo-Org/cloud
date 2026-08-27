@@ -19,6 +19,10 @@ import {
   sessionPromptPayloadSchema,
   sessionQuestionResolvePayloadSchema,
   sessionSyncPayloadSchema,
+  sessionTerminalClosePayloadSchema,
+  sessionTerminalConnectPayloadSchema,
+  sessionTerminalCreatePayloadSchema,
+  sessionTerminalResizePayloadSchema,
   type ControlError,
   type ControlErrorCode,
   type ControlEvent,
@@ -43,6 +47,10 @@ const REQUEST_PAYLOAD_SCHEMAS: Record<ControlOperation, z.ZodType> = {
   'session.abort': sessionAbortPayloadSchema,
   'session.sync': sessionSyncPayloadSchema,
   'session.detach': sessionDetachPayloadSchema,
+  'session.terminal.create': sessionTerminalCreatePayloadSchema,
+  'session.terminal.resize': sessionTerminalResizePayloadSchema,
+  'session.terminal.close': sessionTerminalClosePayloadSchema,
+  'session.terminal.connect': sessionTerminalConnectPayloadSchema,
 };
 
 const EVENT_PAYLOAD_SCHEMAS: Record<ControlEvent, z.ZodType> = {

@@ -665,7 +665,8 @@
     "profile": "پروفایل",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}، تب، {{position}} از {{total}}"
+    "position": "{{name}}، تب، {{position}} از {{total}}",
+    "chat": "پیام‌های گفتگو"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "اجرای بررسی",
       "status": "وضعیت",
       "threshold": "آستانه",
-      "pullRequest": "درخواست pull"
+      "pullRequest": "درخواست pull",
+      "transcriptWaiting": "در انتظار متن گفتوگوی بازبینی.",
+      "transcriptEmpty": "متن گفتوگویی برای این بازبینی وجود ندارد.",
+      "transcriptRetry": "بارگذاری متن گفتوگوی بازبینی ممکن نشد.",
+      "transcriptLive": "زنده",
+      "agentIdle": "عامل بیکار",
+      "agentWorking": "عامل در حال کار...",
+      "anErrorOccurred": "خطایی رخ داد",
+      "errorWithMessage": "خطا: {{message}}",
+      "executionStarted": "اجرا شروع شد",
+      "reviewCompleted": "بررسی تکمیل شد",
+      "reviewInterrupted": "بررسی قطع شد",
+      "sessionError": "خطای جلسه: {{error}}",
+      "statusWithValue": "وضعیت: {{status}}",
+      "toolName": "ابزار: {{name}}",
+      "toolNameError": "ابزار: {{name}} — خطا",
+      "unknownError": "خطای ناشناخته"
     },
     "reviewMemory": {
       "title": "حافظه بررسی",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "اکنون فعال",
     "search": {
       "searching": "در حال جستجو",
       "searchSessions": "جستجوی نشستها",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "جلسات بارگذاری نشدند",
       "couldNotLoadActive": "بارگذاری نشستهای فعال ممکن نشد",
-      "noSessionsYet": "هنوز نشستی وجود ندارد",
       "noSessionsYetDescription": "از تلفن خود یک کار کدنویسی شروع کنید. نشستهای شما اینجا ظاهر میشوند.",
       "noMatches": "هیچ نشستی مطابقت ندارد",
       "tryDifferentSearch": "عبارت جستجوی دیگری را امتحان کنید.",
       "tryAdjustFilters": "فیلترهای خود را تنظیم یا پاک کنید.",
       "couldNotSearch": "جستجوی نشستها ممکن نشد",
-      "allActive": "همه نشستها فعال هستند",
       "completedWillAppear": "نشستهای تکمیلشده اینجا ظاهر میشوند.",
       "noPastSessions": "هیچ نشست گذشته وجود ندارد",
       "live": "زنده"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
       "renameAccessibility": "تغییر نام نشست: {{title}}",
-      "connectRepository": "اتصال مخزن",
       "cloningSession": "در حال شبیهسازی نشست",
       "continue": "ادامه",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد",
-      "cloneFailed": "شبیهسازی این نشست ممکن نشد.",
       "cloneFailedRetry": "شبیهسازی این نشست ممکن نشد. دوباره تلاش کنید.",
-      "connectRepositoryToContinue": "برای ادامه یک مخزن را وصل کنید.",
       "notEnoughCredits": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
       "previousTaskFinishing": "وظیفه قبلی هنوز در حال پایان است. لطفاً لحظهای صبر کنید.",
       "serviceUnavailable": "سرویس در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن را برای GitLab بررسی کنید، سپس تازه‌سازی کنید.",
       "openBitbucket": "باز کردن Bitbucket",
       "openGitlab": "باز کردن GitLab",
-      "recentlyUsed": "اخیراً استفاده‌شده"
+      "recentlyUsed": "اخیراً استفاده‌شده",
+      "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
+      "continueFrom": "در حال ادامهٔ {{title}}",
+      "importFailed": "وارد کردن این نشست ممکن نشد.",
+      "importingSession": "در حال وارد کردن نشست"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل بهروزرسانی شد",
@@ -2462,6 +2477,8 @@
       "viewTable": "مشاهده جدول",
       "title": "جدول",
       "close": "بستن جدول",
+      "loading": "در حال بارگذاری جدول",
+      "empty": "این جدول هیچ ردیفی ندارد.",
       "columnCount_one": "ستون",
       "columnCount": "ستون‌ها",
       "columnCount_other": "ستون‌ها",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "این پیوند {{host}} را در مرورگر شما باز میکند.",
       "open": "باز کردن",
       "trustThisHost": "اعتماد به این میزبان"
+    },
+    "folderPicker": {
+      "fieldLabel": "پوشه",
+      "accessibility": "پوشه: {{label}}",
+      "tapToListHint": "برای فهرست کردن محتویات یک پوشه، روی آن ضربه بزنید",
+      "emptyTitle": "در داخل پوشهای نیست",
+      "emptyDescription": "انجام شد از این پوشه استفاده میکند.",
+      "retryableTitle": "فهرست کردن پوشهها ممکن نشد",
+      "retryableDescription": "اتصال خود را بررسی کنید و تلاش مجدد کنید. انجام شد همچنان این پوشه را تأیید میکند.",
+      "unsupportedTitle": "فهرست کردن پوشهها ممکن نیست",
+      "unsupportedDescription": "این CLI نمیتواند پوشهها را فهرست کند. انجام شد پوشه راهاندازی را حفظ میکند و شروع نشست از آنجا آغاز میشود."
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "وقتی به میزبان یک پیوند اعتماد کنید، بدون پرسیدن دوباره باز میشود.",
     "revoke": "بازگرداندن {{host}}",
     "backToPreferences": "بازگشت به تنظیمات"
+  },
+  "quickChat": {
+    "title": "پیام‌های گفتگو",
+    "composer": {
+      "placeholder": "پیام"
+    },
+    "empty": {
+      "title": "شروع گفتگو",
+      "description": "برای گفتگو با یک مدل، یک پیام ارسال کنید."
+    },
+    "working": "در حال کار",
+    "historyRetry": "تاریخچه گفتگو بارگذاری نشد.",
+    "catalogRetry": "بارگذاری مدل‌ها ناموفق بود",
+    "sendError": "ارسال پیام ممکن نشد. دوباره تلاش کنید."
   }
 }

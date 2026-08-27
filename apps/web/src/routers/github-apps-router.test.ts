@@ -1,9 +1,11 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { createCallerFactory } from '@/lib/trpc/init';
-import type { User } from '@kilocode/db/schema';
+import { TRPCError } from '@trpc/server';
+import type { PlatformIntegration, User } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import type { UpsertPlatformIntegrationResult } from '@/lib/integrations/db/platform-integrations';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
 
 type TestIntegration = {
   id: string;
@@ -36,8 +38,50 @@ const mockSeedUserGithubToken =
   jest.fn<
     (input: Record<string, unknown>) => Promise<{ upserted: boolean; githubLogin: string }>
   >();
+const mockListIntegrations = jest.fn<(owner: Owner) => Promise<PlatformIntegration[]>>();
+const mockEnsureOrganizationAccess =
+  jest.fn<
+    (
+      ctx: { user: User },
+      organizationId: string,
+      roles?: OrganizationRole[]
+    ) => Promise<OrganizationRole>
+  >();
+const mockGetGitHubAppTypeForOrganization =
+  jest.fn<(organizationId: string | null) => Promise<GitHubAppType>>();
+const mockCreateInstallState =
+  jest.fn<
+    (input: {
+      kiloUserId: string;
+      ownerType: Owner['type'];
+      ownerId: string;
+      githubAppType: GitHubAppType;
+      returnTo: string | null;
+    }) => Promise<string>
+  >();
 
-jest.mock('@/lib/integrations/github-apps-service', () => ({}));
+jest.mock('@/lib/integrations/github-apps-service', () => ({
+  listIntegrations: (owner: Owner) => mockListIntegrations(owner),
+}));
+
+jest.mock('@/routers/organizations/utils', () => ({
+  ensureOrganizationAccess: (
+    ctx: { user: User },
+    organizationId: string,
+    roles?: OrganizationRole[]
+  ) => mockEnsureOrganizationAccess(ctx, organizationId, roles),
+}));
+
+jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({
+  getGitHubAppCredentials: jest.fn(),
+  getGitHubAppTypeForOrganization: (organizationId: string | null) =>
+    mockGetGitHubAppTypeForOrganization(organizationId),
+}));
+
+jest.mock('@/lib/integrations/github/install-state', () => ({
+  createInstallState: (input: Parameters<typeof mockCreateInstallState>[0]) =>
+    mockCreateInstallState(input),
+}));
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationForOwner: (owner: Owner, platform: string) =>
@@ -62,6 +106,14 @@ jest.mock('@/lib/github-pr-review/dev-seed', () => ({
 }));
 
 let createCaller: (ctx: { user: User }) => {
+  listOrganizationInstallations: (input: { organizationId: string }) => Promise<{
+    canAdd: boolean;
+    installations: Array<{ id: string }>;
+  }>;
+  mintInstallState: (input: {
+    organizationId?: string;
+    returnTo?: string;
+  }) => Promise<{ token: string }>;
   refreshInstallation: (input?: { organizationId?: string }) => Promise<{ success: boolean }>;
   devSeedUserGithubToken: (input: {
     token: string;
@@ -73,6 +125,111 @@ let createCaller: (ctx: { user: User }) => {
 beforeAll(async () => {
   const mod = await import('./github-apps-router');
   createCaller = createCallerFactory(mod.githubAppsRouter);
+});
+
+const organizationId = '00000000-0000-4000-8000-000000000001';
+const integrationId = '00000000-0000-4000-8000-000000000002';
+const organizationRoles = [
+  'owner',
+  'admin',
+  'billing_manager',
+  'member',
+] satisfies OrganizationRole[];
+
+function organizationIntegration(): PlatformIntegration {
+  const timestamp = '2026-01-01T00:00:00.000Z';
+  return {
+    id: integrationId,
+    owned_by_organization_id: organizationId,
+    owned_by_user_id: null,
+    created_by_user_id: 'user-1',
+    platform: 'github',
+    integration_type: 'app',
+    platform_installation_id: '98765',
+    platform_account_id: '123',
+    platform_account_login: 'existing-org',
+    permissions: null,
+    scopes: [],
+    repository_access: 'all',
+    repositories: [],
+    repositories_synced_at: null,
+    auth_invalid_at: null,
+    auth_invalid_reason: null,
+    metadata: null,
+    kilo_requester_user_id: 'user-1',
+    platform_requester_account_id: null,
+    integration_status: 'active',
+    suspended_at: null,
+    suspended_by: null,
+    github_app_type: 'standard',
+    installed_at: timestamp,
+    created_at: timestamp,
+    updated_at: timestamp,
+  };
+}
+
+describe('githubAppsRouter organization install capability', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockGetGitHubAppTypeForOrganization.mockResolvedValue('standard');
+    mockCreateInstallState.mockResolvedValue('install-token');
+    mockListIntegrations.mockResolvedValue([]);
+  });
+
+  it.each(organizationRoles)(
+    'preserves first-install access for organization %s roles',
+    async role => {
+      mockEnsureOrganizationAccess.mockResolvedValue(role);
+      const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+      await expect(caller.mintInstallState({ organizationId })).resolves.toEqual({
+        token: 'install-token',
+      });
+
+      expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+        expect.objectContaining({ user: expect.objectContaining({ id: 'user-1' }) }),
+        organizationId,
+        organizationRoles
+      );
+      expect(mockCreateInstallState).toHaveBeenCalledWith({
+        kiloUserId: 'user-1',
+        ownerType: 'org',
+        ownerId: organizationId,
+        githubAppType: 'standard',
+        returnTo: null,
+      });
+    }
+  );
+
+  it('allows a non-platform-admin organization member to add after an existing installation', async () => {
+    mockListIntegrations.mockResolvedValue([organizationIntegration()]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    const listed = await caller.listOrganizationInstallations({ organizationId });
+    const minted = await caller.mintInstallState({ organizationId, returnTo: '/settings' });
+
+    expect(listed.canAdd).toBe(true);
+    expect(listed.installations).toHaveLength(1);
+    expect(minted).toEqual({ token: 'install-token' });
+    expect(mockCreateInstallState).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerType: 'org', ownerId: organizationId, returnTo: '/settings' })
+    );
+  });
+
+  it('still denies callers outside the organization role matrix before minting state', async () => {
+    mockEnsureOrganizationAccess.mockRejectedValue(
+      new TRPCError({ code: 'UNAUTHORIZED', message: 'Organization access required' })
+    );
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.mintInstallState({ organizationId })).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    });
+
+    expect(mockGetGitHubAppTypeForOrganization).not.toHaveBeenCalled();
+    expect(mockCreateInstallState).not.toHaveBeenCalled();
+  });
 });
 
 describe('githubAppsRouter.refreshInstallation', () => {

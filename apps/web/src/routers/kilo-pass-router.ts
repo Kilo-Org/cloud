@@ -82,6 +82,7 @@ import { abandonCollectibleInvoicesForStripeSubscription } from '@/lib/kilo-pass
 import {
   getAllMobileStoreKiloPassProducts,
   getMobileStoreKiloPassProductByAppleProductId,
+  getMobileStoreKiloPassProductByGoogleProductId,
 } from '@/lib/kilo-pass/mobile-store-products';
 import {
   buildPurchasePresentation,
@@ -96,6 +97,7 @@ import {
   isNativeIapMutationAllowed,
 } from '@kilocode/app-shared/commerce';
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
+import { verifyGooglePlayKiloPassPurchase } from '@/lib/kilo-pass/google-play-verifier';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import { trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import {
@@ -297,6 +299,29 @@ function assertAppStoreAccountTokenMatchesUser(params: {
   }
 }
 
+const GOOGLE_PLAY_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
+  'Google Play purchase account token does not match the signed-in user.';
+const GOOGLE_PLAY_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
+  "This Google Play purchase isn't linked to your Kilo account. Make sure you're signed in to the Google account that made the purchase, then try again.";
+
+function assertGooglePlayAccountTokenMatchesUser(params: {
+  appAccountToken: string | null;
+  userAppStoreAccountToken: string;
+}): void {
+  if (params.appAccountToken === null) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: GOOGLE_PLAY_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE,
+    });
+  }
+  if (params.appAccountToken !== params.userAppStoreAccountToken) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: GOOGLE_PLAY_ACCOUNT_TOKEN_MISMATCH_MESSAGE,
+    });
+  }
+}
+
 function mapAppStoreCompletionError(error: unknown, userId: string): TRPCError {
   if (error instanceof TRPCError) {
     if (error.code === 'CONFLICT') {
@@ -343,6 +368,57 @@ function mapAppStoreCompletionError(error: unknown, userId: string): TRPCError {
   return new TRPCError({
     code: 'INTERNAL_SERVER_ERROR',
     message: 'We could not finish this App Store purchase. Please try again.',
+  });
+}
+
+function mapPlayCompletionError(error: unknown, userId: string): TRPCError {
+  if (error instanceof TRPCError) {
+    if (error.code === 'CONFLICT') {
+      return new TRPCError({
+        code: 'CONFLICT',
+        message: 'Purchase is still being processed — try again in a moment.',
+      });
+    }
+    return error;
+  }
+
+  captureException(error, {
+    tags: {
+      area: 'kilo-pass',
+      operation: 'complete-play-purchase',
+    },
+    extra: {
+      kiloUserId: userId,
+    },
+  });
+
+  const message = error instanceof Error ? error.message : '';
+  const isVerifierFailure =
+    message.startsWith('Google Play ') ||
+    message.includes('transaction') ||
+    message.includes('product');
+  const isDomainFailure =
+    message.includes('already belongs') ||
+    message.includes('already have an active Kilo Pass subscription') ||
+    message.includes('previous period expiration');
+
+  if (isVerifierFailure) {
+    return new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'We could not verify this Google Play purchase. Please try again.',
+    });
+  }
+
+  if (isDomainFailure) {
+    return new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'This Google Play purchase cannot be used for your account.',
+    });
+  }
+
+  return new TRPCError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'We could not finish this Google Play purchase. Please try again.',
   });
 }
 
@@ -1031,6 +1107,11 @@ const GetPurchasePresentationInputSchema = z.object({
   storefront: PurchaseStorefrontSchema.nullable().optional(),
   product: PurchaseProductSchema,
   program: z.string().max(64).nullable().optional(),
+  /**
+   * Old clients omit it. Omit or false keeps today's Android presentation.
+   * Remove when every Android client mounts Play IAP.
+   */
+  supportsNativePlayKiloPass: z.boolean().optional(),
 });
 
 const PreflightPurchaseInputSchema = z.object({
@@ -1038,6 +1119,13 @@ const PreflightPurchaseInputSchema = z.object({
   storefront: PurchaseStorefrontSchema,
   product: PurchaseProductSchema,
   program: z.string().max(64).nullable().optional(),
+  supportsNativePlayKiloPass: z.boolean().optional(),
+  googleProductId: z.string().min(1).optional(),
+  /**
+   * Play purchase token this device already owns. Untrusted: it can only deny
+   * a purchase. Old clients omit it.
+   */
+  googlePurchaseToken: z.string().min(1).max(256).nullable().optional(),
   appleProductId: z.string().min(1),
   /**
    * Original transaction ID of a Kilo Pass this device already owns, when StoreKit
@@ -1216,6 +1304,7 @@ export const kiloPassRouter = createTRPCRouter({
         storefront: input.storefront,
         product: input.product,
         program: input.program,
+        supportsNativePlayKiloPass: input.supportsNativePlayKiloPass,
       });
     }),
 
@@ -1231,6 +1320,7 @@ export const kiloPassRouter = createTRPCRouter({
           storefront: input.storefront,
           product: input.product,
           program: input.program,
+          supportsNativePlayKiloPass: input.supportsNativePlayKiloPass,
         },
       });
 
@@ -1242,7 +1332,14 @@ export const kiloPassRouter = createTRPCRouter({
         };
       }
 
-      if (!getMobileStoreKiloPassProductByAppleProductId(input.appleProductId)) {
+      if (input.storefront === 'play') {
+        if (
+          !input.googleProductId ||
+          !getMobileStoreKiloPassProductByGoogleProductId(input.googleProductId)
+        ) {
+          return { allowed: false, statusClass: 'terminal', reason: 'unknown_product' };
+        }
+      } else if (!getMobileStoreKiloPassProductByAppleProductId(input.appleProductId)) {
         return { allowed: false, statusClass: 'terminal', reason: 'unknown_product' };
       }
 
@@ -1262,10 +1359,32 @@ export const kiloPassRouter = createTRPCRouter({
         }
       }
 
+      // Same ownership guard for a Play purchase this device already owns.
+      if (input.googlePurchaseToken) {
+        const devicePurchase = await readDb.query.kilo_pass_store_purchases.findFirst({
+          columns: { kilo_user_id: true },
+          where: and(
+            eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.GooglePlay),
+            eq(kilo_pass_store_purchases.provider_subscription_id, input.googlePurchaseToken)
+          ),
+        });
+        if (devicePurchase && devicePurchase.kilo_user_id !== ctx.user.id) {
+          return { allowed: false, statusClass: 'terminal', reason: 'owned_by_another_account' };
+        }
+      }
+
+      // Exclude the native provider for this storefront. Old iOS excluded App Store
+      // only. Play storefront excludes GooglePlay so a Play-owned pass is not treated
+      // as another provider. A live Stripe sub still returns `already_subscribed`.
+      const nativeStoreProvider =
+        input.storefront === 'play'
+          ? KiloPassPaymentProvider.GooglePlay
+          : KiloPassPaymentProvider.AppStore;
+
       const hasLiveOtherProviderSub =
         subscription != null &&
         !isStripeSubscriptionEnded(subscription.status) &&
-        subscription.paymentProvider !== KiloPassPaymentProvider.AppStore;
+        subscription.paymentProvider !== nativeStoreProvider;
 
       if (hasLiveOtherProviderSub) {
         return { allowed: false, statusClass: 'terminal', reason: 'already_subscribed' };
@@ -1286,12 +1405,12 @@ export const kiloPassRouter = createTRPCRouter({
     )
     .output(CompleteStorePurchaseOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      // `isNativeIapMutationAllowed` now also admits Android Play. This mutation stays
+      // App Store, so require the exact App Store combination.
       if (
-        !isNativeIapMutationAllowed({
-          platform: input.platform,
-          storefront: input.storefront,
-          product: input.product,
-        })
+        input.platform !== 'ios' ||
+        input.storefront !== 'app_store' ||
+        input.product !== 'kilo_pass'
       ) {
         throw new TRPCError({
           code: 'FORBIDDEN',
@@ -1324,6 +1443,62 @@ export const kiloPassRouter = createTRPCRouter({
         return result;
       } catch (error) {
         throw mapAppStoreCompletionError(error, ctx.user.id);
+      }
+    }),
+
+  completePlayPurchase: baseProcedure
+    .input(
+      z.object({
+        purchaseToken: z.string().min(1),
+        platform: PurchasePlatformSchema,
+        storefront: PurchaseStorefrontSchema,
+        product: PurchaseProductSchema,
+        program: z.string().max(64).nullable().optional(),
+      })
+    )
+    .output(CompleteStorePurchaseOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      // Play completion is Android-only. The shared helper also admits App Store,
+      // so require an Android platform in addition to its checks.
+      if (
+        !isNativeIapMutationAllowed({
+          platform: input.platform,
+          storefront: input.storefront,
+          product: input.product,
+        }) ||
+        input.platform !== 'android'
+      ) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'commerce_not_available',
+        });
+      }
+      try {
+        const purchase = await verifyGooglePlayKiloPassPurchase(input.purchaseToken);
+        assertGooglePlayAccountTokenMatchesUser({
+          appAccountToken: purchase.appAccountToken,
+          userAppStoreAccountToken: ctx.user.app_store_account_token,
+        });
+        const result = await completeStoreKiloPassPurchase({
+          user: ctx.user,
+          purchase,
+        });
+        if (!result.alreadyProcessed) {
+          trackKiloPassPurchaseCompleted({
+            channel: 'google_play',
+            distinctId: ctx.user.google_user_email,
+            userId: ctx.user.id,
+            tier: result.tier,
+            cadence: result.cadence,
+            purchaseKind: result.purchaseKind,
+            providerTransactionId: purchase.providerTransactionId,
+            productId: purchase.productId,
+            environment: purchase.environment,
+          });
+        }
+        return result;
+      } catch (error) {
+        throw mapPlayCompletionError(error, ctx.user.id);
       }
     }),
 

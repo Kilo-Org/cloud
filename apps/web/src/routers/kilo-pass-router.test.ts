@@ -100,6 +100,10 @@ type AppStoreVerifierMock = {
   verifyAppleKiloPassTransactionJws: ReturnType<typeof jest.fn>;
 };
 
+type GooglePlayVerifierMock = {
+  verifyGooglePlayKiloPassPurchase: ReturnType<typeof jest.fn>;
+};
+
 type StoreCompletionMock = {
   completeStoreKiloPassPurchase: ReturnType<typeof jest.fn>;
 };
@@ -120,6 +124,10 @@ function getStripeMock(): StripeMock {
 
 function getAppStoreVerifierMock(): AppStoreVerifierMock {
   return jest.requireMock('@/lib/kilo-pass/apple-store-verifier') as AppStoreVerifierMock;
+}
+
+function getGooglePlayVerifierMock(): GooglePlayVerifierMock {
+  return jest.requireMock('@/lib/kilo-pass/google-play-verifier') as GooglePlayVerifierMock;
 }
 
 function getStoreCompletionMock(): StoreCompletionMock {
@@ -146,6 +154,7 @@ type KiloPassCaller = {
     storefront?: 'app_store' | 'play' | 'web' | null;
     product: 'credits' | 'kilo_pass';
     program?: string | null;
+    supportsNativePlayKiloPass?: boolean;
   }) => Promise<{
     kind: 'native_iap' | 'web_management' | 'unavailable';
     statusClass: 'healthy' | 'pending' | 'retryable' | 'terminal' | 'inactive';
@@ -163,6 +172,9 @@ type KiloPassCaller = {
     storefront: 'app_store' | 'play' | 'web';
     product: 'credits' | 'kilo_pass';
     program?: string | null;
+    supportsNativePlayKiloPass?: boolean;
+    googleProductId?: string;
+    googlePurchaseToken?: string | null;
     appleProductId: string;
     appleOriginalTransactionId?: string | null;
   }) => Promise<{
@@ -179,6 +191,18 @@ type KiloPassCaller = {
   }>;
   completeAppStorePurchase: (input: {
     signedTransactionJws: string;
+    platform: 'android' | 'ios';
+    storefront: 'app_store' | 'play' | 'web';
+    product: 'credits' | 'kilo_pass';
+    program?: string | null;
+  }) => Promise<{
+    subscriptionId: string;
+    tier: KiloPassTier;
+    cadence: KiloPassCadence;
+    alreadyProcessed: boolean;
+  }>;
+  completePlayPurchase: (input: {
+    purchaseToken: string;
     platform: 'android' | 'ios';
     storefront: 'app_store' | 'play' | 'web';
     product: 'credits' | 'kilo_pass';
@@ -405,6 +429,10 @@ jest.mock('@/lib/kilo-pass/apple-store-verifier', () => ({
   verifyAppleKiloPassTransactionJws: jest.fn(),
 }));
 
+jest.mock('@/lib/kilo-pass/google-play-verifier', () => ({
+  verifyGooglePlayKiloPassPurchase: jest.fn(),
+}));
+
 jest.mock('@/lib/kilo-pass/store-subscription-completion', () => ({
   completeStoreKiloPassPurchase: jest.fn(),
 }));
@@ -479,6 +507,27 @@ function appStorePurchaseFixture(
     providerSubscriptionId: 'app-store-router-test-original',
     appAccountToken: crypto.randomUUID(),
     purchaseToken: null,
+    environment: 'Sandbox',
+    purchasedAtIso: '2026-05-01T00:00:00.000Z',
+    expiresAtIso: '2026-06-01T00:00:00.000Z',
+    tier: KiloPassTier.Tier19,
+    cadence: KiloPassCadence.Monthly,
+    rawPayload: {},
+    ...overrides,
+  };
+}
+
+function googlePlayPurchaseFixture(
+  overrides: Partial<ValidatedStoreKiloPassPurchase> = {}
+): ValidatedStoreKiloPassPurchase {
+  return {
+    paymentProvider: KiloPassPaymentProvider.GooglePlay,
+    productId: 'kilopass_tier19',
+    providerTransactionId: 'GPA.router-test-order',
+    providerOriginalTransactionId: 'play-router-test-token',
+    providerSubscriptionId: 'play-router-test-token',
+    appAccountToken: crypto.randomUUID(),
+    purchaseToken: 'play-router-test-token',
     environment: 'Sandbox',
     purchasedAtIso: '2026-05-01T00:00:00.000Z',
     expiresAtIso: '2026-06-01T00:00:00.000Z',
@@ -698,6 +747,7 @@ describe('kiloPassRouter', () => {
     stripeMock.invoices.voidInvoice.mockReset();
     stripeMock.invoices.retrieve.mockReset();
     getAppStoreVerifierMock().verifyAppleKiloPassTransactionJws.mockReset();
+    getGooglePlayVerifierMock().verifyGooglePlayKiloPassPurchase.mockReset();
     getStoreCompletionMock().completeStoreKiloPassPurchase.mockReset();
     getPosthogTrackingMock().trackKiloPassPurchaseCompleted.mockReset();
     getSentryMock().captureException.mockReset();
@@ -968,6 +1018,194 @@ describe('kiloPassRouter', () => {
         })
       ).rejects.toThrow('commerce_not_available');
     });
+
+    it('rejects an Android Play combination on the App Store completion mutation', async () => {
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.kiloPass.completeAppStorePurchase({
+          signedTransactionJws: 'signed-jws',
+          platform: 'android',
+          storefront: 'play',
+          product: 'kilo_pass',
+        })
+      ).rejects.toThrow('commerce_not_available');
+    });
+  });
+
+  describe('completePlayPurchase', () => {
+    it('completes a Google Play purchase and feeds GooglePlay to the completion service', async () => {
+      const verifierMock = getGooglePlayVerifierMock();
+      const completionMock = getStoreCompletionMock();
+      const trackingMock = getPosthogTrackingMock();
+      const sentryMock = getSentryMock();
+      const user = await insertTestUser();
+      const purchase = googlePlayPurchaseFixture({
+        appAccountToken: user.app_store_account_token,
+      });
+      verifierMock.verifyGooglePlayKiloPassPurchase.mockResolvedValue(purchase);
+      const completionResult = {
+        subscriptionId: 'sub-play-test-id',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        alreadyProcessed: false as const,
+        purchaseKind: 'initial' as const,
+      };
+      const expectedClientResult = {
+        subscriptionId: completionResult.subscriptionId,
+        tier: completionResult.tier,
+        cadence: completionResult.cadence,
+        alreadyProcessed: false,
+      };
+      completionMock.completeStoreKiloPassPurchase.mockResolvedValue(completionResult);
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.completePlayPurchase({
+        purchaseToken: 'play-router-test-token',
+        platform: 'android',
+        storefront: 'play',
+        product: 'kilo_pass',
+      });
+
+      expect(result).toEqual(expectedClientResult);
+      expect(verifierMock.verifyGooglePlayKiloPassPurchase).toHaveBeenCalledWith(
+        'play-router-test-token'
+      );
+      expect(completionMock.completeStoreKiloPassPurchase).toHaveBeenCalledTimes(1);
+      expect(completionMock.completeStoreKiloPassPurchase).toHaveBeenCalledWith({
+        user: expect.objectContaining({ id: user.id }),
+        purchase,
+      });
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledTimes(1);
+      expect(trackingMock.trackKiloPassPurchaseCompleted).toHaveBeenCalledWith({
+        channel: 'google_play',
+        distinctId: user.google_user_email,
+        userId: user.id,
+        tier: completionResult.tier,
+        cadence: completionResult.cadence,
+        purchaseKind: 'initial',
+        providerTransactionId: purchase.providerTransactionId,
+        productId: purchase.productId,
+        environment: purchase.environment,
+      });
+      expect(sentryMock.captureException).not.toHaveBeenCalled();
+    });
+
+    it('rejects the Play completion mutation when the platform is ios', async () => {
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.kiloPass.completePlayPurchase({
+          purchaseToken: 'play-router-test-token',
+          platform: 'ios',
+          storefront: 'app_store',
+          product: 'kilo_pass',
+        })
+      ).rejects.toThrow('commerce_not_available');
+    });
+
+    it('keeps Google Play account mismatch copy stable and does not log it as an internal failure', async () => {
+      const verifierMock = getGooglePlayVerifierMock();
+      const completionMock = getStoreCompletionMock();
+      const sentryMock = getSentryMock();
+      verifierMock.verifyGooglePlayKiloPassPurchase.mockResolvedValue(googlePlayPurchaseFixture());
+
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.kiloPass.completePlayPurchase({
+          purchaseToken: 'play-router-test-token',
+          platform: 'android',
+          storefront: 'play',
+          product: 'kilo_pass',
+        })
+      ).rejects.toThrow('Google Play purchase account token does not match the signed-in user.');
+      expect(completionMock.completeStoreKiloPassPurchase).not.toHaveBeenCalled();
+      expect(sentryMock.captureException).not.toHaveBeenCalled();
+    });
+
+    it('throws a distinct error when appAccountToken is null and does not log it as an internal failure', async () => {
+      const verifierMock = getGooglePlayVerifierMock();
+      const completionMock = getStoreCompletionMock();
+      const sentryMock = getSentryMock();
+      verifierMock.verifyGooglePlayKiloPassPurchase.mockResolvedValue(
+        googlePlayPurchaseFixture({ appAccountToken: null })
+      );
+
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.kiloPass.completePlayPurchase({
+          purchaseToken: 'play-router-test-token',
+          platform: 'android',
+          storefront: 'play',
+          product: 'kilo_pass',
+        })
+      ).rejects.toThrow(
+        "This Google Play purchase isn't linked to your Kilo account. Make sure you're signed in to the Google account that made the purchase, then try again."
+      );
+      expect(completionMock.completeStoreKiloPassPurchase).not.toHaveBeenCalled();
+      expect(sentryMock.captureException).not.toHaveBeenCalled();
+    });
+
+    it('does not track when completeStoreKiloPassPurchase reports alreadyProcessed', async () => {
+      const verifierMock = getGooglePlayVerifierMock();
+      const completionMock = getStoreCompletionMock();
+      const trackingMock = getPosthogTrackingMock();
+      const user = await insertTestUser();
+      verifierMock.verifyGooglePlayKiloPassPurchase.mockResolvedValue(
+        googlePlayPurchaseFixture({
+          appAccountToken: user.app_store_account_token,
+        })
+      );
+      completionMock.completeStoreKiloPassPurchase.mockResolvedValue({
+        subscriptionId: 'sub-play-test-id',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        alreadyProcessed: true,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.completePlayPurchase({
+        purchaseToken: 'play-router-test-token',
+        platform: 'android',
+        storefront: 'play',
+        product: 'kilo_pass',
+      });
+
+      expect(result).toEqual({
+        subscriptionId: 'sub-play-test-id',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        alreadyProcessed: true,
+      });
+      expect(trackingMock.trackKiloPassPurchaseCompleted).not.toHaveBeenCalled();
+    });
+
+    it('maps verifier failures to mobile-safe copy', async () => {
+      const verifierMock = getGooglePlayVerifierMock();
+      const sentryMock = getSentryMock();
+      verifierMock.verifyGooglePlayKiloPassPurchase.mockRejectedValue(
+        new Error('Google Play Kilo Pass product is not enabled')
+      );
+
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.kiloPass.completePlayPurchase({
+          purchaseToken: 'play-router-test-token',
+          platform: 'android',
+          storefront: 'play',
+          product: 'kilo_pass',
+        })
+      ).rejects.toThrow('We could not verify this Google Play purchase. Please try again.');
+      expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('getPurchasePresentation', () => {
@@ -1048,6 +1286,24 @@ describe('kiloPassRouter', () => {
       expect(result.statusClass).toBe('healthy');
       expect(result.cta).toEqual({ label: 'Manage', action: 'open_web' });
       expect(result.webUrl).toContain('/subscriptions/kilo-pass');
+    });
+
+    it('returns native_iap for Android Play Kilo Pass when the client mounts Play IAP', async () => {
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      const result = await caller.kiloPass.getPurchasePresentation({
+        platform: 'android',
+        storefront: 'play',
+        product: 'kilo_pass',
+        supportsNativePlayKiloPass: true,
+      });
+
+      expect(result.kind).toBe('native_iap');
+      expect(result.statusClass).toBe('inactive');
+      expect(result.reason).toBeNull();
+      expect(result.cta).toEqual({ label: null, action: 'none' });
+      expect(result.webUrl).toBeNull();
     });
   });
 
@@ -1278,6 +1534,139 @@ describe('kiloPassRouter', () => {
         allowed: false,
         statusClass: 'terminal',
         reason: 'already_subscribed',
+      });
+    });
+
+    it('allows an Android Play purchase with the flag and a valid Google product id', async () => {
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      const result = await caller.kiloPass.preflightPurchase({
+        platform: 'android',
+        storefront: 'play',
+        product: 'kilo_pass',
+        supportsNativePlayKiloPass: true,
+        googleProductId: 'kilopass_tier19',
+        appleProductId: 'kilopass.tier19.monthly.v1',
+      });
+
+      expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });
+    });
+
+    it('allows a live Google Play subscription on android+play (upgrade path)', async () => {
+      const user = await insertTestUser();
+      await insertSubscription({
+        kiloUserId: user.id,
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerSubscriptionId: 'gpa_preflight_play_owned',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      const caller = await createCallerForUser(user.id);
+
+      const result = await caller.kiloPass.preflightPurchase({
+        platform: 'android',
+        storefront: 'play',
+        product: 'kilo_pass',
+        supportsNativePlayKiloPass: true,
+        googleProductId: 'kilopass_tier19',
+        appleProductId: 'kilopass.tier19.monthly.v1',
+      });
+
+      expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });
+    });
+
+    it('rejects an unknown Google product id', async () => {
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      const result = await caller.kiloPass.preflightPurchase({
+        platform: 'android',
+        storefront: 'play',
+        product: 'kilo_pass',
+        supportsNativePlayKiloPass: true,
+        googleProductId: 'unknown.google.product',
+        appleProductId: 'kilopass.tier19.monthly.v1',
+      });
+
+      expect(result).toEqual({
+        allowed: false,
+        statusClass: 'terminal',
+        reason: 'unknown_product',
+      });
+    });
+
+    it('blocks a live Stripe subscription for an Android Play purchase', async () => {
+      const user = await insertTestUser();
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_preflight_play_stripe',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      const caller = await createCallerForUser(user.id);
+
+      const result = await caller.kiloPass.preflightPurchase({
+        platform: 'android',
+        storefront: 'play',
+        product: 'kilo_pass',
+        supportsNativePlayKiloPass: true,
+        googleProductId: 'kilopass_tier19',
+        appleProductId: 'kilopass.tier19.monthly.v1',
+      });
+
+      expect(result).toEqual({
+        allowed: false,
+        statusClass: 'terminal',
+        reason: 'already_subscribed',
+      });
+    });
+
+    it("blocks a Play purchase when this device's token belongs to another Kilo account", async () => {
+      const owner = await insertTestUser();
+      const buyer = await insertTestUser();
+      const providerSubscriptionId = `gpa_${crypto.randomUUID()}`;
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: owner.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerSubscriptionId,
+      });
+      await db.insert(kilo_pass_store_purchases).values({
+        kilo_pass_subscription_id: subscriptionId,
+        kilo_user_id: owner.id,
+        payment_provider: KiloPassPaymentProvider.GooglePlay,
+        product_id: 'kilopass_tier19',
+        provider_subscription_id: providerSubscriptionId,
+        provider_transaction_id: `tx_${crypto.randomUUID()}`,
+        provider_original_transaction_id: providerSubscriptionId,
+        app_account_token: owner.app_store_account_token,
+        purchase_token: providerSubscriptionId,
+        environment: 'Sandbox',
+        purchased_at: '2026-01-01T00:00:00.000Z',
+        expires_at: '2026-02-01T00:00:00.000Z',
+        raw_payload_json: {},
+      });
+
+      const caller = await createCallerForUser(buyer.id);
+      const result = await caller.kiloPass.preflightPurchase({
+        platform: 'android',
+        storefront: 'play',
+        product: 'kilo_pass',
+        supportsNativePlayKiloPass: true,
+        googleProductId: 'kilopass_tier19',
+        appleProductId: 'kilopass.tier19.monthly.v1',
+        googlePurchaseToken: providerSubscriptionId,
+      });
+
+      expect(result).toEqual({
+        allowed: false,
+        statusClass: 'terminal',
+        reason: 'owned_by_another_account',
       });
     });
   });

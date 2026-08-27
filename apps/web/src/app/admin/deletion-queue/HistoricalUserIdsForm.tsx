@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import Link from 'next/link';
@@ -38,7 +38,7 @@ function resultLabel(result: HistoricalResults[number]): string {
     case 'refused':
       return REFUSAL_LABELS[result.code] ?? humanizeToken(result.code);
     case 'failed':
-      return 'Could not confirm the result. Preview again to retry safely.';
+      return 'Could not confirm the result. Retry the check before submitting again.';
   }
 }
 
@@ -52,10 +52,13 @@ export function HistoricalUserIdsForm({
   const trpc = useTRPC();
   const [text, setText] = useState('');
   const [results, setResults] = useState<HistoricalResults | null>(null);
+  const [previewRetry, setPreviewRetry] = useState(0);
+  const previewVersion = useRef(0);
   const userIds = useMemo(() => parseHistoricalDeletionUserIds(text), [text]);
   const preview = useMutation(
     trpc.admin.userDeletionQueue.previewHistoricalUsers.mutationOptions()
   );
+  const previewMutateAsync = preview.mutateAsync;
   const submit = useMutation(trpc.admin.userDeletionQueue.submitHistoricalUsers.mutationOptions());
   const busy = preview.isPending || submit.isPending;
   const eligibleIds =
@@ -67,6 +70,28 @@ export function HistoricalUserIdsForm({
         ? 'Each user ID must be at most 1,024 characters.'
         : null;
   const error = inputError ?? preview.error?.message ?? submit.error?.message;
+  const canRetryPreview =
+    preview.isError || submit.isError || results?.some(result => result.status === 'failed');
+
+  useEffect(() => {
+    if (userIds.length === 0 || inputError) return;
+    let cancelled = false;
+    const version = previewVersion.current;
+    const handle = window.setTimeout(() => {
+      if (cancelled || version !== previewVersion.current) return;
+      void previewMutateAsync({ userIds })
+        .then(result => {
+          if (!cancelled && version === previewVersion.current) setResults(result);
+        })
+        .catch(() => {
+          if (!cancelled && version === previewVersion.current) setResults(null);
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [inputError, previewMutateAsync, previewRetry, userIds]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -85,19 +110,21 @@ export function HistoricalUserIdsForm({
           id="historical-deletion-user-ids"
           value={text}
           onChange={event => {
+            previewVersion.current += 1;
             setText(event.target.value);
             setResults(null);
             preview.reset();
             submit.reset();
           }}
-          disabled={busy}
+          disabled={submit.isPending}
           aria-describedby="historical-deletion-help historical-deletion-error"
           aria-invalid={Boolean(error)}
           className="min-h-36 font-mono"
           placeholder="One user ID per line"
         />
         <p id="historical-deletion-help" className="text-muted-foreground text-xs">
-          Up to 100 IDs. Duplicate lines are ignored; IDs remain case-sensitive.
+          Up to 100 IDs, checked automatically. Duplicate lines are ignored; IDs remain
+          case-sensitive.
         </p>
         <p id="historical-deletion-error" className="text-destructive text-sm" role="alert">
           {error}
@@ -147,26 +174,27 @@ export function HistoricalUserIdsForm({
         Confirming permanently removes remaining data. Enqueued cleanup cannot be cancelled.
       </p>
       <DialogFooter className="gap-2">
-        <Button
-          type="button"
-          variant={eligibleIds.length > 0 ? 'secondary' : 'default'}
-          disabled={busy || userIds.length === 0 || Boolean(inputError)}
-          onClick={async () => {
-            setResults(null);
-            submit.reset();
-            try {
-              setResults(await preview.mutateAsync({ userIds }));
-            } catch {
+        {canRetryPreview ? (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={busy || userIds.length === 0 || Boolean(inputError)}
+            onClick={() => {
+              previewVersion.current += 1;
               setResults(null);
-            }
-          }}
-        >
-          {preview.isPending ? 'Checking…' : 'Preview user IDs'}
-        </Button>
+              preview.reset();
+              submit.reset();
+              setPreviewRetry(retry => retry + 1);
+            }}
+          >
+            Retry check
+          </Button>
+        ) : null}
         <Button
           type="button"
           disabled={busy || eligibleIds.length === 0 || Boolean(inputError)}
           onClick={async () => {
+            previewVersion.current += 1;
             onSubmittingChange(true);
             try {
               const outcomes = await submit.mutateAsync({ userIds: eligibleIds });

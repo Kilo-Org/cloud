@@ -109,6 +109,16 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
 
   const [viewerVisible, setViewerVisible] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  // Reset a prior image error in render when the URL changes. A successful
+  // renew writes a NEW signed URL; the reset must land in the same commit so
+  // the refreshed image, not the retry chip, renders (and no open viewer is
+  // unmounted). A failed renew keeps the same URL, so `imageFailed` survives
+  // and the retry chip shows once `renewing` clears.
+  const [previousUrl, setPreviousUrl] = useState(url);
+  if (url !== previousUrl) {
+    setPreviousUrl(url);
+    setImageFailed(false);
+  }
   const [preview, setPreview] = useState<PreviewMode | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -225,7 +235,10 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
 
   if (kind === 'image') {
     if (url) {
-      if (imageFailed) {
+      // Keep the unavailable chip hidden while a renew is in flight (no
+      // flicker), but show it after a failed renew: a failed renew only
+      // clears `renewing` and keeps the URL, so `imageFailed` stays set.
+      if (imageFailed && !resolved.renewing) {
         return (
           <Pressable
             onPress={() => {
@@ -262,6 +275,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
             <Image
               source={{ uri: url }}
               cachePolicy="memory"
+              transition={0}
               className="aspect-video w-full"
               contentFit="contain"
               accessible
@@ -272,6 +286,11 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
                   : t('agentChat.filePart.imageOutput')
               }
               onError={() => {
+                // A renew keeps the last URL served while a fresh one is in
+                // flight, so a transient failure must not swap the image. Still
+                // record the flag: a failed renew keeps the URL unchanged, so
+                // this leaves `imageFailed` set and the retry chip shows once
+                // `renewing` clears.
                 setImageFailed(true);
               }}
             />

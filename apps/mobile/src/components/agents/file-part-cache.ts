@@ -17,6 +17,12 @@ export type FilePartCacheEntry = {
   mime: string;
   filename?: string;
   attachmentRef?: CloudAgentAttachmentRef;
+  // absolute expiry (ms since epoch) of a presigned `url`; old in-memory
+  // entries omit `urlExpiresAt` — remove the missing-field branch when no
+  // pre-renewal client remains in production
+  urlExpiresAt?: number;
+  // an automatic URL renew is in flight while the last-good URL is still shown
+  renewing?: boolean;
   // last on-demand presign failed; cleared on success/retry
   resolveFailed?: boolean;
 };
@@ -115,7 +121,7 @@ export function cacheFilePart(
  */
 export function overwriteFilePartCacheEntry(
   partId: string,
-  payload: Readonly<{ url: string; mime: string; filename?: string }>
+  payload: Readonly<{ url: string; mime: string; filename?: string; urlExpiresAt?: number }>
 ): void {
   const url = resolveCacheUrl(partId, payload);
   if (url === undefined) {
@@ -125,6 +131,7 @@ export function overwriteFilePartCacheEntry(
     url,
     mime: payload.mime,
     ...(payload.filename ? { filename: payload.filename } : {}),
+    ...(payload.urlExpiresAt !== undefined ? { urlExpiresAt: payload.urlExpiresAt } : {}),
     attachmentRef: entriesByPartId.get(partId)?.attachmentRef,
   });
   emitChange();
@@ -136,7 +143,9 @@ export function markFilePartResolveFailed(partId: string): void {
   if (!entry) {
     return;
   }
-  entriesByPartId.set(partId, { ...entry, resolveFailed: true });
+  const next = { ...entry, resolveFailed: true };
+  delete next.renewing;
+  entriesByPartId.set(partId, next);
   emitChange();
 }
 
@@ -152,9 +161,39 @@ export function clearFilePartResolveFailed(partId: string): void {
   emitChange();
 }
 
+/** Mark an existing entry as having an automatic URL renew in flight. */
+export function markFilePartRenewing(partId: string): void {
+  const entry = entriesByPartId.get(partId);
+  if (!entry) {
+    return;
+  }
+  entriesByPartId.set(partId, { ...entry, renewing: true });
+  emitChange();
+}
+
+/** Clear the renewing mark from an existing entry. */
+export function clearFilePartRenewing(partId: string): void {
+  const entry = entriesByPartId.get(partId);
+  if (!entry) {
+    return;
+  }
+  const next = { ...entry };
+  delete next.renewing;
+  entriesByPartId.set(partId, next);
+  emitChange();
+}
+
 /** Synchronous lookup used by tests. */
 export function getFilePartCacheEntry(partId: string): FilePartCacheEntry | undefined {
   return entriesByPartId.get(partId);
+}
+
+/** Copy of the in-memory map for the resolver's renewal sweep. */
+export function listFilePartCacheEntries(): readonly {
+  partId: string;
+  entry: FilePartCacheEntry;
+}[] {
+  return Array.from(entriesByPartId, ([partId, entry]) => ({ partId, entry }));
 }
 
 /**

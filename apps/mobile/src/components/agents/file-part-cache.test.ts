@@ -8,9 +8,12 @@ import {
   __resetFilePartCacheForTests,
   cacheFilePart,
   clearFilePartCache,
+  clearFilePartRenewing,
   clearFilePartResolveFailed,
   getFilePartCacheEntry,
   isUsableFilePartUrl,
+  listFilePartCacheEntries,
+  markFilePartRenewing,
   markFilePartResolveFailed,
   overwriteFilePartCacheEntry,
   useFilePartCache,
@@ -269,6 +272,29 @@ describe('overwriteFilePartCacheEntry', () => {
     expect(getFilePartCacheEntry('part-overwrite-failed')).not.toHaveProperty('resolveFailed');
   });
 
+  it('persists urlExpiresAt and keeps attachmentRef', () => {
+    cacheFilePart('part-overwrite-expiry', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.md`,
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+    });
+
+    overwriteFilePartCacheEntry('part-overwrite-expiry', {
+      url: 'https://example.com/fresh.md',
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+      urlExpiresAt: 1_800_000_000_000,
+    });
+
+    expect(getFilePartCacheEntry('part-overwrite-expiry')).toEqual({
+      url: 'https://example.com/fresh.md',
+      mime: 'text/markdown',
+      filename: `${uuid}.md`,
+      urlExpiresAt: 1_800_000_000_000,
+      attachmentRef: { messageUuid: uuid, filename: `${uuid}.md` },
+    });
+  });
+
   it('does not overwrite or emit when the payload URL is unusable', async () => {
     cacheFilePart('part-overwrite-unusable', {
       url: 'https://example.com/keep.md',
@@ -343,6 +369,69 @@ describe('markFilePartResolveFailed / clearFilePartResolveFailed', () => {
   });
 });
 
+describe('markFilePartRenewing / clearFilePartRenewing', () => {
+  const uuid = '11111111-2222-4333-8444-555555555555';
+
+  it('marks on a new identity and clears the key', async () => {
+    cacheFilePart('part-renewing', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/x.md`,
+      mime: 'text/markdown',
+      filename: 'x.md',
+    });
+    const before = getFilePartCacheEntry('part-renewing');
+    const renderer = await mountProbe('part-renewing');
+
+    await act(async () => {
+      await Promise.resolve();
+      markFilePartRenewing('part-renewing');
+    });
+    const marked = getFilePartCacheEntry('part-renewing');
+    expect(marked?.renewing).toBe(true);
+    expect(marked).not.toBe(before);
+
+    await act(async () => {
+      await Promise.resolve();
+      clearFilePartRenewing('part-renewing');
+    });
+    const cleared = getFilePartCacheEntry('part-renewing');
+    expect(cleared).not.toHaveProperty('renewing');
+    expect(cleared).not.toBe(marked);
+
+    renderer.unmount();
+  });
+});
+
+describe('markFilePartResolveFailed clears renewing', () => {
+  const uuid = '11111111-2222-4333-8444-555555555555';
+
+  it('drops a stale renewing flag when a presign fails', () => {
+    cacheFilePart('part-fail-renewing', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/x.md`,
+      mime: 'text/markdown',
+      filename: 'x.md',
+    });
+    markFilePartRenewing('part-fail-renewing');
+    expect(getFilePartCacheEntry('part-fail-renewing')?.renewing).toBe(true);
+
+    markFilePartResolveFailed('part-fail-renewing');
+
+    const failed = getFilePartCacheEntry('part-fail-renewing');
+    expect(failed?.resolveFailed).toBe(true);
+    expect(failed).not.toHaveProperty('renewing');
+  });
+});
+
+describe('listFilePartCacheEntries', () => {
+  it('returns every part id in the map', () => {
+    cacheFilePart('part-a', { url: 'https://example.com/a.png', mime: 'image/png' });
+    cacheFilePart('part-b', { url: 'https://example.com/b.png', mime: 'image/png' });
+
+    const ids = listFilePartCacheEntries()
+      .map(({ partId }) => partId)
+      .toSorted();
+    expect(ids).toEqual(['part-a', 'part-b']);
+  });
+});
 describe('isUsableFilePartUrl', () => {
   it('accepts http, https, and data schemes', () => {
     expect(isUsableFilePartUrl('http://example.com/a.png')).toBe(true);

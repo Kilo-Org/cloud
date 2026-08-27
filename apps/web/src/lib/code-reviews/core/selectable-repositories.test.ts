@@ -24,11 +24,17 @@ describe('buildSelectableRepositories', () => {
           {
             ...fetched[0],
             platformIntegrationId: '00000000-0000-4000-8000-000000000001',
+            platformAccountLogin: 'acme',
+            githubAppType: 'standard',
           },
         ],
         []
       )[0]
-    ).toMatchObject({ platformIntegrationId: '00000000-0000-4000-8000-000000000001' });
+    ).toMatchObject({
+      platformIntegrationId: '00000000-0000-4000-8000-000000000001',
+      platformAccountLogin: 'acme',
+      githubAppType: 'standard',
+    });
   });
 });
 

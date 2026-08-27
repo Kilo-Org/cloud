@@ -19,6 +19,8 @@ export type FetchedRepository = {
   fullName: string;
   private: boolean;
   platformIntegrationId?: string;
+  platformAccountLogin?: string;
+  githubAppType?: string;
 };
 
 export type ManuallyAddedRepository = {
@@ -34,6 +36,8 @@ export type SelectableRepository = {
   full_name: string;
   private: boolean;
   platformIntegrationId?: string;
+  platformAccountLogin?: string;
+  githubAppType?: string;
 };
 
 /** The deduped repository list offered for review config / conversion (fetched + legacy manual). */
@@ -47,6 +51,8 @@ export function buildSelectableRepositories(
     full_name: repo.fullName,
     private: repo.private,
     platformIntegrationId: repo.platformIntegrationId,
+    platformAccountLogin: repo.platformAccountLogin,
+    githubAppType: repo.githubAppType,
   }));
   const seenIds = new Set(canonical.map(repo => repo.id));
   const legacy = manuallyAdded.filter(repo => !seenIds.has(repo.id));

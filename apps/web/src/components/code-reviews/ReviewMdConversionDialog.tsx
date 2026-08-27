@@ -18,6 +18,8 @@ export type ConvertibleRepository = {
   id: number | string;
   full_name: string;
   platformIntegrationId?: string;
+  platformAccountLogin?: string;
+  githubAppType?: string;
 };
 
 type ReviewMdConversionDialogProps = {
@@ -51,6 +53,31 @@ function repositorySelectionKey(repository: ConvertibleRepository): string {
   return `${repository.id}:${repository.platformIntegrationId ?? ''}`;
 }
 
+function duplicateRepositoryNames(repositories: ConvertibleRepository[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const repository of repositories) {
+    counts.set(repository.full_name, (counts.get(repository.full_name) ?? 0) + 1);
+  }
+  return new Set([...counts].filter(([, count]) => count > 1).map(([fullName]) => fullName));
+}
+
+export function conversionIntegrationId(
+  repository: ConvertibleRepository,
+  duplicateNames: ReadonlySet<string>
+): string | undefined {
+  return duplicateNames.has(repository.full_name) ? repository.platformIntegrationId : undefined;
+}
+
+export function conversionRepositoryDiscriminator(
+  repository: ConvertibleRepository,
+  duplicateNames: ReadonlySet<string>
+): string | null {
+  if (!duplicateNames.has(repository.full_name)) return null;
+  const account = repository.platformAccountLogin ?? repository.full_name.split('/')[0];
+  if (repository.githubAppType) return `${account} · ${repository.githubAppType} app`;
+  return `${account} · Connection ${repository.platformIntegrationId ?? repository.id}`;
+}
+
 /**
  * Repository picker for the Custom Instructions -> REVIEW.md conversion (PoC).
  *
@@ -79,10 +106,11 @@ export function ReviewMdConversionDialog({
   const selectedRepositories = sortedRepositories.filter(repo =>
     selectedIds.has(repositorySelectionKey(repo))
   );
+  const duplicateNames = duplicateRepositoryNames(sortedRepositories);
   // Count only currently-selected repos that were started, so deselecting a started repo (or
   // selecting a new unstarted one) doesn't leave the progress text overstating "N started".
   const startedSelectedCount = selectedRepositories.filter(repo =>
-    startedIds.has(String(repo.id))
+    startedIds.has(repositorySelectionKey(repo))
   ).length;
 
   function toggleRepository(repositoryId: string, checked: boolean) {
@@ -121,6 +149,7 @@ export function ReviewMdConversionDialog({
                 const repositoryId = repositorySelectionKey(repo);
                 const isSelected = selectedIds.has(repositoryId);
                 const isStarted = startedIds.has(repositoryId);
+                const discriminator = conversionRepositoryDiscriminator(repo, duplicateNames);
 
                 return (
                   <div
@@ -135,11 +164,13 @@ export function ReviewMdConversionDialog({
                           toggleRepository(repositoryId, checked === true)
                         }
                       />
-                      <label
-                        htmlFor={`convert-${repositoryId}`}
-                        className="cursor-pointer truncate text-sm"
-                      >
-                        {repo.full_name}
+                      <label htmlFor={`convert-${repositoryId}`} className="min-w-0 cursor-pointer">
+                        <span className="block truncate text-sm">{repo.full_name}</span>
+                        {discriminator && (
+                          <span className="text-muted-foreground block truncate text-xs">
+                            {discriminator}
+                          </span>
+                        )}
                       </label>
                     </div>
 
@@ -149,7 +180,7 @@ export function ReviewMdConversionDialog({
                           organizationId,
                           platform,
                           repoFullName: repo.full_name,
-                          platformIntegrationId: repo.platformIntegrationId,
+                          platformIntegrationId: conversionIntegrationId(repo, duplicateNames),
                         })}
                         target="_blank"
                         rel="noopener noreferrer"

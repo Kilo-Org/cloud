@@ -31,6 +31,7 @@ type GitHubRepositoriesResult = {
     private: boolean;
     platformIntegrationId?: string;
     platformAccountLogin?: string;
+    githubAppType?: string;
   }[];
   syncedAt?: string | null;
   errorMessage?: string;
@@ -38,7 +39,11 @@ type GitHubRepositoriesResult = {
 
 const mapRepositories = (
   repositories: PlatformRepository[],
-  integration?: { id: string; platform_account_login: string | null }
+  integration?: {
+    id: string;
+    platform_account_login: string | null;
+    github_app_type: string | null;
+  }
 ): GitHubRepositoriesResult['repositories'] => {
   return repositories.map(repo => ({
     id: repo.id,
@@ -49,6 +54,7 @@ const mapRepositories = (
       ? {
           platformIntegrationId: integration.id,
           platformAccountLogin: integration.platform_account_login ?? undefined,
+          githubAppType: integration.github_app_type ?? undefined,
         }
       : {}),
   }));

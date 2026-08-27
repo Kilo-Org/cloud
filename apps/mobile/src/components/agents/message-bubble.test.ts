@@ -368,6 +368,34 @@ describe('MessageBubble cancel queued and restore', () => {
     expect(restore?.props.accessibilityRole).toBe('button');
   });
 
+  it('sizes the Cancel and Restore controls to the platform minimum touch target', async () => {
+    const cancelTree = await renderBubbleWithHandlers(userMessage('m-size-cancel'), {
+      deliveryState: { status: 'queued' },
+      onCancelQueued: vi.fn<(message: StoredMessage) => void>(),
+    });
+    const cancel = findElementByType(
+      cancelTree,
+      'Button',
+      p => p.accessibilityLabel === 'Cancel queued message'
+    );
+    expect(cancel).not.toBeNull();
+    // The Platform mock reports android, so the controls must reach 48dp.
+    expect(cancel?.props.className).toBe('min-h-12');
+    expect(cancel?.props.size).toBe('sm');
+
+    const restoreTree = await renderBubbleWithHandlers(userMessage('m-size-restore'), {
+      onRestoreQueued: vi.fn<(message: StoredMessage) => void>(),
+    });
+    const restore = findElementByType(
+      restoreTree,
+      'Button',
+      p => p.accessibilityLabel === 'Restore canceled message to the composer'
+    );
+    expect(restore).not.toBeNull();
+    expect(restore?.props.className).toBe('min-h-12');
+    expect(restore?.props.size).toBe('sm');
+  });
+
   it('presses Cancel and Restore to call their handlers with the message', async () => {
     const message = userMessage('m-press-cancel');
     const onCancelQueued = vi.fn<(message: StoredMessage) => void>();

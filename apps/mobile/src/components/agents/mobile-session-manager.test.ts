@@ -531,14 +531,14 @@ describe('createMobileAgentSessionManager api.cancelQueuedMessage', () => {
 
   it('calls the personal mutation with { sessionId, messageId } when no organizationId is set', async () => {
     cancelQueuedMessageMutate.mockReset();
-    cancelQueuedMessageMutate.mockResolvedValue(undefined);
+    cancelQueuedMessageMutate.mockResolvedValue({ dropped: true });
     const config = setup();
     const cancel = config.api.cancelQueuedMessage;
     if (!cancel) {
       throw new Error('expected cancelQueuedMessage api');
     }
     const input = { sessionId: 'c-1', messageId: 'm-1' };
-    await cancel(input as never);
+    await expect(cancel(input as never)).resolves.toEqual({ dropped: true });
 
     expect(cancelQueuedMessageMutate).toHaveBeenCalledTimes(1);
     expect(cancelQueuedMessageMutate).toHaveBeenCalledWith(
@@ -549,14 +549,14 @@ describe('createMobileAgentSessionManager api.cancelQueuedMessage', () => {
 
   it('adds organizationId to the org mutation payload', async () => {
     cancelQueuedMessageMutate.mockReset();
-    cancelQueuedMessageMutate.mockResolvedValue(undefined);
+    cancelQueuedMessageMutate.mockResolvedValue({ dropped: true });
     const config = setup('org-1');
     const cancel = config.api.cancelQueuedMessage;
     if (!cancel) {
       throw new Error('expected cancelQueuedMessage api');
     }
     const input = { sessionId: 'c-1', messageId: 'm-1' };
-    await cancel(input as never);
+    await expect(cancel(input as never)).resolves.toEqual({ dropped: true });
 
     expect(cancelQueuedMessageMutate).toHaveBeenCalledTimes(1);
     expect(cancelQueuedMessageMutate).toHaveBeenCalledWith(

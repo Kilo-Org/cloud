@@ -457,7 +457,7 @@ type SessionManager = {
   exitRemoteSession(): Promise<void>;
   interrupt(): Promise<void>;
   /** Drop one queued (not yet accepted) message by id without interrupting the active run. */
-  cancelQueuedMessage(messageId: string): Promise<void>;
+  cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }>;
   /**
    * Clear the active session's local transcript view only. Server-side history
    * is untouched and reappears on re-entry (`switchSession`). No-op without an
@@ -549,7 +549,16 @@ function isMessageStreaming(msg: StoredMessage): boolean {
  * carry full `RemoteAttachmentPart` info (mime/filename/url); cloud-agent
  * `attachments` carry only filenames, so those parts render as filename-only
  * placeholders until the server echoes the authoritative parts.
+ *
+ * For cloud-agent attachments the `url` records a reconstructable
+ * `cloud-agent://<messageUuid>/<filename>` reference so a cancel-restore can
+ * recover the original upload path (`attachments.path`) and remote filename
+ * and re-admit the already-uploaded object on the next send. The mobile
+ * resolver recognizes that form; the file-part renderer does not treat it as
+ * a fetchable URL, so the optimistic part still renders as a placeholder.
  */
+const CLOUD_AGENT_RESTORE_URL_PREFIX = 'cloud-agent://';
+
 function buildOptimisticFileParts(
   messageId: string,
   sessionId: string,
@@ -575,7 +584,7 @@ function buildOptimisticFileParts(
       type: 'file',
       mime: '',
       filename,
-      url: '',
+      url: `${CLOUD_AGENT_RESTORE_URL_PREFIX}${input.attachments!.path}/${filename}`,
       synthetic: true,
     }));
   }
@@ -2166,13 +2175,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
-  async function cancelQueuedMessage(messageId: string): Promise<void> {
-    if (!currentSession) return;
+  async function cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }> {
+    if (!currentSession) return { dropped: false };
     // Delegate to the session: the cloud-agent transport calls the
     // `cancelQueuedMessage` tRPC mutation and the remote transport relays
     // `drop_queued_message`. A remote CLI_UPGRADE_REQUIRED rejection surfaces
     // to the caller verbatim; this path never falls back to `interrupt()`.
-    await currentSession.cancelQueuedMessage(messageId);
+    return currentSession.cancelQueuedMessage(messageId);
   }
 
   function clearTranscript(): void {

@@ -672,6 +672,37 @@ describe('restoreFileParts — cancel/restore re-send admission', () => {
     renderer.unmount();
   });
 
+  it('re-admits an optimistic cloud-agent file part on the next send', async () => {
+    const renderer = await mountHook();
+    const remoteName = '87654321-4321-4321-8321-cba987654321.md';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: remoteName,
+          mime: '',
+          url: `cloud-agent://12345678-1234-4234-9234-123456789abc/${remoteName}`,
+        },
+      ]);
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('uploaded');
+    expect(chip?.remoteFilename).toBe(remoteName);
+
+    const result = await uploadPendingResult();
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('expected restored-chip upload to succeed');
+    }
+    expect(result.wire?.files).toEqual([remoteName]);
+    // The wire path is the original upload messageUuid the optimistic part encoded.
+    expect(result.wire?.path).toBe('12345678-1234-4234-9234-123456789abc');
+    expect(result.submission?.files.map(file => file.remoteName)).toEqual([remoteName]);
+    renderer.unmount();
+  });
+
   it('skips a part with no URL (not recoverable)', async () => {
     const renderer = await mountHook();
     await act(async () => {

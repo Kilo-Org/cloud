@@ -101,6 +101,14 @@ async function runBestEffort(task: () => Promise<void>): Promise<void> {
 // segment is the wire's remote filename.
 const RESTORED_ATTACHMENT_URL = /^file:\/\/\/tmp\/attachments\/([^/]+)\/([^/]+)\/([^/]+)\/([^/]+)$/;
 
+// The optimistic cloud-agent file part's `url` encodes the original upload
+// path and remote filename as `cloud-agent://<messageUuid>/<filename>`. The
+// SDK has the upload `attachments.path` but not the userId, so the sandbox
+// form above cannot be satisfied; this form is what
+// `buildOptimisticFileParts` can produce and lets a cancel-restore recover
+// both the filename and the messageUuid (the re-send wire's `path`).
+const CLOUD_AGENT_RESTORE_URL = /^cloud-agent:\/\/([^/]+)\/([^/]+)$/;
+
 type ResolvedRestoredAttachmentReference = {
   remoteKey: string;
   remoteFilename: string;
@@ -127,6 +135,18 @@ function resolveRestoredAttachmentReference(input: {
     if (userId !== undefined && messageUuid !== undefined && filename !== undefined) {
       return {
         remoteKey: `${userId}/cloud-agent/${messageUuid}/${filename}`,
+        remoteFilename: filename,
+        messageUuid,
+      };
+    }
+  }
+  const cloudRestore = CLOUD_AGENT_RESTORE_URL.exec(input.url);
+  if (cloudRestore) {
+    const messageUuid = cloudRestore[1];
+    const filename = cloudRestore[2];
+    if (messageUuid !== undefined && filename !== undefined) {
+      return {
+        remoteKey: input.url,
         remoteFilename: filename,
         messageUuid,
       };

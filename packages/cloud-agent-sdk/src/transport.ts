@@ -28,6 +28,8 @@ type CreateRemoteSessionInput = {
     variant?: string;
   };
   orgId?: string;
+  /** Launch directory for the new remote session (`create_session` wire data). */
+  directory?: string;
 };
 
 /**

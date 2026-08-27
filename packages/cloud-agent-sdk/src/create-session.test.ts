@@ -236,6 +236,7 @@ describe('createRemoteSessionOnConnection', () => {
       agent: 'architect',
       model: { providerID: 'kilo', modelID: 'kilo-auto', variant: 'efficient' },
       orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      directory: 'src/app',
     });
 
     expect(connection.sendCommandToConnection).toHaveBeenCalledWith({
@@ -245,8 +246,36 @@ describe('createRemoteSessionOnConnection', () => {
         agent: 'architect',
         model: { providerID: 'kilo', modelID: 'kilo-auto', variant: 'efficient' },
         orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        directory: 'src/app',
       },
       expectedConnectionId: 'cli-owner-1',
+    });
+  });
+
+  it('treats directory alone as an extended field and omits it from the bare retry', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
+
+    const result = await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      directory: 'src/app',
+    });
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(2);
+    expect(connection.sendCommandToConnection).toHaveBeenNthCalledWith(1, {
+      command: 'create_session',
+      data: { protocolVersion: 1, directory: 'src/app' },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    expect(connection.sendCommandToConnection).toHaveBeenNthCalledWith(2, {
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    expect(parseCreateSessionResponse(result)).toEqual({
+      ok: true,
+      kiloSessionId: VALID_SESSION_ID,
     });
   });
 
@@ -334,12 +363,13 @@ describe('createRemoteSessionOnConnection', () => {
     await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
       mutationId: 'spawn-key-1',
       agent: 'code',
+      directory: 'src/app',
     });
 
     expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(1);
     expect(connection.sendCommandToConnection).toHaveBeenCalledWith({
       command: 'create_session',
-      data: { protocolVersion: 1, agent: 'code' },
+      data: { protocolVersion: 1, agent: 'code', directory: 'src/app' },
       expectedConnectionId: 'cli-owner-1',
       mutationId: 'spawn-key-1:ext',
     });
@@ -354,12 +384,13 @@ describe('createRemoteSessionOnConnection', () => {
     const result = await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
       mutationId: 'spawn-key-1',
       agent: 'code',
+      directory: 'src/app',
     });
 
     expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(2);
     expect(connection.sendCommandToConnection).toHaveBeenNthCalledWith(1, {
       command: 'create_session',
-      data: { protocolVersion: 1, agent: 'code' },
+      data: { protocolVersion: 1, agent: 'code', directory: 'src/app' },
       expectedConnectionId: 'cli-owner-1',
       mutationId: 'spawn-key-1:ext',
     });

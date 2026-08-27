@@ -110,6 +110,9 @@ export const ALLOWED_VIEWER_COMMANDS: ReadonlySet<string> = new Set([
   'suggestion_dismiss',
   'list_models',
   'list_commands',
+  // Old CLIs lack this command; remove the CLI_UPGRADE_REQUIRED mapping when
+  // every supported CLI has list_directories.
+  'list_directories',
   'send_command',
   'create_session',
   'exit_cli',
@@ -126,6 +129,7 @@ const CLI_UPGRADE_REQUIRED_COMMANDS: ReadonlySet<string> = new Set([
   'send_command',
   'create_session',
   'exit_cli',
+  'list_directories',
 ]);
 
 const SESSION_OWNER_CHANGED_ERROR = {

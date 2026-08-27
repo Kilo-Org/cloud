@@ -84,9 +84,15 @@ export async function createRemoteSessionOnConnection(
     ...(input?.agent !== undefined ? { agent: input.agent } : {}),
     ...(input?.model !== undefined ? { model: input.model } : {}),
     ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
+    ...(input?.directory !== undefined ? { directory: input.directory } : {}),
   };
+  // `directory` is an extended field; the `:bare` retry omits it for old CLIs.
+  // Remove `:bare` when every supported CLI accepts it.
   const hasExtendedFields =
-    data.agent !== undefined || data.model !== undefined || data.orgId !== undefined;
+    data.agent !== undefined ||
+    data.model !== undefined ||
+    data.orgId !== undefined ||
+    data.directory !== undefined;
   const logicalKey = input?.mutationId;
   const extendedMutationId = logicalKey === undefined ? undefined : `${logicalKey}:ext`;
   const bareMutationId = logicalKey === undefined ? undefined : `${logicalKey}:bare`;

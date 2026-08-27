@@ -436,12 +436,31 @@ describe('iosSink Live Activity content-state', () => {
       },
     ];
 
-    iosSink.publish(snapshotFor([], 1, 'empty'));
+    iosSink.publish(snapshotFor([{ status: 'busy' }], 1));
 
     expect(mockState.started.length).toBe(0);
+    expect(mockState.ended.length).toBe(0);
     const updated = mockState.updated.at(-1) as GlanceableLiveActivityContentState | undefined;
-    expect(updated?.status).toBe('empty');
+    expect(updated?.status).toBe('happy');
+    expect(updated?.running).toBe(1);
     expect(delivery.registerTokens).not.toHaveBeenCalled();
+  });
+
+  it('ends an adopted leftover activity when publish receives ineligible work', () => {
+    mockState.instances = [
+      {
+        update: (next: unknown) => mockState.updated.push(next),
+        end: (policy: unknown, props?: unknown, contentDate?: unknown) =>
+          mockState.ended.push({ policy, props, contentDate }),
+      },
+    ];
+
+    iosSink.publish(snapshotFor([], 1, 'empty'));
+
+    expect(mockState.ended.length).toBe(1);
+    expect(mockState.ended[0]?.policy).toBe('immediate');
+    expect(mockState.updated.length).toBe(0);
+    expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -130,6 +130,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         organization_id: null,
         git_url: args.gitUrl ?? NORMALIZED_GIT_URL,
         git_branch: args.branch,
+        github_integration_id: args.owner.platformIntegrationId,
         created_on_platform: platform,
       });
     } else {
@@ -141,6 +142,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         organization_id: args.owner.organizationId,
         git_url: args.gitUrl ?? NORMALIZED_GIT_URL,
         git_branch: args.branch,
+        github_integration_id: args.owner.platformIntegrationId,
         created_on_platform: platform,
       });
     }
@@ -989,7 +991,6 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         owner: { kind: 'organization', organizationId: orgA.id },
         gitUrl: SHARED_NORMALIZED,
       });
-
       await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(), {
         kind: 'organization',
         organizationId: orgA.id,
@@ -1183,6 +1184,24 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         .returning({ id: platform_integrations.id });
       if (!integrations[0] || !integrations[1]) throw new Error('Expected two integrations');
       integrationIdsToCleanup.push(...integrations.map(integration => integration.id));
+      await seedSession({
+        branch: SHARED_BRANCH,
+        owner: {
+          kind: 'user',
+          userId: user.id,
+          platformIntegrationId: integrations[0].id,
+        },
+        gitUrl: SHARED_NORMALIZED,
+      });
+      await seedSession({
+        branch: SHARED_BRANCH,
+        owner: {
+          kind: 'user',
+          userId: user.id,
+          platformIntegrationId: integrations[1].id,
+        },
+        gitUrl: SHARED_NORMALIZED,
+      });
       await seedSession({
         branch: SHARED_BRANCH,
         owner: { kind: 'user', userId: user.id },

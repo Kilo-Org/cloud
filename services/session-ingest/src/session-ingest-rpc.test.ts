@@ -330,6 +330,59 @@ describe('createSessionForCloudAgent', () => {
     );
   });
 
+  it('persists and preserves the canonical GitHub integration identity', async () => {
+    const githubIntegrationId = '22222222-2222-4222-8222-222222222222';
+    const row = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      github_integration_id: githubIntegrationId,
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const fake = makeRootWriteDb({ created: row });
+
+    await makeRpc(fake.db as never).createSessionForCloudAgent({ ...params, githubIntegrationId });
+
+    expect(fake.values).toHaveBeenCalledWith(
+      expect.objectContaining({ github_integration_id: githubIntegrationId })
+    );
+  });
+
+  it('heals a missing canonical integration and rejects a different persisted identity', async () => {
+    const githubIntegrationId = '22222222-2222-4222-8222-222222222222';
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      github_integration_id: null,
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const healing = makeRootWriteDb({ existing });
+    await makeRpc(healing.db as never).createSessionForCloudAgent({
+      ...params,
+      githubIntegrationId,
+    });
+    expect(healing.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ github_integration_id: githubIntegrationId })
+    );
+
+    const conflicting = makeRootWriteDb({
+      existing: { ...existing, github_integration_id: '33333333-3333-4333-8333-333333333333' },
+    });
+    await expect(
+      makeRpc(conflicting.db as never).createSessionForCloudAgent({
+        ...params,
+        githubIntegrationId,
+      })
+    ).rejects.toThrow('Cloud Agent root session identity conflict');
+  });
+
   it('accepts an identical repository retry without rewriting git_url', async () => {
     const existing = {
       session_id: params.sessionId,

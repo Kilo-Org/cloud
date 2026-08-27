@@ -393,6 +393,7 @@ const commonSessionFieldsWithPr = {
 export const sessionPrJoinPredicate = and(
   eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
   eq(github_branch_pull_requests.git_branch, cli_sessions_v2.git_branch),
+  sql`${github_branch_pull_requests.platform_integration_id} IS NOT DISTINCT FROM ${cli_sessions_v2.github_integration_id}`,
   or(
     and(
       isNotNull(cli_sessions_v2.organization_id),
@@ -1153,6 +1154,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           and(
             eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
             eq(github_branch_pull_requests.git_branch, cli_sessions_v2.git_branch),
+            sql`${github_branch_pull_requests.platform_integration_id} IS NOT DISTINCT FROM ${cli_sessions_v2.github_integration_id}`,
             or(
               and(
                 isNotNull(cli_sessions_v2.organization_id),
@@ -1350,14 +1352,15 @@ export const cliSessionsV2Router = createTRPCRouter({
       const integrationOwner = session.organization_id
         ? ({ type: 'org', id: session.organization_id } as const)
         : ({ type: 'user', id: ctx.user.id } as const);
-      let pinnedIntegrationId = row.platform_integration_id ?? undefined;
+      let pinnedIntegrationId = session.github_integration_id ?? undefined;
       if (session.cloud_agent_session_id) {
+        let cloudIntegrationId: string | undefined;
         try {
           const authToken = generateApiToken(ctx.user);
           const cloudSession = await createCloudAgentNextClient(authToken).getSession(
             session.cloud_agent_session_id
           );
-          pinnedIntegrationId = cloudSession.githubIntegrationId ?? pinnedIntegrationId;
+          cloudIntegrationId = cloudSession.githubIntegrationId;
         } catch (error) {
           captureException(error, {
             tags: {
@@ -1375,6 +1378,29 @@ export const cliSessionsV2Router = createTRPCRouter({
             });
           }
         }
+        if (
+          cloudIntegrationId &&
+          pinnedIntegrationId &&
+          cloudIntegrationId !== pinnedIntegrationId
+        ) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Cloud Agent session GitHub integration does not match its persisted identity',
+          });
+        }
+        pinnedIntegrationId = cloudIntegrationId ?? pinnedIntegrationId;
+        if (cloudIntegrationId && session.github_integration_id === null) {
+          await db
+            .update(cli_sessions_v2)
+            .set({ github_integration_id: cloudIntegrationId })
+            .where(
+              and(
+                eq(cli_sessions_v2.session_id, sessionId),
+                eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+                isNull(cli_sessions_v2.github_integration_id)
+              )
+            );
+        }
       }
 
       const integration = pinnedIntegrationId
@@ -1391,16 +1417,29 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
+      const pinnedCacheRow: AssociatedPrRow =
+        row.platform_integration_id === integration.id
+          ? cacheRow
+          : {
+              pr_url: null,
+              pr_number: null,
+              pr_state: null,
+              pr_title: null,
+              pr_head_sha: null,
+              pr_last_synced_at: null,
+              pr_review_decision: null,
+              review_decision_pending: null,
+            };
+
       // Only a cache row from this exact integration may satisfy the throttle.
       if (
-        row.platform_integration_id === integration.id &&
-        cacheRow.pr_url !== null &&
-        samePullRequest(sessionPrUrl, cacheRow.pr_url) &&
-        cacheRow.pr_last_synced_at !== null
+        pinnedCacheRow.pr_url !== null &&
+        samePullRequest(sessionPrUrl, pinnedCacheRow.pr_url) &&
+        pinnedCacheRow.pr_last_synced_at !== null
       ) {
-        const lastSyncedMs = Date.parse(cacheRow.pr_last_synced_at);
+        const lastSyncedMs = Date.parse(pinnedCacheRow.pr_last_synced_at);
         if (Number.isFinite(lastSyncedMs) && Date.now() - lastSyncedMs < REFRESH_THROTTLE_MS) {
-          return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
+          return { associatedPr: formatAssociatedPr(sessionPr, pinnedCacheRow) };
         }
       }
 
@@ -1487,7 +1526,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       if (
         gitUrl != null &&
         branch != null &&
-        (cacheRow.pr_url == null || samePullRequest(sessionPrUrl, cacheRow.pr_url))
+        (pinnedCacheRow.pr_url == null || samePullRequest(sessionPrUrl, pinnedCacheRow.pr_url))
       ) {
         const prColumns = {
           pr_url: fetched?.htmlUrl ?? null,
@@ -1513,21 +1552,19 @@ export const cliSessionsV2Router = createTRPCRouter({
             }
           : { owned_by_organization_id: null, owned_by_user_id: ctx.user.id };
 
-        const conflictTarget = session.organization_id
-          ? [
-              github_branch_pull_requests.git_url,
-              github_branch_pull_requests.git_branch,
-              github_branch_pull_requests.owned_by_organization_id,
-            ]
-          : [
-              github_branch_pull_requests.git_url,
-              github_branch_pull_requests.git_branch,
-              github_branch_pull_requests.owned_by_user_id,
-            ];
+        const ownerColumn = session.organization_id
+          ? github_branch_pull_requests.owned_by_organization_id
+          : github_branch_pull_requests.owned_by_user_id;
+        const conflictTarget = [
+          github_branch_pull_requests.git_url,
+          github_branch_pull_requests.git_branch,
+          ownerColumn,
+          github_branch_pull_requests.platform_integration_id,
+        ];
 
         const conflictTargetWhere = session.organization_id
-          ? sql`${github_branch_pull_requests.owned_by_organization_id} IS NOT NULL AND ${github_branch_pull_requests.platform_integration_id} IS NULL`
-          : sql`${github_branch_pull_requests.owned_by_user_id} IS NOT NULL AND ${github_branch_pull_requests.platform_integration_id} IS NULL`;
+          ? sql`${github_branch_pull_requests.owned_by_organization_id} IS NOT NULL AND ${github_branch_pull_requests.platform_integration_id} IS NOT NULL`
+          : sql`${github_branch_pull_requests.owned_by_user_id} IS NOT NULL AND ${github_branch_pull_requests.platform_integration_id} IS NOT NULL`;
 
         // Only mark pending when there is a PR whose review decision we still
         // need. Writing a sentinel (no-PR) row with pending=true would cause the
@@ -1550,7 +1587,6 @@ export const cliSessionsV2Router = createTRPCRouter({
             targetWhere: conflictTargetWhere,
             set: {
               pr_url: sql`excluded.pr_url`,
-              platform_integration_id: sql`excluded.platform_integration_id`,
               pr_number: sql`excluded.pr_number`,
               pr_state: sql`excluded.pr_state`,
               pr_title: sql`excluded.pr_title`,
@@ -1592,7 +1628,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       if (mapped) {
         return { associatedPr: mapped };
       }
-      return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
+      return { associatedPr: formatAssociatedPr(sessionPr, pinnedCacheRow) };
     }),
 
   /**

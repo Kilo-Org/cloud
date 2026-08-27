@@ -514,7 +514,8 @@ describe('prepareSession endpoint', () => {
       'code-review',
       expect.stringMatching(/^New session - /),
       'https://github.com/acme/repo',
-      undefined
+      undefined,
+      '123e4567-e89b-12d3-a456-426614174022'
     );
     expect(doStub.registerSession).toHaveBeenCalledWith(
       expect.objectContaining({

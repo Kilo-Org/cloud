@@ -1410,6 +1410,78 @@ describe('cli-sessions-v2-router', () => {
       expect(typeof result.associatedPr?.lastSyncedAt).toBe('string');
     });
 
+    it('joins only the cache row for the session canonical integration', async () => {
+      const integrations = await db
+        .insert(platform_integrations)
+        .values([
+          {
+            owned_by_user_id: regularUser.id,
+            platform: 'github',
+            integration_type: 'app',
+            platform_installation_id: `session-join-${crypto.randomUUID()}`,
+            github_app_type: 'standard',
+          },
+          {
+            owned_by_user_id: regularUser.id,
+            platform: 'github',
+            integration_type: 'app',
+            platform_installation_id: `session-join-${crypto.randomUUID()}`,
+            github_app_type: 'lite',
+          },
+        ])
+        .returning({ id: platform_integrations.id });
+      if (!integrations[0] || !integrations[1]) throw new Error('Expected two integrations');
+      await db
+        .update(cli_sessions_v2)
+        .set({ github_integration_id: integrations[0].id })
+        .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+      await db.insert(github_branch_pull_requests).values([
+        {
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/x',
+          owned_by_user_id: regularUser.id,
+          platform_integration_id: integrations[0].id,
+          pr_url: 'https://github.com/kilo/repo/pull/100',
+          pr_number: 100,
+          pr_state: 'open',
+        },
+        {
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/x',
+          owned_by_user_id: regularUser.id,
+          platform_integration_id: integrations[1].id,
+          pr_url: 'https://github.com/kilo/repo/pull/200',
+          pr_number: 200,
+          pr_state: 'open',
+        },
+      ]);
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getWithRuntimeState({
+          session_id: sessionWithPr,
+        });
+        expect(result.associatedPr?.number).toBe(100);
+      } finally {
+        await db
+          .update(cli_sessions_v2)
+          .set({ github_integration_id: null })
+          .where(eq(cli_sessions_v2.session_id, sessionWithPr));
+        await db.delete(github_branch_pull_requests).where(
+          inArray(
+            github_branch_pull_requests.platform_integration_id,
+            integrations.map(i => i.id)
+          )
+        );
+        await db.delete(platform_integrations).where(
+          inArray(
+            platform_integrations.id,
+            integrations.map(i => i.id)
+          )
+        );
+      }
+    });
+
     it('returns null associatedPr when the per-tenant cache has no row for (git_url, git_branch)', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getWithRuntimeState({
@@ -2151,6 +2223,10 @@ describe('cli-sessions-v2-router', () => {
         })
         .returning({ id: platform_integrations.id });
       integrationId = integration.id;
+      await db
+        .update(cli_sessions_v2)
+        .set({ github_integration_id: integrationId })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
 
       mockedFetchPullRequestByNumber.mockReset();
       mockGetSession.mockReset().mockResolvedValue({ githubIntegrationId: integrationId });
@@ -2232,7 +2308,10 @@ describe('cli-sessions-v2-router', () => {
         .returning({ id: platform_integrations.id });
       await db
         .update(cli_sessions_v2)
-        .set({ cloud_agent_session_id: 'agent_refresh_pr_pinned' })
+        .set({
+          cloud_agent_session_id: 'agent_refresh_pr_pinned',
+          github_integration_id: liteIntegration.id,
+        })
         .where(eq(cli_sessions_v2.session_id, sessionId));
       mockGetSession.mockResolvedValue({ githubIntegrationId: liteIntegration.id });
       mockedFetchPullRequestByNumber.mockResolvedValue({
@@ -2256,7 +2335,7 @@ describe('cli-sessions-v2-router', () => {
       } finally {
         await db
           .update(cli_sessions_v2)
-          .set({ cloud_agent_session_id: null })
+          .set({ cloud_agent_session_id: null, github_integration_id: null })
           .where(eq(cli_sessions_v2.session_id, sessionId));
         await db
           .delete(platform_integrations)
@@ -2267,7 +2346,7 @@ describe('cli-sessions-v2-router', () => {
     it('fails closed for an old session with no canonical or cached integration', async () => {
       await db
         .update(cli_sessions_v2)
-        .set({ cloud_agent_session_id: null })
+        .set({ cloud_agent_session_id: null, github_integration_id: null })
         .where(eq(cli_sessions_v2.session_id, sessionId));
 
       const caller = await createCallerForUser(regularUser.id);
@@ -2363,10 +2442,14 @@ describe('cli-sessions-v2-router', () => {
 
       // The branch cache row for the other PR is untouched.
       const rows = await readCacheRows();
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
+      expect(rows).toHaveLength(2);
+      expect(rows.find(row => row.platform_integration_id === null)).toMatchObject({
         pr_url: 'https://github.com/kilo/repo/pull/99',
         pr_number: 99,
+      });
+      expect(rows.find(row => row.platform_integration_id === integrationId)).toMatchObject({
+        pr_url: SESSION_PR_URL,
+        pr_number: 7,
       });
     });
 
@@ -2519,11 +2602,14 @@ describe('cli-sessions-v2-router', () => {
       // The write guard treated the subpath link as the same PR and updated the
       // existing row in place — no duplicate row and no stale fields.
       const rows = await readCacheRows();
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
+      expect(rows).toHaveLength(2);
+      expect(rows.find(row => row.platform_integration_id === integrationId)).toMatchObject({
         pr_url: SESSION_PR_URL,
         pr_number: 7,
         pr_head_sha: 'new-sha',
+      });
+      expect(rows.find(row => row.platform_integration_id === null)).toMatchObject({
+        pr_head_sha: 'old-sha',
       });
     });
 

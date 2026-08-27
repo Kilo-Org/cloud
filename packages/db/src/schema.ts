@@ -5887,6 +5887,9 @@ export const cli_sessions_v2 = pgTable(
     created_on_platform: text().notNull().default('unknown'),
     git_url: text(),
     git_branch: text(),
+    // Canonical GitHub integration chosen when this session was created.
+    // Deliberately not an FK: session identity must survive integration removal.
+    github_integration_id: uuid(),
     platform: text(), // PR host (e.g. github), NOT the OS.
     pr_url: text(),
     pr_number: integer(),

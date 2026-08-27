@@ -68,6 +68,9 @@ export async function checkMatchingSession(
           isNull(cli_sessions_v2.organization_id),
           eq(cli_sessions_v2.kilo_user_id, owner.userId)
         );
+  const integrationPredicate = owner.platformIntegrationId
+    ? eq(cli_sessions_v2.github_integration_id, owner.platformIntegrationId)
+    : isNull(cli_sessions_v2.github_integration_id);
 
   const platformInList = sql.join(
     [...REVIEW_DECISION_SUPPORTED_PLATFORMS].map(p => sql`${p}`),
@@ -81,6 +84,7 @@ export async function checkMatchingSession(
         WHERE git_url = ${gitUrl}
           AND git_branch = ${branch}
           AND ${tenantPredicate}
+          AND ${integrationPredicate}
           AND created_on_platform IN (${platformInList})
       ) AS has_session
     `

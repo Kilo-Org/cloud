@@ -2919,7 +2919,8 @@ export class SessionService {
     createdOnPlatform: string,
     title?: string,
     gitUrl?: string,
-    cloneFromKiloSessionId?: string
+    cloneFromKiloSessionId?: string,
+    githubIntegrationId?: string
   ): Promise<CreateSessionForCloudAgentResult | undefined> {
     try {
       return await env.SESSION_INGEST.createSessionForCloudAgent({
@@ -2930,6 +2931,7 @@ export class SessionService {
         createdOnPlatform,
         title,
         gitUrl,
+        githubIntegrationId,
         cloneFromKiloSessionId,
       });
     } catch (error) {

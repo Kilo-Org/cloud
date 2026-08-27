@@ -252,7 +252,7 @@ export async function executeBatchReviewDecisionFetch(owner: TenantOwner): Promi
         : null;
     } catch (error) {
       captureException(error, { tags: { source: 'batch_review_decision_get_integration' } });
-      unactionableRows.push(row);
+      // Preserve the claim so a transient lookup failure retries after expiry.
       continue;
     }
     if (!integration) {

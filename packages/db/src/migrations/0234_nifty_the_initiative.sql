@@ -1,0 +1,1 @@
+ALTER TABLE "cli_sessions_v2" ADD COLUMN "github_integration_id" uuid;

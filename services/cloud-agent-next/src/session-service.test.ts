@@ -3791,7 +3791,8 @@ describe('SessionService session-ingest compatibility', () => {
       'cloud-agent',
       undefined,
       undefined,
-      'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+      'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+      '22222222-2222-4222-8222-222222222222'
     );
 
     expect(result).toEqual(readyResult);
@@ -3804,6 +3805,7 @@ describe('SessionService session-ingest compatibility', () => {
       createdOnPlatform: 'cloud-agent',
       title: undefined,
       gitUrl: undefined,
+      githubIntegrationId: '22222222-2222-4222-8222-222222222222',
       cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
   });

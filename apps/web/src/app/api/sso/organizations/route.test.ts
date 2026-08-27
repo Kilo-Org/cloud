@@ -117,13 +117,13 @@ describe('POST /api/sso/organizations', () => {
     });
   });
 
-  it('enforces required SSO for a discovered legacy Google Workspace account', async () => {
+  it('enforces required SSO before returning rowless UUID account Email discovery', async () => {
     mockGetAllUserProviders.mockResolvedValue({
       kind: 'found',
       user: {
-        kiloUserId: 'oauth/google:synthetic-account',
-        providers: ['google'],
-        primaryEmail: 'legacy-workspace@example.com',
+        kiloUserId: '123e4567-e89b-42d3-a456-426614174000',
+        providers: ['email'],
+        primaryEmail: 'rowless-email@example.com',
       },
     });
     mockResolveSsoAuthorityForDomain.mockResolvedValue({
@@ -134,8 +134,9 @@ describe('POST /api/sso/organizations', () => {
     mockGetWorkOSOrganization.mockResolvedValue({ id: 'workos-organization-1' } as never);
 
     await expect(
-      (await POST(request({ email: 'legacy-workspace@example.com' }))).json()
+      (await POST(request({ email: 'rowless-email@example.com' }))).json()
     ).resolves.toEqual({ kind: 'sso', organizationId: 'workos-organization-1' });
+    expect(mockIsNewAccountEligibleForMagicLink).not.toHaveBeenCalled();
   });
 
   it('returns server-authorized account-creation choices for an eligible unknown email', async () => {

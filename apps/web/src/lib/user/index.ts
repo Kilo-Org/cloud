@@ -126,6 +126,7 @@ import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import { hosted_domain_specials } from '@/lib/auth/constants';
+import * as z from 'zod';
 import {
   generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
@@ -1979,7 +1980,7 @@ function legacyProviderFromHostedDomain(user: User): AuthProviderId[] {
     case hosted_domain_specials.email:
       return ['email'];
     default:
-      return [];
+      return isUuidUserId(user.id) ? ['email'] : [];
   }
 }
 
@@ -1993,6 +1994,10 @@ function parseLegacyOAuthProvider(userId: string): AuthProviderId | null {
     default:
       return null;
   }
+}
+
+function isUuidUserId(userId: string): boolean {
+  return z.uuid().safeParse(userId).success;
 }
 
 /**

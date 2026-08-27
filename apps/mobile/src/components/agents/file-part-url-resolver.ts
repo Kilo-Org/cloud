@@ -228,16 +228,7 @@ export async function refreshFilePartUrl(partId: string): Promise<boolean> {
   markFilePartRenewing(partId);
   inFlight.add(partId);
   try {
-    const result = await trpcClient.cloudAgentNext.getAttachmentDownloadUrl.mutate({
-      messageUuid: ref.messageUuid,
-      filename: ref.filename,
-    });
-    overwriteFilePartCacheEntry(partId, {
-      url: result.signedUrl,
-      mime: entry.mime,
-      ...(entry.filename ? { filename: entry.filename } : {}),
-      urlExpiresAt: parseTimestamp(result.expiresAt).getTime(),
-    });
+    await presignAttachment(partId, ref, entry);
     return true;
   } catch {
     clearFilePartRenewing(partId);

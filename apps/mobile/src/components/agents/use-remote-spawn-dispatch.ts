@@ -214,7 +214,13 @@ export function useRemoteSpawnDispatch({
   // Read the press-time inputs through refs so `onStart` stays stable across
   // renders while always seeing the route's latest values.
   const getSubmitPayloadRef = useRef(getSubmitPayload);
-  const spawnFieldsRef = useRef({ mode, selection, organizationId, directory, cloneFromKiloSessionId });
+  const spawnFieldsRef = useRef({
+    mode,
+    selection,
+    organizationId,
+    directory,
+    cloneFromKiloSessionId,
+  });
   const onSpawnAdmittedRef = useRef(onSpawnAdmitted);
   const onSpawnFailedRef = useRef(onSpawnFailed);
   const onSpawnReadyRef = useRef(onSpawnReady);

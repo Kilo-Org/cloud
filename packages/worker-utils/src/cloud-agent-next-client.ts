@@ -41,6 +41,7 @@ export type CloudAgentPrepareSessionInput = {
   model: string;
   variant?: string;
   githubRepo?: string;
+  githubIntegrationId?: string;
   githubToken?: string;
   gitUrl?: string;
   gitToken?: string;

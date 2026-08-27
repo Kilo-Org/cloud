@@ -94,32 +94,41 @@ export async function getPrimaryGitHubIntegrationForOrganization(organizationId:
   return integration ?? null;
 }
 
-export type OrganizationGitHubIntegrationResolution =
+export type GitHubIntegrationResolution =
   | { success: true; integration: PlatformIntegration }
   | { success: false; reason: 'no_installation_found' | 'ambiguous_installation' };
 
 /**
- * Resolves the one healthy organization installation authorized for a GitHub repository.
+ * Resolves the one healthy owner installation authorized for a GitHub repository.
  * Repository-specific resolution is intentionally separate from deterministic primary selection.
  */
-export async function resolveOrganizationGitHubIntegrationForRepository(input: {
-  organizationId: string;
+export async function resolveGitHubIntegrationForRepository(input: {
+  owner: Owner;
   repositoryFullName: string;
   expectedPlatformIntegrationId?: string;
-}): Promise<OrganizationGitHubIntegrationResolution> {
+}): Promise<GitHubIntegrationResolution> {
   const repositoryParts = input.repositoryFullName.split('/');
   if (repositoryParts.length !== 2 || repositoryParts.some(part => part.length === 0)) {
     return { success: false, reason: 'no_installation_found' };
   }
   const [repositoryOwner] = repositoryParts;
+  const ownershipConditions =
+    input.owner.type === 'org'
+      ? [
+          eq(platform_integrations.owned_by_organization_id, input.owner.id),
+          isNull(platform_integrations.owned_by_user_id),
+        ]
+      : [
+          eq(platform_integrations.owned_by_user_id, input.owner.id),
+          isNull(platform_integrations.owned_by_organization_id),
+        ];
 
   const integrations = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
-        eq(platform_integrations.owned_by_organization_id, input.organizationId),
-        isNull(platform_integrations.owned_by_user_id),
+        ...ownershipConditions,
         eq(platform_integrations.platform, PLATFORM.GITHUB),
         eq(platform_integrations.integration_type, 'app'),
         isNotNull(platform_integrations.platform_installation_id),
@@ -155,6 +164,18 @@ export async function resolveOrganizationGitHubIntegrationForRepository(input: {
     return { success: false, reason: 'no_installation_found' };
   }
   return { success: true, integration };
+}
+
+export async function resolveOrganizationGitHubIntegrationForRepository(input: {
+  organizationId: string;
+  repositoryFullName: string;
+  expectedPlatformIntegrationId?: string;
+}): Promise<GitHubIntegrationResolution> {
+  return resolveGitHubIntegrationForRepository({
+    owner: { type: 'org', id: input.organizationId },
+    repositoryFullName: input.repositoryFullName,
+    expectedPlatformIntegrationId: input.expectedPlatformIntegrationId,
+  });
 }
 
 export async function getAllIntegationsForOrganization(organizationId: string) {

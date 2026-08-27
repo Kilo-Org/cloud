@@ -4,6 +4,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   code_review_memory_proposals,
   kilocode_users,
+  platform_integrations,
   type CodeReviewMemoryProposal,
 } from '@kilocode/db/schema';
 
@@ -15,11 +16,16 @@ import {
   upsertScopeProposal,
   type ReviewMemoryOwner,
 } from './db';
-import { buildChangeRequestBody, isStaleOpeningChangeRequest } from './change-request';
+import {
+  approveAndOpenReviewMemoryChangeRequest,
+  buildChangeRequestBody,
+  isStaleOpeningChangeRequest,
+} from './change-request';
 
 describe('review memory change requests', () => {
   afterEach(async () => {
     await db.delete(code_review_memory_proposals);
+    await db.delete(platform_integrations);
     await db.delete(kilocode_users);
   });
 
@@ -72,6 +78,40 @@ describe('review memory change requests', () => {
     expect(isStaleOpeningChangeRequest('2026-06-01T11:31:00.000Z', now)).toBe(false);
     expect(isStaleOpeningChangeRequest('2026-06-01T11:30:00.000Z', now)).toBe(true);
     expect(isStaleOpeningChangeRequest('not-a-date', now)).toBe(false);
+  });
+
+  it('fails closed when multiple GitHub installations match a proposal repository', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const proposal = await seedProposal(owner, 'acme/widgets');
+    await db.insert(platform_integrations).values(
+      ['standard', 'lite'].map((githubAppType, index) => ({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        integration_status: 'active',
+        platform_installation_id: `review-memory-${crypto.randomUUID()}`,
+        platform_account_login: 'acme',
+        repository_access: 'selected',
+        repositories: [
+          { id: index + 1, name: 'widgets', full_name: 'acme/widgets', private: true },
+        ],
+        github_app_type: githubAppType as 'standard' | 'lite',
+        permissions: { contents: 'write', pull_requests: 'write' },
+      }))
+    );
+
+    await expect(
+      approveAndOpenReviewMemoryChangeRequest({ owner, proposalId: proposal.id })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Multiple active GitHub integrations have access to this repository.',
+    });
+    await expect(
+      db.query.code_review_memory_proposals.findFirst({
+        where: (table, { eq }) => eq(table.id, proposal.id),
+      })
+    ).resolves.toMatchObject({ status: 'open' });
   });
 });
 

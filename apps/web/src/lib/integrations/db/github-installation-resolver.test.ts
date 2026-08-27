@@ -1,11 +1,16 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 import { db } from '@/lib/drizzle';
-import { organizations, platform_integrations } from '@kilocode/db/schema';
+import { insertTestUser } from '@/tests/helpers/user.helper';
+import { kilocode_users, organizations, platform_integrations } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
-import { resolveOrganizationGitHubIntegrationForRepository } from './platform-integrations';
+import {
+  resolveGitHubIntegrationForRepository,
+  resolveOrganizationGitHubIntegrationForRepository,
+} from './platform-integrations';
 
 const organizationIds = [crypto.randomUUID(), crypto.randomUUID()];
 const installationIds: string[] = [];
+const userIds: string[] = [];
 
 async function insertOrganization(organizationId: string) {
   await db.insert(organizations).values({
@@ -46,6 +51,10 @@ afterEach(async () => {
     installationIds.length = 0;
   }
   await db.delete(organizations).where(inArray(organizations.id, organizationIds));
+  if (userIds.length > 0) {
+    await db.delete(kilocode_users).where(inArray(kilocode_users.id, userIds));
+    userIds.length = 0;
+  }
 });
 
 describe('resolveOrganizationGitHubIntegrationForRepository', () => {
@@ -209,5 +218,54 @@ describe('resolveOrganizationGitHubIntegrationForRepository', () => {
         repositoryFullName: 'acme/api',
       })
     ).resolves.toEqual({ success: false, reason: 'no_installation_found' });
+  });
+});
+
+describe('resolveGitHubIntegrationForRepository', () => {
+  it('resolves an exact personal installation and fails closed on ambiguity', async () => {
+    const user = await insertTestUser();
+    userIds.push(user.id);
+    const first = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        integration_status: 'active',
+        platform_installation_id: `resolver-${crypto.randomUUID()}`,
+        platform_account_login: 'acme',
+        repository_access: 'all',
+        github_app_type: 'standard',
+      })
+      .returning();
+    const second = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        integration_status: 'active',
+        platform_installation_id: `resolver-${crypto.randomUUID()}`,
+        platform_account_login: 'acme',
+        repository_access: 'all',
+        github_app_type: 'lite',
+      })
+      .returning();
+    const integrations = [...first, ...second];
+    installationIds.push(...integrations.map(integration => integration.platform_installation_id!));
+
+    await expect(
+      resolveGitHubIntegrationForRepository({
+        owner: { type: 'user', id: user.id },
+        repositoryFullName: 'acme/api',
+        expectedPlatformIntegrationId: integrations[0].id,
+      })
+    ).resolves.toEqual({ success: true, integration: integrations[0] });
+    await expect(
+      resolveGitHubIntegrationForRepository({
+        owner: { type: 'user', id: user.id },
+        repositoryFullName: 'acme/api',
+      })
+    ).resolves.toEqual({ success: false, reason: 'ambiguous_installation' });
   });
 });

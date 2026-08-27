@@ -2389,6 +2389,13 @@ export class SessionService {
       ) {
         await this.refreshGitRemoteToken(session, context, metadata, resolvedTokens);
       }
+      const upstreamBranch = metadata.repository?.upstreamBranch;
+      if (
+        metadata.identity.createdOnPlatform === 'code-review' &&
+        upstreamBranch?.startsWith('refs/pull/')
+      ) {
+        await manageBranch(session, workspacePath, upstreamBranch, true);
+      }
 
       const detectedDevcontainer =
         metadata.workspace?.devcontainerRequested && !metadata.devcontainer

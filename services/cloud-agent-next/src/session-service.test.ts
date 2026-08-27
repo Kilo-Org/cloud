@@ -1703,6 +1703,67 @@ describe('SessionService.prepareWorkspace', () => {
     );
   });
 
+  it('refreshes a warm review pull ref while preserving the resolved GitHub app type', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+    const integrationId = '123e4567-e89b-12d3-a456-426614174022';
+    tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValueOnce({
+      success: true,
+      value: {
+        capability: 'kgh2.lite',
+        installationId: '987',
+        accountLogin: 'acme',
+        appType: 'lite',
+        source: 'installation',
+        gitAuthor: { name: 'kilocode-lite[bot]', email: 'lite@example.com' },
+      },
+    });
+    const parsedMetadata = createMetadata({
+      createdOnPlatform: 'code-review',
+      githubRepo: 'acme/repo',
+      githubInstallationId: '987',
+      githubAppType: 'lite',
+      gitUrl: undefined,
+      gitToken: undefined,
+      platform: 'github',
+      upstreamBranch: 'refs/pull/42/head',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sessionHome: '/home/agent_test',
+      branchName: 'refs/pull/42/head',
+      sandboxId: 'ses-abcdef',
+    });
+    if (parsedMetadata.repository?.type !== 'github') {
+      throw new Error('Expected GitHub session metadata');
+    }
+    const metadata = {
+      ...parsedMetadata,
+      repository: { ...parsedMetadata.repository, githubIntegrationId: integrationId },
+    } satisfies CloudAgentSessionState;
+
+    const result = await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ expectedIntegrationId: integrationId })
+    );
+    expect(workspaceMocks.manageBranch).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'refs/pull/42/head',
+      true
+    );
+    expect(result.ready.githubInstallationId).toBe('987');
+    expect(result.ready.githubAppType).toBe('lite');
+  });
+
   it('refreshes the warm fast path GitLab remote with direct managed authentication', async () => {
     const session = createSession(true);
     const sandbox = createSandbox(session, true);

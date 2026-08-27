@@ -1,8 +1,7 @@
 import type { CodeReviewMemoryProposal, PlatformIntegration } from '@kilocode/db/schema';
 import type { ReviewMemoryProposalStatus } from '@kilocode/db/schema-types';
 
-import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
-import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { resolveGitHubIntegrationForRepository } from '@/lib/integrations/db/platform-integrations';
 import {
   createGitHubBranch,
   createGitHubPullRequest,
@@ -203,28 +202,19 @@ async function findGitHubIntegrationForProposal(
   owner: ReviewMemoryOwner,
   proposal: CodeReviewMemoryProposal
 ): Promise<PlatformIntegration> {
-  const integrations = await getAllIntegrationsForOwner(owner);
-  const integration = integrations.find(
-    integration =>
-      integration.platform === PLATFORM.GITHUB &&
-      integration.integration_status === INTEGRATION_STATUS.ACTIVE &&
-      !integration.suspended_at &&
-      integration.platform_installation_id &&
-      hasRepositoryAccess(integration, proposal.repo_full_name)
-  );
-
-  if (!integration) {
+  const resolution = await resolveGitHubIntegrationForRepository({
+    owner,
+    repositoryFullName: proposal.repo_full_name,
+  });
+  if (!resolution.success) {
     throw new ReviewMemoryChangeRequestError(
       'BAD_REQUEST',
-      'No active GitHub integration has access to this repository.'
+      resolution.reason === 'ambiguous_installation'
+        ? 'Multiple active GitHub integrations have access to this repository.'
+        : 'No active GitHub integration has access to this repository.'
     );
   }
-  return integration;
-}
-
-function hasRepositoryAccess(integration: PlatformIntegration, repoFullName: string): boolean {
-  if (integration.repository_access === 'all') return true;
-  return integration.repositories?.some(repo => repo.full_name === repoFullName) ?? false;
+  return resolution.integration;
 }
 
 function assertGitHubPermissions(integration: PlatformIntegration): void {

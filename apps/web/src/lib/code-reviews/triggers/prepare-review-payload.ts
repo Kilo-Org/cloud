@@ -107,6 +107,8 @@ export type PreparePayloadParams = {
 export type SessionInput = {
   /** GitHub repo in format "owner/repo" (for GitHub platform) */
   githubRepo?: string;
+  /** Exact GitHub integration selected by the review webhook. */
+  githubIntegrationId?: string;
   /** Full git URL for cloning (for GitLab and other platforms) */
   gitUrl?: string;
   kilocodeOrganizationId?: string;
@@ -639,8 +641,7 @@ export async function prepareReviewPayload(
     }
 
     // 4. Check for previous completed review (incremental review optimization).
-    // Keep previousHeadSha for prompt diff context, but disable GitHub session
-    // continuation because sendMessageV2 does not refetch refs/pull/<n>/head.
+    // Keep previousHeadSha for prompt diff context and reuse the prior provider session.
     let previousHeadSha: string | null = null;
     let previousCloudAgentSessionId: string | undefined;
     try {
@@ -656,15 +657,6 @@ export async function prepareReviewPayload(
       if (previousReview?.session_id) {
         switch (platform) {
           case PLATFORM.GITHUB:
-            logExceptInTest(
-              '[prepareReviewPayload] Disabling GitHub session continuation for pull-ref checkout safety',
-              {
-                reviewId,
-                previousCloudAgentSessionId: previousReview.session_id,
-                upstreamBranch: getGitHubPullRequestCheckoutRef(review.pr_number),
-              }
-            );
-            break;
           case PLATFORM.GITLAB:
             previousCloudAgentSessionId = previousReview.session_id;
             break;
@@ -791,6 +783,7 @@ export async function prepareReviewPayload(
           : {
               // GitHub: use owner/repo format
               githubRepo: review.repo_full_name,
+              githubIntegrationId: review.platform_integration_id ?? undefined,
               githubToken,
               platform: 'github',
               kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,

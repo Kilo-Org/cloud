@@ -88,6 +88,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const sessionInput = {
       githubRepo: review.repo_full_name,
+      githubIntegrationId: review.platform_integration_id ?? undefined,
       prompt: buildFixReviewPrompt(review.pr_url),
       mode: DEFAULT_CODE_REVIEW_MODE,
       model: resolveBotModelSlug(integration),

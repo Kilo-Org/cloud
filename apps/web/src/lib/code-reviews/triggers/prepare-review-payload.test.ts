@@ -943,7 +943,7 @@ describe('prepareReviewPayload', () => {
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });
 
-  it('does not continue previous cloud-agent sessions for GitHub pull-ref reviews', async () => {
+  it('continues GitHub pull-ref reviews on the exact integration session', async () => {
     const prNumber = 1235;
     mockFindPreviousCompletedReview.mockResolvedValueOnce({
       head_sha: 'sha-previous',
@@ -972,9 +972,10 @@ describe('prepareReviewPayload', () => {
       platform: 'github',
     });
 
-    expect(payload.previousCloudAgentSessionId).toBeUndefined();
+    expect(payload.previousCloudAgentSessionId).toBe('previous-cloud-agent-session');
     expect(payload.sessionInput).toMatchObject({
       githubRepo: REPO,
+      githubIntegrationId: integration.id,
       platform: 'github',
       upstreamBranch: 'refs/pull/1235/head',
     });

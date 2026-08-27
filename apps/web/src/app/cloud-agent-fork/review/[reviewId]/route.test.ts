@@ -35,6 +35,7 @@ type ReviewResult =
 
 type PrepareSessionInput = {
   githubRepo: string;
+  githubIntegrationId?: string;
   prompt: string;
   mode: string;
   model: string;
@@ -231,6 +232,7 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     expect(mockGetIntegrationById).toHaveBeenCalledTimes(1);
     expect(mockPersonalPrepareSession).toHaveBeenCalledWith({
       githubRepo: 'owner/repo',
+      githubIntegrationId: REVIEW_INTEGRATION_ID,
       prompt: buildFixReviewPrompt(PR_URL),
       mode: DEFAULT_CODE_REVIEW_MODE,
       model: CONFIGURED_BOT_MODEL,
@@ -264,6 +266,7 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     expect(mockPersonalPrepareSession).not.toHaveBeenCalled();
     expect(mockOrganizationPrepareSession).toHaveBeenCalledWith({
       githubRepo: 'owner/repo',
+      githubIntegrationId: REVIEW_INTEGRATION_ID,
       prompt: buildFixReviewPrompt(PR_URL),
       mode: DEFAULT_CODE_REVIEW_MODE,
       model: CONFIGURED_BOT_MODEL,
@@ -362,6 +365,7 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     expect(mockGetIntegrationById).toHaveBeenCalledTimes(1);
     expect(mockPersonalPrepareSession).toHaveBeenCalledWith({
       githubRepo: 'owner/repo',
+      githubIntegrationId: REVIEW_INTEGRATION_ID,
       prompt: buildFixReviewPrompt(PR_URL),
       mode: DEFAULT_CODE_REVIEW_MODE,
       model: DEFAULT_BOT_MODEL,

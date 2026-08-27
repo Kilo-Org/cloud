@@ -283,21 +283,21 @@ export function createMobileAgentSessionManager({
           await trpcClient.cloudAgentNext.sendMessage.mutate(baseInput, skipBatchOptions);
         });
       },
-      cancelQueuedMessage: async input => {
-        await withCloudAgentDiagnostics('cancelQueuedMessage', organizationId, async () => {
+      /* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
+      cancelQueuedMessage: async input =>
+        withCloudAgentDiagnostics('cancelQueuedMessage', organizationId, async () => {
           if (organizationId) {
-            await trpcClient.organizations.cloudAgentNext.cancelQueuedMessage.mutate(
+            return trpcClient.organizations.cloudAgentNext.cancelQueuedMessage.mutate(
               { sessionId: input.sessionId, messageId: input.messageId, organizationId },
               skipBatchOptions
             );
-            return;
           }
-          await trpcClient.cloudAgentNext.cancelQueuedMessage.mutate(
+          return trpcClient.cloudAgentNext.cancelQueuedMessage.mutate(
             { sessionId: input.sessionId, messageId: input.messageId },
             skipBatchOptions
           );
-        });
-      },
+        }),
+      /* eslint-enable @typescript-eslint/promise-function-async, require-await */
       interrupt: async payload => {
         await withCloudAgentDiagnostics('interrupt', organizationId, async () => {
           if (organizationId) {

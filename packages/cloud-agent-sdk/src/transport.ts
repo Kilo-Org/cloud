@@ -148,7 +148,7 @@ type Transport = {
    * calls the `cancelQueuedMessage` tRPC mutation. Old remotes reject the drop
    * with CLI_UPGRADE_REQUIRED.
    */
-  dropQueuedMessage?: (messageId: string) => Promise<unknown>;
+  dropQueuedMessage?: (messageId: string) => Promise<{ dropped: boolean }>;
   answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
   reject?: (payload: { requestId: string }) => Promise<unknown>;
   respondToPermission?: (payload: {
@@ -186,7 +186,7 @@ type CloudAgentApi = {
   cancelQueuedMessage?: (payload: {
     sessionId: CloudAgentSessionId;
     messageId: string;
-  }) => Promise<unknown>;
+  }) => Promise<{ dropped: boolean }>;
   answer: (payload: {
     sessionId: CloudAgentSessionId;
     requestId: string;

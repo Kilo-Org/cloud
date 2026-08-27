@@ -992,8 +992,13 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
       },
       interrupt: () => sendCommand('interrupt', {}),
-      dropQueuedMessage: messageId =>
-        sendCommand('drop_queued_message', { protocolVersion: 1, messageID: messageId }),
+      dropQueuedMessage: async messageId => {
+        // The kilocode handler ACKs success only when the queue actually
+        // dropped it (it throws "message not queued" otherwise), so a resolved
+        // `drop_queued_message` command means the queued message was dropped.
+        await sendCommand('drop_queued_message', { protocolVersion: 1, messageID: messageId });
+        return { dropped: true };
+      },
       answer: payload =>
         sendCommand('question_reply', {
           requestID: payload.requestId,

@@ -28,6 +28,7 @@ import type { AssistantMessage, UserMessage, TextPart } from '@kilocode/app-shar
 import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
 import type {
   CloudStatus,
+  FilePart,
   MessageDeliveryState,
   ResolvedSession,
   SessionActivity,
@@ -2260,6 +2261,33 @@ describe('createSessionManager', () => {
         attachments,
         images: undefined,
       });
+    });
+
+    it('records the cloud-agent upload path in the optimistic file part url for cancel-restore', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const attachments = {
+        path: '12345678-1234-4234-9234-123456789abc',
+        files: ['87654321-4321-4321-8321-cba987654321.md'],
+      };
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachments,
+      });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      const [messageId] = storage!.getMessageIds();
+      expect(messageId).toBeDefined();
+      const filePart = storage!.getParts(messageId!).find(part => part.type === 'file') as
+        | FilePart
+        | undefined;
+      expect(filePart?.url).toBe(`cloud-agent://${attachments.path}/${attachments.files[0]}`);
+      expect(filePart?.filename).toBe(attachments.files[0]);
     });
 
     it('rejects canonical attachments for resolved remote sessions before transport send', async () => {
@@ -4675,15 +4703,24 @@ describe('createSessionManager', () => {
   });
 
   describe('cancelQueuedMessage', () => {
-    it('delegates to the active session without interrupting', async () => {
+    it('delegates to the active session without interrupting and returns its { dropped } result', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
       await mgr.switchSession(kiloId('ses-1'));
-      await mgr.cancelQueuedMessage('msg-queued-1');
+      mockSession.cancelQueuedMessage.mockResolvedValue({ dropped: true });
+      await expect(mgr.cancelQueuedMessage('msg-queued-1')).resolves.toEqual({ dropped: true });
 
       expect(mockSession.cancelQueuedMessage).toHaveBeenCalledWith('msg-queued-1');
       expect(mockSession.interrupt).not.toHaveBeenCalled();
+    });
+
+    it('returns { dropped: false } when no active session exists', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await expect(mgr.cancelQueuedMessage('msg-queued-1')).resolves.toEqual({ dropped: false });
+      expect(mockSession.cancelQueuedMessage).not.toHaveBeenCalled();
     });
   });
 

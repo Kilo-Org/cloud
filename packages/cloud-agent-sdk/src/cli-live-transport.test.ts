@@ -1112,7 +1112,9 @@ describe('CliLiveTransport unified user web connection', () => {
     await Promise.resolve();
     jest.mocked(connection.sendCommand).mockClear();
 
-    await transport.dropQueuedMessage?.('msg-drop-1');
+    await expect(transport.dropQueuedMessage?.('msg-drop-1')).resolves.toEqual({
+      dropped: true,
+    });
 
     expect(connection.sendCommand).toHaveBeenCalledTimes(1);
     expect(connection.sendCommand).toHaveBeenCalledWith(

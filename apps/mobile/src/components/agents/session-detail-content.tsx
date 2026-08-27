@@ -868,8 +868,9 @@ export function SessionDetailContent({
 
   const handleCancelQueued = useCallback(
     async (message: StoredMessage) => {
+      let dropped = false;
       try {
-        await manager.cancelQueuedMessage(message.info.id);
+        ({ dropped } = await manager.cancelQueuedMessage(message.info.id));
       } catch (cancelError) {
         const upgrade = isCancelQueuedUpgradeRequired(cancelError);
         setCancelQueuedStatus({
@@ -877,6 +878,18 @@ export function SessionDetailContent({
           message: upgrade
             ? t('agentChat.session.cancelQueuedUpgradeRequired')
             : t('agentChat.session.cancelQueuedFailed'),
+        });
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        return;
+      }
+      if (!dropped) {
+        // The queue did not drop the message (missing id or already-accepted
+        // current turn). Keep the row and surface the failure — never restore,
+        // hide, or drop it, or the user could send again on top of a hidden
+        // running turn.
+        setCancelQueuedStatus({
+          tone: 'error',
+          message: t('agentChat.session.cancelQueuedFailed'),
         });
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         return;

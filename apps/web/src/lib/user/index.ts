@@ -1945,7 +1945,7 @@ async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult
 
   const workosProvider = providers.find(p => p.provider === 'workos');
   const discoveredProviders =
-    providers.length > 0 ? providers.map(p => p.provider) : legacyProviderFromHostedDomain(user);
+    providers.length > 0 ? providers.map(p => p.provider) : inferRowlessAuthProviders(user);
 
   return {
     kind: 'found',
@@ -1958,7 +1958,9 @@ async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult
   };
 }
 
-function legacyProviderFromHostedDomain(user: User): AuthProviderId[] {
+export function inferRowlessAuthProviders(
+  user: Pick<User, 'id' | 'hosted_domain'>
+): AuthProviderId[] {
   const legacyOAuthProvider = parseLegacyOAuthProvider(user.id);
   if (legacyOAuthProvider) return [legacyOAuthProvider];
 

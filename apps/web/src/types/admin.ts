@@ -37,7 +37,11 @@ export type HasSSOProtectedDomain = {
   is_sso_protected_domain: boolean;
 };
 export type HasLoginMethods = {
-  login_methods: AuthProviderId[];
+  login_methods: {
+    provider: AuthProviderId;
+    email: string;
+    source: 'linked' | 'inferred';
+  }[];
 };
 export type UserDetailProps = UserTableProps &
   HasCreditInfo &

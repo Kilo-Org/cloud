@@ -14,7 +14,7 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import { eq, inArray, desc } from 'drizzle-orm';
-import { findUserById } from '@/lib/user';
+import { findUserById, inferRowlessAuthProviders } from '@/lib/user';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { hasReceivedAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
 import { redirect } from 'next/navigation';
@@ -67,7 +67,10 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
   const creditInfo = await getBalanceForUser(user);
   const hasReceivedCardValidationCredits = await hasReceivedAnyFreeWelcomeCredits(user.id);
   const authProviders = await db
-    .selectDistinct({ provider: user_auth_provider.provider })
+    .selectDistinct({
+      provider: user_auth_provider.provider,
+      email: user_auth_provider.email,
+    })
     .from(user_auth_provider)
     .where(eq(user_auth_provider.kilo_user_id, userId))
     .orderBy(user_auth_provider.provider);
@@ -98,7 +101,14 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
     organization_memberships: organizationMemberships,
     autoTopUpConfig,
     is_sso_protected_domain: isSSOProtectedDomain,
-    login_methods: authProviders.length > 0 ? authProviders.map(row => row.provider) : ['email'],
+    login_methods:
+      authProviders.length > 0
+        ? authProviders.map(method => ({ ...method, source: 'linked' as const }))
+        : inferRowlessAuthProviders(user).map(provider => ({
+            provider,
+            email: user.google_user_email,
+            source: 'inferred' as const,
+          })),
   };
 }
 

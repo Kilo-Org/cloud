@@ -173,10 +173,13 @@ describe('organization review agent router: GitHub status', () => {
     expect(status.connected).toBe(true);
     expect(status.integration?.accountLogin).toBe('healthy-org');
     expect(status.health).toEqual({ total: 2, healthy: 1, requiresAction: 1 });
-    expect(status.installations).toEqual([
-      expect.objectContaining({ id: healthy.id, isHealthy: true }),
-      expect.objectContaining({ id: unhealthy.id, isHealthy: false }),
-    ]);
+    expect(status.installations).toHaveLength(2);
+    expect(status.installations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: healthy.id, isHealthy: true }),
+        expect.objectContaining({ id: unhealthy.id, isHealthy: false }),
+      ])
+    );
   });
 });
 

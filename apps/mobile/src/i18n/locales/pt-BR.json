@@ -2191,6 +2191,17 @@
       "hostConfirmMessage": "Este link abre {{host}} no seu navegador.",
       "open": "Abrir",
       "trustThisHost": "Confiar neste host"
+    },
+    "folderPicker": {
+      "accessibility": "Pasta: {{label}}",
+      "emptyDescription": "Concluído usa esta pasta.",
+      "emptyTitle": "Nenhuma pasta dentro",
+      "fieldLabel": "Pasta",
+      "retryableDescription": "Verifique sua conexão e tente novamente. Concluído ainda confirma esta pasta.",
+      "retryableTitle": "Não foi possível listar as pastas",
+      "tapToListHint": "Toque em uma pasta para listar o conteúdo",
+      "unsupportedDescription": "Esta CLI não pode listar pastas. Concluído mantém a pasta de inicialização e Iniciar sessão inicia nela.",
+      "unsupportedTitle": "Não é possível listar pastas"
     }
   },
   "bootstrap": {

@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "ລິ້ງນີ້ເປີດ {{host}} ໃນບຣາວເຊີຂອງທ່ານ.",
       "open": "ເປີດ",
       "trustThisHost": "ໄວ້ໃຈໂຮສນີ້"
+    },
+    "folderPicker": {
+      "accessibility": "ໂຟລເດີ: {{label}}",
+      "emptyDescription": "ສຳເລັດຈະໃຊ້ໂຟລເດີນີ້.",
+      "emptyTitle": "ບໍ່ມີໂຟລເດີພາຍໃນ",
+      "fieldLabel": "ໂຟລເດີ",
+      "retryableDescription": "ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານແລ້ວລອງໃໝ່. ສຳເລັດຍັງຈະຢືນຢັນໂຟລເດີນີ້.",
+      "retryableTitle": "ບໍ່ສາມາດລາຍການໂຟລເດີ",
+      "tapToListHint": "ແຕະໂຟລເດີເພື່ອລາຍການເນື້ອໃນ",
+      "unsupportedDescription": "CLI ນີ້ບໍ່ສາມາດລາຍການໂຟລເດີ. ສຳເລັດຈະຮັກສາໂຟລເດີເລີ່ມຕົ້ນ ແລະ ເລີ່ມເຊດຊັນຈະເລີ່ມຕົ້ນຢູ່ທີ່ນັ້ນ.",
+      "unsupportedTitle": "ບໍ່ສາມາດລາຍການໂຟລເດີ"
     }
   },
   "bootstrap": {

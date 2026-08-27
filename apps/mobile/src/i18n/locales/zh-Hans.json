@@ -2194,6 +2194,17 @@
       "hostConfirmMessage": "此链接将在你的浏览器中打开 {{host}}。",
       "open": "打开",
       "trustThisHost": "信任此主机"
+    },
+    "folderPicker": {
+      "accessibility": "文件夹：{{label}}",
+      "emptyDescription": "完成将使用此文件夹。",
+      "emptyTitle": "里面没有文件夹",
+      "fieldLabel": "文件夹",
+      "retryableDescription": "检查连接并重试。完成仍将确认此文件夹。",
+      "retryableTitle": "无法列出文件夹",
+      "tapToListHint": "点击文件夹以列出其内容",
+      "unsupportedDescription": "此 CLI 无法列出文件夹。完成将保留启动文件夹，开始会话将从那里启动。",
+      "unsupportedTitle": "无法列出文件夹"
     }
   },
   "bootstrap": {

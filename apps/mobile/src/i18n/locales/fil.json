@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Bubuksan ng link na ito ang {{host}} sa iyong browser.",
       "open": "Buksan",
       "trustThisHost": "Pagkatiwalaan ang host na ito"
+    },
+    "folderPicker": {
+      "accessibility": "Folder: {{label}}",
+      "emptyDescription": "Ginagamit ng Tapos ang folder na ito.",
+      "emptyTitle": "Walang folder sa loob",
+      "fieldLabel": "Folder",
+      "retryableDescription": "Suriin ang iyong koneksyon at Subukan muli. Kinukumpirma pa rin ng Tapos ang folder na ito.",
+      "retryableTitle": "Hindi mailista ang mga folder",
+      "tapToListHint": "I-tap ang isang folder para ilista ang mga laman nito",
+      "unsupportedDescription": "Hindi mailista ng CLI na ito ang mga folder. Pinapanatili ng Tapos ang launch folder at nagsisimula ang Simulan ang session doon.",
+      "unsupportedTitle": "Hindi mailista ang mga folder"
     }
   },
   "bootstrap": {

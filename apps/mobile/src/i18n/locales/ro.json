@@ -2668,6 +2668,17 @@
       "hostConfirmMessage": "Acest link deschide {{host}} în browser.",
       "open": "Deschide",
       "trustThisHost": "Încrede-te în această gazdă"
+    },
+    "folderPicker": {
+      "accessibility": "Folder: {{label}}",
+      "emptyDescription": "Gata folosește acest folder.",
+      "emptyTitle": "Niciun folder în interior",
+      "fieldLabel": "Folder",
+      "retryableDescription": "Verifică conexiunea și apasă Reîncearcă. Gata confirmă în continuare acest folder.",
+      "retryableTitle": "Nu s-au putut lista folderele",
+      "tapToListHint": "Atinge un folder pentru a-i lista conținutul",
+      "unsupportedDescription": "Acest CLI nu poate lista foldere. Gata păstrează folderul de pornire, iar Începe sesiunea pornește de acolo.",
+      "unsupportedTitle": "Nu pot lista folderele"
     }
   },
   "bootstrap": {

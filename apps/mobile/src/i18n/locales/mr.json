@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "ही लिंक तुमच्या ब्राउझरमध्ये {{host}} उघडते.",
       "open": "उघडा",
       "trustThisHost": "या होस्टवर विश्वास ठेवा"
+    },
+    "folderPicker": {
+      "accessibility": "फोल्डर: {{label}}",
+      "emptyDescription": "झाले हे फोल्डर वापरते.",
+      "emptyTitle": "आत कोणतेही फोल्डर नाहीत",
+      "fieldLabel": "फोल्डर",
+      "retryableDescription": "तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा. झाले अजूनही हे फोल्डर निश्चित करते.",
+      "retryableTitle": "फोल्डर सूचीबद्ध करता आले नाहीत",
+      "tapToListHint": "त्यातील सामग्री सूचीबद्ध करण्यासाठी फोल्डरवर टॅप करा",
+      "unsupportedDescription": "हे CLI फोल्डर सूचीबद्ध करू शकत नाही. झाले लॉन्च फोल्डर ठेवते आणि सत्र सुरू करा तेथे सुरू होते.",
+      "unsupportedTitle": "फोल्डर सूचीबद्ध करता येत नाहीत"
     }
   },
   "bootstrap": {

@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Kiungo hiki kinafungua {{host}} kwenye kivinjari chako.",
       "open": "Fungua",
       "trustThisHost": "Amini mwenyeji huyu"
+    },
+    "folderPicker": {
+      "accessibility": "Folda: {{label}}",
+      "emptyDescription": "Imefanyika hutumia folda hii.",
+      "emptyTitle": "Hakuna folda ndani",
+      "fieldLabel": "Folda",
+      "retryableDescription": "Angalia muunganisho wako na Jaribu tena. Imefanyika bado inathibitisha folda hii.",
+      "retryableTitle": "Haikuweza kuorodhesha folda",
+      "tapToListHint": "Gusa folda kuorodhesha yaliyomo",
+      "unsupportedDescription": "CLI hii haiwezi kuorodhesha folda. Imefanyika hudumisha folda ya kuanzia na Anza kikao huanzia hapo.",
+      "unsupportedTitle": "Haiwezi kuorodhesha folda"
     }
   },
   "bootstrap": {

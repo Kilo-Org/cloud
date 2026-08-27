@@ -2728,6 +2728,17 @@
       "hostConfirmMessage": "Mae'r ddolen hon yn agor {{host}} yn eich porwr.",
       "open": "Agor",
       "trustThisHost": "Ymddiried yn y gwesteiwr hwn"
+    },
+    "folderPicker": {
+      "accessibility": "Ffolder: {{label}}",
+      "emptyDescription": "Mae Wedi'i wneud yn defnyddio'r ffolder hwn.",
+      "emptyTitle": "Dim ffolderi y tu mewn",
+      "fieldLabel": "Ffolder",
+      "retryableDescription": "Gwiriwch eich cysylltiad a rhoi cynnig eto. Mae Wedi'i wneud yn cadarnhau'r ffolder hwn o hyd.",
+      "retryableTitle": "Methodd rhestru ffolderi",
+      "tapToListHint": "Tapiwch ffolder i restru ei gynnwys",
+      "unsupportedDescription": "Ni all y CLI hwn restru ffolderi. Mae Wedi'i wneud yn cadw'r ffolder lansio ac mae Dechrau sesiwn yn dechrau yno.",
+      "unsupportedTitle": "Ni ellir rhestru ffolderi"
     }
   },
   "bootstrap": {

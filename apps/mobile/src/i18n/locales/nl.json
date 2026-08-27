@@ -2194,6 +2194,17 @@
       "hostConfirmMessage": "Deze link opent {{host}} in uw browser.",
       "open": "Openen",
       "trustThisHost": "Deze host vertrouwen"
+    },
+    "folderPicker": {
+      "accessibility": "Map: {{label}}",
+      "emptyDescription": "Klaar gebruikt deze map.",
+      "emptyTitle": "Geen mappen erin",
+      "fieldLabel": "Map",
+      "retryableDescription": "Controleer je verbinding en kies Opnieuw proberen. Klaar bevestigt deze map nog steeds.",
+      "retryableTitle": "Kon mappen niet weergeven",
+      "tapToListHint": "Tik op een map om de inhoud weer te geven",
+      "unsupportedDescription": "Deze CLI kan mappen niet weergeven. Klaar houdt de startmap aan en Sessie starten start daar.",
+      "unsupportedTitle": "Kan mappen niet weergeven"
     }
   },
   "bootstrap": {

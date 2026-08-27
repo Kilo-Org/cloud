@@ -2194,6 +2194,17 @@
       "hostConfirmMessage": "Bu bağlantı {{host}} adresini tarayıcınızda açar.",
       "open": "Aç",
       "trustThisHost": "Bu sunucuya güven"
+    },
+    "folderPicker": {
+      "accessibility": "Klasör: {{label}}",
+      "emptyDescription": "Bitti bu klasörü kullanır.",
+      "emptyTitle": "İçinde klasör yok",
+      "fieldLabel": "Klasör",
+      "retryableDescription": "Bağlantınızı kontrol edin ve Tekrar dene. Bitti yine de bu klasörü onaylar.",
+      "retryableTitle": "Klasörler listelenemedi",
+      "tapToListHint": "Klasörün içeriğini listelemek için klasöre dokunun",
+      "unsupportedDescription": "Bu CLI klasörleri listeleyemez. Bitti başlatma klasörünü korur ve Oturumu başlat orada başlar.",
+      "unsupportedTitle": "Klasörler listelenemiyor"
     }
   },
   "bootstrap": {

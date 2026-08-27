@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Dette link åbner {{host}} i din browser.",
       "open": "Åbn",
       "trustThisHost": "Stol på denne host"
+    },
+    "folderPicker": {
+      "fieldLabel": "Mappe",
+      "accessibility": "Mappe: {{label}}",
+      "tapToListHint": "Tryk på en mappe for at vise dens indhold",
+      "emptyTitle": "Ingen mapper indeni",
+      "emptyDescription": "Færdig bruger denne mappe.",
+      "retryableTitle": "Kunne ikke vise mapper",
+      "retryableDescription": "Tjek din forbindelse, og tryk på Prøv igen. Færdig bekræfter stadig denne mappe.",
+      "unsupportedTitle": "Kan ikke vise mapper",
+      "unsupportedDescription": "Denne CLI kan ikke vise mapper. Færdig beholder startmappen, og Start session starter der."
     }
   },
   "bootstrap": {

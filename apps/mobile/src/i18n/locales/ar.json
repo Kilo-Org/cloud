@@ -2246,6 +2246,17 @@
       "hostConfirmMessage": "يفتح هذا الرابط {{host}} في متصفحك.",
       "open": "فتح",
       "trustThisHost": "الثقة بهذا المضيف"
+    },
+    "folderPicker": {
+      "accessibility": "المجلد: {{label}}",
+      "emptyDescription": "زر (تم) يستخدم هذا المجلد.",
+      "emptyTitle": "لا توجد مجلدات بداخله",
+      "fieldLabel": "المجلد",
+      "retryableDescription": "تحقق من اتصالك ثم اضغط (إعادة المحاولة). لا يزال زر (تم) يؤكد هذا المجلد.",
+      "retryableTitle": "تعذّر عرض المجلدات",
+      "tapToListHint": "اضغط على مجلد لعرض محتوياته",
+      "unsupportedDescription": "لا يمكن لهذا CLI عرض المجلدات. يحتفظ زر (تم) بمجلد الإطلاق، ويبدأ (بدء الجلسة) منه.",
+      "unsupportedTitle": "لا يمكن عرض المجلدات"
     }
   },
   "bootstrap": {

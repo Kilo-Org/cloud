@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Bu havola {{host}} sahifasini brauzeringizda ochadi.",
       "open": "Ochish",
       "trustThisHost": "Bu xostga ishonish"
+    },
+    "folderPicker": {
+      "accessibility": "Jild: {{label}}",
+      "emptyDescription": "Tayyor bu jilddan foydalanadi.",
+      "emptyTitle": "Ichida jildlar yo'q",
+      "fieldLabel": "Jild",
+      "retryableDescription": "Ulanishni tekshiring va qayta urinish. Tayyor baribir bu jildni tasdiqlaydi.",
+      "retryableTitle": "Jildlarni ro'yxatlab bo'lmadi",
+      "tapToListHint": "Tarkibini ko'rish uchun jildga teging",
+      "unsupportedDescription": "Bu CLI jildlarni ro'yxatlay olmaydi. Tayyor ishga tushirish jildini saqlaydi va Sessiyani boshlash o'sha yerda boshlanadi.",
+      "unsupportedTitle": "Jildlarni ro'yxatlab bo'lmaydi"
     }
   },
   "bootstrap": {

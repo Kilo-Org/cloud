@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Ọna asopọ yii yoo ṣii {{host}} ninu aṣawakiri rẹ.",
       "open": "Ṣii",
       "trustThisHost": "Gbẹkẹle agbalejo yii"
+    },
+    "folderPicker": {
+      "accessibility": "Àpótí: {{label}}",
+      "emptyDescription": "Ṣe máa ń lo àpótí yìí.",
+      "emptyTitle": "Kò sí àwọn àpótí inú rẹ̀",
+      "fieldLabel": "Àpótí",
+      "retryableDescription": "Ṣààyẹ̀wò àṣopọ̀ rẹ kí o sì Gbìyànjú lẹẹkansi. Ṣe ṣì ń fìdí àpótí yìí múlẹ̀.",
+      "retryableTitle": "Kò lè ṣe àkójọ àwọn àpótí",
+      "tapToListHint": "Tẹ àpótí kan láti ṣe àkójọ àwọn ohun inú rẹ̀",
+      "unsupportedDescription": "CLI yìí kò lè ṣe àkójọ àwọn àpótí. Ṣe ń pa àpótí ìbẹ̀rẹ̀ mọ́, Bẹrẹ akoko sì ń bẹ̀rẹ̀ níbẹ̀.",
+      "unsupportedTitle": "Kò lè ṣe àkójọ àwọn àpótí"
     }
   },
   "bootstrap": {

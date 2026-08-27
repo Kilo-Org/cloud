@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Lyen sa a louvri {{host}} nan navigatè w la.",
       "open": "Louvri",
       "trustThisHost": "Fè konfyans ak host sa a"
+    },
+    "folderPicker": {
+      "accessibility": "Katab: {{label}}",
+      "emptyDescription": "Fèt sèvi ak katab sa a.",
+      "emptyTitle": "Pa gen katab anndan",
+      "fieldLabel": "Katab",
+      "retryableDescription": "Tcheke koneksyon ou epi Rekòmanse. Fèt toujou konfime katab sa a.",
+      "retryableTitle": "Pa t ka lye katab yo",
+      "tapToListHint": "Tape yon katab pou lye kontni li yo",
+      "unsupportedDescription": "CLI sa a pa ka lye katab yo. Fèt kenbe katab lansman an epi Kòmanse sesyon kòmanse la.",
+      "unsupportedTitle": "Pa ka lye katab yo"
     }
   },
   "bootstrap": {

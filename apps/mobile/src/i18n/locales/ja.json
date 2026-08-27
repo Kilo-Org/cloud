@@ -2194,6 +2194,17 @@
       "hostConfirmMessage": "このリンクはブラウザで {{host}} を開きます。",
       "open": "開く",
       "trustThisHost": "このホストを信頼する"
+    },
+    "folderPicker": {
+      "accessibility": "フォルダ: {{label}}",
+      "emptyDescription": "完了はこのフォルダを使用します。",
+      "emptyTitle": "フォルダはありません",
+      "fieldLabel": "フォルダ",
+      "retryableDescription": "接続を確認して再試行してください。完了はこのフォルダを確認します。",
+      "retryableTitle": "フォルダを一覧表示できませんでした",
+      "tapToListHint": "フォルダをタップして中身を一覧表示します",
+      "unsupportedDescription": "このCLIはフォルダを一覧表示できません。完了は起動フォルダを維持し、セッションを開始はそこで開始します。",
+      "unsupportedTitle": "フォルダを一覧表示できません"
     }
   },
   "bootstrap": {

@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "یہ لنک {{host}} کو آپ کے براؤزر میں کھولتا ہے۔",
       "open": "کھولیں",
       "trustThisHost": "اس ہوسٹ پر بھروسہ کریں"
+    },
+    "folderPicker": {
+      "fieldLabel": "فولڈر",
+      "accessibility": "فولڈر: {{label}}",
+      "tapToListHint": "اس کے مواد کی فہرست کے لیے کسی فولڈر پر تھپتھپائیں",
+      "emptyTitle": "اندر کوئی فولڈر نہیں",
+      "emptyDescription": "ہو گیا اس فولڈر کو استعمال کرتا ہے۔",
+      "retryableTitle": "فولڈرز کی فہرست نہیں مل سکی",
+      "retryableDescription": "اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔ ہو گیا پھر بھی اس فولڈر کی تصدیق کرتا ہے۔",
+      "unsupportedTitle": "فولڈرز کی فہرست نہیں مل سکتی",
+      "unsupportedDescription": "یہ CLI فولڈرز کی فہرست نہیں بنا سکتا۔ ہو گیا لانچ فولڈر رکھتا ہے اور سیشن شروع کریں وہاں سے شروع ہوتا ہے۔"
     }
   },
   "bootstrap": {

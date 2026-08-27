@@ -2668,6 +2668,17 @@
       "hostConfirmMessage": "Aquest enllaç obre {{host}} al navegador.",
       "open": "Obrir",
       "trustThisHost": "Confia en aquest host"
+    },
+    "folderPicker": {
+      "accessibility": "Carpeta: {{label}}",
+      "emptyDescription": "Fet utilitza aquesta carpeta.",
+      "emptyTitle": "No hi ha cap carpeta",
+      "fieldLabel": "Carpeta",
+      "retryableDescription": "Comprova la connexió i torna-ho a provar. Fet encara confirma aquesta carpeta.",
+      "retryableTitle": "No s'han pogut llistar les carpetes",
+      "tapToListHint": "Toca una carpeta per llistar-ne el contingut",
+      "unsupportedDescription": "Aquesta CLI no pot llistar carpetes. Fet manté la carpeta d'inici i Inicia la sessió comença allà.",
+      "unsupportedTitle": "No es poden llistar les carpetes"
     }
   },
   "bootstrap": {

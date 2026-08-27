@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "ลิงก์นี้จะเปิด {{host}} ในเบราว์เซอร์ของคุณ",
       "open": "เปิด",
       "trustThisHost": "เชื่อถือโฮสต์นี้"
+    },
+    "folderPicker": {
+      "accessibility": "โฟลเดอร์: {{label}}",
+      "emptyDescription": "เสร็จสิ้นใช้โฟลเดอร์นี้",
+      "emptyTitle": "ไม่มีโฟลเดอร์อยู่ภายใน",
+      "fieldLabel": "โฟลเดอร์",
+      "retryableDescription": "ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง เสร็จสิ้นยังคงยืนยันโฟลเดอร์นี้",
+      "retryableTitle": "ไม่สามารถแสดงรายการโฟลเดอร์ได้",
+      "tapToListHint": "แตะโฟลเดอร์เพื่อแสดงเนื้อหา",
+      "unsupportedDescription": "CLI นี้ไม่สามารถแสดงรายการโฟลเดอร์ได้ เสร็จสิ้นจะเก็บโฟลเดอร์เริ่มต้นไว้ และเริ่ม session จะเริ่มที่นั่น",
+      "unsupportedTitle": "ไม่สามารถแสดงรายการโฟลเดอร์ได้"
     }
   },
   "bootstrap": {

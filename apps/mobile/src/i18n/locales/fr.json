@@ -2125,6 +2125,17 @@
       "hostConfirmMessage": "Ce lien ouvre {{host}} dans votre navigateur.",
       "open": "Ouvrir",
       "trustThisHost": "Faire confiance à cet hôte"
+    },
+    "folderPicker": {
+      "accessibility": "Dossier : {{label}}",
+      "emptyDescription": "Terminé utilise ce dossier.",
+      "emptyTitle": "Aucun dossier à l'intérieur",
+      "fieldLabel": "Dossier",
+      "retryableDescription": "Vérifiez votre connexion puis Réessayer. Terminé confirme toujours ce dossier.",
+      "retryableTitle": "Impossible de lister les dossiers",
+      "tapToListHint": "Touchez un dossier pour lister son contenu",
+      "unsupportedDescription": "Cette CLI ne peut pas lister les dossiers. Terminé conserve le dossier de lancement et Démarrer la session y démarre.",
+      "unsupportedTitle": "Impossible de lister les dossiers"
     }
   },
   "bootstrap": {

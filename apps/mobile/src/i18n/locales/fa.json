@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "این پیوند {{host}} را در مرورگر شما باز میکند.",
       "open": "باز کردن",
       "trustThisHost": "اعتماد به این میزبان"
+    },
+    "folderPicker": {
+      "fieldLabel": "پوشه",
+      "accessibility": "پوشه: {{label}}",
+      "tapToListHint": "برای فهرست کردن محتویات یک پوشه، روی آن ضربه بزنید",
+      "emptyTitle": "در داخل پوشهای نیست",
+      "emptyDescription": "انجام شد از این پوشه استفاده میکند.",
+      "retryableTitle": "فهرست کردن پوشهها ممکن نشد",
+      "retryableDescription": "اتصال خود را بررسی کنید و تلاش مجدد کنید. انجام شد همچنان این پوشه را تأیید میکند.",
+      "unsupportedTitle": "فهرست کردن پوشهها ممکن نیست",
+      "unsupportedDescription": "این CLI نمیتواند پوشهها را فهرست کند. انجام شد پوشه راهاندازی را حفظ میکند و شروع نشست از آنجا آغاز میشود."
     }
   },
   "bootstrap": {

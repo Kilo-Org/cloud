@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Esteka honek {{host}} irekitzen du zure arakatzailean.",
       "open": "Ireki",
       "trustThisHost": "Konfiantza eman ostalari honi"
+    },
+    "folderPicker": {
+      "fieldLabel": "Karpeta",
+      "accessibility": "Karpeta: {{label}}",
+      "tapToListHint": "Ukitu karpeta bat haren edukiak zerrendatzeko",
+      "emptyTitle": "Ez dago karpetarik barruan",
+      "emptyDescription": "Egindak karpeta hau erabiltzen du.",
+      "retryableTitle": "Ezin dira karpetak zerrendatu",
+      "retryableDescription": "Egiaztatu konexioa eta Saiatu berriro. Egindak karpeta hau berretsiko du.",
+      "unsupportedTitle": "Karpetak ezin dira zerrendatu",
+      "unsupportedDescription": "CLI honek ezin ditu karpetak zerrendatu. Egindak abio-karpeta mantentzen du eta Hasi saioa han hasten da."
     }
   },
   "bootstrap": {

@@ -2194,6 +2194,17 @@
       "hostConfirmMessage": "이 링크는 브라우저에서 {{host}}를 엽니다.",
       "open": "열기",
       "trustThisHost": "이 호스트 신뢰"
+    },
+    "folderPicker": {
+      "accessibility": "폴더: {{label}}",
+      "emptyDescription": "완료는 이 폴더를 사용합니다.",
+      "emptyTitle": "내부에 폴더가 없습니다",
+      "fieldLabel": "폴더",
+      "retryableDescription": "연결을 확인하고 다시 시도하세요. 완료는 여전히 이 폴더를 확인합니다.",
+      "retryableTitle": "폴더를 표시할 수 없습니다",
+      "tapToListHint": "폴더를 탭하여 내용을 표시하세요",
+      "unsupportedDescription": "이 CLI는 폴더를 표시할 수 없습니다. 완료는 시작 폴더를 유지하고 세션 시작은 거기서 시작됩니다.",
+      "unsupportedTitle": "폴더를 표시할 수 없습니다"
     }
   },
   "bootstrap": {

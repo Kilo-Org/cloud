@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "Denne lenken åpner {{host}} i nettleseren din.",
       "open": "Åpne",
       "trustThisHost": "Stol på denne verten"
+    },
+    "folderPicker": {
+      "accessibility": "Mappe: {{label}}",
+      "emptyDescription": "Ferdig bruker denne mappen.",
+      "emptyTitle": "Ingen mapper inni",
+      "fieldLabel": "Mappe",
+      "retryableDescription": "Sjekk tilkoblingen og prøv igjen. Ferdig bekrefter fortsatt denne mappen.",
+      "retryableTitle": "Kunne ikke liste mapper",
+      "tapToListHint": "Trykk på en mappe for å liste innholdet",
+      "unsupportedDescription": "Denne CLI-en kan ikke liste mapper. Ferdig beholder startmappen og Start økt starter der.",
+      "unsupportedTitle": "Kan ikke liste mapper"
     }
   },
   "bootstrap": {

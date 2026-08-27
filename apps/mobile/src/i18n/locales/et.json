@@ -2648,6 +2648,17 @@
       "hostConfirmMessage": "See link avab {{host}} sinu brauseris.",
       "open": "Ava",
       "trustThisHost": "Usalda seda hosti"
+    },
+    "folderPicker": {
+      "accessibility": "Kaust: {{label}}",
+      "emptyDescription": "Valmis kasutab seda kausta.",
+      "emptyTitle": "Sees pole kaustu",
+      "fieldLabel": "Kaust",
+      "retryableDescription": "Kontrolli ühendust ja proovi uuesti. Valmis kinnitab endiselt seda kausta.",
+      "retryableTitle": "Kaustu ei õnnestunud loetleda",
+      "tapToListHint": "Puuduta kausta, et selle sisu loetleda",
+      "unsupportedDescription": "See CLI ei saa kaustu loetleda. Valmis jätab käivituskausta ja Alusta seanssi algab seal.",
+      "unsupportedTitle": "Kaustu ei saa loetleda"
     }
   },
   "bootstrap": {

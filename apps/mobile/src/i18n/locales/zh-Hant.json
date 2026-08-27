@@ -2194,6 +2194,17 @@
       "hostConfirmMessage": "此連結會在瀏覽器中開啟 {{host}}。",
       "open": "開啟",
       "trustThisHost": "信任此主機"
+    },
+    "folderPicker": {
+      "accessibility": "資料夾：{{label}}",
+      "emptyDescription": "「完成」會使用此資料夾。",
+      "emptyTitle": "裡面沒有資料夾",
+      "fieldLabel": "資料夾",
+      "retryableDescription": "請檢查您的連線並重試。「完成」仍會確認此資料夾。",
+      "retryableTitle": "無法列出資料夾",
+      "tapToListHint": "點選資料夾以列出其中的內容",
+      "unsupportedDescription": "此 CLI 無法列出資料夾。「完成」會保留啟動資料夾，「開始工作階段」會從該處開始。",
+      "unsupportedTitle": "無法列出資料夾"
     }
   },
   "bootstrap": {

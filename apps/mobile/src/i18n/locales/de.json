@@ -2194,6 +2194,17 @@
       "hostConfirmMessage": "Dieser Link öffnet {{host}} in Ihrem Browser.",
       "open": "Öffnen",
       "trustThisHost": "Diesem Host vertrauen"
+    },
+    "folderPicker": {
+      "fieldLabel": "Ordner",
+      "accessibility": "Ordner: {{label}}",
+      "tapToListHint": "Tippen Sie auf einen Ordner, um dessen Inhalt anzuzeigen",
+      "emptyTitle": "Keine Ordner enthalten",
+      "emptyDescription": "Fertig verwendet diesen Ordner.",
+      "retryableTitle": "Ordner konnten nicht aufgelistet werden",
+      "retryableDescription": "Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut. Fertig bestätigt diesen Ordner trotzdem.",
+      "unsupportedTitle": "Ordner können nicht aufgelistet werden",
+      "unsupportedDescription": "Diese CLI kann keine Ordner auflisten. Fertig behält den Startordner und „Sitzung starten\" startet dort."
     }
   },
   "bootstrap": {

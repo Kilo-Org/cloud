@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, isNull, lt, type SQL } from 'drizzle-orm';
+import { and, desc, eq, isNull, lt, or, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
 import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
@@ -24,7 +24,7 @@ const messageInput = z.object({
 });
 
 const listMessagesInput = threadScopeInput.extend({
-  cursor: z.string().datetime().optional(),
+  cursor: z.string().min(1).optional(),
   limit: z.number().min(1).max(50).default(50),
 });
 
@@ -48,6 +48,34 @@ function serializeMessage(message: QuickChatMessage) {
     clientId: message.client_id,
     createdAt: new Date(message.created_at).toISOString(),
   };
+}
+
+const messagesCursorSchema = z.object({
+  createdAt: z.string().datetime(),
+  id: z.string().uuid(),
+});
+
+/**
+ * Encodes the last row of a page as an opaque keyset cursor. The `created_at`
+ * value is normalized to UTC ISO so the cursor round-trips deterministically
+ * through the client even though the stored column can be PostgreSQL-shaped
+ * (e.g. `2026-04-29 01:16:12.945+00`).
+ */
+function encodeMessagesCursor(row: { created_at: string; id: string }): string {
+  return Buffer.from(
+    JSON.stringify({ createdAt: new Date(row.created_at).toISOString(), id: row.id }),
+    'utf8'
+  ).toString('base64url');
+}
+
+function decodeMessagesCursor(cursor: string): z.infer<typeof messagesCursorSchema> {
+  try {
+    return messagesCursorSchema.parse(
+      JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'))
+    );
+  } catch {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid message cursor' });
+  }
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -120,6 +148,7 @@ export const quickChatRouter = createTRPCRouter({
   }),
 
   listMessages: baseProcedure.input(listMessagesInput).query(async ({ ctx, input }) => {
+    const cursor = input.cursor ? decodeMessagesCursor(input.cursor) : null;
     const where = and(
       eq(quick_chat_threads.user_id, ctx.user.id),
       await resolveThreadScope(ctx, input.organizationId)
@@ -133,7 +162,17 @@ export const quickChatRouter = createTRPCRouter({
 
     const pageFilters = [
       eq(quick_chat_messages.thread_id, thread.id),
-      ...(input.cursor ? [lt(quick_chat_messages.created_at, input.cursor)] : []),
+      ...(cursor
+        ? [
+            or(
+              lt(quick_chat_messages.created_at, cursor.createdAt),
+              and(
+                eq(quick_chat_messages.created_at, cursor.createdAt),
+                lt(quick_chat_messages.id, cursor.id)
+              )
+            ),
+          ]
+        : []),
     ];
     const rows = await db
       .select()
@@ -144,7 +183,7 @@ export const quickChatRouter = createTRPCRouter({
 
     const hasMore = rows.length > input.limit;
     const page = rows.slice(0, input.limit);
-    const nextCursor = hasMore ? new Date(page[page.length - 1].created_at).toISOString() : null;
+    const nextCursor = hasMore ? encodeMessagesCursor(page[page.length - 1]) : null;
 
     return {
       messages: page.reverse().map(serializeMessage),

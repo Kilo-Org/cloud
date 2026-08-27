@@ -26,6 +26,7 @@ import { processOrganizationExpirations } from '@/lib/creditExpiration';
 import { startInactiveSpan } from '@sentry/nextjs';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
 import { sendBalanceAlertEmail } from '@/lib/email';
+import { evaluateLowBalanceAlerts } from '@/lib/organizations/alerts/low-balance/low-balance-evaluator';
 import { dispatchLowBalancePush } from '@/lib/notifications-worker-client';
 import { after } from 'next/server';
 import { subHours } from 'date-fns';
@@ -212,12 +213,23 @@ export type OrganizationUsageMutationResult = {
   crossedMinimumBalance: boolean;
   recipients: string[];
   minimumBalanceMicrodollars: number | null;
+  /**
+   * The organization's balance immediately before and after this mutation.
+   * `null` when there was no organization to mutate. Collection-backed
+   * `low_balance` alerts are evaluated from these rather than from the legacy
+   * `minimum_balance` setting above, so they are reported unconditionally
+   * instead of only when the legacy setting happens to be configured.
+   */
+  previousBalanceMicrodollars: number | null;
+  newBalanceMicrodollars: number | null;
 };
 
 const NO_ORGANIZATION_BALANCE_ALERT: OrganizationUsageMutationResult = {
   crossedMinimumBalance: false,
   recipients: [],
   minimumBalanceMicrodollars: null,
+  previousBalanceMicrodollars: null,
+  newBalanceMicrodollars: null,
 };
 
 export type OrganizationUsageMutationInput = Pick<
@@ -301,6 +313,8 @@ export async function mutateOrganizationUsage(
     crossedMinimumBalance,
     recipients,
     minimumBalanceMicrodollars: minimumBalance,
+    previousBalanceMicrodollars: currentBalance,
+    newBalanceMicrodollars: newBalance,
   };
 }
 
@@ -368,10 +382,36 @@ export function scheduleOrganizationLowBalanceAlert(
   });
 }
 
+/**
+ * Evaluates this organization's collection-backed `low_balance` alerts
+ * out-of-band, just-in-time against the same mutation that already computed
+ * the legacy low-balance setting above. This is deliberately not a periodic
+ * sweep: a balance change has exactly one call site, so there is no reason to
+ * wait for a scheduled evaluation the way `monthly_spending` must, since spend
+ * accumulates from several call sites with no single mutation to hook into.
+ */
+export function scheduleLowBalanceOrganizationAlerts(
+  organizationId: Organization['id'],
+  result: OrganizationUsageMutationResult
+): void {
+  const { previousBalanceMicrodollars, newBalanceMicrodollars } = result;
+  if (previousBalanceMicrodollars == null || newBalanceMicrodollars == null) return;
+  after(async () => {
+    await evaluateLowBalanceAlerts({
+      organizationId,
+      previousBalanceMicrodollars,
+      newBalanceMicrodollars,
+    }).catch(err => {
+      console.error('[ingestOrganizationTokenUsage] Failed to evaluate low balance alerts:', err);
+    });
+  });
+}
+
 export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Promise<void> {
   if (!usage.organization_id) return;
   const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
   scheduleOrganizationLowBalanceAlert(usage.organization_id, result);
+  scheduleLowBalanceOrganizationAlerts(usage.organization_id, result);
 }
 
 const MAX_DAILY_LIMIT_USD = 2000;

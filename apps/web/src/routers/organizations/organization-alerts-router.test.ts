@@ -26,6 +26,7 @@ function definition(
     configuration: {
       thresholdMicrodollars: 500_000_000,
       period: CALENDAR_MONTH_UTC_V1,
+      scope: { type: 'organization' },
       recipients: ['finance@example.com'],
       ...overrides,
     },
@@ -344,7 +345,7 @@ describe('organization alerts router', () => {
           channel: 'email' as const,
           claimed_configuration_version: 1,
           threshold_microdollars: 500_000_000,
-          measured_spend_microdollars: 500_000_000,
+          measured_value_microdollars: 500_000_000,
         }))
       );
 
@@ -354,6 +355,34 @@ describe('organization alerts router', () => {
 
       expect(admitted).toMatchObject({ periodOccurrenceId, admittedRecipientCount: 10 });
       expect(unaffected).toMatchObject({ periodOccurrenceId, admittedRecipientCount: 0 });
+    });
+
+    it('reports a low balance alert\u2019s most recent crossing occurrence, not a calendar period', async () => {
+      const alert = await create(owner.id, {
+        definition: {
+          type: 'low_balance',
+          configuration: { thresholdMicrodollars: 50_000_000, recipients: ['finance@example.com'] },
+        },
+      });
+      const beforeAnyDelivery = (await list(owner.id)).alerts.find(row => row.id === alert.id);
+      expect(beforeAnyDelivery).toMatchObject({ admittedRecipientCount: 0 });
+
+      const crossingOccurrenceId = 'low_balance:crossing:v1:2026-08-27T10:00:00.000Z';
+      await db.insert(organization_alert_deliveries).values({
+        alert_id: alert.id,
+        period_occurrence_id: crossingOccurrenceId,
+        recipient_identity_hmac: 'hmac-0',
+        channel: 'email',
+        claimed_configuration_version: 1,
+        threshold_microdollars: 50_000_000,
+        measured_value_microdollars: 40_000_000,
+      });
+
+      const afterDelivery = (await list(owner.id)).alerts.find(row => row.id === alert.id);
+      expect(afterDelivery).toMatchObject({
+        periodOccurrenceId: crossingOccurrenceId,
+        admittedRecipientCount: 1,
+      });
     });
 
     it('requires disclosure confirmation to save an alert or add an address', async () => {

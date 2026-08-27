@@ -1,6 +1,11 @@
 import type { OrganizationAlertType } from '@kilocode/db/schema';
 import * as z from 'zod';
 import {
+  EnabledLowBalanceAlertConfigurationSchema,
+  LOW_BALANCE_ALERT_TYPE,
+  LowBalanceAlertConfigurationSchema,
+} from './low-balance/low-balance.schema';
+import {
   EnabledMonthlySpendingAlertConfigurationSchema,
   MONTHLY_SPENDING_ALERT_TYPE,
   MonthlySpendingAlertConfigurationSchema,
@@ -8,12 +13,16 @@ import {
 
 export * from './alert-periods';
 export * from './alert-recipients';
+export * from './alert-thresholds';
+export * from './low-balance/low-balance.schema';
 export * from './monthly-spending/monthly-spending.schema';
 
 // Re-export the persisted shapes from the database package so app code has a
 // single import site for both the runtime schemas and the types.
 export type {
+  LowBalanceAlertConfiguration,
   MonthlySpendingAlertConfiguration,
+  MonthlySpendingAlertScope,
   OrganizationAlert,
   OrganizationAlertConfiguration,
   OrganizationAlertStatus,
@@ -30,6 +39,12 @@ export const OrganizationAlertDefinitionSchema = z.discriminatedUnion('type', [
     .object({
       type: z.literal(MONTHLY_SPENDING_ALERT_TYPE),
       configuration: MonthlySpendingAlertConfigurationSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal(LOW_BALANCE_ALERT_TYPE),
+      configuration: LowBalanceAlertConfigurationSchema,
     })
     .strict(),
 ]);
@@ -54,6 +69,12 @@ export const EnabledOrganizationAlertDefinitionSchema = z.discriminatedUnion('ty
     .object({
       type: z.literal(MONTHLY_SPENDING_ALERT_TYPE),
       configuration: EnabledMonthlySpendingAlertConfigurationSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal(LOW_BALANCE_ALERT_TYPE),
+      configuration: EnabledLowBalanceAlertConfigurationSchema,
     })
     .strict(),
 ]);

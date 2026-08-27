@@ -6,11 +6,13 @@ import {
   formatAlertThresholdUsdInput,
   MAX_ALERT_THRESHOLD_MICRODOLLARS,
   MonthlySpendingAlertConfigurationSchema,
+  MonthlySpendingAlertScopeSchema,
 } from './monthly-spending.schema';
 
 const validConfiguration = {
   thresholdMicrodollars: 500_000_000,
   period: CALENDAR_MONTH_UTC_V1,
+  scope: { type: 'organization' as const },
   recipients: ['finance@example.com'],
 };
 
@@ -81,6 +83,27 @@ describe('MonthlySpendingAlertConfigurationSchema', () => {
     ).toBe(false);
   });
 
+  test('requires an explicit scope', () => {
+    const { scope: _scope, ...withoutScope } = validConfiguration;
+    expect(MonthlySpendingAlertConfigurationSchema.safeParse(withoutScope).success).toBe(false);
+  });
+
+  test('accepts a group scope with a UUID groupId and rejects a malformed one', () => {
+    const groupId = '00000000-0000-4000-8000-000000000000';
+    expect(
+      MonthlySpendingAlertConfigurationSchema.safeParse({
+        ...validConfiguration,
+        scope: { type: 'group', groupId },
+      }).success
+    ).toBe(true);
+    expect(
+      MonthlySpendingAlertConfigurationSchema.safeParse({
+        ...validConfiguration,
+        scope: { type: 'group', groupId: 'not-a-uuid' },
+      }).success
+    ).toBe(false);
+  });
+
   test('allows a disabled alert to have no recipients while an enabled one may not', () => {
     const withoutRecipients = { ...validConfiguration, recipients: [] };
 
@@ -128,6 +151,29 @@ describe('AlertThresholdUsdInputSchema', () => {
     const result = AlertThresholdUsdInputSchema.safeParse('2000000000.01');
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.message).toMatch(/at most \$1,000,000,000/);
+  });
+});
+
+describe('MonthlySpendingAlertScopeSchema', () => {
+  test('accepts organization and group scopes', () => {
+    expect(MonthlySpendingAlertScopeSchema.parse({ type: 'organization' })).toEqual({
+      type: 'organization',
+    });
+    const groupId = '00000000-0000-4000-8000-000000000000';
+    expect(MonthlySpendingAlertScopeSchema.parse({ type: 'group', groupId })).toEqual({
+      type: 'group',
+      groupId,
+    });
+  });
+
+  test('rejects an organization scope carrying a groupId and an unknown type', () => {
+    expect(
+      MonthlySpendingAlertScopeSchema.safeParse({
+        type: 'organization',
+        groupId: '00000000-0000-4000-8000-000000000000',
+      }).success
+    ).toBe(false);
+    expect(MonthlySpendingAlertScopeSchema.safeParse({ type: 'team' }).success).toBe(false);
   });
 });
 

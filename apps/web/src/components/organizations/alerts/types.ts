@@ -8,6 +8,7 @@ import type { ComponentType } from 'react';
 /** What the shared drawer shell tells a type-specific editor about its alert. */
 export type OrganizationAlertEditorContext<T extends OrganizationAlertType> = {
   mode: 'create' | 'edit';
+  organizationId: string;
   /** The stored configuration when editing, the type's initial one when creating. */
   definition: OrganizationAlertDefinitionOf<T>;
   /**

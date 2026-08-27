@@ -38,6 +38,8 @@ const noAlert: OrganizationUsageMutationResult = {
   crossedMinimumBalance: false,
   recipients: [],
   minimumBalanceMicrodollars: null,
+  previousBalanceMicrodollars: null,
+  newBalanceMicrodollars: null,
 };
 
 function sourceIdentity(input: RecordOrganizationConsumptionInput): string {

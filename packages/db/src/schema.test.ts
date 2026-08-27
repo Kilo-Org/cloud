@@ -470,7 +470,7 @@ function deliveryClaimValues(
     channel: 'email',
     claimed_configuration_version: 1,
     threshold_microdollars: 500_000_000,
-    measured_spend_microdollars: 500_000_000,
+    measured_value_microdollars: 500_000_000,
     ...overrides,
   };
 }
@@ -954,13 +954,17 @@ describe('database schema', () => {
         .insert(schema.organization_alert_deliveries)
         .values(deliveryClaimValues({ alertId: otherAlertId, ...claim }));
 
-      // No claim may be created below the claimed threshold.
+      // The measured value's relationship to the threshold is type-specific
+      // (`monthly_spending` claims only when it is at or above the threshold,
+      // `low_balance` only when it is below), so this table only rejects a
+      // negative measured value or a non-positive threshold; direction is each
+      // type's own claim function's responsibility, not the schema's.
       await expect(
         schemaTestDb.db
           .insert(schema.organization_alert_deliveries)
-          .values(deliveryClaimValues({ alertId, measured_spend_microdollars: 499_000_000 }))
+          .values(deliveryClaimValues({ alertId, measured_value_microdollars: -1 }))
       ).rejects.toMatchObject({
-        cause: { constraint: 'organization_alert_deliveries_spend_check' },
+        cause: { constraint: 'organization_alert_deliveries_measured_value_check' },
       });
     });
   });

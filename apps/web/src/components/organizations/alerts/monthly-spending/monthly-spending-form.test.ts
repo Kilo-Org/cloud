@@ -19,6 +19,7 @@ function configuration(
   return {
     thresholdMicrodollars: 500_000_000,
     period: CALENDAR_MONTH_UTC_V1,
+    scope: { type: 'organization' },
     recipients: ['finance@example.com'],
     ...overrides,
   };
@@ -34,10 +35,19 @@ describe('monthlySpendingFormState', () => {
       monthlySpendingFormState(configuration({ thresholdMicrodollars: 1_234_500_000 }))
     ).toEqual({
       thresholdUsd: '1234.50',
+      scopeType: 'organization',
+      groupId: null,
       recipients: ['finance@example.com'],
       pendingRecipient: '',
       disclosureConfirmed: false,
     });
+  });
+
+  test('reads a group scope into the group picker', () => {
+    const groupId = '00000000-0000-4000-8000-000000000000';
+    const state = monthlySpendingFormState(configuration({ scope: { type: 'group', groupId } }));
+    expect(state.scopeType).toBe('group');
+    expect(state.groupId).toBe(groupId);
   });
 
   test('opens the amount empty for an alert that has no threshold yet', () => {
@@ -145,10 +155,43 @@ describe('buildMonthlySpendingSubmission', () => {
         configuration: {
           thresholdMicrodollars: 1_000_050_000,
           period: CALENDAR_MONTH_UTC_V1,
+          scope: { type: 'organization' },
           recipients: ['finance@example.com'],
         },
       },
     });
+  });
+
+  test('carries a group scope through to the submitted definition', () => {
+    const groupId = '00000000-0000-4000-8000-000000000000';
+    const result = buildMonthlySpendingSubmission({
+      mode: 'edit',
+      saved,
+      requireRecipient: true,
+      state: formState({
+        scopeType: 'group',
+        groupId,
+        thresholdUsd: '500.00',
+        recipients: ['finance@example.com'],
+      }),
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      definition: { configuration: { scope: { type: 'group', groupId } } },
+    });
+  });
+
+  test('falls back to organization scope when a group scope has no group chosen', () => {
+    const result = buildMonthlySpendingSubmission({
+      mode: 'edit',
+      saved,
+      requireRecipient: true,
+      state: formState({ scopeType: 'group', groupId: null }),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.errors.scope).toBeDefined();
   });
 
   test('reports an unusable amount against the amount field', () => {

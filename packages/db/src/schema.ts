@@ -3223,6 +3223,20 @@ export type Organization = typeof organizations.$inferSelect;
 // Collection-backed organization alerts. Lifecycle actor attribution and audit
 // history live in `organization_audit_logs` (the organization audit surface,
 // already PII-managed by `softDeleteUser`), not in a bespoke per-alert log.
+/**
+ * What the measured spend covers. Explicit rather than defaulted, the same as
+ * `period`: an alert with no `scope` is not "organization-wide by default", it
+ * is an invalid configuration. `group` is a live-membership join against
+ * `organization_group_memberships` at evaluation time, not a persisted
+ * attribution: it measures whoever currently belongs to the group, so a
+ * roster change today changes what an earlier month's measured spend would
+ * report if it were recomputed, and a member of several groups is measured
+ * independently by each one.
+ */
+export type MonthlySpendingAlertScope =
+  | { type: 'organization' }
+  | { type: 'group'; groupId: string };
+
 export type MonthlySpendingAlertConfiguration = {
   thresholdMicrodollars: number;
   // Explicit, versioned period definition: monthly behavior is never inferred
@@ -3231,11 +3245,23 @@ export type MonthlySpendingAlertConfiguration = {
     type: 'calendar_month_utc';
     version: 1;
   };
+  scope: MonthlySpendingAlertScope;
   recipients: string[];
 };
 
-export type OrganizationAlertConfiguration = MonthlySpendingAlertConfiguration;
-export type OrganizationAlertType = 'monthly_spending';
+// Unlike `monthly_spending`, this type has no period: it watches the
+// organization's current balance continuously and has no calendar reset. Its
+// occurrence identity instead comes from the crossing event itself (see
+// `low-balance-evaluator.ts`), which is also why it has no `period` field.
+export type LowBalanceAlertConfiguration = {
+  thresholdMicrodollars: number;
+  recipients: string[];
+};
+
+export type OrganizationAlertConfiguration =
+  | MonthlySpendingAlertConfiguration
+  | LowBalanceAlertConfiguration;
+export type OrganizationAlertType = 'monthly_spending' | 'low_balance';
 export type OrganizationAlertStatus = 'enabled' | 'disabled' | 'archived';
 
 export const organization_alerts = pgTable(
@@ -3266,7 +3292,10 @@ export const organization_alerts = pgTable(
     index('IDX_organization_alerts_enabled_organization_id')
       .on(table.organization_id, table.id)
       .where(sql`${table.status} = 'enabled'`),
-    check('organization_alerts_type_check', sql`${table.type} IN ('monthly_spending')`),
+    check(
+      'organization_alerts_type_check',
+      sql`${table.type} IN ('monthly_spending', 'low_balance')`
+    ),
     check(
       'organization_alerts_status_check',
       sql`${table.status} IN ('enabled', 'disabled', 'archived')`
@@ -3315,7 +3344,12 @@ export const organization_alert_deliveries = pgTable(
     // stale worker's compare-and-set can no longer submit that claim.
     claim_version: integer().notNull().default(1),
     threshold_microdollars: bigint({ mode: 'number' }).notNull(),
-    measured_spend_microdollars: bigint({ mode: 'number' }).notNull(),
+    // The value measured against the threshold at claim time. Its relationship
+    // to the threshold is type-specific (`monthly_spending` claims only when
+    // this is `>=` the threshold; `low_balance` claims only when it is `<`), so
+    // this table only constrains it to be non-negative and leaves direction to
+    // each type's own claim function.
+    measured_value_microdollars: bigint({ mode: 'number' }).notNull(),
     attempt_count: integer().notNull().default(0),
     next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -3354,8 +3388,8 @@ export const organization_alert_deliveries = pgTable(
       sql`${table.claimed_configuration_version} > 0 AND ${table.claim_version} > 0 AND ${table.attempt_count} >= 0`
     ),
     check(
-      'organization_alert_deliveries_spend_check',
-      sql`${table.threshold_microdollars} > 0 AND ${table.measured_spend_microdollars} >= ${table.threshold_microdollars}`
+      'organization_alert_deliveries_measured_value_check',
+      sql`${table.threshold_microdollars} > 0 AND ${table.measured_value_microdollars} >= 0`
     ),
     // A lease exists exactly while a worker is submitting, and submission time is
     // retained once submission has begun, including across pre-acceptance retries.

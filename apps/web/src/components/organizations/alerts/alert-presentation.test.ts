@@ -6,6 +6,8 @@ import { organizationAlertSummary, type OrganizationAlertRow } from './alert-pre
 function alertRow(overrides: {
   thresholdMicrodollars?: number;
   recipients?: string[];
+  scope?: { type: 'organization' } | { type: 'group'; groupId: string };
+  groupName?: string | null;
 }): OrganizationAlertRow {
   return {
     id: '00000000-0000-4000-8000-000000000000',
@@ -15,6 +17,7 @@ function alertRow(overrides: {
     configuration: {
       thresholdMicrodollars: overrides.thresholdMicrodollars ?? 500_000_000,
       period: CALENDAR_MONTH_UTC_V1,
+      scope: overrides.scope ?? { type: 'organization' },
       recipients: overrides.recipients ?? ['billing@example.com'],
     },
     configurationVersion: 1,
@@ -23,6 +26,7 @@ function alertRow(overrides: {
     archivedAt: null,
     periodOccurrenceId: 'calendar_month_utc:v1:2026-08',
     admittedRecipientCount: 0,
+    groupName: overrides.groupName ?? null,
   };
 }
 
@@ -38,12 +42,39 @@ describe('organizationAlertSummary', () => {
         })
       )
     ).toBe(
-      `Reaches ${formatAlertUsd(1_234_560_000)} of AI usage spend in a UTC calendar month · 2 recipients`
+      `Reaches ${formatAlertUsd(1_234_560_000)} of AI usage spend in a UTC calendar month for the whole organization · 2 recipients`
     );
   });
 
   test('counts one recipient in the singular and none at all explicitly', () => {
     expect(organizationAlertSummary(alertRow({}))).toMatch(/· 1 recipient$/);
     expect(organizationAlertSummary(alertRow({ recipients: [] }))).toMatch(/· No recipients$/);
+  });
+
+  test('describes a low balance alert by its threshold and recipient count', () => {
+    const row: OrganizationAlertRow = {
+      ...alertRow({ thresholdMicrodollars: 50_000_000, recipients: ['finance@example.com'] }),
+      type: 'low_balance',
+      configuration: {
+        thresholdMicrodollars: 50_000_000,
+        recipients: ['finance@example.com'],
+      },
+    };
+    expect(organizationAlertSummary(row)).toBe(
+      `Drops below ${formatAlertUsd(50_000_000)} of AI usage balance · 1 recipient`
+    );
+  });
+
+  test('describes a group-scoped alert by the group name, or as deleted when it has none', () => {
+    const groupId = '00000000-0000-4000-8000-000000000001';
+    expect(
+      organizationAlertSummary(
+        alertRow({ scope: { type: 'group', groupId }, groupName: 'Engineering' })
+      )
+    ).toContain('for the "Engineering" group');
+    expect(
+      organizationAlertSummary(alertRow({ scope: { type: 'group', groupId }, groupName: null }))
+    ).toContain('for a deleted group');
+    expect(organizationAlertSummary(alertRow({}))).toContain('for the whole organization');
   });
 });

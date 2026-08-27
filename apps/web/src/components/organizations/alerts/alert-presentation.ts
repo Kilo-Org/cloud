@@ -3,6 +3,7 @@ import type { inferRouterOutputs } from '@trpc/server';
 import {
   CALENDAR_MONTH_UTC_PERIOD_TYPE,
   formatAlertUsd,
+  LOW_BALANCE_ALERT_TYPE,
   MONTHLY_SPENDING_ALERT_TYPE,
   type OrganizationAlertPeriodDefinition,
 } from '@/lib/organizations/alerts/organization-alerts';
@@ -41,11 +42,25 @@ function recipientCountSummary(recipients: number): string {
  * Recipient addresses are deliberately summarized as a count: the surface shows
  * what is configured without repeating the disclosure list outside the editor.
  */
+/** Describes what a monthly spending alert's `scope` measures. */
+function scopeSummary(
+  alert: OrganizationAlertRow & { type: typeof MONTHLY_SPENDING_ALERT_TYPE }
+): string {
+  if (alert.configuration.scope.type === 'organization') return 'the whole organization';
+  // A deleted group's name cannot be resolved; the alert is invalid until its
+  // scope is changed, which the editor's own state surfaces separately.
+  return alert.groupName ? `the "${alert.groupName}" group` : 'a deleted group';
+}
+
 export function organizationAlertSummary(alert: OrganizationAlertRow): string {
   switch (alert.type) {
     case MONTHLY_SPENDING_ALERT_TYPE: {
       const { thresholdMicrodollars, period, recipients } = alert.configuration;
-      return `Reaches ${formatAlertUsd(thresholdMicrodollars)} of AI usage spend in ${ALERT_PERIOD_LABELS[period.type]} · ${recipientCountSummary(recipients.length)}`;
+      return `Reaches ${formatAlertUsd(thresholdMicrodollars)} of AI usage spend in ${ALERT_PERIOD_LABELS[period.type]} for ${scopeSummary(alert)} · ${recipientCountSummary(recipients.length)}`;
+    }
+    case LOW_BALANCE_ALERT_TYPE: {
+      const { thresholdMicrodollars, recipients } = alert.configuration;
+      return `Drops below ${formatAlertUsd(thresholdMicrodollars)} of AI usage balance · ${recipientCountSummary(recipients.length)}`;
     }
   }
 }

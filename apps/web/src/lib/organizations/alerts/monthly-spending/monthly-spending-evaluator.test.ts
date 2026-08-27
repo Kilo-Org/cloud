@@ -3,12 +3,14 @@ import {
   microdollar_usage,
   organization_alert_deliveries,
   organization_alerts,
+  organization_group_memberships,
+  organization_groups,
   organizations,
   type OrganizationAlertConfiguration,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { CALENDAR_MONTH_UTC_V1, resolveOrganizationAlertPeriodOccurrence } from '../alert-periods';
 
@@ -47,6 +49,7 @@ async function createAlert(
       configuration: {
         thresholdMicrodollars: THRESHOLD,
         period: CALENDAR_MONTH_UTC_V1,
+        scope: { type: 'organization' },
         recipients: ['finance@example.com'],
         ...overrides,
       },
@@ -56,9 +59,13 @@ async function createAlert(
 }
 
 /** Usage inside the alert's current UTC month, which is what evaluation measures. */
-async function recordSpend(organizationId: string, cost: number): Promise<void> {
+async function recordSpend(
+  organizationId: string,
+  cost: number,
+  kiloUserId = `alert-usage-${organizationId}`
+): Promise<void> {
   await db.insert(microdollar_usage).values({
-    kilo_user_id: `alert-usage-${organizationId}`,
+    kilo_user_id: kiloUserId,
     organization_id: organizationId,
     cost,
     input_tokens: 0,
@@ -66,6 +73,26 @@ async function recordSpend(organizationId: string, cost: number): Promise<void> 
     cache_write_tokens: 0,
     cache_hit_tokens: 0,
   });
+}
+
+async function createGroupWithMembers(
+  organizationId: string,
+  memberUserIds: string[]
+): Promise<string> {
+  const [group] = await db
+    .insert(organization_groups)
+    .values({ organization_id: organizationId, name: `group-${crypto.randomUUID()}` })
+    .returning();
+  if (memberUserIds.length > 0) {
+    await db.insert(organization_group_memberships).values(
+      memberUserIds.map(kiloUserId => ({
+        organization_id: organizationId,
+        group_id: group.id,
+        kilo_user_id: kiloUserId,
+      }))
+    );
+  }
+  return group.id;
 }
 
 function deliveries(alertId: string) {
@@ -289,11 +316,11 @@ describe('monthly spending alert evaluation', () => {
     const claim = () =>
       claimAlertDeliveries({
         alertId,
-        occurrence,
+        periodOccurrenceId: occurrence.occurrenceId,
         recipients: ['first@example.com', 'second@example.com'],
         configurationVersion: 1,
         thresholdMicrodollars: THRESHOLD,
-        measuredSpendMicrodollars: THRESHOLD,
+        measuredValueMicrodollars: THRESHOLD,
       });
 
     // No lock serializes this: delivery identity uniqueness is what keeps a
@@ -337,6 +364,43 @@ describe('monthly spending alert evaluation', () => {
 
     await evaluateMonthlySpendingAlerts();
 
+    expect(await deliveries(alertId)).toHaveLength(0);
+  });
+
+  it('measures only a group\u2019s current members when scoped to a group', async () => {
+    const organizationId = await createEnterpriseOrganization();
+    const memberUser = await insertTestUser();
+    const outsideUser = await insertTestUser();
+    await addUserToOrganization(organizationId, memberUser.id, 'member');
+    await addUserToOrganization(organizationId, outsideUser.id, 'member');
+    const groupId = await createGroupWithMembers(organizationId, [memberUser.id]);
+    const alertId = await createAlert(organizationId, {
+      scope: { type: 'group', groupId },
+    });
+
+    // Only the outside member's spend is recorded; the group has no spend yet.
+    await recordSpend(organizationId, THRESHOLD, outsideUser.id);
+    await evaluateMonthlySpendingAlerts();
+    expect(await deliveries(alertId)).toHaveLength(0);
+
+    // The group member's own spend crosses the threshold on its own.
+    await recordSpend(organizationId, THRESHOLD, memberUser.id);
+    await evaluateMonthlySpendingAlerts();
+    expect(await deliveries(alertId)).toHaveLength(1);
+  });
+
+  it('treats a scope naming a deleted group as invalid rather than as zero spend', async () => {
+    const organizationId = await createEnterpriseOrganization();
+    const groupId = await createGroupWithMembers(organizationId, []);
+    const alertId = await createAlert(organizationId, {
+      scope: { type: 'group', groupId },
+    });
+    await db.delete(organization_groups).where(eq(organization_groups.id, groupId));
+    await recordSpend(organizationId, THRESHOLD);
+
+    const summary = await evaluateMonthlySpendingAlerts();
+
+    expect(summary.invalidAlertCount).toBeGreaterThanOrEqual(1);
     expect(await deliveries(alertId)).toHaveLength(0);
   });
 });

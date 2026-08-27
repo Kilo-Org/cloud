@@ -1,36 +1,32 @@
 import {
   AlertThresholdUsdInputSchema,
   formatAlertThresholdUsdInput,
+  LOW_BALANCE_ALERT_TYPE,
   MAX_ORGANIZATION_ALERT_RECIPIENTS,
-  MONTHLY_SPENDING_ALERT_TYPE,
   OrganizationAlertRecipientSchema,
   OrganizationAlertRecipientsSchema,
   RECIPIENT_DISCLOSURE_REQUIRED_MESSAGE,
-  type MonthlySpendingAlertConfiguration,
-  type MonthlySpendingAlertScope,
+  type LowBalanceAlertConfiguration,
   type OrganizationAlertDefinitionOf,
 } from '@/lib/organizations/alerts/organization-alerts';
 
-/** Everything the Monthly Spending editor holds while it is being filled in. */
-export type MonthlySpendingFormState = {
+/** Everything the Low Balance editor holds while it is being filled in. */
+export type LowBalanceFormState = {
   /** USD text exactly as typed; converted to microdollars only on save. */
   thresholdUsd: string;
-  scopeType: MonthlySpendingAlertScope['type'];
-  /** The chosen group's id when `scopeType` is `'group'`; otherwise unused. */
-  groupId: string | null;
   recipients: string[];
   /** An address that has been typed but not added to `recipients` yet. */
   pendingRecipient: string;
   disclosureConfirmed: boolean;
 };
 
-export type MonthlySpendingFormErrors = Partial<
-  Record<'thresholdUsd' | 'scope' | 'pendingRecipient' | 'recipients' | 'disclosure', string>
+export type LowBalanceFormErrors = Partial<
+  Record<'thresholdUsd' | 'pendingRecipient' | 'recipients' | 'disclosure', string>
 >;
 
-export function monthlySpendingFormState(
-  configuration: MonthlySpendingAlertConfiguration
-): MonthlySpendingFormState {
+export function lowBalanceFormState(
+  configuration: LowBalanceAlertConfiguration
+): LowBalanceFormState {
   return {
     // Zero is not a savable threshold, which is how a new alert starts, so the
     // field opens empty instead of suggesting $0.00.
@@ -38,8 +34,6 @@ export function monthlySpendingFormState(
       configuration.thresholdMicrodollars > 0
         ? formatAlertThresholdUsdInput(configuration.thresholdMicrodollars)
         : '',
-    scopeType: configuration.scope.type,
-    groupId: configuration.scope.type === 'group' ? configuration.scope.groupId : null,
     recipients: [...configuration.recipients],
     pendingRecipient: '',
     disclosureConfirmed: false,
@@ -51,8 +45,8 @@ export function monthlySpendingFormState(
  * the list the user sees is the identity the alert will actually deliver to and
  * duplicates cannot silently consume one of the ten slots.
  */
-export function addMonthlySpendingRecipient(
-  state: MonthlySpendingFormState
+export function addLowBalanceRecipient(
+  state: LowBalanceFormState
 ): { ok: true; recipients: string[] } | { ok: false; error: string } {
   const parsed = OrganizationAlertRecipientSchema.safeParse(state.pendingRecipient);
   if (!parsed.success) {
@@ -71,23 +65,21 @@ export function addMonthlySpendingRecipient(
 }
 
 /**
- * Explains the alert-period admission cap when it has been reached, so a user who
- * adds an address now understands why it cannot receive this alert yet. The count
- * is the router's report of distinct recipients already admitted this period,
- * including addresses that have since been removed.
+ * Explains the crossing-admission cap when it has been reached. Unlike Monthly
+ * Spending, this has no calendar reset: the cap applies to the alert's current
+ * crossing (from the balance dropping below the threshold until it recovers
+ * back to or above it), and clears the next time the alert crosses again.
  */
-export function monthlySpendingAdmissionNotice(admittedRecipientCount: number): string | null {
+export function lowBalanceAdmissionNotice(admittedRecipientCount: number): string | null {
   if (admittedRecipientCount < MAX_ORGANIZATION_ALERT_RECIPIENTS) return null;
   // "Admitted" rather than "notified": a claim is created before its email is
-  // sent, and it still holds one of the month's slots if it was canceled.
-  return `This alert has already admitted ${MAX_ORGANIZATION_ALERT_RECIPIENTS} addresses to delivery in the current UTC calendar month, which is its limit for one month. An address added now cannot receive this alert until the next month.`;
+  // sent, and it still holds one of the crossing's slots if it was canceled.
+  return `This alert has already admitted ${MAX_ORGANIZATION_ALERT_RECIPIENTS} addresses to delivery for its current low-balance crossing, which is its limit until the balance recovers and drops below the threshold again. An address added now cannot receive this alert until then.`;
 }
 
-type MonthlySpendingSubmissionParams = {
-  state: MonthlySpendingFormState;
+type LowBalanceSubmissionParams = {
+  state: LowBalanceFormState;
   mode: 'create' | 'edit';
-  /** The configuration the editor opened with: its period and saved recipients. */
-  saved: MonthlySpendingAlertConfiguration;
   /** An enabled alert must be able to notify at least one recipient. */
   requireRecipient: boolean;
 };
@@ -97,42 +89,38 @@ type MonthlySpendingSubmissionParams = {
  * address to an existing one. Removing addresses does not, so a downgraded
  * organization can still shrink its recipient list.
  */
-export function monthlySpendingDisclosureRequired(params: {
-  state: MonthlySpendingFormState;
+export function lowBalanceDisclosureRequired(params: {
+  state: LowBalanceFormState;
   mode: 'create' | 'edit';
-  saved: MonthlySpendingAlertConfiguration;
+  saved: LowBalanceAlertConfiguration;
 }): boolean {
   if (params.mode === 'create') return true;
   const savedRecipients = new Set(params.saved.recipients);
   return params.state.recipients.some(recipient => !savedRecipients.has(recipient));
 }
 
-export type MonthlySpendingSubmission =
+export type LowBalanceSubmission =
   | {
       ok: true;
-      definition: OrganizationAlertDefinitionOf<typeof MONTHLY_SPENDING_ALERT_TYPE>;
+      definition: OrganizationAlertDefinitionOf<typeof LOW_BALANCE_ALERT_TYPE>;
       recipientDisclosureConfirmed: boolean;
     }
-  | { ok: false; errors: MonthlySpendingFormErrors };
+  | { ok: false; errors: LowBalanceFormErrors };
 
 /**
  * Validates the whole editor at once and produces the definition the router
  * accepts. Every rejection is a field error so it can be shown next to the input
  * that caused it; the server re-validates the same contract.
  */
-export function buildMonthlySpendingSubmission(
-  params: MonthlySpendingSubmissionParams
-): MonthlySpendingSubmission {
+export function buildLowBalanceSubmission(
+  params: LowBalanceSubmissionParams & { saved: LowBalanceAlertConfiguration }
+): LowBalanceSubmission {
   const { state } = params;
-  const errors: MonthlySpendingFormErrors = {};
+  const errors: LowBalanceFormErrors = {};
 
   const threshold = AlertThresholdUsdInputSchema.safeParse(state.thresholdUsd);
   if (!threshold.success) {
     errors.thresholdUsd = threshold.error.issues[0]?.message ?? 'Enter a valid amount';
-  }
-
-  if (state.scopeType === 'group' && !state.groupId) {
-    errors.scope = 'Choose a group.';
   }
 
   if (state.pendingRecipient.trim()) {
@@ -146,7 +134,7 @@ export function buildMonthlySpendingSubmission(
     errors.recipients = 'Add at least one recipient email address';
   }
 
-  if (monthlySpendingDisclosureRequired(params) && !state.disclosureConfirmed) {
+  if (lowBalanceDisclosureRequired(params) && !state.disclosureConfirmed) {
     errors.disclosure = RECIPIENT_DISCLOSURE_REQUIRED_MESSAGE;
   }
 
@@ -155,20 +143,12 @@ export function buildMonthlySpendingSubmission(
   if (Object.keys(errors).length > 0 || !threshold.success || !recipients.success) {
     return { ok: false, errors };
   }
-  const scope: MonthlySpendingAlertScope =
-    state.scopeType === 'group' && state.groupId
-      ? { type: 'group', groupId: state.groupId }
-      : { type: 'organization' };
   return {
     ok: true,
     definition: {
-      type: MONTHLY_SPENDING_ALERT_TYPE,
+      type: LOW_BALANCE_ALERT_TYPE,
       configuration: {
         thresholdMicrodollars: threshold.data,
-        // The period is carried through unchanged: this editor supports one
-        // definition and must never re-declare an alert's window.
-        period: params.saved.period,
-        scope,
         recipients: recipients.data,
       },
     },

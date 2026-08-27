@@ -10,11 +10,13 @@ import {
 import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { sendMonthlySpendingAlertEmail } from '@/lib/email';
+import { sendLowBalanceAlertEmail, sendMonthlySpendingAlertEmail } from '@/lib/email';
 import {
   formatAlertUsd,
   formatOrganizationAlertPeriodOccurrence,
+  LOW_BALANCE_ALERT_TYPE,
   MAX_ORGANIZATION_ALERT_RECIPIENTS,
+  MONTHLY_SPENDING_ALERT_TYPE,
   normalizeOrganizationAlertRecipient,
   OrganizationAlertDefinitionSchema,
   resolveOrganizationAlertPeriodOccurrence,
@@ -60,11 +62,11 @@ export function alertRecipientIdentityHmac(recipient: string): string {
  */
 export async function claimAlertDeliveries(params: {
   alertId: string;
-  occurrence: OrganizationAlertPeriodOccurrence;
+  periodOccurrenceId: string;
   recipients: string[];
   configurationVersion: number;
   thresholdMicrodollars: number;
-  measuredSpendMicrodollars: number;
+  measuredValueMicrodollars: number;
 }): Promise<OrganizationAlertDelivery[]> {
   const admitted = await db
     .select({ recipientIdentityHmac: organization_alert_deliveries.recipient_identity_hmac })
@@ -72,7 +74,7 @@ export async function claimAlertDeliveries(params: {
     .where(
       and(
         eq(organization_alert_deliveries.alert_id, params.alertId),
-        eq(organization_alert_deliveries.period_occurrence_id, params.occurrence.occurrenceId)
+        eq(organization_alert_deliveries.period_occurrence_id, params.periodOccurrenceId)
       )
     );
 
@@ -90,12 +92,12 @@ export async function claimAlertDeliveries(params: {
     .values(
       newIdentities.slice(0, capacity).map(identity => ({
         alert_id: params.alertId,
-        period_occurrence_id: params.occurrence.occurrenceId,
+        period_occurrence_id: params.periodOccurrenceId,
         recipient_identity_hmac: identity,
         channel: 'email' as const,
         claimed_configuration_version: params.configurationVersion,
         threshold_microdollars: params.thresholdMicrodollars,
-        measured_spend_microdollars: params.measuredSpendMicrodollars,
+        measured_value_microdollars: params.measuredValueMicrodollars,
       }))
     )
     .onConflictDoNothing()
@@ -162,14 +164,23 @@ export async function dispatchAlertDelivery(
   if (!claimed) return 'skipped';
 
   try {
-    const result = await sendMonthlySpendingAlertEmail({
-      to: context.recipient,
-      organizationId: context.organizationId,
-      organizationName: context.organizationName,
-      thresholdUsd: formatAlertUsd(delivery.threshold_microdollars),
-      spendUsd: formatAlertUsd(delivery.measured_spend_microdollars),
-      periodLabel: formatOrganizationAlertPeriodOccurrence(context.occurrence),
-    });
+    const result =
+      context.type === MONTHLY_SPENDING_ALERT_TYPE
+        ? await sendMonthlySpendingAlertEmail({
+            to: context.recipient,
+            organizationId: context.organizationId,
+            organizationName: context.organizationName,
+            thresholdUsd: formatAlertUsd(delivery.threshold_microdollars),
+            spendUsd: formatAlertUsd(delivery.measured_value_microdollars),
+            periodLabel: formatOrganizationAlertPeriodOccurrence(context.occurrence),
+          })
+        : await sendLowBalanceAlertEmail({
+            to: context.recipient,
+            organizationId: context.organizationId,
+            organizationName: context.organizationName,
+            thresholdUsd: formatAlertUsd(delivery.threshold_microdollars),
+            balanceUsd: formatAlertUsd(delivery.measured_value_microdollars),
+          });
     if (result.sent) {
       await finishDelivery(delivery.id, { status: 'accepted' });
       return 'accepted';
@@ -189,18 +200,29 @@ export async function dispatchAlertDelivery(
   }
 }
 
-type DispatchContext = {
-  organizationId: string;
-  organizationName: string;
-  recipient: string;
-  occurrence: OrganizationAlertPeriodOccurrence;
-};
+type DispatchContext =
+  | {
+      type: typeof MONTHLY_SPENDING_ALERT_TYPE;
+      organizationId: string;
+      organizationName: string;
+      recipient: string;
+      occurrence: OrganizationAlertPeriodOccurrence;
+    }
+  | {
+      type: typeof LOW_BALANCE_ALERT_TYPE;
+      organizationId: string;
+      organizationName: string;
+      recipient: string;
+    };
 
 /**
  * Re-reads the organization and alert and confirms every fact the claim was
- * created from still holds: the organization exists and is still Enterprise, the
- * alert is still enabled with the same type, threshold and period, the measured
- * spend still crosses the threshold, and the recipient is still configured.
+ * created from still holds: the organization exists and is still Enterprise and
+ * the alert is still enabled with the same type, threshold, and recipient.
+ * `monthly_spending` additionally requires the measured spend to still cross the
+ * threshold within the same period; `low_balance` requires the organization's
+ * current balance to still be below the threshold, re-read fresh so a top-up
+ * between claim and dispatch cancels the send instead of emailing stale state.
  * Seat-subscription state is deliberately not required here, only Enterprise.
  */
 async function loadDispatchContext(
@@ -212,6 +234,8 @@ async function loadDispatchContext(
       organizationName: organizations.name,
       plan: organizations.plan,
       deletedAt: organizations.deleted_at,
+      totalMicrodollarsAcquired: organizations.total_microdollars_acquired,
+      microdollarsUsed: organizations.microdollars_used,
       type: organization_alerts.type,
       status: organization_alerts.status,
       configuration: organization_alerts.configuration,
@@ -228,24 +252,38 @@ async function loadDispatchContext(
     configuration: row.configuration,
   });
   if (!parsed.success) return;
+  if (parsed.data.configuration.thresholdMicrodollars !== delivery.threshold_microdollars) return;
 
-  const { thresholdMicrodollars, period, recipients } = parsed.data.configuration;
-  if (thresholdMicrodollars !== delivery.threshold_microdollars) return;
-  if (delivery.measured_spend_microdollars < thresholdMicrodollars) return;
-
-  const occurrence = resolveOrganizationAlertPeriodOccurrence(period, new Date());
-  if (occurrence.occurrenceId !== delivery.period_occurrence_id) return;
-
-  const recipient = recipients.find(
+  const recipient = parsed.data.configuration.recipients.find(
     candidate => alertRecipientIdentityHmac(candidate) === delivery.recipient_identity_hmac
   );
   if (!recipient) return;
 
+  if (parsed.data.type === MONTHLY_SPENDING_ALERT_TYPE) {
+    if (delivery.measured_value_microdollars < parsed.data.configuration.thresholdMicrodollars) {
+      return;
+    }
+    const occurrence = resolveOrganizationAlertPeriodOccurrence(
+      parsed.data.configuration.period,
+      new Date()
+    );
+    if (occurrence.occurrenceId !== delivery.period_occurrence_id) return;
+    return {
+      type: MONTHLY_SPENDING_ALERT_TYPE,
+      organizationId: row.organizationId,
+      organizationName: row.organizationName,
+      recipient,
+      occurrence,
+    };
+  }
+
+  const currentBalance = row.totalMicrodollarsAcquired - row.microdollarsUsed;
+  if (currentBalance >= parsed.data.configuration.thresholdMicrodollars) return;
   return {
+    type: LOW_BALANCE_ALERT_TYPE,
     organizationId: row.organizationId,
     organizationName: row.organizationName,
     recipient,
-    occurrence,
   };
 }
 

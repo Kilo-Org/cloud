@@ -3,7 +3,10 @@ import 'server-only';
 import {
   microdollar_usage,
   organization_alerts,
+  organization_group_memberships,
+  organization_groups,
   organizations,
+  type MonthlySpendingAlertScope,
   type OrganizationAlert,
 } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
@@ -17,6 +20,7 @@ import {
   type AlertDeliveryOutcome,
 } from '../alert-deliveries';
 import {
+  MONTHLY_SPENDING_ALERT_TYPE,
   OrganizationAlertDefinitionSchema,
   resolveOrganizationAlertPeriodOccurrence,
   type OrganizationAlertPeriodOccurrence,
@@ -107,6 +111,7 @@ async function listEnabledAlertPage(cursor?: {
   id: string;
 }): Promise<OrganizationAlert[]> {
   const conditions = [
+    eq(organization_alerts.type, MONTHLY_SPENDING_ALERT_TYPE),
     eq(organization_alerts.status, 'enabled'),
     eq(organizations.plan, 'enterprise'),
     isNull(organizations.deleted_at),
@@ -138,71 +143,138 @@ function groupByOrganization(alerts: OrganizationAlert[]): Map<string, Organizat
 }
 
 /**
+ * Identifies a scope for the per-organization spend cache, since two alerts
+ * with the same period but different scopes must never share a cached sum.
+ * Stable and collision-free because group ids are UUIDs, which cannot contain
+ * the separator.
+ */
+function scopeCacheKey(scope: MonthlySpendingAlertScope): string {
+  return scope.type === 'organization' ? 'organization' : `group:${scope.groupId}`;
+}
+
+/**
  * Evaluates one organization's alerts. Spend is aggregated once per distinct
- * period occurrence rather than once per alert, and each alert is compared
- * independently so two alerts with the same threshold never merge.
+ * (period occurrence, scope) pair rather than once per alert, and each alert
+ * is compared independently so two alerts with the same threshold never merge.
  */
 async function evaluateOrganizationAlerts(
   alerts: OrganizationAlert[],
   now: Date,
   summary: MonthlySpendingEvaluationSummary
 ): Promise<void> {
-  const spendByOccurrence = new Map<string, number>();
+  const spendByOccurrenceAndScope = new Map<string, number | undefined>();
 
   for (const alert of alerts) {
     const parsed = OrganizationAlertDefinitionSchema.safeParse({
       type: alert.type,
       configuration: alert.configuration,
     });
-    if (!parsed.success) {
+    // The page query already filters to this type; the check below only lets
+    // TypeScript narrow `configuration` and reports the otherwise-impossible
+    // case rather than silently reinterpreting it.
+    if (!parsed.success || parsed.data.type !== MONTHLY_SPENDING_ALERT_TYPE) {
       // Unsupported stored configuration is skipped and reported rather than
       // reinterpreted under a different meaning.
       summary.invalidAlertCount++;
-      captureException(parsed.error, {
+      captureException(parsed.success ? new Error('Alert type mismatch') : parsed.error, {
         tags: { domain: 'organization-alerts', job: 'monthly-spending-evaluation' },
         extra: { organizationId: alert.organization_id, alertId: alert.id },
       });
       continue;
     }
 
-    const { thresholdMicrodollars, period, recipients } = parsed.data.configuration;
+    const { thresholdMicrodollars, period, scope, recipients } = parsed.data.configuration;
     const occurrence = resolveOrganizationAlertPeriodOccurrence(period, now);
     summary.evaluatedAlertCount++;
 
-    let spend = spendByOccurrence.get(occurrence.occurrenceId);
+    const cacheKey = `${occurrence.occurrenceId}::${scopeCacheKey(scope)}`;
+    let spend = spendByOccurrenceAndScope.get(cacheKey);
     if (spend === undefined) {
-      spend = await sumOrganizationSpend(alert.organization_id, occurrence);
-      spendByOccurrence.set(occurrence.occurrenceId, spend);
+      spend = await sumScopedSpend(alert.organization_id, scope, occurrence);
+      if (spend === undefined) {
+        // The scope names a group that no longer exists in this organization.
+        // Reported and skipped rather than measured as zero forever, which
+        // would look identical to "never crossed" and never surface the defect.
+        summary.invalidAlertCount++;
+        captureException(new Error('Alert scope references a missing group'), {
+          tags: { domain: 'organization-alerts', job: 'monthly-spending-evaluation' },
+          extra: { organizationId: alert.organization_id, alertId: alert.id },
+        });
+        continue;
+      }
+      spendByOccurrenceAndScope.set(cacheKey, spend);
     }
     if (spend < thresholdMicrodollars) continue;
 
     summary.crossedAlertCount++;
     const claims = await claimAlertDeliveries({
       alertId: alert.id,
-      occurrence,
+      periodOccurrenceId: occurrence.occurrenceId,
       recipients,
       configurationVersion: alert.configuration_version,
       thresholdMicrodollars,
-      measuredSpendMicrodollars: spend,
+      measuredValueMicrodollars: spend,
     });
     summary.claimedDeliveryCount += claims.length;
   }
 }
 
 /**
- * Direct AI usage spend for one organization over the occurrence's half-open
- * interval, read from canonical usage rather than the eventually consistent daily
- * rollup. Signed corrective rows are included because they are part of what the
- * organization was charged. Consolidated parent/child spend is deliberately not
- * summed: an alert measures its own organization only.
+ * Direct AI usage spend over the occurrence's half-open interval, read from
+ * canonical usage rather than the eventually consistent daily rollup. Signed
+ * corrective rows are included because they are part of what was charged.
+ * Consolidated parent/child spend is deliberately not summed: an alert
+ * measures its own organization, or a group within it, only.
+ *
+ * A `group` scope is a live-membership join, not a persisted attribution: it
+ * measures whoever currently belongs to the group over the interval, so a
+ * roster change today changes what this would report for a past interval if
+ * it were recomputed. Returns `undefined` if the scope names a group that no
+ * longer exists in this organization, which the caller must treat as invalid
+ * rather than as zero spend.
  */
-async function sumOrganizationSpend(
+async function sumScopedSpend(
   organizationId: string,
+  scope: MonthlySpendingAlertScope,
   occurrence: OrganizationAlertPeriodOccurrence
-): Promise<number> {
+): Promise<number | undefined> {
+  if (scope.type === 'organization') {
+    const [row] = await db
+      .select({ total: sum(microdollar_usage.cost) })
+      .from(microdollar_usage)
+      .where(
+        and(
+          eq(microdollar_usage.organization_id, organizationId),
+          gte(microdollar_usage.created_at, occurrence.startInclusive.toISOString()),
+          lt(microdollar_usage.created_at, occurrence.endExclusive.toISOString())
+        )
+      );
+    return Number(row?.total ?? 0);
+  }
+
+  const [group] = await db
+    .select({ id: organization_groups.id })
+    .from(organization_groups)
+    .where(
+      and(
+        eq(organization_groups.organization_id, organizationId),
+        eq(organization_groups.id, scope.groupId)
+      )
+    )
+    .limit(1);
+  if (!group) return undefined;
+
   const [row] = await db
     .select({ total: sum(microdollar_usage.cost) })
     .from(microdollar_usage)
+    .innerJoin(
+      organization_group_memberships,
+      and(
+        eq(organization_group_memberships.organization_id, microdollar_usage.organization_id),
+        eq(organization_group_memberships.kilo_user_id, microdollar_usage.kilo_user_id),
+        eq(organization_group_memberships.group_id, scope.groupId)
+      )
+    )
     .where(
       and(
         eq(microdollar_usage.organization_id, organizationId),

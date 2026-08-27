@@ -6,9 +6,9 @@ const mockGoogleAuth = jest.fn().mockImplementation((...args: unknown[]) => ({
   type: 'google-auth',
 }));
 
-const mockSubscriptionsV2Get = jest.fn().mockResolvedValue({
+const mockSubscriptionsV2Get = jest.fn().mockImplementation((...args: unknown[]) => ({
   data: { subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE' },
-});
+}));
 
 const mockAndroidPublisher = jest.fn().mockImplementation((...args: unknown[]) => ({
   args,

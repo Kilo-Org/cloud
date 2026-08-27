@@ -251,6 +251,37 @@ const config: ExpoConfig = {
       },
     ],
     './plugins/withAndroidManifestFix',
+    // Aggregate "Active Agents" glanceable surfaces: one Live Activity plus Home
+    // Screen and Lock Screen widgets, rendered by src/glanceable-ios. The widget
+    // target reuses the existing app group; no second group is created.
+    [
+      'expo-widgets',
+      {
+        groupIdentifier: 'group.com.kilocode.kiloapp',
+        bundleIdentifier: 'com.kilocode.kiloapp.ExpoWidgetsTarget',
+        enablePushNotifications: true,
+        widgets: [
+          {
+            name: 'ActiveAgentsWidget',
+            displayName: 'Active Agents',
+            description: 'Counts of running, needs-input, and reconnecting agents',
+            contentMarginsDisabled: false,
+            supportedFamilies: [
+              'systemSmall',
+              'systemMedium',
+              'systemLarge',
+              'accessoryCircular',
+              'accessoryRectangular',
+              'accessoryInline',
+            ],
+          },
+        ],
+      },
+    ],
+    // Local Expo module for Android Live Updates (no-op until slice `and`).
+    './plugins/withActiveAgentsLiveUpdate',
+    // No-op until slice `and` writes src/glanceable-android/widget-config.json.
+    './plugins/withActiveAgentsAndroidWidget',
     // Registered only when GOOGLE_IOS_CLIENT_ID is set — a guard for checkouts
     // whose environment does not provide it.
     ...googleSignInPlugins,

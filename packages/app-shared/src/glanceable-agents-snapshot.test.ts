@@ -168,8 +168,18 @@ describe('buildGlanceableSnapshot', () => {
 
 describe('isEligibleGlanceableWork and revision discard', () => {
   it('reports eligibility from the three counts', () => {
-    const empty = buildGlanceableSnapshot({ sessions: [], userId: 'u1', organizationId: null, now: NOW });
-    const busy = buildGlanceableSnapshot({ sessions: [{ status: 'busy' }], userId: 'u1', organizationId: null, now: NOW });
+    const empty = buildGlanceableSnapshot({
+      sessions: [],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const busy = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
     expect(isEligibleGlanceableWork(empty)).toBe(false);
     expect(isEligibleGlanceableWork(busy)).toBe(true);
   });

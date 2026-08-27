@@ -11,6 +11,7 @@ import {
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import {
   getIntegrationForOrganization,
+  getIntegrationsByOrganization,
   updateIntegrationMetadata,
 } from '@/lib/integrations/db/platform-integrations';
 import {
@@ -45,6 +46,7 @@ import { logExceptInTest } from '@/lib/utils.server';
 import {
   clearCodeReviewActionRequiredState,
   getCodeReviewActionRequiredState,
+  getCodeReviewScopedActionRequiredStates,
 } from '@/lib/code-reviews/action-required';
 import { getReviewMemoryEnabledFromConfig } from '@/lib/code-reviews/review-memory/settings';
 import { randomBytes } from 'node:crypto';
@@ -444,12 +446,24 @@ export const organizationReviewAgentRouter = createTRPCRouter({
    * (Replaces getGitHubStatus - now checks for GitHub App instead of OAuth)
    */
   getGitHubStatus: organizationMemberProcedure.query(async ({ input }) => {
-    const integration = await getIntegrationForOrganization(input.organizationId, 'github');
+    const integrations = await getIntegrationsByOrganization(input.organizationId, PLATFORM.GITHUB);
+    const healthyIntegrations = integrations.filter(isPlatformIntegrationHealthy);
+    const integration = healthyIntegrations[0];
 
-    if (!isPlatformIntegrationHealthy(integration)) {
+    if (!integration) {
       return {
         connected: false,
         integration: null,
+        health: {
+          total: integrations.length,
+          healthy: 0,
+          requiresAction: integrations.length,
+        },
+        installations: integrations.map(item => ({
+          id: item.id,
+          accountLogin: item.platform_account_login,
+          isHealthy: false,
+        })),
       };
     }
 
@@ -461,6 +475,16 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         installedAt: integration.installed_at,
         isValid: true,
       },
+      health: {
+        total: integrations.length,
+        healthy: healthyIntegrations.length,
+        requiresAction: integrations.length - healthyIntegrations.length,
+      },
+      installations: integrations.map(item => ({
+        id: item.id,
+        accountLogin: item.platform_account_login,
+        isHealthy: isPlatformIntegrationHealthy(item),
+      })),
     };
   }),
 
@@ -601,7 +625,10 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         council: cfg.council ?? null,
         councilEnabledRepositoryIds: cfg.council_enabled_repository_ids ?? [],
         reviewMemoryEnabled: isBitbucket ? false : getReviewMemoryEnabledFromConfig(config.config),
-        actionRequired: getCodeReviewActionRequiredState(config),
+        actionRequired:
+          getCodeReviewActionRequiredState(config) ??
+          getCodeReviewScopedActionRequiredStates(config)[0] ??
+          null,
       };
     }),
 

@@ -453,9 +453,9 @@ export function ReviewConfigForm({
       );
       setCouncilRequiredLabelsInput((loadedCouncil?.required_labels ?? []).join(', '));
       setCouncilEnabledRepositoryIds(
-        new Set(
-          (configData.councilEnabledRepositoryIds ?? []).filter(
-            (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+        new Set<number>(
+          (configData.councilEnabledRepositoryIds ?? []).flatMap(repositoryId =>
+            typeof repositoryId === 'number' ? [repositoryId] : []
           )
         )
       );

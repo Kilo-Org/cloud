@@ -59,6 +59,7 @@ const mockCreateInstallState =
       returnTo: string | null;
     }) => Promise<string>
   >();
+const mockClearScopedCodeReviewActionRequiredState = jest.fn<() => Promise<void>>();
 
 jest.mock('@/lib/integrations/github-apps-service', () => ({
   listIntegrations: (owner: Owner) => mockListIntegrations(owner),
@@ -103,6 +104,11 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
 
 jest.mock('@/lib/github-pr-review/dev-seed', () => ({
   seedUserGithubToken: (...args: [Record<string, unknown>]) => mockSeedUserGithubToken(...args),
+}));
+
+jest.mock('@/lib/code-reviews/action-required', () => ({
+  clearScopedCodeReviewActionRequiredState: (..._args: unknown[]) =>
+    mockClearScopedCodeReviewActionRequiredState(),
 }));
 
 let createCaller: (ctx: { user: User }) => {
@@ -267,6 +273,7 @@ describe('githubAppsRouter.refreshInstallation', () => {
     mockFetchGitHubRepositories.mockResolvedValue([]);
     mockUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
     mockUpdateRepositoriesForIntegration.mockResolvedValue(undefined);
+    mockClearScopedCodeReviewActionRequiredState.mockResolvedValue(undefined);
   });
 
   it('persists the current account login returned by GitHub', async () => {
@@ -278,6 +285,7 @@ describe('githubAppsRouter.refreshInstallation', () => {
       { type: 'user', id: 'user-1' },
       expect.objectContaining({ platformAccountLogin: 'renamed-owner' })
     );
+    expect(mockClearScopedCodeReviewActionRequiredState).toHaveBeenCalledTimes(1);
   });
 
   it('does not clear stored identity when GitHub returns no current account login', async () => {

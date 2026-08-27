@@ -13,6 +13,7 @@ import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
 import {
   CODE_REVIEW_ACTION_REQUIRED_REASONS,
   CODE_REVIEW_ACTION_REQUIRED_RUNTIME_STATE_KEY,
+  CODE_REVIEW_SCOPED_ACTION_REQUIRED_RUNTIME_STATE_KEY,
   type CodeReviewActionRequiredReason,
   type CodeReviewActionRequiredState,
   getCodeReviewActionRequiredCopy,
@@ -32,6 +33,8 @@ const CodeReviewActionRequiredStateSchema = z.object({
   detectedAt: z.string(),
   lastSeenAt: z.string(),
   triggeringReviewId: z.string().optional(),
+  integrationId: z.string().optional(),
+  repositoryFullName: z.string().optional(),
   lastErrorMessage: z.string(),
   emailSentAt: z.string().optional(),
 });
@@ -60,6 +63,8 @@ type DisableCodeReviewForActionRequiredFailureArgs = {
   reviewId?: string;
   reason: CodeReviewActionRequiredReason;
   errorMessage: string;
+  integrationId?: string | null;
+  repositoryFullName?: string | null;
 };
 
 type DisableCodeReviewForRepeatedCloneTimeoutsTodayArgs = {
@@ -74,6 +79,12 @@ type ClearCodeReviewActionRequiredStateArgs = {
   platform: CodeReviewPlatform;
 };
 
+type ClearScopedCodeReviewActionRequiredStateArgs = {
+  owner: Pick<Owner, 'type' | 'id'>;
+  platform: CodeReviewPlatform;
+  integrationId: string;
+};
+
 type MarkActionRequiredEmailSentArgs = {
   owner: Owner;
   platform: CodeReviewPlatform;
@@ -86,6 +97,11 @@ type PersistActionRequiredDisableArgs = {
   platform: CodeReviewPlatform;
   reviewId?: string;
   reason: CodeReviewActionRequiredReason;
+};
+
+type CodeReviewActionRequiredScope = {
+  integrationId?: string | null;
+  repositoryFullName?: string | null;
 };
 
 type PersistActionRequiredBeforeUpdate = (tx: DrizzleTransaction) => Promise<boolean>;
@@ -169,6 +185,44 @@ export function getCodeReviewActionRequiredState(
   );
 
   return parsed.success ? parsed.data : null;
+}
+
+export function getCodeReviewScopedActionRequiredStates(
+  config: AgentConfigWithRuntimeState | null | undefined
+): CodeReviewActionRequiredState[] {
+  const runtimeState = config?.runtime_state;
+  if (!runtimeState) return [];
+
+  const parsed = z
+    .array(CodeReviewActionRequiredStateSchema)
+    .safeParse(runtimeState[CODE_REVIEW_SCOPED_ACTION_REQUIRED_RUNTIME_STATE_KEY]);
+  return parsed.success ? parsed.data : [];
+}
+
+export function getCodeReviewActionRequiredStateForScope(
+  config: AgentConfigWithRuntimeState | null | undefined,
+  scope: CodeReviewActionRequiredScope
+): CodeReviewActionRequiredState | null {
+  const ownerWideState = getCodeReviewActionRequiredState(config);
+  if (ownerWideState) return ownerWideState;
+  if (!scope.integrationId) return null;
+
+  return (
+    getCodeReviewScopedActionRequiredStates(config).find(
+      state =>
+        state.integrationId === scope.integrationId &&
+        (!state.repositoryFullName || state.repositoryFullName === scope.repositoryFullName)
+    ) ?? null
+  );
+}
+
+function isIntegrationScopedFailure(args: DisableCodeReviewForActionRequiredFailureArgs): boolean {
+  return (
+    Boolean(args.integrationId) &&
+    (args.reason === 'github_installation_required' ||
+      args.reason === 'github_ip_allow_list' ||
+      args.reason === 'gitlab_project_access_required')
+  );
 }
 
 function ownerConditions(owner: Pick<Owner, 'type' | 'id'>, platform: CodeReviewPlatform): SQL[] {
@@ -418,6 +472,69 @@ async function persistActionRequiredDisable(
   });
 }
 
+async function persistScopedActionRequired(
+  args: DisableCodeReviewForActionRequiredFailureArgs
+): Promise<void> {
+  if (!args.integrationId) return;
+  const integrationId = args.integrationId;
+
+  await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`code-review-action-required:${args.owner.type}:${args.owner.id}:${args.platform}`}))`
+    );
+
+    const conditions = ownerConditions(args.owner, args.platform);
+    const [config] = await tx
+      .select()
+      .from(agent_configs)
+      .where(and(...conditions))
+      .for('update')
+      .limit(1);
+    if (!config) {
+      throw new Error(
+        `Code Review agent config not found for owner ${args.owner.type}:${args.owner.id} on ${args.platform}`
+      );
+    }
+
+    const now = new Date().toISOString();
+    const repositoryFullName =
+      args.reason === 'github_ip_allow_list' ? undefined : (args.repositoryFullName ?? undefined);
+    const states = getCodeReviewScopedActionRequiredStates(config);
+    const existingState = states.find(
+      state =>
+        state.integrationId === integrationId && state.repositoryFullName === repositoryFullName
+    );
+    const nextState: CodeReviewActionRequiredState = {
+      reason: args.reason,
+      detectedAt:
+        existingState?.reason === args.reason && existingState.detectedAt
+          ? existingState.detectedAt
+          : now,
+      lastSeenAt: now,
+      ...(args.reviewId ? { triggeringReviewId: args.reviewId } : {}),
+      integrationId,
+      ...(repositoryFullName ? { repositoryFullName } : {}),
+      lastErrorMessage: getCodeReviewActionRequiredCopy(args.reason).description,
+    };
+    const nextStates = states.filter(
+      state =>
+        state.integrationId !== integrationId || state.repositoryFullName !== repositoryFullName
+    );
+    nextStates.push(nextState);
+
+    await tx
+      .update(agent_configs)
+      .set({
+        runtime_state: {
+          ...(config.runtime_state ?? {}),
+          [CODE_REVIEW_SCOPED_ACTION_REQUIRED_RUNTIME_STATE_KEY]: nextStates,
+        },
+        updated_at: now,
+      })
+      .where(and(...conditions));
+  });
+}
+
 async function sendAndMarkActionRequiredEmailNotifications(
   args: PersistActionRequiredDisableArgs,
   shouldSendEmail: boolean
@@ -458,6 +575,11 @@ async function sendAndMarkActionRequiredEmailNotifications(
 export async function disableCodeReviewForActionRequiredFailure(
   args: DisableCodeReviewForActionRequiredFailureArgs
 ): Promise<void> {
+  if (isIntegrationScopedFailure(args)) {
+    await persistScopedActionRequired(args);
+    return;
+  }
+
   const shouldSendEmail = await persistActionRequiredDisable(args);
   if (shouldSendEmail === null) return;
   await sendAndMarkActionRequiredEmailNotifications(args, shouldSendEmail);
@@ -517,8 +639,40 @@ export async function clearCodeReviewActionRequiredState(
   await db
     .update(agent_configs)
     .set({
-      runtime_state: sql`COALESCE(${agent_configs.runtime_state}, '{}'::jsonb) - ${CODE_REVIEW_ACTION_REQUIRED_RUNTIME_STATE_KEY}`,
+      runtime_state: sql`COALESCE(${agent_configs.runtime_state}, '{}'::jsonb) - ${CODE_REVIEW_ACTION_REQUIRED_RUNTIME_STATE_KEY} - ${CODE_REVIEW_SCOPED_ACTION_REQUIRED_RUNTIME_STATE_KEY}`,
       updated_at: new Date().toISOString(),
     })
     .where(and(...conditions));
+}
+
+export async function clearScopedCodeReviewActionRequiredState(
+  args: ClearScopedCodeReviewActionRequiredStateArgs
+): Promise<void> {
+  const conditions = ownerConditions(args.owner, args.platform);
+  await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`code-review-action-required:${args.owner.type}:${args.owner.id}:${args.platform}`}))`
+    );
+    const [config] = await tx
+      .select()
+      .from(agent_configs)
+      .where(and(...conditions))
+      .for('update')
+      .limit(1);
+    if (!config) return;
+
+    const remainingStates = getCodeReviewScopedActionRequiredStates(config).filter(
+      state => state.integrationId !== args.integrationId
+    );
+    const runtimeState = { ...(config.runtime_state ?? {}) };
+    if (remainingStates.length === 0) {
+      delete runtimeState[CODE_REVIEW_SCOPED_ACTION_REQUIRED_RUNTIME_STATE_KEY];
+    } else {
+      runtimeState[CODE_REVIEW_SCOPED_ACTION_REQUIRED_RUNTIME_STATE_KEY] = remainingStates;
+    }
+    await tx
+      .update(agent_configs)
+      .set({ runtime_state: runtimeState, updated_at: new Date().toISOString() })
+      .where(and(...conditions));
+  });
 }

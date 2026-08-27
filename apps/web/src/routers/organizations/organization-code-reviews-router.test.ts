@@ -130,6 +130,56 @@ describe('organization review agent router: toggleReviewAgent', () => {
   });
 });
 
+describe('organization review agent router: GitHub status', () => {
+  afterAll(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+  });
+
+  it('reports aggregate and per-installation health when one installation is healthy', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const [healthy, unhealthy] = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          integration_status: 'active',
+          platform_installation_id: `healthy-${crypto.randomUUID()}`,
+          platform_account_login: 'healthy-org',
+        },
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          integration_status: 'suspended',
+          platform_installation_id: `unhealthy-${crypto.randomUUID()}`,
+          platform_account_login: 'unhealthy-org',
+          suspended_at: new Date().toISOString(),
+        },
+      ])
+      .returning();
+    const caller = await createCallerForUser(owner.id);
+
+    const status = await caller.organizations.reviewAgent.getGitHubStatus({
+      organizationId: organization.id,
+    });
+
+    expect(status.connected).toBe(true);
+    expect(status.integration?.accountLogin).toBe('healthy-org');
+    expect(status.health).toEqual({ total: 2, healthy: 1, requiresAction: 1 });
+    expect(status.installations).toEqual([
+      expect.objectContaining({ id: healthy.id, isHealthy: true }),
+      expect.objectContaining({ id: unhealthy.id, isHealthy: false }),
+    ]);
+  });
+});
+
 describe('organization review agent router: council config', () => {
   afterAll(async () => {
     for (const organizationId of createdOrganizationIds) {

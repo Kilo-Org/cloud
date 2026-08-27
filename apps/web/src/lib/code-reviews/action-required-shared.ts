@@ -12,6 +12,8 @@ export {
 };
 
 export const CODE_REVIEW_ACTION_REQUIRED_RUNTIME_STATE_KEY = 'code_review_action_required';
+export const CODE_REVIEW_SCOPED_ACTION_REQUIRED_RUNTIME_STATE_KEY =
+  'code_review_scoped_action_required';
 
 export type CodeReviewActionRequiredCopy = {
   title: string;
@@ -32,16 +34,16 @@ const WEB_COPY_BY_REASON: Record<
   { checkTitle: string; gitlabDescription: string }
 > = {
   github_installation_required: {
-    checkTitle: 'Code Reviewer disabled: GitHub App access',
-    gitlabDescription: 'Code Reviewer disabled: GitHub App access required',
+    checkTitle: 'Code Reviewer needs GitHub App access',
+    gitlabDescription: 'Code Reviewer needs GitHub App access',
   },
   github_ip_allow_list: {
-    checkTitle: 'Code Reviewer disabled: IP allow list',
-    gitlabDescription: 'Code Reviewer disabled: GitHub IP allow list blocks Kilo',
+    checkTitle: 'Code Reviewer blocked by IP allow list',
+    gitlabDescription: 'Code Reviewer blocked by GitHub IP allow list',
   },
   gitlab_project_access_required: {
-    checkTitle: 'Code Reviewer disabled: GitLab token setup',
-    gitlabDescription: 'Code Reviewer disabled: GitLab token setup required',
+    checkTitle: 'Code Reviewer needs GitLab token access',
+    gitlabDescription: 'Code Reviewer needs GitLab token access',
   },
   byok_invalid_key: {
     checkTitle: 'Code Reviewer disabled: BYOK key issue',
@@ -81,12 +83,16 @@ export function getCodeReviewActionRequiredCopy(
 export function getCodeReviewActionRequiredRecoveryHref(
   reason: CodeReviewActionRequiredReason,
   organizationId?: string,
-  platform?: 'github' | 'gitlab' | 'bitbucket'
+  platform?: 'github' | 'gitlab' | 'bitbucket',
+  integrationId?: string
 ): string {
   if (reason === 'github_installation_required') {
-    return organizationId
+    const path = organizationId
       ? `/organizations/${organizationId}/integrations/github`
       : '/integrations/github';
+    return integrationId
+      ? `${path}#github-installation-${encodeURIComponent(integrationId)}`
+      : path;
   }
 
   if (reason === 'github_ip_allow_list') {

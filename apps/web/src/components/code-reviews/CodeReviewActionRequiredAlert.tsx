@@ -25,7 +25,8 @@ export function CodeReviewActionRequiredAlert({
   const recoveryHref = getCodeReviewActionRequiredRecoveryHref(
     actionRequired.reason,
     organizationId,
-    platform
+    platform,
+    actionRequired.integrationId
   );
   const isMailto = recoveryHref.startsWith('mailto:');
 

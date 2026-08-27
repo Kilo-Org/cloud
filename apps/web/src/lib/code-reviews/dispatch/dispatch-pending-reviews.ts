@@ -51,7 +51,7 @@ import {
   classifyCodeReviewActionRequiredFailure,
   disableCodeReviewForActionRequiredFailure,
   getCodeReviewActionRequiredCopy,
-  getCodeReviewActionRequiredState,
+  getCodeReviewActionRequiredStateForScope,
   isCodeReviewActionRequiredReason,
   type CodeReviewActionRequiredReason,
 } from '../action-required';
@@ -324,7 +324,7 @@ export async function tryDispatchPendingReviews(
         if (actionRequiredReason) {
           if (!actionRequiredStateAlreadyPresent && !isManualReview) {
             logExceptInTest(
-              '[tryDispatchPendingReviews] Disabling Code Reviewer after action-required failure',
+              '[tryDispatchPendingReviews] Recording Code Reviewer action-required failure',
               {
                 reviewId: reservation.review.id,
                 owner,
@@ -339,9 +339,11 @@ export async function tryDispatchPendingReviews(
                 reviewId: reservation.review.id,
                 reason: actionRequiredReason,
                 errorMessage,
+                integrationId: reservation.review.platform_integration_id,
+                repositoryFullName: reservation.review.repo_full_name,
               });
             } catch (disableError) {
-              errorExceptInTest('[tryDispatchPendingReviews] Failed to disable Code Reviewer', {
+              errorExceptInTest('[tryDispatchPendingReviews] Failed to record action-required', {
                 reviewId: reservation.review.id,
                 owner,
                 reason: actionRequiredReason,
@@ -489,7 +491,10 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       );
     }
 
-    const actionRequiredState = getCodeReviewActionRequiredState(persistedAgentConfig);
+    const actionRequiredState = getCodeReviewActionRequiredStateForScope(persistedAgentConfig, {
+      integrationId: review.platform_integration_id,
+      repositoryFullName: review.repo_full_name,
+    });
     if (actionRequiredState) {
       throw new CodeReviewActionRequiredDispatchError(actionRequiredState.reason);
     }
@@ -690,10 +695,12 @@ async function handleAmbiguousDispatchFailure(
           reviewId: review.id,
           reason: actionRequiredReason,
           errorMessage: workerStatus.errorMessage ?? actionRequiredReason,
+          integrationId: review.platform_integration_id,
+          repositoryFullName: review.repo_full_name,
         });
         await finalizeActionRequiredGateCheck(review, actionRequiredReason);
       } catch (disableError) {
-        errorExceptInTest('[dispatchReview] Failed to disable Code Reviewer', {
+        errorExceptInTest('[dispatchReview] Failed to record action-required', {
           reviewId: review.id,
           reason: actionRequiredReason,
           disableError,

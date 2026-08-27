@@ -1560,10 +1560,12 @@ export async function POST(
             reviewId,
             reason: actionRequiredReason,
             errorMessage: errorMessage ?? actionRequiredReason,
+            integrationId: review.platform_integration_id,
+            repositoryFullName: review.repo_full_name,
           });
         } catch (disableError) {
           logExceptInTest(
-            '[code-review-status] Failed to disable Code Reviewer for action-required failure:',
+            '[code-review-status] Failed to record Code Reviewer action-required failure:',
             disableError
           );
           captureException(disableError, {

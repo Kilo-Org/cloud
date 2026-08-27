@@ -43,52 +43,47 @@ else
   base=$(git merge-base origin/main HEAD 2>/dev/null || true)
 fi
 
-# Decide selection mode:
-#   force_all=true — include every workspace (lockfile/workspace-yaml changes
-#     genuinely can break any downstream workspace, and loose `packages/*` files
-#     outside any package dir don't have a single owner to derive dependents of).
-#   force_all=false and dependent_dirs_file populated — a `packages/<name>/**`
-#     path changed; only include that package plus its transitive workspace:*
-#     dependents.
-#   force_all=false and dependent_dirs_file empty — fall back to per-workspace
-#     direct file-diff check.
 force_all=false
 dependent_dirs_file=$(mktemp)
 trap 'rm -f "$dependent_dirs_file"' EXIT
 if [ -n "$base" ]; then
-  if git diff --name-only "$base" -- pnpm-lock.yaml pnpm-workspace.yaml | grep -q .; then
-    force_all=true
-  else
-    # List files changed under packages/**. Anything that doesn't match
-    # `packages/<name>/` (e.g. `packages/README.md`) is a loose file with no
-    # single owning package — fall back to force_all.
-    pkg_changes=$(git diff --name-only "$base" -- 'packages/**' || true)
-    if [ -n "$pkg_changes" ]; then
-      loose=$(printf '%s\n' "$pkg_changes" | grep -vE '^packages/[^/]+/' | head -1 || true)
-      if [ -n "$loose" ]; then
-        force_all=true
-      else
-        # Collect the top-level changed package dirs and union their transitive
-        # workspace:* dependents via pnpm's `...^<name>` selector.
-        changed_pkg_dirs=$(printf '%s\n' "$pkg_changes" | awk -F/ '{print $1"/"$2}' | sort -u)
-        for pkg_dir in $changed_pkg_dirs; do
-          [ -f "$pkg_dir/package.json" ] || continue
-          pkg_name=$(node -e "console.log(require('./$pkg_dir/package.json').name)" 2>/dev/null) || continue
-          [ -n "$pkg_name" ] || continue
-          pnpm --filter "...^$pkg_name" ls --json --depth -1 2>/dev/null | node -e "
-            const pkgs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-            for (const p of pkgs) {
-              if (!p.path) continue;
-              const rel = require('path').relative(process.cwd(), p.path);
-              if (rel && rel !== '.') console.log(rel);
-            }
-          " 2>/dev/null >> "$dependent_dirs_file" || true
-          # Always include the changed package itself; `...^<name>` only matches
-          # true dependents, not the named package.
-          echo "$pkg_dir" >> "$dependent_dirs_file"
-        done
-        sort -u "$dependent_dirs_file" -o "$dependent_dirs_file"
-      fi
+  if ! git diff --quiet "$base" -- pnpm-lock.yaml pnpm-workspace.yaml 'patches/**'; then
+    if ! node scripts/changed-dependencies.mjs "$base" > "$dependent_dirs_file"; then
+      force_all=true
+    elif grep -qxF '*' "$dependent_dirs_file"; then
+      force_all=true
+    fi
+  fi
+
+  # List files changed under packages/**. Anything that doesn't match
+  # `packages/<name>/` (e.g. `packages/README.md`) is a loose file with no
+  # single owning package — fall back to force_all.
+  pkg_changes=$(git diff --name-only "$base" -- 'packages/**' || true)
+  if [ -n "$pkg_changes" ]; then
+    loose=$(printf '%s\n' "$pkg_changes" | grep -vE '^packages/[^/]+/' | head -1 || true)
+    if [ -n "$loose" ]; then
+      force_all=true
+    else
+      # Collect the top-level changed package dirs and union their transitive
+      # workspace:* dependents via pnpm's `...^<name>` selector.
+      changed_pkg_dirs=$(printf '%s\n' "$pkg_changes" | awk -F/ '{print $1"/"$2}' | sort -u)
+      for pkg_dir in $changed_pkg_dirs; do
+        [ -f "$pkg_dir/package.json" ] || continue
+        pkg_name=$(node -e "console.log(require('./$pkg_dir/package.json').name)" 2>/dev/null) || continue
+        [ -n "$pkg_name" ] || continue
+        pnpm --filter "...^$pkg_name" ls --json --depth -1 2>/dev/null | node -e "
+          const pkgs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+          for (const p of pkgs) {
+            if (!p.path) continue;
+            const rel = require('path').relative(process.cwd(), p.path);
+            if (rel && rel !== '.') console.log(rel);
+          }
+        " 2>/dev/null >> "$dependent_dirs_file" || true
+        # Always include the changed package itself; `...^<name>` only matches
+        # true dependents, not the named package.
+        echo "$pkg_dir" >> "$dependent_dirs_file"
+      done
+      sort -u "$dependent_dirs_file" -o "$dependent_dirs_file"
     fi
   fi
 fi
@@ -131,7 +126,7 @@ for dir in $workspace_dirs; do
   # Check for file changes (if we have a merge base)
   if [ -n "$base" ] && ! $force_all; then
     if [ -s "$dependent_dirs_file" ] && grep -qxF "$dir" "$dependent_dirs_file"; then
-      : # include: workspace is a transitive dependent of a changed package
+      :
     else
       changed_file=$(git diff --name-only "$base" -- "$dir/" | head -1 || true)
       [ -n "$changed_file" ] || continue

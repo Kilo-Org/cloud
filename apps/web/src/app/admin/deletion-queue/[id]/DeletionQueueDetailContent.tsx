@@ -35,6 +35,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { UserDeletionStepKey } from '@kilocode/db/schema-types';
+import { USER_DELETION_ID_ONLY_CATALOG_VERSION } from '@/lib/user/deletion-queue/deletion-constants';
 import {
   deletionAttentionHint,
   deletionManualSearchHref,
@@ -109,6 +110,7 @@ export function DeletionQueueDetailContent({
 
   const detail = detailQuery.data;
   const request = detail.request;
+  const idOnly = request.catalogVersion === USER_DELETION_ID_ONLY_CATALOG_VERSION;
   const notifyChannel = deletionNotifyChannel({
     pylonTicket: request.pylonTicket,
     tasks: detail.tasks,
@@ -229,7 +231,9 @@ export function DeletionQueueDetailContent({
         <CardHeader>
           <CardTitle>Steps</CardTitle>
           <CardDescription>
-            Customer notification is the Pylon reply or the completion email, never both.
+            {notifyChannel === 'none'
+              ? 'No customer notifications are included in this request.'
+              : 'Customer notification is the Pylon reply or the completion email, never both.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -254,7 +258,8 @@ export function DeletionQueueDetailContent({
                 const search = stuck
                   ? deletionManualSearchHref({
                       stepKey: task.stepKey,
-                      email: request.email,
+                      email: idOnly ? null : request.email,
+                      userId: idOnly ? request.userId : undefined,
                     })
                   : null;
                 return (
@@ -448,6 +453,9 @@ function CompactDeletionDetail({
             >
               Open Cloud user
             </Link>
+          ) : null}
+          {notifyChannel === 'none' ? (
+            <p className="text-muted-foreground text-xs">No customer notifications</p>
           ) : null}
         </div>
 

@@ -672,7 +672,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, filă, {{position}} din {{total}}"
+    "position": "{{name}}, filă, {{position}} din {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -1308,7 +1309,23 @@
       "checkRun": "Rulare verificare",
       "status": "Stare",
       "threshold": "Prag",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Se așteaptă transcrierea revizuirii.",
+      "transcriptEmpty": "Nu există o transcriere pentru această revizuire.",
+      "transcriptRetry": "Nu s-a putut încărca transcrierea revizuirii.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Agent inactiv",
+      "agentWorking": "Agent lucrează...",
+      "anErrorOccurred": "A apărut o eroare",
+      "errorWithMessage": "Eroare: {{message}}",
+      "executionStarted": "Execuție începută",
+      "reviewCompleted": "Revizuire finalizată",
+      "reviewInterrupted": "Revizuire întreruptă",
+      "sessionError": "Eroare de sesiune: {{error}}",
+      "statusWithValue": "Stare: {{status}}",
+      "toolName": "Unealtă: {{name}}",
+      "toolNameError": "Unealtă: {{name}} — eroare",
+      "unknownError": "Eroare necunoscută"
     },
     "reviewMemory": {
       "title": "Memorie de revizuire",
@@ -2046,7 +2063,6 @@
     }
   },
   "agents": {
-    "activeNow": "Activ acum",
     "search": {
       "searching": "Caută",
       "searchSessions": "Caută sesiuni",
@@ -2057,13 +2073,11 @@
     "sessionList": {
       "couldNotLoad": "Nu s-au putut încărca sesiunile",
       "couldNotLoadActive": "Nu s-au putut încărca sesiunile active",
-      "noSessionsYet": "Încă nicio sesiune",
       "noSessionsYetDescription": "Începe o sarcină de codare de pe telefon. Sesiunile tale vor apărea aici.",
       "noMatches": "Nicio sesiune nu corespunde",
       "tryDifferentSearch": "Încearcă un alt termen de căutare.",
       "tryAdjustFilters": "Încearcă să ajustezi sau să ștergi filtrele.",
       "couldNotSearch": "Nu s-au putut căuta sesiunile",
-      "allActive": "Toate sesiunile sunt active",
       "completedWillAppear": "Sesiunile finalizate vor apărea aici.",
       "noPastSessions": "Nicio sesiune trecută",
       "live": "LIVE"
@@ -2134,13 +2148,10 @@
       "scrollToBottom": "Derulează la final",
       "emptyTitle": "Încă niciun mesaj",
       "renameAccessibility": "Redenumește sesiunea: {{title}}",
-      "connectRepository": "Conectează depozitul",
       "cloningSession": "Se clonează sesiunea",
       "continue": "Continuă",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune",
-      "cloneFailed": "Nu s-a putut clona această sesiune.",
       "cloneFailedRetry": "Nu s-a putut clona această sesiune. Încearcă din nou.",
-      "connectRepositoryToContinue": "Conectează un depozit pentru a continua.",
       "notEnoughCredits": "Credite insuficiente pentru a rula Cloud Agent. Adaugă credite și încearcă din nou.",
       "previousTaskFinishing": "Sarcina anterioară încă se finalizează. Te rugăm să aștepți un moment.",
       "serviceUnavailable": "Serviciul nu este disponibil acum. Te rugăm să încerci din nou.",
@@ -2213,7 +2224,11 @@
       "noRepositoriesVisibleGitlab": "Niciun depozit vizibil. Verifică accesul la depozite pentru GitLab, apoi actualizează.",
       "openBitbucket": "Deschide Bitbucket",
       "openGitlab": "Deschide GitLab",
-      "recentlyUsed": "Folosite recent"
+      "recentlyUsed": "Folosite recent",
+      "continueFrom": "Continuare {{title}}",
+      "importingSession": "Se importă sesiunea",
+      "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
+      "importFailed": "Nu s-a putut importa această sesiune."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizat {{displayCount}} fișier",
@@ -2479,6 +2494,8 @@
       "viewTable": "Vezi tabelul",
       "title": "Tabel",
       "close": "Închide tabelul",
+      "loading": "Se încarcă tabelul",
+      "empty": "Acest tabel nu are rânduri.",
       "columnCount_one": "coloană",
       "columnCount": "coloane",
       "columnCount_other": "coloane",
@@ -2670,6 +2687,17 @@
       "hostConfirmMessage": "Acest link deschide {{host}} în browser.",
       "open": "Deschide",
       "trustThisHost": "Încrede-te în această gazdă"
+    },
+    "folderPicker": {
+      "accessibility": "Folder: {{label}}",
+      "emptyDescription": "Gata folosește acest folder.",
+      "emptyTitle": "Niciun folder în interior",
+      "fieldLabel": "Folder",
+      "retryableDescription": "Verifică conexiunea și apasă Reîncearcă. Gata confirmă în continuare acest folder.",
+      "retryableTitle": "Nu s-au putut lista folderele",
+      "tapToListHint": "Atinge un folder pentru a-i lista conținutul",
+      "unsupportedDescription": "Acest CLI nu poate lista foldere. Gata păstrează folderul de pornire, iar Începe sesiunea pornește de acolo.",
+      "unsupportedTitle": "Nu pot lista folderele"
     }
   },
   "bootstrap": {
@@ -3170,5 +3198,19 @@
     "emptyDescription": "Când ai încredere în gazda unui link, acesta se deschide fără a te mai întreba.",
     "revoke": "Revocă {{host}}",
     "backToPreferences": "Înapoi la preferințe"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Mesaj"
+    },
+    "empty": {
+      "title": "Începe un chat",
+      "description": "Trimite un mesaj pentru a vorbi cu un model."
+    },
+    "working": "Se procesează",
+    "historyRetry": "Nu s-a putut încărca istoricul de chat.",
+    "catalogRetry": "Modelele nu au putut fi încărcate",
+    "sendError": "Mesajul nu a putut fi trimis. Încercați din nou."
   }
 }

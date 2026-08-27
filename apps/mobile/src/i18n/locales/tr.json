@@ -211,7 +211,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, sekme, {{position}} / {{total}}"
+    "position": "{{name}}, sekme, {{position}} / {{total}}",
+    "chat": "Sohbet"
   },
   "chat": {
     "instancePicker": {
@@ -898,7 +899,23 @@
       "title": "İnceleme",
       "tokens": "Jetonlar",
       "tokensInOut": "{{input}} giriş / {{output}} çıkış",
-      "pullRequest": "çekme isteği"
+      "pullRequest": "çekme isteği",
+      "transcriptWaiting": "İnceleme dökümü bekleniyor.",
+      "transcriptEmpty": "Bu incelemeye ait döküm yok.",
+      "transcriptRetry": "İnceleme dökümü yüklenemedi.",
+      "transcriptLive": "CANLI",
+      "agentIdle": "Ajan boşta",
+      "agentWorking": "Ajan çalışıyor...",
+      "anErrorOccurred": "Bir hata oluştu",
+      "errorWithMessage": "Hata: {{message}}",
+      "executionStarted": "Yürütme başladı",
+      "reviewCompleted": "İnceleme tamamlandı",
+      "reviewInterrupted": "İnceleme kesintiye uğradı",
+      "sessionError": "Oturum hatası: {{error}}",
+      "statusWithValue": "Durum: {{status}}",
+      "toolName": "Araç: {{name}}",
+      "toolNameError": "Araç: {{name}} — hata",
+      "unknownError": "Bilinmeyen hata"
     },
     "reviewList": {
       "configureProvider": "Sağlayıcıyı yapılandır",
@@ -1579,7 +1596,6 @@
     }
   },
   "agents": {
-    "activeNow": "Şu anda etkin",
     "search": {
       "searching": "Aranıyor",
       "searchSessions": "Oturumları ara",
@@ -1590,13 +1606,11 @@
     "sessionList": {
       "couldNotLoad": "Oturumlar yüklenemedi",
       "couldNotLoadActive": "Etkin oturumlar yüklenemedi",
-      "noSessionsYet": "Henüz oturum yok",
       "noSessionsYetDescription": "Telefonunuzdan bir kodlama görevi başlatın. Oturumlarınız burada görünecek.",
       "noMatches": "Eşleşen oturum yok",
       "tryDifferentSearch": "Farklı bir arama terimi deneyin.",
       "tryAdjustFilters": "Filtrelerinizi ayarlamayı veya temizlemeyi deneyin.",
       "couldNotSearch": "Oturumlar aranamadı",
-      "allActive": "Tüm oturumlar etkin",
       "completedWillAppear": "Tamamlanan oturumlar burada görünecek.",
       "noPastSessions": "Geçmiş oturum yok",
       "live": "CANLI"
@@ -1665,13 +1679,10 @@
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
       "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
-      "connectRepository": "Depoyu bağla",
       "cloningSession": "Oturum klonlanıyor",
       "continue": "Devam et",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi",
-      "cloneFailed": "Bu oturum kopyalanamadı.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar deneyin.",
-      "connectRepositoryToContinue": "Devam etmek için bir depo bağlayın.",
       "notEnoughCredits": "Cloud Agent'i çalıştırmak için yeterli kredi yok. Kredi ekleyip tekrar deneyin.",
       "previousTaskFinishing": "Önceki görev hâlâ tamamlanıyor. Lütfen bir dakika bekleyin.",
       "serviceUnavailable": "Hizmet şu anda kullanılamıyor. Lütfen tekrar deneyin.",
@@ -1744,7 +1755,11 @@
       "noRepositoriesVisibleGitlab": "Görünür depo yok. GitLab için depo erişimini kontrol edin, ardından yenileyin.",
       "openBitbucket": "Bitbucket'ı Aç",
       "openGitlab": "GitLab'ı Aç",
-      "recentlyUsed": "Son kullanılanlar"
+      "recentlyUsed": "Son kullanılanlar",
+      "continueFrom": "{{title}} devam ediliyor",
+      "importingSession": "Oturum içe aktarılıyor",
+      "cliCannotContinue": "Bu CLI bir oturuma devam edemez. Bulut Ajanı veya başka bir CLI seçin.",
+      "importFailed": "Bu oturum içe aktarılamadı."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi",
@@ -2008,6 +2023,8 @@
       "viewTable": "Tabloyu görüntüle",
       "title": "Tablo",
       "close": "Tabloyu kapat",
+      "loading": "Tablo yükleniyor",
+      "empty": "Bu tabloda hiç satır yok.",
       "columnCount_one": "sütun",
       "columnCount": "sütunlar",
       "columnCount_other": "sütunlar",
@@ -2196,6 +2213,17 @@
       "hostConfirmMessage": "Bu bağlantı {{host}} adresini tarayıcınızda açar.",
       "open": "Aç",
       "trustThisHost": "Bu sunucuya güven"
+    },
+    "folderPicker": {
+      "accessibility": "Klasör: {{label}}",
+      "emptyDescription": "Bitti bu klasörü kullanır.",
+      "emptyTitle": "İçinde klasör yok",
+      "fieldLabel": "Klasör",
+      "retryableDescription": "Bağlantınızı kontrol edin ve Tekrar dene. Bitti yine de bu klasörü onaylar.",
+      "retryableTitle": "Klasörler listelenemedi",
+      "tapToListHint": "Klasörün içeriğini listelemek için klasöre dokunun",
+      "unsupportedDescription": "Bu CLI klasörleri listeleyemez. Bitti başlatma klasörünü korur ve Oturumu başlat orada başlar.",
+      "unsupportedTitle": "Klasörler listelenemiyor"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Bir bağlantının sunucusuna güvendiğinizde, bir daha sormadan açılır.",
     "revoke": "{{host}} güvenini kaldır",
     "backToPreferences": "Tercihlere dön"
+  },
+  "quickChat": {
+    "title": "Sohbet",
+    "composer": {
+      "placeholder": "Mesaj"
+    },
+    "empty": {
+      "title": "Bir sohbet başlat",
+      "description": "Bir modelle konuşmak için mesaj gönder."
+    },
+    "working": "Çalışıyor",
+    "historyRetry": "Sohbet geçmişi yüklenemedi.",
+    "catalogRetry": "Modeller yüklenemedi",
+    "sendError": "Mesaj gönderilemedi. Lütfen tekrar deneyin."
   }
 }

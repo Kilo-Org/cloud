@@ -211,7 +211,8 @@
     "profile": "Hồ sơ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} trên {{total}}"
+    "position": "{{name}}, tab, {{position}} trên {{total}}",
+    "chat": "Trò chuyện"
   },
   "chat": {
     "instancePicker": {
@@ -898,7 +899,23 @@
       "title": "Đánh giá",
       "tokens": "Token",
       "tokensInOut": "{{input}} vào / {{output}} ra",
-      "pullRequest": "yêu cầu hợp nhất"
+      "pullRequest": "yêu cầu hợp nhất",
+      "transcriptWaiting": "Đang chờ bản ghi phiên đánh giá.",
+      "transcriptEmpty": "Không có bản ghi phiên cho đánh giá này.",
+      "transcriptRetry": "Không thể tải bản ghi phiên đánh giá.",
+      "transcriptLive": "TRỰC TIẾP",
+      "agentIdle": "Tác nhân rảnh rỗi",
+      "agentWorking": "Tác nhân đang làm việc...",
+      "anErrorOccurred": "Đã xảy ra lỗi",
+      "errorWithMessage": "Lỗi: {{message}}",
+      "executionStarted": "Đã bắt đầu thực thi",
+      "reviewCompleted": "Đã hoàn tất đánh giá",
+      "reviewInterrupted": "Đánh giá bị gián đoạn",
+      "sessionError": "Lỗi phiên: {{error}}",
+      "statusWithValue": "Trạng thái: {{status}}",
+      "toolName": "Công cụ: {{name}}",
+      "toolNameError": "Công cụ: {{name}} — lỗi",
+      "unknownError": "Lỗi không xác định"
     },
     "reviewList": {
       "configureProvider": "Cấu hình nhà cung cấp",
@@ -1579,7 +1596,6 @@
     }
   },
   "agents": {
-    "activeNow": "Đang hoạt động",
     "search": {
       "searching": "Đang tìm kiếm",
       "searchSessions": "Tìm kiếm phiên",
@@ -1590,13 +1606,11 @@
     "sessionList": {
       "couldNotLoad": "Không thể tải các phiên",
       "couldNotLoadActive": "Không thể tải các phiên đang hoạt động",
-      "noSessionsYet": "Chưa có phiên nào",
       "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại. Các phiên của bạn sẽ xuất hiện tại đây.",
       "noMatches": "Không có phiên nào khớp",
       "tryDifferentSearch": "Hãy thử một cụm từ tìm kiếm khác.",
       "tryAdjustFilters": "Hãy thử điều chỉnh hoặc xóa bộ lọc của bạn.",
       "couldNotSearch": "Không thể tìm kiếm phiên",
-      "allActive": "Tất cả phiên đang hoạt động",
       "completedWillAppear": "Các phiên đã hoàn tất sẽ xuất hiện tại đây.",
       "noPastSessions": "Không có phiên trước đây",
       "live": "TRỰC TIẾP"
@@ -1665,13 +1679,10 @@
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
       "renameAccessibility": "Đổi tên phiên: {{title}}",
-      "connectRepository": "Kết nối kho lưu trữ",
       "cloningSession": "Đang sao chép phiên",
       "continue": "Tiếp tục",
       "couldNotLoadThisSession": "Không thể tải phiên này",
-      "cloneFailed": "Không thể sao chép phiên này.",
       "cloneFailedRetry": "Không thể sao chép phiên này. Hãy thử lại.",
-      "connectRepositoryToContinue": "Kết nối một kho lưu trữ để tiếp tục.",
       "notEnoughCredits": "Không đủ tín dụng để chạy Cloud Agent. Hãy nạp tín dụng và thử lại.",
       "previousTaskFinishing": "Tác vụ trước vẫn đang hoàn tất. Vui lòng chờ một chút.",
       "serviceUnavailable": "Dịch vụ hiện không khả dụng. Vui lòng thử lại.",
@@ -1744,7 +1755,11 @@
       "noRepositoriesVisibleGitlab": "Không có kho lưu trữ hiển thị. Kiểm tra quyền truy cập kho lưu trữ cho GitLab, rồi làm mới.",
       "openBitbucket": "Mở Bitbucket",
       "openGitlab": "Mở GitLab",
-      "recentlyUsed": "Đã dùng gần đây"
+      "recentlyUsed": "Đã dùng gần đây",
+      "continueFrom": "Đang tiếp tục {{title}}",
+      "importingSession": "Đang nhập phiên",
+      "cliCannotContinue": "CLI này không thể tiếp tục một phiên. Hãy chọn Tác nhân đám mây hoặc CLI khác.",
+      "importFailed": "Không thể nhập phiên này."
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp",
@@ -2008,6 +2023,8 @@
       "viewTable": "Xem bảng",
       "title": "Bảng",
       "close": "Đóng bảng",
+      "loading": "Đang tải bảng",
+      "empty": "Bảng này không có hàng nào.",
       "columnCount_one": "cột",
       "columnCount": "các cột",
       "columnCount_other": "các cột",
@@ -2196,6 +2213,17 @@
       "hostConfirmMessage": "Liên kết này mở {{host}} trong trình duyệt của bạn.",
       "open": "Mở",
       "trustThisHost": "Tin cậy máy chủ này"
+    },
+    "folderPicker": {
+      "accessibility": "Thư mục: {{label}}",
+      "emptyDescription": "Xong sử dụng thư mục này.",
+      "emptyTitle": "Không có thư mục bên trong",
+      "fieldLabel": "Thư mục",
+      "retryableDescription": "Kiểm tra kết nối và Thử lại. Xong vẫn xác nhận thư mục này.",
+      "retryableTitle": "Không thể liệt kê thư mục",
+      "tapToListHint": "Chạm vào thư mục để xem nội dung của nó",
+      "unsupportedDescription": "CLI này không thể liệt kê thư mục. Xong giữ thư mục khởi chạy và Bắt đầu phiên bắt đầu tại đó.",
+      "unsupportedTitle": "Không thể liệt kê thư mục"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Khi bạn tin cậy máy chủ của một liên kết, liên kết đó sẽ mở mà không hỏi lại.",
     "revoke": "Thu hồi {{host}}",
     "backToPreferences": "Quay lại cài đặt"
+  },
+  "quickChat": {
+    "title": "Trò chuyện",
+    "composer": {
+      "placeholder": "Tin nhắn"
+    },
+    "empty": {
+      "title": "Bắt đầu trò chuyện",
+      "description": "Gửi tin nhắn để trò chuyện với mô hình."
+    },
+    "working": "Đang xử lý",
+    "historyRetry": "Không thể tải lịch sử trò chuyện.",
+    "catalogRetry": "Không thể tải các mô hình",
+    "sendError": "Không thể gửi tin nhắn. Vui lòng thử lại."
   }
 }

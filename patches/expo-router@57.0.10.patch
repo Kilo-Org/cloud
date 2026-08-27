@@ -1,0 +1,42 @@
+diff --git a/build/fork/useLinking.native.js b/build/fork/useLinking.native.js
+--- a/build/fork/useLinking.native.js
++++ b/build/fork/useLinking.native.js
+@@ -114,20 +114,30 @@ function useLinking(ref, { enabled = true, prefixes, filter, config, getInitialU
+         const path = (0, extractPathFromURL_1.extractExpoPathFromURL)(prefixesRef.current, url);
+         return path !== undefined ? getStateFromPathRef.current(path, configRef.current) : undefined;
+     }, []);
++    const initialURLRef = (0, react_1.useRef)(undefined);
++    (0, react_1.useEffect)(() => {
++        let cancelled = false;
++        initialURLRef.current?.then((url) => {
++            if (cancelled) {
++                return;
++            }
++            initialURLRef.current = undefined;
++            if (typeof url === 'string') {
++                onUnhandledLinking((0, extractPathFromURL_1.extractExpoPathFromURL)(prefixes, url));
++            }
++        }, () => undefined);
++        return () => {
++            cancelled = true;
++        };
++    }, [onUnhandledLinking, prefixes]);
+     const getInitialState = (0, react_1.useCallback)(() => {
+         let state;
+         if (enabledRef.current) {
+             const url = getInitialURLRef.current();
+             if (url != null) {
+                 if (typeof url !== 'string') {
+-                    return url.then((url) => {
+-                        const state = getStateFromURL(url);
+-                        if (typeof url === 'string') {
+-                            // If the link were handled, it gets cleared in NavigationContainer
+-                            onUnhandledLinking((0, extractPathFromURL_1.extractExpoPathFromURL)(prefixes, url));
+-                        }
+-                        return state;
+-                    });
++                    initialURLRef.current = url;
++                    return url.then(getStateFromURL);
+                 }
+                 else {
+                     onUnhandledLinking((0, extractPathFromURL_1.extractExpoPathFromURL)(prefixes, url));

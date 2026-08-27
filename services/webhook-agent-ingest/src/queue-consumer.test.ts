@@ -55,10 +55,10 @@ function makeWebhook() {
   };
 }
 
-function makeRequest(processStatus = 'captured') {
+function makeRequest(processStatus = 'captured', overrides: Partial<{ method: string }> = {}) {
   return {
     body: '{}',
-    method: 'POST',
+    method: overrides.method ?? 'POST',
     path: '/inbound/user/user-1/trigger-1',
     headers: { 'content-type': 'application/json' },
     queryString: null,
@@ -264,6 +264,7 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
           targetType: 'cloud_agent',
           mode: 'code',
           model: 'model-1',
+          variant: 'high',
           githubRepo: 'owner/repo',
           profileId: 'profile-1',
         })
@@ -311,6 +312,7 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
       resourceParts: [webhook.namespace, webhook.triggerId, webhook.requestId],
     });
     expect(prepareBody).toMatchObject({
+      variant: 'high',
       callbackTarget: {
         url: 'https://hooks.test/api/callbacks/execution',
         headers: {
@@ -327,4 +329,76 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['webhook', undefined],
+    ['scheduled', 'high'],
+    ['scheduled', undefined],
+  ] as const)(
+    'forwards variant only when set for %s dispatches',
+    async (triggerSource, variant) => {
+      const prepareRequests: Request[] = [];
+      const webhook = makeWebhook();
+      const stub = {
+        getRequest: vi.fn(async () =>
+          makeRequest('captured', { method: triggerSource === 'scheduled' ? 'SCHEDULED' : 'POST' })
+        ),
+        getConfig: vi.fn(async () =>
+          makeTriggerConfig({
+            targetType: 'cloud_agent',
+            mode: 'code',
+            model: 'model-1',
+            githubRepo: 'owner/repo',
+            profileId: 'profile-1',
+            activationMode: triggerSource,
+            ...(variant !== undefined ? { variant } : {}),
+          })
+        ),
+        updateRequest: vi.fn(async () => ({ success: true })),
+      };
+      const env = {
+        WEBHOOK_AGENT_URL: 'https://hooks.test',
+        WEBHOOK_TOKEN_CACHE: {
+          get: vi.fn(async () => 'api-token'),
+          put: vi.fn(async () => undefined),
+        },
+        INTERNAL_API_SECRET: { get: vi.fn(async () => 'test-internal-secret') },
+        CALLBACK_TOKEN_SECRET: { get: vi.fn(async () => 'test-callback-token-secret') },
+        TRIGGER_DO: {
+          idFromName: vi.fn((name: string) => name),
+          get: vi.fn(() => stub),
+        },
+        CLOUD_AGENT: {
+          fetch: vi.fn(async (request: Request) => {
+            if (request.url.includes('/trpc/prepareSession')) {
+              prepareRequests.push(request);
+              return Response.json({
+                result: { data: { cloudAgentSessionId: 'cloud-session-1' } },
+              });
+            }
+            return Response.json({
+              result: { data: { executionId: 'execution-1', status: 'running' } },
+            });
+          }),
+        },
+      } as unknown as Env;
+      const batch = {
+        queue: 'webhook-delivery',
+        messages: [{ body: webhook, attempts: 1, ack: vi.fn(), retry: vi.fn() }],
+      } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
+
+      await handleWebhookDeliveryBatch(batch, env);
+
+      const prepareBody = await prepareRequests[0]?.json<{
+        variant?: string;
+        createdOnPlatform: string;
+      }>();
+      if (variant === undefined) {
+        expect(prepareBody).not.toHaveProperty('variant');
+      } else {
+        expect(prepareBody).toHaveProperty('variant', variant);
+      }
+      expect(prepareBody?.createdOnPlatform).toBe(triggerSource);
+    }
+  );
 });

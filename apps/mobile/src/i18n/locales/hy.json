@@ -665,7 +665,8 @@
     "profile": "Պրոֆիլ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ներդիր, {{position}} / {{total}}"
+    "position": "{{name}}, ներդիր, {{position}} / {{total}}",
+    "chat": "Զրույց"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Ստուգման գործարկում",
       "status": "Կարգավիճակ",
       "threshold": "Շեմ",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Սպասում ենք ստուգման արձանագրությանը:",
+      "transcriptEmpty": "Այս ստուգման համար արձանագրություն չկա:",
+      "transcriptRetry": "Հնարավոր չեղավ բեռնել ստուգման արձանագրությունը:",
+      "transcriptLive": "Ուղիղ",
+      "agentIdle": "Գործակալը պարապ է",
+      "agentWorking": "Գործակալն աշխատում է...",
+      "anErrorOccurred": "Սխալ է տեղի ունեցել",
+      "errorWithMessage": "Սխալ: {{message}}",
+      "executionStarted": "Կատարումը սկսվել է",
+      "reviewCompleted": "Ստուգումն ավարտված է",
+      "reviewInterrupted": "Ստուգումն ընդհատվել է",
+      "sessionError": "Նիստի սխալ: {{error}}",
+      "statusWithValue": "Կարգավիճակ: {{status}}",
+      "toolName": "Գործիք: {{name}}",
+      "toolNameError": "Գործիք: {{name}} — սխալ",
+      "unknownError": "Անհայտ սխալ"
     },
     "reviewMemory": {
       "title": "Ստուգման հիշողություն",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Այժմ ակտիվ",
     "search": {
       "searching": "Որոնում",
       "searchSessions": "Որոնել նիստեր",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Չհաջողվեց բեռնել նիստերը",
       "couldNotLoadActive": "Չհաջողվեց բեռնել ակտիվ նիստերը",
-      "noSessionsYet": "Դեռևս նիստեր չկան",
       "noSessionsYetDescription": "Սկսեք ծածկագրման առաջադրանք ձեր հեռախոսից։ Ձեր նիստերը կհայտնվեն այստեղ։",
       "noMatches": "Ոչ մի նիստ չի համապատասխանում",
       "tryDifferentSearch": "Փորձեք որոնման այլ տերմին։",
       "tryAdjustFilters": "Փորձեք ճշգրտել կամ մաքրել ձեր զտիչները։",
       "couldNotSearch": "Չհաջողվեց որոնել նիստերը",
-      "allActive": "Բոլոր նիստերն ակտիվ են",
       "completedWillAppear": "Ավարտված նիստերը կհայտնվեն այստեղ։",
       "noPastSessions": "Անցյալի նիստեր չկան",
       "live": "ՈՒՂԻՂ"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Ոլորել մինչև ներքև",
       "emptyTitle": "Դեռևս հաղորդագրություններ չկան",
       "renameAccessibility": "Վերանվանել նիստը՝ {{title}}",
-      "connectRepository": "Միացնել պահոցը",
       "cloningSession": "Նիստի կլոնավորում",
       "continue": "Շարունակել",
       "couldNotLoadThisSession": "Չհաջողվեց բեռնել այս նիստը",
-      "cloneFailed": "Չհաջողվեց կլոնավորել այս նիստը։",
       "cloneFailedRetry": "Չհաջողվեց կլոնավորել այս նիստը։ Կրկին փորձեք։",
-      "connectRepositoryToContinue": "Միացրեք պահոցը՝ շարունակելու համար։",
       "notEnoughCredits": "Cloud Agent-ը գործարկելու համար բավարար կրեդիտ չկա։ Ավելացրեք կրեդիտ և փորձեք կրկին։",
       "previousTaskFinishing": "Նախորդ առաջադրանքը դեռ ավարտվում է։ Խնդրում ենք սպասել մի պահ։",
       "serviceUnavailable": "Ծառայությունն այս պահին հասանելի չէ։ Խնդրում ենք փորձեք կրկին։",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Պահոցներ չեն երևում: Ստուգեք GitLab-ի պահոցների հասանելիությունը, ապա թարմացրեք:",
       "openBitbucket": "Բացել Bitbucket",
       "openGitlab": "Բացել GitLab",
-      "recentlyUsed": "Վերջերս օգտագործված"
+      "recentlyUsed": "Վերջերս օգտագործված",
+      "continueFrom": "Շարունակվում է {{title}}",
+      "importingSession": "Ներմուծվում է նիստ",
+      "cliCannotContinue": "Այս CLI-ն չի կարող շարունակել նիստը: Ընտրեք Ամպային գործակալ կամ մեկ այլ CLI:",
+      "importFailed": "Չհաջողվեց ներմուծել այս նիստը:"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ",
@@ -2462,6 +2477,8 @@
       "viewTable": "Դիտել աղյուսակը",
       "title": "Աղյուսակ",
       "close": "Փակել աղյուսակը",
+      "loading": "Բեռնվում է աղյուսակը",
+      "empty": "Այս աղյուսակում տողեր չկան։",
       "columnCount_one": "սյունակ",
       "columnCount": "սյունակներ",
       "columnCount_other": "սյունակներ",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Այս հղումը ձեր զննարկչում բացում է {{host}}։",
       "open": "Բացել",
       "trustThisHost": "Վստահել այս հոսթին"
+    },
+    "folderPicker": {
+      "accessibility": "Թղթապանակ: {{label}}",
+      "emptyDescription": "«Պատրաստ է»-ն օգտագործում է այս թղթապանակը:",
+      "emptyTitle": "Ներսում թղթապանակներ չկան",
+      "fieldLabel": "Թղթապանակ",
+      "retryableDescription": "Ստուգեք ձեր կապը և Կրկին փորձել: «Պատրաստ է»-ն, այնուամենայնիվ, հաստատում է այս թղթապանակը:",
+      "retryableTitle": "Չհաջողվեց ցուցադրել թղթապանակները",
+      "tapToListHint": "Հպեք թղթապանակին՝ նրա պարունակությունը ցուցադրելու համար",
+      "unsupportedDescription": "Այս CLI-ն չի կարող ցուցադրել թղթապանակները: «Պատրաստ է»-ն պահում է գործարկման թղթապանակը, իսկ «Սկսել նիստը» սկսում է այնտեղ:",
+      "unsupportedTitle": "Հնարավոր չէ ցուցադրել թղթապանակները"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Երբ վստահում եք հղման հոսթին, այն բացվում է առանց կրկին հարցնելու։",
     "revoke": "Հեռացնել {{host}}",
     "backToPreferences": "Վերադառնալ կարգավորումներ"
+  },
+  "quickChat": {
+    "title": "Զրույց",
+    "composer": {
+      "placeholder": "Հաղորդագրություն"
+    },
+    "empty": {
+      "title": "Սկսել զրույց",
+      "description": "Ուղարկեք հաղորդագրություն մոդելի հետ խոսելու համար."
+    },
+    "working": "Մշակվում է",
+    "historyRetry": "Հնարավոր չեղավ բեռնել զրույցի պատմությունը.",
+    "catalogRetry": "Հնարավոր չեղավ բեռնել մոդելները",
+    "sendError": "Հնարավոր չեղավ ուղարկել հաղորդագրությունը։ Կրկին փորձեք։"
   }
 }

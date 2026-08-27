@@ -672,7 +672,8 @@
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, separador, {{position}} de {{total}}"
+    "position": "{{name}}, separador, {{position}} de {{total}}",
+    "chat": "Conversa"
   },
   "chat": {
     "instancePicker": {
@@ -1308,7 +1309,23 @@
       "checkRun": "Execução de verificação",
       "status": "Estado",
       "threshold": "Limiar",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "A aguardar a transcrição da revisão.",
+      "transcriptEmpty": "Sem transcrição para esta revisão.",
+      "transcriptRetry": "Não foi possível carregar a transcrição da revisão.",
+      "transcriptLive": "AO VIVO",
+      "agentIdle": "Agente inativo",
+      "agentWorking": "Agente a trabalhar...",
+      "anErrorOccurred": "Ocorreu um erro",
+      "errorWithMessage": "Erro: {{message}}",
+      "executionStarted": "Execução iniciada",
+      "reviewCompleted": "Revisão concluída",
+      "reviewInterrupted": "Revisão interrompida",
+      "sessionError": "Erro de sessão: {{error}}",
+      "statusWithValue": "Estado: {{status}}",
+      "toolName": "Ferramenta: {{name}}",
+      "toolNameError": "Ferramenta: {{name}} — erro",
+      "unknownError": "Erro desconhecido"
     },
     "reviewMemory": {
       "title": "Memória de revisão",
@@ -2046,7 +2063,6 @@
     }
   },
   "agents": {
-    "activeNow": "Ativo agora",
     "search": {
       "searching": "A pesquisar",
       "searchSessions": "Pesquisar sessões",
@@ -2057,13 +2073,11 @@
     "sessionList": {
       "couldNotLoad": "Não foi possível carregar as sessões",
       "couldNotLoadActive": "Não foi possível carregar as sessões ativas",
-      "noSessionsYet": "Ainda sem sessões",
       "noSessionsYetDescription": "Comece uma tarefa de programação a partir do seu telemóvel. As suas sessões aparecerão aqui.",
       "noMatches": "Nenhuma sessão corresponde",
       "tryDifferentSearch": "Experimente um termo de pesquisa diferente.",
       "tryAdjustFilters": "Experimente ajustar ou limpar os seus filtros.",
       "couldNotSearch": "Não foi possível pesquisar as sessões",
-      "allActive": "Todas as sessões estão ativas",
       "completedWillAppear": "As sessões concluídas aparecerão aqui.",
       "noPastSessions": "Sem sessões anteriores",
       "live": "AO VIVO"
@@ -2134,13 +2148,10 @@
       "scrollToBottom": "Deslocar para baixo",
       "emptyTitle": "Ainda sem mensagens",
       "renameAccessibility": "Renomear sessão: {{title}}",
-      "connectRepository": "Ligar repositório",
       "cloningSession": "A clonar sessão",
       "continue": "Continuar",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão",
-      "cloneFailed": "Não foi possível clonar esta sessão.",
       "cloneFailedRetry": "Não foi possível clonar esta sessão. Tente novamente.",
-      "connectRepositoryToContinue": "Ligue um repositório para continuar.",
       "notEnoughCredits": "Créditos insuficientes para executar o Cloud Agent. Adicione créditos e tente novamente.",
       "previousTaskFinishing": "A tarefa anterior ainda está a terminar. Aguarde um momento.",
       "serviceUnavailable": "O serviço está indisponível neste momento. Tente novamente.",
@@ -2213,7 +2224,11 @@
       "noRepositoriesVisibleGitlab": "Nenhum repositório visível. Verifique o acesso aos repositórios do GitLab e atualize.",
       "openBitbucket": "Abrir o Bitbucket",
       "openGitlab": "Abrir o GitLab",
-      "recentlyUsed": "Usados recentemente"
+      "recentlyUsed": "Usados recentemente",
+      "continueFrom": "A continuar {{title}}",
+      "importingSession": "A importar sessão",
+      "cliCannotContinue": "Esta CLI não pode continuar uma sessão. Escolha Cloud Agent ou outra CLI.",
+      "importFailed": "Não foi possível importar esta sessão."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ficheiro atualizado",
@@ -2479,6 +2494,8 @@
       "viewTable": "Ver tabela",
       "title": "Tabela",
       "close": "Fechar tabela",
+      "loading": "A carregar tabela",
+      "empty": "Esta tabela não tem linhas.",
       "columnCount_one": "coluna",
       "columnCount": "colunas",
       "columnCount_other": "colunas",
@@ -2670,6 +2687,17 @@
       "hostConfirmMessage": "Este link abre {{host}} no seu navegador.",
       "open": "Abrir",
       "trustThisHost": "Confiar neste host"
+    },
+    "folderPicker": {
+      "accessibility": "Pasta: {{label}}",
+      "emptyDescription": "O Concluído usa esta pasta.",
+      "emptyTitle": "Não há pastas no interior",
+      "fieldLabel": "Pasta",
+      "retryableDescription": "Verifique a sua ligação e tente novamente. O Concluído continua a confirmar esta pasta.",
+      "retryableTitle": "Não foi possível listar as pastas",
+      "tapToListHint": "Toque numa pasta para listar o seu conteúdo",
+      "unsupportedDescription": "Esta CLI não pode listar as pastas. O Concluído mantém a pasta de início e o Iniciar sessão começa aí.",
+      "unsupportedTitle": "Não é possível listar as pastas"
     }
   },
   "bootstrap": {
@@ -3170,5 +3198,19 @@
     "emptyDescription": "Quando você confia no host de um link, ele abre sem perguntar novamente.",
     "revoke": "Revogar {{host}}",
     "backToPreferences": "Voltar às preferências"
+  },
+  "quickChat": {
+    "title": "Conversa",
+    "composer": {
+      "placeholder": "Mensagem"
+    },
+    "empty": {
+      "title": "Inicie uma conversa",
+      "description": "Envie uma mensagem para falar com um modelo."
+    },
+    "working": "A trabalhar",
+    "historyRetry": "Não foi possível carregar o histórico do chat.",
+    "catalogRetry": "Não foi possível carregar os modelos",
+    "sendError": "Não foi possível enviar a mensagem. Tente novamente."
   }
 }

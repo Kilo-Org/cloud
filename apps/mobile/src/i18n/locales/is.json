@@ -665,7 +665,8 @@
     "profile": "Notandasnið",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, flipi, {{position}} af {{total}}"
+    "position": "{{name}}, flipi, {{position}} af {{total}}",
+    "chat": "Spjall"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Athugunarkeyrsla",
       "status": "Staða",
       "threshold": "Þröskuldur",
-      "pullRequest": "pull-beiðni"
+      "pullRequest": "pull-beiðni",
+      "transcriptWaiting": "Bíða eftir úttektarafritinu.",
+      "transcriptEmpty": "Ekkert afrit fyrir þessa úttekt.",
+      "transcriptRetry": "Ekki tókst að hlaða úttektarafritið.",
+      "transcriptLive": "BEIN",
+      "agentIdle": "Umboð í bið",
+      "agentWorking": "Umboð að vinna...",
+      "anErrorOccurred": "Villa kom upp",
+      "errorWithMessage": "Villa: {{message}}",
+      "executionStarted": "Framkvæmd hafin",
+      "reviewCompleted": "Úttekt lokið",
+      "reviewInterrupted": "Úttekt rofin",
+      "sessionError": "Fundarvilla: {{error}}",
+      "statusWithValue": "Staða: {{status}}",
+      "toolName": "Tól: {{name}}",
+      "toolNameError": "Tól: {{name}} — villa",
+      "unknownError": "Óþekkt villa"
     },
     "reviewMemory": {
       "title": "Yfirferðarminni",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Virkur núna",
     "search": {
       "searching": "Leitar",
       "searchSessions": "Leita í lotum",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Ekki tókst að hlaða lotur",
       "couldNotLoadActive": "Ekki tókst að hlaða virkar lotur",
-      "noSessionsYet": "Engar lotur ennþá",
       "noSessionsYetDescription": "Byrjaðu kóðunarverkefni frá símanum þínum. Loturnar þínar birtast hér.",
       "noMatches": "Engar lotur passa",
       "tryDifferentSearch": "Prófaðu annað leitarorð.",
       "tryAdjustFilters": "Reyndu að breyta eða hreinsa síurnar þínar.",
       "couldNotSearch": "Ekki tókst að leita í lotum",
-      "allActive": "Allar lotur eru virkar",
       "completedWillAppear": "Lokið lotur birtast hér.",
       "noPastSessions": "Engar fyrri lotur",
       "live": "BEIN"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Skruna til botns",
       "emptyTitle": "Engin skilaboð ennþá",
       "renameAccessibility": "Endurnefna lotu: {{title}}",
-      "connectRepository": "Tengja geymslu",
       "cloningSession": "Klónar lotu",
       "continue": "Halda áfram",
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessa lotu",
-      "cloneFailed": "Ekki tókst að klóna þessa lotu.",
       "cloneFailedRetry": "Ekki tókst að klóna þessa lotu. Reyndu aftur.",
-      "connectRepositoryToContinue": "Tengdu geymslu til að halda áfram.",
       "notEnoughCredits": "Ekki næg kredit til að keyra Cloud Agent. Bættu við kredit og reyndu aftur.",
       "previousTaskFinishing": "Fyrra verkefni er enn að klárast. Bíddu augnablik.",
       "serviceUnavailable": "Þjónustan er ekki tiltæk núna. Reyndu aftur.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Engar geymslur sjáanlegar. Athugaðu geymsluaðgang að GitLab og endurnýjaðu.",
       "openBitbucket": "Opna Bitbucket",
       "openGitlab": "Opna GitLab",
-      "recentlyUsed": "Nýlega notað"
+      "recentlyUsed": "Nýlega notað",
+      "continueFrom": "Halda áfram með {{title}}",
+      "importingSession": "Flytur inn lotu",
+      "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
+      "importFailed": "Ekki tókst að flytja inn þessa lotu."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppfærði {{displayCount}} skrá",
@@ -2462,6 +2477,8 @@
       "viewTable": "Skoða töflu",
       "title": "Tafla",
       "close": "Loka töflu",
+      "loading": "Hleð töflu",
+      "empty": "Þessi tafla hefur engar línur.",
       "columnCount_one": "dálkur",
       "columnCount": "dálkar",
       "columnCount_other": "dálkar",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Þessi tengill opnar {{host}} í vafranum þínum.",
       "open": "Opna",
       "trustThisHost": "Treysta þessum gestgjafa"
+    },
+    "folderPicker": {
+      "accessibility": "Mappa: {{label}}",
+      "emptyDescription": "Lokið notar þessa möppu.",
+      "emptyTitle": "Engar möppur inni",
+      "fieldLabel": "Mappa",
+      "retryableDescription": "Athugaðu tenginguna og reyndu aftur. Lokið staðfestir samt þessa möppu.",
+      "retryableTitle": "Ekki tókst að lista möppur",
+      "tapToListHint": "Ýttu á möppu til að lista innihald hennar",
+      "unsupportedDescription": "Þessi CLI getur ekki listað möppur. Lokið heldur ræsimöppunni og Byrja lotu byrjar þar.",
+      "unsupportedTitle": "Ekki er hægt að lista möppur"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Þegar þú treystir gestgjafa tengils opnast hann án þess að spyrja aftur.",
     "revoke": "Draga til baka {{host}}",
     "backToPreferences": "Til baka í stillingar"
+  },
+  "quickChat": {
+    "title": "Spjall",
+    "composer": {
+      "placeholder": "Skilaboð"
+    },
+    "empty": {
+      "title": "Byrjaðu spjall",
+      "description": "Sendu skilaboð til að tala við líkan."
+    },
+    "working": "Vinnur",
+    "historyRetry": "Ekki tókst að hlaða samtalsferilinn.",
+    "catalogRetry": "Ekki tókst að hlaða líkön",
+    "sendError": "Ekki tókst að senda skilaboðin. Reyndu aftur."
   }
 }

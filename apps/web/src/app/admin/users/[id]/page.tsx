@@ -14,12 +14,12 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import { eq, inArray, desc } from 'drizzle-orm';
-import { findUserById } from '@/lib/user';
+import { findUserById, getCrossAccountEmailConflicts, inferRowlessAuthProviders } from '@/lib/user';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { hasReceivedAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
 import { redirect } from 'next/navigation';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
 
 async function getUserData(userId: string): Promise<UserDetailProps | null> {
   const user = await findUserById(userId);
@@ -67,7 +67,10 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
   const creditInfo = await getBalanceForUser(user);
   const hasReceivedCardValidationCredits = await hasReceivedAnyFreeWelcomeCredits(user.id);
   const authProviders = await db
-    .selectDistinct({ provider: user_auth_provider.provider })
+    .selectDistinct({
+      provider: user_auth_provider.provider,
+      email: user_auth_provider.email,
+    })
     .from(user_auth_provider)
     .where(eq(user_auth_provider.kilo_user_id, userId))
     .orderBy(user_auth_provider.provider);
@@ -82,6 +85,18 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
   const emailDomain = getLowerDomainFromEmail(user.google_user_email);
   const ssoAuthority = emailDomain ? await resolveSsoAuthorityForDomain(emailDomain) : null;
   const isSSOProtectedDomain = ssoAuthority?.status !== 'not_required' && ssoAuthority !== null;
+  const loginMethods: Omit<UserDetailProps['login_methods'][number], 'email_relation'>[] =
+    authProviders.length > 0
+      ? authProviders.map(method => ({ ...method, source: 'linked' }))
+      : inferRowlessAuthProviders(user).map(provider => ({
+          provider,
+          email: user.google_user_email,
+          source: 'inferred',
+        }));
+  const conflictByEmail = await getCrossAccountEmailConflicts(
+    loginMethods.map(method => method.email),
+    user.id
+  );
 
   return {
     ...user,
@@ -98,7 +113,14 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
     organization_memberships: organizationMemberships,
     autoTopUpConfig,
     is_sso_protected_domain: isSSOProtectedDomain,
-    login_methods: authProviders.length > 0 ? authProviders.map(row => row.provider) : ['email'],
+    login_methods: loginMethods.map(method => ({
+      ...method,
+      email_relation: conflictByEmail.get(method.email)
+        ? 'conflict'
+        : normalizeEmail(method.email) === normalizeEmail(user.google_user_email)
+          ? 'primary'
+          : 'different',
+    })),
   };
 }
 

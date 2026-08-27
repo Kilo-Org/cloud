@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry init are kept together */
+/* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry error-boundary wrap are kept together */
 // Must run before the first view mounts: allowRTL(true) makes the native
 // direction known before any layout pass (see src/i18n/rtl.ts).
 // eslint-disable-next-line import/no-duplicates -- the side effect must run here, before the named import below
@@ -21,7 +21,7 @@ import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
 import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
 import * as Sentry from '@sentry/react-native';
-import { isRunningInExpoGo, reloadAppAsync } from 'expo';
+import { reloadAppAsync } from 'expo';
 import { loadAsync, useFonts } from 'expo-font';
 import {
   ErrorBoundary as ExpoRouterErrorBoundary,
@@ -123,77 +123,14 @@ import {
   PENDING_SHARE_ID_DRAFT_KEY,
   saveDraft,
 } from '@/lib/persist/drafts';
-import { SENTRY_ENVIRONMENT } from '@/lib/config';
-import { SENTRY_DSN } from '@/lib/sentry-dsn';
-import { sentryOptionsForConsent } from '@/lib/sentry-consent';
-import { applySentryContext, setSentryContext } from '@/lib/sentry-context';
-import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
-import { resolveSentryEnvironment } from '@/lib/sentry-environment';
+import { setSentryContext } from '@/lib/sentry-context';
+import { initSentry } from '@/lib/sentry-init';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { reapTempFiles } from '@/lib/temp-file-registry';
 
-const expoRouterIntegration = Sentry.expoRouterIntegration({
-  enableTimeToInitialDisplay: !isRunningInExpoGo(),
-});
-
 // No-op unless E2E_LATENCY_WS_MS is set at bundle time (see lib/e2e-ws-latency).
 installE2EWebSocketLatency();
-
-// DEC-02 consent rule: crash and error reporting is mandatory, so
-// `initSentry(false)` runs at module scope — a crash during bootstrap
-// must still be reported. The optional group is `tracesSampleRate` plus
-// MASKED session replay and error screenshots (DEC-02 amendment, owner
-// decision 2026-08-17); the replay integration is only registered once
-// optional consent is accepted, so no replay code runs before the
-// decision. The Sentry context module reapplies identity and global tags after
-// every init, and auth sign-out clears its canonical identity state.
-// `enableTombstone` is Android 12+ only; NDK stays on for older devices.
-// `enableMetricKit` is iOS 15+ only. App-hang tracking stays off so MetricKit
-// hangs are not reported twice. Native init in the Expo plugin captures
-// crashes before JS loads.
-//
-// In-scope core-loop spans (tracesSampleRate > 0 when optional consent is true):
-// — `app.start.cold` / `app.start.warm` (TTID / TTFD via React Navigation
-//   integration). The authoritative per-launch timing metric is the PostHog
-//   `app_startup` event in src/lib/startup-timing.ts.
-function initSentry(optionalConsented: boolean) {
-  Sentry.init({
-    dsn: SENTRY_DSN,
-
-    enabled: true,
-
-    sendDefaultPii: false,
-
-    enableTombstone: true,
-    enableMetricKit: true,
-    enableAppHangTracking: false,
-
-    environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
-    ...sentryOptionsForConsent(optionalConsented),
-
-    integrations: optionalConsented
-      ? [
-          expoRouterIntegration,
-          Sentry.deeplinkIntegration(),
-          Sentry.mobileReplayIntegration({
-            maskAllText: true,
-            maskAllImages: true,
-            maskAllVectors: true,
-          }),
-        ]
-      : [expoRouterIntegration, Sentry.deeplinkIntegration()],
-    enableNativeFramesTracking: false,
-
-    beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],
-    beforeBreadcrumb: scrubBreadcrumb as NonNullable<
-      Parameters<typeof Sentry.init>[0]
-    >['beforeBreadcrumb'],
-
-    spotlight: __DEV__,
-  });
-  applySentryContext();
-}
 
 initSentry(false);
 

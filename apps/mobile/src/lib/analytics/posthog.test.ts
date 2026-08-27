@@ -437,6 +437,42 @@ describe('discardPostHog', () => {
   });
 });
 
+describe('flushLastPostHogEvent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('calls client.flush after initPostHog', async () => {
+    const { initPostHog, flushLastPostHogEvent } = await loadModule();
+    initPostHog();
+
+    await flushLastPostHogEvent();
+
+    expect(hoisted.client.flush).toHaveBeenCalledTimes(1);
+  });
+
+  it('swallows a flush rejection', async () => {
+    const { initPostHog, flushLastPostHogEvent } = await loadModule();
+    initPostHog();
+    hoisted.client.flush.mockRejectedValueOnce(new Error('flush down'));
+
+    await expect(flushLastPostHogEvent()).resolves.toBeUndefined();
+
+    expect(hoisted.client.flush).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw when no client exists', async () => {
+    const { flushLastPostHogEvent } = await loadModule();
+
+    await expect(flushLastPostHogEvent()).resolves.toBeUndefined();
+
+    expect(hoisted.client.flush).not.toHaveBeenCalled();
+  });
+});
+
 describe('identifyUser person properties', () => {
   beforeEach(() => {
     vi.clearAllMocks();

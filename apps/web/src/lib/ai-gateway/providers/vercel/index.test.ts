@@ -11,6 +11,8 @@ import {
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { minimax_m27_free_model, minimax_m3_free_model } from '@/lib/ai-gateway/providers/minimax';
 
 const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
 const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
@@ -192,6 +194,37 @@ describe('convertProviderOptions', () => {
       only: ['future-provider'],
       order: ['another-future-provider'],
     });
+  });
+
+  it('filters ignored providers from an explicit only list when metadata is unavailable', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: {
+          only: ['gmicloud', 'openai'],
+          ignore: ['openai'],
+        },
+      },
+    };
+
+    expect(convertProviderOptions(request, null).gateway?.only).toEqual(['gmicloud']);
+  });
+
+  it('still rejects ignore-only routing when metadata is unavailable', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { ignore: ['openai'] },
+      },
+    };
+
+    expect(() => convertProviderOptions(request, null)).toThrow(
+      'Vercel inference provider data became unavailable during request transform'
+    );
   });
 });
 
@@ -416,6 +449,46 @@ describe('applyVercelSettings managed requests', () => {
       },
     };
   }
+
+  function managedRequestForApi(kind: GatewayRequest['kind'], model: string): GatewayRequest {
+    const provider = { ignore: ['openai'] };
+    if (kind === 'responses') {
+      return { kind, body: { model, input: 'hello', provider } };
+    }
+    if (kind === 'messages') {
+      return {
+        kind,
+        body: {
+          model,
+          max_tokens: 128,
+          messages: [{ role: 'user', content: 'hello' }],
+          provider,
+        },
+      };
+    }
+    return {
+      kind,
+      body: { model, messages: [{ role: 'user', content: 'hello' }], provider },
+    };
+  }
+
+  it.each(
+    [minimax_m3_free_model, minimax_m27_free_model].flatMap(model =>
+      (['chat_completions', 'messages', 'responses'] as const).map(kind => ({ model, kind }))
+    )
+  )(
+    'routes $model.public_id $kind requests with unrelated ignores when metadata is unavailable',
+    async ({ model, kind }) => {
+      const request = managedRequestForApi(kind, model.public_id);
+      applyKiloExclusiveModelSettings(request, model);
+
+      await applyManagedVercelSettings(model.public_id, request, null);
+
+      expect(request.body.model).toBe(model.internal_id);
+      expect(request.body.provider).toBeUndefined();
+      expect(request.body.providerOptions?.gateway?.only).toEqual(['gmicloud']);
+    }
+  );
 
   it('does not add managed Friendli credentials from the environment', async () => {
     process.env.FRIENDLI_API_KEY = 'friendli-managed-key';

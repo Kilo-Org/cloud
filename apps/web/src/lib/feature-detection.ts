@@ -39,6 +39,7 @@ export const FEATURE_VALUES = [
   'kiloclaw',
   'openclaw',
   'direct-gateway',
+  'quick-chat',
   'embeddings',
   'kiloclaw-embedding',
   'openclaw-embedding',

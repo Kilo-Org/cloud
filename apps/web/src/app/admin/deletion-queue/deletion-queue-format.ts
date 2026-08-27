@@ -1,25 +1,6 @@
-export function formatTimestamp(value: string | null): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
-}
+import { humanizeToken } from '@/lib/admin/queue-format';
 
-export function formatAge(fromIso: string, asOfIso: string): string {
-  const from = new Date(fromIso).getTime();
-  const asOf = new Date(asOfIso).getTime();
-  if (Number.isNaN(from) || Number.isNaN(asOf)) return '—';
-  const diffSeconds = Math.max(0, Math.round((asOf - from) / 1000));
-  if (diffSeconds < 60) return `${diffSeconds}s ago`;
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return `${Math.floor(diffHours / 24)}d ago`;
-}
-
-export function humanizeToken(value: string): string {
-  return value.replaceAll(/[_-]+/g, ' ').replace(/^./, char => char.toUpperCase());
-}
+export { formatTimestamp, formatAge, humanizeToken } from '@/lib/admin/queue-format';
 
 const STEP_LABELS: Record<string, { label: string; description: string }> = {
   kiloclaw_destroy: {
@@ -97,7 +78,7 @@ export function deletionStepDescription(stepKey: string): string {
   return STEP_LABELS[stepKey]?.description ?? '';
 }
 
-export type DeletionNotifyChannel = 'pylon' | 'email';
+export type DeletionNotifyChannel = 'pylon' | 'email' | 'none';
 
 const USED_NOTIFY_STATUSES = new Set([
   'succeeded',
@@ -112,10 +93,10 @@ export function deletionNotifyChannel(input: {
   pylonTicket: string | null;
   tasks: readonly { stepKey: string; status: string }[];
 }): DeletionNotifyChannel {
-  if (input.pylonTicket) return 'pylon';
-
   const reply = input.tasks.find(task => task.stepKey === 'pylon_reply');
   const email = input.tasks.find(task => task.stepKey === 'completion_email');
+  if (!reply && !email) return 'none';
+  if (input.pylonTicket) return 'pylon';
   if (email?.status === 'not_applicable' && reply) return 'pylon';
   if (reply?.status === 'not_applicable' && email) return 'email';
   if (reply && USED_NOTIFY_STATUSES.has(reply.status)) return 'pylon';
@@ -128,6 +109,7 @@ export function deletionNotifyStepSkipped(
   channel: DeletionNotifyChannel
 ): boolean {
   if (channel === 'pylon') return stepKey === 'completion_email';
+  if (channel === 'none' && stepKey === 'completion_email') return true;
   return stepKey === 'pylon_reply' || stepKey === 'pylon_finalize';
 }
 
@@ -236,6 +218,17 @@ const EMAIL_EXTRACT = /[^\s@,;()<>"[\]{}]+@[^\s@,;()<>"[\]{}]+\.[A-Za-z]{2,}/g;
 const PYLON_URL =
   /(?:https?:\/\/app\.usepylon\.com[^\s]*\/issues\/|issues\/)(iss_[a-zA-Z0-9]+|\d+)/i;
 const PYLON_TICKET = /(?:^|[\s#(,])(\d{1,8}|iss_[a-zA-Z0-9]+)(?:[\s),;]|$)/i;
+
+export function parseHistoricalDeletionUserIds(text: string): string[] {
+  return [
+    ...new Set(
+      text
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+    ),
+  ];
+}
 
 export function parseDeletionEntries(text: string): Array<{ email: string; pylonTicket?: string }> {
   const segments = text

@@ -205,7 +205,7 @@ export function HistoricalUserIdsForm({
               setResults(allResults);
               onSubmitted();
               if (
-                allResults.some(result => result.status === 'refused' || result.status === 'failed')
+                outcomes.some(result => result.status === 'refused' || result.status === 'failed')
               ) {
                 toast.error('Some users could not be queued. Review the results.');
               } else {

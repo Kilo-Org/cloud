@@ -471,6 +471,37 @@ describe('HistoricalUserIdsForm', () => {
     expect(mockSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    { userId: 'changed-user', status: 'refused', code: 'live_subscription' },
+    { userId: 'changed-user', status: 'failed' },
+  ] satisfies HistoricalResults)(
+    'reports $status submission outcomes as queue errors',
+    async outcome => {
+      mockPreview.mockResolvedValueOnce([
+        { userId: 'eligible-user', status: 'eligible' },
+        { userId: 'changed-user', status: 'eligible' },
+      ]);
+      mockSubmit.mockResolvedValueOnce([
+        {
+          userId: 'eligible-user',
+          status: 'enqueued',
+          requestId: '00000000-0000-4000-8000-000000000001',
+        },
+        outcome,
+      ]);
+      editText('eligible-user\nchanged-user');
+      await advanceTime(401);
+      act(() => button('Confirm ID-only cleanup').click());
+      await advanceTime(0);
+      expect(dom.container.textContent).toContain('Queue results');
+      expect(resultText()).toContain('Queued');
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Some users could not be queued. Review the results.'
+      );
+      expect(mockToast.success).not.toHaveBeenCalled();
+    }
+  );
+
   it('submits only confirmed eligible IDs and preserves merged queue results across rerenders', async () => {
     const submission = Promise.withResolvers<HistoricalResults>();
     const requestId = '00000000-0000-4000-8000-000000000001';
@@ -512,9 +543,10 @@ describe('HistoricalUserIdsForm', () => {
     expect(findButton('Retry check')).toBeUndefined();
     expect(onSubmitted).toHaveBeenCalledTimes(1);
     expect(onSubmittingChange.mock.calls).toEqual([[true], [false]]);
-    expect(mockToast.error).toHaveBeenCalledWith(
-      'Some users could not be queued. Review the results.'
+    expect(mockToast.success).toHaveBeenCalledWith(
+      '1 requests queued. No notifications will be sent.'
     );
+    expect(mockToast.error).not.toHaveBeenCalled();
 
     const queuedResults = resultText();
     renderForm();

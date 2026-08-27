@@ -10,12 +10,12 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
+import { getRepoOptionKey, REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
-import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
+import { filterRepoPickerOptions, groupRepoPickerOptions } from '@/lib/repo-picker-filter';
 
 type PickerListItem =
-  | { key: string; kind: 'header'; titleKey: string }
+  | { key: string; kind: 'header'; title?: string; titleKey?: string }
   | { key: string; kind: 'repo'; repo: RepoOption };
 
 export default function RepoPickerScreen() {
@@ -56,20 +56,18 @@ export default function RepoPickerScreen() {
   // per-provider); when it is non-empty, render the flat filtered list exactly
   // as before.
   const listItems = useMemo<PickerListItem[]>(() => {
-    if (search.trim()) {
-      return filtered.map(repo => ({
-        key: `${repo.platform}:${repo.fullName}`,
-        kind: 'repo',
-        repo,
-      }));
-    }
-    const sections = bridge?.sections ?? [];
+    const sections = search.trim() ? groupRepoPickerOptions(filtered) : (bridge?.sections ?? []);
     const items: PickerListItem[] = [];
     for (const section of sections) {
       if (section.repos.length > 0) {
-        items.push({ key: `header:${section.key}`, kind: 'header', titleKey: section.titleKey });
+        items.push({
+          key: `header:${section.key}`,
+          kind: 'header',
+          title: section.title,
+          titleKey: section.titleKey,
+        });
         for (const repo of section.repos) {
-          items.push({ key: `${repo.platform}:${repo.fullName}`, kind: 'repo', repo });
+          items.push({ key: getRepoOptionKey(repo), kind: 'repo', repo });
         }
       }
     }
@@ -144,7 +142,7 @@ export default function RepoPickerScreen() {
           if (item.kind === 'header') {
             return (
               <Text className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {t(item.titleKey)}
+                {item.title ?? (item.titleKey ? t(item.titleKey) : '')}
               </Text>
             );
           }
@@ -155,7 +153,7 @@ export default function RepoPickerScreen() {
             <Pressable
               className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
               onPress={() => {
-                handleSelect(`${repo.platform}:${repo.fullName}`);
+                handleSelect(getRepoOptionKey(repo));
               }}
               accessibilityRole="button"
               accessibilityLabel={rowLabel}
@@ -174,7 +172,7 @@ export default function RepoPickerScreen() {
               <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
                 {repo.fullName}
               </Text>
-              {bridge.currentValue === `${repo.platform}:${repo.fullName}` ? (
+              {bridge.currentValue === getRepoOptionKey(repo) ? (
                 <Check size={18} color={colors.primary} />
               ) : null}
             </Pressable>

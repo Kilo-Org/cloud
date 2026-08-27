@@ -1,4 +1,4 @@
-import { type RepoPlatform } from '@/lib/picker-bridge';
+import { getRepoOptionKey, type RepoPlatform } from '@/lib/picker-bridge';
 
 export type RepositoryPlatform = RepoPlatform;
 
@@ -12,9 +12,31 @@ export type NewSessionRepository = {
   platform: RepositoryPlatform;
   fullName: string;
   isPrivate: boolean;
+  platformIntegrationId?: string;
+  platformAccountLogin?: string;
   workspaceUuid?: string;
   repositoryUuid?: string;
 };
+
+export function toNewSessionGitHubRepository(repository: {
+  fullName: string;
+  private: boolean;
+  platformIntegrationId?: string;
+  platformAccountLogin?: string;
+}): NewSessionRepository {
+  const result: NewSessionRepository = {
+    platform: 'github',
+    fullName: repository.fullName,
+    isPrivate: repository.private,
+  };
+  if (repository.platformIntegrationId) {
+    result.platformIntegrationId = repository.platformIntegrationId;
+  }
+  if (repository.platformAccountLogin) {
+    result.platformAccountLogin = repository.platformAccountLogin;
+  }
+  return result;
+}
 
 export type RepositoryProviderStatus =
   | 'loading'
@@ -110,20 +132,17 @@ export function resolveBitbucketStatus({
 
 // ── Dedup and grouping ───────────────────────────────────────────────
 
-const repositoryKey = (repository: NewSessionRepository): string =>
-  `${repository.platform}/${repository.fullName}`;
-
 /**
- * Deduplicate repository rows by `platform + fullName`, so the same
- * `fullName` on two platforms stays two rows.
+ * Deduplicate repository rows by their picker identity. GitHub rows with the
+ * same full name remain distinct when they came from different integrations.
  */
-export function dedupeRepositoriesByPlatformAndFullName(
+export function dedupeRepositoriesByIdentity(
   repositories: readonly NewSessionRepository[]
 ): NewSessionRepository[] {
   const seen = new Set<string>();
   const result: NewSessionRepository[] = [];
   for (const repository of repositories) {
-    const key = repositoryKey(repository);
+    const key = getRepoOptionKey(repository);
     if (!seen.has(key)) {
       seen.add(key);
       result.push(repository);

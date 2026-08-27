@@ -711,6 +711,39 @@ describe('useNewSessionCreator repository platform payload', () => {
     expect(payload).not.toHaveProperty('bitbucketRepo');
   });
 
+  it('sends canonical githubRepo plus the selected integration id', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      selectedRepository: {
+        platform: 'github',
+        fullName: 'owner/repo',
+        isPrivate: false,
+        platformIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+        platformAccountLogin: 'owner',
+      },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      githubRepo: 'owner/repo',
+      githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+    });
+  });
+
+  it('omits githubIntegrationId for a provenance-free GitHub response', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('githubIntegrationId');
+  });
+
   it('sends only gitlabProject for a GitLab row and never githubRepo', async () => {
     prepareSessionMutate.mockResolvedValue(sessionResult());
     const creator = runCreator({
@@ -808,6 +841,50 @@ describe('useNewSessionCreator intentFingerprint repo identity', () => {
       workspaceUuid: 'ws-1234',
       repositoryUuid: 'repo-5678',
     });
+  });
+
+  it('includes the GitHub integration id in the fingerprint', async () => {
+    const creator = runCreator({
+      selectedRepository: {
+        platform: 'github',
+        fullName: 'owner/repo',
+        isPrivate: false,
+        platformIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+      },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const fingerprint = outboxMock.writeSafeRetry.mock.calls[0]?.[0].fingerprint ?? '';
+    expect((JSON.parse(fingerprint) as { repo: unknown }).repo).toEqual({
+      platform: 'github',
+      fullName: 'owner/repo',
+      platformIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+    });
+  });
+
+  it('does not reuse an ambiguous legacy bare-name key when provenance is present', async () => {
+    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) => {
+      const parsed = JSON.parse(fingerprint) as { repo: unknown };
+      return typeof parsed.repo === 'string' ? 'legacy-stored-key' : null;
+    });
+    const creator = runCreator({
+      selectedRepository: {
+        platform: 'github',
+        fullName: 'owner/repo',
+        isPrivate: false,
+        platformIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+      },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ operationKey: 'legacy-stored-key' })
+    );
+    expect(outboxMock.getStoredOperationKey).toHaveBeenCalledTimes(1);
   });
 
   // The deployed app persisted safe-retry rows with the bare `fullName` as

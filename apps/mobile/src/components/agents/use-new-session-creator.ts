@@ -48,6 +48,7 @@ type PrepareSessionInput = {
   variant: string | undefined;
   /** Exactly one repository field is set, matching the selected row's platform. */
   githubRepo?: string;
+  githubIntegrationId?: string;
   gitlabProject?: string;
   bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
   autoCommit: boolean;
@@ -150,7 +151,7 @@ export function useNewSessionCreator({
     // intents fall back to the legacy bare-name lookup: two same-named
     // GitLab/Bitbucket rows must never share the stale retry key.
     const legacyIntentFingerprint =
-      selectedRepository?.platform === 'github'
+      selectedRepository?.platform === 'github' && !selectedRepository.platformIntegrationId
         ? JSON.stringify({
             prompt,
             mode,
@@ -314,6 +315,7 @@ export function useNewSessionCreator({
 function resolveRepoFingerprint(repository: NewSessionRepository | null): {
   platform: RepositoryPlatform;
   fullName: string;
+  platformIntegrationId?: string;
   workspaceUuid?: string | null;
   repositoryUuid?: string | null;
 } | null {
@@ -326,6 +328,15 @@ function resolveRepoFingerprint(repository: NewSessionRepository | null): {
       fullName: repository.fullName,
       workspaceUuid: repository.workspaceUuid ?? null,
       repositoryUuid: repository.repositoryUuid ?? null,
+    };
+  }
+  if (repository.platform === 'github') {
+    return {
+      platform: repository.platform,
+      fullName: repository.fullName,
+      ...(repository.platformIntegrationId
+        ? { platformIntegrationId: repository.platformIntegrationId }
+        : {}),
     };
   }
   return { platform: repository.platform, fullName: repository.fullName };
@@ -346,6 +357,9 @@ function setRepositoryField(
   }
   if (repository.platform === 'github') {
     input.githubRepo = repository.fullName;
+    if (repository.platformIntegrationId) {
+      input.githubIntegrationId = repository.platformIntegrationId;
+    }
     return;
   }
   if (repository.platform === 'gitlab') {

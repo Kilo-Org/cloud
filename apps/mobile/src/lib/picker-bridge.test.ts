@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   areModelPickerSelectionScopesEqual,
   commitModelPickerSelection,
+  getRepoOptionKey,
   resolveModelPickerSelection,
+  resolveRepoOptionByKey,
 } from './picker-bridge';
 
 const remoteOption = {
@@ -115,5 +117,31 @@ describe('model picker bridge', () => {
 
     expect(commitModelPickerSelection(bridge, remoteOption.id, 'high')).toBe(true);
     expect(onSelect).toHaveBeenCalledWith({ option: remoteOption, variant: 'high' });
+  });
+});
+
+describe('repository picker identity', () => {
+  const repository = {
+    platform: 'github' as const,
+    fullName: 'owner/repo',
+  };
+
+  it('distinguishes duplicate GitHub repositories across integrations', () => {
+    expect(getRepoOptionKey({ ...repository, platformIntegrationId: 'integration-1' })).not.toBe(
+      getRepoOptionKey({ ...repository, platformIntegrationId: 'integration-2' })
+    );
+  });
+
+  it('keeps the existing platform-qualified key when provenance is absent', () => {
+    expect(getRepoOptionKey(repository)).toBe('github:owner/repo');
+  });
+
+  it('returns null instead of binding a stale or unknown key', () => {
+    const repositories = [
+      { ...repository, isPrivate: false, platformIntegrationId: 'integration-1' },
+    ];
+
+    expect(resolveRepoOptionByKey(repositories, 'github:integration-2:owner/repo')).toBeNull();
+    expect(resolveRepoOptionByKey(repositories, 'github:owner/repo')).toBeNull();
   });
 });

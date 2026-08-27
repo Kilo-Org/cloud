@@ -1,13 +1,41 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  dedupeRepositoriesByPlatformAndFullName,
+  dedupeRepositoriesByIdentity,
   type NewSessionRepository,
   type RepositoryGroup,
   resolveBitbucketStatus,
   resolveProviderStatus,
   resolveRepositoryGroups,
+  toNewSessionGitHubRepository,
 } from './new-session-repository-state';
+
+describe('toNewSessionGitHubRepository', () => {
+  it('preserves integration provenance from the tRPC DTO', () => {
+    expect(
+      toNewSessionGitHubRepository({
+        fullName: 'owner/repo',
+        private: true,
+        platformIntegrationId: 'integration-1',
+        platformAccountLogin: 'owner',
+      })
+    ).toEqual({
+      platform: 'github',
+      fullName: 'owner/repo',
+      isPrivate: true,
+      platformIntegrationId: 'integration-1',
+      platformAccountLogin: 'owner',
+    });
+  });
+
+  it('supports older tRPC responses without provenance', () => {
+    expect(toNewSessionGitHubRepository({ fullName: 'owner/repo', private: false })).toEqual({
+      platform: 'github',
+      fullName: 'owner/repo',
+      isPrivate: false,
+    });
+  });
+});
 
 describe('resolveProviderStatus', () => {
   it('returns loading while the provider query is loading', () => {
@@ -145,22 +173,25 @@ const gitlab = (fullName: string): NewSessionRepository => ({
   isPrivate: false,
 });
 
-describe('dedupeRepositoriesByPlatformAndFullName', () => {
+describe('dedupeRepositoriesByIdentity', () => {
   it('keeps the same fullName on two platforms as two rows', () => {
-    const deduped = dedupeRepositoriesByPlatformAndFullName([
-      github('owner/repo'),
-      gitlab('owner/repo'),
-    ]);
+    const deduped = dedupeRepositoriesByIdentity([github('owner/repo'), gitlab('owner/repo')]);
     expect(deduped).toHaveLength(2);
     expect(deduped.map(repo => repo.platform)).toEqual(['github', 'gitlab']);
   });
 
   it('collapses duplicate rows that share platform and fullName', () => {
-    const deduped = dedupeRepositoriesByPlatformAndFullName([
-      github('owner/repo'),
-      github('owner/repo'),
-    ]);
+    const deduped = dedupeRepositoriesByIdentity([github('owner/repo'), github('owner/repo')]);
     expect(deduped).toHaveLength(1);
+  });
+
+  it('keeps same-name GitHub rows from separate integrations', () => {
+    const deduped = dedupeRepositoriesByIdentity([
+      { ...github('owner/repo'), platformIntegrationId: 'integration-1' },
+      { ...github('owner/repo'), platformIntegrationId: 'integration-2' },
+    ]);
+
+    expect(deduped).toHaveLength(2);
   });
 });
 

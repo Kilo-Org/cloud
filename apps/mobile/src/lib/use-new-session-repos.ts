@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import {
-  dedupeRepositoriesByPlatformAndFullName,
+  dedupeRepositoriesByIdentity,
   detectRepositoryPlatform,
   type NewSessionRepository,
   type RepositoryGroup,
@@ -14,6 +14,7 @@ import {
   resolveBitbucketStatus,
   resolveProviderStatus,
   resolveRepositoryGroups,
+  toNewSessionGitHubRepository,
 } from '@/components/agents/new-session-repository-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
@@ -24,6 +25,7 @@ import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-
 import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
 import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
 import { useTRPC } from '@/lib/trpc';
+import { getRepoOptionKey } from '@/lib/picker-bridge';
 
 type UseNewSessionReposArgs = {
   organizationId: string | undefined;
@@ -91,12 +93,7 @@ export function useNewSessionRepos({
   });
 
   const githubRepositories = useMemo<NewSessionRepository[]>(
-    () =>
-      (githubQuery.data?.repositories ?? []).map(repo => ({
-        platform: 'github',
-        fullName: repo.fullName,
-        isPrivate: repo.private,
-      })),
+    () => (githubQuery.data?.repositories ?? []).map(repo => toNewSessionGitHubRepository(repo)),
     [githubQuery.data]
   );
 
@@ -125,23 +122,28 @@ export function useNewSessionRepos({
   }, [bitbucketQuery.data]);
 
   // Recently used rows: only recents that resolve to a connected repository
-  // appear, and they are deduped by platform + fullName.
+  // appear. Recent-session data has no integration provenance, so an
+  // ambiguous GitHub full name retains the existing first-match behavior.
   const recentlyUsed = useMemo<NewSessionRepository[]>(() => {
     const recentList = recentRepoData?.repositories;
     if (!recentList?.length) {
       return [];
     }
     const unified = [...githubRepositories, ...gitlabRepositories, ...bitbucketRepositories];
-    const byKey = new Map(unified.map(repo => [repoKey(repo), repo]));
     const seen = new Set<string>();
     const result: NewSessionRepository[] = [];
     for (const recent of recentList) {
       const platform = detectRepositoryPlatform(recent.gitUrl);
       const fullName = formatGitUrlProject(recent.gitUrl);
       const match =
-        platform && fullName ? byKey.get(`${platform}/${fullName.toLowerCase()}`) : undefined;
+        platform && fullName
+          ? unified.find(
+              repo =>
+                repo.platform === platform && repo.fullName.toLowerCase() === fullName.toLowerCase()
+            )
+          : undefined;
       if (match) {
-        const key = repoKey(match);
+        const key = getRepoOptionKey(match);
         if (!seen.has(key)) {
           seen.add(key);
           result.push(match);
@@ -153,7 +155,7 @@ export function useNewSessionRepos({
 
   const repositories = useMemo(
     () =>
-      dedupeRepositoriesByPlatformAndFullName([
+      dedupeRepositoriesByIdentity([
         ...recentlyUsed,
         ...githubRepositories,
         ...gitlabRepositories,
@@ -368,8 +370,4 @@ export function useNewSessionRepos({
     openIntegration,
     refreshReposForceFresh,
   };
-}
-
-function repoKey(repository: NewSessionRepository): string {
-  return `${repository.platform}/${repository.fullName.toLowerCase()}`;
 }

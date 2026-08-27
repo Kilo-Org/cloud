@@ -54,14 +54,33 @@ export type RepoOption = {
   platform: RepoPlatform;
   fullName: string;
   isPrivate: boolean;
+  platformIntegrationId?: string;
+  platformAccountLogin?: string;
   workspaceUuid?: string;
   repositoryUuid?: string;
 };
 
+export function getRepoOptionKey(repository: {
+  platform: RepoPlatform;
+  fullName: string;
+  platformIntegrationId?: string;
+}): string {
+  return repository.platformIntegrationId
+    ? `${repository.platform}:${repository.platformIntegrationId}:${repository.fullName}`
+    : `${repository.platform}:${repository.fullName}`;
+}
+
+export function resolveRepoOptionByKey<
+  T extends { platform: RepoPlatform; fullName: string; platformIntegrationId?: string },
+>(repositories: readonly T[], key: string): T | null {
+  return repositories.find(repository => getRepoOptionKey(repository) === key) ?? null;
+}
+
 export type RepoPickerSection = {
-  key: 'recents' | RepoPlatform;
-  /** i18n key the picker resolves for the section header. */
-  titleKey: string;
+  key: string;
+  /** Exactly one title field is set for each section. */
+  titleKey?: string;
+  title?: string;
   repos: RepoOption[];
 };
 

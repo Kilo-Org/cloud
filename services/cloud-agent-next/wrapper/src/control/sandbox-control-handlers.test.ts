@@ -95,7 +95,7 @@ describe('handleControlRequest', () => {
       {
         messageId: 'msg_1',
         turn: { type: 'prompt', prompt: 'hello' },
-        agent: { mode: 'code', model: 'kilo-model' },
+        agent: { mode: 'architect', model: 'kilo/example', variant: 'high' },
       },
       deps({ kiloClient })
     );
@@ -106,8 +106,9 @@ describe('handleControlRequest', () => {
         sessionId: 'kilo_1',
         messageId: 'msg_1',
         prompt: 'hello',
-        agent: 'code',
-        model: { modelID: 'kilo-model' },
+        agent: 'architect',
+        model: { providerID: 'kilo', modelID: 'kilo/example' },
+        variant: 'high',
       },
     ]);
   });
@@ -130,7 +131,7 @@ describe('handleControlRequest', () => {
       {
         messageId: 'msg_command',
         turn: { type: 'command', command: 'review', arguments: '--all changes' },
-        agent: { mode: 'code', model: 'kilo-model' },
+        agent: { mode: 'architect', model: 'kilo/example', variant: 'high' },
       },
       deps({ kiloClient })
     );
@@ -142,9 +143,76 @@ describe('handleControlRequest', () => {
         command: 'review',
         args: '--all changes',
         messageId: 'msg_command',
+        agent: 'architect',
+        model: { providerID: 'kilo', modelID: 'kilo/example' },
+        variant: 'high',
       },
     ]);
     expect(prompts).toEqual([]);
+  });
+
+  it('preserves command model omission with agent and variant', async () => {
+    const commands: unknown[] = [];
+    const kiloClient = fakeKilo({
+      sendCommand: async opts => {
+        commands.push(opts);
+      },
+    });
+
+    const result = await handleControlRequest(
+      'session.prompt',
+      session,
+      {
+        messageId: 'msg_command',
+        turn: { type: 'command', command: 'review', arguments: '' },
+        agent: { mode: 'reviewer', variant: 'high' },
+      },
+      deps({ kiloClient })
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      result: { messageId: 'msg_command', status: 'accepted' },
+    });
+    expect(commands).toEqual([
+      {
+        sessionId: 'kilo_1',
+        command: 'review',
+        args: '',
+        messageId: 'msg_command',
+        agent: 'reviewer',
+        variant: 'high',
+      },
+    ]);
+  });
+
+  it('rejects a missing prompt model before calling Kilo', async () => {
+    const calls: unknown[] = [];
+    const kiloClient = fakeKilo({
+      sendPromptAsync: async opts => {
+        calls.push(opts);
+      },
+      sendCommand: async opts => {
+        calls.push(opts);
+      },
+    });
+
+    const result = await handleControlRequest(
+      'session.prompt',
+      session,
+      {
+        messageId: 'msg_1',
+        turn: { type: 'prompt', prompt: 'hello' },
+        agent: { mode: 'code' },
+      },
+      deps({ kiloClient })
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'protocol_error', message: 'Invalid payload', retryable: false },
+    });
+    expect(calls).toEqual([]);
   });
 
   it('returns protocol_error for session.prompt without session', async () => {

@@ -167,6 +167,67 @@ describe('sandbox control frames', () => {
     ).toBe(true);
   });
 
+  it('preserves an opaque gateway model in prompt and command frames', () => {
+    for (const turn of [
+      { type: 'prompt', prompt: 'hello' },
+      { type: 'command', command: 'review', arguments: '--all changes' },
+    ]) {
+      const payload = {
+        messageId: 'msg_1',
+        turn,
+        agent: { mode: 'architect', model: 'vendor/Team/Model:free~Alias', variant: 'high' },
+        finalization: { autoCommit: true, condenseOnComplete: false },
+      };
+      expect(parseOperationPayload('session.prompt', payload)).toEqual({ ok: true, payload });
+    }
+  });
+
+  it('allows model omission only for command turns without adding a default', () => {
+    const payload = {
+      messageId: 'msg_command',
+      turn: { type: 'command', command: 'review', arguments: '' },
+      agent: { mode: 'reviewer', variant: 'high' },
+    };
+    expect(parseOperationPayload('session.prompt', payload)).toEqual({ ok: true, payload });
+    expect(
+      parseOperationPayload('session.prompt', {
+        ...payload,
+        turn: { type: 'prompt', prompt: 'hello' },
+      })
+    ).toEqual({
+      ok: false,
+      error: { code: 'protocol_error', message: 'Invalid session.prompt payload' },
+    });
+  });
+
+  it.each(['', ' \t\n ', null])(
+    'rejects invalid explicit model %j for prompt and command turns',
+    model => {
+      for (const turn of [
+        { type: 'prompt', prompt: 'hello' },
+        { type: 'command', command: 'review', arguments: '' },
+      ]) {
+        expect(
+          parseOperationPayload('session.prompt', {
+            messageId: 'msg_1',
+            turn,
+            agent: { mode: 'code', model },
+          }).ok
+        ).toBe(false);
+      }
+    }
+  );
+
+  it('rejects native provider selection for model-less commands', () => {
+    expect(
+      parseOperationPayload('session.prompt', {
+        messageId: 'msg_command',
+        turn: { type: 'command', command: 'review', arguments: '' },
+        agent: { mode: 'code', provider: 'anthropic' },
+      }).ok
+    ).toBe(false);
+  });
+
   it('accepts a full sandbox.heartbeat payload', () => {
     expect(
       parseEventPayload('sandbox.heartbeat', {

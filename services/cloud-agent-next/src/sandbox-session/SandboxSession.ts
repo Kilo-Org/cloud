@@ -1,10 +1,14 @@
 import { DurableObject } from 'cloudflare:workers';
+import { TRPCError } from '@trpc/server';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
 import type { Env } from '../types.js';
 import type { SessionId } from '../types/ids.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
+import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
+import { nextMetadataAfterAdmittedAgentModel } from '../persistence/persist-admitted-agent-model.js';
+import { assertKiloModelAvailable } from '../model-validation.js';
 import {
   getSandboxProvider,
   parseSessionMetadata,
@@ -64,20 +68,26 @@ import {
   acceptQueuedMessage,
   assignPreparationAttemptId,
   cancelActiveMessages,
+  createSessionMessageRecord,
+  failQueuedMessage,
   failWaitingMessages as applyFailWaitingMessages,
   failedMessageSnapshot,
+  freezeLegacyQueuedMessages,
   hasAcceptedMessage,
   hasInterruptibleWork,
   incrementAttachFailure,
   incrementPromptFailure,
   isAttachExhausted,
   isPromptExhausted,
+  matchesSessionMessageReplay,
   nextQueuedMessageId,
   recordAcceptedMessageActivity,
+  resolveSessionMessageIntent,
   streamCloudStatus,
   streamQueuedSnapshots,
   terminalizeAcceptedMessages,
   userTurnTerminalState,
+  type ControlSessionMessageInput,
   type SessionMessageRecord,
 } from './session-message-queue.js';
 
@@ -92,13 +102,13 @@ export class SandboxSession extends DurableObject<Env> {
   private readonly eventQueries: EventQueries;
   private readonly terminalLifecycle: ReturnType<typeof createSandboxTerminalLifecycle>;
   private readonly terminalBridge: ReturnType<typeof createSandboxTerminalBridge>;
+  private readonly dispatches = new Map<string, Promise<void>>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     const doName = ctx.id.name;
     const lastColon = doName?.lastIndexOf(':') ?? -1;
     const sessionIdPart = doName && lastColon > 0 ? doName.slice(lastColon + 1) : undefined;
-    this.sessionId = sessionIdPart ? (sessionIdPart as SessionId) : undefined;
     this.terminalLifecycle = createSandboxTerminalLifecycle({
       state: ctx,
       getSessionId: () => this.requireSessionId(),
@@ -110,6 +120,9 @@ export class SandboxSession extends DurableObject<Env> {
       closeRuntimeBridges: (wrapperInstanceId, code, reason) =>
         this.terminalBridge.closeRuntime(wrapperInstanceId, code, reason),
     });
+    const storedSessionId =
+      sessionIdPart ?? this.terminalLifecycle.getStoredMetadata()?.identity.sessionId;
+    this.sessionId = storedSessionId ? (storedSessionId as SessionId) : undefined;
     this.terminalBridge = createSandboxTerminalBridge({
       state: ctx,
       getMetadata: () => this.getMetadata(),
@@ -528,7 +541,14 @@ export class SandboxSession extends DurableObject<Env> {
         error: registered.error ?? 'register failed',
       };
     }
-    return this.queueAndDispatch(input.message.initialTurn);
+    return this.queueAndDispatch(
+      {
+        turn: input.message.initialTurn,
+        agent: input.agent,
+        finalization: input.finalization,
+      },
+      'initial'
+    );
   }
 
   async tryUpdate(updates: { callbackTarget?: CallbackTarget | null }): Promise<OperationResult> {
@@ -586,7 +606,10 @@ export class SandboxSession extends DurableObject<Env> {
             command: request.turn.command,
             arguments: request.turn.arguments,
           };
-    return this.queueAndDispatch(turn);
+    return this.queueAndDispatch(
+      { turn, agent: request.agent, finalization: request.finalization },
+      'followup'
+    );
   }
 
   async replayPreparedInitialMessage(
@@ -629,36 +652,130 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   private async queueAndDispatch(
-    turn: AcceptedExecutionTurn
+    input: ControlSessionMessageInput,
+    origin: 'initial' | 'followup'
   ): Promise<SessionMessageAdmissionResult> {
     const epoch = this.terminalLifecycle.captureEpoch();
-    if (epoch === null) return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
-    const messageId = turn.messageId;
-    const messages = await this.loadMessages();
-    if (!this.terminalLifecycle.isCurrent(epoch)) {
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    if (epoch === null || !metadata) {
       return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
     }
+    const messageId = input.turn.messageId;
+    const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
     const existing = messages.find(message => message.messageId === messageId);
-    if (existing) {
+    const intent = existing
+      ? undefined
+      : resolveSessionMessageIntent(input, origin === 'followup' ? metadata.agent : undefined);
+    if (!existing && !intent) {
+      return { success: false, code: 'BAD_REQUEST', error: 'Session is missing a valid model' };
+    }
+    let validationFailure: Extract<SessionMessageAdmissionResult, { success: false }> | undefined;
+    if (intent?.turn.type === 'prompt' && origin === 'followup') {
+      try {
+        await assertKiloModelAvailable({
+          env: this.env,
+          submittedModel: intent.agent.model,
+          originalToken: metadata.auth.kilocodeToken,
+          originalOrganizationId: metadata.identity.orgId,
+          createdOnPlatform: metadata.identity.createdOnPlatform,
+          procedure: 'admitSubmittedMessage',
+        });
+      } catch (error) {
+        if (!(error instanceof TRPCError)) throw error;
+        if (error.code === 'BAD_REQUEST' || error.code === 'FORBIDDEN') {
+          validationFailure = { success: false, code: error.code, error: error.message };
+        } else if (error.code === 'SERVICE_UNAVAILABLE') {
+          validationFailure = {
+            success: false,
+            code: 'MODEL_VALIDATION_UNAVAILABLE',
+            error: error.message,
+          };
+        } else {
+          throw error;
+        }
+      }
+    }
+    let admitted = false;
+    const result = this.ctx.storage.transactionSync((): SessionMessageAdmissionResult => {
+      const latestMetadata = this.terminalLifecycle.getStoredMetadata();
+      if (!this.terminalLifecycle.isCurrent(epoch) || !latestMetadata) {
+        return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
+      }
+      const latestMessages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
+      const duplicate = latestMessages.find(message => message.messageId === messageId);
+      if (duplicate) {
+        const [frozen] = freezeLegacyQueuedMessages([duplicate], latestMetadata.agent);
+        if (
+          !matchesSessionMessageReplay(frozen, intent ?? input) ||
+          (intent &&
+            frozen.intent &&
+            (intent.agent.variant !== frozen.intent.agent.variant ||
+              intent.finalization?.autoCommit !== frozen.intent.finalization?.autoCommit ||
+              intent.finalization?.condenseOnComplete !==
+                frozen.intent.finalization?.condenseOnComplete))
+        ) {
+          return {
+            success: false,
+            code: 'BAD_REQUEST',
+            error: 'Message ID conflicts with its existing intent or is already terminal',
+          };
+        }
+        return {
+          success: true,
+          outcome: 'queued',
+          messageId,
+          compatibilityDelivery: duplicate.state === 'accepted' ? 'sent' : 'queued',
+        };
+      }
+      if (validationFailure) return validationFailure;
+      if (!intent) return { success: false, code: 'NOT_FOUND', error: 'Message not found' };
+      const nextMessages = freezeLegacyQueuedMessages(latestMessages, latestMetadata.agent);
+      nextMessages.push(createSessionMessageRecord(intent));
+      const nextMetadata =
+        intent.agent.model === undefined
+          ? null
+          : nextMetadataAfterAdmittedAgentModel(latestMetadata, {
+              model: intent.agent.model,
+              variant: intent.agent.variant,
+            });
+      this.ctx.storage.kv.put(MESSAGES_KEY, nextMessages);
+      if (nextMetadata) {
+        this.ctx.storage.kv.put(METADATA_KEY, serializeSessionMetadata(nextMetadata));
+      }
+      admitted = true;
       return { success: true, outcome: 'queued', messageId, compatibilityDelivery: 'queued' };
+    });
+    if (result.success && this.terminalLifecycle.isCurrent(epoch)) {
+      if (admitted) this.broadcastQueuedMessage(messageId, renderExecutionTurnContent(input.turn));
+      const latestMessages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
+      if (nextQueuedMessageId(latestMessages) === messageId) {
+        this.ctx.waitUntil(this.dispatchQueued(messageId, { allowCreate: true }));
+      }
     }
-    messages.push({ messageId, state: 'queued', turn });
-    if (!(await this.saveMessages(messages, epoch))) {
-      return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
-    }
-    this.broadcastQueuedMessage(messageId, renderExecutionTurnContent(turn));
-    if (nextQueuedMessageId(messages) === messageId && this.terminalLifecycle.isCurrent(epoch)) {
-      this.ctx.waitUntil(this.dispatchQueued(messageId, { allowCreate: true }));
-    }
-    return { success: true, outcome: 'queued', messageId, compatibilityDelivery: 'queued' };
+    return result;
   }
 
   private async dispatchQueued(
     messageId: string,
     options?: { allowCreate?: boolean }
   ): Promise<void> {
+    const current = this.dispatches.get(messageId);
+    if (current) return current;
+    const pending = this.deliverQueuedMessage(messageId, options);
+    this.dispatches.set(messageId, pending);
+    try {
+      await pending;
+    } finally {
+      this.dispatches.delete(messageId);
+    }
+  }
+
+  private async deliverQueuedMessage(
+    messageId: string,
+    options?: { allowCreate?: boolean }
+  ): Promise<void> {
     const allowCreate = options?.allowCreate === true;
-    const metadata = await this.getMetadata();
+    const metadata = this.terminalLifecycle.getStoredMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
     const sandboxId = metadata?.workspace?.sandboxId;
     const kiloSessionId = metadata?.auth.kiloSessionId;
@@ -667,17 +784,20 @@ export class SandboxSession extends DurableObject<Env> {
       if (!this.terminalLifecycle.isBlocked()) await this.failWaitingMessages('missing_metadata');
       return;
     }
-    const messages = await this.loadMessages();
-    if (!this.terminalLifecycle.isCurrent(epoch) || nextQueuedMessageId(messages) !== messageId) {
-      return;
-    }
-    const assigned = assignPreparationAttemptId(messages, messageId, () => crypto.randomUUID());
+    const assigned = this.ctx.storage.transactionSync(() => {
+      const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
+      if (!this.terminalLifecycle.isCurrent(epoch) || nextQueuedMessageId(messages) !== messageId) {
+        return undefined;
+      }
+      const frozen = freezeLegacyQueuedMessages(messages, metadata.agent);
+      const prepared = assignPreparationAttemptId(frozen, messageId, () => crypto.randomUUID());
+      if (prepared) this.ctx.storage.kv.put(MESSAGES_KEY, prepared.messages);
+      return prepared;
+    });
     if (!assigned) return;
-    if (assigned.messages !== messages && !(await this.saveMessages(assigned.messages, epoch))) {
-      return;
-    }
-    if (!this.terminalLifecycle.isCurrent(epoch)) return;
     const queued = assigned.messages.find(message => message.messageId === messageId);
+    const intent = queued?.intent;
+    const model = dispatchedKilocodeModelId(intent?.agent.model);
     const control = sandboxControlRpc(this.env, sandboxId);
     const recorder = createPreparationProgressRecorder({
       attemptId: assigned.attemptId,
@@ -693,6 +813,21 @@ export class SandboxSession extends DurableObject<Env> {
       Date.now()
     )) {
       this.broadcastStoredEvent(event);
+    }
+    if (
+      !intent ||
+      ((intent.turn.type === 'prompt' || intent.agent.model !== undefined) && !model)
+    ) {
+      const failedMessages = failQueuedMessage(assigned.messages, messageId);
+      const failed = failedMessages?.find(message => message.messageId === messageId);
+      if (!failedMessages || !failed) return;
+      failed.failedReason = 'invalid_model';
+      if (!(await this.saveMessages(failedMessages, epoch))) return;
+      if (!this.terminalLifecycle.isCurrent(epoch)) return;
+      recorder.finalize({ status: 'failed', safeError: 'Session is missing a valid model' });
+      this.broadcastMessageFailed(failed, Date.now());
+      if (nextQueuedMessageId(failedMessages)) await this.armQueueRetry();
+      return;
     }
     let delivery: 'attach' | 'prompt' | undefined;
     let routeAttached = false;
@@ -842,21 +977,22 @@ export class SandboxSession extends DurableObject<Env> {
         payload: {
           messageId,
           turn:
-            queued?.turn?.type === 'command'
+            intent.turn.type === 'command'
               ? {
                   type: 'command',
-                  command: queued.turn.command,
-                  arguments: queued.turn.arguments,
+                  command: intent.turn.command,
+                  arguments: intent.turn.arguments,
                 }
               : {
                   type: 'prompt',
-                  prompt: queued?.turn?.prompt ?? queued?.prompt ?? '',
+                  prompt: intent.turn.prompt,
                 },
           agent: {
-            mode: metadata.agent?.mode ?? 'code',
-            model: metadata.agent?.model ?? 'default',
-            ...(metadata.agent?.variant ? { variant: metadata.agent.variant } : {}),
+            mode: intent.agent.mode,
+            ...(model !== undefined ? { model } : {}),
+            ...(intent.agent.variant !== undefined ? { variant: intent.agent.variant } : {}),
           },
+          ...(intent.finalization ? { finalization: intent.finalization } : {}),
         },
       });
       if (!this.terminalLifecycle.isCurrent(epoch)) {

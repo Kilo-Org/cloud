@@ -1,6 +1,15 @@
-import { SELF, env, runInDurableObject } from 'cloudflare:test';
+import { SELF, abortAllDurableObjects, env, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  AgentSelectionOverride,
+  SubmittedSessionMessageRequest,
+} from '../../src/execution/types.js';
+import {
+  serializeSessionMetadata,
+  type SessionMetadata,
+} from '../../src/persistence/session-metadata.js';
+import { throwAdmissionError } from '../../src/session/queue-message.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -13,11 +22,16 @@ import {
   saveRouteTable,
 } from '../../src/sandbox-control/durable-state.js';
 import { applyReportedSessionState } from '../../src/sandbox-control/session-routes.js';
-import type { SessionMessageRecord } from '../../src/sandbox-session/session-message-queue.js';
+import {
+  createSessionMessageRecord,
+  type SessionMessageRecord,
+} from '../../src/sandbox-session/session-message-queue.js';
 import { createEventQueries } from '../../src/session/queries/index.js';
 import {
+  requestFrameSchema,
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_AUTO_PONG,
+  type RequestFrame,
 } from '../../src/shared/sandbox-control-protocol.js';
 
 const sandboxId = 'sbx_control_smoke';
@@ -771,6 +785,890 @@ describe('SandboxControl durable remainder', () => {
 });
 
 describe('SandboxSession control-plane regressions', () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ valid: true }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function captureAndAcceptControlRequests(socket: WebSocket): RequestFrame[] {
+    const requests: RequestFrame[] = [];
+    socket.addEventListener('message', event => {
+      const request = requestFrameSchema.parse(JSON.parse(String(event.data)));
+      requests.push(request);
+      socket.send(JSON.stringify({ type: 'response', requestId: request.requestId, ok: true }));
+    });
+    return requests;
+  }
+
+  type SessionStub = ReturnType<typeof env.SANDBOX_SESSION.getByName>;
+
+  const agentA = { mode: 'code', model: 'kilo/anthropic/claude-sonnet-4', variant: 'high' };
+  const modelB = 'kilo/openai/gpt-4.1';
+
+  function messageFixture() {
+    const id = crypto.randomUUID().replaceAll('-', '');
+    const fixture = {
+      sandboxId: `usr-${id}`,
+      ownerId: 'user_admission',
+      sessionId: `workspace_admission_${id}`,
+    } as const satisfies TerminalRuntimeFixture;
+    const session = env.SANDBOX_SESSION.getByName(`${fixture.ownerId}:${fixture.sessionId}`);
+    return { fixture, session };
+  }
+
+  async function seedBlockedAdmission(agent: AgentSelectionOverride = agentA) {
+    const { fixture, session } = messageFixture();
+    await session.registerSession({
+      identity: {
+        sessionId: fixture.sessionId,
+        userId: fixture.ownerId,
+        orgId: 'stored-org',
+        createdOnPlatform: 'stored-platform',
+      },
+      auth: { kiloSessionId: 'kilo_terminal', kilocodeToken: 'stored-test-token' },
+      agent,
+    });
+    await runInDurableObject(session, (_instance, state) => {
+      state.storage.kv.put('session_messages', [
+        { messageId: 'msg_blocker', state: 'accepted', acceptedAt: Date.now() },
+      ] satisfies SessionMessageRecord[]);
+    });
+    return { fixture, session };
+  }
+
+  function admissionState(session: SessionStub) {
+    return runInDurableObject(session, (_instance, state) => ({
+      metadata: state.storage.kv.get<SessionMetadata>('session_metadata'),
+      messages: state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [],
+    }));
+  }
+
+  async function waitForAccepted(session: SessionStub, messageId: string) {
+    await vi.waitFor(async () => {
+      await expect(session.getMessageResult(messageId)).resolves.toMatchObject({
+        type: 'found',
+        result: { status: 'running' },
+      });
+    });
+  }
+
+  function completeTurn(session: SessionStub) {
+    return session.receiveSandboxControlEvent({
+      identity: { directory: '/workspace/terminal', kiloSessionId: 'kilo_terminal' },
+      payload: { type: 'session.turn.close', properties: { sessionID: 'kilo_terminal' } },
+    });
+  }
+
+  it('normalizes initial and command models once without preflight or leaking session finalization', async () => {
+    const { fixture, session } = messageFixture();
+    const { socket } = await initializeTerminalRuntime(fixture);
+    const finalization = {
+      autoCommit: false,
+      condenseOnComplete: true,
+      gateThreshold: 'warning',
+    } as const;
+    try {
+      signalWrapperReady(socket);
+      await waitForWrapperReady(fixture);
+      const requests = captureAndAcceptControlRequests(socket);
+      await expect(
+        session.createSessionWithInitialAdmission({
+          identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+          auth: { kiloSessionId: 'kilo_terminal' },
+          agent: { mode: 'architect', model: 'kilo/fake-deterministic', variant: 'high' },
+          workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+          finalization,
+          message: {
+            initialTurn: {
+              type: 'prompt',
+              messageId: 'msg_initial_model',
+              prompt: 'initial prompt',
+            },
+          },
+        })
+      ).resolves.toMatchObject({ success: true });
+      await waitForAccepted(session, 'msg_initial_model');
+      await completeTurn(session);
+      await expect(
+        session.admitSubmittedMessage({
+          userId: fixture.ownerId,
+          turn: { type: 'command', id: 'msg_command_model', command: 'review', arguments: '--all' },
+          agent: { mode: 'reviewer', model: ' kilo/kilo/example ', variant: 'low' },
+        })
+      ).resolves.toMatchObject({ success: true });
+      await waitForAccepted(session, 'msg_command_model');
+      expect(
+        requests
+          .filter(request => request.operation === 'session.prompt')
+          .map(request => request.payload)
+      ).toEqual([
+        {
+          messageId: 'msg_initial_model',
+          turn: { type: 'prompt', prompt: 'initial prompt' },
+          agent: { mode: 'architect', model: 'fake-deterministic', variant: 'high' },
+          finalization: { autoCommit: false, condenseOnComplete: true },
+        },
+        {
+          messageId: 'msg_command_model',
+          turn: { type: 'command', command: 'review', arguments: '--all' },
+          agent: { mode: 'reviewer', model: 'kilo/example', variant: 'low' },
+        },
+      ]);
+      expect((await admissionState(session)).metadata?.finalization).toEqual(finalization);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    } finally {
+      await session.markAsInterrupted();
+      socket.close();
+    }
+  });
+
+  it('delivers frozen A then B after eviction and reconnect without replay rewinding defaults', async () => {
+    const { fixture, session: originalSession } = messageFixture();
+    let session = originalSession;
+    const { credential, socket } = await initializeTerminalRuntime(fixture);
+    let replacement: WebSocket | undefined;
+    try {
+      const waitingRequests = captureAndAcceptControlRequests(socket);
+      await expect(
+        session.createSessionWithInitialAdmission({
+          identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+          auth: { kiloSessionId: 'kilo_terminal' },
+          agent: agentA,
+          workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+          message: { initialTurn: { type: 'prompt', messageId: 'msg_a', prompt: 'A' } },
+        })
+      ).resolves.toMatchObject({ success: true, compatibilityDelivery: 'queued' });
+      await runInDurableObject(session, instance => instance.alarm());
+      await expect(
+        session.admitSubmittedMessage({
+          userId: fixture.ownerId,
+          turn: { type: 'prompt', id: 'msg_b', prompt: 'B' },
+          agent: { model: modelB, mode: 'reviewer' },
+        })
+      ).resolves.toMatchObject({ success: true });
+      await expect(
+        session.admitSubmittedMessage({
+          userId: fixture.ownerId,
+          turn: { type: 'prompt', id: 'msg_c', prompt: 'inherits B' },
+        })
+      ).resolves.toMatchObject({ success: true });
+      const beforeReplay = await admissionState(session);
+      expect(beforeReplay.metadata?.agent).toEqual({ mode: 'code', model: modelB });
+      const replay: SubmittedSessionMessageRequest = {
+        userId: fixture.ownerId,
+        turn: { type: 'prompt', id: 'msg_a', prompt: 'A' },
+        agent: { model: 'anthropic/claude-sonnet-4' },
+      };
+      await expect(session.admitSubmittedMessage(replay)).resolves.toMatchObject({
+        success: true,
+        compatibilityDelivery: 'queued',
+      });
+      await expect(
+        session.admitSubmittedMessage({ ...replay, agent: { model: modelB } })
+      ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+      await runInDurableObject(session, instance => instance.alarm());
+      expect(await admissionState(session)).toEqual(beforeReplay);
+      expect(waitingRequests).toEqual([]);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+
+      await abortAllDurableObjects();
+      session = env.SANDBOX_SESSION.get(env.SANDBOX_SESSION.idFromString(session.id.toString()));
+      expect(await admissionState(session)).toEqual(beforeReplay);
+      replacement = await connect(credential, fixture.sandboxId);
+      await completeHello(replacement, 'hello_frozen_recreated', {
+        providerInstanceId: fixture.sandboxId,
+      });
+      const requests = captureAndAcceptControlRequests(replacement);
+      signalWrapperReady(replacement);
+      await waitForWrapperReady(fixture);
+      await runInDurableObject(session, instance => instance.alarm());
+      await waitForAccepted(session, 'msg_a');
+      const accepted = await admissionState(session);
+      await expect(session.admitSubmittedMessage(replay)).resolves.toMatchObject({
+        success: true,
+        compatibilityDelivery: 'sent',
+      });
+      expect(await admissionState(session)).toEqual(accepted);
+      await completeTurn(session);
+      await waitForAccepted(session, 'msg_b');
+      await completeTurn(session);
+      await waitForAccepted(session, 'msg_c');
+      expect(
+        requests
+          .filter(request => request.operation === 'session.prompt')
+          .map(request => request.payload)
+      ).toEqual([
+        {
+          messageId: 'msg_a',
+          turn: { type: 'prompt', prompt: 'A' },
+          agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
+        },
+        {
+          messageId: 'msg_b',
+          turn: { type: 'prompt', prompt: 'B' },
+          agent: { mode: 'reviewer', model: 'openai/gpt-4.1' },
+        },
+        {
+          messageId: 'msg_c',
+          turn: { type: 'prompt', prompt: 'inherits B' },
+          agent: { mode: 'code', model: 'openai/gpt-4.1' },
+        },
+      ]);
+      const terminal = await admissionState(session);
+      await expect(session.admitSubmittedMessage(replay)).resolves.toMatchObject({
+        success: false,
+        code: 'BAD_REQUEST',
+      });
+      expect(await admissionState(session)).toEqual(terminal);
+      expect(terminal.metadata?.agent).toEqual({ mode: 'code', model: modelB });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      socket.close();
+      replacement?.close();
+    }
+  });
+
+  it('uses only the preflighted initial agent even when registered defaults have changed', async () => {
+    const { fixture, session } = await seedBlockedAdmission({
+      mode: 'architect',
+      model: modelB,
+      variant: 'low',
+    });
+    await expect(
+      session.createSessionWithInitialAdmission({
+        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+        auth: { kiloSessionId: 'kilo_terminal' },
+        agent: { mode: 'reviewer', model: agentA.model },
+        message: { initialTurn: { type: 'prompt', messageId: 'msg_initial', prompt: 'initial' } },
+      })
+    ).resolves.toMatchObject({ success: true });
+    const state = await admissionState(session);
+    expect(state.messages[1]?.intent).toEqual({
+      turn: { type: 'prompt', messageId: 'msg_initial', prompt: 'initial' },
+      agent: { mode: 'reviewer', model: agentA.model },
+    });
+    expect(state.metadata?.agent).toEqual({ mode: 'architect', model: agentA.model });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('permanently fails a legacy prompt without a model while a new command stays model-less after defaults change', async () => {
+    const { fixture, session } = messageFixture();
+    const { socket } = await initializeTerminalRuntime(fixture);
+    const legacy: SessionMessageRecord = {
+      messageId: 'msg_invalid_model',
+      state: 'queued',
+      prompt: 'never deliver',
+      attachFailures: 1,
+      promptFailures: 2,
+    };
+    try {
+      const requests = captureAndAcceptControlRequests(socket);
+      await session.registerSession({
+        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+        auth: { kiloSessionId: 'kilo_terminal' },
+        agent: { mode: 'code' },
+        workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+      });
+      await runInDurableObject(session, (_instance, state) => {
+        state.storage.kv.put('session_messages', [legacy]);
+      });
+      await expect(
+        session.admitSubmittedMessage({
+          userId: fixture.ownerId,
+          turn: { type: 'command', id: 'msg_model_less', command: 'status', arguments: '--all' },
+          agent: { mode: 'reviewer' },
+        })
+      ).resolves.toMatchObject({ success: true });
+      await expect(
+        session.admitSubmittedMessage({
+          userId: fixture.ownerId,
+          turn: { type: 'prompt', id: 'msg_selected', prompt: 'new B cannot rescue old input' },
+          agent: { model: modelB },
+        })
+      ).resolves.toMatchObject({ success: true });
+      signalWrapperReady(socket);
+      await waitForWrapperReady(fixture);
+      await runInDurableObject(session, instance => instance.alarm());
+      await waitForAccepted(session, 'msg_model_less');
+      const delivered = await admissionState(session);
+      expect(delivered.messages[0]).toEqual({
+        ...legacy,
+        state: 'failed',
+        failedReason: 'invalid_model',
+        legacyIntentInvalid: true,
+        preparationAttemptId: expect.any(String),
+      });
+      expect(delivered.messages.slice(1)).toMatchObject([
+        { messageId: 'msg_model_less', state: 'accepted' },
+        { messageId: 'msg_selected', state: 'queued', intent: { agent: { model: modelB } } },
+      ]);
+      expect(delivered.metadata?.agent).toEqual({ mode: 'code', model: modelB });
+      await runInDurableObject(session, instance => instance.alarm());
+      await runInDurableObject(session, instance => instance.alarm());
+      expect(await admissionState(session)).toEqual(delivered);
+      expect(requests.map(request => request.operation)).toEqual([
+        'session.attach',
+        'session.prompt',
+      ]);
+      expect(
+        requests
+          .filter(request => request.operation === 'session.prompt')
+          .map(request => request.payload)
+      ).toEqual([
+        {
+          messageId: 'msg_model_less',
+          turn: { type: 'command', command: 'status', arguments: '--all' },
+          agent: { mode: 'reviewer' },
+        },
+      ]);
+      await runInDurableObject(session, (_instance, state) => {
+        const events = createEventQueries(
+          drizzle(state.storage, { logger: false }),
+          state.storage.sql
+        ).findByFilters({ eventTypes: ['cloud.message.failed'] });
+        expect(events.map(event => JSON.parse(event.payload))).toMatchObject([
+          { messageId: 'msg_invalid_model', reason: 'invalid_model', accepted: false },
+        ]);
+      });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      await session.markAsInterrupted();
+      socket.close();
+    }
+  });
+
+  it.each([
+    {
+      status: 200,
+      body: { valid: false, reason: 'unavailable' },
+      code: 'BAD_REQUEST',
+      publicCode: 'BAD_REQUEST',
+      error: 'Selected model is not available for this cloud agent session',
+      retryable: false,
+    },
+    {
+      status: 403,
+      body: {},
+      code: 'FORBIDDEN',
+      publicCode: 'FORBIDDEN',
+      error: 'Model catalog access denied for this cloud agent session',
+      retryable: false,
+    },
+    {
+      status: 503,
+      body: {},
+      code: 'MODEL_VALIDATION_UNAVAILABLE',
+      publicCode: 'SERVICE_UNAVAILABLE',
+      error: 'Model availability could not be verified',
+      retryable: true,
+    },
+  ])(
+    'preserves $code over real admission RPC without queue or metadata mutation',
+    async outcome => {
+      const { fixture, session } = await seedBlockedAdmission();
+      await runInDurableObject(session, (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        state.storage.kv.put('session_messages', [
+          ...messages,
+          { messageId: 'msg_legacy', state: 'queued', prompt: 'retain old format on rejection' },
+        ] satisfies SessionMessageRecord[]);
+      });
+      const before = await admissionState(session);
+      vi.mocked(globalThis.fetch).mockImplementation(async () =>
+        Response.json(outcome.body, { status: outcome.status })
+      );
+      const result = await session.admitSubmittedMessage({
+        userId: fixture.ownerId,
+        turn: { type: 'prompt', id: 'msg_rejected', prompt: 'B' },
+        agent: { model: modelB, mode: 'reviewer', variant: 'low' },
+      });
+      expect(result).toEqual({ success: false, code: outcome.code, error: outcome.error });
+      expect(await admissionState(session)).toEqual(before);
+      if (result.success) throw new Error('Expected model admission failure');
+      expect(() => throwAdmissionError(result)).toThrowError(
+        expect.objectContaining({
+          code: outcome.publicCode,
+          message: outcome.error,
+          cause: expect.objectContaining({ error: outcome.code, retryable: outcome.retryable }),
+        })
+      );
+      const [input, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+      const request = new Request(input, init);
+      expect(new URL(request.url).pathname).toBe('/api/organizations/stored-org/models/validate');
+      expect(request.headers.get('Authorization')).toBe('Bearer stored-test-token');
+      expect(request.headers.get('X-KiloCode-OrganizationId')).toBe('stored-org');
+      expect(request.headers.get('X-KiloCode-Feature')).toBe('stored-platform');
+      expect(await request.json()).toEqual({ modelId: 'openai/gpt-4.1' });
+    }
+  );
+
+  it('rejects an omitted prompt model without a stored default and does not mutate admission state', async () => {
+    const { fixture, session } = await seedBlockedAdmission({ mode: 'code' });
+    const before = await admissionState(session);
+    await expect(
+      session.admitSubmittedMessage({
+        userId: fixture.ownerId,
+        turn: { type: 'prompt', id: 'msg_missing', prompt: 'missing selection' },
+      })
+    ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+    expect(await admissionState(session)).toEqual(before);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  function pauseNextValidation() {
+    let entered = false;
+    let released = false;
+    let body: unknown;
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async (_input, init) => {
+      body = init?.body;
+      entered = true;
+      while (!released) await new Promise(resolve => setTimeout(resolve, 1));
+      return Response.json({ valid: true });
+    });
+    return {
+      entered: async () => {
+        await vi.waitFor(() => expect(entered).toBe(true));
+        if (typeof body !== 'string') throw new Error('Expected validation request body');
+        return JSON.parse(body) as unknown;
+      },
+      release: () => {
+        released = true;
+      },
+    };
+  }
+
+  it('keeps the validated selection frozen while concurrent admission changes defaults and metadata', async () => {
+    const { fixture, session } = await seedBlockedAdmission();
+    const validation = pauseNextValidation();
+    const pending = session.admitSubmittedMessage({
+      userId: fixture.ownerId,
+      turn: { type: 'prompt', id: 'msg_slow_a', prompt: 'resolved A before validation' },
+    });
+    try {
+      expect(await validation.entered()).toEqual({ modelId: 'anthropic/claude-sonnet-4' });
+      await session.admitSubmittedMessage({
+        userId: fixture.ownerId,
+        turn: { type: 'command', id: 'msg_fast_b', command: 'review', arguments: '' },
+        agent: { model: modelB, mode: 'reviewer', variant: 'low' },
+      });
+      await session.tryUpdate({ callbackTarget: { url: 'https://example.com/updated-callback' } });
+      expect((await admissionState(session)).metadata?.agent).toEqual({
+        mode: 'code',
+        model: modelB,
+        variant: 'low',
+      });
+      validation.release();
+      await expect(pending).resolves.toMatchObject({ success: true });
+      const state = await admissionState(session);
+      expect(state.messages.slice(1).map(message => message.intent?.agent)).toEqual([
+        { mode: 'reviewer', model: modelB, variant: 'low' },
+        agentA,
+      ]);
+      expect(state.metadata?.agent).toEqual(agentA);
+      expect(state.metadata?.callback).toEqual({
+        target: { url: 'https://example.com/updated-callback' },
+      });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      validation.release();
+      await pending;
+    }
+  });
+
+  it.each([
+    { conflict: 'model', initialAgent: agentA, nextAgent: { model: modelB } },
+    {
+      conflict: 'absent variant',
+      initialAgent: { mode: 'code', model: agentA.model },
+      nextAgent: { model: agentA.model, variant: 'low' },
+    },
+  ])(
+    'rechecks a concurrent duplicate with a different $conflict after validation',
+    async ({ initialAgent, nextAgent }) => {
+      const { fixture, session } = await seedBlockedAdmission(initialAgent);
+      const validation = pauseNextValidation();
+      const input: SubmittedSessionMessageRequest = {
+        userId: fixture.ownerId,
+        turn: { type: 'prompt', id: 'msg_concurrent', prompt: 'same submitted content' },
+      };
+      const pending = session.admitSubmittedMessage(input);
+      try {
+        await validation.entered();
+        await session.admitSubmittedMessage({
+          userId: fixture.ownerId,
+          turn: { type: 'command', id: 'msg_change_default', command: 'review', arguments: '' },
+          agent: nextAgent,
+        });
+        await expect(session.admitSubmittedMessage(input)).resolves.toMatchObject({
+          success: true,
+        });
+        const winner = await admissionState(session);
+        validation.release();
+        await expect(pending).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+        expect(await admissionState(session)).toEqual(winner);
+        expect(
+          winner.messages.filter(message => message.messageId === 'msg_concurrent')
+        ).toMatchObject([{ intent: { agent: nextAgent } }]);
+      } finally {
+        validation.release();
+        await pending;
+      }
+    }
+  );
+
+  it('returns sent when a concurrent duplicate is accepted before validation completes without rewinding newer defaults', async () => {
+    const { fixture, session } = messageFixture();
+    const { socket } = await initializeTerminalRuntime(fixture);
+    const validation = pauseNextValidation();
+    let pending: ReturnType<SessionStub['admitSubmittedMessage']> | undefined;
+    try {
+      const requests = captureAndAcceptControlRequests(socket);
+      signalWrapperReady(socket);
+      await waitForWrapperReady(fixture);
+      await session.registerSession({
+        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+        auth: { kiloSessionId: 'kilo_terminal' },
+        agent: agentA,
+        workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+      });
+      const input: SubmittedSessionMessageRequest = {
+        userId: fixture.ownerId,
+        turn: { type: 'prompt', id: 'msg_winner', prompt: 'accepted concurrent winner' },
+      };
+      pending = session.admitSubmittedMessage(input);
+      await validation.entered();
+      await session.admitSubmittedMessage(input);
+      await waitForAccepted(session, 'msg_winner');
+      await session.admitSubmittedMessage({
+        userId: fixture.ownerId,
+        turn: { type: 'command', id: 'msg_new_defaults', command: 'review', arguments: '' },
+        agent: { model: modelB },
+      });
+      const winner = await admissionState(session);
+      validation.release();
+      await expect(pending).resolves.toMatchObject({
+        success: true,
+        compatibilityDelivery: 'sent',
+      });
+      expect(await admissionState(session)).toEqual(winner);
+      expect(winner.metadata?.agent).toEqual({ mode: 'code', model: modelB });
+      expect(requests.filter(request => request.operation === 'session.prompt')).toHaveLength(1);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      validation.release();
+      await pending;
+      socket.close();
+    }
+  });
+
+  it('does not resurrect a duplicate message terminalized while validation is pending', async () => {
+    const { fixture, session } = await seedBlockedAdmission();
+    const validation = pauseNextValidation();
+    const input: SubmittedSessionMessageRequest = {
+      userId: fixture.ownerId,
+      turn: { type: 'prompt', id: 'msg_terminal', prompt: 'cancel before validation returns' },
+    };
+    const pending = session.admitSubmittedMessage(input);
+    try {
+      await validation.entered();
+      await session.admitSubmittedMessage(input);
+      await session.markAsInterrupted();
+      const terminal = await admissionState(session);
+      validation.release();
+      await expect(pending).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+      expect(await admissionState(session)).toEqual(terminal);
+      expect(terminal.messages.find(message => message.messageId === 'msg_terminal')?.state).toBe(
+        'cancelled'
+      );
+    } finally {
+      validation.release();
+      await pending;
+    }
+  });
+
+  it('fences pending validation when the session is deleted', async () => {
+    const { fixture, session } = await seedBlockedAdmission();
+    const validation = pauseNextValidation();
+    const pending = session.admitSubmittedMessage({
+      userId: fixture.ownerId,
+      turn: { type: 'prompt', id: 'msg_deleted_validation', prompt: 'do not recreate state' },
+      agent: { model: modelB },
+    });
+    try {
+      await validation.entered();
+      await session.deleteSession();
+      validation.release();
+      await expect(pending).resolves.toEqual({
+        success: false,
+        code: 'NOT_FOUND',
+        error: 'Session not found',
+      });
+      expect(await admissionState(session)).toEqual({ metadata: undefined, messages: [] });
+      await expect(session.getMetadata()).resolves.toBeNull();
+    } finally {
+      validation.release();
+      await pending;
+    }
+  });
+
+  it('freezes both legacy queue formats before updating defaults and preserves history and retries', async () => {
+    const { fixture, session } = await seedBlockedAdmission();
+    const history: SessionMessageRecord[] = [
+      ...(await admissionState(session)).messages,
+      { messageId: 'msg_old_failed', state: 'failed', prompt: 'failed old content' },
+    ];
+    const legacy: SessionMessageRecord[] = [
+      {
+        messageId: 'msg_old_turn',
+        state: 'queued',
+        turn: { type: 'prompt', messageId: 'msg_old_turn', prompt: 'old turn A' },
+        attachFailures: 1,
+        promptFailures: 2,
+        preparationAttemptId: 'attempt_old_turn',
+      },
+      { messageId: 'msg_old_prompt', state: 'queued', prompt: 'old prompt A' },
+    ];
+    await runInDurableObject(session, (_instance, state) => {
+      state.storage.kv.put('session_messages', [...history, ...legacy]);
+    });
+    await expect(
+      session.admitSubmittedMessage({
+        userId: fixture.ownerId,
+        turn: { type: 'prompt', id: 'msg_new_b', prompt: 'new B' },
+        agent: { model: modelB },
+      })
+    ).resolves.toMatchObject({ success: true });
+    const frozen = await admissionState(session);
+    expect(frozen.messages.slice(0, 2)).toEqual(history);
+    expect(frozen.messages.slice(2).map(message => message.intent)).toEqual([
+      { turn: { type: 'prompt', messageId: 'msg_old_turn', prompt: 'old turn A' }, agent: agentA },
+      {
+        turn: { type: 'prompt', messageId: 'msg_old_prompt', prompt: 'old prompt A' },
+        agent: agentA,
+      },
+      {
+        turn: { type: 'prompt', messageId: 'msg_new_b', prompt: 'new B' },
+        agent: { mode: 'code', model: modelB },
+      },
+    ]);
+    expect(frozen.messages[2]).toMatchObject({
+      attachFailures: 1,
+      promptFailures: 2,
+      preparationAttemptId: 'attempt_old_turn',
+    });
+    expect(frozen.metadata?.agent).toEqual({ mode: 'code', model: modelB });
+  });
+
+  it('upgrades legacy queued delivery before awaiting control RPC even without new admission', async () => {
+    const { fixture, session } = messageFixture();
+    const { control, socket } = await initializeTerminalRuntime(fixture);
+    let entered = false;
+    let released = false;
+    let dispatch: Promise<void> | undefined;
+    try {
+      const requests = captureAndAcceptControlRequests(socket);
+      signalWrapperReady(socket);
+      await waitForWrapperReady(fixture);
+      await session.registerSession({
+        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+        auth: { kiloSessionId: 'kilo_terminal' },
+        agent: agentA,
+        workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+      });
+      await runInDurableObject(session, (_instance, state) => {
+        state.storage.kv.put('session_messages', [
+          { messageId: 'msg_upgrade_a', state: 'queued', prompt: 'old A' },
+        ] satisfies SessionMessageRecord[]);
+      });
+      await runInDurableObject(control, instance => {
+        const prototype = Object.getPrototypeOf(instance) as typeof instance;
+        const getStatus = instance.getStatus.bind(instance);
+        vi.spyOn(prototype, 'getStatus').mockImplementationOnce(async () => {
+          entered = true;
+          while (!released) await new Promise(resolve => setTimeout(resolve, 1));
+          return getStatus();
+        });
+      });
+      dispatch = runInDurableObject(session, instance => instance.alarm());
+      await vi.waitFor(() => expect(entered).toBe(true));
+      expect((await admissionState(session)).messages[0]?.intent?.agent).toEqual(agentA);
+      await runInDurableObject(session, async (instance, state) => {
+        const metadata = await instance.getMetadata();
+        if (!metadata) throw new Error('Expected registered metadata');
+        state.storage.kv.put(
+          'session_metadata',
+          serializeSessionMetadata({ ...metadata, agent: { mode: 'architect', model: modelB } })
+        );
+      });
+      released = true;
+      await dispatch;
+      await waitForAccepted(session, 'msg_upgrade_a');
+      expect(
+        requests
+          .filter(request => request.operation === 'session.prompt')
+          .map(request => request.payload)
+      ).toEqual([
+        {
+          messageId: 'msg_upgrade_a',
+          turn: { type: 'prompt', prompt: 'old A' },
+          agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
+        },
+      ]);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    } finally {
+      released = true;
+      await dispatch;
+      socket.close();
+    }
+  });
+
+  it('coalesces replays and alarms during a rejected handoff and retries the same intent once', async () => {
+    const { fixture, session } = messageFixture();
+    const { socket } = await initializeTerminalRuntime(fixture);
+    const requests: RequestFrame[] = [];
+    const entered = Promise.withResolvers<RequestFrame>();
+    let holdFirstPrompt = true;
+    let held: RequestFrame | undefined;
+    let alarm: Promise<void> | undefined;
+    try {
+      signalWrapperReady(socket);
+      await waitForWrapperReady(fixture);
+      socket.addEventListener('message', event => {
+        const request = requestFrameSchema.parse(JSON.parse(String(event.data)));
+        requests.push(request);
+        if (request.operation === 'session.prompt' && holdFirstPrompt) {
+          holdFirstPrompt = false;
+          held = request;
+          entered.resolve(request);
+          return;
+        }
+        socket.send(JSON.stringify({ type: 'response', requestId: request.requestId, ok: true }));
+      });
+      await session.createSessionWithInitialAdmission({
+        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+        auth: { kiloSessionId: 'kilo_terminal' },
+        agent: agentA,
+        workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+        message: { initialTurn: { type: 'prompt', messageId: 'msg_retry_a', prompt: 'retry A' } },
+      });
+      const firstRequest = await entered.promise;
+      const original = (await admissionState(session)).messages[0]?.intent;
+      let alarmStarted = false;
+      alarm = runInDurableObject(session, instance => {
+        alarmStarted = true;
+        return instance.alarm();
+      });
+      await vi.waitFor(() => expect(alarmStarted).toBe(true));
+      const replay: SubmittedSessionMessageRequest = {
+        userId: fixture.ownerId,
+        turn: { type: 'prompt', id: 'msg_retry_a', prompt: 'retry A' },
+      };
+      await expect(
+        Promise.all([session.admitSubmittedMessage(replay), session.admitSubmittedMessage(replay)])
+      ).resolves.toMatchObject([
+        { success: true, compatibilityDelivery: 'queued' },
+        { success: true, compatibilityDelivery: 'queued' },
+      ]);
+      expect(requests.map(request => request.operation)).toEqual([
+        'session.attach',
+        'session.prompt',
+      ]);
+      socket.send(
+        JSON.stringify({ type: 'response', requestId: firstRequest.requestId, ok: false })
+      );
+      held = undefined;
+      await alarm;
+      expect((await admissionState(session)).messages[0]).toMatchObject({
+        state: 'queued',
+        promptFailures: 1,
+        intent: original,
+      });
+      await expect(
+        session.admitSubmittedMessage({
+          userId: fixture.ownerId,
+          turn: { type: 'prompt', id: 'msg_retry_b', prompt: 'new B' },
+          agent: { model: modelB },
+        })
+      ).resolves.toMatchObject({ success: true });
+      await runInDurableObject(session, instance => instance.alarm());
+      await waitForAccepted(session, 'msg_retry_a');
+      await runInDurableObject(session, instance => instance.alarm());
+      const delivered = requests.filter(request => request.operation === 'session.prompt');
+      expect(delivered).toHaveLength(2);
+      expect(delivered[0]?.payload).toEqual(delivered[1]?.payload);
+      expect(delivered[1]?.payload).toEqual({
+        messageId: 'msg_retry_a',
+        turn: { type: 'prompt', prompt: 'retry A' },
+        agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
+      });
+      const accepted = await admissionState(session);
+      expect(accepted.messages).toMatchObject([
+        { messageId: 'msg_retry_a', state: 'accepted', promptFailures: 1, intent: original },
+        { messageId: 'msg_retry_b', state: 'queued' },
+      ]);
+      expect(accepted.metadata?.agent).toEqual({ mode: 'code', model: modelB });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      if (held)
+        socket.send(JSON.stringify({ type: 'response', requestId: held.requestId, ok: true }));
+      await alarm;
+      await session.markAsInterrupted();
+      socket.close();
+    }
+  });
+
+  it('reconnects prompt and model-less command snapshots from nested intent', async () => {
+    const { fixture, session } = await seedBlockedAdmission();
+    const records: SessionMessageRecord[] = [
+      createSessionMessageRecord({
+        turn: { type: 'prompt', messageId: 'msg_v2_prompt', prompt: 'nested prompt' },
+        agent: agentA,
+      }),
+      createSessionMessageRecord({
+        turn: {
+          type: 'command',
+          messageId: 'msg_v2_command',
+          command: 'review',
+          arguments: '--all',
+        },
+        agent: { mode: 'code' },
+      }),
+    ];
+    await runInDurableObject(session, (_instance, state) => {
+      state.storage.kv.put('session_messages', records);
+    });
+    const response = await SELF.fetch(
+      `http://worker.test/stream?sessionId=${fixture.sessionId}&userId=${fixture.ownerId}&replay=false`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+    const socket = response.webSocket;
+    if (response.status !== 101 || !socket) throw new Error('Expected session stream');
+    const events: { streamEventType: string; data: unknown }[] = [];
+    socket.addEventListener('message', event => {
+      events.push(JSON.parse(String(event.data)));
+    });
+    socket.accept();
+    try {
+      await vi.waitFor(() => {
+        expect(
+          events
+            .filter(event => event.streamEventType === 'cloud.message.queued')
+            .map(event => event.data)
+        ).toEqual([
+          { messageId: 'msg_v2_prompt', content: 'nested prompt', delivery: 'queued' },
+          { messageId: 'msg_v2_command', content: '/review --all', delivery: 'queued' },
+        ]);
+      });
+      expect((await admissionState(session)).messages).toEqual(records);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    } finally {
+      socket.close();
+    }
+  });
+
   it('aborts and detaches a deleted session without stopping active sibling work', async () => {
     const userId = 'user_control_delete';
     const sessionId = 'workspace_control_deleted';
@@ -940,17 +1838,19 @@ describe('SandboxSession control-plane regressions', () => {
       ).resolves.toMatchObject({ success: true, messageId: followUpTurn.id });
       expect(await state.storage.get<SessionMessageRecord[]>('session_messages')).toEqual([
         blocker,
-        { messageId: initialTurn.messageId, state: 'queued', turn: initialTurn },
-        {
-          messageId: followUpTurn.id,
-          state: 'queued',
+        createSessionMessageRecord({
+          turn: initialTurn,
+          agent: { mode: 'code', model: 'test' },
+        }),
+        createSessionMessageRecord({
           turn: {
             type: 'command',
             messageId: followUpTurn.id,
             command: followUpTurn.command,
             arguments: followUpTurn.arguments,
           },
-        },
+          agent: { mode: 'code', model: 'test' },
+        }),
       ]);
     });
   });

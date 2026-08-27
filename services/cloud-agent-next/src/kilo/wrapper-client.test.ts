@@ -1068,17 +1068,15 @@ describe('WrapperClient', () => {
         agentSessionId: 'test-session',
         userId: 'test-user',
         workspacePath: '/workspace/test',
-        toolCgroupEnv: { TOOL_CGROUP_MODE: 'enforce', TOOL_CGROUP_RESERVE_MB: '1536' },
+        toolCgroupEnv: { TOOL_CGROUP_RESERVE_MB: '1536' },
       });
 
       const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
       const command = startProcessCall[0] as string;
       const options = startProcessCall[1] as { env?: Record<string, string> };
-      expect(command).toContain('TOOL_CGROUP_MODE=');
       expect(command).toContain('TOOL_CGROUP_RESERVE_MB=');
       expect(options.env).toEqual(
         expect.objectContaining({
-          TOOL_CGROUP_MODE: 'enforce',
           TOOL_CGROUP_RESERVE_MB: '1536',
         })
       );
@@ -1094,7 +1092,7 @@ describe('WrapperClient', () => {
 
       const client = new WrapperClient({ session, port: defaultPort });
       const toolCgroupEnv: Record<string, string> = {
-        TOOL_CGROUP_MODE: 'enforce',
+        TOOL_CGROUP_RESERVE_MB: '1536',
         PATH: '/tmp/pwned',
         'BAD;touch /tmp/pwned': 'x',
       };
@@ -1109,12 +1107,12 @@ describe('WrapperClient', () => {
       const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
       const command = startProcessCall[0] as string;
       const options = startProcessCall[1] as { env?: Record<string, string> };
-      expect(command).toContain('TOOL_CGROUP_MODE=');
+      expect(command).toContain('TOOL_CGROUP_RESERVE_MB=');
       expect(command).not.toContain('/tmp/pwned');
       expect(command).not.toContain('BAD;touch');
       expect(options.env).toEqual(
         expect.objectContaining({
-          TOOL_CGROUP_MODE: 'enforce',
+          TOOL_CGROUP_RESERVE_MB: '1536',
         })
       );
       expect(options.env).not.toHaveProperty('PATH');

@@ -241,7 +241,7 @@ async function main() {
   // Wire up components
   // ---------------------------------------------------------------------------
   // Confine tool subprocesses to a memory-capped cgroup (best-effort; null
-  // when disabled or the cgroup fs is unavailable, e.g. in devcontainers).
+  // when the cgroup fs is unavailable, e.g. in devcontainers).
   const toolCgroup = startToolCgroup(process.env);
 
   const state = new WrapperState();

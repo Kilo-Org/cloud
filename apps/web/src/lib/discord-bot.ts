@@ -1,13 +1,7 @@
 import 'server-only';
-import {
-  createCloudAgentNextClient,
-  type PrepareSessionInput,
-} from '@/lib/cloud-agent-next/cloud-agent-client';
+import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { runSessionToCompletion } from '@/lib/cloud-agent-next/run-session';
-import {
-  getGitHubTokenForUser,
-  getGitHubTokenForOrganization,
-} from '@/lib/cloud-agent/github-integration-helpers';
+import { getGitHubTokenForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import type OpenAI from 'openai';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
@@ -19,6 +13,8 @@ import { runBot } from '@/lib/bots/core/run-bot';
 import {
   formatGitHubRepositoriesForPrompt,
   getGitHubRepositoryContext,
+  resolveGitHubRepositorySelection,
+  type GitHubRepositoryContext,
 } from '@/lib/slack-bot/github-repository-context';
 import {
   formatDiscordConversationContextForPrompt,
@@ -28,6 +24,7 @@ import {
 import { getDiscordBotAuthTokenForOwner } from '@/lib/discord/auth';
 import { buildDiscordMessageLink } from '@/lib/discord-bot/discord-utils';
 import type { PlatformIntegration } from '@kilocode/db';
+import { z } from 'zod';
 
 // Version string for API requests
 const DISCORD_BOT_VERSION = '5.0.0';
@@ -63,7 +60,7 @@ Additional context may be appended to this prompt:
 - Discord conversation context (recent messages)
 - Available GitHub repositories for this Discord integration
 
-Treat this context as authoritative. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo and ensure it's accessible to the integration. Never invent repository names.
+Treat this context as authoritative. Prefer selecting a repo from the provided repository list. Preserve its account and platformIntegrationId in githubAccount and githubIntegrationId. If the user requests work on a repo that isn't listed, ask for clarification rather than guessing. Never invent repository names.
 
 ## Tool: spawn_cloud_agent
 You can call the tool "spawn_cloud_agent" to run a Cloud Agent session for coding work on a GitHub repository.
@@ -114,6 +111,15 @@ const SPAWN_CLOUD_AGENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
           description: 'The GitHub repository in owner/repo format (e.g., "facebook/react")',
           pattern: '^[-a-zA-Z0-9_.]+/[-a-zA-Z0-9_.]+$',
         },
+        githubAccount: {
+          type: 'string',
+          description: 'The installation account shown for the selected GitHub repository',
+        },
+        githubIntegrationId: {
+          type: 'string',
+          format: 'uuid',
+          description: 'The platformIntegrationId shown for the selected GitHub repository',
+        },
         prompt: {
           type: 'string',
           description:
@@ -127,10 +133,20 @@ const SPAWN_CLOUD_AGENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
           default: 'code',
         },
       },
-      required: ['githubRepo', 'prompt'],
+      required: ['githubRepo', 'githubAccount', 'githubIntegrationId', 'prompt'],
     },
   },
 };
+
+const DiscordCloudAgentToolInputSchema = z.object({
+  githubRepo: z.string().regex(/^[-a-zA-Z0-9_.]+\/[-a-zA-Z0-9_.]+$/),
+  githubAccount: z.string().min(1).optional(),
+  githubIntegrationId: z.string().uuid().optional(),
+  prompt: z.string(),
+  mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
+});
+
+type DiscordCloudAgentToolInput = z.infer<typeof DiscordCloudAgentToolInputSchema>;
 
 type DiscordRequesterInfo = {
   displayName: string;
@@ -155,11 +171,12 @@ Built for ${requesterPart} by [Kilo for Discord](https://kilo.ai)`;
  * Spawn a Cloud Agent session
  */
 async function spawnCloudAgentSession(
-  args: { githubRepo: string; prompt: string; mode?: string },
+  args: DiscordCloudAgentToolInput,
   owner: Owner,
   model: string,
   authToken: string,
   ticketUserId: string,
+  repositoryContext: GitHubRepositoryContext,
   requesterInfo?: DiscordRequesterInfo
 ): Promise<{ response: string; sessionId?: string }> {
   console.log(
@@ -168,15 +185,13 @@ async function spawnCloudAgentSession(
   );
   console.log('[DiscordBot] Owner:', JSON.stringify(owner, null, 2));
 
-  let githubToken: string | undefined;
-  let kilocodeOrganizationId: string | undefined;
-
-  if (owner.type === 'org') {
-    githubToken = await getGitHubTokenForOrganization(owner.id);
-    kilocodeOrganizationId = owner.id;
-  } else {
-    githubToken = await getGitHubTokenForUser(owner.id);
+  const selection = await resolveGitHubRepositorySelection(owner, args, repositoryContext);
+  if (!selection.success) {
+    return { response: `Error: ${selection.error}` };
   }
+
+  const githubToken = owner.type === 'user' ? await getGitHubTokenForUser(owner.id) : undefined;
+  const kilocodeOrganizationId = owner.type === 'org' ? owner.id : undefined;
 
   const promptWithSignature = requesterInfo
     ? args.prompt + buildPrSignature(requesterInfo)
@@ -186,10 +201,11 @@ async function spawnCloudAgentSession(
     client: createCloudAgentNextClient(authToken, { skipBalanceCheck: true }),
     prepareInput: {
       githubRepo: args.githubRepo,
+      githubIntegrationId: selection.githubIntegrationId,
       prompt: promptWithSignature,
-      mode: (args.mode as PrepareSessionInput['mode']) || 'code',
+      mode: args.mode || 'code',
       model,
-      githubToken,
+      ...(githubToken ? { githubToken } : {}),
       kilocodeOrganizationId,
       createdOnPlatform: 'discord',
     },
@@ -318,13 +334,19 @@ export async function processDiscordBotMessage(
         return { content: `Error executing tool: Unknown tool ${toolCall.function.name}` };
       }
 
-      const args = JSON.parse(toolCall.function.arguments);
+      const parsedArgs = DiscordCloudAgentToolInputSchema.safeParse(
+        JSON.parse(toolCall.function.arguments)
+      );
+      if (!parsedArgs.success) {
+        return { content: 'Error executing tool: Invalid Cloud Agent arguments.' };
+      }
       const toolResult = await spawnCloudAgentSession(
-        args,
+        parsedArgs.data,
         owner,
         selectedModel,
         authToken,
         authUserId,
+        repoContext,
         requesterInfo
       );
 

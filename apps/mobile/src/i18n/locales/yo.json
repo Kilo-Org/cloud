@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Ti n ṣiṣẹ lọwọ bayi",
     "search": {
       "searching": "Ti n wa",
       "searchSessions": "Wa awọn akoko",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Ko le ṣagbewọ awọn igba-ijiroro",
       "couldNotLoadActive": "Ko le ṣe ikojọpọ awọn akoko to n ṣiṣẹ",
-      "noSessionsYet": "Ko si awọn akoko sibẹsibẹ",
       "noSessionsYetDescription": "Bẹrẹ iṣẹ-ṣiṣe coding lati foonu rẹ. Awọn akoko rẹ yoo han nibi.",
       "noMatches": "Ko si awọn akoko ti o ba mu",
       "tryDifferentSearch": "Gbiyanju ọrọ wiwa ti o yatọ.",
       "tryAdjustFilters": "Gbiyanju lati ṣatunṣe tabi paarẹ awọn àlẹ̀ rẹ.",
       "couldNotSearch": "Ko le wa awọn akoko",
-      "allActive": "Gbogbo awọn akoko ti n ṣiṣẹ",
       "completedWillAppear": "Awọn akoko ti o pari yoo han nibi.",
       "noPastSessions": "Ko si awọn akoko ti o kọja",
       "live": "LIVE"

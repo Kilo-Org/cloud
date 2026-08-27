@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "अभी सक्रिय",
     "search": {
       "clearFilters": "फ़िल्टर साफ़ करें",
       "clearSearch": "खोज साफ़ करें",
@@ -1588,14 +1587,12 @@
       "searching": "खोज रहा है"
     },
     "sessionList": {
-      "allActive": "सभी सत्र सक्रिय हैं",
       "completedWillAppear": "पूर्ण सत्र यहाँ दिखाई देंगे।",
       "couldNotLoad": "सत्र लोड नहीं हो सके",
       "couldNotLoadActive": "सक्रिय सत्र लोड नहीं हो सके",
       "couldNotSearch": "सत्र खोजे नहीं जा सके",
       "noMatches": "कोई सत्र मेल नहीं खाता",
       "noPastSessions": "कोई पिछले सत्र नहीं",
-      "noSessionsYet": "अभी कोई सत्र नहीं",
       "noSessionsYetDescription": "अपने फ़ोन से कोडिंग कार्य शुरू करें। आपके सत्र यहाँ दिखाई देंगे।",
       "tryAdjustFilters": "अपने फ़िल्टर समायोजित करने या साफ़ करने का प्रयास करें।",
       "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ।",

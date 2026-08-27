@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "Đang hoạt động",
     "search": {
       "searching": "Đang tìm kiếm",
       "searchSessions": "Tìm kiếm phiên",
@@ -1590,13 +1589,11 @@
     "sessionList": {
       "couldNotLoad": "Không thể tải các phiên",
       "couldNotLoadActive": "Không thể tải các phiên đang hoạt động",
-      "noSessionsYet": "Chưa có phiên nào",
       "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại. Các phiên của bạn sẽ xuất hiện tại đây.",
       "noMatches": "Không có phiên nào khớp",
       "tryDifferentSearch": "Hãy thử một cụm từ tìm kiếm khác.",
       "tryAdjustFilters": "Hãy thử điều chỉnh hoặc xóa bộ lọc của bạn.",
       "couldNotSearch": "Không thể tìm kiếm phiên",
-      "allActive": "Tất cả phiên đang hoạt động",
       "completedWillAppear": "Các phiên đã hoàn tất sẽ xuất hiện tại đây.",
       "noPastSessions": "Không có phiên trước đây",
       "live": "TRỰC TIẾP"

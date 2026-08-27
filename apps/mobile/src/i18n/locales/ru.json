@@ -1591,7 +1591,6 @@
     }
   },
   "agents": {
-    "activeNow": "Активен сейчас",
     "search": {
       "searching": "Поиск",
       "searchSessions": "Поиск сеансов",
@@ -1602,13 +1601,11 @@
     "sessionList": {
       "couldNotLoad": "Не удалось загрузить сеансы",
       "couldNotLoadActive": "Не удалось загрузить активные сеансы",
-      "noSessionsYet": "Сеансов пока нет",
       "noSessionsYetDescription": "Начните задачу кодирования с телефона. Ваши сеансы появятся здесь.",
       "noMatches": "Нет подходящих сеансов",
       "tryDifferentSearch": "Попробуйте другой поисковый запрос.",
       "tryAdjustFilters": "Попробуйте изменить или очистить фильтры.",
       "couldNotSearch": "Не удалось выполнить поиск сеансов",
-      "allActive": "Все сеансы активны",
       "completedWillAppear": "Завершенные сеансы появятся здесь.",
       "noPastSessions": "Нет прошлых сеансов",
       "live": "LIVE"

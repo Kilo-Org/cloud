@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiivne praegu",
     "search": {
       "searching": "Otsimine",
       "searchSessions": "Otsi seansse",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Seansse ei õnnestunud laadida",
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida",
-      "noSessionsYet": "Seansse pole veel",
       "noSessionsYetDescription": "Alusta oma telefonis kodeerimisülesannet. Sinu seansid ilmuvad siia.",
       "noMatches": "Ükski seanss ei vasta",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
       "tryAdjustFilters": "Proovi filtreid kohandada või tühjendada.",
       "couldNotSearch": "Seansside otsimine ebaõnnestus",
-      "allActive": "Kõik seansid on aktiivsed",
       "completedWillAppear": "Lõpetatud seansid ilmuvad siia.",
       "noPastSessions": "Minevikuseansse pole",
       "live": "OTSE"

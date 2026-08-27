@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "ਹੁਣ ਕਿਰਿਆਸ਼ੀਲ",
     "search": {
       "searching": "ਖੋਜ ਰਿਹਾ ਹੈ",
       "searchSessions": "ਸੈਸ਼ਨ ਖੋਜੋ",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ",
       "couldNotLoadActive": "ਕਿਰਿਆਸ਼ੀਲ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ",
-      "noSessionsYet": "ਅਜੇ ਕੋਈ ਸੈਸ਼ਨ ਨਹੀਂ",
       "noSessionsYetDescription": "ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਕੋਡਿੰਗ ਕੰਮ ਸ਼ੁਰੂ ਕਰੋ। ਤੁਹਾਡੇ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
       "noMatches": "ਕੋਈ ਸੈਸ਼ਨ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
       "tryDifferentSearch": "ਵੱਖਰਾ ਖੋਜ ਸ਼ਬਦ ਅਜ਼ਮਾਓ।",
       "tryAdjustFilters": "ਆਪਣੇ ਫਿਲਟਰ ਵਿਵਸਥਿਤ ਜਾਂ ਸਾਫ਼ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "couldNotSearch": "ਸੈਸ਼ਨ ਖੋਜੇ ਨਹੀਂ ਜਾ ਸਕੇ",
-      "allActive": "ਸਾਰੇ ਸੈਸ਼ਨ ਕਿਰਿਆਸ਼ੀਲ ਹਨ",
       "completedWillAppear": "ਮੁਕੰਮਲ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
       "noPastSessions": "ਕੋਈ ਪਿਛਲੇ ਸੈਸ਼ਨ ਨਹੀਂ",
       "live": "ਲਾਈਵ"

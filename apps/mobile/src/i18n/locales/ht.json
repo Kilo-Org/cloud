@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktif kounye a",
     "search": {
       "searching": "Ap chèche",
       "searchSessions": "Chèche sesyon yo",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Pa t 'kapab chaje sesyon yo",
       "couldNotLoadActive": "Pa t 'kapab chaje sesyon aktif yo",
-      "noSessionsYet": "Pa gen sesyon ankò",
       "noSessionsYetDescription": "Kòmanse yon travay kodaj depi telefòn ou. Sesyon ou yo pral parèt isit la.",
       "noMatches": "Pa gen sesyon ki matche",
       "tryDifferentSearch": "Eseye yon tèm rechèch diferan.",
       "tryAdjustFilters": "Eseye ajiste oswa netwaye filtè ou yo.",
       "couldNotSearch": "Pa t 'kapab chèche sesyon yo",
-      "allActive": "Tout sesyon yo aktif",
       "completedWillAppear": "Sesyon ki fini yo pral parèt isit la.",
       "noPastSessions": "Pa gen sesyon pase",
       "live": "AN DIRÈK"

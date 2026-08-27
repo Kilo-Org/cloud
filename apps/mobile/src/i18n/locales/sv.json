@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiv nu",
     "search": {
       "searching": "Söker",
       "searchSessions": "Sök sessioner",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Det gick inte att läsa in sessioner",
       "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner",
-      "noSessionsYet": "Inga sessioner ännu",
       "noSessionsYetDescription": "Starta en kodningsuppgift från din telefon. Dina sessioner visas här.",
       "noMatches": "Inga sessioner matchar",
       "tryDifferentSearch": "Prova en annan sökterm.",
       "tryAdjustFilters": "Försök att justera eller rensa dina filter.",
       "couldNotSearch": "Kunde inte söka i sessioner",
-      "allActive": "Alla sessioner är aktiva",
       "completedWillAppear": "Slutförda sessioner visas här.",
       "noPastSessions": "Inga tidigare sessioner",
       "live": "LIVE"

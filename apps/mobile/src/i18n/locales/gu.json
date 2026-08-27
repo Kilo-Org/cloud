@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "હવે સક્રિય",
     "search": {
       "searching": "શોધી રહ્યું છે",
       "searchSessions": "સત્રો શોધો",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "સત્રો લોડ કરી શકાયા નહીં",
       "couldNotLoadActive": "સક્રિય સત્રો લોડ થઈ શક્યા નથી",
-      "noSessionsYet": "હજુ કોઈ સત્ર નથી",
       "noSessionsYetDescription": "તમારા ફોન પરથી કોડિંગ કાર્ય શરૂ કરો. તમારા સત્રો અહીં દેખાશે.",
       "noMatches": "કોઈ સત્ર મેળ ખાતું નથી",
       "tryDifferentSearch": "અલગ શોધ શબ્દ અજમાવો.",
       "tryAdjustFilters": "તમારા ફિલ્ટર ગોઠવવાનો અથવા સાફ કરવાનો પ્રયાસ કરો.",
       "couldNotSearch": "સત્રો શોધી શકાયા નથી",
-      "allActive": "બધા સત્રો સક્રિય છે",
       "completedWillAppear": "પૂર્ણ થયેલ સત્રો અહીં દેખાશે.",
       "noPastSessions": "કોઈ ભૂતકાળના સત્ર નથી",
       "live": "લાઇવ"

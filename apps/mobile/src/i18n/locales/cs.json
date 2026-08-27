@@ -2059,7 +2059,6 @@
     }
   },
   "agents": {
-    "activeNow": "Nyní aktivní",
     "search": {
       "searching": "Hledání",
       "searchSessions": "Hledat relace",
@@ -2070,13 +2069,11 @@
     "sessionList": {
       "couldNotLoad": "Relace se nepodařilo načíst",
       "couldNotLoadActive": "Aktivní relace se nepodařilo načíst",
-      "noSessionsYet": "Zatím žádné relace",
       "noSessionsYetDescription": "Spusťte programátorskou úlohu z telefonu. Vaše relace se zde zobrazí.",
       "noMatches": "Žádné relace neodpovídají",
       "tryDifferentSearch": "Zkuste jiný hledaný výraz.",
       "tryAdjustFilters": "Zkuste upravit nebo vymazat své filtry.",
       "couldNotSearch": "Relace se nepodařilo vyhledat",
-      "allActive": "Všechny relace jsou aktivní",
       "completedWillAppear": "Dokončené relace se zde zobrazí.",
       "noPastSessions": "Žádné minulé relace",
       "live": "ŽIVĚ"

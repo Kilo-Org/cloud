@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "Jetzt aktiv",
     "search": {
       "searching": "Suchen",
       "searchSessions": "Sitzungen suchen",
@@ -1590,13 +1589,11 @@
     "sessionList": {
       "couldNotLoad": "Sitzungen konnten nicht geladen werden",
       "couldNotLoadActive": "Aktive Sitzungen konnten nicht geladen werden",
-      "noSessionsYet": "Noch keine Sitzungen",
       "noSessionsYetDescription": "Starte eine Codieraufgabe von deinem Telefon. Deine Sitzungen erscheinen hier.",
       "noMatches": "Keine Sitzungen gefunden",
       "tryDifferentSearch": "Versuche einen anderen Suchbegriff.",
       "tryAdjustFilters": "Versuche, deine Filter anzupassen oder zu löschen.",
       "couldNotSearch": "Sitzungen konnten nicht durchsucht werden",
-      "allActive": "Alle Sitzungen sind aktiv",
       "completedWillAppear": "Abgeschlossene Sitzungen erscheinen hier.",
       "noPastSessions": "Keine vergangenen Sitzungen",
       "live": "LIVE"

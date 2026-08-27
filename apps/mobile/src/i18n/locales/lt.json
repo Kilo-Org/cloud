@@ -2059,7 +2059,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktyvus dabar",
     "search": {
       "searching": "Ieškoma",
       "searchSessions": "Ieškoti sesijų",
@@ -2070,13 +2069,11 @@
     "sessionList": {
       "couldNotLoad": "Nepavyko įkelti sesijų",
       "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų",
-      "noSessionsYet": "Sesijų dar nėra",
       "noSessionsYetDescription": "Pradėkite kodavimo užduotį iš savo telefono. Jūsų sesijos bus rodomos čia.",
       "noMatches": "Sesijų neatitikimų nėra",
       "tryDifferentSearch": "Pabandykite kitą paieškos terminą.",
       "tryAdjustFilters": "Pabandykite pakoreguoti arba išvalyti filtrus.",
       "couldNotSearch": "Nepavyko ieškoti sesijų",
-      "allActive": "Visos sesijos aktyvios",
       "completedWillAppear": "Baigtos sesijos bus rodomos čia.",
       "noPastSessions": "Nėra ankstesnių sesijų",
       "live": "TIESIOGIAI"

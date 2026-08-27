@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "現在アクティブ",
     "search": {
       "searching": "検索中",
       "searchSessions": "セッションを検索",
@@ -1590,13 +1589,11 @@
     "sessionList": {
       "couldNotLoad": "セッションを読み込めませんでした",
       "couldNotLoadActive": "アクティブなセッションを読み込めませんでした",
-      "noSessionsYet": "まだセッションはありません",
       "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。セッションがここに表示されます。",
       "noMatches": "一致するセッションはありません",
       "tryDifferentSearch": "別の検索語をお試しください。",
       "tryAdjustFilters": "フィルターを調整またはクリアしてお試しください。",
       "couldNotSearch": "セッションを検索できませんでした",
-      "allActive": "すべてのセッションがアクティブです",
       "completedWillAppear": "完了したセッションがここに表示されます。",
       "noPastSessions": "過去のセッションはありません",
       "live": "ライブ"

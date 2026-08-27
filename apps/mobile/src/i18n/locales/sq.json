@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiv tani",
     "search": {
       "searching": "Kërkim në vazhdim",
       "searchSessions": "Kërko seancat",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Nuk u ngarkuan seancat",
       "couldNotLoadActive": "Nuk u ngarkuan seancat aktive",
-      "noSessionsYet": "Ende pa seanca",
       "noSessionsYetDescription": "Filloni një detyrë kodimi nga telefoni juaj. Seancat tuaja do të shfaqen këtu.",
       "noMatches": "Asnjë seancë nuk përputhet",
       "tryDifferentSearch": "Provoni një term tjetër kërkimi.",
       "tryAdjustFilters": "Provoni t'i rregulloni ose pastroni filtrat tuaj.",
       "couldNotSearch": "Nuk u kërkuan seancat",
-      "allActive": "Të gjitha seancat janë aktive",
       "completedWillAppear": "Seancat e përfunduara do të shfaqen këtu.",
       "noPastSessions": "Asnjë seancë e kaluar",
       "live": "DREJTPËRDREJT"

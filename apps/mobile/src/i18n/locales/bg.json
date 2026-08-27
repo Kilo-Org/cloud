@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Активен сега",
     "search": {
       "searching": "Търсене",
       "searchSessions": "Търсене на сесии",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Не може да се заредят сесиите",
       "couldNotLoadActive": "Не може да се заредят активните сесии",
-      "noSessionsYet": "Все още няма сесии",
       "noSessionsYetDescription": "Започни задача за кодиране от телефона си. Сесиите ти ще се появят тук.",
       "noMatches": "Няма съвпадащи сесии",
       "tryDifferentSearch": "Опитай с различен термин за търсене.",
       "tryAdjustFilters": "Опитай да промениш или изчистиш филтрите си.",
       "couldNotSearch": "Не може да се търсят сесии",
-      "allActive": "Всички сесии са активни",
       "completedWillAppear": "Завършените сесии ще се появят тук.",
       "noPastSessions": "Няма минали сесии",
       "live": "НА ЖИВО"

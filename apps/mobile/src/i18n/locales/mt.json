@@ -2072,7 +2072,6 @@
     }
   },
   "agents": {
-    "activeNow": "Attiv issa",
     "search": {
       "searching": "Qed infittex",
       "searchSessions": "Fittex sessjonijiet",
@@ -2083,13 +2082,11 @@
     "sessionList": {
       "couldNotLoad": "Ma setgħux jitgħabbew is-sessjonijiet",
       "couldNotLoadActive": "Ma setgħux jintgħabbu s-sessjonijiet attivi",
-      "noSessionsYet": "L-ebda sessjoni s'issa",
       "noSessionsYetDescription": "Ibda biċċa xogħol ta' kodifikazzjoni mit-telefon tiegħek. Is-sessjonijiet tiegħek se jidhru hawn.",
       "noMatches": "L-ebda sessjoni ma taqbel",
       "tryDifferentSearch": "Ipprova terminu ta' tfittxija differenti.",
       "tryAdjustFilters": "Ipprova aġġusta jew neħħi l-filtri tiegħek.",
       "couldNotSearch": "Ma setgħux jinstabu s-sessjonijiet",
-      "allActive": "Is-sessjonijiet kollha huma attivi",
       "completedWillAppear": "Is-sessjonijiet kompluti se jidhru hawn.",
       "noPastSessions": "L-ebda sessjoni tal-passat",
       "live": "DIRETT"

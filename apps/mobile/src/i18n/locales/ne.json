@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "अहिले सक्रिय",
     "search": {
       "searching": "खोज्दै",
       "searchSessions": "सत्रहरू खोज्नुहोस्",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "सत्रहरू लोड गर्न सकिएन",
       "couldNotLoadActive": "सक्रिय सत्रहरू लोड गर्न सकिएन",
-      "noSessionsYet": "अहिलेसम्म कुनै सत्रहरू छैनन्",
       "noSessionsYetDescription": "तपाईंको फोनबाट कोडिङ कार्य सुरु गर्नुहोस्। तपाईंका सत्रहरू यहाँ देखा पर्नेछन्।",
       "noMatches": "कुनै सत्र मेल खाएन",
       "tryDifferentSearch": "फरक खोज शब्द प्रयास गर्नुहोस्।",
       "tryAdjustFilters": "फिल्टरहरू समायोजन वा खाली गर्ने प्रयास गर्नुहोस्।",
       "couldNotSearch": "सत्रहरू खोज्न सकिएन",
-      "allActive": "सबै सत्रहरू सक्रिय छन्",
       "completedWillAppear": "पूरा भएका सत्रहरू यहाँ देखा पर्नेछन्।",
       "noPastSessions": "कुनै पुराना सत्रहरू छैनन्",
       "live": "LIVE"

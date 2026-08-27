@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "Şu anda etkin",
     "search": {
       "searching": "Aranıyor",
       "searchSessions": "Oturumları ara",
@@ -1590,13 +1589,11 @@
     "sessionList": {
       "couldNotLoad": "Oturumlar yüklenemedi",
       "couldNotLoadActive": "Etkin oturumlar yüklenemedi",
-      "noSessionsYet": "Henüz oturum yok",
       "noSessionsYetDescription": "Telefonunuzdan bir kodlama görevi başlatın. Oturumlarınız burada görünecek.",
       "noMatches": "Eşleşen oturum yok",
       "tryDifferentSearch": "Farklı bir arama terimi deneyin.",
       "tryAdjustFilters": "Filtrelerinizi ayarlamayı veya temizlemeyi deneyin.",
       "couldNotSearch": "Oturumlar aranamadı",
-      "allActive": "Tüm oturumlar etkin",
       "completedWillAppear": "Tamamlanan oturumlar burada görünecek.",
       "noPastSessions": "Geçmiş oturum yok",
       "live": "CANLI"

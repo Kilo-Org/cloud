@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktibo ngayon",
     "search": {
       "searching": "Naghahanap",
       "searchSessions": "Maghanap ng mga session",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Hindi ma-load ang mga session",
       "couldNotLoadActive": "Hindi ma-load ang mga aktibong session",
-      "noSessionsYet": "Wala pang session",
       "noSessionsYetDescription": "Magsimula ng coding task mula sa iyong phone. Lalabas dito ang iyong mga session.",
       "noMatches": "Walang session na tugma",
       "tryDifferentSearch": "Subukan ang ibang termino sa paghahanap.",
       "tryAdjustFilters": "Subukang ayusin o i-clear ang iyong mga filter.",
       "couldNotSearch": "Hindi ma-search ang mga session",
-      "allActive": "Aktibo ang lahat ng session",
       "completedWillAppear": "Lalabas dito ang mga natapos na session.",
       "noPastSessions": "Walang nakaraang session",
       "live": "LIVE"

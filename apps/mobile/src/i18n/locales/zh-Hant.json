@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "目前使用中",
     "search": {
       "searching": "搜尋中",
       "searchSessions": "搜尋工作階段",
@@ -1590,13 +1589,11 @@
     "sessionList": {
       "couldNotLoad": "無法載入工作階段",
       "couldNotLoadActive": "無法載入使用中的工作階段",
-      "noSessionsYet": "尚無工作階段",
       "noSessionsYetDescription": "從手機開始程式設計任務。您的工作階段將顯示在這裡。",
       "noMatches": "沒有相符的工作階段",
       "tryDifferentSearch": "請嘗試其他搜尋字詞。",
       "tryAdjustFilters": "請嘗試調整或清除您的篩選條件。",
       "couldNotSearch": "無法搜尋工作階段",
-      "allActive": "所有工作階段皆在使用中",
       "completedWillAppear": "已完成的工作階段將顯示在這裡。",
       "noPastSessions": "沒有過去的工作階段",
       "live": "即時"

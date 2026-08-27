@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "आता सक्रिय",
     "search": {
       "searching": "शोधत आहे",
       "searchSessions": "सत्रे शोधा",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "सत्रे लोड करता आली नाहीत",
       "couldNotLoadActive": "सक्रिय सत्रे लोड करता आली नाहीत",
-      "noSessionsYet": "अजून सत्रे नाहीत",
       "noSessionsYetDescription": "तुमच्या फोनवरून कोडिंग कार्य सुरू करा. तुमची सत्रे येथे दिसतील.",
       "noMatches": "जुळणारी सत्रे नाहीत",
       "tryDifferentSearch": "भिन्न शोध संज्ञा वापरून पहा.",
       "tryAdjustFilters": "तुमचे फिल्टर समायोजित किंवा साफ करून पहा.",
       "couldNotSearch": "सत्रे शोधता आली नाहीत",
-      "allActive": "सर्व सत्रे सक्रिय आहेत",
       "completedWillAppear": "पूर्ण झालेली सत्रे येथे दिसतील.",
       "noPastSessions": "भूतकाळातील सत्रे नाहीत",
       "live": "LIVE"

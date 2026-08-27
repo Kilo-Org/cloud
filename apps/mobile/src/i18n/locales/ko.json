@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "지금 활성 중",
     "search": {
       "searching": "검색 중",
       "searchSessions": "세션 검색",
@@ -1590,13 +1589,11 @@
     "sessionList": {
       "couldNotLoad": "세션을 불러올 수 없습니다",
       "couldNotLoadActive": "활성 세션을 불러올 수 없습니다",
-      "noSessionsYet": "아직 세션 없음",
       "noSessionsYetDescription": "휴대폰에서 코딩 작업을 시작하세요. 세션이 여기에 표시됩니다.",
       "noMatches": "일치하는 세션이 없습니다",
       "tryDifferentSearch": "다른 검색어를 사용해 보세요.",
       "tryAdjustFilters": "필터를 조정하거나 지워 보세요.",
       "couldNotSearch": "세션을 검색할 수 없습니다",
-      "allActive": "모든 세션이 활성 상태입니다",
       "completedWillAppear": "완료된 세션이 여기에 표시됩니다.",
       "noPastSessions": "지난 세션 없음",
       "live": "LIVE"

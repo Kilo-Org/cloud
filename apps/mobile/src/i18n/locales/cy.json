@@ -2085,7 +2085,6 @@
     }
   },
   "agents": {
-    "activeNow": "Yn weithredol nawr",
     "search": {
       "searching": "Yn chwilio",
       "searchSessions": "Chwilio sesiynau",
@@ -2096,13 +2095,11 @@
     "sessionList": {
       "couldNotLoad": "Methwyd llwytho sesiynau",
       "couldNotLoadActive": "Methwyd llwytho sesiynau gweithredol",
-      "noSessionsYet": "Dim sesiynau eto",
       "noSessionsYetDescription": "Dechreuwch dasg codio o'ch ffôn. Bydd eich sesiynau'n ymddangos yma.",
       "noMatches": "Dim sesiynau'n cyfateb",
       "tryDifferentSearch": "Ceisiwch derm chwilio gwahanol.",
       "tryAdjustFilters": "Ceisiwch addasu neu glirio'ch hidlwyr.",
       "couldNotSearch": "Methwyd chwilio sesiynau",
-      "allActive": "Mae pob sesiwn yn weithredol",
       "completedWillAppear": "Bydd sesiynau wedi'u cwblhau'n ymddangos yma.",
       "noPastSessions": "Dim sesiynau yn y gorffennol",
       "live": "BYW"

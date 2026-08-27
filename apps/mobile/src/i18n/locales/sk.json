@@ -2059,7 +2059,6 @@
     }
   },
   "agents": {
-    "activeNow": "Práve aktívny",
     "search": {
       "searching": "Vyhľadávanie",
       "searchSessions": "Vyhľadať sedenia",
@@ -2070,13 +2069,11 @@
     "sessionList": {
       "couldNotLoad": "Relácie sa nepodarilo načítať",
       "couldNotLoadActive": "Aktívne sedenia sa nepodarilo načítať",
-      "noSessionsYet": "Zatiaľ žiadne sedenia",
       "noSessionsYetDescription": "Spustite programátorskú úlohu z telefónu. Vaše sedenia sa zobrazia tu.",
       "noMatches": "Žiadne sedenia nezodpovedajú",
       "tryDifferentSearch": "Skúste iný vyhľadávací výraz.",
       "tryAdjustFilters": "Skúste upraviť alebo vymazať filtre.",
       "couldNotSearch": "Sedenie sa nepodarilo vyhľadať",
-      "allActive": "Všetky sedenia sú aktívne",
       "completedWillAppear": "Dokončené sedenia sa zobrazia tu.",
       "noPastSessions": "Žiadne minulé sedenia",
       "live": "NAŽIVO"

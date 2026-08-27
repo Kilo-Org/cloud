@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "এখন সক্রিয়",
     "search": {
       "searching": "খোঁজা হচ্ছে",
       "searchSessions": "সেশন খুঁজুন",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "সেশন লোড করা যায়নি",
       "couldNotLoadActive": "সক্রিয় সেশন লোড করা যায়নি",
-      "noSessionsYet": "এখনো কোনো সেশন নেই",
       "noSessionsYetDescription": "আপনার ফোন থেকে একটি কোডিং কাজ শুরু করুন। আপনার সেশন এখানে দেখাবে।",
       "noMatches": "কোনো সেশন মেলে না",
       "tryDifferentSearch": "একটি ভিন্ন অনুসন্ধান শব্দ চেষ্টা করুন।",
       "tryAdjustFilters": "আপনার ফিল্টার সামঞ্জস্য বা পরিষ্কার করার চেষ্টা করুন।",
       "couldNotSearch": "সেশন খোঁজা যায়নি",
-      "allActive": "সব সেশন সক্রিয়",
       "completedWillAppear": "সম্পন্ন সেশন এখানে দেখাবে।",
       "noPastSessions": "কোনো অতীত সেশন নেই",
       "live": "LIVE"

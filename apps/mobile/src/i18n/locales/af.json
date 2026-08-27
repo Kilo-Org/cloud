@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Nou aktief",
     "search": {
       "searching": "Soek",
       "searchSessions": "Soek sessies",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Kon sessies nie laai nie",
       "couldNotLoadActive": "Kon aktiewe sessies nie laai nie",
-      "noSessionsYet": "Nog geen sessies nie",
       "noSessionsYetDescription": "Begin 'n koderings taak vanaf jou foon. Jou sessies sal hier verskyn.",
       "noMatches": "Geen sessies pas nie",
       "tryDifferentSearch": "Probeer 'n ander soekterm.",
       "tryAdjustFilters": "Probeer jou filters aanpas of uitvee.",
       "couldNotSearch": "Kon sessies nie soek nie",
-      "allActive": "Alle sessies is aktief",
       "completedWillAppear": "Voltooide sessies sal hier verskyn.",
       "noPastSessions": "Geen vorige sessies nie",
       "live": "LEWEND"

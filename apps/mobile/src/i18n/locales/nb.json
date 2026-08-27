@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiv nå",
     "search": {
       "searching": "Søker",
       "searchSessions": "Søk i økter",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Kunne ikke laste inn økter",
       "couldNotLoadActive": "Kunne ikke laste inn aktive økter",
-      "noSessionsYet": "Ingen økter ennå",
       "noSessionsYetDescription": "Start en kodingsoppgave fra telefonen din. Øktene dine vises her.",
       "noMatches": "Ingen økter samsvarer",
       "tryDifferentSearch": "Prøv et annet søkeord.",
       "tryAdjustFilters": "Prøv å justere eller fjerne filtrene dine.",
       "couldNotSearch": "Kunne ikke søke i økter",
-      "allActive": "Alle økter er aktive",
       "completedWillAppear": "Fullførte økter vises her.",
       "noPastSessions": "Ingen tidligere økter",
       "live": "LIVE"

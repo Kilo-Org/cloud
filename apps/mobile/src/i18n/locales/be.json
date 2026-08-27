@@ -2059,7 +2059,6 @@
     }
   },
   "agents": {
-    "activeNow": "Актыўны зараз",
     "search": {
       "searching": "Пошук…",
       "searchSessions": "Пошук сеансаў",
@@ -2070,13 +2069,11 @@
     "sessionList": {
       "couldNotLoad": "Не атрымалася загрузіць сеансы",
       "couldNotLoadActive": "Не атрымалася загрузіць актыўныя сеансы",
-      "noSessionsYet": "Сеансаў яшчэ няма",
       "noSessionsYetDescription": "Пачніце задачу кадавання з тэлефона. Вашы сеансы з'явяцца тут.",
       "noMatches": "Ніводны сеанс не адпавядае",
       "tryDifferentSearch": "Паспрабуйце іншы пошукавы запыт.",
       "tryAdjustFilters": "Паспрабуйце змяніць або ачысціць фільтры.",
       "couldNotSearch": "Не атрымалася выканаць пошук па сеансах",
-      "allActive": "Усе сеансы актыўныя",
       "completedWillAppear": "Завершаныя сеансы з'явяцца тут.",
       "noPastSessions": "Няма мінулых сеансаў",
       "live": "LIVE"

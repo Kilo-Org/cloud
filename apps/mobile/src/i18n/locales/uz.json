@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Hozir faol",
     "search": {
       "searching": "Qidirilmoqda",
       "searchSessions": "Sessiyalarni qidirish",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Sessiyalarni yuklab bo'lmadi",
       "couldNotLoadActive": "Faol sessiyalar yuklab olinmadi",
-      "noSessionsYet": "Hali sessiyalar yo'q",
       "noSessionsYetDescription": "Telefoningizdan kodlash vazifasini boshlang. Sessiyalaringiz shu yerda paydo bo'ladi.",
       "noMatches": "Sessiyalar mos kelmadi",
       "tryDifferentSearch": "Boshqa qidiruv so'zini sinab ko'ring.",
       "tryAdjustFilters": "Filtrlaringizni sozlab yoki tozalab ko'ring.",
       "couldNotSearch": "Sessiyalarni qidirib bo'lmadi",
-      "allActive": "Barcha sessiyalar faol",
       "completedWillAppear": "Tugallangan sessiyalar shu yerda paydo bo'ladi.",
       "noPastSessions": "O'tgan sessiyalar yo'q",
       "live": "JO'N"

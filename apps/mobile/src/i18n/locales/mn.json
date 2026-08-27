@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Одоо идэвхтэй",
     "search": {
       "searching": "Хайж байна",
       "searchSessions": "Сессийг хайх",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Сессийг ачаалах боломжгүй",
       "couldNotLoadActive": "Идэвхтэй сессийг ачаалах боломжгүй",
-      "noSessionsYet": "Хараахан сесси байхгүй",
       "noSessionsYetDescription": "Утаснаасаа кодлох даалгаврыг эхлүүлээрэй. Таны сессүүд энд гарч ирнэ.",
       "noMatches": "Таарсан сесси байхгүй",
       "tryDifferentSearch": "Өөр хайлтын нэр томьёо туршиж үзнэ үү.",
       "tryAdjustFilters": "Шүүлтүүрүүдээ тохируулах эсвэл арилгаж үзнэ үү.",
       "couldNotSearch": "Сессийг хайх боломжгүй",
-      "allActive": "Бүх сессүүд идэвхтэй байна",
       "completedWillAppear": "Дууссан сессүүд энд гарч ирнэ.",
       "noPastSessions": "Өмнөх сесс байхгүй",
       "live": "ШУУД"

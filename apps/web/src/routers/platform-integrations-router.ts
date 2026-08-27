@@ -22,6 +22,6 @@ export const platformIntegrationsRouter = createTRPCRouter({
           integration.integration_type === 'oauth')
       );
     });
-    return summarizePlatformIntegrationsForSetupStatus(visibleIntegrations);
+    return summarizePlatformIntegrationsForSetupStatus(visibleIntegrations, owner.type);
   }),
 });

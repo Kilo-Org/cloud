@@ -59,9 +59,19 @@ const mockCreateInstallState =
       returnTo: string | null;
     }) => Promise<string>
   >();
+const mockUpdateModel =
+  jest.fn<
+    (
+      owner: Owner,
+      modelSlug: string,
+      integrationId?: string
+    ) => Promise<{ success: boolean; error?: string }>
+  >();
 
 jest.mock('@/lib/integrations/github-apps-service', () => ({
   listIntegrations: (owner: Owner) => mockListIntegrations(owner),
+  updateModel: (owner: Owner, modelSlug: string, integrationId?: string) =>
+    mockUpdateModel(owner, modelSlug, integrationId),
 }));
 
 jest.mock('@/routers/organizations/utils', () => ({
@@ -114,7 +124,15 @@ let createCaller: (ctx: { user: User }) => {
     organizationId?: string;
     returnTo?: string;
   }) => Promise<{ token: string }>;
-  refreshInstallation: (input?: { organizationId?: string }) => Promise<{ success: boolean }>;
+  refreshInstallation: (input?: {
+    organizationId?: string;
+    integrationId?: string;
+  }) => Promise<{ success: boolean }>;
+  updateModel: (input: {
+    organizationId?: string;
+    integrationId?: string;
+    modelSlug: string;
+  }) => Promise<{ success: boolean; error?: string }>;
   devSeedUserGithubToken: (input: {
     token: string;
     githubLogin: string;
@@ -297,6 +315,40 @@ describe('githubAppsRouter.refreshInstallation', () => {
     expect(mockUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
     expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+  });
+});
+
+describe('githubAppsRouter.updateModel', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpdateModel.mockResolvedValue({ success: true });
+  });
+
+  it('requires an exact integration for organization updates', async () => {
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await expect(
+      caller.updateModel({
+        organizationId: '11111111-1111-4111-8111-111111111111',
+        modelSlug: 'anthropic/claude-sonnet-4',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'Integration ID is required' });
+
+    expect(mockUpdateModel).not.toHaveBeenCalled();
+  });
+
+  it('preserves personal update behavior without an integration ID', async () => {
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await expect(caller.updateModel({ modelSlug: 'anthropic/claude-sonnet-4' })).resolves.toEqual({
+      success: true,
+    });
+
+    expect(mockUpdateModel).toHaveBeenCalledWith(
+      { type: 'user', id: 'user-1' },
+      'anthropic/claude-sonnet-4',
+      undefined
+    );
   });
 });
 

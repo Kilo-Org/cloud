@@ -216,15 +216,23 @@ export const githubAppsRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string().uuid().optional(),
+        integrationId: z.string().uuid().optional(),
         modelSlug: z.string(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      if (input.organizationId && !input.integrationId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Integration ID is required' });
+      }
       if (input.organizationId) {
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
-      const result = await githubAppsService.updateModel(owner, input.modelSlug);
+      const result = await githubAppsService.updateModel(
+        owner,
+        input.modelSlug,
+        input.integrationId
+      );
 
       if (input.organizationId && result.success) {
         await createAuditLog({

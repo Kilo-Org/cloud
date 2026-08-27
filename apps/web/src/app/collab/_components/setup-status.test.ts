@@ -65,6 +65,26 @@ describe('collab setup status', () => {
     expect(hasAnyConfiguredOrSelectedPlatform(CODE_PLATFORM_IDS, [], statuses)).toBe(true);
   });
 
+  test('shows a deterministic count for multiple GitHub installations', () => {
+    const statuses = buildPlatformSetupStatuses({
+      data: [
+        {
+          platform: 'github',
+          installed: true,
+          installation: { installationCount: 2 },
+        },
+      ],
+      isError: false,
+      isLoading: false,
+    });
+
+    expect(statuses.github).toEqual({
+      kind: 'connected',
+      label: 'Already set up',
+      detail: '2 installations',
+    });
+  });
+
   test('filters connected services out of the authorization queue', () => {
     const statuses = buildPlatformSetupStatuses({
       data: [

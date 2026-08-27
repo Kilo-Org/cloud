@@ -7,7 +7,7 @@ import {
   getIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization,
 } from '@/lib/integrations/db/platform-integrations';
-import { getInstallation, isInstallationGoneError } from './github-apps-service';
+import { getInstallation, isInstallationGoneError, updateModel } from './github-apps-service';
 
 describe('getInstallation', () => {
   it('prefers a healthy installation when the owner has multiple GitHub rows', async () => {
@@ -118,6 +118,57 @@ describe('getInstallation', () => {
       expect(visibleIntegration?.id).toBe(row.id);
       expect(primaryIntegration).toBeNull();
       expect(ownerIntegration).toBeNull();
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+});
+
+describe('updateModel', () => {
+  it('updates only the selected organization installation', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub model update ${crypto.randomUUID()}` })
+      .returning();
+    const rows = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: crypto.randomUUID(),
+          integration_status: 'active',
+          repository_access: 'all',
+          metadata: { model_slug: 'first-model' },
+        },
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: crypto.randomUUID(),
+          integration_status: 'active',
+          repository_access: 'all',
+          metadata: { model_slug: 'second-model' },
+        },
+      ])
+      .returning();
+
+    try {
+      await expect(
+        updateModel({ type: 'org', id: organization.id }, 'updated-model', rows[1].id)
+      ).resolves.toEqual({ success: true });
+
+      const integrations = await db
+        .select({ id: platform_integrations.id, metadata: platform_integrations.metadata })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, organization.id));
+      expect(integrations).toEqual(
+        expect.arrayContaining([
+          { id: rows[0].id, metadata: { model_slug: 'first-model' } },
+          { id: rows[1].id, metadata: { model_slug: 'updated-model' } },
+        ])
+      );
     } finally {
       await db.delete(organizations).where(eq(organizations.id, organization.id));
     }

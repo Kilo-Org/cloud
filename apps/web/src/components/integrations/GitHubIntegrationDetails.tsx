@@ -388,7 +388,11 @@ function GitHubIntegrationDetailsContent({
   const handleModelChange = (modelSlug: string) => {
     setSelectedModel(modelSlug);
     updateModel.mutate(
-      { modelSlug, organizationId },
+      {
+        modelSlug,
+        organizationId,
+        integrationId: organizationId ? installationData?.installation?.id : undefined,
+      },
       {
         onSuccess: result => {
           if (result.success) {

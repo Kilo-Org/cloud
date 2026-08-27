@@ -39,6 +39,9 @@ function getConnectedAccountLabel(
   if (platformId === 'discord') return installation.guildName ?? undefined;
   if (platformId === 'linear') return installation.workspaceName ?? undefined;
   if (platformId === 'github' || platformId === 'gitlab') {
+    if (platformId === 'github' && installation.installationCount) {
+      return `${installation.installationCount} installation${installation.installationCount === 1 ? '' : 's'}`;
+    }
     return installation.accountLogin ?? undefined;
   }
 

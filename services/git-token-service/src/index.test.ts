@@ -1302,14 +1302,12 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   });
 
   it.each([
-    ['POST', 'https://api.github.com/graphql'],
-    ['GET', 'https://api.github.com/user/repos'],
-    ['DELETE', 'https://api.github.com/repos/acme/other/issues/42/comments/1'],
     ['GET', 'https://api.github.com/repos/acme/repo/contents/src%2Findex.ts'],
-    ['POST', 'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip'],
-    ['GET', 'https://github.com/acme/other.git/info/refs?service=git-upload-pack'],
+    ['DELETE', 'https://api.github.com/repos/acme/repo/issues/comments/1'],
+    ['POST', 'https://uploads.github.com/repos/acme/repo/releases/1/assets?name=asset.zip'],
+    ['GET', 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack'],
   ] as const)(
-    'redeems a selected-user capability for unrestricted GitHub request %s %s',
+    'redeems a selected-user capability for claimed-repository request %s %s',
     async (requestMethod, requestUrl) => {
       const service = createService();
       const issued = await service.issueGitHubSessionCapability({
@@ -1336,6 +1334,51 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
           : 'Bearer user-token',
       });
       expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([
+    ['POST', 'https://api.github.com/graphql', 'repository_mismatch'],
+    ['GET', 'https://api.github.com/user/repos', 'repository_mismatch'],
+    [
+      'DELETE',
+      'https://api.github.com/repos/acme/other/issues/42/comments/1',
+      'repository_mismatch',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip',
+      'repository_mismatch',
+    ],
+    [
+      'GET',
+      'https://github.com/acme/other.git/info/refs?service=git-upload-pack',
+      'repository_mismatch',
+    ],
+    ['CONNECT', 'https://api.github.com/repos/acme/repo', 'invalid_upstream_request'],
+  ] as const)(
+    'rejects a selected-user capability outside its repository REST and smart HTTP scope for %s %s',
+    async (requestMethod, requestUrl, reason) => {
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+        allowUserAuthorization: true,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      expect(issued.source).toBe('user');
+      serviceMocks.selectUserAuthorization.mockClear();
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod,
+          requestUrl,
+        })
+      ).resolves.toEqual({ success: false, reason });
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
     }
   );
 

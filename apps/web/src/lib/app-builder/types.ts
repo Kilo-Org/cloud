@@ -165,6 +165,16 @@ export type AvailableRepo = {
   isPrivate: boolean;
 };
 
+export type GitHubMigrationTarget = {
+  platformIntegrationId: string;
+  platformAccountLogin: string;
+  githubAppType: 'standard' | 'lite';
+  newRepoUrl: string;
+  installationSettingsUrl: string;
+  availableRepos: AvailableRepo[];
+  repositorySelection: 'all' | 'selected';
+};
+
 /**
  * Pre-flight check result for GitHub migration
  * User-created repository approach: returns info needed to guide user through creating repo
@@ -186,4 +196,6 @@ export type CanMigrateToGitHubResult = {
   availableRepos: AvailableRepo[];
   /** Whether the GitHub App has access to all repos ('all') or only selected repos ('selected') */
   repositorySelection: 'all' | 'selected';
+  /** Healthy GitHub installations available as migration targets */
+  migrationTargets: GitHubMigrationTarget[];
 };

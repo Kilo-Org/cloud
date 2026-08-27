@@ -17,6 +17,7 @@ const mockHandleInstallationSuspend = jest.fn();
 const mockHandleInstallationUnsuspend = jest.fn();
 const mockHandleInstallationRepositories = jest.fn();
 const mockUpsertCliSessionPullRequestsFromWebhook = jest.fn();
+const mockUpsertCliSessionPullRequestReviewFromWebhook = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -64,7 +65,8 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
   handlePushEvent: jest.fn(),
   upsertCliSessionPullRequestsFromWebhook: (payload: unknown, owner: unknown) =>
     mockUpsertCliSessionPullRequestsFromWebhook(payload, owner),
-  upsertCliSessionPullRequestReviewFromWebhook: jest.fn(),
+  upsertCliSessionPullRequestReviewFromWebhook: (payload: unknown, owner: unknown) =>
+    mockUpsertCliSessionPullRequestReviewFromWebhook(payload, owner),
 }));
 
 jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
@@ -155,6 +157,35 @@ function reviewCommentPayload(overrides: Record<string, unknown> = {}) {
       base: { ref: 'main' },
     },
     ...overrides,
+  };
+}
+
+function pullRequestReviewPayload() {
+  return {
+    action: 'submitted',
+    installation: { id: 98765 },
+    repository: {
+      id: 123,
+      name: 'widgets',
+      full_name: 'acme/widgets',
+      owner: { login: 'acme' },
+    },
+    review: { id: 789, state: 'approved', user: { login: 'reviewer' } },
+    pull_request: {
+      number: 42,
+      title: 'Add widgets',
+      state: 'open',
+      html_url: 'https://github.com/acme/widgets/pull/42',
+      head: {
+        sha: 'abc123',
+        ref: 'feature/widgets',
+        repo: {
+          full_name: 'acme/widgets',
+          clone_url: 'https://github.com/acme/widgets.git',
+          html_url: 'https://github.com/acme/widgets',
+        },
+      },
+    },
   };
 }
 
@@ -345,6 +376,38 @@ describe('handleGitHubWebhook', () => {
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
       expect.objectContaining({ handlers_triggered: ['code_review', 'cli_session_pr_upsert'] })
+    );
+  });
+
+  it('enables secondary pull request and review cache updates with exact integration scope', async () => {
+    mockGetIntegrationForOrganization.mockResolvedValueOnce({ ...integration, id: 'pi_primary' });
+
+    const pullResponse = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(pullResponse.status).toBe(200);
+    expect(mockUpsertCliSessionPullRequestsFromWebhook).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ platformIntegrationId: integration.id })
+    );
+
+    jest.clearAllMocks();
+    mockVerifyGitHubWebhookSignature.mockReturnValue(true);
+    mockFindIntegrationByInstallationId.mockResolvedValue(integration);
+    mockGetIntegrationForOrganization.mockResolvedValue({ ...integration, id: 'pi_primary' });
+    mockLogWebhookEvent.mockResolvedValue({ id: 'we_2', isDuplicate: false });
+
+    const reviewResponse = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review', pullRequestReviewPayload()),
+      'standard'
+    );
+
+    expect(reviewResponse.status).toBe(200);
+    expect(mockUpsertCliSessionPullRequestReviewFromWebhook).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ platformIntegrationId: integration.id })
     );
   });
 

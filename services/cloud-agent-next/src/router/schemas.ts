@@ -1090,6 +1090,11 @@ export const GetSessionOutput = z.object({
 
   // Repository info (no tokens)
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),
+  githubIntegrationId: z
+    .string()
+    .uuid()
+    .optional()
+    .describe('GitHub platform integration pinned to this session'),
   gitUrl: z.string().optional().describe('Generic git URL'),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional().describe('Git platform type'),
 

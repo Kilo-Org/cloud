@@ -615,6 +615,7 @@ export const baseGetSessionNextOutputSchema = z.object({
 
   // Repository info (no tokens)
   githubRepo: z.string().optional(),
+  githubIntegrationId: z.uuid().optional(),
   gitUrl: z.string().optional(),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
 

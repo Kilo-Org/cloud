@@ -76,6 +76,9 @@ export async function upsertCliSessionPullRequestReviewFromWebhook(
         and(
           eq(github_branch_pull_requests.git_url, gitUrl),
           eq(github_branch_pull_requests.git_branch, branch),
+          owner.platformIntegrationId
+            ? eq(github_branch_pull_requests.platform_integration_id, owner.platformIntegrationId)
+            : sql`false`,
           tenantPredicate
         )
       )

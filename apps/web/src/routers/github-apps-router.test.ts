@@ -135,6 +135,7 @@ const organizationRoles = [
   'billing_manager',
   'member',
 ] satisfies OrganizationRole[];
+const organizationManageRoles = ['owner', 'admin'] satisfies OrganizationRole[];
 
 function organizationIntegration(): PlatformIntegration {
   const timestamp = '2026-01-01T00:00:00.000Z';
@@ -177,8 +178,8 @@ describe('githubAppsRouter organization install capability', () => {
     mockListIntegrations.mockResolvedValue([]);
   });
 
-  it.each(organizationRoles)(
-    'preserves first-install access for organization %s roles',
+  it.each(organizationManageRoles)(
+    'allows organization %s roles to start an install',
     async role => {
       mockEnsureOrganizationAccess.mockResolvedValue(role);
       const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
@@ -190,7 +191,7 @@ describe('githubAppsRouter organization install capability', () => {
       expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
         expect.objectContaining({ user: expect.objectContaining({ id: 'user-1' }) }),
         organizationId,
-        organizationRoles
+        organizationManageRoles
       );
       expect(mockCreateInstallState).toHaveBeenCalledWith({
         kiloUserId: 'user-1',
@@ -202,19 +203,34 @@ describe('githubAppsRouter organization install capability', () => {
     }
   );
 
-  it('allows a non-platform-admin organization member to add after an existing installation', async () => {
+  it.each(['billing_manager', 'member'] satisfies OrganizationRole[])(
+    'denies organization %s roles before minting install state',
+    async role => {
+      mockEnsureOrganizationAccess.mockImplementation(async (_ctx, _organizationId, roles) => {
+        if (roles && !roles.includes(role)) {
+          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Organization role required' });
+        }
+        return role;
+      });
+      const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+      await expect(caller.mintInstallState({ organizationId })).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+      });
+
+      expect(mockCreateInstallState).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(organizationRoles)('reports add capability for organization %s roles', async role => {
+    mockEnsureOrganizationAccess.mockResolvedValue(role);
     mockListIntegrations.mockResolvedValue([organizationIntegration()]);
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
 
     const listed = await caller.listOrganizationInstallations({ organizationId });
-    const minted = await caller.mintInstallState({ organizationId, returnTo: '/settings' });
 
-    expect(listed.canAdd).toBe(true);
+    expect(listed.canAdd).toBe(role === 'owner' || role === 'admin');
     expect(listed.installations).toHaveLength(1);
-    expect(minted).toEqual({ token: 'install-token' });
-    expect(mockCreateInstallState).toHaveBeenCalledWith(
-      expect.objectContaining({ ownerType: 'org', ownerId: organizationId, returnTo: '/settings' })
-    );
   });
 
   it('still denies callers outside the organization role matrix before minting state', async () => {

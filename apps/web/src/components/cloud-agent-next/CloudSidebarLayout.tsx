@@ -11,7 +11,8 @@ import { extractRepoFromGitUrl } from './utils/git-utils';
 import { ChatSidebar } from './ChatSidebar';
 import { useSidebarSessions } from './hooks/useSidebarSessions';
 import { useActiveSessions } from './hooks/useActiveSessions';
-import { deleteSessionFromStoreAtom } from './store/db-session-atoms';
+import { dbSessionsAtom, deleteSessionFromStoreAtom } from './store/db-session-atoms';
+import { invalidateSessionQueries, removeDeletedSession } from './session-deletion';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   AlertDialog,
@@ -78,13 +79,12 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
     });
   }, [platformFilter]);
 
-  const { sessions, refetchSessions, removeSessionLocally, renameSessionLocally } =
-    useSidebarSessions({
-      organizationId: organizationId ?? null,
-      searchQuery,
-      createdOnPlatform,
-      gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
-    });
+  const { sessions, refetchSessions, renameSessionLocally } = useSidebarSessions({
+    organizationId: organizationId ?? null,
+    searchQuery,
+    createdOnPlatform,
+    gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
+  });
   const { activeSessions } = useActiveSessions();
 
   // Session deletion (lightweight - no stream cleanup, container handles that on unmount)
@@ -108,50 +108,26 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
       .filter(r => r.displayName);
   }, [recentReposData?.repositories]);
   const queryClient = useQueryClient();
+  const setDbSessions = useSetAtom(dbSessionsAtom);
   const deleteSessionFromStore = useSetAtom(deleteSessionFromStoreAtom);
-
-  const invalidateSessionQueries = useCallback(
-    () =>
-      Promise.all([
-        queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter()),
-        queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter()),
-        queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter()),
-        queryClient.invalidateQueries(trpc.activeSessions.list.pathFilter()),
-      ]),
-    [queryClient, trpc]
-  );
 
   const { mutate: deleteCliSessionV2 } = useMutation(
     trpc.cliSessionsV2.delete.mutationOptions({
       onSuccess: async (_data, { session_id: sessionId }) => {
-        await Promise.all([
-          queryClient.cancelQueries(trpc.cliSessionsV2.list.pathFilter()),
-          queryClient.cancelQueries(trpc.cliSessionsV2.search.pathFilter()),
-          queryClient.cancelQueries(trpc.activeSessions.list.pathFilter()),
-        ]);
-        removeSessionLocally(sessionId);
-        queryClient.setQueryData(
-          trpc.activeSessions.list.queryKey(),
-          current =>
-            current && {
-              ...current,
-              sessions: current.sessions.filter(session => session.id !== sessionId),
-            }
-        );
-
-        try {
-          await deleteSessionFromStore(sessionId);
-        } catch (error) {
-          console.error('Error deleting session from IndexedDB:', error);
-        }
-
+        await removeDeletedSession({
+          sessionId,
+          queryClient,
+          trpc,
+          setDbSessions,
+          deleteSessionFromStore,
+        });
         toast('Session deleted successfully');
-        await invalidateSessionQueries();
+        await invalidateSessionQueries({ queryClient, trpc });
       },
       onError: error => {
         console.error('Error calling session deletion API:', error);
         toast.error('Failed to delete session. Please try again.');
-        void invalidateSessionQueries();
+        void invalidateSessionQueries({ queryClient, trpc });
       },
     })
   );
@@ -160,15 +136,6 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
     select: mutation =>
       (mutation.state.variables as Parameters<typeof deleteCliSessionV2>[0]).session_id,
   });
-  const visibleSessions = useMemo(
-    () => sessions.filter(session => !deletingSessionIds.includes(session.sessionId)),
-    [sessions, deletingSessionIds]
-  );
-  const visibleActiveSessions = useMemo(
-    () => activeSessions.filter(session => !deletingSessionIds.includes(session.id)),
-    [activeSessions, deletingSessionIds]
-  );
-
   const { mutateAsync: renameCliSessionV2 } = useMutation(
     trpc.cliSessionsV2.rename.mutationOptions()
   );
@@ -214,13 +181,14 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
               <SheetTitle>Sessions</SheetTitle>
             </SheetHeader>
             <ChatSidebar
-              sessions={visibleSessions}
+              sessions={sessions}
               currentSessionId={currentSessionId}
               organizationId={organizationId}
               onDeleteSession={setSessionPendingDeletion}
               onRenameSession={handleRenameSession}
               isInSheet
-              activeSessions={visibleActiveSessions}
+              activeSessions={activeSessions}
+              deletingSessionIds={deletingSessionIds}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               platformFilter={platformFilter}
@@ -236,12 +204,13 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
         {/* Desktop Sidebar */}
         <div className="hidden w-80 shrink-0 border-r lg:block">
           <ChatSidebar
-            sessions={visibleSessions}
+            sessions={sessions}
             currentSessionId={currentSessionId}
             organizationId={organizationId}
             onDeleteSession={setSessionPendingDeletion}
             onRenameSession={handleRenameSession}
-            activeSessions={visibleActiveSessions}
+            activeSessions={activeSessions}
+            deletingSessionIds={deletingSessionIds}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             platformFilter={platformFilter}

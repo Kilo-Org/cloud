@@ -244,7 +244,6 @@ type UseSidebarSessionsReturn = {
   sessions: StoredSession[];
   isLoading: boolean;
   refetchSessions: () => void;
-  removeSessionLocally: (sessionId: string) => void;
   renameSessionLocally: (sessionId: string, newTitle: string) => void;
 };
 
@@ -554,28 +553,5 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     [setDbSessions]
   );
 
-  const removeSessionLocally = useCallback(
-    (sessionId: string) => {
-      setDbSessions(prev => removeSidebarDbSession(prev, sessionId));
-      queryClient.setQueriesData(
-        trpc.cliSessionsV2.list.pathFilter(),
-        (current: typeof listData) =>
-          current && {
-            ...current,
-            cliSessions: current.cliSessions.filter(session => session.session_id !== sessionId),
-          }
-      );
-      queryClient.setQueriesData(
-        trpc.cliSessionsV2.search.pathFilter(),
-        (current: typeof searchData) =>
-          current && {
-            ...current,
-            results: current.results.filter(session => session.session_id !== sessionId),
-          }
-      );
-    },
-    [setDbSessions, queryClient, trpc]
-  );
-
-  return { sessions, isLoading, refetchSessions, removeSessionLocally, renameSessionLocally };
+  return { sessions, isLoading, refetchSessions, renameSessionLocally };
 }

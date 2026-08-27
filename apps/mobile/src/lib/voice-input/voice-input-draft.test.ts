@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { applyVoiceDraftToInput } from './voice-input-draft';
+import {
+  applyVoiceDraftAtSelection,
+  applyVoiceDraftToInput,
+  resolveVoiceInsertion,
+  resolveVoiceTranscriptDelta,
+  type VoiceInputSelection,
+} from './voice-input-draft';
+import { appendVoiceTranscript } from './voice-input-state';
 
 type NativeCall = { text: string };
 type ChangeCall = string;
@@ -116,5 +123,196 @@ describe('applyVoiceDraftToInput', () => {
     applyVoiceDraftToInput({ draft: 'hello', input, onChangeText });
 
     expect(onChangeText).toHaveBeenCalledTimes(1);
+  });
+});
+
+type SelectionNativeCall = { text: string; selection?: VoiceInputSelection };
+
+function makeSelectionInput() {
+  const calls: SelectionNativeCall[] = [];
+  const input = {
+    setNativeProps(props: { text: string; selection?: VoiceInputSelection }): void {
+      calls.push({ text: props.text, selection: props.selection });
+    },
+  };
+  return { input, calls };
+}
+
+describe('resolveVoiceTranscriptDelta', () => {
+  it('recovers the trimmed transcript appended by appendVoiceTranscript for every base', () => {
+    const cases: { base: string; transcript: string }[] = [
+      { base: '', transcript: 'hello' },
+      { base: 'hello', transcript: 'world' },
+      { base: 'hello ', transcript: 'world' },
+      { base: 'hello\n', transcript: 'world' },
+      { base: 'hello\t', transcript: 'world' },
+      { base: 'hello', transcript: '  world again' },
+      { base: 'hello', transcript: '' },
+    ];
+
+    for (const { base, transcript } of cases) {
+      const merged = appendVoiceTranscript(base, transcript);
+      expect(resolveVoiceTranscriptDelta(base, merged)).toBe(transcript.trimStart());
+    }
+  });
+
+  it('returns an empty delta when the merged draft no longer starts with the base', () => {
+    expect(resolveVoiceTranscriptDelta('hello', 'different world')).toBe('');
+  });
+});
+
+describe('resolveVoiceInsertion', () => {
+  it('inserts at the caret and lands the caret after the inserted text', () => {
+    const result = resolveVoiceInsertion('hello world', { start: 5, end: 5 }, 'there', undefined);
+
+    expect(result.draft).toBe('hello there world');
+    expect(result.selection).toEqual({ start: 11, end: 11 });
+  });
+
+  it('replaces the selected range', () => {
+    const result = resolveVoiceInsertion('hello world', { start: 5, end: 11 }, 'there', undefined);
+
+    expect(result.draft).toBe('hello there');
+    expect(result.selection).toEqual({ start: 11, end: 11 });
+  });
+
+  it('inserts at the draft end when no selection was reported', () => {
+    const result = resolveVoiceInsertion('hello', null, 'world', undefined);
+
+    expect(result.draft).toBe('hello world');
+    expect(result.selection).toEqual({ start: 11, end: 11 });
+  });
+
+  it('truncates the transcript, not the surrounding text, at maxLength', () => {
+    const result = resolveVoiceInsertion('hello world', { start: 5, end: 5 }, 'there', 14);
+
+    expect(result.draft).toBe('hello th world');
+    expect(result.selection).toEqual({ start: 8, end: 8 });
+  });
+});
+
+describe('applyVoiceDraftAtSelection', () => {
+  it('inserts finalized speech at the caret instead of replacing the draft', () => {
+    const { input, calls } = makeSelectionInput();
+    const changeCalls: string[] = [];
+    const mergedDraft = appendVoiceTranscript('hello world', 'there');
+
+    const result = applyVoiceDraftAtSelection({
+      baseDraft: 'hello world',
+      baseSelection: { start: 5, end: 5 },
+      currentDraft: 'hello world',
+      expectedDraft: 'hello world',
+      mergedDraft,
+      isComposing: false,
+      input,
+      onChangeText: draft => {
+        changeCalls.push(draft);
+      },
+    });
+
+    expect(result).toEqual({
+      kind: 'inserted',
+      draft: 'hello there world',
+      selection: { start: 11, end: 11 },
+    });
+    expect(calls).toEqual([{ text: 'hello there world', selection: { start: 11, end: 11 } }]);
+    expect(changeCalls).toEqual(['hello there world']);
+  });
+
+  it('replaces the prior interim on the next result (live range stays anchored at the caret)', () => {
+    const { input } = makeSelectionInput();
+    const baseDraft = 'say hello';
+    const firstMerged = appendVoiceTranscript(baseDraft, 'good');
+    const secondMerged = appendVoiceTranscript(baseDraft, 'good morning');
+
+    const first = applyVoiceDraftAtSelection({
+      baseDraft,
+      baseSelection: { start: 4, end: 4 },
+      currentDraft: baseDraft,
+      expectedDraft: baseDraft,
+      mergedDraft: firstMerged,
+      isComposing: false,
+      input,
+      onChangeText: () => undefined,
+    });
+    const second = applyVoiceDraftAtSelection({
+      baseDraft,
+      baseSelection: { start: 4, end: 4 },
+      currentDraft: first.kind === 'inserted' ? first.draft : baseDraft,
+      expectedDraft: first.kind === 'inserted' ? first.draft : baseDraft,
+      mergedDraft: secondMerged,
+      isComposing: false,
+      input,
+      onChangeText: () => undefined,
+    });
+
+    expect(second).toEqual({
+      kind: 'inserted',
+      draft: 'say good morning hello',
+      selection: { start: 16, end: 16 },
+    });
+  });
+
+  it('aborts and leaves the user text alone when the live draft diverged from the expected draft', () => {
+    const { input, calls } = makeSelectionInput();
+    const onChangeText = vi.fn<(draft: string) => void>();
+    const mergedDraft = appendVoiceTranscript('hello world', 'there');
+
+    const result = applyVoiceDraftAtSelection({
+      baseDraft: 'hello world',
+      baseSelection: { start: 5, end: 5 },
+      currentDraft: 'hello edited world',
+      expectedDraft: 'hello world',
+      mergedDraft,
+      isComposing: false,
+      input,
+      onChangeText,
+    });
+
+    expect(result).toEqual({ kind: 'aborted' });
+    expect(calls).toEqual([]);
+    expect(onChangeText).not.toHaveBeenCalled();
+  });
+
+  it('aborts and skips the insert when an IME composition is active', () => {
+    const { input, calls } = makeSelectionInput();
+    const onChangeText = vi.fn<(draft: string) => void>();
+    const mergedDraft = appendVoiceTranscript('hello world', 'there');
+
+    const result = applyVoiceDraftAtSelection({
+      baseDraft: 'hello world',
+      baseSelection: { start: 5, end: 5 },
+      currentDraft: 'hello world',
+      expectedDraft: 'hello world',
+      mergedDraft,
+      isComposing: true,
+      input,
+      onChangeText,
+    });
+
+    expect(result).toEqual({ kind: 'aborted' });
+    expect(calls).toEqual([]);
+    expect(onChangeText).not.toHaveBeenCalled();
+  });
+
+  it('still reports the inserted draft when the input ref is null', () => {
+    const mergedDraft = appendVoiceTranscript('hello', 'world');
+
+    const result = applyVoiceDraftAtSelection({
+      baseDraft: 'hello',
+      baseSelection: null,
+      currentDraft: 'hello',
+      expectedDraft: 'hello',
+      mergedDraft,
+      isComposing: false,
+      input: null,
+      onChangeText: () => undefined,
+    });
+
+    expect(result).toEqual({
+      kind: 'inserted',
+      draft: 'hello world',
+      selection: { start: 11, end: 11 },
+    });
   });
 });

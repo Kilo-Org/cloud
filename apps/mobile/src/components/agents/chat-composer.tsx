@@ -18,6 +18,7 @@ import {
   useState,
 } from 'react';
 import {
+  AccessibilityInfo,
   Alert,
   AppState,
   type GestureResponderEvent,
@@ -101,7 +102,10 @@ import {
 } from '@/lib/composer-auto-send';
 import { createSubmitLock, type SubmitLock } from '@/lib/submit-lock';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
-import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
+import {
+  applyVoiceDraftAtSelection,
+  type VoiceInputSelection,
+} from '@/lib/voice-input/voice-input-draft';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
 const TEXT_INPUT_MAX_LINES = 5;
@@ -239,6 +243,18 @@ export function ChatComposer({
   // Last caret the input reported. Paste inserts here so the button behaves
   // like the platform paste.
   const selectionRef = useRef<ComposerSelection | null>(null);
+  // Selection-aware dictation state: the caret captured at session start, the
+  // draft the last speech result produced, and the abort trigger. A user edit
+  // (including an IME edit, which fires onChangeText) diverges the live draft
+  // from the expected draft, so the next speech result aborts instead of
+  // inserting into the edit.
+  const voiceBaseDraftRef = useRef('');
+  const voiceBaseSelectionRef = useRef<VoiceInputSelection | null>(null);
+  const voiceExpectedDraftRef = useRef('');
+  // RN 0.86 exposes no IME composition event, so this stays false; the draft
+  // divergence above is what aborts dictation when an IME session edits text.
+  const isComposingRef = useRef(false);
+  const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const inputFocusedRef = useRef(false);
   const restoreFocusOnActiveRef = useRef(false);
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -546,16 +562,38 @@ export function ChatComposer({
 
   const voiceInput = useVoiceInput({
     disabled: voiceDisabled,
-    getDraft: () => textRef.current,
+    getDraft: () => {
+      // The controller calls getDraft exactly once, at session start, to
+      // snapshot the base draft. Capture the caret at the same instant so the
+      // selection-aware insert path knows where to splice the transcript.
+      voiceBaseDraftRef.current = textRef.current;
+      voiceBaseSelectionRef.current = selectionRef.current;
+      voiceExpectedDraftRef.current = textRef.current;
+      return textRef.current;
+    },
     onDraftChange: draft => {
-      applyVoiceDraftToInput({
+      const result = applyVoiceDraftAtSelection({
+        baseDraft: voiceBaseDraftRef.current,
+        baseSelection: voiceBaseSelectionRef.current,
+        currentDraft: textRef.current,
+        expectedDraft: voiceExpectedDraftRef.current,
+        mergedDraft: draft,
+        isComposing: isComposingRef.current,
         input: inputRef.current,
-        draft,
         maxLength: CLOUD_AGENT_PROMPT_MAX_LENGTH,
         onChangeText: handleChangeText,
       });
+      if (result.kind === 'aborted') {
+        // The user edited the live speech range or an IME session is composing:
+        // keep their text, stop recognition, and announce the stop once.
+        AccessibilityInfo.announceForAccessibility(i18n.t('voiceInput.listeningStopped'));
+        void abortVoiceInputRef.current?.();
+        return;
+      }
+      voiceExpectedDraftRef.current = result.draft;
     },
   });
+  abortVoiceInputRef.current = voiceInput.abort;
 
   const control = resolveChatComposerControlState({
     attachmentsCount: upload.attachments.length,

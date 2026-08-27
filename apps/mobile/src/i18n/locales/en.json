@@ -2773,6 +2773,7 @@
   },
   "voiceInput": {
     "listening": "Listening...",
+    "listeningStopped": "Listening stopped.",
     "staysOff": "Speech stays off until you allow online transcription.",
     "onlineTitle": "Speech is processed online",
     "onlineMessage": "This device cannot transcribe offline. Your recording is sent to {{provider}} to turn it into text. Kilo does not store the audio.",

@@ -36,8 +36,9 @@ type ChatComposerControlState = {
  * the rules in one place lets the component stay a thin presenter and makes
  * every state — happy, blocked, and listening — testable without rendering
  * the composer. Voice input integrates here too: an active voice session
- * makes the input read-only and locks the attachment picker while speech is
- * being recognized.
+ * locks the attachment picker while speech is being recognized, but it keeps
+ * the input editable so dictation can insert at the caret (a user edit during
+ * dictation aborts the session in the selection-aware draft path).
  */
 export function resolveChatComposerControlState(
   input: ChatComposerControlInput
@@ -63,7 +64,9 @@ export function resolveChatComposerControlState(
   const voiceDisabled = toolbarDisabled;
   const paperclipDisabled =
     toolbarDisabled || voiceInputActive || attachmentsCount >= attachmentMax;
-  const inputEditable = !toolbarDisabled && !voiceInputActive;
+  // Voice activity no longer makes the input read-only: dictation inserts at
+  // the caret, so the user can keep editing (an edit aborts the session).
+  const inputEditable = !toolbarDisabled;
   const showToolbar = isFocused || hasText || attachmentsCount > 0 || voiceInputActive;
   const hasSendableContent = hasText || sendableAttachmentsCount > 0;
   return {

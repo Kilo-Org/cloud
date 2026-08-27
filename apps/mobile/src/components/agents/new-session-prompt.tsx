@@ -1,6 +1,7 @@
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   type LayoutChangeEvent,
   Platform,
   Pressable,
@@ -28,7 +29,10 @@ import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { cn } from '@/lib/utils';
-import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
+import {
+  applyVoiceDraftAtSelection,
+  type VoiceInputSelection,
+} from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
@@ -101,6 +105,18 @@ export function NewSessionPrompt({
   // Last caret the input reported. Paste inserts here so the button behaves
   // like the platform paste.
   const promptSelectionRef = useRef<ComposerSelection | null>(null);
+  // Selection-aware dictation state: the caret captured at session start, the
+  // draft the last speech result produced, and the abort trigger. A user edit
+  // (including an IME edit, which fires onChangeText) diverges the live draft
+  // from the expected draft, so the next speech result aborts instead of
+  // inserting into the edit.
+  const voiceBaseDraftRef = useRef('');
+  const voiceBaseSelectionRef = useRef<VoiceInputSelection | null>(null);
+  const voiceExpectedDraftRef = useRef('');
+  // RN 0.86 exposes no IME composition event, so this stays false; the draft
+  // divergence above is what aborts dictation when an IME session edits text.
+  const isComposingRef = useRef(false);
+  const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptMeasure = useTextHeight({
     minHeight: PROMPT_INPUT_MIN_HEIGHT,
@@ -135,16 +151,38 @@ export function NewSessionPrompt({
 
   const voiceInput = useVoiceInput({
     disabled: isCreating,
-    getDraft: () => promptRef.current,
+    getDraft: () => {
+      // The controller calls getDraft exactly once, at session start, to
+      // snapshot the base draft. Capture the caret at the same instant so the
+      // selection-aware insert path knows where to splice the transcript.
+      voiceBaseDraftRef.current = promptRef.current;
+      voiceBaseSelectionRef.current = promptSelectionRef.current;
+      voiceExpectedDraftRef.current = promptRef.current;
+      return promptRef.current;
+    },
     onDraftChange: draft => {
-      applyVoiceDraftToInput({
+      const result = applyVoiceDraftAtSelection({
+        baseDraft: voiceBaseDraftRef.current,
+        baseSelection: voiceBaseSelectionRef.current,
+        currentDraft: promptRef.current,
+        expectedDraft: voiceExpectedDraftRef.current,
+        mergedDraft: draft,
+        isComposing: isComposingRef.current,
         input: promptInputRef.current,
-        draft,
         maxLength: PROMPT_INPUT_MAX_CHARS,
         onChangeText: handlePromptChange,
       });
+      if (result.kind === 'aborted') {
+        // The user edited the live speech range or an IME session is composing:
+        // keep their text, stop recognition, and announce the stop once.
+        AccessibilityInfo.announceForAccessibility(t('voiceInput.listeningStopped'));
+        void abortVoiceInputRef.current?.();
+        return;
+      }
+      voiceExpectedDraftRef.current = result.draft;
     },
   });
+  abortVoiceInputRef.current = voiceInput.abort;
 
   useEffect(() => {
     voiceInputSettlerRef.current = voiceInput.settleBeforeSubmit;

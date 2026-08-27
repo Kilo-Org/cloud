@@ -244,7 +244,7 @@ describe('resolveChatComposerControlState', () => {
     expect(state.paperclipDisabled).toBe(true);
   });
 
-  it('disables the paperclip and input while this owner is voice active', () => {
+  it('disables the paperclip but keeps the input editable while this owner is voice active', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
       sendableAttachmentsCount: 0,
@@ -258,8 +258,8 @@ describe('resolveChatComposerControlState', () => {
     });
 
     expect(state.paperclipDisabled).toBe(true);
-    expect(state.inputEditable).toBe(false);
-    expect(state.inputAccessibilityDisabled).toBe(true);
+    expect(state.inputEditable).toBe(true);
+    expect(state.inputAccessibilityDisabled).toBe(false);
   });
 
   it('leaves voice enabled (only toolbar gates it) when the composer is otherwise ready', () => {

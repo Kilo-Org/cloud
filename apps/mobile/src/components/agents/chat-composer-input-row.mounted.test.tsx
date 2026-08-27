@@ -11,6 +11,12 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   View: 'View',
 }));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  FadeIn: { duration: vi.fn(() => ({})) },
+  FadeOut: { duration: vi.fn(() => ({})) },
+  useReducedMotion: () => false,
+}));
 vi.mock('@/components/ui/icons', () => ({
   ArrowUp: 'ArrowUp',
   Paperclip: 'Paperclip',
@@ -31,6 +37,7 @@ type RenderProps = {
   hasSendableContent?: boolean;
   inputEditable: boolean;
   isStreaming?: boolean;
+  voiceInputAvailable?: boolean;
 };
 
 function makeProps(overrides: Partial<RenderProps> = {}) {
@@ -67,6 +74,13 @@ function makeProps(overrides: Partial<RenderProps> = {}) {
 
 function findTextInput(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
   return root.find(node => typeof node.type === 'string' && (node.type as string) === 'TextInput');
+}
+
+function findAllByType(
+  root: TestRenderer.ReactTestInstance,
+  type: string
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
 }
 
 function findByAccessibilityLabel(
@@ -141,6 +155,21 @@ describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
 
     expect(findByAccessibilityLabel(renderer.root, 'Stop generating')).not.toBeNull();
     expect(findByAccessibilityLabel(renderer.root, 'Send message')).toBeNull();
+
+    renderer.unmount();
+  });
+
+  it('keeps the microphone mounted beside Stop while streaming', async () => {
+    const renderer = await renderRow({
+      inputEditable: true,
+      isStreaming: true,
+      canSend: false,
+      hasSendableContent: false,
+      voiceInputAvailable: true,
+    });
+
+    expect(findAllByType(renderer.root, 'VoiceInputButton')).toHaveLength(1);
+    expect(findByAccessibilityLabel(renderer.root, 'Stop generating')).not.toBeNull();
 
     renderer.unmount();
   });

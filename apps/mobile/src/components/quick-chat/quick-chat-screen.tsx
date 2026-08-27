@@ -19,8 +19,10 @@ import { MessageCircle } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
 import { useOrganization } from '@/lib/organization-context';
+import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 
 import { useQuickChat } from './use-quick-chat';
 
@@ -53,6 +55,7 @@ export function QuickChatScreen() {
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
   const { authEpoch } = useAuth();
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   const {
@@ -97,6 +100,8 @@ export function QuickChatScreen() {
   const tabBarBottomPadding = useTabBarBottomPadding();
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
   const composerScope = `${authEpoch}:${organizationId ?? 'personal'}`;
+  const draftKey = `quick-chat:${composerScope}`;
+  const composerDraft = useFencedDraftLoad({ userId, isIdentityLoading, entityKey: draftKey });
   // A scope switch remounts the composer (`key={composerScope}`) but would
   // leave the picked model id in place, so the chip would keep the prior org's
   // model and send that stale id. Reset the pick so the chip falls back to the
@@ -225,7 +230,8 @@ export function QuickChatScreen() {
         <View style={{ paddingBottom: composerBottomPadding }}>
           <ChatComposer
             key={composerScope}
-            draftKey={`quick-chat:${composerScope}`}
+            draftKey={draftKey}
+            initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
             onSend={handleSend}
             onSendCommand={noopSendCommand}
             onCreateSession={noopCreateSession}

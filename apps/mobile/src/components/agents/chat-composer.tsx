@@ -514,7 +514,8 @@ export function ChatComposer({
     }
   }
 
-  const { addCandidates, removeAttachment, retryAttachment } = upload;
+  const { addCandidates, removeAttachment, retryAttachment, moveAttachment, reorderAttachments } =
+    upload;
 
   useAndroidPendingPickerRecovery({
     surface: 'agent-chat',
@@ -1027,6 +1028,8 @@ export function ChatComposer({
           attachments={upload.attachments}
           onRemove={removeAttachment}
           onRetry={retryAttachment}
+          onMove={moveAttachment}
+          onReorder={reorderAttachments}
         />
       ) : null}
 

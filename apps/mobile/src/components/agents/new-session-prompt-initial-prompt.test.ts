@@ -193,6 +193,8 @@ function defaultProps() {
     onAddAttachment: vi.fn(),
     onRemoveAttachment: vi.fn(),
     onRetryAttachment: vi.fn(),
+    onMoveAttachment: vi.fn(),
+    onReorderAttachments: vi.fn(),
     onRefetchModels: vi.fn(),
     onPrefillAttachments: vi.fn(),
     voiceInputSettlerRef,

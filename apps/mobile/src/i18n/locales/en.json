@@ -152,7 +152,9 @@
     "appearanceDark": "Dark",
     "account": "Account",
     "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
+    "returnSendsMessage": "Return key sends message",
+    "returnSendsMessageSubtitle": "When off, Return inserts a newline in agent composers."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",

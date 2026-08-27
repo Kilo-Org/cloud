@@ -160,8 +160,8 @@ export function resolvePrefillModel(
 /**
  * Resolve a prefill repository against the loaded repository list.
  * Match is **case-insensitive**; returns the **matched entry's
- * `fullName`** (GitHub's canonical casing). Returns `null` when
- * `prefill.repo` is absent or nothing matches.
+ * `fullName`** (GitHub's canonical casing). Returns `null` unless exactly
+ * one entry matches.
  */
 export function resolvePrefillRepo(
   repositories: { fullName: string }[],
@@ -172,8 +172,8 @@ export function resolvePrefillRepo(
   }
 
   const lower = prefill.repo.toLowerCase();
-  const match = repositories.find(r => r.fullName.toLowerCase() === lower);
-  return match?.fullName ?? null;
+  const matches = repositories.filter(repository => repository.fullName.toLowerCase() === lower);
+  return matches.length === 1 ? (matches[0]?.fullName ?? null) : null;
 }
 
 /**
@@ -193,10 +193,10 @@ export function resolvePrefillRepoSelection(
   }
 
   const lower = prefill.repo.toLowerCase();
-  const match = repositories.find(
+  const matches = repositories.filter(
     repository => repository.platform === 'github' && repository.fullName.toLowerCase() === lower
   );
-  return match ? `github:${match.fullName}` : null;
+  return matches.length === 1 && matches[0] ? `github:${matches[0].fullName}` : null;
 }
 
 /**

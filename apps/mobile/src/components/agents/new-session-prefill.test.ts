@@ -243,6 +243,14 @@ describe('resolvePrefillRepo', () => {
     expect(result).toBe('Kilo-Org/cloud');
   });
 
+  it('returns null when multiple options match case-insensitively', () => {
+    const result = resolvePrefillRepo(
+      [{ fullName: 'Kilo-Org/cloud' }, { fullName: 'kilo-org/CLOUD' }],
+      { mode: 'code', repo: 'KILO-ORG/cloud' }
+    );
+    expect(result).toBeNull();
+  });
+
   it.each([
     { repo: 'other/repo', reposOverride: undefined, desc: 'no match' },
     { repo: 'Kilo-Org/cloud', reposOverride: [] as { fullName: string }[], desc: 'empty list' },
@@ -292,6 +300,17 @@ describe('resolvePrefillRepoSelection', () => {
   it('matches case-insensitively and returns the canonical GitHub casing', () => {
     const result = resolvePrefillRepoSelection(repos, { mode: 'code', repo: 'kilo-Org/Cloud' });
     expect(result).toBe('github:Kilo-Org/cloud');
+  });
+
+  it('returns null when multiple GitHub options match case-insensitively', () => {
+    const result = resolvePrefillRepoSelection(
+      [
+        { platform: 'github', fullName: 'Kilo-Org/cloud' },
+        { platform: 'github', fullName: 'kilo-org/CLOUD' },
+      ],
+      { mode: 'code', repo: 'KILO-ORG/cloud' }
+    );
+    expect(result).toBeNull();
   });
 
   it.each([

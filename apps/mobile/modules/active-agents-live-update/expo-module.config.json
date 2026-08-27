@@ -4,6 +4,6 @@
     "modules": []
   },
   "android": {
-    "modules": []
+    "modules": ["com.kilocode.activeagentsliveupdate.ActiveAgentsLiveUpdateModule"]
   }
 }

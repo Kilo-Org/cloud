@@ -1,0 +1,16 @@
+{
+  "widgets": [
+    {
+      "name": "ActiveAgentsWidget",
+      "label": "Active agents",
+      "description": "Shows your active agents at a glance.",
+      "minWidth": "110dp",
+      "minHeight": "40dp",
+      "targetCellWidth": 2,
+      "targetCellHeight": 1,
+      "maxResizeWidth": "360dp",
+      "maxResizeHeight": "120dp",
+      "resizeMode": "horizontal|vertical"
+    }
+  ]
+}

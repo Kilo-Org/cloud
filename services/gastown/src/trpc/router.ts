@@ -39,6 +39,7 @@ import {
 } from './schemas';
 import type { TRPCContext } from './init';
 import { ContainerBillingError } from '../billing/ContainerBilling.error';
+import { resolveRepositoryIntegration } from '../util/repository-integration.util';
 
 // rpcSafe wrapper for TownConfigSchema (imported from ../types, not ./schemas)
 const RpcTownConfigSchema = z.any().pipe(TownConfigSchema);
@@ -51,31 +52,31 @@ function extractGithubRepo(gitUrl: string): string | null {
   return m ? m[1] : null;
 }
 
-/** Best-effort refresh of git credentials for a town via the git-token-service. */
-async function refreshGitCredentials(
+/** Resolve and optionally fence the GitHub integration that can access a repository. */
+async function resolvePlatformIntegration(
   env: Env,
-  townId: string,
   gitUrl: string,
   userId: string,
-  orgId?: string
-): Promise<void> {
-  if (!env.GIT_TOKEN_SERVICE) return;
-  const githubRepo = extractGithubRepo(gitUrl);
-  if (!githubRepo) return;
-
-  const result = await env.GIT_TOKEN_SERVICE.getTokenForRepo({ githubRepo, userId, orgId });
-  if (!result.success) {
-    console.warn(`[gastown-trpc] git credential refresh failed: ${result.reason}`);
-    return;
-  }
-
-  const townStub = getTownDOStub(env, townId);
-  await townStub.updateTownConfig({
-    git_auth: {
-      github_token: result.token,
-      platform_integration_id: result.installationId,
-    },
+  orgId?: string,
+  expectedIntegrationId?: string
+): Promise<string | undefined> {
+  const result = await resolveRepositoryIntegration(env, {
+    gitUrl,
+    userId,
+    orgId,
+    expectedIntegrationId,
   });
+  if (!result.success) {
+    console.warn(`[gastown-trpc] repository integration resolution failed: ${result.reason}`);
+    throw new TRPCError({
+      code:
+        result.reason === 'temporarily_unavailable' || result.reason === 'service_unavailable'
+          ? 'SERVICE_UNAVAILABLE'
+          : 'PRECONDITION_FAILED',
+      message: 'No unambiguous GitHub integration can access this repository',
+    });
+  }
+  return result.platformIntegrationId;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -506,25 +507,20 @@ export const gastownRouter = router({
         await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
       }
 
-      // Resolve git credentials using the town owner's identity
-      try {
-        await refreshGitCredentials(
-          ctx.env,
-          input.townId,
-          input.gitUrl,
-          credentialUserId,
-          townConfig.organization_id
-        );
-      } catch (err) {
-        console.warn('[gastown-trpc] createRig: git credential refresh failed', err);
-      }
+      const platformIntegrationId = await resolvePlatformIntegration(
+        ctx.env,
+        input.gitUrl,
+        credentialUserId,
+        townConfig.organization_id,
+        input.platformIntegrationId
+      );
 
       const rig = await ownerStub.createRig({
         town_id: input.townId,
         name: input.name,
         git_url: input.gitUrl,
         default_branch: input.defaultBranch,
-        platform_integration_id: input.platformIntegrationId,
+        platform_integration_id: platformIntegrationId,
       });
 
       // Configure the Town DO with rig metadata so dispatchAgent can find it.
@@ -537,7 +533,7 @@ export const gastownRouter = router({
           defaultBranch: input.defaultBranch,
           userId: credentialUserId,
           kilocodeToken,
-          platformIntegrationId: input.platformIntegrationId,
+          platformIntegrationId,
         });
         await townStub.addRig({
           rigId: rig.id,
@@ -845,19 +841,17 @@ export const gastownRouter = router({
       const user = userFromCtx(ctx);
       const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
 
-      // Best-effort: refresh git credentials using the town owner's identity
+      // Validate the rig's persisted integration fence before creating work.
       const townConfig = await getTownDOStub(ctx.env, rig.town_id).getTownConfig();
       const credentialUserId = townConfig.owner_user_id ?? user.id;
-      try {
-        await refreshGitCredentials(
+      if (rig.platform_integration_id) {
+        await resolvePlatformIntegration(
           ctx.env,
-          rig.town_id,
           rig.git_url,
           credentialUserId,
-          townConfig.organization_id
+          townConfig.organization_id,
+          rig.platform_integration_id
         );
-      } catch (err) {
-        console.warn('[gastown-trpc] sling: git credential refresh failed', err);
       }
 
       const townStub = getTownDOStub(ctx.env, rig.town_id);
@@ -1072,25 +1066,20 @@ export const gastownRouter = router({
     .mutation(async ({ ctx, input }) => {
       const ownerStub = await resolveRigOwnerStub(ctx.env, ctx, input.townId);
 
-      // Best-effort: refresh git credentials using the town owner's identity
+      // Validate every persisted integration fence before exposing its rig to the mayor.
       const townConfig = await getTownDOStub(ctx.env, input.townId).getTownConfig();
       const credentialUserId = townConfig.owner_user_id ?? ctx.userId;
-      try {
-        const rigList = await ownerStub.listRigs(input.townId);
-        for (const rig of rigList) {
-          if (extractGithubRepo(rig.git_url)) {
-            await refreshGitCredentials(
-              ctx.env,
-              input.townId,
-              rig.git_url,
-              credentialUserId,
-              townConfig.organization_id
-            );
-            break;
-          }
+      const rigList = await ownerStub.listRigs(input.townId);
+      for (const rig of rigList) {
+        if (extractGithubRepo(rig.git_url) && rig.platform_integration_id) {
+          await resolvePlatformIntegration(
+            ctx.env,
+            rig.git_url,
+            credentialUserId,
+            townConfig.organization_id,
+            rig.platform_integration_id
+          );
         }
-      } catch (err) {
-        console.warn('[gastown-trpc] ensureMayor: git credential refresh failed', err);
       }
 
       const townStub = getTownDOStub(ctx.env, input.townId);
@@ -1684,25 +1673,20 @@ export const gastownRouter = router({
         await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
       }
 
-      // Resolve git credentials using the town owner's identity
-      try {
-        await refreshGitCredentials(
-          ctx.env,
-          input.townId,
-          input.gitUrl,
-          credentialUserId,
-          townConfig.organization_id
-        );
-      } catch (err) {
-        console.warn('[gastown-trpc] createOrgRig: git credential refresh failed', err);
-      }
+      const platformIntegrationId = await resolvePlatformIntegration(
+        ctx.env,
+        input.gitUrl,
+        credentialUserId,
+        townConfig.organization_id,
+        input.platformIntegrationId
+      );
 
       const rig = await orgStub.createRig({
         town_id: input.townId,
         name: input.name,
         git_url: input.gitUrl,
         default_branch: input.defaultBranch,
-        platform_integration_id: input.platformIntegrationId,
+        platform_integration_id: platformIntegrationId,
       });
 
       try {
@@ -1713,7 +1697,7 @@ export const gastownRouter = router({
           defaultBranch: input.defaultBranch,
           userId: credentialUserId,
           kilocodeToken,
-          platformIntegrationId: input.platformIntegrationId,
+          platformIntegrationId,
         });
         await townStub.addRig({
           rigId: rig.id,

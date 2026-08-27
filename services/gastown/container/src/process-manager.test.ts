@@ -14,7 +14,6 @@ vi.mock('./agent-runner', () => ({
     (kilocodeToken: string, model: string, smallModel: string, organizationId?: string) =>
       JSON.stringify({ kilocodeToken, model, smallModel, organizationId })
   ),
-  resolveGitCredentials: vi.fn(),
   writeMayorSystemPromptToAgentsMd: vi.fn(),
   ensureMayorWorkspaceForTown: vi.fn(async (_townId: string) => TEST_WORKSPACE),
   mayorWorkdirForTown: vi.fn((_townId: string) => TEST_WORKSPACE),

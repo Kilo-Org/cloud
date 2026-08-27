@@ -39,6 +39,24 @@ function baseRequest(overrides: Partial<StartAgentRequest> = {}): StartAgentRequ
 }
 
 describe('buildAgentEnv', () => {
+  it('prefers a rig-scoped integration token over town-wide GitHub credentials', () => {
+    const originalGitToken = process.env.GIT_TOKEN;
+    const originalCliPat = process.env.GITHUB_CLI_PAT;
+    process.env.GIT_TOKEN = 'other-rig-token';
+    process.env.GITHUB_CLI_PAT = 'town-pat';
+    try {
+      const env = buildAgentEnv(
+        baseRequest({ envVars: { GIT_TOKEN: 'this-rig-token', KILOCODE_TOKEN: 'kilo-token' } })
+      );
+      expect(env.GIT_TOKEN).toBe('this-rig-token');
+      expect(env.GH_TOKEN).toBe('this-rig-token');
+    } finally {
+      if (originalGitToken === undefined) delete process.env.GIT_TOKEN;
+      else process.env.GIT_TOKEN = originalGitToken;
+      if (originalCliPat === undefined) delete process.env.GITHUB_CLI_PAT;
+      else process.env.GITHUB_CLI_PAT = originalCliPat;
+    }
+  });
   it('sets KILO_AUTH_CONTENT with valid JSON auth for the kilo provider when KILOCODE_TOKEN is present', () => {
     const env = buildAgentEnv(
       baseRequest({

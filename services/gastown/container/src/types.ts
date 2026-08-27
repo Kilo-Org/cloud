@@ -23,8 +23,6 @@ export const StartAgentRequest = z.object({
   branch: z.string(),
   defaultBranch: z.string(),
   envVars: z.record(z.string(), z.string()).optional(),
-  /** Platform integration ID for resolving fresh git credentials at startup */
-  platformIntegrationId: z.string().optional(),
   /** Git ref to branch from (e.g. convoy feature branch). Falls back to HEAD if absent. */
   startPoint: z.string().optional(),
   /** Skip repo clone — use a lightweight git-init-only workspace (for reasoning-only agents like triage). */
@@ -38,7 +36,7 @@ export const StartAgentRequest = z.object({
         rigId: z.string(),
         gitUrl: z.string(),
         defaultBranch: z.string(),
-        platformIntegrationId: z.string().optional(),
+        envVars: z.record(z.string(), z.string()).optional(),
       })
     )
     .optional(),
@@ -327,8 +325,6 @@ export const SetupRepoRequest = z.object({
   gitUrl: z.string().min(1),
   defaultBranch: z.string().min(1),
   envVars: z.record(z.string(), z.string()).optional(),
-  /** Platform integration ID for resolving git credentials when no token is in envVars */
-  platformIntegrationId: z.string().optional(),
 });
 export type SetupRepoRequest = z.infer<typeof SetupRepoRequest>;
 

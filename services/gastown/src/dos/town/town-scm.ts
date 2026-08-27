@@ -14,11 +14,10 @@ export type SCMContext = {
   env: Env;
   townId: string;
   getTownConfig: () => Promise<TownConfig>;
-  /**
-   * Rig-level platform integration ID. When provided, it is tried as a
-   * fallback after town-level git_auth so that rigs authenticated solely
-   * through a rig-scoped GitHub App installation can still resolve a token.
-   */
+  githubRepo?: string;
+  userId?: string;
+  orgId?: string;
+  /** Exact Kilo platform integration identity persisted for the rig. */
   platformIntegrationId?: string;
 };
 
@@ -29,22 +28,9 @@ export type GitHubTokenResolution =
 /**
  * Resolve a GitHub API token from the town config.
  *
- * Priority chain (most to least preferred):
- *   1. `github_cli_pat` — user-supplied long-lived PAT, never expires.
- *   2. Platform integration (GitHub App installation) — minted fresh by
- *      git-token-service with KV-backed caching that auto-invalidates
- *      before each token's 1h TTL elapses. This is the authoritative
- *      live source whenever an integration is configured.
- *   3. `git_auth.github_token` — stored installation token from a past
- *      `refreshGitCredentials()` write. Kept as a fallback for towns that
- *      never had an integration wired up. NOT preferred over the integration
- *      because the stored value is typically stale (1h TTL, never updated
- *      by anything in the request path).
- *
- * Historically this preferred the stored token over the integration,
- * which made every consumer (PR poller, /refresh-git-token, agent
- * dispatch's `GIT_TOKEN`) hand out an expired token whenever the rig
- * had been registered more than ~1 hour ago. See ce15a6fe7 for the fix.
+ * Persisted rig integrations are exact fences and always resolve through the
+ * Git Token Service's authoritative repository lookup. Legacy town credentials
+ * remain available only to rigs without a persisted integration identity.
  *
  * Returns a `GitHubTokenResolution`: `ok: true` with the token + source on
  * success, or `ok: false` with the `tried` chain on failure. Used by
@@ -54,40 +40,87 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenRe
   const tried: string[] = [];
   const townConfig = await ctx.getTownConfig();
 
-  // 1. github_cli_pat — long-lived user PAT
+  if (ctx.platformIntegrationId) {
+    tried.push('rig platform integration');
+    if (!ctx.env.GIT_TOKEN_SERVICE) {
+      tried.push('rig platform integration (GIT_TOKEN_SERVICE not bound)');
+      return { ok: false, tried };
+    }
+    if (!ctx.githubRepo || !ctx.userId) {
+      tried.push('rig integration context incomplete');
+      return { ok: false, tried };
+    }
+
+    try {
+      const result = await ctx.env.GIT_TOKEN_SERVICE.getTokenForRepo({
+        githubRepo: ctx.githubRepo,
+        userId: ctx.userId,
+        ...(ctx.orgId ? { orgId: ctx.orgId } : {}),
+        expectedIntegrationId: ctx.platformIntegrationId,
+      });
+      if (result.success) {
+        return { ok: true, token: result.token, source: 'rig platform integration' };
+      }
+      tried.push(`rig platform integration (${result.reason})`);
+    } catch (err) {
+      console.warn(`${TOWN_LOG} resolveGitHubToken: exact rig integration lookup failed`, err);
+      tried.push('rig platform integration (lookup failed)');
+    }
+    return { ok: false, tried };
+  }
+
+  // Legacy unpinned rigs retain their existing credential priority.
   if (townConfig.github_cli_pat) {
     return { ok: true, token: townConfig.github_cli_pat, source: 'town.github_cli_pat' };
   }
   tried.push('town.github_cli_pat');
 
-  // 2. Platform integration — fresh App installation token
-  const integrationId = townConfig.git_auth?.platform_integration_id ?? ctx.platformIntegrationId;
-  const sourceLabel = townConfig.git_auth?.platform_integration_id
-    ? 'town platform integration'
-    : 'rig platform integration';
-  if (integrationId && ctx.env.GIT_TOKEN_SERVICE) {
-    tried.push(sourceLabel);
-    try {
-      const fresh = await ctx.env.GIT_TOKEN_SERVICE.getToken(integrationId);
-      if (typeof fresh === 'string' && fresh.length > 0) {
-        return { ok: true, token: fresh, source: sourceLabel };
+  const legacyIntegrationId = townConfig.git_auth?.platform_integration_id;
+  if (legacyIntegrationId && ctx.env.GIT_TOKEN_SERVICE) {
+    tried.push('legacy town platform integration');
+    if (ctx.githubRepo && ctx.userId) {
+      try {
+        const result = await ctx.env.GIT_TOKEN_SERVICE.getTokenForRepo({
+          githubRepo: ctx.githubRepo,
+          userId: ctx.userId,
+          ...(ctx.orgId ? { orgId: ctx.orgId } : {}),
+        });
+        if (result.success) {
+          return { ok: true, token: result.token, source: 'legacy town platform integration' };
+        }
+        tried.push(`legacy town platform integration (${result.reason})`);
+        if (
+          result.reason === 'ambiguous_installation' ||
+          result.reason === 'temporarily_unavailable'
+        ) {
+          return { ok: false, tried };
+        }
+      } catch (err) {
+        console.warn(`${TOWN_LOG} resolveGitHubToken: legacy repository lookup failed`, err);
+        tried.push('legacy town platform integration (lookup failed)');
       }
-      console.warn(
-        `${TOWN_LOG} resolveGitHubToken: platform integration ${integrationId} returned empty token; falling back to stored github_token`
-      );
-    } catch (err) {
-      console.warn(
-        `${TOWN_LOG} resolveGitHubToken: platform integration token lookup failed for ${integrationId}; falling back to stored github_token`,
-        err
-      );
+    } else {
+      try {
+        const fresh = await ctx.env.GIT_TOKEN_SERVICE.getToken(legacyIntegrationId);
+        if (typeof fresh === 'string' && fresh.length > 0) {
+          return { ok: true, token: fresh, source: 'legacy town platform integration' };
+        }
+        console.warn(
+          `${TOWN_LOG} resolveGitHubToken: legacy platform integration returned empty token; falling back to stored github_token`
+        );
+      } catch (err) {
+        console.warn(
+          `${TOWN_LOG} resolveGitHubToken: legacy platform integration lookup failed; falling back to stored github_token`,
+          err
+        );
+      }
     }
-  } else if (!integrationId) {
+  } else if (!legacyIntegrationId) {
     tried.push('platform integration (none configured)');
   } else {
-    tried.push(`${sourceLabel} (GIT_TOKEN_SERVICE not bound)`);
+    tried.push('legacy town platform integration (GIT_TOKEN_SERVICE not bound)');
   }
 
-  // 3. Stored git_auth.github_token — last-resort fallback
   if (townConfig.git_auth?.github_token) {
     return {
       ok: true,

@@ -312,11 +312,11 @@ export type ApplyActionContext = {
   /** Stop an agent's container process. */
   stopAgent: (agentId: string) => Promise<void>;
   /** Check a PR's status via GitHub/GitLab API. Returns PRStatusOutcome. */
-  checkPRStatus: (prUrl: string) => Promise<PRStatusOutcome>;
+  checkPRStatus: (prUrl: string, rigId: string) => Promise<PRStatusOutcome>;
   /** Check PR for unresolved review comments and failing CI checks. */
-  checkPRFeedback: (prUrl: string) => Promise<PRFeedbackCheckResult | null>;
+  checkPRFeedback: (prUrl: string, rigId: string) => Promise<PRFeedbackCheckResult | null>;
   /** Merge a PR via GitHub/GitLab API. */
-  mergePR: (prUrl: string) => Promise<boolean>;
+  mergePR: (prUrl: string, rigId: string) => Promise<boolean>;
   /** Queue a nudge message for an agent. */
   queueNudge: (agentId: string, message: string, tier: string) => Promise<void>;
   /** Insert a town_event for deferred processing (e.g. pr_status_changed). */
@@ -836,6 +836,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'poll_pr': {
+      const rigId = beadOps.getBead(sql, action.bead_id)?.rig_id ?? '';
       // Touch updated_at and record last_poll_at synchronously so the bead
       // doesn't look stale to Rule 4 (orphaned PR review, 30 min timeout).
       // Without this, active polling keeps the PR alive but updated_at was
@@ -858,7 +859,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
       return async () => {
         try {
-          const outcome = await ctx.checkPRStatus(action.pr_url);
+          const outcome = await ctx.checkPRStatus(action.pr_url, rigId);
           if (outcome.ok) {
             // Successful poll — reset both consecutive error counters
             query(
@@ -1018,7 +1019,9 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             // Each checkPRFeedback call makes 3+ GitHub API requests (GraphQL +
             // check-runs + commit status), so deduplicating halves our API usage.
             const feedback =
-              wantsAutoResolve || wantsAutoMerge ? await ctx.checkPRFeedback(action.pr_url) : null;
+              wantsAutoResolve || wantsAutoMerge
+                ? await ctx.checkPRFeedback(action.pr_url, rigId)
+                : null;
 
             if (feedback) {
               const prevAwaitingRows = z
@@ -1163,7 +1166,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               // If the PR was merged externally during that window, inserting
               // pr_feedback_detected would create a feedback bead for a merged
               // PR — leading to a duplicate PR on an already-merged branch.
-              const freshOutcome = await ctx.checkPRStatus(action.pr_url);
+              const freshOutcome = await ctx.checkPRStatus(action.pr_url, rigId);
               if (!freshOutcome.ok || freshOutcome.result.status !== 'open') {
                 console.log(
                   `${LOG} poll_pr: PR status changed to '${freshOutcome.ok ? freshOutcome.result.status : 'error'}' during feedback check, skipping feedback for bead=${action.bead_id}`
@@ -1526,7 +1529,8 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           // Re-check feedback immediately before merging to avoid acting on
           // stale state. If a reviewer posted new comments or CI regressed
           // since the last poll, abort and reset the timer.
-          const freshFeedback = await ctx.checkPRFeedback(action.pr_url);
+          const rigId = mrBead?.rig_id ?? '';
+          const freshFeedback = await ctx.checkPRFeedback(action.pr_url, rigId);
           if (
             freshFeedback &&
             (freshFeedback.hasUnresolvedComments ||
@@ -1560,7 +1564,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             return;
           }
 
-          const merged = await ctx.mergePR(action.pr_url);
+          const merged = await ctx.mergePR(action.pr_url, rigId);
           if (merged) {
             ctx.insertEvent('pr_status_changed', {
               bead_id: action.bead_id,

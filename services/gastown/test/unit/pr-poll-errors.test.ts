@@ -58,14 +58,20 @@ describe('resolveGitHubToken', () => {
   it('includes platform integration source label in resolution chain', async () => {
     const ctx = mockSCMContext({
       platformIntegrationId: 'integration-123',
-      env: { GIT_TOKEN_SERVICE: { getToken: async () => null } } as unknown as SCMContext['env'],
+      env: {
+        GIT_TOKEN_SERVICE: {
+          getTokenForRepo: async () => ({ success: false, reason: 'integration_mismatch' }),
+        },
+      } as unknown as SCMContext['env'],
+      githubRepo: 'acme/repo',
+      userId: 'user-1',
       getTownConfig: async () =>
         ({ git_auth: { platform_integration_id: 'integration-123' } }) as TownConfig,
     });
     const result = await resolveGitHubToken(ctx);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.tried).toContain('town platform integration');
+      expect(result.tried).toContain('rig platform integration');
     }
   });
 
@@ -92,7 +98,7 @@ describe('resolveGitHubToken', () => {
     const result = await resolveGitHubToken(ctx);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.tried).toContain('town platform integration (GIT_TOKEN_SERVICE not bound)');
+      expect(result.tried).toContain('rig platform integration (GIT_TOKEN_SERVICE not bound)');
     }
   });
 });

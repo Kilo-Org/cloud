@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { runAgent, resolveGitCredentials, writeMayorSystemPromptToAgentsMd } from './agent-runner';
+import { runAgent, writeMayorSystemPromptToAgentsMd } from './agent-runner';
 import {
   stopAgent,
   sendMessage,
@@ -113,11 +113,16 @@ function syncTownConfigToProcessEnv(): void {
   const gitAuth = cfg.git_auth;
   if (typeof gitAuth === 'object' && gitAuth !== null) {
     const auth = gitAuth as Record<string, unknown>;
-    for (const [authKey, envKey] of [
-      ['github_token', 'GIT_TOKEN'],
+    const authMapping: Array<[string, string]> = [
       ['gitlab_token', 'GITLAB_TOKEN'],
       ['gitlab_instance_url', 'GITLAB_INSTANCE_URL'],
-    ] as const) {
+    ];
+    if (cfg.rig_scoped_git_identity !== true) {
+      authMapping.unshift(['github_token', 'GIT_TOKEN']);
+    } else {
+      delete process.env.GIT_TOKEN;
+    }
+    for (const [authKey, envKey] of authMapping) {
       const val = auth[authKey];
       if (typeof val === 'string' && val) {
         process.env[envKey] = val;
@@ -561,16 +566,11 @@ app.post('/repos/setup', async c => {
   // Errors are caught and logged — never propagated as unhandled rejections.
   const doSetup = async () => {
     try {
-      // Resolve git credentials from platformIntegrationId if no token
-      // is present in envVars (e.g. rigs using GitHub App installations).
-      const envVars = await resolveGitCredentials({
-        envVars: req.envVars,
-        platformIntegrationId: req.platformIntegrationId,
-      });
+      const envVars = req.envVars ?? {};
 
       const hasGitToken = !!(envVars.GIT_TOKEN || envVars.GITHUB_TOKEN || envVars.GITLAB_TOKEN);
       console.log(
-        `[control-server] /repos/setup: cloning rigId=${req.rigId} hasGitToken=${hasGitToken} hasPlatformIntegration=${!!req.platformIntegrationId}`
+        `[control-server] /repos/setup: cloning rigId=${req.rigId} hasGitToken=${hasGitToken}`
       );
 
       const browseDir = await setupRigBrowseWorktree({

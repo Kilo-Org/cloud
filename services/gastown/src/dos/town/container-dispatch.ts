@@ -406,7 +406,7 @@ export async function startAgentInContainer(
       rigId: string;
       gitUrl: string;
       defaultBranch: string;
-      platformIntegrationId?: string;
+      envVars?: Record<string, string>;
     }>;
   }
 ): Promise<{ started: boolean; containerFetchMs: number }> {
@@ -449,6 +449,9 @@ export async function startAgentInContainer(
       env,
       townId: params.townId,
       getTownConfig: () => Promise.resolve(params.townConfig),
+      githubRepo: params.gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1],
+      userId: params.userId,
+      orgId: params.townConfig.organization_id,
       platformIntegrationId: params.platformIntegrationId,
     });
     if (githubToken) {
@@ -463,7 +466,7 @@ export async function startAgentInContainer(
 
     // GitHub CLI PAT — used exclusively for `gh` CLI operations (PRs, issues).
     // Separate from GIT_TOKEN which is used for git clone/push.
-    if (params.townConfig.github_cli_pat) {
+    if (!params.platformIntegrationId && params.townConfig.github_cli_pat) {
       envVars.GITHUB_CLI_PAT = params.townConfig.github_cli_pat;
     }
 
@@ -490,7 +493,7 @@ export async function startAgentInContainer(
       `${TOWN_LOG} startAgentInContainer: envVars built: keys=[${Object.keys(envVars).join(',')}] hasGitToken=${!!envVars.GIT_TOKEN} hasGitlabToken=${!!envVars.GITLAB_TOKEN} hasContainerToken=${!!containerToken} hasAgentJwt=${!!agentToken} hasKilocodeToken=${!!kilocodeToken} git_auth_keys=[${Object.keys(params.townConfig.git_auth ?? {}).join(',')}]`
     );
 
-    const containerConfig = await buildContainerConfig(storage, env, params.townId);
+    const containerConfig = await buildContainerConfig(storage, env);
     const container = getTownContainerStub(env, params.townId);
 
     const rigOverride = params.rigOverride ?? null;
@@ -551,7 +554,6 @@ export async function startAgentInContainer(
         // at the convoy's feature branch tip.
         defaultBranch: params.defaultBranch,
         envVars,
-        platformIntegrationId: params.platformIntegrationId,
         // For convoy agents, start from the convoy's feature branch so the
         // worktree includes all previously merged convoy work.
         startPoint: params.convoyFeatureBranch ? `origin/${params.convoyFeatureBranch}` : undefined,
@@ -633,6 +635,7 @@ export async function startMergeInContainer(
     gitUrl: string;
     kilocodeToken?: string;
     townConfig: TownConfig;
+    platformIntegrationId?: string;
   }
 ): Promise<boolean> {
   try {
@@ -667,6 +670,10 @@ export async function startMergeInContainer(
       env,
       townId: params.townId,
       getTownConfig: () => Promise.resolve(params.townConfig),
+      githubRepo: params.gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1],
+      userId,
+      orgId: params.townConfig.organization_id,
+      platformIntegrationId: params.platformIntegrationId,
     });
     if (mergeGithubToken) {
       envVars.GIT_TOKEN = mergeGithubToken;
@@ -683,7 +690,7 @@ export async function startMergeInContainer(
     const mergeKilocodeToken = params.kilocodeToken ?? params.townConfig.kilocode_token;
     if (mergeKilocodeToken) envVars.KILOCODE_TOKEN = mergeKilocodeToken;
 
-    const containerConfig = await buildContainerConfig(storage, env, params.townId);
+    const containerConfig = await buildContainerConfig(storage, env);
     const container = getTownContainerStub(env, params.townId);
 
     const response = await container.fetch('http://container/git/merge', {

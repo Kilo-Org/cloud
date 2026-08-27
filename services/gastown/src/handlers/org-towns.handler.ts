@@ -5,6 +5,7 @@ import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import type { GastownEnv } from '../gastown.worker';
+import { resolveRepositoryIntegration } from '../util/repository-integration.util';
 
 const ORG_TOWNS_LOG = '[org-towns.handler]';
 
@@ -91,7 +92,25 @@ export async function handleCreateOrgRig(c: Context<GastownEnv>, params: { orgId
   const town = await orgDO.getTownAsync(parsed.data.town_id);
   if (!town) return c.json(resError('Town not found in this org'), 404);
 
-  const rig = await orgDO.createRig(parsed.data);
+  const integration = await resolveRepositoryIntegration(c.env, {
+    gitUrl: parsed.data.git_url,
+    userId,
+    orgId: params.orgId,
+    expectedIntegrationId: parsed.data.platform_integration_id,
+  });
+  if (!integration.success) {
+    const status =
+      integration.reason === 'service_unavailable' ||
+      integration.reason === 'temporarily_unavailable'
+        ? 503
+        : 412;
+    return c.json(resError('No unambiguous GitHub integration can access this repository'), status);
+  }
+  const rigInput = {
+    ...parsed.data,
+    platform_integration_id: integration.platformIntegrationId,
+  };
+  const rig = await orgDO.createRig(rigInput);
   console.log(
     `${ORG_TOWNS_LOG} handleCreateOrgRig: rig created id=${rig.id}, now configuring Town DO`
   );
@@ -109,7 +128,7 @@ export async function handleCreateOrgRig(c: Context<GastownEnv>, params: { orgId
       // Never trust caller-supplied kilocode tokens for org rigs — the
       // town's existing token (minted by the owner) is used instead.
       kilocodeToken: undefined,
-      platformIntegrationId: parsed.data.platform_integration_id,
+      platformIntegrationId: integration.platformIntegrationId,
     });
     // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC stub returns Rpc.Promisified
     await townDOStub.addRig({

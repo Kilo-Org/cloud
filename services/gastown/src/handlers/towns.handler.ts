@@ -5,6 +5,7 @@ import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import type { GastownEnv } from '../gastown.worker';
+import { resolveRepositoryIntegration } from '../util/repository-integration.util';
 
 const TOWNS_LOG = '[towns.handler]';
 
@@ -70,7 +71,24 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
   );
 
   const townDO = getGastownUserStub(c.env, params.userId);
-  const rig = await townDO.createRig(parsed.data);
+  const integration = await resolveRepositoryIntegration(c.env, {
+    gitUrl: parsed.data.git_url,
+    userId: params.userId,
+    expectedIntegrationId: parsed.data.platform_integration_id,
+  });
+  if (!integration.success) {
+    const status =
+      integration.reason === 'service_unavailable' ||
+      integration.reason === 'temporarily_unavailable'
+        ? 503
+        : 412;
+    return c.json(resError('No unambiguous GitHub integration can access this repository'), status);
+  }
+  const rigInput = {
+    ...parsed.data,
+    platform_integration_id: integration.platformIntegrationId,
+  };
+  const rig = await townDO.createRig(rigInput);
   console.log(`${TOWNS_LOG} handleCreateRig: rig created id=${rig.id}, now configuring Rig DO`);
 
   // Configure the Town DO with rig metadata and register the rig.
@@ -84,7 +102,7 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
       defaultBranch: parsed.data.default_branch,
       userId: params.userId,
       kilocodeToken: parsed.data.kilocode_token,
-      platformIntegrationId: parsed.data.platform_integration_id,
+      platformIntegrationId: integration.platformIntegrationId,
     });
     // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC stub returns Rpc.Promisified
     await townDOStub.addRig({

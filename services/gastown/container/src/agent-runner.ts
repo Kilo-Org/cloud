@@ -198,12 +198,13 @@ GASTOWN_TOWN_ID="${env.GASTOWN_TOWN_ID}"`);
     env.KILO_ORG_ID = request.organizationId;
   }
 
-  // Authenticate the gh CLI via GH_TOKEN. Prefer the user's GitHub CLI PAT
-  // (which makes PRs/issues appear under their identity) over the integration
-  // token (which appears as the GitHub App bot).
-  const ghCliPat = resolveEnv(request, 'GITHUB_CLI_PAT');
+  // A request-scoped integration token must win over town-wide process state.
+  const scopedGitToken = request.envVars?.GIT_TOKEN ?? request.envVars?.GITHUB_TOKEN;
   const ghToken =
-    ghCliPat ?? resolveEnv(request, 'GIT_TOKEN') ?? resolveEnv(request, 'GITHUB_TOKEN');
+    scopedGitToken ??
+    resolveEnv(request, 'GITHUB_CLI_PAT') ??
+    resolveEnv(request, 'GIT_TOKEN') ??
+    resolveEnv(request, 'GITHUB_TOKEN');
   if (ghToken) {
     env.GH_TOKEN = ghToken;
   }
@@ -263,89 +264,6 @@ async function configureGitCredentials(
   } catch (err) {
     console.warn('Failed to configure git credentials:', err);
   }
-}
-
-/**
- * If no GIT_TOKEN/GITLAB_TOKEN is present in envVars but a platformIntegrationId
- * is available, call the Next.js server to resolve fresh credentials.
- * Returns the (potentially enriched) envVars.
- */
-export async function resolveGitCredentials(params: {
-  envVars?: Record<string, string>;
-  platformIntegrationId?: string;
-}): Promise<Record<string, string>> {
-  const envVars = { ...(params.envVars ?? {}) };
-  const hasToken = !!(envVars.GIT_TOKEN || envVars.GITHUB_TOKEN || envVars.GITLAB_TOKEN);
-
-  if (hasToken) return envVars;
-
-  const integrationId = params.platformIntegrationId;
-  const kiloToken = envVars.KILOCODE_TOKEN;
-  // The Next.js server URL — in dev it's localhost:3000, in prod it's the main app URL.
-  // We derive it from KILO_API_URL (the gateway URL) or fall back to localhost.
-  const apiBase = process.env.KILO_CLOUD_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
-
-  if (!integrationId) {
-    console.warn(
-      '[resolveGitCredentialsIfMissing] No git token and no platformIntegrationId — clone will likely fail'
-    );
-    return envVars;
-  }
-
-  if (!kiloToken) {
-    console.warn(
-      '[resolveGitCredentialsIfMissing] No KILOCODE_TOKEN — cannot authenticate to credential API'
-    );
-    return envVars;
-  }
-
-  console.log(
-    `[resolveGitCredentialsIfMissing] Fetching fresh credentials for integration=${integrationId}`
-  );
-
-  try {
-    const resp = await fetch(`${apiBase}/api/gastown/git-credentials`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${kiloToken}`,
-      },
-      body: JSON.stringify({ platform_integration_id: integrationId }),
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error(
-        `[resolveGitCredentialsIfMissing] API returned ${resp.status}: ${text.slice(0, 200)}`
-      );
-      return envVars;
-    }
-
-    const rawCreds: unknown = await resp.json();
-    const creds = z
-      .object({
-        github_token: z.string().optional(),
-        gitlab_token: z.string().optional(),
-        gitlab_instance_url: z.string().optional(),
-      })
-      .parse(rawCreds);
-
-    if (creds.github_token) {
-      envVars.GIT_TOKEN = creds.github_token;
-      console.log('[resolveGitCredentialsIfMissing] Got fresh GitHub token');
-    }
-    if (creds.gitlab_token) {
-      envVars.GITLAB_TOKEN = creds.gitlab_token;
-      console.log('[resolveGitCredentialsIfMissing] Got fresh GitLab token');
-    }
-    if (creds.gitlab_instance_url) {
-      envVars.GITLAB_INSTANCE_URL = creds.gitlab_instance_url;
-    }
-  } catch (err) {
-    console.error('[resolveGitCredentialsIfMissing] Failed to fetch credentials:', err);
-  }
-
-  return envVars;
 }
 
 /**
@@ -524,15 +442,9 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
     // up for all known rigs before writing AGENTS.md so the mayor (and its
     // sub-agents) can immediately browse codebases.
     if (request.rigs?.length) {
-      // Resolve credentials per-rig since each may use a different
-      // GitHub App installation (platformIntegrationId).
-      const baseEnvVars = request.envVars ?? {};
       const rigSetupResults = await Promise.allSettled(
         request.rigs.map(async rig => {
-          const envVars = await resolveGitCredentials({
-            envVars: baseEnvVars,
-            platformIntegrationId: rig.platformIntegrationId,
-          });
+          const envVars = { ...(request.envVars ?? {}), ...(rig.envVars ?? {}) };
           const hasGitToken = !!(envVars.GIT_TOKEN || envVars.GITHUB_TOKEN || envVars.GITLAB_TOKEN);
           console.log(
             `[runAgent] setting up browse worktree: rig=${rig.rigId} gitUrl=${rig.gitUrl} hasGitToken=${hasGitToken}`
@@ -580,16 +492,7 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
       await writeMayorSystemPromptToAgentsMd(workdir, request.systemPrompt);
     }
   } else {
-    // Resolve git credentials if missing. When the town config doesn't have
-    // a token (common on first dispatch after rig creation), fetch one from
-    // the Next.js server using the platform_integration_id.
-    const envVars = await resolveGitCredentials(request);
-
-    // Merge resolved credentials back into the request so buildAgentEnv
-    // can propagate GIT_TOKEN/GH_TOKEN to the spawned kilo serve process.
-    // Without this, rigs using platformIntegrationId would clone successfully
-    // but the agent session itself would lack git push / gh credentials.
-    request = { ...request, envVars };
+    const envVars = request.envVars ?? {};
 
     await cloneRepo({
       rigId: request.rigId,

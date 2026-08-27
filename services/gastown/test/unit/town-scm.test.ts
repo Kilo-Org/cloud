@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { resolveGitHubToken } from '../../src/dos/town/town-scm';
 import { TownConfigSchema, type TownConfig } from '../../src/types';
 
 const STORED_GITHUB_TOKEN = 'ghs_stored_stale_token';
 const FRESH_INSTALLATION_TOKEN = 'ghs_fresh_from_integration';
 const USER_PAT = 'ghp_user_long_lived_pat';
-const INTEGRATION_ID = '119277743';
+const INTEGRATION_ID = '123e4567-e89b-12d3-a456-426614174001';
 
 function buildConfig(overrides: {
   github_token?: string;
@@ -24,9 +24,23 @@ function buildConfig(overrides: {
 function fakeEnv(opts: {
   tokenServiceResponse?: string | null;
   tokenServiceShouldThrow?: boolean;
+  repoResult?: GetTokenForRepoResult;
+  getTokenForRepo?: ReturnType<typeof vi.fn>;
 }): Env {
   return {
     GIT_TOKEN_SERVICE: {
+      getTokenForRepo:
+        opts.getTokenForRepo ??
+        vi.fn().mockResolvedValue(
+          opts.repoResult ?? {
+            success: true,
+            token: FRESH_INSTALLATION_TOKEN,
+            platformIntegrationId: INTEGRATION_ID,
+            installationId: '119277743',
+            accountLogin: 'acme',
+            appType: 'standard',
+          }
+        ),
       getToken: async (_id: string) => {
         if (opts.tokenServiceShouldThrow) {
           throw new Error('integration lookup failed');
@@ -65,7 +79,7 @@ describe('resolveGitHubToken priority chain', () => {
     expect(result).toEqual({
       ok: true,
       token: FRESH_INSTALLATION_TOKEN,
-      source: 'town platform integration',
+      source: 'legacy town platform integration',
     });
   });
 
@@ -106,12 +120,70 @@ describe('resolveGitHubToken priority chain', () => {
       env: fakeEnv({ tokenServiceResponse: FRESH_INSTALLATION_TOKEN }),
       townId: 'town-1',
       getTownConfig: () => Promise.resolve(cfg),
+      githubRepo: 'acme/repo',
+      userId: 'user-1',
       platformIntegrationId: INTEGRATION_ID,
     });
     expect(result).toEqual({
       ok: true,
       token: FRESH_INSTALLATION_TOKEN,
       source: 'rig platform integration',
+    });
+  });
+
+  it('uses an exact integration fence and does not fall back to town credentials', async () => {
+    const getTokenForRepo = vi
+      .fn()
+      .mockResolvedValue({ success: false, reason: 'integration_mismatch' });
+    const result = await resolveGitHubToken({
+      env: fakeEnv({ getTokenForRepo }),
+      townId: 'town-1',
+      getTownConfig: () =>
+        Promise.resolve(
+          buildConfig({
+            github_token: STORED_GITHUB_TOKEN,
+            github_cli_pat: USER_PAT,
+            platform_integration_id: 'other-integration',
+          })
+        ),
+      githubRepo: 'acme/repo',
+      userId: 'user-1',
+      platformIntegrationId: INTEGRATION_ID,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      tried: ['rig platform integration', 'rig platform integration (integration_mismatch)'],
+    });
+    expect(getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'user-1',
+      expectedIntegrationId: INTEGRATION_ID,
+    });
+  });
+
+  it('fails an ambiguous legacy repository lookup closed', async () => {
+    const result = await resolveGitHubToken({
+      env: fakeEnv({ repoResult: { success: false, reason: 'ambiguous_installation' } }),
+      townId: 'town-1',
+      getTownConfig: () =>
+        Promise.resolve(
+          buildConfig({
+            github_token: STORED_GITHUB_TOKEN,
+            platform_integration_id: INTEGRATION_ID,
+          })
+        ),
+      githubRepo: 'acme/repo',
+      userId: 'user-1',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      tried: [
+        'town.github_cli_pat',
+        'legacy town platform integration',
+        'legacy town platform integration (ambiguous_installation)',
+      ],
     });
   });
 

@@ -1571,7 +1571,6 @@ const MAYOR_STARTUP_PROMPT = 'Mayor ready. Waiting for instructions.';
  */
 const LIVE_ENV_KEYS = new Set([
   'GASTOWN_CONTAINER_TOKEN',
-  'GIT_TOKEN',
   'GITLAB_TOKEN',
   'GITLAB_INSTANCE_URL',
   'GITHUB_CLI_PAT',
@@ -1607,8 +1606,8 @@ const LIVE_ENV_KEYS = new Set([
  *   `LIVE_ENV_KEYS` and `RESERVED_ENV_KEYS` always win.
  * - Remove custom keys that were previously applied but have been
  *   dropped from the town config.
- * - Re-derive `GH_TOKEN` from the live `GITHUB_CLI_PAT` > `GIT_TOKEN`
- *   > `GITHUB_TOKEN` chain so a rotated token takes effect.
+ * - Re-derive `GH_TOKEN` from the agent's scoped integration token before
+ *   considering the town-wide GitHub CLI PAT.
  */
 function buildLiveHotSwapEnv(agent: ManagedAgent): Record<string, string> {
   const env: Record<string, string> = {};
@@ -1654,10 +1653,8 @@ function buildLiveHotSwapEnv(agent: ManagedAgent): Record<string, string> {
     }
   }
 
-  // Re-derive GH_TOKEN from live values using the same priority chain
-  // as buildAgentEnv: GITHUB_CLI_PAT > GIT_TOKEN > GITHUB_TOKEN.
-  const liveGhToken =
-    process.env.GITHUB_CLI_PAT ?? process.env.GIT_TOKEN ?? process.env.GITHUB_TOKEN;
+  // Keep integration credentials scoped to the agent that was dispatched.
+  const liveGhToken = env.GIT_TOKEN ?? env.GITHUB_TOKEN ?? env.GITHUB_CLI_PAT;
   if (liveGhToken) {
     env.GH_TOKEN = liveGhToken;
   } else {

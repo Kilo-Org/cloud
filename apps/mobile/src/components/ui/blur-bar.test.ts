@@ -65,7 +65,7 @@ async function render(children: ReactNode): Promise<Renderer> {
   const ref: { current: Renderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
-    ref.current = TestRenderer.create(createElement(BlurBar, {}, children));
+    ref.current = TestRenderer.create(createElement(BlurBar, null, children));
   });
   if (!ref.current) {
     throw new Error('renderer was not created');
@@ -129,7 +129,8 @@ describe('BlurBar Reduce Transparency', () => {
     expect(blurs[0]?.props.className).toBe('absolute inset-0');
 
     // BlurView is the first child (the background), then children.
-    expect(outer?.children[0]?.type).toBe('BlurView');
+    const firstChild = outer?.children[0];
+    expect(typeof firstChild === 'string' ? null : firstChild?.type).toBe('BlurView');
     expect(hosts(renderer, 'Text')[0]?.props.children).toBe('content');
 
     renderer.unmount();

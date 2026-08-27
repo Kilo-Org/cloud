@@ -93,11 +93,15 @@ describe('PrStateChip tone color', () => {
     const renderer = renderChip(args);
 
     const iconNode = renderer.root.find(
-      node => node.type === 'GitMerge' || node.type === 'GitPullRequest'
+      node =>
+        typeof node.type === 'string' &&
+        ((node.type as string) === 'GitMerge' || (node.type as string) === 'GitPullRequest')
     );
     expect(iconNode.props.color).toBe(lightColors[token]);
 
-    const textNode = renderer.root.find(node => node.type === 'Text');
+    const textNode = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'Text'
+    );
     expect(textNode.props.className).toContain(toneClass);
 
     renderer.unmount();

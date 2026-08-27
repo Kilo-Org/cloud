@@ -427,7 +427,7 @@ function MarkdownTableBody({
 // passes in, so the constructor never needs to know them.
 // The export keeps the body table semantics testable without mounting the modal.
 export class MarkdownTableBodyRenderer extends MarkdownRenderer {
-  private readonly palette: MarkdownPalette;
+  private readonly tablePalette: MarkdownPalette;
   private readonly columnWidth: number;
   private readonly columnCount: number;
 
@@ -443,7 +443,7 @@ export class MarkdownTableBodyRenderer extends MarkdownRenderer {
     }
   ) {
     super(palette, selectable, handlers);
-    this.palette = palette;
+    this.tablePalette = palette;
     this.columnWidth = columnWidth;
     this.columnCount = columnCount;
   }
@@ -465,12 +465,12 @@ export class MarkdownTableBodyRenderer extends MarkdownRenderer {
         className="self-start overflow-hidden rounded-md border"
         // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant colors
         style={{
-          borderColor: this.palette.borderColor,
-          backgroundColor: this.palette.surfaceColor,
+          borderColor: this.tablePalette.borderColor,
+          backgroundColor: this.tablePalette.surfaceColor,
         }}
       >
         <TableRow
-          palette={this.palette}
+          palette={this.tablePalette}
           cells={header}
           columnCount={this.columnCount}
           columnWidth={this.columnWidth}
@@ -481,7 +481,7 @@ export class MarkdownTableBodyRenderer extends MarkdownRenderer {
         {rows.map((row, rowIdx) => (
           <TableRow
             key={rowIdx}
-            palette={this.palette}
+            palette={this.tablePalette}
             cells={row}
             columnCount={this.columnCount}
             columnWidth={this.columnWidth}

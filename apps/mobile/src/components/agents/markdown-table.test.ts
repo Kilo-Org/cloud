@@ -262,7 +262,10 @@ function renderTable(overrides: Partial<typeof defaultProps> = {}): TestRenderer
 
 function chipNode(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
   const chip = renderer.root.findAll(
-    node => node.type === 'Pressable' && node.props.testID === 'md-table-0'
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Pressable' &&
+      node.props.testID === 'md-table-0'
   );
   expect(chip).toHaveLength(1);
   const first = chip[0];
@@ -274,7 +277,10 @@ function chipNode(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactT
 
 function closeNode(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
   const close = renderer.root.findAll(
-    node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Close table'
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Pressable' &&
+      node.props.accessibilityLabel === 'Close table'
   );
   expect(close).toHaveLength(1);
   const first = close[0];
@@ -301,10 +307,17 @@ describe('MarkdownTable closed tree', () => {
     const renderer = renderTable();
 
     expect(chipNode(renderer)).toBeTruthy();
-    expect(renderer.root.findAll(node => node.type === 'Modal')).toHaveLength(0);
     expect(
       renderer.root.findAll(
-        node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Close table'
+        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
+      )
+    ).toHaveLength(0);
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'Pressable' &&
+          node.props.accessibilityLabel === 'Close table'
       )
     ).toHaveLength(0);
   });
@@ -320,7 +333,10 @@ describe('MarkdownTable closed tree', () => {
     const renderer = renderTable();
     expect(
       renderer.root.findAll(
-        node => node.type === 'Text' && node.props.children === '1 column · 1 row'
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'Text' &&
+          node.props.children === '1 column · 1 row'
       )
     ).toHaveLength(1);
   });
@@ -329,7 +345,10 @@ describe('MarkdownTable closed tree', () => {
     const renderer = renderTable({ columnCount: 2, rowCount: 3 });
     expect(
       renderer.root.findAll(
-        node => node.type === 'Text' && node.props.children === '2 columns · 3 rows'
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'Text' &&
+          node.props.children === '2 columns · 3 rows'
       )
     ).toHaveLength(1);
   });
@@ -348,9 +367,16 @@ describe('MarkdownTable open path', () => {
     const renderer = renderTable();
     openTable(renderer);
 
-    expect(renderer.root.findAll(node => node.type === 'Modal')).toHaveLength(1);
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
+      )
+    ).toHaveLength(1);
     const title = renderer.root.findAll(
-      node => node.type === 'Text' && node.props.accessibilityRole === 'header'
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.accessibilityRole === 'header'
     );
     expect(title).toHaveLength(1);
     expect(title[0]?.props.children).toBe('Table');
@@ -365,7 +391,11 @@ describe('MarkdownTable open path', () => {
     ]);
     const renderer = renderTable();
     openTable(renderer);
-    expect(renderer.root.findAll(node => node.type === 'Modal')).toHaveLength(1);
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
+      )
+    ).toHaveLength(1);
 
     act(() => {
       renderer.update(
@@ -376,7 +406,11 @@ describe('MarkdownTable open path', () => {
       );
     });
 
-    expect(renderer.root.findAll(node => node.type === 'Modal')).toHaveLength(1);
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
+      )
+    ).toHaveLength(1);
     expect(useMarkdown).toHaveBeenLastCalledWith(
       '| Column 2 |\n| --- |\n| Row 2 |',
       expect.anything()
@@ -387,7 +421,9 @@ describe('MarkdownTable open path', () => {
     const renderer = renderTable({ rowCount: 0 });
     openTable(renderer);
 
-    const status = renderer.root.findAll(node => node.type === 'AccessibleStatus');
+    const status = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'AccessibleStatus'
+    );
     expect(status).toHaveLength(1);
     expect(status[0]?.props.message).toBe('This table has no rows.');
     expect(closeNode(renderer)).toBeTruthy();
@@ -397,15 +433,25 @@ describe('MarkdownTable open path', () => {
     const renderer = renderTable({ rowCount: 2 });
     openTable(renderer);
 
-    expect(renderer.root.findAll(node => node.type === 'ActivityIndicator')).toHaveLength(1);
-    const status = renderer.root.findAll(node => node.type === 'AccessibleStatus');
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'ActivityIndicator'
+      )
+    ).toHaveLength(1);
+    const status = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'AccessibleStatus'
+    );
     expect(status).toHaveLength(1);
     expect(status[0]?.props.message).toBe('Loading table');
 
     act(() => {
       (closeNode(renderer).props.onPress as (() => void) | undefined)?.();
     });
-    expect(renderer.root.findAll(node => node.type === 'Modal')).toHaveLength(0);
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
+      )
+    ).toHaveLength(0);
   });
 
   it('close button is a button with accessibilityLabel "Close table"', () => {
@@ -427,11 +473,13 @@ describe('MarkdownTable open path', () => {
     const renderer = renderTable();
     openTable(renderer);
 
-    const modal = renderer.root.findAll(node => node.type === 'Modal')[0];
+    const modal = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Modal'
+    )[0];
     expect(modal).toBeTruthy();
     expect(moveA11yFocus).not.toHaveBeenCalled();
     act(() => {
-      (modal.props.onShow as (() => void) | undefined)?.();
+      (modal?.props.onShow as (() => void) | undefined)?.();
     });
     expect(moveA11yFocus).toHaveBeenCalled();
   });
@@ -462,7 +510,10 @@ describe('MarkdownTable close button', () => {
     const renderer = renderTable();
     expect(
       renderer.root.findAll(
-        node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Close table'
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'Pressable' &&
+          node.props.accessibilityLabel === 'Close table'
       )
     ).toHaveLength(0);
   });
@@ -574,9 +625,14 @@ describe('MarkdownTable table semantics', () => {
     openTable(renderer);
 
     const title = renderer.root.findAll(
-      node => node.type === 'Text' && node.props.accessibilityRole === 'header'
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.accessibilityRole === 'header'
     );
-    const modal = renderer.root.findAll(node => node.type === 'Modal')[0];
+    const modal = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Modal'
+    )[0];
     const onShow = modal?.props.onShow as (() => void) | undefined;
 
     expect(title[0]?.props.children).toBe('Table');

@@ -231,6 +231,60 @@ describe('GlanceablePublisher', () => {
     publisher.dispose();
   });
 
+  it('cancels a pending coalesced emit on a fetch error', () => {
+    vi.useFakeTimers();
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    publisher.handleSessions([{ status: 'busy' }, { status: 'busy' }], PUB_CTX);
+    publisher.handleFetchError(PUB_CTX);
+    vi.advanceTimersByTime(1000);
+    // The pre-error happy emit must not fire after the stale republish.
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+    expect(lastSnapshot(calls, 'publish').status).toBe('stale');
+    publisher.dispose();
+  });
+
+  it('does not apply a snapshot after a terminal blank', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({
+      sinks: [sink],
+      now: () => NOW,
+      terminalBlankEpoch: getTerminalBlankEpoch,
+    });
+    writeSignedOutSnapshotAndEnd();
+    publisher.applySnapshot(snapshotFor([{ status: 'busy' }], NOW), PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(0);
+    expect(count(calls, 'publish')).toBe(0);
+    publisher.dispose();
+  });
+
+  it('cancels a pending coalesced emit when a newer snapshot applies', () => {
+    vi.useFakeTimers();
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    publisher.handleSessions([{ status: 'busy' }, { status: 'busy' }], PUB_CTX);
+    publisher.applySnapshot(snapshotFor([{ status: 'busy' }], NOW + 1, 2), PUB_CTX);
+    vi.advanceTimersByTime(1000);
+    // Only the applied snapshot emits; the older coalesced happy update must not.
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    expect(lastSnapshot(calls, 'startOrUpdate').running).toBe(1);
+    publisher.dispose();
+  });
+
+  it('cancels a pending terminal when a newer snapshot applies', () => {
+    vi.useFakeTimers();
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    publisher.handleSessions([{ status: 'idle' }], PUB_CTX);
+    publisher.applySnapshot(snapshotFor([{ status: 'busy' }], NOW + 1, 1), PUB_CTX);
+    vi.advanceTimersByTime(8000);
+    expect(count(calls, 'endImmediate')).toBe(0);
+    publisher.dispose();
+  });
+
   it('keeps the revision monotonic when seeded from an initial snapshot', () => {
     const { sink, calls } = makeSink();
     // Seeded with revision 42; the next snapshot must be 43.

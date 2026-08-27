@@ -7,7 +7,7 @@
 
 import { db } from '@/lib/drizzle';
 import { auto_fix_tickets } from '@kilocode/db/schema';
-import { eq, and, desc, count, or } from 'drizzle-orm';
+import { eq, and, desc, count, or, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { AUTO_FIX_CONSTANTS } from '../core/schemas';
 import type {
@@ -340,12 +340,16 @@ export async function countFixTickets(params: {
  * Resets a failed fix ticket for retry
  * Clears status back to 'pending' and removes error/session data
  */
-export async function resetFixTicketForRetry(ticketId: string): Promise<void> {
+export async function resetFixTicketForRetry(
+  ticketId: string,
+  platformIntegrationId: string
+): Promise<boolean> {
   try {
-    await db
+    const resetTickets = await db
       .update(auto_fix_tickets)
       .set({
         status: 'pending',
+        platform_integration_id: platformIntegrationId,
         session_id: null,
         cli_session_id: null,
         error_message: null,
@@ -353,7 +357,17 @@ export async function resetFixTicketForRetry(ticketId: string): Promise<void> {
         completed_at: null,
         updated_at: new Date().toISOString(),
       })
-      .where(eq(auto_fix_tickets.id, ticketId));
+      .where(
+        and(
+          eq(auto_fix_tickets.id, ticketId),
+          or(
+            isNull(auto_fix_tickets.platform_integration_id),
+            eq(auto_fix_tickets.platform_integration_id, platformIntegrationId)
+          )
+        )
+      )
+      .returning({ id: auto_fix_tickets.id });
+    return resetTickets.length === 1;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'resetFixTicketForRetry' },

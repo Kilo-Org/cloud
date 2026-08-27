@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { NextRequest } from 'next/server';
 import type * as fixTicketsModule from '@/lib/auto-fix/db/fix-tickets';
+import type * as resolveIntegrationModule from '@/lib/auto-fix/github/resolve-integration';
+import type * as githubAdapterModule from '@/lib/integrations/platforms/github/adapter';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 
 const mockGetFixTicketBySessionId = jest.fn() as jest.MockedFunction<
@@ -12,8 +15,12 @@ const mockUpdateFixTicketStatus = jest.fn() as jest.MockedFunction<
 const mockTryDispatchPendingFixes = jest.fn();
 const mockGetBotUserId = jest.fn();
 const mockPostIssueComment = jest.fn();
-const mockGenerateGitHubInstallationToken = jest.fn();
-const mockGetIntegrationById = jest.fn();
+const mockGenerateGitHubInstallationToken = jest.fn() as jest.MockedFunction<
+  typeof githubAdapterModule.generateGitHubInstallationToken
+>;
+const mockResolveAutoFixGitHubIntegration = jest.fn() as jest.MockedFunction<
+  typeof resolveIntegrationModule.resolveAutoFixGitHubIntegration
+>;
 const mockHandleCommentReply = jest.fn();
 const mockHandleCreateIssuePR = jest.fn();
 
@@ -42,8 +49,8 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   generateGitHubInstallationToken: mockGenerateGitHubInstallationToken,
 }));
 
-jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  getIntegrationById: mockGetIntegrationById,
+jest.mock('@/lib/auto-fix/github/resolve-integration', () => ({
+  resolveAutoFixGitHubIntegration: mockResolveAutoFixGitHubIntegration,
 }));
 
 jest.mock('@/lib/auto-fix/github/handle-comment-reply', () => ({
@@ -176,5 +183,52 @@ describe('POST /api/internal/auto-fix/pr-callback', () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ error: 'Ticket ID mismatch' });
+  });
+
+  it('uses the ticket-pinned installation and app type for failure callbacks', async () => {
+    const callbackToken = await deriveCallbackToken({
+      secret: CALLBACK_SECRET,
+      scope: 'auto-fix-pr-callback',
+      resourceParts: [TICKET_ID],
+    });
+    mockGetFixTicketBySessionId.mockResolvedValue({
+      id: TICKET_ID,
+      status: 'running',
+      review_comment_id: null,
+      trigger_source: 'label',
+      platform_integration_id: 'integration-lite',
+      owned_by_organization_id: null,
+      owned_by_user_id: 'user-1',
+      repo_full_name: 'acme/widgets',
+      issue_number: 7,
+    } as Awaited<ReturnType<typeof mockGetFixTicketBySessionId>>);
+    mockResolveAutoFixGitHubIntegration.mockResolvedValue({
+      success: true,
+      integration: {
+        id: 'integration-lite',
+        platform_installation_id: 'installation-lite',
+        github_app_type: 'lite',
+      } as PlatformIntegration,
+    });
+    mockGenerateGitHubInstallationToken.mockResolvedValue({
+      token: 'lite-token',
+      expires_at: '2026-08-27T12:00:00.000Z',
+    });
+
+    const response = await POST(
+      makeRequest(
+        { sessionId: SESSION_ID, status: 'failed', errorMessage: 'execution failed' },
+        { ticketId: TICKET_ID, callbackToken }
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockResolveAutoFixGitHubIntegration).toHaveBeenCalledWith(
+      expect.objectContaining({ platform_integration_id: 'integration-lite' })
+    );
+    expect(mockGenerateGitHubInstallationToken).toHaveBeenCalledWith('installation-lite', 'lite');
+    expect(mockPostIssueComment).toHaveBeenCalledWith(
+      expect.objectContaining({ githubToken: 'lite-token' })
+    );
   });
 });

@@ -12,9 +12,9 @@ import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
-import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { AutoFixAgentConfigSchema } from '@/lib/auto-fix/core/schemas';
 import type { Owner } from '@/lib/auto-fix/core/schemas';
+import { resolveAutoFixGitHubIntegration } from './resolve-integration';
 
 type GetFixConfigResult =
   | {
@@ -45,30 +45,39 @@ export async function getFixConfig(ticketId: string): Promise<GetFixConfigResult
     return { ok: false, error: 'Ticket not found', status: 404 };
   }
 
-  let githubToken: string | undefined;
+  const integrationResult = await resolveAutoFixGitHubIntegration(ticket);
+  if (!integrationResult.success) {
+    const error =
+      integrationResult.reason === 'ambiguous_installation'
+        ? 'Multiple GitHub installations can access this repository'
+        : 'GitHub installation not found for this ticket';
+    return {
+      ok: false,
+      error,
+      status: integrationResult.reason === 'ambiguous_installation' ? 409 : 404,
+    };
+  }
 
-  if (ticket.platform_integration_id) {
-    try {
-      const integration = await getIntegrationById(ticket.platform_integration_id);
+  const integration = integrationResult.integration;
+  const installationId = integration.platform_installation_id;
+  if (!installationId) {
+    return { ok: false, error: 'GitHub installation not found for this ticket', status: 404 };
+  }
 
-      if (integration?.platform_installation_id) {
-        const tokenData = await generateGitHubInstallationToken(
-          integration.platform_installation_id
-        );
-        githubToken = tokenData.token;
-
-        logExceptInTest('[auto-fix-config] GitHub token obtained', {
-          ticketId,
-          hasToken: !!githubToken,
-        });
-      }
-    } catch (authError) {
-      errorExceptInTest('[auto-fix-config] Failed to get GitHub token:', authError);
-      captureException(authError, {
-        tags: { operation: 'auto-fix-config', step: 'get-github-token' },
-        extra: { ticketId, platformIntegrationId: ticket.platform_integration_id },
-      });
-    }
+  let githubToken: string;
+  try {
+    const tokenData = await generateGitHubInstallationToken(
+      installationId,
+      integration.github_app_type ?? 'standard'
+    );
+    githubToken = tokenData.token;
+  } catch (authError) {
+    errorExceptInTest('[auto-fix-config] Failed to get GitHub token:', authError);
+    captureException(authError, {
+      tags: { operation: 'auto-fix-config', step: 'get-github-token' },
+      extra: { ticketId, platformIntegrationId: integration.id },
+    });
+    return { ok: false, error: 'Failed to authenticate with GitHub', status: 500 };
   }
 
   if (!ticket.owned_by_organization_id && !ticket.owned_by_user_id) {

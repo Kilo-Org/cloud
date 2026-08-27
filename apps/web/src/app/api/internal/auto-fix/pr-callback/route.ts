@@ -31,7 +31,7 @@ import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { postIssueComment } from '@/lib/auto-fix/github/post-comment';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
-import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { resolveAutoFixGitHubIntegration } from '@/lib/auto-fix/github/resolve-integration';
 import {
   handleCommentReply,
   sanitizePublicErrorMessage,
@@ -206,12 +206,13 @@ export async function POST(req: NextRequest) {
       // Review-comment-triggered tickets are notified on their original review thread.
       if (!isReviewCommentTrigger) {
         try {
-          if (ticket.platform_integration_id) {
-            const integration = await getIntegrationById(ticket.platform_integration_id);
-
-            if (integration?.platform_installation_id) {
+          const integrationResult = await resolveAutoFixGitHubIntegration(ticket);
+          if (integrationResult.success) {
+            const integration = integrationResult.integration;
+            if (integration.platform_installation_id) {
               const tokenData = await generateGitHubInstallationToken(
-                integration.platform_installation_id
+                integration.platform_installation_id,
+                integration.github_app_type ?? 'standard'
               );
 
               await postIssueComment({

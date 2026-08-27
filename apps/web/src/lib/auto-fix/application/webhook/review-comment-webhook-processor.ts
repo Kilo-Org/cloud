@@ -52,11 +52,12 @@ export class ReviewCommentWebhookProcessor {
     payload: PullRequestReviewCommentPayload,
     integration: PlatformIntegration
   ): Promise<void> {
-    const { comment, pull_request, repository, installation } = payload;
-    const installationId = installation.id.toString();
+    const { comment, pull_request, repository } = payload;
+    const installationId = integration.platform_installation_id;
+    const appType = integration.github_app_type ?? 'standard';
     const [repoOwner, repoName] = repository.full_name.split('/');
 
-    if (!repoOwner || !repoName) {
+    if (!repoOwner || !repoName || !installationId) {
       errorExceptInTest(
         '[ReviewCommentWebhookProcessor] Malformed repository.full_name, cannot proceed',
         { fullName: repository.full_name }
@@ -108,7 +109,8 @@ export class ReviewCommentWebhookProcessor {
         installationId,
         repoOwner,
         repoName,
-        comment.user.login
+        comment.user.login,
+        appType
       );
 
       if (!permission || !WRITE_PERMISSION_LEVELS.has(permission)) {
@@ -120,7 +122,14 @@ export class ReviewCommentWebhookProcessor {
         });
         // Add thumbs-down reaction to indicate permission denied
         try {
-          await addReactionToPRReviewComment(installationId, repoOwner, repoName, comment.id, '-1');
+          await addReactionToPRReviewComment(
+            installationId,
+            repoOwner,
+            repoName,
+            comment.id,
+            '-1',
+            appType
+          );
         } catch {
           // Best-effort reaction
         }
@@ -209,6 +218,18 @@ export class ReviewCommentWebhookProcessor {
       comment.id
     );
 
+    if (
+      existingTicket?.platform_integration_id &&
+      existingTicket.platform_integration_id !== integration.id
+    ) {
+      logExceptInTest('[ReviewCommentWebhookProcessor] Ignoring sibling installation retry', {
+        ticketId: existingTicket.id,
+        ticketIntegrationId: existingTicket.platform_integration_id,
+        deliveringIntegrationId: integration.id,
+      });
+      return;
+    }
+
     // 8. Resolve dispatch owner (org bot user or personal owner)
     let dispatchOwner: Owner;
     if (owner.type === 'org') {
@@ -224,7 +245,8 @@ export class ReviewCommentWebhookProcessor {
             repoOwner,
             repoName,
             comment.id,
-            'confused'
+            'confused',
+            appType
           );
         } catch {
           // Best-effort reaction
@@ -252,7 +274,14 @@ export class ReviewCommentWebhookProcessor {
           }
         );
         try {
-          await addReactionToPRReviewComment(installationId, repoOwner, repoName, comment.id, '+1');
+          await addReactionToPRReviewComment(
+            installationId,
+            repoOwner,
+            repoName,
+            comment.id,
+            '+1',
+            appType
+          );
         } catch {
           // Best-effort reaction
         }
@@ -266,7 +295,14 @@ export class ReviewCommentWebhookProcessor {
       });
 
       try {
-        await resetFixTicketForRetry(existingTicket.id);
+        const reset = await resetFixTicketForRetry(existingTicket.id, integration.id);
+        if (!reset) {
+          logExceptInTest('[ReviewCommentWebhookProcessor] Sibling installation won retry pin', {
+            ticketId: existingTicket.id,
+            deliveringIntegrationId: integration.id,
+          });
+          return;
+        }
 
         try {
           await addReactionToPRReviewComment(
@@ -274,7 +310,8 @@ export class ReviewCommentWebhookProcessor {
             repoOwner,
             repoName,
             comment.id,
-            'eyes'
+            'eyes',
+            appType
           );
         } catch (reactionError) {
           errorExceptInTest(
@@ -302,7 +339,8 @@ export class ReviewCommentWebhookProcessor {
             repoOwner,
             repoName,
             comment.id,
-            'confused'
+            'confused',
+            appType
           );
         } catch {
           // Best-effort reaction
@@ -314,7 +352,14 @@ export class ReviewCommentWebhookProcessor {
 
     // 10. Add eyes reaction to acknowledge the mention
     try {
-      await addReactionToPRReviewComment(installationId, repoOwner, repoName, comment.id, 'eyes');
+      await addReactionToPRReviewComment(
+        installationId,
+        repoOwner,
+        repoName,
+        comment.id,
+        'eyes',
+        appType
+      );
     } catch (reactionError) {
       errorExceptInTest(
         '[ReviewCommentWebhookProcessor] Failed to add eyes reaction:',
@@ -372,7 +417,8 @@ export class ReviewCommentWebhookProcessor {
           repoOwner,
           repoName,
           comment.id,
-          'confused'
+          'confused',
+          appType
         );
       } catch {
         // Best-effort reaction

@@ -42,6 +42,8 @@ import {
   upsertAgentConfigForOwner,
 } from '@/lib/agent-config/db/agent-configs';
 import { tryDispatchPendingFixes } from '@/lib/auto-fix/dispatch/dispatch-pending-fixes';
+import { getBotUserId } from '@/lib/bot-users/bot-user-service';
+import { resolveAutoFixGitHubIntegration } from '@/lib/auto-fix/github/resolve-integration';
 
 export const autoFixRouter = createTRPCRouter({
   /**
@@ -230,20 +232,47 @@ export const autoFixRouter = createTRPCRouter({
       }
 
       // Determine owner for dispatch
-      const owner: Owner = ticket.owned_by_organization_id
-        ? {
-            type: 'org',
-            id: ticket.owned_by_organization_id,
-            userId: ctx.user.id,
-          }
-        : {
-            type: 'user',
-            id: ticket.owned_by_user_id || ctx.user.id,
-            userId: ctx.user.id,
-          };
+      let owner: Owner;
+      if (ticket.owned_by_organization_id) {
+        const botUserId = await getBotUserId(ticket.owned_by_organization_id, 'auto-fix');
+        if (!botUserId) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'Auto Fix bot user is not configured for this organization',
+          });
+        }
+        owner = {
+          type: 'org',
+          id: ticket.owned_by_organization_id,
+          userId: botUserId,
+        };
+      } else {
+        owner = {
+          type: 'user',
+          id: ticket.owned_by_user_id || ctx.user.id,
+          userId: ctx.user.id,
+        };
+      }
+
+      const integrationResult = await resolveAutoFixGitHubIntegration(ticket);
+      if (!integrationResult.success) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            integrationResult.reason === 'ambiguous_installation'
+              ? 'Multiple GitHub installations can access this repository'
+              : 'The GitHub installation for this fix is unavailable',
+        });
+      }
 
       // Reset the ticket for retry
-      await resetFixTicketForRetry(input.ticketId);
+      const reset = await resetFixTicketForRetry(input.ticketId, integrationResult.integration.id);
+      if (!reset) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'The GitHub installation for this fix changed during retry',
+        });
+      }
 
       // Trigger dispatch to process pending tickets
       await tryDispatchPendingFixes(owner);

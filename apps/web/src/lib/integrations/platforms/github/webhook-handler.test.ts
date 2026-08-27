@@ -8,6 +8,7 @@ const mockGetIntegrationForOrganization = jest.fn();
 const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
 const mockHandlePullRequest = jest.fn();
+const mockHandleIssue = jest.fn();
 const mockHandlePRReviewComment = jest.fn();
 const mockHandleGitHubReviewCommentReply = jest.fn();
 const mockHandleInstallationTargetRenamed = jest.fn();
@@ -55,7 +56,8 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
     mockHandleInstallationUnsuspend(payload, appType),
   handleInstallationTargetRenamed: (payload: unknown, integrationId: string, appType: string) =>
     mockHandleInstallationTargetRenamed(payload, integrationId, appType),
-  handleIssue: jest.fn(),
+  handleIssue: (payload: unknown, platformIntegration: unknown) =>
+    mockHandleIssue(payload, platformIntegration),
   handlePRReviewComment: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePRReviewComment(payload, platformIntegration),
   handlePullRequest: (payload: unknown, platformIntegration: unknown) =>
@@ -184,6 +186,30 @@ function issueCommentPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function issuePayload(action: string) {
+  return {
+    action,
+    installation: { id: 98765 },
+    repository: {
+      id: 123,
+      name: 'widgets',
+      full_name: 'acme/widgets',
+      private: true,
+      owner: { login: 'acme' },
+    },
+    issue: {
+      number: 7,
+      html_url: 'https://github.com/acme/widgets/issues/7',
+      title: 'Broken widget',
+      body: 'Please fix it',
+      user: { login: 'alice' },
+      labels: [{ name: 'kilo-auto-fix' }],
+    },
+    label: { name: 'kilo-auto-fix' },
+    sender: { login: 'alice' },
+  };
+}
+
 async function waitForAfterTask() {
   await new Promise(resolve => setTimeout(resolve, 0));
 }
@@ -197,6 +223,7 @@ describe('handleGitHubWebhook', () => {
     mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: false });
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
+    mockHandleIssue.mockResolvedValue(Response.json({ message: 'fix queued' }));
     mockHandlePRReviewComment.mockResolvedValue(undefined);
     mockHandleGitHubReviewCommentReply.mockResolvedValue({
       recorded: false,
@@ -354,6 +381,45 @@ describe('handleGitHubWebhook', () => {
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
       expect.objectContaining({ handlers_triggered: ['pr_review_comment_fix'] })
+    );
+  });
+
+  it('allows only Auto Fix review comments through a secondary installation', async () => {
+    mockGetIntegrationForOrganization.mockResolvedValue({ ...integration, id: 'primary' });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+    expect(mockHandlePRReviewComment).toHaveBeenCalledWith(expect.anything(), integration);
+    expect(mockHandleGitHubReviewCommentReply).not.toHaveBeenCalled();
+  });
+
+  it('allows labeled Auto Fix issues but suppresses other issues on a secondary installation', async () => {
+    mockGetIntegrationForOrganization.mockResolvedValue({ ...integration, id: 'primary' });
+
+    const labeledResponse = await handleGitHubWebhook(
+      signedGitHubRequest('issues', issuePayload('labeled')),
+      'standard'
+    );
+    const openedResponse = await handleGitHubWebhook(
+      signedGitHubRequest('issues', issuePayload('opened')),
+      'standard'
+    );
+
+    expect(labeledResponse.status).toBe(200);
+    expect(openedResponse.status).toBe(200);
+    expect(mockHandleIssue).toHaveBeenCalledTimes(1);
+    expect(mockHandleIssue).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'labeled' }),
+      integration
+    );
+    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
+      'we_1',
+      expect.objectContaining({ handlers_triggered: ['auto_fix'] })
     );
   });
 

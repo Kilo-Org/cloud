@@ -16,7 +16,11 @@ import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { PullRequestReviewCommentPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 
 const mockGetAgentConfigForOwner = jest.fn();
+const mockCreateFixTicket = jest.fn();
 const mockFindExistingReviewCommentFixTicket = jest.fn();
+const mockResetFixTicketForRetry = jest.fn();
+const mockTryDispatchPendingFixes = jest.fn();
+const mockGetBotUserId = jest.fn();
 const mockParseFixCommand = jest.fn();
 const mockAddReactionToPRReviewComment = jest.fn().mockResolvedValue(undefined);
 const mockGetCollaboratorPermissionLevel = jest.fn();
@@ -27,18 +31,18 @@ jest.mock('@/lib/agent-config/db/agent-configs', () => ({
 }));
 
 jest.mock('../../db/fix-tickets', () => ({
-  createFixTicket: jest.fn(),
+  createFixTicket: (...args: unknown[]) => mockCreateFixTicket(...args),
   findExistingReviewCommentFixTicket: (...args: unknown[]) =>
     mockFindExistingReviewCommentFixTicket(...args),
-  resetFixTicketForRetry: jest.fn(),
+  resetFixTicketForRetry: (...args: unknown[]) => mockResetFixTicketForRetry(...args),
 }));
 
 jest.mock('../../dispatch/dispatch-pending-fixes', () => ({
-  tryDispatchPendingFixes: jest.fn().mockResolvedValue(undefined),
+  tryDispatchPendingFixes: (...args: unknown[]) => mockTryDispatchPendingFixes(...args),
 }));
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
-  getBotUserId: jest.fn(),
+  getBotUserId: (...args: unknown[]) => mockGetBotUserId(...args),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -102,8 +106,28 @@ const integration = {
   id: 'integration-1',
   owned_by_user_id: 'user-1',
   owned_by_organization_id: null,
+  platform_installation_id: 'installation-1',
   github_app_type: 'standard',
 } as unknown as PlatformIntegration;
+
+const enabledConfig = {
+  is_enabled: true,
+  config: {
+    enabled_for_issues: true,
+    enabled_for_review_comments: true,
+    repository_selection_mode: 'all',
+    selected_repository_ids: [],
+    skip_labels: [],
+    required_labels: [],
+    model_slug: 'anthropic/claude-sonnet-4.5',
+    custom_instructions: null,
+    pr_title_template: 'Fix #{issue_number}: {issue_title}',
+    pr_body_template: null,
+    pr_base_branch: 'main',
+    max_pr_creation_time_minutes: 15,
+    max_concurrent_per_owner: 3,
+  },
+};
 
 describe('ReviewCommentWebhookProcessor admission', () => {
   let processor: ReviewCommentWebhookProcessor;
@@ -112,6 +136,10 @@ describe('ReviewCommentWebhookProcessor admission', () => {
     jest.clearAllMocks();
     // Default: comments are authored by humans, so admission proceeds.
     mockIsLikelyKiloBotActor.mockReturnValue(false);
+    mockFindExistingReviewCommentFixTicket.mockResolvedValue(null);
+    mockResetFixTicketForRetry.mockResolvedValue(true);
+    mockTryDispatchPendingFixes.mockResolvedValue(undefined);
+    mockCreateFixTicket.mockResolvedValue('ticket-1');
     processor = new ReviewCommentWebhookProcessor();
   });
 
@@ -185,5 +213,78 @@ describe('ReviewCommentWebhookProcessor admission', () => {
     expect(mockGetCollaboratorPermissionLevel).not.toHaveBeenCalled();
     expect(mockAddReactionToPRReviewComment).not.toHaveBeenCalled();
     expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
+  });
+
+  it('pins a new ticket and GitHub operations to the delivering integration row', async () => {
+    const liteIntegration = {
+      ...integration,
+      id: 'integration-lite',
+      platform_installation_id: 'installation-lite',
+      github_app_type: 'lite',
+    } as PlatformIntegration;
+    mockParseFixCommand.mockReturnValue(true);
+    mockGetAgentConfigForOwner.mockResolvedValue(enabledConfig);
+
+    await processor.process(buildPayload('@kilo fix'), liteIntegration);
+
+    expect(mockCreateFixTicket).toHaveBeenCalledWith(
+      expect.objectContaining({ platformIntegrationId: 'integration-lite' })
+    );
+    expect(mockAddReactionToPRReviewComment).toHaveBeenCalledWith(
+      'installation-lite',
+      'acme',
+      'widgets',
+      1,
+      'eyes',
+      'lite'
+    );
+  });
+
+  it('pins a legacy unpinned ticket when retrying from its delivering integration', async () => {
+    mockParseFixCommand.mockReturnValue(true);
+    mockGetAgentConfigForOwner.mockResolvedValue(enabledConfig);
+    mockFindExistingReviewCommentFixTicket.mockResolvedValue({
+      id: 'ticket-existing',
+      status: 'failed',
+      platform_integration_id: null,
+    });
+
+    await processor.process(buildPayload('@kilo fix'), integration);
+
+    expect(mockResetFixTicketForRetry).toHaveBeenCalledWith('ticket-existing', 'integration-1');
+    expect(mockTryDispatchPendingFixes).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry or react through a sibling installation', async () => {
+    mockParseFixCommand.mockReturnValue(true);
+    mockGetAgentConfigForOwner.mockResolvedValue(enabledConfig);
+    mockFindExistingReviewCommentFixTicket.mockResolvedValue({
+      id: 'ticket-existing',
+      status: 'failed',
+      platform_integration_id: 'integration-sibling',
+    });
+
+    await processor.process(buildPayload('@kilo fix'), integration);
+
+    expect(mockResetFixTicketForRetry).not.toHaveBeenCalled();
+    expect(mockTryDispatchPendingFixes).not.toHaveBeenCalled();
+    expect(mockAddReactionToPRReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('does not react or dispatch when a sibling installation wins legacy pinning', async () => {
+    mockParseFixCommand.mockReturnValue(true);
+    mockGetAgentConfigForOwner.mockResolvedValue(enabledConfig);
+    mockFindExistingReviewCommentFixTicket.mockResolvedValue({
+      id: 'ticket-existing',
+      status: 'failed',
+      platform_integration_id: null,
+    });
+    mockResetFixTicketForRetry.mockResolvedValue(false);
+
+    await processor.process(buildPayload('@kilo fix'), integration);
+
+    expect(mockResetFixTicketForRetry).toHaveBeenCalledWith('ticket-existing', 'integration-1');
+    expect(mockTryDispatchPendingFixes).not.toHaveBeenCalled();
+    expect(mockAddReactionToPRReviewComment).not.toHaveBeenCalled();
   });
 });

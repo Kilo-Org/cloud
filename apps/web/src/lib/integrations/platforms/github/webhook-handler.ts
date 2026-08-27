@@ -466,7 +466,15 @@ export async function handleGitHubWebhook(
       ? await getIntegrationForOrganization(integration.owned_by_organization_id, PLATFORM.GITHUB)
       : integration;
     const isSecondaryOrganizationInstallation = primaryIntegration?.id !== integration.id;
-    if (isSecondaryOrganizationInstallation && eventType !== GITHUB_EVENT.PULL_REQUEST) {
+    const action = (payload as { action?: string }).action;
+    const isSecondaryAutoFixEvent =
+      (eventType === GITHUB_EVENT.ISSUES && action === GITHUB_ACTION.LABELED) ||
+      (eventType === GITHUB_EVENT.PULL_REQUEST_REVIEW_COMMENT && action === GITHUB_ACTION.CREATED);
+    if (
+      isSecondaryOrganizationInstallation &&
+      eventType !== GITHUB_EVENT.PULL_REQUEST &&
+      !isSecondaryAutoFixEvent
+    ) {
       logExceptInTest('Secondary GitHub installation event suppressed', {
         integration_id: integration.id,
         event_type: eventType,
@@ -694,12 +702,14 @@ export async function handleGitHubWebhook(
         try {
           await handlePRReviewComment(parseResult.data, integration);
           try {
-            const reviewMemoryResult = await handleGitHubReviewCommentReply({
-              payload: parseResult.data,
-              integration,
-              deliveryId: eventSignature,
-            });
-            if (reviewMemoryResult.recorded) handlersTriggered.push('review_memory_feedback');
+            if (!isSecondaryOrganizationInstallation) {
+              const reviewMemoryResult = await handleGitHubReviewCommentReply({
+                payload: parseResult.data,
+                integration,
+                deliveryId: eventSignature,
+              });
+              if (reviewMemoryResult.recorded) handlersTriggered.push('review_memory_feedback');
+            }
           } catch (error) {
             logExceptInTest(`Error handling review memory feedback${logSuffix}:`, error);
             captureException(error, {
@@ -772,7 +782,7 @@ export async function handleGitHubWebhook(
           await updateWebhookEvent(logResult.webhookEventId, {
             processed: true,
             processed_at: new Date().toISOString(),
-            handlers_triggered: ['auto_triage'],
+            handlers_triggered: [action === GITHUB_ACTION.LABELED ? 'auto_fix' : 'auto_triage'],
             errors: null,
           });
         } catch (error) {

@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   fetchAllDependabotAlerts,
   isFindingEligibleForAutoAnalysis,
   selectRepositoriesForSync,
   syncAutoAnalysisQueueForFinding,
   syncOwner,
+  upsertSecurityFinding,
+  type GitTokenForRepoResult,
 } from './sync.js';
 
 afterEach(() => {
@@ -14,8 +18,19 @@ afterEach(() => {
 
 type FakeDbOptions = {
   authInvalidAt?: string | null;
+  config?: Record<string, unknown>;
   repositories?: string[];
   runtimeState?: Record<string, unknown>;
+  integrations?: Array<{
+    id: string;
+    installationId: string;
+    appType?: 'standard' | 'lite';
+    status?: string;
+    suspendedAt?: string | null;
+    authInvalidAt?: string | null;
+    permissions?: Record<string, string>;
+    repositories: Array<{ id: number; fullName: string }>;
+  }>;
 };
 
 function createFakeDb(options: FakeDbOptions = {}) {
@@ -23,41 +38,64 @@ function createFakeDb(options: FakeDbOptions = {}) {
   const sets: Array<Record<string, unknown>> = [];
   let selectCount = 0;
 
+  const integrations = options.integrations?.map(integration => ({
+    id: integration.id,
+    platform_installation_id: integration.installationId,
+    permissions: integration.permissions ?? { vulnerability_alerts: 'read' },
+    repositories: integration.repositories.map(repository => ({
+      id: repository.id,
+      name: repository.fullName.split('/')[1] ?? repository.fullName,
+      full_name: repository.fullName,
+      private: true,
+    })),
+    authInvalidAt: integration.authInvalidAt ?? null,
+    integrationStatus: integration.status ?? 'active',
+    suspendedAt: integration.suspendedAt ?? null,
+    appType: integration.appType ?? 'standard',
+  })) ?? [
+    {
+      id: 'integration-1',
+      platform_installation_id: 'installation-1',
+      permissions: { vulnerability_alerts: 'read' },
+      repositories: repositories.map((full_name, index) => ({
+        id: index + 1,
+        name: full_name.split('/')[1] ?? full_name,
+        full_name,
+        private: true,
+      })),
+      authInvalidAt: options.authInvalidAt ?? null,
+      integrationStatus: 'active',
+      suspendedAt: null,
+      appType: 'standard' as const,
+    },
+  ];
+
   const db = {
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          limit: async () => {
-            selectCount++;
-            if (selectCount === 1) {
-              return [
-                {
-                  id: 'agent-config',
-                  config: {},
-                  is_enabled: true,
-                  runtime_state: options.runtimeState ?? {},
-                },
-              ];
-            }
-            if (selectCount === 2) {
-              return [
-                {
-                  id: 'integration-1',
-                  platform_installation_id: 'installation-1',
-                  permissions: { vulnerability_alerts: 'read' },
-                  repositories: repositories.map((full_name, index) => ({
-                    id: index + 1,
-                    full_name,
-                  })),
-                  authInvalidAt: options.authInvalidAt ?? null,
-                },
-              ];
-            }
-            return [];
+    select: () => {
+      selectCount++;
+      const rows =
+        selectCount === 1
+          ? [
+              {
+                id: 'agent-config',
+                config: options.config ?? {},
+                is_enabled: true,
+                runtime_state: options.runtimeState ?? {},
+                created_by: 'user-1',
+              },
+            ]
+          : selectCount === 2
+            ? integrations
+            : [];
+      return {
+        from: () => ({
+          where: () => {
+            const query = Promise.resolve(rows);
+            return Object.assign(query, { limit: async () => rows });
           },
         }),
-      }),
-    }),
+      };
+    },
     update: () => ({
       set: (values: Record<string, unknown>) => {
         sets.push(values);
@@ -88,7 +126,17 @@ function runtimeStateSqlText(entry: Record<string, unknown>): string {
 }
 
 function createGitTokenService() {
-  return { getToken: vi.fn(async () => 'github-token') };
+  return {
+    getToken: vi.fn(async () => 'github-token'),
+    getTokenForRepo: vi.fn<
+      (params: {
+        githubRepo: string;
+        userId: string;
+        orgId?: string;
+        expectedIntegrationId?: string;
+      }) => Promise<GitTokenForRepoResult>
+    >(async () => ({ success: false, reason: 'repository_not_installed' })),
+  };
 }
 
 function stubFetch(response: Response | (() => Response)) {
@@ -149,6 +197,242 @@ describe('selectRepositoriesForSync', () => {
   });
 });
 
+describe('Worker GitHub repository integration planning', () => {
+  it('syncs repositories split across installations with each exact app type', async () => {
+    const { db } = createFakeDb({
+      integrations: [
+        {
+          id: 'integration-standard',
+          installationId: 'installation-standard',
+          repositories: [{ id: 1, fullName: 'acme/widgets' }],
+        },
+        {
+          id: 'integration-lite',
+          installationId: 'installation-lite',
+          appType: 'lite',
+          repositories: [{ id: 2, fullName: 'other/api' }],
+        },
+      ],
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(() => new Response(JSON.stringify([]), { status: 200 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        runId: 'run-split',
+      })
+    ).resolves.toMatchObject({ errors: 0, remainingRepoCount: 0 });
+
+    expect(gitTokenService.getToken).toHaveBeenNthCalledWith(
+      1,
+      'installation-standard',
+      'standard'
+    );
+    expect(gitTokenService.getToken).toHaveBeenNthCalledWith(2, 'installation-lite', 'lite');
+    expect(gitTokenService.getTokenForRepo).not.toHaveBeenCalled();
+    expect(fetchStub).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses a received exact plan instead of an ambiguous cached repository mapping', async () => {
+    const exactIntegrationId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const { db } = createFakeDb({
+      integrations: [
+        {
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          installationId: 'installation-standard',
+          repositories: [{ id: 1, fullName: 'acme/widgets' }],
+        },
+        {
+          id: exactIntegrationId,
+          installationId: 'installation-lite',
+          appType: 'lite',
+          repositories: [{ id: 1, fullName: 'ACME/WIDGETS' }],
+        },
+      ],
+    });
+    const gitTokenService = createGitTokenService();
+    stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { organizationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+      runId: 'run-exact-plan',
+      repoFullName: 'acme/widgets',
+      repositoryPlans: [
+        {
+          repoFullName: 'acme/widgets',
+          repositoryId: 1,
+          platformIntegrationId: exactIntegrationId,
+          installationId: 'installation-lite',
+          appType: 'lite',
+        },
+      ],
+    });
+
+    expect(gitTokenService.getToken).toHaveBeenCalledWith('installation-lite', 'lite');
+    expect(gitTokenService.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('uses authoritative Git Token Service resolution for an unpinned legacy repository', async () => {
+    const { db } = createFakeDb();
+    const gitTokenService = createGitTokenService();
+    gitTokenService.getTokenForRepo.mockResolvedValue({
+      success: true,
+      token: 'authoritative-token',
+      platformIntegrationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      installationId: 'installation-live',
+      accountLogin: 'renamed-owner',
+      appType: 'lite',
+    });
+    const fetchStub = stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      actor: { id: 'user-1' },
+      runId: 'run-legacy',
+      repoFullName: 'renamed-owner/legacy',
+    });
+
+    expect(gitTokenService.getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'renamed-owner/legacy',
+      userId: 'user-1',
+    });
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
+    expect(fetchStub).toHaveBeenCalledWith(
+      'https://api.github.com/repos/renamed-owner/legacy/dependabot/alerts?per_page=100',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer authoritative-token' }),
+      })
+    );
+  });
+
+  it('continues syncing a healthy sibling after another installation returns 401', async () => {
+    const { db } = createFakeDb({
+      integrations: [
+        {
+          id: 'integration-invalid',
+          installationId: 'installation-invalid',
+          repositories: [
+            { id: 1, fullName: 'acme/widgets' },
+            { id: 2, fullName: 'acme/website' },
+          ],
+        },
+        {
+          id: 'integration-healthy',
+          installationId: 'installation-healthy',
+          appType: 'lite',
+          repositories: [{ id: 3, fullName: 'other/api' }],
+        },
+      ],
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('Bad credentials', { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
+    vi.stubGlobal('fetch', fetchStub);
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        runId: 'run-partial-auth',
+      })
+    ).resolves.toMatchObject({
+      authInvalid: 2,
+      authInvalidRepos: ['acme/widgets', 'acme/website'],
+      reauthRequired: true,
+    });
+
+    expect(fetchStub).toHaveBeenCalledTimes(2);
+    expect(gitTokenService.getToken).toHaveBeenNthCalledWith(1, 'installation-invalid', 'standard');
+    expect(gitTokenService.getToken).toHaveBeenNthCalledWith(2, 'installation-healthy', 'lite');
+  });
+
+  it('does not prune a selected repository that exists only on a suspended sibling', async () => {
+    const { db, sets } = createFakeDb({
+      config: {
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [1, 2],
+      },
+      integrations: [
+        {
+          id: 'integration-suspended',
+          installationId: 'installation-suspended',
+          status: 'suspended',
+          suspendedAt: '2026-08-27T12:00:00.000Z',
+          repositories: [{ id: 1, fullName: 'old/private' }],
+        },
+        {
+          id: 'integration-healthy',
+          installationId: 'installation-healthy',
+          repositories: [{ id: 2, fullName: 'other/api' }],
+        },
+      ],
+    });
+    const gitTokenService = createGitTokenService();
+    stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      runId: 'run-suspended-sibling',
+    });
+
+    expect(gitTokenService.getToken).toHaveBeenCalledOnce();
+    expect(gitTokenService.getToken).toHaveBeenCalledWith('installation-healthy', 'standard');
+    expect(sets).not.toContainEqual(
+      expect.objectContaining({
+        config: expect.objectContaining({ selected_repository_ids: [2] }),
+      })
+    );
+  });
+
+  it('requests continuation when one installation fails auth before healthy siblings', async () => {
+    const { db } = createFakeDb({
+      integrations: [
+        {
+          id: 'integration-invalid',
+          installationId: 'installation-invalid',
+          repositories: [{ id: 1, fullName: 'acme/widgets' }],
+        },
+        {
+          id: 'integration-healthy',
+          installationId: 'installation-healthy',
+          repositories: [{ id: 2, fullName: 'other/api' }],
+        },
+      ],
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('Bad credentials', { status: 401 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        runId: 'run-auth-continuation',
+        budgetMs: 0,
+      })
+    ).resolves.toMatchObject({
+      authInvalid: 1,
+      reauthRequired: true,
+      exhaustedBudget: true,
+      remainingRepoCount: 1,
+    });
+
+    expect(fetchStub).toHaveBeenCalledOnce();
+  });
+});
+
 describe('Worker GitHub auth-invalid sync', () => {
   it('accepts Dependabot alerts with nullable advisory fields', async () => {
     const alert = createDependabotAlert({
@@ -177,7 +461,7 @@ describe('Worker GitHub auth-invalid sync', () => {
     });
   });
 
-  it('persists the first GitHub 401 and stops syncing remaining repos', async () => {
+  it('persists the first GitHub 401 and skips remaining repos on that installation', async () => {
     const { db, sets } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
     const gitTokenService = createGitTokenService();
     const fetchStub = stubFetch(new Response('Bad credentials', { status: 401 }));
@@ -190,8 +474,8 @@ describe('Worker GitHub auth-invalid sync', () => {
         runId: 'run-1',
       })
     ).resolves.toMatchObject({
-      authInvalid: 1,
-      authInvalidRepos: ['acme/widgets'],
+      authInvalid: 2,
+      authInvalidRepos: ['acme/widgets', 'acme/api'],
       reauthRequired: true,
       errors: 0,
     });
@@ -436,6 +720,59 @@ describe('Worker GitHub auth-invalid sync', () => {
         repo_full_name: 'acme/widgets',
       }),
     });
+  });
+
+  it('updates a finding integration when authoritative sync observes repository movement', async () => {
+    let upsertSql = '';
+    const execute = vi.fn<(query: SQL) => Promise<{ rows: unknown[] }>>(async query => {
+      upsertSql = new PgDialect().sqlToQuery(query).sql;
+      return {
+        rows: [
+          {
+            findingId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            wasInserted: false,
+            previousStatus: 'open',
+            previousSeverity: 'high',
+            effectiveStatus: 'open',
+            effectiveSeverity: 'high',
+            findingCreatedAt: '2026-05-18T10:00:00.000Z',
+            ownedByUserId: null,
+            ownedByOrganizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            source: 'dependabot',
+            sourceId: '23',
+            repoFullName: 'acme/widgets',
+            title: 'Prototype pollution in lodash',
+            packageName: 'lodash',
+            packageEcosystem: 'npm',
+            manifestPath: 'package.json',
+            patchedVersion: '4.17.21',
+            ghsaId: 'GHSA-1234-5678-90ab',
+            cveId: null,
+            cweIds: ['CWE-1321'],
+            cvssScore: '7.5',
+            dependabotHtmlUrl: 'https://github.com/acme/widgets/security/dependabot/23',
+            firstDetectedAt: '2026-05-18T10:00:00.000Z',
+            fixedAt: null,
+            slaDueAt: '2026-06-17T10:00:00.000Z',
+          },
+        ],
+      };
+    });
+
+    await expect(
+      upsertSecurityFinding({ execute } as never, {
+        finding: createDependabotAlert() as never,
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        platformIntegrationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        repoFullName: 'acme/widgets',
+        slaDueAt: '2026-06-17T10:00:00.000Z',
+      })
+    ).resolves.toMatchObject({ findingId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' });
+
+    expect(upsertSql).toContain('"platform_integration_id" = EXCLUDED."platform_integration_id"');
+    expect(upsertSql).toContain(
+      '"security_findings"."platform_integration_id" IS DISTINCT FROM EXCLUDED."platform_integration_id"'
+    );
   });
 
   it('does not let unsafe source snapshot values block finding sync', async () => {

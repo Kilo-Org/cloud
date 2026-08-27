@@ -164,6 +164,47 @@ type SecurityReviewOwner =
   | { organizationId: string; userId?: never }
   | { userId: string; organizationId?: never };
 
+type GitHubAppType = 'standard' | 'lite';
+
+export type RepositoryInstallationPlan = {
+  repoFullName: string;
+  repositoryId?: number;
+  platformIntegrationId: string;
+  installationId: string;
+  appType: GitHubAppType;
+};
+
+export type GitTokenForRepoResult =
+  | {
+      success: true;
+      token: string;
+      platformIntegrationId: string;
+      installationId: string;
+      accountLogin: string;
+      appType: GitHubAppType;
+    }
+  | {
+      success: false;
+      reason:
+        | 'database_not_configured'
+        | 'invalid_repo_format'
+        | 'no_installation_found'
+        | 'repository_not_installed'
+        | 'ambiguous_installation'
+        | 'temporarily_unavailable'
+        | 'invalid_org_id'
+        | 'integration_mismatch';
+    };
+
+type SecuritySyncGitTokenService = GitTokenService & {
+  getTokenForRepo?: (params: {
+    githubRepo: string;
+    userId: string;
+    orgId?: string;
+    expectedIntegrationId?: string;
+  }) => Promise<GitTokenForRepoResult>;
+};
+
 export const SECURITY_SYNC_OWNER_BUDGET_MS = 8 * 60 * 1000;
 
 const SyncRunProgressSchema = z.object({
@@ -176,6 +217,7 @@ const SyncRunProgressSchema = z.object({
   skipped: z.number().int().nonnegative(),
   authInvalid: z.number().int().nonnegative(),
   reauthRequired: z.boolean(),
+  commandResultCode: z.string().optional(),
 });
 
 type SyncRunProgress = z.infer<typeof SyncRunProgressSchema>;
@@ -235,6 +277,7 @@ function applySyncRunProgress(result: SyncResult, progress: SyncRunProgress): vo
   result.authInvalidRepos = [...progress.authInvalidRepos];
   result.reauthRequired = progress.reauthRequired;
   result.staleRepos = [...progress.staleRepos];
+  result.commandResultCode = progress.commandResultCode;
 }
 
 function toSyncRunProgress(
@@ -252,6 +295,7 @@ function toSyncRunProgress(
     skipped: result.skipped,
     authInvalid: result.authInvalid,
     reauthRequired: result.reauthRequired,
+    commandResultCode: result.commandResultCode,
   };
 }
 
@@ -355,25 +399,213 @@ function findingOwnerPartitionColumn(owner: SecurityReviewOwner) {
     : security_findings.owned_by_user_id;
 }
 
+type RepositorySyncPlan = {
+  repoFullName: string;
+  repositoryId?: number;
+  platformIntegrationId?: string;
+  installationId?: string;
+  appType?: GitHubAppType;
+  authInvalidAt: string | null;
+};
+
+type IntegrationCandidate = {
+  id: string;
+  platform_installation_id: string | null;
+  permissions: Record<string, unknown> | null;
+  repositories: PlatformRepository<number | string>[] | null;
+  authInvalidAt: string | null;
+  integrationStatus: string | null;
+  suspendedAt: string | null;
+  appType: GitHubAppType | null;
+};
+
 type EnabledOwnerConfig = {
-  owner: SecurityReviewOwner;
-  platformIntegrationId: string;
-  installationId: string;
   repositories: string[];
   repoNameToId: Map<string, number>;
+  repositoryPlanByName: Map<string, RepositorySyncPlan>;
+  integrationsById: Map<string, IntegrationCandidate>;
+  knownRepositoryIds: Set<number>;
+  resolverUserId: string;
   slaConfig: SecurityAgentConfig;
   notificationPolicy: SecurityNotificationPolicy | null;
   autoAnalysisEnabledAt: string | null;
-  authInvalidAt: string | null;
-  /** Number of selected_repository_ids that are no longer accessible via the installation.
+  /** Number of selected_repository_ids that are no longer present on any owner installation.
    *  Non-zero means the app lost access to a configured repo — freshness must not advance. */
   missingSelectedRepoCount: number;
   runtimeState: Record<string, unknown>;
 };
 
+function hasSecuritySyncPermission(integration: IntegrationCandidate): boolean {
+  const permission = integration.permissions?.vulnerability_alerts;
+  return permission === 'read' || permission === 'write';
+}
+
+function isSyncableIntegration(
+  owner: SecurityReviewOwner,
+  integration: IntegrationCandidate
+): boolean {
+  return (
+    !isOrgOwner(owner) ||
+    (integration.integrationStatus === 'active' && integration.suspendedAt === null)
+  );
+}
+
+function validIntegrationRepositories(integration: IntegrationCandidate): PlatformRepository[] {
+  return (integration.repositories ?? []).filter(
+    (repository): repository is PlatformRepository =>
+      typeof repository.id === 'number' &&
+      typeof repository.full_name === 'string' &&
+      repository.full_name.length > 0
+  );
+}
+
+function normalizedRepoName(repoFullName: string): string {
+  return repoFullName.toLowerCase();
+}
+
+function buildRepositorySyncPlan(
+  owner: SecurityReviewOwner,
+  integrations: IntegrationCandidate[],
+  securityConfig: Partial<SecurityAgentConfig>
+): Pick<
+  EnabledOwnerConfig,
+  | 'repositories'
+  | 'repoNameToId'
+  | 'repositoryPlanByName'
+  | 'knownRepositoryIds'
+  | 'missingSelectedRepoCount'
+> {
+  const knownRepositoryIds = new Set<number>();
+  const candidatesByName = new Map<string, RepositorySyncPlan[]>();
+  const candidatesById = new Map<number, RepositorySyncPlan[]>();
+
+  for (const integration of integrations) {
+    const repositories = validIntegrationRepositories(integration);
+    for (const repository of repositories) knownRepositoryIds.add(repository.id);
+    if (
+      !integration.platform_installation_id ||
+      !hasSecuritySyncPermission(integration) ||
+      !isSyncableIntegration(owner, integration)
+    ) {
+      continue;
+    }
+
+    const seenRepoNames = new Set<string>();
+    for (const repository of repositories) {
+      const normalizedName = normalizedRepoName(repository.full_name);
+      if (seenRepoNames.has(normalizedName)) continue;
+      seenRepoNames.add(normalizedName);
+      const candidate: RepositorySyncPlan = {
+        repoFullName: repository.full_name,
+        repositoryId: repository.id,
+        platformIntegrationId: integration.id,
+        installationId: integration.platform_installation_id,
+        appType: integration.appType ?? 'standard',
+        authInvalidAt: integration.authInvalidAt,
+      };
+      candidatesByName.set(normalizedName, [
+        ...(candidatesByName.get(normalizedName) ?? []),
+        candidate,
+      ]);
+      candidatesById.set(repository.id, [...(candidatesById.get(repository.id) ?? []), candidate]);
+    }
+  }
+
+  const repositoryPlanByName = new Map<string, RepositorySyncPlan>();
+  const repoNameToId = new Map<string, number>();
+  const addCandidates = (candidates: RepositorySyncPlan[]) => {
+    const candidate = candidates[0];
+    if (!candidate || candidate.repositoryId === undefined) return;
+    const normalizedName = normalizedRepoName(candidate.repoFullName);
+    if (repositoryPlanByName.has(normalizedName)) return;
+    repoNameToId.set(candidate.repoFullName, candidate.repositoryId);
+    repositoryPlanByName.set(
+      normalizedName,
+      candidates.length === 1
+        ? candidate
+        : {
+            repoFullName: candidate.repoFullName,
+            repositoryId: candidate.repositoryId,
+            authInvalidAt: null,
+          }
+    );
+  };
+
+  for (const candidates of candidatesByName.values()) addCandidates(candidates);
+
+  const repositories: string[] = [];
+  const selectedNames = new Set<string>();
+  let missingSelectedRepoCount = 0;
+  if (securityConfig.repository_selection_mode === 'selected') {
+    for (const selectedId of new Set(securityConfig.selected_repository_ids ?? [])) {
+      const candidates = candidatesById.get(selectedId) ?? [];
+      if (candidates.length === 0) {
+        if (!knownRepositoryIds.has(selectedId)) missingSelectedRepoCount++;
+        continue;
+      }
+      const candidate = candidates[0];
+      if (!candidate) continue;
+      const normalizedName = normalizedRepoName(candidate.repoFullName);
+      const planned = repositoryPlanByName.get(normalizedName);
+      if (planned && !selectedNames.has(normalizedName)) {
+        repositories.push(planned.repoFullName);
+        selectedNames.add(normalizedName);
+      }
+    }
+  } else {
+    repositories.push(...[...repositoryPlanByName.values()].map(plan => plan.repoFullName));
+  }
+
+  return {
+    repositories,
+    repoNameToId,
+    repositoryPlanByName,
+    knownRepositoryIds,
+    missingSelectedRepoCount,
+  };
+}
+
+function mergeReceivedRepositoryPlans(
+  config: Pick<
+    EnabledOwnerConfig,
+    'repositories' | 'repositoryPlanByName' | 'repoNameToId' | 'integrationsById'
+  >,
+  plans: RepositoryInstallationPlan[]
+): void {
+  for (const plan of plans) {
+    const integration = config.integrationsById.get(plan.platformIntegrationId);
+    if (
+      !integration ||
+      !integration.platform_installation_id ||
+      integration.platform_installation_id !== plan.installationId ||
+      (integration.appType ?? 'standard') !== plan.appType ||
+      !hasSecuritySyncPermission(integration) ||
+      integration.integrationStatus !== 'active' ||
+      integration.suspendedAt !== null
+    ) {
+      continue;
+    }
+
+    const normalizedName = normalizedRepoName(plan.repoFullName);
+    config.repositoryPlanByName.set(normalizedName, {
+      ...plan,
+      authInvalidAt: integration.authInvalidAt,
+    });
+    if (
+      !config.repositories.some(repository => normalizedRepoName(repository) === normalizedName)
+    ) {
+      config.repositories.push(plan.repoFullName);
+    }
+    if (plan.repositoryId !== undefined) {
+      config.repoNameToId.set(plan.repoFullName, plan.repositoryId);
+    }
+  }
+}
+
 export async function getOwnerConfig(
   db: WorkerDb,
-  owner: SecurityReviewOwner
+  owner: SecurityReviewOwner,
+  allowEmptyRepositoryPlan = false
 ): Promise<EnabledOwnerConfig | null> {
   // Get agent config
   const configs = await db
@@ -382,6 +614,7 @@ export async function getOwnerConfig(
       config: agent_configs.config,
       is_enabled: agent_configs.is_enabled,
       runtime_state: agent_configs.runtime_state,
+      created_by: agent_configs.created_by,
     })
     .from(agent_configs)
     .where(
@@ -397,7 +630,6 @@ export async function getOwnerConfig(
   if (configs.length === 0) return null;
   const agentConfig = configs[0];
 
-  // Get platform integration
   const integrations = await db
     .select({
       id: platform_integrations.id,
@@ -405,39 +637,21 @@ export async function getOwnerConfig(
       permissions: platform_integrations.permissions,
       repositories: platform_integrations.repositories,
       authInvalidAt: platform_integrations.auth_invalid_at,
+      integrationStatus: platform_integrations.integration_status,
+      suspendedAt: platform_integrations.suspended_at,
+      appType: platform_integrations.github_app_type,
     })
     .from(platform_integrations)
     .where(
       and(
         integrationOwnerFilter(owner),
         eq(platform_integrations.platform, 'github'),
+        eq(platform_integrations.integration_type, 'app'),
         isNotNull(platform_integrations.platform_installation_id)
       )
-    )
-    .limit(1);
+    );
 
   if (integrations.length === 0) return null;
-  const integration = integrations[0];
-
-  if (!integration.platform_installation_id) return null;
-
-  // Check vulnerability_alerts permission
-  const perms = integration.permissions;
-  if (!perms || (perms.vulnerability_alerts !== 'read' && perms.vulnerability_alerts !== 'write')) {
-    console.warn(`Integration ${integration.id} missing vulnerability_alerts permission, skipping`);
-    return null;
-  }
-
-  // Filter repositories
-  const allRepos = (integration.repositories ?? []).filter(
-    (repository): repository is PlatformRepository =>
-      typeof repository.id === 'number' &&
-      typeof repository.full_name === 'string' &&
-      repository.full_name.length > 0
-  );
-  if (allRepos.length === 0) return null;
-
-  const repoNameToId = new Map(allRepos.map(r => [r.full_name, r.id]));
 
   const parsed = securityAgentConfigSchema.partial().safeParse(agentConfig.config);
   if (!parsed.success) {
@@ -445,28 +659,21 @@ export async function getOwnerConfig(
     return null;
   }
   const securityConfig = parsed.data;
-  let selectedRepos: string[];
-  let missingSelectedRepoCount = 0;
-  if (securityConfig.repository_selection_mode === 'selected') {
-    const selectedIds = new Set(securityConfig.selected_repository_ids ?? []);
-    if (selectedIds.size > 0) {
-      const accessibleIds = new Set(allRepos.map(r => r.id));
-      selectedRepos = allRepos.filter(r => selectedIds.has(r.id)).map(r => r.full_name);
-      missingSelectedRepoCount = [...selectedIds].filter(id => !accessibleIds.has(id)).length;
-    } else {
-      // Mode is 'selected' but no repos are configured — don't fall through to 'all'
-      selectedRepos = [];
-    }
-  } else {
-    selectedRepos = allRepos.map(r => r.full_name);
+  const repositoryPlan = buildRepositorySyncPlan(owner, integrations, securityConfig);
+
+  if (
+    !allowEmptyRepositoryPlan &&
+    repositoryPlan.repositories.length === 0 &&
+    repositoryPlan.missingSelectedRepoCount === 0
+  ) {
+    return null;
   }
 
-  if (selectedRepos.length === 0 && missingSelectedRepoCount === 0) return null;
-
-  if (missingSelectedRepoCount > 0) {
-    console.warn(`${missingSelectedRepoCount} selected repo(s) no longer accessible for owner`, {
-      owner,
-    });
+  if (repositoryPlan.missingSelectedRepoCount > 0) {
+    console.warn(
+      `${repositoryPlan.missingSelectedRepoCount} selected repo(s) no longer present on any installation for owner`,
+      { owner }
+    );
   }
 
   const parsedNotificationPolicy = SecurityNotificationPolicySchema.safeParse(
@@ -489,16 +696,12 @@ export async function getOwnerConfig(
     .limit(1);
 
   return {
-    owner,
-    platformIntegrationId: integration.id,
-    installationId: integration.platform_installation_id,
-    repositories: selectedRepos,
-    repoNameToId,
+    ...repositoryPlan,
+    integrationsById: new Map(integrations.map(integration => [integration.id, integration])),
+    resolverUserId: agentConfig.created_by,
     slaConfig: { ...DEFAULT_SLA_CONFIG, ...securityConfig },
     notificationPolicy,
     autoAnalysisEnabledAt: ownerStates[0]?.autoAnalysisEnabledAt ?? null,
-    authInvalidAt: integration.authInvalidAt,
-    missingSelectedRepoCount,
     runtimeState:
       agentConfig.runtime_state && typeof agentConfig.runtime_state === 'object'
         ? agentConfig.runtime_state
@@ -756,7 +959,7 @@ const supersededSecurityFindingResultSchema = upsertSecurityFindingResultSchema.
 });
 type SupersededSecurityFindingResult = z.infer<typeof supersededSecurityFindingResultSchema>;
 
-async function upsertSecurityFinding(
+export async function upsertSecurityFinding(
   db: Pick<WorkerDb, 'execute'>,
   params: {
     finding: ParsedSecurityFinding;
@@ -778,14 +981,15 @@ async function upsertSecurityFinding(
   // Every stored column is derived from the Dependabot alert (see parseDependabotAlert),
   // and GitHub only advances the alert's updated_at on real changes, so comparing the
   // stored raw_data (jsonb, order-independent) detects any source-driven change in one
-  // check. sla_due_at is the only value we compute ourselves, so it is compared separately
-  // to catch SLA-policy changes. When neither differs the DO UPDATE matches no row and the
+  // check. sla_due_at and the authoritative repository integration are compared separately
+  // to catch SLA-policy changes and legitimate repository movement. When none differs, the
   // fallback SELECT below returns the existing finding with wasInserted=false and no
   // status/severity delta, so notifications and audit events behave exactly as they did for
   // an unchanged re-sync.
   const materialChangePredicate = sql`(
         ${security_findings.raw_data} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.raw_data.name)}
         OR ${security_findings.sla_due_at} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.sla_due_at.name)}
+        OR ${security_findings.platform_integration_id} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)}
       )`;
 
   const result = await db.execute<Record<string, unknown>>(sql`
@@ -862,6 +1066,7 @@ async function upsertSecurityFinding(
       LEFT JOIN existing_match ON true
       ON CONFLICT ${findingOwnerConflictTarget(owner)} DO UPDATE
       SET
+        ${sql.identifier(security_findings.platform_integration_id.name)} = EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)},
         ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
         ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
         ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},
@@ -1645,7 +1850,7 @@ async function pruneStaleReposFromConfig(
   );
 }
 
-/** Remove selected_repository_ids that are no longer accessible via the GitHub installation.
+/** Remove selected_repository_ids that are no longer present on any owner installation.
  *  Unlike pruneStaleReposFromConfig (which prunes by repo name after sync), this handles
  *  repos that silently vanished from the installation and were never synced at all. */
 async function pruneMissingSelectedRepos(
@@ -1696,21 +1901,25 @@ async function pruneMissingSelectedRepos(
 }
 
 export function selectRepositoriesForSync(
-  config: Pick<EnabledOwnerConfig, 'repositories' | 'repoNameToId'>,
+  config: Pick<EnabledOwnerConfig, 'repositories' | 'repoNameToId'> &
+    Partial<Pick<EnabledOwnerConfig, 'repositoryPlanByName'>>,
   repoFullName?: string
 ): string[] {
   if (!repoFullName) return config.repositories;
+  const plannedRepository = config.repositoryPlanByName?.get(normalizedRepoName(repoFullName));
+  if (plannedRepository) return [plannedRepository.repoFullName];
   return config.repoNameToId.has(repoFullName) ? [repoFullName] : [];
 }
 
 export async function syncOwner(params: {
   db: WorkerDb;
-  gitTokenService: GitTokenService;
+  gitTokenService: SecuritySyncGitTokenService;
   owner: SecurityReviewOwner;
   runId: string;
   trigger?: 'scheduled' | 'manual';
   actor?: { id: string; email?: string | null; name?: string | null };
   repoFullName?: string;
+  repositoryPlans?: RepositoryInstallationPlan[];
   notificationMaterializationEnabled?: boolean;
   budgetMs?: number;
 }): Promise<SyncResult> {
@@ -1718,35 +1927,25 @@ export async function syncOwner(params: {
   const trigger = params.trigger ?? 'scheduled';
   const startTime = Date.now();
 
-  const config = await getOwnerConfig(database, owner);
+  const config = await getOwnerConfig(
+    database,
+    owner,
+    Boolean(repoFullName || params.repositoryPlans?.length)
+  );
   if (!config) {
     console.info(`No enabled config for owner, skipping`, { runId, owner });
     return { ...createEmptySyncResult(), commandResultCode: 'CONFIG_DISABLED' };
   }
 
-  const repositories = selectRepositoriesForSync(config, repoFullName);
-  if (repoFullName && repositories.length === 0) {
-    console.warn('Manual sync repository is not accessible for owner, skipping', {
-      runId,
-      owner,
-      repoFullName,
-    });
-    await recordSecurityAgentRepositorySyncFailure(database, {
-      owner: toSecurityAgentCommandOwner(owner),
-      repoFullName,
-      failureCode: 'REPOSITORY_UNAVAILABLE',
-    });
-    return { ...createEmptySyncResult(), commandResultCode: 'REPOSITORY_UNAVAILABLE' };
-  }
+  if (params.repositoryPlans) mergeReceivedRepositoryPlans(config, params.repositoryPlans);
 
-  if (isRecentTimestamp(config.authInvalidAt, AUTH_INVALID_SHORT_CIRCUIT_MS)) {
-    console.warn('Skipping security sync because GitHub installation needs reauthorization', {
-      runId,
-      owner,
-      repositoryCount: repositories.length,
-      authInvalidAt: config.authInvalidAt,
+  let repositories = selectRepositoriesForSync(config, repoFullName);
+  if (repoFullName && repositories.length === 0) {
+    config.repositoryPlanByName.set(normalizedRepoName(repoFullName), {
+      repoFullName,
+      authInvalidAt: null,
     });
-    return createAuthInvalidSyncResult(repositories);
+    repositories = [repoFullName];
   }
 
   const previousProgress = repoFullName ? null : readSyncRunProgress(config.runtimeState, runId);
@@ -1766,6 +1965,7 @@ export async function syncOwner(params: {
   let processedThisPass = 0;
   let incompleteFailures = 0;
   let exhaustedBudget = false;
+  const authInvalidIntegrationIds = new Set<string>();
   const notificationPolicy = params.notificationMaterializationEnabled
     ? config.notificationPolicy
     : null;
@@ -1784,13 +1984,38 @@ export async function syncOwner(params: {
     }
 
     try {
+      const repositoryPlan = config.repositoryPlanByName.get(
+        normalizedRepoName(selectedRepoFullName)
+      );
+      if (!repositoryPlan) {
+        throw new Error(`No GitHub integration plan for ${selectedRepoFullName}`);
+      }
+
+      if (
+        (repositoryPlan.platformIntegrationId &&
+          authInvalidIntegrationIds.has(repositoryPlan.platformIntegrationId)) ||
+        isRecentTimestamp(repositoryPlan.authInvalidAt, AUTH_INVALID_SHORT_CIRCUIT_MS)
+      ) {
+        await recordSecurityAgentRepositorySyncFailure(database, {
+          owner: toSecurityAgentCommandOwner(owner),
+          repoFullName: selectedRepoFullName,
+          failureCode: 'GITHUB_AUTH_INVALID',
+        });
+        totalResult.authInvalid++;
+        totalResult.authInvalidRepos.push(selectedRepoFullName);
+        totalResult.reauthRequired = true;
+        completedRepos.add(selectedRepoFullName);
+        processedThisPass++;
+        continue;
+      }
+
       const repoResult = await syncRepo({
         db: database,
         gitTokenService,
-        installationId: config.installationId,
+        repositoryPlan,
+        resolverUserId: actor?.id ?? config.resolverUserId,
         owner,
         runId,
-        platformIntegrationId: config.platformIntegrationId,
         repoFullName: selectedRepoFullName,
         slaConfig: config.slaConfig,
         notificationPolicy,
@@ -1804,12 +2029,13 @@ export async function syncOwner(params: {
       totalResult.authInvalidRepos.push(...repoResult.authInvalidRepos);
       totalResult.reauthRequired = totalResult.reauthRequired || repoResult.reauthRequired;
       totalResult.staleRepos.push(...repoResult.staleRepos);
+      totalResult.commandResultCode ??= repoResult.commandResultCode;
       successfulRepos++;
       completedRepos.add(selectedRepoFullName);
       processedThisPass++;
 
-      if (repoResult.reauthRequired) {
-        break;
+      if (repoResult.reauthRequired && repositoryPlan.platformIntegrationId) {
+        authInvalidIntegrationIds.add(repositoryPlan.platformIntegrationId);
       }
     } catch (error) {
       incompleteFailures++;
@@ -1829,7 +2055,7 @@ export async function syncOwner(params: {
   }
 
   const remainingRepoCount = repositories.filter(name => !completedRepos.has(name)).length;
-  if (exhaustedBudget && remainingRepoCount > 0 && !totalResult.reauthRequired) {
+  if (exhaustedBudget && remainingRepoCount > 0) {
     await writeSyncRunProgress(
       database,
       owner,
@@ -1866,8 +2092,7 @@ export async function syncOwner(params: {
   // inspection already loaded full accessible repositories for both sync scopes.
   if (config.missingSelectedRepoCount > 0) {
     try {
-      const accessibleRepoIds = new Set(config.repoNameToId.values());
-      await pruneMissingSelectedRepos(database, owner, accessibleRepoIds);
+      await pruneMissingSelectedRepos(database, owner, config.knownRepositoryIds);
     } catch (error) {
       console.error('Failed to prune missing selected repos from config', {
         error: error instanceof Error ? error.message : String(error),
@@ -1915,6 +2140,7 @@ export async function syncOwner(params: {
     totalResult.errors === 0 &&
     totalResult.authInvalid === 0 &&
     totalResult.staleRepos.length === 0 &&
+    totalResult.commandResultCode === undefined &&
     config.missingSelectedRepoCount === 0;
   if (shouldAdvanceFreshness) {
     try {
@@ -1979,11 +2205,11 @@ export async function syncOwner(params: {
 
 async function syncRepo(params: {
   db: WorkerDb;
-  gitTokenService: GitTokenService;
-  installationId: string;
+  gitTokenService: SecuritySyncGitTokenService;
+  repositoryPlan: RepositorySyncPlan;
+  resolverUserId: string;
   owner: SecurityReviewOwner;
   runId: string;
-  platformIntegrationId: string;
   repoFullName: string;
   slaConfig: SecurityAgentConfig;
   notificationPolicy: SecurityNotificationPolicy | null;
@@ -1993,10 +2219,10 @@ async function syncRepo(params: {
   const {
     db: database,
     gitTokenService,
-    installationId,
+    repositoryPlan,
+    resolverUserId,
     owner,
     runId,
-    platformIntegrationId,
     repoFullName,
     slaConfig,
     notificationPolicy,
@@ -2004,8 +2230,36 @@ async function syncRepo(params: {
   } = params;
   const commandOwner = toSecurityAgentCommandOwner(owner);
   await recordSecurityAgentRepositorySyncAttempt(database, { owner: commandOwner, repoFullName });
-  const token = await gitTokenService.getToken(installationId);
   const result = createEmptySyncResult();
+
+  const resolved = await resolveRepositoryToken({
+    gitTokenService,
+    repositoryPlan,
+    owner,
+    repoFullName,
+    resolverUserId,
+  });
+  if (!resolved.success) {
+    if (
+      resolved.reason === 'database_not_configured' ||
+      resolved.reason === 'temporarily_unavailable'
+    ) {
+      throw new Error(`GitHub repository installation resolution failed: ${resolved.reason}`);
+    }
+    const failureCode =
+      resolved.reason === 'ambiguous_installation'
+        ? 'AMBIGUOUS_GITHUB_INTEGRATION'
+        : 'REPOSITORY_UNAVAILABLE';
+    await recordSecurityAgentRepositorySyncFailure(database, {
+      owner: commandOwner,
+      repoFullName,
+      failureCode,
+    });
+    result.commandResultCode = failureCode;
+    if (failureCode === 'REPOSITORY_UNAVAILABLE') result.staleRepos.push(repoFullName);
+    return result;
+  }
+  const { token, installationId, platformIntegrationId } = resolved;
 
   const [repoOwner, repoName] = repoFullName.split('/');
   if (!repoOwner || !repoName) {
@@ -2172,4 +2426,47 @@ async function syncRepo(params: {
     await recordSecurityAgentRepositorySyncSuccess(database, { owner: commandOwner, repoFullName });
   }
   return result;
+}
+
+type ResolvedRepositoryToken = {
+  success: true;
+  token: string;
+  platformIntegrationId: string;
+  installationId: string;
+  appType: GitHubAppType;
+};
+
+async function resolveRepositoryToken(params: {
+  gitTokenService: SecuritySyncGitTokenService;
+  repositoryPlan: RepositorySyncPlan;
+  owner: SecurityReviewOwner;
+  repoFullName: string;
+  resolverUserId: string;
+}): Promise<ResolvedRepositoryToken | Extract<GitTokenForRepoResult, { success: false }>> {
+  const { repositoryPlan } = params;
+  if (
+    repositoryPlan.platformIntegrationId &&
+    repositoryPlan.installationId &&
+    repositoryPlan.appType
+  ) {
+    return {
+      success: true,
+      token: await params.gitTokenService.getToken(
+        repositoryPlan.installationId,
+        repositoryPlan.appType
+      ),
+      platformIntegrationId: repositoryPlan.platformIntegrationId,
+      installationId: repositoryPlan.installationId,
+      appType: repositoryPlan.appType,
+    };
+  }
+
+  if (!params.gitTokenService.getTokenForRepo) {
+    throw new Error('Git Token Service does not support repository resolution');
+  }
+  return params.gitTokenService.getTokenForRepo({
+    githubRepo: params.repoFullName,
+    userId: params.resolverUserId,
+    ...(isOrgOwner(params.owner) ? { orgId: params.owner.organizationId } : {}),
+  });
 }

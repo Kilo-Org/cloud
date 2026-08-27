@@ -42,6 +42,14 @@ const SecuritySyncActorSchema = z.object({
   name: z.string().min(1).nullable().optional(),
 });
 
+const RepositoryInstallationPlanSchema = z.object({
+  repoFullName: z.string().min(1),
+  repositoryId: z.number().int().positive().optional(),
+  platformIntegrationId: z.string().uuid(),
+  installationId: z.string().min(1),
+  appType: z.enum(['standard', 'lite']),
+});
+
 const SecuritySyncMessageSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -56,6 +64,7 @@ const SecuritySyncMessageSchema = z
     dispatchedAt: z.string().datetime(),
     actor: SecuritySyncActorSchema.optional(),
     repoFullName: z.string().min(1).optional(),
+    repositoryPlans: z.array(RepositoryInstallationPlanSchema).optional(),
   })
   .refine(message => message.trigger === 'scheduled' || Boolean(message.commandId), {
     message: 'commandId is required for manual sync commands',
@@ -68,6 +77,7 @@ const ManualSecuritySyncCommandSchema = z.object({
   actor: SecuritySyncActorSchema,
   origin: z.enum(['manual', 'dashboard_refresh', 'enable_initial_sync']).default('manual'),
   repoFullName: z.string().min(1).optional(),
+  repositoryPlans: z.array(RepositoryInstallationPlanSchema).optional(),
   /** Stable web operation key (P1-A-08e); same-key retries reuse the original command. */
   operationKey: z.string().min(1).max(128).optional(),
 });
@@ -235,6 +245,7 @@ function buildManualSyncQueueMessage(
       dispatchedAt: new Date().toISOString(),
       actor: command.actor,
       repoFullName: command.repoFullName,
+      repositoryPlans: command.repositoryPlans,
     },
     contentType: 'json',
   };
@@ -449,6 +460,9 @@ function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>)
   if (result.commandResultCode === 'CONFIG_DISABLED') {
     return { status: 'no_op', resultCode: 'CONFIG_DISABLED' };
   }
+  if (result.commandResultCode === 'AMBIGUOUS_GITHUB_INTEGRATION') {
+    return { status: 'failed', resultCode: 'AMBIGUOUS_GITHUB_INTEGRATION' };
+  }
   if (result.commandResultCode === 'REPOSITORY_UNAVAILABLE' || result.staleRepos.length > 0) {
     return { status: 'failed', resultCode: 'REPOSITORY_UNAVAILABLE' };
   }
@@ -648,6 +662,7 @@ async function processSecuritySyncMessage(
     trigger: body.trigger,
     actor: body.actor,
     repoFullName: body.repoFullName,
+    repositoryPlans: body.repositoryPlans,
     notificationMaterializationEnabled: isStrictTrueRolloutFlag(
       env.SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED,
       'SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED'

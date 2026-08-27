@@ -6,7 +6,6 @@ import {
   _resetGlanceablePersistForTests,
   _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
-  persistGlanceableSink,
 } from '@/lib/glanceable/persist';
 import { registerGlanceableSink, unregisterGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -317,7 +316,7 @@ function makeFakeSink() {
 // selected-organization id and the active-user id hint through the module-level
 // `SecureStore.getItemAsync`, so the mock must answer each key separately.
 function mockSecureStoreKeys() {
-  mocks.getItemAsync.mockImplementation(async (key: string) => {
+  mocks.getItemAsync.mockImplementation((key: string) => {
     if (key === ACTIVE_USER_ID_KEY) {
       return 'u1';
     }

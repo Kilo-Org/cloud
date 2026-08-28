@@ -63,6 +63,66 @@ describe('CLIOutboundMessageSchema', () => {
     }
   });
 
+  it.each(['cli', 'remote'])('preserves full %s metadata and both capabilities', kind => {
+    const msg = {
+      type: 'heartbeat',
+      protocolVersion: '1',
+      capabilities: { attachments: true, sessionClone: true },
+      instance: {
+        name: 'laptop-1',
+        projectName: 'kilo',
+        version: '0.1.2',
+        kind,
+        startedAt: '2026-08-28T12:34:56.789Z',
+        gitBranch: 'feature/identity',
+      },
+      sessions: [{ id: 'ses_1', status: 'busy', title: 'Remote session', platform: 'darwin' }],
+    };
+    expect(CLIOutboundMessageSchema.parse(msg)).toEqual(msg);
+  });
+
+  it.each([
+    ['kind', 'terminal'],
+    ['kind', null],
+    ['startedAt', '2026-08-28T12:34:56Z'],
+    ['startedAt', '2026-08-28T12:34:56.78Z'],
+    ['startedAt', '2026-08-28T12:34:56.7890Z'],
+    ['startedAt', '2026-08-28T12:34:56.789+00:00'],
+    ['startedAt', '2026-02-30T12:34:56.789Z'],
+    ['startedAt', null],
+    ['gitBranch', null],
+  ])('rejects invalid instance %s: %s', (field, value) => {
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        type: 'heartbeat',
+        sessions: [],
+        instance: { name: 'host', projectName: 'project', [field]: value },
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    ['ASCII', 'a'.repeat(24), 'a'.repeat(25)],
+    ['escaped characters', '\\"'.repeat(12), '\\"'.repeat(12) + '\\'],
+    ['CJK', '界'.repeat(24), '界'.repeat(25)],
+    ['surrogate pairs', '\u{10400}'.repeat(12), '\u{10400}'.repeat(12) + 'a'],
+  ])('bounds %s branches by UTF-16 units, not JSON bytes', (_label, valid, invalid) => {
+    const heartbeat = {
+      type: 'heartbeat',
+      sessions: [],
+      instance: { name: 'host', projectName: 'project', gitBranch: valid },
+    };
+    expect(CLIOutboundMessageSchema.parse(JSON.parse(JSON.stringify(heartbeat)))).toEqual(
+      heartbeat
+    );
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        ...heartbeat,
+        instance: { ...heartbeat.instance, gitBranch: invalid },
+      }).success
+    ).toBe(false);
+  });
+
   it('rejects instance with empty name', () => {
     const msg = {
       type: 'heartbeat',

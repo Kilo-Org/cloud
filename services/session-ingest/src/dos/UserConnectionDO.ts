@@ -80,11 +80,10 @@ type WSAttachment =
 
 // Type re-export so test files and other internal callers can reference the
 // connection-row shape from a single place.
-export type ConnectedInstanceRow = {
+// Instance metadata stays optional for old producers and hibernated attachments.
+// Remove that compatibility only after every supported old form has retired.
+export type ConnectedInstanceRow = Instance & {
   connectionId: string;
-  name: string;
-  projectName: string;
-  version?: string;
   // Latest capabilities from the CLI socket attachment. Omitted when the
   // attachment has no capabilities (legacy CLI / pre-field build) so the
   // response stays byte-identical for those clients.
@@ -669,7 +668,32 @@ export class UserConnectionDO extends DurableObject<Env> {
       kiloUserId: attachment.kiloUserId,
       ...(instance ? { instance } : {}),
     };
-    ws.serializeAttachment(updatedAttachment);
+    try {
+      ws.serializeAttachment(updatedAttachment);
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        error.name !== 'Error' ||
+        !/^A WebSocket 'attachment' cannot be larger than 16384 bytes\.'attachment' was \d+ bytes\.$/.test(
+          error.message
+        ) ||
+        !instance ||
+        (instance.kind === undefined &&
+          instance.startedAt === undefined &&
+          instance.gitBranch === undefined)
+      ) {
+        throw error;
+      }
+      // The native regression verifies this capacity error and failed-write atomicity.
+      // Retry the current heartbeat in the old metadata-free form, never a stale one.
+      // Remove only after old producers/attachments retire and enriched heartbeats
+      // have proven native capacity safety.
+      const legacyInstance = { ...instance };
+      delete legacyInstance.kind;
+      delete legacyInstance.startedAt;
+      delete legacyInstance.gitBranch;
+      ws.serializeAttachment({ ...updatedAttachment, instance: legacyInstance });
+    }
 
     // Broadcast the heartbeat to every one of the user's web sockets. Subscribers
     // and non-subscribers both receive it: a removed session id is detectable
@@ -1898,8 +1922,8 @@ export class UserConnectionDO extends DurableObject<Env> {
    *
    * No in-memory map is consulted: hibernation/restart can never produce a
    * stale row because we only read from sockets that are alive right now.
-   * The 2KB `serializeAttachment` budget comfortably accommodates a bounded
-   * instance object (well under 200 bytes).
+   * Old attachments can omit metadata; the heartbeat write handles native
+   * capacity without discarding their legacy instance identity.
    */
   getConnectedInstances(): { instances: ConnectedInstanceRow[] } {
     this.ensureState();
@@ -1917,6 +1941,9 @@ export class UserConnectionDO extends DurableObject<Env> {
         name: att.instance.name,
         projectName: att.instance.projectName,
         ...(att.instance.version ? { version: att.instance.version } : {}),
+        ...(att.instance.kind !== undefined ? { kind: att.instance.kind } : {}),
+        ...(att.instance.startedAt !== undefined ? { startedAt: att.instance.startedAt } : {}),
+        ...(att.instance.gitBranch !== undefined ? { gitBranch: att.instance.gitBranch } : {}),
         ...(att.capabilities ? { capabilities: att.capabilities } : {}),
       });
     }

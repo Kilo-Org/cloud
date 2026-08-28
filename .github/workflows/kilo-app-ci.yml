@@ -16,7 +16,6 @@ on:
       - 'pnpm-lock.yaml'
       - '.github/workflows/kilo-app-ci.yml'
   pull_request:
-    branches: [main]
     paths:
       - 'apps/mobile/**'
       - 'packages/trpc/**'

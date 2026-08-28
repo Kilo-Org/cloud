@@ -91,10 +91,10 @@ vi.mock('@/i18n', () => ({
 // The real persisted-filters hook runs; only its native edges are stubbed, so
 // the apply/clear transitions below exercise the actual filter state.
 vi.mock('expo-secure-store', () => ({
-  getItemAsync: () => Promise.resolve(null),
+  getItemAsync: vi.fn().mockResolvedValue(null),
 }));
 vi.mock('@/lib/auth/account-metadata-write', () => ({
-  setAccountMetadata: () => Promise.resolve(),
+  setAccountMetadata: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },

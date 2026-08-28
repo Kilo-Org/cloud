@@ -10,11 +10,8 @@ import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
 import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
-import {
-  buildAndroidWidgetProps,
-  buildExpiredWidgetProps,
-  buildGenericWidgetProps,
-} from './widget-props';
+import { getStoredWidgetSnapshot, setWidgetSnapshot } from './live-update';
+import { buildCurrentWidgetProps, buildGenericWidgetProps } from './widget-props';
 
 // Register the Android sink at import time. The main-app import of the local
 // live-update module loads this file, so the sink subscribes before any widget
@@ -36,22 +33,22 @@ function translate(key: string): string {
 registerWidgetTaskHandler(async (task: WidgetTaskHandlerProps) => {
   const { widgetInfo, renderWidget } = task;
 
-  let props = getCurrentWidgetProps();
+  // Re-read native storage even in a live process. An old alarm can already have
+  // queued this task when newer work or a privacy blank replaces its deadline.
+  const stored = getStoredWidgetSnapshot();
+  let props =
+    stored === null ? getCurrentWidgetProps() : buildCurrentWidgetProps(stored, translate);
   if (props === null) {
-    // Headless restarts have no live widget props; restore the existing mirror.
+    // Migrate the existing mirror when this installation has no native snapshot yet.
     await restorePersistedGlanceable();
     const snapshot = getLastGlanceableSnapshot();
-    if (snapshot === null) {
-      props = buildGenericWidgetProps(translate);
-    } else if (
-      snapshot.status !== 'privacy' &&
-      snapshot.status !== 'signed_out' &&
-      Date.parse(snapshot.expiresAt) <= Date.now()
-    ) {
-      props = buildExpiredWidgetProps(snapshot, translate);
-    } else {
-      props = buildAndroidWidgetProps(snapshot, {}, translate);
+    if (snapshot !== null && getCurrentWidgetProps() === null) {
+      setWidgetSnapshot(snapshot);
     }
+    props =
+      snapshot === null
+        ? buildGenericWidgetProps(translate)
+        : buildCurrentWidgetProps(snapshot, translate);
     // A live publish during restoration owns the widget.
     props = getCurrentWidgetProps() ?? props;
   }

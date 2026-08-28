@@ -6,11 +6,28 @@ import { isValidElement, type ReactNode } from 'react';
 import { type WidgetRepresentation, type WidgetTaskHandler } from 'react-native-android-widget';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-  registerWidgetTaskHandler: vi.fn<(handler: WidgetTaskHandler) => void>(),
-}));
+const mocks = vi.hoisted(() => {
+  let snapshot: string | null = null;
+  let deadline = 0;
+  return {
+    registerWidgetTaskHandler: vi.fn<(handler: WidgetTaskHandler) => void>(),
+    native: {
+      setWidgetSnapshot: (next: string, expiresAt: number) => {
+        snapshot = next;
+        deadline = expiresAt;
+      },
+      getWidgetSnapshot: () => snapshot,
+      end: vi.fn(),
+    },
+    getDeadline: () => deadline,
+    resetNativeState: () => {
+      snapshot = null;
+      deadline = 0;
+    },
+  };
+});
 
-vi.mock('expo', () => ({ requireOptionalNativeModule: () => null }));
+vi.mock('expo', () => ({ requireOptionalNativeModule: () => mocks.native }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn() },
   Alert: { alert: vi.fn() },
@@ -108,6 +125,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
+  mocks.resetNativeState();
   store.clear();
   secureStore.getItemAsync.mockReset().mockImplementation(async key => {
     await Promise.resolve();
@@ -197,6 +215,89 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
+  });
+
+  it('re-reads native state when an old expiry task reaches newer work', async () => {
+    const old = snapshotFor();
+    const handler = await registerAfterRestart(old);
+    const { androidSink } = await import('./android-sink');
+    androidSink.publish(old);
+    const newer = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u2',
+      organizationId: null,
+      now: NOW + 60_000,
+      previousRevision: old.revision,
+    });
+    mocks.native.setWidgetSnapshot(JSON.stringify(newer), Date.parse(newer.expiresAt));
+    vi.setSystemTime(Date.parse(old.expiresAt));
+
+    const rendered = await runWidgetTask(handler, width);
+    const expected = width === 120 ? ['1 Running'] : ['1 Running', 'Open agents'];
+    expect(collectText(rendered.light)).toEqual(expected);
+    expect(collectText(rendered.dark)).toEqual(expected);
+  });
+
+  it.each([
+    ['privacy', 'Agents hidden'],
+    ['signed_out', 'Sign in to see agents'],
+  ] as const)('reads a native %s blank instead of stale legacy storage', async (status, copy) => {
+    const old = snapshotFor();
+    const handler = await registerAfterRestart(old);
+    mocks.native.setWidgetSnapshot(JSON.stringify(snapshotFor([], status)), 0);
+    vi.setSystemTime(Date.parse(old.expiresAt));
+
+    const rendered = await runWidgetTask(handler, width);
+    expect(collectText(rendered.light)).toEqual([copy]);
+    expect(collectText(rendered.dark)).toEqual([copy]);
+    expect(mocks.getDeadline()).toBe(0);
+  });
+
+  it.each(['happy', 'stale'] as const)(
+    'renders native %s state after a JS reload without extending its expiry',
+    async status => {
+      const snapshot = snapshotFor(undefined, status);
+      const expiresAt = Date.parse(snapshot.expiresAt);
+      mocks.native.setWidgetSnapshot(JSON.stringify(snapshot), expiresAt);
+      vi.setSystemTime(NOW + 7_200_000);
+      const handler = await registerAfterRestart(null);
+
+      const current = await runWidgetTask(handler, width);
+      expect(collectText(current.light)).toContain('1 Needs input');
+      expect(collectText(current.dark)).toContain('1 Needs input');
+      expect(mocks.getDeadline()).toBe(expiresAt);
+
+      vi.setSystemTime(expiresAt);
+      const reloaded = await registerAfterRestart(null);
+      const expired = await runWidgetTask(reloaded, width);
+      expect(collectText(expired.light)).toEqual(['Status expired']);
+      expect(collectText(expired.dark)).toEqual(['Status expired']);
+    }
+  );
+
+  it('expires counts in an already-running handler without a JavaScript timer', async () => {
+    const snapshot = snapshotFor();
+    const handler = await registerAfterRestart(snapshot);
+    await runWidgetTask(handler, width);
+    expect(mocks.getDeadline()).toBe(Date.parse(snapshot.expiresAt));
+    vi.setSystemTime(Date.parse(snapshot.expiresAt));
+
+    const rendered = await runWidgetTask(handler, width);
+    expect(collectText(rendered.light)).toEqual(['Status expired']);
+    expect(collectText(rendered.dark)).toEqual(['Status expired']);
+  });
+
+  it.each([
+    ['invalid JSON', '{'],
+    ['missing fields', JSON.stringify({ status: 'happy' })],
+    ['negative counts', JSON.stringify({ ...snapshotFor(), running: -1 })],
+  ])('rejects a native snapshot with %s', async (_reason, raw) => {
+    const handler = await registerAfterRestart(null);
+    mocks.native.setWidgetSnapshot(raw, 0);
+
+    const rendered = await runWidgetTask(handler, width);
+    expect(collectText(rendered.light)).toEqual(['No work in progress']);
+    expect(collectText(rendered.dark)).toEqual(['No work in progress']);
   });
 
   it('keeps live widget props published while restoration is pending', async () => {

@@ -2,11 +2,12 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildAndroidWidgetProps,
   buildCompactNotificationText,
+  buildCurrentWidgetProps,
   buildOngoingNotificationText,
 } from './widget-props';
 
@@ -121,6 +122,43 @@ describe('buildAndroidWidgetProps', () => {
     expect(json).not.toContain(snapshot.updatedAt);
     expect(json).not.toContain('revision');
     expect(json).not.toContain('title');
+  });
+});
+
+describe('current widget deadline rendering', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each(['happy', 'stale'] as const)('hides expired %s counts and the visible action', status => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW + 28_800_000);
+    const props = buildCurrentWidgetProps({ ...MIXED, status }, translate);
+    expect(props.statusLine).toBe('Status expired');
+    expect(props.countLines).toEqual([]);
+    expect(props.accessibilityLabel).toBe('Status expired, Open agents');
+    expect(props.showOpenAgents).toBe(false);
+  });
+
+  it.each([
+    ['privacy', 'Agents hidden'],
+    ['signed_out', 'Sign in to see agents'],
+    ['empty', 'No work in progress'],
+    ['waiting', 'Waiting for agents'],
+  ] as const)('preserves %s copy beyond an old deadline', (status, expected) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW + 28_800_001);
+    const props = buildCurrentWidgetProps({ ...MIXED, status }, translate);
+    expect(props.statusLine).toBe(expected);
+    expect(props.accessibilityLabel).toBe(`${expected}, Open agents`);
+    expect(props.countLines).toEqual([]);
+    expect(props.showOpenAgents).toBe(false);
+  });
+
+  it('hides counts when the stored expiry is not a valid date', () => {
+    const props = buildCurrentWidgetProps({ ...MIXED, expiresAt: 'invalid' }, translate);
+    expect(props.statusLine).toBe('Status expired');
+    expect(props.countLines).toEqual([]);
   });
 });
 

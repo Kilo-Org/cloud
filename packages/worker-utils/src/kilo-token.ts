@@ -89,7 +89,7 @@ export async function signKiloToken(params: {
   const validatedPayload = signKiloTokenPayload.parse(payload);
 
   let signer = new SignJWT(validatedPayload)
-    .setProtectedHeader({ alg: 'HS256' })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuedAt(now)
     .setExpirationTime(exp);
   if (params.audience) signer = signer.setAudience(params.audience);

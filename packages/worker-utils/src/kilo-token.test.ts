@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { SignJWT } from 'jose';
+import { SignJWT, decodeProtectedHeader } from 'jose';
 import {
   kiloTokenPayload,
   KILO_TOKEN_VERSION,
@@ -112,6 +112,19 @@ describe('signKiloToken', () => {
     const payload = await verifyKiloToken(token, SECRET);
 
     expect('apiTokenPepper' in payload).toBe(false);
+  });
+
+  it('sets typ: JWT on the protected header', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-header',
+      pepper: 'pepper-header',
+      secret: SECRET,
+      expiresInSeconds: 60,
+    });
+
+    const header = decodeProtectedHeader(token);
+
+    expect(header).toEqual({ alg: 'HS256', typ: 'JWT' });
   });
 
   it('produces payloads accepted by the closed schema', async () => {

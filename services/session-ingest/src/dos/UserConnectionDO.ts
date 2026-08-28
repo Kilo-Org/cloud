@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
+import { isNeedsInputStatus } from './session-ingest-attention';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import {
   CLIOutboundMessageSchema,
@@ -2682,6 +2683,20 @@ export class UserConnectionDO extends DurableObject<Env> {
         capabilities?: ConnectionCapabilities;
       }
     > = [];
+    // A subagent raise arrives on the child row, but only root rows are
+    // emitted. Hoist the child's needs-input status onto its root so the
+    // session list shows NEEDS INPUT. Derived per call, so it clears when
+    // the child resolves.
+    // ponytail: one level deep; iterate to a fixed point if the CLI ever nests deeper.
+    const hoistedStatus = new Map<string, string>();
+    for (const [connectionId, sessions] of this.connectionSessions) {
+      if (!liveConnectionIds.has(connectionId)) continue;
+      for (const session of sessions) {
+        if (session.parentSessionId && isNeedsInputStatus(session.status)) {
+          hoistedStatus.set(session.parentSessionId, session.status);
+        }
+      }
+    }
     for (const [connectionId, sessions] of this.connectionSessions) {
       if (!liveConnectionIds.has(connectionId)) continue;
       const protocolVersion = this.connectionProtocolVersion.get(connectionId);
@@ -2694,6 +2709,7 @@ export class UserConnectionDO extends DurableObject<Env> {
         if (this.sessionOwners.get(session.id) !== connectionId) continue;
         result.push({
           ...session,
+          status: hoistedStatus.get(session.id) ?? session.status,
           connectionId,
           ...(protocolVersion ? { protocolVersion } : {}),
           ...(capabilities ? { capabilities } : {}),

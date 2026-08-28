@@ -3920,6 +3920,29 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
+    it('hoists a child needs-input status onto the root row', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('root-1', 'busy', 'Root session'),
+        makeSession('child-1', 'permission', 'Child session', 'root-1'),
+      ]);
+
+      expect(doInstance.getActiveSessions()).toEqual([
+        { id: 'root-1', status: 'permission', title: 'Root session', connectionId: 'cli-1' },
+      ]);
+
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('root-1', 'busy', 'Root session'),
+        makeSession('child-1', 'busy', 'Child session', 'root-1'),
+      ]);
+
+      expect(doInstance.getActiveSessions()).toEqual([
+        { id: 'root-1', status: 'busy', title: 'Root session', connectionId: 'cli-1' },
+      ]);
+    });
+
     it('cleans up child tracking when session disappears from heartbeat', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');

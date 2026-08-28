@@ -95,8 +95,25 @@ function isRootWsSession(session: IncomingWsSession): boolean {
   return !session.parentSessionId;
 }
 
+/**
+ * Keep root rows only. A subagent raise arrives on the child row, so hoist
+ * the child's attention status onto its root before dropping the child.
+ */
 export function selectRootWsSessions<T extends IncomingWsSession>(sessions: readonly T[]): T[] {
-  return sessions.filter(session => isRootWsSession(session));
+  const hoisted = new Map<string, string>();
+  for (const session of sessions) {
+    if (session.parentSessionId && isAttentionStatus(session.status)) {
+      hoisted.set(session.parentSessionId, session.status);
+    }
+  }
+  const roots: T[] = [];
+  for (const session of sessions) {
+    if (isRootWsSession(session)) {
+      const status = hoisted.get(session.id);
+      roots.push(status === undefined ? session : { ...session, status });
+    }
+  }
+  return roots;
 }
 
 // ── Payload parsing (WS trust boundary) ──────────────────────────────

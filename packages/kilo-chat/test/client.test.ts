@@ -21,6 +21,261 @@ function mockFetch(status: number, body: unknown): typeof globalThis.fetch {
   });
 }
 
+type MethodCase =
+  | { kind: 'action'; invoke: (client: KiloChatClient) => Promise<unknown> }
+  | { kind: 'read' | 'event' | 'control' };
+
+// Exhaustive public-method inventory. New methods must choose an admission class.
+const methodInventory: Record<keyof KiloChatClient, MethodCase> = {
+  sendMessage: { kind: 'action', invoke: c => c.sendMessage({ conversationId: 'c', content: [] }) },
+  editMessage: {
+    kind: 'action',
+    invoke: c => c.editMessage('m', { conversationId: 'c', content: [], timestamp: 1 }),
+  },
+  deleteMessage: { kind: 'action', invoke: c => c.deleteMessage('m', { conversationId: 'c' }) },
+  createConversation: { kind: 'action', invoke: c => c.createConversation({ sandboxId: 's' }) },
+  renameConversation: {
+    kind: 'action',
+    invoke: c => c.renameConversation('c', { title: 'renamed' }),
+  },
+  leaveConversation: { kind: 'action', invoke: c => c.leaveConversation('c') },
+  sendTyping: { kind: 'action', invoke: c => c.sendTyping('c') },
+  markConversationRead: {
+    kind: 'action',
+    invoke: c => c.markConversationRead('c', { lastSeenMessageId: 'm' }),
+  },
+  addReaction: {
+    kind: 'action',
+    invoke: c => c.addReaction('m', { conversationId: 'c', emoji: '+1' }),
+  },
+  removeReaction: {
+    kind: 'action',
+    invoke: c => c.removeReaction('m', { conversationId: 'c', emoji: '+1' }),
+  },
+  redeliverMessage: { kind: 'action', invoke: c => c.redeliverMessage('c', 'm') },
+  executeAction: {
+    kind: 'action',
+    invoke: c => c.executeAction('c', 'm', { groupId: 'g', value: 'allow-once' }),
+  },
+  initAttachment: {
+    kind: 'action',
+    invoke: c =>
+      c.initAttachment({
+        conversationId: 'c',
+        filename: 'a.png',
+        mimeType: 'image/png',
+        size: 1,
+        idempotencyKey: 'a',
+      }),
+  },
+  getAttachmentUrl: { kind: 'read' },
+  listConversations: { kind: 'read' },
+  getConversation: { kind: 'read' },
+  getBotStatus: { kind: 'read' },
+  requestBotStatus: { kind: 'read' },
+  getConversationStatus: { kind: 'read' },
+  listMessages: { kind: 'read' },
+  listMessagesPage: { kind: 'read' },
+  sendTypingStop: { kind: 'control' },
+  captureOperation: { kind: 'control' },
+  canPublish: { kind: 'control' },
+  canStartOperation: { kind: 'control' },
+  assertOwner: { kind: 'control' },
+  dispose: { kind: 'control' },
+  on: { kind: 'event' },
+  onMessageCreated: { kind: 'event' },
+  onMessageUpdated: { kind: 'event' },
+  onMessageDeleted: { kind: 'event' },
+  onMessageDeliveryFailed: { kind: 'event' },
+  onMessageRedelivered: { kind: 'event' },
+  onActionDeliveryFailed: { kind: 'event' },
+  onTyping: { kind: 'event' },
+  onTypingStop: { kind: 'event' },
+  onReactionAdded: { kind: 'event' },
+  onReactionRemoved: { kind: 'event' },
+  onConversationCreated: { kind: 'event' },
+  onConversationRenamed: { kind: 'event' },
+  onConversationLeft: { kind: 'event' },
+  onConversationRead: { kind: 'event' },
+  onConversationActivity: { kind: 'event' },
+  onBotStatus: { kind: 'event' },
+  onConversationStatus: { kind: 'event' },
+};
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+function ownedClient(overrides: Partial<KiloChatClientConfig> = {}) {
+  const state = { generation: 0, unlocked: true, owner: true };
+  const requests: string[] = [];
+  const client = new KiloChatClient({
+    ...createMockConfig(async input => {
+      requests.push(input instanceof Request ? input.url : input.toString());
+      return Response.json({ conversations: [], hasMore: false, nextCursor: null });
+    }),
+    canPublish: () => state.owner,
+    captureOperationAdmission: () => {
+      const generation = state.generation;
+      return () => {
+        if (!state.unlocked || generation !== state.generation) throw new Error('stale admission');
+      };
+    },
+    ...overrides,
+  });
+  return { client, state, requests };
+}
+
+const admittedMessage = {
+  id: 'm1',
+  senderId: 'user-a',
+  content: [{ type: 'text', text: 'accepted' }],
+  inReplyToMessageId: null,
+  replyTo: null,
+  updatedAt: null,
+  clientUpdatedAt: null,
+  deleted: false,
+  deliveryFailed: false,
+  reactions: [],
+};
+
+describe('operation admission and ownership', () => {
+  for (const [name, entry] of Object.entries(methodInventory)) {
+    if (entry.kind !== 'action') continue;
+    it(`denies ${name} before credentials or HTTP when locked`, async () => {
+      let tokenReads = 0;
+      const { client, state, requests } = ownedClient({
+        getToken: async () => {
+          tokenReads++;
+          return 'a';
+        },
+      });
+      state.unlocked = false;
+      await expect(entry.invoke(client)).rejects.toThrow('stale admission');
+      expect({ tokenReads, requests }).toEqual({ tokenReads: 0, requests: [] });
+    });
+  }
+
+  it('rejects a delayed token after lock/unlock without sending the draft', async () => {
+    const token = deferred<string>();
+    const entered = deferred<void>();
+    const { client, state, requests } = ownedClient({
+      getToken: () => {
+        entered.resolve();
+        return token.promise;
+      },
+    });
+    const pending = client.sendMessage({
+      conversationId: 'c',
+      content: [{ type: 'text', text: 'unsent' }],
+    });
+    await entered.promise;
+    state.generation++;
+    token.resolve('a');
+    await expect(pending).rejects.toThrow('stale admission');
+    expect(requests).toEqual([]);
+  });
+
+  it('keeps an accepted send but rejects the queued send after lock/unlock', async () => {
+    const response = deferred<Response>();
+    const requests: string[] = [];
+    const { client, state } = ownedClient({
+      fetch: async (_url, init) => {
+        if (typeof init?.body !== 'string') throw new Error('Expected a JSON request body');
+        requests.push(init.body);
+        return response.promise;
+      },
+    });
+    const accepted = client.sendMessage({
+      conversationId: 'c',
+      content: [{ type: 'text', text: 'accepted' }],
+    });
+    const queued = client.sendMessage({
+      conversationId: 'c',
+      content: [{ type: 'text', text: 'unsent' }],
+    });
+    const rejected = expect(queued).rejects.toThrow('stale admission');
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+    state.generation++;
+    response.resolve(Response.json({ messageId: 'm1', message: admittedMessage }));
+    await expect(accepted).resolves.toMatchObject({ messageId: 'm1' });
+    await rejected;
+    expect(requests.map(body => JSON.parse(body).content[0].text)).toEqual(['accepted']);
+  });
+
+  it('does not renew admission across an unauthorized retry', async () => {
+    const recovery = deferred<'retry'>();
+    const recovering = deferred<void>();
+    const requests: string[] = [];
+    const { client, state } = ownedClient({
+      fetch: async input => {
+        requests.push(input instanceof Request ? input.url : input.toString());
+        return Response.json({ error: 'expired' }, { status: 401 });
+      },
+      onUnauthorized: () => {
+        recovering.resolve();
+        return recovery.promise;
+      },
+    });
+    const pending = client.executeAction('c', 'm', { groupId: 'g', value: 'allow-once' });
+    await recovering.promise;
+    state.generation++;
+    recovery.resolve('retry');
+    await expect(pending).rejects.toThrow('stale admission');
+    expect(requests).toEqual([
+      'https://chat.example.com/v1/conversations/c/messages/m/execute-action',
+    ]);
+  });
+
+  it('disposes token waits and queued sends without waiting for their deadlines', async () => {
+    const token = deferred<string>();
+    const entered = deferred<void>();
+    const { client, requests } = ownedClient({
+      getToken: () => {
+        entered.resolve();
+        return token.promise;
+      },
+    });
+    const first = client.sendMessage({ conversationId: 'c', content: [] });
+    const queued = client.sendMessage({ conversationId: 'c', content: [] });
+    const settled = Promise.allSettled([first, queued]);
+    await entered.promise;
+    client.dispose();
+    expect((await settled).map(result => result.status)).toEqual(['rejected', 'rejected']);
+    token.resolve('old');
+    await Promise.resolve();
+    expect(requests).toEqual([]);
+  });
+
+  it('rejects an old read response instead of returning it to a replacement owner', async () => {
+    const response = deferred<Response>();
+    const { client, state } = ownedClient({ fetch: () => response.promise });
+    const pending = client.listConversations();
+    await Promise.resolve();
+    state.owner = false;
+    response.resolve(Response.json({ conversations: [], hasMore: false, nextCursor: null }));
+    await expect(pending).rejects.toThrow('owner is no longer active');
+  });
+
+  it('allows owner-fenced reads and stop-typing cleanup while locked', async () => {
+    const requests: string[] = [];
+    const { client, state } = ownedClient({
+      fetch: async input => {
+        requests.push(input instanceof Request ? input.url : input.toString());
+        return Response.json({ conversations: [], hasMore: false, nextCursor: null });
+      },
+    });
+    state.unlocked = false;
+    await expect(client.listConversations()).resolves.toMatchObject({ conversations: [] });
+    await expect(client.sendTypingStop('c')).resolves.toBeUndefined();
+    expect(requests).toHaveLength(2);
+  });
+});
+
 describe('KiloChatClient', () => {
   const sentMessage = {
     id: 'm1',

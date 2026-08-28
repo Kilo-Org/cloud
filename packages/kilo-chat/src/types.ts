@@ -72,12 +72,24 @@ import type {
 } from './events';
 
 // ── Configuration ───────────────────────────────────────────────────
+export type KiloChatOperation = Readonly<{
+  assertDispatch: () => void;
+  canPublish: () => boolean;
+}>;
+
 export type KiloChatClientConfig = {
   eventService: EventServiceClient;
   baseUrl: string;
   getToken: () => Promise<string>;
   onUnauthorized?: () => Promise<'retry' | 'stop'> | 'retry' | 'stop';
   fetch?: typeof globalThis.fetch;
+  // The old constructor omits these hooks. Preserve web EventServiceContext,
+  // web Kilo Chat context/typing, kilo-chat-hooks, package tests, and external
+  // package users until a breaking release migrates all those producers.
+  captureOperationAdmission?: () => () => void;
+  // Publication checks ownership only, not foreground access. Accepted server
+  // work and incoming messages/status can complete for the same locked owner.
+  canPublish?: () => boolean;
 };
 
 // ── Content blocks ──────────────────────────────────────────────────

@@ -31,6 +31,7 @@ import {
 } from './events';
 import type {
   KiloChatClientConfig,
+  KiloChatOperation,
   ConversationListResponse,
   MessageListResponse,
   ConversationDetailResponse,
@@ -82,11 +83,12 @@ export class KiloChatClient {
   private readonly getToken: () => Promise<string>;
   private readonly onUnauthorized: KiloChatClientConfig['onUnauthorized'];
   private readonly fetchFn: typeof globalThis.fetch;
-  // Per-conversation send queues. Each sendMessage call chains onto the tail
-  // of its conversation's queue so concurrent callers cannot race ahead of
-  // earlier sends and get a lower server-assigned ULID than a later send.
-  // See services/kilo-chat/src/do/conversation-do.ts (nextUlid is monotonic
-  // in DO arrival order, not caller send order).
+  private readonly captureAdmission: KiloChatClientConfig['captureOperationAdmission'];
+  private readonly ownerCanPublish: KiloChatClientConfig['canPublish'];
+  private readonly lifetime = new AbortController();
+  private readonly operations = new WeakSet<KiloChatOperation>();
+  private readonly subscriptions = new Set<() => void>();
+  // Per-conversation send queues preserve caller order for server-assigned ULIDs.
   private readonly sendQueues = new Map<string, Promise<unknown>>();
 
   constructor(config: KiloChatClientConfig) {
@@ -95,42 +97,79 @@ export class KiloChatClient {
     this.getToken = config.getToken;
     this.onUnauthorized = config.onUnauthorized;
     this.fetchFn = config.fetch ?? globalThis.fetch.bind(globalThis);
+    this.captureAdmission = config.captureOperationAdmission;
+    this.ownerCanPublish = config.canPublish;
+  }
+
+  canPublish(): boolean {
+    return !this.lifetime.signal.aborted && (this.ownerCanPublish?.() ?? true);
+  }
+
+  assertOwner(): void {
+    if (!this.canPublish()) throw new Error('Kilo Chat owner is no longer active');
+  }
+
+  /** Capture before any caller queue; a supplied operation is never re-admitted. */
+  captureOperation(operation?: KiloChatOperation): KiloChatOperation {
+    this.assertOwner();
+    if (operation) {
+      if (!this.operations.has(operation)) throw new Error('Invalid Kilo Chat operation');
+      operation.assertDispatch();
+      return operation;
+    }
+    const assertAdmission = this.captureAdmission?.();
+    const captured: KiloChatOperation = Object.freeze({
+      assertDispatch: () => {
+        this.assertOwner();
+        assertAdmission?.();
+      },
+      canPublish: () => this.canPublish(),
+    });
+    captured.assertDispatch();
+    this.operations.add(captured);
+    return captured;
+  }
+
+  /** Protected announcements are not passive cache publication. */
+  canStartOperation(): boolean {
+    try {
+      this.captureOperation();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Opt-in teardown. Old callers that never dispose retain their lifecycle. */
+  dispose(): void {
+    this.lifetime.abort(new Error('Kilo Chat owner is no longer active'));
+    this.sendQueues.clear();
+    for (const off of this.subscriptions) off();
   }
 
   // ── Mutations via HTTP ────────────────────────────────────────────────────
 
   /**
-   * Send a message into a conversation. The send is queued per conversation so
-   * concurrent callers cannot race ahead and get a lower server-assigned ULID.
-   *
-   * **Timeout is uncertain.** When the deadline fires the server may already
-   * have accepted the message. Callers must reconcile the conversation state
-   * via `listMessages` (or event-service events) before retrying the send.
+   * Queue sends per conversation without renewing their original admission.
+   * Timeout is uncertain: reconcile accepted server work before retrying.
    */
-  async sendMessage(req: CreateMessageRequest): Promise<CreateMessageResponse> {
-    const body = req satisfies CreateMessageRequest;
+  async sendMessage(
+    req: CreateMessageRequest,
+    operation?: KiloChatOperation
+  ): Promise<CreateMessageResponse> {
+    const captured = this.captureOperation(operation);
+    const send = () =>
+      this.httpRequest('/v1/messages', {
+        method: 'POST',
+        body: req,
+        schema: createMessageResponseSchema,
+        deadlineMs: SEND_DEADLINE_MS,
+        operation: captured,
+      });
     const prev = this.sendQueues.get(req.conversationId) ?? Promise.resolve();
-    const next = prev.then(
-      () =>
-        this.httpRequest('/v1/messages', {
-          method: 'POST',
-          body,
-          schema: createMessageResponseSchema,
-          deadlineMs: SEND_DEADLINE_MS,
-        }),
-      // A failed prior send must not block subsequent sends — swallow the
-      // rejection on the chain; the original caller already received it.
-      () =>
-        this.httpRequest('/v1/messages', {
-          method: 'POST',
-          body,
-          schema: createMessageResponseSchema,
-          deadlineMs: SEND_DEADLINE_MS,
-        })
-    );
+    // A failed prior send must not block subsequent sends.
+    const next = prev.then(send, send);
     this.sendQueues.set(req.conversationId, next);
-    // Best-effort cleanup so the map doesn't grow unbounded for long-lived
-    // clients. Only clear if this send is still the tail.
     const cleanup = (): void => {
       if (this.sendQueues.get(req.conversationId) === next) {
         this.sendQueues.delete(req.conversationId);
@@ -140,63 +179,70 @@ export class KiloChatClient {
     return next;
   }
 
-  async editMessage(messageId: string, req: EditMessageRequest): Promise<EditMessageResponse> {
-    const body = req satisfies EditMessageRequest;
-
+  async editMessage(
+    messageId: string,
+    req: EditMessageRequest,
+    operation?: KiloChatOperation
+  ): Promise<EditMessageResponse> {
     return this.httpRequest(`/v1/messages/${messageId}`, {
       method: 'PATCH',
-      body,
+      body: req,
       schema: editMessageResponseSchema,
+      operation,
     });
   }
 
   async deleteMessage(
     messageId: string,
-    req: z.input<typeof deleteMessageQuerySchema>
+    req: z.input<typeof deleteMessageQuerySchema>,
+    operation?: KiloChatOperation
   ): Promise<void> {
-    const query = req satisfies z.input<typeof deleteMessageQuerySchema>;
-
     await this.httpRequest(`/v1/messages/${messageId}`, {
       method: 'DELETE',
-      query,
+      query: req,
       schema: voidSchema,
+      operation,
     });
   }
 
-  async createConversation(req: CreateConversationRequest): Promise<CreateConversationResponse> {
-    const body = req satisfies CreateConversationRequest;
-
+  async createConversation(
+    req: CreateConversationRequest,
+    operation?: KiloChatOperation
+  ): Promise<CreateConversationResponse> {
     return this.httpRequest('/v1/conversations', {
       method: 'POST',
-      body,
+      body: req,
       schema: createConversationResponseSchema,
+      operation,
     });
   }
 
   async renameConversation(
     conversationId: string,
-    req: RenameConversationRequest
+    req: RenameConversationRequest,
+    operation?: KiloChatOperation
   ): Promise<{ ok: true }> {
-    const body = req satisfies RenameConversationRequest;
-
     return this.httpRequest(`/v1/conversations/${conversationId}`, {
       method: 'PATCH',
-      body,
+      body: req,
       schema: okResponseSchema,
+      operation,
     });
   }
 
-  async leaveConversation(conversationId: string): Promise<void> {
+  async leaveConversation(conversationId: string, operation?: KiloChatOperation): Promise<void> {
     await this.httpRequest(`/v1/conversations/${conversationId}/leave`, {
       method: 'POST',
       schema: voidSchema,
+      operation,
     });
   }
 
-  async sendTyping(conversationId: string): Promise<void> {
+  async sendTyping(conversationId: string, operation?: KiloChatOperation): Promise<void> {
     await this.httpRequest(`/v1/conversations/${conversationId}/typing`, {
       method: 'POST',
       schema: voidSchema,
+      operation,
     });
   }
 
@@ -204,74 +250,82 @@ export class KiloChatClient {
     await this.httpRequest(`/v1/conversations/${conversationId}/typing/stop`, {
       method: 'POST',
       schema: voidSchema,
+      ownerOnly: true,
     });
   }
 
   async markConversationRead(
     conversationId: string,
-    req: MarkConversationReadRequest
+    req: MarkConversationReadRequest,
+    operation?: KiloChatOperation
   ): Promise<MarkConversationReadResponse> {
-    const body = req satisfies MarkConversationReadRequest;
-
     return this.httpRequest(`/v1/conversations/${conversationId}/mark-read`, {
       method: 'POST',
-      body,
+      body: req,
       schema: markConversationReadResponseSchema,
+      operation,
     });
   }
 
   async addReaction(
     messageId: string,
-    req: z.input<typeof reactionRequestBodySchema>
+    req: z.input<typeof reactionRequestBodySchema>,
+    operation?: KiloChatOperation
   ): Promise<AddReactionResponse> {
-    const body = req satisfies z.input<typeof reactionRequestBodySchema>;
-
     return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'POST',
-      body,
+      body: req,
       schema: addReactionResponseSchema,
+      operation,
     });
   }
 
   async removeReaction(
     messageId: string,
-    req: z.input<typeof reactionRequestBodySchema>
+    req: z.input<typeof reactionRequestBodySchema>,
+    operation?: KiloChatOperation
   ): Promise<RemoveReactionResponse> {
-    const query = req satisfies z.input<typeof reactionRequestBodySchema>;
-
     return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'DELETE',
-      query,
+      query: req,
       schema: removeReactionResponseSchema,
+      operation,
     });
   }
 
-  async redeliverMessage(conversationId: string, messageId: string): Promise<{ ok: true }> {
+  async redeliverMessage(
+    conversationId: string,
+    messageId: string,
+    operation?: KiloChatOperation
+  ): Promise<{ ok: true }> {
     return this.httpRequest(`/v1/conversations/${conversationId}/messages/${messageId}/redeliver`, {
       method: 'POST',
       schema: okResponseSchema,
+      operation,
     });
   }
 
   async executeAction(
     conversationId: string,
     messageId: string,
-    req: z.input<typeof executeActionRequestSchema>
+    req: z.input<typeof executeActionRequestSchema>,
+    operation?: KiloChatOperation
   ): Promise<ExecuteActionResponse> {
-    const body = req satisfies z.input<typeof executeActionRequestSchema>;
-
     return this.httpRequest(
       `/v1/conversations/${conversationId}/messages/${messageId}/execute-action`,
-      { method: 'POST', body, schema: executeActionResponseSchema }
+      { method: 'POST', body: req, schema: executeActionResponseSchema, operation }
     );
   }
 
-  async initAttachment(req: AttachmentInitRequest): Promise<AttachmentInitResponse> {
-    const body = req satisfies AttachmentInitRequest;
+  async initAttachment(
+    req: AttachmentInitRequest,
+    operation?: KiloChatOperation
+  ): Promise<AttachmentInitResponse> {
     return this.httpRequest('/v1/attachments/init', {
       method: 'POST',
-      body,
+      body: req,
       schema: attachmentInitResponseSchema,
+      operation,
     });
   }
 
@@ -293,11 +347,7 @@ export class KiloChatClient {
       limit: opts?.limit,
       cursor: opts?.cursor,
     } satisfies z.input<typeof listConversationsQuerySchema>;
-
-    return this.httpRequest('/v1/conversations', {
-      query,
-      schema: conversationListResponseSchema,
-    });
+    return this.httpRequest('/v1/conversations', { query, schema: conversationListResponseSchema });
   }
 
   async getConversation(conversationId: string): Promise<ConversationDetailResponse> {
@@ -312,15 +362,12 @@ export class KiloChatClient {
     });
   }
 
-  // Nudges the bot to push a fresh `bot.status` event over event-service.
-  // Returns cached status when available so the caller can paint the UI
-  // immediately without waiting for the WS event. Server dedupes within a
-  // short window; subscribed clients call this every ~15s while on a chat
-  // surface.
+  // Status subscriptions nudge cached status; they do not admit foreground actions.
   async requestBotStatus(sandboxId: string): Promise<RequestBotStatusResponse> {
     return this.httpRequest(`/v1/sandboxes/${sandboxId}/request-bot-status`, {
       method: 'POST',
       schema: requestBotStatusResponseSchema,
+      ownerOnly: true,
     });
   }
 
@@ -335,6 +382,7 @@ export class KiloChatClient {
     opts?: z.input<typeof listMessagesQuerySchema>
   ): Promise<Message[]> {
     const res = await this.listMessagesPage(conversationId, opts);
+    this.assertOwner();
     return res.messages;
   }
 
@@ -342,11 +390,9 @@ export class KiloChatClient {
     conversationId: string,
     opts?: z.input<typeof listMessagesQuerySchema>
   ): Promise<MessageListResponse> {
-    const query = {
-      before: opts?.before,
-      limit: opts?.limit,
-    } satisfies z.input<typeof listMessagesQuerySchema>;
-
+    const query = { before: opts?.before, limit: opts?.limit } satisfies z.input<
+      typeof listMessagesQuerySchema
+    >;
     return this.httpRequest(`/v1/conversations/${conversationId}/messages`, {
       query,
       schema: messageListResponseSchema,
@@ -359,12 +405,20 @@ export class KiloChatClient {
     event: N,
     handler: (ctx: string, payload: KiloChatEventOf<N>) => void
   ): () => void {
+    if (!this.canPublish()) return () => {};
     const payloadSchema = getKiloChatEventPayloadSchema(event);
-    return this.es.on(event, (context, payload) => {
+    const unsubscribe = this.es.on(event, (context, payload) => {
+      if (!this.canPublish()) return;
       const result = payloadSchema.safeParse(payload);
       if (!result.success) return;
       handler(context, result.data);
     });
+    const off = () => {
+      unsubscribe();
+      this.subscriptions.delete(off);
+    };
+    this.subscriptions.add(off);
+    return off;
   }
 
   onMessageCreated(handler: (ctx: string, e: MessageCreatedEvent) => void): () => void {
@@ -446,31 +500,41 @@ export class KiloChatClient {
       body?: unknown;
       query?: Record<string, unknown>;
       schema: z.ZodType<T>;
-      signal?: AbortSignal;
       deadlineMs?: number;
+      operation?: KiloChatOperation;
+      ownerOnly?: boolean;
     }
   ): Promise<T> {
-    const deadline = opts.deadlineMs ?? CONTROL_PLANE_DEADLINE_MS;
-    return withDeadline(
-      deadline,
+    this.assertOwner();
+    const operation =
+      opts.method && opts.method !== 'GET' && !opts.ownerOnly
+        ? this.captureOperation(opts.operation)
+        : undefined;
+    const assertDispatch = () => {
+      this.assertOwner();
+      operation?.assertDispatch();
+    };
+    const result = await withDeadline(
+      opts.deadlineMs ?? CONTROL_PLANE_DEADLINE_MS,
       async signal => {
+        const request = { ...opts, signal, assertDispatch };
         try {
-          return await this.httpRequestOnce(path, { ...opts, signal });
+          return await this.httpRequestOnce(path, request);
         } catch (err) {
           // Deadline/timeout errors must NOT trigger unauthorized recovery.
           const onUnauthorized = this.onUnauthorized;
-          if (!this.shouldRecoverFromUnauthorized(err) || onUnauthorized === undefined) {
-            throw err;
-          }
+          if (!this.shouldRecoverFromUnauthorized(err) || onUnauthorized === undefined) throw err;
+          assertDispatch();
           const decision = await onUnauthorized();
-          if (decision !== 'retry') {
-            throw err;
-          }
-          return this.httpRequestOnce(path, { ...opts, signal });
+          assertDispatch();
+          if (decision !== 'retry') throw err;
+          return this.httpRequestOnce(path, request);
         }
       },
-      opts.signal
+      this.lifetime.signal
     );
+    this.assertOwner();
+    return result;
   }
 
   private shouldRecoverFromUnauthorized(err: unknown): err is KiloChatApiError {
@@ -488,12 +552,14 @@ export class KiloChatClient {
       body?: unknown;
       query?: Record<string, unknown>;
       schema: z.ZodType<T>;
-      signal?: AbortSignal;
+      signal: AbortSignal;
+      assertDispatch: () => void;
     }
   ): Promise<T> {
+    opts.assertDispatch();
+    if (opts.signal.aborted) throw opts.signal.reason;
     const token = await this.getToken();
     let url = `${this.baseUrl}${path}`;
-
     if (opts.query) {
       const params = new URLSearchParams();
       for (const [k, v] of Object.entries(opts.query)) {
@@ -503,24 +569,26 @@ export class KiloChatClient {
       const qs = params.toString();
       if (qs) url += `?${qs}`;
     }
-
     const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
     if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
-
+    opts.assertDispatch();
+    if (opts.signal.aborted) throw opts.signal.reason;
     const res = await this.fetchFn(url, {
       method: opts.method ?? 'GET',
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       signal: opts.signal,
     });
-
+    // A lock cannot undo accepted server work; replacement cannot publish it.
+    this.assertOwner();
     if (!res.ok) {
       const body: unknown = await res.json().catch(() => null);
+      this.assertOwner();
       throw new KiloChatApiError(res.status, body);
     }
-
     if (res.status === 204) return opts.schema.parse(undefined);
     const json: unknown = await res.json();
+    this.assertOwner();
     return opts.schema.parse(json);
   }
 }

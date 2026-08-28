@@ -29,7 +29,10 @@ class FakeXMLHttpRequest {
     this.listeners.set(event, listeners);
   }
 
+  sent = false;
+
   send() {
+    this.sent = true;
     if (!FakeXMLHttpRequest.completeOnSend) {
       return;
     }
@@ -71,6 +74,32 @@ describe('createXhrPerformUpload', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('rejects stale admission immediately before send and removes abort listeners', async () => {
+    const abort = new AbortController();
+    const upload = createXhrPerformUpload();
+    await expect(
+      upload(
+        new Blob(['private']),
+        'https://upload.example.test',
+        {},
+        {
+          signal: abort.signal,
+          onProgress: () => {},
+          operation: {
+            canPublish: () => true,
+            assertDispatch: () => {
+              throw new Error('stale lease');
+            },
+          },
+        }
+      )
+    ).rejects.toThrow('stale lease');
+    abort.abort();
+    expect(
+      FakeXMLHttpRequest.instances.map(xhr => ({ sent: xhr.sent, aborted: xhr.aborted }))
+    ).toEqual([{ sent: false, aborted: false }]);
   });
 
   it('resolves successful 2xx uploads', async () => {

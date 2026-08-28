@@ -1,27 +1,33 @@
 import { useCallback } from 'react';
 
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { type AuthenticatedOwner, getAuthenticatedOwner } from '@/lib/context-scope';
+import { LocalAccessDeniedError } from '@/lib/local-access';
+import { assertTransportOwner, isTransportOwner } from '@/lib/local-access-transport';
 import { parseTimestamp } from '@/lib/utils';
 import { trpcClient } from '@/lib/trpc';
 
 type KiloChatTokenResponse = Awaited<ReturnType<typeof trpcClient.kiloChat.getToken.query>>;
-
 type TokenCache = {
   authToken: string;
+  owner: AuthenticatedOwner;
   response: KiloChatTokenResponse;
   expiresAtMs: number;
 };
+type TokenResponseListener = (response: KiloChatTokenResponse, owner: AuthenticatedOwner) => void;
+type TokenResponseGetter = (assertDispatch?: () => void) => Promise<KiloChatTokenResponse>;
 
-type TokenResponseListener = (response: KiloChatTokenResponse) => void;
-
-// Module-level cache keyed on the user's auth token, so a sign-out followed by
-// a different sign-in within the JWT window doesn't return the previous user's
-// token. The in-flight ref is keyed the same way for the same reason.
 let cache: TokenCache | null = null;
-let inFlight: { authToken: string; promise: Promise<KiloChatTokenResponse> } | null = null;
+let inFlight: {
+  authToken: string;
+  owner: AuthenticatedOwner;
+  promise: Promise<KiloChatTokenResponse>;
+} | null = null;
+let cacheGeneration = 0;
 const tokenResponseListeners = new Set<TokenResponseListener>();
 
 export function clearKiloChatTokenCache(): void {
+  cacheGeneration += 1;
   cache = null;
   inFlight = null;
 }
@@ -33,58 +39,93 @@ export function subscribeToKiloChatTokenResponses(listener: TokenResponseListene
   };
 }
 
-/**
- * Returns a stable getter function that fetches a kilo-chat JWT, caching it
- * until 60 seconds before expiry. Concurrent callers share a single in-flight
- * fetch via a module-level dedup ref.
- *
- * The auth token is read at call time through `getAuthTokenForRequest`
- * (matching `trpcClient`) rather than captured from `useAuth()`, so a getter
- * constructed before auth has loaded — or before the user signs in — picks up
- * the correct token on its next call instead of permanently capturing
- * `undefined`.
- */
-export function useKiloChatTokenGetter(): () => Promise<string> {
-  const getTokenResponse = useKiloChatTokenResponseGetter();
+/** The provider supplies its immutable owner; standalone reads capture their owner at invocation. */
+export function useKiloChatTokenGetter(owner?: AuthenticatedOwner): () => Promise<string> {
+  const getTokenResponse = useKiloChatTokenResponseGetter(owner);
   return useCallback(async () => {
     const response = await getTokenResponse();
     return response.token;
   }, [getTokenResponse]);
 }
 
-export function useKiloChatTokenResponseGetter(): () => Promise<KiloChatTokenResponse> {
-  return useCallback(async () => {
-    const authToken = await getAuthTokenForRequest();
-    if (!authToken) {
-      throw new Error('Cannot fetch kilo-chat token: not authenticated');
-    }
-
-    if (cache?.authToken === authToken && cache.expiresAtMs - Date.now() > 60_000) {
-      return cache.response;
-    }
-
-    if (inFlight?.authToken === authToken) {
-      return inFlight.promise;
-    }
-
-    const slot = { authToken, promise: fetchAndCacheToken(authToken) };
-    inFlight = slot;
-    try {
-      return await slot.promise;
-    } finally {
-      // Only clear the slot if a concurrent caller hasn't replaced it.
-      if (inFlight === slot) {
-        inFlight = null;
-      }
-    }
-  }, []);
+function sameGeneration(left: AuthenticatedOwner, right: AuthenticatedOwner): boolean {
+  return left.authEpoch === right.authEpoch && left.generation === right.generation;
 }
 
-async function fetchAndCacheToken(authToken: string): Promise<KiloChatTokenResponse> {
-  const response = await trpcClient.kiloChat.getToken.query();
-  cache = { authToken, response, expiresAtMs: parseTimestamp(response.expiresAt).getTime() };
-  for (const listener of tokenResponseListeners) {
-    listener(response);
+export function useKiloChatTokenResponseGetter(owner?: AuthenticatedOwner): TokenResponseGetter {
+  return useCallback(
+    async assertDispatch => {
+      const capturedOwner = owner ?? getAuthenticatedOwner();
+      const generation = cacheGeneration;
+      const assertCurrent = () => {
+        assertTransportOwner(capturedOwner);
+        if (generation !== cacheGeneration) {
+          throw new LocalAccessDeniedError('stale');
+        }
+        assertDispatch?.();
+      };
+      assertCurrent();
+      const authToken = await getAuthTokenForRequest();
+      assertCurrent();
+      if (!authToken) {
+        throw new Error('Cannot fetch kilo-chat token: not authenticated');
+      }
+      if (
+        cache?.authToken === authToken &&
+        sameGeneration(cache.owner, capturedOwner) &&
+        cache.expiresAtMs - Date.now() > 60_000
+      ) {
+        return cache.response;
+      }
+      if (inFlight?.authToken === authToken && sameGeneration(inFlight.owner, capturedOwner)) {
+        const response = await inFlight.promise;
+        assertCurrent();
+        return response;
+      }
+      const slot = {
+        authToken,
+        owner: capturedOwner,
+        promise: fetchAndCacheToken(authToken, capturedOwner, generation),
+      };
+      inFlight = slot;
+      try {
+        const response = await slot.promise;
+        assertCurrent();
+        return response;
+      } finally {
+        if (inFlight === slot) {
+          inFlight = null;
+        }
+      }
+    },
+    [owner]
+  );
+}
+
+async function fetchAndCacheToken(
+  authToken: string,
+  owner: AuthenticatedOwner,
+  generation: number
+): Promise<KiloChatTokenResponse> {
+  assertTransportOwner(owner);
+  const response = await trpcClient.kiloChat.getToken.query(undefined, {
+    context: { localAccessOwner: owner },
+  });
+  assertTransportOwner(owner);
+  if (generation !== cacheGeneration) {
+    throw new LocalAccessDeniedError('stale');
   }
+  const userId = getAuthenticatedOwner().userId;
+  if (userId !== null && response.userId !== userId) {
+    throw new LocalAccessDeniedError('owner');
+  }
+  cache = { authToken, owner, response, expiresAtMs: parseTimestamp(response.expiresAt).getTime() };
+  for (const listener of tokenResponseListeners) {
+    if (!isTransportOwner(owner)) {
+      break;
+    }
+    listener(response, owner);
+  }
+  assertTransportOwner(owner);
   return response;
 }

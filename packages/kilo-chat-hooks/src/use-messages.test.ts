@@ -1,6 +1,266 @@
-import { describe, expect, it } from 'vitest';
-import { QueryClient } from '@tanstack/react-query';
-import { KiloChatApiError, type Message, type MessageListResponse } from '@kilocode/kilo-chat';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as React from 'react';
+import type * as ReactQuery from '@tanstack/react-query';
+import { QueryClient, type UseMutationOptions } from '@tanstack/react-query';
+import {
+  KiloChatApiError,
+  KiloChatClient,
+  type KiloChatClientConfig,
+  type Message,
+  type MessageListResponse,
+} from '@kilocode/kilo-chat';
+import { useSendMessage, useExecuteAction, useMessageCacheUpdater } from './use-messages';
+import { EventServiceClient, kiloclawConversationContext } from '@kilocode/event-service';
+
+const hookHarness = vi.hoisted(() => ({
+  queryClient: null as QueryClient | null,
+  effects: [] as (() => void | (() => void))[],
+}));
+vi.mock('react', async original => ({
+  ...(await original<typeof React>()),
+  useMemo: <T>(create: () => T) => create(),
+  useRef: <T>(current: T) => ({ current }),
+  useEffect: (effect: () => void | (() => void)) => {
+    hookHarness.effects.push(effect);
+  },
+}));
+vi.mock('@tanstack/react-query', async original => {
+  const actual = await original<typeof ReactQuery>();
+  return {
+    ...actual,
+    useQueryClient: () => hookHarness.queryClient,
+    useMutation: <D, V, C>(options: UseMutationOptions<D, Error, V, C>) => {
+      if (!hookHarness.queryClient) throw new Error('missing test query client');
+      const observer = new actual.MutationObserver(hookHarness.queryClient, options);
+      observer.subscribe(() => {});
+      return {
+        ...observer.getCurrentResult(),
+        mutateAsync: (variables: V, callbacks?: Parameters<typeof observer.mutate>[1]) =>
+          observer.mutate(variables, callbacks),
+        mutate: (variables: V, callbacks?: Parameters<typeof observer.mutate>[1]) => {
+          void observer.mutate(variables, callbacks).catch(() => {});
+        },
+      };
+    },
+  };
+});
+
+function messageDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+function messageOwner(fetch: typeof globalThis.fetch) {
+  const state = { generation: 0, current: true, locked: false };
+  const handlers = new Map<string, (context: string, event: unknown) => void>();
+  const client = new KiloChatClient({
+    baseUrl: 'https://chat.test',
+    getToken: async () => 'a',
+    fetch,
+    eventService: {
+      on: (name: string, handler: (context: string, event: unknown) => void) => {
+        handlers.set(name, handler);
+        return () => {
+          handlers.delete(name);
+        };
+      },
+    } as KiloChatClientConfig['eventService'],
+    canPublish: () => state.current,
+    captureOperationAdmission: () => {
+      const generation = state.generation;
+      return () => {
+        if (state.locked || generation !== state.generation) throw new Error('stale admission');
+      };
+    },
+  });
+  return { client, state, handlers };
+}
+
+describe('message hook ownership and admission', () => {
+  beforeEach(() => {
+    hookHarness.queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    hookHarness.effects = [];
+  });
+
+  it('preserves legacy send bodies, cache settlement, callbacks, and API errors without hooks', async () => {
+    const queryClient = hookHarness.queryClient!;
+    const requests: unknown[] = [];
+    const receipts: string[] = [];
+    const serverMessage = message({ senderId: 'legacy', content: textContent('hello') });
+    const client = new KiloChatClient({
+      eventService: new EventServiceClient({
+        url: 'https://events.test',
+        getToken: async () => 'legacy',
+      }),
+      baseUrl: 'https://chat.test',
+      getToken: async () => 'legacy',
+      fetch: async (_url, init) => {
+        if (typeof init?.body !== 'string') throw new Error('Expected JSON');
+        requests.push(JSON.parse(init.body));
+        return requests.length === 1
+          ? Response.json({ messageId: serverMessage.id, message: serverMessage })
+          : Response.json({ error: 'forbidden' }, { status: 403 });
+      },
+    });
+    const mutation = useSendMessage(client, 'c', 'legacy');
+    const first = { conversationId: 'c', clientId: 'first', content: textContent('hello') };
+    await mutation.mutateAsync(first, {
+      onSuccess: (_response, variables) => {
+        receipts.push(variables.clientId);
+      },
+    });
+    const second = { conversationId: 'c', clientId: 'second', content: textContent('unsent') };
+    await expect(mutation.mutateAsync(second)).rejects.toMatchObject({
+      status: 403,
+      body: { error: 'forbidden' },
+    });
+    expect(requests).toEqual([first, second]);
+    expect(receipts).toEqual(['first']);
+    expect(
+      queryClient.getQueryData<MessageInfiniteData>(messagesKey('c'))?.pages[0]?.messages
+    ).toEqual([serverMessage]);
+  });
+
+  it.each(['send', 'approval'] as const)(
+    'rejects %s after an optimistic wait crosses lock/unlock',
+    async kind => {
+      const queryClient = hookHarness.queryClient!;
+      const waiting = messageDeferred<void>();
+      const entered = messageDeferred<void>();
+      vi.spyOn(queryClient, 'cancelQueries').mockImplementation(async () => {
+        entered.resolve();
+        await waiting.promise;
+      });
+      const requests: string[] = [];
+      const { client, state } = messageOwner(async input => {
+        requests.push(input instanceof Request ? input.url : input.toString());
+        return Response.json({});
+      });
+      const original = message({ content: actionContent(false) });
+      const key = messagesKey('c');
+      queryClient.setQueryData(key, { pages: [messagePage([original])], pageParams: [undefined] });
+      const send = useSendMessage(client, 'c', 'a');
+      const approval = useExecuteAction(client, 'c', 'a');
+      const pending =
+        kind === 'send'
+          ? send.mutateAsync({
+              conversationId: 'c',
+              clientId: 'draft',
+              content: textContent('retain me'),
+            })
+          : approval.mutateAsync({
+              messageId: original.id,
+              groupId: 'approval-1',
+              value: 'allow-once',
+            });
+      await entered.promise;
+      state.generation++;
+      waiting.resolve();
+      await expect(pending).rejects.toThrow('stale admission');
+      expect(requests).toEqual([]);
+      expect(queryClient.getQueryData<MessageInfiniteData>(key)?.pages[0]?.messages).toEqual([
+        original,
+      ]);
+      expect(
+        queryClient
+          .getMutationCache()
+          .getAll()
+          .map(mutation => mutation.state.status)
+      ).toContain('error');
+    }
+  );
+
+  it('does not insert A optimistic content after B replaces the cache during cancellation', async () => {
+    const queryClient = hookHarness.queryClient!;
+    const waiting = messageDeferred<void>();
+    const entered = messageDeferred<void>();
+    vi.spyOn(queryClient, 'cancelQueries').mockImplementation(async () => {
+      entered.resolve();
+      await waiting.promise;
+    });
+    const { client, state } = messageOwner(async () => Response.json({}));
+    const mutation = useSendMessage(client, 'c', 'a');
+    const pending = mutation.mutateAsync({
+      conversationId: 'c',
+      clientId: 'draft',
+      content: textContent('A'),
+    });
+    await entered.promise;
+    state.current = false;
+    const replacement = {
+      pages: [messagePage([message({ senderId: 'b', content: textContent('B') })])],
+      pageParams: [undefined],
+    };
+    queryClient.setQueryData(messagesKey('c'), replacement);
+    waiting.resolve();
+    await expect(pending).rejects.toThrow('owner is no longer active');
+    expect(queryClient.getQueryData(messagesKey('c'))).toEqual(replacement);
+  });
+
+  it('does not roll back B when an A send fails after its optimistic insert', async () => {
+    const queryClient = hookHarness.queryClient!;
+    const response = messageDeferred<Response>();
+    const entered = messageDeferred<void>();
+    const { client, state } = messageOwner(async () => {
+      entered.resolve();
+      return response.promise;
+    });
+    const mutation = useSendMessage(client, 'c', 'a');
+    const pending = mutation.mutateAsync({
+      conversationId: 'c',
+      clientId: 'draft',
+      content: textContent('A'),
+    });
+    await entered.promise;
+    state.current = false;
+    const replacement = {
+      pages: [
+        messagePage([message({ id: 'pending-draft', senderId: 'b', content: textContent('B') })]),
+      ],
+      pageParams: [undefined],
+    };
+    queryClient.setQueryData(messagesKey('c'), replacement);
+    response.resolve(Response.json({ error: 'failed' }, { status: 500 }));
+    await expect(pending).rejects.toThrow('owner is no longer active');
+    expect(queryClient.getQueryData(messagesKey('c'))).toEqual(replacement);
+    expect(queryClient.getQueryState(messagesKey('c'))?.isInvalidated).toBe(false);
+  });
+
+  it('stores same-owner incoming failures while locked without announcing them', () => {
+    const queryClient = hookHarness.queryClient!;
+    const { client, state, handlers } = messageOwner(async () => Response.json({}));
+    const original = message({});
+    queryClient.setQueryData(messagesKey('c'), {
+      pages: [messagePage([original])],
+      pageParams: [undefined],
+    });
+    const announcements: string[] = [];
+    useMessageCacheUpdater(
+      client,
+      's',
+      'c',
+      undefined,
+      () => {
+        announcements.push('action');
+      },
+      () => {
+        announcements.push('delivery');
+      }
+    );
+    hookHarness.effects[0]?.();
+    state.locked = true;
+    handlers.get('message.delivery_failed')?.(kiloclawConversationContext('s', 'c'), {
+      messageId: original.id,
+    });
+    expect(
+      queryClient.getQueryData<MessageInfiniteData>(messagesKey('c'))?.pages[0]?.messages[0]
+        ?.deliveryFailed
+    ).toBe(true);
+    expect(announcements).toEqual([]);
+  });
+});
 import {
   applyExecuteActionResponseToPages,
   applyCreateMessageResponseToPages,
@@ -38,8 +298,8 @@ function message(overrides: Partial<Message>): Message {
   };
 }
 
-function textContent(text: string): Message['content'] {
-  return [{ type: 'text', text }];
+function textContent(text: string) {
+  return [{ type: 'text', text }] satisfies Message['content'];
 }
 
 function actionContent(resolved = false): Message['content'] {

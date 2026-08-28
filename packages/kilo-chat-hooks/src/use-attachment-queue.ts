@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
-import type { AttachmentBlock, KiloChatClient } from '@kilocode/kilo-chat';
+import type { AttachmentBlock, KiloChatClient, KiloChatOperation } from '@kilocode/kilo-chat';
 
 export type QueuedAttachmentStatus = 'uploading' | 'ready' | 'failed';
 
@@ -129,22 +129,19 @@ export type PerformUpload = (
   blob: Blob,
   putUrl: string,
   putHeaders: Record<string, string>,
-  opts: { onProgress: (fraction: number) => void; signal: AbortSignal }
+  opts: {
+    onProgress: (fraction: number) => void;
+    signal: AbortSignal;
+    // Old web/package uploaders omit admission. Remove the fallback only after
+    // all producers migrate in a breaking release; the mobile adapter requires it.
+    operation?: KiloChatOperation;
+  }
 ) => Promise<void>;
 
 function mapXhrUploadResultToOutcome(result: XhrUploadResult): XhrUploadOutcome {
-  if (result.aborted) {
-    return { kind: 'aborted' };
-  }
-
-  if (result.status === 0) {
-    return { kind: 'error', message: 'Network error during upload' };
-  }
-
-  if (result.status >= 200 && result.status < 300) {
-    return { kind: 'ok' };
-  }
-
+  if (result.aborted) return { kind: 'aborted' };
+  if (result.status === 0) return { kind: 'error', message: 'Network error during upload' };
+  if (result.status >= 200 && result.status < 300) return { kind: 'ok' };
   return { kind: 'error', message: `Upload failed (${result.status})` };
 }
 
@@ -153,15 +150,12 @@ export function createXhrPerformUpload(): PerformUpload {
     new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       let aborted = false;
-
       function cleanup() {
         opts.signal.removeEventListener('abort', onAbort);
       }
-
       function createAbortError(): DOMException {
         return new DOMException('Aborted', 'AbortError');
       }
-
       function onAbort() {
         aborted = true;
         try {
@@ -172,41 +166,38 @@ export function createXhrPerformUpload(): PerformUpload {
         cleanup();
         reject(createAbortError());
       }
-
       if (opts.signal.aborted) {
         onAbort();
         return;
       }
-
       opts.signal.addEventListener('abort', onAbort, { once: true });
       xhr.open('PUT', putUrl, true);
-
       for (const [key, value] of Object.entries(putHeaders)) {
-        if (key.toLowerCase() !== 'content-length') {
-          xhr.setRequestHeader(key, value);
-        }
+        if (key.toLowerCase() !== 'content-length') xhr.setRequestHeader(key, value);
       }
-
       xhr.upload.addEventListener('progress', event => {
-        if (!event.lengthComputable || event.total === 0) {
-          return;
-        }
-        opts.onProgress(event.loaded / event.total);
+        if (!event.lengthComputable || event.total === 0) return;
+        if (opts.operation?.canPublish() ?? true) opts.onProgress(event.loaded / event.total);
       });
-
       xhr.addEventListener('loadend', () => {
         cleanup();
         const outcome = mapXhrUploadResultToOutcome({ status: xhr.status, aborted });
-        if (outcome.kind === 'ok') {
-          resolve();
-        } else if (outcome.kind === 'aborted') {
-          reject(createAbortError());
-        } else {
-          reject(new Error(outcome.message));
-        }
+        if (outcome.kind === 'ok') resolve();
+        else if (outcome.kind === 'aborted') reject(createAbortError());
+        else reject(new Error(outcome.message));
       });
-
-      xhr.send(blob);
+      try {
+        // This is the final boundary, after initialization and any adapter work.
+        opts.operation?.assertDispatch();
+        if (opts.signal.aborted) {
+          onAbort();
+          return;
+        }
+        xhr.send(blob);
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
     });
 }
 
@@ -214,6 +205,7 @@ export type AddFileInput = {
   blob: Blob;
   filename: string;
   mimeType: string;
+  operation?: KiloChatOperation;
 };
 
 export type UseAttachmentQueueOptions = {
@@ -221,13 +213,16 @@ export type UseAttachmentQueueOptions = {
   maxBytes: number;
   generateTempId?: () => string;
   onSizeRejected?: (input: AddFileInput) => void;
+  // The old web/package form captures through the client when absent. Remove
+  // the fallback only after all producers migrate; mobile supplies this hook.
+  captureOperation?: () => KiloChatOperation;
 };
 
 export type UseAttachmentQueueResult = {
   rows: QueuedAttachment[];
   addFile: (input: AddFileInput) => string | null;
   removeFile: (tempId: string) => void;
-  retryFile: (tempId: string) => void;
+  retryFile: (tempId: string, operation?: KiloChatOperation) => void;
   clear: () => void;
   clearFiles: (tempIds: string[]) => void;
   getBlob: (tempId: string) => Blob | null;
@@ -246,47 +241,59 @@ export function useAttachmentQueue(
   options: UseAttachmentQueueOptions
 ): UseAttachmentQueueResult {
   const [state, dispatch] = useReducer(attachmentQueueReducer, { rows: [] });
-  const { performUpload, maxBytes, generateTempId, onSizeRejected } = options;
+  const { performUpload, maxBytes, generateTempId, onSizeRejected, captureOperation } = options;
   const generate = generateTempId ?? defaultTempId;
-
   type Pending = {
     abort: AbortController;
+    client: KiloChatClient;
+    operation: KiloChatOperation;
     putUrl?: string;
     putHeaders?: Record<string, string>;
     putUrlExpiresAtMs?: number;
   };
   const pendingRef = useRef<Map<string, Pending>>(new Map());
-  // Blobs are tracked separately so previews keep working after the upload
-  // completes — pendingRef releases its entry on setReady to free upload
-  // bookkeeping, but the local bytes are still useful for the preview chip
-  // until the user sends or removes the attachment.
+  // Retain local bytes through errors and completion until explicit send/remove.
   const blobsRef = useRef<Map<string, Blob>>(new Map());
-
+  const capture = useCallback(
+    (supplied?: KiloChatOperation): KiloChatOperation => {
+      try {
+        return client.captureOperation(supplied ?? captureOperation?.());
+      } catch (error) {
+        return {
+          assertDispatch: () => {
+            throw error;
+          },
+          canPublish: () => client.canPublish(),
+        };
+      }
+    },
+    [client, captureOperation]
+  );
   type UploadArgs = { tempId: string; filename: string; mimeType: string; size: number };
-
   const startUpload = useCallback(
-    async (args: UploadArgs) => {
-      const { tempId, filename, mimeType, size } = args;
+    async ({ tempId, filename, mimeType, size }: UploadArgs) => {
       const pending = pendingRef.current.get(tempId);
       const blob = blobsRef.current.get(tempId);
       if (!pending || !blob) return;
-
+      const { operation } = pending;
       try {
+        operation.assertDispatch();
         let putUrl = pending.putUrl;
         let putHeaders = pending.putHeaders;
         const expiresAtMs = pending.putUrlExpiresAtMs ?? 0;
-        // Treat the URL as expired a minute early to avoid racing R2 at the boundary.
-        const putUrlExpired = Date.now() > expiresAtMs - 60 * 1000;
-
-        if (!putUrl || !putHeaders || putUrlExpired) {
-          const res = await client.initAttachment({
-            conversationId,
-            mimeType,
-            size,
-            filename,
-            idempotencyKey: tempId,
-          });
-          if (pending.abort.signal.aborted) return;
+        // Expire a minute early to avoid racing R2 at the boundary.
+        if (!putUrl || !putHeaders || Date.now() > expiresAtMs - 60 * 1000) {
+          const res = await pending.client.initAttachment(
+            {
+              conversationId,
+              mimeType,
+              size,
+              filename,
+              idempotencyKey: tempId,
+            },
+            operation
+          );
+          if (pending.abort.signal.aborted || !operation.canPublish()) return;
           pending.putUrl = res.putUrl;
           pending.putHeaders = res.putHeaders;
           pending.putUrlExpiresAtMs = res.putUrlExpiresAt * 1000;
@@ -294,35 +301,42 @@ export function useAttachmentQueue(
           putHeaders = res.putHeaders;
           dispatch({ type: 'setInited', tempId, attachmentId: res.attachmentId });
         }
-
+        operation.assertDispatch();
         await performUpload(blob, putUrl, putHeaders, {
+          operation,
           signal: pending.abort.signal,
-          onProgress: fraction => dispatch({ type: 'setProgress', tempId, progress: fraction }),
+          onProgress: fraction => {
+            if (operation.canPublish())
+              dispatch({ type: 'setProgress', tempId, progress: fraction });
+          },
         });
-        if (pending.abort.signal.aborted) return;
+        if (pending.abort.signal.aborted || !operation.canPublish()) return;
         dispatch({ type: 'setReady', tempId });
-        // Release upload bookkeeping; blobsRef keeps the bytes alive for the
-        // preview chip until send or remove.
         pendingRef.current.delete(tempId);
       } catch (err) {
-        if (pending.abort.signal.aborted) return;
-        const message = err instanceof Error ? err.message : 'Upload failed';
-        dispatch({ type: 'setFailed', tempId, error: message });
+        if (pending.abort.signal.aborted || !operation.canPublish()) return;
+        dispatch({
+          type: 'setFailed',
+          tempId,
+          error: err instanceof Error ? err.message : 'Upload failed',
+        });
       }
     },
-    [client, conversationId, performUpload]
+    [conversationId, performUpload]
   );
 
   const addFile = useCallback(
     (input: AddFileInput): string | null => {
+      if (!client.canPublish() || (input.operation && !input.operation.canPublish())) return null;
       if (input.blob.size > maxBytes) {
         onSizeRejected?.(input);
         return null;
       }
+      const operation = capture(input.operation);
       const tempId = generate();
       const size = input.blob.size;
       blobsRef.current.set(tempId, input.blob);
-      pendingRef.current.set(tempId, { abort: new AbortController() });
+      pendingRef.current.set(tempId, { abort: new AbortController(), client, operation });
       dispatch({
         type: 'add',
         row: {
@@ -337,41 +351,31 @@ export function useAttachmentQueue(
       void startUpload({ tempId, filename: input.filename, mimeType: input.mimeType, size });
       return tempId;
     },
-    [conversationId, generate, maxBytes, onSizeRejected, startUpload]
+    [capture, client, generate, maxBytes, onSizeRejected, startUpload]
   );
 
   const removeFile = useCallback((tempId: string) => {
-    const pending = pendingRef.current.get(tempId);
-    pending?.abort.abort();
+    pendingRef.current.get(tempId)?.abort.abort();
     pendingRef.current.delete(tempId);
     blobsRef.current.delete(tempId);
     dispatch({ type: 'remove', tempId });
   }, []);
 
   const retryFile = useCallback(
-    (tempId: string) => {
+    (tempId: string, supplied?: KiloChatOperation) => {
       const existing = pendingRef.current.get(tempId);
-      if (!existing) return;
+      if (!existing || existing.client !== client || !existing.operation.canPublish()) return;
       if (!blobsRef.current.has(tempId)) return;
       const row = state.rows.find(r => r.tempId === tempId);
       if (!row) return;
+      // An explicit retry is a new action. Capture at this call, never after a wait.
+      const operation = capture(supplied);
       existing.abort.abort();
-      const fresh: Pending = {
-        abort: new AbortController(),
-        putUrl: existing.putUrl,
-        putHeaders: existing.putHeaders,
-        putUrlExpiresAtMs: existing.putUrlExpiresAtMs,
-      };
-      pendingRef.current.set(tempId, fresh);
+      pendingRef.current.set(tempId, { ...existing, abort: new AbortController(), operation });
       dispatch({ type: 'retry', tempId });
-      void startUpload({
-        tempId,
-        filename: row.filename,
-        mimeType: row.mimeType,
-        size: row.size,
-      });
+      void startUpload({ tempId, filename: row.filename, mimeType: row.mimeType, size: row.size });
     },
-    [startUpload, state.rows]
+    [capture, client, startUpload, state.rows]
   );
 
   const clear = useCallback(() => {
@@ -380,31 +384,26 @@ export function useAttachmentQueue(
     blobsRef.current.clear();
     dispatch({ type: 'clear' });
   }, []);
-
   const clearFiles = useCallback((tempIds: string[]) => {
     for (const tempId of tempIds) {
-      const pending = pendingRef.current.get(tempId);
-      pending?.abort.abort();
+      pendingRef.current.get(tempId)?.abort.abort();
       pendingRef.current.delete(tempId);
       blobsRef.current.delete(tempId);
     }
     dispatch({ type: 'clearFiles', tempIds });
   }, []);
-
   const getBlob = useCallback((tempId: string) => blobsRef.current.get(tempId) ?? null, []);
-
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       for (const pending of pendingRef.current.values()) pending.abort.abort();
       pendingRef.current.clear();
       blobsRef.current.clear();
-    };
-  }, []);
-
+    },
+    []
+  );
   const readyBlocks = useMemo(() => selectReadyBlocks(state.rows), [state.rows]);
   const isUploading = useMemo(() => selectIsUploading(state.rows), [state.rows]);
   const hasFailed = useMemo(() => selectHasFailed(state.rows), [state.rows]);
-
   return {
     rows: state.rows,
     addFile,

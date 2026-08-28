@@ -2,7 +2,12 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useCallback, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
-import { type AddFileInput, useAttachmentQueue } from '@kilocode/kilo-chat-hooks';
+import {
+  type AddFileInput,
+  useAttachmentQueue,
+  type UseAttachmentQueueOptions,
+} from '@kilocode/kilo-chat-hooks';
+import { type KiloChatOperation } from '@kilocode/kilo-chat';
 
 import { i18n } from '@/i18n';
 import {
@@ -40,27 +45,32 @@ export function MessageInputWithAttachmentQueue({
     onSendContentBlocks: MessageInputContentBlocksOnSend;
   }) {
   const localUrisRef = useRef<Map<string, string>>(new Map());
-
-  const onSizeRejected = useCallback((input: AddFileInput) => {
-    toast.error(buildAttachmentSizeRejectionToast(input.filename));
-  }, []);
-
-  const queue = useAttachmentQueue(client, conversationId, {
+  const onSizeRejected = useCallback(
+    (input: AddFileInput) => {
+      if (client.canStartOperation()) {
+        toast.error(buildAttachmentSizeRejectionToast(input.filename));
+      }
+    },
+    [client]
+  );
+  const queueOptions = {
     performUpload: mobilePerformUpload,
     maxBytes: MOBILE_ATTACHMENT_MAX_BYTES,
     onSizeRejected,
-  });
+    captureOperation: () => client.captureOperation(),
+  } satisfies UseAttachmentQueueOptions &
+    Required<Pick<UseAttachmentQueueOptions, 'captureOperation'>>;
+  const queue = useAttachmentQueue(client, conversationId, queueOptions);
   const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
 
   const addSelectedAttachments = useCallback(
-    async (selected: readonly MessageAttachment[]) => {
+    async (selected: readonly MessageAttachment[], operation: KiloChatOperation) => {
       if (selected.length === 0) {
         return;
       }
-
-      // Gate on size and capacity before any bytes are read: materializing an
-      // oversized file is what runs the device out of memory.
+      operation.assertDispatch();
+      // Gate size/capacity before reading bytes. Materialize sequentially to bound memory.
       const { accepted, toast: rejectionToast } = selectAllowedAttachments({
         existingCount: queue.rows.length,
         selected,
@@ -68,44 +78,49 @@ export function MessageInputWithAttachmentQueue({
       if (rejectionToast) {
         toast.error(rejectionToast);
       }
-
-      // Sequential on purpose: concurrent materialize multiplies peak memory by
-      // the selection size. eslint no-await-in-loop wants Promise.all; refuse.
       for (const attachment of accepted) {
-        // Per-file, so one unreadable file in a multi-select does not discard the
-        // rest. Same message as the gate's unreadable rejection: from the user's
-        // side "we could not read this file" is the same fact whether the size
-        // stat or the read itself failed.
         try {
+          operation.assertDispatch();
           // eslint-disable-next-line no-await-in-loop -- sequential materialize bounds peak memory
           const picked = await materializeAttachment(attachment);
-          const tempId = queue.addFile(picked.input);
+          const tempId = queue.addFile({ ...picked.input, operation });
           if (tempId) {
             localUrisRef.current.set(tempId, picked.localUri);
           }
         } catch {
-          toast.error(buildAttachmentUnreadableToast(attachment.filename));
+          if (client.canStartOperation()) {
+            toast.error(buildAttachmentUnreadableToast(attachment.filename));
+          }
         }
       }
     },
-    [queue]
+    [client, queue]
   );
 
   const pickFromSource = useCallback(
-    async (source: 'camera' | 'library' | 'files') => {
+    async (source: 'camera' | 'library' | 'files', operation: KiloChatOperation) => {
       try {
+        operation.assertDispatch();
         const selected = await pickAttachmentsFromSource(source);
-        await addSelectedAttachments(selected);
+        await addSelectedAttachments(selected, operation);
       } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : i18n.t('chat.attachment.attachFailed')
-        );
+        if (client.canStartOperation()) {
+          toast.error(
+            error instanceof Error ? error.message : i18n.t('chat.attachment.attachFailed')
+          );
+        }
       }
     },
-    [addSelectedAttachments]
+    [addSelectedAttachments, client]
   );
 
   const openPicker = useCallback(() => {
+    let operation: KiloChatOperation | undefined = undefined;
+    try {
+      operation = client.captureOperation();
+    } catch {
+      return;
+    }
     const actionSheet = getAttachmentActionSheetConfig();
     showActionSheetWithOptions(
       {
@@ -115,22 +130,22 @@ export function MessageInputWithAttachmentQueue({
       },
       index => {
         if (index === 0) {
-          void pickFromSource('camera');
+          void pickFromSource('camera', operation);
         } else if (index === 1) {
-          void pickFromSource('library');
+          void pickFromSource('library', operation);
         } else if (index === 2) {
-          void pickFromSource('files');
+          void pickFromSource('files', operation);
         }
       }
     );
-  }, [bottom, pickFromSource, showActionSheetWithOptions]);
+  }, [bottom, client, pickFromSource, showActionSheetWithOptions]);
 
   const addClipboardImage = useCallback(
     async (file: ClipboardImageFile) => {
-      const attachment = clipboardImageToSelection(file);
-      await addSelectedAttachments([attachment]);
+      const operation = client.captureOperation();
+      await addSelectedAttachments([clipboardImageToSelection(file)], operation);
     },
-    [addSelectedAttachments]
+    [addSelectedAttachments, client]
   );
 
   const attachmentQueue: ComposerAttachmentQueue = {
@@ -149,7 +164,6 @@ export function MessageInputWithAttachmentQueue({
     },
     addClipboardImage,
   };
-
   return (
     <MessageInputContent
       {...props}

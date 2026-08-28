@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { useKiloChatMutation } from './use-messages';
 import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
 import {
@@ -89,12 +90,15 @@ export function useConversationDetail(client: KiloChatClient, conversationId: st
 
 export function useCreateConversation(client: KiloChatClient, options?: MutationErrorOptions) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (req: CreateConversationRequest) => client.createConversation(req),
+  return useKiloChatMutation(client, {
+    mutationFn: (req: CreateConversationRequest, operation) =>
+      client.createConversation(req, operation),
     onSuccess: (response, variables) => {
       settleCreateConversation(queryClient, variables, response);
     },
-    onError: options?.onError,
+    onError: error => {
+      if (client.canStartOperation()) options?.onError?.(error);
+    },
   });
 }
 
@@ -106,13 +110,15 @@ type RenameConversationMutationVariables = {
 
 export function useRenameConversation(client: KiloChatClient, options?: MutationErrorOptions) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (variables: RenameConversationMutationVariables) =>
-      client.renameConversation(variables.conversationId, { title: variables.title }),
+  return useKiloChatMutation(client, {
+    mutationFn: (variables: RenameConversationMutationVariables, operation) =>
+      client.renameConversation(variables.conversationId, { title: variables.title }, operation),
     onSuccess: (_data, variables) => {
       settleRenameConversation(queryClient, variables);
     },
-    onError: options?.onError,
+    onError: error => {
+      if (client.canStartOperation()) options?.onError?.(error);
+    },
   });
 }
 
@@ -123,13 +129,13 @@ type LeaveConversationMutationVariables = {
 
 export function useLeaveConversation(client: KiloChatClient, options?: MutationErrorOptions) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (variables: LeaveConversationMutationVariables) =>
-      client.leaveConversation(variables.conversationId),
+  return useKiloChatMutation(client, {
+    mutationFn: (variables: LeaveConversationMutationVariables, operation) =>
+      client.leaveConversation(variables.conversationId, operation),
     onMutate: variables => applyOptimisticLeaveConversation(queryClient, variables),
-    onError: (_err, _variables, context) => {
+    onError: (err, _variables, context) => {
       rollbackOptimisticLeaveConversation(queryClient, context);
-      options?.onError?.(_err);
+      if (client.canStartOperation()) options?.onError?.(err);
     },
     onSuccess: (_data, variables) => {
       settleLeaveConversation(queryClient, variables);
@@ -733,9 +739,11 @@ export function settleMarkConversationRead(
 
 export function useMarkConversationRead(client: KiloChatClient) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ conversationId, lastSeenMessageId }: MarkConversationReadMutationVariables) =>
-      client.markConversationRead(conversationId, { lastSeenMessageId }),
+  return useKiloChatMutation(client, {
+    mutationFn: (
+      { conversationId, lastSeenMessageId }: MarkConversationReadMutationVariables,
+      operation
+    ) => client.markConversationRead(conversationId, { lastSeenMessageId }, operation),
     onMutate: variables => applyOptimisticMarkConversationRead(queryClient, variables),
     onError: (_err, _variables, context) => {
       rollbackOptimisticMarkConversationRead(queryClient, context);

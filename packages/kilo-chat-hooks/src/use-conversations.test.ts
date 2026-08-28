@@ -5,8 +5,148 @@ import type {
 } from '@kilocode/kilo-chat';
 import { ulidToTimestamp } from '@kilocode/kilo-chat';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
-import { QueryClient } from '@tanstack/react-query';
-import { describe, expect, it } from 'vitest';
+import { MutationCache, QueryClient, type UseMutationOptions } from '@tanstack/react-query';
+import type * as ReactQuery from '@tanstack/react-query';
+import type * as React from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { KiloChatClient } from '@kilocode/kilo-chat';
+import { EventServiceClient } from '@kilocode/event-service';
+import {
+  useCreateConversation,
+  useLeaveConversation,
+  useMarkConversationRead,
+} from './use-conversations';
+
+const conversationHarness = vi.hoisted(() => ({ queryClient: null as QueryClient | null }));
+vi.mock('react', async original => ({
+  ...(await original<typeof React>()),
+  useMemo: <T>(create: () => T) => create(),
+  useRef: <T>(current: T) => ({ current }),
+}));
+vi.mock('@tanstack/react-query', async original => {
+  const actual = await original<typeof ReactQuery>();
+  return {
+    ...actual,
+    useQueryClient: () => conversationHarness.queryClient,
+    useMutation: <D, V, C>(options: UseMutationOptions<D, Error, V, C>) => {
+      if (!conversationHarness.queryClient) throw new Error('missing test query client');
+      const observer = new actual.MutationObserver(conversationHarness.queryClient, options);
+      observer.subscribe(() => {});
+      return {
+        ...observer.getCurrentResult(),
+        mutateAsync: (variables: V) => observer.mutate(variables),
+        mutate: (variables: V) => {
+          void observer.mutate(variables).catch(() => {});
+        },
+      };
+    },
+  };
+});
+function conversationDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+function conversationOwner(fetch: typeof globalThis.fetch) {
+  const state = { current: true, generation: 0 };
+  const client = new KiloChatClient({
+    eventService: new EventServiceClient({ url: 'https://events.test', getToken: async () => 'a' }),
+    baseUrl: 'https://chat.test',
+    getToken: async () => 'a',
+    fetch,
+    canPublish: () => state.current,
+    captureOperationAdmission: () => {
+      const generation = state.generation;
+      return () => {
+        if (generation !== state.generation) throw new Error('stale admission');
+      };
+    },
+  });
+  return { client, state };
+}
+
+describe('conversation mutation admission', () => {
+  beforeEach(() => {
+    conversationHarness.queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    });
+  });
+
+  it('captures before the global onMutate wait for conversation creation', async () => {
+    const waiting = conversationDeferred<void>();
+    const entered = conversationDeferred<void>();
+    conversationHarness.queryClient = new QueryClient({
+      mutationCache: new MutationCache({
+        onMutate: async () => {
+          entered.resolve();
+          await waiting.promise;
+        },
+      }),
+    });
+    const requests: string[] = [];
+    const { client, state } = conversationOwner(async input => {
+      requests.push(input instanceof Request ? input.url : input.toString());
+      return Response.json({});
+    });
+    const mutation = useCreateConversation(client);
+    const pending = mutation.mutateAsync({ sandboxId: 's' });
+    await entered.promise;
+    state.generation++;
+    waiting.resolve();
+    await expect(pending).rejects.toThrow('stale admission');
+    expect(requests).toEqual([]);
+  });
+
+  it('honors an outer mark-read admission instead of capturing a new one', async () => {
+    const queryClient = conversationHarness.queryClient!;
+    const requests: string[] = [];
+    const { client, state } = conversationOwner(async input => {
+      requests.push(input instanceof Request ? input.url : input.toString());
+      return Response.json({});
+    });
+    const original = client.captureOperation();
+    queryClient.setQueryData(
+      conversationsKey('s'),
+      conversationsData([[conversation('c', { lastReadAt: 1 })]], [null])
+    );
+    state.generation++;
+    await expect(
+      useMarkConversationRead(client).mutateAsync(
+        { sandboxId: 's', conversationId: 'c', lastSeenMessageId: '01K8ZB8B3H9BRWZ6KCN39AX09G' },
+        undefined,
+        original
+      )
+    ).rejects.toThrow('stale admission');
+    expect(firstConversationLastReadAt(queryClient.getQueryData(conversationsKey('s')))).toBe(1);
+    expect(requests).toEqual([]);
+  });
+
+  it('does not restore A conversation rows into B after a failed leave', async () => {
+    const queryClient = conversationHarness.queryClient!;
+    const response = conversationDeferred<Response>();
+    const entered = conversationDeferred<void>();
+    const { client, state } = conversationOwner(async () => {
+      entered.resolve();
+      return response.promise;
+    });
+    const key = conversationsKey('s');
+    queryClient.setQueryData(key, conversationsData([[conversation('a', {})]], [null]));
+    const pending = useLeaveConversation(client).mutateAsync({
+      sandboxId: 's',
+      conversationId: 'a',
+    });
+    await entered.promise;
+    expect(flattenedIds(queryClient.getQueryData(key))).toEqual([]);
+    state.current = false;
+    queryClient.setQueryData(key, conversationsData([[conversation('b', {})]], [null]));
+    response.resolve(Response.json({ error: 'failed' }, { status: 500 }));
+    await expect(pending).rejects.toThrow('owner is no longer active');
+    expect(flattenedIds(queryClient.getQueryData(key))).toEqual(['b']);
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(false);
+  });
+});
 
 import { conversationKey, conversationsKey, messagesKey } from './query-keys';
 import {

@@ -1,4 +1,190 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { KiloChatClient } from '@kilocode/kilo-chat';
+import { EventServiceClient } from '@kilocode/event-service';
+import { useAttachmentQueue, type PerformUpload } from './use-attachment-queue';
+
+const queueHarness = vi.hoisted(() => ({
+  state: { rows: [] } as AttachmentQueueState,
+  refs: [] as { current: unknown }[],
+  cursor: 0,
+}));
+vi.mock('react', () => ({
+  useCallback: <T>(fn: T) => fn,
+  useMemo: <T>(fn: () => T) => fn(),
+  useEffect: () => {},
+  useRef: <T>(initial: T) => {
+    const index = queueHarness.cursor++;
+    queueHarness.refs[index] ??= { current: initial };
+    return queueHarness.refs[index] as { current: T };
+  },
+  useReducer: (reducer: typeof attachmentQueueReducer) => [
+    queueHarness.state,
+    (action: AttachmentQueueAction) => {
+      queueHarness.state = reducer(queueHarness.state, action);
+    },
+  ],
+}));
+function uploadDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+const initializedUpload = {
+  attachmentId: '01HV0000000000000000000001',
+  putUrl: 'https://upload.test/a',
+  putHeaders: {},
+  putUrlExpiresAt: 4_000_000_000,
+};
+function uploadOwner(fetch: typeof globalThis.fetch) {
+  const state = { current: true, generation: 0 };
+  const client = new KiloChatClient({
+    eventService: new EventServiceClient({ url: 'https://events.test', getToken: async () => 'a' }),
+    baseUrl: 'https://chat.test',
+    getToken: async () => 'a',
+    fetch,
+    canPublish: () => state.current,
+    captureOperationAdmission: () => {
+      const generation = state.generation;
+      return () => {
+        if (generation !== state.generation) throw new Error('stale admission');
+      };
+    },
+  });
+  return { client, state };
+}
+function renderQueue(client: KiloChatClient, performUpload: PerformUpload) {
+  queueHarness.cursor = 0;
+  return useAttachmentQueue(client, 'c', {
+    performUpload,
+    maxBytes: 1000,
+    generateTempId: () => 'tmp-1',
+  });
+}
+
+describe('attachment queue operation ownership', () => {
+  beforeEach(() => {
+    queueHarness.state = { rows: [] };
+    queueHarness.refs = [];
+    queueHarness.cursor = 0;
+  });
+
+  it('retains bytes and rejects an initialized upload after lock/unlock', async () => {
+    const response = uploadDeferred<Response>();
+    const entered = uploadDeferred<void>();
+    const { client, state } = uploadOwner(async () => {
+      entered.resolve();
+      return response.promise;
+    });
+    const uploads: string[] = [];
+    const queue = renderQueue(client, async blob => {
+      uploads.push(await blob.text());
+    });
+    queue.addFile({ blob: new Blob(['photo']), filename: 'a.png', mimeType: 'image/png' });
+    await entered.promise;
+    state.generation++;
+    response.resolve(Response.json(initializedUpload));
+    await vi.waitFor(() => expect(queueHarness.state.rows[0]?.status).toBe('failed'));
+    expect(queueHarness.state.rows[0]).toMatchObject({
+      attachmentId: initializedUpload.attachmentId,
+      error: 'stale admission',
+    });
+    expect(await queue.getBlob('tmp-1')?.text()).toBe('photo');
+    await Promise.resolve();
+    expect(uploads).toEqual([]);
+  });
+
+  it('keeps the explicit retry admission through renewed initialization', async () => {
+    const second = uploadDeferred<Response>();
+    let initializations = 0;
+    const { client, state } = uploadOwner(async () => {
+      initializations++;
+      return initializations === 1
+        ? Response.json({ ...initializedUpload, putUrlExpiresAt: 1 })
+        : second.promise;
+    });
+    const uploads: string[] = [];
+    const upload: PerformUpload = async blob => {
+      uploads.push(await blob.text());
+      throw new Error('network');
+    };
+    renderQueue(client, upload).addFile({
+      blob: new Blob(['photo']),
+      filename: 'a.png',
+      mimeType: 'image/png',
+    });
+    await vi.waitFor(() => expect(queueHarness.state.rows[0]?.status).toBe('failed'));
+    const queue = renderQueue(client, upload);
+    queue.retryFile('tmp-1');
+    await vi.waitFor(() => expect(initializations).toBe(2));
+    state.generation++;
+    second.resolve(Response.json(initializedUpload));
+    await vi.waitFor(() => expect(queueHarness.state.rows[0]?.error).toBe('stale admission'));
+    expect(uploads).toEqual(['photo']);
+    expect(await queue.getBlob('tmp-1')?.text()).toBe('photo');
+  });
+
+  it('does not publish A initialization after the owner becomes B', async () => {
+    const response = uploadDeferred<Response>();
+    const entered = uploadDeferred<void>();
+    const { client, state } = uploadOwner(async () => {
+      entered.resolve();
+      return response.promise;
+    });
+    const uploads: string[] = [];
+    const queue = renderQueue(client, async blob => {
+      uploads.push(await blob.text());
+    });
+    queue.addFile({ blob: new Blob(['A']), filename: 'a.png', mimeType: 'image/png' });
+    await entered.promise;
+    state.current = false;
+    response.resolve(Response.json(initializedUpload));
+    await vi.waitFor(() => expect(client.canPublish()).toBe(false));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(queueHarness.state.rows[0]).toMatchObject({ status: 'uploading' });
+    expect(queueHarness.state.rows[0]?.attachmentId).toBeUndefined();
+    expect(uploads).toEqual([]);
+  });
+
+  it('stores accepted upload completion for the original owner while locked', async () => {
+    const accepted = uploadDeferred<void>();
+    const entered = uploadDeferred<void>();
+    const { client, state } = uploadOwner(async () => Response.json(initializedUpload));
+    const queue = renderQueue(client, async (_blob, _url, _headers, options) => {
+      options.operation?.assertDispatch();
+      entered.resolve();
+      await accepted.promise;
+    });
+    queue.addFile({ blob: new Blob(['photo']), filename: 'a.png', mimeType: 'image/png' });
+    await entered.promise;
+    state.generation++;
+    accepted.resolve();
+    await vi.waitFor(() => expect(queueHarness.state.rows[0]?.status).toBe('ready'));
+    expect(selectReadyBlocks(queueHarness.state.rows)[0]?.attachmentId).toBe(
+      initializedUpload.attachmentId
+    );
+    expect(await queue.getBlob('tmp-1')?.text()).toBe('photo');
+  });
+
+  it('preserves a legacy producer without client or queue admission hooks', async () => {
+    const client = new KiloChatClient({
+      eventService: new EventServiceClient({
+        url: 'https://events.test',
+        getToken: async () => 'a',
+      }),
+      baseUrl: 'https://chat.test',
+      getToken: async () => 'legacy',
+      fetch: async () => Response.json(initializedUpload),
+    });
+    const uploads: string[] = [];
+    renderQueue(client, async blob => {
+      uploads.push(await blob.text());
+    }).addFile({ blob: new Blob(['legacy']), filename: 'a', mimeType: 'image/png' });
+    await vi.waitFor(() => expect(queueHarness.state.rows[0]?.status).toBe('ready'));
+    expect(uploads).toEqual(['legacy']);
+  });
+});
 
 import {
   attachmentQueueReducer,

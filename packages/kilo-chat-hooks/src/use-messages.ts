@@ -1,6 +1,12 @@
 import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
-import { KiloChatApiError, type KiloChatClient } from '@kilocode/kilo-chat';
+import type {
+  InfiniteData,
+  MutateOptions,
+  QueryClient,
+  QueryKey,
+  UseMutationOptions,
+} from '@tanstack/react-query';
+import { KiloChatApiError, type KiloChatClient, type KiloChatOperation } from '@kilocode/kilo-chat';
 import type {
   Message,
   ReactionSummary,
@@ -20,12 +26,139 @@ import type {
   CreateMessageResponse,
   ExecuteActionResponse,
 } from '@kilocode/kilo-chat';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { kiloclawConversationContext } from '@kilocode/event-service';
 
 import { messagesKey } from './query-keys';
 
 export const PAGE_SIZE = 50;
+
+type KiloChatMutationOptions<TData, TVariables, TContext> = Omit<
+  UseMutationOptions<TData, Error, TVariables, TContext | undefined>,
+  'mutationFn' | 'onMutate'
+> & {
+  mutationFn: (variables: TVariables, operation: KiloChatOperation) => Promise<TData>;
+  onMutate?: (variables: TVariables, operation: KiloChatOperation) => TContext | Promise<TContext>;
+};
+
+/**
+ * Capture before React Query's global onMutate, optimistic waits, offline pause,
+ * and retry queues. The optional third mutate argument carries an outer lease.
+ * Old web/package producers omit it and use the client's optional-hook fallback;
+ * remove that form only when a breaking release migrates those producers.
+ */
+export function useKiloChatMutation<TData, TVariables, TContext = unknown>(
+  client: KiloChatClient,
+  options: KiloChatMutationOptions<TData, TVariables, TContext>
+) {
+  type Input = {
+    variables: TVariables;
+    operation: KiloChatOperation;
+    options: typeof options;
+  };
+  // Retained functions read their client's latest options, never a replacement client's options.
+  const optionsRef = useRef({ client, options });
+  if (optionsRef.current.client !== client) {
+    optionsRef.current = { client, options };
+  }
+  const currentOptions = optionsRef.current;
+  currentOptions.options = options;
+
+  const mutation = useMutation<TData, Error, Input, TContext | undefined>({
+    ...options,
+    mutationFn: input => {
+      input.operation.assertDispatch();
+      return input.options.mutationFn(input.variables, input.operation);
+    },
+    onMutate: input => {
+      input.operation.assertDispatch();
+      return input.options.onMutate?.(input.variables, input.operation);
+    },
+    onSuccess: (data, input, context, mutationContext) =>
+      input.operation.canPublish()
+        ? input.options.onSuccess?.(data, input.variables, context, mutationContext)
+        : undefined,
+    onError: (error, input, context, mutationContext) =>
+      input.operation.canPublish()
+        ? input.options.onError?.(error, input.variables, context, mutationContext)
+        : undefined,
+    onSettled: (data, error, input, context, mutationContext) =>
+      input.operation.canPublish()
+        ? input.options.onSettled?.(data, error, input.variables, context, mutationContext)
+        : undefined,
+  });
+  const { mutate, mutateAsync } = mutation;
+  const actions = useMemo(() => {
+    function capture(variables: TVariables, supplied?: KiloChatOperation): Input {
+      let operation: KiloChatOperation;
+      try {
+        operation = client.captureOperation(supplied);
+      } catch (error) {
+        // Let React Query retain its existing error state and the unsent variables.
+        operation = {
+          assertDispatch: () => {
+            throw error;
+          },
+          canPublish: () => client.canPublish(),
+        };
+      }
+      // Pin the callbacks too: a rerender cannot redirect A's settlement into B.
+      return { variables, operation, options: currentOptions.options };
+    }
+    function callbacks(
+      input: Input,
+      supplied?: MutateOptions<TData, Error, TVariables, TContext | undefined>
+    ): MutateOptions<TData, Error, Input, TContext | undefined> {
+      const canNotify = () => {
+        try {
+          input.operation.assertDispatch();
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      return {
+        onSuccess: (data, _input, context, mutationContext) => {
+          if (canNotify()) supplied?.onSuccess?.(data, input.variables, context, mutationContext);
+        },
+        onError: (error, _input, context, mutationContext) => {
+          if (canNotify()) supplied?.onError?.(error, input.variables, context, mutationContext);
+        },
+        onSettled: (data, error, _input, context, mutationContext) => {
+          // Settlement can release a pending UI action while locked, but not for B.
+          if (input.operation.canPublish()) {
+            supplied?.onSettled?.(data, error, input.variables, context, mutationContext);
+          }
+        },
+      };
+    }
+    return {
+      mutate: (
+        variables: TVariables,
+        opts?: MutateOptions<TData, Error, TVariables, TContext | undefined>,
+        operation?: KiloChatOperation
+      ) => {
+        const input = capture(variables, operation);
+        mutate(input, callbacks(input, opts));
+      },
+      mutateAsync: async (
+        variables: TVariables,
+        opts?: MutateOptions<TData, Error, TVariables, TContext | undefined>,
+        operation?: KiloChatOperation
+      ) => {
+        const input = capture(variables, operation);
+        const result = await mutateAsync(input, callbacks(input, opts));
+        client.assertOwner();
+        return result;
+      },
+    };
+  }, [client, currentOptions, mutate, mutateAsync]);
+  return {
+    ...mutation,
+    variables: mutation.variables?.variables,
+    ...actions,
+  };
+}
 
 export type MessagePage = MessageListResponse;
 export type MessageInfiniteData<TPageParam = string | undefined> = InfiniteData<
@@ -456,6 +589,7 @@ export function useMessages(client: KiloChatClient, conversationId: string | nul
         before: pageParam,
         limit: PAGE_SIZE,
       });
+      client.assertOwner();
       return messagesFromListPage(page);
     },
     initialPageParam: undefined as string | undefined,
@@ -656,12 +790,13 @@ export function useSendMessage(
   options?: MutationErrorOptions
 ) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (req: SendMessageVariables) => client.sendMessage(req),
-    onMutate: async (variables: SendMessageVariables) => {
+  return useKiloChatMutation(client, {
+    mutationFn: (req: SendMessageVariables, operation) => client.sendMessage(req, operation),
+    onMutate: async (variables: SendMessageVariables, operation) => {
       if (!conversationId || currentUserId === null) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
+      operation.assertDispatch();
       const pendingId = `pending-${variables.clientId}`;
       const optimisticMessage: Message = {
         id: pendingId,
@@ -682,23 +817,25 @@ export function useSendMessage(
       settleSendMessageSuccess(queryClient, response, context);
     },
     onError: (err, _variables, context) => {
-      if (!context) return;
-      removeMessageFromCache(queryClient, context.queryKey, context.pendingId);
-      invalidateColdSeededMessages(queryClient, context);
-      options?.onError?.(err);
+      if (context) {
+        removeMessageFromCache(queryClient, context.queryKey, context.pendingId);
+        invalidateColdSeededMessages(queryClient, context);
+      }
+      if (client.canStartOperation()) options?.onError?.(err);
     },
   });
 }
 
 export function useEditMessage(client: KiloChatClient, conversationId: string | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ messageId, ...req }: EditMessageRequest & { messageId: string }) =>
-      client.editMessage(messageId, req),
-    onMutate: async variables => {
+  return useKiloChatMutation(client, {
+    mutationFn: ({ messageId, ...req }: EditMessageRequest & { messageId: string }, operation) =>
+      client.editMessage(messageId, req, operation),
+    onMutate: async (variables, operation) => {
       if (!conversationId) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
+      operation.assertDispatch();
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       const optimisticMessage = snapshot
         ? { ...snapshot, content: variables.content, clientUpdatedAt: variables.timestamp }
@@ -727,26 +864,15 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
 }
 
 /**
- * Retries bot delivery of an existing delivery-failed message. The server
- * re-attempts delivery of the same message row (no new message) and pushes
- * `message.redelivered` (clears `deliveryFailed`) right before the attempt,
- * then `message.delivery_failed` again if the retry fails.
- *
- * Not optimistic: an `onMutate` clear would race those events (a rejected
- * redelivery is indistinguishable from a committed one on an ambiguous HTTP
- * error), and a reconciling invalidate/refetch can capture a stale
- * pre-failure snapshot. Instead the clear is applied on HTTP SUCCESS, once the
- * server has confirmed the redelivery — a targeted single-message write, not a
- * refetch. This also covers a dropped `message.redelivered` event (the push is
- * best-effort), which would otherwise strand the flag until an unrelated
- * refetch. A subsequent, strictly-later `message.delivery_failed` event still
- * restores failure if the retry ultimately fails.
+ * Redelivery is not optimistic: an ambiguous failure cannot prove whether the
+ * server accepted it. Clear deliveryFailed only after confirmed HTTP success;
+ * a later message.delivery_failed event can still restore the failure.
  */
 export function useRedeliverMessage(client: KiloChatClient, conversationId: string | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ messageId }: { messageId: string }) =>
-      client.redeliverMessage(conversationId ?? '', messageId),
+  return useKiloChatMutation(client, {
+    mutationFn: ({ messageId }: { messageId: string }, operation) =>
+      client.redeliverMessage(conversationId ?? '', messageId, operation),
     onSuccess: (_data, variables) => {
       if (!conversationId) return;
       const queryKey = messagesKey(conversationId);
@@ -764,13 +890,16 @@ export function useRedeliverMessage(client: KiloChatClient, conversationId: stri
 
 export function useDeleteMessage(client: KiloChatClient, conversationId: string | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ messageId, conversationId }: { messageId: string; conversationId: string }) =>
-      client.deleteMessage(messageId, { conversationId }),
-    onMutate: async variables => {
+  return useKiloChatMutation(client, {
+    mutationFn: (
+      { messageId, conversationId }: { messageId: string; conversationId: string },
+      operation
+    ) => client.deleteMessage(messageId, { conversationId }, operation),
+    onMutate: async (variables, operation) => {
       if (!conversationId) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
+      operation.assertDispatch();
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       const optimisticMessage = snapshot ? { ...snapshot, deleted: true } : undefined;
       queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
@@ -798,13 +927,14 @@ export function useAddReaction(
   currentUserId: string | null
 ) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
-      client.addReaction(messageId, { conversationId: conversationId ?? '', emoji }),
-    onMutate: async variables => {
+  return useKiloChatMutation(client, {
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }, operation) =>
+      client.addReaction(messageId, { conversationId: conversationId ?? '', emoji }, operation),
+    onMutate: async (variables, operation) => {
       if (!conversationId || currentUserId === null) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
+      operation.assertDispatch();
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       const optimisticMessage = snapshot
         ? {
@@ -854,13 +984,14 @@ export function useRemoveReaction(
   currentUserId: string | null
 ) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
-      client.removeReaction(messageId, { conversationId: conversationId ?? '', emoji }),
-    onMutate: async variables => {
+  return useKiloChatMutation(client, {
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }, operation) =>
+      client.removeReaction(messageId, { conversationId: conversationId ?? '', emoji }, operation),
+    onMutate: async (variables, operation) => {
       if (!conversationId || currentUserId === null) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
+      operation.assertDispatch();
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       const optimisticMessage = snapshot
         ? {
@@ -910,20 +1041,24 @@ export function useExecuteAction(
   currentUserId: string | null
 ) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      messageId,
-      groupId,
-      value,
-    }: {
-      messageId: string;
-      groupId: string;
-      value: ExecApprovalDecision;
-    }) => client.executeAction(conversationId ?? '', messageId, { groupId, value }),
-    onMutate: async variables => {
+  return useKiloChatMutation(client, {
+    mutationFn: (
+      {
+        messageId,
+        groupId,
+        value,
+      }: {
+        messageId: string;
+        groupId: string;
+        value: ExecApprovalDecision;
+      },
+      operation
+    ) => client.executeAction(conversationId ?? '', messageId, { groupId, value }, operation),
+    onMutate: async (variables, operation) => {
       if (!conversationId || currentUserId === null) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
+      operation.assertDispatch();
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       const optimisticResolution = {
         value: variables.value,
@@ -935,17 +1070,9 @@ export function useExecuteAction(
         : undefined;
       queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, variables.messageId, msg => ({
-          ...msg,
-          content: msg.content.map(block => {
-            if (block.type !== 'actions') return block;
-            if (block.groupId !== variables.groupId) return block;
-            return {
-              ...block,
-              resolved: optimisticResolution,
-            };
-          }),
-        }));
+        return updateMessageInPages(old, variables.messageId, msg =>
+          applyActionResolution(msg, variables.groupId, optimisticResolution)
+        );
       });
       return { queryKey, snapshot, optimisticMessage, optimisticResolution };
     },
@@ -1049,7 +1176,7 @@ export function useMessageCacheUpdater(
         if (!old) return old;
         return updateMessageInPages(old, e.messageId, msg => ({ ...msg, deliveryFailed: true }));
       });
-      onMessageDeliveryFailed?.();
+      if (client.canStartOperation()) onMessageDeliveryFailed?.();
     };
 
     const onRedelivered = (ctx: string, e: MessageRedeliveredEvent) => {
@@ -1073,7 +1200,7 @@ export function useMessageCacheUpdater(
           }),
         }));
       });
-      onActionFailed?.();
+      if (client.canStartOperation()) onActionFailed?.();
     };
 
     const onReactionAdded = (ctx: string, e: ReactionAddedEvent) => {

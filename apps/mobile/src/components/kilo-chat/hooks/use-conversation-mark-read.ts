@@ -1,4 +1,4 @@
-import { type KiloChatClient, type Message } from '@kilocode/kilo-chat';
+import { type KiloChatClient, type KiloChatOperation, type Message } from '@kilocode/kilo-chat';
 import {
   attemptMarkCurrentConversationRead,
   clearMarkReadRetry,
@@ -8,6 +8,8 @@ import {
 } from '@kilocode/kilo-chat-hooks';
 import { useCallback, useEffect, useRef } from 'react';
 
+import { subscribeAuthenticatedOwner } from '@/lib/context-scope';
+import { subscribeLocalAccess } from '@/lib/local-access';
 import { useAppActiveAndFocused } from './use-app-active-and-focused';
 import { useMarkRead } from './use-mark-read';
 import { shouldMarkLatestMessageRead } from '../message-history-state';
@@ -30,84 +32,113 @@ export function useConversationMarkRead({
   sandboxId,
 }: Params) {
   const latestMessageId = latestMarkReadMessageId(messages);
-  const latestMarkReadMessageSenderId =
-    latestMessageId === null
-      ? null
-      : (messages.find(message => message.id === latestMessageId)?.senderId ?? null);
+  const latestSenderId = messages.find(message => message.id === latestMessageId)?.senderId ?? null;
   const activeAndFocused = useAppActiveAndFocused();
   const markRead = useMarkRead(client);
   const markReadStateRef = useRef(createMarkReadState());
   const markReadRetryStateRef = useRef(createMarkReadRetryState());
-  const currentMarkReadMarker =
-    latestMessageId === null ? null : `${conversationId}:${latestMessageId}`;
-  const currentMarkReadMarkerRef = useRef<string | null>(currentMarkReadMarker);
+  const currentMarker = latestMessageId === null ? null : `${conversationId}:${latestMessageId}`;
+  const currentMarkerRef = useRef(currentMarker);
   const activeAndFocusedRef = useRef(activeAndFocused);
-  const markCurrentConversationReadRef = useRef<(() => void) | null>(null);
-  currentMarkReadMarkerRef.current = currentMarkReadMarker;
+  const operationRef = useRef<KiloChatOperation | null>(null);
+  currentMarkerRef.current = currentMarker;
   activeAndFocusedRef.current = activeAndFocused;
 
   const markCurrentConversationRead = useCallback(() => {
-    if (!hasInitialMessages || latestMessageId === null || currentMarkReadMarker === null) {
-      return;
-    }
     if (
+      !hasInitialMessages ||
+      latestMessageId === null ||
+      currentMarker === null ||
+      !activeAndFocusedRef.current ||
       !shouldMarkLatestMessageRead({
         currentUserId,
-        latestMessageSenderId: latestMarkReadMessageSenderId,
+        latestMessageSenderId: latestSenderId,
       })
     ) {
       return;
     }
-    const marker = currentMarkReadMarker;
-    void attemptMarkCurrentConversationRead({
-      marker,
-      markReadState: markReadStateRef.current,
-      retryState: markReadRetryStateRef.current,
-      currentMarker: () => currentMarkReadMarkerRef.current,
-      isActive: () => activeAndFocusedRef.current,
-      markRead: async () => {
-        await markRead(sandboxId, conversationId, latestMessageId);
-      },
-      retry: () => {
-        markCurrentConversationReadRef.current?.();
-      },
-    });
+    // A rerender cannot replace the closure behind an already scheduled retry.
+    if (markReadRetryStateRef.current.marker === currentMarker) {
+      return;
+    }
+    let operation: KiloChatOperation | undefined = undefined;
+    try {
+      operation = client.captureOperation();
+    } catch {
+      return;
+    }
+    operationRef.current = operation;
+    const retryState = markReadRetryStateRef.current;
+    const isActive = () => {
+      try {
+        operation.assertDispatch();
+        return activeAndFocusedRef.current;
+      } catch {
+        clearMarkReadRetry(retryState);
+        return false;
+      }
+    };
+    const attempt = () => {
+      if (!isActive()) {
+        return;
+      }
+      void attemptMarkCurrentConversationRead({
+        marker: currentMarker,
+        markReadState: markReadStateRef.current,
+        retryState,
+        currentMarker: () => currentMarkerRef.current,
+        isActive,
+        markRead: async () => {
+          await markRead(sandboxId, conversationId, latestMessageId, operation);
+        },
+        retry: attempt,
+      });
+    };
+    attempt();
   }, [
+    client,
     conversationId,
-    currentMarkReadMarker,
+    currentMarker,
     currentUserId,
     hasInitialMessages,
     latestMessageId,
-    latestMarkReadMessageSenderId,
+    latestSenderId,
     markRead,
     sandboxId,
   ]);
-  markCurrentConversationReadRef.current = markCurrentConversationRead;
 
   useEffect(() => {
-    if (!activeAndFocused || currentMarkReadMarker === null) {
-      clearMarkReadRetry(markReadRetryStateRef.current);
-      return;
-    }
     if (
-      markReadRetryStateRef.current.marker !== null &&
-      markReadRetryStateRef.current.marker !== currentMarkReadMarker
+      !activeAndFocused ||
+      currentMarker === null ||
+      (markReadRetryStateRef.current.marker !== null &&
+        markReadRetryStateRef.current.marker !== currentMarker)
     ) {
       clearMarkReadRetry(markReadRetryStateRef.current);
     }
-  }, [activeAndFocused, currentMarkReadMarker]);
+  }, [activeAndFocused, currentMarker]);
 
   useEffect(() => {
     const retryState = markReadRetryStateRef.current;
+    const cancelInvalidRetry = () => {
+      try {
+        operationRef.current?.assertDispatch();
+      } catch {
+        clearMarkReadRetry(retryState);
+      }
+    };
+    const offAccess = subscribeLocalAccess(cancelInvalidRetry);
+    const offOwner = subscribeAuthenticatedOwner(cancelInvalidRetry);
     return () => {
+      offAccess();
+      offOwner();
       clearMarkReadRetry(retryState);
     };
   }, []);
 
   useEffect(() => {
-    if (!activeAndFocused) {
-      return;
+    if (activeAndFocused) {
+      markCurrentConversationRead();
     }
-    markCurrentConversationRead();
   }, [activeAndFocused, markCurrentConversationRead]);
 }

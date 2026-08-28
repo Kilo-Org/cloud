@@ -388,6 +388,7 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(text().includes('Nothing running right now')).toBe(Boolean(test.empty));
     expect(text().includes('Could not load active sessions')).toBe(Boolean(test.error));
     expect(text().includes('Updating')).toBe(Boolean(test.updating));
+    expect(text().includes('Loading…')).toBe(Boolean(test.skeleton));
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
     expect(text()).toContain('Personal');
     expect(headerAction().props.testID).toBe('agents-view-history');
@@ -403,6 +404,38 @@ describe('AgentSessionListScreen live presentation', () => {
       press('New session');
     }
     expect(state.destination).toBe('/(app)/agent-chat/new');
+  });
+
+  it('keeps cold-loading feedback stable until an accepted result', async () => {
+    state.live.hasAcceptedSuccess = false;
+    state.live.isLoading = true;
+    state.live.isFetching = true;
+    await renderScreen();
+    const loading = nodes('Text').find(node => node.children.includes('Loading…'));
+    const skeletons = nodes('Skeleton');
+    expect(loading).toBeDefined();
+    expect(skeletons).toHaveLength(8);
+    expect(text()).not.toContain('Updating');
+    expect(text()).not.toContain('Nothing running right now');
+    expect(state.announcements).toEqual(['Loading…']);
+
+    await renderScreen();
+    state.live.isLoading = false;
+    state.live.isFetching = false;
+    await renderScreen();
+    expect(nodes('Text').find(node => node.children.includes('Loading…'))).toBe(loading);
+    for (const [index, skeleton] of skeletons.entries()) {
+      expect(nodes('Skeleton')[index]).toBe(skeleton);
+    }
+    expect(state.announcements).toEqual(['Loading…']);
+    expect(text()).not.toContain('Nothing running right now');
+
+    state.live.hasAcceptedSuccess = true;
+    await renderScreen();
+    expect(text()).not.toContain('Loading…');
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(text()).toContain('Nothing running right now');
+    expect(state.announcements).toEqual(['Loading…']);
   });
 
   it('keeps list identity, row identity, navigation, run state, and scroll policy through reconnect and refresh failure', async () => {

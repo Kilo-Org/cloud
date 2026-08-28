@@ -56,12 +56,15 @@ export function HomeScreen() {
         <Animated.View layout={LinearTransition} className="gap-2">
           <AgentSessionsSection context={context} sessions={sessions} />
           {context.isReady && (
-            <>
-              <View className="pt-4">
-                <NewTaskButton organizationId={context.organizationId} />
-              </View>
-              <ProductChoices organizationId={context.organizationId} />
-            </>
+            <View className="pt-4">
+              <NewTaskButton organizationId={context.organizationId} />
+            </View>
+          )}
+          {context.accountReady && (
+            <ProductChoices
+              organizationId={context.organizationId}
+              contextReady={context.isReady}
+            />
           )}
         </Animated.View>
       </TabScreenScrollView>

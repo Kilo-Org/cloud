@@ -12,37 +12,45 @@ import { getSecurityAgentPath } from '@/lib/security-agent';
 
 type ProductChoicesProps = {
   organizationId: string | null;
+  contextReady: boolean;
 };
 
-export function ProductChoices({ organizationId }: Readonly<ProductChoicesProps>) {
+export function ProductChoices({ organizationId, contextReady }: Readonly<ProductChoicesProps>) {
   const router = useRouter();
   const { t } = useTranslation();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const scope = organizationId ?? PERSONAL_SECURITY_SCOPE;
+  if (!contextReady && !prReviewEnabled) {
+    return null;
+  }
 
   return (
     <View>
       <SectionHeader label={t('home.explore')} />
       <View className="mx-4 gap-2">
-        <ConfigureRow
-          icon={GitPullRequest}
-          title={t('profile.codeReviewer')}
-          subtitle={t('profile.codeReviewerSubtitle')}
-          className="rounded-lg bg-secondary px-3"
-          onPress={() => {
-            router.push(getCodeReviewerProfilePath(scope));
-          }}
-        />
-        <ConfigureRow
-          icon={ShieldCheck}
-          title={t('profile.securityAgent')}
-          subtitle={t('profile.securityAgentSubtitle')}
-          className="rounded-lg bg-secondary px-3"
-          last={!prReviewEnabled}
-          onPress={() => {
-            router.push(getSecurityAgentPath(scope));
-          }}
-        />
+        {contextReady && (
+          <>
+            <ConfigureRow
+              icon={GitPullRequest}
+              title={t('profile.codeReviewer')}
+              subtitle={t('profile.codeReviewerSubtitle')}
+              className="rounded-lg bg-secondary px-3"
+              onPress={() => {
+                router.push(getCodeReviewerProfilePath(scope));
+              }}
+            />
+            <ConfigureRow
+              icon={ShieldCheck}
+              title={t('profile.securityAgent')}
+              subtitle={t('profile.securityAgentSubtitle')}
+              className="rounded-lg bg-secondary px-3"
+              last={!prReviewEnabled}
+              onPress={() => {
+                router.push(getSecurityAgentPath(scope));
+              }}
+            />
+          </>
+        )}
         {prReviewEnabled ? (
           <ConfigureRow
             icon={GitMerge}

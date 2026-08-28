@@ -3265,6 +3265,7 @@
     "openAgents": "Oscail gníomhairí",
     "running": "AG RITH",
     "needsInput": "teastaíonn ionchur",
-    "reconnecting": "Ag athcheangal"
+    "reconnecting": "Ag athcheangal",
+    "channelName": "Gníomhairí gníomhacha"
   }
 }

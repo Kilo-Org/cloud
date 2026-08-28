@@ -3202,6 +3202,7 @@
     "openAgents": "Buksan ang mga agent",
     "running": "TUMATAKBO",
     "needsInput": "kailangan ng input",
-    "reconnecting": "Muling kumokonekta"
+    "reconnecting": "Muling kumokonekta",
+    "channelName": "Mga aktibong agent"
   }
 }

@@ -3244,6 +3244,7 @@
     "openAgents": "Otvoriť agentov",
     "running": "Prebieha",
     "needsInput": "vyžaduje vstup",
-    "reconnecting": "Opätovné pripájanie"
+    "reconnecting": "Opätovné pripájanie",
+    "channelName": "Aktívni agenti"
   }
 }

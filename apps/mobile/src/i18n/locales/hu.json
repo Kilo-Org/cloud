@@ -3202,6 +3202,7 @@
     "openAgents": "Ügynökök megnyitása",
     "running": "Folyamatban",
     "needsInput": "bemenetet igényel",
-    "reconnecting": "Újracsatlakozás"
+    "reconnecting": "Újracsatlakozás",
+    "channelName": "Aktív ügynökök"
   }
 }

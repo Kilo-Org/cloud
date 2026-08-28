@@ -3244,6 +3244,7 @@
     "openAgents": "Atidaryti agentus",
     "running": "Vykdoma",
     "needsInput": "reikia įvesties",
-    "reconnecting": "Jungiamasi iš naujo"
+    "reconnecting": "Jungiamasi iš naujo",
+    "channelName": "Aktyvūs agentai"
   }
 }

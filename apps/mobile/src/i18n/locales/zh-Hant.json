@@ -3202,6 +3202,7 @@
     "openAgents": "開啟代理",
     "running": "執行中",
     "needsInput": "需要輸入",
-    "reconnecting": "正在重新連線"
+    "reconnecting": "正在重新連線",
+    "channelName": "使用中的代理"
   }
 }

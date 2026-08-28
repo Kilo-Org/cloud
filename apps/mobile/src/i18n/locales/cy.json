@@ -3286,6 +3286,7 @@
     "openAgents": "Agorwch asiantau",
     "running": "YN RHEDEG",
     "needsInput": "angen mewnbwn",
-    "reconnecting": "Yn ailgysylltu"
+    "reconnecting": "Yn ailgysylltu",
+    "channelName": "Asiantau gweithredol"
   }
 }

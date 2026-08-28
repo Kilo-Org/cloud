@@ -3202,6 +3202,7 @@
     "openAgents": "Avaa agentit",
     "running": "KÄYNNISSÄ",
     "needsInput": "vaatii syötettä",
-    "reconnecting": "Yhdistetään uudelleen"
+    "reconnecting": "Yhdistetään uudelleen",
+    "channelName": "Aktiiviset agentit"
   }
 }

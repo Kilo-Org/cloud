@@ -3202,6 +3202,7 @@
     "openAgents": "ወኪሎችን ይክፈቱ",
     "running": "በስራ ላይ",
     "needsInput": "ግብዓት ይፈልጋል",
-    "reconnecting": "እንደገና በመገናኘት ላይ"
+    "reconnecting": "እንደገና በመገናኘት ላይ",
+    "channelName": "ንቁ ወኪሎች"
   }
 }

@@ -3223,6 +3223,7 @@
     "openAgents": "Obre els agents",
     "running": "EN EXECUCIÓ",
     "needsInput": "requereix entrada",
-    "reconnecting": "Reconnectant"
+    "reconnecting": "Reconnectant",
+    "channelName": "Agents actius"
   }
 }

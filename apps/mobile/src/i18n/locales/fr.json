@@ -3223,6 +3223,7 @@
     "openAgents": "Ouvrir les agents",
     "running": "EN COURS",
     "needsInput": "saisie requise",
-    "reconnecting": "Reconnexion en cours"
+    "reconnecting": "Reconnexion en cours",
+    "channelName": "Agents actifs"
   }
 }

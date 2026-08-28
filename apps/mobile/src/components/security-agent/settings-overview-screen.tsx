@@ -89,9 +89,10 @@ export function SettingsOverviewScreen({
     trackRef.current({ interaction: 'settings_config_viewed' });
   }, []);
 
+  // A successful probe can confirm online while NetInfo still pauses queries.
   if (
     !config.data &&
-    (config.isError || (config.fetchStatus === 'paused' && committedConnectivity === 'offline'))
+    (config.isError || (config.fetchStatus === 'paused' && committedConnectivity !== 'unknown'))
   ) {
     return (
       <PlatformErrorScreen

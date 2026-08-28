@@ -1,6 +1,8 @@
+import { withDeadline } from '@kilocode/event-service';
 import { addEventListener } from '@react-native-community/netinfo';
 import { useSyncExternalStore } from 'react';
 
+import { API_BASE_URL } from '@/lib/config';
 import {
   type BannerState,
   type ConnectivitySource,
@@ -30,7 +32,17 @@ const defaultTimer: OfflineBannerTimer = {
 let store: OfflineBannerStore | null = null;
 
 function getStore(): OfflineBannerStore {
-  store ??= createOfflineBannerStore({ source: netInfoSource, timer: defaultTimer });
+  store ??= createOfflineBannerStore({
+    source: netInfoSource,
+    timer: defaultTimer,
+    probe: async () => {
+      await withDeadline(3000, async signal => {
+        await fetch(API_BASE_URL, { method: 'HEAD', signal });
+      });
+      // Any HTTP response proves reachability, including application errors.
+      return true;
+    },
+  });
   return store;
 }
 

@@ -8,8 +8,8 @@ import { requireOptionalNativeModule } from 'expo';
 
 type LiveUpdateNativeModule = {
   isPromotionCapable(): boolean;
-  start(title: string, text: string, promotion: boolean): void;
-  update(title: string, text: string, promotion: boolean): void;
+  start(title: string, text: string, compactText: string | null, promotion: boolean): void;
+  update(title: string, text: string, compactText: string | null, promotion: boolean): void;
   end(): void;
 };
 
@@ -23,12 +23,12 @@ function isPromotionCapable(): boolean {
   return nativeModule?.isPromotionCapable() ?? false;
 }
 
-export function start(title: string, text: string): void {
-  nativeModule?.start(title, text, isPromotionCapable());
+export function start(title: string, text: string, compactText: string | null): void {
+  nativeModule?.start(title, text, compactText, isPromotionCapable());
 }
 
-export function update(title: string, text: string): void {
-  nativeModule?.update(title, text, isPromotionCapable());
+export function update(title: string, text: string, compactText: string | null): void {
+  nativeModule?.update(title, text, compactText, isPromotionCapable());
 }
 
 export function end(): void {

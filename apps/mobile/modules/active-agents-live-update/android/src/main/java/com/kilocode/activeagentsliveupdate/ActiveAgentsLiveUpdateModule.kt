@@ -26,12 +26,12 @@ class ActiveAgentsLiveUpdateModule : Module() {
       isPromotionCapable()
     }
 
-    Function("start") { title: String, text: String, promotion: Boolean ->
-      post(title, text, promotion)
+    Function("start") { title: String, text: String, compactText: String?, promotion: Boolean ->
+      post(title, text, compactText, promotion)
     }
 
-    Function("update") { title: String, text: String, promotion: Boolean ->
-      post(title, text, promotion)
+    Function("update") { title: String, text: String, compactText: String?, promotion: Boolean ->
+      post(title, text, compactText, promotion)
     }
 
     Function("end") {
@@ -91,7 +91,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
     )
   }
 
-  private fun post(title: String, text: String, promotion: Boolean) {
+  private fun post(title: String, text: String, compactText: String?, promotion: Boolean) {
     val builder = newBuilder(title)
       .setSmallIcon(smallIconId())
       .setContentTitle(title)
@@ -106,6 +106,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // setRequestPromotedOngoing does not exist; use the documented flag setter.
     if (promotion && isPromotionCapable()) {
       builder.setFlag(Notification.FLAG_PROMOTED_ONGOING, true)
+      builder.setShortCriticalText(compactText)
       builder.setStyle(Notification.ProgressStyle())
     }
 

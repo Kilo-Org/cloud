@@ -23,6 +23,7 @@ type MockElement = {
     text?: string;
     clickAction?: string;
     clickActionData?: { uri?: string };
+    accessibilityLabel?: string;
     style?: { backgroundColor?: string };
     children?: unknown;
   };
@@ -34,6 +35,7 @@ const COPY: Record<string, string> = {
   'glanceable.running': 'Running',
   'glanceable.empty': 'No work in progress',
   'glanceable.expired': 'Status expired',
+  'glanceable.stale': 'Updates delayed',
   'glanceable.openAgents': 'Open agents',
 };
 
@@ -122,6 +124,44 @@ describe('renderActiveAgentsWidget', () => {
 
     expect(text).toEqual(['1 Needs input', '1 Running', 'Open agents']);
   });
+
+  it.each([
+    { width: 120, visibleText: ['2 Needs input'] },
+    {
+      width: 250,
+      visibleText: [
+        '2 Needs input',
+        '3 Reconnecting',
+        '4 Running',
+        'Updates delayed',
+        'Open agents',
+      ],
+    },
+  ])(
+    'speaks stale numeric counts and keeps the deep link at width $width',
+    ({ width, visibleText }) => {
+      const props = buildAndroidWidgetProps(
+        {
+          ...snapshotFor([], 0, 'stale'),
+          needsInput: 2,
+          reconnecting: 3,
+          running: 4,
+        },
+        {},
+        translate
+      );
+      const rep = render(props, width);
+
+      for (const surface of [rep.light, rep.dark]) {
+        expect(surface.props.accessibilityLabel).toBe(
+          'Updates delayed, 2 Needs input, 3 Reconnecting, 4 Running, Open agents'
+        );
+        expect(collectText(surface)).toEqual(visibleText);
+        expect(surface.props.clickAction).toBe('OPEN_URI');
+        expect(surface.props.clickActionData).toEqual({ uri: 'kiloapp:///cloud/sessions' });
+      }
+    }
+  );
 
   it('hides counts and shows expired copy for an expired snapshot', () => {
     const props = buildAndroidWidgetProps(

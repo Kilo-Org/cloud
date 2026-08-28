@@ -5,6 +5,8 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import {
   _resetAndroidSinkForTests,
   androidSink,
@@ -14,16 +16,33 @@ import {
 import { _setPermissionReaderForTests, type NotificationPermissionStatus } from './permission';
 import { _resetAndroidPermissionAlertForTests } from './permission-alert';
 
-const mocks = vi.hoisted(() => ({
-  native: {
-    isPromotionCapable: vi.fn(() => true),
-    start: vi.fn(),
-    update: vi.fn(),
-    end: vi.fn(),
-  },
-  requestWidgetUpdate: vi.fn(),
-  alert: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  let notification: {
+    title: string;
+    text: string;
+    compactText: string | null;
+    promotion: boolean;
+  } | null = null;
+
+  // eslint-disable-next-line max-params -- the fake mirrors the four positional native bridge arguments
+  function post(title: string, text: string, compactText: string | null, promotion: boolean): void {
+    notification = { title, text, compactText, promotion };
+  }
+
+  return {
+    native: {
+      isPromotionCapable: vi.fn(() => true),
+      start: vi.fn(post),
+      update: vi.fn(post),
+      end: vi.fn(() => {
+        notification = null;
+      }),
+    },
+    getNotification: () => notification,
+    requestWidgetUpdate: vi.fn(),
+    alert: vi.fn(),
+  };
+});
 
 vi.mock('expo', () => ({
   requireOptionalNativeModule: () => mocks.native,
@@ -62,6 +81,13 @@ function snapshotFor(
   });
 }
 
+const MIXED = {
+  ...snapshotFor([], 0, 'happy'),
+  needsInput: 2,
+  reconnecting: 3,
+  running: 4,
+};
+
 async function flushAsync(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -91,6 +117,7 @@ beforeEach(() => {
   // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
   _setPermissionReaderForTests(() => Promise.resolve('granted'));
   mocks.native.isPromotionCapable.mockReturnValue(true);
+  mocks.native.end();
   mocks.native.start.mockClear();
   mocks.native.update.mockClear();
   mocks.native.end.mockClear();
@@ -104,25 +131,67 @@ afterEach(() => {
 });
 
 describe('androidSink start and update', () => {
-  it('starts once and updates the same notification id on a newer revision with promotion', async () => {
-    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+  it('forwards the ranked compact number and all counts on start and update', async () => {
+    androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
-    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
-    await flushAsync();
+    expect(mocks.getNotification()).toEqual({
+      title: 'Active agents',
+      text: '2 Needs input, 3 Reconnecting, 4 Running',
+      compactText: '2',
+      promotion: true,
+    });
 
+    androidSink.startOrUpdate({ ...MIXED, revision: 2, needsInput: 0 }, CTX);
+    await flushAsync();
+    expect(mocks.getNotification()).toEqual({
+      title: 'Active agents',
+      text: '3 Reconnecting, 4 Running',
+      compactText: '3',
+      promotion: true,
+    });
+
+    androidSink.startOrUpdate({ ...MIXED, revision: 3, needsInput: 0, reconnecting: 0 }, CTX);
+    await flushAsync();
+    expect(mocks.getNotification()).toEqual({
+      title: 'Active agents',
+      text: '4 Running',
+      compactText: '4',
+      promotion: true,
+    });
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
-    expect(mocks.native.update).toHaveBeenCalledTimes(1);
-    expect(mocks.native.start).toHaveBeenCalledWith('Active agents', '1 Running', true);
-    expect(mocks.native.update).toHaveBeenCalledWith('Active agents', '1 Running', true);
+    expect(mocks.native.update).toHaveBeenCalledTimes(2);
   });
 
-  it('passes promotion false when the device is not capable', async () => {
+  it('keeps the full summary when the device cannot promote', async () => {
     mocks.native.isPromotionCapable.mockReturnValue(false);
-    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
 
+    expect(mocks.getNotification()).toEqual({
+      title: 'Active agents',
+      text: '2 Needs input, 3 Reconnecting, 4 Running',
+      compactText: '2',
+      promotion: false,
+    });
+  });
+
+  it('forwards compact text when concurrent permission checks start then update', async () => {
+    const deferred = deferredPermission();
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => deferred.promise);
+    androidSink.startOrUpdate(MIXED, CTX);
+    androidSink.startOrUpdate({ ...MIXED, revision: 2, needsInput: 0 }, CTX);
+    deferred.resolve('granted');
+    await flushAsync();
+
+    expect(mocks.getNotification()).toEqual({
+      title: 'Active agents',
+      text: '3 Reconnecting, 4 Running',
+      compactText: '3',
+      promotion: true,
+    });
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
-    expect(mocks.native.start).toHaveBeenCalledWith(expect.any(String), expect.any(String), false);
+    expect(mocks.native.update).toHaveBeenCalledTimes(1);
   });
 
   it('does not start ongoing when notification permission is denied', async () => {
@@ -177,13 +246,17 @@ describe('androidSink start and update', () => {
     expect(mocks.native.update).toHaveBeenCalledTimes(1);
   });
 
-  it('never starts for a waiting snapshot', async () => {
-    androidSink.startOrUpdate(snapshotFor([], 0, 'waiting'), CTX);
-    await flushAsync();
+  it.each(['waiting', 'empty', 'expired', 'signed_out', 'privacy'] as const)(
+    'never starts for a %s snapshot without eligible work',
+    async status => {
+      androidSink.startOrUpdate(snapshotFor([], 0, status), CTX);
+      await flushAsync();
 
-    expect(mocks.native.start).not.toHaveBeenCalled();
-    expect(mocks.native.update).not.toHaveBeenCalled();
-  });
+      expect(mocks.getNotification()).toBeNull();
+      expect(mocks.native.start).not.toHaveBeenCalled();
+      expect(mocks.native.update).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('androidSink widget publish and end', () => {
@@ -198,6 +271,20 @@ describe('androidSink widget publish and end', () => {
     expect(getCurrentWidgetProps()?.primaryCount).toBe(1);
   });
 
+  it('publishes the stale warning and retained counts through the native bridge', async () => {
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    androidSink.publish({ ...MIXED, revision: 2, status: 'stale' });
+
+    const notification = mocks.getNotification();
+    expect(notification?.text).toContain(i18n.t('glanceable.stale'));
+    expect(notification?.text).toContain('2 Needs input, 3 Reconnecting, 4 Running');
+    expect(notification?.compactText).toBe('2');
+    expect(getCurrentWidgetProps()?.accessibilityLabel).toContain(
+      '2 Needs input, 3 Reconnecting, 4 Running, Open agents'
+    );
+  });
+
   it('blanks with privacy copy and dismisses the notification on end', async () => {
     androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
     await flushAsync();
@@ -206,9 +293,15 @@ describe('androidSink widget publish and end', () => {
     androidSink.publish(snapshotFor([], 1, 'privacy'));
     expect(getCurrentWidgetProps()?.statusLine).toBe('Agents hidden');
     expect(getCurrentWidgetProps()?.countLines).toEqual([]);
-    expect(mocks.native.update).toHaveBeenCalledWith('Active agents', 'Agents hidden', true);
+    expect(mocks.getNotification()).toEqual({
+      title: 'Active agents',
+      text: 'Agents hidden',
+      compactText: null,
+      promotion: true,
+    });
 
     androidSink.endImmediate();
+    expect(mocks.getNotification()).toBeNull();
     expect(mocks.native.end).toHaveBeenCalledTimes(1);
   });
 
@@ -273,17 +366,22 @@ describe('handleAppStateActive permission alert', () => {
     expect(mocks.alert).toHaveBeenCalledTimes(1);
   });
 
-  it('retries the pending start when permission is granted on foreground', async () => {
+  it('forwards the pending compact number when permission is granted on foreground', async () => {
     // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
     _setPermissionReaderForTests(() => Promise.resolve('denied'));
-    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
-    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.getNotification()).toBeNull();
 
     // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
     _setPermissionReaderForTests(() => Promise.resolve('granted'));
     await handleAppStateActive();
-    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(mocks.getNotification()).toEqual({
+      title: 'Active agents',
+      text: '2 Needs input, 3 Reconnecting, 4 Running',
+      compactText: '2',
+      promotion: true,
+    });
     expect(mocks.alert).not.toHaveBeenCalled();
   });
 });

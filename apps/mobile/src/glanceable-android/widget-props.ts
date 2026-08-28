@@ -2,7 +2,7 @@ import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-a
 
 import {
   glanceableCountLines,
-  glanceableSpokenLabelKeys,
+  glanceableSpokenLabel,
   glanceableStatusCopyKey,
   type GlanceableSurfaceFlags,
   primaryGlanceableCount,
@@ -42,21 +42,20 @@ export function buildAndroidWidgetProps(
 ): AndroidWidgetProps {
   const status = resolveGlanceableStatus(snapshot, flags);
   const statusKey = glanceableStatusCopyKey(snapshot, flags);
-  const primary = primaryGlanceableCount(snapshot);
+  const showCounts = status === 'happy' || status === 'stale';
+  const primary = showCounts ? primaryGlanceableCount(snapshot) : null;
 
   return {
     statusLine: statusKey === null ? null : translate(statusKey),
-    countLines: glanceableCountLines(snapshot).map(line => ({
+    countLines: (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
       label: translate(line.key),
       count: line.count,
     })),
     primaryLabel: primary === null ? null : translate(primary.key),
     primaryCount: primary === null ? 0 : primary.count,
     openAgentsLabel: translate('glanceable.openAgents'),
-    showOpenAgents: status === 'happy' || status === 'stale',
-    accessibilityLabel: glanceableSpokenLabelKeys(snapshot, flags)
-      .map(key => translate(key))
-      .join(', '),
+    showOpenAgents: showCounts,
+    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, translate),
   };
 }
 
@@ -94,9 +93,8 @@ export function buildGenericWidgetProps(translate: (key: string) => string): And
 }
 
 /**
- * Single-line summary for the ongoing notification: ranked counts for happy and
- * stale, otherwise the locked status copy. Built only from translated keys, so it
- * never leaks a title, organization name, or id.
+ * Ongoing notification: every ranked count, with a warning when stale, otherwise
+ * the locked status copy. Never a title, organization name, or id.
  */
 export function buildOngoingNotificationText(
   snapshot: GlanceableAgentsSnapshot,
@@ -107,8 +105,22 @@ export function buildOngoingNotificationText(
   if (status === 'happy' || status === 'stale') {
     const lines = glanceableCountLines(snapshot);
     if (lines.length > 0) {
-      return lines.map(line => `${line.count} ${translate(line.key)}`).join(', ');
+      const counts = lines.map(line => `${line.count} ${translate(line.key)}`).join(', ');
+      return status === 'stale' ? `${translate('glanceable.stale')}, ${counts}` : counts;
     }
   }
   return translate(glanceableStatusCopyKey(snapshot, flags) ?? 'glanceable.empty');
+}
+
+/** The promoted chip shows only the primary number; the full text keeps all labels. */
+export function buildCompactNotificationText(
+  snapshot: GlanceableAgentsSnapshot,
+  flags: GlanceableSurfaceFlags
+): string | null {
+  const status = resolveGlanceableStatus(snapshot, flags);
+  if (status !== 'happy' && status !== 'stale') {
+    return null;
+  }
+  const primary = primaryGlanceableCount(snapshot);
+  return primary === null ? null : String(primary.count);
 }

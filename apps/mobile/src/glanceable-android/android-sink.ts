@@ -18,6 +18,7 @@ import { showAndroidPermissionAlertOnce } from './permission-alert';
 import {
   type AndroidWidgetProps,
   buildAndroidWidgetProps,
+  buildCompactNotificationText,
   buildExpiredWidgetProps,
   buildOngoingNotificationText,
 } from './widget-props';
@@ -95,9 +96,10 @@ async function tryStartOrUpdate(
   }
   const title = translate(NOTIFICATION_TITLE_KEY);
   const text = buildOngoingNotificationText(snapshot, {}, translate);
+  const compactText = buildCompactNotificationText(snapshot, {});
 
   if (notificationActive) {
-    updateLiveUpdate(title, text);
+    updateLiveUpdate(title, text, compactText);
     revision = snapshot.revision;
     return;
   }
@@ -111,12 +113,12 @@ async function tryStartOrUpdate(
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
     if (notificationActive) {
       if (snapshot.revision > revision) {
-        updateLiveUpdate(title, text);
+        updateLiveUpdate(title, text, compactText);
         revision = snapshot.revision;
       }
       return;
     }
-    startLiveUpdate(title, text);
+    startLiveUpdate(title, text, compactText);
     notificationActive = true;
     revision = snapshot.revision;
     pending = null;
@@ -132,7 +134,11 @@ function retryPendingStart(): void {
     return;
   }
   const title = translate(NOTIFICATION_TITLE_KEY);
-  startLiveUpdate(title, buildOngoingNotificationText(p.snapshot, {}, translate));
+  startLiveUpdate(
+    title,
+    buildOngoingNotificationText(p.snapshot, {}, translate),
+    buildCompactNotificationText(p.snapshot, {})
+  );
   notificationActive = true;
   revision = p.snapshot.revision;
   pending = null;
@@ -173,7 +179,8 @@ export const androidSink: GlanceableSink = {
     if (notificationActive && snapshot.revision > revision) {
       updateLiveUpdate(
         translate(NOTIFICATION_TITLE_KEY),
-        buildOngoingNotificationText(snapshot, {}, translate)
+        buildOngoingNotificationText(snapshot, {}, translate),
+        buildCompactNotificationText(snapshot, {})
       );
       revision = snapshot.revision;
     }

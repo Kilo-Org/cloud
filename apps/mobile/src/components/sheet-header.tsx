@@ -10,6 +10,7 @@ export function SheetHeader({
   onDone,
   onCancel,
   doneLabel,
+  cancelLabel,
   onShare,
   sharing = false,
   disabled = false,
@@ -18,6 +19,11 @@ export function SheetHeader({
   onDone: () => void;
   onCancel?: () => void;
   doneLabel?: string;
+  /**
+   * Overrides the leading control's visible text and accessibility label, so
+   * an in-sheet Back is announced as Back, not Cancel.
+   */
+  cancelLabel?: string;
   onShare?: () => void;
   sharing?: boolean;
   disabled?: boolean;
@@ -25,6 +31,7 @@ export function SheetHeader({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
+  const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
   // Logical `start-*`/`end-*` utilities mirror with the native layout
   // direction (I18nManager), which forceRTL sets before the reload: Cancel and
   // Share stay on the leading edge, Done on the trailing edge. Do not derive
@@ -66,10 +73,10 @@ export function SheetHeader({
             disabled={disabled}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel={t('common.cancel')}
+            accessibilityLabel={resolvedCancelLabel}
             className={`absolute ${leadingClass} px-2 py-2 active:opacity-70 disabled:opacity-50`}
           >
-            <Text className="text-base font-medium text-foreground">{t('common.cancel')}</Text>
+            <Text className="text-base font-medium text-foreground">{resolvedCancelLabel}</Text>
           </Pressable>
         ) : null}
         <Pressable

@@ -30,6 +30,7 @@ vi.mock('@cloudflare/sandbox', () => ({
   Sandbox: class Sandbox {},
 }));
 
+import type { SessionMessageAdmissionResult } from '../execution/types';
 import type { KiloSdkStoredMessage } from '../session-ingest-binding';
 import type { Env } from '../types';
 import {
@@ -59,6 +60,10 @@ function envStub(): Env {
         admitSubmittedMessage: vi.fn(),
         interruptExecution: vi.fn(),
       })),
+    },
+    SANDBOX_SESSION: {
+      idFromName: vi.fn(() => 'sandbox-session-do-id'),
+      get: vi.fn(),
     },
   } as unknown as Env;
 }
@@ -2179,6 +2184,64 @@ describe('handleKiloFacadeRequest', () => {
     });
     expect(admitPrompt).not.toHaveBeenCalled();
   });
+
+  it.each([
+    {
+      admissionCode: 'BAD_REQUEST',
+      status: 400,
+      publicCode: 'KILO_PROMPT_ADMISSION_REJECTED',
+      message: 'Selected model is not available for this cloud agent session',
+    },
+    {
+      admissionCode: 'FORBIDDEN',
+      status: 403,
+      publicCode: 'KILO_PROMPT_ADMISSION_REJECTED',
+      message: 'Model catalog access denied for this cloud agent session',
+    },
+    {
+      admissionCode: 'MODEL_VALIDATION_UNAVAILABLE',
+      status: 503,
+      publicCode: 'MODEL_VALIDATION_UNAVAILABLE',
+      message: 'Model availability could not be verified',
+    },
+  ] as const)(
+    'maps returned control $admissionCode to an SDK error at HTTP $status',
+    async ({ admissionCode, status, publicCode, message }) => {
+      const env = envStub();
+      const admission: SessionMessageAdmissionResult = {
+        success: false,
+        code: admissionCode,
+        error: message,
+      };
+      vi.spyOn(env.SANDBOX_SESSION, 'get').mockReturnValue({
+        admitSubmittedMessage: vi.fn().mockResolvedValue(admission),
+      } as never);
+
+      const response = await handleKiloFacadeRequest({
+        request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/prompt_async`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messageID: 'msg_018f1e2d3c4bAsynPrmtAbCdEf',
+            model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
+            parts: [{ type: 'text', text: 'validate selection' }],
+          }),
+        }),
+        env,
+        userId: 'usr_1',
+        authToken: 'validated-token',
+        deps: {
+          resolveRootSessionForKiloSession: vi.fn(async () => ({
+            cloudAgentSessionId: 'workspace_cold',
+          })),
+          validatePromptBalance: vi.fn(async () => ({ success: true as const })),
+        },
+      });
+
+      expect(response.status).toBe(status);
+      await expect(response.json()).resolves.toEqual({ error: publicCode, message });
+    }
+  );
 
   it('rejects unsupported prompt_async semantic fields without admitting work', async () => {
     const env = envStub();

@@ -51,6 +51,8 @@ import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
+  emitNotificationPermissionResponded,
+  emitNotificationTokenUpdated,
   getDevicePushToken,
   getNotificationPermissionStatus,
   getPlatform,
@@ -453,8 +455,16 @@ export function NotificationsScreen() {
     setIsTogglingPermission(true);
     try {
       const result = await Notifications.requestPermissionsAsync();
+      const granted = result.status === Notifications.PermissionStatus.GRANTED || result.granted;
+      // Only a live permission request emits an outcome. A pre-granted status
+      // returns without prompting, so emitting here would report a spurious
+      // `notification_permission_responded: granted`. This matches the
+      // invariant `registerForPushNotifications` enforces for its own request.
+      if (currentStatus !== 'granted') {
+        emitNotificationPermissionResponded(granted);
+      }
       void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
-      if (result.status === Notifications.PermissionStatus.GRANTED || result.granted) {
+      if (granted) {
         // Keep `isTogglingPermission` set through token registration so the
         // master switch stays busy for the whole enable flow. Clearing it here
         // (before `isRegisteringToken` is set) would briefly re-enable the
@@ -474,6 +484,7 @@ export function NotificationsScreen() {
             // to a device enrolled from this screen arrives in English.
             locale: getResolvedLanguage(),
           });
+          emitNotificationTokenUpdated('registered');
         } catch {
           // registerToken's onError already surfaced the toast; swallow here so
           // the outer catch does not double-report the same failure.

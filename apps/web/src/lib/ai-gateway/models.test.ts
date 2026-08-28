@@ -22,6 +22,7 @@ import { gpt_5_6_sol_discounted_model } from './providers/openai-exclusive';
 import { tencent_hy3_free_model } from './providers/tencent';
 import { gemma_4_26b_a4b_it_free_model } from './providers/google';
 import { longcat_2_free_model } from './providers/longcat';
+import { minimax_m27_free_model, minimax_m3_free_model } from './providers/minimax';
 import { getRandomNumber } from './getRandomNumber';
 
 describe('rate-limited Kilo-exclusive models', () => {
@@ -102,6 +103,44 @@ describe('isFreeModel', () => {
       expect(preferredModels).toContain(longcat_2_free_model.public_id);
       expect(getAiSdkProvider(longcat_2_free_model.public_id, null)).toBeUndefined();
     });
+
+    test.each([
+      {
+        name: 'MiniMax M3',
+        model: minimax_m3_free_model,
+        publicId: 'minimax/minimax-m3:free',
+        internalId: 'minimax/minimax-m3-free',
+        contextLength: 1_048_576,
+        vision: true,
+      },
+      {
+        name: 'MiniMax M2.7',
+        model: minimax_m27_free_model,
+        publicId: 'minimax/minimax-m2.7:free',
+        internalId: 'minimax/minimax-m2.7-free',
+        contextLength: 196_608,
+        vision: false,
+      },
+    ])(
+      'registers $name as a free Vercel GMI Cloud model',
+      async ({ model, publicId, internalId, contextLength, vision }) => {
+        expect(findKiloExclusiveModel(model.public_id)).toBe(model);
+        expect(await isFreeModel(model.public_id)).toBe(true);
+        expect(model).toMatchObject({
+          public_id: publicId,
+          internal_id: internalId,
+          gateway: 'vercel',
+          context_length: contextLength,
+          max_completion_tokens: contextLength,
+          status: 'public',
+          inference_provider_restriction: ['gmicloud'],
+        });
+        expect(model.flags.includes('reasoning')).toBe(true);
+        expect(model.flags.includes('vision')).toBe(vision);
+        expect(getInferenceProvider(model)?.slug).toBe('gmicloud');
+        expect(preferredModels).not.toContain(model.public_id);
+      }
+    );
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
       expect(getInferenceProvider(claude_opus_4_7_stealth_model)?.slug).toBe('stealth');

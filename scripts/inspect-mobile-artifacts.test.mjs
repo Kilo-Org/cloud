@@ -5,9 +5,17 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { checkResourceShrinking } from './inspect-mobile-artifacts.mjs';
+import {
+  checkResourceShrinking,
+  INSPECT_JS_NEEDLES,
+  bundleBufferContains,
+  bundleBufferHasDebugId,
+  inspectJsBundles,
+} from './inspect-mobile-artifacts.mjs';
 
 const SENTINEL_ENTRY = 'base/res/raw/kilo_shrink_sentinel_unused';
+// Every needle plus the debug-id marker, joined into one ASCII fixture.
+const BUNDLE_CONTENT = [...INSPECT_JS_NEEDLES, 'debugId'].join(' ');
 
 // Minimal ZIP writer (local headers + central directory + EOCD) so the test is
 // self-contained and only needs the system `unzip` that checkResourceShrinking
@@ -29,7 +37,7 @@ function writeZip(outputPath, entries) {
   let offset = 0;
   for (const [name, content] of entries) {
     const nameBuffer = Buffer.from(name, 'utf8');
-    const dataBuffer = Buffer.from(content, 'utf8');
+    const dataBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
     const compressed = deflateRawSync(dataBuffer);
     const entryCrc = crc32(dataBuffer);
 
@@ -112,4 +120,47 @@ test('checkResourceShrinking returns true when the sentinel is absent', () => {
     checkResourceShrinking
   );
   assert.equal(result, true);
+});
+
+test('bundleBufferContains matches UTF-8 and UTF-16LE bytes', () => {
+  const utf16Buffer = Buffer.from(BUNDLE_CONTENT, 'utf16le');
+  assert.equal(bundleBufferContains(Buffer.from(BUNDLE_CONTENT, 'utf8'), 'maskAllText'), true);
+  assert.equal(bundleBufferContains(utf16Buffer, 'maskAllText'), true);
+  assert.equal(bundleBufferContains(utf16Buffer, 'us.i.posthog.com'), true);
+  assert.equal(bundleBufferContains(utf16Buffer, 'absent-marker'), false);
+});
+
+test('bundleBufferHasDebugId detects debugId and debug_id in either encoding', () => {
+  assert.equal(bundleBufferHasDebugId(Buffer.from('debugId', 'utf8')), true);
+  assert.equal(bundleBufferHasDebugId(Buffer.from('debug_id', 'utf8')), true);
+  assert.equal(bundleBufferHasDebugId(Buffer.from('debugId', 'utf16le')), true);
+  assert.equal(bundleBufferHasDebugId(Buffer.from('debug_id', 'utf16le')), true);
+  assert.equal(bundleBufferHasDebugId(Buffer.from('no markers here', 'utf8')), false);
+});
+
+test('inspectJsBundles reports all needles and hasDebugId for a UTF-8 jsbundle', () => {
+  const result = withFixture([['index.jsbundle', BUNDLE_CONTENT]], inspectJsBundles);
+  assert.deepEqual(result.needlesFound.sort(), [...INSPECT_JS_NEEDLES].sort());
+  assert.equal(result.hasDebugId, true);
+});
+
+test('inspectJsBundles reports all needles and hasDebugId for a UTF-16LE jsbundle', () => {
+  const utf16Buffer = Buffer.from(BUNDLE_CONTENT, 'utf16le');
+  const result = withFixture([['index.jsbundle', utf16Buffer]], inspectJsBundles);
+  assert.deepEqual(result.needlesFound.sort(), [...INSPECT_JS_NEEDLES].sort());
+  assert.equal(result.hasDebugId, true);
+});
+
+test('inspectJsBundles lacks maskAllText when the bundle omits it', () => {
+  const content = [
+    ...INSPECT_JS_NEEDLES.filter(needle => needle !== 'maskAllText'),
+    'debugId',
+  ].join(' ');
+  const result = withFixture([['index.jsbundle', content]], inspectJsBundles);
+  assert.equal(result.needlesFound.includes('maskAllText'), false);
+});
+
+test('inspectJsBundles reports hasDebugId false when debug-id markers are absent', () => {
+  const result = withFixture([['index.jsbundle', INSPECT_JS_NEEDLES.join(' ')]], inspectJsBundles);
+  assert.equal(result.hasDebugId, false);
 });

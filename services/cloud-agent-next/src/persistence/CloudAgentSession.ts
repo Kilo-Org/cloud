@@ -78,6 +78,7 @@ import { commandsOrDefault, type SlashCommandInfo } from '../shared/slash-comman
 import { withDORetry } from '../utils/do-retry.js';
 import type {
   AcceptedExecutionTurn,
+  AdmissionFailure,
   AgentSelection,
   ExecutionDeliveryContext,
   ExecutionTurnSubmission,
@@ -774,10 +775,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return !(await this.hasDeletionIntent());
   }
 
-  private async containerBillingAdmissionFailure(): Promise<Extract<
-    SessionMessageAdmissionResult,
-    { success: false }
-  > | null> {
+  private async containerBillingAdmissionFailure(): Promise<AdmissionFailure | null> {
     const metadata = await this.getMetadata();
     if (!metadata) return null;
     if (!isCloudAgentContainerBillingEnabled(this.env, metadata.identity)) return null;

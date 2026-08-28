@@ -17,6 +17,7 @@ import {
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
+import { minimax_m27_free_model, minimax_m3_free_model } from '@/lib/ai-gateway/providers/minimax';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -221,6 +222,33 @@ describe('auto models', () => {
     expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
     expect(models.data.some(model => model.id === 'vendor/model:batch')).toBe(false);
   });
+});
+
+describe('MiniMax Vercel promotion models', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it.each([minimax_m3_free_model, minimax_m27_free_model])(
+    'replaces the OpenRouter catalog entry for $public_id without duplicating it',
+    async model => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve(
+          createMockResponse({
+            jsonData: {
+              data: [buildModel({ id: model.public_id, name: 'OpenRouter catalog name' })],
+            },
+          })
+        )
+      ) as unknown as typeof fetch;
+
+      const models = await getEnhancedOpenRouterModels();
+      const matches = models.data.filter(entry => entry.id === model.public_id);
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0]?.name).toBe(model.display_name);
+    }
+  );
 });
 
 describe('reasoning variants', () => {

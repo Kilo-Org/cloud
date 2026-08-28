@@ -109,6 +109,16 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
 
   const [viewerVisible, setViewerVisible] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  // Reset a prior image error in render when the URL changes. A successful
+  // renew writes a NEW signed URL; the reset must land in the same commit so
+  // the refreshed image, not the retry chip, renders (and no open viewer is
+  // unmounted). A failed renew keeps the same URL, so `imageFailed` survives
+  // and the retry chip stays until a new URL lands.
+  const [previousUrl, setPreviousUrl] = useState(url);
+  if (url !== previousUrl) {
+    setPreviousUrl(url);
+    setImageFailed(false);
+  }
   const [preview, setPreview] = useState<PreviewMode | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -225,7 +235,12 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
 
   if (kind === 'image') {
     if (url) {
-      if (imageFailed) {
+      // Show the retry chip while the image is failed and the viewer is closed.
+      // A renew must not hide the chip: `imageFailed` stays set until a NEW URL
+      // lands (the render-phase reset above), so the failed UI persists through
+      // a retry tap or a 30s sweep and clears atomically on success. An open
+      // viewer must stay mounted.
+      if (imageFailed && !viewerVisible) {
         return (
           <Pressable
             onPress={() => {
@@ -262,6 +277,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
             <Image
               source={{ uri: url }}
               cachePolicy="memory"
+              transition={0}
               className="aspect-video w-full"
               contentFit="contain"
               accessible
@@ -272,6 +288,9 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
                   : t('agentChat.filePart.imageOutput')
               }
               onError={() => {
+                // Record the failure: `imageFailed` stays set until the URL
+                // changes, so the retry chip persists through a renew and
+                // clears atomically when a fresh signed URL lands.
                 setImageFailed(true);
               }}
             />

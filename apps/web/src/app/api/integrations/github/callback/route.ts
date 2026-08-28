@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
-import { platform_integrations, type User } from '@kilocode/db/schema';
+import { platform_integrations, type GitHubInstallState, type User } from '@kilocode/db/schema';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import {
@@ -34,7 +34,7 @@ import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { APP_URL } from '@/lib/constants';
 import { consumeInstallState } from '@/lib/integrations/github/install-state';
-import type { GitHubInstallState } from '@kilocode/db/schema';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
   `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
@@ -273,7 +273,11 @@ async function handleCoreInstallFlow(params: {
 
   // Verify user has access to the owner
   if (owner.type === 'org') {
-    await ensureOrganizationAccess({ user: user as unknown as User }, owner.id);
+    await ensureOrganizationAccess(
+      { user: user as unknown as User },
+      owner.id,
+      ORGANIZATION_MANAGE_ROLES
+    );
   } else {
     if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/', APP_URL));

@@ -679,7 +679,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, karta, {{position}} z {{total}}"
+    "position": "{{name}}, karta, {{position}} z {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -1317,7 +1318,23 @@
       "checkRun": "Kontrola běhu",
       "status": "Stav",
       "threshold": "Práh",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Čeká se na přepis kontroly.",
+      "transcriptEmpty": "Pro tuto kontrolu neexistuje přepis.",
+      "transcriptRetry": "Nepodařilo se načíst přepis kontroly.",
+      "transcriptLive": "ŽIVĚ",
+      "agentIdle": "Agent nečinný",
+      "agentWorking": "Agent pracuje…",
+      "anErrorOccurred": "Došlo k chybě",
+      "errorWithMessage": "Chyba: {{message}}",
+      "executionStarted": "Provádění spuštěno",
+      "reviewCompleted": "Recenze dokončena",
+      "reviewInterrupted": "Recenze přerušena",
+      "sessionError": "Chyba relace: {{error}}",
+      "statusWithValue": "Stav: {{status}}",
+      "toolName": "Nástroj: {{name}}",
+      "toolNameError": "Nástroj: {{name}} — chyba",
+      "unknownError": "Neznámá chyba"
     },
     "reviewMemory": {
       "title": "Paměť kontroly",
@@ -2059,7 +2076,6 @@
     }
   },
   "agents": {
-    "activeNow": "Nyní aktivní",
     "search": {
       "searching": "Hledání",
       "searchSessions": "Hledat relace",
@@ -2070,13 +2086,11 @@
     "sessionList": {
       "couldNotLoad": "Relace se nepodařilo načíst",
       "couldNotLoadActive": "Aktivní relace se nepodařilo načíst",
-      "noSessionsYet": "Zatím žádné relace",
       "noSessionsYetDescription": "Spusťte programátorskou úlohu z telefonu. Vaše relace se zde zobrazí.",
       "noMatches": "Žádné relace neodpovídají",
       "tryDifferentSearch": "Zkuste jiný hledaný výraz.",
       "tryAdjustFilters": "Zkuste upravit nebo vymazat své filtry.",
       "couldNotSearch": "Relace se nepodařilo vyhledat",
-      "allActive": "Všechny relace jsou aktivní",
       "completedWillAppear": "Dokončené relace se zde zobrazí.",
       "noPastSessions": "Žádné minulé relace",
       "live": "ŽIVĚ"
@@ -2149,13 +2163,10 @@
       "scrollToBottom": "Posunout dolů",
       "emptyTitle": "Zatím žádné zprávy",
       "renameAccessibility": "Přejmenovat relaci: {{title}}",
-      "connectRepository": "Připojit repozitář",
       "cloningSession": "Klonování relace",
       "continue": "Pokračovat",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst",
-      "cloneFailed": "Tuto relaci se nepodařilo klonovat.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
-      "connectRepositoryToContinue": "Pro pokračování připojte repozitář.",
       "notEnoughCredits": "Nemáte dost kreditů ke spuštění Cloud Agent. Přidejte kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úloha stále běží. Počkejte prosím chvíli.",
       "serviceUnavailable": "Služba je právě nedostupná. Zkuste to prosím znovu.",
@@ -2228,7 +2239,11 @@
       "noRepositoriesVisibleGitlab": "Nebyla viditelná žádná úložiště. Zkontrolujte přístup k úložištím pro GitLab a pak obnovte.",
       "openBitbucket": "Otevřít Bitbucket",
       "openGitlab": "Otevřít GitLab",
-      "recentlyUsed": "Nedávno použité"
+      "recentlyUsed": "Nedávno použité",
+      "cliCannotContinue": "Toto CLI nemůže pokračovat v relaci. Vyberte Cloud Agent nebo jiné CLI.",
+      "continueFrom": "Pokračování {{title}}",
+      "importFailed": "Tuto relaci se nepodařilo importovat.",
+      "importingSession": "Importování relace"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizován {{displayCount}} soubor",
@@ -2496,6 +2511,8 @@
       "viewTable": "Zobrazit tabulku",
       "title": "Tabulka",
       "close": "Zavřít tabulku",
+      "loading": "Načítání tabulky",
+      "empty": "Tato tabulka nemá žádné řádky.",
       "columnCount_one": "sloupec",
       "columnCount": "sloupce",
       "columnCount_other": "sloupce",
@@ -2690,6 +2707,17 @@
       "hostConfirmMessage": "Tento odkaz otevře {{host}} ve vašem prohlížeči.",
       "open": "Otevřít",
       "trustThisHost": "Důvěřovat tomuto hostiteli"
+    },
+    "folderPicker": {
+      "accessibility": "Složka: {{label}}",
+      "emptyDescription": "Hotovo použije tuto složku.",
+      "emptyTitle": "Uvnitř nejsou žádné složky",
+      "fieldLabel": "Složka",
+      "retryableDescription": "Zkontrolujte připojení a stiskněte Zkusit znovu. Hotovo tuto složku i tak potvrdí.",
+      "retryableTitle": "Složky se nepodařilo zobrazit",
+      "tapToListHint": "Klepnutím na složku zobrazíte její obsah",
+      "unsupportedDescription": "Toto CLI neumí zobrazit složky. Hotovo ponechá spouštěcí složku a Spustit relaci začne tam.",
+      "unsupportedTitle": "Složky nelze zobrazit"
     }
   },
   "bootstrap": {
@@ -3191,5 +3219,19 @@
     "emptyDescription": "Když důvěřujete hostiteli odkazu, otevře se bez dalšího dotázání.",
     "revoke": "Odebrat {{host}}",
     "backToPreferences": "Zpět na předvolby"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Zpráva"
+    },
+    "empty": {
+      "title": "Začněte chatovat",
+      "description": "Pošlete zprávu, abyste si popovídali s modelem."
+    },
+    "working": "Pracuji",
+    "historyRetry": "Historie chatu se nepodařila načíst.",
+    "catalogRetry": "Modely se nepodařilo načíst",
+    "sendError": "Zprávu se nepodařilo odeslat. Zkuste to prosím znovu."
   }
 }

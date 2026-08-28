@@ -40,20 +40,10 @@ export function showActivityKitDisabledAlertOnce(): void {
   );
 }
 
-async function readSecureStoreValue(key: string): Promise<string | null> {
-  try {
-    return await SecureStore.getItemAsync(key);
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Re-emit the last eligible snapshot after a once-denied ActivityKit surface
- * became available again. Reads the active-user and selected-organization hints
- * from SecureStore exactly as `notifications.ts` does, so the re-emitted token
- * registration keeps the right scope. No-op when the latch was never denied,
- * was not cleared, or the persisted snapshot has no eligible work.
+ * Recover a once-denied ActivityKit surface after verifying the stored identity
+ * and current snapshot. Clear denial even while idle so later work can start
+ * without another focus event; replay only eligible work.
  */
 export async function recoverGlanceableActivityKit(): Promise<void> {
   if (Platform.OS !== 'ios' || !getActivityKitDenied()) {
@@ -63,13 +53,20 @@ export async function recoverGlanceableActivityKit(): Promise<void> {
   const blankEpoch = getTerminalBlankEpoch();
   const scopeKey = getLocalScopeKey();
   const snapshot = getLastGlanceableSnapshot();
-  if (snapshot === null || snapshot.scopeKey !== scopeKey || !isEligibleGlanceableWork(snapshot)) {
+  if (snapshot === null || snapshot.scopeKey !== scopeKey) {
     return;
   }
-  const [userId, organizationId] = await Promise.all([
-    readSecureStoreValue(ACTIVE_USER_ID_KEY),
-    readSecureStoreValue(ORGANIZATION_STORAGE_KEY),
-  ]);
+  let userId: string | null = null;
+  let organizationId: string | null = null;
+  try {
+    [userId, organizationId] = await Promise.all([
+      SecureStore.getItemAsync(ACTIVE_USER_ID_KEY),
+      SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY),
+    ]);
+  } catch {
+    // A failed organization read must not be treated as the personal scope.
+    return;
+  }
   if (
     currentAuthEpoch() !== authEpoch ||
     getTerminalBlankEpoch() !== blankEpoch ||
@@ -79,6 +76,9 @@ export async function recoverGlanceableActivityKit(): Promise<void> {
     buildOpaqueScopeKey({ userId, organizationId }) !== scopeKey ||
     !clearActivityKitDeniedIfAvailable()
   ) {
+    return;
+  }
+  if (!isEligibleGlanceableWork(snapshot)) {
     return;
   }
   for (const sink of getGlanceableSinks()) {

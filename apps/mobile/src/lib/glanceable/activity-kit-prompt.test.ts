@@ -1,16 +1,20 @@
+/* eslint-disable max-lines -- recovery and privacy regressions share the native ActivityKit harness */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
+import { _resetIosSinkForTests, getActivityKitDenied, iosSink } from '@/glanceable-ios/ios-sink';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { writePrivacySnapshotAndEnd, writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import {
   _resetGlanceablePersistForTests,
   _setLastGlanceableSnapshotForTests,
 } from '@/lib/glanceable/persist';
+import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import {
   type GlanceableSink,
   type GlanceableSinkContext,
@@ -26,8 +30,8 @@ const mocks = vi.hoisted(() => ({
   alert: vi.fn(),
   openSettings: vi.fn(),
   getItemAsync: vi.fn(),
-  clearActivityKitDeniedIfAvailable: vi.fn(),
-  getActivityKitDenied: vi.fn(),
+  instancesError: null as Error | null,
+  nativeActivity: null as Partial<GlanceableLiveActivityContentState> | null,
 }));
 
 vi.mock('react-native', () => ({
@@ -40,9 +44,32 @@ vi.mock('expo-secure-store', () => ({
   getItemAsync: mocks.getItemAsync,
 }));
 
-vi.mock('@/glanceable-ios/ios-sink', () => ({
-  clearActivityKitDeniedIfAvailable: mocks.clearActivityKitDeniedIfAvailable,
-  getActivityKitDenied: mocks.getActivityKitDenied,
+vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
+  ActiveAgentsLiveActivity: {
+    getInstances() {
+      if (mocks.instancesError !== null) {
+        throw mocks.instancesError;
+      }
+      return [];
+    },
+    start(props: Partial<GlanceableLiveActivityContentState>) {
+      mocks.nativeActivity = props;
+      return {
+        async update(next: Partial<GlanceableLiveActivityContentState>) {
+          mocks.nativeActivity = next;
+          await Promise.resolve();
+        },
+        async end() {
+          mocks.nativeActivity = null;
+          await Promise.resolve();
+        },
+      };
+    },
+  },
+}));
+
+vi.mock('@/glanceable-ios/active-agents-widget', () => ({
+  ActiveAgentsWidget: { updateSnapshot: vi.fn(), updateTimeline: vi.fn() },
 }));
 
 vi.mock('@/i18n', () => ({
@@ -60,11 +87,11 @@ function eligibleSnapshot(organizationId: string | null = null): GlanceableAgent
   });
 }
 
-function emptySnapshot(): GlanceableAgentsSnapshot {
+function emptySnapshot(organizationId: string | null = null): GlanceableAgentsSnapshot {
   return buildGlanceableSnapshot({
     sessions: [],
     userId: 'u1',
-    organizationId: null,
+    organizationId,
     now: NOW,
   });
 }
@@ -113,30 +140,43 @@ function delayIdentityRead(delayedKey: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   _resetGlanceablePersistForTests();
+  _resetIosSinkForTests();
   _setLastGlanceableSnapshotForTests(eligibleSnapshot());
   surface.widget = null;
   surface.activity = null;
   surface.context = null;
+  mocks.nativeActivity = null;
   registerGlanceableSink(sink);
+  registerGlanceableSink(iosSink);
   mocks.platform.OS = 'ios';
   mocks.getItemAsync.mockImplementation((key: string) =>
     key === ACTIVE_USER_ID_KEY ? 'u1' : null
   );
-  mocks.getActivityKitDenied.mockReturnValue(true);
-  mocks.clearActivityKitDeniedIfAvailable.mockReturnValue(true);
+  mocks.instancesError = Object.assign(new Error('ActivityKit unavailable'), {
+    code: 'ERR_LIVE_ACTIVITIES_NOT_SUPPORTED',
+  });
+  iosSink.startOrUpdate(eligibleSnapshot(), { userId: 'u1', organizationId: null });
+  mocks.instancesError = null;
 });
 
 afterEach(() => {
   unregisterGlanceableSink(sink);
+  unregisterGlanceableSink(iosSink);
 });
 
 describe('recoverGlanceableActivityKit', () => {
-  it('does nothing when the denied latch was not cleared', async () => {
-    mocks.clearActivityKitDeniedIfAvailable.mockReturnValue(false);
+  it('keeps recovery available after a failed capability probe', async () => {
+    mocks.instancesError = new Error('ActivityKit unavailable');
 
     await recoverGlanceableActivityKit();
 
     expect(surface.activity).toBeNull();
+    expect(getActivityKitDenied()).toBe(true);
+
+    mocks.instancesError = null;
+    await recoverGlanceableActivityKit();
+
+    expect(surface.activity).toEqual(eligibleSnapshot());
   });
 
   it.each([null, emptySnapshot()])(
@@ -147,6 +187,39 @@ describe('recoverGlanceableActivityKit', () => {
       await recoverGlanceableActivityKit();
 
       expect(surface.activity).toBeNull();
+      expect(surface.widget).toBeNull();
+      expect(mocks.nativeActivity).toBeNull();
+    }
+  );
+
+  it.each([null, 'org-9'])(
+    'starts new work after idle recovery in scope %s',
+    async organizationId => {
+      const snapshot = emptySnapshot(organizationId);
+      _setLastGlanceableSnapshotForTests(snapshot);
+      mocks.getItemAsync.mockImplementation((key: string) =>
+        key === ACTIVE_USER_ID_KEY ? 'u1' : organizationId
+      );
+
+      await recoverGlanceableActivityKit();
+
+      expect(surface).toEqual({ widget: null, activity: null, context: null });
+      expect(mocks.nativeActivity).toBeNull();
+
+      const publisher = new GlanceablePublisher({
+        sinks: [iosSink],
+        initial: snapshot,
+        now: () => NOW,
+      });
+      publisher.handleSessions([{ status: 'question' }], { userId: 'u1', organizationId });
+
+      expect(mocks.nativeActivity).toMatchObject({
+        status: 'happy',
+        running: 0,
+        needsInput: 1,
+        reconnecting: 0,
+      });
+      publisher.dispose();
     }
   );
 
@@ -171,6 +244,7 @@ describe('recoverGlanceableActivityKit', () => {
     await recoverGlanceableActivityKit();
 
     expect(surface.activity).toBeNull();
+    expect(getActivityKitDenied()).toBe(true);
   });
 
   it.each([null, 'org-10'])('rejects the mismatched organization hint %s', async organizationId => {
@@ -182,20 +256,46 @@ describe('recoverGlanceableActivityKit', () => {
     await recoverGlanceableActivityKit();
 
     expect(surface.activity).toBeNull();
+    expect(getActivityKitDenied()).toBe(true);
   });
 
-  it.each([ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY])('rejects a failed %s read', async key => {
-    _setLastGlanceableSnapshotForTests(eligibleSnapshot('org-9'));
-    mocks.getItemAsync.mockImplementation((requestedKey: string) => {
-      if (requestedKey === key) {
-        throw new Error('storage unavailable');
+  describe.each([
+    ['eligible', eligibleSnapshot],
+    ['idle', emptySnapshot],
+  ] as const)('%s recovery after storage failures', (_label, snapshotFor) => {
+    it.each([
+      [null, ACTIVE_USER_ID_KEY],
+      [null, ORGANIZATION_STORAGE_KEY],
+      ['org-9', ACTIVE_USER_ID_KEY],
+      ['org-9', ORGANIZATION_STORAGE_KEY],
+    ] as const)(
+      'keeps recovery in scope %s after a failed %s read',
+      async (organizationId, key) => {
+        _setLastGlanceableSnapshotForTests(snapshotFor(organizationId));
+        mocks.getItemAsync.mockImplementation(async (requestedKey: string) => {
+          await Promise.resolve();
+          if (requestedKey === key) {
+            throw new Error('storage unavailable');
+          }
+          return requestedKey === ACTIVE_USER_ID_KEY ? 'u1' : organizationId;
+        });
+
+        await recoverGlanceableActivityKit();
+
+        expect(surface.activity).toBeNull();
+        expect(getActivityKitDenied()).toBe(true);
+
+        const latest = eligibleSnapshot(organizationId);
+        _setLastGlanceableSnapshotForTests(latest);
+        mocks.getItemAsync.mockImplementation((requestedKey: string) =>
+          requestedKey === ACTIVE_USER_ID_KEY ? 'u1' : organizationId
+        );
+        await recoverGlanceableActivityKit();
+
+        expect(surface.activity).toEqual(latest);
+        expect(surface.context).toEqual({ userId: 'u1', organizationId });
       }
-      return requestedKey === ACTIVE_USER_ID_KEY ? 'u1' : 'org-9';
-    });
-
-    await recoverGlanceableActivityKit();
-
-    expect(surface.activity).toBeNull();
+    );
   });
 
   it('does not recover on a non-iOS platform', async () => {
@@ -211,10 +311,14 @@ describe.each([ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY])(
   'ActivityKit recovery while %s is pending',
   delayedKey => {
     it.each([
-      ['logout', writeSignedOutSnapshotAndEnd],
-      ['account switch', bumpAuthEpoch],
-      ['organization switch', writePrivacySnapshotAndEnd],
-    ] as const)('does not restore counts after %s', async (_label, invalidate) => {
+      ['logout', writeSignedOutSnapshotAndEnd, eligibleSnapshot],
+      ['account switch', bumpAuthEpoch, eligibleSnapshot],
+      ['organization switch', writePrivacySnapshotAndEnd, eligibleSnapshot],
+      ['idle logout', writeSignedOutSnapshotAndEnd, emptySnapshot],
+      ['idle account switch', bumpAuthEpoch, emptySnapshot],
+      ['idle organization switch', writePrivacySnapshotAndEnd, emptySnapshot],
+    ] as const)('does not restore counts after %s', async (_label, invalidate, snapshotFor) => {
+      _setLastGlanceableSnapshotForTests(snapshotFor());
       const read = delayIdentityRead(delayedKey);
       const recovering = recoverGlanceableActivityKit();
       await read.started;
@@ -225,18 +329,29 @@ describe.each([ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY])(
 
       expect(surface.activity).toBeNull();
       expect(surface.context).toBeNull();
+      expect(getActivityKitDenied()).toBe(true);
     });
 
-    it('does not recover a captured snapshot after the scope changes', async () => {
+    it('keeps recovery available for the new scope after a delayed read', async () => {
       const read = delayIdentityRead(delayedKey);
       const recovering = recoverGlanceableActivityKit();
       await read.started;
 
-      _setLastGlanceableSnapshotForTests(eligibleSnapshot('org-10'));
+      const latest = eligibleSnapshot('org-10');
+      _setLastGlanceableSnapshotForTests(latest);
       read.resolve();
       await recovering;
 
       expect(surface.activity).toBeNull();
+      expect(getActivityKitDenied()).toBe(true);
+
+      mocks.getItemAsync.mockImplementation((key: string) =>
+        key === ACTIVE_USER_ID_KEY ? 'u1' : 'org-10'
+      );
+      await recoverGlanceableActivityKit();
+
+      expect(surface.activity).toEqual(latest);
+      expect(surface.context).toEqual({ userId: 'u1', organizationId: 'org-10' });
     });
 
     it.each([0, 7])(
@@ -255,6 +370,13 @@ describe.each([ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY])(
         read.resolve();
         await recovering;
 
+        expect(surface.widget).toEqual(latest);
+        expect(surface.activity).toEqual(running > 0 ? latest : null);
+        expect(getActivityKitDenied()).toBe(true);
+
+        await recoverGlanceableActivityKit();
+
+        expect(getActivityKitDenied()).toBe(false);
         expect(surface.widget).toEqual(latest);
         expect(surface.activity).toEqual(running > 0 ? latest : null);
       }

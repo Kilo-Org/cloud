@@ -750,7 +750,8 @@
       "networkError": "नेटवर्क त्रुटी",
       "uploadFailed": "अपलोड अयशस्वी",
       "failedToUploadFile": "फाइल अपलोड करण्यात अयशस्वी: {{reason}}",
-      "nothingToPaste": "पेस्ट करण्यासारखे काही नाही"
+      "nothingToPaste": "पेस्ट करण्यासारखे काही नाही",
+      "metadataStripFailed": "फोटो मेटाडेटा काढता आला नाही."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "सुरू ठेवत आहोत {{title}}",
       "importingSession": "सत्र आयात करत आहोत",
       "cliCannotContinue": "हे CLI सत्र सुरू ठेवू शकत नाही. Cloud Agent किंवा दुसरे CLI निवडा.",
-      "importFailed": "हे सत्र आयात करता आले नाही."
+      "importFailed": "हे सत्र आयात करता आले नाही.",
+      "discardWithUploadsMessage": "तुमचा प्रॉम्प्ट आणि पाठवलेल्या संदेशांना संलग्न नसलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्ययावत केली",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "पूर्ण होत आहे...",
       "messagePlaceholder": "संदेश...",
       "cannotReceiveFiles": "या सत्राला फाइल्स मिळू शकत नाहीत. तुमचा संदेश पाठवण्यासाठी संलग्नता काढा.",
-      "couldNotAttachFiles": "फाइल्स जोडता आल्या नाहीत. पुन्हा प्रयत्न करण्यासाठी पाठवा टॅप करा."
+      "couldNotAttachFiles": "फाइल्स जोडता आल्या नाहीत. पुन्हा प्रयत्न करण्यासाठी पाठवा टॅप करा.",
+      "discardAttachmentsMessage": "पाठवलेल्या संदेशांना संलग्न नसलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील.",
+      "discardAttachmentsTitle": "संलग्नता टाकून द्यायच्या?"
     },
     "chatLink": {
       "linkCopied": "लिंक कॉपी केली",

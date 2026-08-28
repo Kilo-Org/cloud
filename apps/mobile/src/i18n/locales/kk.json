@@ -750,7 +750,8 @@
       "networkError": "Желі қатесі",
       "uploadFailed": "Жүктеу сәтсіз аяқталды",
       "failedToUploadFile": "Файлды жүктеу сәтсіз аяқталды: {{reason}}",
-      "nothingToPaste": "Қоятын ештеңе жоқ"
+      "nothingToPaste": "Қоятын ештеңе жоқ",
+      "metadataStripFailed": "Фотосуреттің метадеректерін жою мүмкін болмады."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Жалғастыру {{title}}",
       "importingSession": "Сессияны импорттау",
       "cliCannotContinue": "Бұл CLI сессияны жалғастыра алмайды. Cloud Agent немесе басқа CLI таңдаңыз.",
-      "importFailed": "Бұл сессияны импорттау мүмкін болмады."
+      "importFailed": "Бұл сессияны импорттау мүмкін болмады.",
+      "discardWithUploadsMessage": "Сұрағыңыз және жіберілген хабарламаларға қосылмаған жүктелген файлдар жойылады."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Аяқталуда...",
       "messagePlaceholder": "Хабарлама...",
       "cannotReceiveFiles": "Бұл сессия файл қабылдай алмайды. Хабарлама жіберу үшін қосымшаларды алып тастаңыз.",
-      "couldNotAttachFiles": "Файлдарды қосу мүмкін болмады. Қайталау үшін жіберуді түртіңіз."
+      "couldNotAttachFiles": "Файлдарды қосу мүмкін болмады. Қайталау үшін жіберуді түртіңіз.",
+      "discardAttachmentsMessage": "Жіберілген хабарламаларға қосылмаған жүктелген файлдар жойылады.",
+      "discardAttachmentsTitle": "Қосымшаларды жою керек пе?"
     },
     "chatLink": {
       "linkCopied": "Сілтеме көшірілді",

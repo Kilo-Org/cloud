@@ -764,7 +764,8 @@
       "networkError": "Chyba siete",
       "uploadFailed": "Nahrávanie zlyhalo",
       "failedToUploadFile": "Súbor sa nepodarilo nahrať: {{reason}}",
-      "nothingToPaste": "Nie je čo vložiť"
+      "nothingToPaste": "Nie je čo vložiť",
+      "metadataStripFailed": "Metaúdaje fotografie sa nepodarilo odstrániť."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2243,7 +2244,8 @@
       "continueFrom": "Pokračovať v {{title}}",
       "importingSession": "Importuje sa relácia",
       "cliCannotContinue": "Tento CLI nemôže pokračovať v relácii. Vyberte Cloud Agent alebo iný CLI.",
-      "importFailed": "Túto reláciu sa nepodarilo importovať."
+      "importFailed": "Túto reláciu sa nepodarilo importovať.",
+      "discardWithUploadsMessage": "Váš prompt a všetky nahrané súbory nepriložené k odoslaným správam sa odstránia."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizovaný {{displayCount}} súbor",
@@ -2613,7 +2615,9 @@
       "finalizingPlaceholder": "Finalizujem...",
       "messagePlaceholder": "Správa...",
       "cannotReceiveFiles": "Táto relácia nemôže prijímať súbory. Odstráňte prílohy, aby ste mohli odoslať správu.",
-      "couldNotAttachFiles": "Súbory sa nepodarilo pripojiť. Klepnutím na odoslať to skúsite znova."
+      "couldNotAttachFiles": "Súbory sa nepodarilo pripojiť. Klepnutím na odoslať to skúsite znova.",
+      "discardAttachmentsMessage": "Nahrané súbory nepriložené k odoslaným správam sa odstránia.",
+      "discardAttachmentsTitle": "Zahodiť prílohy?"
     },
     "chatLink": {
       "linkCopied": "Odkaz skopírovaný",

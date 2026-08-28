@@ -757,7 +757,8 @@
       "networkError": "Tīkla kļūda",
       "uploadFailed": "Augšupielāde neizdevās",
       "failedToUploadFile": "Neizdevās augšupielādēt failu: {{reason}}",
-      "nothingToPaste": "Nav ko ielīmēt"
+      "nothingToPaste": "Nav ko ielīmēt",
+      "metadataStripFailed": "Neizdevās noņemt foto metadatus."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2228,7 +2229,8 @@
       "continueFrom": "Turpina {{title}}",
       "importingSession": "Importē sesiju",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlieties Cloud Agent vai citu CLI.",
-      "importFailed": "Neizdevās importēt šo sesiju."
+      "importFailed": "Neizdevās importēt šo sesiju.",
+      "discardWithUploadsMessage": "Jūsu jautājums un augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails",
@@ -2594,7 +2596,9 @@
       "finalizingPlaceholder": "Pabeidz...",
       "messagePlaceholder": "Ziņojums...",
       "cannotReceiveFiles": "Šī sesija nevar saņemt failus. Noņem pielikumus, lai nosūtītu savu ziņojumu.",
-      "couldNotAttachFiles": "Neizdevās pievienot failus. Pieskarieties Sūtīt, lai mēģinātu vēlreiz."
+      "couldNotAttachFiles": "Neizdevās pievienot failus. Pieskarieties Sūtīt, lai mēģinātu vēlreiz.",
+      "discardAttachmentsMessage": "Augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
+      "discardAttachmentsTitle": "Atmest pielikumus?"
     },
     "chatLink": {
       "linkCopied": "Saite kopēta",

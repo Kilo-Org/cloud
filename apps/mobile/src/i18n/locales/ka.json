@@ -750,7 +750,8 @@
       "networkError": "ქსელის შეცდომა",
       "uploadFailed": "ატვირთვა ვერ მოხერხდა",
       "failedToUploadFile": "ფაილის ატვირთვა ვერ მოხერხდა: {{reason}}",
-      "nothingToPaste": "ჩასასმელი არაფერია"
+      "nothingToPaste": "ჩასასმელი არაფერია",
+      "metadataStripFailed": "ფოტოს მეტამონაცემების წაშლა ვერ მოხერხდა."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
       "continueFrom": "ვაგრძელებთ {{title}}",
       "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
-      "importingSession": "სესიის იმპორტირება"
+      "importingSession": "სესიის იმპორტირება",
+      "discardWithUploadsMessage": "თქვენი მოთხოვნა და ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება."
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "დასრულება...",
       "messagePlaceholder": "შეტყობინება...",
       "cannotReceiveFiles": "ამ სესიას ფაილების მიღება არ შეუძლია. შეტყობინების გასაგზავნად ამოიღეთ დანართები.",
-      "couldNotAttachFiles": "ფაილების მიმაგრება ვერ მოხერხდა. ხელახლა სცადეთ."
+      "couldNotAttachFiles": "ფაილების მიმაგრება ვერ მოხერხდა. ხელახლა სცადეთ.",
+      "discardAttachmentsMessage": "აიტვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
+      "discardAttachmentsTitle": "გავაუქმოთ დანართები?"
     },
     "chatLink": {
       "linkCopied": "ბმული დაკოპირდა",

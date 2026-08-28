@@ -750,7 +750,8 @@
       "networkError": "Netværksfejl",
       "uploadFailed": "Upload mislykkedes",
       "failedToUploadFile": "Kunne ikke uploade fil: {{reason}}",
-      "nothingToPaste": "Intet at indsætte"
+      "nothingToPaste": "Intet at indsætte",
+      "metadataStripFailed": "Billedets metadata kunne ikke fjernes."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
       "continueFrom": "Fortsætter {{title}}",
       "importFailed": "Kunne ikke importere denne session.",
-      "importingSession": "Importerer session"
+      "importingSession": "Importerer session",
+      "discardWithUploadsMessage": "Din prompt og eventuelle uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet."
     },
     "partRenderer": {
       "updatedFileCount_one": "Opdaterede {{displayCount}} fil",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Afslutter...",
       "messagePlaceholder": "Besked...",
       "cannotReceiveFiles": "Denne session kan ikke modtage filer. Fjern vedhæftningerne for at sende din besked.",
-      "couldNotAttachFiles": "Kunne ikke vedhæfte filer. Tryk send for at prøve igen."
+      "couldNotAttachFiles": "Kunne ikke vedhæfte filer. Tryk send for at prøve igen.",
+      "discardAttachmentsMessage": "Uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
+      "discardAttachmentsTitle": "Kassér vedhæftninger?"
     },
     "chatLink": {
       "linkCopied": "Link kopieret",

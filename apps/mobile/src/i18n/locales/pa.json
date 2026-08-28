@@ -750,7 +750,8 @@
       "networkError": "ਨੈੱਟਵਰਕ ਗਲਤੀ",
       "uploadFailed": "ਅੱਪਲੋਡ ਅਸਫਲ",
       "failedToUploadFile": "ਫਾਈਲ ਅੱਪਲੋਡ ਕਰਨ ਵਿੱਚ ਅਸਫਲ: {{reason}}",
-      "nothingToPaste": "ਪੇਸਟ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ"
+      "nothingToPaste": "ਪੇਸਟ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ",
+      "metadataStripFailed": "ਫੋਟੋ ਮੈਟਾਡੇਟਾ ਨਹੀਂ ਹਟਾਇਆ ਜਾ ਸਕਿਆ।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "ਇਹ CLI ਸੈਸ਼ਨ ਜਾਰੀ ਨਹੀਂ ਰੱਖ ਸਕਦਾ। ਕਲਾਉਡ ਏਜੰਟ ਜਾਂ ਕੋਈ ਹੋਰ CLI ਚੁਣੋ।",
       "continueFrom": "{{title}} ਜਾਰੀ ਰੱਖ ਰਿਹਾ ਹੈ",
       "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
-      "importingSession": "ਸੈਸ਼ਨ ਆਯਾਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"
+      "importingSession": "ਸੈਸ਼ਨ ਆਯਾਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
+      "discardWithUploadsMessage": "ਤੁਹਾਡਾ ਪ੍ਰੰਪਟ ਅਤੇ ਭੇਜੇ ਗਏ ਸੁਨੇਹਿਆਂ ਨਾਲ ਅਟੈਚ ਨਾ ਕੀਤੀਆਂ ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "ਮੁਕੰਮਲ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
       "messagePlaceholder": "ਸੁਨੇਹਾ...",
       "cannotReceiveFiles": "ਇਹ ਸੈਸ਼ਨ ਫਾਈਲਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ। ਆਪਣਾ ਸੁਨੇਹਾ ਭੇਜਣ ਲਈ ਅਟੈਚਮੈਂਟ ਹਟਾਓ।",
-      "couldNotAttachFiles": "ਫਾਈਲਾਂ ਅਟੈਚ ਨਹੀਂ ਹੋ ਸਕੀਆਂ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਭੇਜੋ ਟੈਪ ਕਰੋ।"
+      "couldNotAttachFiles": "ਫਾਈਲਾਂ ਅਟੈਚ ਨਹੀਂ ਹੋ ਸਕੀਆਂ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਭੇਜੋ ਟੈਪ ਕਰੋ।",
+      "discardAttachmentsMessage": "ਭੇਜੇ ਗਏ ਸੁਨੇਹਿਆਂ ਨਾਲ ਅਟੈਚ ਨਾ ਕੀਤੀਆਂ ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ।",
+      "discardAttachmentsTitle": "ਅਟੈਚਮੈਂਟਾਂ ਮਿਟਾਈਏ?"
     },
     "chatLink": {
       "linkCopied": "ਲਿੰਕ ਕਾਪੀ ਹੋ ਗਿਆ",

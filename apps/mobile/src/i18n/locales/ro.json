@@ -757,7 +757,8 @@
       "networkError": "Eroare de rețea",
       "uploadFailed": "Încărcarea a eșuat",
       "failedToUploadFile": "Încărcarea fișierului a eșuat: {{reason}}",
-      "nothingToPaste": "Nimic de lipit"
+      "nothingToPaste": "Nimic de lipit",
+      "metadataStripFailed": "Nu s-au putut elimina metadatele fotografiei."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2228,7 +2229,8 @@
       "continueFrom": "Continuare {{title}}",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
-      "importFailed": "Nu s-a putut importa această sesiune."
+      "importFailed": "Nu s-a putut importa această sesiune.",
+      "discardWithUploadsMessage": "Promptul tău și fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizat {{displayCount}} fișier",
@@ -2594,7 +2596,9 @@
       "finalizingPlaceholder": "Se finalizează...",
       "messagePlaceholder": "Mesaj...",
       "cannotReceiveFiles": "Această sesiune nu poate primi fișiere. Elimină atașamentele pentru a trimite mesajul.",
-      "couldNotAttachFiles": "Fișierele nu au putut fi atașate. Atinge trimitere pentru a încerca din nou."
+      "couldNotAttachFiles": "Fișierele nu au putut fi atașate. Atinge trimitere pentru a încerca din nou.",
+      "discardAttachmentsMessage": "Fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
+      "discardAttachmentsTitle": "Renunți la atașamente?"
     },
     "chatLink": {
       "linkCopied": "Link copiat",

@@ -764,7 +764,8 @@
       "networkError": "Tinklo klaida",
       "uploadFailed": "Įkelti nepavyko",
       "failedToUploadFile": "Nepavyko įkelti failo: {{reason}}",
-      "nothingToPaste": "Nėra ko įklijuoti"
+      "nothingToPaste": "Nėra ko įklijuoti",
+      "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2243,7 +2244,8 @@
       "continueFrom": "Tęsiama {{title}}",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šis CLI negali tęsti sesijos. Pasirinkite Cloud Agent arba kitą CLI.",
-      "importFailed": "Nepavyko importuoti šios sesijos."
+      "importFailed": "Nepavyko importuoti šios sesijos.",
+      "discardWithUploadsMessage": "Jūsų užklausa ir visos prie išsiųstų žinučių nepridėtos įkeltos rinkmenos bus ištrintos."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujinta {{displayCount}} rinkmena",
@@ -2613,7 +2615,9 @@
       "finalizingPlaceholder": "Baigiama...",
       "messagePlaceholder": "Žinutė...",
       "cannotReceiveFiles": "Ši sesija negali gauti failų. Pašalinkite priedus, kad išsiųstumėte žinutę.",
-      "couldNotAttachFiles": "Nepavyko pridėti failų. Bakstelėkite siųsti, kad bandytumėte dar kartą."
+      "couldNotAttachFiles": "Nepavyko pridėti failų. Bakstelėkite siųsti, kad bandytumėte dar kartą.",
+      "discardAttachmentsMessage": "Prie išsiųstų žinučių nepridėtos įkeltos rinkmenos bus ištrintos.",
+      "discardAttachmentsTitle": "Atmesti priedus?"
     },
     "chatLink": {
       "linkCopied": "Nuoroda nukopijuota",

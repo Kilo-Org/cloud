@@ -764,7 +764,8 @@
       "networkError": "Chyba sítě",
       "uploadFailed": "Nahrávání se nezdařilo",
       "failedToUploadFile": "Soubor se nepodařilo nahrát: {{reason}}",
-      "nothingToPaste": "Nic k vložení"
+      "nothingToPaste": "Nic k vložení",
+      "metadataStripFailed": "Metadata fotografie se nepodařilo odstranit."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2243,7 +2244,8 @@
       "cliCannotContinue": "Toto CLI nemůže pokračovat v relaci. Vyberte Cloud Agent nebo jiné CLI.",
       "continueFrom": "Pokračování {{title}}",
       "importFailed": "Tuto relaci se nepodařilo importovat.",
-      "importingSession": "Importování relace"
+      "importingSession": "Importování relace",
+      "discardWithUploadsMessage": "Váš dotaz a všechny nahrané soubory nepřipojené k odeslaným zprávám budou smazány."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizován {{displayCount}} soubor",
@@ -2613,7 +2615,9 @@
       "finalizingPlaceholder": "Dokončuje se...",
       "messagePlaceholder": "Zpráva...",
       "cannotReceiveFiles": "Tato relace nemůže přijímat soubory. Odeberte přílohy, abyste mohli odeslat zprávu.",
-      "couldNotAttachFiles": "Soubory se nepodařilo připojit. Klepnutím na odeslat to zkuste znovu."
+      "couldNotAttachFiles": "Soubory se nepodařilo připojit. Klepnutím na odeslat to zkuste znovu.",
+      "discardAttachmentsMessage": "Nahrané soubory nepřipojené k odeslaným zprávám budou smazány.",
+      "discardAttachmentsTitle": "Zahodit přílohy?"
     },
     "chatLink": {
       "linkCopied": "Odkaz zkopírován",

@@ -750,7 +750,8 @@
       "networkError": "Мрежова грешка",
       "uploadFailed": "Качването не успя",
       "failedToUploadFile": "Не можахме да качим файла: {{reason}}",
-      "nothingToPaste": "Няма какво да поставите"
+      "nothingToPaste": "Няма какво да поставите",
+      "metadataStripFailed": "Метаданните на снимката не можаха да бъдат премахнати."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Продължаване на {{title}}",
       "importingSession": "Импортиране на сесията",
       "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
-      "importFailed": "Тази сесия не можа да бъде импортирана."
+      "importFailed": "Тази сесия не можа да бъде импортирана.",
+      "discardWithUploadsMessage": "Вашата подкана и всички качени файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити."
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран {{displayCount}} файл",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Приключване...",
       "messagePlaceholder": "Съобщение...",
       "cannotReceiveFiles": "Тази сесия не може да получава файлове. Премахнете прикачените файлове, за да изпратите съобщението си.",
-      "couldNotAttachFiles": "Не можаха да се прикачат файлове. Докоснете изпращане, за да опитате отново."
+      "couldNotAttachFiles": "Не можаха да се прикачат файлове. Докоснете изпращане, за да опитате отново.",
+      "discardAttachmentsMessage": "Качените файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити.",
+      "discardAttachmentsTitle": "Да отхвърлим прикачените файлове?"
     },
     "chatLink": {
       "linkCopied": "Линкът е копиран",

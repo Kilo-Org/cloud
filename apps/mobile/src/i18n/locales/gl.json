@@ -750,7 +750,8 @@
       "networkError": "Erro de rede",
       "uploadFailed": "Non se puido subir",
       "failedToUploadFile": "Non se puido subir o arquivo: {{reason}}",
-      "nothingToPaste": "Non hai nada que pegar"
+      "nothingToPaste": "Non hai nada que pegar",
+      "metadataStripFailed": "Non se puideron eliminar os metadatos da foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Continuando {{title}}",
       "importingSession": "Importando a sesión",
       "cliCannotContinue": "Este CLI non pode continuar unha sesión. Escolle Cloud Agent ou outro CLI.",
-      "importFailed": "Non se puido importar esta sesión."
+      "importFailed": "Non se puido importar esta sesión.",
+      "discardWithUploadsMessage": "Eliminaranse a túa indicación e os arquivos subidos que non estean anexados a mensaxes enviadas."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Rematando...",
       "messagePlaceholder": "Mensaxe...",
       "cannotReceiveFiles": "Esta sesión non pode recibir ficheiros. Elimina os anexos para enviar a túa mensaxe.",
-      "couldNotAttachFiles": "Non se puideron anexar os ficheiros. Toca enviar para reintentar."
+      "couldNotAttachFiles": "Non se puideron anexar os ficheiros. Toca enviar para reintentar.",
+      "discardAttachmentsMessage": "Eliminaranse os arquivos subidos que non estean anexados a mensaxes enviadas.",
+      "discardAttachmentsTitle": "Descartar os anexos?"
     },
     "chatLink": {
       "linkCopied": "Ligazón copiada",

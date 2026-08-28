@@ -296,7 +296,8 @@
       "networkError": "Netzwerkfehler",
       "uploadFailed": "Hochladen fehlgeschlagen",
       "failedToUploadFile": "Datei konnte nicht hochgeladen werden: {{reason}}",
-      "nothingToPaste": "Nichts einzufügen"
+      "nothingToPaste": "Nichts einzufügen",
+      "metadataStripFailed": "Die Metadaten des Fotos konnten nicht entfernt werden."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1759,7 +1760,8 @@
       "continueFrom": "{{title}} wird fortgesetzt",
       "importingSession": "Sitzung wird importiert",
       "cliCannotContinue": "Diese CLI kann keine Sitzung fortsetzen. Wähle Cloud Agent oder eine andere CLI.",
-      "importFailed": "Diese Sitzung konnte nicht importiert werden."
+      "importFailed": "Diese Sitzung konnte nicht importiert werden.",
+      "discardWithUploadsMessage": "Dein Prompt und alle hochgeladenen Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} Datei aktualisiert",
@@ -2121,7 +2123,9 @@
       "finalizingPlaceholder": "Wird abgeschlossen...",
       "messagePlaceholder": "Nachricht...",
       "cannotReceiveFiles": "Diese Sitzung kann keine Dateien empfangen. Entferne die Anhänge, um deine Nachricht zu senden.",
-      "couldNotAttachFiles": "Dateien konnten nicht angehängt werden. Tippe auf Senden, um es erneut zu versuchen."
+      "couldNotAttachFiles": "Dateien konnten nicht angehängt werden. Tippe auf Senden, um es erneut zu versuchen.",
+      "discardAttachmentsMessage": "Hochgeladene Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht.",
+      "discardAttachmentsTitle": "Anhänge verwerfen?"
     },
     "chatLink": {
       "linkCopied": "Link kopiert",

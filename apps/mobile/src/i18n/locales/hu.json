@@ -750,7 +750,8 @@
       "networkError": "Hálózati hiba",
       "uploadFailed": "A feltöltés nem sikerült",
       "failedToUploadFile": "Nem sikerült feltölteni a fájlt: {{reason}}",
-      "nothingToPaste": "Nincs mit beilleszteni"
+      "nothingToPaste": "Nincs mit beilleszteni",
+      "metadataStripFailed": "Nem sikerült eltávolítani a fotó metaadatait."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Folytatás {{title}}",
       "importingSession": "Munkamenet importálása",
       "cliCannotContinue": "Ez a CLI nem tudja folytatni a munkamenetet. Válasszon Cloud Agentet vagy másik CLI-t.",
-      "importFailed": "Nem sikerült importálni ezt a munkamenetet."
+      "importFailed": "Nem sikerült importálni ezt a munkamenetet.",
+      "discardWithUploadsMessage": "A promptja és az elküldött üzenetekhez nem csatolt feltöltések törlődnek."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissítve",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Befejezés...",
       "messagePlaceholder": "Üzenet...",
       "cannotReceiveFiles": "Ez a munkamenet nem fogadhat fájlokat. Az üzenet elküldéséhez távolítsd el a csatolmányokat.",
-      "couldNotAttachFiles": "A fájlok csatolása nem sikerült. Az újrapróbáláshoz koppints a küldésre."
+      "couldNotAttachFiles": "A fájlok csatolása nem sikerült. Az újrapróbáláshoz koppints a küldésre.",
+      "discardAttachmentsMessage": "Az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
+      "discardAttachmentsTitle": "Elveti a csatolmányokat?"
     },
     "chatLink": {
       "linkCopied": "Hivatkozás másolva",

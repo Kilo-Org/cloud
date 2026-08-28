@@ -11,10 +11,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Bot, Plus } from '@/components/ui/icons';
+import { Bot, Plus, SlidersHorizontal } from '@/components/ui/icons';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import {
+  buildLiveFilterOptions,
+  filterLiveSessions,
+} from '@/components/agents/live-session-filters';
+import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
@@ -54,9 +59,36 @@ export function AgentSessionListScreen() {
     enabled: orgLoaded,
   });
 
+  // Repository and origin filters for the live list. The whole live set is
+  // already in memory, so filtering is local — no refetch, no extra query.
+  // Kept in component state rather than the persisted history filters: the two
+  // screens show different rows, and a filter hidden behind an app restart
+  // would silently hide running sessions.
+  const [platformFilter, setPlatformFilter] = useState<string[]>([]);
+  const [projectFilter, setProjectFilter] = useState<string[]>([]);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
+  const filterOptions = useMemo(() => buildLiveFilterOptions(activeSessions), [activeSessions]);
+  const visibleSessions = useMemo(
+    () => filterLiveSessions(activeSessions, platformFilter, projectFilter),
+    [activeSessions, platformFilter, projectFilter]
+  );
+
+  const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
+  const clearFilters = useCallback(() => {
+    setPlatformFilter([]);
+    setProjectFilter([]);
+  }, []);
+
   // Treat !orgLoaded as loading so the empty state cannot flash before skeletons.
   const loading = isLoading || !orgLoaded;
   const hasLiveRows = activeSessions.length > 0;
+  const hasVisibleRows = visibleSessions.length > 0;
+  // Only offer the picker when there is something to pick, and keep it while a
+  // filter is applied so the user can always get back to the full list.
+  const showFilterButton =
+    hasActiveFilter ||
+    filterOptions.projectOptions.length + filterOptions.platformOptions.length > 0;
 
   const refetchRef = useRef(refetch);
   useEffect(() => {
@@ -106,21 +138,41 @@ export function AgentSessionListScreen() {
 
   const seeAllLabel = t('home.seeAll');
   const headerRight = (
-    <Pressable
-      onPress={() => {
-        router.push('/(app)/(tabs)/(2_agents)/history' as Href);
-      }}
-      // left slop capped against the large title, right slop reaches 44pt wide
-      hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
-      accessibilityRole="button"
-      accessibilityLabel={seeAllLabel}
-      testID="agents-view-history"
-      className="active:opacity-70"
-    >
-      <Text className="shrink font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
-        {seeAllLabel}
-      </Text>
-    </Pressable>
+    <View className="flex-row items-center gap-4">
+      <Pressable
+        onPress={() => {
+          router.push('/(app)/(tabs)/(2_agents)/history' as Href);
+        }}
+        // left slop capped against the large title, right slop reaches 44pt wide
+        hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
+        accessibilityRole="button"
+        accessibilityLabel={seeAllLabel}
+        testID="agents-view-history"
+        className="active:opacity-70"
+      >
+        <Text className="shrink font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
+          {seeAllLabel}
+        </Text>
+      </Pressable>
+      {showFilterButton ? (
+        <Pressable
+          onPress={() => {
+            setShowFilterModal(true);
+          }}
+          // left slop capped against the 16px gap, right slop reaches 44pt wide
+          hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('agentChat.sessionFilter.title')}
+          testID="agents-open-filters"
+          className="active:opacity-70"
+        >
+          <SlidersHorizontal
+            size={20}
+            color={hasActiveFilter ? colors.foreground : colors.mutedForeground}
+          />
+        </Pressable>
+      ) : null}
+    </View>
   );
 
   const [refreshing, setRefreshing] = useState(false);
@@ -194,6 +246,19 @@ export function AgentSessionListScreen() {
         }}
       />
     );
+  } else if (hasLiveRows && !hasVisibleRows) {
+    body = (
+      <EmptyState
+        icon={Bot}
+        title={t('agents.sessionList.noMatches')}
+        description={t('agents.sessionList.tryAdjustFilters')}
+        action={
+          <Button variant="outline" onPress={clearFilters}>
+            <Text>{t('agents.search.clearFilters')}</Text>
+          </Button>
+        }
+      />
+    );
   } else if (!hasLiveRows) {
     body = (
       <EmptyState
@@ -217,7 +282,7 @@ export function AgentSessionListScreen() {
     body = (
       <FlatList
         ref={listRef}
-        data={activeSessions}
+        data={visibleSessions}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         extraData={attentionFocusRevision}
@@ -237,6 +302,17 @@ export function AgentSessionListScreen() {
         className="px-[22px]"
         headerRight={headerRight}
       />
+      <SessionFilterChips
+        platformFilter={platformFilter}
+        projectFilter={projectFilter}
+        projectOptions={filterOptions.projectOptions}
+        onRemovePlatform={platform => {
+          setPlatformFilter(prev => prev.filter(value => value !== platform));
+        }}
+        onRemoveProject={gitUrl => {
+          setProjectFilter(prev => prev.filter(value => value !== gitUrl));
+        }}
+      />
       {body}
       {/* FAB visible when there are live rows — empty state already owns the creation CTA. */}
       {hasLiveRows && (
@@ -252,6 +328,21 @@ export function AgentSessionListScreen() {
         >
           <Plus size={24} color={colors.primaryForeground} />
         </Pressable>
+      )}
+      {showFilterModal && (
+        <SessionFilterModal
+          selectedPlatforms={platformFilter}
+          selectedProjects={projectFilter}
+          projectOptions={filterOptions.projectOptions}
+          platformOptions={filterOptions.platformOptions}
+          onClose={() => {
+            setShowFilterModal(false);
+          }}
+          onApply={filters => {
+            setPlatformFilter(filters.platformFilter);
+            setProjectFilter(filters.projectFilter);
+          }}
+        />
       )}
     </View>
   );

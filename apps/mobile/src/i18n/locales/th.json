@@ -3202,9 +3202,6 @@
     "openAgents": "เปิดเอเจนต์",
     "running": "กำลังทำงาน",
     "needsInput": "ต้องป้อนข้อมูล",
-    "reconnecting": "กำลังเชื่อมต่อใหม่",
-    "channelName": "เอเจนต์ที่กำลังทำงาน",
-    "activityKitDisabledTitle": "กิจกรรมสดปิดอยู่",
-    "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อค"
+    "reconnecting": "กำลังเชื่อมต่อใหม่"
   }
 }

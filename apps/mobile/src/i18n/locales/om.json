@@ -3202,9 +3202,6 @@
     "openAgents": "Eejentoota banaa",
     "running": "Hojii irra jira",
     "needsInput": "seensa barbaada",
-    "reconnecting": "Irra deebi'ee walqabachaa jira",
-    "channelName": "Eejentoota hojii irra jiran",
-    "activityKitDisabledTitle": "Sochiiwwan Kallattii cufamaniiru",
-    "activityKitDisabledBody": "Eejentoota hojii irra jiran Iskiriinii Qulfii irratti arguuf, Qindaa'ina keessatti Sochiiwwan Kallattii banaa."
+    "reconnecting": "Irra deebi'ee walqabachaa jira"
   }
 }

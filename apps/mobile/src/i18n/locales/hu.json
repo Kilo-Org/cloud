@@ -3202,9 +3202,6 @@
     "openAgents": "Ügynökök megnyitása",
     "running": "Folyamatban",
     "needsInput": "bemenetet igényel",
-    "reconnecting": "Újracsatlakozás",
-    "channelName": "Aktív ügynökök",
-    "activityKitDisabledTitle": "Az Élő tevékenységek ki vannak kapcsolva",
-    "activityKitDisabledBody": "Kapcsolja be az Élő tevékenységeket a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
+    "reconnecting": "Újracsatlakozás"
   }
 }

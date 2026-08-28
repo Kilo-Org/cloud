@@ -3202,9 +3202,6 @@
     "openAgents": "Louvri ajans yo",
     "running": "AP KOURI",
     "needsInput": "bezwen input",
-    "reconnecting": "Ap rekonekte",
-    "channelName": "Ajans aktif yo",
-    "activityKitDisabledTitle": "Aktivite an dirèk yo fèmen",
-    "activityKitDisabledBody": "Aktive Aktivite an dirèk nan Paramèt pou wè Ajans aktif yo sou Ekran bloke a."
+    "reconnecting": "Ap rekonekte"
   }
 }

@@ -3202,9 +3202,6 @@
     "openAgents": "এজেন্টগুলি খুলুন",
     "running": "চলছে",
     "needsInput": "ইনপুট প্রয়োজন",
-    "reconnecting": "পুনরায় সংযোগ করা হচ্ছে",
-    "channelName": "সক্রিয় এজেন্ট",
-    "activityKitDisabledTitle": "সরাসরি কার্যকলাপ বন্ধ আছে",
-    "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্টগুলি দেখতে সেটিংসে সরাসরি কার্যকলাপ চালু করুন।"
+    "reconnecting": "পুনরায় সংযোগ করা হচ্ছে"
   }
 }

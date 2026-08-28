@@ -5,7 +5,7 @@
  */
 import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import { type SlashCommandInfo, type StandaloneSuggestion } from '@kilocode/cloud-agent-sdk';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import {
@@ -25,7 +25,6 @@ import {
   Keyboard,
   type LayoutChangeEvent,
   Platform,
-  Pressable,
   type TextInput,
   type TextInputSelectionChangeEvent,
   type TextStyle,
@@ -67,6 +66,7 @@ import {
 } from '@/components/agents/chat-composer-input-height';
 import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
+import { SuggestionCard } from '@/components/agents/suggestion-card';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
@@ -205,14 +205,13 @@ type ChatComposerProps = {
   initialDraft?: string;
   /** Active session id, used to scope the Android picker launch context. */
   sessionId?: string | null;
-  /** Session lifecycle phase; drives contextual starter chips. Defaults to `message`. */
-  sessionState?: ChatComposerSessionState;
+  /** Active Remote CLI `suggest` tool request. */
+  suggestion?: StandaloneSuggestion | null;
+  onAcceptSuggestion?: (requestId: string, index: number) => Promise<void>;
+  onDismissSuggestion?: (requestId: string) => Promise<void>;
   /** Imperative handle the host binds to call `setText`. */
   controlRef?: Ref<ChatComposerControl>;
 };
-
-/** Lifecycle phases that change the composer placeholder and starter chips. */
-export type ChatComposerSessionState = 'empty' | 'preparing' | 'finalizing' | 'message';
 
 export function ChatComposer({
   onSend,
@@ -243,7 +242,9 @@ export function ChatComposer({
   draftKey,
   initialDraft,
   sessionId = null,
-  sessionState = 'message',
+  suggestion = null,
+  onAcceptSuggestion,
+  onDismissSuggestion,
   controlRef,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
@@ -1006,30 +1007,6 @@ export function ChatComposer({
     });
   }
 
-  // Starter chips are static, localized prompt ideas plus a contextual chip for
-  // the session lifecycle phase. They insert and focus only; they never submit.
-  const starterChips = useMemo(() => {
-    const staticChips = [
-      i18n.t('agentChat.composer.starterChipBuild'),
-      i18n.t('agentChat.composer.starterChipFix'),
-      i18n.t('agentChat.composer.starterChipWriteTests'),
-    ];
-    if (sessionState === 'preparing') {
-      return [i18n.t('agentChat.composer.starterChipPrepare'), ...staticChips];
-    }
-    if (sessionState === 'finalizing') {
-      return [i18n.t('agentChat.composer.starterChipWrapUp'), ...staticChips];
-    }
-    if (sessionState === 'empty') {
-      return [i18n.t('agentChat.composer.starterChipEmpty'), ...staticChips];
-    }
-    return staticChips;
-  }, [sessionState]);
-  const showStarters =
-    !hasText &&
-    !isSending &&
-    (!disabled || sessionState === 'preparing' || sessionState === 'finalizing');
-
   async function submit() {
     // Commit any coalesced derived state (hasText, measure, slash command)
     // before the send decision, so a submit in the same frame as the last
@@ -1130,12 +1107,32 @@ export function ChatComposer({
     textAlignVertical: 'top',
     width: '100%',
   };
+  const suggestionRow =
+    suggestion && onAcceptSuggestion && onDismissSuggestion ? (
+      <Animated.View
+        entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
+        exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
+      >
+        <SuggestionCard
+          text={suggestion.text}
+          actions={suggestion.actions}
+          onAccept={async index => {
+            await onAcceptSuggestion(suggestion.requestId, index);
+          }}
+          onDismiss={async () => {
+            await onDismissSuggestion(suggestion.requestId);
+          }}
+        />
+      </Animated.View>
+    ) : null;
 
   return (
     <BlurBar>
       {measure.measureElement}
 
-      {control.showToolbar ? (
+      {suggestionRow}
+
+      {!suggestionRow && control.showToolbar ? (
         <Animated.View
           entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
           exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
@@ -1190,25 +1187,6 @@ export function ChatComposer({
       <View className={cn('px-3', voiceInput.status === 'listening' ? 'pb-1' : 'pb-0')}>
         <VoiceInputStatus status={voiceInput.status} />
       </View>
-
-      {showStarters ? (
-        <View className="flex-row flex-wrap gap-2 px-3 pb-2 pt-3">
-          {starterChips.map(chip => (
-            <Pressable
-              key={chip}
-              onPress={() => {
-                applyComposerText(chip);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={chip}
-              hitSlop={{ top: 8, bottom: 8 }}
-              className="items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 active:opacity-70"
-            >
-              <Text className="text-sm font-normal text-muted-foreground">{chip}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
 
       {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount <= COMPOSER_COUNTER_VISIBLE_REMAINING ? (
         <View className="flex-row justify-end px-4 pb-1">

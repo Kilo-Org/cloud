@@ -2628,13 +2628,7 @@
       "discardAttachmentsMessage": "Prie išsiųstų žinučių nepridėtos įkeltos rinkmenos bus ištrintos.",
       "discardAttachmentsTitle": "Atmesti priedus?",
       "charactersRemaining": "Liko simbolių: {{count}}",
-      "insertNewline": "Įterpti naują eilutę",
-      "starterChipBuild": "Sukurk funkciją",
-      "starterChipEmpty": "Pradėk nuo idėjos",
-      "starterChipFix": "Ištaisyk klaidą",
-      "starterChipPrepare": "Paruošk mano aplinką",
-      "starterChipWrapUp": "Užbaik mano sesiją",
-      "starterChipWriteTests": "Parašyk testus"
+      "insertNewline": "Įterpti naują eilutę"
     },
     "chatLink": {
       "linkCopied": "Nuoroda nukopijuota",

@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "A ga-ehichapụ faịlụ ebugotere ndị a na-ejikọtaghị na ozi ezigara.",
       "discardAttachmentsTitle": "Tụfuo mgbakwunye?",
       "charactersRemaining": "Mkpụrụedemede {{count}} fọdụrụ",
-      "insertNewline": "Tinye ahịrị ọhụrụ",
-      "starterChipBuild": "Mepụta atụmatụ",
-      "starterChipEmpty": "Malite na echiche",
-      "starterChipFix": "Dozie njehie",
-      "starterChipPrepare": "Hazie gburugburu m",
-      "starterChipWrapUp": "Mechie oge nnọkọ m na ngwa",
-      "starterChipWriteTests": "Dee nnwale"
+      "insertNewline": "Tinye ahịrị ọhụrụ"
     },
     "chatLink": {
       "linkCopied": "Ederela njikọ",

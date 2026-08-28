@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Yuborilgan xabarlarga biriktirilmagan yuklangan fayllar o'chiriladi.",
       "discardAttachmentsTitle": "Biriktirilgan fayllar bekor qilinsinmi?",
       "charactersRemaining": "{{count}} ta belgi qoldi",
-      "insertNewline": "Yangi qator kiritish",
-      "starterChipBuild": "Funksiya yarat",
-      "starterChipEmpty": "G'oya bilan boshla",
-      "starterChipFix": "Xatoni tuzat",
-      "starterChipPrepare": "Muhitimni sozla",
-      "starterChipWrapUp": "Sessiyamni yakunla",
-      "starterChipWriteTests": "Sinovlar yoz"
+      "insertNewline": "Yangi qator kiritish"
     },
     "chatLink": {
       "linkCopied": "Havola nusxalandi",

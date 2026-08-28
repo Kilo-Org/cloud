@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
       "discardAttachmentsTitle": "Farga viðhengjum?",
       "charactersRemaining": "{{count}} stafir eftir",
-      "insertNewline": "Setja inn línuskil",
-      "starterChipBuild": "Búðu til eiginleika",
-      "starterChipEmpty": "Byrjaðu með hugmynd",
-      "starterChipFix": "Lagaðu villu",
-      "starterChipPrepare": "Settu upp umhverfið mitt",
-      "starterChipWrapUp": "Ljúktu lotunni minni",
-      "starterChipWriteTests": "Skrifaðu próf"
+      "insertNewline": "Setja inn línuskil"
     },
     "chatLink": {
       "linkCopied": "Krækja afrituð",

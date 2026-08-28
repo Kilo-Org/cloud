@@ -158,12 +158,16 @@ vi.mock('@/components/agents/attachment-paste-hint', () => ({
   AttachmentPasteHint: () => null,
 }));
 
-vi.mock('@/components/agents/chat-toolbar', () => ({
-  ChatToolbar: () => null,
-}));
+const MockChatToolbar = () => null;
+vi.mock('@/components/agents/chat-toolbar', () => ({ ChatToolbar: MockChatToolbar }));
 
 vi.mock('@/components/agents/slash-command-suggestions', () => ({
   SlashCommandSuggestions: () => null,
+}));
+
+const MockSuggestionCard = () => null;
+vi.mock('@/components/agents/suggestion-card', () => ({
+  SuggestionCard: MockSuggestionCard,
 }));
 
 // Marked so the test can locate the input-row element in the returned tree
@@ -409,13 +413,6 @@ function findNode(
   return null;
 }
 
-function findStarterChip(render: React.ReactElement, label: string) {
-  return findNode(
-    render,
-    (type, props) => type === 'Pressable' && props.accessibilityLabel === label
-  );
-}
-
 async function mount(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.slots.length = 0;
   stateSlots.slots.length = 0;
@@ -553,44 +550,39 @@ describe('ChatComposer return-sends wiring', () => {
   });
 });
 
-describe('ChatComposer starter chips', () => {
-  it('hides starters once the input holds text', async () => {
-    const render = await mount(makeProps({}));
-    expect(findStarterChip(render, 'Build a feature')).not.toBeNull();
+describe('ChatComposer CLI suggestion', () => {
+  it('renders the suggestion in the composer and wires both actions', async () => {
+    const onAcceptSuggestion = vi.fn(async () => undefined);
+    const onDismissSuggestion = vi.fn(async () => undefined);
+    const render = await mount(
+      makeProps({
+        suggestion: {
+          requestId: 'sug-1',
+          callId: 'call-1',
+          text: 'Review the completed work?',
+          actions: [{ label: 'Review', prompt: '/review branch' }],
+        },
+        onAcceptSuggestion,
+        onDismissSuggestion,
+      })
+    );
 
-    requireInputRowOnChangeText(render)('typed text');
-    await settle();
-
-    const rerendered = await rerender(makeProps({}));
-    expect(findStarterChip(rerendered, 'Build a feature')).toBeNull();
-  });
-
-  it.each(TEXT_DIRECTIONS)(
-    'preserves starter text and inserts it without submitting in $direction',
-    async ({ isRTL, style }) => {
-      layoutDirection.isRTL = isRTL;
-      const render = await mount(makeProps({}));
-      const chip = findStarterChip(render, 'Build a feature');
-      if (!chip) {
-        throw new Error('starter chip not found');
-      }
-      expect(findNode(chip, type => type === 'Text')?.props).toMatchObject({
-        children: 'Build a feature',
-        className: 'text-sm font-normal text-muted-foreground',
-        style,
-      });
-      const onPress = chip.props.onPress as (() => void) | undefined;
-      if (!onPress) {
-        throw new Error('starter chip missing onPress');
-      }
-
-      onPress();
-      await settle();
-
-      expect(refSlots.slots[0]?.current).toBe('Build a feature');
-      expect(onSendMock).not.toHaveBeenCalled();
+    const suggestion = findNode(render, type => type === MockSuggestionCard);
+    expect(findNode(render, type => type === MockChatToolbar)).toBeNull();
+    expect(suggestion?.props).toMatchObject({
+      text: 'Review the completed work?',
+      actions: [{ label: 'Review', prompt: '/review branch' }],
+    });
+    if (!suggestion) {
+      throw new Error('suggestion not found');
     }
-  );
+
+    await (suggestion.props.onAccept as (index: number) => Promise<void>)(0);
+    await (suggestion.props.onDismiss as () => Promise<void>)();
+
+    expect(onAcceptSuggestion).toHaveBeenCalledWith('sug-1', 0);
+    expect(onDismissSuggestion).toHaveBeenCalledWith('sug-1');
+  });
 });
 
 describe('ChatComposer counter', () => {

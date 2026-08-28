@@ -2647,13 +2647,7 @@
       "discardAttachmentsMessage": "Scriosfar comhaid uaslódáilte nach bhfuil ceangailte le teachtaireachtaí seolta.",
       "discardAttachmentsTitle": "An gcaithfear na ceangaltáin ar lár?",
       "charactersRemaining": "{{count}} carachtar fágtha",
-      "insertNewline": "Cuir líne nua isteach",
-      "starterChipBuild": "Tóg gné",
-      "starterChipEmpty": "Tosaigh le smaoineamh",
-      "starterChipFix": "Deisigh fabht",
-      "starterChipPrepare": "Cuir mo thimpeallacht ar bun",
-      "starterChipWrapUp": "Críochnaigh mo sheisiún",
-      "starterChipWriteTests": "Scríobh tástálacha"
+      "insertNewline": "Cuir líne nua isteach"
     },
     "chatLink": {
       "linkCopied": "Nasc cóipeáilte",

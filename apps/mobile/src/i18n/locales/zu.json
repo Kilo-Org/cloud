@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa.",
       "discardAttachmentsTitle": "Lahla okunamathiselwe?",
       "charactersRemaining": "Kusele izinhlamvu ezingu-{{count}}",
-      "insertNewline": "Faka umugqa omusha",
-      "starterChipBuild": "Yakha isici",
-      "starterChipEmpty": "Qala ngombono",
-      "starterChipFix": "Lungisa iphutha",
-      "starterChipPrepare": "Setha imvelo yami",
-      "starterChipWrapUp": "Phetha iseshini yami",
-      "starterChipWriteTests": "Bhala izivivinyo"
+      "insertNewline": "Faka umugqa omusha"
     },
     "chatLink": {
       "linkCopied": "Isixhumanisi sikopiwe",

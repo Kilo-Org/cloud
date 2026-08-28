@@ -2628,13 +2628,7 @@
       "discardAttachmentsMessage": "Nahrané soubory nepřipojené k odeslaným zprávám budou smazány.",
       "discardAttachmentsTitle": "Zahodit přílohy?",
       "charactersRemaining": "Zbývající počet znaků: {{count}}",
-      "insertNewline": "Vložit nový řádek",
-      "starterChipBuild": "Vytvoř funkci",
-      "starterChipEmpty": "Začni nápadem",
-      "starterChipFix": "Oprav chybu",
-      "starterChipPrepare": "Nastav mé prostředí",
-      "starterChipWrapUp": "Dokonči mou relaci",
-      "starterChipWriteTests": "Napiš testy"
+      "insertNewline": "Vložit nový řádek"
     },
     "chatLink": {
       "linkCopied": "Odkaz zkopírován",

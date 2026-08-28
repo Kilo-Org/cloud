@@ -17,7 +17,6 @@ import {
   ChatComposer,
   type ChatComposerControl,
   type ChatComposerSendOptions,
-  type ChatComposerSessionState,
 } from '@/components/agents/chat-composer';
 import {
   type AgentMode,
@@ -202,6 +201,7 @@ export function SessionDetailContent({
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
+  const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const pendingQuestions = useAtomValue(manager.atoms.pendingQuestions);
   const pendingPermissions = useAtomValue(manager.atoms.pendingPermissions);
   const totalCost = useAtomValue(manager.atoms.totalCost);
@@ -1157,21 +1157,6 @@ export function SessionDetailContent({
     }
     return t('agentChat.composer.messagePlaceholder');
   }, [cloudStatus, t]);
-  // Lifecycle phase that drives the composer's contextual starter chip. The
-  // active cloud phases win over the message-count fallback, matching the
-  // composer's own chip priority (preparing/finalizing before empty).
-  const composerSessionState = useMemo<ChatComposerSessionState>(() => {
-    if (cloudStatus?.type === 'preparing') {
-      return 'preparing';
-    }
-    if (cloudStatus?.type === 'finalizing') {
-      return 'finalizing';
-    }
-    if (messages.length === 0) {
-      return 'empty';
-    }
-    return 'message';
-  }, [cloudStatus, messages.length]);
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSendCommand = useCallback(
@@ -1530,7 +1515,13 @@ export function SessionDetailContent({
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
                 sessionId={sessionId}
-                sessionState={composerSessionState}
+                suggestion={activeSuggestion}
+                onAcceptSuggestion={async (requestId, index) => {
+                  await manager.acceptSuggestion(requestId, index);
+                }}
+                onDismissSuggestion={async requestId => {
+                  await manager.dismissSuggestion(requestId);
+                }}
                 controlRef={composerControlRef}
               />
             </ModelPickerSelectionScopeProvider>

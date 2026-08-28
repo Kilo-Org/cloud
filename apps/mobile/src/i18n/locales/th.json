@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "ไฟล์ที่อัปโหลดแต่ยังไม่ได้แนบกับข้อความที่ส่งแล้วจะถูกลบ",
       "discardAttachmentsTitle": "ทิ้งไฟล์แนบหรือไม่?",
       "charactersRemaining": "เหลือ {{count}} อักขระ",
-      "insertNewline": "แทรกบรรทัดใหม่",
-      "starterChipBuild": "สร้างฟีเจอร์",
-      "starterChipEmpty": "เริ่มต้นด้วยแนวคิด",
-      "starterChipFix": "แก้บั๊ก",
-      "starterChipPrepare": "ตั้งค่าสภาพแวดล้อมของฉัน",
-      "starterChipWrapUp": "จบเซสชันของฉัน",
-      "starterChipWriteTests": "เขียนการทดสอบ"
+      "insertNewline": "แทรกบรรทัดใหม่"
     },
     "chatLink": {
       "linkCopied": "คัดลอกลิงก์แล้ว",

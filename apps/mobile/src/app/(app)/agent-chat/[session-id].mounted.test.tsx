@@ -2,6 +2,7 @@
 /* eslint-disable max-lines -- keep the real SDK lifecycle probes with the route's shared mounted fixture. */
 import { createElement, type ReactElement, useEffect } from 'react';
 import { useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type * as ReactQuery from '@tanstack/react-query';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -18,7 +19,9 @@ import { kiloId, stubTextPart, stubUserMessage } from '@kilocode/cloud-agent-sdk
 import '@/i18n';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
+import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { QueryError } from '@/components/query-error';
+import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { clearActiveToken, setActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -50,6 +53,7 @@ const managers: ManagerProbe[] = [];
 // Request credentials can change independently of the React token (request-time refresh).
 let requestAccount: 'A' | 'B' = 'A';
 const rootRequests: { account: 'A' | 'B'; sessionId: KiloSessionId }[] = [];
+let rootMetadataReady: Promise<undefined> | null = null;
 
 const queryState = vi.hoisted(() => ({
   isPending: false,
@@ -124,21 +128,36 @@ vi.mock('@/components/invalid-route-state', () => ({
   InvalidRouteState: 'InvalidRouteState',
 }));
 
+vi.mock('@/lib/hooks/use-session-mutations', () => ({
+  useSessionMutations: () => ({ renameSessionAsync: vi.fn() }),
+}));
+
 vi.mock('@/components/agents/session-detail-content', () => ({
   SessionDetailContent: function SessionDetailContent(
-    props: Readonly<{ sessionId: KiloSessionId }>
+    props: Readonly<{ sessionId: KiloSessionId; cachedTitle?: string }>
   ) {
     const manager = useSessionManager();
-    const { sessionId } = props;
+    const { t } = useTranslation();
+    const { sessionId, cachedTitle } = props;
     // Match the real detail lifecycle for the original manager and every successor.
     useEffect(() => {
       void manager.switchSession(sessionId);
     }, [sessionId, manager]);
     const rootMessages = useAtomValue(manager.atoms.messagesList);
     const childMessages = useAtomValue(manager.atoms.childMessages)(CHILD_ID);
+    const fetchedData = useAtomValue(manager.atoms.fetchedSessionData);
+    const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
+    // Use the real title hook with metadata from the real manager, not a fixed mock title.
+    const rename = useSessionDetailRename({
+      sessionId,
+      isLoaded: isSessionLoaded,
+      serverTitle: isSessionLoaded ? (fetchedData.title ?? undefined) : undefined,
+      fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
+    });
     return createElement(
       'SessionDetailContent',
       props,
+      createElement(ScreenHeader, { title: rename.title }),
       rootMessages.flatMap(message =>
         message.parts.flatMap(part =>
           part.type === 'text' ? [createElement('RootText', { key: part.id }, part.text)] : []
@@ -289,6 +308,7 @@ beforeEach(() => {
   managers.length = 0;
   requestAccount = 'A';
   rootRequests.length = 0;
+  rootMetadataReady = null;
   childPageMock.mockReset();
   createMobileManagerMock.mockReset();
   createMobileManagerMock.mockImplementation(
@@ -323,12 +343,13 @@ beforeEach(() => {
         prepare: vi.fn(),
         initiate: vi.fn(),
         fetchSession: async id => {
-          rootRequests.push({ account: requestAccount, sessionId: id });
-          await Promise.resolve();
+          const account = requestAccount;
+          rootRequests.push({ account, sessionId: id });
+          await rootMetadataReady;
           return {
             kiloSessionId: id,
             cloudAgentSessionId: null,
-            title: 'Scope probe root',
+            title: `Account ${account} current title`,
             organizationId: null,
             gitUrl: null,
             gitBranch: null,
@@ -952,6 +973,117 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       });
       expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
       expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+    }
+  );
+});
+
+describe.each([
+  { route: 'personal', organizationId: undefined },
+  { route: 'explicit organization', organizationId: 'org-a' },
+])('SessionDetailScreen title isolation on $route routes', ({ organizationId }) => {
+  it.each(['retained replacement', 'fresh pending mount'] as const)(
+    'does not restore an inherited title after %s confirms with delayed metadata',
+    async mountKind => {
+      const actual = await vi.importActual<typeof ReactQuery>('@tanstack/react-query');
+      useQueryMock.mockImplementation(actual.useQuery);
+      const routeMetadata = Promise.withResolvers<{ organization_id: string }>();
+      const sessionMetadata = Promise.withResolvers<undefined>();
+      const identity = Promise.withResolvers<{ id: string }>();
+      confirmationRequests.getMe.mockReturnValueOnce(identity.promise);
+      queryOptionsMock.mockImplementation(() => ({
+        queryKey: [['cliSessionsV2', 'get']],
+        queryFn: async () => {
+          const account = requestAccount;
+          await Promise.resolve();
+          return account === 'A' ? { organization_id: 'org-a' } : routeMetadata.promise;
+        },
+      }));
+      const client = new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+      });
+      vi.useFakeTimers();
+      onTestFinished(() => {
+        client.clear();
+        vi.useRealTimers();
+      });
+      useLocalSearchParamsMock.mockReturnValue({
+        'session-id': 'sess-1',
+        organizationId,
+        title:
+          mountKind === 'fresh pending mount'
+            ? ['Account A private title']
+            : 'Account A private title',
+      });
+      const tree = createElement(
+        QueryClientProvider,
+        { client },
+        createElement(SessionDetailScreen)
+      );
+      if (mountKind === 'fresh pending mount') {
+        beginReplacement();
+        commitCredentials('B');
+        rootMetadataReady = sessionMetadata.promise;
+      }
+      const renderer = await mountRoute(tree);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      if (mountKind === 'retained replacement') {
+        expect(propOf(findByType(renderer.root, 'ScreenHeader')[0], 'title')).toBe(
+          'Account A current title'
+        );
+        expect(transcriptText(renderer, 'RootText')).toBe('Account A root row');
+        await act(async () => {
+          rootMetadataReady = sessionMetadata.promise;
+          beginReplacement();
+          commitCredentials('B');
+          renderer.update(createElement(UserWebConnectionProvider, null, tree));
+          await vi.advanceTimersByTimeAsync(0);
+        });
+      }
+
+      expect(propOf(findByType(renderer.root, 'ScreenHeader')[0], 'title')).toBe('Session');
+      expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+      expect(transcriptText(renderer, 'RootText')).toBe('');
+      await act(async () => {
+        identity.resolve({ id: 'user-B' });
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(getAuthenticatedOwner().userId).toBe('user-B');
+      expect.soft(propOf(findByType(renderer.root, 'ScreenHeader')[0], 'title')).toBe('Session');
+      if (organizationId === undefined) {
+        expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+        expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+        await act(async () => {
+          routeMetadata.resolve({ organization_id: 'org-b' });
+          await vi.advanceTimersByTimeAsync(0);
+        });
+      }
+
+      // Explicit organization routes reach content without resolving the route metadata query.
+      const content = findByType(renderer.root, 'SessionDetailContent');
+      expect(content).toHaveLength(1);
+      expect.soft(propOf(content[0], 'cachedTitle')).toBeUndefined();
+      expect.soft(propOf(findByType(renderer.root, 'ScreenHeader')[0], 'title')).toBe('Session');
+      expect(transcriptText(renderer, 'RootText')).toBe('');
+      await act(async () => {
+        sessionMetadata.resolve(undefined);
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(propOf(findByType(renderer.root, 'ScreenHeader')[0], 'title')).toBe(
+        'Account B current title'
+      );
+      expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
+      act(() => {
+        authState.isSigningOut = true;
+        setSignOutActive(true);
+        beginAuthenticatedOwner();
+      });
+      expect(renderer.toJSON()).toBeNull();
     }
   );
 });

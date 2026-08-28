@@ -1222,10 +1222,17 @@ export function createSessionMessageQueue(
   }
 
   async function cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }> {
-    // Only pending rows are candidates: an accepted/current message has no
-    // `pending_message:*` row, so canceling by id never touches the active run.
     const pendingMessage = await findPendingSessionMessageByMessageId(storage, messageId);
-    if (!pendingMessage) return { dropped: false };
+
+    // A retry after a successful cancel finds no pending row, but the durable
+    // state is already terminalized as interrupted/canceled. Report dropped so
+    // the caller still persists the `cloud.message.canceled` replay event.
+    if (!pendingMessage) {
+      const existing = await getSessionMessageState(storage, messageId);
+      return existing?.status === 'interrupted' && existing.completionSource === 'canceled'
+        ? { dropped: true }
+        : { dropped: false };
+    }
 
     // `admitIntent` wrote a queued `SessionMessageState` alongside the pending
     // row. Terminalize it so `getExistingAdmissionAckForMessageId` rejects a
@@ -1239,14 +1246,21 @@ export function createSessionMessageQueue(
       await repairMissingQueuedStateFromPendingMessage(pendingMessage);
       existing = await getSessionMessageState(storage, messageId);
     }
-    if (existing?.status === 'queued') {
-      await markMessageInterrupted(storage, messageId, {
-        error: 'Queued message canceled by user',
-        completionSource: 'canceled',
-        failureStage: 'interruption',
-        failureCode: 'user_interrupt',
-      });
+
+    // Only a still-queued turn may be dropped. `recordRuntimeAcceptedMessage`
+    // and `ensureAcceptedMessageBeforeTerminal` can write accepted or terminal
+    // state while the pending row still exists; never drop a running or
+    // finished turn.
+    if (existing?.status !== 'queued') {
+      return { dropped: false };
     }
+
+    await markMessageInterrupted(storage, messageId, {
+      error: 'Queued message canceled by user',
+      completionSource: 'canceled',
+      failureStage: 'interruption',
+      failureCode: 'user_interrupt',
+    });
 
     await deletePendingSessionMessageByMessageId(storage, messageId);
     return { dropped: true };

@@ -3233,5 +3233,20 @@
     "historyRetry": "Historie chatu se nepodařila načíst.",
     "catalogRetry": "Modely se nepodařilo načíst",
     "sendError": "Zprávu se nepodařilo odeslat. Zkuste to prosím znovu."
+  },
+  "glanceable": {
+    "waiting": "Aktualizace agentů",
+    "empty": "Žádná probíhající práce",
+    "stale": "Nyní nelze aktualizovat",
+    "expired": "Platnost stavu vypršela",
+    "signedOut": "Přihlaste se pro zobrazení agentů",
+    "privacy": "Agenti jsou skrytí",
+    "openAgents": "Otevřít agenty",
+    "running": "BĚŽÍ",
+    "needsInput": "vyžaduje vstup",
+    "reconnecting": "Obnovování připojení",
+    "channelName": "Aktivní agenti",
+    "activityKitDisabledTitle": "Živé aktivity jsou vypnuté",
+    "activityKitDisabledBody": "Zapněte Živé aktivity v Nastavení, abyste viděli aktivní agenty na zamknuté obrazovce."
   }
 }

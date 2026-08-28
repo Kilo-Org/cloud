@@ -3191,5 +3191,20 @@
     "historyRetry": "Hindi ma-load ang kasaysayan ng chat.",
     "catalogRetry": "Hindi maload ang mga modelo",
     "sendError": "Nabigong magpadala ng mensahe. Pakisubukang muli."
+  },
+  "glanceable": {
+    "waiting": "Ina-update ang mga agent",
+    "empty": "Walang kasalukuyang gawain",
+    "stale": "Hindi makapag-update ngayon",
+    "expired": "Nag-expire ang katayuan",
+    "signedOut": "Mag-sign in para makita ang mga agent",
+    "privacy": "Nakatago ang mga agent",
+    "openAgents": "Buksan ang mga agent",
+    "running": "TUMATAKBO",
+    "needsInput": "kailangan ng input",
+    "reconnecting": "Muling kumokonekta",
+    "channelName": "Mga aktibong agent",
+    "activityKitDisabledTitle": "Naka-off ang Mga Live na Aktibidad",
+    "activityKitDisabledBody": "I-on ang Mga Live na Aktibidad sa Mga setting para makita ang Mga aktibong agent sa Naka-lock na Screen."
   }
 }

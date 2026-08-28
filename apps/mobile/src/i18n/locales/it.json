@@ -3212,5 +3212,20 @@
     "historyRetry": "Impossibile caricare la cronologia della chat.",
     "catalogRetry": "Impossibile caricare i modelli",
     "sendError": "Impossibile inviare il messaggio. Riprova."
+  },
+  "glanceable": {
+    "waiting": "Aggiornamento degli agenti",
+    "empty": "Nessun lavoro in corso",
+    "stale": "Impossibile aggiornare ora",
+    "expired": "Stato scaduto",
+    "signedOut": "Accedi per vedere gli agenti",
+    "privacy": "Agenti nascosti",
+    "openAgents": "Apri agenti",
+    "running": "IN ESECUZIONE",
+    "needsInput": "richiede input",
+    "reconnecting": "Riconnessione in corso",
+    "channelName": "Agenti attivi",
+    "activityKitDisabledTitle": "Le attività in tempo reale sono disattivate",
+    "activityKitDisabledBody": "Attiva le attività in tempo reale in Impostazioni per vedere gli agenti attivi sulla schermata di blocco."
   }
 }

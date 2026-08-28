@@ -254,6 +254,22 @@ function click(container: HTMLElement, text: string) {
   act(() => button.click());
 }
 
+function changeValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  act(() => {
+    const reactPropsKey = Object.keys(element).find(key => key.startsWith('__reactProps'));
+    const reactProps = reactPropsKey
+      ? (
+          element as unknown as Record<
+            string,
+            { onChange?: (event: { target: { value: string } }) => void }
+          >
+        )[reactPropsKey]
+      : undefined;
+    if (!reactProps?.onChange) throw new Error('change handler missing');
+    reactProps.onChange({ target: { value } });
+  });
+}
+
 function expectSubmittedVariantToBeOmitted(onSubmit: jest.Mock<TriggerFormProps['onSubmit']>) {
   const [submission] = onSubmit.mock.calls.at(-1) ?? [];
   if (!submission) throw new Error('form submission missing');
@@ -361,7 +377,7 @@ describe('TriggerForm variants', () => {
     }
   );
 
-  it('preserves compatible effort, resets incompatible effort, and ignores catalogue refreshes', () => {
+  it('preserves compatible effort, resets incompatible effort, and ignores catalogue refreshes', async () => {
     const mounted = render({});
     expect(mounted.container.querySelector('[data-variant]')?.getAttribute('data-variant')).toBe(
       'high'
@@ -380,6 +396,7 @@ describe('TriggerForm variants', () => {
     act(() => root?.render(createElement(TriggerForm, mounted.allProps)));
     click(mounted.container, 'alpha');
     submit(mounted.container);
+    await act(async () => Promise.resolve());
     expectSubmittedVariantToBeOmitted(mounted.onSubmit);
 
     act(() => root?.render(createElement(TriggerForm, { ...mounted.allProps, models: [] })));
@@ -393,6 +410,7 @@ describe('TriggerForm variants', () => {
       'unset'
     );
     submit(mounted.container);
+    await act(async () => Promise.resolve());
     expect(mounted.onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ variant: null }));
   });
 
@@ -562,5 +580,99 @@ describe('TriggerForm container allocation', () => {
     const select = mounted.container.querySelector('[data-container-allocation]');
     expect(select?.getAttribute('data-container-allocation')).toBe('automatic');
     expect(select?.getAttribute('data-disabled')).toBe('true');
+  });
+});
+
+describe('TriggerForm save and invoke', () => {
+  let root: Root | undefined;
+  let cleanup: (() => void) | undefined;
+
+  afterEach(() => {
+    if (root) act(() => root?.unmount());
+    root = undefined;
+    cleanup?.();
+    cleanup = undefined;
+  });
+
+  function render(props: Partial<TriggerFormProps>) {
+    const dom = installDom();
+    cleanup = dom.cleanup;
+    root = createRoot(dom.container);
+    const onSubmit = jest.fn<TriggerFormProps['onSubmit']>().mockResolvedValue(undefined);
+    const onSaveAndInvoke = jest.fn<NonNullable<TriggerFormProps['onSaveAndInvoke']>>();
+    onSaveAndInvoke.mockResolvedValue(undefined);
+    act(() =>
+      root?.render(
+        createElement(TriggerForm, {
+          mode: 'edit',
+          initialData: initialData('high', 'scheduled'),
+          repositories: [],
+          models,
+          onSubmit,
+          onSaveAndInvoke,
+          canSetSandboxAllocation: true,
+          ...props,
+        })
+      )
+    );
+    return { container: dom.container, onSaveAndInvoke };
+  }
+
+  it('uses current validated scheduled form data with the same omission mapping', async () => {
+    const mounted = render({});
+    const prompt = mounted.container.querySelector('#promptTemplate');
+    if (prompt?.tagName !== 'TEXTAREA') {
+      throw new Error('prompt field missing');
+    }
+    changeValue(prompt as HTMLTextAreaElement, 'Use the current prompt');
+    click(mounted.container, 'none');
+    selectContainerAllocation(mounted.container, 'isolated-standard');
+    click(mounted.container, 'Save and invoke now');
+    await act(async () => Promise.resolve());
+
+    expect(mounted.onSaveAndInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        promptTemplate: 'Use the current prompt',
+        variant: 'none',
+        sandboxAllocation: 'isolated-standard',
+      })
+    );
+  });
+
+  it('only exposes the action for active scheduled edits and blocks duplicate clicks', async () => {
+    let resolveSaveAndInvoke: () => void = () => undefined;
+    const pending = new Promise<void>(resolve => {
+      resolveSaveAndInvoke = resolve;
+    });
+    const onSaveAndInvoke = jest.fn<NonNullable<TriggerFormProps['onSaveAndInvoke']>>();
+    onSaveAndInvoke.mockReturnValue(pending);
+    const mounted = render({ onSaveAndInvoke, initialData: initialData('high', 'scheduled') });
+    const saveAndInvokeButton = Array.from(mounted.container.querySelectorAll('button')).find(
+      button => button.textContent === 'Save and invoke now'
+    );
+    if (!saveAndInvokeButton) throw new Error('save and invoke button missing');
+    act(() => {
+      saveAndInvokeButton.click();
+      saveAndInvokeButton.click();
+    });
+    expect(onSaveAndInvoke).toHaveBeenCalledTimes(1);
+    await act(async () => resolveSaveAndInvoke());
+
+    act(() => root?.unmount());
+    const paused = render({
+      initialData: { ...initialData('high', 'scheduled'), isActive: false },
+    });
+    const pausedButton = Array.from(paused.container.querySelectorAll('button')).find(
+      button => button.textContent === 'Save and invoke now'
+    );
+    expect(pausedButton).toHaveProperty('disabled', true);
+
+    act(() => root?.unmount());
+    const webhook = render({ initialData: initialData('high', 'webhook') });
+    expect(webhook.container.textContent).not.toContain('Save and invoke now');
+
+    act(() => root?.unmount());
+    const create = render({ mode: 'create', initialData: initialData('high', 'scheduled') });
+    expect(create.container.textContent).not.toContain('Save and invoke now');
   });
 });

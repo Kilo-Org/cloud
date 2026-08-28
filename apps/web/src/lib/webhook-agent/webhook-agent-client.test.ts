@@ -5,7 +5,12 @@ jest.mock('@/lib/config.server', () => ({
   WEBHOOK_AGENT_URL: 'https://webhook-agent.test',
 }));
 
-import { createWorkerTrigger, getWorkerTrigger, updateWorkerTrigger } from './webhook-agent-client';
+import {
+  createWorkerTrigger,
+  getWorkerTrigger,
+  invokeWorkerScheduledTrigger,
+  updateWorkerTrigger,
+} from './webhook-agent-client';
 
 describe('webhook agent client variant forwarding', () => {
   afterEach(() => {
@@ -173,5 +178,81 @@ describe('webhook agent client sandbox allocation forwarding', () => {
       found: true,
       config: { sandboxAllocation: 'isolated-standard' },
     });
+  });
+});
+
+describe('scheduled trigger invocation', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('posts an invocation without a body and validates the accepted response', async () => {
+    const requestId = '00000000-0000-4000-8000-000000000001';
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ success: true, data: { requestId } }), { status: 202 })
+      );
+
+    await expect(
+      invokeWorkerScheduledTrigger('oauth/google:123', undefined, 'scheduled-trigger')
+    ).resolves.toEqual({ success: true, requestId });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /\/api\/triggers\/user\/o-b2F1dGgvZ29vZ2xlOjEyMw\/scheduled-trigger\/invoke$/
+      ),
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(fetchSpy.mock.calls[0]?.[1]?.body).toBeUndefined();
+    expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('returns sanitized worker failures', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(new Response('not found', { status: 404 }));
+
+    await expect(
+      invokeWorkerScheduledTrigger(
+        undefined,
+        '00000000-0000-4000-8000-000000000002',
+        'scheduled-trigger'
+      )
+    ).resolves.toEqual({
+      success: false,
+      error: 'Scheduled trigger invocation failed',
+      status: 404,
+    });
+  });
+
+  it('handles malformed successful responses safely', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { requestId: 'not-a-uuid' } }), {
+        status: 202,
+      })
+    );
+
+    await expect(
+      invokeWorkerScheduledTrigger('user-1', undefined, 'scheduled-trigger')
+    ).resolves.toEqual({
+      success: false,
+      error: 'Scheduled trigger invocation failed',
+      status: 502,
+    });
+  });
+
+  it('makes one request when the network fails', async () => {
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockRejectedValue(new Error('network unavailable'));
+
+    await expect(
+      invokeWorkerScheduledTrigger('user-1', undefined, 'scheduled-trigger')
+    ).resolves.toEqual({
+      success: false,
+      error: 'Scheduled trigger invocation failed',
+      status: 502,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });

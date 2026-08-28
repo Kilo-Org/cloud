@@ -6,6 +6,7 @@ import type { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import type {
   createWorkerTrigger as createWorkerTriggerType,
   updateWorkerTrigger as updateWorkerTriggerType,
+  invokeWorkerScheduledTrigger as invokeWorkerScheduledTriggerType,
   TriggerConfigResponse,
 } from '@/lib/webhook-agent/webhook-agent-client';
 import type {
@@ -18,6 +19,7 @@ const mockEnsureOrganizationAccess = jest.fn<typeof ensureOrganizationAccess>();
 
 const mockCreateWorkerTrigger = jest.fn<typeof createWorkerTriggerType>();
 const mockUpdateWorkerTrigger = jest.fn<typeof updateWorkerTriggerType>();
+const mockInvokeWorkerScheduledTrigger = jest.fn<typeof invokeWorkerScheduledTriggerType>();
 const mockDbInsert = jest.fn();
 const mockDbUpdate = jest.fn();
 const mockSelectWhere = jest.fn<
@@ -58,6 +60,7 @@ jest.mock('@/lib/webhook-agent/webhook-agent-client', () => ({
   buildInboundUrl: jest.fn(() => 'https://inbound'),
   createWorkerTrigger: mockCreateWorkerTrigger,
   updateWorkerTrigger: mockUpdateWorkerTrigger,
+  invokeWorkerScheduledTrigger: mockInvokeWorkerScheduledTrigger,
 }));
 
 jest.mock('@/routers/organizations/utils', () => ({
@@ -114,6 +117,10 @@ describe('webhook trigger variant inputs', () => {
     ]);
     mockCreateWorkerTrigger.mockResolvedValue({ success: true, inboundUrl: 'https://inbound' });
     mockUpdateWorkerTrigger.mockResolvedValue({ success: true, config: triggerConfig });
+    mockInvokeWorkerScheduledTrigger.mockResolvedValue({
+      success: true,
+      requestId: '00000000-0000-4000-8000-000000000005',
+    });
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
   });
 
@@ -425,5 +432,113 @@ describe('webhook trigger variant inputs', () => {
       })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
+  });
+});
+
+describe('scheduled trigger invocation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSelectWhere.mockResolvedValue([
+      {
+        id: '00000000-0000-4000-8000-000000000002',
+        activation_mode: 'scheduled',
+        target_type: 'cloud_agent',
+      },
+    ]);
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockInvokeWorkerScheduledTrigger.mockResolvedValue({
+      success: true,
+      requestId: '00000000-0000-4000-8000-000000000005',
+    });
+  });
+
+  it('invokes an owned personal trigger using the authenticated user namespace', async () => {
+    await expect(createCaller({ user }).invoke({ triggerId: 'trigger-id' })).resolves.toEqual({
+      requestId: '00000000-0000-4000-8000-000000000005',
+    });
+
+    expect(mockInvokeWorkerScheduledTrigger).toHaveBeenCalledWith(
+      'user-1',
+      undefined,
+      'trigger-id'
+    );
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+  });
+
+  it('allows organization owners and members to invoke owned organization triggers', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    for (const role of ['owner', 'member'] as const) {
+      mockEnsureOrganizationAccess.mockResolvedValueOnce(role);
+      await createCaller({ user }).invoke({ triggerId: 'trigger-id', organizationId });
+    }
+
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(expect.anything(), organizationId, [
+      'owner',
+      'member',
+    ]);
+    expect(mockInvokeWorkerScheduledTrigger).toHaveBeenLastCalledWith(
+      undefined,
+      organizationId,
+      'trigger-id'
+    );
+  });
+
+  it('rejects missing and cross-scope triggers before contacting the worker', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]);
+    await expect(createCaller({ user }).invoke({ triggerId: 'trigger-id' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+
+    mockSelectWhere.mockResolvedValueOnce([]);
+    await expect(
+      createCaller({ user }).invoke({
+        triggerId: 'trigger-id',
+        organizationId: '00000000-0000-4000-8000-000000000003',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockInvokeWorkerScheduledTrigger).not.toHaveBeenCalled();
+  });
+
+  it('rejects unauthorized organizations before checking ownership or contacting the worker', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    mockEnsureOrganizationAccess.mockRejectedValueOnce(new TRPCError({ code: 'UNAUTHORIZED' }));
+
+    await expect(
+      createCaller({ user }).invoke({ triggerId: 'trigger-id', organizationId })
+    ).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    });
+    expect(mockSelectWhere).not.toHaveBeenCalled();
+    expect(mockInvokeWorkerScheduledTrigger).not.toHaveBeenCalled();
+  });
+
+  it('rejects forged fields without contacting the worker', async () => {
+    await expect(
+      createCaller({ user }).invoke({
+        triggerId: 'trigger-id',
+        targetType: 'cloud_agent',
+      } as never)
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockInvokeWorkerScheduledTrigger).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [404, 'NOT_FOUND'],
+    [400, 'BAD_REQUEST'],
+    [409, 'CONFLICT'],
+    [429, 'TOO_MANY_REQUESTS'],
+    [500, 'INTERNAL_SERVER_ERROR'],
+    [502, 'INTERNAL_SERVER_ERROR'],
+  ])('maps worker status %s to %s', async (status, code) => {
+    mockInvokeWorkerScheduledTrigger.mockResolvedValueOnce({
+      success: false,
+      error: 'untrusted worker detail',
+      status,
+    });
+
+    await expect(createCaller({ user }).invoke({ triggerId: 'trigger-id' })).rejects.toMatchObject({
+      code,
+    });
   });
 });

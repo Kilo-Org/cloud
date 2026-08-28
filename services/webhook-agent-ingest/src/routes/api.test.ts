@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { encodeUserIdForPath } from '../util/user-id-encoding';
 
 vi.mock('../util/do-retry', () => ({
   withDORetry: async <TStub, TResult>(
@@ -123,6 +124,8 @@ type StoredConfig = {
   sandboxAllocation?: 'isolated-standard';
 };
 
+type ScheduledInvocation = { success: true; requestId: string } | { success: false; error: string };
+
 function existingConfig(
   targetType: StoredConfig['targetType'],
   activationMode = 'webhook',
@@ -152,16 +155,28 @@ function createRouteHarness(initialConfig: StoredConfig | null) {
     }
   );
   const getConfigForResponse = vi.fn(async () => config);
-  const stub = { configure, getConfig, updateConfig, getConfigForResponse };
+  const idFromName = vi.fn((name: string) => name);
+  const invokeScheduled = vi.fn(
+    async (): Promise<ScheduledInvocation> => ({ success: true, requestId: crypto.randomUUID() })
+  );
+  const stub = { configure, getConfig, updateConfig, getConfigForResponse, invokeScheduled };
   const env = {
     INTERNAL_API_SECRET: { get: vi.fn(async () => INTERNAL_API_SECRET) },
     TRIGGER_DO: {
-      idFromName: vi.fn((name: string) => name),
+      idFromName,
       get: vi.fn(() => stub),
     },
   } as unknown as Env;
 
-  return { configure, env, getConfig, getConfigForResponse, updateConfig };
+  return {
+    configure,
+    env,
+    getConfig,
+    getConfigForResponse,
+    idFromName,
+    invokeScheduled,
+    updateConfig,
+  };
 }
 
 async function requestTrigger(env: Env, method: 'POST' | 'PUT', payload: Record<string, unknown>) {
@@ -286,5 +301,75 @@ describe('trigger sandbox allocation routes', () => {
     } else {
       expect(body).toMatchObject({ data: { sandboxAllocation: 'isolated-standard' } });
     }
+  });
+});
+
+describe('scheduled trigger invocation routes', () => {
+  it('uses the decoded OAuth namespace and invokes without accepting configuration', async () => {
+    const oauthUserId = 'oauth/google:101043560986948156510';
+    const { env, idFromName, invokeScheduled } = createRouteHarness(null);
+
+    const response = await api.request(
+      `/triggers/user/${encodeUserIdForPath(oauthUserId)}/${TRIGGER_ID}/invoke`,
+      { method: 'POST', headers: { 'X-Internal-API-Key': INTERNAL_API_SECRET } },
+      env
+    );
+
+    expect(response.status).toBe(202);
+    expect(invokeScheduled).toHaveBeenCalledOnce();
+    expect(idFromName).toHaveBeenCalledWith(`user/${oauthUserId}/${TRIGGER_ID}`);
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: { requestId: expect.any(String) },
+    });
+  });
+
+  it.each([
+    ['NOT_FOUND', 404],
+    ['NOT_SCHEDULED', 400],
+    ['INACTIVE', 409],
+    ['INFLIGHT_LIMIT', 429],
+    ['QUEUE_FAILED', 500],
+  ] as const)('maps %s invocation failures to %i', async (error, status) => {
+    const { env, invokeScheduled } = createRouteHarness(null);
+    invokeScheduled.mockResolvedValue({ success: false, error });
+
+    const response = await api.request(
+      `/triggers/org/org-1/${TRIGGER_ID}/invoke`,
+      {
+        method: 'POST',
+        headers: { 'X-Internal-API-Key': INTERNAL_API_SECRET },
+      },
+      env
+    );
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ success: false, error });
+  });
+
+  it('requires the internal API key', async () => {
+    const { env, invokeScheduled } = createRouteHarness(null);
+    const response = await api.request(
+      `/triggers/org/org-1/${TRIGGER_ID}/invoke`,
+      { method: 'POST' },
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(invokeScheduled).not.toHaveBeenCalled();
+  });
+
+  it('does not retry a retryable invocation error', async () => {
+    const { env, invokeScheduled } = createRouteHarness(null);
+    invokeScheduled.mockRejectedValue(Object.assign(new Error('retryable'), { retryable: true }));
+
+    const response = await api.request(
+      `/triggers/org/org-1/${TRIGGER_ID}/invoke`,
+      { method: 'POST', headers: { 'X-Internal-API-Key': INTERNAL_API_SECRET } },
+      env
+    );
+
+    expect(response.status).toBe(500);
+    expect(invokeScheduled).toHaveBeenCalledTimes(1);
   });
 });

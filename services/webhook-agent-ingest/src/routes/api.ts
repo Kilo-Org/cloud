@@ -16,6 +16,7 @@ import { internalApiMiddleware } from '../util/auth';
 import { clampRequestLimit } from '../util/constants';
 import { decodeUserIdFromPath, encodeUserIdForPath } from '../util/user-id-encoding';
 import { validateCronExpression, enforcesMinimumInterval, isValidTimezone } from '../util/cron';
+import type { ScheduledInvocationResult } from '../dos/TriggerDO';
 
 const api = new Hono<HonoContext>();
 
@@ -36,6 +37,12 @@ api.post('/triggers/user/:userId/:triggerId', async c => {
   const doKey = buildDOKey(namespace, triggerId);
 
   return handleCreateTrigger(c, namespace, triggerId, doKey);
+});
+
+api.post('/triggers/user/:userId/:triggerId/invoke', async c => {
+  const { triggerId } = c.req.param();
+  const userId = decodeUserIdFromPath(c.req.param('userId'));
+  return handleInvokeScheduled(c, `user/${userId}`, triggerId);
 });
 
 /**
@@ -106,6 +113,11 @@ api.post('/triggers/org/:orgId/:triggerId', async c => {
   const doKey = buildDOKey(namespace, triggerId);
 
   return handleCreateTrigger(c, namespace, triggerId, doKey);
+});
+
+api.post('/triggers/org/:orgId/:triggerId/invoke', async c => {
+  const { orgId, triggerId } = c.req.param();
+  return handleInvokeScheduled(c, `org/${orgId}`, triggerId);
 });
 
 /**
@@ -419,6 +431,38 @@ async function handleGetTrigger(c: RouteContext, namespace: string, triggerId: s
       triggerId,
       error: error instanceof Error ? error.message : String(error),
     });
+    return c.json(resError('Internal server error'), 500);
+  }
+}
+
+async function handleInvokeScheduled(c: RouteContext, namespace: string, triggerId: string) {
+  const doKey = buildDOKey(namespace, triggerId);
+  try {
+    const result: ScheduledInvocationResult = await withDORetry(
+      () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
+      async stub => {
+        const result = await stub.invokeScheduled();
+        return result as ScheduledInvocationResult;
+      },
+      'invokeScheduled',
+      { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 }
+    );
+
+    if (result.success) {
+      return c.json(resSuccess({ requestId: result.requestId }), 202);
+    }
+
+    const statusByError = {
+      NOT_FOUND: 404,
+      NOT_SCHEDULED: 400,
+      INACTIVE: 409,
+      INFLIGHT_LIMIT: 429,
+      QUEUE_FAILED: 500,
+    } as const;
+    const status = statusByError[result.error];
+    return c.json(resError(result.error), status);
+  } catch {
+    logger.error('Failed to invoke scheduled trigger', { namespace, triggerId });
     return c.json(resError('Internal server error'), 500);
   }
 }

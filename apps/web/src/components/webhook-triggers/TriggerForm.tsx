@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -93,6 +93,7 @@ export type TriggerFormProps = {
   models: ModelOption[];
   isLoadingModels?: boolean;
   onSubmit: (data: TriggerFormData) => Promise<void>;
+  onSaveAndInvoke?: (data: TriggerFormData) => Promise<void>;
   onCancel?: () => void;
   onDelete?: () => Promise<void>;
   isLoading?: boolean;
@@ -122,6 +123,7 @@ export function TriggerForm({
   models,
   isLoadingModels,
   onSubmit,
+  onSaveAndInvoke,
   onCancel,
   onDelete,
   isLoading = false,
@@ -182,6 +184,8 @@ export function TriggerForm({
   const [webhookAuthSecret, setWebhookAuthSecret] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const submissionInFlightRef = useRef(false);
+  const [isSaveAndInvoking, setIsSaveAndInvoking] = useState(false);
 
   // Reset form when initialData changes (for edit mode)
   useEffect(() => {
@@ -353,86 +357,111 @@ export function TriggerForm({
 
   const isFormValid = formErrors.length === 0;
 
-  // Handle form submission
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
+  const getFormData = useCallback((): TriggerFormData | undefined => {
+    if (!isFormValid || !profileId) {
+      toast.error('Please fix form errors before submitting');
+      return undefined;
+    }
+    const webhookAuthData: TriggerFormData['webhookAuth'] =
+      !isScheduled && webhookAuthEnabled
+        ? {
+            enabled: true,
+            header: trimmedWebhookAuthHeader,
+            secret: trimmedWebhookAuthSecret ? trimmedWebhookAuthSecret : undefined,
+          }
+        : { enabled: false };
 
-      if (!isFormValid || !profileId) {
-        toast.error('Please fix form errors before submitting');
-        return;
-      }
+    const submittedVariant = isEditMode
+      ? variant === initialData?.variant
+        ? undefined
+        : (variant ?? null)
+      : variant;
+    const submittedSandboxAllocation = isEditMode
+      ? sandboxAllocation === initialSandboxAllocation
+        ? undefined
+        : sandboxAllocation === 'automatic'
+          ? null
+          : sandboxAllocation
+      : sandboxAllocation === 'isolated-standard'
+        ? sandboxAllocation
+        : undefined;
 
-      const webhookAuthData: TriggerFormData['webhookAuth'] =
-        !isScheduled && webhookAuthEnabled
-          ? {
-              enabled: true,
-              header: trimmedWebhookAuthHeader,
-              secret: trimmedWebhookAuthSecret ? trimmedWebhookAuthSecret : undefined,
-            }
-          : { enabled: false };
-
-      const submittedVariant = isEditMode
-        ? variant === initialData?.variant
-          ? undefined
-          : (variant ?? null)
-        : variant;
-      const submittedSandboxAllocation = isEditMode
-        ? sandboxAllocation === initialSandboxAllocation
-          ? undefined
-          : sandboxAllocation === 'automatic'
-            ? null
-            : sandboxAllocation
-        : sandboxAllocation === 'isolated-standard'
-          ? sandboxAllocation
-          : undefined;
-
-      await onSubmit({
-        triggerId,
-        activationMode,
-        cronExpression: isScheduled ? cronExpression.trim() : undefined,
-        cronTimezone: isScheduled ? cronTimezone : undefined,
-        githubRepo,
-        mode: agentMode,
-        model,
-        ...(submittedVariant !== undefined ? { variant: submittedVariant } : {}),
-        ...(submittedSandboxAllocation !== undefined
-          ? { sandboxAllocation: submittedSandboxAllocation }
-          : {}),
-        promptTemplate: promptTemplate.trim(),
-        profileId,
-        autoCommit,
-        condenseOnComplete,
-        isActive: isEditMode ? isActive : undefined,
-        webhookAuth: webhookAuthData,
-      });
-    },
-    [
-      isFormValid,
-      profileId,
-      onSubmit,
+    return {
       triggerId,
       activationMode,
-      cronExpression,
-      cronTimezone,
-      isScheduled,
+      cronExpression: isScheduled ? cronExpression.trim() : undefined,
+      cronTimezone: isScheduled ? cronTimezone : undefined,
       githubRepo,
-      agentMode,
+      mode: agentMode,
       model,
-      variant,
-      initialData?.variant,
-      sandboxAllocation,
-      initialSandboxAllocation,
-      promptTemplate,
+      ...(submittedVariant !== undefined ? { variant: submittedVariant } : {}),
+      ...(submittedSandboxAllocation !== undefined
+        ? { sandboxAllocation: submittedSandboxAllocation }
+        : {}),
+      promptTemplate: promptTemplate.trim(),
+      profileId,
       autoCommit,
       condenseOnComplete,
-      isEditMode,
-      isActive,
-      webhookAuthEnabled,
-      trimmedWebhookAuthHeader,
-      trimmedWebhookAuthSecret,
-    ]
+      isActive: isEditMode ? isActive : undefined,
+      webhookAuth: webhookAuthData,
+    };
+  }, [
+    isFormValid,
+    profileId,
+    triggerId,
+    activationMode,
+    cronExpression,
+    cronTimezone,
+    isScheduled,
+    githubRepo,
+    agentMode,
+    model,
+    variant,
+    initialData?.variant,
+    sandboxAllocation,
+    initialSandboxAllocation,
+    promptTemplate,
+    autoCommit,
+    condenseOnComplete,
+    isEditMode,
+    isActive,
+    webhookAuthEnabled,
+    trimmedWebhookAuthHeader,
+    trimmedWebhookAuthSecret,
+  ]);
+
+  const runSubmission = useCallback(
+    async (submit: (data: TriggerFormData) => Promise<void>, isSaveAndInvokeAction = false) => {
+      if (isLoading || isDeleting || submissionInFlightRef.current) return;
+      const formData = getFormData();
+      if (!formData) return;
+
+      submissionInFlightRef.current = true;
+      if (isSaveAndInvokeAction) setIsSaveAndInvoking(true);
+      try {
+        await submit(formData);
+      } catch {
+        return;
+      } finally {
+        submissionInFlightRef.current = false;
+        if (isSaveAndInvokeAction) setIsSaveAndInvoking(false);
+      }
+    },
+    [getFormData, isDeleting, isLoading]
   );
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      void runSubmission(onSubmit);
+    },
+    [onSubmit, runSubmission]
+  );
+
+  const handleSaveAndInvoke = useCallback(() => {
+    if (!isEditMode || !isScheduled || !isActive || !onSaveAndInvoke) return;
+    void runSubmission(onSaveAndInvoke, true);
+  }, [isActive, isEditMode, isScheduled, onSaveAndInvoke, runSubmission]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
@@ -841,13 +870,15 @@ export function TriggerForm({
 
             {/* Form Actions */}
             <div className="flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   type="submit"
-                  disabled={!isFormValid || isLoading}
+                  disabled={!isFormValid || isLoading || isDeleting || isSaveAndInvoking}
                   className="min-w-[120px]"
                 >
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {(isLoading || isSaveAndInvoking) && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   {isLoading
                     ? isEditMode
                       ? 'Saving...'
@@ -856,8 +887,26 @@ export function TriggerForm({
                       ? 'Save Changes'
                       : 'Create Trigger'}
                 </Button>
+                {isEditMode && isScheduled && onSaveAndInvoke && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleSaveAndInvoke}
+                    disabled={
+                      !isFormValid || isLoading || isDeleting || isSaveAndInvoking || !isActive
+                    }
+                  >
+                    {isSaveAndInvoking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isSaveAndInvoking ? 'Saving and invoking…' : 'Save and invoke now'}
+                  </Button>
+                )}
                 {onCancel && (
-                  <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancel}
+                    disabled={isLoading || isDeleting || isSaveAndInvoking}
+                  >
                     Cancel
                   </Button>
                 )}

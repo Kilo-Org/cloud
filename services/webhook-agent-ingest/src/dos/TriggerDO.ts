@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { eq, inArray, sql, desc } from 'drizzle-orm';
+import { and, eq, inArray, ne, notInArray, sql, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import migrations from '../../drizzle/migrations';
 import {
@@ -82,6 +82,13 @@ export type CapturedRequest = {
   errorMessage: string | null;
   triggerSource: string;
 };
+
+export type ScheduledInvocationResult =
+  | { success: true; requestId: string }
+  | {
+      success: false;
+      error: 'NOT_FOUND' | 'NOT_SCHEDULED' | 'INACTIVE' | 'INFLIGHT_LIMIT' | 'QUEUE_FAILED';
+    };
 
 type ConfigureInput = {
   targetType?: 'cloud_agent' | 'kiloclaw_chat';
@@ -608,6 +615,21 @@ export class TriggerDO extends DurableObject<Env> {
     return { success: true, requestId };
   }
 
+  async invokeScheduled(): Promise<ScheduledInvocationResult> {
+    const config = await this.getConfig();
+    if (!config) {
+      return { success: false, error: 'NOT_FOUND' };
+    }
+    if (config.activationMode !== 'scheduled') {
+      return { success: false, error: 'NOT_SCHEDULED' };
+    }
+    if (!config.isActive) {
+      return { success: false, error: 'INACTIVE' };
+    }
+
+    return this.captureScheduledRequest(config, new Date().toISOString());
+  }
+
   async listRequests(limit: number = 50): Promise<{ requests: CapturedRequest[] }> {
     const clampedLimit = clampRequestLimit(limit);
     const rows = this.db
@@ -670,15 +692,9 @@ export class TriggerDO extends DurableObject<Env> {
       return;
     }
 
-    // Check in-flight limit (same as webhook path)
-    const inflightRows = this.db
-      .select({ count: sql<number>`count(*)` })
-      .from(requestsTable)
-      .where(inArray(requestsTable.process_status, ['captured', 'inprogress']))
-      .all();
-    const inflightCount = inflightRows[0]?.count ?? 0;
-
-    if (inflightCount >= MAX_INFLIGHT_REQUESTS) {
+    const timestamp = new Date().toISOString();
+    const captureResult = await this.captureScheduledRequest(config, timestamp);
+    if (!captureResult.success && captureResult.error === 'INFLIGHT_LIMIT') {
       logger.warn('Scheduled run skipped: too many in-flight', {
         triggerId: config.triggerId,
       });
@@ -686,10 +702,36 @@ export class TriggerDO extends DurableObject<Env> {
       return;
     }
 
-    // Create synthetic request
-    const requestId = crypto.randomUUID();
-    const timestamp = new Date().toISOString();
+    const updatedConfig = { ...config, lastScheduledAt: timestamp };
+    this.db
+      .update(triggerConfigTable)
+      .set({ last_scheduled_at: timestamp })
+      .where(eq(triggerConfigTable.trigger_id, config.triggerId))
+      .run();
+    await this.ctx.storage.put('config', updatedConfig);
 
+    logger.info('Scheduled trigger fired', {
+      triggerId: config.triggerId,
+      requestId: captureResult.success ? captureResult.requestId : undefined,
+    });
+
+    await this.scheduleNextAlarm(updatedConfig);
+  }
+
+  private async captureScheduledRequest(
+    config: TriggerConfig,
+    timestamp: string
+  ): Promise<ScheduledInvocationResult> {
+    const inflightRows = this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(requestsTable)
+      .where(inArray(requestsTable.process_status, ['captured', 'inprogress']))
+      .all();
+    const inflightCount = inflightRows[0]?.count ?? 0;
+
+    if (inflightCount >= MAX_INFLIGHT_REQUESTS) return { success: false, error: 'INFLIGHT_LIMIT' };
+
+    const requestId = crypto.randomUUID();
     this.db
       .insert(requestsTable)
       .values({
@@ -707,28 +749,33 @@ export class TriggerDO extends DurableObject<Env> {
       })
       .run();
 
-    // Overflow cleanup (same as captureRequest)
-    this.db.run(sql`
-      DELETE FROM ${requestsTable}
-      WHERE ${requestsTable.id} IN (
-        SELECT ${requestsTable.id} FROM ${requestsTable}
-        WHERE ${requestsTable.process_status} NOT IN ('inprogress')
-        ORDER BY ${requestsTable.created_at} DESC
-        LIMIT -1 OFFSET ${MAX_REQUESTS}
+    this.db
+      .delete(requestsTable)
+      .where(
+        and(
+          ne(requestsTable.process_status, 'inprogress'),
+          notInArray(
+            requestsTable.id,
+            this.db
+              .select({ id: requestsTable.id })
+              .from(requestsTable)
+              .where(ne(requestsTable.process_status, 'inprogress'))
+              .orderBy(desc(requestsTable.created_at))
+              .limit(MAX_REQUESTS)
+          )
+        )
       )
-    `);
+      .run();
 
-    // Enqueue to existing delivery queue
     try {
       await enqueueWebhookDelivery(this.env.WEBHOOK_DELIVERY_QUEUE, {
         namespace: config.namespace,
         triggerId: config.triggerId,
         requestId,
       });
-    } catch (enqueueError) {
+    } catch {
       logger.error('Failed to enqueue scheduled delivery, marking request as failed', {
         requestId,
-        error: enqueueError instanceof Error ? enqueueError.message : String(enqueueError),
       });
 
       this.db
@@ -736,28 +783,14 @@ export class TriggerDO extends DurableObject<Env> {
         .set({
           process_status: 'failed',
           completed_at: new Date().toISOString(),
-          error_message: `Queue enqueue failed: ${enqueueError instanceof Error ? enqueueError.message : String(enqueueError)}`,
+          error_message: 'Queue enqueue failed',
         })
         .where(eq(requestsTable.id, requestId))
         .run();
+      return { success: false, error: 'QUEUE_FAILED' };
     }
 
-    // Update last_scheduled_at — use updated config for scheduleNextAlarm
-    const updatedConfig = { ...config, lastScheduledAt: timestamp };
-    this.db
-      .update(triggerConfigTable)
-      .set({ last_scheduled_at: timestamp })
-      .where(eq(triggerConfigTable.trigger_id, config.triggerId))
-      .run();
-    await this.ctx.storage.put('config', updatedConfig);
-
-    logger.info('Scheduled trigger fired', {
-      triggerId: config.triggerId,
-      requestId,
-    });
-
-    // Reschedule next run
-    await this.scheduleNextAlarm(updatedConfig);
+    return { success: true, requestId };
   }
 
   private async scheduleNextAlarm(config: TriggerConfig): Promise<void> {

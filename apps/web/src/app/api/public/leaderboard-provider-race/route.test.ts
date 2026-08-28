@@ -18,7 +18,17 @@ jest.mock('@/lib/snowflake', () => ({
 
 type SnowflakeConfig = ReturnType<typeof resolveSnowflakeConfig>;
 
-const FAKE_CONFIG = { accountHost: 'test.snowflakecomputing.com' } as SnowflakeConfig;
+const FAKE_CONFIG = {
+  accountHost: 'test.snowflakecomputing.com',
+  jwtAccountIdentifier: 'TEST_ACCOUNT',
+  username: 'TEST_USER',
+  role: 'TEST_ROLE',
+  warehouse: 'TEST_WAREHOUSE',
+  database: 'TEST_DATABASE',
+  schema: 'TEST_SCHEMA',
+  privateKeyPem: 'test-private-key',
+  publicKeyFingerprint: 'SHA256:test-fingerprint',
+} satisfies NonNullable<SnowflakeConfig>;
 
 // The route builds a module-level in-process cache (1h TTL) at import time, so
 // each test loads it in an isolated module registry to keep that cache from
@@ -93,6 +103,44 @@ describe('GET /api/public/leaderboard-provider-race', () => {
     const response = await GET();
 
     expect(response.status).toBe(502);
+  });
+});
+
+describe('leaderboard Snowflake database and schema', () => {
+  test.each([
+    {
+      route: 'leaderboard-model-usage',
+      loadRoute: () => import('../leaderboard-model-usage/route'),
+      table: 'microdollar_usage_daily',
+    },
+    {
+      route: 'leaderboard-model-provider-usage',
+      loadRoute: () => import('../leaderboard-model-provider-usage/route'),
+      table: 'microdollar_usage_daily',
+    },
+    {
+      route: 'leaderboard-provider-race',
+      loadRoute: () => import('./route'),
+      table: 'usage_daily',
+    },
+  ])('$route uses the configured database and schema', async ({ loadRoute, table }) => {
+    await jest.isolateModulesAsync(async () => {
+      const snowflake = await import('@/lib/snowflake');
+      jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+      const executeStatement = jest.mocked(snowflake.executeSnowflakeStatement);
+      executeStatement.mockReset().mockResolvedValue([]);
+      const { GET } = await loadRoute();
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+      expect(executeStatement).toHaveBeenCalledTimes(1);
+      expect(executeStatement).toHaveBeenCalledWith({
+        config: FAKE_CONFIG,
+        statement: expect.stringMatching(new RegExp(`\\bfrom\\s+${table}\\s+as\\b`, 'i')),
+        timeoutSeconds: 30,
+      });
+    });
   });
 });
 

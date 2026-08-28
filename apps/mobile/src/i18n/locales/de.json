@@ -3202,9 +3202,6 @@
     "openAgents": "Agenten öffnen",
     "running": "LÄUFT",
     "needsInput": "Eingabe erforderlich",
-    "reconnecting": "Verbindung wird wiederhergestellt",
-    "channelName": "Aktive Agenten",
-    "activityKitDisabledTitle": "Live-Aktivitäten sind deaktiviert",
-    "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
+    "reconnecting": "Verbindung wird wiederhergestellt"
   }
 }

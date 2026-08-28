@@ -3223,9 +3223,6 @@
     "openAgents": "Otvorite agente",
     "running": "RADI",
     "needsInput": "treba unos",
-    "reconnecting": "Ponovno povezivanje",
-    "channelName": "Aktivni agenti",
-    "activityKitDisabledTitle": "Aktivnosti uživo su isključene",
-    "activityKitDisabledBody": "Uključite aktivnosti uživo u Postavkama da biste vidjeli aktivne agente na zaključanom ekranu."
+    "reconnecting": "Ponovno povezivanje"
   }
 }

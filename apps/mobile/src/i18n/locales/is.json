@@ -3202,9 +3202,6 @@
     "openAgents": "Opna umboð",
     "running": "Í gangi",
     "needsInput": "þarfnast inntaks",
-    "reconnecting": "Tengist aftur",
-    "channelName": "Virk umboð",
-    "activityKitDisabledTitle": "Slökkt er á Beinni virkni",
-    "activityKitDisabledBody": "Kveiktu á Beinni virkni í Stillingum til að sjá Virk umboð á Lásskjánum."
+    "reconnecting": "Tengist aftur"
   }
 }

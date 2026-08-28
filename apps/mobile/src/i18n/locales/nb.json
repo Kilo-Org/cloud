@@ -3202,9 +3202,6 @@
     "openAgents": "Åpne agenter",
     "running": "KJØRER",
     "needsInput": "trenger innspill",
-    "reconnecting": "Kobler til på nytt",
-    "channelName": "Aktive agenter",
-    "activityKitDisabledTitle": "Oppdateringer i sanntid er av",
-    "activityKitDisabledBody": "Slå på Oppdateringer i sanntid i Innstillinger for å se Aktive agenter på låst skjerm."
+    "reconnecting": "Kobler til på nytt"
   }
 }

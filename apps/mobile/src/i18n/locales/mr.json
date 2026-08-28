@@ -3202,9 +3202,6 @@
     "openAgents": "एजंट्स उघडा",
     "running": "चालू आहे",
     "needsInput": "इनपुट आवश्यक",
-    "reconnecting": "पुन्हा जोडत आहे",
-    "channelName": "सक्रिय एजंट्स",
-    "activityKitDisabledTitle": "थेट क्रियाकलाप बंद आहेत",
-    "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये थेट क्रियाकलाप सुरू करा."
+    "reconnecting": "पुन्हा जोडत आहे"
   }
 }

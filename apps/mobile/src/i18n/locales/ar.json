@@ -3286,9 +3286,6 @@
     "openAgents": "فتح الوكلاء",
     "running": "قيد التشغيل",
     "needsInput": "يتطلب إدخالًا",
-    "reconnecting": "جارٍ إعادة الاتصال",
-    "channelName": "الوكلاء النشطون",
-    "activityKitDisabledTitle": "الأنشطة المباشرة متوقفة",
-    "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لرؤية الوكلاء النشطين على شاشة القفل."
+    "reconnecting": "جارٍ إعادة الاتصال"
   }
 }

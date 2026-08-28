@@ -3223,9 +3223,6 @@
     "openAgents": "Deschide agenții",
     "running": "Rulează",
     "needsInput": "necesită introducere",
-    "reconnecting": "Se reconectează",
-    "channelName": "Agenți activi",
-    "activityKitDisabledTitle": "Activitățile live sunt dezactivate",
-    "activityKitDisabledBody": "Activează Activități live în Setări pentru a vedea Agenții activi pe ecranul de blocare."
+    "reconnecting": "Se reconectează"
   }
 }

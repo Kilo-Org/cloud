@@ -25,7 +25,7 @@ select
     , ud.model_provider_company as provider
     , ud.is_open_weights
     , sum(ud.total_tokens) as tokens
-from kilo_dw.dbt_prod.usage_daily as ud
+from usage_daily as ud
 where
     ud.usage_date >= '2025-07-01'
     and date_trunc('week', ud.usage_date) < date_trunc('week', current_date())

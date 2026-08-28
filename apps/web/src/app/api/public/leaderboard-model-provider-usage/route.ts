@@ -20,7 +20,7 @@ select
     , sum(mu.total_cache_hit_tokens) as "sum_cache_hit_tokens"
     , sum(mu.request_count) as "sum_request_count"
     , sum(mu.error_count) as "sum_error_count"
-from kilo_dw.dbt_prod.microdollar_usage_daily as mu
+from microdollar_usage_daily as mu
 where
     mu.usage_date >= dateadd(week, -1, current_date())
     and mu.usage_date < current_date()
@@ -157,9 +157,9 @@ function parseAndAggregateUsage(rows: string[][]): ModelProviderUsage[] {
       costPerMillionTokens: ratio(usage.sumCost, usage.sumTokens),
       cacheRatio: ratio(usage.sumCacheHitTokens, usage.sumInputTokens),
       errorRate: ratio(usage.sumErrorCount, usage.sumRequestCount),
-      percentageOfModel:
-        ratio(usage.sumTokens, totalTokensByModel.get(usage.model) ?? 0) * 100,
-    })).filter(usage => usage.errorRate < MAXIMUM_ERROR_RATE);
+      percentageOfModel: ratio(usage.sumTokens, totalTokensByModel.get(usage.model) ?? 0) * 100,
+    }))
+    .filter(usage => usage.errorRate < MAXIMUM_ERROR_RATE);
 }
 
 export const GET = createPublicSnowflakeReport({

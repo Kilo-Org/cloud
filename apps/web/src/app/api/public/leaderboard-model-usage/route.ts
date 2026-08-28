@@ -20,7 +20,7 @@ select
         else null
       end as mode
     , sum(coalesce(mu.total_input_tokens, 0)) + sum(coalesce(mu.total_output_tokens, 0)) as "tokens"
-from kilo_dw.dbt_prod.microdollar_usage_daily as mu
+from microdollar_usage_daily as mu
 where
     mu.usage_date >= dateadd(week, -1, current_date())
     and mu.usage_date < current_date()

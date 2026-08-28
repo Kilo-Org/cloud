@@ -11,246 +11,20 @@ import type { PlatformRepository } from '@/lib/integrations/core/types';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { logExceptInTest } from '@/lib/utils.server';
 import crypto from 'crypto';
-import * as http from 'http';
-import * as https from 'https';
 import {
   buildGitLabUrl,
   DEFAULT_GITLAB_INSTANCE_URL,
-  type GitLabResolvedUrl,
   GitLabInstanceUrlError,
   isDefaultGitLabInstanceUrl,
   normalizeGitLabInstanceUrl,
-  resolveGitLabUrlSafely,
 } from './instance-url';
+import { fetchGitLab } from './safe-transport';
 
 const GITLAB_CLIENT_ID = process.env.GITLAB_CLIENT_ID;
 const GITLAB_CLIENT_SECRET = getEnvVariable('GITLAB_CLIENT_SECRET');
 const GITLAB_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.GITLAB);
 
 const DEFAULT_GITLAB_URL = DEFAULT_GITLAB_INSTANCE_URL;
-const MAX_GITLAB_REDIRECTS = 5;
-const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
-const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
-
-async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): Promise<Response> {
-  const response = await fetchGitLabOnce(url, init);
-  if (!isGitLabRedirect(response.status)) {
-    return response;
-  }
-
-  const location = response.headers.get('location');
-  if (!location) {
-    return response;
-  }
-
-  if (redirectCount >= MAX_GITLAB_REDIRECTS) {
-    throw new Error('GitLab request exceeded redirect limit');
-  }
-
-  const redirectUrl = new URL(location, url).toString();
-  return fetchGitLab(
-    redirectUrl,
-    buildRedirectRequestInit(init, response.status, url, redirectUrl),
-    redirectCount + 1
-  );
-}
-
-async function fetchGitLabOnce(url: string, init?: RequestInit): Promise<Response> {
-  const resolvedUrl = await resolveGitLabUrlSafely(url);
-  if (!resolvedUrl.address) {
-    return fetch(url, { ...init, redirect: 'manual' });
-  }
-
-  return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
-}
-
-function isGitLabRedirect(status: number): boolean {
-  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
-}
-
-function buildRedirectRequestInit(
-  init: RequestInit | undefined,
-  status: number,
-  fromUrl: string,
-  toUrl: string
-): RequestInit | undefined {
-  if (!init) {
-    return undefined;
-  }
-
-  const headers = new Headers(init.headers);
-  const from = new URL(fromUrl);
-  const to = new URL(toUrl);
-  if (from.protocol === 'https:' && to.protocol === 'http:') {
-    throw new Error('GitLab request refused HTTPS-to-HTTP redirect');
-  }
-
-  if (from.origin !== to.origin) {
-    if ((status === 307 || status === 308) && init.body != null) {
-      throw new Error('GitLab request refused cross-origin redirect with request body');
-    }
-
-    headers.delete('authorization');
-    headers.delete('cookie');
-  }
-
-  const method = init.method?.toUpperCase() ?? 'GET';
-  if (
-    ((status === 301 || status === 302) && method === 'POST') ||
-    (status === 303 && method !== 'GET' && method !== 'HEAD')
-  ) {
-    headers.delete('content-length');
-    headers.delete('content-type');
-    return { ...init, body: undefined, headers, method: 'GET' };
-  }
-
-  return { ...init, headers };
-}
-
-function fetchGitLabBoundToAddress(
-  { url, address, family }: GitLabResolvedUrl & { address: string },
-  init?: RequestInit
-): Promise<Response> {
-  const request = url.protocol === 'https:' ? https.request : http.request;
-  const headers = headersInitToRecord(init?.headers);
-  const body = bodyInitToBuffer(init?.body);
-
-  if (body && !hasHeader(headers, 'content-length')) {
-    headers['content-length'] = String(Buffer.byteLength(body));
-  }
-
-  return new Promise((resolve, reject) => {
-    const req = request(
-      {
-        protocol: url.protocol,
-        hostname: url.hostname,
-        port: url.port,
-        path: `${url.pathname}${url.search}`,
-        method: init?.method ?? 'GET',
-        headers,
-        family,
-        lookup: (_hostname, _options, callback) => callback(null, address, family ?? 0),
-        ...(url.protocol === 'https:' ? { servername: url.hostname } : {}),
-      },
-      response => {
-        const chunks: Buffer[] = [];
-        let responseBytes = 0;
-        response.on('data', chunk => {
-          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-          responseBytes += buffer.byteLength;
-          if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
-            const error = new Error('GitLab response exceeded size limit');
-            response.destroy(error);
-            req.destroy(error);
-            reject(error);
-            return;
-          }
-
-          chunks.push(buffer);
-        });
-        response.on('error', reject);
-        response.on('end', () => {
-          try {
-            const status = response.statusCode ?? 500;
-            const body = responseStatusForbidsBody(status) ? null : Buffer.concat(chunks);
-            resolve(
-              new Response(body, {
-                status,
-                statusText: response.statusMessage,
-                headers: responseHeadersToHeaders(response.headers),
-              })
-            );
-          } catch (error) {
-            reject(error);
-          }
-        });
-      }
-    );
-
-    req.on('error', reject);
-    req.setTimeout(GITLAB_REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error('GitLab request timed out'));
-    });
-
-    const signal = init?.signal;
-    if (signal) {
-      if (signal.aborted) {
-        req.destroy(signal.reason);
-        reject(signal.reason);
-        return;
-      }
-
-      signal.addEventListener(
-        'abort',
-        () => {
-          req.destroy(signal.reason);
-          reject(signal.reason);
-        },
-        { once: true }
-      );
-    }
-
-    if (body) {
-      req.write(body);
-    }
-    req.end();
-  });
-}
-
-function headersInitToRecord(headers: HeadersInit | undefined): Record<string, string> {
-  const record: Record<string, string> = {};
-  new Headers(headers).forEach((value, key) => {
-    record[key] = value;
-  });
-  return record;
-}
-
-function hasHeader(headers: Record<string, string>, header: string): boolean {
-  const lowerHeader = header.toLowerCase();
-  return Object.keys(headers).some(key => key.toLowerCase() === lowerHeader);
-}
-
-function bodyInitToBuffer(body: BodyInit | null | undefined): Buffer | undefined {
-  if (body == null) {
-    return undefined;
-  }
-
-  if (typeof body === 'string') {
-    return Buffer.from(body);
-  }
-
-  if (body instanceof URLSearchParams) {
-    return Buffer.from(body.toString());
-  }
-
-  if (body instanceof ArrayBuffer) {
-    return Buffer.from(body);
-  }
-
-  if (ArrayBuffer.isView(body)) {
-    return Buffer.from(body.buffer, body.byteOffset, body.byteLength);
-  }
-
-  throw new Error('Unsupported GitLab request body type');
-}
-
-function responseStatusForbidsBody(status: number): boolean {
-  return status === 204 || status === 205 || status === 304;
-}
-
-function responseHeadersToHeaders(headers: http.IncomingHttpHeaders): Headers {
-  const responseHeaders = new Headers();
-  for (const [key, value] of Object.entries(headers)) {
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        responseHeaders.append(key, item);
-      }
-    } else if (value !== undefined) {
-      responseHeaders.set(key, value);
-    }
-  }
-  return responseHeaders;
-}
 
 /**
  * GitLab OAuth scopes required for the integration
@@ -279,7 +53,7 @@ export type GitLabProject = {
   name: string;
   path_with_namespace: string;
   visibility: 'private' | 'internal' | 'public';
-  default_branch: string;
+  default_branch?: string | null;
   web_url: string;
   archived: boolean;
   marked_for_deletion_on?: string | null;
@@ -471,6 +245,9 @@ export async function fetchGitLabProjects(
         name: project.name,
         full_name: project.path_with_namespace,
         private: project.visibility === 'private',
+        // Legacy project/cache rows omit this field. Keep that form until old clients/rows
+        // and the 30-day ledger window expire; never guess a default branch.
+        ...(project.default_branch ? { default_branch: project.default_branch } : {}),
       }))
     );
 

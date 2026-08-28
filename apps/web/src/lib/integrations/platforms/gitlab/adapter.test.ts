@@ -1,3 +1,8 @@
+jest.mock('@/lib/utils.server', () => ({ logExceptInTest: jest.fn() }));
+jest.mock('@/lib/integrations/oauth/urls', () => ({
+  getPlatformOAuthCallbackUrl: () => 'https://app.example/api/integrations/gitlab/callback',
+}));
+
 jest.mock('dns/promises', () => ({
   lookup: jest.fn(),
 }));
@@ -410,6 +415,7 @@ describe('fetchGitLabProjects', () => {
         name: 'active-project',
         full_name: 'group/active-project',
         private: true,
+        default_branch: 'main',
       },
     ]);
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -422,6 +428,66 @@ describe('fetchGitLabProjects', () => {
       2,
       'https://gitlab.com/api/v4/projects?membership=true&per_page=100&page=2&archived=false',
       expect.anything()
+    );
+  });
+
+  it('keeps nested paths, numeric IDs, and the provider default branch', async () => {
+    mockSelfHostedGitLabResponse({
+      status: 200,
+      json: [
+        {
+          id: 42,
+          name: 'project',
+          path_with_namespace: 'group/subgroup/project',
+          visibility: 'public',
+          default_branch: 'release/next',
+          archived: false,
+        },
+      ],
+    });
+    await expect(
+      fetchGitLabProjects('test-token', 'https://gitlab.example.com/gitlab')
+    ).resolves.toEqual([
+      {
+        id: 42,
+        name: 'project',
+        full_name: 'group/subgroup/project',
+        private: false,
+        default_branch: 'release/next',
+      },
+    ]);
+  });
+
+  it.each([null, undefined])(
+    'keeps an unavailable default branch absent: %s',
+    async defaultBranch => {
+      mockFetch.mockResolvedValueOnce(
+        Response.json([
+          {
+            id: 42,
+            name: 'empty-project',
+            path_with_namespace: 'group/empty-project',
+            visibility: 'private',
+            default_branch: defaultBranch,
+            archived: false,
+          },
+        ])
+      );
+      await expect(fetchGitLabProjects('test-token')).resolves.toEqual([
+        { id: 42, name: 'empty-project', full_name: 'group/empty-project', private: true },
+      ]);
+    }
+  );
+
+  it('keeps an empty discovery result empty', async () => {
+    mockFetch.mockResolvedValueOnce(Response.json([]));
+    await expect(fetchGitLabProjects('test-token')).resolves.toEqual([]);
+  });
+
+  it('keeps the legacy discovery error message', async () => {
+    mockFetch.mockResolvedValueOnce(Response.json({ message: 'denied' }, { status: 403 }));
+    await expect(fetchGitLabProjects('test-token')).rejects.toThrow(
+      'GitLab projects fetch failed: 403'
     );
   });
 });
@@ -576,7 +642,7 @@ describe('deleteProjectWebhook', () => {
 
     await expect(
       deleteProjectWebhook('test-token', 123, 456, 'https://gitlab.example.com')
-    ).rejects.toThrow('GitLab response exceeded size limit');
+    ).rejects.toMatchObject({ name: 'Error', message: 'GitLab response exceeded size limit' });
   });
 
   it('strips authorization headers when redirects change origin', async () => {

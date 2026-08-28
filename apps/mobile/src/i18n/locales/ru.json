@@ -152,7 +152,9 @@
     "appearanceDark": "Темная",
     "account": "Аккаунт",
     "prReviewAttribution": "Добавить атрибуцию приложения в проверки PR",
-    "prReviewAttributionSubtitle": "Добавлять нижний колонтитул «Проверено с помощью Kilo» при отправке проверки."
+    "prReviewAttributionSubtitle": "Добавлять нижний колонтитул «Проверено с помощью Kilo» при отправке проверки.",
+    "returnSendsMessage": "Клавиша ввода отправляет сообщение",
+    "returnSendsMessageSubtitle": "Если выключено, клавиша ввода вставляет новую строку в полях ввода сообщений агентам."
   },
   "notifications": {
     "title": "Уведомления",
@@ -2156,7 +2158,15 @@
       "cannotReceiveFiles": "Эта сессия не может получать файлы. Удалите вложения, чтобы отправить сообщение.",
       "couldNotAttachFiles": "Не удалось прикрепить файлы. Нажмите «Отправить», чтобы повторить.",
       "discardAttachmentsMessage": "Загруженные файлы, не прикрепленные к отправленным сообщениям, будут удалены.",
-      "discardAttachmentsTitle": "Удалить вложения?"
+      "discardAttachmentsTitle": "Удалить вложения?",
+      "charactersRemaining": "Осталось символов: {{count}}",
+      "insertNewline": "Вставить новую строку",
+      "starterChipBuild": "Создать функцию",
+      "starterChipEmpty": "Начать с идеи",
+      "starterChipFix": "Исправить ошибку",
+      "starterChipPrepare": "Настроить мое окружение",
+      "starterChipWrapUp": "Завершить мой сеанс",
+      "starterChipWriteTests": "Написать тесты"
     },
     "chatLink": {
       "linkCopied": "Ссылка скопирована",

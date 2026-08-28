@@ -1,4 +1,4 @@
-import { ArrowUp, Paperclip, Square } from '@/components/ui/icons';
+import { ArrowUp, CornerDownLeft, Paperclip, Square } from '@/components/ui/icons';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type RefObject } from 'react';
 import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   type LayoutChangeEvent,
+  Platform,
   Pressable,
   TextInput,
   type TextInputSelectionChangeEvent,
@@ -21,6 +22,8 @@ import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
 
 const PAPERCLIP_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 const CONTROL_HIT_SLOP = 6;
+/** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
+const CONTROL_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
 
 type ChatComposerInputRowProps = {
   attachmentsEnabled: boolean;
@@ -39,12 +42,15 @@ type ChatComposerInputRowProps = {
   onInputBlur: () => void;
   onInputFocus: () => void;
   onInputLayout: (event: LayoutChangeEvent) => void;
+  onInsertNewline: () => void;
   onSelectionChange: (event: TextInputSelectionChangeEvent) => void;
   onStop: () => void;
   onSubmit: () => void;
   onToggleVoice: () => void;
   paperclipDisabled: boolean;
   placeholder: string;
+  /** Return submits the message instead of inserting a newline. */
+  returnSendsMessage: boolean;
   textInputStyle: TextStyle;
   voiceDisabled: boolean;
   voiceInputAvailable: boolean;
@@ -75,12 +81,14 @@ export function ChatComposerInputRow({
   onInputBlur,
   onInputFocus,
   onInputLayout,
+  onInsertNewline,
   onSelectionChange,
   onStop,
   onSubmit,
   onToggleVoice,
   paperclipDisabled,
   placeholder,
+  returnSendsMessage,
   textInputStyle,
   voiceDisabled,
   voiceInputAvailable,
@@ -133,12 +141,34 @@ export function ChatComposerInputRow({
           contextMenuHidden={!inputEditable}
           pointerEvents={inputEditable ? 'auto' : 'none'}
           accessibilityState={{ disabled: inputAccessibilityDisabled }}
-          returnKeyType="default"
-          submitBehavior="newline"
+          returnKeyType={returnSendsMessage ? 'send' : 'default'}
+          submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
+          onSubmitEditing={returnSendsMessage ? onSubmit : undefined}
+          maxFontSizeMultiplier={1}
           autoCapitalize="sentences"
           autoCorrect
         />
       </View>
+
+      {returnSendsMessage ? (
+        <View className="ml-1">
+          <Pressable
+            onPress={onInsertNewline}
+            disabled={!inputEditable}
+            hitSlop={CONTROL_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel={t('agentChat.composer.insertNewline')}
+            accessibilityState={{ disabled: !inputEditable }}
+            style={{ minHeight: CONTROL_HIT_TARGET, minWidth: CONTROL_HIT_TARGET }}
+            className={cn(
+              'items-center justify-center rounded-full active:opacity-70',
+              !inputEditable && 'opacity-50'
+            )}
+          >
+            <CornerDownLeft size={18} color={colors.mutedForeground} />
+          </Pressable>
+        </View>
+      ) : null}
 
       {voiceInputAvailable ? (
         <View className="ml-1">
@@ -164,8 +194,9 @@ export function ChatComposerInputRow({
             accessibilityRole="button"
             accessibilityLabel={t('agentChat.composer.stopGenerating')}
             accessibilityState={{ disabled }}
+            style={{ height: CONTROL_HIT_TARGET, width: CONTROL_HIT_TARGET }}
             className={cn(
-              'h-8 w-8 items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500',
+              'items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500',
               disabled && 'opacity-50'
             )}
           >
@@ -185,7 +216,8 @@ export function ChatComposerInputRow({
             accessibilityRole="button"
             accessibilityLabel={t('agentChat.composer.sendMessage')}
             accessibilityState={{ disabled: !canSend, busy: isSending }}
-            className={`h-8 w-8 items-center justify-center rounded-full active:opacity-70 ${
+            style={{ height: CONTROL_HIT_TARGET, width: CONTROL_HIT_TARGET }}
+            className={`items-center justify-center rounded-full active:opacity-70 ${
               canSend ? 'bg-accent-soft' : 'bg-muted'
             }`}
           >

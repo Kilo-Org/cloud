@@ -152,7 +152,9 @@
     "appearanceDark": "כהה",
     "account": "חשבון",
     "prReviewAttribution": "הוסף שיוך אפליקציה לסקירות PR",
-    "prReviewAttributionSubtitle": "הוסף כותרת תחתונה של 'נסקר דרך Kilo' כשאתה שולח סקירה."
+    "prReviewAttributionSubtitle": "הוסף כותרת תחתונה של 'נסקר דרך Kilo' כשאתה שולח סקירה.",
+    "returnSendsMessage": "מקש החזרה שולח הודעה",
+    "returnSendsMessageSubtitle": "כשהאפשרות כבויה, מקש החזרה מוסיף שורה חדשה בשדות ההודעה של הסוכנים."
   },
   "notifications": {
     "title": "התראות",
@@ -2144,7 +2146,15 @@
       "cannotReceiveFiles": "סשן זה אינו יכול לקבל קבצים. הסר את הקבצים המצורפים כדי לשלוח את ההודעה.",
       "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב.",
       "discardAttachmentsMessage": "קבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
-      "discardAttachmentsTitle": "למחוק את הקבצים המצורפים?"
+      "discardAttachmentsTitle": "למחוק את הקבצים המצורפים?",
+      "charactersRemaining": "נותרו {{count}} תווים",
+      "insertNewline": "הוסף שורה חדשה",
+      "starterChipBuild": "פתח תכונה",
+      "starterChipEmpty": "התחל ברעיון",
+      "starterChipFix": "תקן באג",
+      "starterChipPrepare": "הגדר את הסביבה שלי",
+      "starterChipWrapUp": "סיים את ההפעלה שלי",
+      "starterChipWriteTests": "כתוב בדיקות"
     },
     "chatLink": {
       "linkCopied": "הקישור הועתק",

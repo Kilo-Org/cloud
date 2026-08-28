@@ -152,7 +152,9 @@
     "appearanceDark": "ଗାଢ଼",
     "account": "ଆକାଉଣ୍ଟ",
     "prReviewAttribution": "PR ସମୀକ୍ଷାରେ ଆପ୍ ଆଟ୍ରିବ୍ୟୁଶନ୍ ଯୋଡନ୍ତୁ",
-    "prReviewAttributionSubtitle": "ଆପଣ ଏକ ସମୀକ୍ଷା ଦାଖଲ କଲେ \"Kilo ମାଧ୍ୟମରେ ସମୀକ୍ଷା ହୋଇଛି\" footer ସଂଲଗ୍ନ କରନ୍ତୁ।"
+    "prReviewAttributionSubtitle": "ଆପଣ ଏକ ସମୀକ୍ଷା ଦାଖଲ କଲେ \"Kilo ମାଧ୍ୟମରେ ସମୀକ୍ଷା ହୋଇଛି\" footer ସଂଲଗ୍ନ କରନ୍ତୁ।",
+    "returnSendsMessage": "ରିଟର୍ନ କୀ ବାର୍ତ୍ତା ପଠାଏ",
+    "returnSendsMessageSubtitle": "ବନ୍ଦ ଥିଲେ, ରିଟର୍ନ କୀ ଏଜେଣ୍ଟର ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନରେ ନୂଆ ଧାଡ଼ି ଯୋଡ଼େ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "ଏହି ସେସନ୍ ଫାଇଲ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ। ଆପଣଙ୍କ ବାର୍ତ୍ତା ପଠାଇବାକୁ ଆଟାଚମେଣ୍ଟ ଅପସାରଣ କରନ୍ତୁ।",
       "couldNotAttachFiles": "ଫାଇଲ ଆଟାଚ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁନଃଚେଷ୍ଟା କରିବାକୁ ପଠାନ୍ତୁ ଟାପ୍ କରନ୍ତୁ।",
       "discardAttachmentsMessage": "ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ସଂଲଗ୍ନ ହୋଇନଥିବା ଅପଲୋଡ୍ ହୋଇଥିବା ଫାଇଲ୍ ଗୁଡ଼ିକ ବିଲୋପ ହେବ।",
-      "discardAttachmentsTitle": "ସଂଲଗ୍ନକଗୁଡ଼ିକ ପରିତ୍ୟାଗ କରିବେ?"
+      "discardAttachmentsTitle": "ସଂଲଗ୍ନକଗୁଡ଼ିକ ପରିତ୍ୟାଗ କରିବେ?",
+      "charactersRemaining": "{{count}}ଟି ଅକ୍ଷର ବାକି ଅଛି",
+      "insertNewline": "ନୂଆ ଧାଡ଼ି ଯୋଡ଼ନ୍ତୁ",
+      "starterChipBuild": "ଏକ ବୈଶିଷ୍ଟ୍ୟ ତିଆରି କରନ୍ତୁ",
+      "starterChipEmpty": "ଏକ ଧାରଣାରୁ ଆରମ୍ଭ କରନ୍ତୁ",
+      "starterChipFix": "ଏକ ତ୍ରୁଟି ଠିକ୍ କରନ୍ତୁ",
+      "starterChipPrepare": "ମୋ ପରିବେଶ ପ୍ରସ୍ତୁତ କରନ୍ତୁ",
+      "starterChipWrapUp": "ମୋ ସେସନ୍ ସମାପ୍ତ କରନ୍ତୁ",
+      "starterChipWriteTests": "ପରୀକ୍ଷା ଲେଖନ୍ତୁ"
     },
     "chatLink": {
       "linkCopied": "ଲିଙ୍କ କପି ହେଲା",

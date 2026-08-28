@@ -2062,7 +2062,15 @@
       "cannotReceiveFiles": "Cette session ne peut pas recevoir de fichiers. Supprimez les pièces jointes pour envoyer votre message.",
       "couldNotAttachFiles": "Impossible de joindre les fichiers. Touchez Envoyer pour réessayer.",
       "discardAttachmentsMessage": "Les fichiers téléversés non joints à des messages envoyés seront supprimés.",
-      "discardAttachmentsTitle": "Abandonner les pièces jointes ?"
+      "discardAttachmentsTitle": "Abandonner les pièces jointes ?",
+      "charactersRemaining": "{{count}} caractères restants",
+      "insertNewline": "Insérer un saut de ligne",
+      "starterChipBuild": "Créer une fonctionnalité",
+      "starterChipEmpty": "Commencer par une idée",
+      "starterChipFix": "Corriger un bogue",
+      "starterChipPrepare": "Configurer mon environnement",
+      "starterChipWrapUp": "Terminer ma session",
+      "starterChipWriteTests": "Écrire des tests"
     },
     "chatLink": {
       "linkCopied": "Lien copié",
@@ -2192,7 +2200,9 @@
     "appearanceDark": "Sombre",
     "account": "Compte",
     "prReviewAttribution": "Ajouter l'attribution de l'application aux revues de PR",
-    "prReviewAttributionSubtitle": "Ajouter un pied de page « Revue via Kilo » lorsque vous soumettez une revue."
+    "prReviewAttributionSubtitle": "Ajouter un pied de page « Revue via Kilo » lorsque vous soumettez une revue.",
+    "returnSendsMessage": "La touche Entrée envoie le message",
+    "returnSendsMessageSubtitle": "Si cette option est désactivée, la touche Entrée insère un saut de ligne dans les champs de saisie des agents."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",

@@ -152,7 +152,9 @@
     "appearanceDark": "Sötét",
     "account": "Fiók",
     "prReviewAttribution": "Alkalmazás-hozzárendelés hozzáadása a PR-ellenőrzésekhez",
-    "prReviewAttributionSubtitle": "A 'Reviewed via Kilo' lábléc hozzáfűzése, amikor ellenőrzést küld el."
+    "prReviewAttributionSubtitle": "A 'Reviewed via Kilo' lábléc hozzáfűzése, amikor ellenőrzést küld el.",
+    "returnSendsMessage": "Az Enter billentyű elküldi az üzenetet",
+    "returnSendsMessageSubtitle": "Kikapcsolva az Enter új sort szúr be az ügynökök üzenetbeviteli mezőibe."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nem érhető el",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Ez a munkamenet nem fogadhat fájlokat. Az üzenet elküldéséhez távolítsd el a csatolmányokat.",
       "couldNotAttachFiles": "A fájlok csatolása nem sikerült. Az újrapróbáláshoz koppints a küldésre.",
       "discardAttachmentsMessage": "Az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
-      "discardAttachmentsTitle": "Elveti a csatolmányokat?"
+      "discardAttachmentsTitle": "Elveti a csatolmányokat?",
+      "charactersRemaining": "{{count}} karakter maradt",
+      "insertNewline": "Új sor beszúrása",
+      "starterChipBuild": "Funkció fejlesztése",
+      "starterChipEmpty": "Kezdés egy ötlettel",
+      "starterChipFix": "Hiba javítása",
+      "starterChipPrepare": "A környezetem beállítása",
+      "starterChipWrapUp": "A munkamenetem lezárása",
+      "starterChipWriteTests": "Tesztek írása"
     },
     "chatLink": {
       "linkCopied": "Hivatkozás másolva",

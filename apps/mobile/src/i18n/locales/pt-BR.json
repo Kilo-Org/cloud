@@ -2128,7 +2128,15 @@
       "cannotReceiveFiles": "Esta sessão não pode receber arquivos. Remova os anexos para enviar sua mensagem.",
       "couldNotAttachFiles": "Não foi possível anexar os arquivos. Toque em enviar para tentar novamente.",
       "discardAttachmentsMessage": "Os arquivos enviados que não estiverem anexados a mensagens enviadas serão excluídos.",
-      "discardAttachmentsTitle": "Descartar anexos?"
+      "discardAttachmentsTitle": "Descartar anexos?",
+      "charactersRemaining": "{{count}} caracteres restantes",
+      "insertNewline": "Inserir quebra de linha",
+      "starterChipBuild": "Criar uma funcionalidade",
+      "starterChipEmpty": "Começar com uma ideia",
+      "starterChipFix": "Corrigir um erro",
+      "starterChipPrepare": "Configurar meu ambiente",
+      "starterChipWrapUp": "Encerrar minha sessão",
+      "starterChipWriteTests": "Escrever testes"
     },
     "chatLink": {
       "linkCopied": "Link copiado",
@@ -2258,7 +2266,9 @@
     "appearanceDark": "Escuro",
     "account": "Conta",
     "prReviewAttribution": "Adicionar atribuição do app às avaliações de PR",
-    "prReviewAttributionSubtitle": "Anexe um rodapé \"Reviewed via Kilo\" ao enviar uma avaliação."
+    "prReviewAttributionSubtitle": "Anexe um rodapé \"Reviewed via Kilo\" ao enviar uma avaliação.",
+    "returnSendsMessage": "A tecla Enter envia a mensagem",
+    "returnSendsMessageSubtitle": "Quando desativada, a tecla Enter insere uma quebra de linha nos campos de mensagem dos agentes."
   },
   "addCredits": {
     "cta": "Adicionar créditos",

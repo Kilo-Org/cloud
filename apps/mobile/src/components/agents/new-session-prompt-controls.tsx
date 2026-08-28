@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -14,6 +15,7 @@ type NewSessionPromptControlsProps = {
   voiceInput: ReturnType<typeof useVoiceInput>;
   onAddAttachment: () => void;
   pasteClipboard: () => void;
+  children?: ReactNode;
 };
 
 export function NewSessionPromptControls({
@@ -21,6 +23,7 @@ export function NewSessionPromptControls({
   voiceInput,
   onAddAttachment,
   pasteClipboard,
+  children,
 }: Readonly<NewSessionPromptControlsProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -60,6 +63,7 @@ export function NewSessionPromptControls({
           <VoiceInputStatus status={voiceInput.status} />
         </View>
       ) : null}
+      {children}
       {voiceInput.available ? (
         <VoiceInputButton
           disabled={control.voiceDisabled}

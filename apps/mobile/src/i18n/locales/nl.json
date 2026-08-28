@@ -152,7 +152,9 @@
     "appearanceDark": "Donker",
     "account": "Account",
     "prReviewAttribution": "App-attributie aan PR-reviews toevoegen",
-    "prReviewAttributionSubtitle": "Voeg een 'Reviewed via Kilo'-voettekst toe wanneer je een review indient."
+    "prReviewAttributionSubtitle": "Voeg een 'Reviewed via Kilo'-voettekst toe wanneer je een review indient.",
+    "returnSendsMessage": "Return-toets verzendt bericht",
+    "returnSendsMessageSubtitle": "Als dit uitstaat, voegt Return een nieuwe regel in de berichtinvoervelden van agents in."
   },
   "notifications": {
     "channel": {
@@ -2132,7 +2134,15 @@
       "cannotReceiveFiles": "Deze sessie kan geen bestanden ontvangen. Verwijder de bijlagen om je bericht te verzenden.",
       "couldNotAttachFiles": "Bestanden konden niet worden bijgevoegd. Tik op Verzenden om opnieuw te proberen.",
       "discardAttachmentsMessage": "Geüploade bestanden die niet aan verzonden berichten zijn bijgevoegd, worden verwijderd.",
-      "discardAttachmentsTitle": "Bijlagen weggooien?"
+      "discardAttachmentsTitle": "Bijlagen weggooien?",
+      "charactersRemaining": "{{count}} tekens resterend",
+      "insertNewline": "Nieuwe regel invoegen",
+      "starterChipBuild": "Een functie bouwen",
+      "starterChipEmpty": "Beginnen met een idee",
+      "starterChipFix": "Een fout oplossen",
+      "starterChipPrepare": "Mijn omgeving instellen",
+      "starterChipWrapUp": "Mijn sessie afronden",
+      "starterChipWriteTests": "Tests schrijven"
     },
     "chatLink": {
       "linkCopied": "Link gekopieerd",

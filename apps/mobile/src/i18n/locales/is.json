@@ -152,7 +152,9 @@
     "appearanceDark": "Dökkt",
     "account": "Reikningur",
     "prReviewAttribution": "Bæta við app-eignarmerki í PR-úttektir",
-    "prReviewAttributionSubtitle": "Bæta við „Reviewed via Kilo“-fótlið þegar þú skilar úttekt."
+    "prReviewAttributionSubtitle": "Bæta við „Reviewed via Kilo“-fótlið þegar þú skilar úttekt.",
+    "returnSendsMessage": "Færslulykill sendir skilaboð",
+    "returnSendsMessageSubtitle": "Þegar slökkt er setur færslulykillinn inn línuskil í ritlum umboða."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ótiltækur",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Þessi lota getur ekki tekið við skrám. Fjarlægðu viðhengin til að senda skilaboðin.",
       "couldNotAttachFiles": "Ekki tókst að hengja skrár við. Bankaðu á senda til að reyna aftur.",
       "discardAttachmentsMessage": "Upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
-      "discardAttachmentsTitle": "Farga viðhengjum?"
+      "discardAttachmentsTitle": "Farga viðhengjum?",
+      "charactersRemaining": "{{count}} stafir eftir",
+      "insertNewline": "Setja inn línuskil",
+      "starterChipBuild": "Búa til eiginleika",
+      "starterChipEmpty": "Byrja með hugmynd",
+      "starterChipFix": "Laga villu",
+      "starterChipPrepare": "Setja upp umhverfið mitt",
+      "starterChipWrapUp": "Ljúka lotunni minni",
+      "starterChipWriteTests": "Skrifa próf"
     },
     "chatLink": {
       "linkCopied": "Krækja afrituð",

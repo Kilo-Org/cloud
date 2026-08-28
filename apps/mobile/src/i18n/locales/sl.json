@@ -152,7 +152,9 @@
     "appearanceDark": "Temno",
     "account": "Račun",
     "prReviewAttribution": "Dodaj pripis aplikacije k pregledom PR",
-    "prReviewAttributionSubtitle": "K oddaji pregleda dodaj nogo »Reviewed via Kilo«."
+    "prReviewAttributionSubtitle": "K oddaji pregleda dodaj nogo »Reviewed via Kilo«.",
+    "returnSendsMessage": "Tipka Enter pošlje sporočilo",
+    "returnSendsMessageSubtitle": "Ko je možnost izklopljena, tipka Enter vstavi novo vrstico v polja za vnos sporočil agentom."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ni na voljo",
@@ -2624,7 +2626,15 @@
       "cannotReceiveFiles": "Ta seja ne more prejemati datotek. Odstrani priponke za pošiljanje sporočila.",
       "couldNotAttachFiles": "Priponk ni bilo mogoče priložiti. Dotakni se pošlji za ponovni poskus.",
       "discardAttachmentsMessage": "Naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisane.",
-      "discardAttachmentsTitle": "Zavreči priloge?"
+      "discardAttachmentsTitle": "Zavreči priloge?",
+      "charactersRemaining": "Preostalo znakov: {{count}}",
+      "insertNewline": "Vstavite novo vrstico",
+      "starterChipBuild": "Razvijte funkcijo",
+      "starterChipEmpty": "Začnite z zamislijo",
+      "starterChipFix": "Odpravite napako",
+      "starterChipPrepare": "Nastavite moje okolje",
+      "starterChipWrapUp": "Zaključite mojo sejo",
+      "starterChipWriteTests": "Napišite preizkuse"
     },
     "chatLink": {
       "linkCopied": "Povezava kopirana",

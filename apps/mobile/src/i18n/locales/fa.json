@@ -152,7 +152,9 @@
     "appearanceDark": "تیره",
     "account": "حساب",
     "prReviewAttribution": "افزودن انتساب برنامه به مرورهای PR",
-    "prReviewAttributionSubtitle": "هنگام ارسال یک مرور، یک پانوشت «بازبینی شده از طریق Kilo» اضافه کنید."
+    "prReviewAttributionSubtitle": "هنگام ارسال یک مرور، یک پانوشت «بازبینی شده از طریق Kilo» اضافه کنید.",
+    "returnSendsMessage": "کلید بازگشت پیام را ارسال می‌کند",
+    "returnSendsMessageSubtitle": "وقتی خاموش است، کلید بازگشت در کادرهای ورودی پیام عامل یک خط جدید درج می‌کند."
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست pull در دسترس نیست",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "این جلسه نمی‌تواند فایل دریافت کند. برای ارسال پیام، پیوست‌ها را حذف کنید.",
       "couldNotAttachFiles": "پیوست کردن فایل‌ها ممکن نشد. برای تلاش مجدد، ارسال را لمس کنید.",
       "discardAttachmentsMessage": "فایل‌های بارگذاری‌شده‌ای که به پیام‌های ارسال‌شده پیوست نشده‌اند حذف خواهند شد.",
-      "discardAttachmentsTitle": "پیوست‌ها دور انداخته شوند؟"
+      "discardAttachmentsTitle": "پیوست‌ها دور انداخته شوند؟",
+      "charactersRemaining": "{{count}} نویسه باقی مانده",
+      "insertNewline": "درج خط جدید",
+      "starterChipBuild": "ساخت یک ویژگی",
+      "starterChipEmpty": "شروع با یک ایده",
+      "starterChipFix": "رفع یک اشکال",
+      "starterChipPrepare": "راه‌اندازی محیط من",
+      "starterChipWrapUp": "پایان دادن به نشست من",
+      "starterChipWriteTests": "نوشتن آزمون‌ها"
     },
     "chatLink": {
       "linkCopied": "پیوند کپی شد",

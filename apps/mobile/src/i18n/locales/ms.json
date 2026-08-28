@@ -152,7 +152,9 @@
     "appearanceDark": "Gelap",
     "account": "Akaun",
     "prReviewAttribution": "Tambahkan atribusi aplikasi kepada semakan PR",
-    "prReviewAttributionSubtitle": "Tambahkan pengaki Reviewed via Kilo apabila anda menghantar semakan."
+    "prReviewAttributionSubtitle": "Tambahkan pengaki Reviewed via Kilo apabila anda menghantar semakan.",
+    "returnSendsMessage": "Kekunci Kembali menghantar mesej",
+    "returnSendsMessageSubtitle": "Apabila dimatikan, kekunci Kembali menyisipkan baris baharu dalam komposer ejen."
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Sesi ini tidak boleh menerima fail. Buang lampiran untuk menghantar mesej anda.",
       "couldNotAttachFiles": "Tidak dapat melampirkan fail. Ketik hantar untuk mencuba semula.",
       "discardAttachmentsMessage": "Fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
-      "discardAttachmentsTitle": "Buang lampiran?"
+      "discardAttachmentsTitle": "Buang lampiran?",
+      "charactersRemaining": "{{count}} aksara berbaki",
+      "insertNewline": "Sisipkan baris baharu",
+      "starterChipBuild": "Bina ciri",
+      "starterChipEmpty": "Mulakan dengan idea",
+      "starterChipFix": "Baiki pepijat",
+      "starterChipPrepare": "Sediakan persekitaran saya",
+      "starterChipWrapUp": "Tamatkan sesi saya",
+      "starterChipWriteTests": "Tulis ujian"
     },
     "chatLink": {
       "linkCopied": "Pautan disalin",

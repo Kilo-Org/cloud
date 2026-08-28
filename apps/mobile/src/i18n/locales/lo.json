@@ -152,7 +152,9 @@
     "appearanceDark": "ມືດ",
     "account": "ບັນຊີ",
     "prReviewAttribution": "ຕື່ມການລະບຸແຫຼ່ງຂອງແອັບລົງໃນການທົບທວນ PR",
-    "prReviewAttributionSubtitle": "ຕື່ມ footer ທີ່ລະບຸວ່າ \"ທົບທວນຜ່ານ Kilo\" ເມື່ອທ່ານສົ່ງການທົບທວນ."
+    "prReviewAttributionSubtitle": "ຕື່ມ footer ທີ່ລະບຸວ່າ \"ທົບທວນຜ່ານ Kilo\" ເມື່ອທ່ານສົ່ງການທົບທວນ.",
+    "returnSendsMessage": "ປຸ່ມຂຶ້ນແຖວໃໝ່ສົ່ງຂໍ້ຄວາມ",
+    "returnSendsMessageSubtitle": "ເມື່ອປິດ, ປຸ່ມຂຶ້ນແຖວໃໝ່ຈະແຊກແຖວໃໝ່ໃນຊ່ອງປ້ອນຂໍ້ຄວາມຂອງຕົວແທນ."
   },
   "prReview": {
     "pullRequestUnavailable": "pull request ບໍ່ພ້ອມໃຊ້",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "ເຊດຊັນນີ້ບໍ່ສາມາດຮັບໄຟລ໌. ລຶບໄຟລ໌ແນບອອກເພື່ອສົ່ງຂໍ້ຄວາມ.",
       "couldNotAttachFiles": "ບໍ່ສາມາດແນບໄຟລ໌. ແຕະສົ່ງເພື່ອລອງອີກ.",
       "discardAttachmentsMessage": "ໄຟລ໌ທີ່ອັບໂຫລດແຕ່ບໍ່ໄດ້ແນບກັບຂໍ້ຄວາມທີ່ສົ່ງແລ້ວຈະຖືກລຶບ.",
-      "discardAttachmentsTitle": "ຍົກເລີກໄຟລ໌ແນບ?"
+      "discardAttachmentsTitle": "ຍົກເລີກໄຟລ໌ແນບ?",
+      "charactersRemaining": "ເຫຼືອ {{count}} ຕົວອັກສອນ",
+      "insertNewline": "ແຊກແຖວໃໝ່",
+      "starterChipBuild": "ສ້າງຄຸນສົມບັດ",
+      "starterChipEmpty": "ເລີ່ມດ້ວຍແນວຄິດ",
+      "starterChipFix": "ແກ້ໄຂຂໍ້ຜິດພາດ",
+      "starterChipPrepare": "ຕັ້ງສະພາບແວດລ້ອມຂອງຂ້ອຍ",
+      "starterChipWrapUp": "ສິ້ນສຸດເຊດຊັນຂອງຂ້ອຍ",
+      "starterChipWriteTests": "ຂຽນການທົດສອບ"
     },
     "chatLink": {
       "linkCopied": "ສຳເນົາລິ້ງແລ້ວ",

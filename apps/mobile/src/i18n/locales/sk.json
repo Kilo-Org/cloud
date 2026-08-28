@@ -152,7 +152,9 @@
     "appearanceDark": "Tmavý",
     "account": "Účet",
     "prReviewAttribution": "Pridať atribúciu aplikácie do kontrol PR",
-    "prReviewAttributionSubtitle": "Keď odošlete kontrolu, pridajte pätičku Reviewed via Kilo."
+    "prReviewAttributionSubtitle": "Keď odošlete kontrolu, pridajte pätičku Reviewed via Kilo.",
+    "returnSendsMessage": "Kláves Enter odošle správu",
+    "returnSendsMessageSubtitle": "Keď je táto možnosť vypnutá, kláves Enter vloží nový riadok do polí na zadávanie správy agentom."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nie je dostupný",
@@ -2624,7 +2626,15 @@
       "cannotReceiveFiles": "Táto relácia nemôže prijímať súbory. Odstráňte prílohy, aby ste mohli odoslať správu.",
       "couldNotAttachFiles": "Súbory sa nepodarilo pripojiť. Klepnutím na odoslať to skúsite znova.",
       "discardAttachmentsMessage": "Nahrané súbory nepriložené k odoslaným správam sa odstránia.",
-      "discardAttachmentsTitle": "Zahodiť prílohy?"
+      "discardAttachmentsTitle": "Zahodiť prílohy?",
+      "charactersRemaining": "Počet zostávajúcich znakov: {{count}}",
+      "insertNewline": "Vložiť nový riadok",
+      "starterChipBuild": "Vytvoriť funkciu",
+      "starterChipEmpty": "Začať nápadom",
+      "starterChipFix": "Opraviť chybu",
+      "starterChipPrepare": "Nastaviť moje prostredie",
+      "starterChipWrapUp": "Dokončiť moje sedenie",
+      "starterChipWriteTests": "Napísať testy"
     },
     "chatLink": {
       "linkCopied": "Odkaz skopírovaný",

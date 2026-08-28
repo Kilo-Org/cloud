@@ -152,7 +152,9 @@
     "appearanceDark": "ഡാർക്ക്",
     "account": "അക്കൗണ്ട്",
     "prReviewAttribution": "PR അവലോകനങ്ങളിലേക്ക് ആപ്പ് ആട്രിബ്യൂഷൻ ചേർക്കുക",
-    "prReviewAttributionSubtitle": "നിങ്ങൾ ഒരു അവലോകനം സമർപ്പിക്കുമ്പോൾ Reviewed via Kilo ഫൂട്ടർ കൂട്ടിച്ചേർക്കുക."
+    "prReviewAttributionSubtitle": "നിങ്ങൾ ഒരു അവലോകനം സമർപ്പിക്കുമ്പോൾ Reviewed via Kilo ഫൂട്ടർ കൂട്ടിച്ചേർക്കുക.",
+    "returnSendsMessage": "റിട്ടേൺ കീ സന്ദേശം അയയ്ക്കുന്നു",
+    "returnSendsMessageSubtitle": "ഓഫായിരിക്കുമ്പോൾ, റിട്ടേൺ ഏജന്റ് സന്ദേശ ഇൻപുട്ടുകളിൽ പുതിയ വരി ചേർക്കുന്നു."
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "ഈ സെഷന് ഫയലുകൾ സ്വീകരിക്കാൻ കഴിയില്ല. നിങ്ങളുടെ സന്ദേശം അയയ്ക്കാൻ അറ്റാച്ച്മെന്റുകൾ നീക്കം ചെയ്യുക.",
       "couldNotAttachFiles": "ഫയലുകൾ അറ്റാച്ച് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കാൻ അയയ്ക്കുക ടാപ്പ് ചെയ്യുക.",
       "discardAttachmentsMessage": "അയച്ച സന്ദേശങ്ങളിൽ അറ്റാച്ച് ചെയ്യാത്ത അപ്‌ലോഡുകൾ ഇല്ലാതാക്കും.",
-      "discardAttachmentsTitle": "അറ്റാച്ച്മെന്റുകൾ ഉപേക്ഷിക്കണോ?"
+      "discardAttachmentsTitle": "അറ്റാച്ച്മെന്റുകൾ ഉപേക്ഷിക്കണോ?",
+      "charactersRemaining": "{{count}} അക്ഷരങ്ങൾ ശേഷിക്കുന്നു",
+      "insertNewline": "പുതിയ വരി ചേർക്കുക",
+      "starterChipBuild": "ഒരു ഫീച്ചർ നിർമ്മിക്കുക",
+      "starterChipEmpty": "ഒരു ആശയത്തോടെ ആരംഭിക്കുക",
+      "starterChipFix": "ഒരു ബഗ് പരിഹരിക്കുക",
+      "starterChipPrepare": "എന്റെ എൻവയോൺമെന്റ് സജ്ജീകരിക്കുക",
+      "starterChipWrapUp": "എന്റെ സെഷൻ പൂർത്തിയാക്കുക",
+      "starterChipWriteTests": "ടെസ്റ്റുകൾ എഴുതുക"
     },
     "chatLink": {
       "linkCopied": "ലിങ്ക് പകർത്തി",

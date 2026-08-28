@@ -152,7 +152,9 @@
     "appearanceDark": "డార్క్",
     "account": "ఖాతా",
     "prReviewAttribution": "PR సమీక్షలకు యాప్ ఆపాదనను జోడించండి",
-    "prReviewAttributionSubtitle": "మీరు సమీక్షను సమర్పించినప్పుడు Kilo ద్వారా సమీక్షించబడింది అనే ఫుటర్ను జోడించండి."
+    "prReviewAttributionSubtitle": "మీరు సమీక్షను సమర్పించినప్పుడు Kilo ద్వారా సమీక్షించబడింది అనే ఫుటర్ను జోడించండి.",
+    "returnSendsMessage": "రిటర్న్ కీ సందేశాన్ని పంపుతుంది",
+    "returnSendsMessageSubtitle": "ఆఫ్లో ఉన్నప్పుడు, రిటర్న్ ఏజెంట్ సందేశ ఇన్పుట్లలో కొత్త పంక్తిని చేర్చుతుంది."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "ఈ సెషన్ ఫైల్లను స్వీకరించలేదు. మీ సందేశాన్ని పంపడానికి అటాచ్మెంట్లను తీసివేయండి.",
       "couldNotAttachFiles": "ఫైల్లను అటాచ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి పంపు నొక్కండి.",
       "discardAttachmentsMessage": "పంపిన సందేశాలకు జోడించని అప్లోడ్ చేసిన ఫైల్లు తొలగించబడతాయి.",
-      "discardAttachmentsTitle": "జోడింపులను విస్మరించాలా?"
+      "discardAttachmentsTitle": "జోడింపులను విస్మరించాలా?",
+      "charactersRemaining": "{{count}} అక్షరాలు మిగిలి ఉన్నాయి",
+      "insertNewline": "కొత్త పంక్తిని చేర్చండి",
+      "starterChipBuild": "ఒక ఫీచర్ను రూపొందించండి",
+      "starterChipEmpty": "ఒక ఆలోచనతో ప్రారంభించండి",
+      "starterChipFix": "ఒక లోపాన్ని పరిష్కరించండి",
+      "starterChipPrepare": "నా వాతావరణాన్ని సిద్ధం చేయండి",
+      "starterChipWrapUp": "నా సెషన్ను ముగించండి",
+      "starterChipWriteTests": "పరీక్షలు రాయండి"
     },
     "chatLink": {
       "linkCopied": "లింక్ కాపీ చేయబడింది",

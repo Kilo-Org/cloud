@@ -152,7 +152,9 @@
     "appearanceDark": "Maizina",
     "account": "Kaonty",
     "prReviewAttribution": "Ampio ny attribution ny app amin'ny fandinihana PR",
-    "prReviewAttributionSubtitle": "Asio footer \"Reviewed via Kilo\" rehefa mandefa fandinihana ianao."
+    "prReviewAttributionSubtitle": "Asio footer \"Reviewed via Kilo\" rehefa mandefa fandinihana ianao.",
+    "returnSendsMessage": "Mandefa hafatra ny bokotra Fiverenana",
+    "returnSendsMessageSubtitle": "Rehefa tsy alefa, ny bokotra Fiverenana dia mampiditra andalana vaovao ao amin'ny fampidirana hafatry ny mpanampy."
   },
   "prReview": {
     "pullRequestUnavailable": "Tsy misy ny pull request",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Tsy afaka mandray rakitra ity session ity. Esory ny rakitra vao alefaso ny hafatrao.",
       "couldNotAttachFiles": "Tsy afaka nampidirina ny rakitra. Tsindrio ny send raha handramana indray.",
       "discardAttachmentsMessage": "Hofafana ny rakitra nampidirina nefa tsy nampiarahina tamin'ny hafatra nalefa.",
-      "discardAttachmentsTitle": "Ario ve ny firaiketana?"
+      "discardAttachmentsTitle": "Ario ve ny firaiketana?",
+      "charactersRemaining": "Soratra {{count}} sisa",
+      "insertNewline": "Ampidiro andalana vaovao",
+      "starterChipBuild": "Mamoròna fiasa",
+      "starterChipEmpty": "Atombohy amin'ny hevitra iray",
+      "starterChipFix": "Ahitsio ny hadisoana",
+      "starterChipPrepare": "Amboary ny tontolo iainako",
+      "starterChipWrapUp": "Farano ny session-ko",
+      "starterChipWriteTests": "Manorata fitsapana"
     },
     "chatLink": {
       "linkCopied": "Adika ny rohy",

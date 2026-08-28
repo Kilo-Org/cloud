@@ -152,7 +152,9 @@
     "appearanceDark": "Tumšs",
     "account": "Konts",
     "prReviewAttribution": "Pievienot lietotnes attiecinājumu PR pārskatiem",
-    "prReviewAttributionSubtitle": "Pievienot \"Reviewed via Kilo\" kājeni, kad iesniedzat pārskatu."
+    "prReviewAttributionSubtitle": "Pievienot \"Reviewed via Kilo\" kājeni, kad iesniedzat pārskatu.",
+    "returnSendsMessage": "Ievades taustiņš nosūta ziņojumu",
+    "returnSendsMessageSubtitle": "Ja izslēgts, ievades taustiņš ievieto jaunu rindu aģenta ziņojuma ievades laukā."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nav pieejams",
@@ -2605,7 +2607,15 @@
       "cannotReceiveFiles": "Šī sesija nevar saņemt failus. Noņem pielikumus, lai nosūtītu savu ziņojumu.",
       "couldNotAttachFiles": "Neizdevās pievienot failus. Pieskarieties Sūtīt, lai mēģinātu vēlreiz.",
       "discardAttachmentsMessage": "Augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
-      "discardAttachmentsTitle": "Atmest pielikumus?"
+      "discardAttachmentsTitle": "Atmest pielikumus?",
+      "charactersRemaining": "Atlikušās rakstzīmes: {{count}}",
+      "insertNewline": "Ievietot jaunu rindu",
+      "starterChipBuild": "Izveidot funkciju",
+      "starterChipEmpty": "Sākt ar ideju",
+      "starterChipFix": "Izlabot kļūdu",
+      "starterChipPrepare": "Iestatīt manu vidi",
+      "starterChipWrapUp": "Pabeigt manu sesiju",
+      "starterChipWriteTests": "Rakstīt testus"
     },
     "chatLink": {
       "linkCopied": "Saite kopēta",

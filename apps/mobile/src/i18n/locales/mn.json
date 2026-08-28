@@ -152,7 +152,9 @@
     "appearanceDark": "Харанхуй",
     "account": "Бүртгэл",
     "prReviewAttribution": "PR хяналтуудад аппын хамааралыг нэмэх",
-    "prReviewAttributionSubtitle": "Үнэлгээ илгээхдээ 'Kilo-гаар хянасан' тайлбарыг нэмнэ."
+    "prReviewAttributionSubtitle": "Үнэлгээ илгээхдээ 'Kilo-гаар хянасан' тайлбарыг нэмнэ.",
+    "returnSendsMessage": "Мөр шилжүүлэх товч мессеж илгээнэ",
+    "returnSendsMessageSubtitle": "Унтраалттай үед мөр шилжүүлэх товч агентын мессеж оруулах талбарт шинэ мөр оруулна."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request боломжгүй",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Энэ сесси файл хүлээн авах боломжгүй. Мэдээлэл илгээхийн тулд хавсралтуудыг арилгана уу.",
       "couldNotAttachFiles": "Файлуудыг хавсаргаж чадсангүй. Дахин оролдохын тулд илгээх товчийг дарна уу.",
       "discardAttachmentsMessage": "Илгээсэн мессежид хавсаргаагүй байршуулсан файлууд устах болно.",
-      "discardAttachmentsTitle": "Хавсралтуудыг хаях уу?"
+      "discardAttachmentsTitle": "Хавсралтуудыг хаях уу?",
+      "charactersRemaining": "{{count}} тэмдэгт үлдсэн",
+      "insertNewline": "Шинэ мөр оруулах",
+      "starterChipBuild": "Шинэ функц бүтээх",
+      "starterChipEmpty": "Санаанаас эхлэх",
+      "starterChipFix": "Алдаа засах",
+      "starterChipPrepare": "Орчноо тохируулах",
+      "starterChipWrapUp": "Сессээ дуусгах",
+      "starterChipWriteTests": "Тест бичих"
     },
     "chatLink": {
       "linkCopied": "Холбоос хуулагдлаа",

@@ -152,7 +152,9 @@
     "appearanceDark": "இருள்",
     "account": "கணக்கு",
     "prReviewAttribution": "PR மதிப்பாய்வுகளில் பயன்பாட்டு பங்களிப்பைச் சேர்க்கவும்",
-    "prReviewAttributionSubtitle": "நீங்கள் ஒரு மதிப்பாய்வை சமர்ப்பிக்கும்போது Reviewed via Kilo அடிக்குறிப்பைச் சேர்க்கவும்"
+    "prReviewAttributionSubtitle": "நீங்கள் ஒரு மதிப்பாய்வை சமர்ப்பிக்கும்போது Reviewed via Kilo அடிக்குறிப்பைச் சேர்க்கவும்",
+    "returnSendsMessage": "திரும்பு விசை செய்தியை அனுப்பும்",
+    "returnSendsMessageSubtitle": "முடக்கப்பட்டால், திரும்பு விசை முகவர்களின் செய்தி உள்ளீடுகளில் புதிய வரியைச் செருகும்."
   },
   "prReview": {
     "pullRequestUnavailable": "இழுப்பு கோரிக்கை கிடைக்கவில்லை",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "இந்த அமர்வு கோப்புகளைப் பெற முடியாது. உங்கள் செய்தியை அனுப்ப இணைப்புகளை அகற்றவும்.",
       "couldNotAttachFiles": "கோப்புகளை இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்க அனுப்பு என்பதைத் தட்டவும்.",
       "discardAttachmentsMessage": "அனுப்பிய செய்திகளில் இணைக்கப்படாத பதிவேற்றங்கள் நீக்கப்படும்.",
-      "discardAttachmentsTitle": "இணைப்புகளை நிராகரிக்கவா?"
+      "discardAttachmentsTitle": "இணைப்புகளை நிராகரிக்கவா?",
+      "charactersRemaining": "{{count}} எழுத்துகள் மீதமுள்ளன",
+      "insertNewline": "புதிய வரியைச் செருகவும்",
+      "starterChipBuild": "ஓர் அம்சத்தை உருவாக்கவும்",
+      "starterChipEmpty": "ஓர் யோசனையுடன் தொடங்கவும்",
+      "starterChipFix": "ஒரு பிழையைச் சரிசெய்யவும்",
+      "starterChipPrepare": "எனது சூழலை அமைக்கவும்",
+      "starterChipWrapUp": "எனது அமர்வை முடிக்கவும்",
+      "starterChipWriteTests": "சோதனைகளை எழுதவும்"
     },
     "chatLink": {
       "linkCopied": "இணைப்பு நகலெடுக்கப்பட்டது",

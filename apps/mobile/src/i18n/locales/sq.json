@@ -152,7 +152,9 @@
     "appearanceDark": "E errët",
     "account": "Llogaria",
     "prReviewAttribution": "Shtoni atributin e aplikacionit në rishikimet PR",
-    "prReviewAttributionSubtitle": "Shtoni një fundshënim \"Reviewed via Kilo\" kur paraqisni një rishikim."
+    "prReviewAttributionSubtitle": "Shtoni një fundshënim \"Reviewed via Kilo\" kur paraqisni një rishikim.",
+    "returnSendsMessage": "Tasti i kthimit dërgon mesazhin",
+    "returnSendsMessageSubtitle": "Kur çaktivizohet, tasti i kthimit shton një rresht të ri në fushat e mesazheve të agjentëve."
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa e tërheqjes e padisponueshme",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Kjo seancë nuk mund të marrë skedarë. Hiqni bashkëngjitjet për të dërguar mesazhin tuaj.",
       "couldNotAttachFiles": "Skedarët nuk u bashkëngjitën. Prekni Dërgo për të riprovuar.",
       "discardAttachmentsMessage": "Skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
-      "discardAttachmentsTitle": "Të hiqen bashkëngjitjet?"
+      "discardAttachmentsTitle": "Të hiqen bashkëngjitjet?",
+      "charactersRemaining": "Mbeten {{count}} karaktere",
+      "insertNewline": "Shtoni një rresht të ri",
+      "starterChipBuild": "Krijoni një veçori",
+      "starterChipEmpty": "Filloni me një ide",
+      "starterChipFix": "Rregulloni një gabim",
+      "starterChipPrepare": "Konfiguroni mjedisin tim",
+      "starterChipWrapUp": "Përfundoni seancën time",
+      "starterChipWriteTests": "Shkruani teste"
     },
     "chatLink": {
       "linkCopied": "Lidhja u kopjua",

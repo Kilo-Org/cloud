@@ -152,7 +152,9 @@
     "appearanceDark": "Tywyll",
     "account": "Cyfrif",
     "prReviewAttribution": "Ychwanegu priodoli ap at adolygiadau PR",
-    "prReviewAttributionSubtitle": "Atodwch droedyn 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno adolygiad"
+    "prReviewAttributionSubtitle": "Atodwch droedyn 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno adolygiad",
+    "returnSendsMessage": "Mae'r fysell Dychwelyd yn anfon neges",
+    "returnSendsMessageSubtitle": "Pan fydd wedi'i ddiffodd, mae Dychwelyd yn mewnosod llinell newydd ym meysydd mewnbwn neges asiantau."
   },
   "prReview": {
     "pullRequestUnavailable": "Ni ellir cael y cais tynnu",
@@ -2662,7 +2664,15 @@
       "cannotReceiveFiles": "Ni all y sesiwn hon dderbyn ffeiliau. Dileuwch yr atodiadau i anfon eich neges.",
       "couldNotAttachFiles": "Methwyd atodi ffeiliau. Tapiwch anfon i geisio eto.",
       "discardAttachmentsMessage": "Bydd ffeiliau wedi'u huwchlwytho nad ydynt wedi'u hatodi i negeseuon a anfonwyd yn cael eu dileu.",
-      "discardAttachmentsTitle": "Taflu atodiadau?"
+      "discardAttachmentsTitle": "Taflu atodiadau?",
+      "charactersRemaining": "{{count}} nod yn weddill",
+      "insertNewline": "Mewnosod llinell newydd",
+      "starterChipBuild": "Adeiladu nodwedd",
+      "starterChipEmpty": "Dechrau gyda syniad",
+      "starterChipFix": "Trwsio nam",
+      "starterChipPrepare": "Gosod fy amgylchedd",
+      "starterChipWrapUp": "Gorffen fy sesiwn",
+      "starterChipWriteTests": "Ysgrifennu profion"
     },
     "chatLink": {
       "linkCopied": "Copïwyd y ddolen",

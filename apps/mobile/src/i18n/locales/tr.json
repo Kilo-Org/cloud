@@ -152,7 +152,9 @@
     "appearanceDark": "Koyu",
     "account": "Hesap",
     "prReviewAttribution": "PR incelemelerine uygulama atfı ekle",
-    "prReviewAttributionSubtitle": "İnceleme gönderdiğinde 'Kilo ile incelendi' alt bilgisi ekle"
+    "prReviewAttributionSubtitle": "İnceleme gönderdiğinde 'Kilo ile incelendi' alt bilgisi ekle",
+    "returnSendsMessage": "Enter tuşu mesaj gönderir",
+    "returnSendsMessageSubtitle": "Kapalıyken Enter tuşu, ajan mesaj giriş alanlarına yeni satır ekler."
   },
   "notifications": {
     "title": "Bildirimler",
@@ -2132,7 +2134,15 @@
       "cannotReceiveFiles": "Bu oturum dosya alamaz. Mesajınızı göndermek için ekleri kaldırın.",
       "couldNotAttachFiles": "Dosyalar eklenemedi. Yeniden denemek için Gönder’e dokunun.",
       "discardAttachmentsMessage": "Gönderilen mesajlara eklenmemiş yüklemeler silinecek.",
-      "discardAttachmentsTitle": "Ekler silinsin mi?"
+      "discardAttachmentsTitle": "Ekler silinsin mi?",
+      "charactersRemaining": "{{count}} karakter kaldı",
+      "insertNewline": "Yeni satır ekleyin",
+      "starterChipBuild": "Bir özellik geliştirin",
+      "starterChipEmpty": "Bir fikirle başlayın",
+      "starterChipFix": "Bir hatayı düzeltin",
+      "starterChipPrepare": "Ortamımı kurun",
+      "starterChipWrapUp": "Oturumumu tamamlayın",
+      "starterChipWriteTests": "Testler yazın"
     },
     "chatLink": {
       "linkCopied": "Bağlantı kopyalandı",

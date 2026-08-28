@@ -747,6 +747,33 @@ describe('restoreFileParts — cancel/restore re-send admission', () => {
     expect(hookApi().attachments).toHaveLength(0);
     renderer.unmount();
   });
+
+  it('replaces occupied-composer chips with the restored set instead of merging', async () => {
+    const renderer = await mountHook();
+    // Seed an occupied composer with an existing chip.
+    await act(async () => {
+      hookApi().restoreChips([makeAttachment({ id: 'existing', filename: 'existing.pdf' })]);
+      await settle();
+    });
+    expect(hookApi().attachments.map(item => item.filename)).toEqual(['existing.pdf']);
+
+    const restoredName = '8f14e45f-ceea-4b2a-8c6d-1a2b3c4d5e6f.pdf';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: restoredName,
+          mime: 'application/pdf',
+          url: `file:///tmp/attachments/session-1/user-1/msg-uuid-1/${restoredName}`,
+        },
+      ]);
+      await settle();
+    });
+
+    // The restored set replaces the seeded chip: no merge, no cap overrun.
+    expect(hookApi().attachments.map(item => item.filename)).toEqual([restoredName]);
+    expect(hookApi().attachments[0]?.id).not.toBe('existing');
+    renderer.unmount();
+  });
 });
 
 describe('useAgentAttachmentUpload — attachment reorder (attachment reorder)', () => {
@@ -1168,6 +1195,46 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     expect(hoisted.announcingToastError).not.toHaveBeenCalled();
     expect(hookApi().attachments).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('never announces or writes back a chip discarded by restoreFileParts', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    const discardedId = hookApi().attachments[0]?.id;
+    if (!discardedId) {
+      throw new Error('attachment id missing');
+    }
+    expect(hookApi().attachments[0]?.status).toBe('uploading');
+
+    const restoredName = '8f14e45f-ceea-4b2a-8c6d-1a2b3c4d5e6f.pdf';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: restoredName,
+          mime: 'application/pdf',
+          url: `file:///tmp/attachments/session-1/user-1/msg-uuid-1/${restoredName}`,
+        },
+      ]);
+      await settle();
+    });
+
+    // Restore replaces the occupied chip and cancels its in-flight upload.
+    expect(hookApi().attachments.map(item => item.filename)).toEqual([restoredName]);
+    expect(hookApi().attachments[0]?.id).not.toBe(discardedId);
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+
+    // The stale upload later resolves: it must not announce, toast, or write
+    // the discarded chip back into the attachments list.
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
+    expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    expect(hookApi().attachments.map(item => item.filename)).toEqual([restoredName]);
+    expect(hookApi().attachments.map(item => item.id)).not.toContain(discardedId);
     renderer.unmount();
   });
 

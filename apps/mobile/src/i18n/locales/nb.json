@@ -152,7 +152,9 @@
     "appearanceDark": "Mørk",
     "account": "Konto",
     "prReviewAttribution": "Legg til appattribusjon i PR-anmeldelser",
-    "prReviewAttributionSubtitle": "Legg til en «Anmeldt via Kilo»-bunntekst når du sender inn en anmeldelse."
+    "prReviewAttributionSubtitle": "Legg til en «Anmeldt via Kilo»-bunntekst når du sender inn en anmeldelse.",
+    "returnSendsMessage": "Returtasten sender meldingen",
+    "returnSendsMessageSubtitle": "Når dette er av, setter returtasten inn et linjeskift i agentenes meldingsfelt."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgjengelig",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Denne økten kan ikke motta filer. Fjern vedleggene for å sende meldingen din.",
       "couldNotAttachFiles": "Kunne ikke legge til filer. Trykk send for å prøve igjen.",
       "discardAttachmentsMessage": "Opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",
-      "discardAttachmentsTitle": "Forkaste vedlegg?"
+      "discardAttachmentsTitle": "Forkaste vedlegg?",
+      "charactersRemaining": "{{count}} tegn igjen",
+      "insertNewline": "Sett inn linjeskift",
+      "starterChipBuild": "Lag en funksjon",
+      "starterChipEmpty": "Start med en idé",
+      "starterChipFix": "Fiks en feil",
+      "starterChipPrepare": "Sett opp miljøet mitt",
+      "starterChipWrapUp": "Avslutt økten min",
+      "starterChipWriteTests": "Skriv tester"
     },
     "chatLink": {
       "linkCopied": "Lenke kopiert",

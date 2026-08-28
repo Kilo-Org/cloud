@@ -152,7 +152,9 @@
     "appearanceDark": "تاریک",
     "account": "اکاؤنٹ",
     "prReviewAttribution": "PR جائزوں میں ایپ انتساب شامل کریں",
-    "prReviewAttributionSubtitle": "جائزہ جمع کرتے وقت Reviewed via Kilo فوٹر جوڑیں۔"
+    "prReviewAttributionSubtitle": "جائزہ جمع کرتے وقت Reviewed via Kilo فوٹر جوڑیں۔",
+    "returnSendsMessage": "ریٹرن کلید پیغام بھیجتی ہے",
+    "returnSendsMessageSubtitle": "بند ہونے پر، ریٹرن ایجنٹ کے پیغام لکھنے کے خانوں میں نئی سطر داخل کرتی ہے۔"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "یہ سیشن فائلیں وصول نہیں کر سکتا۔ اپنا پیغام بھیجنے کے لیے اٹیچمنٹ ہٹائیں۔",
       "couldNotAttachFiles": "فائلیں منسلک نہیں ہو سکیں۔ دوبارہ کوشش کے لیے بھیجنے پر تھپتھپائیں۔",
       "discardAttachmentsMessage": "بھیجے گئے پیغامات سے غیر منسلک اپ لوڈز حذف ہو جائیں گے۔",
-      "discardAttachmentsTitle": "اٹیچمنٹس ضائع کریں؟"
+      "discardAttachmentsTitle": "اٹیچمنٹس ضائع کریں؟",
+      "charactersRemaining": "{{count}} حروف باقی ہیں",
+      "insertNewline": "نئی سطر داخل کریں",
+      "starterChipBuild": "ایک فیچر بنائیں",
+      "starterChipEmpty": "ایک خیال سے شروع کریں",
+      "starterChipFix": "ایک خرابی درست کریں",
+      "starterChipPrepare": "میرا ماحول ترتیب دیں",
+      "starterChipWrapUp": "میرا سیشن مکمل کریں",
+      "starterChipWriteTests": "ٹیسٹ لکھیں"
     },
     "chatLink": {
       "linkCopied": "لنک کاپی ہو گیا",

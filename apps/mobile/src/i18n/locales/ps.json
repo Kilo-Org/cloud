@@ -152,7 +152,9 @@
     "appearanceDark": "تیاره",
     "account": "حساب",
     "prReviewAttribution": "د PR بیاکتنو ته د ایپ انتساب اضافه کړئ",
-    "prReviewAttributionSubtitle": "کله چې تاسو یوه بیاکتنه وړاندې کوئ، د Reviewed via Kilo فوټر اضافه کړئ."
+    "prReviewAttributionSubtitle": "کله چې تاسو یوه بیاکتنه وړاندې کوئ، د Reviewed via Kilo فوټر اضافه کړئ.",
+    "returnSendsMessage": "د بېرته ستنېدو کیلي پیغام لېږي",
+    "returnSendsMessageSubtitle": "کله چې بند وي، د بېرته ستنېدو کیلي د ایجنټ د پیغام لیکلو په ځایونو کې نوې کرښه دننه کوي."
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ شتون نلري",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "دا غونډه فایلونه نه شي ترلاسه کولای. د پیغام لیږلو لپاره ضمیمې لرې کړئ.",
       "couldNotAttachFiles": "فایلونه ونه لګېدل. د بیا هڅې لپاره لیږل ټایپ کړئ.",
       "discardAttachmentsMessage": "هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي.",
-      "discardAttachmentsTitle": "ضمیمې لغوه کړئ؟"
+      "discardAttachmentsTitle": "ضمیمې لغوه کړئ؟",
+      "charactersRemaining": "{{count}} توري پاتې دي",
+      "insertNewline": "نوې کرښه دننه کړئ",
+      "starterChipBuild": "یوه ځانګړتیا جوړه کړئ",
+      "starterChipEmpty": "له یوې مفکورې پیل وکړئ",
+      "starterChipFix": "یوه تېروتنه سمه کړئ",
+      "starterChipPrepare": "زما چاپېریال چمتو کړئ",
+      "starterChipWrapUp": "زما ناسته پای ته ورسوئ",
+      "starterChipWriteTests": "ازموینې ولیکئ"
     },
     "chatLink": {
       "linkCopied": "لینک کاپي شو",

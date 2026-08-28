@@ -152,7 +152,9 @@
     "appearanceDark": "Escuro",
     "account": "Conta",
     "prReviewAttribution": "Engadir atribución da app ás revisións de PR",
-    "prReviewAttributionSubtitle": "Engade un pé de páxina \"Reviewed via Kilo\" cando envíes unha revisión."
+    "prReviewAttributionSubtitle": "Engade un pé de páxina \"Reviewed via Kilo\" cando envíes unha revisión.",
+    "returnSendsMessage": "A tecla Intro envía a mensaxe",
+    "returnSendsMessageSubtitle": "Cando está desactivado, Intro insire un salto de liña nos campos de mensaxe dos axentes."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request non dispoñible",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Esta sesión non pode recibir ficheiros. Elimina os anexos para enviar a túa mensaxe.",
       "couldNotAttachFiles": "Non se puideron anexar os ficheiros. Toca enviar para reintentar.",
       "discardAttachmentsMessage": "Eliminaranse os arquivos subidos que non estean anexados a mensaxes enviadas.",
-      "discardAttachmentsTitle": "Descartar os anexos?"
+      "discardAttachmentsTitle": "Descartar os anexos?",
+      "charactersRemaining": "Quedan {{count}} caracteres",
+      "insertNewline": "Inserir un salto de liña",
+      "starterChipBuild": "Crear unha funcionalidade",
+      "starterChipEmpty": "Comezar cunha idea",
+      "starterChipFix": "Corrixir un erro",
+      "starterChipPrepare": "Configurar o meu ambiente",
+      "starterChipWrapUp": "Rematar a miña sesión",
+      "starterChipWriteTests": "Escribir probas"
     },
     "chatLink": {
       "linkCopied": "Ligazón copiada",

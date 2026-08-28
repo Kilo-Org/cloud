@@ -6,7 +6,17 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { Text as renderText } from '@/components/ui/text';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type ChatComposer } from './chat-composer';
+
+const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const TEXT_DIRECTIONS = [
+  { direction: 'LTR', isRTL: false, style: undefined },
+  { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }, undefined] },
+];
+
+vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
 
 // The composer's uncontrolled input is covered by Appium E2E; this suite pins
 // the draft-restore contract that a native E2E cannot easily prove: a restored
@@ -23,6 +33,12 @@ const onSendMock = vi.fn(async () => undefined);
 // re-render (`rerender`) with the refs — the composer's live text and its
 // applied-draft flag — intact, and start a fresh instance with `mount`.
 const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor: 0 }));
+// `useState` is stateful per call-order slot (mirroring `refSlots`) so the
+// starter/`hasText` gating can be observed across a re-render, not just the
+// mount-time initial value.
+const stateSlots = vi.hoisted(() => ({ slots: [] as { value: unknown }[], cursor: 0 }));
+const returnSendsPref = vi.hoisted(() => ({ returnSendsMessage: false }));
+const reducedMotionOn = vi.hoisted(() => ({ value: false }));
 
 // The strip wire-lock test asserts the composer forwards the upload hook's
 // move/reorder callbacks by identity, so both mocks must be hoisted and shared.
@@ -34,6 +50,7 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
+    useContext: vi.fn(() => undefined),
     useEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
@@ -45,7 +62,18 @@ vi.mock('react', async () => {
       refSlots.slots[index] ??= { current: initial };
       return refSlots.slots[index] as React.RefObject<T>;
     }),
-    useState: vi.fn(<T>(initial: T) => [initial, vi.fn() as () => void] as [T, (value: T) => void]),
+    useState: vi.fn(<T>(initial: T) => {
+      const index = stateSlots.cursor;
+      stateSlots.cursor += 1;
+      const slot = (stateSlots.slots[index] ??= { value: initial as unknown });
+      return [
+        slot.value as T,
+        (next: T | ((prev: T) => T)) => {
+          slot.value =
+            typeof next === 'function' ? (next as (prev: T) => T)(slot.value as T) : next;
+        },
+      ] as [T, (value: T | ((prev: T) => T)) => void];
+    }),
   };
 });
 
@@ -54,9 +82,20 @@ vi.mock('react-native', () => ({
   AppState: {
     addEventListener: () => ({ remove: vi.fn() }),
   },
-  Keyboard: { dismiss: vi.fn() },
+  Keyboard: {
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+    dismiss: vi.fn(),
+  },
+  I18nManager: layoutDirection,
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  Text: 'Text',
+  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
   View: 'View',
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -92,6 +131,7 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useReducedMotion: () => reducedMotionOn.value,
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -261,6 +301,14 @@ vi.mock('@/lib/voice-input/voice-input-draft', () => ({
   applyVoiceDraftToInput: vi.fn(),
 }));
 
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: returnSendsPref.returnSendsMessage,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
+  }),
+}));
+
 type ComposerProps = Parameters<typeof ChatComposer>[0];
 
 function makeProps(overrides: Partial<ComposerProps> = {}): ComposerProps {
@@ -337,13 +385,46 @@ function requireInputRowOnChangeText(render: React.ReactElement): (text: string)
   return onChangeText;
 }
 
+function findNode(
+  node: Node,
+  predicate: (type: unknown, props: Record<string, unknown>) => boolean
+): { type: unknown; props: Record<string, unknown> } | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const { type, props } = node as { type?: unknown; props?: Record<string, unknown> };
+  if (props !== undefined && predicate(type, props)) {
+    return { type, props };
+  }
+  if (type === renderText && props !== undefined) {
+    return findNode(renderText(props as React.ComponentProps<typeof renderText>), predicate);
+  }
+  const children = props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findNode(child as Node, predicate);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+function findStarterChip(render: React.ReactElement, label: string) {
+  return findNode(
+    render,
+    (type, props) => type === 'Pressable' && props.accessibilityLabel === label
+  );
+}
+
 async function mount(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.slots.length = 0;
+  stateSlots.slots.length = 0;
   return rerender(props);
 }
 
 async function rerender(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.cursor = 0;
+  stateSlots.cursor = 0;
   const { ChatComposer } = await import('./chat-composer');
   return ChatComposer(props);
 }
@@ -358,6 +439,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   refSlots.slots.length = 0;
   refSlots.cursor = 0;
+  stateSlots.slots.length = 0;
+  stateSlots.cursor = 0;
+  returnSendsPref.returnSendsMessage = false;
+  reducedMotionOn.value = false;
+  layoutDirection.isRTL = false;
 });
 
 // The restore contract has one axis: whether the host resolved a draft. Both
@@ -437,6 +523,121 @@ describe('ChatComposer draft restore', () => {
       submission: undefined,
       onOptimisticSend: expect.any(Function),
     });
+  });
+});
+describe('ChatComposer return-sends wiring', () => {
+  it('wires the return-sends preference and an insert-newline handler to the input row', async () => {
+    returnSendsPref.returnSendsMessage = true;
+    const withReturnSend = findInputRowProps(await mount(makeProps({})));
+    expect(withReturnSend?.returnSendsMessage).toBe(true);
+    expect(typeof withReturnSend?.onInsertNewline).toBe('function');
+
+    returnSendsPref.returnSendsMessage = false;
+    const withNewline = findInputRowProps(await mount(makeProps({})));
+    expect(withNewline?.returnSendsMessage).toBe(false);
+  });
+
+  it('inserts a newline into the draft without submitting', async () => {
+    returnSendsPref.returnSendsMessage = true;
+    const render = await mount(makeProps({}));
+    const rowProps = findInputRowProps(render);
+    const onInsertNewline = rowProps?.onInsertNewline as (() => void) | undefined;
+    if (onInsertNewline === undefined) {
+      throw new Error('ChatComposerInputRow element did not carry an onInsertNewline handler');
+    }
+
+    onInsertNewline();
+
+    expect(refSlots.slots[0]?.current).toBe('\n');
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChatComposer starter chips', () => {
+  it('hides starters once the input holds text', async () => {
+    const render = await mount(makeProps({}));
+    expect(findStarterChip(render, 'Build a feature')).not.toBeNull();
+
+    requireInputRowOnChangeText(render)('typed text');
+    await settle();
+
+    const rerendered = await rerender(makeProps({}));
+    expect(findStarterChip(rerendered, 'Build a feature')).toBeNull();
+  });
+
+  it.each(TEXT_DIRECTIONS)(
+    'preserves starter text and inserts it without submitting in $direction',
+    async ({ isRTL, style }) => {
+      layoutDirection.isRTL = isRTL;
+      const render = await mount(makeProps({}));
+      const chip = findStarterChip(render, 'Build a feature');
+      if (!chip) {
+        throw new Error('starter chip not found');
+      }
+      expect(findNode(chip, type => type === 'Text')?.props).toMatchObject({
+        children: 'Build a feature',
+        className: 'text-sm font-normal text-muted-foreground',
+        style,
+      });
+      const onPress = chip.props.onPress as (() => void) | undefined;
+      if (!onPress) {
+        throw new Error('starter chip missing onPress');
+      }
+
+      onPress();
+      await settle();
+
+      expect(refSlots.slots[0]?.current).toBe('Build a feature');
+      expect(onSendMock).not.toHaveBeenCalled();
+    }
+  );
+});
+
+describe('ChatComposer counter', () => {
+  it.each(TEXT_DIRECTIONS)(
+    'shows the remaining-character counter only once the draft nears the limit in $direction',
+    async ({ isRTL, style }) => {
+      layoutDirection.isRTL = isRTL;
+      const render = await mount(makeProps({}));
+      expect(
+        findNode(render, (type, props) => type === 'Text' && typeof props.children === 'number')
+      ).toBeNull();
+
+      requireInputRowOnChangeText(render)('hello');
+      await settle();
+      expect(
+        findNode(
+          await rerender(makeProps({})),
+          (type, props) => type === 'Text' && typeof props.children === 'number'
+        )
+      ).toBeNull();
+
+      requireInputRowOnChangeText(render)('x'.repeat(CLOUD_AGENT_PROMPT_MAX_LENGTH - 5));
+      await settle();
+
+      const rerendered = await rerender(makeProps({}));
+      const counter = findNode(
+        rerendered,
+        (type, props) => type === 'Text' && props.children === 5
+      );
+      expect(counter).not.toBeNull();
+      expect(counter?.props).toMatchObject({
+        accessibilityLabel: '5 characters remaining',
+        className: 'text-xs font-normal text-muted-foreground',
+        style,
+      });
+    }
+  );
+});
+
+describe('ChatComposer reduced motion', () => {
+  it('drops the toolbar entrance animation under reduced motion', async () => {
+    reducedMotionOn.value = true;
+    const render = await mount(makeProps({}));
+
+    const toolbarView = findNode(render, type => type === 'Animated.View');
+    expect(toolbarView).not.toBeNull();
+    expect(toolbarView?.props.entering).toBeUndefined();
   });
 });
 

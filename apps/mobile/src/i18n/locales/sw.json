@@ -152,7 +152,9 @@
     "appearanceDark": "Nyeusi",
     "account": "Akaunti",
     "prReviewAttribution": "Ongeza sifa ya app kwenye ukaguzi wa PR",
-    "prReviewAttributionSubtitle": "Ongeza 'Reviewed via Kilo' kwenye sehemu ya chini unapowasilisha ukaguzi."
+    "prReviewAttributionSubtitle": "Ongeza 'Reviewed via Kilo' kwenye sehemu ya chini unapowasilisha ukaguzi.",
+    "returnSendsMessage": "Kitufe cha kurudi hutuma ujumbe",
+    "returnSendsMessageSubtitle": "Kikiwa kimezimwa, kitufe cha kurudi huingiza mstari mpya kwenye sehemu za kuandika ujumbe kwa mawakala."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request haipatikani",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Kikao hiki hakiwezi kupokea faili. Ondoa viambatisho ili utume ujumbe wako.",
       "couldNotAttachFiles": "Haikuweza kuambatisha faili. Gusa tuma ili ujaribu tena.",
       "discardAttachmentsMessage": "Faili zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa.",
-      "discardAttachmentsTitle": "Tupa viambatisho?"
+      "discardAttachmentsTitle": "Tupa viambatisho?",
+      "charactersRemaining": "Herufi {{count}} zimesalia",
+      "insertNewline": "Ingiza mstari mpya",
+      "starterChipBuild": "Unda kipengele",
+      "starterChipEmpty": "Anza na wazo",
+      "starterChipFix": "Rekebisha hitilafu",
+      "starterChipPrepare": "Sanidi mazingira yangu",
+      "starterChipWrapUp": "Kamilisha kikao changu",
+      "starterChipWriteTests": "Andika majaribio"
     },
     "chatLink": {
       "linkCopied": "Kiungo kimenakiliwa",

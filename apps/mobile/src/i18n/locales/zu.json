@@ -152,7 +152,9 @@
     "appearanceDark": "Ubumnyama",
     "account": "Akhawunti",
     "prReviewAttribution": "Engeza ukukhonjwa kohlelo lokusebenza ezibuyekezweni ze-PR",
-    "prReviewAttributionSubtitle": "Engeza umugqa 'Reviewed via Kilo' uma uthumela isibuyekezo."
+    "prReviewAttributionSubtitle": "Engeza umugqa 'Reviewed via Kilo' uma uthumela isibuyekezo.",
+    "returnSendsMessage": "Ukhiye wokubuyela uthumela umlayezo",
+    "returnSendsMessageSubtitle": "Uma kuvaliwe, ukhiye wokubuyela ufaka umugqa omusha kuma-composer ama-ejenti."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokudonsa asitholakali",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Lesi seshini asikwazi ukwamukela amafayela. Susa okunamathiselwe ukuze uthumele umlayezo wakho.",
       "couldNotAttachFiles": "Asikwazanga ukunamathisela amafayela. Thepha thumela ukuzama futhi.",
       "discardAttachmentsMessage": "Amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa.",
-      "discardAttachmentsTitle": "Lahla okunamathiselwe?"
+      "discardAttachmentsTitle": "Lahla okunamathiselwe?",
+      "charactersRemaining": "Kusele izinhlamvu ezingu-{{count}}",
+      "insertNewline": "Faka umugqa omusha",
+      "starterChipBuild": "Yakha isici",
+      "starterChipEmpty": "Qala ngombono",
+      "starterChipFix": "Lungisa iphutha",
+      "starterChipPrepare": "Setha imvelo yami",
+      "starterChipWrapUp": "Phetha iseshini yami",
+      "starterChipWriteTests": "Bhala izivivinyo"
     },
     "chatLink": {
       "linkCopied": "Isixhumanisi sikopiwe",

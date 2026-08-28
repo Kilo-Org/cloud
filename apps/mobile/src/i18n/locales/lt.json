@@ -152,7 +152,9 @@
     "appearanceDark": "Tamsi",
     "account": "Paskyra",
     "prReviewAttribution": "Pridėti programėlės atribuciją prie PR peržiūrų",
-    "prReviewAttributionSubtitle": "Kai pateikiate peržiūrą, apačioje pridėkite poraštę „Peržiūrėta per Kilo“."
+    "prReviewAttributionSubtitle": "Kai pateikiate peržiūrą, apačioje pridėkite poraštę „Peržiūrėta per Kilo“.",
+    "returnSendsMessage": "Grįžimo klavišas siunčia žinutę",
+    "returnSendsMessageSubtitle": "Kai išjungta, grįžimo klavišas įterpia naują eilutę agentų žinučių įvesties laukuose."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nepasiekiamas",
@@ -2624,7 +2626,15 @@
       "cannotReceiveFiles": "Ši sesija negali gauti failų. Pašalinkite priedus, kad išsiųstumėte žinutę.",
       "couldNotAttachFiles": "Nepavyko pridėti failų. Bakstelėkite siųsti, kad bandytumėte dar kartą.",
       "discardAttachmentsMessage": "Prie išsiųstų žinučių nepridėtos įkeltos rinkmenos bus ištrintos.",
-      "discardAttachmentsTitle": "Atmesti priedus?"
+      "discardAttachmentsTitle": "Atmesti priedus?",
+      "charactersRemaining": "Liko simbolių: {{count}}",
+      "insertNewline": "Įterpti naują eilutę",
+      "starterChipBuild": "Sukurti funkciją",
+      "starterChipEmpty": "Pradėti nuo idėjos",
+      "starterChipFix": "Ištaisyti klaidą",
+      "starterChipPrepare": "Paruošti mano aplinką",
+      "starterChipWrapUp": "Užbaigti mano sesiją",
+      "starterChipWriteTests": "Parašyti testus"
     },
     "chatLink": {
       "linkCopied": "Nuoroda nukopijuota",

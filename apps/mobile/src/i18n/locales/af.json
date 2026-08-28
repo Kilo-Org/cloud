@@ -152,7 +152,9 @@
     "appearanceDark": "Donker",
     "account": "Rekening",
     "prReviewAttribution": "Voeg app-toeskrywing by PR-hersienings toe",
-    "prReviewAttributionSubtitle": "Voeg 'n \"Reviewed via Kilo\"-voetskrif by wanneer jy 'n hersiening indien"
+    "prReviewAttributionSubtitle": "Voeg 'n \"Reviewed via Kilo\"-voetskrif by wanneer jy 'n hersiening indien",
+    "returnSendsMessage": "Terugkeersleutel stuur boodskap",
+    "returnSendsMessageSubtitle": "Wanneer dit af is, voeg die terugkeersleutel 'n nuwe reël in agente se boodskapinvoer in."
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Hierdie sessie kan nie lêers ontvang nie. Verwyder die aanhegsels om jou boodskap te stuur.",
       "couldNotAttachFiles": "Kon nie lêers aanheg nie. Tik stuur om weer te probeer.",
       "discardAttachmentsMessage": "Opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal verwyder word.",
-      "discardAttachmentsTitle": "Aanhegsels weggooi?"
+      "discardAttachmentsTitle": "Aanhegsels weggooi?",
+      "charactersRemaining": "{{count}} karakters oor",
+      "insertNewline": "Voeg nuwe reël in",
+      "starterChipBuild": "Bou 'n funksie",
+      "starterChipEmpty": "Begin met 'n idee",
+      "starterChipFix": "Maak 'n fout reg",
+      "starterChipPrepare": "Stel my omgewing op",
+      "starterChipWrapUp": "Voltooi my sessie",
+      "starterChipWriteTests": "Skryf toetse"
     },
     "chatLink": {
       "linkCopied": "Skakel gekopieer",

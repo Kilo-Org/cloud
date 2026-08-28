@@ -152,7 +152,9 @@
     "appearanceDark": "गहरा",
     "account": "खाता",
     "prReviewAttribution": "PR समीक्षाओं में ऐप एट्रिब्यूशन जोड़ें",
-    "prReviewAttributionSubtitle": "समीक्षा सबमिट करने पर Reviewed via Kilo फ़ुटर जोड़ें।"
+    "prReviewAttributionSubtitle": "समीक्षा सबमिट करने पर Reviewed via Kilo फ़ुटर जोड़ें।",
+    "returnSendsMessage": "रिटर्न कुंजी संदेश भेजती है",
+    "returnSendsMessageSubtitle": "बंद होने पर, रिटर्न कुंजी एजेंट के संदेश इनपुट में नई पंक्ति डालती है।"
   },
   "notifications": {
     "title": "सूचनाएँ",
@@ -2098,7 +2100,15 @@
       "cannotReceiveFiles": "यह सत्र फ़ाइलें प्राप्त नहीं कर सकता। अपना संदेश भेजने के लिए अटैचमेंट हटाएँ।",
       "couldNotAttachFiles": "फ़ाइलें संलग्न नहीं की जा सकीं। फिर से कोशिश करने के लिए भेजें पर टैप करें।",
       "discardAttachmentsMessage": "भेजे गए संदेशों से न जुड़ी अपलोड की गई फ़ाइलें हटा दी जाएँगी।",
-      "discardAttachmentsTitle": "संलग्नक ख़ारिज करें?"
+      "discardAttachmentsTitle": "संलग्नक ख़ारिज करें?",
+      "charactersRemaining": "{{count}} अक्षर शेष",
+      "insertNewline": "नई पंक्ति डालें",
+      "starterChipBuild": "एक सुविधा बनाएँ",
+      "starterChipEmpty": "एक विचार से शुरू करें",
+      "starterChipFix": "एक त्रुटि ठीक करें",
+      "starterChipPrepare": "मेरा परिवेश तैयार करें",
+      "starterChipWrapUp": "मेरा सत्र समाप्त करें",
+      "starterChipWriteTests": "परीक्षण लिखें"
     },
     "chatLink": {
       "linkCopied": "लिंक कॉपी किया गया",

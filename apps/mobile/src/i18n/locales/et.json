@@ -152,7 +152,9 @@
     "appearanceDark": "Tumedas",
     "account": "Konto",
     "prReviewAttribution": "Lisa rakenduse viide PR-ülevaatustesse",
-    "prReviewAttributionSubtitle": "Kui esitad ülevaate, lisa jalusesse 'Reviewed via Kilo'."
+    "prReviewAttributionSubtitle": "Kui esitad ülevaate, lisa jalusesse 'Reviewed via Kilo'.",
+    "returnSendsMessage": "Sisestusklahv saadab sõnumi",
+    "returnSendsMessageSubtitle": "Kui see on välja lülitatud, lisab sisestusklahv agentide sõnumi sisestusväljadel reavahetuse."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole saadaval",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "See seanss ei saa faile vastu võtta. Sõnumi saatmiseks eemaldage manused.",
       "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puudutage saatmist.",
       "discardAttachmentsMessage": "Üles laaditud failid, mida pole saadetud sõnumitele lisatud, kustutatakse.",
-      "discardAttachmentsTitle": "Kas loobuda manustest?"
+      "discardAttachmentsTitle": "Kas loobuda manustest?",
+      "charactersRemaining": "{{count}} tähemärki jäänud",
+      "insertNewline": "Lisage reavahetus",
+      "starterChipBuild": "Looge funktsioon",
+      "starterChipEmpty": "Alustage ideest",
+      "starterChipFix": "Parandage viga",
+      "starterChipPrepare": "Seadistage minu keskkond",
+      "starterChipWrapUp": "Lõpetage minu seanss",
+      "starterChipWriteTests": "Kirjutage testid"
     },
     "chatLink": {
       "linkCopied": "Link kopeeritud",

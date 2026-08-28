@@ -152,7 +152,9 @@
     "appearanceDark": "داكن",
     "account": "الحساب",
     "prReviewAttribution": "أضِف إسناد التطبيق إلى مراجعات PR",
-    "prReviewAttributionSubtitle": "ألحق تذييل \"تمت المراجعة عبر Kilo\" عند إرسال مراجعة."
+    "prReviewAttributionSubtitle": "ألحق تذييل \"تمت المراجعة عبر Kilo\" عند إرسال مراجعة.",
+    "returnSendsMessage": "مفتاح الإدخال يرسل الرسالة",
+    "returnSendsMessageSubtitle": "عند إيقاف هذا الخيار، يُدرج مفتاح الإدخال سطرًا جديدًا في حقول إدخال رسائل الوكلاء."
   },
   "notifications": {
     "title": "الإشعارات",
@@ -2180,7 +2182,15 @@
       "cannotReceiveFiles": "لا يمكن لهذه الجلسة استقبال الملفات. أزل المرفقات لإرسال رسالتك.",
       "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى.",
       "discardAttachmentsMessage": "سيتم حذف الملفات المرفوعة غير المرفقة برسائل مرسلة.",
-      "discardAttachmentsTitle": "تجاهل المرفقات؟"
+      "discardAttachmentsTitle": "تجاهل المرفقات؟",
+      "charactersRemaining": "الأحرف المتبقية: {{count}}",
+      "insertNewline": "إدراج سطر جديد",
+      "starterChipBuild": "إنشاء ميزة",
+      "starterChipEmpty": "البدء بفكرة",
+      "starterChipFix": "إصلاح خلل",
+      "starterChipPrepare": "إعداد بيئتي",
+      "starterChipWrapUp": "إنهاء جلستي",
+      "starterChipWriteTests": "كتابة اختبارات"
     },
     "chatLink": {
       "linkCopied": "تم نسخ الرابط",

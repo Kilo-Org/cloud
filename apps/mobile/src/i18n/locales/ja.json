@@ -152,7 +152,9 @@
     "appearanceDark": "ダーク",
     "account": "アカウント",
     "prReviewAttribution": "PRレビューにアプリの帰属を追加",
-    "prReviewAttributionSubtitle": "レビューを送信すると、Reviewed via Kiloフッターが追加されます。"
+    "prReviewAttributionSubtitle": "レビューを送信すると、Reviewed via Kiloフッターが追加されます。",
+    "returnSendsMessage": "リターンキーでメッセージを送信",
+    "returnSendsMessageSubtitle": "オフの場合、リターンキーでエージェントのメッセージ入力欄に改行を挿入します。"
   },
   "notifications": {
     "title": "通知",
@@ -2132,7 +2134,15 @@
       "cannotReceiveFiles": "このセッションはファイルを受信できません。メッセージを送信するには添付ファイルを削除してください。",
       "couldNotAttachFiles": "ファイルを添付できませんでした。再試行するには送信をタップしてください。",
       "discardAttachmentsMessage": "送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
-      "discardAttachmentsTitle": "添付ファイルを破棄しますか？"
+      "discardAttachmentsTitle": "添付ファイルを破棄しますか？",
+      "charactersRemaining": "残り{{count}}文字",
+      "insertNewline": "改行を挿入",
+      "starterChipBuild": "機能を作成",
+      "starterChipEmpty": "アイデアから開始",
+      "starterChipFix": "バグを修正",
+      "starterChipPrepare": "環境をセットアップ",
+      "starterChipWrapUp": "セッションをまとめる",
+      "starterChipWriteTests": "テストを作成"
     },
     "chatLink": {
       "linkCopied": "リンクをコピーしました",

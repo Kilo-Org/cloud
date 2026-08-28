@@ -152,7 +152,9 @@
     "appearanceDark": "ডার্ক",
     "account": "অ্যাকাউন্ট",
     "prReviewAttribution": "PR পর্যালোচনায় অ্যাপ অ্যাট্রিবিউশন যোগ করুন",
-    "prReviewAttributionSubtitle": "আপনি একটি পর্যালোচনা জমা দিলে একটি Reviewed via Kilo ফুটার যুক্ত করুন।"
+    "prReviewAttributionSubtitle": "আপনি একটি পর্যালোচনা জমা দিলে একটি Reviewed via Kilo ফুটার যুক্ত করুন।",
+    "returnSendsMessage": "রিটার্ন কী বার্তা পাঠায়",
+    "returnSendsMessageSubtitle": "বন্ধ থাকলে, রিটার্ন কী এজেন্টের বার্তা লেখার ঘরে নতুন লাইন যোগ করে।"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট অনুপলব্ধ",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "এই সেশনটি ফাইল গ্রহণ করতে পারে না। আপনার বার্তা পাঠাতে সংযুক্তিগুলি সরান।",
       "couldNotAttachFiles": "ফাইল সংযুক্ত করা যায়নি। আবার চেষ্টা করতে পাঠান ট্যাপ করুন।",
       "discardAttachmentsMessage": "পাঠানো বার্তায় সংযুক্ত নয় এমন আপলোড করা ফাইলগুলি মুছে ফেলা হবে।",
-      "discardAttachmentsTitle": "সংযুক্তিগুলি বাতিল করবেন?"
+      "discardAttachmentsTitle": "সংযুক্তিগুলি বাতিল করবেন?",
+      "charactersRemaining": "{{count}}টি অক্ষর বাকি",
+      "insertNewline": "নতুন লাইন যোগ করুন",
+      "starterChipBuild": "একটি ফিচার তৈরি করুন",
+      "starterChipEmpty": "একটি ধারণা দিয়ে শুরু করুন",
+      "starterChipFix": "একটি ত্রুটি ঠিক করুন",
+      "starterChipPrepare": "আমার পরিবেশ প্রস্তুত করুন",
+      "starterChipWrapUp": "আমার সেশন শেষ করুন",
+      "starterChipWriteTests": "পরীক্ষা লিখুন"
     },
     "chatLink": {
       "linkCopied": "লিঙ্ক কপি হয়েছে",

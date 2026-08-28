@@ -25,14 +25,17 @@ import {
   Keyboard,
   type LayoutChangeEvent,
   Platform,
+  Pressable,
   type TextInput,
   type TextInputSelectionChangeEvent,
   type TextStyle,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useNavigation } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
@@ -41,6 +44,7 @@ import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Text } from '@/components/ui/text';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import {
   createMobileSlashCommandList,
@@ -54,14 +58,19 @@ import {
   pasteTextIntoComposer,
 } from '@/components/agents/composer-paste-text';
 import {
+  COMPOSER_CHROME_HEIGHT,
   COMPOSER_INPUT_PADDING_HORIZONTAL,
+  resolveComposerMaxHeight,
   resolveComposerTextContentWidth,
+  SESSION_HEADER_HEIGHT,
   shouldEnableComposerInputScroll,
 } from '@/components/agents/chat-composer-input-height';
 import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
+import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import {
   nextStopRemountPhase,
   type StopRemountPhase,
@@ -108,17 +117,15 @@ import {
 } from '@/lib/voice-input/voice-input-draft';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
-const TEXT_INPUT_MAX_LINES = 5;
 const TEXT_INPUT_LINE_HEIGHT = 20;
 const TEXT_INPUT_VERTICAL_PADDING = 24;
-const TEXT_INPUT_MIN_HEIGHT = TEXT_INPUT_LINE_HEIGHT + TEXT_INPUT_VERTICAL_PADDING;
-const TEXT_INPUT_MAX_HEIGHT =
-  TEXT_INPUT_LINE_HEIGHT * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING;
 const TEXT_INPUT_FONT_SIZE = 16;
 const COMPOSER_FOCUS_RESTORE_DELAY_MS = 100;
 /** Match RNGH pan activeOffsetY / failOffsetX so Android JS path and iOS pan agree. */
 const DISMISS_KEYBOARD_ACTIVE_OFFSET_Y = 24;
 const DISMISS_KEYBOARD_FAIL_OFFSET_X = 16;
+/** Hide the remaining-characters counter until the draft nears the limit. */
+const COMPOSER_COUNTER_VISIBLE_REMAINING = 1000;
 
 type AndroidDismissKeyboardGesture = {
   identifier: string;
@@ -198,9 +205,14 @@ type ChatComposerProps = {
   initialDraft?: string;
   /** Active session id, used to scope the Android picker launch context. */
   sessionId?: string | null;
+  /** Session lifecycle phase; drives contextual starter chips. Defaults to `message`. */
+  sessionState?: ChatComposerSessionState;
   /** Imperative handle the host binds to call `setText`. */
   controlRef?: Ref<ChatComposerControl>;
 };
+
+/** Lifecycle phases that change the composer placeholder and starter chips. */
+export type ChatComposerSessionState = 'empty' | 'preparing' | 'finalizing' | 'message';
 
 export function ChatComposer({
   onSend,
@@ -231,10 +243,15 @@ export function ChatComposer({
   draftKey,
   initialDraft,
   sessionId = null,
+  sessionState = 'message',
   controlRef,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
+  const { height: windowHeight, fontScale } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const { reducedMotion } = useMotionPolicy();
+  const { returnSendsMessage } = useReturnSendsMessagePreference();
   // Draft persistence is fenced on identity: while the user id is unknown,
   // drafts neither save nor flush (the drafts module no-ops on an empty id).
   const { userId } = useCurrentUserId();
@@ -259,6 +276,8 @@ export function ChatComposer({
   const restoreFocusOnActiveRef = useRef(false);
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasText, setHasText] = useState(false);
+  const [characterCount, setCharacterCount] = useState(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
@@ -342,13 +361,43 @@ export function ChatComposer({
     );
   });
 
+  const fontSize = TEXT_INPUT_FONT_SIZE * fontScale;
+  const lineHeight = TEXT_INPUT_LINE_HEIGHT * fontScale;
+  const inputMinHeight = lineHeight + TEXT_INPUT_VERTICAL_PADDING;
+  const inputMaxHeight = resolveComposerMaxHeight({
+    windowHeight,
+    safeAreaInsetTop: insets.top,
+    safeAreaInsetBottom: insets.bottom,
+    keyboardHeight,
+    sessionHeaderHeight: SESSION_HEADER_HEIGHT * fontScale,
+    composerChromeHeight: COMPOSER_CHROME_HEIGHT * fontScale,
+    minHeight: inputMinHeight,
+  });
+
+  // Track the keyboard's reported height so the remaining-space cap follows it.
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, event => {
+      setKeyboardHeight(Math.max(event.endCoordinates.height, 0));
+    });
+    const hide = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   const measure = useTextHeight({
-    minHeight: TEXT_INPUT_MIN_HEIGHT,
-    maxHeight: TEXT_INPUT_MAX_HEIGHT,
+    minHeight: inputMinHeight,
+    maxHeight: inputMaxHeight,
     verticalPadding: TEXT_INPUT_VERTICAL_PADDING,
     textContentWidth: resolveComposerTextContentWidth(inputWidth),
     fontSize: TEXT_INPUT_FONT_SIZE,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
+    fontScale,
   });
   // useTextHeight() returns a new object every render.  Hold the latest
   // measure in a ref so the draft-restore effect only runs after an
@@ -367,6 +416,7 @@ export function ChatComposer({
   composerFrameCoalescerRef.current ??= createFrameCoalescer<string>(value => {
     measureRef.current.setText(value);
     setHasText(value.trim().length > 0);
+    setCharacterCount(value.length);
     setSlashCommandInput(getSlashCommandCandidate(value));
   });
   const composerFrameCoalescer = composerFrameCoalescerRef.current;
@@ -401,6 +451,7 @@ export function ChatComposer({
     });
     selectionRef.current = { start: draft.length, end: draft.length };
     setHasText(draft.trim().length > 0);
+    setCharacterCount(draft.length);
     setSlashCommandInput(getSlashCommandCandidate(draft));
     measureRef.current.setText(draft);
   }, []);
@@ -468,6 +519,7 @@ export function ChatComposer({
     textRef.current = value;
     measure.setText(value);
     setHasText(value.trim().length > 0);
+    setCharacterCount(value.length);
     setSlashCommandInput(null);
     inputRef.current?.setNativeProps({
       text: value,
@@ -692,7 +744,7 @@ export function ChatComposer({
     };
   }, []);
 
-  const inputScrollable = shouldEnableComposerInputScroll(measure.height, TEXT_INPUT_MAX_HEIGHT);
+  const inputScrollable = shouldEnableComposerInputScroll(measure.height, inputMaxHeight);
   const dismissKeyboardPan = useMemo(
     () =>
       // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
@@ -795,6 +847,7 @@ export function ChatComposer({
     composerFrameCoalescer.flush();
     textRef.current = '';
     setHasText(false);
+    setCharacterCount(0);
     setSlashCommandInput(null);
     measure.reset();
     inputRef.current?.clear();
@@ -938,6 +991,45 @@ export function ChatComposer({
     applyComposerText(`/${command.name} `);
   }
 
+  // Visible newline control for the Return-sends preference: inserts `\n` at
+  // the caret the same way the platform paste does, without ever submitting.
+  function handleInsertNewline() {
+    if (sendLockRef.current.isLocked() || !control.inputEditable) {
+      return;
+    }
+    selectionRef.current = pasteTextIntoComposer('\n', {
+      input: inputRef.current,
+      draft: textRef.current,
+      selection: selectionRef.current,
+      maxLength: CLOUD_AGENT_PROMPT_MAX_LENGTH,
+      onChangeText: handleChangeText,
+    });
+  }
+
+  // Starter chips are static, localized prompt ideas plus a contextual chip for
+  // the session lifecycle phase. They insert and focus only; they never submit.
+  const starterChips = useMemo(() => {
+    const staticChips = [
+      i18n.t('agentChat.composer.starterChipBuild'),
+      i18n.t('agentChat.composer.starterChipFix'),
+      i18n.t('agentChat.composer.starterChipWriteTests'),
+    ];
+    if (sessionState === 'preparing') {
+      return [i18n.t('agentChat.composer.starterChipPrepare'), ...staticChips];
+    }
+    if (sessionState === 'finalizing') {
+      return [i18n.t('agentChat.composer.starterChipWrapUp'), ...staticChips];
+    }
+    if (sessionState === 'empty') {
+      return [i18n.t('agentChat.composer.starterChipEmpty'), ...staticChips];
+    }
+    return staticChips;
+  }, [sessionState]);
+  const showStarters =
+    !hasText &&
+    !isSending &&
+    (!disabled || sessionState === 'preparing' || sessionState === 'finalizing');
+
   async function submit() {
     // Commit any coalesced derived state (hasText, measure, slash command)
     // before the send decision, so a submit in the same frame as the last
@@ -1029,10 +1121,10 @@ export function ChatComposer({
 
   const textInputStyle: TextStyle = {
     color: colors.foreground,
-    fontSize: TEXT_INPUT_FONT_SIZE,
+    fontSize,
     height: measure.height,
     includeFontPadding: false,
-    lineHeight: TEXT_INPUT_LINE_HEIGHT,
+    lineHeight,
     paddingHorizontal: COMPOSER_INPUT_PADDING_HORIZONTAL,
     paddingVertical: 12,
     textAlignVertical: 'top',
@@ -1044,7 +1136,10 @@ export function ChatComposer({
       {measure.measureElement}
 
       {control.showToolbar ? (
-        <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(100)}>
+        <Animated.View
+          entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
+          exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
+        >
           <ChatToolbar
             mode={mode}
             onModeChange={onModeChange}
@@ -1081,7 +1176,10 @@ export function ChatComposer({
       ) : null}
 
       {slashCommandSuggestions.length > 0 && !isSending ? (
-        <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(100)}>
+        <Animated.View
+          entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
+          exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
+        >
           <SlashCommandSuggestions
             commands={slashCommandSuggestions}
             onSelect={handleSelectSlashCommand}
@@ -1092,6 +1190,38 @@ export function ChatComposer({
       <View className={cn('px-3', voiceInput.status === 'listening' ? 'pb-1' : 'pb-0')}>
         <VoiceInputStatus status={voiceInput.status} />
       </View>
+
+      {showStarters ? (
+        <View className="flex-row flex-wrap gap-2 px-3 pb-2 pt-3">
+          {starterChips.map(chip => (
+            <Pressable
+              key={chip}
+              onPress={() => {
+                applyComposerText(chip);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={chip}
+              hitSlop={{ top: 8, bottom: 8 }}
+              className="items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 active:opacity-70"
+            >
+              <Text className="text-sm font-normal text-muted-foreground">{chip}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
+      {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount <= COMPOSER_COUNTER_VISIBLE_REMAINING ? (
+        <View className="flex-row justify-end px-4 pb-1">
+          <Text
+            className="text-xs font-normal text-muted-foreground"
+            accessibilityLabel={i18n.t('agentChat.composer.charactersRemaining', {
+              count: CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount,
+            })}
+          >
+            {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount}
+          </Text>
+        </View>
+      ) : null}
 
       <GestureDetector gesture={dismissKeyboardPan}>
         <View collapsable={false} className="w-full" {...androidDismissKeyboardTouchProps}>
@@ -1106,7 +1236,7 @@ export function ChatComposer({
             inputRef={inputRef}
             isSending={isSending}
             isStreaming={isStreaming}
-            maxInputHeight={TEXT_INPUT_MAX_HEIGHT}
+            maxInputHeight={inputMaxHeight}
             measureHeight={measure.height}
             onAddAttachment={() => {
               void handleAddAttachment();
@@ -1121,6 +1251,7 @@ export function ChatComposer({
               setIsFocused(true);
             }}
             onInputLayout={handleInputLayout}
+            onInsertNewline={handleInsertNewline}
             onSelectionChange={handleSelectionChange}
             onStop={handleStop}
             onSubmit={() => {
@@ -1131,6 +1262,7 @@ export function ChatComposer({
             }}
             paperclipDisabled={control.paperclipDisabled}
             placeholder={placeholder}
+            returnSendsMessage={returnSendsMessage}
             textInputStyle={textInputStyle}
             voiceDisabled={control.voiceDisabled}
             voiceInputAvailable={voiceInput.available}

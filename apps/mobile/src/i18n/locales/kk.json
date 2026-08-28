@@ -152,7 +152,9 @@
     "appearanceDark": "Қараңғы",
     "account": "Тіркелгі",
     "prReviewAttribution": "PR рецензияларына қосымшаның атрибуциясын қосу",
-    "prReviewAttributionSubtitle": "Рецензия жібергенде төменге Reviewed via Kilo жолын қосыңыз."
+    "prReviewAttributionSubtitle": "Рецензия жібергенде төменге Reviewed via Kilo жолын қосыңыз.",
+    "returnSendsMessage": "Қайтару пернесі хабарламаны жібереді",
+    "returnSendsMessageSubtitle": "Өшірулі кезде Қайтару пернесі агенттердің хабарлама енгізу өрістеріне жаңа жол енгізеді."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request қолжетімсіз",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Бұл сессия файл қабылдай алмайды. Хабарлама жіберу үшін қосымшаларды алып тастаңыз.",
       "couldNotAttachFiles": "Файлдарды қосу мүмкін болмады. Қайталау үшін жіберуді түртіңіз.",
       "discardAttachmentsMessage": "Жіберілген хабарламаларға қосылмаған жүктелген файлдар жойылады.",
-      "discardAttachmentsTitle": "Қосымшаларды жою керек пе?"
+      "discardAttachmentsTitle": "Қосымшаларды жою керек пе?",
+      "charactersRemaining": "{{count}} таңба қалды",
+      "insertNewline": "Жаңа жол енгізу",
+      "starterChipBuild": "Мүмкіндік жасау",
+      "starterChipEmpty": "Идеядан бастау",
+      "starterChipFix": "Қатені түзету",
+      "starterChipPrepare": "Ортамды баптау",
+      "starterChipWrapUp": "Сессиямды аяқтау",
+      "starterChipWriteTests": "Тесттер жазу"
     },
     "chatLink": {
       "linkCopied": "Сілтеме көшірілді",

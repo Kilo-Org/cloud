@@ -152,7 +152,9 @@
     "appearanceDark": "Fosc",
     "account": "Compte",
     "prReviewAttribution": "Afegiu l'atribució de l'aplicació a les revisions de PR",
-    "prReviewAttributionSubtitle": "Afegiu un peu de pàgina «Reviewed via Kilo» quan envieu una revisió."
+    "prReviewAttributionSubtitle": "Afegiu un peu de pàgina «Reviewed via Kilo» quan envieu una revisió.",
+    "returnSendsMessage": "La tecla de retorn envia el missatge",
+    "returnSendsMessageSubtitle": "Quan està desactivat, la tecla de retorn insereix un salt de línia als camps de missatge dels agents."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request no disponible",
@@ -2605,7 +2607,15 @@
       "cannotReceiveFiles": "Aquesta sessió no pot rebre fitxers. Treu els fitxers adjunts per enviar el teu missatge.",
       "couldNotAttachFiles": "No s'han pogut adjuntar els fitxers. Toqueu Envia per tornar-ho a provar.",
       "discardAttachmentsMessage": "S'eliminaran els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
-      "discardAttachmentsTitle": "Descartar els adjunts?"
+      "discardAttachmentsTitle": "Descartar els adjunts?",
+      "charactersRemaining": "Queden {{count}} caràcters",
+      "insertNewline": "Insereix un salt de línia",
+      "starterChipBuild": "Crea una funció",
+      "starterChipEmpty": "Comença amb una idea",
+      "starterChipFix": "Corregeix un error",
+      "starterChipPrepare": "Configura el meu entorn",
+      "starterChipWrapUp": "Finalitza la meva sessió",
+      "starterChipWriteTests": "Escriu proves"
     },
     "chatLink": {
       "linkCopied": "Enllaç copiat",

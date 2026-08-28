@@ -789,9 +789,21 @@ export function useAgentAttachmentUpload(
           progress: null,
         };
       });
-      commitAttachments(current => [...current, ...additions]);
+      // Restore replaces the current chips: the restored set is the canceled
+      // message's own file parts, so it already sits at or under the max-file
+      // cap and a merge with the occupied composer's chips would both overrun
+      // the cap and send the wrong file set. Replacing also discards any
+      // occupied-composer chips still uploading, so invalidate them exactly
+      // like `reset`/`clearOptimistic`: a stale async completion must not
+      // announce/toast or re-append a chip the user no longer sees.
+      generationRef.current += 1;
+      for (const id of liveIdsRef.current) {
+        cancelUpload(id);
+      }
+      liveIdsRef.current.clear();
+      commitAttachments(() => additions);
     },
-    [commitAttachments]
+    [cancelUpload, commitAttachments]
   );
 
   // Optimistic-send chip clear: like `reset` but keeps the local cache files

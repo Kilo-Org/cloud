@@ -152,7 +152,9 @@
     "appearanceDark": "深色",
     "account": "账户",
     "prReviewAttribution": "在 PR 审查中添加应用署名",
-    "prReviewAttributionSubtitle": "提交审查时，追加 Reviewed via Kilo 页脚。"
+    "prReviewAttributionSubtitle": "提交审查时，追加 Reviewed via Kilo 页脚。",
+    "returnSendsMessage": "回车键发送消息",
+    "returnSendsMessageSubtitle": "关闭后，回车键会在代理编辑器中插入换行。"
   },
   "notifications": {
     "title": "通知",
@@ -2132,7 +2134,15 @@
       "cannotReceiveFiles": "此会话无法接收文件。请移除附件后再发送消息。",
       "couldNotAttachFiles": "无法附加文件。点击发送以重试。",
       "discardAttachmentsMessage": "未附加到已发送消息的上传文件将被删除。",
-      "discardAttachmentsTitle": "丢弃附件？"
+      "discardAttachmentsTitle": "丢弃附件？",
+      "charactersRemaining": "还可输入 {{count}} 个字符",
+      "insertNewline": "插入换行",
+      "starterChipBuild": "开发功能",
+      "starterChipEmpty": "从一个想法开始",
+      "starterChipFix": "修复错误",
+      "starterChipPrepare": "设置我的环境",
+      "starterChipWrapUp": "为我的会话收尾",
+      "starterChipWriteTests": "编写测试"
     },
     "chatLink": {
       "linkCopied": "链接已复制",

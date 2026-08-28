@@ -17,6 +17,7 @@ import {
   ChatComposer,
   type ChatComposerControl,
   type ChatComposerSendOptions,
+  type ChatComposerSessionState,
 } from '@/components/agents/chat-composer';
 import {
   type AgentMode,
@@ -47,10 +48,7 @@ import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
-import {
-  isCancelQueuedUpgradeRequired,
-  resolveCancelQueuedRestoreOutcome,
-} from '@/components/agents/mobile-session-manager';
+import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
 import { firstHumanText, isFilePart } from './part-types';
 import {
   buildRemoteAttachmentPartsWithRetryableFeedback,
@@ -880,9 +878,8 @@ export function SessionDetailContent({
         return;
       }
       const composerHasContent = composerControlRef.current?.hasContent() ?? false;
-      const outcome = resolveCancelQueuedRestoreOutcome(composerHasContent);
       const prompt = firstHumanText(message.parts);
-      if (outcome === 'restore') {
+      if (!composerHasContent) {
         if (prompt !== '') {
           composerControlRef.current?.setText(prompt);
         }
@@ -1159,6 +1156,21 @@ export function SessionDetailContent({
     }
     return t('agentChat.composer.messagePlaceholder');
   }, [cloudStatus, t]);
+  // Lifecycle phase that drives the composer's contextual starter chip. The
+  // active cloud phases win over the message-count fallback, matching the
+  // composer's own chip priority (preparing/finalizing before empty).
+  const composerSessionState = useMemo<ChatComposerSessionState>(() => {
+    if (cloudStatus?.type === 'preparing') {
+      return 'preparing';
+    }
+    if (cloudStatus?.type === 'finalizing') {
+      return 'finalizing';
+    }
+    if (messages.length === 0) {
+      return 'empty';
+    }
+    return 'message';
+  }, [cloudStatus, messages.length]);
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSendCommand = useCallback(
@@ -1517,6 +1529,7 @@ export function SessionDetailContent({
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
                 sessionId={sessionId}
+                sessionState={composerSessionState}
                 controlRef={composerControlRef}
               />
             </ModelPickerSelectionScopeProvider>

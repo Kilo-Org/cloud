@@ -152,7 +152,9 @@
     "appearanceDark": "Fènwa",
     "account": "Kont",
     "prReviewAttribution": "Ajoute atribisyon aplikasyon nan revizyon PR",
-    "prReviewAttributionSubtitle": "Ajoute yon footer Reviewed via Kilo lè ou soumèt yon revizyon."
+    "prReviewAttributionSubtitle": "Ajoute yon footer Reviewed via Kilo lè ou soumèt yon revizyon.",
+    "returnSendsMessage": "Kle Retou a voye mesaj",
+    "returnSendsMessageSubtitle": "Lè li dezaktive, kle Retou a antre yon nouvo liy nan chan mesaj ajan yo."
   },
   "prReview": {
     "pullRequestUnavailable": "Demand rale pa disponib",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Sesyon sa a pa ka resevwa fichye. Retire pyès jwenn yo pou voye mesaj ou.",
       "couldNotAttachFiles": "Pa t ka kole fichye. Tape voye pou eseye ankò.",
       "discardAttachmentsMessage": "Fichye telechaje ki pa atache ak mesaj voye yo pral efase.",
-      "discardAttachmentsTitle": "Jete atachman yo?"
+      "discardAttachmentsTitle": "Jete atachman yo?",
+      "charactersRemaining": "{{count}} karaktè rete",
+      "insertNewline": "Antre yon nouvo liy",
+      "starterChipBuild": "Kreye yon fonksyon",
+      "starterChipEmpty": "Kòmanse ak yon lide",
+      "starterChipFix": "Korije yon erè",
+      "starterChipPrepare": "Konfigire anviwònman mwen",
+      "starterChipWrapUp": "Fini sesyon mwen",
+      "starterChipWriteTests": "Ekri tès"
     },
     "chatLink": {
       "linkCopied": "Lyen kopye",

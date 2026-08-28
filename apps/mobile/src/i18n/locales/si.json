@@ -152,7 +152,9 @@
     "appearanceDark": "අඳුරු",
     "account": "ගිණුම",
     "prReviewAttribution": "PR සමාලෝචන සඳහා යෙදුම් ආරෝපණය එක් කරන්න",
-    "prReviewAttributionSubtitle": "සමාලෝචනයක් ඉදිරිපත් කරන විට Kilo හරහා සමාලෝචනය යන පාදකය එකතු කරන්න"
+    "prReviewAttributionSubtitle": "සමාලෝචනයක් ඉදිරිපත් කරන විට Kilo හරහා සමාලෝචනය යන පාදකය එකතු කරන්න",
+    "returnSendsMessage": "ආපසු යතුර පණිවිඩය යවයි",
+    "returnSendsMessageSubtitle": "ක්‍රියා විරහිත විට, ආපසු යතුර නියෝජිත පණිවිඩ ආදාන කොටුවල නව පේළියක් ඇතුළත් කරයි."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ලබා ගත නොහැක",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "මෙම සැසියට ගොනු ලබා ගත නොහැක. ඔබගේ පණිවිඩය යැවීමට ඇමුණුම් ඉවත් කරන්න.",
       "couldNotAttachFiles": "ගොනු ඇමිණිය නොහැකි විය. නැවත උත්සාහ කිරීමට යැවීම තට්ටු කරන්න.",
       "discardAttachmentsMessage": "යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත.",
-      "discardAttachmentsTitle": "ඇමුණුම් ඉවතලන්නද?"
+      "discardAttachmentsTitle": "ඇමුණුම් ඉවතලන්නද?",
+      "charactersRemaining": "අක්ෂර {{count}} ක් ඉතිරිව ඇත",
+      "insertNewline": "නව පේළියක් ඇතුළත් කරන්න",
+      "starterChipBuild": "විශේෂාංගයක් සාදන්න",
+      "starterChipEmpty": "අදහසකින් ආරම්භ කරන්න",
+      "starterChipFix": "දෝෂයක් නිවැරදි කරන්න",
+      "starterChipPrepare": "මගේ පරිසරය සකසන්න",
+      "starterChipWrapUp": "මගේ සැසිය අවසන් කරන්න",
+      "starterChipWriteTests": "පරීක්ෂණ ලියන්න"
     },
     "chatLink": {
       "linkCopied": "සබැඳිය පිටපත් කරන ලදී",

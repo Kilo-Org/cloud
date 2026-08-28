@@ -152,7 +152,9 @@
     "appearanceDark": "गाढा",
     "account": "खाता",
     "prReviewAttribution": "PR समीक्षाहरूमा एप विशेषता थप्नुहोस्",
-    "prReviewAttributionSubtitle": "समीक्षा पेश गर्दा Reviewed via Kilo फुटर थप्नुहोस्।"
+    "prReviewAttributionSubtitle": "समीक्षा पेश गर्दा Reviewed via Kilo फुटर थप्नुहोस्।",
+    "returnSendsMessage": "रिटर्न कुञ्जीले सन्देश पठाउँछ",
+    "returnSendsMessageSubtitle": "बन्द हुँदा, रिटर्न कुञ्जीले एजेन्टको सन्देश लेख्ने ठाउँमा नयाँ पङ्क्ति घुसाउँछ।"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल अनुरोध उपलब्ध छैन",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "यो सत्रले फाइल प्राप्त गर्न सक्दैन। आफ्नो सन्देश पठाउन संलग्नहरू हटाउनुहोस्।",
       "couldNotAttachFiles": "फाइलहरू संलग्न गर्न सकिएन। फेरि प्रयास गर्न पठाउनुहोस् ट्याप गर्नुहोस्।",
       "discardAttachmentsMessage": "पठाइएका सन्देशहरूमा संलग्न नभएका अपलोडहरू मेटिनेछन्।",
-      "discardAttachmentsTitle": "संलग्नकहरू खारेज गर्ने?"
+      "discardAttachmentsTitle": "संलग्नकहरू खारेज गर्ने?",
+      "charactersRemaining": "{{count}} अक्षर बाँकी छन्",
+      "insertNewline": "नयाँ पङ्क्ति घुसाउनुहोस्",
+      "starterChipBuild": "सुविधा बनाउनुहोस्",
+      "starterChipEmpty": "एउटा विचारबाट सुरु गर्नुहोस्",
+      "starterChipFix": "त्रुटि सच्याउनुहोस्",
+      "starterChipPrepare": "मेरो वातावरण तयार गर्नुहोस्",
+      "starterChipWrapUp": "मेरो सत्र समाप्त गर्नुहोस्",
+      "starterChipWriteTests": "परीक्षणहरू लेख्नुहोस्"
     },
     "chatLink": {
       "linkCopied": "लिंक प्रतिलिपि गरियो",

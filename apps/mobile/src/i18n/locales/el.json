@@ -152,7 +152,9 @@
     "appearanceDark": "Σκούρο",
     "account": "Λογαριασμός",
     "prReviewAttribution": "Προσθήκη αναφοράς της εφαρμογής στις ανασκοπήσεις PR",
-    "prReviewAttributionSubtitle": "Προσθέστε μια υποσημείωση «Reviewed via Kilo» όταν υποβάλλετε μια ανασκόπηση."
+    "prReviewAttributionSubtitle": "Προσθέστε μια υποσημείωση «Reviewed via Kilo» όταν υποβάλλετε μια ανασκόπηση.",
+    "returnSendsMessage": "Το πλήκτρο επιστροφής στέλνει το μήνυμα",
+    "returnSendsMessageSubtitle": "Όταν είναι απενεργοποιημένο, το πλήκτρο επιστροφής εισάγει νέα γραμμή στα πεδία εισαγωγής μηνύματος των πρακτόρων."
   },
   "prReview": {
     "pullRequestUnavailable": "Το pull request δεν είναι διαθέσιμο",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Αυτή η συνεδρία δεν μπορεί να λάβει αρχεία. Αφαιρέστε τα συνημμένα για να στείλετε το μήνυμά σας.",
       "couldNotAttachFiles": "Δεν ήταν δυνατή η προσάρτηση αρχείων. Πατήστε αποστολή για να δοκιμάσετε ξανά.",
       "discardAttachmentsMessage": "Τα μεταφορτωμένα αρχεία που δεν έχουν προσαρτηθεί σε απεσταλμένα μηνύματα θα διαγραφούν.",
-      "discardAttachmentsTitle": "Απόρριψη συνημμένων;"
+      "discardAttachmentsTitle": "Απόρριψη συνημμένων;",
+      "charactersRemaining": "Απομένουν {{count}} χαρακτήρες",
+      "insertNewline": "Εισαγωγή νέας γραμμής",
+      "starterChipBuild": "Δημιουργία λειτουργίας",
+      "starterChipEmpty": "Ξεκινήστε με μια ιδέα",
+      "starterChipFix": "Διόρθωση σφάλματος",
+      "starterChipPrepare": "Ρύθμιση του περιβάλλοντός μου",
+      "starterChipWrapUp": "Ολοκλήρωση της συνεδρίας μου",
+      "starterChipWriteTests": "Σύνταξη δοκιμών"
     },
     "chatLink": {
       "linkCopied": "Ο σύνδεσμος αντιγράφηκε",

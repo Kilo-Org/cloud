@@ -152,7 +152,9 @@
     "appearanceDark": "어두움",
     "account": "계정",
     "prReviewAttribution": "PR 리뷰에 앱 표시 정보 추가",
-    "prReviewAttributionSubtitle": "리뷰를 제출할 때 Reviewed via Kilo 푸터를 추가합니다."
+    "prReviewAttributionSubtitle": "리뷰를 제출할 때 Reviewed via Kilo 푸터를 추가합니다.",
+    "returnSendsMessage": "리턴 키로 메시지 보내기",
+    "returnSendsMessageSubtitle": "끄면 에이전트의 메시지 입력란에서 리턴 키로 줄바꿈을 삽입합니다."
   },
   "notifications": {
     "title": "알림",
@@ -2132,7 +2134,15 @@
       "cannotReceiveFiles": "이 세션은 파일을 받을 수 없습니다. 메시지를 보내려면 첨부 파일을 제거하세요.",
       "couldNotAttachFiles": "파일을 첨부하지 못했습니다. 다시 시도하려면 보내기를 탭하세요.",
       "discardAttachmentsMessage": "보낸 메시지에 첨부되지 않은 업로드 파일이 삭제됩니다.",
-      "discardAttachmentsTitle": "첨부 파일을 삭제할까요?"
+      "discardAttachmentsTitle": "첨부 파일을 삭제할까요?",
+      "charactersRemaining": "{{count}}자 남음",
+      "insertNewline": "줄바꿈 삽입",
+      "starterChipBuild": "기능 구현",
+      "starterChipEmpty": "아이디어로 시작",
+      "starterChipFix": "버그 수정",
+      "starterChipPrepare": "내 환경 설정",
+      "starterChipWrapUp": "내 세션 마무리",
+      "starterChipWriteTests": "테스트 작성"
     },
     "chatLink": {
       "linkCopied": "링크 복사됨",

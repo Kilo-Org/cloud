@@ -1,13 +1,23 @@
+/* eslint-disable max-lines -- The shared native hook mocks support prompt seeding and merged control-order regression coverage in one suite. */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { NewSessionPromptControls as renderPromptControls } from '@/components/agents/new-session-prompt-controls';
+import { Text as renderText } from '@/components/ui/text';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
 
 import '@/i18n';
-import type * as ReactI18next from 'react-i18next';
+import * as ReactI18next from 'react-i18next';
+
+const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const TEXT_DIRECTIONS = [
+  { direction: 'LTR', isRTL: false, style: undefined },
+  { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }, undefined] },
+];
+
+vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -33,6 +43,7 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
+    useContext: vi.fn(() => undefined),
     useEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
@@ -40,15 +51,30 @@ vi.mock('react', async () => {
       const ref: React.RefObject<T> = { current: initial };
       return ref;
     }),
-    useState: vi.fn(<T>(initial: T) => [initial, vi.fn() as () => void] as [T, (value: T) => void]),
+    useState: vi.fn(
+      <T>(initial: T | (() => T)) =>
+        [
+          typeof initial === 'function' ? (initial as () => T)() : initial,
+          vi.fn() as () => void,
+        ] as [T, (value: T) => void]
+    ),
   };
 });
 
 // ── react-native ────────────────────────────────────────────────────
 vi.mock('react-native', () => ({
+  AccessibilityInfo: {
+    announceForAccessibility: vi.fn(),
+  },
+  Keyboard: {
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
+  I18nManager: layoutDirection,
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
+  Text: 'Text',
   TextInput: 'TextInput',
+  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
   View: 'View',
 }));
 
@@ -58,9 +84,14 @@ vi.mock('react-native-reanimated', () => ({
   FadeOut: { duration: vi.fn() },
 }));
 
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+}));
+
 // ── icons ──────────────────────────────────────────────────────────
 vi.mock('@/components/ui/icons', () => ({
   ClipboardPaste: () => null,
+  CornerDownLeft: () => null,
   Paperclip: () => null,
 }));
 
@@ -74,6 +105,10 @@ vi.mock('sonner-native', () => ({
 // ── sub-components ─────────────────────────────────────────────────
 vi.mock('@/components/agents/attachment-preview-strip', () => ({
   AttachmentPreviewStrip: () => null,
+}));
+
+vi.mock('@/components/ui/accessible-status', () => ({
+  AccessibleStatus: () => null,
 }));
 
 vi.mock('@/components/agents/chat-toolbar', () => ({
@@ -106,6 +141,16 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     foreground: '#000',
     mutedForeground: '#666',
     primaryForeground: '#fff',
+  }),
+}));
+
+const returnSendsMessage = vi.hoisted(() => ({ current: false }));
+
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: returnSendsMessage.current,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
   }),
 }));
 
@@ -145,24 +190,39 @@ vi.mock('@/lib/voice-input/voice-input-draft', () => ({
 type Node = { props?: Record<string, unknown> } | null | undefined | string | number | boolean;
 type ElementType = string | ((...args: never[]) => unknown);
 
-function findElementByType(node: Node, target: ElementType): Record<string, unknown> | null {
+function findElementByType(
+  node: Node,
+  target: ElementType,
+  accessibilityLabel?: string
+): Record<string, unknown> | null {
   if (node === null || typeof node !== 'object') {
     return null;
   }
   const props = node.props ?? {};
   const children = props.children;
   const nodeType = (node as { type?: unknown }).type;
-  if (nodeType === target) {
+  if (
+    nodeType === target &&
+    (accessibilityLabel === undefined || props.accessibilityLabel === accessibilityLabel)
+  ) {
     return node.props ?? {};
+  }
+  if (nodeType === renderText) {
+    return findElementByType(
+      renderText(props as React.ComponentProps<typeof renderText>),
+      target,
+      accessibilityLabel
+    );
   }
   if (nodeType === renderPromptControls) {
     return findElementByType(
       renderPromptControls(props as React.ComponentProps<typeof renderPromptControls>),
-      target
+      target,
+      accessibilityLabel
     );
   }
   for (const child of Array.isArray(children) ? children : [children]) {
-    const found = findElementByType(child as Node, target);
+    const found = findElementByType(child as Node, target, accessibilityLabel);
     if (found) {
       return found;
     }
@@ -201,7 +261,66 @@ function defaultProps() {
 describe('NewSessionPrompt initialPrompt seed', () => {
   beforeEach(() => {
     voiceInputAvailable.current = false;
+    returnSendsMessage.current = false;
+    layoutDirection.isRTL = false;
   });
+
+  it.each(TEXT_DIRECTIONS)(
+    'preserves starter text and insertion in $direction',
+    async ({ isRTL, style }) => {
+      const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+      layoutDirection.isRTL = isRTL;
+      let draft = '';
+      let started = false;
+      const element = renderPrompt({
+        ...defaultProps(),
+        onChangeText: text => {
+          draft = text;
+        },
+        onStartSession: () => {
+          started = true;
+        },
+      });
+      const chip = findElementByType(element, 'Pressable', 'Build a feature');
+      if (chip === null) {
+        throw new Error('starter chip not found');
+      }
+      expect(findElementByType(chip.children as Node, 'Text')).toMatchObject({
+        children: 'Build a feature',
+        className: 'text-sm font-normal text-muted-foreground',
+        style,
+      });
+      expect(findElementByType(element, 'Text', '100000 characters remaining')).toBeNull();
+
+      const onPress = chip.onPress as () => void;
+      onPress();
+
+      expect(draft).toBe('Build a feature');
+      expect(started).toBe(false);
+    }
+  );
+
+  it.each(TEXT_DIRECTIONS)(
+    'shows the seeded counter and its accessible label only near the limit in $direction',
+    async ({ isRTL, style }) => {
+      const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+      layoutDirection.isRTL = isRTL;
+      const shortSeed = renderPrompt({ ...defaultProps(), initialPrompt: 'hello' });
+      expect(findElementByType(shortSeed, 'Text', '99995 characters remaining')).toBeNull();
+      expect(findElementByType(shortSeed, 'Pressable', 'Build a feature')).toBeNull();
+
+      const element = renderPrompt({
+        ...defaultProps(),
+        initialPrompt: 'x'.repeat(100_000 - 5),
+      });
+      expect(findElementByType(element, 'Text', '5 characters remaining')).toMatchObject({
+        children: 5,
+        className: 'text-xs font-normal text-muted-foreground',
+        style,
+      });
+      expect(findElementByType(element, 'Pressable', 'Build a feature')).toBeNull();
+    }
+  );
 
   it('does not invoke onChangeText when initialPrompt seeds the uncontrolled input on mount', async () => {
     const { NewSessionPrompt } = await import('./new-session-prompt');
@@ -320,7 +439,13 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     voiceInputAvailable.current = voiceAvailable;
     const element = renderPrompt({ ...defaultProps(), isCreating, attachmentMax });
 
-    expect(findElementByType(element, 'Pressable')).toMatchObject({
+    expect(
+      findElementByType(
+        element,
+        'Pressable',
+        ReactI18next.getI18n().t('agentChat.newSession.addAttachment')
+      )
+    ).toMatchObject({
       disabled: paperclipDisabled,
       accessibilityState: { disabled: paperclipDisabled },
       hitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
@@ -332,6 +457,30 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(findElementByType(element, VoiceInputStatus)).toEqual(
       voiceAvailable ? { status: 'idle' } : null
     );
+  });
+
+  it('keeps the newline button between the voice status and voice button', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    voiceInputAvailable.current = true;
+    returnSendsMessage.current = true;
+    const element = renderPrompt(defaultProps());
+    const controlsProps = findElementByType(element, renderPromptControls);
+    expect(controlsProps).not.toBeNull();
+
+    const controls: React.ReactElement<{ children: Node[] }> = renderPromptControls(
+      controlsProps as React.ComponentProps<typeof renderPromptControls>
+    );
+    const [, status, newline, voice] = controls.props.children;
+
+    expect(findElementByType(status, VoiceInputStatus)).not.toBeNull();
+    expect(
+      findElementByType(
+        newline,
+        'Pressable',
+        ReactI18next.getI18n().t('agentChat.composer.insertNewline')
+      )
+    ).not.toBeNull();
+    expect(findElementByType(voice, VoiceInputButton)).not.toBeNull();
   });
 
   it('keeps the extracted controls unmounted for clone entry', async () => {

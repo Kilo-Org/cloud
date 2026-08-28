@@ -152,7 +152,9 @@
     "appearanceDark": "Pōuri",
     "account": "Pūkete",
     "prReviewAttribution": "Tāpiri te tautohu taupānga ki ngā arotake PR",
-    "prReviewAttributionSubtitle": "Tāpiri he hiku 'Kua arotakea mā Kilo' ina tuku koe i tētahi arotake."
+    "prReviewAttributionSubtitle": "Tāpiri he hiku 'Kua arotakea mā Kilo' ina tuku koe i tētahi arotake.",
+    "returnSendsMessage": "Ka tuku karere te pātuhi Whakahoki",
+    "returnSendsMessageSubtitle": "Ina weto, ka whakauru te pātuhi Whakahoki i tētahi rārangi hōu ki ngā kaitito māngai."
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono huna",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Kāore e taea te whiwhi kōnae i tēnei wātū. Tangohia ngā whakapirihanga kia tukua tō karere.",
       "couldNotAttachFiles": "Kāore i taea te whakapiri kōnae. Pāwhiri ki te tuku kia whakamātau anō.",
       "discardAttachmentsMessage": "Ka mukua ngā kōnae kua tukua ake kāore anō kia whakapirihia ki ngā karere kua tukua.",
-      "discardAttachmentsTitle": "Whakarere i ngā whakapirihanga?"
+      "discardAttachmentsTitle": "Whakarere i ngā whakapirihanga?",
+      "charactersRemaining": "E {{count}} ngā pū e toe ana",
+      "insertNewline": "Whakauru rārangi hōu",
+      "starterChipBuild": "Hangaia he āhuatanga",
+      "starterChipEmpty": "Tīmata ki tētahi whakaaro",
+      "starterChipFix": "Whakatikahia he hapa",
+      "starterChipPrepare": "Whakaritea taku taiao",
+      "starterChipWrapUp": "Whakakapihia taku wātūtū",
+      "starterChipWriteTests": "Tuhia ngā whakamātau"
     },
     "chatLink": {
       "linkCopied": "Kua tāruatia te hononga",

@@ -152,7 +152,9 @@
     "appearanceDark": "Mørk",
     "account": "Konto",
     "prReviewAttribution": "Tilføj app-tilskrivning til PR-anmeldelser",
-    "prReviewAttributionSubtitle": "Tilføj en \"Reviewed via Kilo\"-sidefod, når du sender en anmeldelse."
+    "prReviewAttributionSubtitle": "Tilføj en \"Reviewed via Kilo\"-sidefod, når du sender en anmeldelse.",
+    "returnSendsMessage": "Returtasten sender beskeden",
+    "returnSendsMessageSubtitle": "Når dette er slået fra, indsætter returtasten et linjeskift i agenternes beskedfelter."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgængelig",
@@ -2586,7 +2588,15 @@
       "cannotReceiveFiles": "Denne session kan ikke modtage filer. Fjern vedhæftningerne for at sende din besked.",
       "couldNotAttachFiles": "Kunne ikke vedhæfte filer. Tryk send for at prøve igen.",
       "discardAttachmentsMessage": "Uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
-      "discardAttachmentsTitle": "Kassér vedhæftninger?"
+      "discardAttachmentsTitle": "Kassér vedhæftninger?",
+      "charactersRemaining": "{{count}} tegn tilbage",
+      "insertNewline": "Indsæt linjeskift",
+      "starterChipBuild": "Byg en funktion",
+      "starterChipEmpty": "Start med en idé",
+      "starterChipFix": "Ret en fejl",
+      "starterChipPrepare": "Konfigurér mit miljø",
+      "starterChipWrapUp": "Afslut min session",
+      "starterChipWriteTests": "Skriv test"
     },
     "chatLink": {
       "linkCopied": "Link kopieret",

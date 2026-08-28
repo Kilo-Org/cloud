@@ -1,13 +1,25 @@
 /* eslint-disable max-lines -- one cohesive notification suite sharing the glanceable sink and native module mock harness. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  buildOpaqueScopeKey,
+  type GlanceableAgentsSnapshot,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { writePrivacySnapshotAndEnd, writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import {
   _resetGlanceablePersistForTests,
   _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
+  getLastGlanceableSnapshot,
+  getLocalScopeKey,
+  persistGlanceableSink,
 } from '@/lib/glanceable/persist';
-import { registerGlanceableSink, unregisterGlanceableSink } from '@/lib/glanceable/sink-registry';
+import {
+  type GlanceableSinkContext,
+  registerGlanceableSink,
+  unregisterGlanceableSink,
+} from '@/lib/glanceable/sink-registry';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   _setGlanceableSinksLoaderForTests,
@@ -77,7 +89,10 @@ vi.mock('@kilocode/notifications', () => ({
   ANDROID_NOTIFICATION_CHANNELS: [
     { id: 'agent', name: 'Agent sessions', importance: 'high' },
     { id: 'chat', name: 'Chat messages', importance: 'high' },
+    { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default' },
     { id: 'balance', name: 'Balance alerts', importance: 'default' },
+    { id: 'security', name: 'Security findings', importance: 'high' },
+    { id: 'active-agents', name: 'Active agents', importance: 'default' },
   ],
   pushDataSchema: { safeParse: mocks.safeParse },
 }));
@@ -142,24 +157,40 @@ describe('ensureAndroidNotificationChannels', () => {
     expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
   });
 
-  it('creates every channel on Android with the mapped importance', async () => {
+  it('silences the aggregate channel on first creation without changing other channels', async () => {
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
     await ensureAndroidNotificationChannels();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(3);
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledWith('agent', {
-      name: 'Agent sessions',
-      importance: 4,
-    });
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledWith('chat', {
-      name: 'Chat messages',
-      importance: 4,
-    });
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledWith('balance', {
-      name: 'Balance alerts',
-      importance: 3,
-    });
+    expect(mocks.setNotificationChannelAsync.mock.calls).toEqual([
+      ['agent', { name: 'Agent sessions', importance: 4 }],
+      ['chat', { name: 'Chat messages', importance: 4 }],
+      ['kiloclaw', { name: 'KiloClaw activity', importance: 3 }],
+      ['balance', { name: 'Balance alerts', importance: 3 }],
+      ['security', { name: 'Security findings', importance: 4 }],
+      [
+        'active-agents',
+        { name: 'Active agents', importance: 3, sound: null, enableVibrate: false },
+      ],
+    ]);
+  });
+
+  it('also silences first creation through channel renaming without changing other options', async () => {
+    const { renameAndroidNotificationChannels } = await loadNotifications();
+
+    await renameAndroidNotificationChannels();
+
+    expect(mocks.setNotificationChannelAsync.mock.calls).toEqual([
+      ['agent', { name: expect.any(String), importance: 4 }],
+      ['chat', { name: expect.any(String), importance: 4 }],
+      ['kiloclaw', { name: expect.any(String), importance: 3 }],
+      ['balance', { name: expect.any(String), importance: 3 }],
+      ['security', { name: expect.any(String), importance: 4 }],
+      [
+        'active-agents',
+        { name: expect.any(String), importance: 3, sound: null, enableVibrate: false },
+      ],
+    ]);
   });
 
   it('single-flights concurrent callers to one creation pass', async () => {
@@ -170,7 +201,7 @@ describe('ensureAndroidNotificationChannels', () => {
 
     expect(first).toBe(second);
     await Promise.all([first, second]);
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(3);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
   });
 
   it('swallows a per-channel failure and still creates the remaining channels', async () => {
@@ -179,7 +210,7 @@ describe('ensureAndroidNotificationChannels', () => {
 
     await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(3);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
         'error.subsystem': 'notifications',
@@ -274,6 +305,8 @@ describe('setupNotificationResponseHandler', () => {
   });
 });
 
+const SCOPE_KEY = buildOpaqueScopeKey({ userId: 'u1', organizationId: 'org-9' });
+
 function glanceableSnapshot(
   overrides: Partial<GlanceableAgentsSnapshot> = {}
 ): GlanceableAgentsSnapshot {
@@ -282,8 +315,8 @@ function glanceableSnapshot(
     revision: 1,
     updatedAt: '2026-01-01T00:00:00.000Z',
     expiresAt: '2026-01-01T08:00:00.000Z',
-    scopeKey: 'scope-1',
-    organizationBound: false,
+    scopeKey: SCOPE_KEY,
+    organizationBound: true,
     status: 'happy',
     running: 1,
     needsInput: 0,
@@ -305,10 +338,24 @@ function activeGlanceablePush(
 }
 
 function makeFakeSink() {
+  const surface: {
+    widget: GlanceableAgentsSnapshot | null;
+    activity: GlanceableAgentsSnapshot | null;
+    context: GlanceableSinkContext | null;
+  } = { widget: null, activity: null, context: null };
   return {
-    publish: vi.fn(),
-    endImmediate: vi.fn(),
-    startOrUpdate: vi.fn(),
+    surface,
+    publish: vi.fn((snapshot: GlanceableAgentsSnapshot) => {
+      surface.widget = snapshot;
+    }),
+    endImmediate: vi.fn(() => {
+      surface.activity = null;
+      surface.context = null;
+    }),
+    startOrUpdate: vi.fn((snapshot: GlanceableAgentsSnapshot, context: GlanceableSinkContext) => {
+      surface.activity = snapshot;
+      surface.context = context;
+    }),
   };
 }
 
@@ -325,6 +372,22 @@ function mockSecureStoreKeys() {
     }
     return null;
   });
+}
+
+function delayIdentityRead(delayedKey: string) {
+  const started = deferred();
+  const gate = deferred();
+  let pending = true;
+  mocks.getItemAsync.mockImplementation(async (key: string) => {
+    const value = key === ACTIVE_USER_ID_KEY ? 'u1' : 'org-9';
+    if (key === delayedKey && pending) {
+      pending = false;
+      started.resolve();
+      await gate.promise;
+    }
+    return value;
+  });
+  return { started: started.promise, resolve: gate.resolve };
 }
 
 // Map-backed SecureStore surface for the persist module's restore path. The
@@ -356,7 +419,7 @@ describe('applyGlanceablePushData', () => {
   it('discards a remote snapshot that is not newer than the last applied snapshot', async () => {
     _setLastGlanceableSnapshotForTests(
       glanceableSnapshot({
-        scopeKey: 'scope-1',
+        scopeKey: SCOPE_KEY,
         revision: 3,
         updatedAt: '2026-01-02T00:00:00.000Z',
       })
@@ -365,7 +428,7 @@ describe('applyGlanceablePushData', () => {
     registerGlanceableSink(sink);
 
     const result = await applyGlanceablePushData(
-      activeGlanceablePush({ scopeKey: 'scope-1', updatedAt: '2026-01-01T00:00:00.000Z' })
+      activeGlanceablePush({ scopeKey: SCOPE_KEY, updatedAt: '2026-01-01T00:00:00.000Z' })
     );
 
     expect(result).toBe(false);
@@ -378,7 +441,7 @@ describe('applyGlanceablePushData', () => {
   it('applies a newer remote snapshot and re-registers under the selected organization', async () => {
     _setLastGlanceableSnapshotForTests(
       glanceableSnapshot({
-        scopeKey: 'scope-1',
+        scopeKey: SCOPE_KEY,
         revision: 3,
         updatedAt: '2026-01-01T00:00:00.000Z',
       })
@@ -388,7 +451,7 @@ describe('applyGlanceablePushData', () => {
 
     const result = await applyGlanceablePushData(
       activeGlanceablePush({
-        scopeKey: 'scope-1',
+        scopeKey: SCOPE_KEY,
         updatedAt: '2026-01-02T00:00:00.000Z',
         organizationBound: true,
       })
@@ -409,7 +472,7 @@ describe('applyGlanceablePushData', () => {
     vi.useFakeTimers();
     _setLastGlanceableSnapshotForTests(
       glanceableSnapshot({
-        scopeKey: 'scope-1',
+        scopeKey: SCOPE_KEY,
         revision: 3,
         updatedAt: '2026-01-01T00:00:00.000Z',
       })
@@ -419,7 +482,7 @@ describe('applyGlanceablePushData', () => {
 
     const result = await applyGlanceablePushData(
       activeGlanceablePush({
-        scopeKey: 'scope-1',
+        scopeKey: SCOPE_KEY,
         updatedAt: '2026-01-02T00:00:00.000Z',
         status: 'empty',
         running: 0,
@@ -440,7 +503,7 @@ describe('applyGlanceablePushData', () => {
     // the fire-time eligibility guard sees non-eligible work and ends it.
     _setLastGlanceableSnapshotForTests(
       glanceableSnapshot({
-        scopeKey: 'scope-1',
+        scopeKey: SCOPE_KEY,
         revision: 4,
         updatedAt: '2026-01-02T00:00:00.000Z',
         status: 'empty',
@@ -461,7 +524,7 @@ describe('applyGlanceablePushData', () => {
     vi.useFakeTimers();
     _setLastGlanceableSnapshotForTests(
       glanceableSnapshot({
-        scopeKey: 'scope-1',
+        scopeKey: SCOPE_KEY,
         revision: 3,
         updatedAt: '2026-01-01T00:00:00.000Z',
       })
@@ -471,7 +534,7 @@ describe('applyGlanceablePushData', () => {
 
     await applyGlanceablePushData(
       activeGlanceablePush({
-        scopeKey: 'scope-1',
+        scopeKey: SCOPE_KEY,
         updatedAt: '2026-01-02T00:00:00.000Z',
         status: 'empty',
         running: 0,
@@ -482,7 +545,7 @@ describe('applyGlanceablePushData', () => {
     );
     await applyGlanceablePushData(
       activeGlanceablePush({
-        scopeKey: 'scope-1',
+        scopeKey: SCOPE_KEY,
         updatedAt: '2026-01-03T00:00:00.000Z',
         organizationBound: true,
       })
@@ -495,6 +558,219 @@ describe('applyGlanceablePushData', () => {
 
     unregisterGlanceableSink(sink);
   });
+});
+
+describe('glanceable publication storage fences', () => {
+  const sink = makeFakeSink();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    _resetGlanceablePersistForTests();
+    _setSecureStoreForTests(secureStoreMock);
+    _setLastGlanceableSnapshotForTests(glanceableSnapshot({ revision: 3 }));
+    secureStore.clear();
+    mockSecureStoreKeys();
+    sink.surface.widget = null;
+    sink.surface.activity = null;
+    sink.surface.context = null;
+    registerGlanceableSink(persistGlanceableSink);
+    registerGlanceableSink(sink);
+  });
+
+  afterEach(() => {
+    unregisterGlanceableSink(sink);
+    unregisterGlanceableSink(persistGlanceableSink);
+    _resetGlanceablePersistForTests();
+    vi.useRealTimers();
+  });
+
+  it('publishes authorized personal work without an organization hint', async () => {
+    const scopeKey = buildOpaqueScopeKey({ userId: 'u1', organizationId: null });
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({ scopeKey, organizationBound: false, revision: 3 })
+    );
+    mocks.getItemAsync.mockImplementation((key: string) =>
+      key === ACTIVE_USER_ID_KEY ? 'u1' : null
+    );
+
+    const applied = await applyGlanceablePushData(
+      activeGlanceablePush({
+        scopeKey,
+        organizationBound: false,
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        running: 9,
+      })
+    );
+
+    expect(applied).toBe(true);
+    expect(sink.surface.widget).toMatchObject({ scopeKey, revision: 4, running: 9 });
+    expect(sink.surface.activity).toEqual(sink.surface.widget);
+    expect(sink.surface.context).toEqual({ userId: 'u1', organizationId: null });
+  });
+
+  it.each([
+    [null, 'org-9'],
+    ['u2', 'org-9'],
+    ['u1', null],
+    ['u1', 'org-10'],
+  ])(
+    'rejects identity hints %s / %s outside the persisted scope',
+    async (userId, organizationId) => {
+      mocks.getItemAsync.mockImplementation((key: string) =>
+        key === ACTIVE_USER_ID_KEY ? userId : organizationId
+      );
+      const current = getLastGlanceableSnapshot();
+
+      const applied = await applyGlanceablePushData(
+        activeGlanceablePush({ updatedAt: '2026-01-02T00:00:00.000Z', running: 9 })
+      );
+
+      expect(applied).toBe(false);
+      expect(getLastGlanceableSnapshot()).toBe(current);
+      expect(sink.surface.widget).toBeNull();
+      expect(sink.surface.activity).toBeNull();
+    }
+  );
+
+  it.each([ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY])('rejects a failed %s read', async key => {
+    mocks.getItemAsync.mockImplementation((requestedKey: string) => {
+      if (requestedKey === key) {
+        throw new Error('storage unavailable');
+      }
+      return requestedKey === ACTIVE_USER_ID_KEY ? 'u1' : 'org-9';
+    });
+
+    const applied = await applyGlanceablePushData(activeGlanceablePush());
+
+    expect(applied).toBe(false);
+    expect(sink.surface.widget).toBeNull();
+    expect(sink.surface.activity).toBeNull();
+  });
+
+  describe.each([ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY])(
+    'while %s is pending',
+    delayedKey => {
+      it.each([
+        ['logout', writeSignedOutSnapshotAndEnd],
+        ['account switch', bumpAuthEpoch],
+        ['organization switch', writePrivacySnapshotAndEnd],
+      ] as const)('does not restore counts after %s', async (_label, invalidate) => {
+        const read = delayIdentityRead(delayedKey);
+        const applying = applyGlanceablePushData(
+          activeGlanceablePush({ updatedAt: '2026-01-02T00:00:00.000Z', running: 9 })
+        );
+        await read.started;
+
+        invalidate();
+        const current = getLastGlanceableSnapshot();
+        const widget = sink.surface.widget;
+        const scopeKey = getLocalScopeKey();
+        read.resolve();
+
+        expect(await applying).toBe(false);
+        expect(getLastGlanceableSnapshot()).toBe(current);
+        expect(getLocalScopeKey()).toBe(scopeKey);
+        expect(sink.surface.widget).toBe(widget);
+        expect(sink.surface.activity).toBeNull();
+      });
+
+      it('rejects captured work even when the blanked scope becomes current again', async () => {
+        const read = delayIdentityRead(delayedKey);
+        const applying = applyGlanceablePushData(
+          activeGlanceablePush({ updatedAt: '2026-01-02T00:00:00.000Z', running: 9 })
+        );
+        await read.started;
+        writePrivacySnapshotAndEnd();
+        const authorized = glanceableSnapshot({ running: 2, revision: 5 });
+        persistGlanceableSink.publish(authorized);
+        sink.publish(authorized);
+        sink.startOrUpdate(authorized, { userId: 'u1', organizationId: 'org-9' });
+        read.resolve();
+
+        expect(await applying).toBe(false);
+        expect(getLastGlanceableSnapshot()).toEqual(authorized);
+        expect(sink.surface.widget).toEqual(authorized);
+        expect(sink.surface.activity).toEqual(authorized);
+      });
+
+      it('keeps a replacement scope when storage still returns the old identity', async () => {
+        const read = delayIdentityRead(delayedKey);
+        const applying = applyGlanceablePushData(
+          activeGlanceablePush({ updatedAt: '2026-01-02T00:00:00.000Z', running: 9 })
+        );
+        await read.started;
+        const replacement = glanceableSnapshot({
+          scopeKey: buildOpaqueScopeKey({ userId: 'u1', organizationId: 'org-10' }),
+          running: 7,
+        });
+        persistGlanceableSink.publish(replacement);
+        sink.publish(replacement);
+        read.resolve();
+
+        expect(await applying).toBe(false);
+        expect(getLastGlanceableSnapshot()).toEqual(replacement);
+        expect(sink.surface.widget).toEqual(replacement);
+        expect(sink.surface.activity).toBeNull();
+      });
+
+      it.each([
+        [0, '2026-01-02T00:00:00.000Z'],
+        [9, '2026-01-02T00:00:00.000Z'],
+        [0, '2026-01-03T00:00:00.000Z'],
+        [9, '2026-01-03T00:00:00.000Z'],
+      ] as const)(
+        'discards captured counts (%s) after publication at %s',
+        async (running, updatedAt) => {
+          const read = delayIdentityRead(delayedKey);
+          const applying = applyGlanceablePushData(
+            activeGlanceablePush({
+              updatedAt: '2026-01-02T00:00:00.000Z',
+              running,
+              status: running === 0 ? 'empty' : 'happy',
+              eligibleStartedAt: running === 0 ? null : '2026-01-01T00:00:00.000Z',
+            })
+          );
+          await read.started;
+          expect(
+            await applyGlanceablePushData(activeGlanceablePush({ updatedAt, running: 7 }))
+          ).toBe(true);
+          const latest = getLastGlanceableSnapshot();
+          read.resolve();
+
+          expect(await applying).toBe(false);
+          vi.advanceTimersByTime(8000);
+          expect(getLastGlanceableSnapshot()).toBe(latest);
+          expect(sink.surface.widget).toEqual(latest);
+          expect(sink.surface.activity).toEqual(latest);
+          expect(sink.surface.activity?.running).toBe(7);
+        }
+      );
+
+      it('rebases a current remote snapshot above an intervening publication', async () => {
+        const read = delayIdentityRead(delayedKey);
+        const applying = applyGlanceablePushData(
+          activeGlanceablePush({ updatedAt: '2026-01-03T00:00:00.000Z', running: 9 })
+        );
+        await read.started;
+        expect(
+          await applyGlanceablePushData(
+            activeGlanceablePush({ updatedAt: '2026-01-02T00:00:00.000Z', running: 2 })
+          )
+        ).toBe(true);
+        read.resolve();
+
+        expect(await applying).toBe(true);
+        expect(sink.surface.widget).toMatchObject({
+          running: 9,
+          revision: 5,
+          accountEpoch: currentAuthEpoch(),
+        });
+        expect(sink.surface.activity).toEqual(sink.surface.widget);
+        expect(getLastGlanceableSnapshot()).toEqual(sink.surface.widget);
+        expect(sink.surface.context).toEqual({ userId: 'u1', organizationId: 'org-9' });
+      });
+    }
+  );
 });
 
 describe('setupNotificationBackgroundHandler', () => {
@@ -532,12 +808,12 @@ describe('setupNotificationBackgroundHandler', () => {
     // `restorePersistedGlanceable` before applying; without it the scope-key
     // fence discards the push and the sink never publishes.
     const persisted = glanceableSnapshot({
-      scopeKey: 'scope-1',
+      scopeKey: SCOPE_KEY,
       revision: 1,
       updatedAt: '2026-01-01T00:00:00.000Z',
     });
     secureStore.set('glanceable-snapshot', JSON.stringify(persisted));
-    secureStore.set('glanceable-scope-key', 'scope-1');
+    secureStore.set('glanceable-scope-key', SCOPE_KEY);
     mocks.safeParse.mockImplementation((data: unknown) => ({ success: true, data }));
     _setGlanceableSinksLoaderForTests(() => undefined);
 
@@ -562,7 +838,7 @@ describe('setupNotificationBackgroundHandler', () => {
         data: {
           dataString: JSON.stringify(
             activeGlanceablePush({
-              scopeKey: 'scope-1',
+              scopeKey: SCOPE_KEY,
               updatedAt: '2026-01-02T00:00:00.000Z',
               organizationBound: true,
             })

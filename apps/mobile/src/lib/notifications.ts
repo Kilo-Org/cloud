@@ -18,6 +18,7 @@ import {
   NOTIFICATION_TOKEN_UPDATED_EVENT,
 } from '@kilocode/app-shared/analytics';
 import {
+  buildOpaqueScopeKey,
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
@@ -124,25 +125,43 @@ function scheduleGlanceableTerminalEnd(): void {
 export async function applyGlanceablePushData(
   data: Extract<PushData, { type: 'active_agents_glanceable' }>
 ): Promise<boolean> {
-  if (data.scopeKey !== getLocalScopeKey()) {
+  const authEpoch = currentAuthEpoch();
+  const blankEpoch = getTerminalBlankEpoch();
+  const scopeKey = getLocalScopeKey();
+  const capturedSnapshot = getLastGlanceableSnapshot();
+  if (data.scopeKey !== scopeKey) {
     return false;
   }
 
+  const organizationId = await getSelectedOrganizationId();
+  const userId = await getActiveUserId();
+  if (
+    currentAuthEpoch() !== authEpoch ||
+    getTerminalBlankEpoch() !== blankEpoch ||
+    getLocalScopeKey() !== scopeKey ||
+    userId === null ||
+    buildOpaqueScopeKey({ userId, organizationId }) !== scopeKey
+  ) {
+    return false;
+  }
+
+  // Fence and rebase against the latest publication after storage reads.
+  // A publication during the reads also wins a timestamp tie.
   const { type: _type, ...fields } = data;
   const current = getLastGlanceableSnapshot();
-
-  if (current !== null && fields.updatedAt < current.updatedAt) {
+  if (
+    current !== null &&
+    (fields.updatedAt < current.updatedAt ||
+      (current !== capturedSnapshot && fields.updatedAt === current.updatedAt))
+  ) {
     return false;
   }
 
   const snapshot: GlanceableAgentsSnapshot = {
     ...fields,
     revision: current === null ? fields.revision : current.revision + 1,
-    accountEpoch: currentAuthEpoch(),
+    accountEpoch: authEpoch,
   };
-
-  const organizationId = await getSelectedOrganizationId();
-  const userId = await getActiveUserId();
 
   const ctx = { userId, organizationId };
   if (isEligibleGlanceableWork(snapshot)) {
@@ -164,10 +183,8 @@ export async function applyGlanceablePushData(
 }
 
 /**
- * Read the selected organization id from SecureStore. The scope-key fence above
- * already proved the incoming snapshot belongs to the current scope, so this id
- * (a string for an org scope, null for personal) keeps org-scoped APNs token
- * lookups finding the token when `startOrUpdate` re-registers it.
+ * Read the selected organization id for scope validation and token registration.
+ * A missing hint only matches a personal scope; it cannot revive an org scope.
  */
 async function getSelectedOrganizationId(): Promise<string | null> {
   try {
@@ -178,10 +195,9 @@ async function getSelectedOrganizationId(): Promise<string | null> {
 }
 
 /**
- * Read the active-user id hint from SecureStore. Null when the hint is
- * unavailable (headless background apply before the identity resolves, or a
- * failed read). It only feeds logout reconciliation ordering, never the
- * snapshot.
+ * Read the active-user id for scope validation and logout reconciliation.
+ * An unavailable hint drops the push rather than reviving a persisted scope.
+ * The raw id never enters the snapshot.
  */
 async function getActiveUserId(): Promise<string | null> {
   try {
@@ -390,6 +406,7 @@ async function createAndroidNotificationChannels(): Promise<void> {
           channel.importance === 'high'
             ? Notifications.AndroidImportance.HIGH
             : Notifications.AndroidImportance.DEFAULT,
+        ...(channel.id === 'active-agents' ? { sound: null, enableVibrate: false } : {}),
       });
     } catch (error) {
       Sentry.captureException(error, {
@@ -445,6 +462,7 @@ export async function renameAndroidNotificationChannels(): Promise<void> {
           channel.importance === 'high'
             ? Notifications.AndroidImportance.HIGH
             : Notifications.AndroidImportance.DEFAULT,
+        ...(channel.id === 'active-agents' ? { sound: null, enableVibrate: false } : {}),
       });
     } catch (error) {
       Sentry.captureException(error, {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect } from 'expo-router';
-import { Alert, Platform } from 'react-native';
+import { Alert, AppState, Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { AgentSessionListScreen } from '@/components/agents/session-list-screen';
@@ -140,14 +140,20 @@ export default function AgentSessionList() {
     return subscribeToGitHubInstallReturnOutcome(consumeReturnOutcome);
   }, [consumeReturnOutcome]);
 
-  // Show the one-time "turn on Live Activities" alert when the Agents tab
-  // regains focus and ActivityKit is unavailable, and recover the surface when
-  // it became available again. Never auto-alerts from the publisher; this tab
-  // focus is the single prompt and recovery site.
+  // Only tab focus can show the one-time alert. Settings can return without
+  // changing route focus, so also retry recovery when the app becomes active.
   useFocusEffect(
     useCallback(() => {
       showActivityKitDisabledAlertOnce();
       void recoverGlanceableActivityKit();
+      const subscription = AppState.addEventListener('change', state => {
+        if (state === 'active') {
+          void recoverGlanceableActivityKit();
+        }
+      });
+      return () => {
+        subscription.remove();
+      };
     }, [])
   );
 

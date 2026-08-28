@@ -1,37 +1,82 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree, and @testing-library/react-native cannot be transformed by the current vitest pipeline (react-native ships Flow). See src/test/render-with-providers.tsx. */
+/* eslint-disable max-lines -- mounted route outcomes and Settings recovery share the native boundary harness. */
+import * as SecureStore from 'expo-secure-store';
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  buildGlanceableSnapshot,
+  type GlanceableAgentsSnapshot,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 import AgentSessionList, { buildGitHubInstallOutcomeAlert } from './index';
 import {
   getGitHubInstallReturnOutcome,
   setGitHubInstallReturnOutcome,
 } from '@/lib/github-install-return';
+import {
+  _resetGlanceablePersistForTests,
+  _setLastGlanceableSnapshotForTests,
+} from '@/lib/glanceable/persist';
+import {
+  type GlanceableSink,
+  registerGlanceableSink,
+  unregisterGlanceableSink,
+} from '@/lib/glanceable/sink-registry';
+import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 const alertMock = vi.hoisted(() => vi.fn());
 const platformMock = vi.hoisted(() => ({ OS: 'ios' }));
 const mintInstallStateMock = vi.hoisted(() => vi.fn());
 const openAuthSessionMock = vi.hoisted(() => vi.fn());
 const openBrowserMock = vi.hoisted(() => vi.fn());
+const focusedRoute = vi.hoisted(() => ({ focused: true }));
+const appStateListeners = vi.hoisted(() => new Set<(state: string) => void>());
+const activityKit = vi.hoisted(() => ({ denied: false, available: false, settingsOpen: false }));
 
 vi.mock('react-native', () => ({
   Alert: { alert: alertMock },
   Platform: platformMock,
+  AppState: {
+    addEventListener: (_event: string, listener: (state: string) => void) => {
+      appStateListeners.add(listener);
+      return {
+        remove: () => {
+          appStateListeners.delete(listener);
+        },
+      };
+    },
+  },
+  Linking: {
+    openSettings: () => {
+      activityKit.settingsOpen = true;
+    },
+  },
 }));
 
 vi.mock('expo-router', async () => {
   const { useEffect } = await import('react');
   return {
-    useFocusEffect: (effect: () => void) => {
-      useEffect(effect, [effect]);
+    useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+      const focused = focusedRoute.focused;
+      useEffect(() => (focused ? effect() : undefined), [effect, focused]);
     },
   };
 });
 
-vi.mock('@/lib/glanceable/activity-kit-prompt', () => ({
-  showActivityKitDisabledAlertOnce: vi.fn(),
-  recoverGlanceableActivityKit: vi.fn().mockResolvedValue(undefined),
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn((key: string) => (key === ACTIVE_USER_ID_KEY ? 'u1' : null)),
+}));
+
+vi.mock('@/glanceable-ios/ios-sink', () => ({
+  getActivityKitDenied: () => activityKit.denied,
+  clearActivityKitDeniedIfAvailable: () => {
+    if (!activityKit.denied || !activityKit.available) {
+      return false;
+    }
+    activityKit.denied = false;
+    return true;
+  },
 }));
 
 vi.mock('expo-web-browser', () => ({
@@ -309,5 +354,138 @@ describe('Agents tab return-outcome rendering', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+});
+
+describe('Agents ActivityKit Settings recovery', () => {
+  const surface: { activity: GlanceableAgentsSnapshot | null } = { activity: null };
+  const sink: GlanceableSink = {
+    publish: () => undefined,
+    endImmediate() {
+      surface.activity = null;
+    },
+    startOrUpdate(snapshot) {
+      surface.activity = snapshot;
+    },
+  };
+  const snapshot = buildGlanceableSnapshot({
+    sessions: [{ status: 'busy' }, { status: 'question' }],
+    userId: 'u1',
+    organizationId: null,
+    now: 1_750_000_000_000,
+  });
+
+  beforeEach(() => {
+    alertMock.mockClear();
+    platformMock.OS = 'ios';
+    focusedRoute.focused = true;
+    activityKit.denied = false;
+    activityKit.available = false;
+    activityKit.settingsOpen = false;
+    surface.activity = null;
+    appStateListeners.clear();
+    setGitHubInstallReturnOutcome(null);
+    _resetGlanceablePersistForTests();
+    _setLastGlanceableSnapshotForTests(snapshot);
+    registerGlanceableSink(sink);
+  });
+
+  afterEach(() => {
+    unregisterGlanceableSink(sink);
+  });
+
+  function changeAppState(state: string) {
+    act(() => {
+      for (const listener of appStateListeners) {
+        listener(state);
+      }
+    });
+  }
+
+  it('recovers on direct Settings return without refocusing or repeating the alert', async () => {
+    activityKit.denied = true;
+    const renderer = mountRoute();
+    await flushMicrotasks();
+    expect(surface.activity).toBeNull();
+    expect(lastAlertButtons()).toEqual([
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Open Settings', onPress: expect.any(Function) },
+    ]);
+
+    act(() => {
+      lastAlertButtons()
+        ?.find(button => button.text === 'Open Settings')
+        ?.onPress?.();
+    });
+    expect(activityKit.settingsOpen).toBe(true);
+    changeAppState('background');
+    changeAppState('active');
+    await flushMicrotasks();
+    expect(surface.activity).toBeNull();
+    expect(alertMock.mock.calls).toHaveLength(1);
+
+    changeAppState('background');
+    activityKit.available = true;
+    changeAppState('inactive');
+    await flushMicrotasks();
+    expect(surface.activity).toBeNull();
+    changeAppState('active');
+    await flushMicrotasks();
+
+    expect(surface.activity).toEqual(snapshot);
+    expect(alertMock.mock.calls).toHaveLength(1);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('retries the same snapshot after a failed Settings-return identity read', async () => {
+    activityKit.denied = true;
+    const renderer = mountRoute();
+    await flushMicrotasks();
+    alertMock.mockClear();
+
+    changeAppState('background');
+    activityKit.available = true;
+    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('storage unavailable'));
+    changeAppState('active');
+    await flushMicrotasks();
+    expect(surface.activity).toBeNull();
+
+    changeAppState('background');
+    changeAppState('active');
+    await flushMicrotasks();
+
+    expect(surface.activity).toEqual(snapshot);
+    expect(alertMock.mock.calls).toHaveLength(0);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it.each(['blur', 'unmount'])('stops foreground recovery after route %s', async transition => {
+    const renderer = mountRoute();
+    if (transition === 'blur') {
+      focusedRoute.focused = false;
+      act(() => {
+        renderer.update(createElement(AgentSessionList));
+      });
+    } else {
+      act(() => {
+        renderer.unmount();
+      });
+    }
+    activityKit.denied = true;
+    activityKit.available = true;
+    changeAppState('active');
+    await flushMicrotasks();
+
+    expect(surface.activity).toBeNull();
+    expect(appStateListeners.size).toBe(0);
+    if (transition === 'blur') {
+      act(() => {
+        renderer.unmount();
+      });
+    }
   });
 });

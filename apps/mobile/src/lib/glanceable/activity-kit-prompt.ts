@@ -1,10 +1,15 @@
 import * as SecureStore from 'expo-secure-store';
 import { Alert, Linking, Platform } from 'react-native';
 
-import { isEligibleGlanceableWork } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  buildOpaqueScopeKey,
+  isEligibleGlanceableWork,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { clearActivityKitDeniedIfAvailable, getActivityKitDenied } from '@/glanceable-ios/ios-sink';
-import { getLastGlanceableSnapshot } from '@/lib/glanceable/persist';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
+import { getLastGlanceableSnapshot, getLocalScopeKey } from '@/lib/glanceable/persist';
 import { getGlanceableSinks } from '@/lib/glanceable/sink-registry';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
@@ -51,17 +56,31 @@ async function readSecureStoreValue(key: string): Promise<string | null> {
  * was not cleared, or the persisted snapshot has no eligible work.
  */
 export async function recoverGlanceableActivityKit(): Promise<void> {
-  if (Platform.OS !== 'ios' || !clearActivityKitDeniedIfAvailable()) {
+  if (Platform.OS !== 'ios' || !getActivityKitDenied()) {
     return;
   }
+  const authEpoch = currentAuthEpoch();
+  const blankEpoch = getTerminalBlankEpoch();
+  const scopeKey = getLocalScopeKey();
   const snapshot = getLastGlanceableSnapshot();
-  if (snapshot === null || !isEligibleGlanceableWork(snapshot)) {
+  if (snapshot === null || snapshot.scopeKey !== scopeKey || !isEligibleGlanceableWork(snapshot)) {
     return;
   }
   const [userId, organizationId] = await Promise.all([
     readSecureStoreValue(ACTIVE_USER_ID_KEY),
     readSecureStoreValue(ORGANIZATION_STORAGE_KEY),
   ]);
+  if (
+    currentAuthEpoch() !== authEpoch ||
+    getTerminalBlankEpoch() !== blankEpoch ||
+    getLocalScopeKey() !== scopeKey ||
+    getLastGlanceableSnapshot() !== snapshot ||
+    userId === null ||
+    buildOpaqueScopeKey({ userId, organizationId }) !== scopeKey ||
+    !clearActivityKitDeniedIfAvailable()
+  ) {
+    return;
+  }
   for (const sink of getGlanceableSinks()) {
     sink.startOrUpdate(snapshot, { userId, organizationId });
   }

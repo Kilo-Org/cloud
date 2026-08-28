@@ -6,7 +6,6 @@ import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import type { UpsertPlatformIntegrationResult } from '@/lib/integrations/db/platform-integrations';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
-import { getEnvVariable } from '@/lib/dotenvx';
 
 type TestIntegration = {
   id: string;
@@ -106,12 +105,6 @@ jest.mock('@/lib/github-pr-review/dev-seed', () => ({
   seedUserGithubToken: (...args: [Record<string, unknown>]) => mockSeedUserGithubToken(...args),
 }));
 
-jest.mock('@/lib/dotenvx', () => ({
-  getEnvVariable: jest.fn(),
-}));
-
-const mockGetEnvVariable = jest.mocked(getEnvVariable);
-
 let createCaller: (ctx: { user: User }) => {
   listOrganizationInstallations: (input: { organizationId: string }) => Promise<{
     canAdd: boolean;
@@ -180,9 +173,8 @@ function organizationIntegration(): PlatformIntegration {
 describe('githubAppsRouter organization install capability', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetEnvVariable.mockReturnValue(
-      '9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55'
-    );
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS =
+      '9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55';
     mockEnsureOrganizationAccess.mockResolvedValue('member');
     mockGetGitHubAppTypeForOrganization.mockResolvedValue('standard');
     mockCreateInstallState.mockResolvedValue('install-token');

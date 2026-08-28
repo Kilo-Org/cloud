@@ -2,6 +2,24 @@ import { env, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, it, expect } from 'vitest';
 import { triggerConfig } from '../../src/db/sqlite-schema';
+import type { TriggerDO } from '../../src/dos/TriggerDO';
+
+async function expectSandboxAllocation(
+  stub: DurableObjectStub<TriggerDO>,
+  sandboxAllocation: 'isolated-standard' | undefined
+): Promise<void> {
+  expect((await stub.getConfig())?.sandboxAllocation).toBe(sandboxAllocation);
+  expect((await stub.getConfigForResponse())?.sandboxAllocation).toBe(sandboxAllocation);
+  await runInDurableObject(stub, async (_instance, state) => {
+    const config = await state.storage.get<{ sandboxAllocation?: 'isolated-standard' }>('config');
+    expect(config?.sandboxAllocation).toBe(sandboxAllocation);
+    const row = drizzle(state.storage)
+      .select({ sandboxAllocation: triggerConfig.sandbox_allocation })
+      .from(triggerConfig)
+      .get();
+    expect(row?.sandboxAllocation).toBe(sandboxAllocation ?? null);
+  });
+}
 
 describe('TriggerDO', () => {
   const testUserId = 'user123';
@@ -11,6 +29,178 @@ describe('TriggerDO', () => {
   const testOrgNamespace = `org/${testOrgId}`;
 
   describe('configure', () => {
+    it.each([
+      ['webhook', undefined],
+      ['scheduled', '* * * * *'],
+    ] as const)(
+      'persists sandbox allocation for %s triggers independently from KV hydration',
+      async (activationMode, cronExpression) => {
+        const triggerId = `sandbox-allocation-${activationMode}`;
+        const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+        const stub = env.TRIGGER_DO.get(id);
+
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          sandboxAllocation: 'isolated-standard',
+          activationMode,
+          cronExpression,
+        });
+
+        await runInDurableObject(stub, async (_instance, state) => {
+          const config = await state.storage.get<{ sandboxAllocation?: 'isolated-standard' }>(
+            'config'
+          );
+          expect(config?.sandboxAllocation).toBe('isolated-standard');
+          const row = drizzle(state.storage)
+            .select({ sandboxAllocation: triggerConfig.sandbox_allocation })
+            .from(triggerConfig)
+            .get();
+          expect(row?.sandboxAllocation).toBe('isolated-standard');
+          await state.storage.delete('config');
+        });
+
+        expect((await stub.getConfig())?.sandboxAllocation).toBe('isolated-standard');
+      }
+    );
+
+    it.each([
+      ['webhook', undefined],
+      ['scheduled', '* * * * *'],
+    ] as const)(
+      'updates, preserves, and clears sandbox allocation in SQLite and KV for %s triggers',
+      async (activationMode, cronExpression) => {
+        const triggerId = `sandbox-allocation-update-${activationMode}`;
+        const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+        const stub = env.TRIGGER_DO.get(id);
+
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          activationMode,
+          cronExpression,
+        });
+        await stub.updateConfig({ sandboxAllocation: 'isolated-standard' });
+        await expectSandboxAllocation(stub, 'isolated-standard');
+
+        await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+        await expectSandboxAllocation(stub, 'isolated-standard');
+
+        await stub.updateConfig({ sandboxAllocation: undefined });
+        await expectSandboxAllocation(stub, 'isolated-standard');
+
+        await stub.updateConfig({ sandboxAllocation: null });
+        await expectSandboxAllocation(stub, undefined);
+      }
+    );
+
+    it('hydrates an existing SQLite row with a null sandbox allocation', async () => {
+      const triggerId = 'sandbox-allocation-legacy';
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage)
+          .insert(triggerConfig)
+          .values({
+            trigger_id: triggerId,
+            namespace: testUserNamespace,
+            user_id: testUserId,
+            org_id: null,
+            created_at: '2026-01-01T00:00:00.000Z',
+            is_active: 1,
+            target_type: 'cloud_agent',
+            github_repo: 'owner/repo',
+            prompt_template: 'Process {{body}}',
+            activation_mode: 'webhook',
+          })
+          .run();
+      });
+
+      expect((await stub.getConfig())?.sandboxAllocation).toBeUndefined();
+    });
+
+    it('rejects an invalid persisted sandbox allocation', async () => {
+      const triggerId = 'sandbox-allocation-invalid';
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process {{body}}',
+      });
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage).update(triggerConfig).set({ sandbox_allocation: 'invalid' }).run();
+      });
+
+      await runInDurableObject(stub, async instance => {
+        await expect(instance.getConfig()).rejects.toThrow();
+      });
+    });
+
+    it('rejects sandbox allocation for KiloClaw without mutating it or normal configs', async () => {
+      const kiloclawId = env.TRIGGER_DO.idFromName(
+        `${testUserNamespace}/sandbox-allocation-kiloclaw`
+      );
+      const normalId = env.TRIGGER_DO.idFromName(`${testUserNamespace}/sandbox-allocation-normal`);
+      const kiloclawStub = env.TRIGGER_DO.get(kiloclawId);
+      const normalStub = env.TRIGGER_DO.get(normalId);
+      const baseConfig = {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process {{body}}',
+      };
+
+      await runInDurableObject(kiloclawStub, async (instance, state) => {
+        await expect(
+          instance.configure(testUserNamespace, 'sandbox-allocation-kiloclaw', {
+            ...baseConfig,
+            targetType: 'kiloclaw_chat',
+            sandboxAllocation: 'isolated-standard',
+          })
+        ).rejects.toThrow('Sandbox allocation is only supported for cloud agent triggers');
+        expect(await instance.getConfig()).toBeNull();
+        expect(await state.storage.get('config')).toBeUndefined();
+      });
+
+      await kiloclawStub.configure(testUserNamespace, 'sandbox-allocation-kiloclaw', {
+        ...baseConfig,
+        targetType: 'kiloclaw_chat',
+      });
+      await normalStub.configure(testUserNamespace, 'sandbox-allocation-normal', {
+        ...baseConfig,
+        sandboxAllocation: 'isolated-standard',
+      });
+      const before = await kiloclawStub.getConfig();
+
+      await runInDurableObject(kiloclawStub, async instance => {
+        await expect(
+          instance.updateConfig({ sandboxAllocation: 'isolated-standard' })
+        ).rejects.toThrow('Sandbox allocation is only supported for cloud agent triggers');
+        await expect(instance.updateConfig({ sandboxAllocation: null })).rejects.toThrow(
+          'Sandbox allocation is only supported for cloud agent triggers'
+        );
+      });
+      expect(await kiloclawStub.getConfig()).toEqual(before);
+      await expectSandboxAllocation(kiloclawStub, undefined);
+
+      await expect(
+        kiloclawStub.updateConfig({ promptTemplate: 'Updated {{body}}' })
+      ).resolves.toEqual({ success: true });
+      expect(await kiloclawStub.getConfig()).toMatchObject({
+        ...before,
+        promptTemplate: 'Updated {{body}}',
+      });
+      await expectSandboxAllocation(normalStub, 'isolated-standard');
+    });
+
     it('round-trips an omitted variant as undefined', async () => {
       const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/variant-omitted`);
       const stub = env.TRIGGER_DO.get(id);

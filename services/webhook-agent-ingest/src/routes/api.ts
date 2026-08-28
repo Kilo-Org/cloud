@@ -176,6 +176,7 @@ export const TriggerConfigInput = z
       .max(50)
       .regex(/^[a-zA-Z]+$/)
       .optional(),
+    sandboxAllocation: z.literal('isolated-standard').optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
     profileId: z.string().uuid().optional(),
     autoCommit: z.boolean().optional(),
@@ -262,6 +263,13 @@ export const TriggerConfigInput = z
           message: 'kiloclawInstanceId is required for kiloclaw_chat triggers',
           path: ['kiloclawInstanceId'],
         });
+      if (data.sandboxAllocation !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'sandboxAllocation is not applicable for kiloclaw_chat triggers',
+          path: ['sandboxAllocation'],
+        });
+      }
     }
   });
 
@@ -279,6 +287,7 @@ export const TriggerConfigUpdateInput = z
       .regex(/^[a-zA-Z]+$/)
       .nullable()
       .optional(),
+    sandboxAllocation: z.literal('isolated-standard').nullable().optional(),
     promptTemplate: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
     profileId: z.string().uuid().optional(),
@@ -447,6 +456,13 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
 
     if (!existingConfig) {
       return c.json(resError('Trigger not found'), 404);
+    }
+
+    if (existingConfig.targetType === 'kiloclaw_chat' && updates.sandboxAllocation !== undefined) {
+      return c.json(
+        resError('sandboxAllocation is not applicable for kiloclaw_chat triggers'),
+        400
+      );
     }
 
     const result = await withDORetry(

@@ -30,6 +30,8 @@ import { computeNextCronTime } from '../util/cron';
 
 export type { ProcessStatus, RequestUpdates } from '../db/types';
 
+const SandboxAllocation = z.literal('isolated-standard');
+
 export const TriggerConfig = z.object({
   triggerId: z.string(),
   namespace: z.string(),
@@ -43,6 +45,7 @@ export const TriggerConfig = z.object({
   mode: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
   variant: z.string().optional(),
+  sandboxAllocation: SandboxAllocation.optional(),
   promptTemplate: z.string(),
   profileId: z.string().nullable().optional(),
   autoCommit: z.boolean().optional(),
@@ -87,6 +90,7 @@ type ConfigureInput = {
   mode?: string;
   model?: string;
   variant?: string;
+  sandboxAllocation?: 'isolated-standard';
   promptTemplate: string;
   profileId?: string;
   autoCommit?: boolean;
@@ -106,6 +110,7 @@ type UpdateConfigInput = {
   mode?: string;
   model?: string;
   variant?: string | null;
+  sandboxAllocation?: 'isolated-standard' | null;
   promptTemplate?: string;
   isActive?: boolean;
   profileId?: string;
@@ -138,6 +143,12 @@ export class TriggerDO extends DurableObject<Env> {
       throw new Error('Trigger configuration is required');
     }
 
+    const targetType = configOverrides.targetType ?? 'cloud_agent';
+    const sandboxAllocation = SandboxAllocation.optional().parse(configOverrides.sandboxAllocation);
+    if (sandboxAllocation !== undefined && targetType === 'kiloclaw_chat') {
+      throw new Error('Sandbox allocation is only supported for cloud agent triggers');
+    }
+
     const webhookAuth = await this.resolveWebhookAuthOnCreate(configOverrides.webhookAuth);
 
     const config: TriggerConfig = {
@@ -147,12 +158,13 @@ export class TriggerDO extends DurableObject<Env> {
       orgId,
       createdAt: new Date().toISOString(),
       isActive: true,
-      targetType: configOverrides.targetType ?? 'cloud_agent',
+      targetType,
       kiloclawInstanceId: configOverrides.kiloclawInstanceId ?? null,
       githubRepo: configOverrides.githubRepo ?? null,
       mode: configOverrides.mode ?? null,
       model: configOverrides.model ?? null,
       variant: configOverrides.variant,
+      sandboxAllocation,
       promptTemplate: configOverrides.promptTemplate,
       profileId: configOverrides.profileId ?? null,
       autoCommit: configOverrides.autoCommit,
@@ -163,8 +175,6 @@ export class TriggerDO extends DurableObject<Env> {
       cronExpression: configOverrides.cronExpression ?? null,
       cronTimezone: configOverrides.cronTimezone ?? 'UTC',
     };
-
-    await this.ctx.storage.put('config', config);
 
     const insertValues = {
       trigger_id: config.triggerId,
@@ -179,6 +189,7 @@ export class TriggerDO extends DurableObject<Env> {
       mode: config.mode ?? null,
       model: config.model ?? null,
       variant: config.variant ?? null,
+      sandbox_allocation: config.sandboxAllocation ?? null,
       prompt_template: config.promptTemplate,
       profile_id: config.profileId ?? null,
       auto_commit: config.autoCommit !== undefined ? (config.autoCommit ? 1 : 0) : null,
@@ -202,6 +213,8 @@ export class TriggerDO extends DurableObject<Env> {
         set: updateValues,
       })
       .run();
+
+    await this.ctx.storage.put('config', config);
 
     // Set initial alarm for scheduled triggers
     if (config.activationMode === 'scheduled' && config.cronExpression) {
@@ -246,6 +259,7 @@ export class TriggerDO extends DurableObject<Env> {
       mode: record.mode ?? null,
       model: record.model ?? null,
       variant: record.variant ?? undefined,
+      sandboxAllocation: parseSandboxAllocation(record.sandbox_allocation),
       promptTemplate: record.prompt_template,
       profileId: record.profile_id ?? null,
       autoCommit: record.auto_commit !== null ? record.auto_commit === 1 : undefined,
@@ -281,6 +295,11 @@ export class TriggerDO extends DurableObject<Env> {
       return { success: false };
     }
 
+    const sandboxAllocationUpdate = SandboxAllocation.nullish().parse(updates.sandboxAllocation);
+    if (sandboxAllocationUpdate !== undefined && existingConfig.targetType === 'kiloclaw_chat') {
+      throw new Error('Sandbox allocation is only supported for cloud agent triggers');
+    }
+
     const resolveNullable = <T>(
       update: T | null | undefined,
       existing: T | undefined
@@ -297,6 +316,7 @@ export class TriggerDO extends DurableObject<Env> {
       mode: updates.mode ?? existingConfig.mode,
       model: updates.model ?? existingConfig.model,
       variant: resolveNullable(updates.variant, existingConfig.variant),
+      sandboxAllocation: resolveNullable(sandboxAllocationUpdate, existingConfig.sandboxAllocation),
       promptTemplate: updates.promptTemplate ?? existingConfig.promptTemplate,
       isActive: updates.isActive ?? existingConfig.isActive,
       profileId: updates.profileId ?? existingConfig.profileId,
@@ -311,14 +331,13 @@ export class TriggerDO extends DurableObject<Env> {
       cronTimezone: updates.cronTimezone ?? existingConfig.cronTimezone,
     };
 
-    await this.ctx.storage.put('config', updatedConfig);
-
     this.db
       .update(triggerConfigTable)
       .set({
         mode: updatedConfig.mode,
         model: updatedConfig.model,
         variant: updatedConfig.variant ?? null,
+        sandbox_allocation: updatedConfig.sandboxAllocation ?? null,
         prompt_template: updatedConfig.promptTemplate,
         is_active: updatedConfig.isActive ? 1 : 0,
         profile_id: updatedConfig.profileId,
@@ -337,6 +356,8 @@ export class TriggerDO extends DurableObject<Env> {
       })
       .where(eq(triggerConfigTable.trigger_id, updatedConfig.triggerId))
       .run();
+
+    await this.ctx.storage.put('config', updatedConfig);
 
     // Alarm lifecycle for scheduled triggers
     if (updatedConfig.activationMode === 'scheduled') {
@@ -834,6 +855,13 @@ function extractStoredWebhookAuth(config: TriggerConfig | null): StoredWebhookAu
     header: config.webhookAuthHeader,
     secretHash: config.webhookAuthSecretHash,
   };
+}
+
+function parseSandboxAllocation(value: string | null): 'isolated-standard' | undefined {
+  if (value === null) {
+    return undefined;
+  }
+  return SandboxAllocation.parse(value);
 }
 
 function recordToCapturedRequest(record: RequestRow): CapturedRequest {

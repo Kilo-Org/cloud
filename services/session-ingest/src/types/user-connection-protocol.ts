@@ -631,6 +631,14 @@ export const browserProviderOutboundMessageSchema = browserBoundary(
           })
           .optional(),
       }),
+      // Read-only history requires proof, not registration or a generation grant.
+      z.strictObject({
+        type: z.literal('provider_status'),
+        requestId: browserRequestIdSchema,
+        providerId: browserProviderIdSchema,
+        providerProof: browserProofSchema,
+        cursor: browserJobIdSchema.optional(),
+      }),
       z.strictObject({
         type: z.literal('provider_heartbeat'),
         requestId: browserRequestIdSchema,
@@ -674,8 +682,9 @@ export const browserProviderOutboundMessageSchema = browserBoundary(
 );
 export type BrowserProviderOutboundMessage = z.infer<typeof browserProviderOutboundMessageSchema>;
 
-// These frames target only the registered provider socket, never ordinary web
-// subscribers. A snapshot is reconciliation data, not permission to execute.
+// Provider frames never target ordinary web subscribers. Execution frames require
+// a registered socket; status results require a proof-authorized request.
+// A snapshot is reconciliation data, not permission to execute.
 export const browserProviderInboundMessageSchema = browserBoundary(
   z
     .discriminatedUnion('type', [
@@ -699,6 +708,18 @@ export const browserProviderInboundMessageSchema = browserBoundary(
         jobs: z.array(browserJobSnapshotSchema).max(BROWSER_PAGE_SIZE),
         nextCursor: browserJobIdSchema.optional(),
       }),
+      // History grants no execution, lease, approval, or recovery authority.
+      z
+        .strictObject({
+          type: z.literal('provider_status_result'),
+          requestId: browserRequestIdSchema,
+          providerId: browserProviderIdSchema,
+          jobs: z.array(browserJobSnapshotSchema).max(BROWSER_PAGE_SIZE),
+          nextCursor: browserJobIdSchema.optional(),
+        })
+        .refine(message => message.jobs.every(job => job.providerId === message.providerId), {
+          message: 'History must match the requested provider',
+        }),
       z.strictObject({
         type: z.literal('provider_lease_ack'),
         ...browserBindingShape,

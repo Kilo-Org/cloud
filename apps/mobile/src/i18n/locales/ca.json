@@ -757,7 +757,8 @@
       "networkError": "Error de xarxa",
       "uploadFailed": "La pujada ha fallat",
       "failedToUploadFile": "No s'ha pogut pujar el fitxer: {{reason}}",
-      "nothingToPaste": "Res per enganxar"
+      "nothingToPaste": "Res per enganxar",
+      "metadataStripFailed": "No s'han pogut eliminar les metadades de la foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2228,7 +2229,8 @@
       "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Trieu Cloud Agent o un altre CLI.",
       "continueFrom": "Continuant {{title}}",
       "importFailed": "No s'ha pogut importar aquesta sessió.",
-      "importingSession": "Important la sessió"
+      "importingSession": "Important la sessió",
+      "discardWithUploadsMessage": "S'eliminaran el teu missatge i els fitxers penjats que no s'hagin adjuntat a missatges enviats."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxer actualitzat",
@@ -2591,7 +2593,9 @@
       "finalizingPlaceholder": "Tancant...",
       "messagePlaceholder": "Missatge...",
       "cannotReceiveFiles": "Aquesta sessió no pot rebre fitxers. Treu els fitxers adjunts per enviar el teu missatge.",
-      "couldNotAttachFiles": "No s'han pogut adjuntar els fitxers. Toqueu Envia per tornar-ho a provar."
+      "couldNotAttachFiles": "No s'han pogut adjuntar els fitxers. Toqueu Envia per tornar-ho a provar.",
+      "discardAttachmentsMessage": "S'eliminaran els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
+      "discardAttachmentsTitle": "Descartar els adjunts?"
     },
     "chatLink": {
       "linkCopied": "Enllaç copiat",

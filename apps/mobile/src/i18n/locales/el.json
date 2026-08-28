@@ -750,7 +750,8 @@
       "networkError": "Σφάλμα δικτύου",
       "uploadFailed": "Η μεταφόρτωση απέτυχε",
       "failedToUploadFile": "Δεν ήταν δυνατή η μεταφόρτωση του αρχείου: {{reason}}",
-      "nothingToPaste": "Δεν υπάρχει τίποτα για επικόλληση"
+      "nothingToPaste": "Δεν υπάρχει τίποτα για επικόλληση",
+      "metadataStripFailed": "Δεν ήταν δυνατή η αφαίρεση των μεταδεδομένων της φωτογραφίας."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Συνέχιση του {{title}}",
       "importingSession": "Εισαγωγή συνεδρίας",
       "cliCannotContinue": "Αυτό το CLI δεν μπορεί να συνεχίσει μια συνεδρία. Επιλέξτε Cloud Agent ή άλλο CLI.",
-      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας."
+      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας.",
+      "discardWithUploadsMessage": "Το μήνυμά σας και τυχόν μεταφορτωμένα αρχεία που δεν έχουν προσαρτηθεί σε απεσταλμένα μηνύματα θα διαγραφούν."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Ολοκλήρωση...",
       "messagePlaceholder": "Μήνυμα...",
       "cannotReceiveFiles": "Αυτή η συνεδρία δεν μπορεί να λάβει αρχεία. Αφαιρέστε τα συνημμένα για να στείλετε το μήνυμά σας.",
-      "couldNotAttachFiles": "Δεν ήταν δυνατή η προσάρτηση αρχείων. Πατήστε αποστολή για να δοκιμάσετε ξανά."
+      "couldNotAttachFiles": "Δεν ήταν δυνατή η προσάρτηση αρχείων. Πατήστε αποστολή για να δοκιμάσετε ξανά.",
+      "discardAttachmentsMessage": "Τα μεταφορτωμένα αρχεία που δεν έχουν προσαρτηθεί σε απεσταλμένα μηνύματα θα διαγραφούν.",
+      "discardAttachmentsTitle": "Απόρριψη συνημμένων;"
     },
     "chatLink": {
       "linkCopied": "Ο σύνδεσμος αντιγράφηκε",

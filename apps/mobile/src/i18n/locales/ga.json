@@ -771,7 +771,8 @@
       "networkError": "Earráid líonra",
       "uploadFailed": "Theip ar an uaslódáil",
       "failedToUploadFile": "Theip ar an gcomhad a uaslódáil: {{reason}}",
-      "nothingToPaste": "Níl aon rud le greamú"
+      "nothingToPaste": "Níl aon rud le greamú",
+      "metadataStripFailed": "Níorbh fhéidir meiteashonraí an ghrianghraif a bhaint."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2258,7 +2259,8 @@
       "cliCannotContinue": "Ní féidir leis an CLI seo seisiún a leanúint ar aghaidh. Roghnaigh Cloud Agent nó CLI eile.",
       "continueFrom": "Ag leanúint ar aghaidh le {{title}}",
       "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
-      "importingSession": "Ag iompórtáil seisiúin"
+      "importingSession": "Ag iompórtáil seisiúin",
+      "discardWithUploadsMessage": "Scriosfar do leid agus aon chomhaid uaslódáilte nach bhfuil ceangailte le teachtaireachtaí seolta."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} comhad",
@@ -2629,7 +2631,9 @@
       "finalizingPlaceholder": "Ag críochnú...",
       "messagePlaceholder": "Teachtaireacht...",
       "cannotReceiveFiles": "Ní féidir leis an seisiún seo comhaid a fháil. Bain na ceangaltáin le do theachtaireacht a sheoladh.",
-      "couldNotAttachFiles": "Níorbh fhéidir comhaid a cheangal. Tapáil seol le triail arís."
+      "couldNotAttachFiles": "Níorbh fhéidir comhaid a cheangal. Tapáil seol le triail arís.",
+      "discardAttachmentsMessage": "Scriosfar comhaid uaslódáilte nach bhfuil ceangailte le teachtaireachtaí seolta.",
+      "discardAttachmentsTitle": "An gcaithfear na ceangaltáin ar lár?"
     },
     "chatLink": {
       "linkCopied": "Nasc cóipeáilte",

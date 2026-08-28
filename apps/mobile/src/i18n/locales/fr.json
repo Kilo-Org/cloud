@@ -280,7 +280,8 @@
       "networkError": "Erreur réseau",
       "uploadFailed": "Échec de l'envoi",
       "failedToUploadFile": "Échec de l'envoi du fichier : {{reason}}",
-      "nothingToPaste": "Rien à coller"
+      "nothingToPaste": "Rien à coller",
+      "metadataStripFailed": "Impossible de supprimer les métadonnées de la photo."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1685,7 +1686,8 @@
       "cliCannotContinue": "Cette CLI ne peut pas continuer une session. Choisissez Cloud Agent ou une autre CLI.",
       "continueFrom": "Continuation de {{title}}",
       "importFailed": "Impossible d'importer cette session.",
-      "importingSession": "Importation de la session"
+      "importingSession": "Importation de la session",
+      "discardWithUploadsMessage": "Votre prompt et les fichiers téléversés non joints à des messages envoyés seront supprimés."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour",
@@ -2048,7 +2050,9 @@
       "finalizingPlaceholder": "Finalisation...",
       "messagePlaceholder": "Message...",
       "cannotReceiveFiles": "Cette session ne peut pas recevoir de fichiers. Supprimez les pièces jointes pour envoyer votre message.",
-      "couldNotAttachFiles": "Impossible de joindre les fichiers. Touchez Envoyer pour réessayer."
+      "couldNotAttachFiles": "Impossible de joindre les fichiers. Touchez Envoyer pour réessayer.",
+      "discardAttachmentsMessage": "Les fichiers téléversés non joints à des messages envoyés seront supprimés.",
+      "discardAttachmentsTitle": "Abandonner les pièces jointes ?"
     },
     "chatLink": {
       "linkCopied": "Lien copié",

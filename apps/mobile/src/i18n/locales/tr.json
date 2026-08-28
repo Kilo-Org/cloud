@@ -296,7 +296,8 @@
       "networkError": "Ağ hatası",
       "uploadFailed": "Yükleme başarısız oldu",
       "failedToUploadFile": "Dosya yüklenemedi: {{reason}}",
-      "nothingToPaste": "Yapıştırılacak bir şey yok"
+      "nothingToPaste": "Yapıştırılacak bir şey yok",
+      "metadataStripFailed": "Fotoğraf meta verileri kaldırılamadı."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1759,7 +1760,8 @@
       "continueFrom": "{{title}} devam ediliyor",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam edemez. Bulut Ajanı veya başka bir CLI seçin.",
-      "importFailed": "Bu oturum içe aktarılamadı."
+      "importFailed": "Bu oturum içe aktarılamadı.",
+      "discardWithUploadsMessage": "İsteminiz ve gönderilen mesajlara eklenmemiş tüm yüklemeler silinecek."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi",
@@ -2118,7 +2120,9 @@
       "finalizingPlaceholder": "Tamamlanıyor...",
       "messagePlaceholder": "Mesaj...",
       "cannotReceiveFiles": "Bu oturum dosya alamaz. Mesajınızı göndermek için ekleri kaldırın.",
-      "couldNotAttachFiles": "Dosyalar eklenemedi. Yeniden denemek için Gönder’e dokunun."
+      "couldNotAttachFiles": "Dosyalar eklenemedi. Yeniden denemek için Gönder’e dokunun.",
+      "discardAttachmentsMessage": "Gönderilen mesajlara eklenmemiş yüklemeler silinecek.",
+      "discardAttachmentsTitle": "Ekler silinsin mi?"
     },
     "chatLink": {
       "linkCopied": "Bağlantı kopyalandı",

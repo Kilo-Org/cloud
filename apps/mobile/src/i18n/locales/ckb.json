@@ -750,7 +750,8 @@
       "networkError": "هەڵەی تۆڕ",
       "uploadFailed": "بارکردن شکستی هێنا",
       "failedToUploadFile": "نەتوانرا فایلەکە بار بکرێت: {{reason}}",
-      "nothingToPaste": "هیچ شتێک نییە بۆ بلکاندن"
+      "nothingToPaste": "هیچ شتێک نییە بۆ بلکاندن",
+      "metadataStripFailed": "نەتوانرا مێتاداتای وێنەکە لاببرێت."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "بەردەوامبوونی {{title}}",
       "importingSession": "هاوردەکردنی دانیشتن",
       "cliCannotContinue": "ئەم CLIـیە ناتوانێت بەردەوام لە دانیشتنێک بێت. Cloud Agent یان CLIـیەکی دیکە هەڵبژێرە.",
-      "importFailed": "نەتوانرا ئەم دانیشتنە هاوردە بکرێت."
+      "importFailed": "نەتوانرا ئەم دانیشتنە هاوردە بکرێت.",
+      "discardWithUploadsMessage": "داواکارییەکەت و ئەو پەڕگە بارکراوانەی هاوپێچی پەیامی نێردراو نەکراون دەسڕێنەوە."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} پەڕگە نوێکرایەوە",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "کۆتایی هێنان...",
       "messagePlaceholder": "نامە...",
       "cannotReceiveFiles": "ئەم دانیشتنە ناتوانێت فایل وەربگرێت. پاشگرەکان لاببە بۆ ناردنی نامەکەت.",
-      "couldNotAttachFiles": "نەتوانرا فایلەکان بلکێنرێت. دابکە لەسەر ناردن بۆ دووبارە هەوڵدان."
+      "couldNotAttachFiles": "نەتوانرا فایلەکان بلکێنرێت. دابکە لەسەر ناردن بۆ دووبارە هەوڵدان.",
+      "discardAttachmentsMessage": "ئەو پەڕگە بارکراوانەی هاوپێچی پەیامی نێردراو نەکراون دەسڕێنەوە.",
+      "discardAttachmentsTitle": "فڕێدانی هاوپێچەکان؟"
     },
     "chatLink": {
       "linkCopied": "بەستەرەکە کۆپی کرا",

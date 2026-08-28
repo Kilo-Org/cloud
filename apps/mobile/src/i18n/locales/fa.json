@@ -750,7 +750,8 @@
       "networkError": "خطای شبکه",
       "uploadFailed": "بارگذاری ناموفق بود",
       "failedToUploadFile": "بارگذاری فایل ناموفق بود: {{reason}}",
-      "nothingToPaste": "چیزی برای جای‌گذاری نیست"
+      "nothingToPaste": "چیزی برای جای‌گذاری نیست",
+      "metadataStripFailed": "حذف فراداده عکس ممکن نشد."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
       "continueFrom": "در حال ادامهٔ {{title}}",
       "importFailed": "وارد کردن این نشست ممکن نشد.",
-      "importingSession": "در حال وارد کردن نشست"
+      "importingSession": "در حال وارد کردن نشست",
+      "discardWithUploadsMessage": "پرسش شما و فایل‌های بارگذاری‌شده‌ای که به پیام‌های ارسال‌شده پیوست نشده‌اند حذف خواهند شد."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل بهروزرسانی شد",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "در حال تکمیل...",
       "messagePlaceholder": "پیام...",
       "cannotReceiveFiles": "این جلسه نمی‌تواند فایل دریافت کند. برای ارسال پیام، پیوست‌ها را حذف کنید.",
-      "couldNotAttachFiles": "پیوست کردن فایل‌ها ممکن نشد. برای تلاش مجدد، ارسال را لمس کنید."
+      "couldNotAttachFiles": "پیوست کردن فایل‌ها ممکن نشد. برای تلاش مجدد، ارسال را لمس کنید.",
+      "discardAttachmentsMessage": "فایل‌های بارگذاری‌شده‌ای که به پیام‌های ارسال‌شده پیوست نشده‌اند حذف خواهند شد.",
+      "discardAttachmentsTitle": "پیوست‌ها دور انداخته شوند؟"
     },
     "chatLink": {
       "linkCopied": "پیوند کپی شد",

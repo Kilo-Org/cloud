@@ -757,7 +757,8 @@
       "networkError": "Mrežna greška",
       "uploadFailed": "Otpremanje nije uspelo",
       "failedToUploadFile": "Otpremanje datoteke nije uspelo: {{reason}}",
-      "nothingToPaste": "Nema šta da se nalepi"
+      "nothingToPaste": "Nema šta da se nalepi",
+      "metadataStripFailed": "Metapodaci fotografije nisu mogli biti uklonjeni."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2228,7 +2229,8 @@
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Izaberite Cloud Agent ili drugi CLI.",
       "continueFrom": "Nastavljanje {{title}}",
       "importFailed": "Uvoz ove sesije nije uspeo.",
-      "importingSession": "Uvoz sesije"
+      "importingSession": "Uvoz sesije",
+      "discardWithUploadsMessage": "Vaš upit i svi otpremljeni fajlovi koji nisu priloženi poslatim porukama biće obrisani."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažuriran {{displayCount}} fajl",
@@ -2591,7 +2593,9 @@
       "finalizingPlaceholder": "Završavanje...",
       "messagePlaceholder": "Poruka...",
       "cannotReceiveFiles": "Ova sesija ne može da prima datoteke. Uklonite priloge da biste poslali poruku.",
-      "couldNotAttachFiles": "Dodavanje datoteka nije uspelo. Dodirnite pošalji za ponovni pokušaj."
+      "couldNotAttachFiles": "Dodavanje datoteka nije uspelo. Dodirnite pošalji za ponovni pokušaj.",
+      "discardAttachmentsMessage": "Otpremljeni fajlovi koji nisu priloženi poslatim porukama biće obrisani.",
+      "discardAttachmentsTitle": "Odbaciti priloge?"
     },
     "chatLink": {
       "linkCopied": "Link kopiran",

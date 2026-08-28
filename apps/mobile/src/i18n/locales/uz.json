@@ -750,7 +750,8 @@
       "networkError": "Tarmoq xatosi",
       "uploadFailed": "Yuklash amalga oshmadi",
       "failedToUploadFile": "Faylni yuklab bo'lmadi: {{reason}}",
-      "nothingToPaste": "Joylashtirish uchun hech narsa yo'q"
+      "nothingToPaste": "Joylashtirish uchun hech narsa yo'q",
+      "metadataStripFailed": "Surat metama'lumotlarini olib tashlab bo'lmadi."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "{{title}} ni davom ettirish",
       "importingSession": "Sessiyani import qilish",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent yoki boshqa CLI'ni tanlang.",
-      "importFailed": "Bu sessiyani import qilib bo'lmadi."
+      "importFailed": "Bu sessiyani import qilib bo'lmadi.",
+      "discardWithUploadsMessage": "Promptingiz va yuborilgan xabarlarga biriktirilmagan yuklangan fayllar o'chiriladi."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Yakunlanmoqda...",
       "messagePlaceholder": "Xabar...",
       "cannotReceiveFiles": "Bu sessiya fayllarni qabul qila olmaydi. Xabarni yuborish uchun biriktirishlarni olib tashlang.",
-      "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborishga bosing."
+      "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborishga bosing.",
+      "discardAttachmentsMessage": "Yuborilgan xabarlarga biriktirilmagan yuklangan fayllar o'chiriladi.",
+      "discardAttachmentsTitle": "Biriktirilgan fayllar bekor qilinsinmi?"
     },
     "chatLink": {
       "linkCopied": "Havola nusxalandi",

@@ -750,7 +750,8 @@
       "networkError": "Şəbəkə xətası",
       "uploadFailed": "Yükləmə uğursuz oldu",
       "failedToUploadFile": "Fayl yüklənə bilmədi: {{reason}}",
-      "nothingToPaste": "Yapışdırılacaq heç nə yoxdur"
+      "nothingToPaste": "Yapışdırılacaq heç nə yoxdur",
+      "metadataStripFailed": "Foto metadata silinə bilmədi."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "{{title}} davam etdirilir",
       "importingSession": "Sessiya idxal edilir",
       "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seçin.",
-      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı."
+      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı.",
+      "discardWithUploadsMessage": "İstəyiniz və göndərilmiş mesajlara əlavə edilməmiş yükləmələr silinəcək."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Tamamlanır...",
       "messagePlaceholder": "Mesaj...",
       "cannotReceiveFiles": "Bu sessiya fayl qəbul edə bilmir. Mesajınızı göndərmək üçün əlavələri silin.",
-      "couldNotAttachFiles": "Fayllar əlavə edilə bilmədi. Yenidən cəhd etmək üçün göndər düyməsinə toxunun."
+      "couldNotAttachFiles": "Fayllar əlavə edilə bilmədi. Yenidən cəhd etmək üçün göndər düyməsinə toxunun.",
+      "discardAttachmentsMessage": "Göndərilmiş mesajlara əlavə edilməmiş yükləmələr silinəcək.",
+      "discardAttachmentsTitle": "Əlavələr ləğv edilsin?"
     },
     "chatLink": {
       "linkCopied": "Keçid kopyalandı",

@@ -280,7 +280,8 @@
       "networkError": "Errore di rete",
       "uploadFailed": "Caricamento non riuscito",
       "failedToUploadFile": "Caricamento del file non riuscito: {{reason}}",
-      "nothingToPaste": "Niente da incollare"
+      "nothingToPaste": "Niente da incollare",
+      "metadataStripFailed": "Impossibile rimuovere i metadati della foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1751,7 +1752,8 @@
       "continueFrom": "Continuazione di {{title}}",
       "importingSession": "Importazione della sessione",
       "cliCannotContinue": "Questa CLI non può continuare una sessione. Scegli Cloud Agent o un'altra CLI.",
-      "importFailed": "Impossibile importare questa sessione."
+      "importFailed": "Impossibile importare questa sessione.",
+      "discardWithUploadsMessage": "Il tuo prompt e i file caricati non allegati a messaggi inviati verranno eliminati."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aggiornato {{displayCount}} file",
@@ -2114,7 +2116,9 @@
       "finalizingPlaceholder": "Finalizzazione...",
       "messagePlaceholder": "Messaggio...",
       "cannotReceiveFiles": "Questa sessione non può ricevere file. Rimuovi gli allegati per inviare il messaggio.",
-      "couldNotAttachFiles": "Impossibile allegare i file. Tocca Invia per riprovare."
+      "couldNotAttachFiles": "Impossibile allegare i file. Tocca Invia per riprovare.",
+      "discardAttachmentsMessage": "I file caricati non allegati a messaggi inviati verranno eliminati.",
+      "discardAttachmentsTitle": "Scartare gli allegati?"
     },
     "chatLink": {
       "linkCopied": "Link copiato",

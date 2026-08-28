@@ -750,7 +750,8 @@
       "networkError": "Error sa network",
       "uploadFailed": "Nabigo ang pag-upload",
       "failedToUploadFile": "Nabigong i-upload ang file: {{reason}}",
-      "nothingToPaste": "Walang maipa-paste"
+      "nothingToPaste": "Walang maipa-paste",
+      "metadataStripFailed": "Hindi maalis ang photo metadata."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Ipinagpapatuloy ang {{title}}",
       "importingSession": "I-import ang session",
       "cliCannotContinue": "Hindi maipagpapatuloy ng CLI na ito ang session. Pumili ng Cloud Agent o ibang CLI.",
-      "importFailed": "Hindi ma-import ang session na ito."
+      "importFailed": "Hindi ma-import ang session na ito.",
+      "discardWithUploadsMessage": "Ide-delete ang iyong prompt at anumang na-upload na file na hindi nakalakip sa mga naipadalang mensahe."
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} file",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Inaayos na…",
       "messagePlaceholder": "Mensahe...",
       "cannotReceiveFiles": "Hindi makakatanggap ng file ang session na ito. Alisin ang mga attachment para maipadala ang iyong mensahe.",
-      "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang send para subukang muli."
+      "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang send para subukang muli.",
+      "discardAttachmentsMessage": "Ide-delete ang mga na-upload na file na hindi nakalakip sa mga naipadalang mensahe.",
+      "discardAttachmentsTitle": "I-discard ang mga attachment?"
     },
     "chatLink": {
       "linkCopied": "Na-kopya ang link",

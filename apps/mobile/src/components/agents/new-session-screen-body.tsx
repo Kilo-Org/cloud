@@ -425,9 +425,10 @@ export function NewSessionScreenBody() {
     }
   }
 
-  // Discard confirm: leaving with a non-empty prompt asks first. Discard
-  // clears the stored draft and the route-owned prompt ref before the captured
-  // navigation action is replayed, so a discarded prompt can never resurface.
+  // Discard confirm: leaving with a non-empty prompt or unsent uploads asks
+  // first. Discard clears the stored draft and the route-owned prompt ref, then
+  // releases admitted uploads before the captured navigation action is
+  // replayed, so a discarded draft or unclaimed upload can never resurface.
   const handleDiscardDraft = useCallback(async () => {
     if (userId) {
       const cleared = await clearDraft(userId, NEW_SESSION_DRAFT_KEY);
@@ -438,10 +439,14 @@ export function NewSessionScreenBody() {
       }
     }
     promptRef.current = '';
-  }, [userId, promptRef]);
+    // Release only after the discard is committed (clearDraft succeeded): a
+    // failed clear keeps the composer mounted, so the uploads stay recoverable.
+    attachments.releaseUnclaimedUploads();
+  }, [userId, promptRef, attachments]);
 
   useNewSessionDiscardGuard({
-    dirty: isCloneEntry ? false : hasPrompt,
+    dirty: (isCloneEntry ? false : hasPrompt) || attachments.hasUnclaimedAttachments,
+    hasUnclaimedAttachments: attachments.hasUnclaimedAttachments,
     onDiscard: handleDiscardDraft,
     skipNextGuardRef: skipDiscardGuardRef,
   });

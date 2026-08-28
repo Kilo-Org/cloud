@@ -750,7 +750,8 @@
       "networkError": "ຂໍ້ຜິດພາດເຄືອຂ່າຍ",
       "uploadFailed": "ການອັບໂຫລດລົ້ມເຫລວ",
       "failedToUploadFile": "ການອັບໂຫລດໄຟລ໌ລົ້ມເຫລວ: {{reason}}",
-      "nothingToPaste": "ບໍ່ມີຫຍັງໃຫ້ວາງ"
+      "nothingToPaste": "ບໍ່ມີຫຍັງໃຫ້ວາງ",
+      "metadataStripFailed": "ບໍ່ສາມາດລຶບຂໍ້ມູນ metadata ຂອງຮູບໄດ້."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "ກຳລັງສືບຕໍ່ {{title}}",
       "importingSession": "ກຳລັງນຳເຂົ້າເຊດຊັນ",
       "cliCannotContinue": "CLI ນີ້ບໍ່ສາມາດສືບຕໍ່ເຊດຊັນໄດ້. ເລືອກ Cloud Agent ຫຼື CLI ອື່ນ.",
-      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້."
+      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້.",
+      "discardWithUploadsMessage": "ຂໍ້ຄວາມຂອງທ່ານ ແລະ ໄຟລ໌ທີ່ອັບໂຫລດແຕ່ບໍ່ໄດ້ແນບກັບຂໍ້ຄວາມທີ່ສົ່ງແລ້ວຈະຖືກລຶບ."
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດ {{displayCount}} ໄຟລ໌",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "ກຳລັງສຳເລັດ...",
       "messagePlaceholder": "ຂໍ້ຄວາມ...",
       "cannotReceiveFiles": "ເຊດຊັນນີ້ບໍ່ສາມາດຮັບໄຟລ໌. ລຶບໄຟລ໌ແນບອອກເພື່ອສົ່ງຂໍ້ຄວາມ.",
-      "couldNotAttachFiles": "ບໍ່ສາມາດແນບໄຟລ໌. ແຕະສົ່ງເພື່ອລອງອີກ."
+      "couldNotAttachFiles": "ບໍ່ສາມາດແນບໄຟລ໌. ແຕະສົ່ງເພື່ອລອງອີກ.",
+      "discardAttachmentsMessage": "ໄຟລ໌ທີ່ອັບໂຫລດແຕ່ບໍ່ໄດ້ແນບກັບຂໍ້ຄວາມທີ່ສົ່ງແລ້ວຈະຖືກລຶບ.",
+      "discardAttachmentsTitle": "ຍົກເລີກໄຟລ໌ແນບ?"
     },
     "chatLink": {
       "linkCopied": "ສຳເນົາລິ້ງແລ້ວ",

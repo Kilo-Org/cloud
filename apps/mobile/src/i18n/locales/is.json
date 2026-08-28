@@ -750,7 +750,8 @@
       "networkError": "Netvilla",
       "uploadFailed": "Upphleðsla mistókst",
       "failedToUploadFile": "Ekki tókst að hlaða upp skrá: {{reason}}",
-      "nothingToPaste": "Ekkert til að líma"
+      "nothingToPaste": "Ekkert til að líma",
+      "metadataStripFailed": "Ekki tókst að fjarlægja lýsigögn myndar."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Halda áfram með {{title}}",
       "importingSession": "Flytur inn lotu",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
-      "importFailed": "Ekki tókst að flytja inn þessa lotu."
+      "importFailed": "Ekki tókst að flytja inn þessa lotu.",
+      "discardWithUploadsMessage": "Skilaboðunum þínum og upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppfærði {{displayCount}} skrá",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Ljýkur máli...",
       "messagePlaceholder": "Skilaboð...",
       "cannotReceiveFiles": "Þessi lota getur ekki tekið við skrám. Fjarlægðu viðhengin til að senda skilaboðin.",
-      "couldNotAttachFiles": "Ekki tókst að hengja skrár við. Bankaðu á senda til að reyna aftur."
+      "couldNotAttachFiles": "Ekki tókst að hengja skrár við. Bankaðu á senda til að reyna aftur.",
+      "discardAttachmentsMessage": "Upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
+      "discardAttachmentsTitle": "Farga viðhengjum?"
     },
     "chatLink": {
       "linkCopied": "Krækja afrituð",

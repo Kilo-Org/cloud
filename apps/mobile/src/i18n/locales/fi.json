@@ -750,7 +750,8 @@
       "networkError": "Verkkovirhe",
       "uploadFailed": "Lataus epäonnistui",
       "failedToUploadFile": "Tiedoston lataaminen epäonnistui: {{reason}}",
-      "nothingToPaste": "Ei mitään liitettävää"
+      "nothingToPaste": "Ei mitään liitettävää",
+      "metadataStripFailed": "Valokuvan metatietoja ei voitu poistaa."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
       "continueFrom": "Jatketaan {{title}}",
       "importFailed": "Tätä istuntoa ei voitu tuoda.",
-      "importingSession": "Tuodaan istuntoa"
+      "importingSession": "Tuodaan istuntoa",
+      "discardWithUploadsMessage": "Kehotteesi ja ladatut tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan."
     },
     "partRenderer": {
       "updatedFileCount_one": "Päivitetty {{displayCount}} tiedosto",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Viimeistellään...",
       "messagePlaceholder": "Viesti...",
       "cannotReceiveFiles": "Tämä istunto ei voi vastaanottaa tiedostoja. Poista liitteet lähettääksesi viestisi.",
-      "couldNotAttachFiles": "Tiedostoja ei voitu liittää. Napauta lähetä yrittääksesi uudelleen."
+      "couldNotAttachFiles": "Tiedostoja ei voitu liittää. Napauta lähetä yrittääksesi uudelleen.",
+      "discardAttachmentsMessage": "Ladatut tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
+      "discardAttachmentsTitle": "Hylätäänkö liitteet?"
     },
     "chatLink": {
       "linkCopied": "Linkki kopioitu",

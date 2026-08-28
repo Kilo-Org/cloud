@@ -296,7 +296,8 @@
       "networkError": "Lỗi mạng",
       "uploadFailed": "Tải lên thất bại",
       "failedToUploadFile": "Không thể tải tệp lên: {{reason}}",
-      "nothingToPaste": "Không có gì để dán"
+      "nothingToPaste": "Không có gì để dán",
+      "metadataStripFailed": "Không thể xóa siêu dữ liệu ảnh."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1759,7 +1760,8 @@
       "continueFrom": "Đang tiếp tục {{title}}",
       "importingSession": "Đang nhập phiên",
       "cliCannotContinue": "CLI này không thể tiếp tục một phiên. Hãy chọn Tác nhân đám mây hoặc CLI khác.",
-      "importFailed": "Không thể nhập phiên này."
+      "importFailed": "Không thể nhập phiên này.",
+      "discardWithUploadsMessage": "Lời nhắc của bạn và các tệp đã tải lên nhưng chưa đính kèm vào tin nhắn đã gửi sẽ bị xóa."
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp",
@@ -2118,7 +2120,9 @@
       "finalizingPlaceholder": "Đang hoàn tất...",
       "messagePlaceholder": "Tin nhắn...",
       "cannotReceiveFiles": "Phiên này không thể nhận tệp. Hãy gỡ tệp đính kèm để gửi tin nhắn của bạn.",
-      "couldNotAttachFiles": "Không thể đính kèm tệp. Chạm vào Gửi để thử lại."
+      "couldNotAttachFiles": "Không thể đính kèm tệp. Chạm vào Gửi để thử lại.",
+      "discardAttachmentsMessage": "Các tệp đã tải lên nhưng chưa đính kèm vào tin nhắn đã gửi sẽ bị xóa.",
+      "discardAttachmentsTitle": "Hủy bỏ tệp đính kèm?"
     },
     "chatLink": {
       "linkCopied": "Đã sao chép liên kết",

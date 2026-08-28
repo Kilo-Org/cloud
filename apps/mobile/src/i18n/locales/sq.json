@@ -750,7 +750,8 @@
       "networkError": "Gabim rrjeti",
       "uploadFailed": "Ngarkimi dështoi",
       "failedToUploadFile": "Ngarkimi i skedarit dështoi: {{reason}}",
-      "nothingToPaste": "Asgjë për të ngjitur"
+      "nothingToPaste": "Asgjë për të ngjitur",
+      "metadataStripFailed": "Metadatat e fotos nuk mund të hiqeshin."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Duke vazhduar {{title}}",
       "importingSession": "Duke importuar seancë",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidhni Cloud Agent ose një CLI tjetër.",
-      "importFailed": "Nuk u arrit të importohej kjo seancë."
+      "importFailed": "Nuk u arrit të importohej kjo seancë.",
+      "discardWithUploadsMessage": "Kërkesa juaj dhe skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen."
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Duke përfunduar...",
       "messagePlaceholder": "Mesazh",
       "cannotReceiveFiles": "Kjo seancë nuk mund të marrë skedarë. Hiqni bashkëngjitjet për të dërguar mesazhin tuaj.",
-      "couldNotAttachFiles": "Skedarët nuk u bashkëngjitën. Prekni Dërgo për të riprovuar."
+      "couldNotAttachFiles": "Skedarët nuk u bashkëngjitën. Prekni Dërgo për të riprovuar.",
+      "discardAttachmentsMessage": "Skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
+      "discardAttachmentsTitle": "Të hiqen bashkëngjitjet?"
     },
     "chatLink": {
       "linkCopied": "Lidhja u kopjua",

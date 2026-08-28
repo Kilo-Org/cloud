@@ -750,7 +750,8 @@
       "networkError": "Netwerkfout",
       "uploadFailed": "Oplaai het misluk",
       "failedToUploadFile": "Kon lêer nie oplaai nie: {{reason}}",
-      "nothingToPaste": "Niks om te plak nie"
+      "nothingToPaste": "Niks om te plak nie",
+      "metadataStripFailed": "Foto se metadata kon nie verwyder word nie."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Gaan voort met {{title}}",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortgaan nie. Kies Cloud Agent of 'n ander CLI.",
-      "importFailed": "Kon hierdie sessie nie invoer nie."
+      "importFailed": "Kon hierdie sessie nie invoer nie.",
+      "discardWithUploadsMessage": "Jou aansporing en enige opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal verwyder word."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer bygewerk",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Sluit af...",
       "messagePlaceholder": "Boodskap...",
       "cannotReceiveFiles": "Hierdie sessie kan nie lêers ontvang nie. Verwyder die aanhegsels om jou boodskap te stuur.",
-      "couldNotAttachFiles": "Kon nie lêers aanheg nie. Tik stuur om weer te probeer."
+      "couldNotAttachFiles": "Kon nie lêers aanheg nie. Tik stuur om weer te probeer.",
+      "discardAttachmentsMessage": "Opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal verwyder word.",
+      "discardAttachmentsTitle": "Aanhegsels weggooi?"
     },
     "chatLink": {
       "linkCopied": "Skakel gekopieer",

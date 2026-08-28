@@ -778,7 +778,8 @@
       "networkError": "Gwall rhwydwaith",
       "uploadFailed": "Methodd yr uwchlwythiad",
       "failedToUploadFile": "Methwyd uwchlwytho'r ffeil: {{reason}}",
-      "nothingToPaste": "Dim byd i'w ludo"
+      "nothingToPaste": "Dim byd i'w ludo",
+      "metadataStripFailed": "Ni ellid tynnu metadata'r llun."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2273,7 +2274,8 @@
       "continueFrom": "Parhau gyda {{title}}",
       "importingSession": "Mewnforio sesiwn",
       "cliCannotContinue": "Ni all y CLI hwn barhau sesiwn. Dewiswch Cloud Agent neu CLI arall.",
-      "importFailed": "Ni ellid mewnforio'r sesiwn hon."
+      "importFailed": "Ni ellid mewnforio'r sesiwn hon.",
+      "discardWithUploadsMessage": "Bydd eich anogiad ac unrhyw ffeiliau wedi'u huwchlwytho nad ydynt wedi'u hatodi i negeseuon a anfonwyd yn cael eu dileu."
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil",
@@ -2648,7 +2650,9 @@
       "finalizingPlaceholder": "Dirwyn i ben...",
       "messagePlaceholder": "Neges...",
       "cannotReceiveFiles": "Ni all y sesiwn hon dderbyn ffeiliau. Dileuwch yr atodiadau i anfon eich neges.",
-      "couldNotAttachFiles": "Methwyd atodi ffeiliau. Tapiwch anfon i geisio eto."
+      "couldNotAttachFiles": "Methwyd atodi ffeiliau. Tapiwch anfon i geisio eto.",
+      "discardAttachmentsMessage": "Bydd ffeiliau wedi'u huwchlwytho nad ydynt wedi'u hatodi i negeseuon a anfonwyd yn cael eu dileu.",
+      "discardAttachmentsTitle": "Taflu atodiadau?"
     },
     "chatLink": {
       "linkCopied": "Copïwyd y ddolen",

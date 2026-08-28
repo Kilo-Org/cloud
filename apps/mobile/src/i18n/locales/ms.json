@@ -750,7 +750,8 @@
       "networkError": "Ralat rangkaian",
       "uploadFailed": "Muat naik gagal",
       "failedToUploadFile": "Gagal memuat naik fail: {{reason}}",
-      "nothingToPaste": "Tiada apa untuk ditampal"
+      "nothingToPaste": "Tiada apa untuk ditampal",
+      "metadataStripFailed": "Metadata foto tidak dapat dibuang."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Ejen Awan atau CLI lain.",
       "continueFrom": "Meneruskan {{title}}",
       "importFailed": "Tidak dapat mengimport sesi ini.",
-      "importingSession": "Mengimport sesi"
+      "importingSession": "Mengimport sesi",
+      "discardWithUploadsMessage": "Gesaan anda dan fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fail dikemas kini",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Menyiapkan...",
       "messagePlaceholder": "Mesej...",
       "cannotReceiveFiles": "Sesi ini tidak boleh menerima fail. Buang lampiran untuk menghantar mesej anda.",
-      "couldNotAttachFiles": "Tidak dapat melampirkan fail. Ketik hantar untuk mencuba semula."
+      "couldNotAttachFiles": "Tidak dapat melampirkan fail. Ketik hantar untuk mencuba semula.",
+      "discardAttachmentsMessage": "Fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
+      "discardAttachmentsTitle": "Buang lampiran?"
     },
     "chatLink": {
       "linkCopied": "Pautan disalin",

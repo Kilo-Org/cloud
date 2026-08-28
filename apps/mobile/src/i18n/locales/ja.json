@@ -296,7 +296,8 @@
       "networkError": "ネットワークエラー",
       "uploadFailed": "アップロードに失敗しました",
       "failedToUploadFile": "ファイルのアップロードに失敗しました: {{reason}}",
-      "nothingToPaste": "貼り付けるものはありません"
+      "nothingToPaste": "貼り付けるものはありません",
+      "metadataStripFailed": "写真のメタデータを削除できませんでした。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}、{{status}}",
@@ -1759,7 +1760,8 @@
       "cliCannotContinue": "このCLIはセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
       "continueFrom": "{{title}}を続行しています",
       "importFailed": "このセッションをインポートできませんでした。",
-      "importingSession": "セッションをインポートしています"
+      "importingSession": "セッションをインポートしています",
+      "discardWithUploadsMessage": "プロンプトと、送信済みメッセージに添付されていないアップロード済みファイルは削除されます。"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました",
@@ -2118,7 +2120,9 @@
       "finalizingPlaceholder": "終了処理中...",
       "messagePlaceholder": "メッセージ...",
       "cannotReceiveFiles": "このセッションはファイルを受信できません。メッセージを送信するには添付ファイルを削除してください。",
-      "couldNotAttachFiles": "ファイルを添付できませんでした。再試行するには送信をタップしてください。"
+      "couldNotAttachFiles": "ファイルを添付できませんでした。再試行するには送信をタップしてください。",
+      "discardAttachmentsMessage": "送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
+      "discardAttachmentsTitle": "添付ファイルを破棄しますか？"
     },
     "chatLink": {
       "linkCopied": "リンクをコピーしました",

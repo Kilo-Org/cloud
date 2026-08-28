@@ -296,7 +296,8 @@
       "networkError": "خطأ في الشبكة",
       "uploadFailed": "فشل الرفع",
       "failedToUploadFile": "فشل رفع الملف: {{reason}}",
-      "nothingToPaste": "لا يوجد شيء للصق"
+      "nothingToPaste": "لا يوجد شيء للصق",
+      "metadataStripFailed": "تعذّر إزالة البيانات الوصفية للصورة."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1791,7 +1792,8 @@
       "continueFrom": "متابعة {{title}}",
       "importingSession": "جارٍ استيراد الجلسة",
       "cliCannotContinue": "لا يمكن لهذه CLI متابعة جلسة. اختر وكيل سحابي أو CLI آخر.",
-      "importFailed": "تعذر استيراد هذه الجلسة."
+      "importFailed": "تعذر استيراد هذه الجلسة.",
+      "discardWithUploadsMessage": "سيتم حذف مطالبتك وأي ملفات مرفوعة غير مرفقة برسائل مرسلة."
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث {{displayCount}} ملف",
@@ -2166,7 +2168,9 @@
       "finalizingPlaceholder": "جارٍ الإنهاء...",
       "messagePlaceholder": "رسالة...",
       "cannotReceiveFiles": "لا يمكن لهذه الجلسة استقبال الملفات. أزل المرفقات لإرسال رسالتك.",
-      "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى."
+      "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى.",
+      "discardAttachmentsMessage": "سيتم حذف الملفات المرفوعة غير المرفقة برسائل مرسلة.",
+      "discardAttachmentsTitle": "تجاهل المرفقات؟"
     },
     "chatLink": {
       "linkCopied": "تم نسخ الرابط",

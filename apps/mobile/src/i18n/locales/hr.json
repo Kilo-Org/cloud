@@ -757,7 +757,8 @@
       "networkError": "Greška mreže",
       "uploadFailed": "Učitavanje nije uspjelo",
       "failedToUploadFile": "Nije moguće učitati datoteku: {{reason}}",
-      "nothingToPaste": "Nema što zalijepiti"
+      "nothingToPaste": "Nema što zalijepiti",
+      "metadataStripFailed": "Nije moguće ukloniti metapodatke fotografije."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2228,7 +2229,8 @@
       "continueFrom": "Nastavljanje {{title}}",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberite Cloud Agent ili drugi CLI.",
-      "importFailed": "Uvoz ove sesije nije uspio."
+      "importFailed": "Uvoz ove sesije nije uspio.",
+      "discardWithUploadsMessage": "Vaš upit i sve učitane datoteke koje nisu priložene poslanim porukama bit će obrisani."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana {{displayCount}} datoteka",
@@ -2591,7 +2593,9 @@
       "finalizingPlaceholder": "Dovršavanje...",
       "messagePlaceholder": "Poruka...",
       "cannotReceiveFiles": "Ova sesija ne može primati datoteke. Uklonite privitke da biste poslali poruku.",
-      "couldNotAttachFiles": "Nije moguće priviti datoteke. Dodirnite Pošalji za ponovni pokušaj."
+      "couldNotAttachFiles": "Nije moguće priviti datoteke. Dodirnite Pošalji za ponovni pokušaj.",
+      "discardAttachmentsMessage": "Učitane datoteke koje nisu priložene poslanim porukama bit će obrisane.",
+      "discardAttachmentsTitle": "Odbaciti privitke?"
     },
     "chatLink": {
       "linkCopied": "Poveznica kopirana",

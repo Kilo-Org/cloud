@@ -750,7 +750,8 @@
       "networkError": "កំហុសបណ្តាញ",
       "uploadFailed": "ការផ្ទុកឡើងបានបរាជ័យ",
       "failedToUploadFile": "បរាជ័យក្នុងការផ្ទុកឡើងឯកសារ: {{reason}}",
-      "nothingToPaste": "គ្មានអ្វីត្រូវបិទភ្ជាប់"
+      "nothingToPaste": "គ្មានអ្វីត្រូវបិទភ្ជាប់",
+      "metadataStripFailed": "មិនអាចដកទិន្នន័យមេតារូបថតចេញបានទេ។"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}} {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "កំពុងបន្ត {{title}}",
       "importingSession": "កំពុងនាំចូលវគ្គ",
       "cliCannotContinue": "CLI នេះមិនអាចបន្តវគ្គបានទេ។ ជ្រើសរើស Cloud Agent ឬ CLI ផ្សេងទៀត។",
-      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។"
+      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។",
+      "discardWithUploadsMessage": "ការជំរុញរបស់អ្នក និងឯកសារដែលបានផ្ទុកឡើង ហើយមិនបានភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវបានលុប។"
     },
     "partRenderer": {
       "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{displayCount}}",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "កំពុងបញ្ចប់...",
       "messagePlaceholder": "សារ...",
       "cannotReceiveFiles": "វគ្គនេះមិនអាចទទួលឯកសារបានទេ។ ដកឯកសារភ្ជាប់ចេញដើម្បីផ្ញើសាររបស់អ្នក។",
-      "couldNotAttachFiles": "មិនអាចភ្ជាប់ឯកសារបានទេ។ ប៉ះផ្ញើដើម្បីព្យាយាមម្តងទៀត។"
+      "couldNotAttachFiles": "មិនអាចភ្ជាប់ឯកសារបានទេ។ ប៉ះផ្ញើដើម្បីព្យាយាមម្តងទៀត។",
+      "discardAttachmentsMessage": "ឯកសារដែលបានផ្ទុកឡើង ហើយមិនបានភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវបានលុប។",
+      "discardAttachmentsTitle": "បោះបង់ឯកសារភ្ជាប់?"
     },
     "chatLink": {
       "linkCopied": "បានចម្លងតំណ",

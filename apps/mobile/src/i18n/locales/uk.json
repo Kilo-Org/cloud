@@ -296,7 +296,8 @@
       "networkError": "Помилка мережі",
       "uploadFailed": "Не вдалося завантажити",
       "failedToUploadFile": "Не вдалося завантажити файл: {{reason}}",
-      "nothingToPaste": "Нема чого вставити"
+      "nothingToPaste": "Нема чого вставити",
+      "metadataStripFailed": "Не вдалося видалити метадані фото."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1775,7 +1776,8 @@
       "cliCannotContinue": "Цей CLI не може продовжити сеанс. Виберіть Хмарний агент або інший CLI.",
       "continueFrom": "Продовження {{title}}",
       "importFailed": "Не вдалося імпортувати цей сеанс.",
-      "importingSession": "Імпортування сеансу"
+      "importingSession": "Імпортування сеансу",
+      "discardWithUploadsMessage": "Ваш запит і всі завантажені файли, не прикріплені до надісланих повідомлень, буде видалено."
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл",
@@ -2142,7 +2144,9 @@
       "finalizingPlaceholder": "Завершення...",
       "messagePlaceholder": "Повідомлення...",
       "cannotReceiveFiles": "Ця сесія не може отримувати файли. Видаліть вкладення, щоб надіслати повідомлення.",
-      "couldNotAttachFiles": "Не вдалося прикріпити файли. Торкніться «Надіслати», щоб спробувати ще раз."
+      "couldNotAttachFiles": "Не вдалося прикріпити файли. Торкніться «Надіслати», щоб спробувати ще раз.",
+      "discardAttachmentsMessage": "Завантажені файли, не прикріплені до надісланих повідомлень, буде видалено.",
+      "discardAttachmentsTitle": "Відкинути вкладення?"
     },
     "chatLink": {
       "linkCopied": "Посилання скопійовано",

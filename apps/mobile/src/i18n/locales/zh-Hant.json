@@ -296,7 +296,8 @@
       "networkError": "網路錯誤",
       "uploadFailed": "上傳失敗",
       "failedToUploadFile": "上傳檔案失敗：{{reason}}",
-      "nothingToPaste": "沒有可貼上的內容"
+      "nothingToPaste": "沒有可貼上的內容",
+      "metadataStripFailed": "無法移除相片中繼資料。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -1759,7 +1760,8 @@
       "continueFrom": "正在繼續 {{title}}",
       "importingSession": "正在匯入工作階段",
       "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
-      "importFailed": "無法匯入此工作階段。"
+      "importFailed": "無法匯入此工作階段。",
+      "discardWithUploadsMessage": "您的提示和任何未附加至已傳送訊息的上傳檔案將遭刪除。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 個檔案",
@@ -2118,7 +2120,9 @@
       "finalizingPlaceholder": "正在收尾...",
       "messagePlaceholder": "訊息...",
       "cannotReceiveFiles": "此工作階段無法接收檔案。請移除附件後再傳送訊息。",
-      "couldNotAttachFiles": "無法附加檔案。點選傳送以重試。"
+      "couldNotAttachFiles": "無法附加檔案。點選傳送以重試。",
+      "discardAttachmentsMessage": "未附加至已傳送訊息的上傳檔案將遭刪除。",
+      "discardAttachmentsTitle": "捨棄附件？"
     },
     "chatLink": {
       "linkCopied": "連結已複製",

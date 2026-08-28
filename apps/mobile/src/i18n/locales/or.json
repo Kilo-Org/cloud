@@ -750,7 +750,8 @@
       "networkError": "ନେଟୱର୍କ ତ୍ରୁଟି",
       "uploadFailed": "ଅପଲୋଡ୍ ବିଫଳ",
       "failedToUploadFile": "ଫାଇଲ୍ ଅପଲୋଡ୍ ବିଫଳ ହେଲା: {{reason}}",
-      "nothingToPaste": "ପେଷ୍ଟ କରିବାକୁ କିଛି ନାହିଁ"
+      "nothingToPaste": "ପେଷ୍ଟ କରିବାକୁ କିଛି ନାହିଁ",
+      "metadataStripFailed": "ଫଟୋର ମେଟାଡାଟା ଅପସାରଣ ହୋଇପାରିଲା ନାହିଁ।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "ଏହି CLI ଏକ ସେସନ୍ ଜାରି ରଖିପାରିବ ନାହିଁ। Cloud Agent କିମ୍ବା ଅନ୍ୟ CLI ଚୟନ କରନ୍ତୁ।",
       "continueFrom": "{{title}} ଜାରି ରହୁଛି",
       "importFailed": "ଏହି ସେସନ୍ ଆମଦାନୀ କରିପାରିଲା ନାହିଁ।",
-      "importingSession": "ସେସନ୍ ଆମଦାନୀ କରୁଛି"
+      "importingSession": "ସେସନ୍ ଆମଦାନୀ କରୁଛି",
+      "discardWithUploadsMessage": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ଏବଂ ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ସଂଲଗ୍ନ ହୋଇନଥିବା ଅପଲୋଡ୍ ହୋଇଥିବା ଫାଇଲ୍ ଗୁଡ଼ିକ ବିଲୋପ ହେବ।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "ସମାପ୍ତ ହେଉଛି...",
       "messagePlaceholder": "ସନ୍ଦେଶ",
       "cannotReceiveFiles": "ଏହି ସେସନ୍ ଫାଇଲ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ। ଆପଣଙ୍କ ବାର୍ତ୍ତା ପଠାଇବାକୁ ଆଟାଚମେଣ୍ଟ ଅପସାରଣ କରନ୍ତୁ।",
-      "couldNotAttachFiles": "ଫାଇଲ ଆଟାଚ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁନଃଚେଷ୍ଟା କରିବାକୁ ପଠାନ୍ତୁ ଟାପ୍ କରନ୍ତୁ।"
+      "couldNotAttachFiles": "ଫାଇଲ ଆଟାଚ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁନଃଚେଷ୍ଟା କରିବାକୁ ପଠାନ୍ତୁ ଟାପ୍ କରନ୍ତୁ।",
+      "discardAttachmentsMessage": "ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ସଂଲଗ୍ନ ହୋଇନଥିବା ଅପଲୋଡ୍ ହୋଇଥିବା ଫାଇଲ୍ ଗୁଡ଼ିକ ବିଲୋପ ହେବ।",
+      "discardAttachmentsTitle": "ସଂଲଗ୍ନକଗୁଡ଼ିକ ପରିତ୍ୟାଗ କରିବେ?"
     },
     "chatLink": {
       "linkCopied": "ଲିଙ୍କ କପି ହେଲା",

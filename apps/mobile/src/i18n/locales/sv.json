@@ -750,7 +750,8 @@
       "networkError": "Nätverksfel",
       "uploadFailed": "Uppladdningen misslyckades",
       "failedToUploadFile": "Det gick inte att ladda upp filen: {{reason}}",
-      "nothingToPaste": "Ingenting att klistra in"
+      "nothingToPaste": "Ingenting att klistra in",
+      "metadataStripFailed": "Fotots metadata kunde inte tas bort."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "Denna CLI kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI.",
       "continueFrom": "Fortsätter {{title}}",
       "importFailed": "Det gick inte att importera denna session.",
-      "importingSession": "Importerar session"
+      "importingSession": "Importerar session",
+      "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppdaterade {{displayCount}} fil",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Avslutar...",
       "messagePlaceholder": "Meddelande...",
       "cannotReceiveFiles": "Denna session kan inte ta emot filer. Ta bort bilagorna för att skicka ditt meddelande.",
-      "couldNotAttachFiles": "Det gick inte att bifoga filer. Tryck på skicka för att försöka igen."
+      "couldNotAttachFiles": "Det gick inte att bifoga filer. Tryck på skicka för att försöka igen.",
+      "discardAttachmentsMessage": "Uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
+      "discardAttachmentsTitle": "Kassera bilagor?"
     },
     "chatLink": {
       "linkCopied": "Länk kopierad",

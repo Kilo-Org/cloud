@@ -25,6 +25,7 @@ import {
   buildWirePayload,
   classifyUploadFailure,
   hasAnyFailedAttachment,
+  hasAnyUnclaimedAttachment,
   isAnyAttachmentUploading,
 } from '@/lib/agent-attachments/agent-attachment-types';
 import {
@@ -35,6 +36,7 @@ import {
   describeTerminalReason,
   measureLocalSize,
   normalizeFilename,
+  releasePendingUploads,
   uploadOne,
 } from '@/lib/agent-attachments/upload-task';
 import { registerTempFile } from '@/lib/temp-file-registry';
@@ -77,14 +79,14 @@ function deleteCacheOwnedFile(localUri: string): void {
 }
 
 /**
- * Run a cancel handle and swallow its rejection. Cancellation is best-effort
- * and must never surface as an unhandled rejection.
+ * Run an async operation and swallow its rejection. Cancellation and release
+ * are best-effort and must never surface as an unhandled rejection.
  */
-async function runCancellation(handle: () => Promise<void>): Promise<void> {
+async function runBestEffort(task: () => Promise<void>): Promise<void> {
   try {
-    await handle();
+    await task();
   } catch {
-    // Best-effort cancellation.
+    // Best-effort operation: a failure leaves the 24-hour reaper to recover.
   }
 }
 
@@ -106,8 +108,11 @@ type UseAgentAttachmentUploadReturn = {
   removeAttachment: (id: string) => void;
   retryAttachment: (id: string) => void;
   reset: () => void;
+  /** Release every admitted-but-unsent key (leave/abandon). Never blocks or throws. */
+  releaseUnclaimedUploads: () => void;
   isUploading: boolean;
   hasFailedAttachments: boolean;
+  hasUnclaimedAttachments: boolean;
   /** Upload every pending/retryable chip and return the payloads, or `{ ok: false }`. */
   uploadPending: () => Promise<UploadPendingResult>;
 };
@@ -146,7 +151,7 @@ export function useAgentAttachmentUpload(
       return;
     }
     cancelHandlesRef.current.delete(id);
-    void runCancellation(handle);
+    void runBestEffort(handle);
   }, []);
 
   useEffect(() => {
@@ -239,6 +244,13 @@ export function useAgentAttachmentUpload(
             },
             onTask: t => {
               task = t;
+            },
+            onAdmitted: admittedKey => {
+              // Record the admitted key the moment the presign returns, so a
+              // remove/leave that races the PUT still releases the pending
+              // ledger row. `remoteFilename` is only set on success, so this
+              // pre-PUT key never leaks into the wire payload.
+              updateAttachment(attachment.id, { remoteKey: admittedKey });
             },
             isCancelled: () => cancelled,
           });
@@ -395,8 +407,12 @@ export function useAgentAttachmentUpload(
             localUri,
             localFileOwned,
             metadataStripFailed: metadataStripFailed || undefined,
-            status: 'pending',
-            progress: 0,
+            // A strip-failed image is a terminal error chip: it never uploads,
+            // hides Retry, and blocks Send/Start.
+            status: metadataStripFailed ? 'error' : 'pending',
+            error: metadataStripFailed ? i18n.t('chat.attachment.metadataStripFailed') : undefined,
+            terminal: metadataStripFailed ? true : undefined,
+            progress: metadataStripFailed ? null : 0,
           });
         }
       }
@@ -410,13 +426,13 @@ export function useAgentAttachmentUpload(
         return;
       }
       commitAttachments(current => [...current, ...additions]);
-      // Step 2: images upload at selection time. Documents stay deferred to
-      // send (`uploadPending`). The upload is fire-and-forget: the chip flips
-      // to `uploading` synchronously in `startUpload`, and success/error
-      // states already exist in that path.
+      // Images and documents both upload at selection time. The upload is
+      // fire-and-forget: the chip flips to `uploading` synchronously in
+      // `startUpload`, and success/error states already exist in that path.
+      // A strip-failed image stays a terminal error chip and never uploads.
       for (const addition of additions) {
         liveIdsRef.current.add(addition.id);
-        if (addition.kind === 'image') {
+        if (addition.metadataStripFailed !== true) {
           void startUpload(addition, pathRef.current);
         }
       }
@@ -432,22 +448,53 @@ export function useAgentAttachmentUpload(
       if (chip?.localFileOwned) {
         deleteCacheOwnedFile(chip.localUri);
       }
+      // Release the admitted pending-ledger row (if the presign already
+      // admitted one) so the removed chip stops consuming the quota.
+      const remoteKey = chip?.remoteKey;
+      if (remoteKey !== undefined) {
+        void runBestEffort(async () => {
+          await releasePendingUploads({ organizationId, objectKeys: [remoteKey] });
+        });
+      }
       commitAttachments(current => current.filter(item => item.id !== id));
     },
-    [cancelUpload, commitAttachments]
+    [cancelUpload, commitAttachments, organizationId]
   );
 
   const retryAttachment = useCallback(
     (id: string) => {
       const attachment = attachments.find(item => item.id === id);
-      if (!attachment || attachment.terminal) {
-        // Terminal chips have no retry affordance; bail so a stray
-        // tap cannot re-upload a server-rejected file.
+      if (!attachment || attachment.terminal || attachment.status !== 'error') {
+        // Terminal chips have no retry affordance, and only an error chip is
+        // retryable: bailing here makes a second Retry tap during the release
+        // window a no-op, so it can never presign a second key.
         return;
       }
-      void startUpload(attachment, pathRef.current);
+      const priorRemoteKey = attachment.remoteKey;
+      // Release the prior admitted key before re-presigning so a Retry swaps
+      // one pending-ledger row instead of appending a second one (the
+      // per-message cap is 5). A retryable failure itself never releases:
+      // only an explicit Retry releases and re-presigns. The release is
+      // best-effort, matching remove/leave: a failed release leaves the row
+      // for the 24-hour reaper and the retry still proceeds. Transition out
+      // of the error state synchronously so the chip stops advertising Retry.
+      updateAttachment(id, { status: 'uploading', error: undefined, progress: 0 });
+      void (async () => {
+        if (priorRemoteKey !== undefined) {
+          await runBestEffort(async () => {
+            await releasePendingUploads({ organizationId, objectKeys: [priorRemoteKey] });
+          });
+        }
+        // Re-check liveness after the release await: a Remove, reset, or leave
+        // in that window clears the id, and starting the upload then would
+        // presign a key nobody can release.
+        if (!liveIdsRef.current.has(attachment.id)) {
+          return;
+        }
+        void startUpload(attachment, pathRef.current);
+      })();
     },
-    [attachments, startUpload]
+    [attachments, startUpload, organizationId, updateAttachment]
   );
 
   const reset = useCallback(() => {
@@ -469,19 +516,36 @@ export function useAgentAttachmentUpload(
     messageUuidRef.current = Crypto.randomUUID();
   }, [cancelUpload, commitAttachments]);
 
+  // Release every admitted-but-unsent key on leave/abandon. Fire-and-forget:
+  // a failed release just leaves the row for the 24-hour reaper. Deliberately
+  // does NOT clear state or cancel — the screen unmount cleanup owns that — so
+  // a discard whose clear step fails keeps the composer intact for a retry.
+  const releaseUnclaimedUploads = useCallback(() => {
+    const admittedKeys = attachmentsRef.current
+      .map(chip => chip.remoteKey)
+      .filter((key): key is string => key !== undefined);
+    if (admittedKeys.length === 0) {
+      return;
+    }
+    void runBestEffort(async () => {
+      await releasePendingUploads({ organizationId, objectKeys: admittedKeys });
+    });
+  }, [organizationId]);
+
   const uploadPending = useCallback(async (): Promise<UploadPendingResult> => {
     const chips = attachmentsRef.current;
-    // A terminal chip blocks the send.
-    if (chips.some(chip => chip.status === 'error' && chip.terminal === true)) {
+    // A failed chip (retryable or terminal) blocks the send: the user must
+    // retry or remove it through the chip affordance, never re-upload at send.
+    if (chips.some(chip => chip.status === 'error')) {
       return { ok: false };
     }
-    // An in-flight upload (e.g. a retry) blocks too: its outcome is unknown.
+    // An in-flight upload (e.g. a selection-time upload still running) blocks.
     if (chips.some(chip => chip.status === 'uploading')) {
       return { ok: false };
     }
-    const toUpload = chips.filter(
-      chip => chip.status === 'pending' || (chip.status === 'error' && chip.terminal !== true)
-    );
+    // Documents now upload at selection time, so a still-`pending` chip is the
+    // rare one whose fire-and-forget start has not begun; upload it here.
+    const toUpload = chips.filter(chip => chip.status === 'pending');
     // eslint-disable-next-line typescript-eslint/promise-function-async -- map callback returns startUpload's promise directly
     const results = await Promise.all(toUpload.map(chip => startUpload(chip, pathRef.current)));
     if (results.some(result => result.failed)) {
@@ -524,6 +588,7 @@ export function useAgentAttachmentUpload(
 
   const isUploading = isAnyAttachmentUploading(attachments);
   const hasFailedAttachments = hasAnyFailedAttachment(attachments);
+  const hasUnclaimedAttachments = hasAnyUnclaimedAttachment(attachments);
 
   return useMemo(
     () => ({
@@ -532,8 +597,10 @@ export function useAgentAttachmentUpload(
       removeAttachment,
       retryAttachment,
       reset,
+      releaseUnclaimedUploads,
       isUploading,
       hasFailedAttachments,
+      hasUnclaimedAttachments,
       uploadPending,
     }),
     [
@@ -542,8 +609,10 @@ export function useAgentAttachmentUpload(
       removeAttachment,
       retryAttachment,
       reset,
+      releaseUnclaimedUploads,
       isUploading,
       hasFailedAttachments,
+      hasUnclaimedAttachments,
       uploadPending,
     ]
   );

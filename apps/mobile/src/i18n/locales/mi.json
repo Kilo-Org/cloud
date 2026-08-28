@@ -750,7 +750,8 @@
       "networkError": "Hapa whatunga",
       "uploadFailed": "I rahua te tuku ake",
       "failedToUploadFile": "I rahua te tuku ake i te kōnae: {{reason}}",
-      "nothingToPaste": "Kāore he mea hei piri"
+      "nothingToPaste": "Kāore he mea hei piri",
+      "metadataStripFailed": "Kāore i taea te tango i ngā raraunga-ā-whakaahua."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria te Cloud Agent, tētahi atu CLI rānei.",
       "continueFrom": "Kei te haere tonu {{title}}",
       "importFailed": "Kāore i taea te kawemai i tēnei wātū.",
-      "importingSession": "Kei te kawemai i te wātū"
+      "importingSession": "Kei te kawemai i te wātū",
+      "discardWithUploadsMessage": "Ka mukua tō pātai me ngā kōnae kua tukua ake kāore anō kia whakapirihia ki ngā karere kua tukua."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Kei te whakakapi...",
       "messagePlaceholder": "Karere...",
       "cannotReceiveFiles": "Kāore e taea te whiwhi kōnae i tēnei wātū. Tangohia ngā whakapirihanga kia tukua tō karere.",
-      "couldNotAttachFiles": "Kāore i taea te whakapiri kōnae. Pāwhiri ki te tuku kia whakamātau anō."
+      "couldNotAttachFiles": "Kāore i taea te whakapiri kōnae. Pāwhiri ki te tuku kia whakamātau anō.",
+      "discardAttachmentsMessage": "Ka mukua ngā kōnae kua tukua ake kāore anō kia whakapirihia ki ngā karere kua tukua.",
+      "discardAttachmentsTitle": "Whakarere i ngā whakapirihanga?"
     },
     "chatLink": {
       "linkCopied": "Kua tāruatia te hononga",

@@ -750,7 +750,8 @@
       "networkError": "نیٹ ورک کی خرابی",
       "uploadFailed": "اپ لوڈ ناکام",
       "failedToUploadFile": "فائل اپ لوڈ نہیں ہو سکی: {{reason}}",
-      "nothingToPaste": "چسپاں کرنے کے لیے کچھ نہیں"
+      "nothingToPaste": "چسپاں کرنے کے لیے کچھ نہیں",
+      "metadataStripFailed": "تصویر کا میٹاڈیٹا نہیں ہٹایا جا سکا۔"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "{{title}} جاری کیا جا رہا ہے",
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
-      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔"
+      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔",
+      "discardWithUploadsMessage": "آپ کا پرامپٹ اور بھیجے گئے پیغامات سے غیر منسلک اپ لوڈز حذف ہو جائیں گے۔"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہوئی",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "ختم کیا جا رہا ہے...",
       "messagePlaceholder": "پیغام...",
       "cannotReceiveFiles": "یہ سیشن فائلیں وصول نہیں کر سکتا۔ اپنا پیغام بھیجنے کے لیے اٹیچمنٹ ہٹائیں۔",
-      "couldNotAttachFiles": "فائلیں منسلک نہیں ہو سکیں۔ دوبارہ کوشش کے لیے بھیجنے پر تھپتھپائیں۔"
+      "couldNotAttachFiles": "فائلیں منسلک نہیں ہو سکیں۔ دوبارہ کوشش کے لیے بھیجنے پر تھپتھپائیں۔",
+      "discardAttachmentsMessage": "بھیجے گئے پیغامات سے غیر منسلک اپ لوڈز حذف ہو جائیں گے۔",
+      "discardAttachmentsTitle": "اٹیچمنٹس ضائع کریں؟"
     },
     "chatLink": {
       "linkCopied": "لنک کاپی ہو گیا",

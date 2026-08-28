@@ -750,7 +750,8 @@
       "networkError": "Nettverksfeil",
       "uploadFailed": "Opplasting mislyktes",
       "failedToUploadFile": "Kunne ikke laste opp filen: {{reason}}",
-      "nothingToPaste": "Ingenting å lime inn"
+      "nothingToPaste": "Ingenting å lime inn",
+      "metadataStripFailed": "Kunne ikke fjerne bildets metadata."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",
       "continueFrom": "Fortsetter {{title}}",
       "importFailed": "Kunne ikke importere denne økten.",
-      "importingSession": "Importerer økt"
+      "importingSession": "Importerer økt",
+      "discardWithUploadsMessage": "Forespørselen din og opplastede filer som ikke er vedlagt sendte meldinger, blir slettet."
     },
     "partRenderer": {
       "updatedFileCount_one": "Oppdaterte {{displayCount}} fil",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "Avrunder...",
       "messagePlaceholder": "Melding...",
       "cannotReceiveFiles": "Denne økten kan ikke motta filer. Fjern vedleggene for å sende meldingen din.",
-      "couldNotAttachFiles": "Kunne ikke legge til filer. Trykk send for å prøve igjen."
+      "couldNotAttachFiles": "Kunne ikke legge til filer. Trykk send for å prøve igjen.",
+      "discardAttachmentsMessage": "Opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",
+      "discardAttachmentsTitle": "Forkaste vedlegg?"
     },
     "chatLink": {
       "linkCopied": "Lenke kopiert",

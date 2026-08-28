@@ -750,7 +750,8 @@
       "networkError": "నెట్‌వర్క్ లోపం",
       "uploadFailed": "అప్‌లోడ్ విఫలమైంది",
       "failedToUploadFile": "ఫైల్ అప్‌లోడ్ చేయడంలో విఫలమైంది: {{reason}}",
-      "nothingToPaste": "పేస్ట్ చేయడానికి ఏమీ లేదు"
+      "nothingToPaste": "పేస్ట్ చేయడానికి ఏమీ లేదు",
+      "metadataStripFailed": "ఫోటో మెటాడేటాను తొలగించలేకపోయాము."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "{{title}}ను కొనసాగిస్తోంది",
       "importingSession": "సెషన్ను దిగుమతి చేస్తోంది",
       "cliCannotContinue": "ఈ CLI సెషన్ను కొనసాగించదు. Cloud Agent లేదా మరొక CLIని ఎంచుకోండి.",
-      "importFailed": "ఈ సెషన్ను దిగుమతి చేయలేకపోయాం."
+      "importFailed": "ఈ సెషన్ను దిగుమతి చేయలేకపోయాం.",
+      "discardWithUploadsMessage": "మీ ప్రాంప్ట్ మరియు పంపిన సందేశాలకు జోడించని అప్లోడ్ చేసిన ఫైల్లు తొలగించబడతాయి."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",
@@ -2572,7 +2574,9 @@
       "finalizingPlaceholder": "ముగిస్తోంది...",
       "messagePlaceholder": "సందేశం...",
       "cannotReceiveFiles": "ఈ సెషన్ ఫైల్లను స్వీకరించలేదు. మీ సందేశాన్ని పంపడానికి అటాచ్మెంట్లను తీసివేయండి.",
-      "couldNotAttachFiles": "ఫైల్లను అటాచ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి పంపు నొక్కండి."
+      "couldNotAttachFiles": "ఫైల్లను అటాచ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి పంపు నొక్కండి.",
+      "discardAttachmentsMessage": "పంపిన సందేశాలకు జోడించని అప్లోడ్ చేసిన ఫైల్లు తొలగించబడతాయి.",
+      "discardAttachmentsTitle": "జోడింపులను విస్మరించాలా?"
     },
     "chatLink": {
       "linkCopied": "లింక్ కాపీ చేయబడింది",

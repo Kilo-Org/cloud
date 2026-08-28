@@ -1,5 +1,5 @@
 /**
- * Token-based APNs client for Live Activity pushes (push-to-start and update).
+ * Token-based APNs client for Live Activity start, update, and end pushes.
  * Pure: every network hop goes through the injected `fetchFn` so unit tests
  * substitute a fake. Never logs a device token or the private key.
  */
@@ -13,7 +13,10 @@ export type ApnsCredentials = {
   topic: string;
 };
 
-export type LiveActivityEvent = 'start' | 'update';
+export type LiveActivityEvent = 'start' | 'update' | 'end';
+
+// ActivityKit controls Lock Screen dismissal, not Dynamic Island retention.
+const TERMINAL_SECONDS = 8;
 
 const APNS_BASE_URL = 'https://api.push.apple.com';
 const APNS_KEY_PREFIX = '-----BEGIN PRIVATE KEY-----';
@@ -75,14 +78,15 @@ export async function signApnsJwt(
  * `.push-type.liveactivity` topic suffix. The `timestamp` (Unix seconds) is
  * what lets iOS discard an older revision that arrives late.
  */
-export function buildLiveActivityApnsRequest(params: {
-  token: string;
-  event: LiveActivityEvent;
-  contentState: Record<string, unknown>;
-  credentials: ApnsCredentials;
-  authorizationJwt: string;
-  timestampSeconds: number;
-}): { url: string; headers: Record<string, string>; body: string } {
+export function buildLiveActivityApnsRequest(
+  params: {
+    token: string;
+    contentState: Record<string, unknown>;
+    credentials: ApnsCredentials;
+    authorizationJwt: string;
+    timestampSeconds: number;
+  } & ({ event: 'start' | 'update' } | { event: 'end'; dismissalDateSeconds: number })
+): { url: string; headers: Record<string, string>; body: string } {
   return {
     url: `${APNS_BASE_URL}/3/device/${params.token}`,
     headers: {
@@ -103,6 +107,7 @@ export function buildLiveActivityApnsRequest(params: {
           ? { 'attributes-type': LIVE_ACTIVITY_ATTRIBUTES_TYPE, attributes: {} }
           : {}),
         'content-state': params.contentState,
+        ...(params.event === 'end' ? { 'dismissal-date': params.dismissalDateSeconds } : {}),
       },
     }),
   };
@@ -124,6 +129,12 @@ export async function sendLiveActivityApns(params: {
   timestampSeconds?: number;
   /** Recheck the durable generation after signing, before each request. */
   isCurrent?: () => Promise<boolean>;
+  /** Persist terminal intent after signing, before the end can reach ActivityKit. */
+  beforeEnd?: (token: string) => Promise<boolean>;
+  /** Retire successful ends by registration identity, even after a newer generation. */
+  onEnded?: (token: string) => Promise<void>;
+  /** Release only an explicitly rejected end; a lost response leaves delivery uncertain. */
+  onEndRejected?: (token: string) => Promise<void>;
   fetchFn?: typeof fetch;
 }): Promise<LiveActivityApnsSendResult> {
   if (params.tokens.length === 0) {
@@ -135,22 +146,33 @@ export async function sendLiveActivityApns(params: {
 
   const results = await Promise.allSettled(
     params.tokens.map(async ({ token, event }) => {
+      if (params.isCurrent && !(await params.isCurrent())) return false;
+      if (event === 'end' && params.beforeEnd && !(await params.beforeEnd(token))) return false;
       const request = buildLiveActivityApnsRequest({
         token,
-        event,
+        ...(event === 'end'
+          ? { event, dismissalDateSeconds: Math.floor(Date.now() / 1000) + TERMINAL_SECONDS }
+          : { event }),
         contentState: params.contentState,
         credentials: params.credentials,
         authorizationJwt,
         timestampSeconds: params.timestampSeconds ?? params.nowSeconds,
       });
-      if (params.isCurrent && !(await params.isCurrent())) return false;
       const response = await fetchFn(request.url, {
         method: 'POST',
         headers: request.headers,
         body: request.body,
       });
       if (!response.ok) {
+        if (event === 'end') {
+          // A 410 confirms an inactive target, not a live activity that can recover.
+          if (response.status === 410) await params.onEnded?.(token);
+          else await params.onEndRejected?.(token);
+        }
         throw new Error(`APNs rejected the push with status ${response.status}`);
+      }
+      if (event === 'end') {
+        await params.onEnded?.(token);
       }
       return true;
     })

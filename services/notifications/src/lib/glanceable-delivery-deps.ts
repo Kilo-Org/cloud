@@ -11,6 +11,10 @@ import type { GlanceableDeliveryDeps, IosActivityToken } from './glanceable-deli
 export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
   let db: ReturnType<typeof getWorkerDb> | undefined;
   const getDbForCall = () => (db ??= getWorkerDb(env.HYPERDRIVE.connectionString));
+  const iosTargets = new Map<
+    string,
+    Pick<typeof user_activity_tokens.$inferSelect, 'id' | 'updated_at'>
+  >();
 
   return {
     buildSnapshot: async (userId, organizationId) => {
@@ -65,7 +69,12 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
           ? isNull(user_activity_tokens.organization_id)
           : eq(user_activity_tokens.organization_id, organizationId);
       const rows = await getDbForCall()
-        .select({ token: user_activity_tokens.token, kind: user_activity_tokens.kind })
+        .select({
+          token: user_activity_tokens.token,
+          kind: user_activity_tokens.kind,
+          id: user_activity_tokens.id,
+          updated_at: user_activity_tokens.updated_at,
+        })
         .from(user_activity_tokens)
         .where(
           and(
@@ -74,9 +83,19 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
             inArray(user_activity_tokens.kind, ['ios_activity', 'ios_push_to_start'])
           )
         );
-      return rows.map(row => ({ token: row.token, kind: row.kind as IosActivityToken['kind'] }));
+      for (const row of rows) {
+        if (row.kind === 'ios_activity') iosTargets.set(row.token, row);
+      }
+      return rows.map(row => ({ ...row, kind: row.kind as IosActivityToken['kind'] }));
     },
-    sendIosLiveActivity: async (tokens, contentState, timestampSeconds, isCurrent) => {
+    sendIosLiveActivity: async (
+      tokens,
+      contentState,
+      timestampSeconds,
+      isCurrent,
+      beforeEnd,
+      onEndRejected
+    ) => {
       const credentials = await readApnsCredentials(env);
       if (credentials === null || (isCurrent && !(await isCurrent()))) return;
       const result = await sendLiveActivityApns({
@@ -86,6 +105,24 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
         nowSeconds: Math.floor(Date.now() / 1000),
         timestampSeconds,
         isCurrent,
+        beforeEnd,
+        onEndRejected,
+        onEnded: async token => {
+          const target = iosTargets.get(token);
+          if (!target) return;
+          // A delayed end must not delete a scope subscription, another activity,
+          // or a registration refreshed since this delivery selected its target.
+          await getDbForCall()
+            .delete(user_activity_tokens)
+            .where(
+              and(
+                eq(user_activity_tokens.id, target.id),
+                eq(user_activity_tokens.token, token),
+                eq(user_activity_tokens.kind, 'ios_activity'),
+                eq(user_activity_tokens.updated_at, target.updated_at)
+              )
+            );
+        },
       });
       if (result.failed > 0) {
         console.warn('Some Live Activity APNs sends failed', {

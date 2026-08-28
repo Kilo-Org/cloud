@@ -25,6 +25,8 @@ export async function refreshGlanceableSnapshot(
 ): Promise<void> {
   const scope = scopeSchema.parse(params);
   const key = `glanceable:${JSON.stringify([scope.userId, scope.organizationId])}`;
+  // Row renewal or temporary absence cannot prove that the native token is live.
+  const iosEndPrefix = (token: string) => `glanceable-ios-end:${JSON.stringify(token)}:`;
   const request = await storage.transaction(async tx => {
     const previous = refreshStateSchema.optional().parse(await tx.get(key));
     const now = Date.now();
@@ -72,6 +74,7 @@ export async function refreshGlanceableSnapshot(
   });
   if (committed === null) return;
 
+  const eligible = committed.running + committed.needsInput + committed.reconnecting > 0;
   await deliverGlanceableSnapshot(scope, {
     ...deps,
     buildSnapshot: async () => committed,
@@ -79,6 +82,34 @@ export async function refreshGlanceableSnapshot(
     isCurrent: async () => {
       const current = refreshStateSchema.parse(await storage.get(key));
       return current.revision === request.revision;
+    },
+    listIosActivityTokens: async (userId, organizationId) => {
+      const tokens = await deps.listIosActivityTokens(userId, organizationId);
+      const current = refreshStateSchema.parse(await storage.get(key));
+      if (current.revision !== request.revision) return [];
+      // Empty work can retry ends. Eligible work excludes every accepted or uncertain end.
+      if (!eligible) return tokens;
+      const retiring = await Promise.all(
+        tokens.map(async ({ token, kind }) =>
+          kind === 'ios_activity'
+            ? (await storage.list({ prefix: iosEndPrefix(token), limit: 1 })).size > 0
+            : false
+        )
+      );
+      return tokens.filter((_, index) => !retiring[index]);
+    },
+    beforeIosEnd: async token => {
+      return storage.transaction(async tx => {
+        const current = refreshStateSchema.parse(await tx.get(key));
+        if (current.revision !== request.revision) return false;
+        // Each revision sends at most one end per token. Keep its obligation separate.
+        await tx.put(`${iosEndPrefix(token)}${key}:${request.revision}`, true);
+        return true;
+      });
+    },
+    onIosEndRejected: async token => {
+      // A delayed rejection releases only its attempt, not another pending or accepted end.
+      await storage.delete(`${iosEndPrefix(token)}${key}:${request.revision}`);
     },
   });
 }

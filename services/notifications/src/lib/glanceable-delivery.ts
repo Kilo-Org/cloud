@@ -31,22 +31,23 @@ export type IosActivityToken = { token: string; kind: 'ios_activity' | 'ios_push
 export type ExpoPushToken = { token: string; locale: string | null };
 
 /**
- * Maps the registered iOS activity tokens to the APNs sends for one delivery.
- * When an `ios_activity` token exists, that Live Activity is already on screen,
- * so send `update` to those tokens only — never `start`, which would stack a
- * second activity. Only when no `ios_activity` token exists does the
- * still-registered push-to-start token get `start` to create one.
+ * Update eligible activities or end zero-count activities. Never start empty work.
+ * A push-to-start token is used only when no activity target remains, avoiding
+ * duplicate activities while allowing fresh work after terminal target retirement.
  */
 export function apnsSendsForTokens(
-  tokens: readonly IosActivityToken[]
+  tokens: readonly IosActivityToken[],
+  eligible: boolean
 ): { token: string; event: LiveActivityEvent }[] {
   const activityTokens = tokens.filter(token => token.kind === 'ios_activity');
   if (activityTokens.length > 0) {
-    return activityTokens.map(({ token }) => ({ token, event: 'update' }));
+    return activityTokens.map(({ token }) => ({ token, event: eligible ? 'update' : 'end' }));
   }
-  return tokens
-    .filter(token => token.kind === 'ios_push_to_start')
-    .map(({ token }) => ({ token, event: 'start' }));
+  return eligible
+    ? tokens
+        .filter(token => token.kind === 'ios_push_to_start')
+        .map(({ token }) => ({ token, event: 'start' }))
+    : [];
 }
 
 export function toGlanceableContentState(
@@ -90,6 +91,8 @@ export function buildGlanceableExpoMessages(
   );
 }
 
+type IosActivityRegistration = IosActivityToken & { id: string; updated_at: string };
+
 export type GlanceableDeliveryDeps = {
   /**
    * Build the fresh snapshot via the web internal route. `null` means the
@@ -103,17 +106,23 @@ export type GlanceableDeliveryDeps = {
   listIosActivityTokens: (
     userId: string,
     organizationId: string | null
-  ) => Promise<IosActivityToken[]>;
+  ) => Promise<IosActivityRegistration[]>;
   sendIosLiveActivity: (
     tokens: readonly { token: string; event: LiveActivityEvent }[],
     contentState: GlanceableApnsContentState,
     timestampSeconds: number,
-    isCurrent?: () => Promise<boolean>
+    isCurrent?: () => Promise<boolean>,
+    beforeEnd?: (token: string) => Promise<boolean>,
+    onEndRejected?: (token: string) => Promise<void>
   ) => Promise<void>;
   /** Reserved before reading; do not assign a new timestamp after a delayed send. */
   apnsTimestampSeconds?: number;
   /** Durable generation fence, also checked by adapters after awaits and before outbound sends. */
   isCurrent?: () => Promise<boolean>;
+  /** Atomically fence and persist an end intent before the transport sends it. */
+  beforeIosEnd?: (token: string) => Promise<boolean>;
+  /** Release the current attempt only after an explicit transport rejection. */
+  onIosEndRejected?: (token: string) => Promise<void>;
   listIosExpoTokens: (userId: string, organizationId: string | null) => Promise<ExpoPushToken[]>;
   listAndroidExpoTokens: (
     userId: string,
@@ -135,13 +144,16 @@ export async function deliverGlanceableSnapshot(
 
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
-  const iosSends = apnsSendsForTokens(iosTokens);
+  const eligible = snapshot.running + snapshot.needsInput + snapshot.reconnecting > 0;
+  const iosSends = apnsSendsForTokens(iosTokens, eligible);
   if (iosSends.length > 0) {
     await deps.sendIosLiveActivity(
       iosSends,
       contentState,
       deps.apnsTimestampSeconds ?? Math.floor(Date.parse(snapshot.updatedAt) / 1000),
-      deps.isCurrent
+      deps.isCurrent,
+      deps.beforeIosEnd,
+      deps.onIosEndRejected
     );
   }
 

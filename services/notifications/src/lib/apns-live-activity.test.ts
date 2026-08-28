@@ -90,6 +90,68 @@ describe('buildLiveActivityApnsRequest', () => {
   });
 });
 
+describe('APNs terminal contract', () => {
+  it('encodes final content and a native dismissal date without start attributes', () => {
+    const request = buildLiveActivityApnsRequest({
+      token: 'ending-activity',
+      event: 'end',
+      contentState: { name: 'ActiveAgentsLiveActivity', props: '{"status":"empty","running":0}' },
+      credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem: 'pem', topic: TOPIC },
+      authorizationJwt: 'header.payload.sig',
+      timestampSeconds: 1_750_000_000,
+      dismissalDateSeconds: 1_750_000_108,
+    });
+    expect(JSON.parse(request.body)).toEqual({
+      aps: {
+        timestamp: 1_750_000_000,
+        event: 'end',
+        'dismissal-date': 1_750_000_108,
+        'content-state': {
+          name: 'ActiveAgentsLiveActivity',
+          props: '{"status":"empty","running":0}',
+        },
+      },
+    });
+  });
+
+  it('anchors the terminal window at the send boundary without changing snapshot order', async () => {
+    const privateKeyPem = await generateTestPrivateKeyPem();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1_750_000_000_000);
+    const bodies: unknown[] = [];
+    try {
+      await sendLiveActivityApns({
+        credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem, topic: TOPIC },
+        tokens: [{ token: 'ending-activity', event: 'end' }],
+        contentState: { running: 0 },
+        nowSeconds: 1_750_000_000,
+        timestampSeconds: 1_750_000_001,
+        isCurrent: async () => true,
+        beforeEnd: async () => {
+          clock.mockReturnValue(1_750_000_100_000);
+          return true;
+        },
+        fetchFn: async (_url, init) => {
+          if (typeof init?.body !== 'string') throw new Error('Expected a JSON body');
+          bodies.push(JSON.parse(init.body));
+          return new Response(null, { status: 200 });
+        },
+      });
+      expect(bodies).toEqual([
+        {
+          aps: {
+            event: 'end',
+            timestamp: 1_750_000_001,
+            'dismissal-date': 1_750_000_108,
+            'content-state': { running: 0 },
+          },
+        },
+      ]);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+});
+
 describe('signApnsJwt', () => {
   it('signs a JWT whose header carries alg/kid and claims carry iss/iat', async () => {
     const privateKeyPem = await generateTestPrivateKeyPem();
@@ -206,6 +268,26 @@ describe('sendLiveActivityApns', () => {
 
     expect(delivered).toEqual(['https://api.push.apple.com/3/device/token-current']);
     expect(result).toEqual({ attempted: 1, ok: 1, failed: 0 });
+  });
+
+  it('skips an end when the durable intent loses its generation before the request', async () => {
+    const privateKeyPem = await generateTestPrivateKeyPem();
+    const delivered: string[] = [];
+    const result = await sendLiveActivityApns({
+      credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem, topic: TOPIC },
+      tokens: [{ token: 'ending-activity', event: 'end' }],
+      contentState: { running: 0 },
+      nowSeconds: 1_750_000_000,
+      isCurrent: async () => true,
+      beforeEnd: async () => false,
+      fetchFn: async url => {
+        if (typeof url !== 'string') throw new Error('Expected a string URL');
+        delivered.push(url);
+        return new Response(null, { status: 200 });
+      },
+    });
+    expect(delivered).toEqual([]);
+    expect(result).toEqual({ attempted: 0, ok: 0, failed: 0 });
   });
 
   it('counts rejected pushes as failures', async () => {

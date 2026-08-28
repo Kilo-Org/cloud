@@ -30,6 +30,8 @@ type PendingDeepLinkRecord = {
 const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
 let pendingDeepLink: string | null = null;
+// Development correlation is memory-only; durable records remain ordinary hrefs.
+let pendingDevRequestId: number | null = null;
 let pendingSource: DeepLinkSource | null = null;
 let launchLinkHandled = false;
 
@@ -138,7 +140,11 @@ function deletePersistedPendingDeepLink(): void {
  * launch actually caused by a link, so the link is the better evidence of what
  * started this process.
  */
-export function setPendingDeepLink(href: string, source: DeepLinkSource): void {
+export function setPendingDeepLink(
+  href: string,
+  source: DeepLinkSource,
+  devRequestId: number | null = null
+): void {
   if (source === 'universal-link') {
     pendingDeepLink = href;
     pendingSource = source;
@@ -149,16 +155,22 @@ export function setPendingDeepLink(href: string, source: DeepLinkSource): void {
   } else {
     return;
   }
+  pendingDevRequestId = devRequestId;
   pendingDeepLinkUserId = currentDeepLinkUserId;
   pendingDeepLinkEpoch += 1;
   persistPendingDeepLink(href, source);
   notifyPendingDeepLinkListeners();
 }
 
+export function getPendingDeepLinkRequestId(): number | null {
+  return pendingDevRequestId;
+}
+
 /** Get-and-clear. Single consumer is `_layout.tsx`. */
 export function getPendingDeepLink(): string | null {
   const href = pendingDeepLink;
   pendingDeepLink = null;
+  pendingDevRequestId = null;
   pendingSource = null;
   pendingDeepLinkUserId = null;
   pendingDeepLinkEpoch += 1;
@@ -175,6 +187,7 @@ export function getPendingDeepLink(): string | null {
  */
 export function clearPendingDeepLink(): void {
   pendingDeepLink = null;
+  pendingDevRequestId = null;
   pendingSource = null;
   pendingDeepLinkUserId = null;
   pendingDeepLinkEpoch += 1;
@@ -316,8 +329,11 @@ export function captureLaunchDeepLink(): void {
   if (!url) {
     return;
   }
-  takeDevSessionFromUrl(url);
   const href = resolveIncomingUrl(url);
+  if (takeDevSessionFromUrl(url, href, true)) {
+    launchLinkHandled = true;
+    return;
+  }
   if (href) {
     setPendingDeepLink(href, 'universal-link');
     launchLinkHandled = true;
@@ -332,6 +348,7 @@ export function wasLaunchLinkHandled(): boolean {
 /** Test-only: reset module-private latch, pending slot, and listeners between cases. */
 export function _resetDeepLinkLaunchForTests(): void {
   pendingDeepLink = null;
+  pendingDevRequestId = null;
   pendingSource = null;
   pendingDeepLinkUserId = null;
   launchLinkHandled = false;

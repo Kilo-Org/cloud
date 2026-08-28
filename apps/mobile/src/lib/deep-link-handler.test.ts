@@ -153,11 +153,11 @@ describe('redirectSystemPath', () => {
         'kiloapp:///home?dev_session_token=tok&dev_session_refresh=ref&dev_session_expires_in=3600';
       const result = redirectSystemPath({ path, initial: true });
       expect(result).toBeNull();
-      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(0_home)');
+      expect(getPendingDeepLink()).toBeNull();
       expect(consumePendingDevSession()).toEqual({
-        token: 'tok',
-        refreshToken: 'ref',
-        expiresIn: 3600,
+        id: 1,
+        href: '/(app)/(tabs)/(0_home)',
+        credentials: { token: 'tok', refreshToken: 'ref', expiresIn: 3600 },
       });
     });
   });
@@ -215,6 +215,15 @@ describe('redirectSystemPath', () => {
   });
 
   describe('try/catch', () => {
+    it('does not return credentials to ordinary routing when resolution fails', () => {
+      mocks.shouldThrow = true;
+      const path =
+        'kiloapp:///home?dev_session_token=tok&dev_session_refresh=ref&dev_session_expires_in=3600';
+      expect(redirectSystemPath({ path, initial: true })).toBeNull();
+      expect(consumePendingDevSession()).toBeNull();
+      expect(getPendingDeepLink()).toBeNull();
+    });
+
     it('returns path unchanged when resolveIncomingUrl throws', () => {
       mocks.shouldThrow = true;
       const path = 'https://app.kilo.ai/profile';

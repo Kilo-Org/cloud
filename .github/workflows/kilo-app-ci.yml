@@ -15,6 +15,8 @@ on:
       - 'packages/cloud-agent-sdk/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/kilo-app-ci.yml'
+      - '.github/workflows/ci.yml'
+      - 'scripts/stacked-ci.test.mjs'
   pull_request:
     paths:
       - 'apps/mobile/**'
@@ -28,6 +30,8 @@ on:
       - 'packages/cloud-agent-sdk/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/kilo-app-ci.yml'
+      - '.github/workflows/ci.yml'
+      - 'scripts/stacked-ci.test.mjs'
   workflow_call:
 
 concurrency:
@@ -192,6 +196,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Check stacked CI admission
+        run: node --test scripts/stacked-ci.test.mjs
 
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build

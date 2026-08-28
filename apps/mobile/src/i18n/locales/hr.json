@@ -3212,5 +3212,20 @@
     "historyRetry": "Nije moguće učitati povijest razgovora.",
     "catalogRetry": "Učitavanje modela nije uspjelo",
     "sendError": "Nije moguće poslati poruku. Pokušajte ponovno."
+  },
+  "glanceable": {
+    "waiting": "Ažuriranje agenata",
+    "empty": "Nema rada u tijeku",
+    "stale": "Trenutačno nije moguće ažurirati",
+    "expired": "Status je istekao",
+    "signedOut": "Prijavite se da biste vidjeli agente",
+    "privacy": "Agenti su skriveni",
+    "openAgents": "Otvorite agente",
+    "running": "RADI",
+    "needsInput": "treba unos",
+    "reconnecting": "Ponovno povezivanje",
+    "channelName": "Aktivni agenti",
+    "activityKitDisabledTitle": "Aktivnosti uživo su isključene",
+    "activityKitDisabledBody": "Uključite Aktivnosti uživo u Postavkama kako biste vidjeli aktivne agente na zaključanom zaslonu."
   }
 }

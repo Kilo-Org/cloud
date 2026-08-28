@@ -3191,5 +3191,20 @@
     "historyRetry": "Det gick inte att läsa in chatthistoriken.",
     "catalogRetry": "Kunde inte läsa in modeller",
     "sendError": "Kunde inte skicka meddelandet. Försök igen."
+  },
+  "glanceable": {
+    "waiting": "Uppdaterar agenter",
+    "empty": "Inget arbete pågår",
+    "stale": "Kan inte uppdatera nu",
+    "expired": "Statusen har gått ut",
+    "signedOut": "Logga in för att se agenter",
+    "privacy": "Agenter dolda",
+    "openAgents": "Öppna agenter",
+    "running": "KÖRS",
+    "needsInput": "kräver indata",
+    "reconnecting": "Återansluter",
+    "channelName": "Aktiva agenter",
+    "activityKitDisabledTitle": "Liveaktiviteter är avstängda",
+    "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se Aktiva agenter på låsskärmen."
   }
 }

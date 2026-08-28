@@ -3191,5 +3191,20 @@
     "historyRetry": "የውይይት ታሪክ መጫን አልተቻለም።",
     "catalogRetry": "ሞዴሎችን መጫን አልተቻለም",
     "sendError": "መልእክቱን መላክ አልተቻለም። እንደገና ይሞክሩ።"
+  },
+  "glanceable": {
+    "waiting": "ወኪሎችን በማዘመን ላይ",
+    "empty": "በሂደት ላይ ያለ ስራ የለም",
+    "stale": "አሁን ማዘመን አይቻልም",
+    "expired": "የሁኔታው ጊዜ አልፏል",
+    "signedOut": "ወኪሎችን ለማየት ይግቡ",
+    "privacy": "ወኪሎች ተደብቀዋል",
+    "openAgents": "ወኪሎችን ይክፈቱ",
+    "running": "በስራ ላይ",
+    "needsInput": "ግብዓት ይፈልጋል",
+    "reconnecting": "እንደገና በመገናኘት ላይ",
+    "channelName": "ንቁ ወኪሎች",
+    "activityKitDisabledTitle": "የቀጥታ እንቅስቃሴዎች ጠፍተዋል",
+    "activityKitDisabledBody": "ንቁ ወኪሎችን በመቆለፊያ ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን ያብሩ።"
   }
 }

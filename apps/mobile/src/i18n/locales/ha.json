@@ -3191,5 +3191,20 @@
     "historyRetry": "Ba a iya loda tarihin tattaunawa.",
     "catalogRetry": "An kasa ɗora samfuran",
     "sendError": "An kasa aika saƙon. Sake gwadawa."
+  },
+  "glanceable": {
+    "waiting": "Ana sabunta wakilai",
+    "empty": "Babu aikin da ke gudana",
+    "stale": "Ba a iya sabuntawa yanzu",
+    "expired": "Matsayi ya ƙare",
+    "signedOut": "Shiga don ganin wakilai",
+    "privacy": "An ɓoye wakilai",
+    "openAgents": "Buɗe wakilai",
+    "running": "Ana gudana",
+    "needsInput": "yana buƙatar bayani",
+    "reconnecting": "Ana sake haɗawa",
+    "channelName": "Wakilai da ke aiki",
+    "activityKitDisabledTitle": "Ayyukan Kai Tsaye suna a kashe",
+    "activityKitDisabledBody": "Kunna Ayyukan Kai Tsaye a cikin Saituna don ganin Wakilai da ke Aiki a kan Allon Kulle."
   }
 }

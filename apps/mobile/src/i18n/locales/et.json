@@ -3191,5 +3191,20 @@
     "historyRetry": "Vestluse ajaloo laadimine ei õnnestunud.",
     "catalogRetry": "Mudeleid ei õnnestunud laadida",
     "sendError": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
+  },
+  "glanceable": {
+    "waiting": "Agentide uuendamine",
+    "empty": "Ühtegi tööd pole pooleli",
+    "stale": "Praegu ei saa uuendada",
+    "expired": "Olek on aegunud",
+    "signedOut": "Agentide nägemiseks logige sisse",
+    "privacy": "Agendid on peidetud",
+    "openAgents": "Avage agendid",
+    "running": "TÖÖTAB",
+    "needsInput": "vajab sisendit",
+    "reconnecting": "Ühenduse taastamine",
+    "channelName": "Aktiivsed agendid",
+    "activityKitDisabledTitle": "Reaalajas tegevused on välja lülitatud",
+    "activityKitDisabledBody": "Lülitage seadetes reaalajas tegevused sisse, et näha aktiivseid agente lukustuskuval."
   }
 }

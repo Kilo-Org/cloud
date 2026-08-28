@@ -3191,5 +3191,20 @@
     "historyRetry": "Ekki tókst að hlaða samtalsferilinn.",
     "catalogRetry": "Ekki tókst að hlaða líkön",
     "sendError": "Ekki tókst að senda skilaboðin. Reyndu aftur."
+  },
+  "glanceable": {
+    "waiting": "Uppfærir umboð",
+    "empty": "Engin vinna í gangi",
+    "stale": "Ekki hægt að uppfæra núna",
+    "expired": "Staða útrunnin",
+    "signedOut": "Skráðu þig inn til að sjá umboð",
+    "privacy": "Umboð falin",
+    "openAgents": "Opna umboð",
+    "running": "Í gangi",
+    "needsInput": "þarfnast inntaks",
+    "reconnecting": "Tengist aftur",
+    "channelName": "Virk umboð",
+    "activityKitDisabledTitle": "Slökkt er á Beinni virkni",
+    "activityKitDisabledBody": "Kveiktu á Beinni virkni í Stillingum til að sjá Virk umboð á Lásskjánum."
   }
 }

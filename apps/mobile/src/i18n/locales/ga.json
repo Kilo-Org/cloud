@@ -3254,5 +3254,20 @@
     "historyRetry": "Níorbh fhéidir stair an chomhrá a lódáil.",
     "catalogRetry": "Níorbh fhéidir múnlaí a lódáil",
     "sendError": "Níorbh fhéidir an teachtaireacht a sheoladh. Bain triail as arís."
+  },
+  "glanceable": {
+    "waiting": "Gníomhairí á nuashonrú",
+    "empty": "Níl aon obair ar siúl",
+    "stale": "Ní féidir nuashonrú anois",
+    "expired": "Stádas imithe in éag",
+    "signedOut": "Sínigh isteach chun gníomhairí a fheiceáil",
+    "privacy": "Gníomhairí i bhfolach",
+    "openAgents": "Oscail gníomhairí",
+    "running": "AG RITH",
+    "needsInput": "teastaíonn ionchur",
+    "reconnecting": "Ag athcheangal",
+    "channelName": "Gníomhairí gníomhacha",
+    "activityKitDisabledTitle": "Tá Gníomhaíochtaí Beo as",
+    "activityKitDisabledBody": "Cumasaigh Gníomhaíochtaí Beo sna Socruithe chun Gníomhairí gníomhacha a fheiceáil ar an Scáileán Glasála."
   }
 }

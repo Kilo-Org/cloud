@@ -3191,5 +3191,20 @@
     "historyRetry": "Suhbat tarixini yuklab bo'lmadi.",
     "catalogRetry": "Modellarni yuklab bo'lmadi",
     "sendError": "Xabarni yuborib bo'lmadi. Iltimos, qayta urinib ko'ring."
+  },
+  "glanceable": {
+    "waiting": "Agentlar yangilanmoqda",
+    "empty": "Bajarilayotgan ish yo'q",
+    "stale": "Hozir yangilab bo'lmaydi",
+    "expired": "Holat muddati tugadi",
+    "signedOut": "Agentlarni ko'rish uchun tizimga kiring",
+    "privacy": "Agentlar yashirilgan",
+    "openAgents": "Agentlarni oching",
+    "running": "Ishlamoqda",
+    "needsInput": "kiritish kerak",
+    "reconnecting": "Qayta ulanmoqda",
+    "channelName": "Faol agentlar",
+    "activityKitDisabledTitle": "Jonli faoliyatlar o'chirilgan",
+    "activityKitDisabledBody": "Qulflangan ekranda Faol agentlarni ko'rish uchun Sozlamalarda Jonli faoliyatlarni yoqing."
   }
 }

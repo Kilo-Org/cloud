@@ -3212,5 +3212,20 @@
     "historyRetry": "Nu s-a putut încărca istoricul de chat.",
     "catalogRetry": "Modelele nu au putut fi încărcate",
     "sendError": "Mesajul nu a putut fi trimis. Încercați din nou."
+  },
+  "glanceable": {
+    "waiting": "Se actualizează agenții",
+    "empty": "Nicio sarcină în curs",
+    "stale": "Nu se poate actualiza acum",
+    "expired": "Stare expirată",
+    "signedOut": "Autentifică-te pentru a vedea agenții",
+    "privacy": "Agenți ascunși",
+    "openAgents": "Deschide agenții",
+    "running": "Rulează",
+    "needsInput": "necesită introducere",
+    "reconnecting": "Se reconectează",
+    "channelName": "Agenți activi",
+    "activityKitDisabledTitle": "Activitățile live sunt dezactivate",
+    "activityKitDisabledBody": "Activează Activități live în Setări pentru a vedea Agenții activi pe ecranul de blocare."
   }
 }

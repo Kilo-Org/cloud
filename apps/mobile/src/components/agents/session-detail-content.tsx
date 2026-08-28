@@ -77,6 +77,7 @@ import { SessionSkeletonMessages } from '@/components/agents/session-detail-skel
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
   getSessionTranscriptItemKey,
+  getSessionTranscriptItemType,
   mergeSessionTranscript,
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
@@ -1458,6 +1459,7 @@ export function SessionDetailContent({
           sessionId={sessionId}
           items={transcript}
           keyExtractor={getSessionTranscriptItemKey}
+          getItemType={getSessionTranscriptItemType}
           hasOlderMessages={hasOlderMessages}
           isLoadingOlderMessages={isLoadingOlderMessages}
           olderMessagesError={olderMessagesError}

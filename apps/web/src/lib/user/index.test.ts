@@ -128,6 +128,11 @@ import {
   user_terms_acceptances,
   quick_chat_threads,
   quick_chat_messages,
+  agent_harness_clients,
+  agent_harness_conversation_grants,
+  agent_harness_conversation_registry,
+  agent_harness_invitation_results,
+  agent_harness_retirements,
   user_deletion_requests,
   user_deletion_steps,
   cloud_agent_pending_uploads,
@@ -306,6 +311,11 @@ describe('User', () => {
     await db.delete(platform_oauth_credentials);
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
+    await db.delete(agent_harness_retirements);
+    await db.delete(agent_harness_conversation_registry);
+    await db.delete(agent_harness_invitation_results);
+    await db.delete(agent_harness_conversation_grants);
+    await db.delete(agent_harness_clients);
     await db.delete(quick_chat_messages);
     await db.delete(quick_chat_threads);
     await db.delete(organizations);
@@ -1683,6 +1693,235 @@ describe('User', () => {
           .from(quick_chat_messages)
           .where(eq(quick_chat_messages.thread_id, otherThread.id))
       ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(agent_harness_retirements)
+          .where(inArray(agent_harness_retirements.thread_id, [thread.id, otherThread.id]))
+      ).toEqual([
+        expect.objectContaining({ thread_id: thread.id, generation: 0, reason: 'account_deleted' }),
+      ]);
+    });
+
+    it('deletes harness personal payloads and retains minimal fences, including orphaned coordinators', async () => {
+      const user = await insertTestUser({ id: `oauth/github:harness-cleanup-${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization('Harness cleanup', otherUser.id, 0);
+      const personalThreadId = randomUUID();
+      const organizationThreadId = randomUUID();
+      const orphanThreadId = randomUUID();
+      const otherThreadId = randomUUID();
+      const clientId = randomUUID();
+      const otherClientId = randomUUID();
+      const deletedThreadIds = [personalThreadId, organizationThreadId, orphanThreadId];
+      const allThreadIds = [...deletedThreadIds, otherThreadId];
+      const threads = [
+        { id: personalThreadId, user_id: user.id, organization_id: null, generation: 2 },
+        {
+          id: organizationThreadId,
+          user_id: user.id,
+          organization_id: organization.id,
+          generation: 3,
+        },
+        { id: otherThreadId, user_id: otherUser.id, organization_id: null, generation: 4 },
+      ];
+      await db
+        .insert(quick_chat_threads)
+        .values(
+          threads.map(({ id, user_id, organization_id }) => ({ id, user_id, organization_id }))
+        );
+      await db.insert(agent_harness_conversation_registry).values([
+        ...threads.map(({ id, ...thread }) => ({ thread_id: id, ...thread })),
+        {
+          thread_id: orphanThreadId,
+          user_id: user.id,
+          organization_id: organization.id,
+          generation: 7,
+        },
+      ]);
+      await db.insert(agent_harness_clients).values([
+        {
+          id: clientId,
+          user_id: user.id,
+          kind: 'mobile',
+          session_binding: 'deleted-session-reference',
+        },
+        {
+          id: otherClientId,
+          user_id: otherUser.id,
+          kind: 'browser',
+          session_binding: 'kept-session-reference',
+        },
+      ]);
+      await db.insert(agent_harness_conversation_grants).values(
+        threads.map(thread => ({
+          thread_id: thread.id,
+          user_id: thread.user_id,
+          client_id: thread.user_id === user.id ? clientId : otherClientId,
+          generation: thread.generation,
+          expires_at: '2100-01-01T00:00:00.000Z',
+        }))
+      );
+      await db.insert(agent_harness_invitation_results).values(
+        threads.map(thread => {
+          const invitationId = randomUUID();
+          return {
+            thread_id: thread.id,
+            operation_id: randomUUID(),
+            input_digest: `input-${thread.id}`,
+            invitation_id: invitationId,
+            canonical_result: {
+              invitationId,
+              acceptInviteUrl: `https://example.com/invite/${randomUUID()}`,
+              emailStatus: 'pending' as const,
+            },
+          };
+        })
+      );
+      await db.insert(quick_chat_messages).values(
+        threads.map(thread => ({
+          thread_id: thread.id,
+          role: 'user',
+          content: `private-${thread.id}`,
+        }))
+      );
+
+      await expect(softDeleteUser(user.id)).resolves.toBeUndefined();
+
+      expect(
+        await db
+          .select()
+          .from(agent_harness_clients)
+          .where(inArray(agent_harness_clients.id, [clientId, otherClientId]))
+      ).toEqual([
+        expect.objectContaining({ id: otherClientId, session_binding: 'kept-session-reference' }),
+      ]);
+      expect(
+        await db
+          .select()
+          .from(agent_harness_conversation_grants)
+          .where(inArray(agent_harness_conversation_grants.thread_id, allThreadIds))
+      ).toEqual([expect.objectContaining({ thread_id: otherThreadId })]);
+      expect(
+        await db
+          .select()
+          .from(agent_harness_invitation_results)
+          .where(inArray(agent_harness_invitation_results.thread_id, allThreadIds))
+      ).toEqual([expect.objectContaining({ thread_id: otherThreadId })]);
+      expect(
+        await db
+          .select()
+          .from(quick_chat_messages)
+          .where(inArray(quick_chat_messages.thread_id, allThreadIds))
+      ).toEqual([
+        expect.objectContaining({ thread_id: otherThreadId, content: `private-${otherThreadId}` }),
+      ]);
+      expect(
+        await db
+          .select()
+          .from(quick_chat_threads)
+          .where(inArray(quick_chat_threads.id, allThreadIds))
+      ).toEqual([expect.objectContaining({ id: otherThreadId })]);
+      expect(
+        await db
+          .select({
+            thread_id: agent_harness_conversation_registry.thread_id,
+            generation: agent_harness_conversation_registry.generation,
+            user_id: agent_harness_conversation_registry.user_id,
+            organization_id: agent_harness_conversation_registry.organization_id,
+          })
+          .from(agent_harness_conversation_registry)
+          .where(inArray(agent_harness_conversation_registry.thread_id, deletedThreadIds))
+      ).toEqual(
+        expect.arrayContaining([
+          { thread_id: personalThreadId, generation: 2, user_id: null, organization_id: null },
+          { thread_id: organizationThreadId, generation: 3, user_id: null, organization_id: null },
+          { thread_id: orphanThreadId, generation: 7, user_id: null, organization_id: null },
+        ])
+      );
+      expect(
+        await db
+          .select()
+          .from(agent_harness_conversation_registry)
+          .where(eq(agent_harness_conversation_registry.thread_id, otherThreadId))
+      ).toEqual([expect.objectContaining({ user_id: otherUser.id, generation: 4 })]);
+      const fences = await db
+        .select()
+        .from(agent_harness_retirements)
+        .where(inArray(agent_harness_retirements.thread_id, allThreadIds));
+      expect(fences).toHaveLength(3);
+      expect(fences).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            thread_id: personalThreadId,
+            generation: 2,
+            reason: 'account_deleted',
+          }),
+          expect.objectContaining({
+            thread_id: organizationThreadId,
+            generation: 3,
+            reason: 'account_deleted',
+          }),
+          expect.objectContaining({
+            thread_id: orphanThreadId,
+            generation: 7,
+            reason: 'account_deleted',
+          }),
+        ])
+      );
+      await db
+        .update(agent_harness_retirements)
+        .set({ acknowledged_at: sql`now()` })
+        .where(eq(agent_harness_retirements.thread_id, personalThreadId));
+      const readFences = () =>
+        db
+          .select()
+          .from(agent_harness_retirements)
+          .where(inArray(agent_harness_retirements.thread_id, deletedThreadIds))
+          .orderBy(agent_harness_retirements.thread_id);
+      const acknowledgedFences = await readFences();
+      await expect(softDeleteUser(user.id)).resolves.toBeUndefined();
+      expect(await readFences()).toEqual(acknowledgedFences);
+    });
+
+    it('rolls back harness fences and payload cleanup with the caller transaction', async () => {
+      const user = await insertTestUser();
+      const threadId = randomUUID();
+      const clientId = randomUUID();
+      await db.insert(quick_chat_threads).values({ id: threadId, user_id: user.id });
+      await db
+        .insert(agent_harness_conversation_registry)
+        .values({ thread_id: threadId, user_id: user.id });
+      await db.insert(agent_harness_clients).values({
+        id: clientId,
+        user_id: user.id,
+        kind: 'browser',
+        session_binding: 'original-session-reference',
+      });
+      await expect(
+        db.transaction(async tx => {
+          await anonymizeCloudUserData(tx, user.id);
+          throw new Error('Abort account cleanup');
+        })
+      ).rejects.toThrow('Abort account cleanup');
+      expect(
+        await db.select().from(quick_chat_threads).where(eq(quick_chat_threads.id, threadId))
+      ).toEqual([expect.objectContaining({ user_id: user.id })]);
+      expect(
+        await db.select().from(agent_harness_clients).where(eq(agent_harness_clients.id, clientId))
+      ).toEqual([expect.objectContaining({ session_binding: 'original-session-reference' })]);
+      expect(
+        await db
+          .select()
+          .from(agent_harness_conversation_registry)
+          .where(eq(agent_harness_conversation_registry.thread_id, threadId))
+      ).toEqual([expect.objectContaining({ user_id: user.id })]);
+      expect(
+        await db
+          .select()
+          .from(agent_harness_retirements)
+          .where(eq(agent_harness_retirements.thread_id, threadId))
+      ).toEqual([]);
     });
 
     it('deletes user data export state and dependent multipart and outbox rows', async () => {

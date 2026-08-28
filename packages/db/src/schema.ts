@@ -11110,11 +11110,153 @@ export const quick_chat_messages = pgTable(
     content: text().notNull(),
     client_id: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    // Old append writers omit these fields. Keep the defaults until old writers and records are gone.
+    // Legacy assistant text is no more authoritative than legacy user text.
+    provenance: text({ enum: ['legacy', 'harness'] })
+      .notNull()
+      .default('legacy'),
+    server_projection_key: text(),
+    ingress_acknowledged_at: timestamp({ withTimezone: true, mode: 'string' }),
+    ingress_lease_token: uuid(),
+    ingress_lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
     index('IDX_quick_chat_messages_thread_created_at').on(table.thread_id, table.created_at),
+    uniqueIndex('quick_chat_messages_server_projection_uidx').on(table.server_projection_key),
+    // A lease never acknowledges import. No timestamp watermark can exclude a late commit.
+    index('IDX_quick_chat_messages_pending_ingress')
+      .on(table.thread_id, table.created_at, table.id)
+      .where(sql`${table.provenance} = 'legacy' AND ${table.ingress_acknowledged_at} IS NULL`),
+    index('IDX_quick_chat_messages_ingress_lease')
+      .on(table.ingress_lease_expires_at.asc().nullsFirst(), table.thread_id, table.id)
+      .where(sql`${table.provenance} = 'legacy' AND ${table.ingress_acknowledged_at} IS NULL`),
+    check(
+      'quick_chat_messages_projection_check',
+      sql`(${table.provenance} = 'legacy' AND ${table.server_projection_key} IS NULL)
+        OR (${table.provenance} = 'harness' AND ${table.server_projection_key} IS NOT NULL)`
+    ),
+    check(
+      'quick_chat_messages_ingress_lease_check',
+      sql`(${table.ingress_lease_token} IS NULL) = (${table.ingress_lease_expires_at} IS NULL)`
+    ),
   ]
 );
 
 export type QuickChatMessage = typeof quick_chat_messages.$inferSelect;
 export type NewQuickChatMessage = typeof quick_chat_messages.$inferInsert;
+
+export const agent_harness_clients = pgTable(
+  'agent_harness_clients',
+  {
+    id: uuid()
+      .primaryKey()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    kind: text({ enum: ['browser', 'mobile'] }).notNull(),
+    // A server-derived revocation reference, never a bearer or refresh token.
+    session_binding: text().notNull(),
+    supported_tools: jsonb().$type<{ name: string; version: string }[]>().notNull().default([]),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('IDX_agent_harness_clients_user').on(table.user_id),
+    check('agent_harness_clients_kind_check', sql`${table.kind} IN ('browser', 'mobile')`),
+  ]
+);
+
+export const agent_harness_conversation_grants = pgTable(
+  'agent_harness_conversation_grants',
+  {
+    id: uuid()
+      .primaryKey()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    thread_id: uuid()
+      .notNull()
+      .references(() => quick_chat_threads.id, { onDelete: 'cascade' }),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    client_id: uuid()
+      .notNull()
+      .references(() => agent_harness_clients.id, { onDelete: 'cascade' }),
+    generation: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('IDX_agent_harness_grants_thread').on(table.thread_id),
+    index('IDX_agent_harness_grants_user').on(table.user_id),
+    index('IDX_agent_harness_grants_client').on(table.client_id),
+    check('agent_harness_grants_generation_check', sql`${table.generation} >= 0`),
+  ]
+);
+
+// This registry is discovery data, not authority. No FK can erase an orphaned coordinator.
+// Account cleanup clears the owner/context links after persisting its retirement fence.
+export const agent_harness_conversation_registry = pgTable(
+  'agent_harness_conversation_registry',
+  {
+    thread_id: uuid().primaryKey(),
+    user_id: text(),
+    organization_id: uuid(),
+    generation: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+  },
+  table => [
+    index('IDX_agent_harness_registry_user').on(table.user_id),
+    index('IDX_agent_harness_registry_org').on(table.organization_id),
+    check('agent_harness_registry_generation_check', sql`${table.generation} >= 0`),
+  ]
+);
+
+export const agent_harness_invitation_results = pgTable(
+  'agent_harness_invitation_results',
+  {
+    thread_id: uuid()
+      .notNull()
+      .references(() => quick_chat_threads.id, { onDelete: 'cascade' }),
+    operation_id: uuid().notNull(),
+    input_digest: text().notNull(),
+    // Deliberately no invitation FK or expiry: replay lasts for the conversation's lifetime.
+    invitation_id: uuid().notNull(),
+    canonical_result: jsonb()
+      .$type<{ invitationId: string; acceptInviteUrl: string; emailStatus: 'pending' }>()
+      .notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+  },
+  table => [primaryKey({ columns: [table.thread_id, table.operation_id] })]
+);
+
+// Delivery acknowledgment ends retry work, not the fence. Retain this minimal record permanently.
+// No FK to the user, organization, thread, or registry can cascade-delete the fence.
+export const agent_harness_retirements = pgTable(
+  'agent_harness_retirements',
+  {
+    thread_id: uuid().notNull(),
+    generation: integer().notNull().default(0),
+    reason: text({ enum: ['account_deleted', 'context_retired'] }).notNull(),
+    retired_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    acknowledged_at: timestamp({ withTimezone: true, mode: 'string' }),
+    lease_token: uuid(),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    primaryKey({ columns: [table.thread_id, table.generation] }),
+    index('IDX_agent_harness_retirements_pending')
+      .on(table.lease_expires_at.asc().nullsFirst(), table.thread_id, table.generation)
+      .where(isNull(table.acknowledged_at)),
+    check('agent_harness_retirements_generation_check', sql`${table.generation} >= 0`),
+    check(
+      'agent_harness_retirements_reason_check',
+      sql`${table.reason} IN ('account_deleted', 'context_retired')`
+    ),
+    check(
+      'agent_harness_retirements_lease_check',
+      sql`(${table.lease_token} IS NULL) = (${table.lease_expires_at} IS NULL)`
+    ),
+  ]
+);

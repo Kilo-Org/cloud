@@ -220,6 +220,12 @@
   },
   "overrides": [
     {
+      "files": ["src/components/ui/icons.test.ts"],
+      "rules": {
+        "import/no-nodejs-modules": "off"
+      }
+    },
+    {
       "files": ["src/lib/expo-router-linking.mounted.test.tsx"],
       "rules": {
         "import/no-nodejs-modules": "off",

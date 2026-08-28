@@ -14,6 +14,7 @@
     "test:web-env": "tsx --tsconfig scripts/web-env/tsconfig.json --test scripts/web-env/*.test.ts",
     "test:setup-smoke": "pnpm --filter web run test:setup-smoke",
     "test:mobile-artifacts": "node --test scripts/inspect-mobile-artifacts.test.mjs",
+    "test:agent-harness-ci": "node --test scripts/agent-harness-ci.test.mjs && pnpm --filter @kilocode/agent-harness exec vitest run src/boundaries.test.ts",
     "lint": "scripts/lint-all.sh",
     "format": "oxfmt",
     "format:check": "oxfmt --list-different .",

@@ -25,12 +25,18 @@ done
 #   the pushed range. `git merge-base origin/main HEAD` on a push to main
 #   resolves to HEAD, which would produce an empty matrix and skip the
 #   workspace-tests job.
-# - `pull_request` event (and locally with no GitHub env): use the merge-base
-#   against origin/main to preserve prior PR behavior.
+# - `pull_request` event: compare the actual head with its target merge-base,
+#   not origin/main or the synthetic merge checkout. This also handles stacked PRs.
+# - Locally with no GitHub env: retain the merge-base against origin/main.
 # - All-zeros before-sha (force-push / first push / branch creation) or any
 #   invalid/unreachable before-sha falls back to HEAD~1.
 base=""
-if [ "${GITHUB_EVENT_NAME:-}" = "push" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+head=""
+if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+  head=$(jq -er '.pull_request.head.sha' "$GITHUB_EVENT_PATH")
+  target=$(jq -er '.pull_request.base.sha' "$GITHUB_EVENT_PATH")
+  base=$(git merge-base "$target" "$head")
+elif [ "${GITHUB_EVENT_NAME:-}" = "push" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
   before=$(jq -r '.before // ""' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
   if [ -n "$before" ] \
       && [ "$before" != "0000000000000000000000000000000000000000" ] \
@@ -43,12 +49,15 @@ else
   base=$(git merge-base origin/main HEAD 2>/dev/null || true)
 fi
 
+revisions=("$base")
+[ -z "$head" ] || revisions+=("$head")
+
 force_all=false
 dependent_dirs_file=$(mktemp)
 trap 'rm -f "$dependent_dirs_file"' EXIT
 if [ -n "$base" ]; then
-  if ! git diff --quiet "$base" -- pnpm-lock.yaml pnpm-workspace.yaml 'patches/**'; then
-    if ! node scripts/changed-dependencies.mjs "$base" > "$dependent_dirs_file"; then
+  if ! git diff --quiet "${revisions[@]}" -- pnpm-lock.yaml pnpm-workspace.yaml 'patches/**'; then
+    if ! node scripts/changed-dependencies.mjs "${revisions[@]}" > "$dependent_dirs_file"; then
       force_all=true
     elif grep -qxF '*' "$dependent_dirs_file"; then
       force_all=true
@@ -58,7 +67,7 @@ if [ -n "$base" ]; then
   # List files changed under packages/**. Anything that doesn't match
   # `packages/<name>/` (e.g. `packages/README.md`) is a loose file with no
   # single owning package — fall back to force_all.
-  pkg_changes=$(git diff --name-only "$base" -- 'packages/**' || true)
+  pkg_changes=$(git diff --name-only "${revisions[@]}" -- 'packages/**' || true)
   if [ -n "$pkg_changes" ]; then
     loose=$(printf '%s\n' "$pkg_changes" | grep -vE '^packages/[^/]+/' | head -1 || true)
     if [ -n "$loose" ]; then
@@ -128,7 +137,7 @@ for dir in $workspace_dirs; do
     if [ -s "$dependent_dirs_file" ] && grep -qxF "$dir" "$dependent_dirs_file"; then
       :
     else
-      changed_file=$(git diff --name-only "$base" -- "$dir/" | head -1 || true)
+      changed_file=$(git diff --name-only "${revisions[@]}" -- "$dir/" | head -1 || true)
       [ -n "$changed_file" ] || continue
     fi
   fi

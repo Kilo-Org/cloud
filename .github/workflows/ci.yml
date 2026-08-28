@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 # Cancel in-progress runs when a new commit is pushed to the same PR
 concurrency:
@@ -63,6 +62,7 @@ jobs:
               - 'apps/web/jest.config.ts'
               - 'apps/web/postcss.config.mjs'
               - 'apps/web/sentry.*'
+              - 'packages/agent-harness/**'
               - 'packages/db/**'
               - 'packages/encryption/**'
               - 'packages/trpc/**'
@@ -98,6 +98,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify agent harness CI contracts and boundaries
+        run: pnpm run test:agent-harness-ci
 
       - name: Plugin shared-schemas sync check
         run: bash scripts/sync-plugin-shared.sh --check

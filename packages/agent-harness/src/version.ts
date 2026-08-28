@@ -1,0 +1,1 @@
+export const AGENT_HARNESS_PROTOCOL_VERSION = 1;

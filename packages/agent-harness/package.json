@@ -1,0 +1,38 @@
+{
+  "name": "@kilocode/agent-harness",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/version.ts",
+    "./react": "./src/react.ts",
+    "./*.test": null,
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit",
+    "lint": "oxlint --config ../../.oxlintrc.json",
+    "format": "oxfmt"
+  },
+  "dependencies": {
+    "@kilocode/mcp-gateway": "workspace:*",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "19.2.14",
+    "@typescript/native-preview": "catalog:",
+    "dependency-cruiser": "17.3.10",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

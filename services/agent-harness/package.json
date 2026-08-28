@@ -1,0 +1,39 @@
+{
+  "name": "@kilocode/agent-harness-worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*.test": null,
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit",
+    "lint": "oxlint --config ../../.oxlintrc.json",
+    "format": "oxfmt"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "3.0.11",
+    "@cfworker/json-schema": "4.1.1",
+    "@kilocode/agent-harness": "workspace:*",
+    "@kilocode/mcp-gateway": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "ai": "7.0.29",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "jose": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "drizzle-kit": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

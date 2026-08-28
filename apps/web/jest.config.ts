@@ -5,7 +5,20 @@ import type { Config } from 'jest';
 const config: Config = {
   testEnvironment: 'node',
   transform: {
-    '^.+\\.(t|j)sx?$': [
+    '^.+\\.tsx$': [
+      '@swc/jest',
+      {
+        jsc: {
+          parser: { syntax: 'typescript', tsx: true, decorators: true },
+          transform: {
+            legacyDecorator: true,
+            decoratorMetadata: true,
+            react: { runtime: 'automatic' },
+          },
+        },
+      },
+    ],
+    '^.+\\.(ts|jsx?)$': [
       '@swc/jest',
       {
         jsc: {
@@ -35,7 +48,11 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^server-only$': '<rootDir>/src/tests/setup/__mocks__/server-only.js',
   },
-  testMatch: ['**/src/**/*.test.ts', '<rootDir>/../../packages/db/src/**/*.test.ts'],
+  testMatch: [
+    '**/src/**/*.test.ts',
+    '<rootDir>/src/components/quick-chat/**/*.test.tsx',
+    '<rootDir>/../../packages/db/src/**/*.test.ts',
+  ],
   testPathIgnorePatterns: [
     '<rootDir>/../../.kilocode/',
     '<rootDir>/../../services/cloud-agent-next/',

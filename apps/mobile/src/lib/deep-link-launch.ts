@@ -169,13 +169,7 @@ export function getPendingDeepLinkRequestId(): number | null {
 /** Get-and-clear. Single consumer is `_layout.tsx`. */
 export function getPendingDeepLink(): string | null {
   const href = pendingDeepLink;
-  pendingDeepLink = null;
-  pendingDevRequestId = null;
-  pendingSource = null;
-  pendingDeepLinkUserId = null;
-  pendingDeepLinkEpoch += 1;
-  deletePersistedPendingDeepLink();
-  notifyPendingDeepLinkListeners();
+  clearPendingDeepLink();
   return href;
 }
 

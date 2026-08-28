@@ -665,7 +665,8 @@
     "profile": "Profiili",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, välilehti, {{position}}/{{total}}"
+    "position": "{{name}}, välilehti, {{position}}/{{total}}",
+    "chat": "Keskustelu"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Tarkistusajo",
       "status": "Tila",
       "threshold": "Kynnysarvo",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Odotetaan tarkistuksen transkriptiota.",
+      "transcriptEmpty": "Ei transkriptiota tälle tarkistukselle.",
+      "transcriptRetry": "Tarkistuksen transkriptiota ei voitu ladata.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Agentti vapaalla",
+      "agentWorking": "Agentti työstää...",
+      "anErrorOccurred": "Tapahtui virhe",
+      "errorWithMessage": "Virhe: {{message}}",
+      "executionStarted": "Suoritus aloitettu",
+      "reviewCompleted": "Tarkistus valmistui",
+      "reviewInterrupted": "Tarkistus keskeytetty",
+      "sessionError": "Istuntovirhe: {{error}}",
+      "statusWithValue": "Tila: {{status}}",
+      "toolName": "Työkalu: {{name}}",
+      "toolNameError": "Työkalu: {{name}} — virhe",
+      "unknownError": "Tuntematon virhe"
     },
     "reviewMemory": {
       "title": "Arviointimuisti",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiivinen nyt",
     "search": {
       "searching": "Haetaan",
       "searchSessions": "Hae istuntoja",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Istuntoja ei voitu ladata",
       "couldNotLoadActive": "Aktiivisia istuntoja ei voitu ladata",
-      "noSessionsYet": "Ei istuntoja vielä",
       "noSessionsYetDescription": "Aloita koodaustehtävä puhelimellasi. Istunnot näkyvät tässä.",
       "noMatches": "Mikään istunto ei vastaa",
       "tryDifferentSearch": "Kokeile toista hakusanaa.",
       "tryAdjustFilters": "Yritä muuttaa tai poistaa suodattimesi.",
       "couldNotSearch": "Istuntoja ei voitu hakea",
-      "allActive": "Kaikki istunnot ovat aktiivisia",
       "completedWillAppear": "Valmistuneet istunnot näkyvät tässä.",
       "noPastSessions": "Ei aiempia istuntoja",
       "live": "LIVE"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Vieritä alareunaan",
       "emptyTitle": "Ei viestejä vielä",
       "renameAccessibility": "Nimeä istunto uudelleen: {{title}}",
-      "connectRepository": "Yhdistä arkisto",
       "cloningSession": "Kloonataan istuntoa",
       "continue": "Jatka",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
-      "cloneFailed": "Tätä istuntoa ei voitu kloonata.",
       "cloneFailedRetry": "Tätä istuntoa ei voitu kloonata. Yritä uudelleen.",
-      "connectRepositoryToContinue": "Yhdistä arkisto jatkaaksesi.",
       "notEnoughCredits": "Ei riittävästi krediittejä Cloud Agentin käyttämiseen. Lisää krediittejä ja yritä uudelleen.",
       "previousTaskFinishing": "Edellinen tehtävä on vielä viimeistelyssä. Odota hetki.",
       "serviceUnavailable": "Palvelu ei ole tällä hetkellä käytettävissä. Yritä uudelleen.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Repositorioita ei näy. Tarkista repositorion käyttöoikeus GitLabiin ja päivitä sitten.",
       "openBitbucket": "Avaa Bitbucket",
       "openGitlab": "Avaa GitLab",
-      "recentlyUsed": "Äskettäin käytetyt"
+      "recentlyUsed": "Äskettäin käytetyt",
+      "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
+      "continueFrom": "Jatketaan {{title}}",
+      "importFailed": "Tätä istuntoa ei voitu tuoda.",
+      "importingSession": "Tuodaan istuntoa"
     },
     "partRenderer": {
       "updatedFileCount_one": "Päivitetty {{displayCount}} tiedosto",
@@ -2462,6 +2477,8 @@
       "viewTable": "Näytä taulukko",
       "title": "Taulukko",
       "close": "Sulje taulukko",
+      "loading": "Ladataan taulukkoa",
+      "empty": "Tässä taulukossa ei ole rivejä.",
       "columnCount_one": "sarake",
       "columnCount": "sarakkeet",
       "columnCount_other": "sarakkeet",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Tämä linkki avaa {{host}} selaimessasi.",
       "open": "Avaa",
       "trustThisHost": "Luota tähän isäntään"
+    },
+    "folderPicker": {
+      "accessibility": "Kansio: {{label}}",
+      "emptyDescription": "Valmis käyttää tätä kansiota.",
+      "emptyTitle": "Ei kansioita sisällä",
+      "fieldLabel": "Kansio",
+      "retryableDescription": "Tarkista yhteys ja yritä uudelleen. Valmis vahvistaa silti tämän kansion.",
+      "retryableTitle": "Kansioita ei voitu luetella",
+      "tapToListHint": "Napauta kansiota luetellaksesi sen sisällön",
+      "unsupportedDescription": "Tämä CLI ei voi luetella kansioita. Valmis säilyttää käynnistyskansion, ja Aloita istunto alkaa siitä.",
+      "unsupportedTitle": "Kansioita ei voi luetella"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Kun luotat linkin isäntään, se avataan kysymättä uudelleen.",
     "revoke": "Peruuta {{host}}",
     "backToPreferences": "Takaisin asetuksiin"
+  },
+  "quickChat": {
+    "title": "Keskustelu",
+    "composer": {
+      "placeholder": "Viesti"
+    },
+    "empty": {
+      "title": "Aloita keskustelu",
+      "description": "Lähetä viesti keskustellaksesi mallin kanssa."
+    },
+    "working": "Työstetään",
+    "historyRetry": "Keskusteluhistoriaa ei voitu ladata.",
+    "catalogRetry": "Malleja ei voitu ladata",
+    "sendError": "Viestiä ei voitu lähettää. Yritä uudelleen."
   }
 }

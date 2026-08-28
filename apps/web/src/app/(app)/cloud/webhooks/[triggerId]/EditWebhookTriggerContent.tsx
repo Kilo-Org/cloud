@@ -93,6 +93,7 @@ export function EditWebhookTriggerContent({
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
       })),
     [modelsData?.data]
   );
@@ -108,6 +109,7 @@ export function EditWebhookTriggerContent({
       githubRepo: triggerData.githubRepo ?? '',
       mode: (triggerData.mode ?? 'code') as AgentMode,
       model: triggerData.model ?? '',
+      variant: triggerData.variant ?? undefined,
       promptTemplate: triggerData.promptTemplate,
       profileId: triggerData.profileId ?? undefined,
       autoCommit: triggerData.autoCommit ?? undefined,
@@ -159,6 +161,7 @@ export function EditWebhookTriggerContent({
         cronTimezone: formData.cronTimezone,
         mode: formData.mode,
         model: formData.model,
+        variant: formData.variant,
         promptTemplate: formData.promptTemplate,
         profileId: formData.profileId,
         autoCommit: formData.autoCommit ?? null,

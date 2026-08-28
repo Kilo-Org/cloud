@@ -1,27 +1,6 @@
 import type { DataExportHealth } from './data-export-types';
 
-export function formatTimestamp(value: string | null): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
-}
-
-/**
- * Deterministic relative age between two timestamps. Using the server-provided
- * `asOf` instead of Date.now() keeps server and client renders consistent.
- */
-export function formatAge(fromIso: string, asOfIso: string): string {
-  const from = new Date(fromIso).getTime();
-  const asOf = new Date(asOfIso).getTime();
-  if (Number.isNaN(from) || Number.isNaN(asOf)) return '—';
-  const diffSeconds = Math.max(0, Math.round((asOf - from) / 1000));
-  if (diffSeconds < 60) return `${diffSeconds}s ago`;
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return `${Math.floor(diffHours / 24)}d ago`;
-}
+export { formatTimestamp, formatAge, humanizeToken } from '@/lib/admin/queue-format';
 
 export function formatBytes(value: number | null): string {
   if (value === null || !Number.isFinite(value) || value < 0) return 'Not available';
@@ -34,11 +13,6 @@ export function formatBytes(value: number | null): string {
 
 export function formatCount(value: number): string {
   return value.toLocaleString();
-}
-
-/** snake_case or kebab-case tokens from the API become readable labels. */
-export function humanizeToken(value: string): string {
-  return value.replaceAll(/[_-]+/g, ' ').replace(/^./, char => char.toUpperCase());
 }
 
 type Severity = DataExportHealth['severity'];

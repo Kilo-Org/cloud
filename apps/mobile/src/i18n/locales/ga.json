@@ -686,7 +686,8 @@
     "profile": "Próifíl",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, cluaisín, {{position}} as {{total}}"
+    "position": "{{name}}, cluaisín, {{position}} as {{total}}",
+    "chat": "Comhrá"
   },
   "chat": {
     "instancePicker": {
@@ -1326,7 +1327,23 @@
       "checkRun": "Rith seiceála",
       "status": "Stádas",
       "threshold": "Tairseach",
-      "pullRequest": "iarratas tarraingthe"
+      "pullRequest": "iarratas tarraingthe",
+      "transcriptWaiting": "Ag fanacht le hathscríbhinn an athbhreithnithe.",
+      "transcriptEmpty": "Níl aon athscríbhinn don athbhreithniú seo.",
+      "transcriptRetry": "Níorbh fhéidir athscríbhinn an athbhreithnithe a lódáil.",
+      "transcriptLive": "BEO",
+      "agentIdle": "Gníomhaire díomhaoin",
+      "agentWorking": "Gníomhaire ag obair...",
+      "anErrorOccurred": "Tharla earráid",
+      "errorWithMessage": "Earráid: {{message}}",
+      "executionStarted": "Forghníomhú tosaithe",
+      "reviewCompleted": "Athbhreithniú críochnaithe",
+      "reviewInterrupted": "Cuireadh isteach ar an athbhreithniú",
+      "sessionError": "Earráid seisiúin: {{error}}",
+      "statusWithValue": "Stádas: {{status}}",
+      "toolName": "Uirlis: {{name}}",
+      "toolNameError": "Uirlis: {{name}} — earráid",
+      "unknownError": "Earráid anaithnid"
     },
     "reviewMemory": {
       "title": "Cuimhne athbhreithnithe",
@@ -2072,7 +2089,6 @@
     }
   },
   "agents": {
-    "activeNow": "Gníomhach anois",
     "search": {
       "searching": "Ag cuardach",
       "searchSessions": "Cuardaigh seisiúin",
@@ -2083,13 +2099,11 @@
     "sessionList": {
       "couldNotLoad": "Níorbh fhéidir seisiúin a lódáil",
       "couldNotLoadActive": "Níorbh fhéidir seisiúin ghníomhacha a lódáil",
-      "noSessionsYet": "Níl aon seisiún fós",
       "noSessionsYetDescription": "Tosaigh tasc códaithe ó do ghuthán. Beidh do sheisiúin le feiceáil anseo.",
       "noMatches": "Ní mheaitseálann aon seisiún",
       "tryDifferentSearch": "Bain triail as téarma cuardaigh eile.",
       "tryAdjustFilters": "Bain triail as do scagairí a choigeartú nó a ghlanadh.",
       "couldNotSearch": "Níorbh fhéidir seisiúin a chuardach",
-      "allActive": "Tá na seisiúin go léir gníomhach",
       "completedWillAppear": "Beidh seisiúin chríochnaithe le feiceáil anseo.",
       "noPastSessions": "Níl aon seisiúin roimhe seo",
       "live": "BEO"
@@ -2164,13 +2178,10 @@
       "scrollToBottom": "Scrollaigh go bun",
       "emptyTitle": "Níl aon teachtaireachtaí fós",
       "renameAccessibility": "Athainmnigh seisiún: {{title}}",
-      "connectRepository": "Ceangail stór",
       "cloningSession": "Ag clónáil seisiúin",
       "continue": "Lean ar aghaidh",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil",
-      "cloneFailed": "Níorbh fhéidir an seisiún seo a chlónáil.",
       "cloneFailedRetry": "Níorbh fhéidir an seisiún seo a chlónáil. Bain triail as arís.",
-      "connectRepositoryToContinue": "Ceangail stór chun leanúint ar aghaidh.",
       "notEnoughCredits": "Níl go leor creidmheasanna agat chun Cloud Agent a rith. Cuir creidmheasanna leis agus bain triail as arís.",
       "previousTaskFinishing": "Tá an tasc roimhe seo fós ag críochnú. Fan nóiméad le do thoil.",
       "serviceUnavailable": "Níl an tseirbhís ar fáil faoi láthair. Bain triail as arís le do thoil.",
@@ -2243,7 +2254,11 @@
       "noRepositoriesVisibleGitlab": "Níl aon stórtha le feiceáil. Seiceáil rochtain ar stórtha do GitLab, agus ansin athnuaigh.",
       "openBitbucket": "Oscail Bitbucket",
       "openGitlab": "Oscail GitLab",
-      "recentlyUsed": "A úsáideadh le déanaí"
+      "recentlyUsed": "A úsáideadh le déanaí",
+      "cliCannotContinue": "Ní féidir leis an CLI seo seisiún a leanúint ar aghaidh. Roghnaigh Cloud Agent nó CLI eile.",
+      "continueFrom": "Ag leanúint ar aghaidh le {{title}}",
+      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
+      "importingSession": "Ag iompórtáil seisiúin"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} comhad",
@@ -2513,6 +2528,8 @@
       "viewTable": "Féach ar an tábla",
       "title": "Tábla",
       "close": "Dún an tábla",
+      "loading": "Ag lódáil an tábla",
+      "empty": "Níl aon ró sa tábla seo.",
       "columnCount_one": "colún",
       "columnCount": "colúin",
       "columnCount_other": "colúin",
@@ -2710,6 +2727,17 @@
       "hostConfirmMessage": "Osclaíonn an nasc seo {{host}} i do bhrabhsálaí.",
       "open": "Oscail",
       "trustThisHost": "Muinín as an óstaigh seo"
+    },
+    "folderPicker": {
+      "fieldLabel": "Fillteán",
+      "accessibility": "Fillteán: {{label}}",
+      "tapToListHint": "Tapáil ar fhillteán chun a bhfuil ann a liostú",
+      "emptyTitle": "Níl aon fhillteán taobh istigh",
+      "emptyDescription": "Úsáideann \"Déanta\" an fillteán seo.",
+      "retryableTitle": "Níorbh fhéidir na fillteáin a liostú",
+      "retryableDescription": "Seiceáil do nasc agus bain triail as arís. Deimhníonn \"Déanta\" an fillteán seo fós.",
+      "unsupportedTitle": "Ní féidir fillteáin a liostú",
+      "unsupportedDescription": "Ní féidir leis an CLI seo fillteáin a liostú. Coimeádann \"Déanta\" an fillteán seolta agus tosaíonn \"Tosaigh seisiún\" ann."
     }
   },
   "bootstrap": {
@@ -3212,5 +3240,19 @@
     "emptyDescription": "Nuair a bhíonn muinín agat as óstach an naisc, osclaíonn sé gan ceist a chur arís.",
     "revoke": "Cúlghair {{host}}",
     "backToPreferences": "Ar ais go dtí na roghanna"
+  },
+  "quickChat": {
+    "title": "Comhrá",
+    "composer": {
+      "placeholder": "Teachtaireacht"
+    },
+    "empty": {
+      "title": "Tosaigh comhrá",
+      "description": "Seol teachtaireacht chun labhairt le samhail."
+    },
+    "working": "Ag obair",
+    "historyRetry": "Níorbh fhéidir stair an chomhrá a lódáil.",
+    "catalogRetry": "Níorbh fhéidir múnlaí a lódáil",
+    "sendError": "Níorbh fhéidir an teachtaireacht a sheoladh. Bain triail as arís."
   }
 }

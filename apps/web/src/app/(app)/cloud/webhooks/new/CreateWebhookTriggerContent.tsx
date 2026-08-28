@@ -79,6 +79,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
       })),
     [modelsData?.data]
   );
@@ -116,6 +117,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         githubRepo: formData.githubRepo,
         mode: formData.mode,
         model: formData.model,
+        variant: formData.variant ?? undefined,
         promptTemplate: formData.promptTemplate,
         profileId: formData.profileId,
         autoCommit: formData.autoCommit,

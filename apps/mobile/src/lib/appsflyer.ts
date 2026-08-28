@@ -135,11 +135,34 @@ async function whenConnectorReady(action: () => void): Promise<void> {
 // eslint-disable-next-line @typescript-eslint/no-empty-function -- AppsFlyer SDK callbacks are required arguments
 function noop() {}
 
+// Bound AppsFlyer logEvent so a test spy can wrap the real transport without
+// replacing the SDK import. `trackEvent` and `drainPendingEvents` route
+// through `logEventImpl`, which defaults to the bound SDK call. The single
+// callback signature matches the only call shape this module uses.
+type AppsFlyerCallback = () => void;
+type AppsFlyerLogEvent = (
+  eventName: string,
+  eventValues: Record<string, string>,
+  ...callbacks: AppsFlyerCallback[]
+) => void;
+const defaultLogEvent: AppsFlyerLogEvent = (eventName, eventValues, ...callbacks) => {
+  appsFlyer.logEvent(eventName, eventValues, callbacks[0] ?? noop, callbacks[1] ?? noop);
+};
+let logEventImpl: AppsFlyerLogEvent = defaultLogEvent;
+
+/** Test-only wrap hook (slice P3-AH-16a). Replaces the logEvent implementation
+ *  with wrap(boundAppsFlyerLogEvent). */
+export function wrapAppsFlyerLogEventForTests(
+  wrap: (logEvent: AppsFlyerLogEvent) => AppsFlyerLogEvent
+): void {
+  logEventImpl = wrap(defaultLogEvent);
+}
+
 function drainPendingEvents() {
   for (const event of pendingEvents) {
     if (event.generation === currentGeneration()) {
       // Error callback is `noop` for the same reason as in trackEvent below.
-      appsFlyer.logEvent(event.name, event.values, noop, noop);
+      logEventImpl(event.name, event.values, noop, noop);
     }
   }
   pendingEvents.length = 0;
@@ -233,7 +256,7 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
   // can act on, so it is not reported. Actionable AppsFlyer failures — a bad
   // dev key or app id, or a broken purchase connector — still reach Sentry
   // through initSdk's and the connector's error callbacks.
-  appsFlyer.logEvent(name, eventValues, noop, noop);
+  logEventImpl(name, eventValues, noop, noop);
 }
 
 /**

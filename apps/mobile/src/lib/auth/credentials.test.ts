@@ -38,7 +38,13 @@ vi.mock('@sentry/react-native', () => ({
   captureException: vi.fn(),
 }));
 vi.mock('@/lib/analytics/posthog', () => ({
+  captureEvent: vi.fn(),
+  CONSENT_OUTCOME_EVENT: 'consent_outcome',
   discardPostHog: vi.fn().mockResolvedValue(undefined),
+  flushLastPostHogEvent: vi.fn().mockResolvedValue(undefined),
+  isPostHogReady: vi.fn(() => false),
+  LOGOUT_EVENT: 'logout',
+  subscribeToPostHogReady: vi.fn(),
 }));
 vi.mock('@/lib/appsflyer', () => ({ resetAppsFlyerState: vi.fn(), trackEvent: vi.fn() }));
 vi.mock('@/lib/auth/account-metadata-write', () => ({

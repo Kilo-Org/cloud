@@ -11,11 +11,8 @@ import {
   FAST_SANDBOX_COMMAND_TIMEOUT_MS,
   GIT_CLONE_TIMEOUT_MS,
   GIT_COMMAND_TIMEOUT_MS,
-  logSandboxOperationTimeout,
   timedExec,
-  withSandboxOperationTimeoutLog,
 } from './sandbox-timeout-logging.js';
-import { withTimeout } from '@kilocode/worker-utils';
 import { isSandboxInternalServerError } from './sandbox-recovery.js';
 import { shellQuote } from './kilo/utils.js';
 import {
@@ -777,65 +774,49 @@ export async function cloneGitHubRepo(
   session: ExecutionSession,
   workspacePath: string,
   githubRepo: string,
-  githubToken?: string,
   gitAuthor?: GitAuthorConfig,
   options?: { shallow?: boolean }
 ): Promise<void> {
   const gitUrl = `https://github.com/${githubRepo}.git`;
-  await cloneGitRepo(session, workspacePath, gitUrl, githubToken, gitAuthor, options);
+  await cloneGitRepo(session, workspacePath, gitUrl, gitAuthor, options);
 }
 
 export async function cloneGitRepo(
   session: ExecutionSession,
   workspacePath: string,
   gitUrl: string,
-  gitToken?: string,
   gitAuthor?: GitAuthorConfig,
-  options?: { shallow?: boolean; platform?: ManagedGitPlatform }
+  options?: { shallow?: boolean; platform?: ManagedGitPlatform; token?: string }
 ): Promise<void> {
-  // Build URL with token if available (for private repos)
-  // GitLab OAuth tokens require username 'oauth2'; all other providers use 'x-access-token'
-  let repoUrl = gitUrl;
-  if (gitToken) {
+  let cloneUrl = gitUrl;
+  if (options?.token && options.platform === undefined) {
     const url = new URL(gitUrl);
-    url.username = gitCredentialUsername(options?.platform);
-    url.password = gitToken;
-    repoUrl = url.toString();
+    url.username = gitCredentialUsername(undefined);
+    url.password = options.token;
+    cloneUrl = url.toString();
   }
-
   const sanitizedGitUrl = sanitizeGitUrlForLogging(gitUrl);
   const shallow = options?.shallow ?? false;
   logger.setTags({ gitUrl: sanitizedGitUrl, workspacePath, shallow });
   logger.info('Cloning generic git repository');
 
   try {
-    // SDK clone timeout terminates the subprocess; the outer timeout bounds the request.
-    const result = await withTimeout(
-      withSandboxOperationTimeoutLog(
-        session.gitCheckout(repoUrl, {
-          targetDir: workspacePath,
-          cloneTimeoutMs: GIT_CLONE_TIMEOUT_MS,
-          // Use depth: 1 for shallow clones (faster, less disk space)
-          ...(shallow && { depth: 1 }),
-        }),
-        {
-          operation: 'git.clone',
-          timeoutMs: GIT_CLONE_TIMEOUT_MS,
-          timeoutLayer: 'sdk',
-        }
-      ),
-      GIT_CLONE_TIMEOUT_MS + FAST_SANDBOX_COMMAND_TIMEOUT_MS,
-      `Git clone request timed out after ${(GIT_CLONE_TIMEOUT_MS + FAST_SANDBOX_COMMAND_TIMEOUT_MS) / 1000} seconds for ${sanitizedGitUrl}`,
-      () =>
-        logSandboxOperationTimeout({
-          operation: 'git.clone',
-          timeoutMs: GIT_CLONE_TIMEOUT_MS + FAST_SANDBOX_COMMAND_TIMEOUT_MS,
-          timeoutLayer: 'outer',
-        })
-    );
+    // Clone through the session shell so GIT_CONFIG_* / token env reach the
+    // credential helper. The sandbox gitCheckout API only posts the URL and
+    // does not document session-env inheritance.
+    const cloneArgs = ['git', 'clone', '--progress'];
+    if (shallow) {
+      cloneArgs.push('--depth', '1');
+    }
+    cloneArgs.push(cloneUrl, workspacePath);
+    const result = await timedExec(session, cloneArgs.map(shellQuote).join(' '), 'git.clone', {
+      timeoutMs: GIT_CLONE_TIMEOUT_MS,
+    });
 
-    if (!result.success) {
-      throw new Error(`gitCheckout failed with exit code ${result.exitCode ?? 'unknown'}`);
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `git clone failed with exit code ${result.exitCode ?? 'unknown'}: ${result.stderr || result.stdout}`
+      );
     }
 
     await updateGitAuthor(
@@ -862,27 +843,19 @@ export async function cloneGitRepo(
     // message, including patterns like:
     //   "remote: Repository not found."
     //   "fatal: repository '...' not found"
-    // We also pull stderr from a typed GitCheckoutError if present.
     const stderr = extractStderr(err);
     const haystack = `${errorMessage}\n${stderr}`;
     if (REPO_NOT_FOUND_PATTERN.test(haystack)) {
       throw new GitRepositoryNotFoundError(sanitizedGitUrl);
     }
 
-    // All other failures (LFS, network, timeouts, etc.) — wrap as a
-    // typed clone-failure error. Defense-in-depth: tokens shouldn't reach
-    // this point (the SDK strips them and `sanitizedGitUrl` has been
-    // masked), but we still run `sanitizeGitOutput` in case a future code
-    // path inlines an authenticated URL into the error message.
     throw new GitCloneFailedError(sanitizedGitUrl, sanitizeGitOutput(errorMessage));
   }
 }
 
 export type RestoreWorkspaceOptions = {
   githubRepo?: string;
-  githubToken?: string;
   gitUrl?: string;
-  gitToken?: string;
   gitAuthor?: GitAuthorConfig;
   lastSeenBranch?: string;
   platform?: ManagedGitPlatform;
@@ -895,17 +868,11 @@ export async function restoreWorkspace(
   options: RestoreWorkspaceOptions
 ): Promise<void> {
   if (options.gitUrl) {
-    await cloneGitRepo(session, workspacePath, options.gitUrl, options.gitToken, undefined, {
+    await cloneGitRepo(session, workspacePath, options.gitUrl, undefined, {
       platform: options.platform,
     });
   } else if (options.githubRepo) {
-    await cloneGitHubRepo(
-      session,
-      workspacePath,
-      options.githubRepo,
-      options.githubToken,
-      options.gitAuthor
-    );
+    await cloneGitHubRepo(session, workspacePath, options.githubRepo, options.gitAuthor);
   } else {
     throw new Error('No repository source provided for workspace restore');
   }
@@ -941,61 +908,24 @@ export async function updateGitRemoteUrl(
   workspacePath: string,
   gitUrl: string
 ): Promise<void> {
-  const canonicalUrl = new URL(gitUrl);
-  canonicalUrl.username = '';
-  canonicalUrl.password = '';
+  let originUrl = gitUrl;
+  try {
+    const canonicalUrl = new URL(gitUrl);
+    canonicalUrl.username = '';
+    canonicalUrl.password = '';
+    originUrl = canonicalUrl.toString();
+  } catch {
+    // SCP-style remotes are already credential-free; leave them unchanged.
+  }
   const result = await timedExec(
     session,
-    `git remote set-url origin ${shellQuote(canonicalUrl.toString())}`,
+    `git remote set-url origin ${shellQuote(originUrl)}`,
     'git.updateRemoteUrl',
     { cwd: workspacePath }
   );
   if (result.exitCode !== 0) {
     throw new Error('Failed to update git remote URL');
   }
-}
-
-/**
- * Update the git remote origin URL to include a new token.
- * This is needed when the git token changes and we need to push/pull.
- *
- * @param session - Execution session
- * @param workspacePath - Path to the git repository
- * @param gitUrl - Full git URL (e.g., https://github.com/org/repo.git)
- * @param gitToken - New git token for authentication
- * @param platform - Git platform; GitLab requires 'oauth2' as the username
- */
-export async function updateGitRemoteToken(
-  session: ExecutionSession,
-  workspacePath: string,
-  gitUrl: string,
-  gitToken: string,
-  platform?: ManagedGitPlatform
-): Promise<void> {
-  const newUrl = new URL(gitUrl);
-  newUrl.username = gitCredentialUsername(platform);
-  newUrl.password = gitToken;
-
-  const sanitizedGitUrl = sanitizeGitUrlForLogging(gitUrl);
-  logger.setTags({ workspacePath, gitUrl: sanitizedGitUrl });
-  logger.info('Updating git remote URL with new token');
-
-  const result = await timedExec(
-    session,
-    `cd '${workspacePath}' && git remote set-url origin '${newUrl.toString()}'`,
-    'git.updateRemoteToken'
-  );
-
-  if (result.exitCode !== 0) {
-    // Log actual error for debugging (sanitized via structured logging)
-    logger.error('Git remote update failed', {
-      exitCode: result.exitCode,
-    });
-    // Throw generic error to avoid leaking token in response
-    throw new Error(`Failed to update git remote URL`);
-  }
-
-  logger.info('Successfully updated git remote URL');
 }
 
 async function gitFetch(session: ExecutionSession, workspacePath: string): Promise<void> {

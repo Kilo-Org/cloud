@@ -665,7 +665,8 @@
     "profile": "Profili",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, skedë, {{position}} nga {{total}}"
+    "position": "{{name}}, skedë, {{position}} nga {{total}}",
+    "chat": "Bisedë"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Ekzekutimi i kontrollit",
       "status": "Statusi",
       "threshold": "Pragu",
-      "pullRequest": "kërkesë për tërheqje"
+      "pullRequest": "kërkesë për tërheqje",
+      "transcriptWaiting": "Duke pritur transkriptin e shqyrtimit.",
+      "transcriptEmpty": "Asnjë transkript për këtë shqyrtim.",
+      "transcriptRetry": "Nuk u arrit të ngarkohej transkripti i shqyrtimit.",
+      "transcriptLive": "Drejtpërdrejt",
+      "agentIdle": "Agjenti i papunë",
+      "agentWorking": "Agjenti duke punuar...",
+      "anErrorOccurred": "Ndodhi një gabim",
+      "errorWithMessage": "Gabim: {{message}}",
+      "executionStarted": "Ekzekutimi filloi",
+      "reviewCompleted": "Rishikimi u përfundua",
+      "reviewInterrupted": "Rishikimi u ndërpre",
+      "sessionError": "Gabim sesioni: {{error}}",
+      "statusWithValue": "Statusi: {{status}}",
+      "toolName": "Mjeti: {{name}}",
+      "toolNameError": "Mjeti: {{name}} — gabim",
+      "unknownError": "Gabim i panjohur"
     },
     "reviewMemory": {
       "title": "Kujtesa e shqyrtimit",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiv tani",
     "search": {
       "searching": "Kërkim në vazhdim",
       "searchSessions": "Kërko seancat",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Nuk u ngarkuan seancat",
       "couldNotLoadActive": "Nuk u ngarkuan seancat aktive",
-      "noSessionsYet": "Ende pa seanca",
       "noSessionsYetDescription": "Filloni një detyrë kodimi nga telefoni juaj. Seancat tuaja do të shfaqen këtu.",
       "noMatches": "Asnjë seancë nuk përputhet",
       "tryDifferentSearch": "Provoni një term tjetër kërkimi.",
       "tryAdjustFilters": "Provoni t'i rregulloni ose pastroni filtrat tuaj.",
       "couldNotSearch": "Nuk u kërkuan seancat",
-      "allActive": "Të gjitha seancat janë aktive",
       "completedWillAppear": "Seancat e përfunduara do të shfaqen këtu.",
       "noPastSessions": "Asnjë seancë e kaluar",
       "live": "DREJTPËRDREJT"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Shko në fund",
       "emptyTitle": "Ende pa mesazhe",
       "renameAccessibility": "Riemërto seancën: {{title}}",
-      "connectRepository": "Lidh depon",
       "cloningSession": "Duke klonuar seancën",
       "continue": "Vazhdo",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë",
-      "cloneFailed": "Nuk u klonua kjo seancë.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provoni përsëri.",
-      "connectRepositoryToContinue": "Lidhni një depo për të vazhduar.",
       "notEnoughCredits": "Kredi të pamjaftueshme për të ekzekutuar Cloud Agent. Shtoni kredi dhe provoni përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme ende po përfundon. Ju lutemi prisni një moment.",
       "serviceUnavailable": "Shërbimi nuk është i disponueshëm tani. Ju lutemi provoni përsëri.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Nuk ka depo të dukshme. Kontrollo aksesin e depove për GitLab, pastaj rifresko.",
       "openBitbucket": "Hap Bitbucket",
       "openGitlab": "Hap GitLab",
-      "recentlyUsed": "Të përdorura së fundmi"
+      "recentlyUsed": "Të përdorura së fundmi",
+      "continueFrom": "Duke vazhduar {{title}}",
+      "importingSession": "Duke importuar seancë",
+      "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidhni Cloud Agent ose një CLI tjetër.",
+      "importFailed": "Nuk u arrit të importohej kjo seancë."
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar",
@@ -2462,6 +2477,8 @@
       "viewTable": "Shiko tabelën",
       "title": "Tabela",
       "close": "Mbyll tabelën",
+      "loading": "Duke ngarkuar tabelën",
+      "empty": "Kjo tabelë nuk ka rreshta.",
       "columnCount_one": "kolona",
       "columnCount": "kolonat",
       "columnCount_other": "kolonat",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Kjo lidhje hap {{host}} në shfletuesin tuaj.",
       "open": "Hap",
       "trustThisHost": "Beso këtë host"
+    },
+    "folderPicker": {
+      "accessibility": "Dosja: {{label}}",
+      "emptyDescription": "U krye përdor këtë dosje.",
+      "emptyTitle": "Asnjë dosje brenda",
+      "fieldLabel": "Dosja",
+      "retryableDescription": "Kontrolloni lidhjen tuaj dhe Riprovo. U krye ende e konfirmon këtë dosje.",
+      "retryableTitle": "Nuk u arrit të listoheshin dosjet",
+      "tapToListHint": "Prekni një dosje për të listuar përmbajtjen e saj",
+      "unsupportedDescription": "Ky CLI nuk mund të listojë dosje. U krye ruan dosjen e nisjes dhe Filloni seancën fillon atje.",
+      "unsupportedTitle": "Nuk mund të listohen dosjet"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Kur i beson hostit të një lidhjeje, ajo hapet pa pyetur përsëri.",
     "revoke": "Heq besimin për {{host}}",
     "backToPreferences": "Kthehu te preferencat"
+  },
+  "quickChat": {
+    "title": "Bisedë",
+    "composer": {
+      "placeholder": "Mesazh"
+    },
+    "empty": {
+      "title": "Filloni një bisedë",
+      "description": "Dërgo një mesazh për të biseduar me një model."
+    },
+    "working": "Duke punuar",
+    "historyRetry": "Nuk u arrit të ngarkohej historia e bisedës.",
+    "catalogRetry": "Nuk u ngarkuan modelet",
+    "sendError": "Mesazhi nuk u dërgua. Provoni përsëri."
   }
 }

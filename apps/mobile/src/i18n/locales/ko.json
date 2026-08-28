@@ -211,7 +211,8 @@
     "profile": "프로필",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, 탭, {{total}} 중 {{position}}"
+    "position": "{{name}}, 탭, {{total}} 중 {{position}}",
+    "chat": "채팅"
   },
   "chat": {
     "instancePicker": {
@@ -898,7 +899,23 @@
       "title": "리뷰",
       "tokens": "토큰",
       "tokensInOut": "{{input}} 입력 / {{output}} 출력",
-      "pullRequest": "풀 리퀘스트"
+      "pullRequest": "풀 리퀘스트",
+      "transcriptWaiting": "리뷰 대화록을 기다리는 중입니다.",
+      "transcriptEmpty": "이 리뷰에 대한 대화록이 없습니다.",
+      "transcriptRetry": "리뷰 대화록을 불러올 수 없습니다.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "에이전트 대기 중",
+      "agentWorking": "에이전트 작업 중...",
+      "anErrorOccurred": "오류가 발생했습니다",
+      "errorWithMessage": "오류: {{message}}",
+      "executionStarted": "실행 시작됨",
+      "reviewCompleted": "리뷰 완료됨",
+      "reviewInterrupted": "리뷰 중단됨",
+      "sessionError": "세션 오류: {{error}}",
+      "statusWithValue": "상태: {{status}}",
+      "toolName": "도구: {{name}}",
+      "toolNameError": "도구: {{name}} — 오류",
+      "unknownError": "알 수 없는 오류"
     },
     "reviewList": {
       "configureProvider": "제공업체 구성",
@@ -1579,7 +1596,6 @@
     }
   },
   "agents": {
-    "activeNow": "지금 활성 중",
     "search": {
       "searching": "검색 중",
       "searchSessions": "세션 검색",
@@ -1590,13 +1606,11 @@
     "sessionList": {
       "couldNotLoad": "세션을 불러올 수 없습니다",
       "couldNotLoadActive": "활성 세션을 불러올 수 없습니다",
-      "noSessionsYet": "아직 세션 없음",
       "noSessionsYetDescription": "휴대폰에서 코딩 작업을 시작하세요. 세션이 여기에 표시됩니다.",
       "noMatches": "일치하는 세션이 없습니다",
       "tryDifferentSearch": "다른 검색어를 사용해 보세요.",
       "tryAdjustFilters": "필터를 조정하거나 지워 보세요.",
       "couldNotSearch": "세션을 검색할 수 없습니다",
-      "allActive": "모든 세션이 활성 상태입니다",
       "completedWillAppear": "완료된 세션이 여기에 표시됩니다.",
       "noPastSessions": "지난 세션 없음",
       "live": "LIVE"
@@ -1665,13 +1679,10 @@
       "scrollToBottom": "맨 아래로 스크롤",
       "emptyTitle": "아직 메시지가 없습니다",
       "renameAccessibility": "세션 이름 바꾸기: {{title}}",
-      "connectRepository": "저장소 연결",
       "cloningSession": "세션 복제 중",
       "continue": "계속",
       "couldNotLoadThisSession": "이 세션을 로드하지 못했습니다",
-      "cloneFailed": "이 세션을 복제하지 못했습니다.",
       "cloneFailedRetry": "이 세션을 복제하지 못했습니다. 다시 시도하세요.",
-      "connectRepositoryToContinue": "계속하려면 저장소를 연결하세요.",
       "notEnoughCredits": "Cloud Agent를 실행할 크레딧이 부족합니다. 크레딧을 추가하고 다시 시도하세요.",
       "previousTaskFinishing": "이전 작업이 아직 끝나지 않았습니다. 잠시 기다려 주세요.",
       "serviceUnavailable": "지금 서비스를 사용할 수 없습니다. 다시 시도하세요.",
@@ -1744,7 +1755,11 @@
       "noRepositoriesVisibleGitlab": "표시된 저장소가 없습니다. GitLab의 저장소 접근 권한을 확인한 후 새로고침하세요.",
       "openBitbucket": "Bitbucket 열기",
       "openGitlab": "GitLab 열기",
-      "recentlyUsed": "최근 사용"
+      "recentlyUsed": "최근 사용",
+      "continueFrom": "{{title}} 계속하는 중",
+      "importingSession": "세션 가져오는 중",
+      "cliCannotContinue": "이 CLI는 세션을 계속할 수 없습니다. Cloud Agent 또는 다른 CLI를 선택하세요.",
+      "importFailed": "이 세션을 가져올 수 없습니다."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}개 파일 업데이트됨",
@@ -2008,6 +2023,8 @@
       "viewTable": "표 보기",
       "title": "표",
       "close": "표 닫기",
+      "loading": "표 불러오는 중",
+      "empty": "이 표에는 행이 없습니다.",
       "columnCount_one": "열",
       "columnCount": "열",
       "columnCount_other": "열",
@@ -2196,6 +2213,17 @@
       "hostConfirmMessage": "이 링크는 브라우저에서 {{host}}를 엽니다.",
       "open": "열기",
       "trustThisHost": "이 호스트 신뢰"
+    },
+    "folderPicker": {
+      "accessibility": "폴더: {{label}}",
+      "emptyDescription": "완료는 이 폴더를 사용합니다.",
+      "emptyTitle": "내부에 폴더가 없습니다",
+      "fieldLabel": "폴더",
+      "retryableDescription": "연결을 확인하고 다시 시도하세요. 완료는 여전히 이 폴더를 확인합니다.",
+      "retryableTitle": "폴더를 표시할 수 없습니다",
+      "tapToListHint": "폴더를 탭하여 내용을 표시하세요",
+      "unsupportedDescription": "이 CLI는 폴더를 표시할 수 없습니다. 완료는 시작 폴더를 유지하고 세션 시작은 거기서 시작됩니다.",
+      "unsupportedTitle": "폴더를 표시할 수 없습니다"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "링크의 호스트를 신뢰하면 다시 묻지 않고 열립니다.",
     "revoke": "{{host}} 신뢰 해제",
     "backToPreferences": "기본 설정으로 돌아가기"
+  },
+  "quickChat": {
+    "title": "채팅",
+    "composer": {
+      "placeholder": "메시지"
+    },
+    "empty": {
+      "title": "채팅 시작하기",
+      "description": "모델과 대화하려면 메시지를 보내세요."
+    },
+    "working": "작업 중",
+    "historyRetry": "채팅 기록을 불러올 수 없습니다.",
+    "catalogRetry": "모델을 불러올 수 없습니다",
+    "sendError": "메시지를 보낼 수 없습니다. 다시 시도하세요."
   }
 }

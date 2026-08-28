@@ -322,6 +322,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           initialMessageId: rs?.initialMessageId ?? null,
           runtimeAgents: rs?.runtimeAgents,
           associatedPr: sessionResult.associatedPr,
+          totalCostMicrodollars: sessionResult.total_cost_microdollars,
         };
       },
 

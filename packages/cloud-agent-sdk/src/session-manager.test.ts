@@ -4685,6 +4685,21 @@ describe('createSessionManager', () => {
       });
     });
 
+    it('forwards a caller directory to the transport', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_dddddddddddddddddddddddddd'));
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      await mgr.createRemoteSession({ directory: 'child' });
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith(
+        expect.objectContaining({ directory: 'child' })
+      );
+    });
+
     it('prefers override.selection over observedModel and omits variant when absent', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

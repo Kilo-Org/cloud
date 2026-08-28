@@ -3202,9 +3202,6 @@
     "openAgents": "에이전트 열기",
     "running": "실행 중",
     "needsInput": "입력 필요",
-    "reconnecting": "다시 연결 중",
-    "channelName": "활성 에이전트",
-    "activityKitDisabledTitle": "실시간 현황이 꺼져 있습니다",
-    "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요."
+    "reconnecting": "다시 연결 중"
   }
 }

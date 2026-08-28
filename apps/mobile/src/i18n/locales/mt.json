@@ -3265,9 +3265,6 @@
     "openAgents": "Iftaħ l-aġenti",
     "running": "Għaddej",
     "needsInput": "jeħtieġ input",
-    "reconnecting": "Qed jerġa' jaqbad",
-    "channelName": "Aġenti attivi",
-    "activityKitDisabledTitle": "L-Attivitajiet Diretti huma mitfija",
-    "activityKitDisabledBody": "Ixgħel l-Attivitajiet Diretti fis-Settings biex tara l-Aġenti Attivi fuq l-Iskrin Imsakkar."
+    "reconnecting": "Qed jerġa' jaqbad"
   }
 }

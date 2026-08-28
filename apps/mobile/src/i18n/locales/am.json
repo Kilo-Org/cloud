@@ -3202,9 +3202,6 @@
     "openAgents": "ወኪሎችን ይክፈቱ",
     "running": "በስራ ላይ",
     "needsInput": "ግብዓት ይፈልጋል",
-    "reconnecting": "እንደገና በመገናኘት ላይ",
-    "channelName": "ንቁ ወኪሎች",
-    "activityKitDisabledTitle": "የቀጥታ እንቅስቃሴዎች ጠፍተዋል",
-    "activityKitDisabledBody": "ንቁ ወኪሎችን በመቆለፊያ ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን ያብሩ።"
+    "reconnecting": "እንደገና በመገናኘት ላይ"
   }
 }

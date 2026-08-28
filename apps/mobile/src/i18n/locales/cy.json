@@ -3286,9 +3286,6 @@
     "openAgents": "Agorwch asiantau",
     "running": "YN RHEDEG",
     "needsInput": "angen mewnbwn",
-    "reconnecting": "Yn ailgysylltu",
-    "channelName": "Asiantau gweithredol",
-    "activityKitDisabledTitle": "Mae Gweithgareddau Byw wedi'u diffodd",
-    "activityKitDisabledBody": "Trowch Weithgareddau Byw ymlaen yn Gosodiadau i weld Asiantau gweithredol ar y Sgrin Glo."
+    "reconnecting": "Yn ailgysylltu"
   }
 }

@@ -3202,9 +3202,6 @@
     "openAgents": "Mở tác nhân",
     "running": "ĐANG CHẠY",
     "needsInput": "cần nhập",
-    "reconnecting": "Đang kết nối lại",
-    "channelName": "Tác nhân đang hoạt động",
-    "activityKitDisabledTitle": "Hoạt động trực tiếp đang tắt",
-    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên Màn hình khóa."
+    "reconnecting": "Đang kết nối lại"
   }
 }

@@ -3244,9 +3244,6 @@
     "openAgents": "Otevřít agenty",
     "running": "BĚŽÍ",
     "needsInput": "vyžaduje vstup",
-    "reconnecting": "Obnovování připojení",
-    "channelName": "Aktivní agenti",
-    "activityKitDisabledTitle": "Živé aktivity jsou vypnuté",
-    "activityKitDisabledBody": "Zapněte Živé aktivity v Nastavení, abyste viděli aktivní agenty na zamknuté obrazovce."
+    "reconnecting": "Obnovování připojení"
   }
 }

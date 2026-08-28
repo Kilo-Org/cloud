@@ -3202,9 +3202,6 @@
     "openAgents": "Agentlarni oching",
     "running": "Ishlamoqda",
     "needsInput": "kiritish kerak",
-    "reconnecting": "Qayta ulanmoqda",
-    "channelName": "Faol agentlar",
-    "activityKitDisabledTitle": "Jonli faoliyatlar o'chirilgan",
-    "activityKitDisabledBody": "Qulflangan ekranda Faol agentlarni ko'rish uchun Sozlamalarda Jonli faoliyatlarni yoqing."
+    "reconnecting": "Qayta ulanmoqda"
   }
 }

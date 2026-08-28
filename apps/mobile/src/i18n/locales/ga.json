@@ -3265,9 +3265,6 @@
     "openAgents": "Oscail gníomhairí",
     "running": "AG RITH",
     "needsInput": "teastaíonn ionchur",
-    "reconnecting": "Ag athcheangal",
-    "channelName": "Gníomhairí gníomhacha",
-    "activityKitDisabledTitle": "Tá Gníomhaíochtaí Beo as",
-    "activityKitDisabledBody": "Cumasaigh Gníomhaíochtaí Beo sna Socruithe chun Gníomhairí gníomhacha a fheiceáil ar an Scáileán Glasála."
+    "reconnecting": "Ag athcheangal"
   }
 }

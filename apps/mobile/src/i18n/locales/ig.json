@@ -3202,9 +3202,6 @@
     "openAgents": "Mepee ndị ọrụ",
     "running": "NA-AGBA",
     "needsInput": "chọrọ ntinye",
-    "reconnecting": "Na-ejikọ ọzọ",
-    "channelName": "Ndị ọrụ na-arụ ọrụ",
-    "activityKitDisabledTitle": "Agbanyụrụ Ihe Omume Dị Ndụ",
-    "activityKitDisabledBody": "Gbanye Ihe Omume Dị Ndụ na Ntọala iji hụ Ndị ọrụ na-arụ ọrụ na Ihuenyo Mkpọchi."
+    "reconnecting": "Na-ejikọ ọzọ"
   }
 }

@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Sessiyalarni filtrlash",
-      "sortBy": "Saralash",
-      "sortLastUpdated": "Oxirgi yangilangan",
-      "sortCreated": "Yaratilgan",
       "platform": "Platforma",
       "platformCloud": "Bulut",
       "platformExtension": "Kengaytma",

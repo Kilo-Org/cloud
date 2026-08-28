@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Сессияларды сүзу",
-      "sortBy": "Сұрыптау",
-      "sortLastUpdated": "Соңғы жаңарту",
-      "sortCreated": "Жасалған",
       "platform": "Платформа",
       "platformCloud": "Cloud",
       "platformExtension": "Кеңейтім",

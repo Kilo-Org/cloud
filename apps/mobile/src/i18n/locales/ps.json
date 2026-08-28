@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "غونډې فلټر کړئ",
-      "sortBy": "ترتیب کول",
-      "sortLastUpdated": "وروستی تازه شوی",
-      "sortCreated": "جوړ شوی",
       "platform": "پلیټ فارم",
       "platformCloud": "کلاوډ",
       "platformExtension": "اکسټنشن",

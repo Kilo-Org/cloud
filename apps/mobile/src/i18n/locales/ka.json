@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "სესიების გაფილტვრა",
-      "sortBy": "დალაგება",
-      "sortLastUpdated": "ბოლო განახლება",
-      "sortCreated": "შექმნის თარიღი",
       "platform": "პლატფორმა",
       "platformCloud": "Cloud",
       "platformExtension": "გაფართოება",

@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Hlunga amaseshini",
-      "sortBy": "Hlunga ngokwe-",
-      "sortLastUpdated": "Kugcine ukubuyekezwa",
-      "sortCreated": "Daliwe",
       "platform": "Inkundla",
       "platformCloud": "I-Cloud",
       "platformExtension": "Isandiso",

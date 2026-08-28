@@ -2035,9 +2035,6 @@
     },
     "sessionFilter": {
       "title": "筛选会话",
-      "sortBy": "排序方式",
-      "sortLastUpdated": "最近更新",
-      "sortCreated": "创建时间",
       "platform": "平台",
       "platformCloud": "云端",
       "platformExtension": "扩展",

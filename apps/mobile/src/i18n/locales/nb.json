@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Filtrer økter",
-      "sortBy": "Sorter etter",
-      "sortLastUpdated": "Sist oppdatert",
-      "sortCreated": "Opprettet",
       "platform": "Plattform",
       "platformCloud": "Sky",
       "platformExtension": "Utvidelse",

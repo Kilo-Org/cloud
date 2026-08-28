@@ -2035,9 +2035,6 @@
     },
     "sessionFilter": {
       "title": "Sitzungen filtern",
-      "sortBy": "Sortieren nach",
-      "sortLastUpdated": "Zuletzt aktualisiert",
-      "sortCreated": "Erstellt",
       "platform": "Plattform",
       "platformCloud": "Cloud",
       "platformExtension": "Erweiterung",

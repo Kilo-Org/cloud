@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "سیشن فلٹر کریں",
-      "sortBy": "ترتیب دیں",
-      "sortLastUpdated": "آخری اپڈیٹ",
-      "sortCreated": "تخلیق شدہ",
       "platform": "پلیٹ فارم",
       "platformCloud": "کلاؤڈ",
       "platformExtension": "ایکسٹینشن",

@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "அமர்வுகளை வடிகட்டு",
-      "sortBy": "வரிசைப்படுத்து",
-      "sortLastUpdated": "கடைசியாக புதுப்பிக்கப்பட்டது",
-      "sortCreated": "உருவாக்கப்பட்டது",
       "platform": "தளம்",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",

@@ -2519,9 +2519,6 @@
     },
     "sessionFilter": {
       "title": "Filter sessions",
-      "sortBy": "Sort by",
-      "sortLastUpdated": "Last updated",
-      "sortCreated": "Created",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",

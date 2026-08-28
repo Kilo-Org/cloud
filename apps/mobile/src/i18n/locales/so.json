@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Shaandhee kalfadhiyada",
-      "sortBy": "Ku kala saar",
-      "sortLastUpdated": "Markii ugu dambaysay ee la cusboonaysiiyay",
-      "sortCreated": "Waa la abuuray",
       "platform": "Platform",
       "platformCloud": "Dar",
       "platformExtension": "Extension",

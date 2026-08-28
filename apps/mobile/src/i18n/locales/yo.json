@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Ṣàlẹmọ awọn igba-ijiroro",
-      "sortBy": "Tọka nipasẹ",
-      "sortLastUpdated": "Titi o ṣe tun ṣe",
-      "sortCreated": "Tí a ṣẹ̀dá",
       "platform": "Pẹpẹ",
       "platformCloud": "Awọsanma",
       "platformExtension": "Igun",

@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "సెషన్లను ఫిల్టర్ చేయండి",
-      "sortBy": "దీని ప్రకారం క్రమబద్ధీకరించండి",
-      "sortLastUpdated": "చివరిగా నవీకరించబడింది",
-      "sortCreated": "సృష్టించబడింది",
       "platform": "ప్లాట్ఫారమ్",
       "platformCloud": "క్లౌడ్",
       "platformExtension": "ఎక్స్టెన్షన్",

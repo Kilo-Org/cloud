@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "กรองเซสชัน",
-      "sortBy": "เรียงตาม",
-      "sortLastUpdated": "อัปเดตล่าสุด",
-      "sortCreated": "สร้างเมื่อ",
       "platform": "แพลตฟอร์ม",
       "platformCloud": "คลาวด์",
       "platformExtension": "ส่วนขยาย",

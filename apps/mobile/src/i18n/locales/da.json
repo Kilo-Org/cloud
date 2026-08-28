@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Filtrér sessioner",
-      "sortBy": "Sortér efter",
-      "sortLastUpdated": "Sidst opdateret",
-      "sortCreated": "Oprettet",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Udvidelse",

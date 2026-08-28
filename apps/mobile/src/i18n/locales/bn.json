@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "সেশন ফিল্টার করুন",
-      "sortBy": "সাজান",
-      "sortLastUpdated": "সর্বশেষ আপডেট",
-      "sortCreated": "তৈরি হয়েছে",
       "platform": "প্ল্যাটফর্ম",
       "platformCloud": "ক্লাউড",
       "platformExtension": "এক্সটেনশন",

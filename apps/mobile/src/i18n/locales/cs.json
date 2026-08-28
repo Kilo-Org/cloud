@@ -2527,9 +2527,6 @@
     },
     "sessionFilter": {
       "title": "Filtrovat relace",
-      "sortBy": "Řadit podle",
-      "sortLastUpdated": "Poslední aktualizace",
-      "sortCreated": "Vytvořeno",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Rozšíření",

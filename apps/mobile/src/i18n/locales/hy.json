@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Զտել նիստերը",
-      "sortBy": "Դասավորել ըստ",
-      "sortLastUpdated": "Վերջին թարմացում",
-      "sortCreated": "Ստեղծված",
       "platform": "Հարթակ",
       "platformCloud": "Cloud",
       "platformExtension": "Ընդլայնում",

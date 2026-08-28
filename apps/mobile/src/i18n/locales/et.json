@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Filtreeri seansse",
-      "sortBy": "Sorteeri",
-      "sortLastUpdated": "Viimati muudetud",
-      "sortCreated": "Loodud",
       "platform": "Platvorm",
       "platformCloud": "Pilv",
       "platformExtension": "Laiendus",

@@ -2035,9 +2035,6 @@
     },
     "sessionFilter": {
       "title": "Lọc phiên",
-      "sortBy": "Sắp xếp theo",
-      "sortLastUpdated": "Cập nhật gần nhất",
-      "sortCreated": "Đã tạo",
       "platform": "Nền tảng",
       "platformCloud": "Đám mây",
       "platformExtension": "Tiện ích mở rộng",

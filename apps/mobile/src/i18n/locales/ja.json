@@ -2035,9 +2035,6 @@
     },
     "sessionFilter": {
       "title": "セッションをフィルター",
-      "sortBy": "並べ替え",
-      "sortLastUpdated": "最終更新",
-      "sortCreated": "作成日時",
       "platform": "プラットフォーム",
       "platformCloud": "クラウド",
       "platformExtension": "拡張機能",

@@ -8,7 +8,10 @@
 
 export const AUTH_TOKEN_KEY = 'auth-token';
 export const ORGANIZATION_STORAGE_KEY = 'selected-organization';
+/** Filter record for the session history page. */
 export const SESSION_FILTERS_KEY = 'agent-session-filters';
+/** Filter record for the live sessions page. Separate: the pages filter separate lists. */
+export const LIVE_SESSION_FILTERS_KEY = 'live-session-filters';
 export const NOTIFICATION_PROMPT_SEEN_KEY = 'notification-prompt-seen';
 export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
 export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';

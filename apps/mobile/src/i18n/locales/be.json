@@ -2527,9 +2527,6 @@
     },
     "sessionFilter": {
       "title": "Фільтраваць сеансы",
-      "sortBy": "Сартаваць па",
-      "sortLastUpdated": "Апошняе абнаўленне",
-      "sortCreated": "Створаны",
       "platform": "Платформа",
       "platformCloud": "Воблака",
       "platformExtension": "Пашырэнне",

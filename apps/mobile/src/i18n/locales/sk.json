@@ -2527,9 +2527,6 @@
     },
     "sessionFilter": {
       "title": "Filtrovať relácie",
-      "sortBy": "Zoradiť podľa",
-      "sortLastUpdated": "Naposledy upravené",
-      "sortCreated": "Vytvorené",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Rozšírenie",

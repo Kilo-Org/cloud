@@ -2031,9 +2031,6 @@
     },
     "sessionFilter": {
       "title": "Filtrar sessões",
-      "sortBy": "Ordenar por",
-      "sortLastUpdated": "Última atualização",
-      "sortCreated": "Criado",
       "platform": "Plataforma",
       "platformCloud": "Nuvem",
       "platformExtension": "Extensão",

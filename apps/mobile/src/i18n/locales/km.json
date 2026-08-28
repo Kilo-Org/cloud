@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "ត្រងវគ្គ",
-      "sortBy": "តម្រៀបតាម",
-      "sortLastUpdated": "បានធ្វើបច្ចុប្បន្នភាពចុងក្រោយ",
-      "sortCreated": "បានបង្កើត",
       "platform": "វេទិកា",
       "platformCloud": "Cloud",
       "platformExtension": "ផ្នែកបន្ថែម",

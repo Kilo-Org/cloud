@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "فیلتر جلسات",
-      "sortBy": "مرتب‌سازی بر اساس",
-      "sortLastUpdated": "آخرین به‌روزرسانی",
-      "sortCreated": "ایجاد شده",
       "platform": "پلتفرم",
       "platformCloud": "ابر",
       "platformExtension": "افزونه",

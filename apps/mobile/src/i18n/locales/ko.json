@@ -2035,9 +2035,6 @@
     },
     "sessionFilter": {
       "title": "세션 필터링",
-      "sortBy": "정렬 기준",
-      "sortLastUpdated": "마지막 업데이트",
-      "sortCreated": "생성됨",
       "platform": "플랫폼",
       "platformCloud": "클라우드",
       "platformExtension": "확장 프로그램",

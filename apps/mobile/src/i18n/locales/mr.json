@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "सत्रे फिल्टर करा",
-      "sortBy": "क्रमवारी लावा",
-      "sortLastUpdated": "शेवटचे अपडेट",
-      "sortCreated": "तयार केले",
       "platform": "प्लॅटफॉर्म",
       "platformCloud": "क्लाउड",
       "platformExtension": "एक्स्टेन्शन",

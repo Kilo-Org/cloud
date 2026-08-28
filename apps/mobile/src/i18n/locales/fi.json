@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Suodata istuntoja",
-      "sortBy": "Lajittele",
-      "sortLastUpdated": "Päivitetty viimeksi",
-      "sortCreated": "Luotu",
       "platform": "Alusta",
       "platformCloud": "Pilvi",
       "platformExtension": "Laajennus",

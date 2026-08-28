@@ -2083,9 +2083,6 @@
     },
     "sessionFilter": {
       "title": "تصفية الجلسات",
-      "sortBy": "ترتيب حسب",
-      "sortLastUpdated": "آخر تحديث",
-      "sortCreated": "تم الإنشاء",
       "platform": "المنصة",
       "platformCloud": "السحابة",
       "platformExtension": "الامتداد",

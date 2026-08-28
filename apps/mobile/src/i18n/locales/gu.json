@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "સત્રો ફિલ્ટર કરો",
-      "sortBy": "ક્રમ આપો",
-      "sortLastUpdated": "છેલ્લે અપડેટ",
-      "sortCreated": "બનાવેલ",
       "platform": "પ્લેટફોર્મ",
       "platformCloud": "ક્લાઉડ",
       "platformExtension": "એક્સટેન્શન",

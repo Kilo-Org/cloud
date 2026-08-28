@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "ਸੈਸ਼ਨ ਫਿਲਟਰ ਕਰੋ",
-      "sortBy": "ਕ੍ਰਮਬੱਧ ਕਰੋ",
-      "sortLastUpdated": "ਆਖਰੀ ਅੱਪਡੇਟ",
-      "sortCreated": "ਬਣਾਇਆ ਗਿਆ",
       "platform": "ਪਲੇਟਫਾਰਮ",
       "platformCloud": "ਕਲਾਉਡ",
       "platformExtension": "ਐਕਸਟੈਂਸ਼ਨ",

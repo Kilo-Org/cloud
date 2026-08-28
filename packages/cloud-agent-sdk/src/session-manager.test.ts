@@ -1878,6 +1878,8 @@ describe('createSessionManager', () => {
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      // The retarget runs in the live phase, after the snapshot replay ends.
+      mockSessionCallbacks.onReplayComplete?.();
 
       mockSession.send.mockImplementation(() => new Promise(() => {}));
       void mgr.send({ payload: { type: 'prompt', prompt: 'Hello', mode: 'code' } });
@@ -1906,6 +1908,91 @@ describe('createSessionManager', () => {
       expect(ids).toHaveLength(1);
       expect(ids[0]).toBe('cli-assigned-id');
       expect(ids).not.toContain(optimisticId);
+    });
+
+    it('keeps the optimistic row when a queue snapshot omits the in-flight id', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({ payload: { type: 'prompt', prompt: 'Hello', mode: 'code' } });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      expect(storage!.getMessageIds()).toHaveLength(1);
+      const [optimisticId] = storage!.getMessageIds();
+
+      // A root FIFO snapshot omits the in-flight send and the just-started
+      // message. It must not delete the optimistic row; only the authoritative
+      // `message.updated` retarget reconciles it.
+      mockSessionCallbacks.onEvent?.({
+        type: 'queue.changed',
+        sessionId: kiloId('ses-1'),
+        queued: [],
+      } as NormalizedEvent);
+
+      expect(storage!.getMessageIds()).toContain(optimisticId);
+    });
+
+    it('keeps the optimistic row when a child-session queue snapshot arrives', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({ payload: { type: 'prompt', prompt: 'Hello', mode: 'code' } });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      expect(storage!.getMessageIds()).toHaveLength(1);
+      const [optimisticId] = storage!.getMessageIds();
+
+      // A child/subagent snapshot must not delete the root session's row.
+      mockSessionCallbacks.onEvent?.({
+        type: 'queue.changed',
+        sessionId: kiloId('child-ses-1'),
+        queued: [],
+      } as NormalizedEvent);
+
+      expect(storage!.getMessageIds()).toContain(optimisticId);
+    });
+
+    it('keeps the optimistic row when a historical message.updated arrives during replay', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({ payload: { type: 'prompt', prompt: 'Hello', mode: 'code' } });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      expect(storage!.getMessageIds()).toHaveLength(1);
+      const [optimisticId] = storage!.getMessageIds();
+
+      // The manager is still replaying (`remoteHistoryReplaying` stays true
+      // until onReplayComplete), so a historical user message must not
+      // retarget-delete the in-flight optimistic row.
+      const historical = stubUserMessage({
+        id: 'historical-id',
+        sessionID: kiloId('ses-1'),
+        time: { created: 1 },
+        agent: 'test-agent',
+        model: { providerID: 'test-provider', modelID: 'test-model' },
+      });
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: historical,
+      } as NormalizedEvent);
+
+      expect(storage!.getMessageIds()).toContain(optimisticId);
     });
 
     it('leaves storage empty and sets error indicator + failedPrompt on failure', async () => {

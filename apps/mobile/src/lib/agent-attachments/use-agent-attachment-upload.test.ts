@@ -703,6 +703,41 @@ describe('restoreFileParts — cancel/restore re-send admission', () => {
     renderer.unmount();
   });
 
+  it('recovers messageUuid and remoteKey from a presigned https URL', async () => {
+    const renderer = await mountHook();
+    const remoteName = '87654321-4321-4321-8321-cba987654321.md';
+    const messageUuid = '12345678-1234-4234-9234-123456789abc';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: 'notes.md',
+          mime: 'text/markdown',
+          url: `https://r2.example.com/attachments/user-1/cloud-agent/${messageUuid}/${remoteName}?X-Amz-Expires=3600&X-Amz-Signature=deadbeef`,
+        },
+      ]);
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('uploaded');
+    // The remote filename comes from the key path, not the picker filename.
+    expect(chip?.remoteFilename).toBe(remoteName);
+    // The admission marker is the credential-free key, not the signed URL.
+    expect(chip?.remoteKey).toBe(`cloud-agent/${messageUuid}/${remoteName}`);
+
+    const result = await uploadPendingResult();
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('expected restored-chip upload to succeed');
+    }
+    expect(result.wire?.files).toEqual([remoteName]);
+    // The re-send must reuse the canceled message's path, not the rotated one.
+    expect(result.wire?.path).toBe(messageUuid);
+    expect(result.submission?.files.map(file => file.remoteName)).toEqual([remoteName]);
+    renderer.unmount();
+  });
+
   it('skips a part with no URL (not recoverable)', async () => {
     const renderer = await mountHook();
     await act(async () => {

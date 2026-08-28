@@ -577,14 +577,15 @@ function buildOptimisticFileParts(
     }));
   }
   if (input.attachments && input.attachments.files.length > 0) {
-    return input.attachments.files.map((filename, index) => ({
+    const attachments = input.attachments;
+    return attachments.files.map((filename, index) => ({
       id: `${messageId}-file-${index}`,
       sessionID: sessionId,
       messageID: messageId,
       type: 'file',
       mime: '',
       filename,
-      url: `${CLOUD_AGENT_RESTORE_URL_PREFIX}${input.attachments!.path}/${filename}`,
+      url: `${CLOUD_AGENT_RESTORE_URL_PREFIX}${attachments.path}/${filename}`,
       synthetic: true,
     }));
   }
@@ -1829,19 +1830,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           return;
         }
         if (event.type === 'queue.changed' && activeSessionType === 'remote') {
-          // The CLI's authoritative FIFO snapshot omits an optimistic id when
-          // it assigned its own id (old CLI) or already dequeued it. Drop any
-          // optimistic row the snapshot no longer includes so a retarget can
-          // never leave a ghost prompt behind.
-          if (remoteOptimisticIds.size > 0) {
-            const queued = new Set(event.queued);
-            for (const id of [...remoteOptimisticIds]) {
-              if (!queued.has(id)) {
-                remoteOptimisticIds.delete(id);
-                session.storage.deleteMessage(id);
-              }
-            }
-          }
+          // The authoritative reconciliation of an optimistic row is the
+          // `message.updated` retarget below. A FIFO snapshot omits the
+          // in-flight send and the just-started message, and child/subagent
+          // snapshots are forwarded through this same path, so deleting an
+          // optimistic row merely because its id left `queued` would drop the
+          // prompt until the CLI echoes it back.
           return;
         }
         if (event.type === 'message.updated') {
@@ -1866,7 +1860,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             // echoes messageID) → keep the row (the upsert just overwrote it)
             // and clear the id. Different id (old CLI) → the synthetic row is
             // orphaned; drop the oldest optimistic row and its id.
-            if (activeSessionType === 'remote' && remoteOptimisticIds.size > 0) {
+            if (
+              activeSessionType === 'remote' &&
+              !remoteHistoryReplaying &&
+              remoteOptimisticIds.size > 0
+            ) {
               if (remoteOptimisticIds.has(event.info.id)) {
                 remoteOptimisticIds.delete(event.info.id);
               } else {
@@ -2040,8 +2038,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         sessionId: optimisticSessionId,
         messageId,
         messageText,
-        attachments: input.attachments,
-        attachmentParts: input.attachmentParts,
+        ...(input.attachments ? { attachments: input.attachments } : {}),
+        ...(input.attachmentParts ? { attachmentParts: input.attachmentParts } : {}),
       });
       if (sessionType === 'remote') {
         remoteOptimisticIds.add(messageId);

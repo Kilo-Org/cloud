@@ -6,6 +6,12 @@ import * as SecureStore from 'expo-secure-store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import {
+  beginAuthenticatedOwner,
+  confirmAuthenticatedOwner,
+  getAuthenticatedOwner,
+  isAuthenticatedOwner,
+} from '@/lib/context-scope';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
@@ -45,10 +51,23 @@ const kvMock = vi.hoisted(() => {
 
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: kvMock.getItem,
-  setItem: kvMock.setItem,
-  removeItem: kvMock.removeItem,
+  // eslint-disable-next-line max-params -- mirror the guarded KV write API
+  setItem: async (scope: string, key: string, value: string, guard?: () => boolean) => {
+    if (!guard || guard()) {
+      await kvMock.setItem(scope, key, value);
+    }
+  },
+  removeItem: async (scope: string, key: string, guard?: () => boolean) => {
+    if (!guard || guard()) {
+      await kvMock.removeItem(scope, key);
+    }
+  },
   clearScope: kvMock.clearScope,
-  clearScopePrefix: kvMock.clearScopePrefix,
+  clearScopePrefix: async (prefix: string, guard?: () => boolean) => {
+    if (!guard || guard()) {
+      await kvMock.clearScopePrefix(prefix);
+    }
+  },
 }));
 
 const store = new Map<string, string>();
@@ -96,6 +115,8 @@ function queryLike(state: Partial<Query['state']>, queryKey: unknown): Query {
 
 function makeAuthoritativeQueryClient(userId: string): QueryClient {
   const queryClient = new QueryClient();
+  beginAuthenticatedOwner();
+  confirmAuthenticatedOwner(getAuthenticatedOwner(), userId);
   queryClient.setQueryData(GET_ME_QUERY_KEY, { id: userId });
   return queryClient;
 }
@@ -426,7 +447,7 @@ describe('publication budget', () => {
     expect(scopes.get('cache:u1:1')?.has('read-cache')).toBe(false);
   });
 
-  it('restores from the scope even when the publication fence would block a write', async () => {
+  it('denies stale-owner reads as well as writes without deleting the stored bytes', async () => {
     const { scopes } = createFakeKv();
     const queryClient = new QueryClient();
     scopes.set(
@@ -441,7 +462,8 @@ describe('publication budget', () => {
     bumpAuthEpoch();
 
     const restored = await persister.restoreClient();
-    expect(restored?.clientState.queries[0]?.state.data).toEqual({ id: 'u1' });
+    expect(restored).toBeUndefined();
+    expect(scopes.get('cache:u1:1')?.has('read-cache')).toBe(true);
   });
 });
 
@@ -492,180 +514,172 @@ describe('publication fence', () => {
   });
 });
 
-describe('cold-start restore and takeover', () => {
-  it('restores the hint user scope and reports it to the authenticated mount', async () => {
-    const { scopes } = createFakeKv();
-    store.set(ACTIVE_USER_ID_KEY, 'u1');
-    scopes.set(
-      'cache:u1:1',
-      new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
-    );
-    const queryClient = new QueryClient();
-
-    await restorePersistedCacheOnColdStart(queryClient);
-
-    // The allowlisted getMe query was hydrated from the hint account's scope.
-    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'u1' });
-    expect(takeOverColdStartRestore()).toBe('cache:u1:1');
-    // A completed restore is reported exactly once.
-    expect(takeOverColdStartRestore()).toBeNull();
-  });
-
-  it('drops an expired blob instead of hydrating it', async () => {
+describe('owner-proved restore and cold-start isolation', () => {
+  const recentKey = [['cliSessionsV2', 'recentRepositories'], { type: 'query' }];
+  function contentBlob(userId: string) {
+    const blob = makePersistedClient({ id: userId, email: 'cached@example.test' });
+    const identity = blob.clientState.queries[0];
+    if (!identity) {
+      throw new Error('Missing fixture query');
+    }
+    blob.clientState.queries.push({
+      ...identity,
+      queryKey: recentKey,
+      queryHash: JSON.stringify(recentKey),
+      state: { ...identity.state, data: { private: userId } },
+    });
+    return blob;
+  }
+  async function restore(queryClient: QueryClient) {
+    const { restorePersistedCacheForOwner } = await import('./read-cache');
+    const owner = getAuthenticatedOwner();
+    await restorePersistedCacheForOwner(queryClient, owner, () => isAuthenticatedOwner(owner));
+  }
+  it('retains a cold hint without reading or exposing any cached content', async () => {
     const { kv, scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
-    const expired = makePersistedClient({ id: 'u1' });
+    scopes.set('cache:u1:1', new Map([['read-cache', JSON.stringify(contentBlob('u1'))]]));
+    const client = new QueryClient();
+    await restorePersistedCacheOnColdStart(client);
+    expect(client.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
+    expect(client.getQueryData(recentKey)).toBeUndefined();
+    expect(kv.getItem).not.toHaveBeenCalled();
+    expect(takeOverColdStartRestore()).toBe('cache:u1:1');
+    expect(takeOverColdStartRestore()).toBeNull();
+  });
+  it('restores the stock session-list key after JSON omits undefined input fields', async () => {
+    const { scopes } = createFakeKv();
+    const listKey = [
+      ['cliSessionsV2', 'list'],
+      {
+        input: {
+          limit: 30,
+          orderBy: 'updated_at',
+          includeChildren: false,
+          createdOnPlatform: undefined,
+          gitUrl: undefined,
+          organizationId: null,
+        },
+        type: 'infinite',
+      },
+    ];
+    const blob = contentBlob('u1');
+    const fixture = blob.clientState.queries[0];
+    if (!fixture) {
+      throw new Error('Missing fixture');
+    }
+    const { hashKey } = await import('@tanstack/react-query');
+    const data = {
+      pages: [{ cliSessions: [{ session_id: 'saved-session' }] }],
+      pageParams: [null],
+    };
+    blob.clientState.queries.push({
+      ...fixture,
+      queryKey: listKey,
+      queryHash: hashKey(listKey),
+      state: { ...fixture.state, data },
+    });
+    scopes.set('cache:u1:1', new Map([['read-cache', JSON.stringify(blob)]]));
+    const client = makeAuthoritativeQueryClient('u1');
+    await restore(client);
+    expect(client.getQueryData(listKey)).toEqual(data);
+  });
+  it('restores only matching owner content and never restores getMe identity', async () => {
+    const { scopes } = createFakeKv();
+    scopes.set('cache:u1:1', new Map([['read-cache', JSON.stringify(contentBlob('u1'))]]));
+    const client = makeAuthoritativeQueryClient('u1');
+    await restore(client);
+    expect(client.getQueryData(recentKey)).toEqual({ private: 'u1' });
+    expect(client.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'u1' });
+  });
+  it('rejects a cached identity mismatch inside the proved owner scope', async () => {
+    const { scopes } = createFakeKv();
+    scopes.set('cache:u2:1', new Map([['read-cache', JSON.stringify(contentBlob('u1'))]]));
+    const client = makeAuthoritativeQueryClient('u2');
+    await restore(client);
+    expect(client.getQueryData(recentKey)).toBeUndefined();
+    expect(client.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'u2' });
+  });
+  it('drops an expired blob only after the owner is proved', async () => {
+    const { scopes } = createFakeKv();
+    const expired = contentBlob('u1');
     expired.timestamp = Date.now() - READ_CACHE_MAX_AGE_MS - 1;
     scopes.set('cache:u1:1', new Map([['read-cache', JSON.stringify(expired)]]));
-    const queryClient = new QueryClient();
-
-    await restorePersistedCacheOnColdStart(queryClient);
-
-    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
-    expect(kv.removeItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
-    expect(takeOverColdStartRestore()).toBe('cache:u1:1');
+    const client = makeAuthoritativeQueryClient('u1');
+    await restore(client);
+    expect(client.getQueryData(recentKey)).toBeUndefined();
+    expect(scopes.get('cache:u1:1')?.has('read-cache')).toBe(false);
   });
-
-  it('never restores a blob written by an older schema: it lives in another scope', async () => {
-    const { kv, scopes } = createFakeKv();
-    store.set(ACTIVE_USER_ID_KEY, 'u1');
-    // The previous schema version wrote into `cache:u1:0`; the current scope is
-    // `cache:u1:1`, so the old blob is never read and never hydrated.
-    const oldSchemaBlob = JSON.stringify(makePersistedClient({ id: 'u1' }));
-    scopes.set('cache:u1:0', new Map([['read-cache', oldSchemaBlob]]));
-    const queryClient = new QueryClient();
-
-    await restorePersistedCacheOnColdStart(queryClient);
-
-    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
-    expect(kv.getItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
-    expect(kv.getItem).not.toHaveBeenCalledWith('cache:u1:0', 'read-cache');
+  it('leaves an older schema isolated in its original scope', async () => {
+    const { scopes } = createFakeKv();
+    scopes.set('cache:u1:0', new Map([['read-cache', JSON.stringify(contentBlob('u1'))]]));
+    const client = makeAuthoritativeQueryClient('u1');
+    await restore(client);
+    expect(client.getQueryData(recentKey)).toBeUndefined();
+    expect(scopes.has('cache:u1:0')).toBe(true);
   });
-
-  it('is best effort: a corrupt blob never blocks startup and is discarded', async () => {
-    const { kv, scopes } = createFakeKv();
+  it('keeps a corrupt cold blob untouched until proof authorizes cache cleanup', async () => {
+    const { scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     scopes.set('cache:u1:1', new Map([['read-cache', 'not-json']]));
-    const queryClient = new QueryClient();
-
-    await expect(restorePersistedCacheOnColdStart(queryClient)).resolves.toBeUndefined();
-
-    expect(kv.removeItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
-    expect(takeOverColdStartRestore()).toBeNull();
+    const client = new QueryClient();
+    await restorePersistedCacheOnColdStart(client);
+    expect(scopes.get('cache:u1:1')?.get('read-cache')).toBe('not-json');
+    const proved = makeAuthoritativeQueryClient('u1');
+    await restore(proved);
+    expect(scopes.get('cache:u1:1')?.has('read-cache')).toBe(false);
   });
-
-  it('abandons a still-pending restore once the authenticated mount takes over', async () => {
-    createFakeKv();
-    const hintRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
-    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(
-      async () =>
-        new Promise<string | null>(resolve => {
-          hintRead.resolve = resolve;
-        })
-    );
-    const queryClient = new QueryClient();
-
-    const restorePromise = restorePersistedCacheOnColdStart(queryClient);
-    // The mount takes over while the hint read is still in flight.
-    expect(takeOverColdStartRestore()).toBeNull();
-    hintRead.resolve?.('u1');
-    await restorePromise;
-
-    // The late restore never claimed a scope.
-    expect(takeOverColdStartRestore()).toBeNull();
-  });
-
-  it('never hydrates when the mount takes over while the restore read is in flight', async () => {
-    const { kv, scopes } = createFakeKv();
-    store.set(ACTIVE_USER_ID_KEY, 'u1');
-    scopes.set(
-      'cache:u1:1',
-      new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
-    );
-    const restoreRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
-    kv.getItem.mockImplementationOnce(
-      async () =>
-        new Promise<string | null>(resolve => {
-          restoreRead.resolve = resolve;
-        })
-    );
-    const queryClient = new QueryClient();
-
-    const restorePromise = restorePersistedCacheOnColdStart(queryClient);
+  it.each(['takeover', 'account'])(
+    'abandons a pending hint after %s changes its generation',
+    async change => {
+      createFakeKv();
+      const gate = Promise.withResolvers<string | null>();
+      vi.mocked(SecureStore.getItemAsync).mockReturnValueOnce(gate.promise);
+      const restoring = restorePersistedCacheOnColdStart(new QueryClient());
+      if (change === 'account') {
+        bumpAuthEpoch();
+      } else {
+        takeOverColdStartRestore();
+      }
+      gate.resolve('u1');
+      await restoring;
+      expect(takeOverColdStartRestore()).toBeNull();
+    }
+  );
+  it('never hydrates a late old-account read after direct sign-in', async () => {
+    const { kv } = createFakeKv();
+    const client = makeAuthoritativeQueryClient('u1');
+    const gate = Promise.withResolvers<string | null>();
+    kv.getItem.mockReturnValueOnce(gate.promise);
+    const restoring = restore(client);
     await vi.waitFor(() => {
       expect(kv.getItem).toHaveBeenCalled();
     });
-    // The mount takes over while the KV read is still in flight: the restore
-    // must not hydrate after the authoritative identity has taken over.
-    expect(takeOverColdStartRestore()).toBeNull();
-    restoreRead.resolve?.(JSON.stringify(makePersistedClient({ id: 'u1' })));
-    await restorePromise;
-
-    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
-    expect(takeOverColdStartRestore()).toBeNull();
+    bumpAuthEpoch();
+    beginAuthenticatedOwner();
+    confirmAuthenticatedOwner(getAuthenticatedOwner(), 'u2');
+    client.clear();
+    client.setQueryData(GET_ME_QUERY_KEY, { id: 'u2' });
+    gate.resolve(JSON.stringify(contentBlob('u1')));
+    await restoring;
+    expect(client.getQueryData(recentKey)).toBeUndefined();
+    expect(client.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'u2' });
   });
-
-  it('never hydrates when the auth epoch changes while the restore read is in flight', async () => {
+  it('does not let a late rejected restore delete another generation cache', async () => {
     const { kv, scopes } = createFakeKv();
-    store.set(ACTIVE_USER_ID_KEY, 'u1');
-    scopes.set(
-      'cache:u1:1',
-      new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
-    );
-    const restoreRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
-    kv.getItem.mockImplementationOnce(
-      async () =>
-        new Promise<string | null>(resolve => {
-          restoreRead.resolve = resolve;
-        })
-    );
-    const queryClient = new QueryClient();
-
-    const restorePromise = restorePersistedCacheOnColdStart(queryClient);
+    scopes.set('cache:u1:1', new Map([['read-cache', 'retained']]));
+    const client = makeAuthoritativeQueryClient('u1');
+    const gate = Promise.withResolvers<string | null>();
+    kv.getItem.mockReturnValueOnce(gate.promise);
+    const restoring = restore(client);
     await vi.waitFor(() => {
       expect(kv.getItem).toHaveBeenCalled();
     });
-    // A sign-out (or sign-in) bumps the epoch while the KV read is in flight,
-    // before the authenticated mount takes over: the restore must not hydrate
-    // the hint account into the query client.
-    bumpAuthEpoch();
-    restoreRead.resolve?.(JSON.stringify(makePersistedClient({ id: 'u1' })));
-    await restorePromise;
-
-    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
-    expect(takeOverColdStartRestore()).toBeNull();
-  });
-
-  it('never restores when the auth epoch changes while the hint read is in flight', async () => {
-    const { kv } = createFakeKv();
-    const hintRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
-    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(
-      async () =>
-        new Promise<string | null>(resolve => {
-          hintRead.resolve = resolve;
-        })
-    );
-    const queryClient = new QueryClient();
-
-    const restorePromise = restorePersistedCacheOnColdStart(queryClient);
-    // The epoch moved before the hint read settled: the restore is abandoned
-    // before it can even read the cache.
-    bumpAuthEpoch();
-    hintRead.resolve?.('u1');
-    await restorePromise;
-
-    expect(kv.getItem).not.toHaveBeenCalled();
-    expect(takeOverColdStartRestore()).toBeNull();
-  });
-
-  it('does nothing when the identity hint is absent', async () => {
-    const { kv } = createFakeKv();
-    const queryClient = new QueryClient();
-
-    await restorePersistedCacheOnColdStart(queryClient);
-
-    expect(kv.getItem).not.toHaveBeenCalled();
-    expect(takeOverColdStartRestore()).toBeNull();
+    beginAuthenticatedOwner();
+    confirmAuthenticatedOwner(getAuthenticatedOwner(), 'u1');
+    gate.reject(new Error('late I/O error'));
+    await restoring;
+    expect(scopes.get('cache:u1:1')?.get('read-cache')).toBe('retained');
   });
 });
 

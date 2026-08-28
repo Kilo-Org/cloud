@@ -1,205 +1,68 @@
 import * as Sentry from '@sentry/react-native';
-import * as z from 'zod';
-import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import {
+  captureAccountGeneration,
+  getAuthenticatedOwner,
+  isAuthenticatedOwner,
+} from '@/lib/context-scope';
 import { chainSave } from '@/lib/hooks/save-chain';
-import { utf8ByteLength } from '@/lib/utf8-utils';
+import { parseStoredDraft, serializeStoredDraft } from '@/lib/storage-keys';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 
-/**
- * Durable high-intent drafts over the encrypted SQLCipher KV store (DEC-01).
- *
- * One entry per `entityKey` under scope `draft:<userId>`, so a draft is
- * account-scoped and survives sign-out by design (user work is not
- * refetchable; cache rows are deleted on sign-out, drafts are not).
- *
- * Writes are debounced 500 ms per full storage key (`draft:<userId>` +
- * entityKey): every pending timer closes over its own userId, entityKey, and
- * value, so switching entity keys or accounts in the same epoch never
- * retargets an older timer — the old key receives only its own write. Each
- * write is epoch-fenced and serialized per full key via `chainSave`; values
- * over 64 KB are skipped (never written partially); a scope holds at most
- * 100 entries, evicting the oldest `updated_at` above the cap.
- *
- * A corrupt or unreadable stored value loads as null (start empty) and is
- * reported to Sentry with no toast: there is no user action that re-reads a
- * draft, so the failure is structurally non-retryable and the composer is
- * already usable empty. Callers pass a shape validator, so a valid-JSON value
- * that does not match its contract (e.g. a number where composer text is
- * expected) is treated as corrupt and discarded the same way.
- *
- * Every asynchronous write (debounced timer, flush, clear) is caught at this
- * boundary: a storage failure is reported to Sentry and swallowed, so the
- * fire-and-forget `void` call sites can never leak an unhandled rejection.
- *
- * Serialization is contained before any timer exists: a value that cannot be
- * JSON-serialized (a circular reference, or a top-level undefined) is
- * reported to Sentry and skipped without scheduling a write.
- */
-
+/** Durable drafts retain their JSON values and draft:<userId> scopes across sign-out. */
 export const DRAFT_DEBOUNCE_MS = 500;
 export const DRAFT_MAX_BYTES = 64 * 1024;
 export const DRAFT_MAX_ENTRIES = 100;
-
-const DRAFT_SCOPE_PREFIX = 'draft:';
-
-/** One user's draft scope. Entity keys live as KV items under this scope. */
+export const SCOPED_DRAFT_KEY_PREFIX = 'context-draft:v1:';
 export function draftScope(userId: string): string {
-  return `${DRAFT_SCOPE_PREFIX}${userId}`;
+  return `draft:${userId}`;
 }
 
-const stringDraftSchema = z.string();
-
-/** Runtime shape guard for a composer text draft (a JSON string). */
-export function isStringDraft(value: unknown): value is string {
-  return stringDraftSchema.safeParse(value).success;
-}
-
-/** Shape validator for one loaded draft value, supplied by the caller. */
+// Compatibility path: unchanged callers retain these exports and nullable reads. New consumers use
+// scoped-draft-keys/useScopedDraftLoad. Remove legacy forms only after a6 and explicit recovery finish.
+export {
+  agentComposerDraftKey,
+  isStringDraft,
+  isMergeDraft,
+  isSharePayloadsDraft,
+  isShareNavigationDraft,
+  NEW_SESSION_DRAFT_KEY,
+  SHARE_PAYLOADS_DRAFT_KEY,
+  SHARE_NAV_DRAFT_KEY,
+  PENDING_SHARE_ID_DRAFT_KEY,
+  SESSION_SEARCH_DRAFT_KEY,
+  prReviewDraftKey,
+  prMergeDraftKey,
+  prReplyDraftKey,
+  prCommentDraftKey,
+  securityDismissDraftKey,
+  resolvePrefillOverDraft,
+  type SharePayloadsDraft,
+  type ShareNavigationDraft,
+} from '@/lib/storage-keys';
 export type DraftShapeValidator<T> = (value: unknown) => value is T;
-
-/** Session composer draft entity key. */
-export function agentComposerDraftKey(sessionId: string): string {
-  return `agent-composer:${sessionId}`;
-}
-
-/** New-session prompt draft entity key. */
-export const NEW_SESSION_DRAFT_KEY = 'agent-composer:new';
-
-/** Durable pending share-intent payloads (map + insertion order) entity key. */
-export const SHARE_PAYLOADS_DRAFT_KEY = 'share-payloads';
-
-/** Durable pending share-navigation queue entity key. */
-export const SHARE_NAV_DRAFT_KEY = 'share-navigation';
-
-/** Durable pending (not-yet-delivered) share id entity key. */
-export const PENDING_SHARE_ID_DRAFT_KEY = 'pending-share-id';
-
-/** Agents session-list search query draft entity key. */
-export const SESSION_SEARCH_DRAFT_KEY = 'session-search-query';
-
-/** Pending-review draft entity key, unique per pull request. */
-export function prReviewDraftKey(owner: string, repo: string, number: number): string {
-  return `pr-review:${owner}/${repo}#${number}`;
-}
-
-/** Merge-sheet draft entity key, unique per pull request. */
-export function prMergeDraftKey(owner: string, repo: string, number: number): string {
-  return `pr-merge:${owner}/${repo}#${number}`;
-}
-
-/** Reply draft entity key, unique per review comment thread. */
-// eslint-disable-next-line eslint/max-params -- the key encodes owner, repo, number, and comment id
-export function prReplyDraftKey(
-  owner: string,
-  repo: string,
-  number: number,
-  commentId: number
-): string {
-  return `pr-reply:${owner}/${repo}#${number}:${commentId}`;
-}
-
-/** Inline review-comment draft entity key, unique per diff position. */
-// eslint-disable-next-line eslint/max-params -- the key encodes the full diff position
-export function prCommentDraftKey(
-  owner: string,
-  repo: string,
-  number: number,
-  path: string,
-  side: string,
-  line: number,
-  startLine?: number
-): string {
-  return `pr-comment:${owner}/${repo}#${number}:${path}:${side}:${startLine ?? line}-${line}`;
-}
-
-const mergeDraftSchema = z.object({
-  title: z.string(),
-  message: z.string(),
-});
-
-/** Runtime shape guard for a merge-sheet draft ({ title, message }). */
-export function isMergeDraft(value: unknown): value is { title: string; message: string } {
-  return mergeDraftSchema.safeParse(value).success;
-}
-
-const sharePayloadsDraftSchema = z.object({
-  order: z.array(z.string()),
-  entries: z.record(
-    z.string(),
-    z.object({
-      text: z.string(),
-      files: z.array(z.object({ name: z.string(), uri: z.string() })),
-      failedFiles: z.array(z.string()),
-    })
-  ),
-});
-
-/** Shape of the persisted share payloads map (order + per-id entries). */
-export type SharePayloadsDraft = z.infer<typeof sharePayloadsDraftSchema>;
-
-/** Runtime shape guard for a persisted share payloads map. */
-export function isSharePayloadsDraft(value: unknown): value is SharePayloadsDraft {
-  return sharePayloadsDraftSchema.safeParse(value).success;
-}
-
-const shareNavigationDraftSchema = z.array(
-  z.object({ href: z.string(), shareId: z.string().nullable() })
-);
-
-/** Shape of the persisted share navigation queue. */
-export type ShareNavigationDraft = z.infer<typeof shareNavigationDraftSchema>;
-
-/** Runtime shape guard for a persisted share navigation queue. */
-export function isShareNavigationDraft(value: unknown): value is ShareNavigationDraft {
-  return shareNavigationDraftSchema.safeParse(value).success;
-}
-
-/** Security dismiss draft entity key, unique per scope and finding. */
-export function securityDismissDraftKey(scope: string, findingId: string): string {
-  return `security-dismiss:${scope}:${findingId}`;
-}
-
-/**
- * New-session initial-prompt precedence: a non-empty share prefill always
- * beats a stored draft (the share payload is the user's explicit current
- * intent); an empty or absent prefill falls back to the stored draft. The
- * caller resolves both before mounting the input, so a draft never renders
- * first and gets replaced by a late prefill.
- */
-export function resolvePrefillOverDraft(
-  prefillText: string | null | undefined,
-  draftText: string | null | undefined
-): string | undefined {
-  if (prefillText !== undefined && prefillText !== null && prefillText.trim().length > 0) {
-    return prefillText;
-  }
-  return draftText ?? undefined;
-}
-
-/** The epoch-fenced write payload for one draft write. */
-type DraftWritePayload = {
-  epoch: number;
+export type DraftLoadResult<T> =
+  | ReturnType<typeof parseStoredDraft<T>>
+  | Readonly<{ status: 'absent' }>
+  | Readonly<{ status: 'failed'; error: unknown }>;
+export type DraftWriteResult = 'committed' | 'failed' | 'stale' | 'conflict';
+export type DraftWriteOptions = { isCurrent?: () => boolean; expectedSerialized?: string | null };
+type DraftWritePayload = DraftWriteOptions & {
+  generationFence: () => boolean;
   userId: string;
   entityKey: string;
   serialized: string;
 };
-
-type PendingSave = {
-  timer: ReturnType<typeof setTimeout>;
-  epoch: number;
-  serialized: string;
-};
-
-// One pending debounced write per full storage key. The timer, epoch, and
-// value are captured together under the full key, so a later save for a
-// different key (or a different account with the same entity key) can never
-// retarget it.
+type PendingSave = DraftWritePayload & { timer: ReturnType<typeof setTimeout> };
 const pendingSaves = new Map<string, PendingSave>();
-
 function fullKey(userId: string, entityKey: string): string {
-  return `${draftScope(userId)}\u0000${entityKey}`;
+  return JSON.stringify([draftScope(userId), entityKey]);
 }
-
+function takePending(key: string): PendingSave | undefined {
+  const pending = pendingSaves.get(key);
+  clearTimeout(pending?.timer);
+  pendingSaves.delete(key);
+  return pending;
+}
 function reportDraftFailure(
   error: unknown,
   operation: 'read' | 'write' | 'clear',
@@ -211,232 +74,240 @@ function reportDraftFailure(
     ...(fingerprint ? { fingerprint: [fingerprint] } : {}),
   });
 }
+function canWrite(userId: string, entityKey: string, isCurrent?: () => boolean): boolean {
+  const owner = getAuthenticatedOwner();
+  return (
+    Boolean(userId) &&
+    (!isCurrent || isCurrent()) &&
+    (!entityKey.startsWith(SCOPED_DRAFT_KEY_PREFIX) ||
+      (Boolean(isCurrent) && isAuthenticatedOwner(owner) && owner.userId === userId))
+  );
+}
 
-/**
- * Loads one draft. Returns the parsed JSON value, or null when the key is
- * absent, the value is corrupt/unreadable, the value exceeds the 64 KB cap,
- * or the parsed value fails the caller's shape validator — all but the absent
- * case load as empty and report corruption to Sentry. The value shape is the
- * caller's contract: composer text stores a JSON string, and pending-review
- * stores a JSON `PendingReviewItem[]`.
- */
+/** A rejected read never proves absence. New tagged reads also require authoritative owner proof. */
+// eslint-disable-next-line max-params -- the optional fence preserves the legacy read API
+export async function loadDraftResult<T>(
+  userId: string,
+  entityKey: string,
+  isValid: DraftShapeValidator<T>,
+  isCurrent?: () => boolean
+): Promise<DraftLoadResult<T>> {
+  const generationFence = captureAccountGeneration();
+  const owner = getAuthenticatedOwner();
+  const allowed = () =>
+    Boolean(userId) &&
+    generationFence() &&
+    (!isCurrent || isCurrent()) &&
+    (!entityKey.startsWith(SCOPED_DRAFT_KEY_PREFIX) ||
+      (isAuthenticatedOwner(owner) && owner.userId === userId));
+  if (!allowed()) {
+    return { status: 'failed', error: new Error('Draft owner is unresolved') };
+  }
+  let raw: string | null = null;
+  try {
+    raw = await encryptedKv.getItem(draftScope(userId), entityKey);
+  } catch (error) {
+    reportDraftFailure(error, 'read');
+    return { status: 'failed', error };
+  }
+  if (!allowed()) {
+    return { status: 'failed', error: new Error('Draft owner changed') };
+  }
+  if (raw === null) {
+    return { status: 'absent' };
+  }
+  const parsed = parseStoredDraft(raw, isValid, DRAFT_MAX_BYTES);
+  if (parsed.status === 'malformed') {
+    const fingerprints = {
+      size: 'draft-read-size-limit',
+      shape: 'draft-read-shape-mismatch',
+      json: undefined,
+    };
+    reportDraftFailure(new Error('Malformed draft'), 'read', fingerprints[parsed.reason]);
+  }
+  return parsed;
+}
 export async function loadDraft<T>(
   userId: string,
   entityKey: string,
   isValid: DraftShapeValidator<T>
 ): Promise<T | null> {
-  if (!userId) {
-    return null;
-  }
-  try {
-    const raw = await encryptedKv.getItem(draftScope(userId), entityKey);
-    if (raw === null) {
-      return null;
-    }
-    if (utf8ByteLength(raw) > DRAFT_MAX_BYTES) {
-      reportDraftFailure(
-        new Error('stored draft exceeds the 64 KB cap'),
-        'read',
-        'draft-read-size-limit'
-      );
-      return null;
-    }
-    const parsed: unknown = JSON.parse(raw);
-    if (!isValid(parsed)) {
-      reportDraftFailure(
-        new Error('stored draft does not match its expected shape'),
-        'read',
-        'draft-read-shape-mismatch'
-      );
-      return null;
-    }
-    return parsed;
-  } catch (error) {
-    reportDraftFailure(error, 'read');
-    return null;
-  }
+  const result = await loadDraftResult(userId, entityKey, isValid);
+  return result.status === 'present' ? result.value : null;
 }
-
-async function writeDraft({
-  epoch,
-  userId,
-  entityKey,
-  serialized,
-}: DraftWritePayload): Promise<void> {
-  const key = fullKey(userId, entityKey);
-  await chainSave(key, async () => {
-    // The authoritative fence lives inside the chained run: a write queued
-    // before a sign-out/sign-in must never land after the epoch moved.
-    if (!isCurrentAuthEpoch(epoch)) {
-      return;
-    }
-    await encryptedKv.setItem(draftScope(userId), entityKey, serialized);
-    await evictOldestBeyondCap(draftScope(userId));
+function serializeDraft(value: unknown): string | null {
+  return serializeStoredDraft(value, DRAFT_MAX_BYTES, (failure, fingerprint) => {
+    reportDraftFailure(failure, 'write', fingerprint);
   });
 }
-
-/**
- * Runs a draft write and contains every failure at this boundary: the error
- * is reported to Sentry and swallowed, so the debounced timer and the
- * fire-and-forget flush/clear call sites can never leak an unhandled
- * rejection, and the composer stays usable (the previous stored value, if
- * any, is left untouched).
- */
-async function writeDraftSafely(payload: DraftWritePayload): Promise<void> {
-  try {
-    await writeDraft(payload);
-  } catch (error) {
-    reportDraftFailure(error, 'write');
-  }
-}
-
-async function evictOldestBeyondCap(scope: string): Promise<void> {
-  const entries = await encryptedKv.listEntries(scope);
-  if (entries.length <= DRAFT_MAX_ENTRIES) {
-    return;
-  }
-  // `listEntries` is oldest-first; remove the oldest entries down to the cap.
-  const overflow = entries.length - DRAFT_MAX_ENTRIES;
-  const oldest = entries.slice(0, overflow);
+async function evictOldestBeyondCap(
+  payload: DraftWritePayload,
+  isCurrent: () => boolean
+): Promise<void> {
+  const scope = draftScope(payload.userId);
+  const all = await encryptedKv.listEntries(scope);
+  // New writes preserve ambiguous legacy candidates. Only explicit migration can remove them.
+  const entries = payload.entityKey.startsWith(SCOPED_DRAFT_KEY_PREFIX)
+    ? all.filter(entry => entry.k.startsWith(SCOPED_DRAFT_KEY_PREFIX))
+    : all;
   await Promise.all(
-    oldest.map(async entry => {
-      await encryptedKv.removeItem(scope, entry.k);
+    entries.slice(0, Math.max(0, entries.length - DRAFT_MAX_ENTRIES)).map(async entry => {
+      await encryptedKv.removeItem(scope, entry.k, isCurrent);
     })
   );
 }
-
-/**
- * Schedules a debounced save of one JSON-serializable draft value, keyed on
- * the full storage key. Values over 64 KB are skipped (never written
- * partially; a previously stored draft stays untouched). Unserializable
- * values (circular references, top-level undefined) are reported to Sentry
- * and skipped. Returns nothing — the write is fire-and-forget; use
- * {@link flushDraft} to force it.
- */
-export function saveDraft(userId: string, entityKey: string, value: unknown): void {
-  if (!userId) {
-    return;
-  }
+async function writeDraftSafely(payload: DraftWritePayload): Promise<DraftWriteResult> {
+  const { userId, entityKey, serialized, expectedSerialized } = payload;
+  const isCurrent = () =>
+    payload.generationFence() && canWrite(userId, entityKey, payload.isCurrent);
   try {
-    // JSON.stringify produces no string for a top-level undefined, function,
-    // or symbol; reject those before the byte-cap check, which needs a string.
-    const serialized = JSON.stringify(value) as string | undefined;
-    if (serialized === undefined) {
-      reportDraftFailure(
-        new Error('draft value cannot be serialized to JSON'),
-        'write',
-        'draft-write-unsupported-value'
-      );
-      return;
-    }
-    if (utf8ByteLength(serialized) > DRAFT_MAX_BYTES) {
-      return;
-    }
-    const key = fullKey(userId, entityKey);
-    const previous = pendingSaves.get(key);
-    if (previous) {
-      clearTimeout(previous.timer);
-    }
-    const epoch = currentAuthEpoch();
-    const timer = setTimeout(() => {
-      pendingSaves.delete(key);
-      void writeDraftSafely({ epoch, userId, entityKey, serialized });
-    }, DRAFT_DEBOUNCE_MS);
-    pendingSaves.set(key, { timer, epoch, serialized });
-  } catch (error) {
-    // Serialization and byte sizing run before any timer exists; contain
-    // every failure here so saveDraft never throws synchronously.
-    reportDraftFailure(error, 'write');
-  }
-}
-
-/**
- * Forces the pending debounced write for the full key to run now (AppState
- * background, unmount, and tests). A no-op when no write is pending. Write
- * failures are reported to Sentry and swallowed, so callers can invoke it
- * fire-and-forget.
- */
-export async function flushDraft(userId: string, entityKey: string): Promise<void> {
-  if (!userId) {
-    return;
-  }
-  const key = fullKey(userId, entityKey);
-  const pending = pendingSaves.get(key);
-  if (!pending) {
-    return;
-  }
-  clearTimeout(pending.timer);
-  pendingSaves.delete(key);
-  await writeDraftSafely({ ...pending, userId, entityKey });
-}
-
-/**
- * Cancels the key's pending debounced write and removes the stored entry.
- * Serialized behind any in-flight write for the same key, so a clear can
- * never race a queued save back into existence. Not epoch-fenced: clearing
- * is explicit user intent and must work regardless of auth transitions.
- * Remove failures are reported to Sentry and swallowed, but the returned
- * boolean tells the caller whether the entry was actually removed, so a
- * discard flow can stay on the screen when the clear fails.
- */
-export async function clearDraft(userId: string, entityKey: string): Promise<boolean> {
-  if (!userId) {
-    return true;
-  }
-  const key = fullKey(userId, entityKey);
-  const pending = pendingSaves.get(key);
-  if (pending) {
-    clearTimeout(pending.timer);
-    pendingSaves.delete(key);
-  }
-  try {
-    await chainSave(key, async () => {
-      await encryptedKv.removeItem(draftScope(userId), entityKey);
+    return await chainSave<DraftWriteResult>(fullKey(userId, entityKey), async () => {
+      if (!isCurrent()) {
+        return 'stale';
+      }
+      if (expectedSerialized !== undefined) {
+        const current = await encryptedKv.getItem(draftScope(userId), entityKey);
+        if (!isCurrent()) {
+          return 'stale';
+        }
+        if (current !== expectedSerialized || pendingSaves.has(fullKey(userId, entityKey))) {
+          return 'conflict';
+        }
+      }
+      await encryptedKv.setItem(draftScope(userId), entityKey, serialized, isCurrent);
+      if (!isCurrent()) {
+        return 'stale';
+      }
+      await evictOldestBeyondCap(payload, isCurrent);
+      return isCurrent() ? 'committed' : 'stale';
     });
+  } catch (error) {
+    reportDraftFailure(error, 'write');
+    return 'failed';
+  }
+}
+/** Immediate confirmed persistence. Migration cannot infer a commit from saveDraft or flushDraft. */
+// eslint-disable-next-line max-params -- retain user/key/value positions from saveDraft
+export async function saveDraftConfirmed(
+  userId: string,
+  entityKey: string,
+  value: unknown,
+  options: DraftWriteOptions = {}
+): Promise<DraftWriteResult> {
+  if (!canWrite(userId, entityKey, options.isCurrent)) {
+    return 'stale';
+  }
+  const serialized = serializeDraft(value);
+  if (serialized === null) {
+    return 'failed';
+  }
+  const result = await writeDraftSafely({
+    ...options,
+    generationFence: captureAccountGeneration(),
+    userId,
+    entityKey,
+    serialized,
+  });
+  return result;
+}
+// eslint-disable-next-line max-params -- scoped callers add their restored hook's fence without changing legacy producers
+export function saveDraft(
+  userId: string,
+  entityKey: string,
+  value: unknown,
+  isCurrent?: () => boolean
+): void {
+  if (!canWrite(userId, entityKey, isCurrent)) {
+    return;
+  }
+  const serialized = serializeDraft(value);
+  if (serialized === null) {
+    return;
+  }
+  const key = fullKey(userId, entityKey);
+  takePending(key);
+  const payload = {
+    generationFence: captureAccountGeneration(),
+    userId,
+    entityKey,
+    serialized,
+    isCurrent,
+  };
+  const timer = setTimeout(() => {
+    pendingSaves.delete(key);
+    void writeDraftSafely(payload);
+  }, DRAFT_DEBOUNCE_MS);
+  pendingSaves.set(key, { ...payload, timer });
+}
+export async function flushDraft(
+  userId: string,
+  entityKey: string,
+  isCurrent?: () => boolean
+): Promise<void> {
+  if (!canWrite(userId, entityKey, isCurrent)) {
+    return;
+  }
+  const key = fullKey(userId, entityKey);
+  const pending = takePending(key);
+  if (pending) {
+    await writeDraftSafely(pending);
+  }
+}
+export async function clearDraft(
+  userId: string,
+  entityKey: string,
+  isCurrent?: () => boolean
+): Promise<boolean> {
+  if (!userId) {
     return true;
+  }
+  if (!canWrite(userId, entityKey, isCurrent)) {
+    return false;
+  }
+  const key = fullKey(userId, entityKey);
+  takePending(key);
+  const generationFence = captureAccountGeneration();
+  const allowed = () => generationFence() && canWrite(userId, entityKey, isCurrent);
+  try {
+    return await chainSave(key, async () => {
+      if (!allowed()) {
+        return false;
+      }
+      await encryptedKv.removeItem(draftScope(userId), entityKey, allowed);
+      return allowed();
+    });
   } catch (error) {
     reportDraftFailure(error, 'clear');
     return false;
   }
 }
-
-/**
- * Conditionally removes a draft entry only when its settled persisted value
- * still equals `expectedSerialized` (the exact stored raw string). Unlike
- * `clearDraft`, this never cancels a pending debounced write, and the compare
- * runs inside the serialized chain, so it sees the final value after any
- * in-flight write settles. A newer value therefore always wins: a clear that
- * is registered after a newer write sees the newer value and skips, and a
- * clear registered before leaves the newer write intact. Remove failures are
- * reported to Sentry and swallowed. Used by the pending share id, where
- * clearing an older id must never delete a just-written id.
- */
+/** Compare settled source bytes before cleanup. A newer edit, owner, or generation wins. */
+// eslint-disable-next-line max-params -- the optional migration fence preserves pending-share callers
 export async function clearDraftIfStill(
   userId: string,
   entityKey: string,
-  expectedSerialized: string
+  expectedSerialized: string,
+  isCurrent?: () => boolean
 ): Promise<void> {
-  if (!userId) {
-    return;
-  }
+  const generationFence = captureAccountGeneration();
+  const allowed = () => generationFence() && canWrite(userId, entityKey, isCurrent);
   const key = fullKey(userId, entityKey);
   try {
     await chainSave(key, async () => {
+      if (!allowed()) {
+        return;
+      }
       const current = await encryptedKv.getItem(draftScope(userId), entityKey);
-      if (current === expectedSerialized) {
-        await encryptedKv.removeItem(draftScope(userId), entityKey);
+      if (allowed() && current === expectedSerialized && !pendingSaves.has(key)) {
+        await encryptedKv.removeItem(draftScope(userId), entityKey, allowed);
       }
     });
   } catch (error) {
     reportDraftFailure(error, 'clear');
   }
 }
-
-// Test-only: cancels every pending debounced timer so a test never leaks a
-// fire into a later case (the same pattern as `resetEncryptedKvOpenForTests`).
 export function resetDraftTimersForTests(): void {
-  for (const pending of pendingSaves.values()) {
-    clearTimeout(pending.timer);
+  for (const key of pendingSaves.keys()) {
+    takePending(key);
   }
-  pendingSaves.clear();
 }

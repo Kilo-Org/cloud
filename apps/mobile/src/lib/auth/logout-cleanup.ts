@@ -3,8 +3,6 @@ import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 
 import { emitNotificationTokenUpdated, getDevicePushTokenOutcome } from '@/lib/notifications';
-import { readCachedUserId } from '@/lib/persist/read-cache';
-import { queryClient } from '@/lib/query-client';
 import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
 import { trpcClient } from '@/lib/trpc';
 
@@ -30,7 +28,7 @@ import { trpcClient } from '@/lib/trpc';
  * `z.number()` rejects NaN and Infinity, so `failedAt` is always finite.
  */
 const logoutCleanupTombstoneSchema = z.object({
-  /** getMe cache identity at logout, or null when the query had not resolved. */
+  /** Proved identity captured before logout revokes content access, or null when unresolved. */
   userId: z.string().nullable(),
   /** Device push token at logout; null when lookup failed or permission missing. */
   pushToken: z.string().nullable(),
@@ -73,7 +71,8 @@ async function writeLogoutCleanupTombstone(tombstone: LogoutCleanupTombstone): P
 /**
  * Runs remote logout cleanup while the token owner still serves auth headers
  * (called by sign-out BEFORE the epoch bump and BEFORE any credential
- * deletion). It NEVER throws: every step is internally caught, so a remote
+ * deletion). The caller captures the proved user ID before revoking content access.
+ * It NEVER throws: every step is internally caught, so a remote
  * or storage failure can never block local sign-out.
  *
  * - Revokes the current device session and unregisters the device push token
@@ -82,10 +81,8 @@ async function writeLogoutCleanupTombstone(tombstone: LogoutCleanupTombstone): P
  *   push unregister writes a tombstone; a successful one deletes any existing
  *   tombstone, and is never retried later.
  */
-export async function runLogoutCleanup(): Promise<void> {
+export async function runLogoutCleanup(userId: string | null): Promise<void> {
   try {
-    const userId = readCachedUserId(queryClient);
-
     // Push token outcome: 'none' → nothing to unregister; 'lookup-failed' →
     // a server row may exist, so reconciliation re-reads the stable device
     // token and the tombstone stores pushToken: null.

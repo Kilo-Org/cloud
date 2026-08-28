@@ -16,7 +16,21 @@ const kvMock = vi.hoisted(() => ({
   listEntries: vi.fn(async (_scope: string): Promise<{ k: string; updatedAt: number }[]> => []),
 }));
 
-vi.mock('@/lib/persist/encrypted-kv', () => kvMock);
+vi.mock('@/lib/persist/encrypted-kv', () => ({
+  getItem: kvMock.getItem,
+  listEntries: kvMock.listEntries,
+  // eslint-disable-next-line max-params -- mirror the guarded native KV write API
+  setItem: async (scope: string, key: string, value: string, guard?: () => boolean) => {
+    if (!guard || guard()) {
+      await kvMock.setItem(scope, key, value);
+    }
+  },
+  removeItem: async (scope: string, key: string, guard?: () => boolean) => {
+    if (!guard || guard()) {
+      await kvMock.removeItem(scope, key);
+    }
+  },
+}));
 
 vi.mock('@sentry/react-native', () => ({
   captureException: vi.fn(),
@@ -80,7 +94,7 @@ function isReviewDraft(value: unknown): value is ReviewDraftItem[] {
 }
 
 function storageKey(scope: string, k: string): string {
-  return `${scope}\u0000${k}`;
+  return JSON.stringify([scope, k]);
 }
 
 function seedStoredValue(scope: string, k: string, v: string): void {
@@ -577,5 +591,90 @@ describe('eviction at the entry cap', () => {
     const entries = await kvMock.listEntries('draft:u1');
     expect(entries).toHaveLength(DRAFT_MAX_ENTRIES);
     expect(kvMock.removeItem).not.toHaveBeenCalled();
+  });
+});
+
+// a6 activates production-caller enforcement for each row as it converts the surface.
+const scopedDraftInventory = [
+  { caller: 'new-session', target: { kind: 'new-session' } },
+  { caller: 'session-detail/composer-autosave', target: { kind: 'session', sessionId: 'new' } },
+  { caller: 'history/search', target: { kind: 'search' } },
+  { caller: 'Quick Chat', target: { kind: 'quick-chat' } },
+] as const;
+
+describe('strict draft boundaries and scoped-key inventory', () => {
+  it.each(scopedDraftInventory)(
+    'isolates $caller by tagged context and durable arbitrary user ID',
+    async ({ caller, target }) => {
+      const context = await import('@/lib/context-scope');
+      const { scopedDraftKey } = await import('./scoped-draft-keys');
+      const { loadDraftResult, saveDraftConfirmed } = await import('./drafts');
+      context.beginAuthenticatedOwner();
+      const userId = 'oauth/user:a/b_用户';
+      context.confirmAuthenticatedOwner(context.getAuthenticatedOwner(), userId);
+      const owner = context.getAuthenticatedOwner();
+      const isCurrent = () => context.isAuthenticatedOwner(owner);
+      await Promise.all(
+        [null, 'personal', 'org:a/b'].map(async (org, index) => {
+          const key = scopedDraftKey(context.contextScope(org), target);
+          const text = `${caller} draft ${index}`;
+          expect(await saveDraftConfirmed(userId, key, text, { isCurrent })).toBe('committed');
+          expect(await loadDraftResult(userId, key, isStringDraft, isCurrent)).toMatchObject({
+            status: 'present',
+            value: text,
+          });
+          expect(
+            await loadDraftResult('another-user', key, isStringDraft, isCurrent)
+          ).toMatchObject({ status: 'failed' });
+        })
+      );
+    }
+  );
+  it('does not interpret rejected I/O as an absent draft', async () => {
+    const { loadDraftResult } = await import('./drafts');
+    seedStoredValue('draft:u1', 'k', '"preserved"');
+    kvMock.getItem.mockRejectedValueOnce(new Error('I/O unavailable'));
+    expect(await loadDraftResult('u1', 'k', isStringDraft)).toMatchObject({ status: 'failed' });
+    expect(kvStore.get(storageKey('draft:u1', 'k'))?.v).toBe('"preserved"');
+  });
+  it.each([
+    ['{broken', 'json'],
+    ['42', 'shape'],
+  ])('keeps malformed %s distinct from absence', async (raw, reason) => {
+    const { loadDraftResult } = await import('./drafts');
+    seedStoredValue('draft:u1', 'k', raw);
+    expect(await loadDraftResult('u1', 'k', isStringDraft)).toEqual({
+      status: 'malformed',
+      reason,
+    });
+    expect(kvStore.get(storageKey('draft:u1', 'k'))?.v).toBe(raw);
+  });
+  it('does not publish a draft read after a direct account replacement', async () => {
+    const context = await import('@/lib/context-scope');
+    const { loadDraftResult } = await import('./drafts');
+    const gate = Promise.withResolvers<string | null>();
+    kvMock.getItem.mockReturnValueOnce(gate.promise);
+    const read = loadDraftResult('u1', 'k', isStringDraft);
+    context.beginAuthenticatedOwner();
+    context.confirmAuthenticatedOwner(context.getAuthenticatedOwner(), 'u2');
+    gate.resolve('"private u1"');
+    expect(await read).toMatchObject({ status: 'failed' });
+  });
+  it('cannot write a tagged key from an unproved prefilled/raw save', async () => {
+    const context = await import('@/lib/context-scope');
+    const { scopedDraftKey } = await import('./scoped-draft-keys');
+    const key = scopedDraftKey(context.contextScope(null), { kind: 'new-session' });
+    seedStoredValue('draft:u1', key, '"saved"');
+    saveDraft('u1', key, 'prefill');
+    await flushDraft('u1', key);
+    expect(await clearDraft('u1', key)).toBe(false);
+    expect(kvStore.get(storageKey('draft:u1', key))?.v).toBe('"saved"');
+  });
+  it('does not alias pending keys through NUL delimiters in arbitrary user IDs', async () => {
+    saveDraft('a', 'b\u0000c', 'first');
+    saveDraft('a\u0000b', 'c', 'second');
+    await Promise.all([flushDraft('a', 'b\u0000c'), flushDraft('a\u0000b', 'c')]);
+    expect(kvStore.get(storageKey('draft:a', 'b\u0000c'))?.v).toBe('"first"');
+    expect(kvStore.get(storageKey('draft:a\u0000b', 'c'))?.v).toBe('"second"');
   });
 });

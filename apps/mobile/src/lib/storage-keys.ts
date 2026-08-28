@@ -1,5 +1,8 @@
+import * as z from 'zod';
+import { utf8ByteLength } from '@/lib/utf8-utils';
+
 /**
- * Centralized SecureStore key constants.
+ * Centralized SecureStore key constants and persisted draft contracts.
  *
  * All keys used with expo-secure-store should be defined here so they stay
  * consistent across reads, writes, and sign-out cleanup.
@@ -7,7 +10,10 @@
  */
 
 export const AUTH_TOKEN_KEY = 'auth-token';
+/** Legacy, ownerless selection. Read only as an explicit recovery candidate; never restore it automatically. */
 export const ORGANIZATION_STORAGE_KEY = 'selected-organization';
+/** Account-owned tagged context records survive sign-out. Remove the legacy fallback after explicit migration. */
+export const SELECTED_CONTEXT_KEY_PREFIX = 'selected-context-v1-';
 export const SESSION_FILTERS_KEY = 'agent-session-filters';
 export const NOTIFICATION_PROMPT_SEEN_KEY = 'notification-prompt-seen';
 export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
@@ -85,4 +91,127 @@ export function encodeStorageKey(prefix: string, userId: string): string {
   return `${prefix}${[...new TextEncoder().encode(userId)]
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')}`;
+}
+
+// Legacy draft contracts remain re-exported from persist/drafts. Keep these exact serialized forms
+// until every producer adopts tagged keys and explicit recovery finishes; never rewrite them on read.
+const stringDraftSchema = z.string();
+export function isStringDraft(value: unknown): value is string {
+  return stringDraftSchema.safeParse(value).success;
+}
+export function agentComposerDraftKey(sessionId: string): string {
+  return `agent-composer:${sessionId}`;
+}
+export const NEW_SESSION_DRAFT_KEY = 'agent-composer:new';
+export const SHARE_PAYLOADS_DRAFT_KEY = 'share-payloads';
+export const SHARE_NAV_DRAFT_KEY = 'share-navigation';
+export const PENDING_SHARE_ID_DRAFT_KEY = 'pending-share-id';
+export const SESSION_SEARCH_DRAFT_KEY = 'session-search-query';
+export function prReviewDraftKey(owner: string, repo: string, number: number): string {
+  return `pr-review:${owner}/${repo}#${number}`;
+}
+export function prMergeDraftKey(owner: string, repo: string, number: number): string {
+  return `pr-merge:${owner}/${repo}#${number}`;
+}
+// eslint-disable-next-line max-params -- retain the legacy PR/comment key API
+export function prReplyDraftKey(
+  owner: string,
+  repo: string,
+  number: number,
+  commentId: number
+): string {
+  return `pr-reply:${owner}/${repo}#${number}:${commentId}`;
+}
+// eslint-disable-next-line max-params -- retain the legacy diff-position key API
+export function prCommentDraftKey(
+  owner: string,
+  repo: string,
+  number: number,
+  path: string,
+  side: string,
+  line: number,
+  startLine?: number
+): string {
+  return `pr-comment:${owner}/${repo}#${number}:${path}:${side}:${startLine ?? line}-${line}`;
+}
+const mergeDraftSchema = z.object({ title: z.string(), message: z.string() });
+export function isMergeDraft(value: unknown): value is { title: string; message: string } {
+  return mergeDraftSchema.safeParse(value).success;
+}
+const sharePayloadsDraftSchema = z.object({
+  order: z.array(z.string()),
+  entries: z.record(
+    z.string(),
+    z.object({
+      text: z.string(),
+      files: z.array(z.object({ name: z.string(), uri: z.string() })),
+      failedFiles: z.array(z.string()),
+    })
+  ),
+});
+export type SharePayloadsDraft = z.infer<typeof sharePayloadsDraftSchema>;
+export function isSharePayloadsDraft(value: unknown): value is SharePayloadsDraft {
+  return sharePayloadsDraftSchema.safeParse(value).success;
+}
+const shareNavigationDraftSchema = z.array(
+  z.object({ href: z.string(), shareId: z.string().nullable() })
+);
+export type ShareNavigationDraft = z.infer<typeof shareNavigationDraftSchema>;
+export function isShareNavigationDraft(value: unknown): value is ShareNavigationDraft {
+  return shareNavigationDraftSchema.safeParse(value).success;
+}
+export function securityDismissDraftKey(scope: string, findingId: string): string {
+  return `security-dismiss:${scope}:${findingId}`;
+}
+export function resolvePrefillOverDraft(
+  prefillText: string | null | undefined,
+  draftText: string | null | undefined
+): string | undefined {
+  return prefillText != null && prefillText.trim().length > 0
+    ? prefillText
+    : (draftText ?? undefined);
+}
+
+/** Serialize stored values without scheduling a write for unsupported or oversized data. */
+export function serializeStoredDraft(
+  value: unknown,
+  maxBytes: number,
+  onFailure: (error: unknown, fingerprint?: string) => void
+): string | null {
+  try {
+    // JSON.stringify's declared return omits unsupported top-level values such as undefined.
+    const serialized = JSON.stringify(value) as string | undefined;
+    if (serialized === undefined) {
+      onFailure(
+        new Error('draft value cannot be serialized to JSON'),
+        'draft-write-unsupported-value'
+      );
+      return null;
+    }
+    return utf8ByteLength(serialized) <= maxBytes ? serialized : null;
+  } catch (error) {
+    onFailure(error);
+    return null;
+  }
+}
+
+/** Validate unknown stored bytes without disclosing their contents in an error message. */
+export function parseStoredDraft<T>(
+  raw: string,
+  isValid: (value: unknown) => value is T,
+  maxBytes: number
+):
+  | Readonly<{ status: 'present'; value: T; serialized: string }>
+  | Readonly<{ status: 'malformed'; reason: 'size' | 'shape' | 'json' }> {
+  if (utf8ByteLength(raw) > maxBytes) {
+    return { status: 'malformed', reason: 'size' };
+  }
+  try {
+    const value: unknown = JSON.parse(raw);
+    return isValid(value)
+      ? { status: 'present', value, serialized: raw }
+      : { status: 'malformed', reason: 'shape' };
+  } catch {
+    return { status: 'malformed', reason: 'json' };
+  }
 }

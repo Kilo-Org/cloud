@@ -64,7 +64,6 @@ import {
   AUTH_TOKEN_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
-  ORGANIZATION_STORAGE_KEY,
   PENDING_DEEP_LINK_KEY,
   PICKER_LAUNCH_CONTEXT_KEY,
   REFRESH_TOKEN_KEY,
@@ -75,6 +74,15 @@ import { clearTelemetryDecision } from '@/lib/telemetry/controller';
 import { clearSentryUser } from '@/lib/sentry-context';
 import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
+import {
+  beginAuthenticatedOwner,
+  getAuthenticatedOwner,
+  isAuthenticatedOwner,
+  subscribeAuthenticatedOwner,
+} from '@/lib/context-scope';
+import { initializeLocalAccess, setLocalAccessOwner } from '@/lib/local-access';
+import { createLocalAccessStorage } from '@/lib/local-access-storage';
+import { authenticateLocalAccess } from '@/lib/local-authentication';
 
 // Pre-load tokens at module level so they're available before React mounts
 export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
@@ -143,6 +151,35 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const isSignedOutReference = useRef(false);
 
   useEffect(() => {
+    const dispose = initializeLocalAccess({
+      storage: createLocalAccessStorage(),
+      authenticate: async () => {
+        const { i18n } = await import('@/i18n');
+        return authenticateLocalAccess(i18n.t('common.continue'));
+      },
+      lifecycle: {
+        getCurrentState: () => AppState.currentState,
+        subscribe: listener => {
+          const subscription = AppState.addEventListener('change', listener);
+          return () => {
+            subscription.remove();
+          };
+        },
+      },
+    });
+    const bindOwner = () => {
+      const owner = getAuthenticatedOwner();
+      void setLocalAccessOwner(owner.userId, owner.authEpoch);
+    };
+    const unsubscribe = subscribeAuthenticatedOwner(bindOwner);
+    bindOwner();
+    return () => {
+      unsubscribe();
+      dispose();
+    };
+  }, []);
+
+  useEffect(() => {
     const load = async () => {
       try {
         // Capture the epoch before any asynchronous read: every later check
@@ -157,7 +194,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // Legacy exchange: if we have a token but no refresh token, upgrade once.
           if (!storedRefresh) {
             const pair = await exchangeLegacyToken();
-            if (pair) {
+            if (pair && isCurrentAuthEpoch(epoch)) {
               setToken(pair.token);
               setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
               setIsLoading(false);
@@ -210,13 +247,47 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // full teardown, and a sign-out queued behind a sign-in signs that new
       // session out (documented, correct FIFO semantics).
       await chainSave('auth-transition', async () => {
+        const previousUserId = readCachedUserId(queryClient);
+        const hadSession = getActiveToken() !== null;
+        // Close admission before owner subscribers can request identity with the old credentials.
+        setSignOutActive(true);
+        setSignOutTeardownActive(true);
         bumpAuthEpoch();
+        beginAuthenticatedOwner();
         setAuthEpoch(currentAuthEpoch());
-        // Bind the pending deep-link slot to the new user id at the same
-        // place the auth epoch advances, so a destination captured while this
-        // account is signed in restores only for this account.
-        setCurrentDeepLinkUserId(readUserIdFromToken(tokenValue));
+        setToken(undefined);
+        clearActiveToken();
+        const cancelled = queryClient.cancelQueries();
+        queryClient.clear();
+        // Reset before the credential write can expose replacement content. The transition queue
+        // also keeps old per-key deletes ahead of every replacement account's metadata write.
+        gateKiloClawOwned();
+        clearSessionScopedState();
+        clearAgentModelPreference();
+        clearReasoningPreference();
+        clearKeepScreenOnPreference();
+        clearPrReviewFooterPreference();
+        clearPendingConsentOutcome();
+        clearSentryUser();
         const epoch = currentAuthEpoch();
+        await Promise.all([
+          cancelled,
+          deleteAccountMetadata(ACTIVE_USER_ID_KEY),
+          deleteAccountMetadata(SESSION_FILTERS_KEY),
+          deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
+          deleteAccountMetadata(PICKER_LAUNCH_CONTEXT_KEY),
+          clearLastActiveInstance(),
+          clearKiloClawOwned(),
+          clearRecentPrs(),
+          clearViewedFiles(),
+          clearSessionAttentionForSignOut(),
+          ...(hadSession ? [clearCacheScopeForSignOut(previousUserId)] : []),
+        ]);
+        if (!isCurrentAuthEpoch(epoch)) {
+          return;
+        }
+        // Preserve the development destination contract; the token id is only a deep-link hint.
+        setCurrentDeepLinkUserId(readUserIdFromToken(tokenValue));
         const published = await persistSignInCredentialsAtEpoch(tokenValue, refreshTokenValue, {
           expiresIn,
         });
@@ -240,9 +311,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         trackEvent('login');
         resetPurchaseErrorToastDedup();
         setToken(tokenValue);
-        // A direct account switch must not keep the prior account's session
-        // state: trusted hosts, image confirms, media caches, temp copies.
-        clearSessionScopedState();
       });
     },
     []
@@ -257,6 +325,8 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       if (isSignedOutReference.current) {
         return;
       }
+      const logoutOwner = getAuthenticatedOwner();
+      const logoutUserId = isAuthenticatedOwner(logoutOwner) ? logoutOwner.userId : null;
       isSignedOutReference.current = true;
       // Close the teardown guard synchronously, before the first await: a
       // refresh or request-token cold read must not touch the old credentials
@@ -271,6 +341,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // the read-cache mount unsubscribes and cannot resubscribe while the old
       // user id is still cached.
       setSignOutActive(true);
+      beginAuthenticatedOwner();
       // Drop an account-bound pending deep-link destination synchronously,
       // before the first await, so a different account signed in later in this
       // process cannot navigate to the previous account's destination. A
@@ -291,7 +362,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // headers, and while optional telemetry is still allowed so the
         // unregister emit in logout-cleanup can capture. Never throws by
         // contract.
-        await runLogoutCleanup();
+        await runLogoutCleanup(logoutUserId);
         // Flush the logout and any cleanup-captured events, then tear the SDK
         // down — drop queues, do not flush them. Must happen before any
         // SecureStore or cache awaits so optional analytics cannot transmit
@@ -319,16 +390,15 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // fence) and before any local deletion (no deferred save can land
         // after it).
         bumpAuthEpoch();
+        beginAuthenticatedOwner();
         setAuthEpoch(currentAuthEpoch());
         // The signed-out session owns no user id: a destination captured
         // during teardown is recorded as "captured while signed out".
         setCurrentDeepLinkUserId(null);
         clearActiveToken();
         try {
-          // Independent local cleanup, concurrent via allSettled: a
-          // rejection in any member must never stop the others or the
-          // preference clears. The credential deletion and the identity-hint
-          // deletion are members of the same always-attempted batch.
+          // Independent local cleanup must continue after any individual failure.
+          // The ownerless legacy organization key stays available for deliberate recovery.
           await Promise.allSettled([
             writeCredentials(async () => {
               await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
@@ -340,18 +410,13 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
               await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
             }),
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
-            deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
             deleteAccountMetadata(SESSION_FILTERS_KEY),
             deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
             deleteAccountMetadata(PENDING_DEEP_LINK_KEY),
             deleteAccountMetadata(PICKER_LAUNCH_CONTEXT_KEY),
-            // Phase 4b read-cache cleanup: capture the authoritative user
-            // id from the getMe cache while it is still present (the batch
-            // expression runs before queryClient.clear()), then remove that
-            // user's cache scope (or every `cache:` scope when the id is
-            // unknown — privacy wins). Best effort: a failed cleanup can
-            // never abort sign-out.
-            clearCacheScopeForSignOut(readCachedUserId(queryClient)),
+            // Cleanup retains the captured identity, never authority to publish content.
+            // An unresolved owner still clears every cache scope for privacy.
+            clearCacheScopeForSignOut(logoutUserId),
             clearLastActiveInstance(),
             clearKiloClawOwned(),
             clearRecentPrs(),

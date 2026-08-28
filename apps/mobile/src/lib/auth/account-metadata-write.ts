@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { getAuthenticatedOwner } from '@/lib/context-scope';
 
 /**
  * Epoch-fenced, per-key serialized SecureStore write for account-scoped
@@ -9,10 +10,19 @@ import { chainSave } from '@/lib/hooks/save-chain';
  * queued behind an in-flight save for the same key skips entirely when a
  * sign-out (or sign-in) bumps the epoch before it runs.
  */
-export async function writeAccountMetadata(key: string, write: () => Promise<void>): Promise<void> {
+export async function writeAccountMetadata(
+  key: string,
+  write: () => Promise<void>,
+  isCurrent?: () => boolean
+): Promise<void> {
   const epoch = currentAuthEpoch();
+  const owner = getAuthenticatedOwner();
   await chainSave(key, async () => {
-    if (!isCurrentAuthEpoch(epoch)) {
+    if (
+      !isCurrentAuthEpoch(epoch) ||
+      owner.generation !== getAuthenticatedOwner().generation ||
+      (isCurrent && !isCurrent())
+    ) {
       return;
     }
     await write();

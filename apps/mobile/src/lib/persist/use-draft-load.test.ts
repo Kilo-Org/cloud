@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- legacy restoration and captured cleanup share the same KV and mounted hook harness */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
 import * as React from 'react';
@@ -24,8 +25,9 @@ vi.mock('@sentry/react-native', () => ({
 }));
 
 /* eslint-disable import/first */
-import { isMergeDraft, prMergeDraftKey } from './drafts';
-import { useFencedDraftLoad } from './use-draft-load';
+import { flushDraft, isMergeDraft, prMergeDraftKey, saveDraft } from './drafts';
+import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from './use-draft-load';
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 /* eslint-enable import/first */
 
 function storageKey(scope: string, k: string): string {
@@ -275,5 +277,81 @@ describe('useFencedDraftLoad generic draft shape', () => {
 
     // B has no stored value. The stale A load must never publish A's value.
     expect(renders.at(-1)).toEqual({ settled: true, value: null });
+  });
+});
+
+const cleanupControl: { current: ReturnType<typeof useRemoteSpawnDraftCleanup> | null } = {
+  current: null,
+};
+function RemoteCleanupHarness({
+  entityKey,
+  isCurrent,
+}: {
+  entityKey: string;
+  isCurrent: () => boolean;
+}) {
+  cleanupControl.current = useRemoteSpawnDraftCleanup({
+    userId: 'u1',
+    entityKey,
+    isCurrent: () => isCurrent(),
+  });
+  return null;
+}
+async function mountCleanup() {
+  const context = await import('@/lib/context-scope');
+  const keys = await import('./scoped-draft-keys');
+  context.beginAuthenticatedOwner();
+  context.confirmAuthenticatedOwner(context.getAuthenticatedOwner(), 'u1');
+  const owner = context.getAuthenticatedOwner();
+  const isCurrent = () => context.isAuthenticatedOwner(owner);
+  const entityKey = keys.scopedDraftKey(context.contextScope('personal'), { kind: 'new-session' });
+  const rendererRef: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
+  await act(async () => {
+    rendererRef.current = TestRenderer.create(
+      React.createElement(RemoteCleanupHarness, { entityKey, isCurrent })
+    );
+  });
+  if (!rendererRef.current) {
+    throw new Error('Cleanup harness did not mount');
+  }
+  return { renderer: rendererRef.current, entityKey, isCurrent };
+}
+describe('captured remote-spawn draft cleanup', () => {
+  it('clears the captured tagged key only on leave, not when its guard callback changes', async () => {
+    const { renderer, entityKey, isCurrent } = await mountCleanup();
+    seedStoredValue('draft:u1', entityKey, '"captured"');
+    seedStoredValue('draft:u1', 'agent-composer:new', '"legacy fallback"');
+    cleanupControl.current?.markRemoteSpawnAttempted();
+    await act(async () => {
+      renderer.update(React.createElement(RemoteCleanupHarness, { entityKey, isCurrent }));
+    });
+    expect(kvStore.get(storageKey('draft:u1', entityKey))?.v).toBe('"captured"');
+    await act(async () => {
+      renderer.unmount();
+    });
+    await flushMicrotasks();
+    expect(kvStore.has(storageKey('draft:u1', entityKey))).toBe(false);
+    expect(kvStore.get(storageKey('draft:u1', 'agent-composer:new'))?.v).toBe('"legacy fallback"');
+  });
+  it('flushes the exact captured key on a normal leave', async () => {
+    const { renderer, entityKey, isCurrent } = await mountCleanup();
+    saveDraft('u1', entityKey, 'unsent', isCurrent);
+    await act(async () => {
+      renderer.unmount();
+    });
+    await flushMicrotasks();
+    expect(kvStore.get(storageKey('draft:u1', entityKey))?.v).toBe('"unsent"');
+  });
+  it('keeps the old draft when auth changes before a recorded spawn leaves', async () => {
+    const { renderer, entityKey, isCurrent } = await mountCleanup();
+    saveDraft('u1', entityKey, 'preserved', isCurrent);
+    await flushDraft('u1', entityKey, isCurrent);
+    cleanupControl.current?.markRemoteSpawnAttempted();
+    bumpAuthEpoch();
+    await act(async () => {
+      renderer.unmount();
+    });
+    await flushMicrotasks();
+    expect(kvStore.get(storageKey('draft:u1', entityKey))?.v).toBe('"preserved"');
   });
 });

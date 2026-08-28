@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react-native';
-import { and, asc, eq, like, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 // The `drizzle-orm/expo-sqlite` barrel also pulls in `useLiveQuery`, which
 // imports expo-sqlite for change listeners this store never uses; the driver
 // subpath is the same `drizzle()` without that.
@@ -26,19 +26,16 @@ import { kv } from './schema';
  * wraps the *synchronous* handle, so the statements themselves block the JS
  * thread; the exported API stays async because opening and keying do not.
  *
- * Opening is single-flight: one module-level open promise, awaited by every
- * caller. A wrong key or a corrupt file fails the `sqlite_master` probe and
- * is recovered by closing, deleting the database, generating a fresh key,
- * and reopening — the loss is accepted (cache and drafts are recoverable
- * losses), startup is never blocked, and the reset is reported to Sentry.
+ * Opening is single-flight. A failed open stays memoized until explicit nondestructive Retry.
+ * Every failure preserves the database and stored key. Drafts are not recoverable cache data.
+ * Malformed keys, corrupt files, and missing SQLCipher require specific recovery guidance.
  */
 
 const DATABASE_NAME = 'kilo-persist.db';
 const KEY_BYTE_COUNT = 32;
 
 // SQLCipher key format: exactly 64 lowercase hex chars (32 bytes). A stored
-// key that does not match is treated as tampered: it must never reach PRAGMA
-// interpolation, and the open is routed into delete-and-recreate recovery.
+// key that does not match stays protected for explicit repair and never reaches PRAGMA interpolation.
 const DB_KEY_PATTERN = /^[0-9a-f]{64}$/;
 
 /** True when `key` is exactly 64 lowercase hex characters (32 bytes). */
@@ -85,19 +82,35 @@ async function generateHexKey(): Promise<string> {
   return hex;
 }
 
+let pendingNewKey: string | null = null;
+
 async function readOrCreateKey(): Promise<string> {
-  const existing = await SecureStore.getItemAsync(PERSIST_DB_KEY);
-  if (existing) {
+  let existing: string | null = null;
+  try {
+    existing = await SecureStore.getItemAsync(PERSIST_DB_KEY);
+  } catch {
+    throw openFailure({
+      status: 'retryable',
+      reason: 'secure-store',
+      guidance: 'retry',
+    });
+  }
+  // Even an empty stored key is malformed, not evidence that the store is new.
+  if (existing !== null) {
     return existing;
   }
-  const key = await generateHexKey();
-  await SecureStore.setItemAsync(PERSIST_DB_KEY, key);
-  return key;
-}
-
-async function generateAndStoreKey(): Promise<string> {
-  const key = await generateHexKey();
-  await SecureStore.setItemAsync(PERSIST_DB_KEY, key);
+  pendingNewKey ??= await generateHexKey();
+  try {
+    await SecureStore.setItemAsync(PERSIST_DB_KEY, pendingNewKey);
+  } catch {
+    throw openFailure({
+      status: 'retryable',
+      reason: 'secure-store',
+      guidance: 'retry',
+    });
+  }
+  const key = pendingNewKey;
+  pendingNewKey = null;
   return key;
 }
 
@@ -133,15 +146,18 @@ async function closeQuietly(client: SQLite.SQLiteDatabase): Promise<void> {
   try {
     await client.closeAsync();
   } catch {
-    // Close is best-effort; the delete in the recovery path removes the file.
+    // Preserve the original failure and the durable file even when closing the handle fails.
   }
 }
 
 async function openWithKey(key: string): Promise<KVDatabase> {
   if (!isValidDbKey(key)) {
-    // A malformed or tampered key never reaches PRAGMA interpolation; the
-    // thrown error routes the open into delete-and-recreate recovery.
-    throw new TypeError('encrypted-kv: database key must be 64 lowercase hex characters');
+    // Preserve the file and key for explicit recovery. Never interpolate malformed key bytes.
+    throw openFailure({
+      status: 'protected',
+      reason: 'malformed-key',
+      guidance: 'restore-key',
+    });
   }
   // Connection setup, not a query, so it stays on the raw handle: SQLCipher
   // needs the key before the database header and the schema can be read, and
@@ -155,8 +171,7 @@ async function openWithKey(key: string): Promise<KVDatabase> {
     client.execSync(`PRAGMA key = "x'${key}'"`);
     return drizzle(client);
   } catch (error) {
-    // The PRAGMA failed after the handle opened. Close it before rethrowing
-    // so the delete-and-recreate recovery never runs with an open handle.
+    // Close the failed native handle without deleting the file or replacing its key.
     await closeQuietly(client);
     throw error;
   }
@@ -165,83 +180,112 @@ async function openWithKey(key: string): Promise<KVDatabase> {
 async function probeAndMigrate(db: KVDatabase): Promise<void> {
   // A wrong key or a corrupt file makes this throw (DEC-01 step 3).
   db.get(sql`SELECT count(*) FROM sqlite_master`);
-  // Drizzle owns the schema; a recreated (deleted) file has no
-  // `__drizzle_migrations` table, so the migrations run again on it.
+  // Drizzle applies missing migrations without resetting existing records.
   await migrate(db, migrations);
 }
 
+export type EncryptedStoreRecovery = Readonly<{
+  status: 'retryable' | 'protected';
+  reason:
+    | 'secure-store'
+    | 'io'
+    | 'malformed-key'
+    | 'corrupt-database'
+    | 'missing-sqlcipher'
+    | 'unknown';
+  guidance: 'retry' | 'restore-key' | 'repair-database' | 'rebuild' | 'retry-without-reset';
+}>;
+
+const openRecoveries = new WeakMap<Error, EncryptedStoreRecovery>();
+function openFailure(recovery: EncryptedStoreRecovery): Error {
+  const error = new Error(`Encrypted store open failed: ${recovery.reason}`);
+  openRecoveries.set(error, Object.freeze(recovery));
+  return error;
+}
+
+export function encryptedStoreRecovery(error: unknown): EncryptedStoreRecovery {
+  const known = error instanceof Error ? openRecoveries.get(error) : undefined;
+  if (known) {
+    return known;
+  }
+  if (error instanceof MissingSQLCipherError) {
+    return { status: 'protected', reason: 'missing-sqlcipher', guidance: 'rebuild' };
+  }
+  // Drizzle wraps native SQLite errors. Classify the native cause without logging its SQL text.
+  const native = error instanceof Error && error.cause instanceof Error ? error.cause : error;
+  const message = native instanceof Error ? native.message : '';
+  if (
+    /file is not a database|database disk image is malformed|SQLITE_(NOTADB|CORRUPT)/i.test(message)
+  ) {
+    return { status: 'protected', reason: 'corrupt-database', guidance: 'repair-database' };
+  }
+  if (
+    /SQLITE_(BUSY|LOCKED|IOERR|CANTOPEN)|disk I\/O error|database is (locked|busy)|unable to open database file/i.test(
+      message
+    )
+  ) {
+    return { status: 'retryable', reason: 'io', guidance: 'retry' };
+  }
+  return { status: 'protected', reason: 'unknown', guidance: 'retry-without-reset' };
+}
+
 async function openEncryptedDatabase(): Promise<KVDatabase> {
-  const key = await readOrCreateKey();
   let db: KVDatabase | undefined = undefined;
   try {
+    const key = await readOrCreateKey();
     db = await openWithKey(key);
     await probeAndMigrate(db);
     return db;
-  } catch (openError) {
-    if (openError instanceof MissingSQLCipherError) {
-      // Deleting and recreating cannot add SQLCipher to the build, and the
-      // existing file may hold the user's drafts. Fail loud, touch nothing.
-      Sentry.captureException(openError, {
-        level: 'error',
-        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
-        fingerprint: ['encrypted-kv-missing-sqlcipher'],
-      });
-      throw openError;
-    }
-    // Wrong key, corrupt file, or a tampered key: cache and drafts are
-    // recoverable losses. Close, delete the file, regenerate the key, and
-    // reopen (DEC-01 step 4).
+  } catch (error) {
     if (db) {
       await closeQuietly(db.$client);
     }
-    let reopened: KVDatabase | undefined = undefined;
-    try {
-      await SQLite.deleteDatabaseAsync(DATABASE_NAME);
-      const freshKey = await generateAndStoreKey();
-      reopened = await openWithKey(freshKey);
-      await probeAndMigrate(reopened);
-      Sentry.captureException(openError, {
-        level: 'warning',
-        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
-      });
-      return reopened;
-    } catch (resetError) {
-      // The whole recovery is inside this try: a failed delete, key
-      // regeneration, or reopen must report too, because the open memo makes
-      // one failure reject every caller for the rest of the install.
-      // Close the reopened handle before rethrowing so a failed recovery
-      // cannot leak it; the delete above already removed the file.
-      if (reopened) {
-        await closeQuietly(reopened.$client);
-      }
-      Sentry.captureException(resetError, {
-        level: 'error',
-        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
-      });
-      throw resetError;
-    }
+    const failure =
+      error instanceof MissingSQLCipherError ? error : openFailure(encryptedStoreRecovery(error));
+    // Never report native SQL text: a failing key pragma can contain the encryption key.
+    Sentry.captureException(failure, {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+      ...(error instanceof MissingSQLCipherError
+        ? { fingerprint: ['encrypted-kv-missing-sqlcipher'] }
+        : {}),
+    });
+    throw failure;
   }
 }
 
-let openPromise: Promise<KVDatabase> | null = null;
+type OpenAttempt = { promise: Promise<KVDatabase>; failed: boolean };
+let openAttempt: OpenAttempt | null = null;
 
-// eslint-disable-next-line require-await, @typescript-eslint/require-await -- single-flight must memoize the open synchronously before any await; the awaits live inside the memoized open chain (same pattern as chainSave in save-chain.ts)
-async function openDatabase(): Promise<KVDatabase> {
-  // Single-flight: one module-level open promise, awaited by every caller.
-  // The memo is kept on failure too, so every later caller rejects with the
-  // same error instead of re-running the open. Retrying would delete the
-  // database, regenerate the key, and report to Sentry once per call — and
-  // the read cache calls on every query settle. Nothing an open failure hits
-  // is transient: a wrong key, a corrupt file, and a build without SQLCipher
-  // all need a relaunch or a rebuild.
-  openPromise ??= openEncryptedDatabase();
-  return openPromise;
+async function recordOpenFailure(attempt: OpenAttempt): Promise<void> {
+  try {
+    await attempt.promise;
+  } catch {
+    // Mutate only this settled attempt, never the memo for a newer attempt.
+    attempt.failed = true;
+  }
 }
 
-// Test-only: drops the memoized open so a test can force a fresh open
-// (the same pattern as `inFlightSaveCount` in save-chain.ts).
+// eslint-disable-next-line require-await, @typescript-eslint/require-await -- memoize before any caller can start a second open
+async function openDatabase(): Promise<KVDatabase> {
+  if (!openAttempt) {
+    openAttempt = { promise: openEncryptedDatabase(), failed: false };
+    void recordOpenFailure(openAttempt);
+  }
+  return openAttempt.promise;
+}
+
+/** Explicit, nondestructive Retry. Pending attempts coalesce; successful handles remain open. */
+export async function retryEncryptedKvOpen(): Promise<void> {
+  if (openAttempt?.failed) {
+    openAttempt = null;
+  }
+  await openDatabase();
+}
+
 export function resetEncryptedKvOpenForTests(): void {
-  openPromise = null;
+  openAttempt = null;
+  pendingNewKey = null;
 }
 
 /** Reads one value; returns null when the key is absent. */
@@ -256,11 +300,23 @@ export async function getItem(scope: string, k: string): Promise<string | null> 
   return row?.v ?? null;
 }
 
-/** Writes or overwrites one value, recording `Date.now()`. */
-export async function setItem(scope: string, k: string, v: string): Promise<void> {
+/** Check the captured owner again after the asynchronous open, immediately before the SQL write. */
+// eslint-disable-next-line max-params -- the optional owner fence preserves the KV API
+export async function setItem(
+  scope: string,
+  k: string,
+  v: string,
+  isCurrent?: () => boolean
+): Promise<void> {
   validateItemKey(scope, k);
   validateValue(v);
+  if (isCurrent && !isCurrent()) {
+    return;
+  }
   const db = await openDatabase();
+  if (isCurrent && !isCurrent()) {
+    return;
+  }
   const updatedAt = Date.now();
   db.insert(kv)
     .values({ scope, k, v, updatedAt })
@@ -268,28 +324,59 @@ export async function setItem(scope: string, k: string, v: string): Promise<void
     .run();
 }
 
-/** Removes one value; a missing key is not an error. */
-export async function removeItem(scope: string, k: string): Promise<void> {
+export async function removeItem(
+  scope: string,
+  k: string,
+  isCurrent?: () => boolean
+): Promise<void> {
   validateItemKey(scope, k);
+  if (isCurrent && !isCurrent()) {
+    return;
+  }
   const db = await openDatabase();
+  if (isCurrent && !isCurrent()) {
+    return;
+  }
   db.delete(kv)
     .where(and(eq(kv.scope, scope), eq(kv.k, k)))
     .run();
 }
 
-/** Removes every entry in exactly one scope. */
-export async function clearScope(scope: string): Promise<void> {
+export async function clearScope(scope: string, isCurrent?: () => boolean): Promise<void> {
   validateScope(scope);
+  if (isCurrent && !isCurrent()) {
+    return;
+  }
   const db = await openDatabase();
+  if (isCurrent && !isCurrent()) {
+    return;
+  }
   db.delete(kv).where(eq(kv.scope, scope)).run();
 }
 
-/** Removes every entry whose scope starts with `prefix` (SQL `LIKE prefix || '%'`). */
-export async function clearScopePrefix(prefix: string): Promise<void> {
+/** Match a literal prefix: arbitrary user IDs can contain SQL LIKE wildcards. */
+export async function clearScopePrefix(
+  prefix: string,
+  isCurrent?: () => boolean,
+  numericSuffixOnly = false
+): Promise<void> {
   validateScope(prefix);
+  if (isCurrent && !isCurrent()) {
+    return;
+  }
   const db = await openDatabase();
+  if (isCurrent && !isCurrent()) {
+    return;
+  }
+  // Version-only suffixes prevent user a's cleanup from matching user a:b's cache scopes.
+  const suffix = sql`substr(${kv.scope}, length(${prefix}) + 1)`;
   db.delete(kv)
-    .where(like(kv.scope, sql`${prefix} || '%'`))
+    .where(
+      and(
+        sql`substr(${kv.scope}, 1, length(${prefix})) = ${prefix}`,
+        numericSuffixOnly ? sql`length(${suffix}) > 0 AND ${suffix} NOT GLOB '*[^0-9]*'` : undefined
+      )
+    )
     .run();
 }
 

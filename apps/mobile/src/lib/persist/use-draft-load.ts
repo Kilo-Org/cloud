@@ -1,138 +1,309 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { type AuthenticatedOwner, isAuthenticatedOwner } from '@/lib/context-scope';
 import {
   clearDraft,
+  type DraftLoadResult,
   type DraftShapeValidator,
   flushDraft,
   isStringDraft,
   loadDraft,
+  loadDraftResult,
   NEW_SESSION_DRAFT_KEY,
+  saveDraft,
 } from '@/lib/persist/drafts';
+import { encryptedStoreRecovery, retryEncryptedKvOpen } from './encrypted-kv';
+import { migrateLegacyDraft, parseScopedDraftKey } from './scoped-draft-keys';
 
 type UseFencedDraftLoadInput<T> = {
   userId: string | undefined;
   isIdentityLoading: boolean;
-  /** Full draft entity key under `draft:<userId>` (e.g. `agent-composer:new`). */
   entityKey: string;
-  /** Shape validator for the loaded value; defaults to a string draft. */
   validate?: DraftShapeValidator<T>;
 };
 
-/**
- * Loads a durable draft under `draft:<userId>` once per identity/entity
- * generation. Resets to the not-settled state whenever the identity or entity
- * changes, and only the newest generation's load may publish: every effect run
- * captures the current generation and every cleanup (unmount or a superseding
- * run) bumps it, so a load started for an older account or session can never
- * publish into the newest screen. `value` stays null until a stored draft (or
- * the absence of one) has loaded. The draft shape is the caller's contract:
- * pass a `validate` guard for a non-string draft, or omit it for a string.
- */
+/** Compatibility only: unchanged PR/review/share callers retain nullable restoration. */
 export function useFencedDraftLoad<T = string>({
   userId,
   isIdentityLoading,
   entityKey,
   validate,
-}: UseFencedDraftLoadInput<T>): {
-  settled: boolean;
-  value: T | null;
-} {
-  const resolvedValidate = (validate ?? isStringDraft) as DraftShapeValidator<T>;
-  // Hold the resolved validator in a ref so the effect's dependency array stays
-  // limited to the identity/entity generation (the validator is a stable
-  // module-level guard for every caller).
-  const resolvedValidateRef = useRef(resolvedValidate);
-  resolvedValidateRef.current = resolvedValidate;
-  const [draftState, setDraftState] = useState<{ settled: boolean; value: T | null }>({
+}: UseFencedDraftLoadInput<T>): { settled: boolean; value: T | null } {
+  const resolvedValidateRef = useRef((validate ?? isStringDraft) as DraftShapeValidator<T>);
+  resolvedValidateRef.current = (validate ?? isStringDraft) as DraftShapeValidator<T>;
+  const epoch = currentAuthEpoch();
+  const identity = JSON.stringify([epoch, userId, entityKey]);
+  const activeIdentity = useRef(identity);
+  const generation = useRef(0);
+  if (activeIdentity.current !== identity) {
+    activeIdentity.current = identity;
+    generation.current += 1;
+  }
+  const [stored, setStored] = useState<{ identity: string; settled: boolean; value: T | null }>({
+    identity,
     settled: false,
     value: null,
   });
-  // Reset the settled draft state when the identity or entity changes, so the
-  // prompt stays hidden while the new generation's draft loads and never
-  // shows the previous account's or session's draft.
-  const draftIdentity = `${userId ?? 'anonymous'}\u0000${entityKey}`;
-  const [prevDraftIdentity, setPrevDraftIdentity] = useState(draftIdentity);
-  // The reset must be visible on THIS render, not the next: a deferred
-  // setDraftState would still return the previous account's or entity's
-  // settled value here, and a surface seeding from that stale value would
-  // pin the old text to the new key.
-  const identityChanged = prevDraftIdentity !== draftIdentity;
-  // Generation fence: a load applies only when its captured generation is
-  // still current. The identity-change render bumps the generation
-  // synchronously, so an in-flight load whose read already resolved can never
-  // publish the previous account's or entity's value before the effect
-  // cleanup runs. Cleanup (unmount or a superseding run) bumps it again, so a
-  // stale load can never publish after a newer run armed itself (refs dodge
-  // type-aware flow narrowing).
-  const draftLoadGenerationRef = useRef(0);
-  if (identityChanged) {
-    setPrevDraftIdentity(draftIdentity);
-    setDraftState({ settled: false, value: null });
-    draftLoadGenerationRef.current += 1;
-  }
   useEffect(() => {
-    draftLoadGenerationRef.current += 1;
-    const generation = draftLoadGenerationRef.current;
+    generation.current += 1;
+    const attempt = generation.current;
+    setStored({ identity, settled: false, value: null });
     if (!userId) {
       if (!isIdentityLoading) {
-        setDraftState({ settled: true, value: null });
+        setStored({ identity, settled: true, value: null });
       }
       return undefined;
     }
     void (async () => {
       const value = await loadDraft(userId, entityKey, resolvedValidateRef.current);
-      if (draftLoadGenerationRef.current === generation) {
-        setDraftState({ settled: true, value: value ?? null });
+      if (attempt === generation.current && isCurrentAuthEpoch(epoch)) {
+        setStored({ identity, settled: true, value });
       }
     })();
     return () => {
-      draftLoadGenerationRef.current += 1;
+      generation.current += 1;
     };
-  }, [userId, isIdentityLoading, entityKey]);
-  return identityChanged ? { settled: false, value: null } : draftState;
+  }, [identity, userId, entityKey, isIdentityLoading, epoch]);
+  return stored.identity === identity
+    ? { settled: stored.settled, value: stored.value }
+    : { settled: false, value: null };
+}
+
+export type ScopedDraftState<T> = DraftLoadResult<T> | Readonly<{ status: 'unresolved' }>;
+type ScopedDraftInput<T> = {
+  owner: AuthenticatedOwner;
+  entityKey: string;
+  selectionGeneration: number;
+  isReady: boolean;
+  validate?: DraftShapeValidator<T>;
+};
+
+/** The restored result, not initial/prefilled text, grants access to every persistence action. */
+export function useScopedDraftLoad<T = string>({
+  owner,
+  entityKey,
+  selectionGeneration,
+  isReady,
+  validate,
+}: ScopedDraftInput<T>) {
+  const identity = JSON.stringify([
+    owner.authEpoch,
+    owner.generation,
+    owner.userId,
+    entityKey,
+    selectionGeneration,
+    isReady,
+  ]);
+  const activeIdentity = useRef(identity);
+  const generation = useRef(0);
+  const writeGeneration = useRef<number | null>(null);
+  if (activeIdentity.current !== identity) {
+    activeIdentity.current = identity;
+    generation.current += 1;
+    writeGeneration.current = null;
+  }
+  const validateRef = useRef((validate ?? isStringDraft) as DraftShapeValidator<T>);
+  validateRef.current = (validate ?? isStringDraft) as DraftShapeValidator<T>;
+  const [stored, setStored] = useState<{
+    identity: string;
+    generation: number;
+    result: ScopedDraftState<T>;
+  }>({ identity, generation: 0, result: { status: 'unresolved' } });
+  const pending = useRef<{ identity: string; generation: number; promise: Promise<void> } | null>(
+    null
+  );
+
+  const load = useCallback(
+    async (retryStore: boolean): Promise<void> => {
+      if (!isReady || activeIdentity.current !== identity || !isAuthenticatedOwner(owner)) {
+        return;
+      }
+      if (
+        pending.current?.identity === identity &&
+        pending.current.generation === generation.current
+      ) {
+        return pending.current.promise;
+      }
+      generation.current += 1;
+      writeGeneration.current = null;
+      const attempt = generation.current;
+      const isCurrent = () =>
+        activeIdentity.current === identity &&
+        generation.current === attempt &&
+        isAuthenticatedOwner(owner);
+      setStored({ identity, generation: attempt, result: { status: 'unresolved' } });
+      const promise = (async () => {
+        if (owner.userId === null || !isCurrent()) {
+          return;
+        }
+        let result: ScopedDraftState<T> = { status: 'unresolved' };
+        try {
+          if (retryStore) {
+            await retryEncryptedKvOpen();
+          }
+          if (!isCurrent()) {
+            return;
+          }
+          result = parseScopedDraftKey(entityKey)
+            ? await loadDraftResult(owner.userId, entityKey, validateRef.current, isCurrent)
+            : { status: 'malformed', reason: 'shape' };
+        } catch (error) {
+          result = { status: 'failed', error };
+        }
+        if (isCurrent()) {
+          writeGeneration.current =
+            result.status === 'present' || result.status === 'absent' ? attempt : null;
+          setStored({ identity, generation: attempt, result });
+        }
+      })();
+      const flight = { identity, generation: attempt, promise };
+      pending.current = flight;
+      void (async () => {
+        await promise;
+        if (pending.current === flight) {
+          pending.current = null;
+        }
+      })();
+      await promise;
+    },
+    [identity, owner, entityKey, isReady]
+  );
+
+  useEffect(() => {
+    void load(false);
+    return () => {
+      generation.current += 1;
+    };
+  }, [load]);
+  const result: ScopedDraftState<T> =
+    stored.identity === identity && stored.generation === generation.current
+      ? stored.result
+      : { status: 'unresolved' };
+  const restored = result.status === 'present' || result.status === 'absent';
+  const persistenceAllowed = () => isAuthenticatedOwner(owner);
+  const allowed = () =>
+    isReady &&
+    persistenceAllowed() &&
+    activeIdentity.current === identity &&
+    stored.generation === generation.current &&
+    stored.generation === writeGeneration.current &&
+    restored;
+  const retry = async () => {
+    if (activeIdentity.current !== identity || !isAuthenticatedOwner(owner)) {
+      return;
+    }
+    if (
+      pending.current?.identity === identity &&
+      pending.current.generation === generation.current
+    ) {
+      await pending.current.promise;
+    } else if (
+      stored.generation === generation.current &&
+      (result.status === 'failed' || result.status === 'malformed')
+    ) {
+      await load(true);
+    }
+  };
+  const save = (value: T) => {
+    if (owner.userId !== null && allowed()) {
+      // Context changes close new edits, not persistence already admitted to this owner and key.
+      saveDraft(owner.userId, entityKey, value, persistenceAllowed);
+    }
+  };
+  const flush = async () => {
+    if (owner.userId !== null && restored && persistenceAllowed()) {
+      await flushDraft(owner.userId, entityKey, persistenceAllowed);
+    }
+  };
+  const clear = async () => {
+    if (owner.userId === null || !allowed()) {
+      return false;
+    }
+    const cleared = await clearDraft(owner.userId, entityKey, allowed);
+    return cleared;
+  };
+  const importLegacy = async (candidateKey: string) => {
+    if (!allowed()) {
+      return 'stale' as const;
+    }
+    const outcome = await migrateLegacyDraft({
+      owner,
+      destinationKey: entityKey,
+      candidateKey,
+      selection: 'explicit',
+      isCurrent: allowed,
+    });
+    if (outcome === 'committed' && allowed()) {
+      await load(false);
+    }
+    return outcome;
+  };
+  return {
+    status: result.status,
+    result,
+    value: result.status === 'present' ? result.value : null,
+    canWrite: allowed(),
+    isCurrent: allowed,
+    recovery: result.status === 'failed' ? encryptedStoreRecovery(result.error) : null,
+    retry,
+    save,
+    flush,
+    clear,
+    importLegacy,
+  };
 }
 
 type UseRemoteSpawnDraftCleanupInput = {
   userId: string | undefined;
+  /** New producers pass the exact captured scoped key; the fallback serves unchanged routes until a6. */
+  entityKey?: string;
+  isCurrent?: () => boolean;
 };
 
-/**
- * Owns the new-session draft's fate when the screen leaves after a remote
- * spawn attempt. The spawn dispatch consumes the outcome internally — a
- * success replaces the screen, a failure toasts and stays — and the route
- * arms the attempt marker only once the dispatch admits the spawn (voice
- * settlement and remote admission passed). The route's observable signal is
- * therefore the attempt marker plus the unmount itself: a successful spawn is
- * the one path that unmounts the screen with an attempt recorded. The leaving
- * route clears the consumed `agent-composer:new` entry (the prompt must not
- * reappear on the next new-session visit) instead of flushing it. Without an
- * attempt the unmount flushes the pending debounce, preserving the draft for
- * a normal leave (back button) or a tap that stopped before any spawn attempt
- * (blocked admission, cancelled voice submit).
- *
- * Boundary: a failed spawn followed by a manual leave also clears the draft.
- * The failed spawn itself never clears — the screen stays mounted, so the
- * retry-while-on-screen contract holds — and the recorded trade-off is that a
- * user who abandons the screen after a failed attempt loses the prompt, the
- * same as if the attempt had succeeded.
- */
-export function useRemoteSpawnDraftCleanup({ userId }: UseRemoteSpawnDraftCleanupInput) {
-  const spawnAttemptedRef = useRef(false);
+/** Preserve the existing attempted-spawn leave policy, but never retarget its captured draft. */
+export function useRemoteSpawnDraftCleanup({
+  userId,
+  entityKey = NEW_SESSION_DRAFT_KEY,
+  isCurrent,
+}: UseRemoteSpawnDraftCleanupInput) {
+  const epoch = currentAuthEpoch();
+  const identity = JSON.stringify([epoch, userId, entityKey]);
+  const guard = useRef({ identity, isCurrent });
+  guard.current = { identity, isCurrent };
+  const attempted = useRef<typeof guard.current | null>(null);
   const markRemoteSpawnAttempted = useCallback(() => {
-    spawnAttemptedRef.current = true;
-  }, []);
+    const current = guard.current;
+    if (
+      current.identity === identity &&
+      isCurrentAuthEpoch(epoch) &&
+      (!current.isCurrent || current.isCurrent())
+    ) {
+      attempted.current = current;
+    }
+  }, [epoch, identity]);
   useEffect(
     () => () => {
-      if (!userId) {
+      const current = guard.current;
+      const allowed = () =>
+        current.identity === identity &&
+        isCurrentAuthEpoch(epoch) &&
+        (!current.isCurrent || current.isCurrent());
+      if (!userId || !allowed()) {
         return;
       }
-      if (spawnAttemptedRef.current) {
-        void clearDraft(userId, NEW_SESSION_DRAFT_KEY);
+      const attempt = attempted.current;
+      if (attempt?.identity === identity && (!attempt.isCurrent || attempt.isCurrent())) {
+        void clearDraft(
+          userId,
+          entityKey,
+          () => allowed() && (!attempt.isCurrent || attempt.isCurrent())
+        );
       } else {
-        void flushDraft(userId, NEW_SESSION_DRAFT_KEY);
+        void flushDraft(userId, entityKey, allowed);
       }
     },
-    [userId]
+    [userId, entityKey, epoch, identity]
   );
   return { markRemoteSpawnAttempted };
 }

@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { type Query, type QueryClient } from '@tanstack/react-query';
+import { hashKey, type Query, type QueryClient } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import {
   type AsyncStorage,
@@ -9,6 +9,11 @@ import {
 import { z } from 'zod';
 
 import { buildAgentSessionListInput } from '@/lib/agent-session-input';
+import {
+  type AuthenticatedOwner,
+  getAuthenticatedOwner,
+  isAuthenticatedOwner,
+} from '@/lib/context-scope';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
@@ -62,11 +67,14 @@ type QueryCacheReader = { getQueryData?: QueryClient['getQueryData'] };
 
 const cachedUserSchema = z.object({ id: z.string().min(1) });
 
-/** Authoritative user id from the cached `user.getMe` result, or null. */
+/** Cached getMe identifies a user only after this generation's network response proves the same owner. */
 export function readCachedUserId(queryClient: QueryCacheReader): string | null {
   const data = queryClient.getQueryData?.(GET_ME_QUERY_KEY);
   const parsed = cachedUserSchema.safeParse(data);
-  return parsed.success ? parsed.data.id : null;
+  const owner = getAuthenticatedOwner();
+  return parsed.success && isAuthenticatedOwner(owner) && parsed.data.id === owner.userId
+    ? owner.userId
+    : null;
 }
 
 const queryKeyMetaSchema = z.object({ input: z.unknown().optional() });
@@ -95,6 +103,13 @@ type AllowedProcedure = {
  */
 const DEFAULT_SESSION_LIST_INPUT = buildAgentSessionListInput({ organizationId: null });
 const DEFAULT_SESSION_LIST_KEY_COUNT = Object.keys(DEFAULT_SESSION_LIST_INPUT).length;
+// JSON omits undefined input fields. Match the canonical stock key when restoring legacy blobs;
+// do not relax the live allowlist or change the query-key positions used by permission eviction.
+const SERIALIZED_SESSION_LIST_KEYS = new Set(
+  ['query', 'infinite'].map(type =>
+    hashKey([['cliSessionsV2', 'list'], { type, input: DEFAULT_SESSION_LIST_INPUT }])
+  )
+);
 
 // Initial allowlist. Verified against the mobile tRPC router
 // (`packages/trpc/src/mobile.ts`) before coding.
@@ -205,6 +220,7 @@ type ReadCachePersisterOptions = {
  */
 export function createReadCachePersister(options: ReadCachePersisterOptions): Persister {
   const { queryClient, userId, epoch } = options;
+  const owner = getAuthenticatedOwner();
   const scope = readCacheScope(userId);
 
   // Publication fence: every sign-in and sign-out bumps the epoch, and the
@@ -216,38 +232,70 @@ export function createReadCachePersister(options: ReadCachePersisterOptions): Pe
   // clearing scopes — even from a persister created at the current epoch while
   // the old user id is cached.
   const isPublicationAllowed = (): boolean =>
-    !isSignOutActive() && isCurrentAuthEpoch(epoch) && readCachedUserId(queryClient) === userId;
+    !isSignOutActive() &&
+    isCurrentAuthEpoch(epoch) &&
+    isAuthenticatedOwner(owner) &&
+    owner.userId === userId &&
+    readCachedUserId(queryClient) === userId;
 
   const storage: AsyncStorage = {
     getItem: async k => {
+      if (!isPublicationAllowed()) {
+        return null;
+      }
       const value = await encryptedKv.getItem(scope, k);
-      return value;
+      return isPublicationAllowed() ? value : null;
     },
     setItem: async (k, v) => {
-      // The fence also guards the storage write: the async-storage persister
-      // throttles saves, so the actual write can happen after teardown.
-      if (!isPublicationAllowed()) {
-        return;
+      if (isPublicationAllowed()) {
+        await encryptedKv.setItem(scope, k, v, isPublicationAllowed);
       }
-      await encryptedKv.setItem(scope, k, v);
     },
     removeItem: async k => {
-      await encryptedKv.removeItem(scope, k);
+      if (isPublicationAllowed()) {
+        await encryptedKv.removeItem(scope, k, isPublicationAllowed);
+      }
     },
   };
   const base = createAsyncStoragePersister({ storage, key: READ_CACHE_KEY });
 
   return {
     ...base,
+    restoreClient: async () => {
+      const client = await base.restoreClient();
+      if (!client || !isPublicationAllowed()) {
+        return undefined;
+      }
+      const identity = client.clientState.queries.find(
+        query => JSON.stringify(query.queryKey) === JSON.stringify(GET_ME_QUERY_KEY)
+      );
+      const cachedOwner = cachedUserSchema.safeParse(identity?.state.data);
+      if (!cachedOwner.success || cachedOwner.data.id !== userId) {
+        return undefined;
+      }
+      return {
+        ...client,
+        clientState: {
+          mutations: [],
+          // Identity and membership must come from this generation's server responses, not disk.
+          queries: client.clientState.queries.filter(query => {
+            const path = JSON.stringify(query.queryKey[0]);
+            return (
+              query.state.status === 'success' &&
+              (isReadCacheAllowedKey(query.queryKey) ||
+                SERIALIZED_SESSION_LIST_KEYS.has(hashKey(query.queryKey))) &&
+              path !== '["user","getMe"]' &&
+              path !== '["organizations","list"]'
+            );
+          }),
+        },
+      };
+    },
     persistClient: async client => {
       if (!isPublicationAllowed()) {
         return;
       }
-      const serialized = JSON.stringify(client);
-      if (utf8ByteLength(serialized) > READ_CACHE_MAX_BYTES) {
-        // Oversized blobs are never written partially: the previous blob for
-        // this scope is removed so a stale snapshot cannot survive the write
-        // that replaced it.
+      if (utf8ByteLength(JSON.stringify(client)) > READ_CACHE_MAX_BYTES) {
         await base.removeClient();
         return;
       }
@@ -256,80 +304,66 @@ export function createReadCachePersister(options: ReadCachePersisterOptions): Pe
   };
 }
 
+/** The caller's owner proof, not active-user-id or a cached getMe, authorizes hydration. */
+export async function restorePersistedCacheForOwner(
+  queryClient: QueryClient,
+  owner: AuthenticatedOwner,
+  isCurrent: () => boolean
+): Promise<void> {
+  if (!isAuthenticatedOwner(owner) || owner.userId === null || !isCurrent()) {
+    return;
+  }
+  const persister = createReadCachePersister({
+    queryClient,
+    userId: owner.userId,
+    epoch: owner.authEpoch,
+  });
+  try {
+    await persistQueryClientRestore({
+      queryClient,
+      maxAge: READ_CACHE_MAX_AGE_MS,
+      persister: {
+        ...persister,
+        restoreClient: async () => {
+          const client = await persister.restoreClient();
+          return isAuthenticatedOwner(owner) && isCurrent() ? client : undefined;
+        },
+      },
+    });
+  } catch {
+    // The library rethrows after its guarded cache cleanup. Cache failure must not block live data.
+  }
+}
+
 // ── Cold-start restore ─────────────────────────────────────────────────────
 
 let coldStartGeneration = 0;
 let coldStartRestoredScope: string | null = null;
 
 /**
- * Best-effort cold-start restore for the identity hint stored in
- * `ACTIVE_USER_ID_KEY`. Never blocks startup. A generation flag abandons the
- * restore once the authenticated mount takes over: a late restore no-ops —
- * including one whose KV read was still in flight at takeover, which never
- * hydrates — and never claims a scope, and the scope of a completed restore
- * is reported to the mount via {@link takeOverColdStartRestore}.
+ * Compatibility entry for the root layout. Capture the legacy identity hint without reading content.
+ * Only restorePersistedCacheForOwner can hydrate, after this generation's authoritative identity resolves.
+ * Remove the hint entry once the root layout no longer invokes the legacy cold-start contract.
  */
-export async function restorePersistedCacheOnColdStart(queryClient: QueryClient): Promise<void> {
-  // The generation bump is synchronous so the authenticated mount can abandon
-  // this restore immediately after scheduling it.
+export async function restorePersistedCacheOnColdStart(_queryClient: QueryClient): Promise<void> {
   coldStartGeneration += 1;
   const generation = coldStartGeneration;
-  // Capture the epoch before the first SecureStore read: a sign-in or sign-out
-  // that lands while the hint read or the KV read is in flight fences the
-  // whole restore, so it can never hydrate (or claim a scope) after the auth
-  // epoch moved — including after a logout that cleared the query client.
   const epoch = currentAuthEpoch();
   try {
     const hintUserId = await SecureStore.getItemAsync(ACTIVE_USER_ID_KEY);
-    if (generation !== coldStartGeneration || !hintUserId || !isCurrentAuthEpoch(epoch)) {
-      return;
+    if (generation === coldStartGeneration && hintUserId && isCurrentAuthEpoch(epoch)) {
+      // Compatibility entry for the root layout: retain only the hint, never hydrate content.
+      // The authenticated mount reads the cache only after this generation's getMe proves ownership.
+      coldStartRestoredScope = readCacheScope(hintUserId);
     }
-    const persister = createReadCachePersister({
-      queryClient,
-      userId: hintUserId,
-      epoch,
-    });
-    if (generation !== coldStartGeneration || !isCurrentAuthEpoch(epoch)) {
-      return;
-    }
-    // The mount bumps the generation when it takes over, and
-    // `persistQueryClientRestore` hydrates internally without a hook, so the
-    // fence lives in a wrapped `restoreClient`: it reports no blob (and the
-    // library therefore does nothing) whenever the generation moved or the
-    // auth epoch changed while the KV read was in flight. A late restore can
-    // never hydrate after the authoritative identity has taken over or a
-    // sign-in/sign-out has moved the epoch.
-    const fencedPersister: Persister = {
-      ...persister,
-      restoreClient: async () => {
-        const restored = await persister.restoreClient();
-        return generation === coldStartGeneration && isCurrentAuthEpoch(epoch)
-          ? restored
-          : undefined;
-      },
-    };
-    // No `buster`: the scope segment already carries the schema version, so a
-    // blob written by an older schema lives in another scope and is never read.
-    await persistQueryClientRestore({
-      queryClient,
-      persister: fencedPersister,
-      maxAge: READ_CACHE_MAX_AGE_MS,
-    });
-    if (generation !== coldStartGeneration || !isCurrentAuthEpoch(epoch)) {
-      // The mount took over, or the auth epoch changed, while the restore was
-      // in flight: the late restore is abandoned and must not claim a scope.
-      return;
-    }
-    coldStartRestoredScope = readCacheScope(hintUserId);
   } catch {
-    // Best effort: a failed or interrupted restore never blocks startup.
+    // A failed hint costs a warm start, never authorizes a different account.
   }
 }
 
 /**
  * Marks the authenticated mount as the cache owner: any still-pending cold-
- * start restore is abandoned, and the scope a completed restore hydrated is
- * returned (and cleared from the module) for identity comparison.
+ * start hint read is abandoned. Return and clear the hint scope; it never authorizes hydration.
  */
 export function takeOverColdStartRestore(): string | null {
   coldStartGeneration += 1;
@@ -350,9 +384,15 @@ export function takeOverColdStartRestore(): string | null {
  * abort sign-out; the stale blob only costs a future warm start.
  */
 export async function clearCacheScopeForSignOut(knownUserId: string | null): Promise<void> {
+  const owner = getAuthenticatedOwner();
+  const epoch = currentAuthEpoch();
+  const isCurrent = () =>
+    isCurrentAuthEpoch(epoch) && getAuthenticatedOwner().generation === owner.generation;
   try {
     await encryptedKv.clearScopePrefix(
-      knownUserId ? `${CACHE_SCOPE_PREFIX}${knownUserId}:` : CACHE_SCOPE_PREFIX
+      knownUserId ? `${CACHE_SCOPE_PREFIX}${knownUserId}:` : CACHE_SCOPE_PREFIX,
+      isCurrent,
+      Boolean(knownUserId)
     );
   } catch {
     // Best effort: query and auth state reset still run after this returns.

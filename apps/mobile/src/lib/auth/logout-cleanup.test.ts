@@ -30,47 +30,10 @@ vi.mock('@/lib/notifications', () => ({
   getDevicePushTokenOutcome: vi.fn(),
 }));
 
-vi.mock('@/lib/auth/token-owner', () => ({
-  getActiveToken: vi.fn(),
-}));
-
-// The cleanup reads the cached user id from the read cache, which calls the
-// encrypted-kv module; the mock keeps the native SQLCipher chain out of this
-// node suite.
-vi.mock('@/lib/persist/encrypted-kv', () => ({
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clearScope: vi.fn(),
-  clearScopePrefix: vi.fn(),
-}));
-
 import { readLogoutCleanupTombstone, runLogoutCleanup } from '@/lib/auth/logout-cleanup';
 import { getDevicePushTokenOutcome } from '@/lib/notifications';
-import { getActiveToken } from '@/lib/auth/token-owner';
-import { queryClient } from '@/lib/query-client';
 import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
 /* eslint-enable import/first */
-
-const GET_ME_QUERY_KEY: readonly unknown[] = [['user', 'getMe'], { type: 'query' }];
-
-function base64url(input: string): string {
-  return btoa(input).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
-}
-
-function makeToken(payload: unknown): string {
-  return `${base64url('{"alg":"none"}')}.${base64url(JSON.stringify(payload))}.signature`;
-}
-
-const TOKEN_WITH_SESSION = makeToken({ sub: 'u1' });
-
-function seedUser(userId: string | null): void {
-  if (userId === null) {
-    queryClient.removeQueries({ queryKey: GET_ME_QUERY_KEY });
-  } else {
-    queryClient.setQueryData(GET_ME_QUERY_KEY, { id: userId });
-  }
-}
 
 function pushOutcome(kind: 'token' | 'none' | 'lookup-failed', token?: string): void {
   vi.mocked(getDevicePushTokenOutcome).mockResolvedValue(
@@ -82,11 +45,6 @@ describe('runLogoutCleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store.clear();
-    vi.mocked(getActiveToken).mockReturnValue({
-      token: TOKEN_WITH_SESSION,
-      expiresAtMs: null,
-    });
-    seedUser('u1');
   });
 
   it('revokes the session and unregisters the token, then deletes any existing tombstone on full success', async () => {
@@ -95,7 +53,7 @@ describe('runLogoutCleanup', () => {
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
     trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
 
-    await expect(runLogoutCleanup()).resolves.toBeUndefined();
+    await expect(runLogoutCleanup('u1')).resolves.toBeUndefined();
 
     expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledTimes(1);
     expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledWith({ token: 'push-1' });
@@ -108,7 +66,7 @@ describe('runLogoutCleanup', () => {
       outcome: 'no_identifiable_session',
     });
 
-    await runLogoutCleanup();
+    await runLogoutCleanup('u1');
 
     // No unregister call for a permission-denied device; the fulfilled revoke
     // means nothing is outstanding.
@@ -121,7 +79,7 @@ describe('runLogoutCleanup', () => {
     trpcMock.revokeCurrentDeviceSession.mutate.mockRejectedValue(new Error('network down'));
     trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
 
-    await runLogoutCleanup();
+    await runLogoutCleanup('u1');
 
     const tombstone = await readLogoutCleanupTombstone();
     expect(tombstone).toEqual({
@@ -137,7 +95,7 @@ describe('runLogoutCleanup', () => {
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
     trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
 
-    await runLogoutCleanup();
+    await runLogoutCleanup('u1');
 
     const tombstone = await readLogoutCleanupTombstone();
     expect(tombstone).toMatchObject({
@@ -152,7 +110,7 @@ describe('runLogoutCleanup', () => {
     trpcMock.revokeCurrentDeviceSession.mutate.mockRejectedValue({ data: { code: 'NOT_FOUND' } });
     trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
 
-    await runLogoutCleanup();
+    await runLogoutCleanup('u1');
 
     // Nothing outstanding: the tombstone is deleted, not written.
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
@@ -162,7 +120,7 @@ describe('runLogoutCleanup', () => {
     pushOutcome('lookup-failed');
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
 
-    await runLogoutCleanup();
+    await runLogoutCleanup('u1');
 
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
     const tombstone = await readLogoutCleanupTombstone();
@@ -176,7 +134,7 @@ describe('runLogoutCleanup', () => {
     pushOutcome('none');
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
 
-    await runLogoutCleanup();
+    await runLogoutCleanup('u1');
 
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
@@ -192,7 +150,7 @@ describe('runLogoutCleanup', () => {
     const { setItemAsync } = await import('expo-secure-store');
     vi.mocked(setItemAsync).mockRejectedValueOnce(new Error('secure store down'));
 
-    await expect(runLogoutCleanup()).resolves.toBeUndefined();
+    await expect(runLogoutCleanup('u1')).resolves.toBeUndefined();
     expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: { 'error.subsystem': 'auth', 'error.operation': 'write_logout_tombstone' },
     });
@@ -202,7 +160,7 @@ describe('runLogoutCleanup', () => {
     vi.mocked(getDevicePushTokenOutcome).mockRejectedValue(new Error('native error'));
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
 
-    await expect(runLogoutCleanup()).resolves.toBeUndefined();
+    await expect(runLogoutCleanup('u1')).resolves.toBeUndefined();
 
     // The failed lookup is treated as outstanding so reconciliation re-reads.
     const tombstone = await readLogoutCleanupTombstone();

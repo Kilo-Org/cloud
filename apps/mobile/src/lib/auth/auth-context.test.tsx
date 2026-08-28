@@ -5,6 +5,8 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as AuthContextModule from './auth-context';
+import type * as LogoutCleanupModule from './logout-cleanup';
+import type * as StorageKeysModule from '@/lib/storage-keys';
 
 // ---- hoisted mocks ----
 
@@ -66,6 +68,7 @@ const hoisted = vi.hoisted(() => {
   // Hoisted so the foreground tests can capture AppState listeners from the
   // same mock instance every module registry resolves to.
   const appState = {
+    currentState: 'active',
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   };
 
@@ -147,13 +150,43 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
   purgePostHogPersistence: hoisted.posthogStorage.purgePostHogPersistence,
 }));
 
-vi.mock('@/lib/query-client', () => ({
-  queryClient: { clear: vi.fn() },
-}));
+vi.mock('@/lib/query-client', async () => {
+  const { QueryClient } = await import('@tanstack/react-query');
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  vi.spyOn(queryClient, 'clear');
+  vi.spyOn(queryClient, 'cancelQueries');
+  return { queryClient };
+});
 
 vi.mock('@/lib/persist/read-cache', () => readCacheMock);
 
-vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
+vi.mock('@/lib/auth/logout-cleanup', async importOriginal => ({
+  ...(await importOriginal<typeof LogoutCleanupModule>()),
+  ...logoutCleanupMock,
+}));
+
+const cleanupRemote = vi.hoisted(() => ({
+  revoke: vi.fn().mockResolvedValue({ outcome: 'revoked' }),
+  unregister: vi.fn(),
+  pushToken: vi.fn(),
+}));
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {
+    user: {
+      revokeCurrentDeviceSession: { mutate: cleanupRemote.revoke },
+      unregisterPushToken: { mutate: cleanupRemote.unregister },
+    },
+  },
+}));
+vi.mock('@/lib/notifications', () => ({
+  getDevicePushTokenOutcome: cleanupRemote.pushToken,
+  emitNotificationTokenUpdated: vi.fn(),
+}));
+
+const legacyExchangeMock = vi.hoisted(() => ({
+  exchangeLegacyToken: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('@/lib/auth/exchange-legacy-token', () => legacyExchangeMock);
 
 vi.mock('@/lib/consent', () => ({
   clearPendingConsentOutcome: consentMock.clearPendingConsentOutcome,
@@ -229,7 +262,8 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
   clearViewedFiles: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/lib/storage-keys', () => ({
+vi.mock('@/lib/storage-keys', async importOriginal => ({
+  ...(await importOriginal<typeof StorageKeysModule>()),
   ACTIVE_USER_ID_KEY: 'active-user-id',
   AUTH_TOKEN_KEY: 'auth-token',
   KEEP_SCREEN_ON_KEY: 'keep-session-screen-on',
@@ -331,6 +365,69 @@ describe('sign-out teardown ordering', () => {
     vi.clearAllMocks();
     hoisted.callOrder.length = 0;
     hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+  });
+
+  it('retains A in a real failed cleanup tombstone and cannot unregister under B after content revocation', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const scope = await import('../context-scope');
+    const cleanup = await vi.importActual<typeof LogoutCleanupModule>('./logout-cleanup');
+    const { LOGOUT_CLEANUP_TOMBSTONE_KEY } = await import('../storage-keys');
+    const persisted = new Map<string, string>();
+    const registrations = new Map([['account-b', 'push-a']]);
+    cleanupRemote.pushToken.mockResolvedValueOnce({ kind: 'token', token: 'push-a' });
+    cleanupRemote.unregister
+      .mockImplementation(({ token }: { token: string }) => {
+        const userId = scope.getAuthenticatedOwner().userId;
+        if (userId && registrations.get(userId) === token) {
+          registrations.delete(userId);
+        }
+        return { success: true };
+      })
+      .mockRejectedValueOnce(new Error('offline'));
+    await act(async () => {
+      await ctx.signIn('token-a');
+      scope.confirmAuthenticatedOwner(scope.getAuthenticatedOwner(), 'account-a');
+    });
+    const logoutOwner = scope.getAuthenticatedOwner();
+    const reproof: boolean[] = [];
+    const unsubscribe = scope.subscribeAuthenticatedOwner(() => {
+      const current = scope.getAuthenticatedOwner();
+      if (current.userId === null) {
+        reproof.push(scope.confirmAuthenticatedOwner(current, 'account-a'));
+      }
+    });
+    hoisted.secureStore.setItemAsync.mockImplementationOnce((storageKey: string, value: string) => {
+      persisted.set(storageKey, value);
+    });
+    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(cleanup.runLogoutCleanup);
+    await act(async () => {
+      await ctx.signOut();
+    });
+    unsubscribe();
+    expect(scope.isAuthenticatedOwner(logoutOwner)).toBe(false);
+    expect(scope.getAuthenticatedOwner().userId).toBeNull();
+    expect(reproof).not.toContain(true);
+    hoisted.secureStore.getItemAsync.mockResolvedValueOnce(
+      persisted.get(LOGOUT_CLEANUP_TOMBSTONE_KEY) ?? null
+    );
+    expect(await cleanup.readLogoutCleanupTombstone()).toMatchObject({
+      userId: 'account-a',
+      pushToken: 'push-a',
+      needsPushUnregister: true,
+    });
+    await act(async () => {
+      await ctx.signIn('token-b');
+      scope.confirmAuthenticatedOwner(scope.getAuthenticatedOwner(), 'account-b');
+    });
+    hoisted.secureStore.getItemAsync.mockResolvedValueOnce(
+      persisted.get(LOGOUT_CLEANUP_TOMBSTONE_KEY) ?? null
+    );
+    const { attemptLogoutReconciliation } = await import('./logout-reconciliation');
+    expect(await attemptLogoutReconciliation('account-b')).toEqual({
+      kind: 'different-user-discarded',
+    });
+    expect(registrations.get('account-b')).toBe('push-a');
+    unmount();
   });
 
   it('orders capture, cleanup, flush, clearTelemetryDecision, then Sentry.setUser', async () => {
@@ -452,7 +549,7 @@ describe('sign-out teardown ordering', () => {
       'auth-token',
       expect.anything()
     );
-    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
+    expect(hoisted.secureStore.deleteItemAsync).not.toHaveBeenCalledWith('organization');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('pending-deep-link');
@@ -572,7 +669,7 @@ describe('sign-out teardown ordering', () => {
     // Let signOut reach the per-key metadata deletes while the filters write
     // is still in flight, so the filters delete must serialize behind it.
     await vi.waitFor(() => {
-      expect(secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
+      expect(secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
     });
     releaseInFlight?.();
     await act(async () => {
@@ -675,6 +772,136 @@ describe('stale sign-in continuation', () => {
     };
   }
 
+  it('clears A content and revokes A authority before replacement credentials can publish', async () => {
+    const { getCtx, unmount } = await mountStaleTest();
+    const scope = await import('@/lib/context-scope');
+    const { queryClient: client } = await import('@/lib/query-client');
+    await act(async () => {
+      await getCtx().signIn('token-a');
+    });
+    scope.confirmAuthenticatedOwner(scope.getAuthenticatedOwner(), 'account-a');
+    const previous = scope.getAuthenticatedOwner();
+    const unsubscribe = scope.subscribeAuthenticatedOwner(() => {
+      const current = scope.getAuthenticatedOwner();
+      if (current.userId === null) {
+        // Simulate a synchronous observer attempting to prove A before B credentials publish.
+        scope.confirmAuthenticatedOwner(current, 'account-a');
+      }
+    });
+    client.setQueryData(['private-content'], 'private a');
+    const gate = Promise.withResolvers<undefined>();
+    hoisted.secureStore.setItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+    });
+    const replacing = getCtx().signIn('token-b');
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(scope.isAuthenticatedOwner(previous)).toBe(false);
+    expect(scope.getAuthenticatedOwner().userId).toBeNull();
+    expect(client.getQueryData(['private-content'])).toBeUndefined();
+    expect(getCtx().token).toBeUndefined();
+    gate.resolve(undefined);
+    await act(async () => {
+      await replacing;
+    });
+    expect(getCtx().token).toBe('token-b');
+    expect(client.getQueryData(['private-content'])).toBeUndefined();
+    unsubscribe();
+    unmount();
+  });
+
+  it('initializes local access from a background AppState without granting foreground readiness', async () => {
+    hoisted.appState.currentState = 'background';
+    const { getCtx, unmount } = await mountStaleTest();
+    try {
+      const scope = await import('@/lib/context-scope');
+      const access = await import('@/lib/local-access');
+      await act(async () => {
+        await getCtx().signIn('token-a');
+      });
+      await act(async () => {
+        scope.confirmAuthenticatedOwner(scope.getAuthenticatedOwner(), 'account-a');
+        await new Promise(resolve => {
+          setTimeout(resolve, 0);
+        });
+      });
+      expect(access.getLocalAccessSnapshot()).toMatchObject({
+        userId: 'account-a',
+        enabled: false,
+        foregroundReady: false,
+        unlocked: false,
+      });
+    } finally {
+      unmount();
+      hoisted.appState.currentState = 'active';
+    }
+  });
+
+  it('loads disabled-account security readiness without a presentation component', async () => {
+    const { getCtx, unmount } = await mountStaleTest();
+    const scope = await import('@/lib/context-scope');
+    const access = await import('@/lib/local-access');
+    await act(async () => {
+      await getCtx().signIn('token-a');
+    });
+    await act(async () => {
+      scope.confirmAuthenticatedOwner(scope.getAuthenticatedOwner(), 'account-a');
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(access.getLocalAccessSnapshot()).toMatchObject({
+      userId: 'account-a',
+      preference: 'absent',
+      enabled: false,
+      foregroundReady: true,
+      unlocked: true,
+    });
+    access.setLocalAccessContextReady(true);
+    expect(
+      access.captureLocalAccessLease({ userId: 'account-a', organizationId: null }).userId
+    ).toBe('account-a');
+    unmount();
+  });
+
+  it('does not publish A security preference after direct sign-in replaces its owner', async () => {
+    const { getCtx, unmount } = await mountStaleTest();
+    const scope = await import('@/lib/context-scope');
+    const access = await import('@/lib/local-access');
+    const { localAccessStorageKey } = await import('@/lib/local-access-storage');
+    await act(async () => {
+      await getCtx().signIn('token-a');
+    });
+    const gate = Promise.withResolvers<string | null>();
+    hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+      if (key === localAccessStorageKey('account-a')) {
+        const value = await gate.promise;
+        return value;
+      }
+      return null;
+    });
+    scope.confirmAuthenticatedOwner(scope.getAuthenticatedOwner(), 'account-a');
+    await act(async () => {
+      await getCtx().signIn('token-b');
+    });
+    await act(async () => {
+      scope.confirmAuthenticatedOwner(scope.getAuthenticatedOwner(), 'account-b');
+      gate.resolve('{"version":1,"enabled":true}');
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(access.getLocalAccessSnapshot()).toMatchObject({
+      userId: 'account-b',
+      enabled: false,
+      unlocked: true,
+    });
+    unmount();
+  });
+
   it('signs the new session out when a sign-out is queued behind a sign-in (FIFO)', async () => {
     const { getCtx, unmount } = await mountStaleTest();
 
@@ -697,7 +924,7 @@ describe('stale sign-in continuation', () => {
     expect(getCtx().sessionEnded).toBe(true);
     expect(getCtx().isSigningOut).toBe(true);
     const { queryClient: queryClientMock } = await import('@/lib/query-client');
-    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(2);
 
     unmount();
   });
@@ -848,6 +1075,30 @@ describe('bootstrap and foreground race fencing', () => {
       mod,
     };
   }
+
+  it('does not publish a legacy exchange result after direct sign-in changes its epoch', async () => {
+    const gate = Promise.withResolvers<{
+      token: string;
+      refreshToken: string;
+      expiresIn: number;
+    }>();
+    hoisted.secureStore.getItemAsync.mockResolvedValueOnce('legacy-a').mockResolvedValueOnce(null);
+    legacyExchangeMock.exchangeLegacyToken.mockReturnValueOnce(gate.promise);
+    const { getCtx, unmount } = await mountProvider();
+    await act(async () => {
+      await getCtx().signIn('replacement-b');
+    });
+    await act(async () => {
+      gate.resolve({ token: 'exchanged-a', refreshToken: 'refresh-a', expiresIn: 3600 });
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+    const tokens = await import('@/lib/auth/token-owner');
+    expect(getCtx().token).toBe('replacement-b');
+    expect(tokens.getActiveToken()?.token).toBe('replacement-b');
+    unmount();
+  });
 
   it('regression: sign-out during bootstrap does not restore the preloaded token into React state or the owner', async () => {
     let releaseRead: (() => void) | undefined = undefined;
@@ -1235,9 +1486,8 @@ describe('auth-transition queue and sign-out failure matrix', () => {
       await Promise.all([signOutPromise, signInPromise]);
     });
 
-    // Whole-body FIFO: the sign-out's teardown (including the query-client
-    // clear) settled before the sign-in's credential write ran.
-    expect(clearMock).toHaveBeenCalledTimes(1);
+    // Sign-out and replacement sign-in each clear content before the credential write.
+    expect(clearMock).toHaveBeenCalledTimes(2);
     const clearOrder = clearMock.mock.invocationCallOrder[0];
     const setOrder = hoisted.secureStore.setItemAsync.mock.invocationCallOrder[0];
     expect(clearOrder).toBeLessThan(setOrder);
@@ -1287,7 +1537,7 @@ describe('auth-transition queue and sign-out failure matrix', () => {
       'auth-token',
       expect.anything()
     );
-    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
+    expect(hoisted.secureStore.deleteItemAsync).not.toHaveBeenCalledWith('organization');
     const { queryClient: queryClientMock } = await import('@/lib/query-client');
     expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
     expect(getCtx().token).toBeUndefined();
@@ -1342,7 +1592,7 @@ describe('auth-transition queue and sign-out failure matrix', () => {
       'auth-token',
       expect.anything()
     );
-    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
+    expect(hoisted.secureStore.deleteItemAsync).not.toHaveBeenCalledWith('organization');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
     const { clearAgentModelPreference } = await import('@/lib/hooks/use-persisted-agent-model');
@@ -1356,11 +1606,10 @@ describe('auth-transition queue and sign-out failure matrix', () => {
 
   it('resets auth state even when the deletion batch phase throws synchronously', async () => {
     const { getCtx, unmount } = await mountQueueTest();
-    // A synchronous throw while the allSettled batch is being built: the
-    // batch never runs, the preference clears are skipped, and the inner
-    // finally still resets query and auth state.
-    readCacheMock.readCachedUserId.mockImplementationOnce(() => {
-      throw new Error('cache read exploded');
+    // A synchronous throw during batch construction skips the preference
+    // clears, but the inner finally still resets query and auth state.
+    readCacheMock.clearCacheScopeForSignOut.mockImplementationOnce(() => {
+      throw new Error('cache cleanup exploded');
     });
 
     const signOutPromise = getCtx().signOut();

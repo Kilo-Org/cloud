@@ -348,93 +348,137 @@ describe('single-flight open contract', () => {
   });
 });
 
-describe('open failure recovery', () => {
+describe('nondestructive open recovery', () => {
+  it.each(['SQLITE_IOERR', 'disk I/O error', 'database is locked', 'unable to open database file'])(
+    'classifies temporary native failure %s as retryable',
+    async message => {
+      const { encryptedStoreRecovery } = await import('./encrypted-kv');
+      expect(encryptedStoreRecovery(new Error(message))).toEqual({
+        status: 'retryable',
+        reason: 'io',
+        guidance: 'retry',
+      });
+    }
+  );
   it.each([
     {
       seam: 'probe',
-      failOnce: () => {
+      fail: () => {
         failNextProbe = true;
       },
+      reason: 'corrupt-database',
     },
     {
       seam: 'PRAGMA key',
-      failOnce: () => {
+      fail: () => {
         failNextPragma = true;
       },
+      reason: 'unknown',
     },
-  ])(
-    'a failing $seam deletes, regenerates the key, reopens, and reports the reset to Sentry',
-    async ({ failOnce }) => {
-      failOnce();
-      await setItem('s', 'a', 'x');
+  ])('protects a failing $seam until explicit Retry', async ({ fail, reason }) => {
+    store.set(PERSIST_DB_KEY, 'a'.repeat(64));
+    fail();
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow(reason);
+    await expect(getItem('s', 'a')).rejects.toThrow(reason);
+    expect(store.get(PERSIST_DB_KEY)).toBe('a'.repeat(64));
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).not.toHaveBeenCalled();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    const { retryEncryptedKvOpen } = await import('./encrypted-kv');
+    await Promise.all([retryEncryptedKvOpen(), retryEncryptedKvOpen(), retryEncryptedKvOpen()]);
+    await setItem('s', 'a', 'x');
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
+    expect(closeCallCount).toBe(1);
+    expect(store.get(PERSIST_DB_KEY)).toBe('a'.repeat(64));
+  });
 
-      // Only the first handle was closed; the recovery-opened one stays open.
-      expect(closeCallCount).toBe(1);
-      expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
-      // A fresh key was generated and stored over the old one.
-      expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
-      expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
-      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-      expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
-        level: 'warning',
-        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+  it('does not replace a pending memo when concurrent Retry arrives', async () => {
+    const secureStore = await import('expo-secure-store');
+    const gate = Promise.withResolvers<string | null>();
+    vi.mocked(secureStore.getItemAsync).mockReturnValueOnce(gate.promise);
+    const { retryEncryptedKvOpen } = await import('./encrypted-kv');
+    const first = getItem('s', 'k');
+    const retry = retryEncryptedKvOpen();
+    gate.resolve('b'.repeat(64));
+    await Promise.all([first, retry]);
+    await retryEncryptedKvOpen();
+    await setItem('s', 'k', 'retained');
+    await expect(getItem('s', 'k')).resolves.toBe('retained');
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries temporary SecureStore failures without regenerating the stored key', async () => {
+    const secureStore = await import('expo-secure-store');
+    const { retryEncryptedKvOpen, encryptedStoreRecovery } = await import('./encrypted-kv');
+    store.set(PERSIST_DB_KEY, 'c'.repeat(64));
+    vi.mocked(secureStore.getItemAsync).mockRejectedValueOnce(new Error('temporarily locked'));
+    try {
+      await getItem('s', 'k');
+      throw new Error('The read must reject');
+    } catch (error) {
+      expect(encryptedStoreRecovery(error)).toEqual({
+        status: 'retryable',
+        reason: 'secure-store',
+        guidance: 'retry',
       });
-
-      // The store works on the recovered database.
-      await expect(getItem('s', 'a')).resolves.toBe('x');
     }
-  );
+    await expect(getItem('s', 'k')).rejects.toThrow('secure-store');
+    expect(SQLite.openDatabaseSync).not.toHaveBeenCalled();
+    await Promise.all([retryEncryptedKvOpen(), retryEncryptedKvOpen()]);
+    await setItem('s', 'k', 'restored');
+    await expect(getItem('s', 'k')).resolves.toBe('restored');
+    expect(store.get(PERSIST_DB_KEY)).toBe('c'.repeat(64));
+    expect(Crypto.getRandomBytesAsync).not.toHaveBeenCalled();
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
 
-  // Every recovery failure reports once, whichever seam fails: the open memo
-  // makes one failure reject every later caller, so silence would hide a
-  // persistence outage that lasts the rest of the install.
-  it.each([
-    {
-      seam: 'probe',
-      failAlways: () => {
-        failNextProbe = true;
-        failEveryProbe = true;
-      },
-      recover: () => {
-        failEveryProbe = false;
-      },
-      sentryReports: 1,
-    },
-    {
-      seam: 'PRAGMA key',
-      failAlways: () => {
-        failEveryPragma = true;
-      },
-      recover: () => {
-        failEveryPragma = false;
-      },
-      sentryReports: 1,
-    },
-  ])(
-    'a $seam that fails on recovery too closes both handles and rejects every later caller',
-    async ({ failAlways, recover, sentryReports }) => {
-      failAlways();
-      await expect(setItem('s', 'a', 'x')).rejects.toThrow();
+  it('retains the first generated key when its SecureStore write temporarily fails', async () => {
+    const secureStore = await import('expo-secure-store');
+    const { retryEncryptedKvOpen } = await import('./encrypted-kv');
+    vi.mocked(secureStore.setItemAsync).mockRejectedValueOnce(new Error('temporary write failure'));
+    await expect(getItem('s', 'k')).rejects.toThrow('secure-store');
+    await retryEncryptedKvOpen();
+    await setItem('s', 'k', 'value');
+    await expect(getItem('s', 'k')).resolves.toBe('value');
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+    expect(store.get(PERSIST_DB_KEY)).toMatch(/^01[0-9a-f]{62}$/);
+  });
 
-      // Both the first handle and the recovery-opened handle were closed.
-      expect(closeCallCount).toBe(2);
-      expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledTimes(1);
-      expect(Sentry.captureException).toHaveBeenCalledTimes(sentryReports);
-
-      // The failed open stays memoized: no second open, no second delete, no
-      // second Sentry report, however many callers arrive.
-      recover();
-      await expect(setItem('s', 'a', 'x')).rejects.toThrow();
-      await expect(getItem('s', 'a')).rejects.toThrow();
+  it.each(['corrupt', 'missing-sqlcipher'])(
+    'keeps terminal %s failures protected across explicit Retry',
+    async kind => {
+      store.set(PERSIST_DB_KEY, 'd'.repeat(64));
+      failEveryProbe = kind === 'corrupt';
+      hasSQLCipher = kind !== 'missing-sqlcipher';
+      const { retryEncryptedKvOpen } = await import('./encrypted-kv');
+      await expect(getItem('s', 'k')).rejects.toThrow();
+      await expect(retryEncryptedKvOpen()).rejects.toThrow();
+      await expect(getItem('s', 'k')).rejects.toThrow();
+      expect(store.get(PERSIST_DB_KEY)).toBe('d'.repeat(64));
       expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
-      expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledTimes(1);
-      expect(Sentry.captureException).toHaveBeenCalledTimes(sentryReports);
-
-      // A relaunch (a fresh module) opens cleanly again.
-      resetEncryptedKvOpenForTests();
-      await expect(setItem('s', 'a', 'x')).resolves.toBeUndefined();
+      expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+      expect(Crypto.getRandomBytesAsync).not.toHaveBeenCalled();
     }
   );
+
+  it('fences a deferred SQL write and cleanup after the owner changes during open', async () => {
+    const secureStore = await import('expo-secure-store');
+    const gate = Promise.withResolvers<string | null>();
+    vi.mocked(secureStore.getItemAsync).mockReturnValueOnce(gate.promise);
+    let current = true;
+    const write = setItem('draft:a', 'k', 'stale', () => current);
+    const cleanup = clearScope('draft:a', () => current);
+    current = false;
+    gate.resolve('e'.repeat(64));
+    await Promise.all([write, cleanup]);
+    await expect(getItem('draft:a', 'k')).resolves.toBeNull();
+    expect(
+      sqlLog.some(
+        source => source.startsWith('insert into "kv"') || source.startsWith('delete from "kv"')
+      )
+    ).toBe(false);
+  });
 });
 
 describe('database key validation', () => {
@@ -453,33 +497,35 @@ describe('database key validation', () => {
   });
 
   it.each([
+    { kind: 'empty', tamperedKey: '', forbidden: 'PRAGMA key' },
     { kind: 'non-hex', tamperedKey: 'tampered-key-not-hex', forbidden: "x'tampered-key-not-hex'" },
     { kind: 'non-lowercase hex', tamperedKey: 'A'.repeat(64), forbidden: 'AAAAAAAA' },
     { kind: 'wrong-length hex', tamperedKey: 'a'.repeat(32), forbidden: "x'a".repeat(32) },
-  ])(
-    'never interpolates a $kind key and recovers with a fresh key',
-    async ({ tamperedKey, forbidden }) => {
-      store.set(PERSIST_DB_KEY, tamperedKey);
-      await setItem('s', 'a', 'x');
-
-      // The tampered key never reached PRAGMA interpolation.
-      expect(sqlLog.some(sql => sql.includes(forbidden))).toBe(false);
-      // Recovery deleted the database, generated a fresh key, and reopened.
-      expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
-      expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
-      const stored = store.get(PERSIST_DB_KEY);
-      expect(stored).toMatch(/^[0-9a-f]{64}$/);
-      expect(sqlLog).toContain(`PRAGMA key = "x'${stored}'"`);
-      // No handle was opened for the tampered key, so only the fresh one is open.
-      expect(closeCallCount).toBe(0);
-
-      // The store works on the recovered database.
-      await expect(getItem('s', 'a')).resolves.toBe('x');
-    }
-  );
+  ])('never interpolates or replaces a $kind key', async ({ tamperedKey, forbidden }) => {
+    store.set(PERSIST_DB_KEY, tamperedKey);
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow('malformed-key');
+    const { retryEncryptedKvOpen } = await import('./encrypted-kv');
+    await expect(retryEncryptedKvOpen()).rejects.toThrow('malformed-key');
+    expect(sqlLog.some(sql => sql.includes(forbidden))).toBe(false);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(tamperedKey);
+    expect(closeCallCount).toBe(0);
+  });
 });
 
 describe('kv behavior', () => {
+  it('cleans only literal user prefixes and numeric cache versions', async () => {
+    await setItem('cache:a_%:1', 'k', 'a');
+    await setItem('cache:a_%:2', 'k', 'a2');
+    await setItem('cache:aXX:1', 'k', 'wildcard collision');
+    await setItem('cache:a_%:nested:1', 'k', 'nested user');
+    await clearScopePrefix('cache:a_%:', undefined, true);
+    await expect(getItem('cache:a_%:1', 'k')).resolves.toBeNull();
+    await expect(getItem('cache:a_%:2', 'k')).resolves.toBeNull();
+    await expect(getItem('cache:aXX:1', 'k')).resolves.toBe('wildcard collision');
+    await expect(getItem('cache:a_%:nested:1', 'k')).resolves.toBe('nested user');
+  });
   it('stores and reads a value', async () => {
     await setItem('draft:u1', 'agent-composer:new', 'hello');
     await expect(getItem('draft:u1', 'agent-composer:new')).resolves.toBe('hello');

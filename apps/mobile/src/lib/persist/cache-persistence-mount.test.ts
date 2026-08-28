@@ -1,481 +1,207 @@
-/* eslint-disable max-lines -- cohesive mount suite for identity resolution, mismatch recovery, and persister lifecycle */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree. See src/app/(app)/(tabs)/(2_agents)/index.mounted.test.tsx. */
-/* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV and SecureStore factories settle without await because they resolve immediately */
-import { createElement, useSyncExternalStore } from 'react';
+/* eslint-disable typescript-eslint/no-deprecated -- mounted cache tests use the installed DOM-free renderer */
+/* eslint-disable require-await, typescript-eslint/require-await -- native fixtures and async act callbacks settle synchronously */
+/* eslint-disable max-params -- the KV fixture mirrors the four-argument guarded write API */
+import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { type Mutation } from '@tanstack/react-query';
-import { type PersistedQueryClientSaveOptions } from '@tanstack/react-query-persist-client';
+import { hashKey } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
 import {
-  isSignOutActive,
-  setSignOutActive,
-  subscribeSignOutActive,
-} from '@/lib/auth/sign-out-state';
-import { CachePersistenceMount } from './cache-persistence-mount';
+  beginAuthenticatedOwner,
+  confirmAuthenticatedOwner,
+  getAuthenticatedOwner,
+} from '@/lib/context-scope';
 import { queryClient } from '@/lib/query-client';
-import {
-  clearCacheScopeForSignOut,
-  createReadCachePersister,
-  resetReadCacheForTests,
-  restorePersistedCacheOnColdStart,
-  shouldPersistReadCacheQuery,
-  takeOverColdStartRestore,
-} from './read-cache';
-import { GET_ME_QUERY_KEY, makePersistedClient } from './test-fixtures';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
+import { CachePersistenceMount } from './cache-persistence-mount';
+import { resetReadCacheForTests, restorePersistedCacheOnColdStart } from './read-cache';
+import { GET_ME_QUERY_KEY, makePersistedClient } from './test-fixtures';
 
-type Identity = {
-  userId: string | undefined;
-  isLoading: boolean;
-  isError: boolean;
-};
-
-const identityMock = vi.hoisted<{ value: Identity }>(() => ({
-  value: { userId: undefined, isLoading: true, isError: false },
+const mocks = vi.hoisted(() => ({
+  userId: undefined as string | undefined,
+  store: new Map<string, string>(),
+  hint: new Map<string, string>(),
+  get: vi.fn(),
+  set: vi.fn(),
+  setHint: vi.fn(),
 }));
-
-const authMock = vi.hoisted<{ value: { authEpoch: number; isSigningOut: boolean } }>(() => ({
-  value: { authEpoch: 0, isSigningOut: false },
-}));
-
-const persistQueryClientSubscribeMock = vi.hoisted(() =>
-  vi.fn<(options: PersistedQueryClientSaveOptions) => () => void>()
-);
-const persistQueryClientRestoreMock = vi.hoisted(() => vi.fn(async () => undefined));
-const unsubscribeMock = vi.hoisted(() => vi.fn<() => void>());
-
-const kvMock = vi.hoisted(() => ({
-  getItem: vi.fn(async (): Promise<string | null> => null),
-  setItem: vi.fn(async (): Promise<void> => undefined),
-  removeItem: vi.fn(async (): Promise<void> => undefined),
-  clearScope: vi.fn(async (): Promise<void> => undefined),
-  clearScopePrefix: vi.fn(async (): Promise<void> => undefined),
-}));
-
-const secureStoreMock = vi.hoisted(() => ({
-  getItemAsync: vi.fn(async (): Promise<string | null> => null),
-  setItemAsync: vi.fn(async (): Promise<void> => undefined),
-  deleteItemAsync: vi.fn(async (): Promise<void> => undefined),
-}));
-
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: vi.fn(() => identityMock.value),
+  useCurrentUserId: () => ({
+    userId: mocks.userId,
+    owner: getAuthenticatedOwner(),
+    isLoading: false,
+    isError: false,
+  }),
 }));
-
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: vi.fn(() => authMock.value),
+  useAuth: () => ({ authEpoch: currentAuthEpoch(), isSigningOut: isSignOutActive() }),
 }));
-
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: async (key: string) => mocks.hint.get(key) ?? null,
+  setItemAsync: mocks.setHint,
+}));
 vi.mock('@/lib/persist/encrypted-kv', () => ({
-  getItem: kvMock.getItem,
-  setItem: kvMock.setItem,
-  removeItem: kvMock.removeItem,
-  clearScope: kvMock.clearScope,
-  clearScopePrefix: kvMock.clearScopePrefix,
+  getItem: mocks.get,
+  setItem: mocks.set,
+  removeItem: async (scope: string, _key: string, guard?: () => boolean) => {
+    if (!guard || guard()) {
+      mocks.store.delete(scope);
+    }
+  },
+  clearScopePrefix: async (prefix: string, guard?: () => boolean) => {
+    if (guard && !guard()) {
+      return;
+    }
+    for (const scope of mocks.store.keys()) {
+      if (scope.startsWith(prefix)) {
+        mocks.store.delete(scope);
+      }
+    }
+  },
 }));
 
-vi.mock('@tanstack/react-query-persist-client', () => ({
-  persistQueryClientSubscribe: persistQueryClientSubscribeMock,
-  persistQueryClientRestore: persistQueryClientRestoreMock,
-}));
-
-vi.mock('expo-secure-store', () => secureStoreMock);
-
+const RECENT_KEY = [['cliSessionsV2', 'recentRepositories'], { type: 'query' }];
+let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+function prove(userId: string) {
+  bumpAuthEpoch();
+  beginAuthenticatedOwner();
+  mocks.userId = userId;
+  queryClient.clear();
+  queryClient.setQueryData(GET_ME_QUERY_KEY, { id: userId });
+  confirmAuthenticatedOwner(getAuthenticatedOwner(), userId);
+}
+function seed(userId: string, text: string) {
+  const blob = makePersistedClient({ id: userId });
+  const fixture = blob.clientState.queries[0];
+  if (!fixture) {
+    throw new Error('Missing query fixture');
+  }
+  blob.clientState.queries.push({
+    ...fixture,
+    queryHash: hashKey(RECENT_KEY),
+    queryKey: RECENT_KEY,
+    state: { ...fixture.state, data: { text } },
+  });
+  mocks.store.set(`cache:${userId}:1`, JSON.stringify(blob));
+}
+async function mount() {
+  await act(async () => {
+    renderer = TestRenderer.create(createElement(CachePersistenceMount));
+  });
+}
+async function update() {
+  await act(async () => {
+    renderer?.update(createElement(CachePersistenceMount));
+  });
+}
 beforeEach(() => {
   vi.clearAllMocks();
   resetReadCacheForTests();
-  identityMock.value = { userId: undefined, isLoading: true, isError: false };
-  authMock.value = { authEpoch: 0, isSigningOut: false };
-  kvMock.getItem.mockResolvedValue(null);
-  kvMock.setItem.mockResolvedValue(undefined);
-  kvMock.removeItem.mockResolvedValue(undefined);
-  kvMock.clearScope.mockResolvedValue(undefined);
-  kvMock.clearScopePrefix.mockResolvedValue(undefined);
-  secureStoreMock.getItemAsync.mockResolvedValue(null);
-  secureStoreMock.setItemAsync.mockResolvedValue(undefined);
-  secureStoreMock.deleteItemAsync.mockResolvedValue(undefined);
-  persistQueryClientSubscribeMock.mockReturnValue(unsubscribeMock);
-  persistQueryClientRestoreMock.mockResolvedValue(undefined);
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
-function mount(): TestRenderer.ReactTestRenderer {
-  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
-    current: undefined,
-  };
-  act(() => {
-    rendererRef.current = TestRenderer.create(createElement(CachePersistenceMount));
+  beginAuthenticatedOwner();
+  queryClient.clear();
+  mocks.userId = undefined;
+  mocks.store.clear();
+  mocks.hint.clear();
+  mocks.get.mockImplementation(async (scope: string) => mocks.store.get(scope) ?? null);
+  // eslint-disable-next-line max-params -- mirror the guarded KV write API
+  mocks.set.mockImplementation(
+    async (scope: string, _key: string, value: string, guard?: () => boolean) => {
+      if (!guard || guard()) {
+        mocks.store.set(scope, value);
+      }
+    }
+  );
+  mocks.setHint.mockImplementation(async (key: string, value: string) => {
+    mocks.hint.set(key, value);
   });
-  if (!rendererRef.current) {
-    throw new Error('CachePersistenceMount did not render');
-  }
-  return rendererRef.current;
-}
-
-async function flushMicrotasks(): Promise<void> {
+});
+afterEach(async () => {
   await act(async () => {
-    await new Promise(resolve => {
-      setTimeout(resolve, 0);
-    });
+    renderer?.unmount();
   });
-}
+  queryClient.clear();
+});
 
-function latestPersistOptions(): PersistedQueryClientSaveOptions | undefined {
-  return persistQueryClientSubscribeMock.mock.calls.at(-1)?.[0];
-}
-
-function mutationLike(state: Partial<Mutation['state']>): Mutation {
-  return { state } as unknown as Mutation;
-}
-
-describe('CachePersistenceMount', () => {
-  it('resolves identity, writes the hint, and subscribes one scoped persister', async () => {
-    identityMock.value = { userId: 'u1', isLoading: false, isError: false };
-    const renderer = mount();
-    await flushMicrotasks();
-
-    // The identity hint for the next cold start was written via the fenced helper.
-    expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(ACTIVE_USER_ID_KEY, 'u1');
-
-    // One mounted subscription with the allowlist-only dehydrate filters. The
-    // root layout already performed the only cold-start restore, so the mount
-    // subscribes without restoring — no `maxAge` and no restore promise. The
-    // schema version lives in the scope, so no `buster` is passed.
-    expect(persistQueryClientSubscribeMock).toHaveBeenCalledTimes(1);
-    expect(latestPersistOptions()).toMatchObject({
-      queryClient,
-      dehydrateOptions: {
-        shouldDehydrateQuery: shouldPersistReadCacheQuery,
-        shouldDehydrateMutation: expect.any(Function),
-      },
-    });
-    expect(latestPersistOptions()?.buster).toBeUndefined();
-
-    // The persister is bound to exactly the user's scope for the schema.
-    await latestPersistOptions()?.persister.restoreClient();
-    expect(kvMock.getItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
-
-    // No cold-start restore claimed a scope, so nothing is cleared.
-    expect(kvMock.clearScope).not.toHaveBeenCalled();
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('regression: a failed identity-hint write never escapes as an unhandled rejection', async () => {
-    const unhandled: unknown[] = [];
-    const onUnhandledRejection = (reason: unknown) => {
-      unhandled.push(reason);
-    };
-    process.on('unhandledRejection', onUnhandledRejection);
-
-    try {
-      identityMock.value = { userId: 'u1', isLoading: false, isError: false };
-      secureStoreMock.setItemAsync.mockRejectedValueOnce(new Error('keychain unavailable'));
-      const renderer = mount();
-      await flushMicrotasks();
-
-      // The hint write was still attempted even though SecureStore rejects.
-      expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(ACTIVE_USER_ID_KEY, 'u1');
-      // Give the runtime a turn to flag an unhandled rejection if the mount
-      // ever fires the write without containing it.
-      await new Promise(resolve => {
-        setImmediate(resolve);
-      });
-      expect(unhandled).toEqual([]);
-
-      act(() => {
-        renderer.unmount();
-      });
-    } finally {
-      process.off('unhandledRejection', onUnhandledRejection);
-    }
-  });
-
-  it('does nothing while identity is loading', () => {
-    identityMock.value = { userId: undefined, isLoading: true, isError: false };
-    const renderer = mount();
-
-    expect(persistQueryClientSubscribeMock).not.toHaveBeenCalled();
-    expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('does nothing when identity resolution errored', () => {
-    identityMock.value = { userId: undefined, isLoading: false, isError: true };
-    const renderer = mount();
-
-    expect(persistQueryClientSubscribeMock).not.toHaveBeenCalled();
-    expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('does nothing before a userId resolves', () => {
-    identityMock.value = { userId: undefined, isLoading: false, isError: false };
-    const renderer = mount();
-
-    expect(persistQueryClientSubscribeMock).not.toHaveBeenCalled();
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('keeps a restored scope that matches the authoritative user', async () => {
-    secureStoreMock.getItemAsync.mockResolvedValue('u1');
+describe('CachePersistenceMount owner proof', () => {
+  it('does not restore or publish content from an active-user-id hint alone', async () => {
+    seed('a', 'private a');
+    mocks.hint.set(ACTIVE_USER_ID_KEY, 'a');
     await restorePersistedCacheOnColdStart(queryClient);
-
-    const clearSpy = vi.spyOn(queryClient, 'clear');
-    identityMock.value = { userId: 'u1', isLoading: false, isError: false };
-    const renderer = mount();
-    await flushMicrotasks();
-
-    // The mount consumed the cold-start takeover and did not clear anything.
-    expect(takeOverColdStartRestore()).toBeNull();
-    expect(clearSpy).not.toHaveBeenCalled();
-    expect(kvMock.clearScope).not.toHaveBeenCalled();
-    expect(persistQueryClientSubscribeMock).toHaveBeenCalledTimes(1);
-
-    clearSpy.mockRestore();
-    act(() => {
-      renderer.unmount();
-    });
+    await mount();
+    expect(queryClient.getQueryData(RECENT_KEY)).toBeUndefined();
+    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
+    expect(mocks.get).not.toHaveBeenCalled();
   });
-
-  it('clears a mismatched restored scope and the query client before rescoping', async () => {
-    secureStoreMock.getItemAsync.mockResolvedValue('user-a');
+  it('restores matching owner content without replacing authoritative getMe', async () => {
+    seed('a', 'private a');
+    prove('a');
+    await mount();
+    expect(queryClient.getQueryData(RECENT_KEY)).toEqual({ text: 'private a' });
+    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'a' });
+    expect(mocks.hint.get(ACTIVE_USER_ID_KEY)).toBe('a');
+  });
+  it('ignores a mismatched cold hint and restores only the proved account', async () => {
+    seed('a', 'private a');
+    seed('b', 'private b');
+    mocks.hint.set(ACTIVE_USER_ID_KEY, 'a');
     await restorePersistedCacheOnColdStart(queryClient);
-
-    const clearSpy = vi.spyOn(queryClient, 'clear');
-    identityMock.value = { userId: 'user-b', isLoading: false, isError: false };
-    const renderer = mount();
-    await flushMicrotasks();
-
-    // Authoritative identity wins: the other account's restored data and the
-    // query client are cleared before the new scope subscribes.
-    expect(takeOverColdStartRestore()).toBeNull();
-    expect(clearSpy).toHaveBeenCalledTimes(1);
-    expect(kvMock.clearScope).toHaveBeenCalledWith('cache:user-a:1');
-    await latestPersistOptions()?.persister.restoreClient();
-    expect(kvMock.getItem).toHaveBeenCalledWith('cache:user-b:1', 'read-cache');
-
-    clearSpy.mockRestore();
-    act(() => {
-      renderer.unmount();
-    });
+    prove('b');
+    await mount();
+    expect(queryClient.getQueryData(RECENT_KEY)).toEqual({ text: 'private b' });
+    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'b' });
   });
-
-  it('unsubscribes the previous persister when the user changes', async () => {
-    identityMock.value = { userId: 'u1', isLoading: false, isError: false };
-    const renderer = mount();
-    await flushMicrotasks();
-    expect(persistQueryClientSubscribeMock).toHaveBeenCalledTimes(1);
-
-    identityMock.value = { userId: 'u2', isLoading: false, isError: false };
-    act(() => {
-      renderer.update(createElement(CachePersistenceMount));
+  it('drops an old account restore when B signs in during its cache read', async () => {
+    seed('a', 'private a');
+    seed('b', 'private b');
+    const a = mocks.store.get('cache:a:1') ?? null;
+    const gate = Promise.withResolvers<string | null>();
+    mocks.get.mockReturnValueOnce(gate.promise);
+    prove('a');
+    await mount();
+    await act(async () => {
+      prove('b');
     });
-    await flushMicrotasks();
-
-    expect(persistQueryClientSubscribeMock).toHaveBeenCalledTimes(2);
-    expect(unsubscribeMock).toHaveBeenCalled();
-    act(() => {
-      renderer.unmount();
+    await update();
+    await act(async () => {
+      gate.resolve(a);
     });
+    expect(queryClient.getQueryData(RECENT_KEY)).toEqual({ text: 'private b' });
+    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'b' });
   });
-
-  it('clears the previous account cache scope when the user changes', async () => {
-    identityMock.value = { userId: 'u1', isLoading: false, isError: false };
-    const renderer = mount();
-    await flushMicrotasks();
-    expect(kvMock.clearScopePrefix).not.toHaveBeenCalled();
-
-    // A direct account switch (no sign-out): the mount must drop the old
-    // account's read-cache scope before subscribing for the new account.
-    identityMock.value = { userId: 'u2', isLoading: false, isError: false };
-    act(() => {
-      renderer.update(createElement(CachePersistenceMount));
-    });
-    await flushMicrotasks();
-
-    expect(kvMock.clearScopePrefix).toHaveBeenCalledWith('cache:u1:');
-    act(() => {
-      renderer.unmount();
-    });
+  it('keeps restoration available after a failed hint write', async () => {
+    seed('a', 'private a');
+    prove('a');
+    mocks.setHint.mockRejectedValueOnce(new Error('temporary keychain error'));
+    await mount();
+    expect(queryClient.getQueryData(RECENT_KEY)).toEqual({ text: 'private a' });
   });
-
-  it('unsubscribes the persister on unmount', async () => {
-    identityMock.value = { userId: 'u1', isLoading: false, isError: false };
-    const renderer = mount();
-    await flushMicrotasks();
-
-    act(() => {
-      renderer.unmount();
-    });
-
-    expect(unsubscribeMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('denies every mutation from the persisted client, including paused ones', async () => {
-    identityMock.value = { userId: 'u1', isLoading: false, isError: false };
-    const renderer = mount();
-    await flushMicrotasks();
-
-    const shouldDehydrateMutation =
-      latestPersistOptions()?.dehydrateOptions?.shouldDehydrateMutation;
-    expect(shouldDehydrateMutation).toBeTypeOf('function');
-    // The library default dehydrates paused mutations; the mount denies them
-    // so a restored read cache can never replay one (never-replay).
-    expect(shouldDehydrateMutation?.(mutationLike({ isPaused: true }))).toBe(false);
-    expect(shouldDehydrateMutation?.(mutationLike({ isPaused: false }))).toBe(false);
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('unsubscribes and resubscribes when the auth epoch changes and the user stays equal', async () => {
-    identityMock.value = { userId: 'u1', isLoading: false, isError: false };
-    authMock.value = { authEpoch: 1, isSigningOut: false };
-    const renderer = mount();
-    await flushMicrotasks();
-    expect(persistQueryClientSubscribeMock).toHaveBeenCalledTimes(1);
-
-    // The epoch bumps (sign-out or newer sign-in) while the authoritative user
-    // id stays equal: the mount must tear down the old persister and
-    // resubscribe so the new subscription is fenced on the current epoch.
-    authMock.value = { authEpoch: 2, isSigningOut: false };
-    act(() => {
-      renderer.update(createElement(CachePersistenceMount));
-    });
-    await flushMicrotasks();
-
-    expect(persistQueryClientSubscribeMock).toHaveBeenCalledTimes(2);
-    expect(unsubscribeMock).toHaveBeenCalled();
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('regression: sign-out unsubscribes the mount and a query update during delayed cleanup never rewrites the old user blob', async () => {
-    // The old user id stays cached for the whole sign-out teardown (the query
-    // client is only cleared at the end of sign-out).
-    queryClient.setQueryData(GET_ME_QUERY_KEY, { id: 'u1' });
-    identityMock.value = { userId: 'u1', isLoading: false, isError: false };
-    authMock.value = { authEpoch: 0, isSigningOut: false };
-    const renderer = mount();
-    await flushMicrotasks();
-    expect(persistQueryClientSubscribeMock).toHaveBeenCalledTimes(1);
-    const stalePersister = latestPersistOptions()?.persister;
-    expect(stalePersister).toBeDefined();
-
-    // Delay the sign-out scope clear so a query update can land mid-teardown.
-    const cleanupGate: { release: (() => void) | null } = { release: null };
-    const cleanupHeld = new Promise<void>(resolve => {
-      cleanupGate.release = resolve;
-    });
-    kvMock.clearScopePrefix.mockImplementationOnce(async () => {
-      await cleanupHeld;
-    });
-
-    // Sign-out starts: the module epoch bumps and the reactive sign-out state
-    // flips in the same render while the old user id is still cached.
-    bumpAuthEpoch();
+  it('unsubscribes on sign-out and never rewrites the cleared old scope', async () => {
+    prove('a');
+    await mount();
     setSignOutActive(true);
-    authMock.value = { authEpoch: 1, isSigningOut: true };
-    act(() => {
-      renderer.update(createElement(CachePersistenceMount));
+    await update();
+    mocks.store.clear();
+    queryClient.setQueryData(RECENT_KEY, { text: 'late a' });
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
     });
-    await flushMicrotasks();
-
-    // The mount tore down the old subscription and refused to resubscribe.
-    expect(unsubscribeMock).toHaveBeenCalledTimes(1);
-    expect(persistQueryClientSubscribeMock).toHaveBeenCalledTimes(1);
-
-    // The sign-out cleanup starts and is held open.
-    const cleanupPromise = clearCacheScopeForSignOut('u1');
-    await vi.waitFor(() => {
-      expect(kvMock.clearScopePrefix).toHaveBeenCalled();
-    });
-
-    // A query update fires a throttled save from the torn-down subscription
-    // while cleanup is still in flight: no cache blob may be written.
-    await stalePersister?.persistClient(makePersistedClient({ id: 'u1' }));
-    expect(kvMock.setItem).not.toHaveBeenCalled();
-
-    cleanupGate.release?.();
-    await cleanupPromise;
-
-    // Even a persister created at the CURRENT epoch with a matching cached
-    // user id (the resubscription the race used to create) refuses to publish
-    // while sign-out is active, so cleanup is final: a save after the clear
-    // also writes nothing.
-    const freshPersister = createReadCachePersister({
-      queryClient,
-      userId: 'u1',
-      epoch: currentAuthEpoch(),
-    });
-    await freshPersister.persistClient(makePersistedClient({ id: 'u1' }));
-    expect(kvMock.setItem).not.toHaveBeenCalled();
-
-    act(() => {
-      renderer.unmount();
-    });
-    queryClient.removeQueries({ queryKey: GET_ME_QUERY_KEY });
+    expect(mocks.store.size).toBe(0);
   });
-
-  it('feeds one flag to both consumers: the React subscriber and the cache write fence', async () => {
-    queryClient.setQueryData(GET_ME_QUERY_KEY, { id: 'u1' });
-    const persister = createReadCachePersister({
-      queryClient,
-      userId: 'u1',
-      epoch: currentAuthEpoch(),
+  it('does not hydrate after unmount while the cache read is pending', async () => {
+    seed('a', 'private a');
+    const a = mocks.store.get('cache:a:1') ?? null;
+    const gate = Promise.withResolvers<string | null>();
+    mocks.get.mockReturnValueOnce(gate.promise);
+    prove('a');
+    await mount();
+    await act(async () => {
+      renderer?.unmount();
+      gate.resolve(a);
     });
-
-    // The exact subscription the auth context uses for `isSigningOut`.
-    const observed: boolean[] = [];
-    function SignOutConsumer(): null {
-      observed.push(useSyncExternalStore(subscribeSignOutActive, isSignOutActive));
-      return null;
-    }
-    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
-      current: undefined,
-    };
-    act(() => {
-      rendererRef.current = TestRenderer.create(createElement(SignOutConsumer));
-    });
-    expect(observed.at(-1)).toBe(false);
-
-    // ONE setter: there is no second flag to keep in sync by hand.
-    act(() => {
-      setSignOutActive(true);
-    });
-    // The React consumer re-rendered with the in-progress state.
-    expect(observed.at(-1)).toBe(true);
-
-    // The write path reads the same flag and refuses the KV write.
-    await persister.persistClient(makePersistedClient({ id: 'u1' }));
-    expect(kvMock.setItem).not.toHaveBeenCalled();
-
-    // Clearing the one flag opens both consumers again.
-    act(() => {
-      setSignOutActive(false);
-    });
-    expect(observed.at(-1)).toBe(false);
-    await persister.persistClient(makePersistedClient({ id: 'u1' }));
-    expect(kvMock.setItem).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      rendererRef.current?.unmount();
-    });
-    queryClient.removeQueries({ queryKey: GET_ME_QUERY_KEY });
+    expect(queryClient.getQueryData(RECENT_KEY)).toBeUndefined();
   });
 });

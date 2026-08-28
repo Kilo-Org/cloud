@@ -786,6 +786,9 @@ importers:
       '@emoji-mart/react':
         specifier: 1.1.1
         version: 1.1.1(emoji-mart@5.6.0)(react@19.2.6)
+      '@gitbeaker/requester-utils':
+        specifier: 43.8.0
+        version: 43.8.0
       '@gitbeaker/rest':
         specifier: 43.8.0
         version: 43.8.0

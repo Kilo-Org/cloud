@@ -44,6 +44,7 @@
     "@chat-adapter/state-redis": "4.36.0",
     "@emoji-mart/data": "1.2.1",
     "@emoji-mart/react": "1.1.1",
+    "@gitbeaker/requester-utils": "43.8.0",
     "@gitbeaker/rest": "43.8.0",
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/auto-routing-contracts": "workspace:*",

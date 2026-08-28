@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "កិច្ចការមុនកំពុងបញ្ចប់នៅឡើយ។ សូមរង់ចាំបន្តិច។",
       "serviceUnavailable": "សេវាកម្មមិនអាចប្រើបាននៅពេលនេះទេ។ សូមព្យាយាមម្តងទៀត។",
       "connectionTrouble": "បញ្ហាការតភ្ជាប់។ សូមព្យាយាមម្តងទៀតក្នុងពេលបន្តិចទៀត។",
-      "modelUnavailable": "ម៉ូដែលនេះមិនអាចប្រើជាមួយ Cloud Agent បានទេ។ សូមជ្រើសរើសម៉ូដែលផ្សេង ហើយព្យាយាមម្តងទៀត។"
+      "modelUnavailable": "ម៉ូដែលនេះមិនអាចប្រើជាមួយ Cloud Agent បានទេ។ សូមជ្រើសរើសម៉ូដែលផ្សេង ហើយព្យាយាមម្តងទៀត។",
+      "cancelQueuedFailed": "មិនអាចលុបចោលសារបានទេ។",
+      "cancelQueuedRestoreAvailable": "បានលុបចោលសារ។ ប៉ះ ស្តារ ដើម្បីនាំសារត្រឡប់ទៅអ្នកតែង។",
+      "cancelQueuedRestored": "បានលុបចោលសារ។ ការជំរុញបានត្រឡប់មកអ្នកតែងវិញហើយ។",
+      "cancelQueuedUpgradeRequired": "ការលុបចោលសារដែលបានដាក់ក្នុងជួរត្រូវការ Kilo CLI កំណែថ្មីជាងនេះ។ ធ្វើបច្ចុប្បន្នភាព Kilo CLI ហើយភ្ជាប់ឡើងវិញ។"
     },
     "remoteSession": {
       "failedToCreate": "បរាជ័យក្នុងការបង្កើតវគ្គពីចម្ងាយ",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "សារបានដាក់ក្នុងជួរ",
       "userMessage": "សារអ្នកប្រើ",
       "assistantMessage": "សារជំនួយការ",
-      "longPressHint": "ចុចឱ្យជាប់សម្រាប់ព័ត៌មានលម្អិតនៃសារ"
+      "longPressHint": "ចុចឱ្យជាប់សម្រាប់ព័ត៌មានលម្អិតនៃសារ",
+      "cancelQueued": "លុបចោលសារ",
+      "cancelQueuedAccessibility": "លុបចោលសារដែលបានដាក់ក្នុងជួរ",
+      "restoreQueued": "ស្តារ",
+      "restoreQueuedAccessibility": "ស្តារសារដែលបានលុបចោលទៅអ្នកតែង"
     },
     "olderMessages": {
       "arrived": "បានផ្ទុកសារមុនៗ",

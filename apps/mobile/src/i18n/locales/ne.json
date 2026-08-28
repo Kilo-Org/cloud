@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "अघिल्लो कार्य अझै समाप्त हुँदैछ। कृपया एक क्षण पर्खनुहोस्।",
       "serviceUnavailable": "सेवा अहिले उपलब्ध छैन। फेरि प्रयास गर्नुहोस्।",
       "connectionTrouble": "जडान समस्या। कृपया केही क्षणमा फेरि प्रयास गर्नुहोस्।",
-      "modelUnavailable": "यो मोडेल Cloud Agent का लागि उपलब्ध छैन। अर्को मोडेल छानेर फेरि प्रयास गर्नुहोस्।"
+      "modelUnavailable": "यो मोडेल Cloud Agent का लागि उपलब्ध छैन। अर्को मोडेल छानेर फेरि प्रयास गर्नुहोस्।",
+      "cancelQueuedFailed": "सन्देश रद्द गर्न सकिएन।",
+      "cancelQueuedRestoreAvailable": "सन्देश रद्द गरियो। यसलाई सन्देश लेख्ने ठाउँमा फर्काउन “पुनः स्थापित गर्नुहोस्” मा ट्याप गर्नुहोस्।",
+      "cancelQueuedRestored": "सन्देश रद्द गरियो। प्रम्प्ट सन्देश लेख्ने ठाउँमा फर्किएको छ।",
+      "cancelQueuedUpgradeRequired": "लाममा रहेका सन्देशहरू रद्द गर्न नयाँ Kilo CLI चाहिन्छ। Kilo CLI अद्यावधिक गरेर पुनः जडान गर्नुहोस्।"
     },
     "remoteSession": {
       "failedToCreate": "दूरस्थ सत्र सिर्जना गर्न असफल भयो",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "सन्देश लाइनमा राखियो",
       "userMessage": "प्रयोगकर्ता सन्देश",
       "assistantMessage": "सहायक सन्देश",
-      "longPressHint": "सन्देश विवरणका लागि लामो थिच्नुहोस्"
+      "longPressHint": "सन्देश विवरणका लागि लामो थिच्नुहोस्",
+      "cancelQueued": "सन्देश रद्द गर्नुहोस्",
+      "cancelQueuedAccessibility": "लाममा रहेको सन्देश रद्द गर्नुहोस्",
+      "restoreQueued": "पुनः स्थापित गर्नुहोस्",
+      "restoreQueuedAccessibility": "रद्द गरिएको सन्देशलाई सन्देश लेख्ने ठाउँमा पुनः स्थापित गर्नुहोस्"
     },
     "olderMessages": {
       "arrived": "पहिलेका सन्देशहरू लोड भयो",

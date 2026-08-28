@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Fyrra verkefni er enn að klárast. Bíddu augnablik.",
       "serviceUnavailable": "Þjónustan er ekki tiltæk núna. Reyndu aftur.",
       "connectionTrouble": "Tengingarvandræði. Reyndu aftur eftir augnablik.",
-      "modelUnavailable": "Þetta líkan er ekki tiltækt fyrir Cloud Agent. Veldu annað líkan og reyndu aftur."
+      "modelUnavailable": "Þetta líkan er ekki tiltækt fyrir Cloud Agent. Veldu annað líkan og reyndu aftur.",
+      "cancelQueuedFailed": "Ekki tókst að hætta við skilaboðin.",
+      "cancelQueuedRestoreAvailable": "Hætt var við skilaboðin. Bankaðu á Endurheimta til að færa þau aftur í ritilinn.",
+      "cancelQueuedRestored": "Hætt var við skilaboðin. Skilaboðin eru aftur í ritlinum.",
+      "cancelQueuedUpgradeRequired": "Til að hætta við skilaboð í biðröð þarf nýrri Kilo CLI. Uppfærðu Kilo CLI og tengdu aftur."
     },
     "remoteSession": {
       "failedToCreate": "Ekki tókst að búa til fjarlota lotu",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Skilaboð sett í biðröð",
       "userMessage": "Skilaboð frá notanda",
       "assistantMessage": "Skilaboð frá aðstoðarmanni",
-      "longPressHint": "Haltu lengi inni fyrir skilaboðaupplýsingar"
+      "longPressHint": "Haltu lengi inni fyrir skilaboðaupplýsingar",
+      "cancelQueued": "Hætta við skilaboð",
+      "cancelQueuedAccessibility": "Hætta við skilaboð í biðröð",
+      "restoreQueued": "Endurheimta",
+      "restoreQueuedAccessibility": "Endurheimta afturkölluð skilaboð í ritilinn"
     },
     "olderMessages": {
       "arrived": "Eldri skilaboð hlaðin",

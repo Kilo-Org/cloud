@@ -1688,7 +1688,11 @@
       "previousTaskFinishing": "De vorige taak is nog bezig. Even geduld.",
       "serviceUnavailable": "De service is momenteel niet beschikbaar. Probeer het opnieuw.",
       "connectionTrouble": "Verbindingsprobleem. Probeer het over een moment opnieuw.",
-      "modelUnavailable": "Dit model is niet beschikbaar voor Cloud Agent. Kies een ander model en probeer het opnieuw."
+      "modelUnavailable": "Dit model is niet beschikbaar voor Cloud Agent. Kies een ander model en probeer het opnieuw.",
+      "cancelQueuedFailed": "Bericht kon niet worden geannuleerd.",
+      "cancelQueuedRestoreAvailable": "Bericht geannuleerd. Tik op Herstellen om het terug te zetten in het berichtinvoerveld.",
+      "cancelQueuedRestored": "Bericht geannuleerd. De prompt staat weer in het berichtinvoerveld.",
+      "cancelQueuedUpgradeRequired": "Berichten in de wachtrij annuleren vereist een nieuwere Kilo CLI. Werk Kilo CLI bij en maak opnieuw verbinding."
     },
     "remoteSession": {
       "failedToCreate": "Externe sessie maken mislukt",
@@ -2009,7 +2013,11 @@
       "queuedAccessibility": "Bericht in wachtrij",
       "userMessage": "Gebruikersbericht",
       "assistantMessage": "Assistentbericht",
-      "longPressHint": "Lang indrukken voor berichtdetails"
+      "longPressHint": "Lang indrukken voor berichtdetails",
+      "cancelQueued": "Bericht annuleren",
+      "cancelQueuedAccessibility": "Bericht in de wachtrij annuleren",
+      "restoreQueued": "Herstellen",
+      "restoreQueuedAccessibility": "Geannuleerd bericht herstellen naar het berichtinvoerveld"
     },
     "olderMessages": {
       "arrived": "Eerdere berichten geladen",

@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
       "serviceUnavailable": "Huduma haipatikani sasa hivi. Tafadhali jaribu tena.",
       "connectionTrouble": "Tatizo la muunganisho. Tafadhali jaribu tena baada ya muda mfupi.",
-      "modelUnavailable": "Mfano huu haupatikani kwa Cloud Agent. Chagua mfano mwingine na ujaribu tena."
+      "modelUnavailable": "Mfano huu haupatikani kwa Cloud Agent. Chagua mfano mwingine na ujaribu tena.",
+      "cancelQueuedFailed": "Imeshindwa kughairi ujumbe.",
+      "cancelQueuedRestoreAvailable": "Ujumbe umeghairiwa. Gusa Rejesha ili kuurudisha kwenye sehemu ya kuandika ujumbe.",
+      "cancelQueuedRestored": "Ujumbe umeghairiwa. Maagizo yamerudi kwenye sehemu ya kuandika ujumbe.",
+      "cancelQueuedUpgradeRequired": "Kughairi ujumbe ulio kwenye foleni kunahitaji Kilo CLI mpya zaidi. Sasisha Kilo CLI na unganisha tena."
     },
     "remoteSession": {
       "failedToCreate": "Imeshindwa kuunda kikao cha mbali",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Ujumbe umepangwa",
       "userMessage": "Ujumbe wa mtumiaji",
       "assistantMessage": "Ujumbe wa msaidizi",
-      "longPressHint": "Bonyeza kwa muda mrefu kwa maelezo ya ujumbe"
+      "longPressHint": "Bonyeza kwa muda mrefu kwa maelezo ya ujumbe",
+      "cancelQueued": "Ghairi ujumbe",
+      "cancelQueuedAccessibility": "Ghairi ujumbe ulio kwenye foleni",
+      "restoreQueued": "Rejesha",
+      "restoreQueuedAccessibility": "Rejesha ujumbe ulioghairiwa kwenye sehemu ya kuandika ujumbe"
     },
     "olderMessages": {
       "arrived": "Ujumbe wa awali umepakiwa",

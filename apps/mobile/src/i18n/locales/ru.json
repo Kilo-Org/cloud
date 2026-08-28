@@ -1704,7 +1704,11 @@
       "previousTaskFinishing": "Предыдущая задача ещё завершается. Подождите немного.",
       "serviceUnavailable": "Сервис сейчас недоступен. Попробуйте ещё раз.",
       "connectionTrouble": "Проблемы с подключением. Повторите через мгновение.",
-      "modelUnavailable": "Эта модель недоступна для Cloud Agent. Выберите другую модель и попробуйте снова."
+      "modelUnavailable": "Эта модель недоступна для Cloud Agent. Выберите другую модель и попробуйте снова.",
+      "cancelQueuedFailed": "Не удалось отменить сообщение.",
+      "cancelQueuedRestoreAvailable": "Сообщение отменено. Нажмите «Восстановить», чтобы вернуть его в поле ввода.",
+      "cancelQueuedRestored": "Сообщение отменено. Запрос снова в поле ввода.",
+      "cancelQueuedUpgradeRequired": "Для отмены сообщений в очереди требуется более новая версия Kilo CLI. Обновите Kilo CLI и подключитесь заново."
     },
     "remoteSession": {
       "failedToCreate": "Не удалось создать удаленный сеанс",
@@ -2027,7 +2031,11 @@
       "queuedAccessibility": "Сообщение в очереди",
       "userMessage": "Сообщение пользователя",
       "assistantMessage": "Сообщение ассистента",
-      "longPressHint": "Долгое нажатие для сведений о сообщении"
+      "longPressHint": "Долгое нажатие для сведений о сообщении",
+      "cancelQueued": "Отменить сообщение",
+      "cancelQueuedAccessibility": "Отменить сообщение в очереди",
+      "restoreQueued": "Восстановить",
+      "restoreQueuedAccessibility": "Восстановить отмененное сообщение в поле ввода"
     },
     "olderMessages": {
       "arrived": "Более ранние сообщения загружены",

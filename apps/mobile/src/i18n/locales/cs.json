@@ -2172,7 +2172,11 @@
       "previousTaskFinishing": "Předchozí úloha stále běží. Počkejte prosím chvíli.",
       "serviceUnavailable": "Služba je právě nedostupná. Zkuste to prosím znovu.",
       "connectionTrouble": "Problém s připojením. Zkuste to prosím za chvíli.",
-      "modelUnavailable": "Tento model není pro Cloud Agent dostupný. Vyberte jiný model a zkuste to znovu."
+      "modelUnavailable": "Tento model není pro Cloud Agent dostupný. Vyberte jiný model a zkuste to znovu.",
+      "cancelQueuedFailed": "Zprávu se nepodařilo zrušit.",
+      "cancelQueuedRestoreAvailable": "Zpráva zrušena. Klepnutím na Obnovit ji vrátíte do pole pro zprávu.",
+      "cancelQueuedRestored": "Zpráva zrušena. Dotaz je zpět v poli pro zprávu.",
+      "cancelQueuedUpgradeRequired": "Rušení zpráv ve frontě vyžaduje novější Kilo CLI. Aktualizujte Kilo CLI a připojte se znovu."
     },
     "remoteSession": {
       "failedToCreate": "Vzdálenou relaci se nepodařilo vytvořit",
@@ -2495,7 +2499,11 @@
       "queuedAccessibility": "Zpráva ve frontě",
       "userMessage": "Uživatelská zpráva",
       "assistantMessage": "Zpráva asistenta",
-      "longPressHint": "Dlouhým stisknutím zobrazíte podrobnosti zprávy"
+      "longPressHint": "Dlouhým stisknutím zobrazíte podrobnosti zprávy",
+      "cancelQueued": "Zrušit zprávu",
+      "cancelQueuedAccessibility": "Zrušit zprávu ve frontě",
+      "restoreQueued": "Obnovit",
+      "restoreQueuedAccessibility": "Obnovit zrušenou zprávu do pole pro zprávu"
     },
     "olderMessages": {
       "arrived": "Načteny dřívější zprávy",

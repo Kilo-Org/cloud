@@ -1614,7 +1614,11 @@
       "previousTaskFinishing": "La tâche précédente est encore en cours. Veuillez patienter un instant.",
       "serviceUnavailable": "Le service est indisponible pour le moment. Veuillez réessayer.",
       "connectionTrouble": "Problème de connexion. Veuillez réessayer dans un instant.",
-      "modelUnavailable": "Ce modèle n'est pas disponible pour Cloud Agent. Choisissez un autre modèle et réessayez."
+      "modelUnavailable": "Ce modèle n'est pas disponible pour Cloud Agent. Choisissez un autre modèle et réessayez.",
+      "cancelQueuedFailed": "Impossible d'annuler le message.",
+      "cancelQueuedRestoreAvailable": "Message annulé. Touchez Restaurer pour le remettre dans le champ de saisie.",
+      "cancelQueuedRestored": "Message annulé. Le prompt est de nouveau dans le champ de saisie.",
+      "cancelQueuedUpgradeRequired": "L'annulation des messages en attente nécessite une version plus récente de Kilo CLI. Mettez à jour Kilo CLI et reconnectez-vous."
     },
     "remoteSession": {
       "failedToCreate": "Échec de la création de la session distante",
@@ -1936,7 +1940,11 @@
       "queuedAccessibility": "Message en file d'attente",
       "userMessage": "Message de l'utilisateur",
       "assistantMessage": "Message de l'assistant",
-      "longPressHint": "Appui long pour les détails du message"
+      "longPressHint": "Appui long pour les détails du message",
+      "cancelQueued": "Annuler le message",
+      "cancelQueuedAccessibility": "Annuler le message en attente",
+      "restoreQueued": "Restaurer",
+      "restoreQueuedAccessibility": "Restaurer le message annulé dans le champ de saisie"
     },
     "olderMessages": {
       "arrived": "Messages précédents chargés",

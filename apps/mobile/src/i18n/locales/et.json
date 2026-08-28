@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Eelmine ülesanne on veel lõpetamisel. Palun oota hetk.",
       "serviceUnavailable": "Teenus pole praegu saadaval. Palun proovi uuesti.",
       "connectionTrouble": "Ühenduseprobleem. Palun proovi hetke pärast uuesti.",
-      "modelUnavailable": "See mudel pole Cloud Agenti jaoks saadaval. Vali teine mudel ja proovi uuesti."
+      "modelUnavailable": "See mudel pole Cloud Agenti jaoks saadaval. Vali teine mudel ja proovi uuesti.",
+      "cancelQueuedFailed": "Sõnumi tühistamine ebaõnnestus.",
+      "cancelQueuedRestoreAvailable": "Sõnum on tühistatud. Selle sõnumi sisestusväljale tagasitoomiseks puudutage nuppu „Taastage“.",
+      "cancelQueuedRestored": "Sõnum on tühistatud. Päring on tagasi sõnumi sisestusväljal.",
+      "cancelQueuedUpgradeRequired": "Ootel sõnumite tühistamiseks on vaja uuemat Kilo CLI-d. Uuendage Kilo CLI-d ja ühenduge uuesti."
     },
     "remoteSession": {
       "failedToCreate": "Kaugseansi loomine ebaõnnestus",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Sõnum järjekorras",
       "userMessage": "Kasutaja sõnum",
       "assistantMessage": "Abistaja sõnum",
-      "longPressHint": "Sõnumi üksikasjade jaoks vajuta pikalt"
+      "longPressHint": "Sõnumi üksikasjade jaoks vajuta pikalt",
+      "cancelQueued": "Tühistage sõnum",
+      "cancelQueuedAccessibility": "Tühistage ootel sõnum",
+      "restoreQueued": "Taastage",
+      "restoreQueuedAccessibility": "Taastage tühistatud sõnum sõnumi sisestusväljale"
     },
     "olderMessages": {
       "arrived": "Varasemad sõnumid laaditud",

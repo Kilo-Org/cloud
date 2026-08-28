@@ -1688,7 +1688,11 @@
       "previousTaskFinishing": "前のタスクがまだ終わっていません。少々お待ちください。",
       "serviceUnavailable": "サービスは現在利用できません。もう一度お試しください。",
       "connectionTrouble": "接続に問題があります。しばらくしてから再試行してください。",
-      "modelUnavailable": "このモデルはCloud Agentではご利用いただけません。別のモデルを選んで、もう一度お試しください。"
+      "modelUnavailable": "このモデルはCloud Agentではご利用いただけません。別のモデルを選んで、もう一度お試しください。",
+      "cancelQueuedFailed": "メッセージをキャンセルできませんでした。",
+      "cancelQueuedRestoreAvailable": "メッセージをキャンセルしました。「復元」をタップすると、メッセージ入力欄に戻せます。",
+      "cancelQueuedRestored": "メッセージをキャンセルしました。プロンプトがメッセージ入力欄に戻りました。",
+      "cancelQueuedUpgradeRequired": "送信待ちのメッセージをキャンセルするには、新しいKilo CLIが必要です。Kilo CLIを更新して再接続してください。"
     },
     "remoteSession": {
       "failedToCreate": "リモートセッションを作成できませんでした",
@@ -2009,7 +2013,11 @@
       "queuedAccessibility": "メッセージがキューに追加されました",
       "userMessage": "ユーザーメッセージ",
       "assistantMessage": "アシスタントメッセージ",
-      "longPressHint": "メッセージの詳細は長押し"
+      "longPressHint": "メッセージの詳細は長押し",
+      "cancelQueued": "メッセージをキャンセル",
+      "cancelQueuedAccessibility": "送信待ちのメッセージをキャンセル",
+      "restoreQueued": "復元",
+      "restoreQueuedAccessibility": "キャンセルしたメッセージをメッセージ入力欄に復元"
     },
     "olderMessages": {
       "arrived": "以前のメッセージを読み込みました",

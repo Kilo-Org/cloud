@@ -1688,7 +1688,11 @@
       "previousTaskFinishing": "上一个任务仍在进行中。请稍等片刻。",
       "serviceUnavailable": "服务当前不可用。请重试。",
       "connectionTrouble": "连接出现问题。请稍后重试。",
-      "modelUnavailable": "此模型不适用于 Cloud Agent。请选择其他模型重试。"
+      "modelUnavailable": "此模型不适用于 Cloud Agent。请选择其他模型重试。",
+      "cancelQueuedFailed": "无法取消消息。",
+      "cancelQueuedRestoreAvailable": "消息已取消。点击“恢复”将其放回编辑器。",
+      "cancelQueuedRestored": "消息已取消。提示词已放回编辑器。",
+      "cancelQueuedUpgradeRequired": "取消已排队的消息需要更新的 Kilo CLI。请更新 Kilo CLI 并重新连接。"
     },
     "remoteSession": {
       "failedToCreate": "创建远程会话失败",
@@ -2009,7 +2013,11 @@
       "queuedAccessibility": "消息已排队",
       "userMessage": "用户消息",
       "assistantMessage": "助手消息",
-      "longPressHint": "长按查看消息详情"
+      "longPressHint": "长按查看消息详情",
+      "cancelQueued": "取消消息",
+      "cancelQueuedAccessibility": "取消已排队的消息",
+      "restoreQueued": "恢复",
+      "restoreQueuedAccessibility": "将已取消的消息恢复到编辑器"
     },
     "olderMessages": {
       "arrived": "已加载较早的消息",

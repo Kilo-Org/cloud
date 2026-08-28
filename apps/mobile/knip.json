@@ -5,6 +5,7 @@
   "ignoreDependencies": [
     "expo-updates",
     "expo-system-ui",
+    "react-native-android-widget",
     "postcss",
     "eslint-plugin-sonarjs",
     "@sentry/cli"

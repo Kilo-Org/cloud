@@ -41,6 +41,10 @@ export function EditWebhookTriggerContent({
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
 
+  const { data: capabilities, isPending: isLoadingCapabilities } = useQuery(
+    trpc.webhookTriggers.capabilities.queryOptions({ organizationId })
+  );
+
   // Fetch trigger configuration
   const {
     data: triggerData,
@@ -110,6 +114,7 @@ export function EditWebhookTriggerContent({
       mode: (triggerData.mode ?? 'code') as AgentMode,
       model: triggerData.model ?? '',
       variant: triggerData.variant ?? undefined,
+      sandboxAllocation: triggerData.sandboxAllocation ?? undefined,
       promptTemplate: triggerData.promptTemplate,
       profileId: triggerData.profileId ?? undefined,
       autoCommit: triggerData.autoCommit ?? undefined,
@@ -162,6 +167,7 @@ export function EditWebhookTriggerContent({
         mode: formData.mode,
         model: formData.model,
         variant: formData.variant,
+        sandboxAllocation: formData.sandboxAllocation,
         promptTemplate: formData.promptTemplate,
         profileId: formData.profileId,
         autoCommit: formData.autoCommit ?? null,
@@ -381,6 +387,8 @@ export function EditWebhookTriggerContent({
           repositoriesError={repoError?.message}
           models={modelOptions}
           isLoadingModels={isLoadingModels}
+          canSetSandboxAllocation={capabilities?.canSetSandboxAllocation ?? false}
+          isLoadingCapabilities={isLoadingCapabilities}
           onSubmit={handleSubmit}
           onCancel={handleCancel}
           onDelete={handleDelete}

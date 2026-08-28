@@ -8,6 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ProfileSelector } from '@/components/cloud-agent/ProfileSelector';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import { ModeCombobox } from '@/components/shared/ModeCombobox';
@@ -44,6 +51,7 @@ export type TriggerFormData = {
   mode: AgentMode;
   model: string;
   variant?: string | null;
+  sandboxAllocation?: 'isolated-standard' | null;
   promptTemplate: string;
   profileId: string;
   autoCommit?: boolean;
@@ -68,6 +76,7 @@ export type TriggerFormProps = {
     mode: AgentMode;
     model: string;
     variant?: string;
+    sandboxAllocation?: 'isolated-standard' | null;
     promptTemplate: string;
     profileId?: string;
     autoCommit?: boolean;
@@ -87,6 +96,8 @@ export type TriggerFormProps = {
   onCancel?: () => void;
   onDelete?: () => Promise<void>;
   isLoading?: boolean;
+  canSetSandboxAllocation?: boolean;
+  isLoadingCapabilities?: boolean;
   /** Full inbound webhook URL (only needed in edit mode) */
   inboundUrl?: string;
 };
@@ -114,6 +125,8 @@ export function TriggerForm({
   onCancel,
   onDelete,
   isLoading = false,
+  canSetSandboxAllocation = false,
+  isLoadingCapabilities = false,
   inboundUrl,
 }: TriggerFormProps) {
   const isEditMode = formMode === 'edit';
@@ -133,6 +146,16 @@ export function TriggerForm({
   const [agentMode, setAgentMode] = useState<AgentMode>((initialData?.mode as AgentMode) ?? 'ask');
   const [model, setModel] = useState(initialData?.model ?? '');
   const [variant, setVariant] = useState(initialData?.variant);
+  const initialSandboxAllocation =
+    initialData?.sandboxAllocation === 'isolated-standard' ? 'isolated-standard' : 'automatic';
+  const [sandboxAllocation, setSandboxAllocation] = useState<'automatic' | 'isolated-standard'>(
+    initialSandboxAllocation
+  );
+  const hasSavedSandboxAllocation = initialSandboxAllocation === 'isolated-standard';
+  const showSandboxAllocation =
+    canSetSandboxAllocation ||
+    hasSavedSandboxAllocation ||
+    sandboxAllocation === 'isolated-standard';
   const modelVariants = models.find(option => option.id === model)?.variants ?? [];
 
   const handleModelChange = (nextModel: string) => {
@@ -171,6 +194,7 @@ export function TriggerForm({
       setAgentMode(initialData.mode ?? 'ask');
       setModel(initialData.model);
       setVariant(initialData.variant);
+      setSandboxAllocation(initialData.sandboxAllocation ?? 'automatic');
       setPromptTemplate(initialData.promptTemplate);
       setProfileId(initialData.profileId ?? null);
       setAutoCommit(initialData.autoCommit ?? false);
@@ -182,6 +206,7 @@ export function TriggerForm({
     if (!initialData) {
       setWebhookAuthEnabled(false);
       setWebhookAuthHeader('');
+      setSandboxAllocation('automatic');
     }
     setWebhookAuthSecret('');
   }, [initialData]);
@@ -297,6 +322,16 @@ export function TriggerForm({
       errors.push(webhookAuthSecretError);
     }
 
+    const requiresSandboxAllocationEligibility =
+      sandboxAllocation === 'isolated-standard' &&
+      (!isEditMode || sandboxAllocation !== initialSandboxAllocation);
+    if (
+      requiresSandboxAllocationEligibility &&
+      (!canSetSandboxAllocation || isLoadingCapabilities)
+    ) {
+      errors.push('Dedicated Standard allocation is not available');
+    }
+
     return errors;
   }, [
     activeTriggerIdSchema,
@@ -309,6 +344,11 @@ export function TriggerForm({
     profileId,
     webhookAuthHeaderError,
     webhookAuthSecretError,
+    sandboxAllocation,
+    initialSandboxAllocation,
+    isEditMode,
+    canSetSandboxAllocation,
+    isLoadingCapabilities,
   ]);
 
   const isFormValid = formErrors.length === 0;
@@ -337,6 +377,15 @@ export function TriggerForm({
           ? undefined
           : (variant ?? null)
         : variant;
+      const submittedSandboxAllocation = isEditMode
+        ? sandboxAllocation === initialSandboxAllocation
+          ? undefined
+          : sandboxAllocation === 'automatic'
+            ? null
+            : sandboxAllocation
+        : sandboxAllocation === 'isolated-standard'
+          ? sandboxAllocation
+          : undefined;
 
       await onSubmit({
         triggerId,
@@ -347,6 +396,9 @@ export function TriggerForm({
         mode: agentMode,
         model,
         ...(submittedVariant !== undefined ? { variant: submittedVariant } : {}),
+        ...(submittedSandboxAllocation !== undefined
+          ? { sandboxAllocation: submittedSandboxAllocation }
+          : {}),
         promptTemplate: promptTemplate.trim(),
         profileId,
         autoCommit,
@@ -369,6 +421,8 @@ export function TriggerForm({
       model,
       variant,
       initialData?.variant,
+      sandboxAllocation,
+      initialSandboxAllocation,
       promptTemplate,
       autoCommit,
       condenseOnComplete,
@@ -569,6 +623,49 @@ export function TriggerForm({
               disabled={isLoading}
               isScheduled={isScheduled}
             />
+
+            {showSandboxAllocation && (
+              <div className="space-y-2">
+                <Label htmlFor="sandboxAllocation">Container allocation</Label>
+                <Select
+                  value={sandboxAllocation}
+                  onValueChange={value => {
+                    if (value === 'automatic' || value === 'isolated-standard') {
+                      setSandboxAllocation(value);
+                    }
+                  }}
+                  disabled={isLoading || isLoadingCapabilities}
+                >
+                  <SelectTrigger
+                    id="sandboxAllocation"
+                    className="w-full sm:w-80"
+                    aria-describedby="sandboxAllocationHelp"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="automatic">Automatic</SelectItem>
+                    <SelectItem
+                      value="isolated-standard"
+                      disabled={!canSetSandboxAllocation && !hasSavedSandboxAllocation}
+                    >
+                      Dedicated Standard
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p id="sandboxAllocationHelp" className="text-muted-foreground max-w-prose text-xs">
+                  Automatic uses existing Cloud Agent routing. Dedicated Standard provisions one
+                  container per execution with 4 vCPU, 12 GiB RAM, and 20 GB disk, which may affect
+                  compute charges.
+                </p>
+                {!canSetSandboxAllocation && hasSavedSandboxAllocation && (
+                  <p className="text-muted-foreground text-xs">
+                    Only Kilo admins can newly enable Dedicated Standard. You can keep this
+                    allocation or clear it.
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Profile Selection (Required) */}
             <div className="space-y-2">

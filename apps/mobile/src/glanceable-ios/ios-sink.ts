@@ -27,6 +27,9 @@ let revision = 0;
 /** In-flight native `update`; `end` awaits it so its contentDate is never older. */
 let inFlightUpdate: Promise<void> | null = null;
 let lastProps: Partial<GlanceableLiveActivityContentState> | null = null;
+// Native instances remain discoverable until end settles. Their JS wrappers
+// have no stable identity, so do not adopt while any local end is pending.
+let pendingEnds = 0;
 
 function translate(key: string): string {
   return i18n.t(key);
@@ -52,6 +55,9 @@ function isActivityKitUnavailable(error: unknown): boolean {
  * leaves denial unset so a later call retries.
  */
 function adoptExistingActivity(): Activity | null {
+  if (pendingEnds > 0) {
+    return null;
+  }
   try {
     return ActiveAgentsLiveActivity.getInstances().at(-1) ?? null;
   } catch (error) {
@@ -88,21 +94,32 @@ async function endNow(): Promise<void> {
   if (activity === null) {
     return;
   }
+  // Detach before yielding so a concurrent start owns independent state.
+  const endingActivity = activity;
+  const endingUpdate = inFlightUpdate;
+  const endingProps = lastProps;
+  activity = null;
+  inFlightUpdate = null;
+  lastProps = null;
+  revision = 0;
+  pendingEnds += 1;
+
   // ActivityKit (iOS 17.2+) discards an end whose contentDate is older than the
   // last content write. Native `update` stamps its own later wall-clock, so wait
   // for the in-flight update and pass a fresh `Date()` — never the earlier JS
   // stamp or the snapshot's logical `updatedAt`, which is recorded beforehand.
-  if (inFlightUpdate !== null) {
+  if (endingUpdate !== null) {
     try {
-      await inFlightUpdate;
+      await endingUpdate;
     } catch {
       // A rejected update must not block the end; the contentDate still advances.
     }
   }
-  void activity.end('immediate', lastProps ?? undefined, new Date());
-  inFlightUpdate = null;
-  activity = null;
-  revision = 0;
+  try {
+    await endingActivity.end('immediate', endingProps ?? undefined, new Date());
+  } finally {
+    pendingEnds -= 1;
+  }
 }
 
 /** True once ActivityKit reported the surface unavailable (see slice psh for the alert). */
@@ -138,6 +155,7 @@ export function _resetIosSinkForTests(): void {
   revision = 0;
   inFlightUpdate = null;
   lastProps = null;
+  pendingEnds = 0;
 }
 
 export const iosSink: GlanceableSink = {
@@ -182,23 +200,12 @@ export const iosSink: GlanceableSink = {
     if (activity === null) {
       // Adopt the newest existing instance before starting a second one, so a
       // process restart updates the activity it started earlier.
-      let adopted = false;
-      try {
-        const instances = ActiveAgentsLiveActivity.getInstances();
-        const newest = instances.at(-1);
-        if (newest !== undefined) {
-          activity = newest;
-          inFlightUpdate = null;
-          adopted = true;
-        }
-      } catch (error) {
-        if (isActivityKitUnavailable(error)) {
-          activityKitDeniedState = true;
-          return;
-        }
-        // A transient getInstances failure leaves activity null; the start
-        // below still runs, so a later emit can retry.
+      activity = adoptExistingActivity();
+      if (getActivityKitDenied()) {
+        return;
       }
+      const adopted = activity !== null;
+      inFlightUpdate = null;
 
       if (activity === null) {
         try {

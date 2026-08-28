@@ -47,7 +47,7 @@ const mockState = vi.hoisted(() => ({
   startError: null as { code: string; message: string } | null,
   instancesError: null as { code: string; message: string } | null,
   instances: [] as unknown[],
-  started: [] as { props: unknown; url?: string }[],
+  started: [] as { props: unknown; url?: string; ended: boolean }[],
   updated: [] as unknown[],
   snapshots: [] as unknown[],
   timelines: [] as { date: Date; props: unknown }[][],
@@ -64,18 +64,25 @@ vi.mock('expo-widgets', () => ({
         error.code = mockState.startError.code;
         throw error;
       }
-      mockState.started.push({ props, url });
-      return {
+      const state = { props, url, ended: false };
+      mockState.started.push(state);
+      const instance = {
         update: async (next: unknown) => {
           mockState.updated.push(next);
           if (mockState.updatePromise !== null) {
             await mockState.updatePromise;
           }
+          state.props = next;
         },
         end: (policy: unknown, finalProps?: unknown, contentDate?: unknown) => {
+          state.ended = true;
+          state.props = finalProps;
+          mockState.instances = mockState.instances.filter(current => current !== instance);
           mockState.ended.push({ policy, props: finalProps, contentDate });
         },
       };
+      mockState.instances.push(instance);
+      return instance;
     },
     getInstances: () => {
       if (mockState.instancesError !== null) {
@@ -321,6 +328,104 @@ describe('iosSink end', () => {
     // The end must not carry the earlier JS publish stamp (NOW), which ActivityKit
     // discards as older than the native write.
     expect(contentDate?.getTime()).toBeGreaterThanOrEqual(nativeWriteTime);
+  });
+
+  it('ends once after the pending update when concurrent ends target the same activity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+
+    const update = Promise.withResolvers<undefined>();
+    mockState.updatePromise = update.promise;
+    iosSink.publish(snapshotFor([], 1, 'empty'));
+    iosSink.endImmediate();
+    iosSink.endImmediate();
+
+    await Promise.resolve();
+    expect(mockState.started[0]?.ended).toBe(false);
+    expect(mockState.ended).toEqual([]);
+
+    const nativeWriteTime = NOW + 50;
+    vi.setSystemTime(new Date(nativeWriteTime));
+    update.resolve(undefined);
+    await vi.waitFor(() => {
+      expect(mockState.started[0]?.ended).toBe(true);
+    });
+
+    expect(mockState.ended).toEqual([
+      {
+        policy: 'immediate',
+        props: expect.objectContaining({ status: 'empty', running: 0 }),
+        contentDate: expect.any(Date),
+      },
+    ]);
+    expect((mockState.ended[0]?.contentDate as Date | undefined)?.getTime()).toBeGreaterThanOrEqual(
+      nativeWriteTime
+    );
+  });
+
+  it('keeps a new activity and its pending update when an older end finishes', async () => {
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 4), CTX);
+    const oldUpdate = Promise.withResolvers<undefined>();
+    mockState.updatePromise = oldUpdate.promise;
+    iosSink.publish(snapshotFor([], 5, 'empty'));
+    iosSink.endImmediate();
+
+    const newSnapshot = snapshotFor([{ status: 'question' }], 0);
+    iosSink.publish(newSnapshot);
+    iosSink.startOrUpdate(newSnapshot, CTX);
+    const newUpdate = Promise.withResolvers<undefined>();
+    mockState.updatePromise = newUpdate.promise;
+    iosSink.startOrUpdate(snapshotFor([{ status: 'question' }, { status: 'question' }], 1), CTX);
+
+    oldUpdate.resolve(undefined);
+    await vi.waitFor(() => {
+      expect(mockState.started[0]?.ended).toBe(true);
+    });
+
+    expect(mockState.started).toMatchObject([
+      { ended: true, props: { status: 'empty', running: 0, needsInput: 0 } },
+      { ended: false, props: { status: 'happy', running: 0, needsInput: 1 } },
+    ]);
+
+    // The older end must not reset the new revision or forget its pending update.
+    mockState.updatePromise = null;
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    iosSink.endImmediate();
+    await Promise.resolve();
+    expect(mockState.started[1]?.ended).toBe(false);
+
+    newUpdate.resolve(undefined);
+    await vi.waitFor(() => {
+      expect(mockState.started[1]?.ended).toBe(true);
+    });
+    expect(mockState.started).toMatchObject([
+      { ended: true, props: { status: 'empty', running: 0, needsInput: 0 } },
+      { ended: true, props: { status: 'happy', running: 0, needsInput: 2 } },
+    ]);
+  });
+
+  it('ends with the terminal props and a fresh date after a pending update rejects', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+
+    const update = Promise.withResolvers<undefined>();
+    mockState.updatePromise = update.promise;
+    iosSink.publish(snapshotFor([], 1, 'empty'));
+    iosSink.endImmediate();
+
+    const failureTime = NOW + 50;
+    vi.setSystemTime(new Date(failureTime));
+    update.reject(new Error('Native update failed'));
+    await vi.waitFor(() => {
+      expect(mockState.started[0]?.ended).toBe(true);
+    });
+
+    expect(mockState.started[0]?.props).toMatchObject({ status: 'empty', running: 0 });
+    expect((mockState.ended[0]?.contentDate as Date | undefined)?.getTime()).toBeGreaterThanOrEqual(
+      failureTime
+    );
   });
 
   it('adopts and ends a leftover activity when the handle is null after restart', () => {

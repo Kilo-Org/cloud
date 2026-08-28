@@ -152,7 +152,9 @@
     "appearanceDark": "تاریک",
     "account": "هەژمار",
     "prReviewAttribution": "زیادکردنی خاوەندارییەتی ئەپ بۆ پێداچوونەوەکانی PR",
-    "prReviewAttributionSubtitle": "لە کاتی ناردنی پێداچوونەوەیەک، دەقی «پێداچوونەوە لە ڕێگەی Kilo» لە کۆتاییدا زیاد بکە."
+    "prReviewAttributionSubtitle": "لە کاتی ناردنی پێداچوونەوەیەک، دەقی «پێداچوونەوە لە ڕێگەی Kilo» لە کۆتاییدا زیاد بکە.",
+    "returnSendsMessage": "کلیلی گەڕانەوە پەیام دەنێرێت",
+    "returnSendsMessageSubtitle": "کاتێک ناچالاکە، کلیلی گەڕانەوە دێڕێکی نوێ لە خانەکانی نووسینی پەیامی ئەرکەکان تێدەخات."
   },
   "prReview": {
     "pullRequestUnavailable": "داواکاری ڕاکێشان بەردەست نییە",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "ئەم دانیشتنە ناتوانێت فایل وەربگرێت. پاشگرەکان لاببە بۆ ناردنی نامەکەت.",
       "couldNotAttachFiles": "نەتوانرا فایلەکان بلکێنرێت. دابکە لەسەر ناردن بۆ دووبارە هەوڵدان.",
       "discardAttachmentsMessage": "ئەو پەڕگە بارکراوانەی هاوپێچی پەیامی نێردراو نەکراون دەسڕێنەوە.",
-      "discardAttachmentsTitle": "فڕێدانی هاوپێچەکان؟"
+      "discardAttachmentsTitle": "فڕێدانی هاوپێچەکان؟",
+      "charactersRemaining": "{{count}} پیت ماوە",
+      "insertNewline": "تێخستنی دێڕێکی نوێ",
+      "starterChipBuild": "دروستکردنی تایبەتمەندییەک",
+      "starterChipEmpty": "دەستپێکردن بە بیرۆکەیەک",
+      "starterChipFix": "چاککردنەوەی هەڵەیەک",
+      "starterChipPrepare": "ڕێکخستنی ژینگەکەم",
+      "starterChipWrapUp": "تەواوکردنی سێشنەکەم",
+      "starterChipWriteTests": "نووسینی تاقیکردنەوەکان"
     },
     "chatLink": {
       "linkCopied": "بەستەرەکە کۆپی کرا",

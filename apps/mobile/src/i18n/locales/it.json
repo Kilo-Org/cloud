@@ -2131,7 +2131,15 @@
       "cannotReceiveFiles": "Questa sessione non può ricevere file. Rimuovi gli allegati per inviare il messaggio.",
       "couldNotAttachFiles": "Impossibile allegare i file. Tocca Invia per riprovare.",
       "discardAttachmentsMessage": "I file caricati non allegati a messaggi inviati verranno eliminati.",
-      "discardAttachmentsTitle": "Scartare gli allegati?"
+      "discardAttachmentsTitle": "Scartare gli allegati?",
+      "charactersRemaining": "{{count}} caratteri rimanenti",
+      "insertNewline": "Inserisci un'interruzione di riga",
+      "starterChipBuild": "Crea una funzionalità",
+      "starterChipEmpty": "Inizia con un'idea",
+      "starterChipFix": "Correggi un errore",
+      "starterChipPrepare": "Configura il mio ambiente",
+      "starterChipWrapUp": "Concludi la mia sessione",
+      "starterChipWriteTests": "Scrivi test"
     },
     "chatLink": {
       "linkCopied": "Link copiato",
@@ -2261,7 +2269,9 @@
     "appearanceDark": "Scuro",
     "account": "Account",
     "prReviewAttribution": "Aggiungi l'attribuzione dell'app alle revisioni PR",
-    "prReviewAttributionSubtitle": "Aggiungi un footer \"Recensito tramite Kilo\" quando invii una recensione."
+    "prReviewAttributionSubtitle": "Aggiungi un footer \"Recensito tramite Kilo\" quando invii una recensione.",
+    "returnSendsMessage": "Il tasto Invio invia il messaggio",
+    "returnSendsMessageSubtitle": "Se disattivato, Invio inserisce un'interruzione di riga nei campi di inserimento dei messaggi degli agenti."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",

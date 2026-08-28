@@ -152,7 +152,9 @@
     "appearanceDark": "Dudu",
     "account": "Àkọọ́lẹ̀",
     "prReviewAttribution": "Fi àtọ̀tọ̀ app kun si àwọn àtúnyẹ̀wò PR",
-    "prReviewAttributionSubtitle": "Fi àtẹ̀lẹ̀ 'Reviewed via Kilo' kun nígbà tí o bá fi àtúnyẹ̀wò sílẹ̀."
+    "prReviewAttributionSubtitle": "Fi àtẹ̀lẹ̀ 'Reviewed via Kilo' kun nígbà tí o bá fi àtúnyẹ̀wò sílẹ̀.",
+    "returnSendsMessage": "Bọtini ipadabọ n fi ifiranṣẹ ranṣẹ",
+    "returnSendsMessageSubtitle": "Nigbati o ba wa ni pipa, bọtini ipadabọ n fi ila tuntun sii ni awọn aaye kikọ ifiranṣẹ aṣoju."
   },
   "prReview": {
     "pullRequestUnavailable": "Ibeere fifa ko si",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "Igba-ijiroro yii ko le gba awọn faili. Yọ awọn asomọ lati fi ifiranṣẹ rẹ ranṣẹ.",
       "couldNotAttachFiles": "Ko le so awọn faili. Tẹ firanṣẹ lati tun gbiyanju.",
       "discardAttachmentsMessage": "A yoo paarẹ awọn faili ti a gbe soke ti a ko so mọ awọn ifiranṣẹ ti a fi ranṣẹ.",
-      "discardAttachmentsTitle": "Jù awọn asomọ silẹ?"
+      "discardAttachmentsTitle": "Jù awọn asomọ silẹ?",
+      "charactersRemaining": "Ohun kikọ {{count}} ku",
+      "insertNewline": "Fi ila tuntun sii",
+      "starterChipBuild": "Ṣẹda ẹya kan",
+      "starterChipEmpty": "Bẹrẹ pẹlu imọran kan",
+      "starterChipFix": "Ṣatunṣe aṣiṣe kan",
+      "starterChipPrepare": "Ṣeto ayika mi",
+      "starterChipWrapUp": "Pari akoko mi",
+      "starterChipWriteTests": "Kọ awọn idanwo"
     },
     "chatLink": {
       "linkCopied": "Ọna asopọ ti daakọ",

@@ -152,7 +152,9 @@
     "appearanceDark": "Gelap",
     "account": "Akun",
     "prReviewAttribution": "Tambahkan atribusi aplikasi ke ulasan PR",
-    "prReviewAttributionSubtitle": "Tambahkan footer Ditinjau melalui Kilo saat Anda mengirimkan ulasan."
+    "prReviewAttributionSubtitle": "Tambahkan footer Ditinjau melalui Kilo saat Anda mengirimkan ulasan.",
+    "returnSendsMessage": "Tombol Enter mengirim pesan",
+    "returnSendsMessageSubtitle": "Saat nonaktif, Enter menyisipkan baris baru di kolom pesan agen."
   },
   "notifications": {
     "title": "Notifikasi",
@@ -2135,7 +2137,15 @@
       "cannotReceiveFiles": "Sesi ini tidak dapat menerima file. Hapus lampiran untuk mengirim pesan Anda.",
       "couldNotAttachFiles": "Tidak dapat melampirkan file. Ketuk Kirim untuk mencoba lagi.",
       "discardAttachmentsMessage": "Unggahan yang tidak dilampirkan ke pesan terkirim akan dihapus.",
-      "discardAttachmentsTitle": "Buang lampiran?"
+      "discardAttachmentsTitle": "Buang lampiran?",
+      "charactersRemaining": "{{count}} karakter tersisa",
+      "insertNewline": "Sisipkan baris baru",
+      "starterChipBuild": "Buat fitur",
+      "starterChipEmpty": "Mulai dengan ide",
+      "starterChipFix": "Perbaiki kesalahan",
+      "starterChipPrepare": "Siapkan lingkungan saya",
+      "starterChipWrapUp": "Akhiri sesi saya",
+      "starterChipWriteTests": "Tulis pengujian"
     },
     "chatLink": {
       "linkCopied": "Tautan disalin",

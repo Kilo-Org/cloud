@@ -152,7 +152,9 @@
     "appearanceDark": "Duhu",
     "account": "Asusu",
     "prReviewAttribution": "Ƙara asalin app a cikin bitar PR",
-    "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An bita ta Kilo\" lokacin da ka ƙaddamar da bita."
+    "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An bita ta Kilo\" lokacin da ka ƙaddamar da bita.",
+    "returnSendsMessage": "Maɓallin Komawa yana aika saƙo",
+    "returnSendsMessageSubtitle": "Idan a kashe yake, Komawa yana saka sabon layi a wuraren shigar da saƙo na wakilai."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar jan ba ta samuwa",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "Wannan zaman ba zai iya karɓar fayiloli ba. Cire abubuwan da aka haɗa don aika sakonka.",
       "couldNotAttachFiles": "An kasa haɗa fayiloli. Danna aika don sake gwadawa.",
       "discardAttachmentsMessage": "Za a share fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
-      "discardAttachmentsTitle": "Watsi da haɗe-haɗe?"
+      "discardAttachmentsTitle": "Watsi da haɗe-haɗe?",
+      "charactersRemaining": "Haruffa {{count}} suka rage",
+      "insertNewline": "Saka sabon layi",
+      "starterChipBuild": "Gina fasali",
+      "starterChipEmpty": "Fara da ra'ayi",
+      "starterChipFix": "Gyara kuskure",
+      "starterChipPrepare": "Shirya muhallina",
+      "starterChipWrapUp": "Kammala zamana",
+      "starterChipWriteTests": "Rubuta gwaje-gwaje"
     },
     "chatLink": {
       "linkCopied": "An kwafa hanyar",

@@ -152,7 +152,9 @@
     "appearanceDark": "Oscuro",
     "account": "Cuenta",
     "prReviewAttribution": "Añadir atribución de la app a las revisiones de PR",
-    "prReviewAttributionSubtitle": "Añade un pie de página Revisado vía Kilo cuando envías una revisión."
+    "prReviewAttributionSubtitle": "Añade un pie de página Revisado vía Kilo cuando envías una revisión.",
+    "returnSendsMessage": "La tecla Intro envía el mensaje",
+    "returnSendsMessageSubtitle": "Si está desactivado, Intro inserta un salto de línea en los campos de mensaje del agente."
   },
   "notifications": {
     "channel": {
@@ -2147,7 +2149,15 @@
       "cannotReceiveFiles": "Esta sesión no puede recibir archivos. Quita los archivos adjuntos para enviar tu mensaje.",
       "couldNotAttachFiles": "No se pudieron adjuntar los archivos. Toca enviar para reintentar.",
       "discardAttachmentsMessage": "Se eliminarán los archivos subidos que no estén adjuntos a mensajes enviados.",
-      "discardAttachmentsTitle": "¿Descartar adjuntos?"
+      "discardAttachmentsTitle": "¿Descartar adjuntos?",
+      "charactersRemaining": "Quedan {{count}} caracteres",
+      "insertNewline": "Insertar salto de línea",
+      "starterChipBuild": "Crear una función",
+      "starterChipEmpty": "Empezar con una idea",
+      "starterChipFix": "Corregir un error",
+      "starterChipPrepare": "Configurar mi entorno",
+      "starterChipWrapUp": "Finalizar mi sesión",
+      "starterChipWriteTests": "Escribir pruebas"
     },
     "chatLink": {
       "linkCopied": "Enlace copiado",

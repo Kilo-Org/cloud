@@ -152,7 +152,9 @@
     "appearanceDark": "Темна",
     "account": "Обліковий запис",
     "prReviewAttribution": "Додати атрибуцію застосунку до перевірок PR",
-    "prReviewAttributionSubtitle": "Додавати нижній колонтитул Reviewed via Kilo, коли надсилаєте перевірку."
+    "prReviewAttributionSubtitle": "Додавати нижній колонтитул Reviewed via Kilo, коли надсилаєте перевірку.",
+    "returnSendsMessage": "Клавіша повернення надсилає повідомлення",
+    "returnSendsMessageSubtitle": "Коли вимкнено, клавіша повернення вставляє новий рядок у полях введення повідомлень агентам."
   },
   "notifications": {
     "title": "Сповіщення",
@@ -2159,7 +2161,15 @@
       "cannotReceiveFiles": "Ця сесія не може отримувати файли. Видаліть вкладення, щоб надіслати повідомлення.",
       "couldNotAttachFiles": "Не вдалося прикріпити файли. Торкніться «Надіслати», щоб спробувати ще раз.",
       "discardAttachmentsMessage": "Завантажені файли, не прикріплені до надісланих повідомлень, буде видалено.",
-      "discardAttachmentsTitle": "Відкинути вкладення?"
+      "discardAttachmentsTitle": "Відкинути вкладення?",
+      "charactersRemaining": "Залишилося символів: {{count}}",
+      "insertNewline": "Вставити новий рядок",
+      "starterChipBuild": "Створити функцію",
+      "starterChipEmpty": "Почати з ідеї",
+      "starterChipFix": "Виправити помилку",
+      "starterChipPrepare": "Налаштувати моє середовище",
+      "starterChipWrapUp": "Завершити мій сеанс",
+      "starterChipWriteTests": "Написати тести"
     },
     "chatLink": {
       "linkCopied": "Посилання скопійовано",

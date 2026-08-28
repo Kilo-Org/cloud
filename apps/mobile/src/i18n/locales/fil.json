@@ -152,7 +152,9 @@
     "appearanceDark": "Dark",
     "account": "Account",
     "prReviewAttribution": "Magdagdag ng app attribution sa mga PR review",
-    "prReviewAttributionSubtitle": "Magdagdag ng footer na Reviewed via Kilo kapag nagsumite ka ng review."
+    "prReviewAttributionSubtitle": "Magdagdag ng footer na Reviewed via Kilo kapag nagsumite ka ng review.",
+    "returnSendsMessage": "Nagpapadala ng mensahe ang Return key",
+    "returnSendsMessageSubtitle": "Kapag naka-off, naglalagay ang Return ng bagong linya sa mga input ng mensahe ng agent."
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi available ang pull request",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "Hindi makakatanggap ng file ang session na ito. Alisin ang mga attachment para maipadala ang iyong mensahe.",
       "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang send para subukang muli.",
       "discardAttachmentsMessage": "Ide-delete ang mga na-upload na file na hindi nakalakip sa mga naipadalang mensahe.",
-      "discardAttachmentsTitle": "I-discard ang mga attachment?"
+      "discardAttachmentsTitle": "I-discard ang mga attachment?",
+      "charactersRemaining": "{{count}} na character ang natitira",
+      "insertNewline": "Magpasok ng bagong linya",
+      "starterChipBuild": "Gumawa ng feature",
+      "starterChipEmpty": "Magsimula sa isang ideya",
+      "starterChipFix": "Ayusin ang depekto",
+      "starterChipPrepare": "Ihanda ang aking environment",
+      "starterChipWrapUp": "Tapusin ang aking session",
+      "starterChipWriteTests": "Sumulat ng mga pagsubok"
     },
     "chatLink": {
       "linkCopied": "Na-kopya ang link",

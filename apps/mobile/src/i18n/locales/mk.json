@@ -152,7 +152,9 @@
     "appearanceDark": "Темно",
     "account": "Сметка",
     "prReviewAttribution": "Додајте припишување на апликацијата во прегледите на PR",
-    "prReviewAttributionSubtitle": "Додајте потпис „Прегледано преку Kilo“ кога поднесувате преглед."
+    "prReviewAttributionSubtitle": "Додајте потпис „Прегледано преку Kilo“ кога поднесувате преглед.",
+    "returnSendsMessage": "Копчето за нов ред испраќа порака",
+    "returnSendsMessageSubtitle": "Кога е исклучено, копчето за нов ред вметнува нов ред во полињата за внес на пораки на агентите."
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за повлекување е недостапно",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "Оваа сесија не може да прима датотеки. Отстранете ги прилозите за да ја испратите пораката.",
       "couldNotAttachFiles": "Не можев да прикачам датотеки. Допрете испрати за да се обидете повторно.",
       "discardAttachmentsMessage": "Прикачените датотеки што не се приложени кон испратени пораки ќе бидат избришани.",
-      "discardAttachmentsTitle": "Да се отфрлат прилозите?"
+      "discardAttachmentsTitle": "Да се отфрлат прилозите?",
+      "charactersRemaining": "Преостануваат {{count}} знаци",
+      "insertNewline": "Вметнете нов ред",
+      "starterChipBuild": "Изградете функционалност",
+      "starterChipEmpty": "Започнете со идеја",
+      "starterChipFix": "Поправете грешка",
+      "starterChipPrepare": "Поставете ја мојата околина",
+      "starterChipWrapUp": "Завршете ја мојата сесија",
+      "starterChipWriteTests": "Напишете тестови"
     },
     "chatLink": {
       "linkCopied": "Линкот е копиран",

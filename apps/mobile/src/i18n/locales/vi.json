@@ -152,7 +152,9 @@
     "appearanceDark": "Tối",
     "account": "Tài khoản",
     "prReviewAttribution": "Thêm ghi công ứng dụng vào các đánh giá PR",
-    "prReviewAttributionSubtitle": "Thêm chân trang Reviewed via Kilo khi bạn gửi đánh giá."
+    "prReviewAttributionSubtitle": "Thêm chân trang Reviewed via Kilo khi bạn gửi đánh giá.",
+    "returnSendsMessage": "Phím xuống dòng gửi tin nhắn",
+    "returnSendsMessageSubtitle": "Khi tắt, phím xuống dòng chèn dòng mới trong ô nhập tin nhắn của tác nhân."
   },
   "notifications": {
     "title": "Thông báo",
@@ -2135,7 +2137,15 @@
       "cannotReceiveFiles": "Phiên này không thể nhận tệp. Hãy gỡ tệp đính kèm để gửi tin nhắn của bạn.",
       "couldNotAttachFiles": "Không thể đính kèm tệp. Chạm vào Gửi để thử lại.",
       "discardAttachmentsMessage": "Các tệp đã tải lên nhưng chưa đính kèm vào tin nhắn đã gửi sẽ bị xóa.",
-      "discardAttachmentsTitle": "Hủy bỏ tệp đính kèm?"
+      "discardAttachmentsTitle": "Hủy bỏ tệp đính kèm?",
+      "charactersRemaining": "Còn {{count}} ký tự",
+      "insertNewline": "Chèn dòng mới",
+      "starterChipBuild": "Xây dựng một tính năng",
+      "starterChipEmpty": "Bắt đầu với một ý tưởng",
+      "starterChipFix": "Sửa lỗi",
+      "starterChipPrepare": "Thiết lập môi trường của bạn",
+      "starterChipWrapUp": "Kết thúc phiên của bạn",
+      "starterChipWriteTests": "Viết kiểm thử"
     },
     "chatLink": {
       "linkCopied": "Đã sao chép liên kết",

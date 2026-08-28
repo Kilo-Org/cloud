@@ -152,7 +152,9 @@
     "appearanceDark": "Цёмная",
     "account": "Уліковы запіс",
     "prReviewAttribution": "Дадаваць атрыбуцыю дадатку да рэцэнзій PR",
-    "prReviewAttributionSubtitle": "Дадаваць футэр «Reviewed via Kilo» пры адпраўцы рэцэнзіі."
+    "prReviewAttributionSubtitle": "Дадаваць футэр «Reviewed via Kilo» пры адпраўцы рэцэнзіі.",
+    "returnSendsMessage": "Клавіша ўводу адпраўляе паведамленне",
+    "returnSendsMessageSubtitle": "Калі выключана, клавіша ўводу ўстаўляе новы радок у кампазітарах агентаў."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request недаступны",
@@ -2627,7 +2629,15 @@
       "cannotReceiveFiles": "Гэты сеанс не можа атрымліваць файлы. Прыбярыце ўкладанні, каб адправіць паведамленне.",
       "couldNotAttachFiles": "Не ўдалося прымацаваць файлы. Націсніце «Адправіць», каб паспрабаваць яшчэ раз.",
       "discardAttachmentsMessage": "Загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя.",
-      "discardAttachmentsTitle": "Выдаліць укладанні?"
+      "discardAttachmentsTitle": "Выдаліць укладанні?",
+      "charactersRemaining": "Засталося сімвалаў: {{count}}",
+      "insertNewline": "Уставіць новы радок",
+      "starterChipBuild": "Стварыць функцыю",
+      "starterChipEmpty": "Пачаць з ідэі",
+      "starterChipFix": "Выправіць памылку",
+      "starterChipPrepare": "Наладзіць маё асяроддзе",
+      "starterChipWrapUp": "Завяршыць мой сеанс",
+      "starterChipWriteTests": "Напісаць тэсты"
     },
     "chatLink": {
       "linkCopied": "Спасылка скапіраваная",

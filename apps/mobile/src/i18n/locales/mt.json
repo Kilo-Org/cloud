@@ -152,7 +152,9 @@
     "appearanceDark": "Skur",
     "account": "Kont",
     "prReviewAttribution": "Żid attribuzzjoni tal-app mar-reviżjonijiet tal-PR",
-    "prReviewAttributionSubtitle": "Żid footer 'Reviewed via Kilo' meta tissottometti reviżjoni."
+    "prReviewAttributionSubtitle": "Żid footer 'Reviewed via Kilo' meta tissottometti reviżjoni.",
+    "returnSendsMessage": "It-tast tar-ritorn jibgħat il-messaġġ",
+    "returnSendsMessageSubtitle": "Meta jkun mitfi, it-tast tar-ritorn idaħħal linja ġdida fl-oqsma tad-dħul tal-messaġġi tal-aġenti."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mhux disponibbli",
@@ -2646,7 +2648,15 @@
       "cannotReceiveFiles": "Din is-sessjoni ma tistax tirċievi fajls. Neħħi l-annessi biex tibgħat il-messaġġ tiegħek.",
       "couldNotAttachFiles": "Ma setgħux jintrabtu l-fajls. Tektek biex tibgħat u erġa' ipprova.",
       "discardAttachmentsMessage": "Il-fajls imtellgħin li mhumiex mehmuża ma' messaġġi mibgħuta se jitħassru.",
-      "discardAttachmentsTitle": "Twarrab l-annessi?"
+      "discardAttachmentsTitle": "Twarrab l-annessi?",
+      "charactersRemaining": "Fadal {{count}} karattru",
+      "insertNewline": "Daħħal linja ġdida",
+      "starterChipBuild": "Ibni funzjoni",
+      "starterChipEmpty": "Ibda b'idea",
+      "starterChipFix": "Irranġa żball",
+      "starterChipPrepare": "Ħejji l-ambjent tiegħi",
+      "starterChipWrapUp": "Temm is-sessjoni tiegħi",
+      "starterChipWriteTests": "Ikteb testijiet"
     },
     "chatLink": {
       "linkCopied": "Ir-rabta ġiet ikkupjata",

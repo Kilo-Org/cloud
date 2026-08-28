@@ -152,7 +152,9 @@
     "appearanceDark": "深色",
     "account": "帳戶",
     "prReviewAttribution": "在 PR 審查中加入應用程式歸因",
-    "prReviewAttributionSubtitle": "提交審查時，附加「Reviewed via Kilo」頁尾。"
+    "prReviewAttributionSubtitle": "提交審查時，附加「Reviewed via Kilo」頁尾。",
+    "returnSendsMessage": "換行鍵傳送訊息",
+    "returnSendsMessageSubtitle": "關閉時，換行鍵會在代理撰寫器中插入換行。"
   },
   "notifications": {
     "title": "通知",
@@ -2135,7 +2137,15 @@
       "cannotReceiveFiles": "此工作階段無法接收檔案。請移除附件後再傳送訊息。",
       "couldNotAttachFiles": "無法附加檔案。點選傳送以重試。",
       "discardAttachmentsMessage": "未附加至已傳送訊息的上傳檔案將遭刪除。",
-      "discardAttachmentsTitle": "捨棄附件？"
+      "discardAttachmentsTitle": "捨棄附件？",
+      "charactersRemaining": "剩餘 {{count}} 個字元",
+      "insertNewline": "插入換行",
+      "starterChipBuild": "建立功能",
+      "starterChipEmpty": "從一個想法開始",
+      "starterChipFix": "修正錯誤",
+      "starterChipPrepare": "設定我的環境",
+      "starterChipWrapUp": "為我的工作階段收尾",
+      "starterChipWriteTests": "撰寫測試"
     },
     "chatLink": {
       "linkCopied": "連結已複製",

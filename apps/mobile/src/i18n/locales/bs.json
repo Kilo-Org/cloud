@@ -152,7 +152,9 @@
     "appearanceDark": "Tamno",
     "account": "Nalog",
     "prReviewAttribution": "Dodajte atribuciju aplikacije PR pregledima.",
-    "prReviewAttributionSubtitle": "Dodajte podnožje \"Pregledano putem Kilo-a\" kada pošaljete pregled."
+    "prReviewAttributionSubtitle": "Dodajte podnožje \"Pregledano putem Kilo-a\" kada pošaljete pregled.",
+    "returnSendsMessage": "Tipka za novi red šalje poruku",
+    "returnSendsMessageSubtitle": "Kada je isključeno, tipka za novi red umeće novi red u polja za unos poruke agentima."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nedostupan",
@@ -2608,7 +2610,15 @@
       "cannotReceiveFiles": "Ova sesija ne može primiti datoteke. Uklonite privitke da pošaljete svoju poruku.",
       "couldNotAttachFiles": "Datoteke nisu mogle biti priložene. Dodirnite pošalji za ponovni pokušaj.",
       "discardAttachmentsMessage": "Otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisane.",
-      "discardAttachmentsTitle": "Odbaciti privitke?"
+      "discardAttachmentsTitle": "Odbaciti privitke?",
+      "charactersRemaining": "Preostalo znakova: {{count}}",
+      "insertNewline": "Umetnite novi red",
+      "starterChipBuild": "Izradite funkciju",
+      "starterChipEmpty": "Počnite s idejom",
+      "starterChipFix": "Ispravite grešku",
+      "starterChipPrepare": "Postavite moje okruženje",
+      "starterChipWrapUp": "Završite moju sesiju",
+      "starterChipWriteTests": "Napišite testove"
     },
     "chatLink": {
       "linkCopied": "Veza kopirana",

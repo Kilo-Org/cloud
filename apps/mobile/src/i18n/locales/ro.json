@@ -152,7 +152,9 @@
     "appearanceDark": "Întunecat",
     "account": "Cont",
     "prReviewAttribution": "Adaugă atribuirea aplicației la revizuirile PR",
-    "prReviewAttributionSubtitle": "Adaugă un subsol „Revizuit prin Kilo” când trimiți o revizuire."
+    "prReviewAttributionSubtitle": "Adaugă un subsol „Revizuit prin Kilo” când trimiți o revizuire.",
+    "returnSendsMessage": "Tasta Enter trimite mesajul",
+    "returnSendsMessageSubtitle": "Când opțiunea este dezactivată, tasta Enter inserează o linie nouă în câmpurile de mesaj ale agenților."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request indisponibil",
@@ -2608,7 +2610,15 @@
       "cannotReceiveFiles": "Această sesiune nu poate primi fișiere. Elimină atașamentele pentru a trimite mesajul.",
       "couldNotAttachFiles": "Fișierele nu au putut fi atașate. Atinge trimitere pentru a încerca din nou.",
       "discardAttachmentsMessage": "Fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
-      "discardAttachmentsTitle": "Renunți la atașamente?"
+      "discardAttachmentsTitle": "Renunți la atașamente?",
+      "charactersRemaining": "{{count}} caractere rămase",
+      "insertNewline": "Inserează o linie nouă",
+      "starterChipBuild": "Dezvoltă o funcționalitate",
+      "starterChipEmpty": "Începe cu o idee",
+      "starterChipFix": "Remediază o eroare",
+      "starterChipPrepare": "Configurează mediul meu",
+      "starterChipWrapUp": "Încheie sesiunea mea",
+      "starterChipWriteTests": "Scrie teste"
     },
     "chatLink": {
       "linkCopied": "Link copiat",

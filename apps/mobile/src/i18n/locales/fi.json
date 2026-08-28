@@ -152,7 +152,9 @@
     "appearanceDark": "Tumma",
     "account": "Tili",
     "prReviewAttribution": "Lisää sovelluksen määrittäminen PR-arvosteluihin",
-    "prReviewAttributionSubtitle": "Liitä Reviewed via Kilo -alaviite, kun lähetät arvostelun."
+    "prReviewAttributionSubtitle": "Liitä Reviewed via Kilo -alaviite, kun lähetät arvostelun.",
+    "returnSendsMessage": "Enter-näppäin lähettää viestin",
+    "returnSendsMessageSubtitle": "Kun asetus on pois päältä, Enter lisää rivinvaihdon agenttien viestikenttiin."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole käytettävissä",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "Tämä istunto ei voi vastaanottaa tiedostoja. Poista liitteet lähettääksesi viestisi.",
       "couldNotAttachFiles": "Tiedostoja ei voitu liittää. Napauta lähetä yrittääksesi uudelleen.",
       "discardAttachmentsMessage": "Ladatut tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
-      "discardAttachmentsTitle": "Hylätäänkö liitteet?"
+      "discardAttachmentsTitle": "Hylätäänkö liitteet?",
+      "charactersRemaining": "{{count}} merkkiä jäljellä",
+      "insertNewline": "Lisää rivinvaihto",
+      "starterChipBuild": "Toteuta ominaisuus",
+      "starterChipEmpty": "Aloita ideasta",
+      "starterChipFix": "Korjaa virhe",
+      "starterChipPrepare": "Määritä ympäristöni",
+      "starterChipWrapUp": "Viimeistele istuntoni",
+      "starterChipWriteTests": "Kirjoita testejä"
     },
     "chatLink": {
       "linkCopied": "Linkki kopioitu",

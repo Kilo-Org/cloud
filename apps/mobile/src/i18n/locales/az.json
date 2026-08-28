@@ -152,7 +152,9 @@
     "appearanceDark": "Qaranlıq",
     "account": "Hesab",
     "prReviewAttribution": "PR icmallarına proqram atribusiyası əlavə et",
-    "prReviewAttributionSubtitle": "İcmal təqdim edərkən 'Reviewed via Kilo' altbilgisini əlavə et."
+    "prReviewAttributionSubtitle": "İcmal təqdim edərkən 'Reviewed via Kilo' altbilgisini əlavə et.",
+    "returnSendsMessage": "Sətirsonu düyməsi mesaj göndərir",
+    "returnSendsMessageSubtitle": "Söndürüldükdə sətirsonu düyməsi agent kompozitorlarında yeni sətir daxil edir."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request əlçatan deyil",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "Bu sessiya fayl qəbul edə bilmir. Mesajınızı göndərmək üçün əlavələri silin.",
       "couldNotAttachFiles": "Fayllar əlavə edilə bilmədi. Yenidən cəhd etmək üçün göndər düyməsinə toxunun.",
       "discardAttachmentsMessage": "Göndərilmiş mesajlara əlavə edilməmiş yükləmələr silinəcək.",
-      "discardAttachmentsTitle": "Əlavələr ləğv edilsin?"
+      "discardAttachmentsTitle": "Əlavələr ləğv edilsin?",
+      "charactersRemaining": "{{count}} simvol qalıb",
+      "insertNewline": "Yeni sətir daxil edin",
+      "starterChipBuild": "Funksiya yaradın",
+      "starterChipEmpty": "Bir ideya ilə başlayın",
+      "starterChipFix": "Səhvi düzəldin",
+      "starterChipPrepare": "Mühitimi qurun",
+      "starterChipWrapUp": "Sessiyamı tamamlayın",
+      "starterChipWriteTests": "Testlər yazın"
     },
     "chatLink": {
       "linkCopied": "Keçid kopyalandı",

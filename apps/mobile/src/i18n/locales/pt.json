@@ -152,7 +152,9 @@
     "appearanceDark": "Escuro",
     "account": "Conta",
     "prReviewAttribution": "Adicionar atribuição da app às revisões de PR",
-    "prReviewAttributionSubtitle": "Adicionar um rodapé «Revisto via Kilo» quando submeter uma revisão."
+    "prReviewAttributionSubtitle": "Adicionar um rodapé «Revisto via Kilo» quando submeter uma revisão.",
+    "returnSendsMessage": "A tecla de retorno envia a mensagem",
+    "returnSendsMessageSubtitle": "Quando desativado, a tecla de retorno insere uma nova linha nos campos de mensagem dos agentes."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request indisponível",
@@ -2608,7 +2610,15 @@
       "cannotReceiveFiles": "Esta sessão não pode receber ficheiros. Remova os anexos para enviar a sua mensagem.",
       "couldNotAttachFiles": "Não foi possível anexar ficheiros. Toque em enviar para tentar novamente.",
       "discardAttachmentsMessage": "Os ficheiros carregados que não estejam anexados a mensagens enviadas serão eliminados.",
-      "discardAttachmentsTitle": "Descartar anexos?"
+      "discardAttachmentsTitle": "Descartar anexos?",
+      "charactersRemaining": "{{count}} caracteres restantes",
+      "insertNewline": "Inserir nova linha",
+      "starterChipBuild": "Criar uma funcionalidade",
+      "starterChipEmpty": "Começar com uma ideia",
+      "starterChipFix": "Corrigir um erro",
+      "starterChipPrepare": "Configurar o meu ambiente",
+      "starterChipWrapUp": "Concluir a minha sessão",
+      "starterChipWriteTests": "Escrever testes"
     },
     "chatLink": {
       "linkCopied": "Ligação copiada",

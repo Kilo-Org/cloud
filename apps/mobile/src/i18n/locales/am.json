@@ -152,7 +152,9 @@
     "appearanceDark": "ጨለማ",
     "account": "መለያ",
     "prReviewAttribution": "የመተግበሪያ መለያን ወደ PR ግምገማዎች ያክሉ",
-    "prReviewAttributionSubtitle": "ግምገማ ሲያስገቡ የ'በKilo ተገምግሟል' ግርጌ ያክሉ።"
+    "prReviewAttributionSubtitle": "ግምገማ ሲያስገቡ የ'በKilo ተገምግሟል' ግርጌ ያክሉ።",
+    "returnSendsMessage": "የመመለሻ ቁልፍ መልእክት ይልካል",
+    "returnSendsMessageSubtitle": "ሲጠፋ፣ የመመለሻ ቁልፍ በወኪል መልእክት ማስገቢያዎች ውስጥ አዲስ መስመር ያስገባል።"
   },
   "prReview": {
     "pullRequestUnavailable": "የጎተራ ጥያቄ የለም",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "ይህ ክፍለ-ጊዜ ፋይሎች መቀበል አይችልም። መልእክትዎን ለመላክ አባሪዎቹን ያስወግዱ።",
       "couldNotAttachFiles": "ፋይሎችን ማያያዝ አልተቻለም። እንደገና ለመሞከር ላክ ይንኩ።",
       "discardAttachmentsMessage": "ከተላኩ መልእክቶች ጋር ያልተያያዙ የተጫኑ ፋይሎች ይሰረዛሉ።",
-      "discardAttachmentsTitle": "አባሪዎችን ያስወግዱ?"
+      "discardAttachmentsTitle": "አባሪዎችን ያስወግዱ?",
+      "charactersRemaining": "{{count}} ቁምፊዎች ይቀራሉ",
+      "insertNewline": "አዲስ መስመር ያስገቡ",
+      "starterChipBuild": "ባህሪ ይገንቡ",
+      "starterChipEmpty": "በሀሳብ ይጀምሩ",
+      "starterChipFix": "ስህተት ያስተካክሉ",
+      "starterChipPrepare": "የስራ አካባቢዬን ያዋቅሩ",
+      "starterChipWrapUp": "ክፍለ ጊዜዬን ያጠናቅቁ",
+      "starterChipWriteTests": "ሙከራዎችን ይፃፉ"
     },
     "chatLink": {
       "linkCopied": "አገናኝ ተቀድቷል",

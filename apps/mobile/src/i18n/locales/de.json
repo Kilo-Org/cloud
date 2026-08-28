@@ -152,7 +152,9 @@
     "appearanceDark": "Dunkel",
     "account": "Konto",
     "prReviewAttribution": "App-Zuordnung zu PR-Reviews hinzufügen",
-    "prReviewAttributionSubtitle": "Hänge beim Einreichen eines Reviews eine „Reviewed via Kilo“-Fußzeile an."
+    "prReviewAttributionSubtitle": "Hänge beim Einreichen eines Reviews eine „Reviewed via Kilo“-Fußzeile an.",
+    "returnSendsMessage": "Eingabetaste sendet Nachricht",
+    "returnSendsMessageSubtitle": "Wenn deaktiviert, fügt die Eingabetaste einen Zeilenumbruch in die Nachrichteneingabe für Agenten ein."
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -2135,7 +2137,15 @@
       "cannotReceiveFiles": "Diese Sitzung kann keine Dateien empfangen. Entferne die Anhänge, um deine Nachricht zu senden.",
       "couldNotAttachFiles": "Dateien konnten nicht angehängt werden. Tippe auf Senden, um es erneut zu versuchen.",
       "discardAttachmentsMessage": "Hochgeladene Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht.",
-      "discardAttachmentsTitle": "Anhänge verwerfen?"
+      "discardAttachmentsTitle": "Anhänge verwerfen?",
+      "charactersRemaining": "Noch {{count}} Zeichen",
+      "insertNewline": "Zeilenumbruch einfügen",
+      "starterChipBuild": "Eine Funktion entwickeln",
+      "starterChipEmpty": "Mit einer Idee beginnen",
+      "starterChipFix": "Einen Fehler beheben",
+      "starterChipPrepare": "Meine Umgebung einrichten",
+      "starterChipWrapUp": "Meine Sitzung abschließen",
+      "starterChipWriteTests": "Tests schreiben"
     },
     "chatLink": {
       "linkCopied": "Link kopiert",

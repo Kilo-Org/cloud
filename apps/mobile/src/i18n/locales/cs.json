@@ -152,7 +152,9 @@
     "appearanceDark": "Tmavý",
     "account": "Účet",
     "prReviewAttribution": "Přidat atribuci aplikace k recenzím PR",
-    "prReviewAttributionSubtitle": "Při odeslání recenze přidejte zápatí „Reviewed via Kilo“."
+    "prReviewAttributionSubtitle": "Při odeslání recenze přidejte zápatí „Reviewed via Kilo“.",
+    "returnSendsMessage": "Klávesa Enter odesílá zprávu",
+    "returnSendsMessageSubtitle": "Když je tato volba vypnutá, klávesa Enter vloží nový řádek do polí pro zprávu agentům."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request není dostupný",
@@ -2627,7 +2629,15 @@
       "cannotReceiveFiles": "Tato relace nemůže přijímat soubory. Odeberte přílohy, abyste mohli odeslat zprávu.",
       "couldNotAttachFiles": "Soubory se nepodařilo připojit. Klepnutím na odeslat to zkuste znovu.",
       "discardAttachmentsMessage": "Nahrané soubory nepřipojené k odeslaným zprávám budou smazány.",
-      "discardAttachmentsTitle": "Zahodit přílohy?"
+      "discardAttachmentsTitle": "Zahodit přílohy?",
+      "charactersRemaining": "Zbývající počet znaků: {{count}}",
+      "insertNewline": "Vložit nový řádek",
+      "starterChipBuild": "Vytvořit funkci",
+      "starterChipEmpty": "Začít nápadem",
+      "starterChipFix": "Opravit chybu",
+      "starterChipPrepare": "Nastavit mé prostředí",
+      "starterChipWrapUp": "Dokončit mou relaci",
+      "starterChipWriteTests": "Napsat testy"
     },
     "chatLink": {
       "linkCopied": "Odkaz zkopírován",

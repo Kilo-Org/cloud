@@ -152,7 +152,9 @@
     "appearanceDark": "Mörkt",
     "account": "Konto",
     "prReviewAttribution": "Lägg till appattribution i PR-granskningar",
-    "prReviewAttributionSubtitle": "Lägg till en Reviewed via Kilo-sidfot när du skickar en granskning."
+    "prReviewAttributionSubtitle": "Lägg till en Reviewed via Kilo-sidfot när du skickar en granskning.",
+    "returnSendsMessage": "Returtangenten skickar meddelanden",
+    "returnSendsMessageSubtitle": "När detta är avstängt infogar returtangenten en radbrytning i agenternas meddelandefält."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request inte tillgänglig",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "Denna session kan inte ta emot filer. Ta bort bilagorna för att skicka ditt meddelande.",
       "couldNotAttachFiles": "Det gick inte att bifoga filer. Tryck på skicka för att försöka igen.",
       "discardAttachmentsMessage": "Uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
-      "discardAttachmentsTitle": "Kassera bilagor?"
+      "discardAttachmentsTitle": "Kassera bilagor?",
+      "charactersRemaining": "{{count}} tecken kvar",
+      "insertNewline": "Infoga radbrytning",
+      "starterChipBuild": "Bygg en funktion",
+      "starterChipEmpty": "Börja med en idé",
+      "starterChipFix": "Åtgärda ett fel",
+      "starterChipPrepare": "Konfigurera min miljö",
+      "starterChipWrapUp": "Avsluta min session",
+      "starterChipWriteTests": "Skriv tester"
     },
     "chatLink": {
       "linkCopied": "Länk kopierad",

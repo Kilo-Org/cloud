@@ -152,7 +152,9 @@
     "appearanceDark": "ಡಾರ್ಕ್",
     "account": "ಖಾತೆ",
     "prReviewAttribution": "PR ವಿಮರ್ಶೆಗಳಿಗೆ ಅಪ್ಲಿಕೇಶನ್ ಗುಣಲಕ್ಷಣವನ್ನು ಸೇರಿಸಿ",
-    "prReviewAttributionSubtitle": "ನೀವು ವಿಮರ್ಶೆ ಸಲ್ಲಿಸಿದಾಗ Kilo ಮೂಲಕ ವಿಮರ್ಶಿಸಲಾಗಿದೆ ಫೂಟರ್ ಅನ್ನು ಸೇರಿಸಿ."
+    "prReviewAttributionSubtitle": "ನೀವು ವಿಮರ್ಶೆ ಸಲ್ಲಿಸಿದಾಗ Kilo ಮೂಲಕ ವಿಮರ್ಶಿಸಲಾಗಿದೆ ಫೂಟರ್ ಅನ್ನು ಸೇರಿಸಿ.",
+    "returnSendsMessage": "ರಿಟರ್ನ್ ಕೀ ಸಂದೇಶವನ್ನು ಕಳುಹಿಸುತ್ತದೆ",
+    "returnSendsMessageSubtitle": "ಆಫ್ ಆಗಿದ್ದಾಗ, ರಿಟರ್ನ್ ಕೀ ಏಜೆಂಟ್ ಸಂಯೋಜಕಗಳಲ್ಲಿ ಹೊಸ ಸಾಲನ್ನು ಸೇರಿಸುತ್ತದೆ."
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "ಈ ಸೆಷನ್ ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ನಿಮ್ಮ ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಲು ಲಗತ್ತುಗಳನ್ನು ತೆಗೆದುಹಾಕಿ.",
       "couldNotAttachFiles": "ಫೈಲ್‌ಗಳನ್ನು ಲಗತ್ತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಕಳುಹಿಸಿ ಟ್ಯಾಪ್ ಮಾಡಿ.",
       "discardAttachmentsMessage": "ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳಿಗೆ ಲಗತ್ತಿಸದ ಅಪ್‌ಲೋಡ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ.",
-      "discardAttachmentsTitle": "ಲಗತ್ತುಗಳನ್ನು ತೆಗೆದುಹಾಕಬೇಕೆ?"
+      "discardAttachmentsTitle": "ಲಗತ್ತುಗಳನ್ನು ತೆಗೆದುಹಾಕಬೇಕೆ?",
+      "charactersRemaining": "{{count}} ಅಕ್ಷರಗಳು ಉಳಿದಿವೆ",
+      "insertNewline": "ಹೊಸ ಸಾಲನ್ನು ಸೇರಿಸಿ",
+      "starterChipBuild": "ವೈಶಿಷ್ಟ್ಯವನ್ನು ನಿರ್ಮಿಸಿ",
+      "starterChipEmpty": "ಒಂದು ಆಲೋಚನೆಯೊಂದಿಗೆ ಪ್ರಾರಂಭಿಸಿ",
+      "starterChipFix": "ದೋಷವನ್ನು ಸರಿಪಡಿಸಿ",
+      "starterChipPrepare": "ನನ್ನ ಪರಿಸರವನ್ನು ಹೊಂದಿಸಿ",
+      "starterChipWrapUp": "ನನ್ನ ಸೆಶನ್ ಮುಕ್ತಾಯಗೊಳಿಸಿ",
+      "starterChipWriteTests": "ಪರೀಕ್ಷೆಗಳನ್ನು ಬರೆಯಿರಿ"
     },
     "chatLink": {
       "linkCopied": "ಲಿಂಕ್ ನಕಲಿಸಲಾಗಿದೆ",

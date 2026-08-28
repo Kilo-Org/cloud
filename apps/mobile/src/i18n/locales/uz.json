@@ -152,7 +152,9 @@
     "appearanceDark": "Qorong'i",
     "account": "Hisob",
     "prReviewAttribution": "PR sharhlariga ilova atributini qo'shish",
-    "prReviewAttributionSubtitle": "Sharh yuborganingizda Reviewed via Kilo taglavhasini qo'shing."
+    "prReviewAttributionSubtitle": "Sharh yuborganingizda Reviewed via Kilo taglavhasini qo'shing.",
+    "returnSendsMessage": "Qaytarish tugmasi xabar yuboradi",
+    "returnSendsMessageSubtitle": "O'chirilganda, Qaytarish tugmasi agentlarning xabar kiritish maydonlarida yangi qator kiritadi."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mavjud emas",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "Bu sessiya fayllarni qabul qila olmaydi. Xabarni yuborish uchun biriktirishlarni olib tashlang.",
       "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborishga bosing.",
       "discardAttachmentsMessage": "Yuborilgan xabarlarga biriktirilmagan yuklangan fayllar o'chiriladi.",
-      "discardAttachmentsTitle": "Biriktirilgan fayllar bekor qilinsinmi?"
+      "discardAttachmentsTitle": "Biriktirilgan fayllar bekor qilinsinmi?",
+      "charactersRemaining": "{{count}} ta belgi qoldi",
+      "insertNewline": "Yangi qator kiritish",
+      "starterChipBuild": "Funksiya yaratish",
+      "starterChipEmpty": "G'oya bilan boshlash",
+      "starterChipFix": "Xatoni tuzatish",
+      "starterChipPrepare": "Muhitimni sozlash",
+      "starterChipWrapUp": "Sessiyamni yakunlash",
+      "starterChipWriteTests": "Sinovlar yozish"
     },
     "chatLink": {
       "linkCopied": "Havola nusxalandi",

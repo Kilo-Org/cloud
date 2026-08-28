@@ -152,7 +152,9 @@
     "appearanceDark": "Dukkana",
     "account": "Herrega",
     "prReviewAttribution": "App attribution PR sakatta'ootti dabali",
-    "prReviewAttributionSubtitle": "Kilo ttiin 'Reviewed via Kilo' footar dabali, sakatta'a yeroo galchitu."
+    "prReviewAttributionSubtitle": "Kilo ttiin 'Reviewed via Kilo' footar dabali, sakatta'a yeroo galchitu.",
+    "returnSendsMessage": "Furtuun deebi'uu ergaa ergiti",
+    "returnSendsMessageSubtitle": "Yeroo cufamu, furtuun deebi'uu iddoo ergaa ejentii galchuu keessatti sarara haaraa galchiti."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request hin jiraatu",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "Shumarri kun faayiloota fudhachuu hin danda'u. Ergaa kee erguuf faayiloota baasi.",
       "couldNotAttachFiles": "Faayiloota qabachiisuu hin danda'ine. Erguuf ergi cuqaasa.",
       "discardAttachmentsMessage": "Faayiloonni ol fe'aman kan ergaawwan ergamanitti hin qabachiifamne ni haqamu.",
-      "discardAttachmentsTitle": "Faayiloota qabachiifaman haqnaa?"
+      "discardAttachmentsTitle": "Faayiloota qabachiifaman haqnaa?",
+      "charactersRemaining": "Qubeelaa {{count}} hafe",
+      "insertNewline": "Sarara haaraa galchaa",
+      "starterChipBuild": "Amala haaraa ijaaraa",
+      "starterChipEmpty": "Yaada tokkoon jalqabaa",
+      "starterChipFix": "Dogoggora sirreessaa",
+      "starterChipPrepare": "Naannoo koo qopheessaa",
+      "starterChipWrapUp": "Xalayyii koo xumuraa",
+      "starterChipWriteTests": "Qormaata barreessaa"
     },
     "chatLink": {
       "linkCopied": "Geessituun maxxanameera",

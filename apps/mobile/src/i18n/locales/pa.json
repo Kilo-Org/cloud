@@ -152,7 +152,9 @@
     "appearanceDark": "ਗੂੜ੍ਹਾ",
     "account": "ਖਾਤਾ",
     "prReviewAttribution": "PR ਸਮੀਖਿਆਵਾਂ ਵਿੱਚ ਐਪ ਐਟ੍ਰੀਬਿਊਸ਼ਨ ਸ਼ਾਮਲ ਕਰੋ",
-    "prReviewAttributionSubtitle": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਕਰਨ ਵੇਲੇ Kilo ਰਾਹੀਂ ਸਮੀਖਿਆ ਕੀਤੀ ਫੁੱਟਰ ਜੋੜੋ।"
+    "prReviewAttributionSubtitle": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਕਰਨ ਵੇਲੇ Kilo ਰਾਹੀਂ ਸਮੀਖਿਆ ਕੀਤੀ ਫੁੱਟਰ ਜੋੜੋ।",
+    "returnSendsMessage": "ਰਿਟਰਨ ਕੁੰਜੀ ਸੁਨੇਹਾ ਭੇਜਦੀ ਹੈ",
+    "returnSendsMessageSubtitle": "ਬੰਦ ਹੋਣ 'ਤੇ, ਰਿਟਰਨ ਏਜੰਟ ਕੰਪੋਜ਼ਰਾਂ ਵਿੱਚ ਨਵੀਂ ਲਾਈਨ ਪਾਉਂਦੀ ਹੈ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "ਇਹ ਸੈਸ਼ਨ ਫਾਈਲਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ। ਆਪਣਾ ਸੁਨੇਹਾ ਭੇਜਣ ਲਈ ਅਟੈਚਮੈਂਟ ਹਟਾਓ।",
       "couldNotAttachFiles": "ਫਾਈਲਾਂ ਅਟੈਚ ਨਹੀਂ ਹੋ ਸਕੀਆਂ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਭੇਜੋ ਟੈਪ ਕਰੋ।",
       "discardAttachmentsMessage": "ਭੇਜੇ ਗਏ ਸੁਨੇਹਿਆਂ ਨਾਲ ਅਟੈਚ ਨਾ ਕੀਤੀਆਂ ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ।",
-      "discardAttachmentsTitle": "ਅਟੈਚਮੈਂਟਾਂ ਮਿਟਾਈਏ?"
+      "discardAttachmentsTitle": "ਅਟੈਚਮੈਂਟਾਂ ਮਿਟਾਈਏ?",
+      "charactersRemaining": "{{count}} ਅੱਖਰ ਬਾਕੀ ਹਨ",
+      "insertNewline": "ਨਵੀਂ ਲਾਈਨ ਪਾਓ",
+      "starterChipBuild": "ਇੱਕ ਵਿਸ਼ੇਸ਼ਤਾ ਬਣਾਓ",
+      "starterChipEmpty": "ਇੱਕ ਵਿਚਾਰ ਨਾਲ ਸ਼ੁਰੂ ਕਰੋ",
+      "starterChipFix": "ਇੱਕ ਤਰੁੱਟੀ ਠੀਕ ਕਰੋ",
+      "starterChipPrepare": "ਮੇਰਾ ਵਾਤਾਵਰਨ ਸੈੱਟ ਕਰੋ",
+      "starterChipWrapUp": "ਮੇਰਾ ਸੈਸ਼ਨ ਮੁਕੰਮਲ ਕਰੋ",
+      "starterChipWriteTests": "ਟੈਸਟ ਲਿਖੋ"
     },
     "chatLink": {
       "linkCopied": "ਲਿੰਕ ਕਾਪੀ ਹੋ ਗਿਆ",

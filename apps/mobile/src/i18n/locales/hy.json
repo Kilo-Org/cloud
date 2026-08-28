@@ -152,7 +152,9 @@
     "appearanceDark": "Մուգ",
     "account": "Հաշիվ",
     "prReviewAttribution": "Ավելացնել հավելվածի վերագրումը PR ակնարկներին",
-    "prReviewAttributionSubtitle": "Ավելացնել «Վերանայվել է Kilo-ի միջոցով» ստորագիրը, երբ ներկայացնում եք ակնարկ:"
+    "prReviewAttributionSubtitle": "Ավելացնել «Վերանայվել է Kilo-ի միջոցով» ստորագիրը, երբ ներկայացնում եք ակնարկ:",
+    "returnSendsMessage": "Վերադարձի ստեղնն ուղարկում է հաղորդագրությունը",
+    "returnSendsMessageSubtitle": "Երբ անջատված է, վերադարձի ստեղնը նոր տող է տեղադրում գործակալների հաղորդագրության մուտքագրման դաշտերում։"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-ը հասանելի չէ",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "Այս նիստը չի կարող ընդունել ֆայլեր: Հեռացրեք կցումները՝ հաղորդագրությունն ուղարկելու համար:",
       "couldNotAttachFiles": "Հնարավոր չեղավ կցել ֆայլերը: Հպեք «Ուղարկել»՝ նորից փորձելու համար:",
       "discardAttachmentsMessage": "Ուղարկված հաղորդագրություններին չկցված վերբեռնված ֆայլերը կջնջվեն։",
-      "discardAttachmentsTitle": "Մերժե՞լ կցորդները"
+      "discardAttachmentsTitle": "Մերժե՞լ կցորդները",
+      "charactersRemaining": "Մնացել է {{count}} նիշ",
+      "insertNewline": "Տեղադրել նոր տող",
+      "starterChipBuild": "Ստեղծել գործառույթ",
+      "starterChipEmpty": "Սկսել գաղափարից",
+      "starterChipFix": "Շտկել սխալը",
+      "starterChipPrepare": "Կարգավորել իմ միջավայրը",
+      "starterChipWrapUp": "Ավարտել իմ նիստը",
+      "starterChipWriteTests": "Գրել թեստեր"
     },
     "chatLink": {
       "linkCopied": "Հղումը պատճենված է",

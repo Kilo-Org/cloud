@@ -152,7 +152,9 @@
     "appearanceDark": "მუქი",
     "account": "ანგარიში",
     "prReviewAttribution": "აპლიკაციის მითითების დამატება PR რეცენზიებში",
-    "prReviewAttributionSubtitle": "დაამატეთ „განხილულია Kilo-ს მეშვეობით“ ქვედა წარწერა, როცა რეცენზიას გაგზავნით."
+    "prReviewAttributionSubtitle": "დაამატეთ „განხილულია Kilo-ს მეშვეობით“ ქვედა წარწერა, როცა რეცენზიას გაგზავნით.",
+    "returnSendsMessage": "დაბრუნების კლავიში აგზავნის შეტყობინებას",
+    "returnSendsMessageSubtitle": "როცა გამორთულია, დაბრუნების კლავიში აგენტის შეტყობინების შეყვანის ველებში ახალ ხაზს ამატებს."
   },
   "prReview": {
     "pullRequestUnavailable": "პულ-რექვესთი მიუწვდომელია",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "ამ სესიას ფაილების მიღება არ შეუძლია. შეტყობინების გასაგზავნად ამოიღეთ დანართები.",
       "couldNotAttachFiles": "ფაილების მიმაგრება ვერ მოხერხდა. ხელახლა სცადეთ.",
       "discardAttachmentsMessage": "აიტვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
-      "discardAttachmentsTitle": "გავაუქმოთ დანართები?"
+      "discardAttachmentsTitle": "გავაუქმოთ დანართები?",
+      "charactersRemaining": "დარჩენილია {{count}} სიმბოლო",
+      "insertNewline": "ახალი ხაზის ჩასმა",
+      "starterChipBuild": "შექმენით ფუნქცია",
+      "starterChipEmpty": "დაიწყეთ იდეით",
+      "starterChipFix": "შეასწორეთ შეცდომა",
+      "starterChipPrepare": "გამართეთ ჩემი გარემო",
+      "starterChipWrapUp": "დაასრულეთ ჩემი სესია",
+      "starterChipWriteTests": "დაწერეთ ტესტები"
     },
     "chatLink": {
       "linkCopied": "ბმული დაკოპირდა",

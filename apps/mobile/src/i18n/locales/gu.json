@@ -152,7 +152,9 @@
     "appearanceDark": "ડાર્ક",
     "account": "એકાઉન્ટ",
     "prReviewAttribution": "PR સમીક્ષાઓમાં એપ એટ્રિબ્યુશન ઉમેરો",
-    "prReviewAttributionSubtitle": "સમીક્ષા સબમિટ કરતી વખતે Reviewed via Kilo ફૂટર જોડો."
+    "prReviewAttributionSubtitle": "સમીક્ષા સબમિટ કરતી વખતે Reviewed via Kilo ફૂટર જોડો.",
+    "returnSendsMessage": "રિટર્ન કી સંદેશ મોકલે છે",
+    "returnSendsMessageSubtitle": "બંધ હોય ત્યારે, રિટર્ન એજન્ટના સંદેશ ઇનપુટમાં નવી લાઇન દાખલ કરે છે."
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
@@ -2589,7 +2591,15 @@
       "cannotReceiveFiles": "આ સત્ર ફાઇલો મેળવી શકતું નથી. તમારો સંદેશ મોકલવા માટે એટેચમેન્ટ્સ દૂર કરો.",
       "couldNotAttachFiles": "ફાઇલો એટેચ કરી શકાઈ નહીં. ફરી પ્રયાસ કરવા મોકલો ટેપ કરો.",
       "discardAttachmentsMessage": "મોકલેલા સંદેશોમાં એટેચ ન કરેલી અપલોડ થયેલી ફાઇલો કાઢી નાખવામાં આવશે.",
-      "discardAttachmentsTitle": "એટેચમેન્ટ્સ કાઢી નાખવા છે?"
+      "discardAttachmentsTitle": "એટેચમેન્ટ્સ કાઢી નાખવા છે?",
+      "charactersRemaining": "{{count}} અક્ષરો બાકી",
+      "insertNewline": "નવી લાઇન દાખલ કરો",
+      "starterChipBuild": "સુવિધા બનાવો",
+      "starterChipEmpty": "વિચારથી શરૂઆત કરો",
+      "starterChipFix": "ભૂલ સુધારો",
+      "starterChipPrepare": "મારું એન્વાયર્નમેન્ટ સેટ કરો",
+      "starterChipWrapUp": "મારું સત્ર પૂર્ણ કરો",
+      "starterChipWriteTests": "પરીક્ષણો લખો"
     },
     "chatLink": {
       "linkCopied": "લિંક કૉપિ થઈ",

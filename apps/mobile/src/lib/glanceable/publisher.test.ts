@@ -143,46 +143,64 @@ describe('GlanceablePublisher', () => {
     expect(lastSnapshot(calls, 'publish').status).toBe('empty');
   });
 
-  it('keeps counts on stale and hides counts on expired', () => {
-    const { sink, calls } = makeSink();
-    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
-    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
-    publisher.handleFetchError(PUB_CTX);
-    expect(lastSnapshot(calls, 'publish').status).toBe('stale');
-    expect(lastSnapshot(calls, 'publish').running).toBe(1);
-
+  it('keeps the original deadline through repeated failures and stays expired after it', () => {
     let now = NOW;
-    const { sink: sink2, calls: calls2 } = makeSink();
-    const publisher2 = new GlanceablePublisher({ sinks: [sink2], now: () => now });
-    publisher2.handleSessions([{ status: 'busy' }], PUB_CTX);
-    now = NOW + GLANCEABLE_SNAPSHOT_EXPIRY_MS;
-    publisher2.handleSessions([{ status: 'busy' }], PUB_CTX);
-    const expired = calls2.filter(
-      (call): call is { type: 'publish'; snapshot: GlanceableAgentsSnapshot } =>
-        call.type === 'publish' && call.snapshot.status === 'expired'
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now });
+    publisher.handleSessions(
+      [{ status: 'busy' }, { status: 'question' }, { status: 'retry' }],
+      PUB_CTX
     );
-    expect(expired.length).toBe(1);
-    expect(expired[0]?.snapshot.running).toBe(0);
+    const successful = lastSnapshot(calls, 'publish');
+    const failures = [
+      [60_000, 'stale', 1],
+      [GLANCEABLE_SNAPSHOT_EXPIRY_MS - 1, 'stale', 1],
+      [GLANCEABLE_SNAPSHOT_EXPIRY_MS, 'expired', 0],
+      [GLANCEABLE_SNAPSHOT_EXPIRY_MS + 60_000, 'expired', 0],
+    ] as const;
+    for (const [index, [elapsed, status, expectedCount]] of failures.entries()) {
+      now = NOW + elapsed;
+      publisher.handleFetchError(PUB_CTX);
+      expect(lastSnapshot(calls, 'publish')).toMatchObject({
+        revision: index + 2,
+        updatedAt: successful.updatedAt,
+        expiresAt: successful.expiresAt,
+        scopeKey: successful.scopeKey,
+        status,
+        running: expectedCount,
+        needsInput: expectedCount,
+        reconnecting: expectedCount,
+      });
+    }
+    expect(lastSnapshot(calls, 'publish').eligibleStartedAt).toBeNull();
+    publisher.dispose();
   });
 
-  it('does not schedule the 8s terminal for a signed-out snapshot', () => {
-    vi.useFakeTimers();
-    const { sink, calls } = makeSink();
-    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
-    publisher.applySnapshot(
-      buildGlanceableSnapshot({
+  it.each(['signed_out', 'privacy'] as const)(
+    'preserves %s through failures and expiry',
+    status => {
+      vi.useFakeTimers();
+      let now = NOW;
+      const { sink, calls } = makeSink();
+      const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now });
+      const blank = buildGlanceableSnapshot({
         sessions: [],
         userId: 'u1',
         organizationId: null,
         now: NOW,
-        status: 'signed_out',
-      }),
-      PUB_CTX
-    );
-    vi.advanceTimersByTime(8000);
-    expect(count(calls, 'endImmediate')).toBe(0);
-    publisher.dispose();
-  });
+        status,
+      });
+      publisher.applySnapshot(blank, PUB_CTX);
+      for (const elapsed of [60_000, GLANCEABLE_SNAPSHOT_EXPIRY_MS + 1]) {
+        now = NOW + elapsed;
+        publisher.handleFetchError(PUB_CTX);
+        expect(lastSnapshot(calls, 'publish')).toEqual(blank);
+      }
+      vi.advanceTimersByTime(8000);
+      expect(count(calls, 'endImmediate')).toBe(0);
+      publisher.dispose();
+    }
+  );
 
   it('does not publish or restart after a terminal blank', () => {
     const { sink, calls } = makeSink();
@@ -201,7 +219,8 @@ describe('GlanceablePublisher', () => {
       expect(lastSnapshot(calls, 'publish').status).toBe('signed_out');
       expect(count(calls, 'endImmediate')).toBe(1);
 
-      // A live cache success after the blank must not publish or restart.
+      // A cache error or success after the blank must not publish or restart.
+      publisher.handleFetchError(PUB_CTX);
       publisher.handleSessions([{ status: 'busy' }, { status: 'busy' }], PUB_CTX);
       expect(count(calls, 'startOrUpdate')).toBe(1);
       expect(count(calls, 'publish')).toBe(2);
@@ -285,13 +304,25 @@ describe('GlanceablePublisher', () => {
     publisher.dispose();
   });
 
-  it('keeps the revision monotonic when seeded from an initial snapshot', () => {
+  it('renews the deadline on successful data while keeping seeded revisions monotonic', () => {
+    let now = NOW;
     const { sink, calls } = makeSink();
-    // Seeded with revision 42; the next snapshot must be 43.
     const initial = snapshotFor([{ status: 'busy' }], NOW - 60_000, 41);
-    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, initial });
-    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
-    expect(lastSnapshot(calls, 'startOrUpdate').revision).toBe(43);
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now, initial });
+    publisher.handleFetchError(PUB_CTX);
+    publisher.handleSessions([{ status: 'question' }], PUB_CTX);
+    const fresh = lastSnapshot(calls, 'startOrUpdate');
+    expect(fresh).toMatchObject({
+      revision: 44,
+      status: 'happy',
+      running: 0,
+      needsInput: 1,
+      updatedAt: new Date(NOW).toISOString(),
+      expiresAt: new Date(NOW + GLANCEABLE_SNAPSHOT_EXPIRY_MS).toISOString(),
+    });
+    now = Date.parse(initial.expiresAt);
+    publisher.handleFetchError(PUB_CTX);
+    expect(lastSnapshot(calls, 'publish')).toEqual({ ...fresh, revision: 45, status: 'stale' });
     publisher.dispose();
   });
 });

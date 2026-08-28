@@ -5,6 +5,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { getLastGlanceableSnapshot } from './persist';
+import { withStatus } from './publisher';
 import { getGlanceableSinks } from './sink-registry';
 
 // Monotonic epoch bumped on every terminal blank (signed-out or privacy). The
@@ -99,8 +100,8 @@ export function writePrivacySnapshotAndEnd(): void {
 }
 
 /**
- * Republish the last snapshot with a stale status (keeps counts). Used by the
- * org fence when the org list errors: stale, not lost-org.
+ * Republish the last snapshot as stale until its deadline, then expired. Used
+ * by the org fence when the org list errors: stale, not lost-org.
  */
 export function republishLastSnapshotStale(): void {
   const previous = getLastGlanceableSnapshot();
@@ -112,15 +113,7 @@ export function republishLastSnapshotStale(): void {
   if (previous.status === 'signed_out' || previous.status === 'privacy') {
     return;
   }
-  const now = Date.now();
-  const updatedAt = new Date(now).toISOString();
-  const snapshot: GlanceableAgentsSnapshot = {
-    ...previous,
-    revision: previous.revision + 1,
-    updatedAt,
-    expiresAt: new Date(now + GLANCEABLE_SNAPSHOT_EXPIRY_MS).toISOString(),
-    status: 'stale',
-  };
+  const snapshot = withStatus(previous, 'stale', Date.now());
   for (const sink of getGlanceableSinks()) {
     sink.publish(snapshot);
   }

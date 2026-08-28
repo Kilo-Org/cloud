@@ -2547,7 +2547,9 @@
       "uploading": "Ina-upload…",
       "uploaded": "Na-upload",
       "uploadFailedRetry": "Nabigo ang upload. I-tap para subukang muli.",
-      "uploadFailedTerminal": "Hindi ma-upload ang file na ito."
+      "uploadFailedTerminal": "Hindi ma-upload ang file na ito.",
+      "moveLeft": "Ilipat ang {{filename}} pakaliwa",
+      "moveRight": "Ilipat ang {{filename}} pakanan"
     },
     "attachmentPasteHint": {
       "accessibility": "I-paste ang imahe mula sa clipboard",

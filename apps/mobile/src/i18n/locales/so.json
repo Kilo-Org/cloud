@@ -2547,7 +2547,9 @@
       "uploading": "Soo gudbinaya…",
       "uploaded": "Waa la soo gudbiyay",
       "uploadFailedRetry": "Soo gudbintu way ku guuldarraystay. Taabo si aad mar kale isku daydo.",
-      "uploadFailedTerminal": "Faylkan lama soo gudbin karo."
+      "uploadFailedTerminal": "Faylkan lama soo gudbin karo.",
+      "moveLeft": "U dhaqaaji {{filename}} bidix",
+      "moveRight": "U dhaqaaji {{filename}} midig"
     },
     "attachmentPasteHint": {
       "accessibility": "Ku dheji sawirka saxanka qorista",

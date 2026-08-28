@@ -2585,7 +2585,9 @@
       "uploading": "Загрузка…",
       "uploaded": "Загружана",
       "uploadFailedRetry": "Загрузка не ўдалася. Націсніце, каб паўтарыць.",
-      "uploadFailedTerminal": "Гэты файл нельга загрузіць."
+      "uploadFailedTerminal": "Гэты файл нельга загрузіць.",
+      "moveLeft": "Перамясціць {{filename}} улева",
+      "moveRight": "Перамясціць {{filename}} управа"
     },
     "attachmentPasteHint": {
       "accessibility": "Уставіць выяву з буфера абмену",

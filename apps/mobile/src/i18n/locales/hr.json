@@ -2566,7 +2566,9 @@
       "uploading": "Učitavanje…",
       "uploaded": "Učitano",
       "uploadFailedRetry": "Učitavanje nije uspjelo. Dodirnite za ponovni pokušaj.",
-      "uploadFailedTerminal": "Ova datoteka ne može se učitati."
+      "uploadFailedTerminal": "Ova datoteka ne može se učitati.",
+      "moveLeft": "Pomaknite {{filename}} ulijevo",
+      "moveRight": "Pomaknite {{filename}} udesno"
     },
     "attachmentPasteHint": {
       "accessibility": "Zalijepi sliku iz međuspremnika",

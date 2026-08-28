@@ -2547,7 +2547,9 @@
       "uploading": "ಅಪ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "uploaded": "ಅಪ್‌ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
       "uploadFailedRetry": "ಅಪ್‌ಲೋಡ್ ವಿಫಲವಾಗಿದೆ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ.",
-      "uploadFailedTerminal": "ಈ ಫೈಲ್ ಅನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ."
+      "uploadFailedTerminal": "ಈ ಫೈಲ್ ಅನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+      "moveLeft": "{{filename}} ಅನ್ನು ಎಡಕ್ಕೆ ಸರಿಸಿ",
+      "moveRight": "{{filename}} ಅನ್ನು ಬಲಕ್ಕೆ ಸರಿಸಿ"
     },
     "attachmentPasteHint": {
       "accessibility": "ಕ್ಲಿಪ್‌ಬೋರ್ಡ್‌ನಿಂದ ಚಿತ್ರ ಅಂಟಿಸಿ",

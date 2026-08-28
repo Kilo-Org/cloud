@@ -2566,7 +2566,9 @@
       "uploading": "A carregar…",
       "uploaded": "Carregado",
       "uploadFailedRetry": "Falha no carregamento. Toque para repetir.",
-      "uploadFailedTerminal": "Este ficheiro não pode ser carregado."
+      "uploadFailedTerminal": "Este ficheiro não pode ser carregado.",
+      "moveLeft": "Mover {{filename}} para a esquerda",
+      "moveRight": "Mover {{filename}} para a direita"
     },
     "attachmentPasteHint": {
       "accessibility": "Colar imagem da área de transferência",

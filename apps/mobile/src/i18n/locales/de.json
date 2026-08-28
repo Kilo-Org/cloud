@@ -2093,7 +2093,9 @@
       "uploading": "Wird hochgeladen…",
       "uploaded": "Hochgeladen",
       "uploadFailedRetry": "Hochladen fehlgeschlagen. Zum erneuten Versuch tippen.",
-      "uploadFailedTerminal": "Diese Datei kann nicht hochgeladen werden."
+      "uploadFailedTerminal": "Diese Datei kann nicht hochgeladen werden.",
+      "moveLeft": "{{filename}} nach links verschieben",
+      "moveRight": "{{filename}} nach rechts verschieben"
     },
     "attachmentPasteHint": {
       "accessibility": "Bild aus der Zwischenablage einfügen",

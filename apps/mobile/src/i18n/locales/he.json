@@ -2105,7 +2105,9 @@
       "uploading": "מעלה…",
       "uploaded": "הועלה",
       "uploadFailedRetry": "ההעלאה נכשלה. הקש כדי לנסות שוב.",
-      "uploadFailedTerminal": "לא ניתן להעלות את הקובץ הזה."
+      "uploadFailedTerminal": "לא ניתן להעלות את הקובץ הזה.",
+      "moveLeft": "הזז את {{filename}} שמאלה",
+      "moveRight": "הזז את {{filename}} ימינה"
     },
     "attachmentPasteHint": {
       "accessibility": "הדבק תמונה מהלוח",

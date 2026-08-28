@@ -2604,7 +2604,9 @@
       "uploading": "Ag uaslódáil…",
       "uploaded": "Uaslódáilte",
       "uploadFailedRetry": "Theip ar an uaslódáil. Tapáil le hathiarracht a dhéanamh.",
-      "uploadFailedTerminal": "Ní féidir an comhad seo a uaslódáil."
+      "uploadFailedTerminal": "Ní féidir an comhad seo a uaslódáil.",
+      "moveLeft": "Bog {{filename}} ar chlé",
+      "moveRight": "Bog {{filename}} ar dheis"
     },
     "attachmentPasteHint": {
       "accessibility": "Greamaigh íomhá ón ngearrthaisce",

@@ -2547,7 +2547,9 @@
       "uploading": "Enviando…",
       "uploaded": "Enviado",
       "uploadFailedRetry": "Fallou o envío. Toca para reintentar.",
-      "uploadFailedTerminal": "Este arquivo non se pode subir."
+      "uploadFailedTerminal": "Este arquivo non se pode subir.",
+      "moveLeft": "Mover {{filename}} á esquerda",
+      "moveRight": "Mover {{filename}} á dereita"
     },
     "attachmentPasteHint": {
       "accessibility": "Pegar imaxe do portapapeis",

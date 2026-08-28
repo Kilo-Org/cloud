@@ -2547,7 +2547,9 @@
       "uploading": "Վերբեռնվում է…",
       "uploaded": "Վերբեռնված",
       "uploadFailedRetry": "Վերբեռնումը ձախողվեց: Հպեք՝ նորից փորձելու համար:",
-      "uploadFailedTerminal": "Այս ֆայլը հնարավոր չէ վերբեռնել:"
+      "uploadFailedTerminal": "Այս ֆայլը հնարավոր չէ վերբեռնել:",
+      "moveLeft": "Տեղափոխել {{filename}} ձախ",
+      "moveRight": "Տեղափոխել {{filename}} աջ"
     },
     "attachmentPasteHint": {
       "accessibility": "Տեղադրել պատկերը սեղմատախտակից",

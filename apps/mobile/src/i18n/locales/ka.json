@@ -2547,7 +2547,9 @@
       "uploading": "ატვირთვა…",
       "uploaded": "ატვირთულია",
       "uploadFailedRetry": "ატვირთვა ვერ მოხერხდა. ხელახლა სცადეთ.",
-      "uploadFailedTerminal": "ამ ფაილის ატვირთვა შეუძლებელია."
+      "uploadFailedTerminal": "ამ ფაილის ატვირთვა შეუძლებელია.",
+      "moveLeft": "გადაიტანეთ {{filename}} მარცხნივ",
+      "moveRight": "გადაიტანეთ {{filename}} მარჯვნივ"
     },
     "attachmentPasteHint": {
       "accessibility": "სურათის ჩასმა ბუფერიდან",

@@ -661,6 +661,222 @@ describe('UserConnectionDO', () => {
       });
     }
 
+    describe('provider status', () => {
+      function historyRequest(): Extract<
+        BrowserProviderOutboundMessage,
+        { type: 'provider_status' }
+      > {
+        return {
+          type: 'provider_status',
+          requestId: crypto.randomUUID(),
+          providerId: registration.providerId,
+          providerProof: registration.providerProof,
+        };
+      }
+
+      it.each(['registered', 'unregistered'] as const)(
+        'returns prior-generation history privately to the %s requester without restoring execution',
+        async requester => {
+          const f = await browserSetup();
+          const first = await approve(f, await invoke(f));
+          await frame(f.doInstance, f.panel, resultMessage(first));
+          await quiesce(f, first);
+          const completed = job(f, first.jobId);
+          await frame(f.doInstance, f.panel, { ...registration, generation: first.generation });
+          const current = await invoke(f, 2);
+          expect(current.generation).toBeGreaterThan(completed.generation);
+          const reader =
+            requester === 'registered' ? f.panel : addWebSocket(f.mockCtx, 'history-reader');
+          if (requester === 'unregistered') await negotiate(f.doInstance, reader, 'web');
+          const request = historyRequest();
+          const before = structuredClone([...f.ctx.storage.store]);
+          const attachments = f.mockCtx.sockets.map(ws => ws.deserializeAttachment());
+          const alarmAt = f.ctx.storage.alarmAt;
+          for (const ws of f.mockCtx.sockets) ws.send.mockClear();
+          vi.mocked(Date.now).mockReturnValue(now + 1_000);
+          f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+
+          await frame(f.doInstance, reader, request);
+
+          expect(allSent(reader)).toEqual([
+            {
+              type: 'provider_status_result',
+              requestId: request.requestId,
+              providerId: registration.providerId,
+              jobs: expect.arrayContaining([completed, current]),
+            },
+          ]);
+          expect(allSent(reader)[0]?.jobs).toHaveLength(2);
+          for (const ws of f.mockCtx.sockets) {
+            if (ws !== reader) expect(allSent(ws)).toEqual([]);
+          }
+          expect([...f.ctx.storage.store]).toEqual(before);
+          expect(f.mockCtx.sockets.map(ws => ws.deserializeAttachment())).toEqual(attachments);
+          expect(f.ctx.storage.alarmAt).toBe(alarmAt);
+        }
+      );
+
+      it('returns fenced interruption history when reconnect registration fails', async () => {
+        const f = await browserSetup();
+        const active = await approve(f, await invoke(f));
+        await f.doInstance.webSocketClose(f.panel as never, 1000, 'closed', true);
+        const reader = addWebSocket(f.mockCtx, 'reconnected-reader');
+        await negotiate(f.doInstance, reader, 'web');
+        const attempt = { ...registration, generation: active.generation };
+        await frame(f.doInstance, reader, attempt);
+        expect(allSent(reader).at(-1)).toMatchObject({
+          type: 'response',
+          id: attempt.requestId,
+          error: { code: 'provider_unavailable', retryable: true },
+        });
+        const interrupted = job(f, active.jobId);
+        expect(interrupted).toMatchObject({
+          status: 'interrupted',
+          result: { reason: 'provider_lost', effectsUncertain: true },
+        });
+        const before = structuredClone([...f.ctx.storage.store]);
+        const attachments = f.mockCtx.sockets.map(ws => ws.deserializeAttachment());
+        for (const ws of f.mockCtx.sockets) ws.send.mockClear();
+        f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+        const request = historyRequest();
+
+        await frame(f.doInstance, reader, request);
+
+        expect(allSent(reader)).toEqual([
+          {
+            type: 'provider_status_result',
+            requestId: request.requestId,
+            providerId: active.providerId,
+            jobs: [interrupted],
+          },
+        ]);
+        for (const ws of f.mockCtx.sockets) {
+          if (ws !== reader) expect(allSent(ws)).toEqual([]);
+        }
+        expect([...f.ctx.storage.store]).toEqual(before);
+        expect(f.mockCtx.sockets.map(ws => ws.deserializeAttachment())).toEqual(attachments);
+        await frame(f.doInstance, reader, attempt);
+        expect(allSent(reader).at(-1)).toMatchObject({
+          type: 'response',
+          id: attempt.requestId,
+          error: { code: 'provider_unavailable', retryable: true },
+        });
+        expect(providerJobs(reader)).toEqual([]);
+      });
+
+      it.each([
+        { name: 'wrong proof', kiloUserId: 'usr_1', providerProof: 'd'.repeat(64) },
+        { name: 'wrong user', kiloUserId: 'usr_2', providerProof: registration.providerProof },
+      ])(
+        'correlates a $name failure without exposing history or changing authority',
+        async fields => {
+          const f = await browserSetup();
+          await invoke(f);
+          const reader = addWebSocket(f.mockCtx, 'denied-reader', [], fields.kiloUserId);
+          await negotiate(f.doInstance, reader, 'web');
+          const request = { ...historyRequest(), providerProof: fields.providerProof };
+          const before = structuredClone([...f.ctx.storage.store]);
+          const attachments = f.mockCtx.sockets.map(ws => ws.deserializeAttachment());
+          for (const ws of f.mockCtx.sockets) ws.send.mockClear();
+          f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+
+          await frame(f.doInstance, reader, request);
+
+          expect(allSent(reader)).toEqual([
+            {
+              type: 'response',
+              id: request.requestId,
+              error: {
+                source: 'relay',
+                code: 'owner_mismatch',
+                message: 'Browser job request rejected: owner_mismatch',
+                retryable: false,
+              },
+            },
+          ]);
+          for (const ws of f.mockCtx.sockets) {
+            if (ws !== reader) expect(allSent(ws)).toEqual([]);
+          }
+          expect([...f.ctx.storage.store]).toEqual(before);
+          expect(f.mockCtx.sockets.map(ws => ws.deserializeAttachment())).toEqual(attachments);
+        }
+      );
+
+      it.each(['CLI', 'unnegotiated web'] as const)(
+        'exposes no history to a %s requester with a valid provider proof',
+        async requester => {
+          const f = await browserSetup();
+          await invoke(f);
+          const reader = requester === 'CLI' ? f.cli : f.viewer;
+          const before = structuredClone([...f.ctx.storage.store]);
+          const attachments = f.mockCtx.sockets.map(ws => ws.deserializeAttachment());
+          for (const ws of f.mockCtx.sockets) ws.send.mockClear();
+
+          await frame(f.doInstance, reader, historyRequest());
+
+          for (const ws of f.mockCtx.sockets) expect(allSent(ws)).toEqual([]);
+          expect([...f.ctx.storage.store]).toEqual(before);
+          expect(f.mockCtx.sockets.map(ws => ws.deserializeAttachment())).toEqual(attachments);
+        }
+      );
+
+      it('returns an empty history without renewing an expired lease or changing its alarm', async () => {
+        const f = await browserSetup();
+        const reader = addWebSocket(f.mockCtx, 'empty-history-reader');
+        await negotiate(f.doInstance, reader, 'web');
+        const request = historyRequest();
+        const before = structuredClone([...f.ctx.storage.store]);
+        const attachment = reader.deserializeAttachment();
+        const alarmAt = f.ctx.storage.alarmAt;
+        for (const ws of f.mockCtx.sockets) ws.send.mockClear();
+        vi.mocked(Date.now).mockReturnValue(now + BROWSER_LEASE_MS + 1);
+
+        await frame(f.doInstance, reader, request);
+
+        expect(allSent(reader)).toEqual([
+          {
+            type: 'provider_status_result',
+            requestId: request.requestId,
+            providerId: registration.providerId,
+            jobs: [],
+          },
+        ]);
+        for (const ws of f.mockCtx.sockets) {
+          if (ws !== reader) expect(allSent(ws)).toEqual([]);
+        }
+        expect([...f.ctx.storage.store]).toEqual(before);
+        expect(reader.deserializeAttachment()).toEqual(attachment);
+        expect(f.ctx.storage.alarmAt).toBe(alarmAt);
+      });
+
+      it('rejects unknown history without creating provider or socket authority', async () => {
+        const f = setup();
+        const reader = addWebSocket(f.mockCtx, 'unknown-history-reader');
+        await negotiate(f.doInstance, reader, 'web');
+        reader.send.mockClear();
+        const attachment = reader.deserializeAttachment();
+        const request = historyRequest();
+
+        await frame(f.doInstance, reader, request);
+
+        expect(allSent(reader)).toEqual([
+          {
+            type: 'response',
+            id: request.requestId,
+            error: {
+              source: 'relay',
+              code: 'not_found',
+              message: 'Browser job request rejected: not_found',
+              retryable: false,
+            },
+          },
+        ]);
+        expect([...f.ctx.storage.store]).toEqual([]);
+        expect(reader.deserializeAttachment()).toEqual(attachment);
+        expect(f.ctx.storage.alarmAt).toBeNull();
+      });
+    });
+
     it('negotiates through legacy acknowledgements and sends no browser frames before opt-in', async () => {
       const { doInstance, mockCtx } = setup();
       const cli = addCliSocket(mockCtx, 'cli', [], undefined, 'usr_1');

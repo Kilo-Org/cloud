@@ -591,9 +591,33 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
+  private async handleBrowserProviderStatus(
+    ws: WebSocket,
+    message: Extract<BrowserProviderOutboundMessage, { type: 'provider_status' }>
+  ): Promise<void> {
+    if (!this.isBrowserSocket(ws)) return;
+    try {
+      this.sendBrowserMessage(ws, await this.browserJobs.providerStatus(ws, message));
+    } catch (error) {
+      if (!(error instanceof BrowserJobStoreError)) throw error;
+      if (this.isBrowserSocket(ws)) {
+        this.sendToWeb(ws, {
+          type: 'response',
+          id: message.requestId,
+          error: {
+            source: 'relay',
+            code: error.code,
+            message: error.message,
+            retryable: error.retryable,
+          },
+        });
+      }
+    }
+  }
+
   private async handleBrowserProvider(
     ws: WebSocket,
-    message: BrowserProviderOutboundMessage
+    message: Exclude<BrowserProviderOutboundMessage, { type: 'provider_status' }>
   ): Promise<void> {
     if (!this.isBrowserSocket(ws)) return;
     try {
@@ -849,7 +873,12 @@ export class UserConnectionDO extends DurableObject<Env> {
         const browser = webOutboundWithBrowserMessageSchema.safeParse(parsed);
         if (browser.success && 'providerId' in browser.data) {
           const provider = browser.data;
-          await this.runBrowserOperation(() => this.handleBrowserProvider(ws, provider));
+          if (provider.type === 'provider_status') {
+            // History must not restore execution state or deliver mutation effects.
+            await this.handleBrowserProviderStatus(ws, provider);
+          } else {
+            await this.runBrowserOperation(() => this.handleBrowserProvider(ws, provider));
+          }
           return;
         }
       }

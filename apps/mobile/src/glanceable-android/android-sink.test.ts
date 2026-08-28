@@ -25,15 +25,22 @@ const mocks = vi.hoisted(() => {
     promotion: boolean;
   } | null = null;
 
-  // eslint-disable-next-line max-params -- the fake mirrors the native bridge arguments
+  // Capture the requested bridge timeout, not Android's alarm cancellation behavior.
+  let notificationDeadline: number | null = null;
+  let widgetSnapshot: string | null = null;
+  let widgetDeadline = 0;
+
+  // eslint-disable-next-line max-params -- the fake models the native bridge arguments
   function post(
     title: string,
     text: string,
     _openAgentsLabel: string,
     compactText: string | null,
-    promotion: boolean
+    promotion: boolean,
+    timeoutMs = 0
   ): void {
     notification = { title, text, compactText, promotion };
+    notificationDeadline = timeoutMs > 0 ? Date.now() + timeoutMs : null;
   }
 
   return {
@@ -43,9 +50,17 @@ const mocks = vi.hoisted(() => {
       update: vi.fn(post),
       end: vi.fn(() => {
         notification = null;
+        notificationDeadline = null;
       }),
+      setWidgetSnapshot: vi.fn((snapshot: string, deadline: number) => {
+        widgetSnapshot = snapshot;
+        widgetDeadline = deadline;
+      }),
+      getWidgetSnapshot: () => widgetSnapshot,
     },
     getNotification: () => notification,
+    getRequestedNotificationDeadline: () => notificationDeadline,
+    getWidgetDeadline: () => widgetDeadline,
     requestWidgetUpdate: vi.fn(),
     alert: vi.fn(),
   };
@@ -124,6 +139,9 @@ function deferredPermission(): {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(NOW);
+  mocks.native.setWidgetSnapshot('', 0);
   _resetAndroidSinkForTests();
   _resetAndroidPermissionAlertForTests();
   // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
@@ -187,7 +205,8 @@ describe('androidSink start and update', () => {
       '4 Running',
       'Open agents',
       '4',
-      true
+      true,
+      0
     );
   });
 
@@ -363,31 +382,25 @@ describe('androidSink widget publish and end', () => {
     );
   });
 
-  it('blanks with privacy copy and dismisses the notification on end', async () => {
-    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+  it.each([
+    ['privacy', 'Agents hidden'],
+    ['signed_out', 'Sign in to see agents'],
+  ] as const)('cancels both deadlines immediately for %s', async (status, copy) => {
+    androidSink.publish(MIXED);
+    androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
-    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    androidSink.publish(snapshotFor([], 1, 'empty'));
+    expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
 
-    androidSink.publish(snapshotFor([], 1, 'privacy'));
-    expect(getCurrentWidgetProps()?.statusLine).toBe('Agents hidden');
+    androidSink.publish(snapshotFor([], 2, status));
+    expect(mocks.getNotification()).toBeNull();
+    expect(mocks.getRequestedNotificationDeadline()).toBeNull();
+    expect(mocks.getWidgetDeadline()).toBe(0);
+    vi.setSystemTime(NOW + 28_800_001);
+    expect(getCurrentWidgetProps()?.statusLine).toBe(copy);
     expect(getCurrentWidgetProps()?.countLines).toEqual([]);
-    expect(mocks.native.update).toHaveBeenCalledWith(
-      'Active agents',
-      'Agents hidden',
-      'Open agents',
-      null,
-      true
-    );
-    expect(mocks.getNotification()).toEqual({
-      title: 'Active agents',
-      text: 'Agents hidden',
-      compactText: null,
-      promotion: true,
-    });
-
     androidSink.endImmediate();
     expect(mocks.getNotification()).toBeNull();
-    expect(mocks.native.end).toHaveBeenCalledTimes(1);
   });
 
   it('does not update the notification from publish before it has started', () => {
@@ -422,26 +435,153 @@ describe('androidSink widget publish and end', () => {
     expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
   });
 
-  it('schedules a single future redraw at expiresAt with expired copy', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(NOW);
-    const snapshot = snapshotFor([{ status: 'busy' }], 0);
+  it.each(['happy', 'stale'] as const)(
+    'hands Android the original %s expiry without a JS timer',
+    status => {
+      const snapshot = snapshotFor([{ status: 'busy' }], 0, status);
+      androidSink.publish(snapshot);
+      expect(mocks.getWidgetDeadline()).toBe(NOW + 28_800_000);
+      expect(vi.getTimerCount()).toBe(0);
 
-    androidSink.publish(snapshot);
-    expect(mocks.requestWidgetUpdate).toHaveBeenCalledTimes(1);
+      vi.setSystemTime(NOW + 28_799_999);
+      expect(getCurrentWidgetProps()?.primaryCount).toBe(1);
+      vi.setSystemTime(NOW + 28_800_000);
+      expect(getCurrentWidgetProps()?.statusLine).toBe('Status expired');
+      expect(getCurrentWidgetProps()?.countLines).toEqual([]);
+      expect(getCurrentWidgetProps()?.primaryCount).toBe(0);
+      expect(getCurrentWidgetProps()?.showOpenAgents).toBe(false);
+    }
+  );
 
-    vi.advanceTimersByTime(28_800_000);
-    expect(mocks.requestWidgetUpdate).toHaveBeenCalledTimes(2);
+  it('replaces the old widget deadline and keeps it when only the notification ends', () => {
+    androidSink.publish(MIXED);
+    const newer = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW + 60_000,
+      previousRevision: MIXED.revision,
+    });
+    androidSink.publish(newer);
+    androidSink.endImmediate();
+    expect(mocks.getWidgetDeadline()).toBe(NOW + 28_860_000);
+    vi.setSystemTime(NOW + 28_800_000);
+    expect(getCurrentWidgetProps()?.primaryCount).toBe(1);
+    expect(mocks.getNotification()).toBeNull();
+  });
 
-    const secondCall = mocks.requestWidgetUpdate.mock.calls[1]?.[0] as
-      | { renderWidget?: unknown }
-      | undefined;
-    expect(typeof secondCall?.renderWidget).toBe('function');
-
-    expect(getCurrentWidgetProps()?.statusLine).toBe('Status expired');
+  it('does not extend the successful deadline when stale data is published later', () => {
+    androidSink.publish(MIXED);
+    vi.setSystemTime(NOW + 60_000);
+    androidSink.publish({ ...MIXED, status: 'stale', revision: 2 });
+    expect(mocks.getWidgetDeadline()).toBe(NOW + 28_800_000);
+    expect(getCurrentWidgetProps()?.primaryCount).toBe(2);
+    vi.setSystemTime(NOW + 28_800_000);
     expect(getCurrentWidgetProps()?.countLines).toEqual([]);
-    expect(getCurrentWidgetProps()?.primaryCount).toBe(0);
-    expect(getCurrentWidgetProps()?.showOpenAgents).toBe(false);
+  });
+
+  it('passes an eight-second terminal timeout that survives clearing JS state', async () => {
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    androidSink.publish(snapshotFor([], 1, 'empty'));
+    _resetAndroidSinkForTests();
+
+    expect(mocks.getNotification()).toMatchObject({
+      text: 'No work in progress',
+      compactText: null,
+    });
+    expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
+    expect(mocks.getWidgetDeadline()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('keeps the first terminal deadline across later empty updates', async () => {
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    androidSink.publish(snapshotFor([], 1, 'empty'));
+    vi.setSystemTime(NOW + 4000);
+    androidSink.publish(snapshotFor([], 2, 'empty'));
+    expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
+    vi.setSystemTime(NOW + 8000);
+    androidSink.publish(snapshotFor([], 3, 'empty'));
+    expect(mocks.getNotification()).toBeNull();
+  });
+
+  it('allows the same terminal revision to retry after a native post rejects', async () => {
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    const empty = snapshotFor([], 1, 'empty');
+    mocks.native.update.mockImplementationOnce(() => {
+      throw new Error('Cannot persist the active agents notification timeout');
+    });
+
+    expect(() => {
+      androidSink.publish(empty);
+    }).toThrow('Cannot persist the active agents notification timeout');
+    expect(mocks.getNotification()?.text).toBe('2 Needs input, 3 Reconnecting, 4 Running');
+    expect(mocks.getRequestedNotificationDeadline()).toBeNull();
+
+    vi.setSystemTime(NOW + 3000);
+    androidSink.publish(empty);
+    expect(mocks.getNotification()).toMatchObject({
+      text: 'No work in progress',
+      compactText: null,
+    });
+    expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
+  });
+
+  it.each(['publish', 'startOrUpdate', 'JS reload'] as const)(
+    'requests untimed eligible work through %s after terminal copy',
+    async method => {
+      androidSink.publish(MIXED);
+      androidSink.startOrUpdate(MIXED, CTX);
+      await flushAsync();
+      androidSink.publish(snapshotFor([], 1, 'empty'));
+      expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
+      vi.setSystemTime(NOW + 4000);
+      if (method === 'JS reload') {
+        _resetAndroidSinkForTests();
+      }
+      const newer = { ...MIXED, revision: 3 };
+      if (method === 'publish') {
+        androidSink.publish(newer);
+      } else {
+        androidSink.startOrUpdate(newer, CTX);
+        await flushAsync();
+      }
+
+      expect(mocks.getRequestedNotificationDeadline()).toBeNull();
+      expect(mocks.getNotification()).toMatchObject({
+        text: '2 Needs input, 3 Reconnecting, 4 Running',
+        compactText: '2',
+      });
+      expect(mocks.getWidgetDeadline()).toBe(method === 'publish' ? NOW + 28_800_000 : 0);
+    }
+  );
+
+  it('rejects a pending start when its successful snapshot expires', async () => {
+    const deferred = deferredPermission();
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- the test controls permission resolution
+    _setPermissionReaderForTests(() => deferred.promise);
+    androidSink.startOrUpdate(MIXED, CTX);
+    vi.setSystemTime(NOW + 28_800_000);
+    deferred.resolve('granted');
+    await flushAsync();
+
+    expect(mocks.getNotification()).toBeNull();
+  });
+
+  it('rejects a pending start after an empty snapshot cancels the work', async () => {
+    const deferred = deferredPermission();
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- the test controls permission resolution
+    _setPermissionReaderForTests(() => deferred.promise);
+    androidSink.startOrUpdate(MIXED, CTX);
+    androidSink.publish(snapshotFor([], 1, 'empty'));
+    deferred.resolve('granted');
+    await flushAsync();
+
+    expect(mocks.getNotification()).toBeNull();
+    expect(mocks.getWidgetDeadline()).toBe(0);
   });
 });
 

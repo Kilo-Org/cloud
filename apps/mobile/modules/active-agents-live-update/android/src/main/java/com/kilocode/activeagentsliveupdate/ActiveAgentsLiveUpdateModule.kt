@@ -29,15 +29,23 @@ class ActiveAgentsLiveUpdateModule : Module() {
     }
 
     Function("start") { title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean ->
-      post(title, text, openAgentsLabel, compactText, promotion)
+      post(title, text, openAgentsLabel, compactText, promotion, 0)
     }
 
-    Function("update") { title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean ->
-      post(title, text, openAgentsLabel, compactText, promotion)
+    Function("update") { title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean, timeoutMs: Double ->
+      post(title, text, openAgentsLabel, compactText, promotion, timeoutMs.toLong())
     }
 
     Function("end") {
       dismiss()
+    }
+
+    Function("setWidgetSnapshot") { snapshot: String, expiresAt: Double ->
+      ActiveAgentsDeadlineReceiver.setWidgetSnapshot(context, snapshot, expiresAt.toLong())
+    }
+
+    Function("getWidgetSnapshot") {
+      ActiveAgentsDeadlineReceiver.getWidgetSnapshot(context)
     }
   }
 
@@ -46,6 +54,9 @@ class ActiveAgentsLiveUpdateModule : Module() {
 
   private val notificationManager: NotificationManager
     get() = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+  private val notificationState
+    get() = context.getSharedPreferences("active_agents_notification", Context.MODE_PRIVATE)
 
   private fun smallIconId(): Int =
     context.resources.getIdentifier("notification_icon", "drawable", context.packageName)
@@ -93,7 +104,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
     )
   }
 
-  private fun post(title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean) {
+  private fun post(title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean, timeoutMs: Long) {
     val contentIntent = openAgentsPendingIntent()
     val builder = newBuilder(title)
       .setSmallIcon(smallIconId())
@@ -120,16 +131,39 @@ class ActiveAgentsLiveUpdateModule : Module() {
       builder.setStyle(Notification.ProgressStyle())
     }
 
-    notificationManager.notify(NOTIFICATION_ID, builder.build())
+    // Commit before arming a timeout so process exit cannot lose cancellation state.
+    if (timeoutMs > 0) {
+      check(notificationState.edit().putBoolean(HAS_TIMEOUT, true).commit()) {
+        "Cannot persist the active agents notification timeout"
+      }
+    }
+
+    if (Build.VERSION.SDK_INT >= 26) {
+      // Ordinary updates must retain the notification so onlyAlertOnce suppresses repeat alerts.
+      if (timeoutMs <= 0 && notificationState.getBoolean(HAS_TIMEOUT, false)) {
+        notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
+      }
+      builder.setTimeoutAfter(timeoutMs.coerceAtLeast(0))
+    } else {
+      ActiveAgentsDeadlineReceiver.setLegacyNotificationTimeout(context, timeoutMs)
+    }
+    notificationManager.notify(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID, builder.build())
+    if (timeoutMs <= 0) {
+      notificationState.edit().putBoolean(HAS_TIMEOUT, false).apply()
+    }
   }
 
   private fun dismiss() {
-    notificationManager.cancel(NOTIFICATION_ID)
+    if (Build.VERSION.SDK_INT < 26) {
+      ActiveAgentsDeadlineReceiver.setLegacyNotificationTimeout(context, 0)
+    }
+    notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
+    notificationState.edit().remove(HAS_TIMEOUT).apply()
   }
 
   private companion object {
+    const val HAS_TIMEOUT = "has_timeout"
     const val CHANNEL_ID = "active-agents"
-    const val NOTIFICATION_ID = 1001
     const val OPEN_AGENTS_DEEP_LINK = "kiloapp:///cloud/sessions"
     const val OPEN_AGENTS_REQUEST_CODE = 1002
   }

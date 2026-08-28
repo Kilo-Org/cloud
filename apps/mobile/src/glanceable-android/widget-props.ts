@@ -59,8 +59,23 @@ export function buildAndroidWidgetProps(
   };
 }
 
+/** Every redraw checks the data deadline, including a task queued by an older alarm. */
+export function buildCurrentWidgetProps(
+  snapshot: GlanceableAgentsSnapshot,
+  translate: (key: string) => string
+): AndroidWidgetProps {
+  const expiresAt = Date.parse(snapshot.expiresAt);
+  if (
+    (snapshot.status === 'happy' || snapshot.status === 'stale') &&
+    (!Number.isFinite(expiresAt) || expiresAt <= Date.now())
+  ) {
+    return buildExpiredWidgetProps(snapshot, translate);
+  }
+  return buildAndroidWidgetProps(snapshot, {}, translate);
+}
+
 /** Zero-count expired props: the single future redraw hides counts at expiresAt. */
-export function buildExpiredWidgetProps(
+function buildExpiredWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   translate: (key: string) => string
 ): AndroidWidgetProps {

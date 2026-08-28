@@ -3202,6 +3202,7 @@
     "openAgents": "Open agents",
     "running": "Running",
     "needsInput": "Needs input",
-    "reconnecting": "Reconnecting"
+    "reconnecting": "Reconnecting",
+    "channelName": "Active agents"
   }
 }

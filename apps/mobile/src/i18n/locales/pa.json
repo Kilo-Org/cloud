@@ -3202,6 +3202,7 @@
     "openAgents": "ਏਜੰਟ ਖੋਲ੍ਹੋ",
     "running": "ਚੱਲ ਰਿਹਾ ਹੈ",
     "needsInput": "ਇਨਪੁੱਟ ਦੀ ਲੋੜ ਹੈ",
-    "reconnecting": "ਮੁੜ ਕਨੈਕਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"
+    "reconnecting": "ਮੁੜ ਕਨੈਕਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
+    "channelName": "ਸਰਗਰਮ ਏਜੰਟ"
   }
 }

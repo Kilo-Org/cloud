@@ -3202,6 +3202,7 @@
     "openAgents": "Avage agendid",
     "running": "TÖÖTAB",
     "needsInput": "vajab sisendit",
-    "reconnecting": "Ühenduse taastamine"
+    "reconnecting": "Ühenduse taastamine",
+    "channelName": "Aktiivsed agendid"
   }
 }

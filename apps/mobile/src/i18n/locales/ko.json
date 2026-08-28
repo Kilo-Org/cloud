@@ -3202,6 +3202,7 @@
     "openAgents": "에이전트 열기",
     "running": "실행 중",
     "needsInput": "입력 필요",
-    "reconnecting": "다시 연결 중"
+    "reconnecting": "다시 연결 중",
+    "channelName": "활성 에이전트"
   }
 }

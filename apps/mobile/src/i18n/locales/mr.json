@@ -3202,6 +3202,7 @@
     "openAgents": "एजंट्स उघडा",
     "running": "चालू आहे",
     "needsInput": "इनपुट आवश्यक",
-    "reconnecting": "पुन्हा जोडत आहे"
+    "reconnecting": "पुन्हा जोडत आहे",
+    "channelName": "सक्रिय एजंट्स"
   }
 }

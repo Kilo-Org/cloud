@@ -3202,6 +3202,7 @@
     "openAgents": "عامل‌ها را باز کنید",
     "running": "در حال اجرا",
     "needsInput": "نیاز به ورودی",
-    "reconnecting": "در حال اتصال مجدد"
+    "reconnecting": "در حال اتصال مجدد",
+    "channelName": "عامل‌های فعال"
   }
 }

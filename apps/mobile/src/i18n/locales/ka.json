@@ -3202,6 +3202,7 @@
     "openAgents": "აგენტების გახსნა",
     "running": "მუშაობს",
     "needsInput": "მოითხოვს შეყვანას",
-    "reconnecting": "კავშირის აღდგენა"
+    "reconnecting": "კავშირის აღდგენა",
+    "channelName": "აქტიური აგენტები"
   }
 }

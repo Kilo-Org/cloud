@@ -3223,6 +3223,7 @@
     "openAgents": "Otvorite agente",
     "running": "RADI",
     "needsInput": "treba unos",
-    "reconnecting": "Ponovno povezivanje"
+    "reconnecting": "Ponovno povezivanje",
+    "channelName": "Aktivni agenti"
   }
 }

@@ -3202,6 +3202,7 @@
     "openAgents": "Buka ejen",
     "running": "Sedang berjalan",
     "needsInput": "perlu input",
-    "reconnecting": "Menyambung semula"
+    "reconnecting": "Menyambung semula",
+    "channelName": "Ejen aktif"
   }
 }

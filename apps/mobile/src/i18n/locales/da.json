@@ -3202,6 +3202,7 @@
     "openAgents": "Åbn agenter",
     "running": "KØRER",
     "needsInput": "kræver input",
-    "reconnecting": "Genopretter forbindelsen"
+    "reconnecting": "Genopretter forbindelsen",
+    "channelName": "Aktive agenter"
   }
 }

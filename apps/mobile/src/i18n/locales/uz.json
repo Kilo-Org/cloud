@@ -3202,6 +3202,7 @@
     "openAgents": "Agentlarni oching",
     "running": "Ishlamoqda",
     "needsInput": "kiritish kerak",
-    "reconnecting": "Qayta ulanmoqda"
+    "reconnecting": "Qayta ulanmoqda",
+    "channelName": "Faol agentlar"
   }
 }

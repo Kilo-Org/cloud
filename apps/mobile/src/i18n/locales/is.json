@@ -3202,6 +3202,7 @@
     "openAgents": "Opna umboð",
     "running": "Í gangi",
     "needsInput": "þarfnast inntaks",
-    "reconnecting": "Tengist aftur"
+    "reconnecting": "Tengist aftur",
+    "channelName": "Virk umboð"
   }
 }

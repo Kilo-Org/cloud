@@ -3223,6 +3223,7 @@
     "openAgents": "פתח סוכנים",
     "running": "רץ",
     "needsInput": "נדרש קלט",
-    "reconnecting": "מתחבר מחדש"
+    "reconnecting": "מתחבר מחדש",
+    "channelName": "סוכנים פעילים"
   }
 }

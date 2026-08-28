@@ -3286,6 +3286,7 @@
     "openAgents": "فتح الوكلاء",
     "running": "قيد التشغيل",
     "needsInput": "يتطلب إدخالًا",
-    "reconnecting": "جارٍ إعادة الاتصال"
+    "reconnecting": "جارٍ إعادة الاتصال",
+    "channelName": "الوكلاء النشطون"
   }
 }

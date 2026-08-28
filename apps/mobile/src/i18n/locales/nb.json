@@ -3202,6 +3202,7 @@
     "openAgents": "Åpne agenter",
     "running": "KJØRER",
     "needsInput": "trenger innspill",
-    "reconnecting": "Kobler til på nytt"
+    "reconnecting": "Kobler til på nytt",
+    "channelName": "Aktive agenter"
   }
 }

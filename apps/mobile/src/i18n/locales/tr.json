@@ -3202,6 +3202,7 @@
     "openAgents": "Ajanları açın",
     "running": "Çalışıyor",
     "needsInput": "Girdi gerekli",
-    "reconnecting": "Yeniden bağlanılıyor"
+    "reconnecting": "Yeniden bağlanılıyor",
+    "channelName": "Etkin ajanlar"
   }
 }

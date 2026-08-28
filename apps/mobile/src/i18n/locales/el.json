@@ -3202,6 +3202,7 @@
     "openAgents": "Ανοίξτε τους πράκτορες",
     "running": "Σε εξέλιξη",
     "needsInput": "χρειάζεται είσοδο",
-    "reconnecting": "Επανασύνδεση"
+    "reconnecting": "Επανασύνδεση",
+    "channelName": "Ενεργοί πράκτορες"
   }
 }

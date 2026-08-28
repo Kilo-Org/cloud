@@ -3223,6 +3223,7 @@
     "openAgents": "Apri agenti",
     "running": "IN ESECUZIONE",
     "needsInput": "richiede input",
-    "reconnecting": "Riconnessione in corso"
+    "reconnecting": "Riconnessione in corso",
+    "channelName": "Agenti attivi"
   }
 }

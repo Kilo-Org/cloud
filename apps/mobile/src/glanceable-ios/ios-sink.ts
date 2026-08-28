@@ -103,10 +103,13 @@ export const iosSink: GlanceableSink = {
   publish(snapshot) {
     const props = buildGlanceableViewProps(snapshot, {}, translate);
     ActiveAgentsWidget.updateSnapshot(props);
-    ActiveAgentsWidget.updateTimeline([
-      { date: new Date(), props },
-      { date: new Date(snapshot.expiresAt), props: buildExpiredProps(snapshot) },
-    ]);
+    // updateSnapshot replaces the timeline, so terminal copy needs no expiry frame.
+    if (snapshot.status !== 'signed_out' && snapshot.status !== 'privacy') {
+      ActiveAgentsWidget.updateTimeline([
+        { date: new Date(), props },
+        { date: new Date(snapshot.expiresAt), props: buildExpiredProps(snapshot) },
+      ]);
+    }
     // Mirror the published snapshot onto a present Live Activity so the empty
     // "No work in progress" and stale "Can't update now" copy shows during the
     // terminal window before `endImmediate` ends it. Never start an activity

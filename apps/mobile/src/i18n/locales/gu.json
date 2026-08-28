@@ -750,7 +750,8 @@
       "networkError": "નેટવર્ક ભૂલ",
       "uploadFailed": "અપલોડ નિષ્ફળ",
       "failedToUploadFile": "ફાઇલ અપલોડ કરવામાં નિષ્ફળ: {{reason}}",
-      "nothingToPaste": "પેસ્ટ કરવા માટે કંઈ નથી"
+      "nothingToPaste": "પેસ્ટ કરવા માટે કંઈ નથી",
+      "metadataStripFailed": "ફોટો મેટાડેટા દૂર કરી શકાયું નહીં."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "{{title}} ચાલુ કરી રહ્યાં છીએ",
       "importingSession": "સત્ર આયાત કરી રહ્યાં છીએ",
       "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
-      "importFailed": "આ સત્ર આયાત કરી શક્યા નથી."
+      "importFailed": "આ સત્ર આયાત કરી શક્યા નથી.",
+      "discardWithUploadsMessage": "તમારો પ્રોમ્પ્ટ અને મોકલેલા સંદેશોમાં એટેચ ન કરેલી અપલોડ થયેલી ફાઇલો કાઢી નાખવામાં આવશે."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ કરેલ",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "પૂર્ણ થઈ રહ્યું છે...",
       "messagePlaceholder": "સંદેશ...",
       "cannotReceiveFiles": "આ સત્ર ફાઇલો મેળવી શકતું નથી. તમારો સંદેશ મોકલવા માટે એટેચમેન્ટ્સ દૂર કરો.",
-      "couldNotAttachFiles": "ફાઇલો એટેચ કરી શકાઈ નહીં. ફરી પ્રયાસ કરવા મોકલો ટેપ કરો."
+      "couldNotAttachFiles": "ફાઇલો એટેચ કરી શકાઈ નહીં. ફરી પ્રયાસ કરવા મોકલો ટેપ કરો.",
+      "discardAttachmentsMessage": "મોકલેલા સંદેશોમાં એટેચ ન કરેલી અપલોડ થયેલી ફાઇલો કાઢી નાખવામાં આવશે.",
+      "discardAttachmentsTitle": "એટેચમેન્ટ્સ કાઢી નાખવા છે?"
     },
     "chatLink": {
       "linkCopied": "લિંક કૉપિ થઈ",

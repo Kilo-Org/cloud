@@ -266,7 +266,8 @@
       "networkError": "नेटवर्क त्रुटि",
       "uploadFailed": "अपलोड विफल",
       "failedToUploadFile": "फ़ाइल अपलोड करने में विफल: {{reason}}",
-      "nothingToPaste": "चिपकाने के लिए कुछ नहीं"
+      "nothingToPaste": "चिपकाने के लिए कुछ नहीं",
+      "metadataStripFailed": "फ़ोटो का मेटाडेटा हटाया नहीं जा सका।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1759,7 +1760,8 @@
       "cliCannotContinue": "यह CLI सत्र जारी नहीं रख सकता। Cloud Agent या कोई अन्य CLI चुनें।",
       "continueFrom": "{{title}} जारी रखा जा रहा है",
       "importFailed": "यह सत्र आयात नहीं हो सका।",
-      "importingSession": "सत्र आयात किया जा रहा है"
+      "importingSession": "सत्र आयात किया जा रहा है",
+      "discardWithUploadsMessage": "आपका प्रॉम्प्ट और भेजे गए संदेशों से न जुड़ी अपलोड की गई फ़ाइलें हटा दी जाएँगी।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई",
@@ -2087,7 +2089,9 @@
       "finalizingPlaceholder": "समाप्त किया जा रहा है...",
       "messagePlaceholder": "संदेश...",
       "cannotReceiveFiles": "यह सत्र फ़ाइलें प्राप्त नहीं कर सकता। अपना संदेश भेजने के लिए अटैचमेंट हटाएँ।",
-      "couldNotAttachFiles": "फ़ाइलें संलग्न नहीं की जा सकीं। फिर से कोशिश करने के लिए भेजें पर टैप करें।"
+      "couldNotAttachFiles": "फ़ाइलें संलग्न नहीं की जा सकीं। फिर से कोशिश करने के लिए भेजें पर टैप करें।",
+      "discardAttachmentsMessage": "भेजे गए संदेशों से न जुड़ी अपलोड की गई फ़ाइलें हटा दी जाएँगी।",
+      "discardAttachmentsTitle": "संलग्नक ख़ारिज करें?"
     },
     "chatLink": {
       "linkCopied": "लिंक कॉपी किया गया",

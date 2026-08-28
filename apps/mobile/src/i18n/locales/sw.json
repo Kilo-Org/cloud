@@ -750,7 +750,8 @@
       "networkError": "Hitilafu ya mtandao",
       "uploadFailed": "Kupakia kumeshindwa",
       "failedToUploadFile": "Imeshindwa kupakia faili: {{reason}}",
-      "nothingToPaste": "Hakuna cha kubandika"
+      "nothingToPaste": "Hakuna cha kubandika",
+      "metadataStripFailed": "Imeshindwa kuondoa metadata ya picha."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
       "continueFrom": "Endelea na {{title}}",
       "importFailed": "Haikuweza kuingiza kikao hiki.",
-      "importingSession": "Inaingiza kikao"
+      "importingSession": "Inaingiza kikao",
+      "discardWithUploadsMessage": "Maagizo yako na faili zozote zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa."
     },
     "partRenderer": {
       "updatedFileCount_one": "Imesasisha faili {{displayCount}}",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Inahitimisha...",
       "messagePlaceholder": "Ujumbe...",
       "cannotReceiveFiles": "Kikao hiki hakiwezi kupokea faili. Ondoa viambatisho ili utume ujumbe wako.",
-      "couldNotAttachFiles": "Haikuweza kuambatisha faili. Gusa tuma ili ujaribu tena."
+      "couldNotAttachFiles": "Haikuweza kuambatisha faili. Gusa tuma ili ujaribu tena.",
+      "discardAttachmentsMessage": "Faili zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa.",
+      "discardAttachmentsTitle": "Tupa viambatisho?"
     },
     "chatLink": {
       "linkCopied": "Kiungo kimenakiliwa",

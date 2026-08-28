@@ -750,7 +750,8 @@
       "networkError": "የአውታረ መረብ ስህተት",
       "uploadFailed": "መጫን አልተሳካም",
       "failedToUploadFile": "ፋይሉን መጫን አልተሳካም: {{reason}}",
-      "nothingToPaste": "የሚለጠፍ ነገር የለም"
+      "nothingToPaste": "የሚለጠፍ ነገር የለም",
+      "metadataStripFailed": "የፎቶውን ሜታዳታ ማስወገድ አልተቻለም።"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}፣ {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "ይህ CLI ክፍለ-ጊዜ መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
       "continueFrom": "{{title}}ን በመቀጠል ላይ",
       "importFailed": "ይህን ክፍለ-ጊዜ ማስመጣት አልተቻለም።",
-      "importingSession": "ክፍለ-ጊዜን በማስመጣት ላይ"
+      "importingSession": "ክፍለ-ጊዜን በማስመጣት ላይ",
+      "discardWithUploadsMessage": "ጥያቄዎ እና ከተላኩ መልእክቶች ጋር ያልተያያዙ የተጫኑ ፋይሎች ይሰረዛሉ።"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "እያጠናቀቀ ነው...",
       "messagePlaceholder": "መልእክት",
       "cannotReceiveFiles": "ይህ ክፍለ-ጊዜ ፋይሎች መቀበል አይችልም። መልእክትዎን ለመላክ አባሪዎቹን ያስወግዱ።",
-      "couldNotAttachFiles": "ፋይሎችን ማያያዝ አልተቻለም። እንደገና ለመሞከር ላክ ይንኩ።"
+      "couldNotAttachFiles": "ፋይሎችን ማያያዝ አልተቻለም። እንደገና ለመሞከር ላክ ይንኩ።",
+      "discardAttachmentsMessage": "ከተላኩ መልእክቶች ጋር ያልተያያዙ የተጫኑ ፋይሎች ይሰረዛሉ።",
+      "discardAttachmentsTitle": "አባሪዎችን ያስወግዱ?"
     },
     "chatLink": {
       "linkCopied": "አገናኝ ተቀድቷል",

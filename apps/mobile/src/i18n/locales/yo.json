@@ -750,7 +750,8 @@
       "networkError": "Àṣìṣe nẹ́tíwọ́ọ̀kì",
       "uploadFailed": "Gbigbé sókè kùnà",
       "failedToUploadFile": "Kùnà láti gbé fáìlì sókè: {{reason}}",
-      "nothingToPaste": "Kò sí ohun tó wà láti lẹ́ pẹ́"
+      "nothingToPaste": "Kò sí ohun tó wà láti lẹ́ pẹ́",
+      "metadataStripFailed": "Ko le yọ awọn alaye nipa fọ́tò kuro."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Tẹ̀síwájú {{title}}",
       "importingSession": "Gbigbe igba-ijiroro wọle",
       "cliCannotContinue": "CLI yii ko le tẹ̀síwájú igba-ijiroro. Yan Cloud Agent tabi CLI miiran.",
-      "importFailed": "Ko le gbe igba-ijiroro yii wọle."
+      "importFailed": "Ko le gbe igba-ijiroro yii wọle.",
+      "discardWithUploadsMessage": "A yoo paarẹ iyanilenu rẹ ati awọn faili ti a gbe soke ti a ko so mọ awọn ifiranṣẹ ti a fi ranṣẹ."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ti ṣe imudojuiwọn {{displayCount}} faili",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Nparí...",
       "messagePlaceholder": "Ifiranṣẹ...",
       "cannotReceiveFiles": "Igba-ijiroro yii ko le gba awọn faili. Yọ awọn asomọ lati fi ifiranṣẹ rẹ ranṣẹ.",
-      "couldNotAttachFiles": "Ko le so awọn faili. Tẹ firanṣẹ lati tun gbiyanju."
+      "couldNotAttachFiles": "Ko le so awọn faili. Tẹ firanṣẹ lati tun gbiyanju.",
+      "discardAttachmentsMessage": "A yoo paarẹ awọn faili ti a gbe soke ti a ko so mọ awọn ifiranṣẹ ti a fi ranṣẹ.",
+      "discardAttachmentsTitle": "Jù awọn asomọ silẹ?"
     },
     "chatLink": {
       "linkCopied": "Ọna asopọ ti daakọ",

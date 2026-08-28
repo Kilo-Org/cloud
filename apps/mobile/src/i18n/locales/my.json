@@ -750,7 +750,8 @@
       "networkError": "ကွန်ရက်အမှား",
       "uploadFailed": "အပ်လုဒ် မအောင်မြင်ပါ",
       "failedToUploadFile": "ဖိုင်အပ်လုဒ် မအောင်မြင်ပါ: {{reason}}",
-      "nothingToPaste": "ကူးထည့်စရာ မရှိပါ"
+      "nothingToPaste": "ကူးထည့်စရာ မရှိပါ",
+      "metadataStripFailed": "ဓာတ်ပုံ၏ နောက်ခံအချက်အလက်များကို ဖယ်ရှား၍မရခဲ့ပါ။"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "{{title}} ကို ဆက်လုပ်နေသည်",
       "importingSession": "ဆက်ရှင် တင်သွင်းနေသည်",
       "cliCannotContinue": "ဤ CLI သည် ဆက်ရှင်ကို ဆက်လုပ်နိုင်မည် မဟုတ်ပါ။ Cloud Agent သို့မဟုတ် အခြား CLI တစ်ခုကို ရွေးပါ။",
-      "importFailed": "ဤဆက်ရှင်ကို တင်သွင်း၍မရပါ။"
+      "importFailed": "ဤဆက်ရှင်ကို တင်သွင်း၍မရပါ။",
+      "discardWithUploadsMessage": "သင့်ညွှန်ကြားချက်နှင့် ပို့ပြီးသော စာများတွင် မပူးတွဲထားသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။"
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခု မွမ်းမံပြီး",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "အကျဉ်းချုပ် ပြုလုပ်နေသည်...",
       "messagePlaceholder": "မက်ဆေ့ချ်",
       "cannotReceiveFiles": "ဤ session သည် ဖိုင်များကို မလက်ခံနိုင်ပါ။ စာပို့ရန် ပူးတွဲဖိုင်များကို ဖယ်ရှားပါ။",
-      "couldNotAttachFiles": "ဖိုင်များကို မပူးတွဲနိုင်ပါ။ ထပ်ကြိုးစားရန် ပို့ရန် နှိပ်ပါ။"
+      "couldNotAttachFiles": "ဖိုင်များကို မပူးတွဲနိုင်ပါ။ ထပ်ကြိုးစားရန် ပို့ရန် နှိပ်ပါ။",
+      "discardAttachmentsMessage": "ပို့ပြီးသော စာများတွင် မပူးတွဲထားသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။",
+      "discardAttachmentsTitle": "ပူးတွဲဖိုင်များကို ပယ်ဖျက်မည်လား။"
     },
     "chatLink": {
       "linkCopied": "link ကို ကူးယူပြီးပါပြီ",

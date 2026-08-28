@@ -750,7 +750,8 @@
       "networkError": "ನೆಟ್ವರ್ಕ್ ದೋಷ",
       "uploadFailed": "ಅಪ್‌ಲೋಡ್ ವಿಫಲವಾಗಿದೆ",
       "failedToUploadFile": "ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ವಿಫಲವಾಗಿದೆ: {{reason}}",
-      "nothingToPaste": "ಅಂಟಿಸಲು ಏನೂ ಇಲ್ಲ"
+      "nothingToPaste": "ಅಂಟಿಸಲು ಏನೂ ಇಲ್ಲ",
+      "metadataStripFailed": "ಫೋಟೋ ಮೆಟಾಡೇಟಾ ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "ಮುಂದುವರಿಸುತ್ತಿದೆ {{title}}",
       "importingSession": "ಸೆಷನ್ ಆಮದು ಮಾಡುತ್ತಿದೆ",
       "cliCannotContinue": "ಈ CLI ಒಂದು ಸೆಷನ್ ಅನ್ನು ಮುಂದುವರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. Cloud Agent ಅಥವಾ ಮತ್ತೊಂದು CLI ಅನ್ನು ಆಯ್ಕೆ ಮಾಡಿ.",
-      "importFailed": "ಈ ಸೆಷನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+      "importFailed": "ಈ ಸೆಷನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "discardWithUploadsMessage": "ನಿಮ್ಮ ಪ್ರಾಂಪ್ಟ್ ಮತ್ತು ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳಿಗೆ ಲಗತ್ತಿಸದ ಯಾವುದೇ ಅಪ್‌ಲೋಡ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ಫೈಲ್ ನವೀಕರಿಸಲಾಗಿದೆ",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "ಮುಕ್ತಾಯಗೊಳಿಸುತ್ತಿದೆ...",
       "messagePlaceholder": "ಸಂದೇಶ...",
       "cannotReceiveFiles": "ಈ ಸೆಷನ್ ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ನಿಮ್ಮ ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಲು ಲಗತ್ತುಗಳನ್ನು ತೆಗೆದುಹಾಕಿ.",
-      "couldNotAttachFiles": "ಫೈಲ್‌ಗಳನ್ನು ಲಗತ್ತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಕಳುಹಿಸಿ ಟ್ಯಾಪ್ ಮಾಡಿ."
+      "couldNotAttachFiles": "ಫೈಲ್‌ಗಳನ್ನು ಲಗತ್ತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಕಳುಹಿಸಿ ಟ್ಯಾಪ್ ಮಾಡಿ.",
+      "discardAttachmentsMessage": "ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳಿಗೆ ಲಗತ್ತಿಸದ ಅಪ್‌ಲೋಡ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ.",
+      "discardAttachmentsTitle": "ಲಗತ್ತುಗಳನ್ನು ತೆಗೆದುಹಾಕಬೇಕೆ?"
     },
     "chatLink": {
       "linkCopied": "ಲಿಂಕ್ ನಕಲಿಸಲಾಗಿದೆ",

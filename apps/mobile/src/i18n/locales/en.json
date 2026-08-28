@@ -1,4 +1,131 @@
 {
+  "providerReview": {
+    "title": "Review code",
+    "pullRequest": {
+      "title": "Pull request review",
+      "open": "Open pull request",
+      "review": "Review pull request",
+      "merge": "Merge pull request",
+      "confirmMerge": "Merge pull request?",
+      "paste": "Paste a pull request link",
+      "urlAccessibility": "Pull request URL",
+      "clearLink": "Clear pull request link",
+      "share": "Share pull request",
+      "badge": "Pull request #{{number}}",
+      "loading": "Loading pull request",
+      "unavailable": "This pull request is unavailable. Check the link and your repository access.",
+      "noReviews": "No pull requests in this scope. Paste a link or select a repository.",
+      "noDiscussion": "No discussion on this pull request yet. You can add a comment."
+    },
+    "mergeRequest": {
+      "title": "Merge request review",
+      "open": "Open merge request",
+      "review": "Review merge request",
+      "merge": "Merge merge request",
+      "confirmMerge": "Merge merge request?",
+      "paste": "Paste a merge request link",
+      "urlAccessibility": "Merge request URL",
+      "clearLink": "Clear merge request link",
+      "share": "Share merge request",
+      "badge": "Merge request !{{number}}",
+      "loading": "Loading merge request",
+      "unavailable": "This merge request is unavailable. Check the link and your repository access.",
+      "noReviews": "No merge requests in this scope. Paste a link or select a repository.",
+      "noDiscussion": "No discussion on this merge request yet. You can add a comment."
+    },
+    "identity": {
+      "owner": "Kilo owner: {{owner}}",
+      "actor": "{{provider}} actor: {{actor}}",
+      "integration": "Connection: {{integration}}",
+      "instance": "Instance: {{instance}}",
+      "repository": "Repository: {{repository}}",
+      "revision": "Revision: {{revision}}"
+    },
+    "connection": {
+      "connect": "Connect {{provider}}",
+      "reconnect": "Reconnect {{provider}}",
+      "expired": "Your {{provider}} connection expired. Reconnect to continue with your saved work.",
+      "personalBitbucket": "Bitbucket review is available in an organization, not Personal.",
+      "switchOrganization": "Switch organization",
+      "loading": "Loading {{provider}}"
+    },
+    "entry": {
+      "paste": "Paste a pull request or merge request link",
+      "invalidLink": "This link does not identify a supported review. Correct the link and try again.",
+      "ambiguous": "More than one connection matches this review. Select the exact connection.",
+      "noRecents": "No recent reviews. Paste a link to start.",
+      "openProvider": "View on {{provider}}"
+    },
+    "inbox": {
+      "actorScope": "Reviews for {{actor}} on {{provider}}",
+      "repositoryScope": "Reviews in {{repository}} using {{actor}}",
+      "pageFailed": "Could not load the next page. Your loaded reviews are still available.",
+      "retryPage": "Retry this page"
+    },
+    "files": {
+      "empty": "No changed files",
+      "binary": "This file is binary. View it on {{provider}}.",
+      "truncated": "This diff is incomplete. View the full diff on {{provider}}.",
+      "unavailable": "Context is unavailable at this revision. View the file on {{provider}}.",
+      "contextFailed": "Could not load context. Your file and line selection are unchanged.",
+      "position": "{{path}}, {{side}} side, line {{line}}, revision {{revision}}"
+    },
+    "checks": {
+      "empty": "No checks reported. This does not mean the checks passed.",
+      "unavailable": "Check results are unavailable for this connection.",
+      "openProvider": "View checks on {{provider}}"
+    },
+    "permission": {
+      "forbidden": "You do not have permission to perform this action. {{reason}}",
+      "unsupported": "This provider does not support this action. {{reason}}",
+      "version": "This action is unavailable on this provider version. {{reason}}",
+      "license": "This action requires a different provider license. {{reason}}",
+      "restricted": "A current repository restriction blocks this action. {{reason}}",
+      "unknown": "The connection has not confirmed whether this action is available.",
+      "readOnly": "You can read this review. This connection needs additional permission to write.",
+      "replaceToken": "Replace the connection token"
+    },
+    "draft": {
+      "stale": "The revision changed. Your text and original position are saved. Refresh before choosing a new position.",
+      "quarantined": "This saved draft has an unresolved account or repository identity. It has not been attached to this review.",
+      "emptyQueue": "No comments queued. Add a comment or a review summary.",
+      "saved": "Your review summary and choice are saved for this revision.",
+      "refresh": "Refresh review"
+    },
+    "outcome": {
+      "confirmed": "{{provider}} confirmed this action.",
+      "accepted": "{{provider}} accepted this action. Completion is not confirmed yet.",
+      "partial": "Confirmed: {{confirmed}}. Unfinished: {{unfinished}}. Your remaining work is saved.",
+      "unresolved": "The outcome is unknown. Check the status before sending anything again.",
+      "retryable": "The action did not start. Your work is saved. You can retry the same action.",
+      "rejected": "The action was rejected. Your work is saved. {{reason}}",
+      "checkStatus": "Check action status",
+      "storageFailed": "Could not save this action safely. Nothing was sent. Your text is still here."
+    },
+    "merge": {
+      "noMethods": "No merge method is available. {{reason}}",
+      "confirmDelete": "{{actor}} will merge {{source}} into {{target}} using {{method}} and delete the source branch {{source}}.",
+      "confirmKeep": "{{actor}} will merge {{source}} into {{target}} using {{method}} and keep the source branch {{source}}.",
+      "deleteBranch": "Delete source branch {{branch}} after merging",
+      "pendingTask": "The merge task is still running. You can leave and check its status later.",
+      "deletionFailed": "The merge is confirmed, but branch deletion failed. {{reason}}",
+      "deletionUnknown": "The merge is confirmed. Branch deletion is not confirmed.",
+      "changedHead": "The source or target revision changed. Refresh the review before merging."
+    },
+    "gitlab": {
+      "approvals": "Approvals needed: {{displayCount}}",
+      "changesRequested": "Changes requested",
+      "changesDoNotBlock": "Requested changes are recorded, but this instance does not enforce them as a merge block.",
+      "squashPolicy": "Squash policy: {{policy}}"
+    },
+    "bitbucket": {
+      "noExpectedHeadGuard": "Bitbucket cannot atomically bind this action to the reviewed revision. Head checks detect changes but cannot prevent a concurrent update.",
+      "participantState": "{{actor}}: {{state}}",
+      "noAutoMerge": "Bitbucket does not provide an API to schedule or cancel automatic merging.",
+      "noBranchSync": "Bitbucket does not provide an API to synchronize this branch.",
+      "noReactions": "Bitbucket does not provide comment reactions through this API."
+    }
+  },
   "common": {
     "cancel": "Cancel",
     "done": "Done",

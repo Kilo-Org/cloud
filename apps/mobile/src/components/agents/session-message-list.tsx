@@ -31,10 +31,13 @@ const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
 // otherwise spam the FlashList event log.
 const ON_START_REACHED_THRESHOLD = 2;
 
+const DRAW_DISTANCE = 1000;
+
 type SessionMessageListProps<T> = {
   sessionId: string;
   items: readonly T[];
   keyExtractor: (item: T) => string;
+  getItemType?: (item: T) => string;
   hasOlderMessages: boolean;
   isLoadingOlderMessages: boolean;
   olderMessagesError: OlderMessagesError | null;
@@ -64,6 +67,7 @@ export function SessionMessageList<T>({
   sessionId,
   items,
   keyExtractor,
+  getItemType,
   hasOlderMessages,
   isLoadingOlderMessages,
   olderMessagesError,
@@ -219,7 +223,12 @@ export function SessionMessageList<T>({
         contentContainerStyle={resolvedContentContainerStyle}
         data={items}
         keyExtractor={keyExtractor}
+        getItemType={getItemType}
         renderItem={renderItem}
+        // Transcript rows are tall and parse markdown on mount. The 250 dp
+        // default draws under half a screen ahead, so a fast fling shows blank
+        // space until the rows mount. Four screens of lookahead hides that.
+        drawDistance={DRAW_DISTANCE}
         // Android Fabric can race clipped-view reattachment with rapid transcript updates.
         removeClippedSubviews={false}
         onScroll={handleScroll}

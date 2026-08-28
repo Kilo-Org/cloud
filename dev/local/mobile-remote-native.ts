@@ -119,6 +119,39 @@ function withArtifact(
   }
 }
 
+type DispatchRun = { databaseId: number; headSha: string };
+
+function listDispatchRuns(branch: string): DispatchRun[] {
+  const raw = gh([
+    'run',
+    'list',
+    '--workflow',
+    WORKFLOW_FILE,
+    '--branch',
+    branch,
+    '--event',
+    'workflow_dispatch',
+    '--limit',
+    '30',
+    '--json',
+    'databaseId,headSha',
+  ]);
+  return JSON.parse(raw) as DispatchRun[];
+}
+
+// `gh workflow run` reports no run id, and no listing exposes the dispatch
+// inputs, so take the newest run on this commit that did not exist before
+// the dispatch. `gh run list` returns newest first. Two hosts dispatching
+// different platforms in the same poll window can still cross; that ends in
+// the local build, which is the fallback anyway.
+export function pickDispatchedRun(
+  runs: DispatchRun[],
+  before: ReadonlySet<number>,
+  headSha: string
+): number | undefined {
+  return runs.find(run => !before.has(run.databaseId) && run.headSha === headSha)?.databaseId;
+}
+
 // Dispatch the workflow for the current branch and wait for it to finish.
 // Only possible when HEAD is exactly the pushed upstream commit — the
 // runner builds from the remote ref, so anything else builds the wrong tree.
@@ -134,7 +167,13 @@ function dispatchAndWatch(platform: 'ios' | 'android'): boolean {
     log(`branch ${branch} is not pushed to its upstream; cannot dispatch a remote build`);
     return false;
   }
-  const dispatchedAt = Date.now();
+  let before: Set<number>;
+  try {
+    before = new Set(listDispatchRuns(branch).map(run => run.databaseId));
+  } catch (error) {
+    log(`cannot list existing runs (${message(error)})`);
+    return false;
+  }
   try {
     gh(['workflow', 'run', WORKFLOW_FILE, '--ref', branch, '-f', `platform=${platform}`]);
   } catch (error) {
@@ -148,25 +187,7 @@ function dispatchAndWatch(platform: 'ios' | 'android'): boolean {
   for (let attempt = 0; attempt < 12 && runId === undefined; attempt++) {
     sleepSync(5000);
     try {
-      const raw = gh([
-        'run',
-        'list',
-        '--workflow',
-        WORKFLOW_FILE,
-        '--branch',
-        branch,
-        '--event',
-        'workflow_dispatch',
-        '--limit',
-        '1',
-        '--json',
-        'databaseId,createdAt',
-      ]);
-      const runs = JSON.parse(raw) as Array<{ databaseId: number; createdAt: string }>;
-      const run = runs[0];
-      if (run && Date.parse(run.createdAt) >= dispatchedAt - 2 * 60 * 1000) {
-        runId = run.databaseId;
-      }
+      runId = pickDispatchedRun(listDispatchRuns(branch), before, head);
     } catch {
       // Keep polling; the run can lag the dispatch.
     }

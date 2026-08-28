@@ -750,7 +750,8 @@
       "networkError": "Ցանցի սխալ",
       "uploadFailed": "Վերբեռնումը ձախողվեց",
       "failedToUploadFile": "Չհաջողվեց վերբեռնել ֆայլը: {{reason}}",
-      "nothingToPaste": "Կպցնելու բան չկա"
+      "nothingToPaste": "Կպցնելու բան չկա",
+      "metadataStripFailed": "Չհաջողվեց հեռացնել լուսանկարի մետատվյալները։"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Շարունակվում է {{title}}",
       "importingSession": "Ներմուծվում է նիստ",
       "cliCannotContinue": "Այս CLI-ն չի կարող շարունակել նիստը: Ընտրեք Ամպային գործակալ կամ մեկ այլ CLI:",
-      "importFailed": "Չհաջողվեց ներմուծել այս նիստը:"
+      "importFailed": "Չհաջողվեց ներմուծել այս նիստը:",
+      "discardWithUploadsMessage": "Ձեր հուշումը և ուղարկված հաղորդագրություններին չկցված վերբեռնված բոլոր ֆայլերը կջնջվեն։"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Ամփոփվում է...",
       "messagePlaceholder": "Հաղորդագրություն...",
       "cannotReceiveFiles": "Այս նիստը չի կարող ընդունել ֆայլեր: Հեռացրեք կցումները՝ հաղորդագրությունն ուղարկելու համար:",
-      "couldNotAttachFiles": "Հնարավոր չեղավ կցել ֆայլերը: Հպեք «Ուղարկել»՝ նորից փորձելու համար:"
+      "couldNotAttachFiles": "Հնարավոր չեղավ կցել ֆայլերը: Հպեք «Ուղարկել»՝ նորից փորձելու համար:",
+      "discardAttachmentsMessage": "Ուղարկված հաղորդագրություններին չկցված վերբեռնված ֆայլերը կջնջվեն։",
+      "discardAttachmentsTitle": "Մերժե՞լ կցորդները"
     },
     "chatLink": {
       "linkCopied": "Հղումը պատճենված է",

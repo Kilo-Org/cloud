@@ -750,7 +750,8 @@
       "networkError": "Сүлжээний алдаа",
       "uploadFailed": "Байршуулалт амжилтгүй боллоо",
       "failedToUploadFile": "Файл байршуулах боломжгүй боллоо: {{reason}}",
-      "nothingToPaste": "Буулгах зүйл алга"
+      "nothingToPaste": "Буулгах зүйл алга",
+      "metadataStripFailed": "Зургийн мета өгөгдлийг устгаж чадсангүй."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "{{title}} үргэлжлүүлж байна",
       "importingSession": "Сесс импортлож байна",
       "cliCannotContinue": "Энэ CLI сесс үргэлжлүүлэх боломжгүй. Cloud Agent эсвэл өөр CLI сонгоно уу.",
-      "importFailed": "Энэ сессийг импортлох боломжгүй."
+      "importFailed": "Энэ сессийг импортлох боломжгүй.",
+      "discardWithUploadsMessage": "Таны заавар болон илгээсэн мессежид хавсаргаагүй байршуулсан файлууд устах болно."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл шинэчлэгдсэн",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Дуусгаж байна...",
       "messagePlaceholder": "Мессеж",
       "cannotReceiveFiles": "Энэ сесси файл хүлээн авах боломжгүй. Мэдээлэл илгээхийн тулд хавсралтуудыг арилгана уу.",
-      "couldNotAttachFiles": "Файлуудыг хавсаргаж чадсангүй. Дахин оролдохын тулд илгээх товчийг дарна уу."
+      "couldNotAttachFiles": "Файлуудыг хавсаргаж чадсангүй. Дахин оролдохын тулд илгээх товчийг дарна уу.",
+      "discardAttachmentsMessage": "Илгээсэн мессежид хавсаргаагүй байршуулсан файлууд устах болно.",
+      "discardAttachmentsTitle": "Хавсралтуудыг хаях уу?"
     },
     "chatLink": {
       "linkCopied": "Холбоос хуулагдлаа",

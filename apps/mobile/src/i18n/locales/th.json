@@ -750,7 +750,8 @@
       "networkError": "ข้อผิดพลาดของเครือข่าย",
       "uploadFailed": "อัปโหลดล้มเหลว",
       "failedToUploadFile": "อัปโหลดไฟล์ไม่สำเร็จ: {{reason}}",
-      "nothingToPaste": "ไม่มีอะไรให้วาง"
+      "nothingToPaste": "ไม่มีอะไรให้วาง",
+      "metadataStripFailed": "ไม่สามารถลบข้อมูลเมตาของรูปภาพได้"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "กำลังดำเนินการต่อ {{title}}",
       "importingSession": "กำลังนำเข้าเซสชัน",
       "cliCannotContinue": "CLI นี้ไม่สามารถดำเนินการต่อเซสชันได้ เลือก Cloud Agent หรือ CLI อื่น",
-      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้"
+      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้",
+      "discardWithUploadsMessage": "พรอมต์ของคุณและไฟล์ที่อัปโหลดแต่ยังไม่ได้แนบกับข้อความที่ส่งแล้วจะถูกลบ"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดต {{displayCount}} ไฟล์",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "กำลังสรุป...",
       "messagePlaceholder": "ข้อความ...",
       "cannotReceiveFiles": "เซสชันนี้ไม่สามารถรับไฟล์ได้ นำไฟล์แนบออกเพื่อส่งข้อความของคุณ",
-      "couldNotAttachFiles": "แนบไฟล์ไม่สำเร็จ แตะส่งเพื่อลองอีกครั้ง"
+      "couldNotAttachFiles": "แนบไฟล์ไม่สำเร็จ แตะส่งเพื่อลองอีกครั้ง",
+      "discardAttachmentsMessage": "ไฟล์ที่อัปโหลดแต่ยังไม่ได้แนบกับข้อความที่ส่งแล้วจะถูกลบ",
+      "discardAttachmentsTitle": "ทิ้งไฟล์แนบหรือไม่?"
     },
     "chatLink": {
       "linkCopied": "คัดลอกลิงก์แล้ว",

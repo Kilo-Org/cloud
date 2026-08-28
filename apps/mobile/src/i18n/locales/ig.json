@@ -750,7 +750,8 @@
       "networkError": "Njehie netwọk",
       "uploadFailed": "Ibugote dara",
       "failedToUploadFile": "Enweghị ike ibutu faịlụ: {{reason}}",
-      "nothingToPaste": "Ọ dịghị ihe a ga-amado"
+      "nothingToPaste": "Ọ dịghị ihe a ga-amado",
+      "metadataStripFailed": "Enweghị ike iwepụ ozi gbasara foto ahụ."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
       "continueFrom": "Na-aga n'ihu na {{title}}",
       "importFailed": "Enweghị ike ibubata nnọkọ a.",
-      "importingSession": "Na-ebubata nnọkọ"
+      "importingSession": "Na-ebubata nnọkọ",
+      "discardWithUploadsMessage": "A ga-ehichapụ ihe ị dere na faịlụ ọ bụla ebugotere ndị a na-ejikọtaghị na ozi ezigara."
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere {{displayCount}} faịlụ",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Na-emechi...",
       "messagePlaceholder": "Ozi...",
       "cannotReceiveFiles": "Nnọkọ a enweghị ike ịnata faịlụ. Wepụ mgbakwunye ndị ahụ ka iziga ozi gị.",
-      "couldNotAttachFiles": "Enweghị ike itinye faịlụ. Pịa ziga ka ị nwaa ọzọ."
+      "couldNotAttachFiles": "Enweghị ike itinye faịlụ. Pịa ziga ka ị nwaa ọzọ.",
+      "discardAttachmentsMessage": "A ga-ehichapụ faịlụ ebugotere ndị a na-ejikọtaghị na ozi ezigara.",
+      "discardAttachmentsTitle": "Tụfuo mgbakwunye?"
     },
     "chatLink": {
       "linkCopied": "Ederela njikọ",

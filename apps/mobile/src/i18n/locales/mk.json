@@ -750,7 +750,8 @@
       "networkError": "Грешка во мрежата",
       "uploadFailed": "Испраќањето не успеа",
       "failedToUploadFile": "Не успеа испраќањето на датотеката: {{reason}}",
-      "nothingToPaste": "Нема што да се залепи"
+      "nothingToPaste": "Нема што да се залепи",
+      "metadataStripFailed": "Метаподатоците на фотографијата не можеа да се отстранат."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Продолжување со {{title}}",
       "importingSession": "Внесување на сесија",
       "cliCannotContinue": "Овој CLI не може да продолжи сесија. Изберете Cloud Agent или друг CLI.",
-      "importFailed": "Не можеше да се внесе оваа сесија."
+      "importFailed": "Не можеше да се внесе оваа сесија.",
+      "discardWithUploadsMessage": "Вашиот предлог и сите прикачени датотеки што не се приложени кон испратени пораки ќе бидат избришани."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана {{displayCount}} датотека",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Завршување...",
       "messagePlaceholder": "Порака...",
       "cannotReceiveFiles": "Оваа сесија не може да прима датотеки. Отстранете ги прилозите за да ја испратите пораката.",
-      "couldNotAttachFiles": "Не можев да прикачам датотеки. Допрете испрати за да се обидете повторно."
+      "couldNotAttachFiles": "Не можев да прикачам датотеки. Допрете испрати за да се обидете повторно.",
+      "discardAttachmentsMessage": "Прикачените датотеки што не се приложени кон испратени пораки ќе бидат избришани.",
+      "discardAttachmentsTitle": "Да се отфрлат прилозите?"
     },
     "chatLink": {
       "linkCopied": "Линкот е копиран",

@@ -3224,6 +3224,8 @@
     "running": "DARBOJAS",
     "needsInput": "nepieciešama ievade",
     "reconnecting": "Atkārtoti izveido savienojumu",
-    "channelName": "Aktīvie aģenti"
+    "channelName": "Aktīvie aģenti",
+    "activityKitDisabledTitle": "Tiešraides aktivitātes ir izslēgtas",
+    "activityKitDisabledBody": "Ieslēdz tiešraides aktivitātes iestatījumos, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
   }
 }

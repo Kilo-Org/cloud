@@ -3203,6 +3203,8 @@
     "running": "MANDEHA",
     "needsInput": "mila fampidirana",
     "reconnecting": "Mampifandray indray",
-    "channelName": "Agent mavitrika"
+    "channelName": "Agent mavitrika",
+    "activityKitDisabledTitle": "Tsy mandeha ny Hetsika Mivantana",
+    "activityKitDisabledBody": "Alefaso ao amin'ny Fikirana ny Hetsika Mivantana mba hahitana ny Agent Mavitrika eo amin'ny Efijery Fihidy."
   }
 }

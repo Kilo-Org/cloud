@@ -3245,6 +3245,8 @@
     "running": "Vykdoma",
     "needsInput": "reikia įvesties",
     "reconnecting": "Jungiamasi iš naujo",
-    "channelName": "Aktyvūs agentai"
+    "channelName": "Aktyvūs agentai",
+    "activityKitDisabledTitle": "Tiesioginės veiklos išjungtos",
+    "activityKitDisabledBody": "Nustatymuose įjunkite tiesiogines veiklas, kad užrakinimo ekrane matytumėte aktyvius agentus."
   }
 }

@@ -3203,6 +3203,8 @@
     "running": "Në ekzekutim",
     "needsInput": "ka nevojë për të dhëna",
     "reconnecting": "Duke u rilidhur",
-    "channelName": "Agjentët aktivë"
+    "channelName": "Agjentët aktivë",
+    "activityKitDisabledTitle": "Aktivitetet e drejtpërdrejta janë çaktivizuar",
+    "activityKitDisabledBody": "Aktivizoni Aktivitetet e drejtpërdrejta te Cilësimet për të parë Agjentët aktivë në Ekranin e kyçjes."
   }
 }

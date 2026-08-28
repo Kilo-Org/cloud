@@ -3203,6 +3203,8 @@
     "running": "در حال اجرا",
     "needsInput": "نیاز به ورودی",
     "reconnecting": "در حال اتصال مجدد",
-    "channelName": "عامل‌های فعال"
+    "channelName": "عامل‌های فعال",
+    "activityKitDisabledTitle": "فعالیت‌های زنده خاموش هستند",
+    "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحه قفل، فعالیت‌های زنده را در تنظیمات روشن کنید."
   }
 }

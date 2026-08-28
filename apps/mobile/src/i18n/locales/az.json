@@ -3203,6 +3203,8 @@
     "running": "İŞLƏYİR",
     "needsInput": "GİRİŞ TƏLƏB OLUNUR",
     "reconnecting": "Yenidən qoşulur",
-    "channelName": "Aktiv agentlər"
+    "channelName": "Aktiv agentlər",
+    "activityKitDisabledTitle": "Canlı fəaliyyətlər söndürülüb",
+    "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün Parametrlərdə Canlı fəaliyyətləri aktivləşdirin."
   }
 }

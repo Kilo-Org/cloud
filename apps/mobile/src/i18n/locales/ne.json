@@ -3203,6 +3203,8 @@
     "running": "चलिरहेको",
     "needsInput": "इनपुट चाहिन्छ",
     "reconnecting": "पुनः जडान गर्दै",
-    "channelName": "सक्रिय एजेन्टहरू"
+    "channelName": "सक्रिय एजेन्टहरू",
+    "activityKitDisabledTitle": "प्रत्यक्ष गतिविधिहरू बन्द छन्",
+    "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।"
   }
 }

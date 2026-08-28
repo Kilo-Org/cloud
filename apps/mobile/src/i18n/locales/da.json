@@ -3203,6 +3203,8 @@
     "running": "KØRER",
     "needsInput": "kræver input",
     "reconnecting": "Genopretter forbindelsen",
-    "channelName": "Aktive agenter"
+    "channelName": "Aktive agenter",
+    "activityKitDisabledTitle": "Liveaktiviteter er slået fra",
+    "activityKitDisabledBody": "Slå Liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."
   }
 }

@@ -3203,6 +3203,8 @@
     "running": "BERJALAN",
     "needsInput": "memerlukan input",
     "reconnecting": "Menghubungkan kembali",
-    "channelName": "Agen aktif"
+    "channelName": "Agen aktif",
+    "activityKitDisabledTitle": "Aktivitas Langsung nonaktif",
+    "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di Pengaturan untuk melihat Agen Aktif di Layar Terkunci."
   }
 }

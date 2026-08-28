@@ -3203,6 +3203,8 @@
     "running": "Running",
     "needsInput": "Needs input",
     "reconnecting": "Reconnecting",
-    "channelName": "Active agents"
+    "channelName": "Active agents",
+    "activityKitDisabledTitle": "Live Activities are off",
+    "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
   }
 }

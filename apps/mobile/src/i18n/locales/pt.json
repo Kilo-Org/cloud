@@ -3224,6 +3224,8 @@
     "running": "EM EXECUÇÃO",
     "needsInput": "requer entrada",
     "reconnecting": "A restabelecer ligação",
-    "channelName": "Agentes ativos"
+    "channelName": "Agentes ativos",
+    "activityKitDisabledTitle": "As Atividades em tempo real estão desativadas",
+    "activityKitDisabledBody": "Ative as Atividades em tempo real nas Definições para ver os agentes ativos no Ecrã bloqueado."
   }
 }

@@ -3203,6 +3203,8 @@
     "running": "執行中",
     "needsInput": "需要輸入",
     "reconnecting": "正在重新連線",
-    "channelName": "使用中的代理"
+    "channelName": "使用中的代理",
+    "activityKitDisabledTitle": "即時動態已關閉",
+    "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，以在鎖定畫面上查看使用中的代理。"
   }
 }

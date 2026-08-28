@@ -3224,6 +3224,8 @@
     "running": "Em execução",
     "needsInput": "requer entrada",
     "reconnecting": "Reconectando",
-    "channelName": "Agentes ativos"
+    "channelName": "Agentes ativos",
+    "activityKitDisabledTitle": "As Atividades ao Vivo estão desativadas",
+    "activityKitDisabledBody": "Ative as Atividades ao Vivo em Ajustes para ver os agentes ativos na Tela Bloqueada."
   }
 }

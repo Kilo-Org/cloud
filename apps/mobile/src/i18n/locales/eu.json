@@ -3203,6 +3203,8 @@
     "running": "Exekutatzen",
     "needsInput": "sarreraren zain",
     "reconnecting": "Berriro konektatzen",
-    "channelName": "Agente aktiboak"
+    "channelName": "Agente aktiboak",
+    "activityKitDisabledTitle": "Zuzeneko jarduerak desaktibatuta daude",
+    "activityKitDisabledBody": "Aktibatu Zuzeneko jarduerak Ezarpenetan, Agente aktiboak Blokeo-pantailan ikusteko."
   }
 }

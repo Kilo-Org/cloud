@@ -3203,6 +3203,8 @@
     "running": "Ana gudana",
     "needsInput": "yana buƙatar bayani",
     "reconnecting": "Ana sake haɗawa",
-    "channelName": "Wakilai da ke aiki"
+    "channelName": "Wakilai da ke aiki",
+    "activityKitDisabledTitle": "Ayyukan Kai Tsaye suna a kashe",
+    "activityKitDisabledBody": "Kunna Ayyukan Kai Tsaye a cikin Saituna don ganin Wakilai da ke Aiki a kan Allon Kulle."
   }
 }

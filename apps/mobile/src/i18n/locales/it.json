@@ -3224,6 +3224,8 @@
     "running": "IN ESECUZIONE",
     "needsInput": "richiede input",
     "reconnecting": "Riconnessione in corso",
-    "channelName": "Agenti attivi"
+    "channelName": "Agenti attivi",
+    "activityKitDisabledTitle": "Le attività in tempo reale sono disattivate",
+    "activityKitDisabledBody": "Attiva le attività in tempo reale in Impostazioni per vedere gli agenti attivi sulla schermata di blocco."
   }
 }

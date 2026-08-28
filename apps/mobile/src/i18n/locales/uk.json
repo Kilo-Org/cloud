@@ -3245,6 +3245,8 @@
     "running": "Виконується",
     "needsInput": "потребує вводу",
     "reconnecting": "Повторне підключення",
-    "channelName": "Активні агенти"
+    "channelName": "Активні агенти",
+    "activityKitDisabledTitle": "Дії наживо вимкнено",
+    "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані."
   }
 }

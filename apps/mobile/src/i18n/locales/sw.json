@@ -3203,6 +3203,8 @@
     "running": "Inaendelea",
     "needsInput": "inahitaji mchango",
     "reconnecting": "Inaunganisha tena",
-    "channelName": "Mawakala wanaofanya kazi"
+    "channelName": "Mawakala wanaofanya kazi",
+    "activityKitDisabledTitle": "Shughuli za Moja kwa Moja zimezimwa",
+    "activityKitDisabledBody": "Washa Shughuli za Moja kwa Moja katika Mipangilio ili uone Mawakala wanaofanya kazi kwenye Skrini Iliyofungwa."
   }
 }

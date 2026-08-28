@@ -3203,6 +3203,8 @@
     "running": "Ishlamoqda",
     "needsInput": "kiritish kerak",
     "reconnecting": "Qayta ulanmoqda",
-    "channelName": "Faol agentlar"
+    "channelName": "Faol agentlar",
+    "activityKitDisabledTitle": "Jonli faoliyatlar o'chirilgan",
+    "activityKitDisabledBody": "Qulflangan ekranda Faol agentlarni ko'rish uchun Sozlamalarda Jonli faoliyatlarni yoqing."
   }
 }

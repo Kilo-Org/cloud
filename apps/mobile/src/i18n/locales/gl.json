@@ -3203,6 +3203,8 @@
     "running": "Executando",
     "needsInput": "precisa entrada",
     "reconnecting": "Reconectando",
-    "channelName": "Axentes activos"
+    "channelName": "Axentes activos",
+    "activityKitDisabledTitle": "As actividades en directo están desactivadas",
+    "activityKitDisabledBody": "Activa as actividades en directo en Configuración para ver os axentes activos na pantalla de bloqueo."
   }
 }

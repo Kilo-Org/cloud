@@ -3203,6 +3203,8 @@
     "running": "Kei te oma",
     "needsInput": "e hiahia ana ki te whakaurunga",
     "reconnecting": "Kei te hono anō",
-    "channelName": "Ngā māngai hohe"
+    "channelName": "Ngā māngai hohe",
+    "activityKitDisabledTitle": "Kua whakawetohia ngā Mahi Mataora",
+    "activityKitDisabledBody": "Whakakāngia ngā Mahi Mataora i Ngā tautuhinga kia kite i ngā Māngai Hohe i te Mata Maukati."
   }
 }

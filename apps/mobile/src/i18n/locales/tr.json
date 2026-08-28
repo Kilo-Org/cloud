@@ -3203,6 +3203,8 @@
     "running": "Çalışıyor",
     "needsInput": "Girdi gerekli",
     "reconnecting": "Yeniden bağlanılıyor",
-    "channelName": "Etkin ajanlar"
+    "channelName": "Etkin ajanlar",
+    "activityKitDisabledTitle": "Canlı Etkinlikler kapalı",
+    "activityKitDisabledBody": "Etkin ajanları Kilit Ekranı'nda görmek için Ayarlar'dan Canlı Etkinlikler'i açın."
   }
 }

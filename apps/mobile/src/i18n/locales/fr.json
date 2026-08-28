@@ -3224,6 +3224,8 @@
     "running": "EN COURS",
     "needsInput": "saisie requise",
     "reconnecting": "Reconnexion en cours",
-    "channelName": "Agents actifs"
+    "channelName": "Agents actifs",
+    "activityKitDisabledTitle": "Les activités en direct sont désactivées",
+    "activityKitDisabledBody": "Activez les activités en direct dans Réglages pour voir les agents actifs sur l'écran verrouillé."
   }
 }

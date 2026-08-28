@@ -1,0 +1,91 @@
+import { z } from 'zod';
+
+import {
+  createPublicSnowflakeReport,
+  publicSnowflakeReportOptions,
+} from '@/lib/public-snowflake-report';
+import { LEADERBOARD_PROVIDER_RACE_REDIS_KEY } from '@/lib/redis-keys';
+
+// Weekly token volume per model lab, from a fixed start date through the most
+// recent complete week. Grouped at week x model_provider_company x
+// is_open_weights so a single payload drives both the per-lab "race" view and
+// an open-weight vs proprietary toggle. model_provider_company and
+// is_open_weights are maintained in the dbt model_dim seed (kilocode-dbt), so
+// the lab mapping lives in one place rather than being re-derived here.
+// The partial current week is excluded so every returned week is complete.
+// Infrastructure-artifact BYOK model ids are excluded here (not in the base
+// dbt model, which stays complete): URI/path ids (s3://, gs://, ...), ckpt:
+// checkpoint refs, and HuggingFace class names (e.g. AtlasForCausalLM). These
+// are customers pointing Kilo at their own checkpoints/endpoints - single-org
+// noise that cannot be attributed to a model lab and would otherwise dominate
+// the "other" bucket.
+const LEADERBOARD_PROVIDER_RACE_QUERY = `
+select
+    to_char(date_trunc('week', ud.usage_date), 'YYYY-MM-DD') as week_start
+    , ud.model_provider_company as provider
+    , ud.is_open_weights
+    , sum(ud.total_tokens) as tokens
+from kilo_dw.dbt_prod.usage_daily as ud
+where
+    ud.usage_date >= '2025-07-01'
+    and date_trunc('week', ud.usage_date) < date_trunc('week', current_date())
+    and ud.total_tokens > 0
+    and not (
+        ud.model like '%://%'
+        or ud.model ilike 'ckpt:%'
+        or ud.model ilike '%ForCausalLM'
+    )
+group by 1, 2, 3
+order by 1, 4 desc;
+`;
+
+const providerRaceSchema = z.array(
+  z.object({
+    weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    provider: z.string().min(1),
+    isOpenWeights: z.boolean().nullable(),
+    tokens: z.number(),
+  })
+);
+
+type ProviderRace = z.infer<typeof providerRaceSchema>;
+
+// is_open_weights is maintained in the dbt model_dim seed and is NULL for
+// unmapped models (the ones bucketed as provider = 'other'). Only the explicit
+// 'true'/'false' strings map to a boolean; anything else (NULL from the SQL API,
+// or a future mapping gap) becomes null so the client can distinguish "unknown"
+// from a confirmed closed-weight lab instead of silently bucketing gaps as closed.
+function parseOpenWeights(raw: string): boolean | null {
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return null;
+}
+
+function parseProviderRace(rows: string[][]): ProviderRace {
+  return rows.map(row => {
+    const [weekStart, provider, rawOpenWeights, rawTokens] = row;
+    const tokens = Number(rawTokens);
+
+    if (!weekStart || !provider || !Number.isFinite(tokens)) {
+      throw new Error('Snowflake returned an invalid provider race row');
+    }
+
+    return providerRaceSchema.element.parse({
+      weekStart,
+      provider,
+      isOpenWeights: parseOpenWeights(rawOpenWeights),
+      tokens,
+    });
+  });
+}
+
+export const GET = createPublicSnowflakeReport({
+  cacheKey: LEADERBOARD_PROVIDER_RACE_REDIS_KEY,
+  errorMessage: 'Failed to fetch leaderboard provider race',
+  parseRows: parseProviderRace,
+  query: LEADERBOARD_PROVIDER_RACE_QUERY,
+  schema: providerRaceSchema,
+  source: 'public-leaderboard-provider-race-api',
+});
+
+export const OPTIONS = publicSnowflakeReportOptions;

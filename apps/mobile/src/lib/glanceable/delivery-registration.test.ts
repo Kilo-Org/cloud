@@ -5,6 +5,11 @@ import { buildGlanceableSnapshot } from '@kilocode/app-shared/glanceable-agents-
 const logoutMock = vi.hoisted(() => ({
   attemptLogoutReconciliation: vi.fn(),
   awaitLogoutReconciliationSettled: vi.fn(),
+  hasPendingActivityUnregister: vi.fn(),
+}));
+
+const expoWidgetsMock = vi.hoisted(() => ({
+  pushToStartListener: null as ((event: { activityPushToStartToken: string }) => void) | null,
 }));
 
 const trpcMock = vi.hoisted(() => ({
@@ -29,7 +34,11 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 vi.mock('expo-widgets', () => ({
-  addPushToStartTokenListener: vi.fn(),
+  addPushToStartTokenListener: (
+    listener: (event: { activityPushToStartToken: string }) => void
+  ) => {
+    expoWidgetsMock.pushToStartListener = listener;
+  },
 }));
 vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
   ActiveAgentsLiveActivity: {
@@ -71,6 +80,7 @@ describe('delivery registerTokens', () => {
     trpcMock.unregisterActivityToken.mutate.mockResolvedValue({ success: true });
     logoutMock.attemptLogoutReconciliation.mockResolvedValue({ kind: 'no-tombstone' });
     logoutMock.awaitLogoutReconciliationSettled.mockResolvedValue(undefined);
+    logoutMock.hasPendingActivityUnregister.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -301,5 +311,48 @@ describe('delivery registerTokens', () => {
     // The final state is re-registered: a later unregister targets the token.
     const final = await getGlanceableDelivery().unregisterTokens();
     expect(final).toEqual({ ok: true, tokens: ['android-token-1'] });
+  });
+
+  it('does not register iOS tokens while a pending activity unregister is still recorded', async () => {
+    logoutMock.hasPendingActivityUnregister.mockResolvedValue(true);
+
+    getGlanceableDelivery().registerTokens(snapshot(), null, 'u1');
+
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(logoutMock.attemptLogoutReconciliation).toHaveBeenCalledWith('u1');
+    expect(trpcMock.registerActivityToken.mutate).not.toHaveBeenCalled();
+  });
+
+  it('does not register the Android token while a pending activity unregister is still recorded', async () => {
+    platformMock.OS = 'android';
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setGetDevicePushTokenForTests(() => Promise.resolve('android-token-1'));
+    logoutMock.hasPendingActivityUnregister.mockResolvedValue(true);
+
+    getGlanceableDelivery().registerTokens(snapshot(), null, 'u1');
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(trpcMock.registerActivityToken.mutate).not.toHaveBeenCalled();
+  });
+
+  it('returns only the failed iOS tokens on a partial unregister failure', async () => {
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'ptt-token' });
+    activityMock.getPushToken.mockResolvedValue('activity-token-1');
+
+    // Tokens are unregistered in gather order (push-to-start first): the first
+    // unregister fails while the activity unregister succeeds.
+    trpcMock.unregisterActivityToken.mutate
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ success: true });
+
+    const result = await getGlanceableDelivery().unregisterTokens();
+
+    expect(result).toEqual({ ok: false, tokens: ['ptt-token'] });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledTimes(2);
   });
 });

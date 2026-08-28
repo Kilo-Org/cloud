@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ExpoPushMessage } from './expo-push';
 import {
-  apnsEventForTokenKind,
+  apnsSendsForTokens,
   buildGlanceableExpoMessages,
   deliverGlanceableSnapshot,
   toGlanceableContentState,
@@ -51,13 +51,37 @@ function fakeDeps(overrides: Partial<GlanceableDeliveryDeps> = {}): {
   return { deps, calls };
 }
 
-describe('apnsEventForTokenKind', () => {
-  it('maps the push-to-start token to the start event', () => {
-    expect(apnsEventForTokenKind('ios_push_to_start')).toBe('start');
+describe('apnsSendsForTokens', () => {
+  it('sends update only to the activity tokens when one exists, never start to push-to-start', () => {
+    expect(
+      apnsSendsForTokens([
+        { token: 'ptt-token', kind: 'ios_push_to_start' },
+        { token: 'activity-token', kind: 'ios_activity' },
+      ])
+    ).toEqual([{ token: 'activity-token', event: 'update' }]);
   });
 
-  it('maps the activity token to the update event', () => {
-    expect(apnsEventForTokenKind('ios_activity')).toBe('update');
+  it('sends start to the push-to-start token when no activity token exists', () => {
+    expect(apnsSendsForTokens([{ token: 'ptt-token', kind: 'ios_push_to_start' }])).toEqual([
+      { token: 'ptt-token', event: 'start' },
+    ]);
+  });
+
+  it('sends update to every activity token when several are registered', () => {
+    expect(
+      apnsSendsForTokens([
+        { token: 'ptt-token', kind: 'ios_push_to_start' },
+        { token: 'activity-token-1', kind: 'ios_activity' },
+        { token: 'activity-token-2', kind: 'ios_activity' },
+      ])
+    ).toEqual([
+      { token: 'activity-token-1', event: 'update' },
+      { token: 'activity-token-2', event: 'update' },
+    ]);
+  });
+
+  it('sends nothing when no iOS token exists', () => {
+    expect(apnsSendsForTokens([])).toEqual([]);
   });
 });
 
@@ -128,7 +152,7 @@ describe('deliverGlanceableSnapshot', () => {
     expect(calls.expoSends).toHaveLength(0);
   });
 
-  it('delivers the content-state to iOS tokens with the right start/update events', async () => {
+  it('sends update only to the activity tokens when both kinds are registered', async () => {
     const iosTokens: IosActivityToken[] = [
       { token: 'ptt-token', kind: 'ios_push_to_start' },
       { token: 'activity-token', kind: 'ios_activity' },
@@ -144,10 +168,7 @@ describe('deliverGlanceableSnapshot', () => {
       { token: string; event: string }[],
       GlanceableApnsContentState,
     ];
-    expect(tokens).toEqual([
-      { token: 'ptt-token', event: 'start' },
-      { token: 'activity-token', event: 'update' },
-    ]);
+    expect(tokens).toEqual([{ token: 'activity-token', event: 'update' }]);
     expect(contentState.name).toBe('ActiveAgentsLiveActivity');
     const props = JSON.parse(contentState.props) as Record<string, unknown>;
     expect(props.status).toBe('happy');
@@ -157,6 +178,23 @@ describe('deliverGlanceableSnapshot', () => {
     expect(props).not.toHaveProperty('type');
     expect(props).not.toHaveProperty('accountEpoch');
     expect(props).not.toHaveProperty('scopeKey');
+    expect(calls.expoSends).toHaveLength(0);
+  });
+
+  it('sends start to the push-to-start token when no activity token exists', async () => {
+    const iosTokens: IosActivityToken[] = [{ token: 'ptt-token', kind: 'ios_push_to_start' }];
+    const { deps, calls } = fakeDeps({
+      listIosActivityTokens: vi.fn(async () => iosTokens),
+    });
+
+    await deliverGlanceableSnapshot({ userId: 'u1', organizationId: 'org-1' }, deps);
+
+    expect(calls.iosSends).toHaveLength(1);
+    const [tokens] = calls.iosSends[0] as [
+      { token: string; event: string }[],
+      GlanceableApnsContentState,
+    ];
+    expect(tokens).toEqual([{ token: 'ptt-token', event: 'start' }]);
     expect(calls.expoSends).toHaveLength(0);
   });
 

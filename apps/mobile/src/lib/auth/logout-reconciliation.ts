@@ -84,6 +84,18 @@ export async function awaitLogoutReconciliationSettled(): Promise<void> {
   }
 }
 
+/**
+ * True while a tombstone still needs an activity-token unregister. A pending
+ * reconciliation retry owns those recorded tokens, so a new session must not
+ * re-register them: the next attempt would delete the new session's rows. This
+ * covers the spacing-skipped case where `attemptLogoutReconciliation` made no
+ * new in-flight attempt to await.
+ */
+export async function hasPendingActivityUnregister(): Promise<boolean> {
+  const tombstone = await readLogoutCleanupTombstone();
+  return tombstone?.needsActivityUnregister ?? false;
+}
+
 async function runReconciliation(userId: string): Promise<ReconciliationAttemptOutcome> {
   const epoch = currentAuthEpoch();
   const tombstone = await readLogoutCleanupTombstone();

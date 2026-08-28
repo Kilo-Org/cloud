@@ -6,6 +6,7 @@ import { ActiveAgentsLiveActivity } from '@/glanceable-ios/active-agents-live-ac
 import {
   attemptLogoutReconciliation,
   awaitLogoutReconciliationSettled,
+  hasPendingActivityUnregister,
 } from '@/lib/auth/logout-reconciliation';
 import { trpcClient } from '@/lib/trpc';
 
@@ -124,6 +125,11 @@ async function registerAndroidOngoingToken(
     if (epoch !== androidRegisterEpoch) {
       return;
     }
+    if (await hasPendingActivityUnregister()) {
+      // A pending retry owns the recorded activity tokens; re-registering this
+      // device token now would only be deleted by the next attempt.
+      return;
+    }
     const token = await getDevicePushTokenLazy()();
     if (token === null) {
       return;
@@ -181,6 +187,11 @@ const delivery: GlanceableDelivery = {
         void attemptLogoutReconciliation(userId);
       }
       await awaitLogoutReconciliationSettled();
+      if (await hasPendingActivityUnregister()) {
+        // A pending retry owns the recorded activity tokens; re-registering
+        // them now would only be deleted by the next reconciliation attempt.
+        return;
+      }
       if (pushToStartToken !== null) {
         await register({
           token: pushToStartToken,
@@ -217,9 +228,11 @@ const delivery: GlanceableDelivery = {
 
 /**
  * Gathers the push-to-start token plus the current activity's push token, runs
- * each `unregister(token)` in parallel, and reports success plus every token
- * it attempted. Never rejects: the caller tombstones `tokens` when `ok` is
- * false and retries them at the next authenticated opportunity.
+ * each `unregister(token)` in parallel, and reports success plus only the
+ * tokens whose unregister failed. Never rejects: the caller tombstones
+ * `tokens` when `ok` is false and retries exactly those tokens at the next
+ * authenticated opportunity, so a partial failure never re-deletes a token
+ * that already succeeded (and may be re-registered by the new session).
  */
 async function unregisterActivityTokens(): Promise<{ ok: boolean; tokens: string[] }> {
   const tokens: string[] = [];
@@ -246,8 +259,11 @@ async function unregisterActivityTokens(): Promise<{ ok: boolean; tokens: string
       return ok;
     })
   );
-  const ok = results.every(result => result.status === 'fulfilled' && result.value);
-  return { ok, tokens };
+  const failedTokens = tokens.filter((_token, index) => {
+    const result = results[index];
+    return result === undefined || result.status === 'rejected' || !result.value;
+  });
+  return { ok: failedTokens.length === 0, tokens: failedTokens };
 }
 
 setGlanceableDelivery(delivery);

@@ -34,6 +34,7 @@ vi.mock('@/lib/notifications', () => notificationsMock);
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
   attemptLogoutReconciliation,
+  hasPendingActivityUnregister,
   resetLogoutReconciliationForTests,
   TOMBSTONE_MAX_AGE_MS,
 } from '@/lib/auth/logout-reconciliation';
@@ -303,5 +304,27 @@ describe('attemptLogoutReconciliation', () => {
     const outcome = await attemptLogoutReconciliation('u1');
 
     expect(outcome).toEqual({ kind: 'expired-retained' });
+  });
+
+  it('reports a pending activity unregister while the tombstone still needs it', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+      makeTombstone({ needsActivityUnregister: true, activityTokens: ['activity-1'] })
+    );
+
+    await expect(hasPendingActivityUnregister()).resolves.toBe(true);
+  });
+
+  it('reports no pending activity unregister when the tombstone needs only the push part', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+      makeTombstone({ needsActivityUnregister: false, needsPushUnregister: true })
+    );
+
+    await expect(hasPendingActivityUnregister()).resolves.toBe(false);
+  });
+
+  it('reports no pending activity unregister when no tombstone exists', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(null);
+
+    await expect(hasPendingActivityUnregister()).resolves.toBe(false);
   });
 });

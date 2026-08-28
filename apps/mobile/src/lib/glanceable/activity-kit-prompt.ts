@@ -66,8 +66,3 @@ export async function recoverGlanceableActivityKit(): Promise<void> {
     sink.startOrUpdate(snapshot, { userId, organizationId });
   }
 }
-
-/** Test-only: drop the once-per-process latch between cases. */
-export function _resetActivityKitPromptForTests(): void {
-  alertShown = false;
-}

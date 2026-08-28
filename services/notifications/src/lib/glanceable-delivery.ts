@@ -30,8 +30,23 @@ export type GlanceableApnsContentState = {
 export type IosActivityToken = { token: string; kind: 'ios_activity' | 'ios_push_to_start' };
 export type ExpoPushToken = { token: string; locale: string | null };
 
-export function apnsEventForTokenKind(kind: IosActivityToken['kind']): LiveActivityEvent {
-  return kind === 'ios_push_to_start' ? 'start' : 'update';
+/**
+ * Maps the registered iOS activity tokens to the APNs sends for one delivery.
+ * When an `ios_activity` token exists, that Live Activity is already on screen,
+ * so send `update` to those tokens only — never `start`, which would stack a
+ * second activity. Only when no `ios_activity` token exists does the
+ * still-registered push-to-start token get `start` to create one.
+ */
+export function apnsSendsForTokens(
+  tokens: readonly IosActivityToken[]
+): { token: string; event: LiveActivityEvent }[] {
+  const activityTokens = tokens.filter(token => token.kind === 'ios_activity');
+  if (activityTokens.length > 0) {
+    return activityTokens.map(({ token }) => ({ token, event: 'update' }));
+  }
+  return tokens
+    .filter(token => token.kind === 'ios_push_to_start')
+    .map(({ token }) => ({ token, event: 'start' }));
 }
 
 export function toGlanceableContentState(
@@ -113,11 +128,9 @@ export async function deliverGlanceableSnapshot(
   const contentState = toGlanceableContentState(snapshot);
 
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
-  if (iosTokens.length > 0) {
-    await deps.sendIosLiveActivity(
-      iosTokens.map(({ token, kind }) => ({ token, event: apnsEventForTokenKind(kind) })),
-      contentState
-    );
+  const iosSends = apnsSendsForTokens(iosTokens);
+  if (iosSends.length > 0) {
+    await deps.sendIosLiveActivity(iosSends, contentState);
   }
 
   // iOS Expo tokens always need the data-only wake: it drives the widget

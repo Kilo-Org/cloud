@@ -35,6 +35,21 @@ import {
   MAX_DURABLE_RESULT_BYTES,
   UserConnectionDO,
 } from './UserConnectionDO';
+import {
+  BROWSER_APPROVAL_TIMEOUT_MS,
+  BROWSER_EXECUTION_TIMEOUT_MS,
+  BROWSER_LEASE_MS,
+  BROWSER_QUEUE_TIMEOUT_MS,
+  BROWSER_RETENTION_MS,
+} from './browser-job-store';
+import {
+  browserCLIInboundMessageSchema,
+  browserProviderInboundMessageSchema,
+  browserJobSnapshotSchema,
+  type BrowserRequest,
+  type BrowserProviderOutboundMessage,
+  type BrowserJobSnapshot,
+} from '../types/user-connection-protocol';
 
 // ---------------------------------------------------------------------------
 // Mock WebSocket
@@ -53,15 +68,17 @@ type MockWS = {
 function createMockWs(tags: string[] = [], attachment?: unknown): MockWS {
   const ws: MockWS = {
     send: vi.fn(),
-    close: vi.fn(),
+    close: vi.fn(() => {
+      ws.readyState = 3;
+    }),
     readyState: 1,
-    _attachment: attachment ?? null,
+    _attachment: structuredClone(attachment ?? null),
     _tags: tags,
     serializeAttachment(att: unknown) {
-      ws._attachment = att;
+      ws._attachment = structuredClone(att);
     },
     deserializeAttachment() {
-      return ws._attachment;
+      return structuredClone(ws._attachment);
     },
   };
   return ws;
@@ -71,10 +88,57 @@ function createMockWs(tags: string[] = [], attachment?: unknown): MockWS {
 // Mock DurableObjectState (this.ctx)
 // ---------------------------------------------------------------------------
 
-/** In-memory Map-backed KV fake for ctx.storage (put/get/delete/list). */
+/** KV fake with serial, atomic transactions and observable alarm state. */
 function makeStorageFake() {
   const store = new Map<string, unknown>();
+  let alarmAt: number | null = null;
+  let serial: Promise<unknown> = Promise.resolve();
+  const transaction = vi.fn(<T>(run: (tx: DurableObjectTransaction) => Promise<T>): Promise<T> => {
+    const next = serial.then(async () => {
+      const working = new Map(store);
+      const writes = new Set<string>();
+      const deletes = new Set<string>();
+      const tx = {
+        async get<V>(key: string): Promise<V | undefined> {
+          return structuredClone(working.get(key)) as V | undefined;
+        },
+        async put(key: string, value: unknown) {
+          working.set(key, structuredClone(value));
+          writes.add(key);
+          deletes.delete(key);
+        },
+        async delete(key: string) {
+          writes.delete(key);
+          deletes.add(key);
+          return working.delete(key);
+        },
+        async list<V>(options: { prefix?: string; limit?: number } = {}): Promise<Map<string, V>> {
+          return new Map(
+            [...working]
+              .filter(([key]) => key.startsWith(options.prefix ?? ''))
+              .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+              .slice(0, options.limit)
+              .map(([key, value]) => [key, structuredClone(value) as V])
+          );
+        },
+      };
+      const result = await run(tx as DurableObjectTransaction);
+      for (const key of writes) store.set(key, working.get(key));
+      for (const key of deletes) store.delete(key);
+      return result;
+    });
+    serial = next.catch(() => undefined);
+    return next;
+  });
   return {
+    transaction,
+    get alarmAt() {
+      return alarmAt;
+    },
+    getAlarm: vi.fn(async () => alarmAt),
+    deleteAlarm: vi.fn(async () => {
+      alarmAt = null;
+    }),
     store,
     put: vi.fn(async (key: string, value: unknown) => {
       store.set(key, value);
@@ -95,7 +159,9 @@ function makeStorageFake() {
       }
       return result;
     }),
-    setAlarm: vi.fn(),
+    setAlarm: vi.fn(async (at: number) => {
+      alarmAt = at;
+    }),
   };
 }
 
@@ -223,7 +289,11 @@ function connectWebSocket(doInstance: UserConnectionDO, connectionId: string): M
   return server;
 }
 
-function connectCliSocket(doInstance: UserConnectionDO, connectionId: string): MockWS {
+function connectCliSocket(
+  doInstance: UserConnectionDO,
+  connectionId: string,
+  kiloUserId = ''
+): MockWS {
   const client = createMockWs();
   const server = createMockWs();
   vi.stubGlobal(
@@ -241,7 +311,7 @@ function connectCliSocket(doInstance: UserConnectionDO, connectionId: string): M
   );
 
   doInstance.fetch(
-    new Request(`http://local/cli?connectionId=${connectionId}`, {
+    new Request(`http://local/cli?connectionId=${connectionId}&kiloUserId=${kiloUserId}`, {
       headers: { Upgrade: 'websocket' },
     })
   );
@@ -426,6 +496,1294 @@ describe('UserConnectionDO', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  describe('browser relay', () => {
+    const now = Date.UTC(2026, 7, 28);
+    const owner = { parentSessionId: 'ses_parent', parentProof: 'a'.repeat(64) };
+    const otherOwner = { parentSessionId: 'ses_other', parentProof: 'b'.repeat(64) };
+    const tab = {
+      tabId: 42,
+      title: 'Approved page',
+      url: 'https://example.com/',
+      effectiveMode: 'safe' as const,
+    };
+    const registration = {
+      type: 'provider_register',
+      requestId: '00000000-0000-4000-8000-000000000001',
+      providerId: 'bp_00000000-0000-4000-8000-000000000001',
+      providerProof: 'c'.repeat(64),
+      label: 'Work profile',
+      generation: 0,
+      enabled: true,
+    } satisfies BrowserProviderOutboundMessage;
+    type Invoke = Extract<BrowserRequest, { operation: 'invoke' }>;
+
+    function invokeRequest(n = 1, changes: Partial<Invoke> = {}): Invoke {
+      return {
+        type: 'browser_request',
+        operation: 'invoke',
+        requestId: crypto.randomUUID(),
+        owner,
+        providerId: registration.providerId,
+        invocationId: `b1.${now}.${n.toString(16).padStart(64, '0')}`,
+        goal: `Observe page ${n}`,
+        ...changes,
+      };
+    }
+
+    async function frame(doInstance: UserConnectionDO, ws: MockWS, message: unknown) {
+      await doInstance.webSocketMessage(ws as never, JSON.stringify(message));
+      await flushAsync();
+    }
+
+    async function negotiate(doInstance: UserConnectionDO, ws: MockWS, role: 'cli' | 'web') {
+      await frame(
+        doInstance,
+        ws,
+        role === 'cli'
+          ? { type: 'heartbeat', sessions: [], capabilities: { browserJobsV1: true } }
+          : { type: 'ping', nonce: 'browser', capabilities: { browserJobsV1: true } }
+      );
+    }
+
+    async function browserSetup() {
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const f = setup();
+      const cli = addCliSocket(f.mockCtx, 'cli-browser', [], undefined, 'usr_1');
+      const panel = addWebSocket(f.mockCtx, 'panel');
+      const viewer = addWebSocket(f.mockCtx, 'viewer');
+      await negotiate(f.doInstance, cli, 'cli');
+      await negotiate(f.doInstance, panel, 'web');
+      await frame(f.doInstance, panel, registration);
+      cli.send.mockClear();
+      panel.send.mockClear();
+      viewer.send.mockClear();
+      return { ...f, cli, panel, viewer };
+    }
+    type Fixture = Awaited<ReturnType<typeof browserSetup>>;
+
+    function response(ws: MockWS, requestId: string) {
+      const sent = allSent(ws).findLast(
+        m => m.type === 'browser_response' && m.requestId === requestId
+      );
+      const parsed = browserCLIInboundMessageSchema.parse(sent);
+      if (parsed.type !== 'browser_response') throw new Error('Missing browser response');
+      return parsed.response;
+    }
+
+    function job(f: Fixture, jobId: string): BrowserJobSnapshot {
+      const stored = f.ctx.storage.store.get(`browser/job/${jobId}`);
+      if (!isRecord(stored)) throw new Error('Missing stored browser job');
+      return browserJobSnapshotSchema.parse(stored.snapshot);
+    }
+
+    async function invoke(f: Fixture, n = 1, changes: Partial<Invoke> = {}, cli = f.cli) {
+      const request = invokeRequest(n, changes);
+      await frame(f.doInstance, cli, request);
+      const accepted = response(cli, request.requestId);
+      if (accepted.kind !== 'ack') throw new Error(`Admission failed: ${JSON.stringify(accepted)}`);
+      return job(f, accepted.jobId);
+    }
+
+    function binding(snapshot: BrowserJobSnapshot) {
+      return {
+        providerId: snapshot.providerId,
+        browserTaskId: snapshot.browserTaskId,
+        jobId: snapshot.jobId,
+        invocationId: snapshot.invocationId,
+        generation: snapshot.generation,
+      };
+    }
+
+    function providerJobs(ws: MockWS): BrowserJobSnapshot[] {
+      return allSent(ws).flatMap(message => {
+        const parsed = browserProviderInboundMessageSchema.safeParse(message);
+        return parsed.success && parsed.data.type === 'provider_job' ? [parsed.data.job] : [];
+      });
+    }
+
+    async function approve(f: Fixture, snapshot: BrowserJobSnapshot) {
+      await frame(f.doInstance, f.panel, {
+        type: 'provider_approval',
+        ...binding(snapshot),
+        approval: { decision: 'approved', tab },
+      });
+      return job(f, snapshot.jobId);
+    }
+
+    function resultMessage(snapshot: BrowserJobSnapshot) {
+      const { generation: _generation, ...handle } = binding(snapshot);
+      return {
+        type: 'provider_result',
+        ...binding(snapshot),
+        tab,
+        result: {
+          ...handle,
+          status: 'succeeded',
+          reason: 'completed',
+          effectsUncertain: false,
+          summary: 'Observed the requested page.',
+          evidence: [{ text: 'The page contains the requested value.', url: tab.url }],
+        },
+      };
+    }
+
+    function lookup(
+      snapshot: BrowserJobSnapshot,
+      operation: 'status' | 'cancel' = 'status',
+      proof = owner
+    ) {
+      return {
+        type: 'browser_request',
+        requestId: crypto.randomUUID(),
+        operation,
+        owner: proof,
+        browserTaskId: snapshot.browserTaskId,
+        jobId: snapshot.jobId,
+      } satisfies BrowserRequest;
+    }
+
+    async function quiesce(f: Fixture, snapshot: BrowserJobSnapshot, panel = f.panel) {
+      await frame(f.doInstance, panel, {
+        type: 'provider_quiesced',
+        ...binding(snapshot),
+        tabId: tab.tabId,
+      });
+    }
+
+    async function heartbeat(f: Fixture, generation = 1, panel = f.panel) {
+      await frame(f.doInstance, panel, {
+        type: 'provider_heartbeat',
+        requestId: crypto.randomUUID(),
+        providerId: registration.providerId,
+        generation,
+      });
+    }
+
+    it('negotiates through legacy acknowledgements and sends no browser frames before opt-in', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cli = addCliSocket(mockCtx, 'cli', [], undefined, 'usr_1');
+      const panel = addWebSocket(mockCtx, 'panel');
+      await frame(doInstance, cli, { type: 'heartbeat', sessions: [] });
+      await frame(doInstance, panel, { type: 'ping', nonce: 'legacy' });
+      await frame(doInstance, cli, invokeRequest());
+      await frame(doInstance, panel, registration);
+      expect(allSent(cli)).toEqual([{ type: 'heartbeat_ack' }]);
+      expect(allSent(panel).filter(m => m.type !== 'system')).toEqual([
+        { type: 'pong', nonce: 'legacy' },
+      ]);
+      expect(mockCtx.storage.store.size).toBe(0);
+      expect(cli.deserializeAttachment()).toMatchObject({
+        browserCapabilities: { browserJobsV1: false },
+      });
+      await negotiate(doInstance, cli, 'cli');
+      await negotiate(doInstance, panel, 'web');
+      expect(allSent(cli).at(-1)).toEqual({
+        type: 'heartbeat_ack',
+        capabilities: { browserJobsV1: true },
+      });
+      expect(allSent(panel).at(-1)).toEqual({
+        type: 'pong',
+        nonce: 'browser',
+        capabilities: { browserJobsV1: true },
+      });
+    });
+
+    it('preserves negotiation and registration during delayed subscription access', async () => {
+      const f = await browserSetup();
+      f.panel = addWebSocket(f.mockCtx, 'late-panel');
+      const accessible = {
+        kiloSessionId: 'ses_delayed',
+        organizationId: null,
+        cloudAgentSessionScopeId: null,
+      };
+      const access = Promise.withResolvers<typeof accessible>();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockReturnValueOnce(access.promise);
+      const pending = sendSubscribe(f.doInstance, f.panel, accessible.kiloSessionId);
+
+      await negotiate(f.doInstance, f.panel, 'web');
+      await frame(f.doInstance, f.panel, registration);
+      const registered = f.panel.deserializeAttachment() as Record<string, unknown>;
+      expect(registered).toMatchObject({
+        browserCapabilities: { browserJobsV1: true },
+        browserSocketId: expect.any(String),
+        browserProvider: { providerId: registration.providerId, generation: 2 },
+      });
+      access.resolve(accessible);
+      await pending;
+
+      expect(f.panel.deserializeAttachment()).toEqual({
+        ...registered,
+        subscribedSessions: [accessible.kiloSessionId],
+      });
+      const active = await approve(f, await invoke(f));
+      await frame(f.doInstance, f.panel, resultMessage(active));
+      expect(providerJobs(f.panel).map(snapshot => snapshot.jobId)).toEqual([active.jobId]);
+      expect(
+        allSent(f.cli).filter(
+          message => message.type === 'browser_event' && message.event === 'result'
+        )
+      ).toMatchObject([{ result: { jobId: active.jobId, status: 'succeeded' } }]);
+    });
+
+    it('preserves approval during delayed subscription access across hibernation', async () => {
+      const f = await browserSetup();
+      const active = await invoke(f);
+      const accessible = {
+        kiloSessionId: 'ses_delayed',
+        organizationId: null,
+        cloudAgentSessionScopeId: null,
+      };
+      const access = Promise.withResolvers<typeof accessible>();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockReturnValueOnce(access.promise);
+      const pending = sendSubscribe(f.doInstance, f.panel, accessible.kiloSessionId);
+
+      await approve(f, active);
+      expect(job(f, active.jobId).status).toBe('running');
+      access.resolve(accessible);
+      await pending;
+      f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+      await f.doInstance.alarm();
+      await flushAsync();
+
+      expect(job(f, active.jobId)).toMatchObject({ status: 'running', approvedTab: tab });
+      await frame(f.doInstance, f.panel, resultMessage(active));
+      expect(providerJobs(f.panel).map(snapshot => snapshot.jobId)).toEqual([active.jobId]);
+      expect(
+        allSent(f.cli).filter(
+          message => message.type === 'browser_event' && message.event === 'result'
+        )
+      ).toMatchObject([{ result: { jobId: active.jobId, status: 'succeeded' } }]);
+    });
+
+    it.each(['replacement', 'close'] as const)(
+      'preserves the %s fence when delayed subscription access completes',
+      async cause => {
+        const f = await browserSetup();
+        const accessible = {
+          kiloSessionId: 'ses_delayed',
+          organizationId: null,
+          cloudAgentSessionScopeId: null,
+        };
+        const access = Promise.withResolvers<typeof accessible>();
+        sessionAccessMocks.resolveAccessibleKiloSession.mockReturnValueOnce(access.promise);
+        const pending = sendSubscribe(f.doInstance, f.panel, accessible.kiloSessionId);
+
+        if (cause === 'replacement') connectWebSocket(f.doInstance, 'panel');
+        else await f.doInstance.webSocketClose(f.panel as never, 1000, 'closed', true);
+        await flushAsync();
+        const closed = f.panel.deserializeAttachment();
+        f.cli.send.mockClear();
+        f.panel.send.mockClear();
+        access.resolve(accessible);
+        await pending;
+
+        expect(f.panel.deserializeAttachment()).toEqual(closed);
+        expect(allSent(f.panel)).toEqual([]);
+        expect(allSent(f.cli).filter(message => message.type === 'subscribe')).toEqual([]);
+      }
+    );
+
+    it('keeps discovery private and separate from the unchanged CLI instance list', async () => {
+      const f = await browserSetup();
+      const spawner = addCliSocket(f.mockCtx, 'spawner', [], {
+        name: 'Laptop',
+        projectName: 'Repo',
+      });
+      await frame(f.doInstance, spawner, {
+        type: 'heartbeat',
+        sessions: [],
+        instance: { name: 'Laptop', projectName: 'Repo' },
+      });
+      const before = f.doInstance.getConnectedInstances();
+      const request: BrowserRequest = {
+        type: 'browser_request',
+        operation: 'list',
+        requestId: crypto.randomUUID(),
+      };
+      await frame(f.doInstance, f.cli, request);
+      expect(response(f.cli, request.requestId)).toEqual({
+        kind: 'providers',
+        providers: [
+          {
+            providerId: registration.providerId,
+            label: 'Work profile',
+            availability: 'available',
+            queueDepth: 0,
+          },
+        ],
+      });
+      expect(f.doInstance.getConnectedInstances()).toEqual(before);
+      expect(before).toEqual({
+        instances: [{ connectionId: 'spawner', name: 'Laptop', projectName: 'Repo' }],
+      });
+      expect(allSent(f.viewer).every(m => m.type === 'system')).toBe(true);
+      expect(JSON.stringify(response(f.cli, request.requestId))).not.toMatch(
+        /Proof|socketId|generation|goal|parent/
+      );
+    });
+
+    it('returns empty discovery and authoritative not-found recovery without allocating work', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const { doInstance, mockCtx } = setup();
+      const cli = addCliSocket(mockCtx, 'cli', [], undefined, 'usr_1');
+      await negotiate(doInstance, cli, 'cli');
+      const list: BrowserRequest = {
+        type: 'browser_request',
+        operation: 'list',
+        requestId: crypto.randomUUID(),
+      };
+      const recover: BrowserRequest = {
+        type: 'browser_request',
+        operation: 'recover',
+        owner,
+        invocationId: invokeRequest().invocationId,
+        requestId: crypto.randomUUID(),
+      };
+      await frame(doInstance, cli, list);
+      await frame(doInstance, cli, recover);
+      expect(response(cli, list.requestId)).toEqual({ kind: 'providers', providers: [] });
+      expect(response(cli, recover.requestId)).toEqual({
+        kind: 'not_found',
+        invocationId: recover.invocationId,
+      });
+      expect([...mockCtx.storage.store.keys()].filter(key => key.startsWith('browser/'))).toEqual(
+        []
+      );
+    });
+
+    it('commits admission and acknowledges it before one persisted provider dispatch', async () => {
+      const f = await browserSetup();
+      const order: string[] = [];
+      f.cli.send.mockImplementation((raw: string) => {
+        const message = browserCLIInboundMessageSchema.parse(JSON.parse(raw));
+        if (message.type === 'browser_response' && message.response.kind === 'ack') {
+          expect(job(f, message.response.jobId).status).toBe(
+            order.length === 0 ? 'queued' : 'awaiting_approval'
+          );
+          order.push('ack');
+        }
+      });
+      f.panel.send.mockImplementation((raw: string) => {
+        const message = browserProviderInboundMessageSchema.parse(JSON.parse(raw));
+        if (message.type === 'provider_job') {
+          expect(f.ctx.storage.store.get(`browser/job/${message.job.jobId}`)).toMatchObject({
+            dispatch: { at: now },
+            snapshot: { status: 'awaiting_approval' },
+          });
+          order.push('dispatch');
+        }
+      });
+      const accepted = await invoke(f);
+      await invoke(f);
+      expect(order).toEqual(['ack', 'dispatch', 'ack']);
+      expect(providerJobs(f.panel).map(j => j.jobId)).toEqual([accepted.jobId]);
+      expect(allSent(f.viewer)).toEqual([]);
+      expect(JSON.stringify(allSent(f.panel))).not.toContain(owner.parentProof);
+      expect(JSON.stringify([...f.ctx.storage.store])).not.toContain(registration.providerProof);
+    });
+
+    it('requires explicit provider selection, enabled registration, and the correct socket roles', async () => {
+      const f = await browserSetup();
+      const active = await invoke(f);
+      const before = structuredClone([...f.ctx.storage.store]);
+      const { providerId: _providerId, ...implicit } = invokeRequest(2);
+      await frame(f.doInstance, f.cli, implicit);
+      await frame(f.doInstance, f.panel, invokeRequest(2));
+      await frame(f.doInstance, f.viewer, invokeRequest(2));
+      await frame(f.doInstance, f.cli, {
+        type: 'provider_approval',
+        ...binding(active),
+        approval: { decision: 'approved', tab },
+      });
+      await frame(f.doInstance, f.panel, { ...registration, enabled: false });
+      expect([...f.ctx.storage.store]).toEqual(before);
+      expect(providerJobs(f.panel)).toHaveLength(1);
+      expect(job(f, active.jobId).status).toBe('awaiting_approval');
+    });
+
+    it('keeps retryable capacity or availability failures distinct from non-retryable proof failures', async () => {
+      const f = await browserSetup();
+      const active = await invoke(f);
+      const unavailable = invokeRequest(2, {
+        providerId: 'bp_00000000-0000-4000-8000-000000000002',
+      });
+      await frame(f.doInstance, f.cli, unavailable);
+      expect(response(f.cli, unavailable.requestId)).toMatchObject({
+        kind: 'error',
+        code: 'provider_unavailable',
+        retryable: true,
+      });
+      const forged = lookup(active, 'status', { ...owner, parentProof: 'f'.repeat(64) });
+      await frame(f.doInstance, f.cli, forged);
+      expect(response(f.cli, forged.requestId)).toMatchObject({
+        kind: 'error',
+        code: 'owner_mismatch',
+        retryable: false,
+      });
+      expect(job(f, active.jobId).status).toBe('awaiting_approval');
+    });
+
+    it('isolates multiple parents across two CLI sockets despite a forged heartbeat', async () => {
+      const f = await browserSetup();
+      const second = addCliSocket(f.mockCtx, 'second', [], undefined, 'usr_1');
+      await negotiate(f.doInstance, second, 'cli');
+      const a = await invoke(f);
+      const b = await invoke(f, 2, { owner: otherOwner });
+      await frame(f.doInstance, second, {
+        type: 'heartbeat',
+        capabilities: { browserJobsV1: true },
+        sessions: [makeSession(owner.parentSessionId), makeSession(otherOwner.parentSessionId)],
+      });
+      for (const target of [a, b]) {
+        for (const operation of ['status', 'cancel'] as const) {
+          const request = lookup(target, operation, { ...owner, parentProof: 'd'.repeat(64) });
+          await frame(f.doInstance, second, request);
+          expect(response(second, request.requestId)).toMatchObject({
+            kind: 'error',
+            code: 'owner_mismatch',
+          });
+        }
+      }
+      await approve(f, a);
+      await frame(f.doInstance, f.panel, resultMessage(a));
+      expect(allSent(second).filter(m => m.type === 'browser_event')).toEqual([]);
+      expect(
+        allSent(f.cli).filter(m => m.type === 'browser_event' && m.event === 'result')
+      ).toMatchObject([{ result: { jobId: a.jobId, summary: 'Observed the requested page.' } }]);
+      expect(job(f, b.jobId).status).toBe('queued');
+    });
+
+    it('requires fresh approval and the exact approved tab before accepting a result', async () => {
+      const f = await browserSetup();
+      const active = await invoke(f);
+      await frame(f.doInstance, f.panel, resultMessage(active));
+      expect(job(f, active.jobId).status).toBe('awaiting_approval');
+      await approve(f, active);
+      for (const changed of [
+        { tabId: 99 },
+        { title: 'Other' },
+        { url: 'https://other.example/' },
+        { effectiveMode: 'dangerous' },
+      ]) {
+        await frame(f.doInstance, f.panel, {
+          ...resultMessage(active),
+          tab: { ...tab, ...changed },
+        });
+        expect(job(f, active.jobId).status).toBe('running');
+      }
+      await frame(f.doInstance, f.panel, resultMessage(active));
+      await quiesce(f, active);
+      const continued = await invoke(f, 2, { browserTaskId: active.browserTaskId });
+      expect(continued.browserTaskId).toBe(active.browserTaskId);
+      expect(continued.status).toBe('awaiting_approval');
+      expect(continued.approvedTab).toBeUndefined();
+      await frame(f.doInstance, f.panel, resultMessage(continued));
+      expect(job(f, continued.jobId).status).toBe('awaiting_approval');
+    });
+
+    it('advances FIFO only after exact quiescence, not terminal success or an empty CLI heartbeat', async () => {
+      const f = await browserSetup();
+      const first = await approve(f, await invoke(f));
+      const second = await invoke(f, 2);
+      const third = await invoke(f, 3);
+      await frame(f.doInstance, f.panel, resultMessage(first));
+      await negotiate(f.doInstance, f.cli, 'cli');
+      await heartbeat(f);
+      expect(providerJobs(f.panel).map(j => j.jobId)).toEqual([first.jobId]);
+      await quiesce(f, first);
+      expect(providerJobs(f.panel).map(j => j.jobId)).toEqual([first.jobId, second.jobId]);
+      await quiesce(f, first);
+      expect(job(f, third.jobId).status).toBe('queued');
+      expect(providerJobs(f.panel)).toHaveLength(2);
+    });
+
+    it('settles denied approval without running and holds FIFO until quiescence', async () => {
+      const f = await browserSetup();
+      const first = await invoke(f);
+      const next = await invoke(f, 2);
+      await frame(f.doInstance, f.panel, {
+        type: 'provider_approval',
+        ...binding(first),
+        approval: { decision: 'denied', reason: 'approval_denied' },
+      });
+      expect(job(f, first.jobId)).toMatchObject({
+        status: 'failed',
+        result: { reason: 'approval_denied', effectsUncertain: false },
+      });
+      expect(job(f, first.jobId).approvedTab).toBeUndefined();
+      expect(providerJobs(f.panel)).toHaveLength(1);
+      await quiesce(f, first);
+      expect(providerJobs(f.panel).map(j => j.jobId)).toEqual([first.jobId, next.jobId]);
+    });
+
+    it('authorizes provider_cancel by the registered socket and generation, including queued jobs', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      const queued = await invoke(f, 2, { owner: otherOwner });
+      const stranger = addWebSocket(f.mockCtx, 'stranger');
+      await negotiate(f.doInstance, stranger, 'web');
+      const cancel = { type: 'provider_cancel', ...binding(queued) };
+      await frame(f.doInstance, stranger, cancel);
+      await frame(f.doInstance, f.cli, cancel);
+      await frame(f.doInstance, f.panel, { ...cancel, generation: queued.generation + 1 });
+      expect(job(f, queued.jobId).status).toBe('queued');
+      await frame(f.doInstance, f.panel, cancel);
+      expect(job(f, queued.jobId)).toMatchObject({
+        status: 'cancelled',
+        result: { effectsUncertain: false },
+      });
+      expect(job(f, active.jobId).status).toBe('running');
+      expect(allSent(stranger).filter(m => m.type === 'provider_snapshot')).toEqual([]);
+    });
+
+    it.each(['awaiting_approval', 'running'] as const)(
+      'forwards cancellation after settlement and fences %s work against late success',
+      async state => {
+        const f = await browserSetup();
+        let active = await invoke(f);
+        if (state === 'running') active = await approve(f, active);
+        const queued = await invoke(f, 2);
+        const cancelledBeforeDelivery: string[] = [];
+        f.panel.send.mockImplementation((raw: string) => {
+          const message = JSON.parse(raw) as { type: string };
+          if (message.type === 'provider_job_cancel')
+            cancelledBeforeDelivery.push(job(f, active.jobId).status);
+        });
+        const cancel = lookup(active, 'cancel');
+        await frame(f.doInstance, f.cli, cancel);
+        expect(response(f.cli, cancel.requestId)).toMatchObject({
+          kind: 'ack',
+          operation: 'cancel',
+          jobId: active.jobId,
+        });
+        expect(cancelledBeforeDelivery).toEqual(['cancelled']);
+        expect(job(f, active.jobId).result).toMatchObject({
+          status: 'cancelled',
+          reason: 'cancelled',
+        });
+        await frame(f.doInstance, f.panel, resultMessage(active));
+        expect(job(f, active.jobId).status).toBe('cancelled');
+        expect(providerJobs(f.panel)).toHaveLength(1);
+        expect(job(f, queued.jobId).status).toBe(state === 'running' ? 'interrupted' : 'queued');
+        await quiesce(f, active);
+        expect(providerJobs(f.panel)).toHaveLength(state === 'running' ? 1 : 2);
+      }
+    );
+
+    it.each(['panel close', 'socket error', 'disablement', 'shutdown'] as const)(
+      'settles active and queued jobs on %s without releasing uncertain execution',
+      async cause => {
+        const f = await browserSetup();
+        const active = await approve(f, await invoke(f));
+        const queued = await invoke(f, 2);
+        if (cause === 'panel close')
+          await f.doInstance.webSocketClose(f.panel as never, 1000, 'closed', true);
+        else if (cause === 'socket error') await f.doInstance.webSocketError(f.panel as never);
+        else
+          await frame(f.doInstance, f.panel, {
+            type: 'provider_unavailable',
+            providerId: active.providerId,
+            generation: active.generation,
+            reason: 'provider_unavailable',
+            effectsUncertain: true,
+          });
+        await flushAsync();
+        expect(job(f, active.jobId)).toMatchObject({
+          status: 'interrupted',
+          result: { effectsUncertain: true },
+        });
+        expect(job(f, queued.jobId)).toMatchObject({
+          status: 'interrupted',
+          result: { reason: 'provider_unavailable', effectsUncertain: false },
+        });
+        expect(f.ctx.storage.store.get(`browser/provider/${active.providerId}`)).toMatchObject({
+          fence: { jobId: active.jobId, requiresRecovery: true },
+          queue: [],
+        });
+        const replacement = addWebSocket(f.mockCtx, `replacement-${cause}`);
+        await negotiate(f.doInstance, replacement, 'web');
+        await frame(f.doInstance, replacement, { ...registration, generation: active.generation });
+        expect(allSent(replacement).at(-1)).toMatchObject({
+          type: 'response',
+          error: { code: 'provider_unavailable' },
+        });
+        expect(providerJobs(replacement)).toEqual([]);
+        expect(
+          allSent(f.cli).filter(m => m.type === 'browser_event' && m.event === 'result')
+        ).toHaveLength(2);
+      }
+    );
+
+    it('settles a failed provider send as interruption and never retries executable work', async () => {
+      const f = await browserSetup();
+      let attempted = 0;
+      f.panel.send.mockImplementation((raw: string) => {
+        if ((JSON.parse(raw) as { type: string }).type === 'provider_job') {
+          attempted++;
+          throw new Error('Socket closed during dispatch');
+        }
+      });
+      const first = await invoke(f);
+      expect(first).toMatchObject({
+        status: 'interrupted',
+        result: { reason: 'provider_lost', effectsUncertain: true },
+      });
+      const duplicate = await invoke(f);
+      expect(duplicate.jobId).toBe(first.jobId);
+      expect(duplicate.result).toEqual(first.result);
+      f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+      await invoke(f);
+      expect(attempted).toBe(1);
+      expect(f.ctx.storage.store.get(`browser/provider/${first.providerId}`)).toMatchObject({
+        fence: { jobId: first.jobId },
+        queue: [],
+      });
+    });
+
+    it('does not opt in a socket when its capability acknowledgement cannot be sent', async () => {
+      const f = await browserSetup();
+      const cli = addCliSocket(f.mockCtx, 'lost-ack', [], undefined, 'usr_1');
+      cli.send.mockImplementationOnce(() => {
+        throw new Error('Ack lost');
+      });
+      await negotiate(f.doInstance, cli, 'cli');
+      await frame(f.doInstance, cli, invokeRequest());
+      expect(cli.deserializeAttachment()).toMatchObject({
+        browserCapabilities: { browserJobsV1: false },
+      });
+      expect(providerJobs(f.panel)).toEqual([]);
+      expect([...f.ctx.storage.store.keys()].filter(key => key.startsWith('browser/job/'))).toEqual(
+        []
+      );
+      await negotiate(f.doInstance, cli, 'cli');
+      const accepted = await invoke(f, 1, {}, cli);
+      expect(accepted.status).toBe('awaiting_approval');
+    });
+
+    it('sends neither acceptance nor work when the admission transaction fails', async () => {
+      const f = await browserSetup();
+      f.ctx.storage.transaction.mockRejectedValueOnce(new Error('Commit failed'));
+      await expect(frame(f.doInstance, f.cli, invokeRequest())).rejects.toThrow('Commit failed');
+      await flushAsync();
+      expect(allSent(f.cli).filter(m => m.type === 'browser_response')).toEqual([]);
+      expect(providerJobs(f.panel)).toEqual([]);
+      expect([...f.ctx.storage.store.keys()].filter(key => key.startsWith('browser/job/'))).toEqual(
+        []
+      );
+    });
+
+    it('rejects changed duplicate payloads without replacing the accepted job', async () => {
+      const f = await browserSetup();
+      const accepted = await invoke(f);
+      const conflict = invokeRequest(1, { goal: 'Different work' });
+      await frame(f.doInstance, f.cli, conflict);
+      expect(response(f.cli, conflict.requestId)).toMatchObject({
+        kind: 'error',
+        code: 'invocation_conflict',
+        retryable: false,
+      });
+      expect(job(f, accepted.jobId)).toEqual(accepted);
+      expect(providerJobs(f.panel)).toHaveLength(1);
+    });
+
+    it('preserves jobs after CLI loss and recovers a stored result only after parent proof', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      await disconnectCli(f.doInstance, f.cli);
+      f.mockCtx.removeSocket(f.cli);
+      expect(job(f, active.jobId).status).toBe('running');
+      f.cli.send.mockClear();
+      await frame(f.doInstance, f.panel, resultMessage(active));
+      expect(allSent(f.cli)).toEqual([]);
+      const replacement = addCliSocket(f.mockCtx, 'recovered-cli', [], undefined, 'usr_1');
+      await negotiate(f.doInstance, replacement, 'cli');
+      const recover: BrowserRequest = {
+        type: 'browser_request',
+        operation: 'recover',
+        requestId: crypto.randomUUID(),
+        owner,
+        invocationId: active.invocationId,
+      };
+      await frame(f.doInstance, replacement, recover);
+      expect(response(replacement, recover.requestId)).toMatchObject({
+        kind: 'recovered',
+        job: {
+          jobId: active.jobId,
+          status: 'succeeded',
+          result: { summary: 'Observed the requested page.' },
+        },
+      });
+      expect(providerJobs(f.panel)).toHaveLength(1);
+    });
+
+    it('does not transfer parent subscriptions on same-ID CLI replacement or accept the replaced heartbeat', async () => {
+      const f = await browserSetup();
+      const first = await approve(f, await invoke(f));
+      const other = await invoke(f, 2, { owner: otherOwner });
+      const replacement = connectCliSocket(f.doInstance, 'cli-browser', 'usr_1');
+      await negotiate(f.doInstance, replacement, 'cli');
+      f.cli.send.mockClear();
+      await frame(f.doInstance, f.cli, {
+        type: 'heartbeat',
+        sessions: [makeSession('ses_forged')],
+        capabilities: { browserJobsV1: true },
+      });
+      expect(f.doInstance.hasActiveCliSession('ses_forged')).toBe(false);
+      expect(allSent(f.cli)).toEqual([]);
+      const forged = lookup(first, 'cancel', { ...owner, parentProof: 'f'.repeat(64) });
+      await frame(f.doInstance, replacement, forged);
+      expect(response(replacement, forged.requestId)).toMatchObject({
+        kind: 'error',
+        code: 'owner_mismatch',
+      });
+      const recovered = lookup(first);
+      await frame(f.doInstance, replacement, recovered);
+      expect(response(replacement, recovered.requestId)).toMatchObject({
+        kind: 'status',
+        job: { jobId: first.jobId },
+      });
+      await frame(f.doInstance, f.panel, resultMessage(first));
+      await quiesce(f, first);
+      await approve(f, other);
+      await frame(f.doInstance, f.panel, resultMessage(other));
+      const results = allSent(replacement).filter(
+        m => m.type === 'browser_event' && m.event === 'result'
+      );
+      expect(results).toMatchObject([
+        { requestId: recovered.requestId, result: { jobId: first.jobId } },
+      ]);
+      expect(results).toHaveLength(1);
+    });
+
+    it('restores running bindings after hibernation and preserves the nonce through CLI heartbeats', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      const before = f.cli.deserializeAttachment() as { browserSocketId: string };
+      f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+      await negotiate(f.doInstance, f.cli, 'cli');
+      expect(f.cli.deserializeAttachment()).toMatchObject({
+        browserSocketId: before.browserSocketId,
+      });
+      await frame(f.doInstance, f.panel, resultMessage(active));
+      expect(job(f, active.jobId).status).toBe('succeeded');
+      expect(
+        allSent(f.cli).filter(m => m.type === 'browser_event' && m.event === 'result')
+      ).toMatchObject([{ result: { jobId: active.jobId } }]);
+      expect(providerJobs(f.panel)).toHaveLength(1);
+    });
+
+    it('interrupts unacknowledged dispatch after hibernation without sending another executable job', async () => {
+      const f = await browserSetup();
+      const active = await invoke(f);
+      const queued = await invoke(f, 2);
+      f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+      await f.doInstance.alarm();
+      await flushAsync();
+      expect(job(f, active.jobId)).toMatchObject({
+        status: 'interrupted',
+        result: { reason: 'provider_lost', effectsUncertain: true },
+      });
+      expect(job(f, queued.jobId).status).toBe('interrupted');
+      await invoke(f);
+      await approve(f, active);
+      expect(job(f, active.jobId).status).toBe('interrupted');
+      expect(providerJobs(f.panel)).toHaveLength(1);
+      expect(f.ctx.storage.store.get(`browser/provider/${active.providerId}`)).toMatchObject({
+        fence: { jobId: active.jobId, requiresRecovery: true },
+      });
+    });
+
+    it('requires the provider proof and explicit affected-tab recovery before granting a fresh generation', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      const queued = await invoke(f, 2);
+      await f.doInstance.webSocketClose(f.panel as never, 1000, 'closed', true);
+      const replacement = connectWebSocket(f.doInstance, 'panel');
+      await negotiate(f.doInstance, replacement, 'web');
+      await frame(f.doInstance, replacement, {
+        ...registration,
+        providerProof: 'd'.repeat(64),
+        generation: active.generation,
+      });
+      expect(allSent(replacement).at(-1)).toMatchObject({
+        type: 'response',
+        error: { code: 'owner_mismatch' },
+      });
+      const recover = {
+        ...registration,
+        generation: active.generation,
+        recovery: {
+          invocationId: active.invocationId,
+          tabId: tab.tabId,
+          tabClosed: true,
+          locksDrained: true,
+        },
+      };
+      for (const fields of [{ tabId: 99 }, { tabClosed: false }, { locksDrained: false }]) {
+        await frame(f.doInstance, replacement, {
+          ...recover,
+          recovery: { ...recover.recovery, ...fields },
+        });
+        expect(f.ctx.storage.store.get(`browser/provider/${active.providerId}`)).toMatchObject({
+          fence: { jobId: active.jobId },
+        });
+      }
+      await frame(f.doInstance, replacement, recover);
+      expect(allSent(replacement)).toContainEqual(
+        expect.objectContaining({ type: 'provider_lease_ack', generation: active.generation + 1 })
+      );
+      expect(job(f, queued.jobId).status).toBe('interrupted');
+      expect(providerJobs(replacement)).toEqual([]);
+      await frame(f.doInstance, f.panel, {
+        type: 'provider_quiesced',
+        ...binding(active),
+        tabId: tab.tabId,
+      });
+      const continuation = await invoke(f, 3, { browserTaskId: active.browserTaskId });
+      expect(continuation.status).toBe('awaiting_approval');
+      expect(providerJobs(replacement).map(j => j.jobId)).toEqual([continuation.jobId]);
+      expect(providerJobs(f.panel)).toHaveLength(1);
+    });
+
+    it('does not deliver a terminal result before its transaction commits', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      const transaction = f.ctx.storage.transaction.getMockImplementation();
+      if (!transaction) throw new Error('Missing transaction fake');
+      const arrived = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      f.ctx.storage.transaction.mockImplementationOnce(run =>
+        transaction(async tx => {
+          const value = await run(tx);
+          arrived.resolve();
+          await release.promise;
+          return value;
+        })
+      );
+      const pending = f.doInstance.webSocketMessage(
+        f.panel as never,
+        JSON.stringify(resultMessage(active))
+      );
+      await arrived.promise;
+      expect(job(f, active.jobId).status).toBe('running');
+      expect(
+        allSent(f.cli).filter(m => m.type === 'browser_event' && m.event === 'result')
+      ).toEqual([]);
+      release.resolve();
+      await pending;
+      expect(job(f, active.jobId).status).toBe('succeeded');
+      expect(
+        allSent(f.cli).filter(m => m.type === 'browser_event' && m.event === 'result')
+      ).toMatchObject([{ result: { jobId: active.jobId, status: 'succeeded' } }]);
+    });
+
+    it('settles a cancellation/result race once and never replaces its terminal result', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      await Promise.all([
+        frame(f.doInstance, f.cli, lookup(active, 'cancel')),
+        frame(f.doInstance, f.panel, resultMessage(active)),
+      ]);
+      expect(job(f, active.jobId).status).toBe('cancelled');
+      f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+      await frame(f.doInstance, f.panel, resultMessage(active));
+      expect(job(f, active.jobId).status).toBe('cancelled');
+      expect(
+        allSent(f.cli).filter(m => m.type === 'browser_event' && m.event === 'result')
+      ).toHaveLength(1);
+    });
+
+    it.each(['queue', 'approval', 'execution', 'lease'] as const)(
+      'settles the %s deadline with a finite, distinct result and no replay',
+      async phase => {
+        const f = await browserSetup();
+        let active = await invoke(f);
+        if (phase !== 'approval') active = await approve(f, active);
+        let timed = active;
+        if (phase === 'queue') {
+          await frame(f.doInstance, f.panel, resultMessage(active));
+          timed = await invoke(f, 2);
+        }
+        const duration =
+          phase === 'queue'
+            ? BROWSER_QUEUE_TIMEOUT_MS
+            : phase === 'approval'
+              ? BROWSER_APPROVAL_TIMEOUT_MS
+              : phase === 'execution'
+                ? BROWSER_EXECUTION_TIMEOUT_MS
+                : BROWSER_LEASE_MS;
+        if (phase !== 'lease') {
+          for (let elapsed = 10_000; elapsed < duration; elapsed += 10_000) {
+            vi.mocked(Date.now).mockReturnValue(now + elapsed);
+            await heartbeat(f);
+            await negotiate(f.doInstance, f.cli, 'cli');
+          }
+        }
+        vi.mocked(Date.now).mockReturnValue(now + duration);
+        await f.doInstance.alarm();
+        await flushAsync();
+        expect(job(f, timed.jobId)).toMatchObject({
+          status: phase === 'lease' ? 'interrupted' : 'timed_out',
+          result: { reason: phase === 'lease' ? 'lease_expired' : `${phase}_timeout` },
+        });
+        expect(
+          allSent(f.cli).filter(m => m.type === 'browser_event' && m.event === 'result')
+        ).toContainEqual(
+          expect.objectContaining({
+            result: expect.objectContaining({
+              jobId: timed.jobId,
+              reason: phase === 'lease' ? 'lease_expired' : `${phase}_timeout`,
+            }),
+          })
+        );
+        await frame(f.doInstance, f.panel, resultMessage(timed));
+        expect(job(f, timed.jobId).status).not.toBe('succeeded');
+        expect(providerJobs(f.panel)).toHaveLength(1);
+      }
+    );
+
+    it('settles encoded retention before cleanup and retains the unresolved execution fence', async () => {
+      const f = await browserSetup();
+      const active = await approve(
+        f,
+        await invoke(f, 1, {
+          invocationId: `b1.${now - BROWSER_RETENTION_MS + 1_000}.${'1'.padStart(64, '0')}`,
+        })
+      );
+      expect(f.ctx.storage.alarmAt).toBe(now + 1_000);
+      vi.mocked(Date.now).mockReturnValue(now + 1_000);
+      await f.doInstance.alarm();
+      await flushAsync();
+      expect(f.ctx.storage.store.has(`browser/job/${active.jobId}`)).toBe(false);
+      expect(
+        allSent(f.cli).filter(m => m.type === 'browser_event' && m.event === 'result')
+      ).toMatchObject([
+        { result: { jobId: active.jobId, status: 'timed_out', reason: 'invocation_expired' } },
+      ]);
+      expect(f.ctx.storage.store.get(`browser/provider/${active.providerId}`)).toMatchObject({
+        fence: { jobId: active.jobId, requiresRecovery: true },
+      });
+      const expired: BrowserRequest = {
+        type: 'browser_request',
+        operation: 'recover',
+        requestId: crypto.randomUUID(),
+        owner,
+        invocationId: active.invocationId,
+      };
+      await frame(f.doInstance, f.cli, expired);
+      expect(response(f.cli, expired.requestId)).toMatchObject({
+        kind: 'error',
+        code: 'invocation_expired',
+        retryable: false,
+      });
+      f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+      await f.doInstance.alarm();
+      expect(providerJobs(f.panel)).toHaveLength(1);
+      expect(allSent(f.panel).filter(m => m.type === 'provider_job_cancel').length).toBeGreaterThan(
+        0
+      );
+    });
+
+    it.each([
+      ['missing expiry', {}],
+      ['not-a-number expiry', { expiresAt: NaN }],
+      ['infinite expiry', { expiresAt: Infinity }],
+      ['null record', null],
+    ])('arms a browser deadline despite a legacy command with %s', async (_name, legacy) => {
+      const f = await browserSetup();
+      await f.ctx.storage.put('pendingCommand/old-format', legacy);
+      await invoke(f, 1, {
+        invocationId: `b1.${now - BROWSER_RETENTION_MS + 1_000}.${'1'.padStart(64, '0')}`,
+      });
+      expect(f.ctx.storage.alarmAt).toBe(now + 1_000);
+    });
+
+    it('composes ready pushes, durable commands, leases, CLI eviction, and retention after hibernation', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      await f.ctx.storage.put('readyPush:ses_ready', {
+        kiloUserId: 'usr_1',
+        title: 'Ready',
+        fireAt: now + 5_000,
+        attempts: 0,
+      });
+      await f.ctx.storage.put('pendingCommand/legacy', {
+        originalId: 'legacy',
+        command: 'send_message',
+        targetConnectionId: 'cli-browser',
+        webConnectionId: 'viewer',
+        expiresAt: now + 7_000,
+        state: 'pending',
+      });
+      f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+      await f.doInstance.alarm();
+      expect(f.ctx.storage.alarmAt).toBe(now + 5_000);
+      vi.mocked(Date.now).mockReturnValue(now + 5_000);
+      await f.doInstance.alarm();
+      expect(f.ctx.storage.store.has('readyPush:ses_ready')).toBe(false);
+      expect(f.ctx.storage.alarmAt).toBe(now + 7_000);
+      vi.mocked(Date.now).mockReturnValue(now + 7_000);
+      await f.doInstance.alarm();
+      await flushAsync();
+      expect(allSent(f.viewer)).toContainEqual({
+        type: 'response',
+        id: 'legacy',
+        error: { source: 'relay', code: 'COMMAND_EXPIRED', message: 'Command expired' },
+      });
+      await f.doInstance.alarm();
+      expect(f.ctx.storage.store.has('pendingCommand/legacy')).toBe(false);
+      expect(f.ctx.storage.alarmAt).toBe(now + BROWSER_LEASE_MS);
+      vi.mocked(Date.now).mockReturnValue(now + BROWSER_LEASE_MS);
+      await f.doInstance.alarm();
+      expect(job(f, active.jobId).result?.reason).toBe('lease_expired');
+      expect(f.ctx.storage.alarmAt).toBe(now + 30_000);
+      vi.mocked(Date.now).mockReturnValue(now + 30_000);
+      await f.doInstance.alarm();
+      expect(f.cli.close.mock.calls).toContainEqual([4408, 'heartbeat timeout']);
+      expect(f.ctx.storage.alarmAt).toBe(now + BROWSER_RETENTION_MS);
+      vi.mocked(Date.now).mockReturnValue(now + BROWSER_RETENTION_MS);
+      await f.doInstance.alarm();
+      expect(f.ctx.storage.store.has(`browser/job/${active.jobId}`)).toBe(false);
+      expect(f.ctx.storage.alarmAt).toBeNull();
+    });
+
+    it('does not extend a provider lease through CLI traffic or queue snapshots', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      vi.mocked(Date.now).mockReturnValue(now + 10_000);
+      await negotiate(f.doInstance, f.cli, 'cli');
+      const queued = await invoke(f, 2);
+      expect(f.ctx.storage.alarmAt).toBe(now + BROWSER_LEASE_MS);
+      vi.mocked(Date.now).mockReturnValue(now + BROWSER_LEASE_MS);
+      await f.doInstance.alarm();
+      expect(job(f, active.jobId).result?.reason).toBe('lease_expired');
+      expect(job(f, queued.jobId).result?.reason).toBe('provider_unavailable');
+    });
+
+    it('keeps independent provider snapshots and parent results on their proven sockets', async () => {
+      const f = await browserSetup();
+      const panel = addWebSocket(f.mockCtx, 'second-profile');
+      const cli = addCliSocket(f.mockCtx, 'second-process', [], undefined, 'usr_1');
+      await negotiate(f.doInstance, panel, 'web');
+      await negotiate(f.doInstance, cli, 'cli');
+      const providerId = 'bp_00000000-0000-4000-8000-000000000002';
+      await frame(f.doInstance, panel, {
+        ...registration,
+        providerId,
+        providerProof: 'e'.repeat(64),
+        label: 'Personal profile',
+      });
+      const first = await approve(f, await invoke(f));
+      const second = await invoke(f, 2, { owner: otherOwner, providerId }, cli);
+      expect(providerJobs(panel).map(j => j.jobId)).toEqual([second.jobId]);
+      expect(providerJobs(f.panel).map(j => j.jobId)).toEqual([first.jobId]);
+      await frame(f.doInstance, panel, {
+        type: 'provider_approval',
+        ...binding(second),
+        approval: { decision: 'approved', tab },
+      });
+      await frame(f.doInstance, panel, resultMessage(second));
+      await frame(f.doInstance, f.panel, resultMessage(first));
+      expect(
+        allSent(cli).filter(m => m.type === 'browser_event' && m.event === 'result')
+      ).toMatchObject([{ result: { jobId: second.jobId } }]);
+      expect(
+        allSent(f.cli).filter(m => m.type === 'browser_event' && m.event === 'result')
+      ).toMatchObject([{ result: { jobId: first.jobId } }]);
+      expect(
+        allSent(panel)
+          .filter(m => m.type === 'provider_snapshot')
+          .every(m => m.providerId === providerId)
+      ).toBe(true);
+      expect(allSent(f.viewer).filter(m => m.type !== 'system')).toEqual([]);
+    });
+
+    it('does not publish uncommitted admission or give a racing same-ID replacement its authority', async () => {
+      const f = await browserSetup();
+      const transaction = f.ctx.storage.transaction.getMockImplementation();
+      if (!transaction) throw new Error('Missing transaction fake');
+      const arrived = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      f.ctx.storage.transaction.mockImplementationOnce(run =>
+        transaction(async tx => {
+          const value = await run(tx);
+          arrived.resolve();
+          await release.promise;
+          return value;
+        })
+      );
+      const pending = f.doInstance.webSocketMessage(
+        f.cli as never,
+        JSON.stringify(invokeRequest())
+      );
+      await arrived.promise;
+      expect(allSent(f.cli).filter(m => m.type === 'browser_response')).toEqual([]);
+      expect(providerJobs(f.panel)).toEqual([]);
+      expect([...f.ctx.storage.store.keys()].filter(key => key.startsWith('browser/job/'))).toEqual(
+        []
+      );
+      const replacement = connectCliSocket(f.doInstance, 'cli-browser', 'usr_1');
+      await negotiate(f.doInstance, replacement, 'cli');
+      release.resolve();
+      await pending;
+      await flushAsync();
+      const active = providerJobs(f.panel)[0];
+      if (!active) throw new Error('Missing committed dispatch');
+      expect(allSent(replacement).filter(m => m.type === 'browser_event')).toEqual([]);
+      const forged = lookup(active, 'status', otherOwner);
+      await frame(f.doInstance, replacement, forged);
+      expect(response(replacement, forged.requestId)).toMatchObject({
+        kind: 'error',
+        code: 'owner_mismatch',
+      });
+      const proven = lookup(active);
+      await frame(f.doInstance, replacement, proven);
+      await approve(f, active);
+      await frame(f.doInstance, f.panel, resultMessage(active));
+      expect(
+        allSent(replacement).filter(m => m.type === 'browser_event' && m.event === 'result')
+      ).toMatchObject([{ requestId: proven.requestId, result: { jobId: active.jobId } }]);
+      expect(f.cli.deserializeAttachment()).toMatchObject({ replaced: true });
+    });
+
+    it('settles live provider replacement without waiting for a close callback or trusting the new connection ID', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      const queued = await invoke(f, 2);
+      const replacement = connectWebSocket(f.doInstance, 'panel');
+      await negotiate(f.doInstance, replacement, 'web');
+      expect(job(f, active.jobId).status).toBe('interrupted');
+      expect(job(f, queued.jobId).status).toBe('interrupted');
+      expect(f.panel.deserializeAttachment()).toMatchObject({ replaced: true });
+      await frame(f.doInstance, replacement, { ...registration, generation: active.generation });
+      expect(allSent(replacement).at(-1)).toMatchObject({
+        type: 'response',
+        error: { code: 'provider_unavailable' },
+      });
+      await heartbeat(f, active.generation);
+      expect(f.ctx.storage.store.get(`browser/provider/${active.providerId}`)).toMatchObject({
+        fence: { jobId: active.jobId, requiresRecovery: true },
+      });
+      expect(providerJobs(replacement)).toEqual([]);
+    });
+
+    it('revokes browser capability without sending new frame types to the downgraded panel', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      const queued = await invoke(f, 2);
+      f.panel.send.mockClear();
+      await frame(f.doInstance, f.panel, {
+        type: 'ping',
+        nonce: 'disabled',
+        capabilities: { browserJobsV1: false },
+      });
+      expect(job(f, active.jobId).status).toBe('interrupted');
+      expect(job(f, queued.jobId).status).toBe('interrupted');
+      expect(allSent(f.panel)).toEqual([{ type: 'pong', nonce: 'disabled' }]);
+      await heartbeat(f);
+      expect(allSent(f.panel)).toEqual([{ type: 'pong', nonce: 'disabled' }]);
+    });
+
+    it('settles revoked provider sockets before a delayed close callback', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      const queued = await invoke(f, 2);
+      f.doInstance.closeViewerSockets();
+      await flushAsync();
+      expect(job(f, active.jobId).status).toBe('interrupted');
+      expect(job(f, queued.jobId).status).toBe('interrupted');
+      expect(f.panel.readyState).toBe(3);
+      expect(f.ctx.storage.store.get(`browser/provider/${active.providerId}`)).toMatchObject({
+        fence: { jobId: active.jobId, requiresRecovery: true },
+      });
+    });
+
+    it('rejects a prior provider socket even when it guesses the replacement generation', async () => {
+      const f = await browserSetup();
+      const replacement = addWebSocket(f.mockCtx, 'new-panel');
+      await negotiate(f.doInstance, replacement, 'web');
+      await frame(f.doInstance, replacement, registration);
+      const active = await invoke(f);
+      expect(active.generation).toBe(2);
+      const prior = {
+        type: 'provider_approval',
+        ...binding(active),
+        approval: { decision: 'approved', tab },
+      };
+      await frame(f.doInstance, f.panel, prior);
+      expect(job(f, active.jobId).status).toBe('awaiting_approval');
+      vi.mocked(Date.now).mockReturnValue(now + 10_000);
+      await heartbeat(f, active.generation);
+      expect(f.ctx.storage.alarmAt).toBe(now + BROWSER_LEASE_MS);
+      await frame(f.doInstance, replacement, prior);
+      expect(job(f, active.jobId).status).toBe('running');
+      expect(providerJobs(replacement)).toHaveLength(1);
+      expect(providerJobs(f.panel)).toEqual([]);
+    });
+
+    it('rejects cross-parent access with a valid foreign proof and rejects another authenticated user', async () => {
+      const f = await browserSetup();
+      const first = await invoke(f);
+      const second = await invoke(f, 2, { owner: otherOwner });
+      for (const [target, proof] of [
+        [first, otherOwner],
+        [second, owner],
+      ] as const) {
+        for (const operation of ['status', 'cancel'] as const) {
+          const request = lookup(target, operation, proof);
+          await frame(f.doInstance, f.cli, request);
+          expect(response(f.cli, request.requestId)).toMatchObject({
+            kind: 'error',
+            code: 'owner_mismatch',
+          });
+        }
+      }
+      const foreignUser = addCliSocket(f.mockCtx, 'foreign-user', [], undefined, 'usr_2');
+      await negotiate(f.doInstance, foreignUser, 'cli');
+      const request = lookup(first);
+      await frame(f.doInstance, foreignUser, request);
+      expect(response(foreignUser, request.requestId)).toMatchObject({
+        kind: 'error',
+        code: 'owner_mismatch',
+      });
+      expect(job(f, first.jobId).status).toBe('awaiting_approval');
+      expect(job(f, second.jobId).status).toBe('queued');
+    });
+
+    it('does not treat queued cancellation as acknowledgement of another dispatched invocation', async () => {
+      const f = await browserSetup();
+      const active = await invoke(f);
+      const queued = await invoke(f, 2);
+      await frame(f.doInstance, f.panel, { type: 'provider_cancel', ...binding(queued) });
+      f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+      await f.doInstance.alarm();
+      expect(job(f, active.jobId)).toMatchObject({
+        status: 'interrupted',
+        result: { reason: 'provider_lost' },
+      });
+      expect(job(f, queued.jobId).status).toBe('cancelled');
+      expect(providerJobs(f.panel)).toHaveLength(1);
+    });
+
+    it('returns a retryable queue-cap error without evicting accepted work', async () => {
+      const f = await browserSetup();
+      const active = await approve(f, await invoke(f));
+      for (let n = 2; n <= 101; n++) await invoke(f, n);
+      const overflow = invokeRequest(102);
+      await frame(f.doInstance, f.cli, overflow);
+      expect(response(f.cli, overflow.requestId)).toMatchObject({
+        kind: 'error',
+        code: 'capacity_exceeded',
+        retryable: true,
+      });
+      expect(
+        [...f.ctx.storage.store.keys()].filter(key => key.startsWith('browser/job/'))
+      ).toHaveLength(101);
+      expect(job(f, active.jobId).status).toBe('running');
+      expect(providerJobs(f.panel)).toHaveLength(1);
+    });
   });
 
   describe('notifySessionEvent', () => {
@@ -771,7 +2129,8 @@ describe('UserConnectionDO', () => {
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      expect(ctx.storage.setAlarm).toHaveBeenCalled();
+      await flushAsync();
+      expect(ctx.storage.alarmAt).toBeGreaterThan(Date.now());
     });
 
     it('sends heartbeat_ack to CLI socket', async () => {
@@ -1234,6 +2593,7 @@ describe('UserConnectionDO', () => {
         connectionId: 'viewer-1',
         subscribedSessions: [],
         kiloUserId: 'usr_1',
+        browserCapabilities: { browserJobsV1: false },
       });
     });
   });
@@ -2119,8 +3479,49 @@ describe('UserConnectionDO', () => {
       ctx.storage.setAlarm.mockClear();
       vi.mocked(Date.now).mockReturnValue(now + 20_000);
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await flushAsync();
 
-      expect(ctx.storage.setAlarm).toHaveBeenCalledWith(now + 35_000);
+      expect(ctx.storage.alarmAt).toBe(now + 35_000);
+    });
+
+    it('does not delay a committed legacy command behind an unrelated alarm read', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cli = addCliSocket(mockCtx, 'cli-1');
+      const nextOwner = addCliSocket(mockCtx, 'cli-2');
+      const web = addWebSocket(mockCtx);
+      sendHeartbeat(doInstance, cli, [makeSession('s1')]);
+      sendHeartbeat(doInstance, nextOwner, []);
+      await flushAsync();
+      const list = ctx.storage.list.getMockImplementation();
+      if (!list) throw new Error('Missing list fake');
+      const arrived = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      ctx.storage.list.mockImplementationOnce(async options => {
+        arrived.resolve();
+        await release.promise;
+        return list(options);
+      });
+      sendHeartbeat(doInstance, cli, [makeSession('s1')]);
+      await arrived.promise;
+      await sendCommand(doInstance, web, {
+        id: 'committed',
+        command: 'send_message',
+        sessionId: 's1',
+      });
+      const beforeOwnerChange = allSent(cli).filter(message => message.type === 'command');
+      sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
+      await flushAsync();
+      release.resolve();
+      await flushAsync();
+      expect(beforeOwnerChange).toMatchObject([
+        { type: 'command', command: 'send_message', sessionId: 's1' },
+      ]);
+      expect(allSent(cli).filter(message => message.type === 'command')).toHaveLength(1);
+      expect(allSent(web)).toContainEqual({
+        type: 'response',
+        id: 'committed',
+        error: { source: 'relay', code: 'SESSION_OWNER_CHANGED', message: 'Session owner changed' },
+      });
     });
 
     it('expires pending commands during alarm processing', async () => {

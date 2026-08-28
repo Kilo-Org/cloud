@@ -4,7 +4,22 @@ import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import {
+  BrowserJobStoreError,
+  createBrowserJobStore,
+  type BrowserStoreEffects,
+} from './browser-job-store';
+import {
   CLIOutboundMessageSchema,
+  cliOutboundWithBrowserMessageSchema,
+  webOutboundWithBrowserMessageSchema,
+  normalizedBrowserCapabilitiesSchema,
+  type BrowserCapabilities,
+  type BrowserRequest,
+  type BrowserResponse,
+  type BrowserEvent,
+  type BrowserJobSnapshot,
+  type BrowserProviderInboundMessage,
+  type BrowserProviderOutboundMessage,
   type CLIInboundMessage,
   type Instance,
   type SessionEventPayload,
@@ -42,7 +57,19 @@ type ConnectionCapabilities = {
   sessionClone?: boolean;
 };
 
-type WSAttachment =
+type BrowserProviderBinding = {
+  providerId: BrowserJobSnapshot['providerId'];
+  generation: number;
+  unacknowledgedDispatch?: BrowserJobSnapshot['jobId'];
+};
+
+type WSAttachment = {
+  browserSocketId?: string;
+  // Old attachments omit this field; normalize them to unsupported until they retire.
+  browserCapabilities?: BrowserCapabilities;
+  browserProvider?: BrowserProviderBinding;
+  replaced?: true;
+} & (
   | {
       role: 'cli';
       connectionId: string;
@@ -76,7 +103,8 @@ type WSAttachment =
       // accepted before this field existed. Needed for command/subscribe
       // access rechecks against current session membership.
       kiloUserId?: string;
-    };
+    }
+);
 
 // Type re-export so test files and other internal callers can reference the
 // connection-row shape from a single place.
@@ -301,6 +329,358 @@ export class UserConnectionDO extends DurableObject<Env> {
   private completedCorrelationIds = new Set<string>();
 
   private stateReconstructed = false;
+  private browserJobs = createBrowserJobStore(this.ctx.storage);
+  private browserWork: Promise<unknown> = Promise.resolve();
+  private browserRestored = false;
+  private alarmWork: Promise<void> = Promise.resolve();
+
+  // Serialize browser effects as well as ledger commits, without blocking legacy traffic.
+  private runBrowserOperation<T>(run: () => Promise<T>): Promise<T> {
+    const next = this.browserWork.then(async () => {
+      await this.restoreBrowserState();
+      return run();
+    });
+    this.browserWork = next.catch(() => undefined);
+    return next;
+  }
+
+  private async restoreBrowserState(): Promise<void> {
+    if (this.browserRestored) return;
+    for (const ws of this.ctx.getWebSockets('web')) {
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      if (!attachment?.browserProvider?.unacknowledgedDispatch) continue;
+      // Approval acknowledges the dispatched invocation. Never resend work on wake
+      // when that acknowledgement is missing; the ledger retains the execution fence.
+      const change = await this.browserJobs.disconnectProvider(ws);
+      this.deliverBrowserEffects(change.effects);
+      const current = ws.deserializeAttachment() as WSAttachment | null;
+      if (current?.browserProvider) {
+        delete current.browserProvider.unacknowledgedDispatch;
+        ws.serializeAttachment(current);
+      }
+    }
+    this.deliverBrowserEffects({
+      updates: [],
+      cancellations: await this.browserJobs.pendingCancellations(),
+    });
+    this.browserRestored = true;
+  }
+
+  private isBrowserSocket(ws: WebSocket): boolean {
+    const attachment = ws.deserializeAttachment() as WSAttachment | null;
+    return Boolean(
+      attachment &&
+      !attachment.replaced &&
+      attachment.kiloUserId &&
+      ws.readyState === WebSocket.OPEN &&
+      this.ctx.getWebSockets(attachment.role).includes(ws) &&
+      normalizedBrowserCapabilitiesSchema.parse(attachment.browserCapabilities).browserJobsV1
+    );
+  }
+
+  private findBrowserSocket(
+    routing: { socketId: string; connectionId: string },
+    role: 'cli' | 'web'
+  ): WebSocket | undefined {
+    return this.ctx.getWebSockets(role).find(ws => {
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      return (
+        attachment?.role === role &&
+        attachment.browserSocketId === routing.socketId &&
+        attachment.connectionId === routing.connectionId &&
+        this.isBrowserSocket(ws)
+      );
+    });
+  }
+
+  private findBrowserProvider(providerId: string, generation?: number): WebSocket | undefined {
+    return this.ctx.getWebSockets('web').find(ws => {
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      return (
+        attachment?.browserProvider?.providerId === providerId &&
+        (generation === undefined || attachment.browserProvider.generation === generation) &&
+        this.isBrowserSocket(ws)
+      );
+    });
+  }
+
+  private sendBrowserMessage(
+    ws: WebSocket,
+    message: BrowserResponse | BrowserEvent | BrowserProviderInboundMessage
+  ): boolean {
+    if (!this.isBrowserSocket(ws)) return false;
+    try {
+      ws.send(JSON.stringify(message));
+      return true;
+    } catch {
+      // Do not log proof-bearing input or socket errors containing frame data.
+      console.warn('Browser socket send failed');
+      return false;
+    }
+  }
+
+  private negotiateBrowser(
+    ws: WebSocket,
+    capabilities: unknown,
+    acknowledgement:
+      | Extract<CLIInboundMessage, { type: 'heartbeat_ack' }>
+      | Extract<WebInboundMessage, { type: 'pong' }>
+  ): void {
+    const normalized = normalizedBrowserCapabilitiesSchema.parse(capabilities);
+    const attachment = ws.deserializeAttachment() as WSAttachment | null;
+    if (!attachment) return;
+    try {
+      // Old peers receive the original ack/pong shape until they advertise support.
+      // Remove this fallback only when all legacy clients retire.
+      ws.send(
+        JSON.stringify({
+          ...acknowledgement,
+          ...(normalized.browserJobsV1 ? { capabilities: normalized } : {}),
+        })
+      );
+      attachment.browserCapabilities = normalized;
+    } catch {
+      attachment.browserCapabilities = { browserJobsV1: false };
+    }
+    ws.serializeAttachment(attachment);
+  }
+
+  private sendBrowserJob(ws: WebSocket, requestId: string, job: BrowserJobSnapshot): void {
+    this.sendBrowserMessage(
+      ws,
+      job.result
+        ? { type: 'browser_event', requestId, event: 'result', result: job.result }
+        : { type: 'browser_event', requestId, event: 'progress', job }
+    );
+  }
+
+  private sendBrowserSnapshot(job: BrowserJobSnapshot): void {
+    const ws = this.findBrowserProvider(job.providerId, job.generation);
+    if (!ws) return;
+    // Incremental reconciliation; provider heartbeats also return bounded full pages.
+    this.sendBrowserMessage(ws, {
+      type: 'provider_snapshot',
+      providerId: job.providerId,
+      generation: job.generation,
+      jobs: [job],
+    });
+  }
+
+  private deliverBrowserEffects(effects: BrowserStoreEffects): void {
+    for (const cancellation of effects.cancellations) {
+      const ws = this.findBrowserSocket(cancellation.routing, 'web');
+      if (ws) this.sendBrowserMessage(ws, cancellation.message);
+    }
+    for (const { job, delivery } of effects.updates) {
+      const ws = this.findBrowserSocket(delivery, 'cli');
+      if (ws) this.sendBrowserJob(ws, delivery.requestId, job);
+      this.sendBrowserSnapshot(job);
+    }
+  }
+
+  private async disconnectBrowserProvider(ws: WebSocket): Promise<void> {
+    const attachment = ws.deserializeAttachment() as WSAttachment | null;
+    if (!attachment?.browserProvider) return;
+    const change = await this.browserJobs.disconnectProvider(ws);
+    this.deliverBrowserEffects(change.effects);
+    const current = ws.deserializeAttachment() as WSAttachment | null;
+    if (current?.browserProvider) {
+      delete current.browserProvider.unacknowledgedDispatch;
+      ws.serializeAttachment(current);
+    }
+    this.scheduleNextAlarm(Date.now());
+  }
+
+  private async dispatchBrowserJob(providerId: string): Promise<void> {
+    const provider = this.findBrowserProvider(providerId);
+    if (!provider) return;
+    const change = await this.browserJobs.dispatch(providerId);
+    if (!change.value) {
+      this.deliverBrowserEffects(change.effects);
+      return;
+    }
+    const attachment = provider.deserializeAttachment() as WSAttachment | null;
+    if (attachment?.browserProvider) {
+      attachment.browserProvider.unacknowledgedDispatch = change.value.message.job.jobId;
+      provider.serializeAttachment(attachment);
+    }
+    this.deliverBrowserEffects(change.effects);
+    const target = this.findBrowserSocket(change.value.routing, 'web');
+    if (!target || !this.sendBrowserMessage(target, change.value.message)) {
+      // The dispatch intent already committed. A send failure cannot put it back in FIFO.
+      await this.disconnectBrowserProvider(provider);
+    }
+  }
+
+  private sendBrowserAcknowledgement(
+    ws: WebSocket,
+    request: BrowserRequest & { operation: 'invoke' | 'cancel' },
+    job: BrowserJobSnapshot
+  ): void {
+    this.sendBrowserMessage(ws, {
+      type: 'browser_response',
+      requestId: request.requestId,
+      response: {
+        kind: 'ack',
+        operation: request.operation,
+        providerId: job.providerId,
+        browserTaskId: job.browserTaskId,
+        jobId: job.jobId,
+        invocationId: job.invocationId,
+      },
+    });
+  }
+
+  private async handleBrowserRequest(ws: WebSocket, request: BrowserRequest): Promise<void> {
+    if (!this.isBrowserSocket(ws)) return;
+    try {
+      if (request.operation === 'list') {
+        const providers = await this.browserJobs.listProviders(ws, request);
+        this.sendBrowserMessage(ws, {
+          type: 'browser_response',
+          requestId: request.requestId,
+          response: { kind: 'providers', ...providers },
+        });
+      } else if (request.operation === 'invoke') {
+        const change = await this.browserJobs.invoke(ws, request);
+        const { job } = change.value;
+        this.sendBrowserAcknowledgement(ws, request, job);
+        this.deliverBrowserEffects(change.effects);
+        this.sendBrowserJob(ws, request.requestId, job);
+        this.sendBrowserSnapshot(job);
+        await this.dispatchBrowserJob(job.providerId);
+      } else {
+        const change = await this.browserJobs.lookup(ws, request);
+        const job = change.value;
+        if (!job && request.operation === 'recover') {
+          this.sendBrowserMessage(ws, {
+            type: 'browser_response',
+            requestId: request.requestId,
+            response: { kind: 'not_found', invocationId: request.invocationId },
+          });
+        } else if (job) {
+          if (request.operation === 'cancel') {
+            this.sendBrowserAcknowledgement(ws, request, job);
+          } else {
+            this.sendBrowserMessage(ws, {
+              type: 'browser_response',
+              requestId: request.requestId,
+              response: { kind: request.operation === 'recover' ? 'recovered' : 'status', job },
+            });
+          }
+          this.deliverBrowserEffects(change.effects);
+          if (request.operation === 'cancel' && change.effects.updates.length === 0) {
+            this.sendBrowserJob(ws, request.requestId, job);
+          }
+        }
+      }
+    } catch (error) {
+      if (!(error instanceof BrowserJobStoreError)) throw error;
+      this.sendBrowserMessage(ws, {
+        type: 'browser_response',
+        requestId: request.requestId,
+        response: {
+          kind: 'error',
+          code: error.code,
+          message: error.message,
+          retryable: error.retryable,
+        },
+      });
+    } finally {
+      this.scheduleNextAlarm(Date.now());
+    }
+  }
+
+  private async handleBrowserProvider(
+    ws: WebSocket,
+    message: BrowserProviderOutboundMessage
+  ): Promise<void> {
+    if (!this.isBrowserSocket(ws)) return;
+    try {
+      if (message.type === 'provider_register') {
+        const previous = (ws.deserializeAttachment() as WSAttachment | null)?.browserProvider;
+        if (previous && previous.providerId !== message.providerId) {
+          throw new BrowserJobStoreError('owner_mismatch');
+        }
+        const change = await this.browserJobs.registerProvider(ws, message);
+        const { providerId, generation, leaseExpiresAt } = change.value;
+        this.deliverBrowserEffects(change.effects);
+        // A grant replaces only this profile's delivery binding, not its durable fence.
+        for (const other of this.ctx.getWebSockets('web')) {
+          const attachment = other.deserializeAttachment() as WSAttachment | null;
+          if (other !== ws && attachment?.browserProvider?.providerId === providerId) {
+            delete attachment.browserProvider;
+            other.serializeAttachment(attachment);
+          }
+        }
+        const attachment = ws.deserializeAttachment() as WSAttachment;
+        attachment.browserProvider = { providerId, generation };
+        ws.serializeAttachment(attachment);
+        if (!this.isBrowserSocket(ws)) {
+          await this.disconnectBrowserProvider(ws);
+          return;
+        }
+        this.sendBrowserMessage(ws, {
+          type: 'provider_lease_ack',
+          requestId: message.requestId,
+          providerId,
+          generation,
+          leaseExpiresAt: new Date(leaseExpiresAt).toISOString(),
+        });
+        this.sendBrowserMessage(ws, {
+          type: 'provider_snapshot',
+          providerId,
+          generation,
+          jobs: [],
+        });
+      } else {
+        const change = await this.browserJobs.updateProvider(ws, message);
+        this.deliverBrowserEffects(change.effects);
+        const value = change.value;
+        if (value.job && value.job.status !== 'awaiting_approval') {
+          const attachment = ws.deserializeAttachment() as WSAttachment | null;
+          if (attachment?.browserProvider?.unacknowledgedDispatch === value.job.jobId) {
+            delete attachment.browserProvider.unacknowledgedDispatch;
+            ws.serializeAttachment(attachment);
+          }
+          if (change.effects.updates.length === 0) this.sendBrowserSnapshot(value.job);
+        }
+        if (message.type === 'provider_heartbeat' && value.leaseExpiresAt !== undefined) {
+          this.sendBrowserMessage(ws, {
+            type: 'provider_lease_ack',
+            requestId: message.requestId,
+            providerId: message.providerId,
+            generation: message.generation,
+            leaseExpiresAt: new Date(value.leaseExpiresAt).toISOString(),
+          });
+          if (value.snapshot) {
+            this.sendBrowserMessage(ws, { ...value.snapshot, requestId: message.requestId });
+          }
+        }
+        if (message.type === 'provider_quiesced' || message.type === 'provider_heartbeat') {
+          await this.dispatchBrowserJob(message.providerId);
+        }
+      }
+    } catch (error) {
+      if (!(error instanceof BrowserJobStoreError)) throw error;
+      // Registration/heartbeat errors use the legacy response envelope, not an
+      // unnegotiated provider frame. Never expose validation issues or raw proofs.
+      if ('requestId' in message && this.isBrowserSocket(ws)) {
+        this.sendToWeb(ws, {
+          type: 'response',
+          id: message.requestId,
+          error: {
+            source: 'relay',
+            code: error.code,
+            message: error.message,
+            retryable: error.retryable,
+          },
+        });
+      }
+    } finally {
+      this.scheduleNextAlarm(Date.now());
+    }
+  }
 
   private ensureState(): void {
     if (this.stateReconstructed) return;
@@ -311,7 +691,7 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     for (const ws of this.ctx.getWebSockets()) {
       const attachment = ws.deserializeAttachment() as WSAttachment | null;
-      if (!attachment) continue;
+      if (!attachment || attachment.replaced) continue;
 
       if (attachment.role === 'cli') {
         cliCount++;
@@ -329,7 +709,6 @@ export class UserConnectionDO extends DurableObject<Env> {
           ws.serializeAttachment({ ...attachment, heartbeatAt });
         }
       } else {
-        if (attachment.replaced) continue;
         webCount++;
         for (const sessionId of attachment.subscribedSessions) {
           let subs = this.webSubscriptions.get(sessionId);
@@ -454,9 +833,26 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
+    if (attachment.replaced) return;
     if (attachment.role === 'cli') {
+      if (this.isBrowserSocket(ws)) {
+        const browser = cliOutboundWithBrowserMessageSchema.safeParse(parsed);
+        if (browser.success && browser.data.type === 'browser_request') {
+          const request = browser.data;
+          await this.runBrowserOperation(() => this.handleBrowserRequest(ws, request));
+          return;
+        }
+      }
       this.handleCliMessage(ws, attachment, parsed, raw, binaryByteCount);
-    } else if (!attachment.replaced) {
+    } else {
+      if (this.isBrowserSocket(ws)) {
+        const browser = webOutboundWithBrowserMessageSchema.safeParse(parsed);
+        if (browser.success && 'providerId' in browser.data) {
+          const provider = browser.data;
+          await this.runBrowserOperation(() => this.handleBrowserProvider(ws, provider));
+          return;
+        }
+      }
       await this.handleWebMessage(ws, attachment, parsed);
     }
   }
@@ -472,12 +868,17 @@ export class UserConnectionDO extends DurableObject<Env> {
     const attachment = ws.deserializeAttachment() as WSAttachment | null;
     if (!attachment) return;
 
+    // Fence late frames immediately, including a close racing a browser transaction.
+    ws.serializeAttachment({ ...attachment, replaced: true });
     if (attachment.role === 'cli') {
-      // Await attention resets so cli.disconnected is not broadcast until the
-      // stored status write has committed (mobile history refetch races otherwise).
+      // Browser jobs survive CLI loss. Only proven recovery can rebind delivery.
+      // Await attention resets before the legacy cli.disconnected broadcast.
       return this.handleCliDisconnect(ws, attachment);
     }
     this.handleWebDisconnect(ws);
+    if (attachment.browserProvider) {
+      return this.runBrowserOperation(() => this.disconnectBrowserProvider(ws));
+    }
   }
 
   webSocketError(ws: WebSocket): void | Promise<void> {
@@ -493,6 +894,11 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.ensureState();
 
     const now = Date.now();
+    await this.runBrowserOperation(async () => {
+      const expired = await this.browserJobs.expire(now);
+      this.deliverBrowserEffects(expired.effects);
+      await this.browserJobs.cleanup(now);
+    });
     this.expirePendingCommands(now);
     await this.fireReadyPushes(now);
     const staleConnectionIds: string[] = [];
@@ -507,10 +913,11 @@ export class UserConnectionDO extends DurableObject<Env> {
       // Find and close the stale CLI WebSocket
       for (const ws of this.ctx.getWebSockets('cli')) {
         const att = ws.deserializeAttachment() as WSAttachment | null;
-        if (att?.role === 'cli' && att.connectionId === connectionId) {
+        if (att?.role === 'cli' && !att.replaced && att.connectionId === connectionId) {
           console.log('Closing stale CLI connection (heartbeat timeout)', {
             connectionId,
           });
+          ws.serializeAttachment({ ...att, replaced: true });
           ws.close(4408, 'heartbeat timeout');
           break;
         }
@@ -520,7 +927,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
 
     this.scheduleNextAlarm(now);
-    this.scheduleDurablePendingAlarm();
+    await this.alarmWork;
   }
 
   // ---------------------------------------------------------------------------
@@ -658,8 +1065,9 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Persist to attachment for hibernation recovery
+    // Preserve the actual browser socket nonce across legacy heartbeats.
     const updatedAttachment: WSAttachment = {
+      ...attachment,
       role: 'cli',
       connectionId,
       sessions,
@@ -667,7 +1075,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       protocolVersion,
       capabilities,
       kiloUserId: attachment.kiloUserId,
-      ...(instance ? { instance } : {}),
+      instance,
     };
     ws.serializeAttachment(updatedAttachment);
 
@@ -688,7 +1096,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       },
     });
 
-    this.sendToCli(ws, { type: 'heartbeat_ack' });
+    this.negotiateBrowser(ws, capabilities, { type: 'heartbeat_ack' });
   }
 
   /**
@@ -1250,7 +1658,10 @@ export class UserConnectionDO extends DurableObject<Env> {
         await this.handleWebCommand(ws, attachment, msg);
         break;
       case 'ping':
-        this.sendToWeb(ws, { type: 'pong', nonce: msg.nonce });
+        this.negotiateBrowser(ws, msg.capabilities, { type: 'pong', nonce: msg.nonce });
+        if (attachment.browserProvider && !this.isBrowserSocket(ws)) {
+          await this.runBrowserOperation(() => this.disconnectBrowserProvider(ws));
+        }
         break;
     }
   }
@@ -1274,6 +1685,10 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
+    // Access resolution can race provider updates or replacement on this socket.
+    const current = ws.deserializeAttachment() as WSAttachment | null;
+    if (current?.role !== 'web' || current.replaced) return;
+
     let subs = this.webSubscriptions.get(sessionId);
     if (!subs) {
       subs = new Set();
@@ -1282,9 +1697,9 @@ export class UserConnectionDO extends DurableObject<Env> {
     subs.add(ws);
 
     // Persist subscription in attachment for hibernation recovery
-    if (!attachment.subscribedSessions.includes(sessionId)) {
-      attachment.subscribedSessions.push(sessionId);
-      ws.serializeAttachment(attachment);
+    if (!current.subscribedSessions.includes(sessionId)) {
+      current.subscribedSessions.push(sessionId);
+      ws.serializeAttachment(current);
     }
 
     this.sendToWeb(ws, {
@@ -1634,7 +2049,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       state: 'pending' as const,
     } satisfies PendingCommandEntry);
     this.scheduleNextAlarm(now);
-    this.scheduleDurablePendingAlarm();
 
     this.sendToCli(targetCli, {
       type: 'command',
@@ -1696,7 +2110,6 @@ export class UserConnectionDO extends DurableObject<Env> {
             return;
           }
           this.scheduleNextAlarm(now);
-          this.scheduleDurablePendingAlarm();
           this.sendToCli(targetCli, {
             type: 'command',
             id: correlationId,
@@ -1750,7 +2163,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     const replaced = this.ctx.getWebSockets('cli').some(ws => {
       if (ws === disconnectedWs) return false;
       const att = ws.deserializeAttachment() as WSAttachment | null;
-      return att?.role === 'cli' && att.connectionId === connectionId;
+      return att?.role === 'cli' && !att.replaced && att.connectionId === connectionId;
     });
 
     // Fail pending commands that targeted this specific socket.
@@ -1931,6 +2344,15 @@ export class UserConnectionDO extends DurableObject<Env> {
   closeViewerSockets(): number {
     const sockets = this.ctx.getWebSockets('web');
     for (const ws of sockets) {
+      const attachment = ws.deserializeAttachment() as WSAttachment | null;
+      if (attachment?.browserProvider) {
+        ws.serializeAttachment({ ...attachment, replaced: true });
+        this.ctx.waitUntil(
+          this.runBrowserOperation(() => this.disconnectBrowserProvider(ws)).catch(() => {
+            console.error('Failed to settle revoked browser provider');
+          })
+        );
+      }
       ws.close(1000, 'session access revoked');
     }
     return sockets.length;
@@ -2028,7 +2450,7 @@ export class UserConnectionDO extends DurableObject<Env> {
   private closeStaleSocket(connectionId: string): boolean {
     for (const ws of this.ctx.getWebSockets('cli')) {
       const att = ws.deserializeAttachment() as WSAttachment | null;
-      if (att?.role === 'cli' && att.connectionId === connectionId) {
+      if (att?.role === 'cli' && !att.replaced && att.connectionId === connectionId) {
         console.log('Closing stale CLI socket for reconnect', { connectionId });
         this.ctx.waitUntil(
           this.failPendingCommandsForSocket(ws, false).catch((error: unknown) => {
@@ -2038,7 +2460,8 @@ export class UserConnectionDO extends DurableObject<Env> {
             });
           })
         );
-        // Preserve session ownership — the reconnecting CLI still owns these sessions
+        // Preserve legacy session ownership, but never migrate browser delivery authority.
+        ws.serializeAttachment({ ...att, replaced: true });
         ws.close(1000, 'replaced by reconnect');
         return true;
       }
@@ -2059,6 +2482,13 @@ export class UserConnectionDO extends DurableObject<Env> {
 
       ws.serializeAttachment({ ...attachment, replaced: true });
       this.handleWebDisconnect(ws);
+      if (attachment.browserProvider) {
+        this.ctx.waitUntil(
+          this.runBrowserOperation(() => this.disconnectBrowserProvider(ws)).catch(() => {
+            console.error('Failed to settle replaced browser provider');
+          })
+        );
+      }
       ws.close(1000, 'replaced by reconnect');
     }
   }
@@ -2079,7 +2509,12 @@ export class UserConnectionDO extends DurableObject<Env> {
   private findCliByConnectionId(connectionId: string): WebSocket | undefined {
     for (const ws of this.ctx.getWebSockets('cli')) {
       const attachment = ws.deserializeAttachment() as WSAttachment | null;
-      if (attachment?.role === 'cli' && attachment.connectionId === connectionId) {
+      if (
+        attachment?.role === 'cli' &&
+        !attachment.replaced &&
+        attachment.connectionId === connectionId &&
+        ws.readyState === WebSocket.OPEN
+      ) {
         return ws;
       }
     }
@@ -2478,29 +2913,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     );
   }
 
-  private scheduleDurablePendingAlarm(): void {
-    this.ctx.waitUntil(
-      (async () => {
-        const entries = await this.ctx.storage.list<PendingCommandEntry>({
-          prefix: PENDING_COMMAND_KEY_PREFIX,
-        });
-        const now = Date.now();
-        let expiresAt: number | undefined;
-        for (const entry of entries.values()) {
-          if (entry.expiresAt <= now) continue;
-          if (expiresAt === undefined || entry.expiresAt < expiresAt) {
-            expiresAt = entry.expiresAt;
-          }
-        }
-        if (expiresAt === undefined) return;
-        const currentAlarm = await this.ctx.storage.getAlarm();
-        if (currentAlarm === null || expiresAt < currentAlarm) {
-          await this.ctx.storage.setAlarm(expiresAt);
-        }
-      })()
-    );
-  }
-
   private expirePendingCommands(now: number): void {
     // Track correlationIds already delivered in-memory so the durable
     // sweep does not double-deliver to the same web socket.
@@ -2600,64 +3012,56 @@ export class UserConnectionDO extends DurableObject<Env> {
   }
 
   private scheduleNextAlarm(now: number): void {
-    // Post-eviction one-shot: rebuild readyPushFireAt from KV when the mirror
-    // is empty and we have not yet successfully refreshed this wake.
-    if (this.readyPushFireAt.size === 0 && !this.readyPushRebuilt) {
-      this.ctx.waitUntil(
-        (async () => {
-          try {
-            const pending = await this.ctx.storage.list<ReadyPushEntry>({
-              prefix: READY_PUSH_KEY_PREFIX,
-            });
-            for (const [key, entry] of pending) {
-              if (!entry || typeof entry.fireAt !== 'number') continue;
-              const sessionId = key.slice(READY_PUSH_KEY_PREFIX.length);
-              if (sessionId) this.readyPushFireAt.set(sessionId, entry.fireAt);
-            }
-            this.readyPushRebuilt = true;
-            this.scheduleNextAlarm(Date.now());
-          } catch (error: unknown) {
-            // Leave readyPushRebuilt false so the next schedule retries.
-            console.error('Failed to rebuild readyPush mirror', {
-              error: error instanceof Error ? error.message : String(error),
-            });
+    // Serialize reads and the single alarm write. A late legacy scheduling task
+    // must not overwrite an earlier browser deadline with a stale decision.
+    const scheduled = this.alarmWork
+      .catch(() => undefined)
+      .then(async () => {
+        if (this.readyPushFireAt.size === 0 && !this.readyPushRebuilt) {
+          const pending = await this.ctx.storage.list<ReadyPushEntry>({
+            prefix: READY_PUSH_KEY_PREFIX,
+          });
+          for (const [key, entry] of pending) {
+            if (!entry || typeof entry.fireAt !== 'number') continue;
+            const sessionId = key.slice(READY_PUSH_KEY_PREFIX.length);
+            if (sessionId) this.readyPushFireAt.set(sessionId, entry.fireAt);
           }
-        })()
-      );
-    }
-
-    let nextAlarmAt: number | undefined;
-
-    for (const lastSeen of this.lastHeartbeatAt.values()) {
-      const staleAt = lastSeen + UserConnectionDO.HEARTBEAT_TIMEOUT_MS;
-      if (staleAt > now && (nextAlarmAt === undefined || staleAt < nextAlarmAt)) {
-        nextAlarmAt = staleAt;
-      }
-    }
-
-    for (const entry of this.pendingCommands.values()) {
-      if (entry.expiresAt > now && (nextAlarmAt === undefined || entry.expiresAt < nextAlarmAt)) {
-        nextAlarmAt = entry.expiresAt;
-      }
-    }
-
-    // readyPush entries are NEVER filtered by fireAt > now: if any exists and
-    // min(fireAt) <= now, arm at now (immediate fire). Arm whenever any
-    // readyPush exists, even with zero heartbeat/pending candidates.
-    if (this.readyPushFireAt.size > 0) {
-      let minFireAt = Infinity;
-      for (const fireAt of this.readyPushFireAt.values()) {
-        if (fireAt < minFireAt) minFireAt = fireAt;
-      }
-      const readyAt = minFireAt <= now ? now : minFireAt;
-      if (nextAlarmAt === undefined || readyAt < nextAlarmAt) {
-        nextAlarmAt = readyAt;
-      }
-    }
-
-    if (nextAlarmAt !== undefined) {
-      void this.ctx.storage.setAlarm(nextAlarmAt);
-    }
+          this.readyPushRebuilt = true;
+        }
+        const durable = await this.ctx.storage.list<PendingCommandEntry>({
+          prefix: PENDING_COMMAND_KEY_PREFIX,
+        });
+        const browser = await this.browserJobs.deadlines();
+        const currentNow = Math.max(now, Date.now());
+        let next = Infinity;
+        const include = (at: number) => {
+          if (Number.isFinite(at)) next = Math.min(next, Math.max(currentNow, at));
+        };
+        for (const [connectionId, lastSeen] of this.lastHeartbeatAt) {
+          if (this.findCliByConnectionId(connectionId)) {
+            include(lastSeen + UserConnectionDO.HEARTBEAT_TIMEOUT_MS);
+          }
+        }
+        for (const entry of this.pendingCommands.values()) include(entry.expiresAt);
+        // Include done entries too, but keep malformed legacy deadlines out of the shared decision.
+        for (const entry of durable.values()) {
+          if (entry) include(entry.expiresAt);
+        }
+        for (const fireAt of this.readyPushFireAt.values()) include(fireAt);
+        if (browser.next !== null) include(browser.next);
+        if (Number.isFinite(next)) {
+          await this.ctx.storage.setAlarm(next);
+        } else {
+          await this.ctx.storage.deleteAlarm();
+        }
+      });
+    this.alarmWork = scheduled;
+    this.ctx.waitUntil(
+      scheduled.catch(() => {
+        // A later scheduling site retries the full decision, never a partial deadline.
+        console.error('Failed to compose user connection alarm');
+      })
+    );
   }
 
   private aggregateSessions(): Array<

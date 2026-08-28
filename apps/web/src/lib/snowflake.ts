@@ -66,6 +66,7 @@ export function resolveSnowflakeConfig(): SnowflakeConfig | null {
   return {
     accountHost: accountHost
       .trim()
+      .toLowerCase()
       .replace(/^https?:\/\//, '')
       .replace(/\/$/, ''),
     jwtAccountIdentifier: getEnvVariable('SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER'),
@@ -198,7 +199,7 @@ async function parseAllRows(
   }
 
   const url = new URL(statusUrl, `https://${config.accountHost}`);
-  if (url.hostname !== config.accountHost) {
+  if (url.hostname !== config.accountHost.toLowerCase()) {
     throw new Error(`Snowflake returned unexpected result host: ${url.hostname}`);
   }
 
@@ -231,7 +232,7 @@ async function pollStatement(
 ): Promise<SnowflakeApiResponse> {
   const url = new URL(statusUrl, `https://${config.accountHost}`);
 
-  if (url.hostname !== config.accountHost) {
+  if (url.hostname !== config.accountHost.toLowerCase()) {
     throw new Error(`Snowflake returned unexpected poll host: ${url.hostname}`);
   }
 

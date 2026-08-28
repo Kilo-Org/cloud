@@ -2848,7 +2848,8 @@
     "busy": "Glasovni vnos je zaseden. Poskusite znova.",
     "stopped": "Glasovni vnos je bil ustavljen. Dotaknite se mikrofona za ponovni poskus.",
     "unavailableDevice": "Glasovni vnos na tej napravi ni na voljo.",
-    "unavailableLanguage": "Glasovni vnos ni na voljo za ta jezik naprave."
+    "unavailableLanguage": "Glasovni vnos ni na voljo za ta jezik naprave.",
+    "listeningStopped": "Poslušanje je ustavljeno."
   },
   "share": {
     "title": "Deli s Kilo",

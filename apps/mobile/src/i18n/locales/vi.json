@@ -2354,7 +2354,8 @@
     "busy": "Nhập giọng nói đang bận. Thử lại.",
     "stopped": "Đã dừng nhập giọng nói. Chạm vào micro để thử lại.",
     "unavailableDevice": "Không thể nhập giọng nói trên thiết bị này.",
-    "unavailableLanguage": "Không thể nhập giọng nói bằng ngôn ngữ của thiết bị này."
+    "unavailableLanguage": "Không thể nhập giọng nói bằng ngôn ngữ của thiết bị này.",
+    "listeningStopped": "Đã dừng nghe."
   },
   "share": {
     "title": "Chia sẻ đến Kilo",

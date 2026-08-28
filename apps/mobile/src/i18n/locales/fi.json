@@ -2808,7 +2808,8 @@
     "busy": "Puheentunnistus on varattu. Yritä uudelleen.",
     "stopped": "Puheentunnistus pysähtyi. Napauta mikrofonia yrittääksesi uudelleen.",
     "unavailableDevice": "Puheentunnistus ei ole käytettävissä tässä laitteessa.",
-    "unavailableLanguage": "Puheentunnistus ei ole käytettävissä tälle laitekielelle."
+    "unavailableLanguage": "Puheentunnistus ei ole käytettävissä tälle laitekielelle.",
+    "listeningStopped": "Kuuntelu pysähtyi."
   },
   "share": {
     "title": "Jaa Kiloon",

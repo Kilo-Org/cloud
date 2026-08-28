@@ -2354,7 +2354,8 @@
     "busy": "音声入力は処理中です。もう一度お試しください。",
     "stopped": "音声入力が停止しました。マイクをタップして、もう一度お試しください。",
     "unavailableDevice": "このデバイスでは音声入力は利用できません。",
-    "unavailableLanguage": "このデバイスの言語では音声入力は利用できません。"
+    "unavailableLanguage": "このデバイスの言語では音声入力は利用できません。",
+    "listeningStopped": "聞き取りを停止しました。"
   },
   "share": {
     "title": "Kiloに共有",

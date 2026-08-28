@@ -2354,7 +2354,8 @@
     "busy": "語音輸入忙碌中。請再試一次。",
     "stopped": "語音輸入已停止。點按麥克風圖示再試一次。",
     "unavailableDevice": "此裝置上無法使用語音輸入。",
-    "unavailableLanguage": "此裝置語言無法使用語音輸入。"
+    "unavailableLanguage": "此裝置語言無法使用語音輸入。",
+    "listeningStopped": "已停止聆聽。"
   },
   "share": {
     "title": "分享到 Kilo",

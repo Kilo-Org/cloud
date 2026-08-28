@@ -2808,7 +2808,8 @@
     "busy": "Futja me zë është e zënë. Provo përsëri.",
     "stopped": "Futja me zë u ndal. Prekni mikrofonin për të provuar përsëri.",
     "unavailableDevice": "Futja me zë nuk është e disponueshme në këtë pajisje.",
-    "unavailableLanguage": "Futja me zë nuk është e disponueshme për gjuhën e kësaj pajisjeje."
+    "unavailableLanguage": "Futja me zë nuk është e disponueshme për gjuhën e kësaj pajisjeje.",
+    "listeningStopped": "Dëgjimi u ndal."
   },
   "share": {
     "title": "Ndaj te Kilo",

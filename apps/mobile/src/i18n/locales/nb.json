@@ -2808,7 +2808,8 @@
     "busy": "Taleinntasting er opptatt. Prøv igjen.",
     "stopped": "Taleinntasting stoppet. Trykk på mikrofonen for å prøve igjen.",
     "unavailableDevice": "Taleinntasting er ikke tilgjengelig på denne enheten.",
-    "unavailableLanguage": "Taleinntasting er ikke tilgjengelig for dette enhetsspråket."
+    "unavailableLanguage": "Taleinntasting er ikke tilgjengelig for dette enhetsspråket.",
+    "listeningStopped": "Lyttingen er stoppet."
   },
   "share": {
     "title": "Del til Kilo",

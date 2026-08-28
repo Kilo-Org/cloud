@@ -2354,7 +2354,8 @@
     "busy": "음성 입력이 사용 중입니다. 다시 시도하세요.",
     "stopped": "음성 입력이 중지되었습니다. 마이크를 탭하여 다시 시도하세요.",
     "unavailableDevice": "이 기기에서는 음성 입력을 사용할 수 없습니다.",
-    "unavailableLanguage": "이 기기 언어에서는 음성 입력을 사용할 수 없습니다."
+    "unavailableLanguage": "이 기기 언어에서는 음성 입력을 사용할 수 없습니다.",
+    "listeningStopped": "듣기가 중지되었습니다."
   },
   "share": {
     "title": "Kilo로 공유",

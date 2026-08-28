@@ -2367,7 +2367,8 @@
     "busy": "L'input vocale è occupato. Riprova.",
     "stopped": "L'input vocale si è interrotto. Tocca il microfono per riprovare.",
     "unavailableDevice": "L'input vocale non è disponibile su questo dispositivo.",
-    "unavailableLanguage": "L'input vocale non è disponibile per la lingua del dispositivo."
+    "unavailableLanguage": "L'input vocale non è disponibile per la lingua del dispositivo.",
+    "listeningStopped": "Ascolto interrotto."
   },
   "share": {
     "title": "Condividi su Kilo",

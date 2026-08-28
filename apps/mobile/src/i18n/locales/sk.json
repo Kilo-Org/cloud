@@ -2848,7 +2848,8 @@
     "busy": "Hlasový vstup je zaneprázdnený. Skúste to znova.",
     "stopped": "Hlasový vstup sa zastavil. Klepnutím na mikrofón to skúste znova.",
     "unavailableDevice": "Hlasový vstup nie je na tomto zariadení dostupný.",
-    "unavailableLanguage": "Hlasový vstup nie je dostupný pre jazyk tohto zariadenia."
+    "unavailableLanguage": "Hlasový vstup nie je dostupný pre jazyk tohto zariadenia.",
+    "listeningStopped": "Počúvanie sa zastavilo."
   },
   "share": {
     "title": "Zdieľať do Kilo",

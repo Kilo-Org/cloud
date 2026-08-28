@@ -2808,7 +2808,8 @@
     "busy": "Ingizo la sauti linashughulika. Jaribu tena.",
     "stopped": "Ingizo la sauti limesimama. Gusa kipaza sauti kujaribu tena.",
     "unavailableDevice": "Ingizo la sauti halipatikani kwenye kifaa hiki.",
-    "unavailableLanguage": "Ingizo la sauti halipatikani kwa lugha hii ya kifaa."
+    "unavailableLanguage": "Ingizo la sauti halipatikani kwa lugha hii ya kifaa.",
+    "listeningStopped": "Usikilizaji umesimama."
   },
   "share": {
     "title": "Shiriki kwa Kilo",

@@ -2888,7 +2888,8 @@
     "busy": "Mae mewnbwn llais yn brysur. Rhowch gynnig arall arni.",
     "stopped": "Stopiodd mewnbwn llais. Tapiwch y meic i roi cynnig arall arni.",
     "unavailableDevice": "Nid yw mewnbwn llais ar gael ar y ddyfais hon.",
-    "unavailableLanguage": "Nid yw mewnbwn llais ar gael ar gyfer iaith y ddyfais hon."
+    "unavailableLanguage": "Nid yw mewnbwn llais ar gael ar gyfer iaith y ddyfais hon.",
+    "listeningStopped": "Stopiodd y gwrando."
   },
   "share": {
     "title": "Rhannu i Kilo",

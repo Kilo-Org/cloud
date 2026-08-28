@@ -2380,7 +2380,8 @@
     "busy": "Wprowadzanie głosowe jest zajęte. Spróbuj ponownie.",
     "stopped": "Wprowadzanie głosowe zostało zatrzymane. Dotknij mikrofonu, aby spróbować ponownie.",
     "unavailableDevice": "Wprowadzanie głosowe nie jest dostępne na tym urządzeniu.",
-    "unavailableLanguage": "Wprowadzanie głosowe nie jest dostępne dla języka tego urządzenia."
+    "unavailableLanguage": "Wprowadzanie głosowe nie jest dostępne dla języka tego urządzenia.",
+    "listeningStopped": "Słuchanie zatrzymane."
   },
   "share": {
     "title": "Udostępnij do Kilo",

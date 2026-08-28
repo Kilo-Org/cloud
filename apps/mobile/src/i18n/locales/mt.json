@@ -2868,7 +2868,8 @@
     "busy": "Id-dħul bil-vuċi huwa okkupat. Erġa' pprova.",
     "stopped": "Id-dħul bil-vuċi waqaf. Tektek il-mikrofonu biex terġa' tipprova.",
     "unavailableDevice": "Id-dħul bil-vuċi mhux disponibbli fuq dan it-tagħmir.",
-    "unavailableLanguage": "Id-dħul bil-vuċi mhux disponibbli għal din il-lingwa tal-apparat."
+    "unavailableLanguage": "Id-dħul bil-vuċi mhux disponibbli għal din il-lingwa tal-apparat.",
+    "listeningStopped": "Is-smigħ waqaf."
   },
   "share": {
     "title": "Aqsam ma' Kilo",

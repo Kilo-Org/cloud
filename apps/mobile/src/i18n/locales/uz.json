@@ -2808,7 +2808,8 @@
     "busy": "Ovozli kiritish band. Qayta urinib ko'ring.",
     "stopped": "Ovozli kiritish to'xtatildi. Qayta urinish uchun mikrofonni bosing.",
     "unavailableDevice": "Ovozli kiritish bu qurilmada mavjud emas.",
-    "unavailableLanguage": "Ovozli kiritish bu qurilma tili uchun mavjud emas."
+    "unavailableLanguage": "Ovozli kiritish bu qurilma tili uchun mavjud emas.",
+    "listeningStopped": "Tinglash to'xtatildi."
   },
   "share": {
     "title": "Kiloga ulashish",

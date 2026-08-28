@@ -2808,7 +2808,8 @@
     "busy": "Häälsisestus on hõivatud. Proovi uuesti.",
     "stopped": "Häälsisestus peatus. Uuesti proovimiseks puuduta mikrofoni.",
     "unavailableDevice": "Häälsisestus pole sellel seadmel saadaval.",
-    "unavailableLanguage": "Häälsisestus pole selle seadme keele puhul saadaval."
+    "unavailableLanguage": "Häälsisestus pole selle seadme keele puhul saadaval.",
+    "listeningStopped": "Kuulamine peatus."
   },
   "share": {
     "title": "Jaga Kilosse",

@@ -2808,7 +2808,8 @@
     "busy": "Shigar da murya tana aiki. Sake gwadawa.",
     "stopped": "Shigar da murya ta tsaya. Danna makirufo don sake gwadawa.",
     "unavailableDevice": "Shigar da murya ba ta samuwa akan wannan na'ura.",
-    "unavailableLanguage": "Shigar da murya ba ta samuwa don harshen wannan na'ura."
+    "unavailableLanguage": "Shigar da murya ba ta samuwa don harshen wannan na'ura.",
+    "listeningStopped": "An dakatar da sauraro."
   },
   "share": {
     "title": "Raba zuwa Kilo",

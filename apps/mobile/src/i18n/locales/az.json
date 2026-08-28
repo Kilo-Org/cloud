@@ -2808,7 +2808,8 @@
     "busy": "Səs girişi məşğuldur. Yenidən cəhd edin.",
     "stopped": "Səs girişi dayandı. Yenidən cəhd etmək üçün mikrofona toxunun.",
     "unavailableDevice": "Səs girişi bu cihazda mövcud deyil.",
-    "unavailableLanguage": "Səs girişi bu cihaz dili üçün mövcud deyil."
+    "unavailableLanguage": "Səs girişi bu cihaz dili üçün mövcud deyil.",
+    "listeningStopped": "Dinləmə dayandı."
   },
   "share": {
     "title": "Kilo-ya paylaş",

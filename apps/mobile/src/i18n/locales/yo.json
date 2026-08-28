@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Iṣẹ́ ti o ti kọja ṣì ń pari. Jọwọ duro diẹ.",
       "serviceUnavailable": "Iṣẹ naa ko si lọwọlọwọ. Jọwọ tun gbiyanju.",
       "connectionTrouble": "Iṣoro asopọ. Jọwọ tun gbiyanju ni iṣẹju diẹ.",
-      "modelUnavailable": "Awoṣe yii ko si fun Cloud Agent. Jọwọ yan awoṣe miiran ki o tun gbiyanju."
+      "modelUnavailable": "Awoṣe yii ko si fun Cloud Agent. Jọwọ yan awoṣe miiran ki o tun gbiyanju.",
+      "cancelQueuedFailed": "Ko le fagile ifiranṣẹ naa.",
+      "cancelQueuedRestoreAvailable": "A ti fagile ifiranṣẹ. Tẹ Mú pada lati da a pada si aaye kikọ ifiranṣẹ.",
+      "cancelQueuedRestored": "A ti fagile ifiranṣẹ. Iyanilenu ti pada si aaye kikọ ifiranṣẹ.",
+      "cancelQueuedUpgradeRequired": "Fifagile awọn ifiranṣẹ ti o wa ni isinyi nilo Kilo CLI tuntun kan. Ṣe imudojuiwọn Kilo CLI ki o si tun so."
     },
     "remoteSession": {
       "failedToCreate": "Kuna lati ṣẹda akoko jijin",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Ifiranṣẹ n in isinyi",
       "userMessage": "Ifiranṣẹ olumulo",
       "assistantMessage": "Ifiranṣẹ oluranlowo",
-      "longPressHint": "Tẹ pẹ lati wo awọn alaye ifiranṣẹ"
+      "longPressHint": "Tẹ pẹ lati wo awọn alaye ifiranṣẹ",
+      "cancelQueued": "Fagile ifiranṣẹ",
+      "cancelQueuedAccessibility": "Fagile ifiranṣẹ ti o wa ni isinyi",
+      "restoreQueued": "Mú pada",
+      "restoreQueuedAccessibility": "Mú ifiranṣẹ ti a fagile pada si aaye kikọ ifiranṣẹ"
     },
     "olderMessages": {
       "arrived": "Awọn ifiranṣẹ tẹlẹ ti ṣagbewọ",

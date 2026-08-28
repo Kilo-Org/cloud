@@ -2202,7 +2202,11 @@
       "previousTaskFinishing": "Mae'r dasg flaenorol yn dal i orffen. Arhoswch funud.",
       "serviceUnavailable": "Nid yw'r gwasanaeth ar gael ar hyn o bryd. Ceisiwch eto.",
       "connectionTrouble": "Problem cysylltiad. Ceisiwch eto ymhen munud.",
-      "modelUnavailable": "Nid yw'r model hwn ar gael ar gyfer Cloud Agent. Dewiswch fodel arall a cheisiwch eto."
+      "modelUnavailable": "Nid yw'r model hwn ar gael ar gyfer Cloud Agent. Dewiswch fodel arall a cheisiwch eto.",
+      "cancelQueuedFailed": "Ni ellid canslo'r neges.",
+      "cancelQueuedRestoreAvailable": "Neges wedi'i chanslo. Tapiwch Adfer i'w dychwelyd i'r maes mewnbwn neges.",
+      "cancelQueuedRestored": "Neges wedi'i chanslo. Mae'r anogiad yn ôl yn y maes mewnbwn neges.",
+      "cancelQueuedUpgradeRequired": "Mae angen Kilo CLI mwy newydd i ganslo negeseuon yn y ciw. Diweddarwch Kilo CLI ac ailgysylltwch."
     },
     "remoteSession": {
       "failedToCreate": "Methodd creu sesiwn o bell",
@@ -2527,7 +2531,11 @@
       "queuedAccessibility": "Neges mewn ciw",
       "userMessage": "Neges defnyddiwr",
       "assistantMessage": "Neges cynorthwyydd",
-      "longPressHint": "Pwyswch yn hir i weld manylion y neges"
+      "longPressHint": "Pwyswch yn hir i weld manylion y neges",
+      "cancelQueued": "Canslo neges",
+      "cancelQueuedAccessibility": "Canslo neges yn y ciw",
+      "restoreQueued": "Adfer",
+      "restoreQueuedAccessibility": "Adfer neges wedi'i chanslo i'r maes mewnbwn neges"
     },
     "olderMessages": {
       "arrived": "Llwythwyd negeseuon cynharach",

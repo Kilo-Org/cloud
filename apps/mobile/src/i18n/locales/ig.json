@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Ọrụ gara aga ka na-agwụcha. Biko chere obere oge.",
       "serviceUnavailable": "Ọrụ ahụ adịghị ugbu a. Biko nwaa ọzọ.",
       "connectionTrouble": "Nsogbu njikọ. Biko nwaa ọzọ obere oge.",
-      "modelUnavailable": "Ihe nlereanya a adịghị maka Cloud Agent. Họrọ ihe nlereanya ọzọ ma nwaa ọzọ."
+      "modelUnavailable": "Ihe nlereanya a adịghị maka Cloud Agent. Họrọ ihe nlereanya ọzọ ma nwaa ọzọ.",
+      "cancelQueuedFailed": "Enweghị ike ịkagbu ozi ahụ.",
+      "cancelQueuedRestoreAvailable": "Akagbuola ozi. Pịa Weghachite ka iweghachite ya n'ebe ntinye ozi.",
+      "cancelQueuedRestored": "Akagbuola ozi. Ihe ị dere alaghachila n'ebe ntinye ozi.",
+      "cancelQueuedUpgradeRequired": "Ịkagbu ozi na-echere chọrọ Kilo CLI ọhụrụ karịa. Melite Kilo CLI ma jikọọ ọzọ."
     },
     "remoteSession": {
       "failedToCreate": "Dara ịmepụta nzukọ dị anya",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Edobelere ozi",
       "userMessage": "Ozi onye ọrụ",
       "assistantMessage": "Ozi enyemaka",
-      "longPressHint": "Pịa ogologo maka nkọwa ozi"
+      "longPressHint": "Pịa ogologo maka nkọwa ozi",
+      "cancelQueued": "Kagbuo ozi",
+      "cancelQueuedAccessibility": "Kagbuo ozi na-echere",
+      "restoreQueued": "Weghachite",
+      "restoreQueuedAccessibility": "Weghachite ozi akagbuola n'ebe ntinye ozi"
     },
     "olderMessages": {
       "arrived": "Ebuturu ozi ndị gara aga",

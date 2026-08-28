@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Edellinen tehtävä on vielä viimeistelyssä. Odota hetki.",
       "serviceUnavailable": "Palvelu ei ole tällä hetkellä käytettävissä. Yritä uudelleen.",
       "connectionTrouble": "Yhteysongelma. Yritä uudelleen hetken kuluttua.",
-      "modelUnavailable": "Tämä malli ei ole käytettävissä Cloud Agentille. Valitse toinen malli ja yritä uudelleen."
+      "modelUnavailable": "Tämä malli ei ole käytettävissä Cloud Agentille. Valitse toinen malli ja yritä uudelleen.",
+      "cancelQueuedFailed": "Viestiä ei voitu peruuttaa.",
+      "cancelQueuedRestoreAvailable": "Viesti peruutettu. Napauta Palauta palauttaaksesi sen viestikenttään.",
+      "cancelQueuedRestored": "Viesti peruutettu. Kehote on taas viestikentässä.",
+      "cancelQueuedUpgradeRequired": "Jonossa olevien viestien peruuttaminen edellyttää uudempaa Kilo CLI:tä. Päivitä Kilo CLI ja yhdistä uudelleen."
     },
     "remoteSession": {
       "failedToCreate": "Etäistunnon luonti epäonnistui",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Viesti jonossa",
       "userMessage": "Käyttäjän viesti",
       "assistantMessage": "Avustajan viesti",
-      "longPressHint": "Pitkä painallus viestin tietoja varten"
+      "longPressHint": "Pitkä painallus viestin tietoja varten",
+      "cancelQueued": "Peruuta viesti",
+      "cancelQueuedAccessibility": "Peruuta jonossa oleva viesti",
+      "restoreQueued": "Palauta",
+      "restoreQueuedAccessibility": "Palauta peruutettu viesti viestikenttään"
     },
     "olderMessages": {
       "arrived": "Aiemmat viestit ladattu",

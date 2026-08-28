@@ -1688,7 +1688,11 @@
       "previousTaskFinishing": "上一個工作仍在進行中。請稍等片刻。",
       "serviceUnavailable": "服務目前無法使用。請重試。",
       "connectionTrouble": "連線發生問題。請稍後重試。",
-      "modelUnavailable": "此模型不適用於 Cloud Agent。請選擇其他模型再試一次。"
+      "modelUnavailable": "此模型不適用於 Cloud Agent。請選擇其他模型再試一次。",
+      "cancelQueuedFailed": "無法取消訊息。",
+      "cancelQueuedRestoreAvailable": "訊息已取消。請點按「還原」將其放回撰寫器。",
+      "cancelQueuedRestored": "訊息已取消。提示已放回撰寫器。",
+      "cancelQueuedUpgradeRequired": "取消已排入佇列的訊息需要更新的 Kilo CLI。請更新 Kilo CLI 並重新連接。"
     },
     "remoteSession": {
       "failedToCreate": "無法建立遠端工作階段",
@@ -2009,7 +2013,11 @@
       "queuedAccessibility": "訊息已排入佇列",
       "userMessage": "使用者訊息",
       "assistantMessage": "助理訊息",
-      "longPressHint": "長按以檢視訊息詳細資料"
+      "longPressHint": "長按以檢視訊息詳細資料",
+      "cancelQueued": "取消訊息",
+      "cancelQueuedAccessibility": "取消已排入佇列的訊息",
+      "restoreQueued": "還原",
+      "restoreQueuedAccessibility": "將已取消的訊息還原至撰寫器"
     },
     "olderMessages": {
       "arrived": "已載入較早的訊息",

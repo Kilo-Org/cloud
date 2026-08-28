@@ -2157,7 +2157,11 @@
       "previousTaskFinishing": "La tasca anterior encara s'està acabant. Espera un moment.",
       "serviceUnavailable": "El servei no està disponible ara mateix. Torna-ho a provar.",
       "connectionTrouble": "Problema de connexió. Torna-ho a provar d'aquí a un moment.",
-      "modelUnavailable": "Aquest model no està disponible per a Cloud Agent. Tria un altre model i torna-ho a provar."
+      "modelUnavailable": "Aquest model no està disponible per a Cloud Agent. Tria un altre model i torna-ho a provar.",
+      "cancelQueuedFailed": "No s'ha pogut cancel·lar el missatge.",
+      "cancelQueuedRestoreAvailable": "Missatge cancel·lat. Toca Restaura per tornar-lo al camp de missatge.",
+      "cancelQueuedRestored": "Missatge cancel·lat. El missatge torna a ser al camp de missatge.",
+      "cancelQueuedUpgradeRequired": "Per cancel·lar missatges en cua cal una versió més nova de Kilo CLI. Actualitza Kilo CLI i torna't a connectar."
     },
     "remoteSession": {
       "failedToCreate": "No s'ha pogut crear la sessió remota",
@@ -2479,7 +2483,11 @@
       "queuedAccessibility": "Missatge en cua",
       "userMessage": "Missatge de l'usuari",
       "assistantMessage": "Missatge de l'assistent",
-      "longPressHint": "Manteniu premut per veure els detalls del missatge"
+      "longPressHint": "Manteniu premut per veure els detalls del missatge",
+      "cancelQueued": "Cancel·la el missatge",
+      "cancelQueuedAccessibility": "Cancel·la el missatge en cua",
+      "restoreQueued": "Restaura",
+      "restoreQueuedAccessibility": "Restaura el missatge cancel·lat al camp de missatge"
     },
     "olderMessages": {
       "arrived": "S'han carregat els missatges anteriors",

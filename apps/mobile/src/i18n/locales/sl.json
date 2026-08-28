@@ -2172,7 +2172,11 @@
       "previousTaskFinishing": "Prejšnja naloga se še dokončuje. Počakajte trenutek.",
       "serviceUnavailable": "Storitev trenutno ni na voljo. Poskusite znova.",
       "connectionTrouble": "Težava s povezavo. Poskusite znova čez trenutek.",
-      "modelUnavailable": "Ta model ni na voljo za Cloud Agent. Izberite drug model in poskusite znova."
+      "modelUnavailable": "Ta model ni na voljo za Cloud Agent. Izberite drug model in poskusite znova.",
+      "cancelQueuedFailed": "Sporočila ni bilo mogoče preklicati.",
+      "cancelQueuedRestoreAvailable": "Sporočilo je preklicano. Tapnite »Obnovite«, da ga vrnete v polje za vnos sporočila.",
+      "cancelQueuedRestored": "Sporočilo je preklicano. Zahteva je spet v polju za vnos sporočila.",
+      "cancelQueuedUpgradeRequired": "Preklic sporočil v čakalni vrsti zahteva novejši Kilo CLI. Posodobite Kilo CLI in se ponovno povežite."
     },
     "remoteSession": {
       "failedToCreate": "Oddaljene seje ni bilo mogoče ustvariti",
@@ -2495,7 +2499,11 @@
       "queuedAccessibility": "Sporočilo je v čakalni vrsti",
       "userMessage": "Sporočilo uporabnika",
       "assistantMessage": "Sporočilo asistenta",
-      "longPressHint": "Dolg pritisk za podrobnosti sporočila"
+      "longPressHint": "Dolg pritisk za podrobnosti sporočila",
+      "cancelQueued": "Prekličite sporočilo",
+      "cancelQueuedAccessibility": "Prekličite sporočilo v čakalni vrsti",
+      "restoreQueued": "Obnovite",
+      "restoreQueuedAccessibility": "Obnovite preklicano sporočilo v polju za vnos sporočila"
     },
     "olderMessages": {
       "arrived": "Naložena so bila prejšnja sporočila",

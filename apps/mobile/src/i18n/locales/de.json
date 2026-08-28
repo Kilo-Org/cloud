@@ -1688,7 +1688,11 @@
       "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
       "serviceUnavailable": "Der Dienst ist gerade nicht verfügbar. Bitte versuche es erneut.",
       "connectionTrouble": "Verbindungsproblem. Bitte versuche es in einem Moment erneut.",
-      "modelUnavailable": "Dieses Modell ist für Cloud Agent nicht verfügbar. Wähle ein anderes Modell und versuche es erneut."
+      "modelUnavailable": "Dieses Modell ist für Cloud Agent nicht verfügbar. Wähle ein anderes Modell und versuche es erneut.",
+      "cancelQueuedFailed": "Die Nachricht konnte nicht abgebrochen werden.",
+      "cancelQueuedRestoreAvailable": "Nachricht abgebrochen. Tippe auf „Wiederherstellen“, um sie zurück in die Nachrichteneingabe zu holen.",
+      "cancelQueuedRestored": "Nachricht abgebrochen. Der Prompt ist wieder in der Nachrichteneingabe.",
+      "cancelQueuedUpgradeRequired": "Das Abbrechen von Nachrichten in der Warteschlange erfordert eine neuere Kilo CLI. Aktualisiere die Kilo CLI und verbinde dich erneut."
     },
     "remoteSession": {
       "failedToCreate": "Remote-Sitzung konnte nicht erstellt werden",
@@ -2009,7 +2013,11 @@
       "queuedAccessibility": "Nachricht in Warteschlange",
       "userMessage": "Nutzer-Nachricht",
       "assistantMessage": "Assistenten-Nachricht",
-      "longPressHint": "Lange drücken für Nachrichtendetails"
+      "longPressHint": "Lange drücken für Nachrichtendetails",
+      "cancelQueued": "Nachricht abbrechen",
+      "cancelQueuedAccessibility": "Nachricht in der Warteschlange abbrechen",
+      "restoreQueued": "Wiederherstellen",
+      "restoreQueuedAccessibility": "Abgebrochene Nachricht in der Nachrichteneingabe wiederherstellen"
     },
     "olderMessages": {
       "arrived": "Frühere Nachrichten geladen",

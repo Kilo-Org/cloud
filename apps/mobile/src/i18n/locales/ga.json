@@ -2187,7 +2187,11 @@
       "previousTaskFinishing": "Tá an tasc roimhe seo fós ag críochnú. Fan nóiméad le do thoil.",
       "serviceUnavailable": "Níl an tseirbhís ar fáil faoi láthair. Bain triail as arís le do thoil.",
       "connectionTrouble": "Fadhb cheangail. Bain triail as arís i gceann nóiméid.",
-      "modelUnavailable": "Níl an tsamhail seo ar fáil do Cloud Agent. Roghnaigh samhail eile agus bain triail as arís."
+      "modelUnavailable": "Níl an tsamhail seo ar fáil do Cloud Agent. Roghnaigh samhail eile agus bain triail as arís.",
+      "cancelQueuedFailed": "Níorbh fhéidir an teachtaireacht a chealú.",
+      "cancelQueuedRestoreAvailable": "Cealaíodh an teachtaireacht. Tapáil Athchóirigh chun í a chur ar ais sa réimse ionchuir teachtaireachta.",
+      "cancelQueuedRestored": "Cealaíodh an teachtaireacht. Tá an leid ar ais sa réimse ionchuir teachtaireachta.",
+      "cancelQueuedUpgradeRequired": "Éilíonn cealú teachtaireachtaí sa scuaine Kilo CLI níos nua. Nuashonraigh Kilo CLI agus athcheangail."
     },
     "remoteSession": {
       "failedToCreate": "Theip ar sheisiún cianda a chruthú",
@@ -2511,7 +2515,11 @@
       "queuedAccessibility": "Teachtaireacht curtha sa scuaine",
       "userMessage": "Teachtaireacht úsáideora",
       "assistantMessage": "Teachtaireacht chúntóra",
-      "longPressHint": "Brúigh fada le sonraí na teachtaireachta"
+      "longPressHint": "Brúigh fada le sonraí na teachtaireachta",
+      "cancelQueued": "Cealaigh teachtaireacht",
+      "cancelQueuedAccessibility": "Cealaigh teachtaireacht sa scuaine",
+      "restoreQueued": "Athchóirigh",
+      "restoreQueuedAccessibility": "Athchóirigh an teachtaireacht chealaithe sa réimse ionchuir teachtaireachta"
     },
     "olderMessages": {
       "arrived": "Lódáladh teachtaireachtaí níos luaithe",

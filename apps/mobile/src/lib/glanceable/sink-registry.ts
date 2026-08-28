@@ -36,8 +36,8 @@ export function getGlanceableSinks(): readonly GlanceableSink[] {
 
 /**
  * Activity-token registrar, set by a later token slice. No-op by default.
- * `unregisterTokens` reports success plus the tokens it attempted, so logout
- * can tombstone a failed unregister and retry those exact tokens later.
+ * `unregisterTokens` reports only the tokens whose unregister failed, so
+ * logout can tombstone the failed tokens and retry them later.
  */
 export type GlanceableDelivery = {
   registerTokens(

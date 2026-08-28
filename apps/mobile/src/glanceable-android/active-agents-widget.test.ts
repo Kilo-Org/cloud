@@ -4,7 +4,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { describe, expect, it, vi } from 'vitest';
 
-import { OPEN_AGENTS_CLICK, renderActiveAgentsWidget } from './active-agents-widget';
+import { renderActiveAgentsWidget } from './active-agents-widget';
 import { buildAndroidWidgetProps } from './widget-props';
 
 // Stub the widget primitives so the layout functions return inspectable trees
@@ -22,6 +22,7 @@ type MockElement = {
   props: {
     text?: string;
     clickAction?: string;
+    clickActionData?: { uri?: string };
     style?: { backgroundColor?: string };
     children?: unknown;
   };
@@ -140,11 +141,13 @@ describe('renderActiveAgentsWidget', () => {
     expect(text).toEqual(['Status expired']);
   });
 
-  it('labels the whole widget with the Open agents click action', () => {
+  it('labels the whole widget with the Open agents deep-link click action', () => {
     const props = buildAndroidWidgetProps(snapshotFor([{ status: 'busy' }], 0), {}, translate);
     const rep = render(props, 250);
 
-    expect(rep.light.props.clickAction).toBe(OPEN_AGENTS_CLICK);
-    expect(rep.dark.props.clickAction).toBe(OPEN_AGENTS_CLICK);
+    expect(rep.light.props.clickAction).toBe('OPEN_URI');
+    expect(rep.light.props.clickActionData).toEqual({ uri: 'kiloapp:///cloud/sessions' });
+    expect(rep.dark.props.clickAction).toBe('OPEN_URI');
+    expect(rep.dark.props.clickActionData).toEqual({ uri: 'kiloapp:///cloud/sessions' });
   });
 });

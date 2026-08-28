@@ -7,15 +7,9 @@ import {
 import { i18n } from '@/i18n';
 import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
-import { openGlanceableAgents } from '@/lib/glanceable/open-agents';
 
-import { OPEN_AGENTS_CLICK, renderActiveAgentsWidget } from './active-agents-widget';
-import {
-  androidSink,
-  getCurrentWidgetProps,
-  handleAppStateActive,
-  handleWidgetOpenTap,
-} from './android-sink';
+import { renderActiveAgentsWidget } from './active-agents-widget';
+import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
 import { buildAndroidWidgetProps, buildGenericWidgetProps } from './widget-props';
 
 // Register the Android sink at import time. The main-app import of the local
@@ -23,29 +17,21 @@ import { buildAndroidWidgetProps, buildGenericWidgetProps } from './widget-props
 // render. No React dependency here: the publisher is plain state.
 registerGlanceableSink(androidSink);
 
-function translate(key: string): string {
-  return i18n.t(key);
-}
-
-// Restart a permission-denied pending start when the app returns to the
-// foreground and notification permission is now granted. Plain AppState, no
-// React component: this module loads once for the whole process.
+// The permission alert needs a foreground Activity; RN Android's AlertModule
+// no-ops in headless JS. Show it when the app returns to the foreground instead.
 AppState.addEventListener('change', state => {
   if (state === 'active') {
     void handleAppStateActive();
   }
 });
 
-registerWidgetTaskHandler(async (task: WidgetTaskHandlerProps) => {
-  const { widgetInfo, widgetAction, clickAction, renderWidget } = task;
+function translate(key: string): string {
+  return i18n.t(key);
+}
 
-  if (widgetAction === 'WIDGET_CLICK') {
-    if (clickAction === OPEN_AGENTS_CLICK) {
-      openGlanceableAgents();
-      await handleWidgetOpenTap();
-    }
-    return;
-  }
+// eslint-disable-next-line require-await, @typescript-eslint/require-await -- react-native-android-widget requires an async handler; the render path is synchronous
+registerWidgetTaskHandler(async (task: WidgetTaskHandlerProps) => {
+  const { widgetInfo, renderWidget } = task;
 
   // A process restart loses the in-memory widget props. Render them directly
   // when present: a live redraw's in-memory props are newer than any

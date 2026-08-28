@@ -51,7 +51,9 @@ class ActiveAgentsLiveUpdateModule : Module() {
     context.resources.getIdentifier("notification_icon", "drawable", context.packageName)
 
   private fun isPromotionCapable(): Boolean =
-    Build.VERSION.SDK_INT_FULL >= 36_001_000 && notificationManager.canPostPromotedNotifications()
+    Build.VERSION.SDK_INT >= 36 &&
+      Build.VERSION.SDK_INT_FULL >= 36_001_000 &&
+      notificationManager.canPostPromotedNotifications()
 
   private fun ensureChannel(title: String) {
     if (Build.VERSION.SDK_INT < 26) {

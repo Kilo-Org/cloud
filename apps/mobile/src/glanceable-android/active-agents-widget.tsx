@@ -14,9 +14,6 @@ import { type AndroidWidgetProps } from './widget-props';
 
 export const WIDGET_NAME = 'ActiveAgentsWidget';
 
-/** Custom click action; the task handler maps it to openGlanceableAgents(). */
-export const OPEN_AGENTS_CLICK = 'OPEN_AGENTS';
-
 /** Below this width (dp) the widget shows only the primary count. */
 const COMPACT_MAX_WIDTH_DP = 150;
 
@@ -82,7 +79,8 @@ function renderPrimaryArea(props: AndroidWidgetProps, palette: Palette, compact:
 function renderSurface(props: AndroidWidgetProps, palette: Palette, compact: boolean) {
   return (
     <FlexWidget
-      clickAction={OPEN_AGENTS_CLICK}
+      clickAction="OPEN_URI"
+      clickActionData={{ uri: 'kiloapp:///cloud/sessions' }}
       accessibilityLabel={props.accessibilityLabel}
       style={{
         backgroundColor: palette.background,

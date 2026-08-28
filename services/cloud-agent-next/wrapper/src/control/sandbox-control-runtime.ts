@@ -1,3 +1,4 @@
+import { withTimeoutAndAbort } from '../utils.js';
 import {
   createSandboxControlClient,
   type SandboxControlClient,
@@ -17,6 +18,7 @@ type StartOptions = {
   createClient?: (options: SandboxControlClientOptions) => SandboxControlClient;
   onRequest?: SandboxControlRequestHandler;
   onConnected?: (client: SandboxControlClient) => void;
+  onDisconnected?: () => void;
   getHeartbeatPayload?: () => unknown;
   isReady?: () => boolean;
 };
@@ -26,45 +28,112 @@ type SandboxControlEventFeedOptions = {
   open: (signal: AbortSignal) => Promise<{ stream?: AsyncIterable<unknown> }>;
   consume: (stream: AsyncIterable<unknown>) => Promise<void>;
   onUnexpectedClose: (error: unknown) => void;
+  now?: () => number;
 };
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
+export const KILO_FEED_FRESHNESS_TIMEOUT_MS = 30_000;
+export const KILO_CONTROL_REQUEST_TIMEOUT_MS = 10_000;
+
+export async function withKiloRequestDeadline<T>(
+  request: (signal: AbortSignal) => Promise<T>,
+  externalSignal?: AbortSignal
+): Promise<T> {
+  const controller = new AbortController();
+  const signal = externalSignal
+    ? AbortSignal.any([controller.signal, externalSignal])
+    : controller.signal;
+  try {
+    signal.throwIfAborted();
+    return await withTimeoutAndAbort(request(signal), {
+      signal,
+      timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
+      timeoutMessage: 'Kilo request timed out',
+      abortMessage: 'Kilo request cancelled',
+    });
+  } finally {
+    controller.abort();
+  }
+}
+
+function isFeedConnectedEvent(envelope: unknown): boolean {
+  return (
+    typeof envelope === 'object' &&
+    envelope !== null &&
+    'payload' in envelope &&
+    typeof envelope.payload === 'object' &&
+    envelope.payload !== null &&
+    'type' in envelope.payload &&
+    envelope.payload.type === 'server.connected'
+  );
+}
 
 export async function startSandboxControlEventFeed(
   options: SandboxControlEventFeedOptions
-): Promise<void> {
-  const feed = await options.open(options.signal);
-  if (!feed.stream) {
-    throw new Error('Kilo global event feed is unavailable');
+): Promise<{ isFresh: () => boolean }> {
+  const controller = new AbortController();
+  const signal = AbortSignal.any([options.signal, controller.signal]);
+  const now = options.now ?? Date.now;
+  let feed: { stream?: AsyncIterable<unknown> };
+  let iterator: AsyncIterator<unknown>;
+  let first: IteratorResult<unknown>;
+  try {
+    feed = await withTimeoutAndAbort(options.open(signal), {
+      signal,
+      timeoutMs: KILO_FEED_FRESHNESS_TIMEOUT_MS,
+      timeoutMessage: 'Kilo global event feed startup timed out',
+      abortMessage: 'Kilo global event feed cancelled',
+    });
+    if (!feed.stream) {
+      throw new Error('Kilo global event feed is unavailable');
+    }
+    iterator = feed.stream[Symbol.asyncIterator]();
+    first = await withTimeoutAndAbort(iterator.next(), {
+      signal,
+      timeoutMs: KILO_FEED_FRESHNESS_TIMEOUT_MS,
+      timeoutMessage: 'Kilo global event feed startup timed out',
+      abortMessage: 'Kilo global event feed cancelled',
+    });
+    signal.throwIfAborted();
+    if (first.done) {
+      throw new Error('Kilo global event feed ended before startup');
+    }
+  } catch (error) {
+    controller.abort();
+    throw error;
   }
 
-  const iterator = feed.stream[Symbol.asyncIterator]();
-  const first = await iterator.next();
-  if (first.done) {
-    throw new Error('Kilo global event feed ended before startup');
-  }
+  let lastEventAt = now();
+  const isFresh = () => !signal.aborted && now() - lastEventAt < KILO_FEED_FRESHNESS_TIMEOUT_MS;
+  const fail = (error: unknown): void => {
+    if (signal.aborted) return;
+    controller.abort();
+    options.onUnexpectedClose(error);
+  };
+  const freshnessTimer = setInterval(() => {
+    if (!isFresh()) fail(new Error('Kilo global event feed stopped responding'));
+  }, 10_000);
+  freshnessTimer.unref();
+  signal.addEventListener('abort', () => clearInterval(freshnessTimer), { once: true });
 
   async function* establishedFeed(): AsyncGenerator<unknown> {
     yield first.value;
-    while (true) {
+    while (!signal.aborted) {
       const next = await iterator.next();
-      if (next.done) return;
+      if (signal.aborted || next.done) return;
+      if (isFeedConnectedEvent(next.value)) {
+        throw new Error('Kilo global event feed reconnected with a delivery gap');
+      }
+      lastEventAt = now();
       yield next.value;
     }
   }
 
   void options.consume(establishedFeed()).then(
-    () => {
-      if (!options.signal.aborted) {
-        options.onUnexpectedClose(new Error('Kilo global event feed ended'));
-      }
-    },
-    error => {
-      if (!options.signal.aborted) {
-        options.onUnexpectedClose(error);
-      }
-    }
+    () => fail(new Error('Kilo global event feed ended')),
+    error => fail(error)
   );
+  return { isFresh };
 }
 
 export function maybeStartSandboxControlClient(
@@ -89,19 +158,35 @@ export function maybeStartSandboxControlClient(
     heartbeat = null;
   }
 
+  function handleDisconnected(): void {
+    if (closed) return;
+    closed = true;
+    stopHeartbeat();
+    options.onDisconnected?.();
+  }
+
+  function sendHeartbeat(active: SandboxControlClient): void {
+    try {
+      if (!active.sendEvent?.('sandbox.heartbeat', options.getHeartbeatPayload?.())) {
+        handleDisconnected();
+      }
+    } catch {
+      handleDisconnected();
+    }
+    if (options.isReady?.() === false) stopHeartbeat();
+  }
+
   function handleConnected(active: SandboxControlClient): void {
     if (closed || options.isReady?.() === false) return;
-    active.sendEvent?.('sandbox.ready', { kiloReady: true, globalFeedAttached: true });
-    if (options.getHeartbeatPayload && active.sendEvent) {
+    if (!active.sendEvent?.('sandbox.ready', { kiloReady: true, globalFeedAttached: true })) {
+      handleDisconnected();
+      return;
+    }
+    if (options.getHeartbeatPayload) {
       stopHeartbeat();
-      active.sendEvent('sandbox.heartbeat', options.getHeartbeatPayload());
-      heartbeat = setInterval(() => {
-        if (options.isReady?.() === false) {
-          stopHeartbeat();
-          return;
-        }
-        active.sendEvent?.('sandbox.heartbeat', options.getHeartbeatPayload?.());
-      }, HEARTBEAT_INTERVAL_MS);
+      sendHeartbeat(active);
+      if (closed) return;
+      heartbeat = setInterval(() => sendHeartbeat(active), HEARTBEAT_INTERVAL_MS);
       heartbeat.unref();
     }
     options.onConnected?.(active);
@@ -114,7 +199,7 @@ export function maybeStartSandboxControlClient(
     ...(env.wrapperInstanceId ? { wrapperInstanceId: env.wrapperInstanceId } : {}),
     wrapperVersion: options.wrapperVersion,
     log,
-    onReconnect: () => handleConnected(client),
+    onDisconnected: handleDisconnected,
     ...(options.onRequest ? { onRequest: options.onRequest } : {}),
   });
 
@@ -133,6 +218,7 @@ export function maybeStartSandboxControlClient(
     .catch(() => {
       if (!closed) {
         log('sandbox control client failed');
+        handleDisconnected();
       }
     });
 

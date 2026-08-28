@@ -47,35 +47,30 @@ export function sessionEventIdentity(input: {
 
 export function updateSessionSnapshots(
   event: { type: string; properties: Record<string, unknown>; directory?: string },
-  sessions: HandlerSessionSnapshot[]
+  sessions: HandlerSessionSnapshot[],
+  now = Date.now()
 ): void {
-  if (event.type !== 'session.status') return;
-  const kiloSessionId = eventKiloSessionId(event.properties);
-  if (!kiloSessionId || rootForSession(kiloSessionId, event.directory) !== kiloSessionId) return;
-  const status = event.properties.status;
-  if (!isRecord(status)) return;
-  const state =
-    status.type === 'idle'
-      ? 'idle'
-      : status.type === 'busy' || status.type === 'retry' || status.type === 'offline'
-        ? 'active'
-        : undefined;
-  if (!state) return;
-  const existing = sessions.find(session => session.kiloSessionId === kiloSessionId);
-  if (existing) {
-    existing.state = state;
-    existing.idleForMs = 0;
-    return;
+  const sessionId = eventKiloSessionId(event.properties);
+  const kiloSessionId = rootForSession(sessionId, event.directory);
+  if (!kiloSessionId || !sessionId) return;
+  const snapshot = sessions.find(session => session.kiloSessionId === kiloSessionId);
+  if (!snapshot) return;
+  snapshot.lastActivityAt = now;
+  if (event.type === 'question.asked' || event.type === 'permission.asked') {
+    const id = event.properties.id;
+    if (typeof id !== 'string') return;
+    snapshot.pendingInputs ??= new Set();
+    snapshot.pendingInputs.add(id);
+  } else if (
+    event.type === 'question.replied' ||
+    event.type === 'question.rejected' ||
+    event.type === 'permission.replied'
+  ) {
+    const id = event.properties.requestID;
+    if (typeof id !== 'string') return;
+    snapshot.pendingInputs?.delete(id);
+    if (!snapshot.pendingInputs?.size) delete snapshot.pendingInputs;
   }
-  sessions.push({ kiloSessionId, state, idleForMs: 0 });
-}
-
-export function permissionAskId(event: {
-  type: string;
-  properties: Record<string, unknown>;
-}): string | undefined {
-  if (event.type !== 'permission.asked') return undefined;
-  return typeof event.properties.id === 'string' ? event.properties.id : undefined;
 }
 
 export async function* unfilteredKiloEvents(

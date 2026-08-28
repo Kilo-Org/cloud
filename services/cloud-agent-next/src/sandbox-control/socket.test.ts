@@ -503,20 +503,26 @@ describe('sandbox control socket handler', () => {
     );
   });
 
-  it('sends an outbound request and settles the waiter from the wrapper response', async () => {
+  it('keeps the expected runtime fence off the wire and settles the outbound request', async () => {
     const ws = createFakeWebSocket({
       handshakeComplete: true,
       acceptedAt: Date.now(),
       protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
       providerInstanceId: 'inst_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
     });
     const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
-    const pending = handler.sendRequest({ operation: 'sandbox.status', payload: {} });
+    const pending = handler.sendRequest({
+      operation: 'sandbox.status',
+      payload: {},
+      expectedWrapperInstanceId: WRAPPER_INSTANCE_ID,
+    });
     const sent = JSON.parse(ws.send.mock.calls[0]?.[0] as string) as {
       requestId: string;
       operation: string;
     };
     expect(sent.operation).toBe('sandbox.status');
+    expect(sent).not.toHaveProperty('expectedWrapperInstanceId');
     await handler.handleMessage(
       asWs(ws),
       JSON.stringify({

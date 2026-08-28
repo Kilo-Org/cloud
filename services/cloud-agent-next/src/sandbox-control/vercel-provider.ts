@@ -1,5 +1,6 @@
+import { withTimeout } from '@kilocode/worker-utils';
 import { z } from 'zod';
-import { logger } from '../logger.js';
+import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import {
   VercelSandboxRestClient,
   VercelSandboxRestError,
@@ -8,6 +9,7 @@ import {
   type VercelSandboxSession,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
+import { DEADLINE_MS } from './deadlines.js';
 import type { ObserveResult } from './physical-lifecycle.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
 
@@ -34,6 +36,7 @@ export type VercelProviderRef = z.infer<typeof providerRefSchema>;
 
 export type VercelControlRestClient = {
   createSandbox: VercelSandboxRestClient['createSandbox'];
+  inspectByName: VercelSandboxRestClient['inspectByName'];
   getSession: VercelSandboxRestClient['getSession'];
   executeCommand: (
     sessionId: string,
@@ -70,73 +73,109 @@ function isNotFound(error: unknown): boolean {
 
 export function createVercelProviderAdapter(deps: {
   sandboxName: string;
-  config: VercelSandboxRuntimeConfig;
+  config?: VercelSandboxRuntimeConfig;
   restClient?: VercelControlRestClient;
   now?: () => number;
 }): ProviderAdapter {
+  const config = deps.config;
+  if (!config) {
+    const unavailable = async (): Promise<never> => {
+      throw new Error('Vercel sandbox runtime configuration is unavailable');
+    };
+    return {
+      resumable: false,
+      ensureBillingAdmission: unavailable,
+      create: unavailable,
+      launch: unavailable,
+      observe: async () => ({ status: 'unknown' }),
+      stop: async () => 'retryable',
+      ensureLeaseAtLeast: unavailable,
+      logs: async () => 'Vercel sandbox runtime configuration is unavailable',
+    };
+  }
   const restClient =
     deps.restClient ??
     new VercelSandboxRestClient({
-      accessToken: deps.config.accessToken,
-      teamId: deps.config.teamId,
-      projectId: deps.config.projectId,
+      accessToken: config.accessToken,
+      teamId: config.teamId,
+      projectId: config.projectId,
       fetch,
     });
   const now = deps.now ?? Date.now;
+  const ensureBillingAdmission: ProviderAdapter['ensureBillingAdmission'] = async (
+    _ref,
+    billing
+  ) => {
+    if (billing?.enforcementRequested) {
+      throw new AgentSandboxUnavailableError(
+        'Container billing admission is unavailable for Vercel sandbox sessions',
+        'billing_blocked'
+      );
+    }
+  };
 
   return {
     resumable: false,
+    ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
+      await ensureBillingAdmission(intent.allocationName ?? deps.sandboxName, intent.billing);
       const created = await restClient.createSandbox({
-        name: deps.sandboxName,
+        name: intent.allocationName ?? deps.sandboxName,
         operationId: intent.intentId,
-        runtimeBuildId: deps.config.runtimeBuildId,
-        snapshotId: deps.config.snapshotId,
-        runtime: deps.config.runtime,
-        timeoutMs: deps.config.initialTimeoutMs,
+        runtimeBuildId: config.runtimeBuildId,
+        snapshotId: config.snapshotId,
+        runtime: config.runtime,
+        timeoutMs: config.initialTimeoutMs,
       });
-      const providerRef = encodeVercelProviderRef({
-        sandboxName: created.runtime.sandboxName,
-        sessionId: created.runtime.sessionId,
-      });
-      try {
-        await restClient.executeCommand(created.runtime.sessionId, {
-          command: 'sh',
-          args: ['-lc', `exec bun run ${CONTROL_WRAPPER_PATH}`],
-          cwd: '/',
-          env: {
-            ...intent.env,
-            PROVIDER_INSTANCE_ID: providerRef,
-            WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
-          },
-          sudo: false,
-          wait: false,
-        });
-      } catch (error) {
-        logger
-          .withFields({
-            sandboxId: deps.sandboxName,
-            sessionId: created.runtime.sessionId,
-            error: error instanceof Error ? error.message : 'control wrapper start failed',
-          })
-          .warn('Vercel control wrapper failed to start; VM kept for stop');
-      }
-      return { providerRef };
+      return { providerRef: encodeVercelProviderRef(created.runtime) };
     },
-    async observe(ref) {
+    async launch(ref, env) {
       const parsed = decodeVercelProviderRef(ref);
-      if (parsed === null) return ref === null ? 'terminal' : 'unknown';
+      if (!parsed) throw new Error('Invalid Vercel sandbox allocation');
+      await restClient.executeCommand(parsed.sessionId, {
+        command: 'sh',
+        args: ['-lc', `exec bun run ${CONTROL_WRAPPER_PATH}`],
+        cwd: '/',
+        env: {
+          ...env,
+          PROVIDER_INSTANCE_ID: ref,
+          WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
+        },
+        sudo: false,
+        wait: false,
+      });
+    },
+    async observe(ref, intent) {
+      const parsed = decodeVercelProviderRef(ref);
       try {
-        const { session } = await restClient.getSession(parsed.sessionId, parsed.sandboxName);
-        return observeStatus(session.status);
+        if (parsed) {
+          const { session } = await restClient.getSession(parsed.sessionId, parsed.sandboxName);
+          return { status: observeStatus(session.status) };
+        }
+        if (ref !== null || !intent) return { status: 'unknown' };
+        const inspected = await restClient.inspectByName({
+          name: intent.allocationName ?? deps.sandboxName,
+          operationId: intent.intentId,
+          runtimeBuildId: config.runtimeBuildId,
+          snapshotId: config.snapshotId,
+          runtime: config.runtime,
+        });
+        if (!inspected) {
+          return {
+            status: now() < intent.createdAt + DEADLINE_MS.createSettle ? 'unknown' : 'terminal',
+          };
+        }
+        return {
+          status: observeStatus(inspected.session.status),
+          providerRef: encodeVercelProviderRef(inspected.runtime),
+        };
       } catch (error) {
-        if (isNotFound(error)) return 'terminal';
-        return 'unknown';
+        return { status: parsed && isNotFound(error) ? 'terminal' : 'unknown' };
       }
     },
     async stop(ref) {
       const parsed = decodeVercelProviderRef(ref);
-      if (parsed === null) return ref === null ? 'terminal' : 'retryable';
+      if (parsed === null) return 'retryable';
       try {
         const session = await restClient.stopSession(parsed.sessionId, parsed.sandboxName);
         return TERMINAL_STATUSES.has(session.status) ? 'terminal' : 'retryable';
@@ -156,17 +195,17 @@ export function createVercelProviderAdapter(deps: {
       await restClient.extendSessionTimeout(
         parsed.sessionId,
         parsed.sandboxName,
-        Math.max(ms, deps.config.extendDurationMs)
+        Math.max(ms, config.extendDurationMs)
       );
     },
     async logs(ref) {
       const parsed = decodeVercelProviderRef(ref);
-      if (parsed === null) return `vercel ${ref ?? 'none'}`;
+      if (parsed === null) return `vercel ${ref}`;
       try {
-        const bytes = await restClient.readFile(
-          parsed.sessionId,
-          CONTROL_WRAPPER_LOG_PATH,
-          LOG_MAX_BYTES
+        const bytes = await withTimeout(
+          restClient.readFile(parsed.sessionId, CONTROL_WRAPPER_LOG_PATH, LOG_MAX_BYTES),
+          DEADLINE_MS.stopAttempt,
+          'Vercel sandbox logs timed out'
         );
         return new TextDecoder().decode(bytes);
       } catch {

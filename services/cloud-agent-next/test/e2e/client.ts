@@ -9,6 +9,7 @@
  */
 
 import WebSocket from 'ws';
+import { z } from 'zod';
 import { mintApiToken, mintStreamTicket, type TestUser } from './auth.js';
 
 /**
@@ -30,6 +31,7 @@ export type CallbackTarget = {
 
 export type DriverConfig = {
   workerUrl: string;
+  expectControlPlane?: boolean;
   user: TestUser;
   nextAuthSecret: string;
   /**
@@ -110,8 +112,9 @@ export async function trpcCall<T>(
       `tRPC ${procedure} failed: ${response.status} ${response.statusText} — ${text}`
     );
   }
-  const parsed = JSON.parse(text);
-  return parsed?.result?.data as T;
+  const parsed: unknown = JSON.parse(text);
+  const envelope = z.object({ result: z.object({ data: z.unknown() }) }).parse(parsed);
+  return envelope.result.data as T;
 }
 
 // ---------------------------------------------------------------------------
@@ -146,8 +149,16 @@ export async function startSession(
   args: StartSessionArgs,
   api: ApiVersion = 'unified'
 ): Promise<StartSessionResult> {
-  if (api === 'legacy') return startSessionLegacy(config, args);
-  return startSessionUnified(config, args);
+  const result =
+    api === 'legacy'
+      ? await startSessionLegacy(config, args)
+      : await startSessionUnified(config, args);
+  if (config.expectControlPlane && !result.cloudAgentSessionId.startsWith('workspace_')) {
+    throw new Error(
+      `Started ${result.cloudAgentSessionId}, but expected an enrolled workspace_* session; do not retry start`
+    );
+  }
+  return result;
 }
 
 async function startSessionUnified(
@@ -167,16 +178,13 @@ async function startSessionUnified(
       type: 'git',
       url: config.gitUrl,
     },
-    ...(args.callbackTarget || config.kilocodeOrganizationId
-      ? {
-          options: {
-            ...(args.callbackTarget ? { callbackTarget: args.callbackTarget } : {}),
-            ...(config.kilocodeOrganizationId
-              ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
-              : {}),
-          },
-        }
-      : {}),
+    options: {
+      createdOnPlatform: 'cloud-agent-web',
+      ...(args.callbackTarget ? { callbackTarget: args.callbackTarget } : {}),
+      ...(config.kilocodeOrganizationId
+        ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+        : {}),
+    },
   });
 }
 
@@ -212,6 +220,7 @@ async function startSessionLegacy(
       mode: args.mode ?? 'code',
       model: config.model,
       gitUrl: config.gitUrl,
+      createdOnPlatform: 'cloud-agent-web',
       shallow: args.shallow ?? true,
       ...(args.callbackTarget ? { callbackTarget: args.callbackTarget } : {}),
       ...(args.messageId ? { initialMessageId: args.messageId } : {}),
@@ -286,6 +295,27 @@ export async function sendMessage(
 // ---------------------------------------------------------------------------
 // Control-plane helpers
 // ---------------------------------------------------------------------------
+
+const messageResultSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  messageId: z.string(),
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'interrupted']),
+});
+
+export async function getMessageResult(config: DriverConfig, sessionId: string, messageId: string) {
+  const result = messageResultSchema.parse(
+    await trpcCall<unknown>(
+      config,
+      'getMessageResult',
+      { cloudAgentSessionId: sessionId, messageId },
+      { method: 'GET' }
+    )
+  );
+  if (result.cloudAgentSessionId !== sessionId || result.messageId !== messageId) {
+    throw new Error('Message result identity did not match the requested turn');
+  }
+  return result;
+}
 
 export type InterruptResult = {
   success: boolean;
@@ -394,20 +424,22 @@ export async function waitForGateEngaged(
 // WebSocket stream
 // ---------------------------------------------------------------------------
 
-export type StreamEvent = {
-  eventId: number;
-  executionId: string | null;
-  sessionId: string;
-  streamEventType: string;
-  timestamp: string;
-  data: Record<string, unknown>;
-};
+const streamEventSchema = z.object({
+  eventId: z.number(),
+  executionId: z.string().nullable().default(null),
+  sessionId: z.string(),
+  streamEventType: z.string(),
+  timestamp: z.string(),
+  data: z.record(z.string(), z.unknown()),
+});
+
+export type StreamEvent = z.infer<typeof streamEventSchema>;
 
 export type StreamConnection = {
   events: StreamEvent[];
   close: () => void;
   /** Resolves when a terminal event arrives or timeout elapses. */
-  waitForTerminal: (timeoutMs: number) => Promise<StreamEvent | null>;
+  waitForTerminal: (timeoutMs: number, messageId?: string) => Promise<StreamEvent | null>;
   /** Resolves the first event matching the predicate. */
   waitFor: (
     predicate: (event: StreamEvent) => boolean,
@@ -425,7 +457,36 @@ export type StreamOptions = {
 };
 
 /** Event types we treat as terminal for scenario purposes. */
-const TERMINAL_STREAM_TYPES = new Set(['complete', 'error', 'interrupted', 'cloud.message.failed']);
+const TERMINAL_STREAM_TYPES = new Set([
+  'complete',
+  'error',
+  'interrupted',
+  'cloud.message.completed',
+  'cloud.message.failed',
+]);
+
+export function messageIdFromEvent(event: StreamEvent): string | undefined {
+  if (!event.data || typeof event.data !== 'object') return undefined;
+  if (typeof event.data.messageId === 'string') return event.data.messageId;
+  const payload = event.data.payload;
+  return payload &&
+    typeof payload === 'object' &&
+    'messageId' in payload &&
+    typeof payload.messageId === 'string'
+    ? payload.messageId
+    : undefined;
+}
+
+export function isMessageCompleted(
+  event: StreamEvent | null,
+  messageId: string
+): event is StreamEvent & { streamEventType: 'cloud.message.completed' } {
+  return (
+    event !== null &&
+    event.streamEventType === 'cloud.message.completed' &&
+    messageIdFromEvent(event) === messageId
+  );
+}
 
 export function openStream(
   config: DriverConfig,
@@ -454,7 +515,14 @@ export function openStream(
   ws.on('message', raw => {
     let parsed: StreamEvent;
     try {
-      parsed = JSON.parse(raw.toString());
+      const text =
+        raw instanceof ArrayBuffer
+          ? Buffer.from(raw).toString('utf8')
+          : Array.isArray(raw)
+            ? Buffer.concat(raw).toString('utf8')
+            : raw.toString('utf8');
+      const data: unknown = JSON.parse(text);
+      parsed = streamEventSchema.parse(data);
     } catch {
       return;
     }
@@ -476,8 +544,8 @@ export function openStream(
     }
   });
 
-  ws.on('error', err => {
-    console.error('stream error:', err);
+  ws.on('error', () => {
+    console.error('session stream connection failed');
   });
 
   function close(): void {
@@ -498,6 +566,7 @@ export function openStream(
     // the target is already in history.
     const existing = events.find(predicate);
     if (existing) return Promise.resolve(existing);
+    if (closed) return Promise.resolve(null);
     return new Promise(resolve => {
       const timer = setTimeout(() => {
         const idx = listeners.findIndex(l => l.resolve === resolveOnce);
@@ -516,8 +585,16 @@ export function openStream(
     events,
     close,
     waitFor,
-    waitForTerminal: timeoutMs =>
-      waitFor(event => TERMINAL_STREAM_TYPES.has(event.streamEventType), timeoutMs),
+    waitForTerminal: (timeoutMs, messageId) =>
+      waitFor(
+        event =>
+          messageId === undefined
+            ? TERMINAL_STREAM_TYPES.has(event.streamEventType)
+            : (event.streamEventType === 'cloud.message.completed' ||
+                event.streamEventType === 'cloud.message.failed') &&
+              messageIdFromEvent(event) === messageId,
+        timeoutMs
+      ),
     get receivedCount() {
       return events.length;
     },

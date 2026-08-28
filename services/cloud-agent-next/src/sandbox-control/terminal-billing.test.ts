@@ -68,6 +68,11 @@ describe('validateTerminalBillingRuntime', () => {
 
   it.each([
     {
+      sandboxId: 'istd-abcdef',
+      sandboxClassName: 'Sandbox' as const,
+      service: 'cloud-agent-next-sandbox',
+    },
+    {
       sandboxId: 'crv-abcdef',
       sandboxClassName: 'SandboxCodeReview' as const,
       service: 'cloud-agent-next-sandbox-code-review',

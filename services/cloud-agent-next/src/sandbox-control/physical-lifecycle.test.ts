@@ -58,11 +58,11 @@ describe('physical sandbox lifecycle', () => {
     );
   });
 
-  it('confirmRunning sets ref and clears intent', () => {
+  it('confirmRunning retains the allocation intent until physical death', () => {
     const record = confirmRunning(creating(), PROVIDER_REF, NOW);
     expect(record.state).toBe('running');
     expect(record.providerRef).toBe(PROVIDER_REF);
-    expect(record.createIntent).toBeNull();
+    expect(record.createIntent).toEqual({ intentId: INTENT_ID, createdAt: NOW });
   });
 
   it('beginStop from creating with no ref still writes a tombstone', () => {
@@ -93,7 +93,7 @@ describe('physical sandbox lifecycle', () => {
   it('observe unknown never goes to stopped', () => {
     expect(observe(creating(), 'unknown').state).toBe('creating');
     expect(observe(running(), 'unknown').state).toBe('unknown');
-    expect(observe(beginStop(running(), 'idle', NOW), 'unknown').state).toBe('unknown');
+    expect(observe(beginStop(running(), 'idle', NOW), 'unknown').state).toBe('stopping');
     expect(observe(fail(running(), NOW), 'unknown').state).toBe('unknown');
     expect(observe(observe(running(), 'unknown'), 'unknown').state).toBe('unknown');
   });
@@ -134,7 +134,7 @@ describe('physical sandbox lifecycle', () => {
     const record = observe(failed, 'unknown');
     expect(record.state).toBe('unknown');
     expect(record.providerRef).toBe(PROVIDER_REF);
-    expect(record.createIntent).toBeNull();
+    expect(record.createIntent).toEqual({ intentId: INTENT_ID, createdAt: NOW });
   });
 
   it('exhaustStopRetries → unknown with tombstone retained', () => {

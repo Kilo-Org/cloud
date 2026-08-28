@@ -16,6 +16,8 @@ export const SANDBOX_CONTROL_REQUEST_TIMEOUT_MS = 30_000;
 
 export const SANDBOX_CONTROL_ATTACH_TIMEOUT_MS = 8 * 60_000;
 
+export const SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS = 60 * 60_000;
+
 export const SANDBOX_OPERATIONS = ['sandbox.hello', 'sandbox.status', 'sandbox.shutdown'] as const;
 
 export const SESSION_OPERATIONS = [
@@ -161,7 +163,7 @@ export const sandboxHeartbeatPayloadSchema = z
           kiloSessionId: z.string().min(1),
           state: z.enum(['idle', 'active', 'finalizing']),
           idleForMs: z.number().int().nonnegative(),
-          waitingOn: z.enum(['model', 'tool', 'finalizing']).optional(),
+          waitingOn: z.enum(['model', 'tool', 'finalizing', 'preparation', 'input']).optional(),
         })
         .strict()
     ),
@@ -270,6 +272,18 @@ const sessionPromptAgentSchema = z
 const sessionPromptPayloadBaseSchema = z
   .object({
     messageId: z.string().min(1).max(128),
+    attachments: z
+      .array(
+        z
+          .object({
+            filename: z.string().min(1),
+            mime: z.string().min(1),
+            signedUrl: z.string().min(1),
+            localPath: z.string().min(1),
+          })
+          .strict()
+      )
+      .optional(),
     finalization: z
       .object({
         autoCommit: z.boolean().optional(),
@@ -336,6 +350,7 @@ export const sessionQuestionResolveResultSchema = z
 
 export const sessionAbortPayloadSchema = z
   .object({
+    messageId: z.string().min(1).max(128).optional(),
     reason: z.string().min(1).max(256).optional(),
   })
   .strict();
@@ -442,6 +457,16 @@ export const sessionEventPayloadSchema = z
     timestamp: z.string().min(1).optional(),
   })
   .strict();
+
+export const sessionMessageOutcomeSchema = z
+  .object({
+    messageId: z.string().min(1).max(128),
+    status: z.enum(['completed', 'failed', 'cancelled']),
+    reason: z.string().max(4096).optional(),
+  })
+  .strict();
+
+export type SessionMessageOutcome = z.infer<typeof sessionMessageOutcomeSchema>;
 
 export const sessionPreparingPayloadSchema = z
   .object({

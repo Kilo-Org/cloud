@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import {
+  KILO_FEED_FRESHNESS_TIMEOUT_MS,
   maybeStartSandboxControlClient,
   startSandboxControlEventFeed,
 } from './sandbox-control-runtime';
@@ -9,7 +10,7 @@ function fakeClient(): SandboxControlClient {
   return {
     connect: async () => {},
     close: () => {},
-    sendEvent: () => {},
+    sendEvent: () => true,
   };
 }
 
@@ -87,7 +88,7 @@ describe('maybeStartSandboxControlClient', () => {
       wrapperVersion: '2.4.0',
     });
     expect(received?.log).toBeTypeOf('function');
-    expect(received?.onReconnect).toBeTypeOf('function');
+    expect(received?.onDisconnected).toBeTypeOf('function');
     await Promise.resolve();
     expect(connectCalls).toBe(1);
     expect(logs.join('\n')).not.toContain(credential);
@@ -102,6 +103,7 @@ describe('maybeStartSandboxControlClient', () => {
       close: () => {},
       sendEvent: (event, payload) => {
         events.push({ event, payload });
+        return true;
       },
     };
 
@@ -144,6 +146,7 @@ describe('maybeStartSandboxControlClient', () => {
       close: () => {},
       sendEvent: (event, payload) => {
         events.push({ event, payload });
+        return true;
       },
     };
 
@@ -180,6 +183,7 @@ describe('maybeStartSandboxControlClient', () => {
       close: () => {},
       sendEvent: (event, payload) => {
         events.push({ event, payload });
+        return true;
       },
     };
 
@@ -205,20 +209,13 @@ describe('maybeStartSandboxControlClient', () => {
     await Promise.resolve();
     expect(events).toEqual([]);
 
+    received?.onDisconnected?.();
     ready = true;
-    received?.onReconnect?.();
-    expect(events).toEqual([
-      { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
-      { event: 'sandbox.heartbeat', payload: heartbeatPayload },
-    ]);
-
-    ready = false;
-    received?.onReconnect?.();
-    expect(events).toHaveLength(2);
+    expect(events).toEqual([]);
     started?.close();
   });
 
-  it('emits ready and heartbeat again on reconnect without duplicating timers', async () => {
+  it('does not re-advertise readiness after an established disconnect', async () => {
     const events: Array<{ event: string; payload: unknown }> = [];
     const connected: SandboxControlClient[] = [];
     const heartbeatPayload = { state: 'idle' };
@@ -228,6 +225,7 @@ describe('maybeStartSandboxControlClient', () => {
       close: () => {},
       sendEvent: (event, payload) => {
         events.push({ event, payload });
+        return true;
       },
     };
 
@@ -251,14 +249,13 @@ describe('maybeStartSandboxControlClient', () => {
 
     await Promise.resolve();
     await Promise.resolve();
-    received?.onReconnect?.();
-    expect(connected).toEqual([client, client]);
+    received?.onDisconnected?.();
+    expect(connected).toEqual([client]);
     expect(events).toEqual([
       { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
       { event: 'sandbox.heartbeat', payload: heartbeatPayload },
-      { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
-      { event: 'sandbox.heartbeat', payload: heartbeatPayload },
     ]);
+    client.close();
   });
 
   it('clears reconnect after close and omits credentials from connect failure logs', async () => {
@@ -273,6 +270,7 @@ describe('maybeStartSandboxControlClient', () => {
       close: () => {},
       sendEvent: (event, payload) => {
         events.push({ event, payload });
+        return true;
       },
     };
 
@@ -295,7 +293,7 @@ describe('maybeStartSandboxControlClient', () => {
     await Promise.resolve();
     await Promise.resolve();
     started?.close();
-    received?.onReconnect?.();
+    received?.onDisconnected?.();
     received?.log?.('sandbox control reconnect scheduled in 0ms (socket closed)');
     expect(events).toEqual([]);
     expect(logs.join('\n')).not.toContain(credential);
@@ -324,7 +322,7 @@ describe('startSandboxControlEventFeed', () => {
     const starting = startSandboxControlEventFeed({
       signal: abort.signal,
       open: async signal => {
-        expect(signal).toBe(abort.signal);
+        expect(signal.aborted).toBe(false);
         return { stream: stream() };
       },
       consume: async events => {
@@ -432,6 +430,92 @@ describe('startSandboxControlEventFeed', () => {
     expect(received).toHaveLength(1);
     expect(failures).toHaveLength(1);
     expect(failures[0]).toEqual(new Error('Kilo global event feed ended'));
+  });
+
+  it('keeps silent work healthy on raw Kilo heartbeats and retires a frozen open feed', async () => {
+    const abort = new AbortController();
+    const timers = spyOn(globalThis, 'setInterval');
+    const failures: unknown[] = [];
+    let now = 0;
+    const firstConsumed = Promise.withResolvers<void>();
+    let delivered: () => void = firstConsumed.resolve;
+    let streamSignal: AbortSignal | undefined;
+    const queue: unknown[] = [{ payload: { type: 'server.connected' } }];
+    let next = Promise.withResolvers<void>();
+    const stream = {
+      async *[Symbol.asyncIterator]() {
+        while (!abort.signal.aborted) {
+          if (queue.length === 0) await next.promise;
+          const event = queue.shift();
+          next = Promise.withResolvers<void>();
+          if (event !== undefined) yield event;
+        }
+      },
+    };
+    try {
+      const feed = await startSandboxControlEventFeed({
+        signal: abort.signal,
+        now: () => now,
+        open: async signal => {
+          streamSignal = signal;
+          return { stream };
+        },
+        consume: async events => {
+          for await (const event of events) {
+            expect(event).toBeDefined();
+            delivered?.();
+          }
+        },
+        onUnexpectedClose: error => failures.push(error),
+      });
+      await firstConsumed.promise;
+      for (now = 10_000; now <= 120_000; now += 10_000) {
+        const consumed = Promise.withResolvers<void>();
+        delivered = consumed.resolve;
+        queue.push({ payload: { type: 'server.heartbeat', properties: {} } });
+        next.resolve();
+        await consumed.promise;
+        expect(feed.isFresh()).toBe(true);
+      }
+      expect(failures).toEqual([]);
+      now += KILO_FEED_FRESHNESS_TIMEOUT_MS;
+      expect(feed.isFresh()).toBe(false);
+      const watchdog = timers.mock.calls.find(([, ms]) => ms === 10_000)?.[0];
+      if (typeof watchdog !== 'function') throw new Error('missing feed freshness watchdog');
+      watchdog();
+      watchdog();
+      expect(streamSignal?.aborted).toBe(true);
+      expect(failures).toEqual([new Error('Kilo global event feed stopped responding')]);
+    } finally {
+      abort.abort();
+      next.resolve();
+      timers.mockRestore();
+    }
+  });
+
+  it('rejects an implicit global-feed reconnect instead of forwarding across a gap', async () => {
+    const abort = new AbortController();
+    const failed = Promise.withResolvers<unknown>();
+    const received: unknown[] = [];
+    async function* stream() {
+      yield { payload: { type: 'server.connected' } };
+      yield { payload: { type: 'server.connected' } };
+      yield { payload: { type: 'session.turn.close', properties: {} } };
+    }
+    const feed = await startSandboxControlEventFeed({
+      signal: abort.signal,
+      open: async () => ({ stream: stream() }),
+      consume: async events => {
+        for await (const event of events) received.push(event);
+      },
+      onUnexpectedClose: failed.resolve,
+    });
+    expect(await failed.promise).toEqual(
+      new Error('Kilo global event feed reconnected with a delivery gap')
+    );
+    expect(received).toHaveLength(1);
+    expect(feed.isFresh()).toBe(false);
+    abort.abort();
   });
 
   it('reports an established feed error as a fatal runtime failure', async () => {

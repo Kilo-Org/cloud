@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { restoreSession, extractDiffs } from './restore-session';
+
+const SESSION_ID = 'ses_test123';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -11,13 +13,16 @@ import { restoreSession, extractDiffs } from './restore-session';
 // Real session-ingest exports always carry a top-level `info` block with at
 // least `id`. The orchestrator's malformed-snapshot guardrail keys off that
 // field, so test fixtures must match real shape.
-function snapshotInfo(): { id: string; version: string } {
-  return { id: 'ses_test_fixture', version: '2' };
+function snapshotInfo(id = SESSION_ID): { id: string; version: string } {
+  return { id, version: '2' };
 }
 
-function makeSnapshot(diffs: Array<{ file: string; after: string; status: string }>): string {
+function makeSnapshot(
+  diffs: Array<{ file: string; after: string; status: string }>,
+  sessionId = SESSION_ID
+): string {
   return JSON.stringify({
-    info: snapshotInfo(),
+    info: snapshotInfo(sessionId),
     messages: [{ info: { summary: { diffs } } }],
   });
 }
@@ -84,6 +89,7 @@ function writeMockKilo(binDir: string, exitCode: number): void {
 function writeCapturingMockKilo(binDir: string, capturePath: string): void {
   const script = `#!/bin/sh
 if [ "$1" = "import" ] && [ -n "$2" ]; then
+  printf '%s' "$2" > "${capturePath}.path"
   cp "$2" "${capturePath}"
 fi
 exit 0
@@ -92,8 +98,8 @@ exit 0
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
 
-function writeSlowMockKilo(binDir: string): void {
-  const script = '#!/bin/sh\nsleep 1\nexit 0\n';
+function writeSlowMockKilo(binDir: string, startedMarker?: string): void {
+  const script = `#!/bin/sh\n${startedMarker ? `: > "${startedMarker}"\n` : ''}exec sleep 30\n`;
   const kiloPath = path.join(binDir, 'kilo');
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
@@ -122,8 +128,9 @@ describe('restoreSession', () => {
   let savedEnv: Record<string, string | undefined>;
   let originalFetch: typeof globalThis.fetch;
 
-  const SESSION_ID = 'ses_test123';
-  const TMP_PATH = `/tmp/kilo-session-export-${SESSION_ID}.json`;
+  function snapshotDirectories(): string[] {
+    return fs.readdirSync(tmpDir).filter(entry => entry.startsWith('kilo-session-export-'));
+  }
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'restore-test-'));
@@ -139,12 +146,14 @@ describe('restoreSession', () => {
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
       KILOCODE_TOKEN_FILE: process.env.KILOCODE_TOKEN_FILE,
       PATH: process.env.PATH,
+      TMPDIR: process.env.TMPDIR,
     };
 
     process.env.KILO_SESSION_INGEST_URL = 'http://localhost:9999';
     process.env.KILOCODE_TOKEN = 'test-token';
     delete process.env.KILOCODE_TOKEN_FILE;
     process.env.PATH = `${binDir}:${process.env.PATH}`;
+    process.env.TMPDIR = tmpDir;
 
     originalFetch = globalThis.fetch;
   });
@@ -163,11 +172,6 @@ describe('restoreSession', () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     } catch {
       // best-effort cleanup
-    }
-    try {
-      fs.unlinkSync(TMP_PATH);
-    } catch {
-      // may already be cleaned up
     }
   });
 
@@ -295,6 +299,45 @@ describe('restoreSession', () => {
     }
   });
 
+  it('aborts during download without starting import and removes its temp directory', async () => {
+    const downloadStarted = Promise.withResolvers<AbortSignal>();
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+    globalThis.fetch = asFetch((_input, init) => {
+      const signal = init?.signal;
+      if (!signal) throw new Error('Expected download signal');
+      downloadStarted.resolve(signal);
+      return new Promise<Response>((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    });
+    const controller = new AbortController();
+    const restoring = restoreSession(SESSION_ID, workspace, undefined, {
+      signal: controller.signal,
+    });
+
+    try {
+      const signal = await downloadStarted.promise;
+      expect(signal.aborted).toBe(false);
+      expect(snapshotDirectories()).toHaveLength(1);
+      controller.abort();
+      const result = await restoring;
+
+      expect(signal.aborted).toBe(true);
+      expect(result).toEqual({
+        ok: false,
+        error: 'snapshot download failed',
+        code: null,
+        step: 'download',
+      });
+      expect(fs.existsSync(capturePath)).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      controller.abort();
+      await restoring;
+    }
+  });
+
   it('returns download error when the snapshot lacks top-level info.id', async () => {
     mockFetchOk(JSON.stringify({ detail: 'upstream error body' }));
 
@@ -368,7 +411,7 @@ describe('restoreSession', () => {
   });
 
   it('returns download error when JSON after info.id is malformed', async () => {
-    mockFetchOk('{"info":{"id":"ses_test_fixture"},"messages":[not-json]}');
+    mockFetchOk('{"info":{"id":"ses_test123"},"messages":[not-json]}');
 
     const result = await restoreSession(SESSION_ID, workspace);
 
@@ -381,7 +424,7 @@ describe('restoreSession', () => {
   });
 
   it('returns download error when bytes follow the JSON document', async () => {
-    mockFetchOk('{"info":{"id":"ses_test_fixture"},"messages":[]} trailing');
+    mockFetchOk('{"info":{"id":"ses_test123"},"messages":[]} trailing');
 
     const result = await restoreSession(SESSION_ID, workspace);
 
@@ -437,30 +480,48 @@ describe('restoreSession', () => {
       expect(result.error).toContain('kilo import timed out');
       expect(result.detail).toContain('timeout');
     }
-    expect(fs.existsSync(TMP_PATH)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
   });
 
-  it('terminates kilo import when the workspace deadline is aborted', async () => {
+  it('terminates kilo import when the workspace deadline is aborted after import starts', async () => {
     mockFetchOk(makeSnapshot([]));
-    writeSlowMockKilo(binDir);
+    writeSlowMockKilo(binDir, path.join(workspace, 'import-started'));
+    const importStarted = Promise.withResolvers<void>();
+    const watcher = fs.watch(
+      workspace,
+      { signal: AbortSignal.timeout(3_000) },
+      (_event, filename) => {
+        if (filename === 'import-started') importStarted.resolve();
+      }
+    );
+    watcher.on('error', importStarted.reject);
+    watcher.on('close', () => importStarted.reject(new Error('Import did not start')));
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 50);
-    const startedAt = Date.now();
-
-    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+    const restoring = restoreSession(SESSION_ID, workspace, undefined, {
       importTimeoutMs: 5_000,
       importTerminationGraceMs: 50,
       signal: controller.signal,
     });
-    const elapsedMs = Date.now() - startedAt;
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.step).toBe('import');
-      expect(result.error).toContain('kilo import failed');
+    try {
+      await importStarted.promise;
+      const startedAt = Date.now();
+      controller.abort();
+      const result = await restoring;
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.step).toBe('import');
+        expect(result.error).toContain('kilo import failed');
+        expect(result.detail).toContain('termination abort');
+      }
+      expect(Date.now() - startedAt).toBeLessThan(1_000);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      controller.abort();
+      watcher.close();
+      await restoring;
     }
-    expect(elapsedMs).toBeLessThan(800);
-    expect(fs.existsSync(TMP_PATH)).toBe(false);
   });
 
   it('returns import error when kilo import is terminated by a signal', async () => {
@@ -913,22 +974,71 @@ describe('restoreSession', () => {
 
     const result = await restoreSession(SESSION_ID, workspace);
     expect(result.ok).toBe(true);
-    expect(fs.existsSync(TMP_PATH)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
   });
 
-  it('cleans up temp file when Bun.write throws during download', async () => {
-    // Simulate a partial write: pre-create the temp file so it exists on disk,
-    // then have fetch() reject — the catch path should still unlink it.
-    fs.writeFileSync(TMP_PATH, 'partial snapshot data');
+  it('cleans up its temp directory when Bun.write fails after a partial download', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const writes: string[] = [];
+    const write = spyOn(Bun, 'write').mockImplementationOnce(async destination => {
+      if (typeof destination !== 'string') throw new Error('Expected snapshot path');
+      writes.push(destination);
+      fs.writeFileSync(destination, 'partial snapshot data');
+      throw new Error('write failed');
+    });
 
-    globalThis.fetch = asFetch(() => Promise.reject(new Error('connection reset')));
+    try {
+      const result = await restoreSession(SESSION_ID, workspace);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.step).toBe('download');
+      expect(writes).toHaveLength(1);
+      expect(fs.existsSync(writes[0])).toBe(false);
+      expect(snapshotDirectories()).toEqual([]);
+    } finally {
+      write.mockRestore();
+    }
+  });
+
+  it('cleans up its temp directory when downloaded metadata is invalid', async () => {
+    mockFetchOk('{"info":{}}');
 
     const result = await restoreSession(SESSION_ID, workspace);
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.step).toBe('download');
+    if (!result.ok) expect(result.step).toBe('download');
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it('isolates import snapshot paths for simultaneous restores of the same session', async () => {
+    const secondWorkspace = path.join(tmpDir, 'second-workspace');
+    fs.mkdirSync(secondWorkspace);
+    writeCapturingMockKilo(binDir, 'import-input.json');
+    let downloadCount = 0;
+    globalThis.fetch = asFetch(() => {
+      downloadCount += 1;
+      return Promise.resolve(
+        new Response(
+          makeSnapshot([{ file: 'restored.txt', after: String(downloadCount), status: 'modified' }])
+        )
+      );
+    });
+
+    const results = await Promise.all([
+      restoreSession(SESSION_ID, workspace),
+      restoreSession(SESSION_ID, secondWorkspace),
+    ]);
+
+    expect(results.map(result => result.ok)).toEqual([true, true]);
+    const importedPaths = [workspace, secondWorkspace].map(directory =>
+      fs.readFileSync(path.join(directory, 'import-input.json.path'), 'utf8')
+    );
+    expect(importedPaths[0]).not.toBe(importedPaths[1]);
+    for (const importedPath of importedPaths) {
+      expect(path.dirname(importedPath)).toStartWith(path.join(tmpDir, 'kilo-session-export-'));
+      expect(fs.existsSync(path.dirname(importedPath))).toBe(false);
     }
-    expect(fs.existsSync(TMP_PATH)).toBe(false);
+    expect(fs.readFileSync(path.join(workspace, 'restored.txt'), 'utf8')).toBe('1');
+    expect(fs.readFileSync(path.join(secondWorkspace, 'restored.txt'), 'utf8')).toBe('2');
+    expect(snapshotDirectories()).toEqual([]);
   });
 
   it('cleans up temp file on import failure', async () => {
@@ -937,7 +1047,7 @@ describe('restoreSession', () => {
 
     const result = await restoreSession(SESSION_ID, workspace);
     expect(result.ok).toBe(false);
-    expect(fs.existsSync(TMP_PATH)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
   });
 
   // ---- Fetch URL construction ----
@@ -963,13 +1073,11 @@ describe('restoreSession', () => {
   it('URL-encodes the session ID', async () => {
     let capturedUrl: string | undefined;
 
-    // Use chars that need URL-encoding but are filesystem-safe (the
-    // function writes to /tmp/kilo-session-export-<id>.json)
     const specialId = 'ses special&chars=1';
 
     globalThis.fetch = asFetch(input => {
       capturedUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : '';
-      return Promise.resolve(new Response(makeSnapshot([]), { status: 200 }));
+      return Promise.resolve(new Response(makeSnapshot([], specialId), { status: 200 }));
     });
 
     await restoreSession(specialId, workspace);

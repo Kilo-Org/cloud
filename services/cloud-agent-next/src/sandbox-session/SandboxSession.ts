@@ -1,5 +1,10 @@
 import { DurableObject } from 'cloudflare:workers';
 import { TRPCError } from '@trpc/server';
+import { withTimeout } from '@kilocode/worker-utils';
+import { z } from 'zod';
+import { buildSandboxBillingInput } from '../container-usage-context.js';
+import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
+import { withDORetry } from '../utils/do-retry.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
@@ -28,7 +33,14 @@ import type { LatestAssistantMessage } from '../session/types.js';
 import { createEventQueries, type EventQueries } from '../session/queries/index.js';
 import { createStreamHandler } from '../websocket/stream.js';
 import type { StoredEvent } from '../websocket/types.js';
-import { persistSandboxControlSessionEvent } from './sandbox-control-event.js';
+import {
+  applyPendingInteractionEvent,
+  pendingInteractionsSchema,
+  persistSandboxControlSessionEvent,
+  type PendingInteractions,
+} from './sandbox-control-event.js';
+import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
+import { getSessionWorkspacePath } from '../workspace.js';
 import {
   controlEventToIngestItems,
   ingestKiloSessionId,
@@ -39,23 +51,41 @@ import { logger } from '../logger.js';
 import { sandboxControlRpc } from './control-rpc.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createMessageId } from '../session/message-id.js';
-import { buildSessionAttachPayload, fillAttachGitToken } from './attach-payload.js';
+import {
+  buildSessionAttachPayload,
+  fillAttachGitToken,
+  validateControlSessionOptions,
+} from './attach-payload.js';
 import { createPreparationProgressRecorder } from '../session/preparation-progress.js';
 import {
   finalizeOtherRunningAttemptsForMessage,
   finalizePreparationAttempt,
+  getPreparationSnapshots,
 } from '../session/preparation-history.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+  SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+  sessionAttachResultSchema,
+  sessionMessageOutcomeSchema,
+  sessionPromptResultSchema,
+  sessionSyncResultSchema,
+  sessionPermissionResolveResultSchema,
+  sessionQuestionResolveResultSchema,
+  sessionAbortResultSchema,
+  wrapperInstanceIdSchema,
+  type SessionSyncResult,
   type SessionEventIdentity,
   type SessionPreparingPayload,
 } from '../shared/sandbox-control-protocol.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
 import {
   controlDispatchDisposition,
-  failureReasonFromControlStatus,
+  controlRequestResult,
+  isRetryableDeliveryError,
   observeControlAfterStopping,
   safeErrorFromQueueReason,
+  SESSION_DELIVERY_TIMEOUT_MS,
+  withDeliveryDeadline,
 } from './control-dispatch.js';
 import { acceptedAlarmDecision } from './accepted-overdue.js';
 import { bootPreparingStep, provisionPreparingStep } from './preparing-steps.js';
@@ -66,27 +96,21 @@ import {
 } from './terminal-lifecycle.js';
 import {
   acceptQueuedMessage,
+  applyMessageOutcome,
   assignPreparationAttemptId,
-  cancelActiveMessages,
   createSessionMessageRecord,
   failQueuedMessage,
   failWaitingMessages as applyFailWaitingMessages,
   failedMessageSnapshot,
   freezeLegacyQueuedMessages,
   hasAcceptedMessage,
-  hasInterruptibleWork,
-  incrementAttachFailure,
-  incrementPromptFailure,
-  isAttachExhausted,
-  isPromptExhausted,
+  incrementDeliveryFailure,
   matchesSessionMessageReplay,
   nextQueuedMessageId,
   recordAcceptedMessageActivity,
   resolveSessionMessageIntent,
   streamCloudStatus,
   streamQueuedSnapshots,
-  terminalizeAcceptedMessages,
-  userTurnTerminalState,
   type ControlSessionMessageInput,
   type SessionMessageRecord,
 } from './session-message-queue.js';
@@ -94,8 +118,18 @@ import {
 const METADATA_KEY = SANDBOX_SESSION_METADATA_KEY;
 const MESSAGES_KEY = 'session_messages';
 const QUEUE_RETRY_MS = 5_000;
+const PENDING_RUNTIME_CLEANUP_KEY = 'pending_runtime_cleanup';
+const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
+const pendingRuntimeCleanupSchema = z.object({
+  ownerId: z.string().min(1),
+  sessionId: z.string().min(1),
+  sandboxId: z.string().min(1),
+  wrapperInstanceId: wrapperInstanceIdSchema,
+  reason: z.string(),
+});
 
 type MessageRecord = SessionMessageRecord;
+type DispatchPhase = 'preparing' | 'attach' | 'prompt';
 
 export class SandboxSession extends DurableObject<Env> {
   private readonly sessionId: SessionId | undefined;
@@ -127,7 +161,7 @@ export class SandboxSession extends DurableObject<Env> {
       state: ctx,
       getMetadata: () => this.getMetadata(),
       getTerminal: async (ptyId): Promise<SandboxTerminalRecord | undefined> =>
-        this.terminalLifecycle.getTerminal(ptyId),
+        this.pendingRuntimeCleanup() ? undefined : this.terminalLifecycle.getTerminal(ptyId),
       requestConnect: async (record, payload) =>
         this.terminalLifecycle.requestConnect(record, payload),
       reportActivity: async record => this.terminalLifecycle.reportActivity(record),
@@ -155,6 +189,13 @@ export class SandboxSession extends DurableObject<Env> {
     const handler = createStreamHandler(this.ctx, this.eventQueries, sessionId, {
       deriveCloudStatus: () => this.deriveCloudStatus(),
       deriveQueuedMessages: () => this.deriveQueuedMessages(),
+      derivePendingInteractions: () => this.derivePendingInteractions(),
+      deriveSessionStatus: async () =>
+        hasAcceptedMessage(this.loadMessages())
+          ? { type: 'busy' as const }
+          : { type: 'idle' as const },
+      getPreparationSnapshots: async () => getPreparationSnapshots(this.eventQueries),
+      reconcileMaterializedEvents: true,
     });
     return handler.handleStreamRequest(request);
   }
@@ -179,6 +220,7 @@ export class SandboxSession extends DurableObject<Env> {
   async receiveSandboxControlEvent(input: {
     identity: { directory: string; kiloSessionId?: string; rootKiloSessionId?: string };
     payload: { type: string; properties: Record<string, unknown>; timestamp?: string };
+    wrapperInstanceId?: string;
   }): Promise<{ applied: boolean }> {
     const metadata = await this.getMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
@@ -192,6 +234,7 @@ export class SandboxSession extends DurableObject<Env> {
       return { applied: false };
     }
     const root = metadata.auth.kiloSessionId;
+    if (input.identity.directory !== this.directory(metadata)) return { applied: false };
     if (
       input.identity.rootKiloSessionId !== undefined &&
       root !== undefined &&
@@ -208,20 +251,62 @@ export class SandboxSession extends DurableObject<Env> {
       return { applied: false };
     }
     const sessionId = this.requireSessionId();
+    const eventKiloSessionId =
+      input.identity.kiloSessionId ??
+      ingestKiloSessionId(input.payload.type, input.payload.properties);
+    if (input.payload.type === 'session.message.outcome') {
+      const outcome = sessionMessageOutcomeSchema.safeParse(input.payload.properties);
+      if (
+        !outcome.success ||
+        !input.wrapperInstanceId ||
+        (eventKiloSessionId !== undefined && root !== undefined && eventKiloSessionId !== root)
+      ) {
+        return { applied: false };
+      }
+      const messages = this.loadMessages();
+      const existing = messages.find(message => message.messageId === outcome.data.messageId);
+      if (
+        existing?.wrapperInstanceId === input.wrapperInstanceId &&
+        existing.state === outcome.data.status
+      )
+        return { applied: true };
+      const settled = applyMessageOutcome(
+        messages,
+        outcome.data,
+        input.wrapperInstanceId,
+        Date.now()
+      );
+      if (!settled || !this.saveMessages(settled, epoch)) return { applied: false };
+      await this.armQueueRetry();
+      const nextId = nextQueuedMessageId(this.loadMessages());
+      if (nextId && this.terminalLifecycle.isCurrent(epoch)) {
+        this.ctx.waitUntil(this.dispatchQueued(nextId));
+      }
+      return { applied: true };
+    }
+    if (!this.isCurrentEventRuntime(input.wrapperInstanceId)) return { applied: false };
+    if (
+      eventKiloSessionId !== undefined &&
+      eventKiloSessionId !== root &&
+      (root === undefined || input.identity.rootKiloSessionId !== root)
+    )
+      return { applied: false };
+    if (
+      (input.payload.type === 'question.asked' || input.payload.type === 'permission.asked') &&
+      !this.loadMessages().some(
+        message => message.state === 'accepted' || message.state === 'queued'
+      )
+    )
+      return { applied: false };
+    this.recordPendingInteraction(input.payload);
     persistSandboxControlSessionEvent({
       sessionId,
       payload: input.payload,
       eventQueries: this.eventQueries,
       broadcast: event => this.broadcastStoredEvent(event),
     });
-    const eventKiloSessionId =
-      input.identity.kiloSessionId ??
-      ingestKiloSessionId(input.payload.type, input.payload.properties);
-    const terminal = userTurnTerminalState(input.payload.type, eventKiloSessionId, root);
-    if (!terminal) {
-      const activeMessages = recordAcceptedMessageActivity(await this.loadMessages(), Date.now());
-      if (activeMessages) await this.saveMessages(activeMessages);
-    }
+    const activeMessages = recordAcceptedMessageActivity(this.loadMessages(), Date.now());
+    if (activeMessages) this.saveMessages(activeMessages, epoch);
     const ingestItems = controlEventToIngestItems(input.payload.type, input.payload.properties);
     const rootKiloSessionId = metadata.auth.kiloSessionId;
     const token = metadata.auth.kilocodeToken;
@@ -259,32 +344,19 @@ export class SandboxSession extends DurableObject<Env> {
         );
       }
     }
-    if (!this.terminalLifecycle.isCurrent(epoch)) return { applied: false };
-    if (terminal) {
-      const before = await this.loadMessages();
-      if (!this.terminalLifecycle.isCurrent(epoch)) return { applied: false };
-      if (hasAcceptedMessage(before)) {
-        if (!(await this.saveMessages(terminalizeAcceptedMessages(before, terminal), epoch))) {
-          return { applied: false };
-        }
-        this.broadcastClientEvent(terminal === 'failed' ? 'error' : 'complete');
-        const nextId = nextQueuedMessageId(await this.loadMessages());
-        if (nextId && this.terminalLifecycle.isCurrent(epoch)) {
-          this.ctx.waitUntil(this.dispatchQueued(nextId));
-        }
-      }
-    }
-    return { applied: true };
+    return { applied: this.terminalLifecycle.isCurrent(epoch) };
   }
 
   async receiveSandboxControlPreparing(input: {
     identity: SessionEventIdentity;
     payload: SessionPreparingPayload;
+    wrapperInstanceId?: string;
   }): Promise<{ applied: boolean }> {
     const metadata = await this.getMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
     if (!metadata || epoch === null) return { applied: false };
     const root = metadata.auth.kiloSessionId;
+    if (input.identity.directory !== this.directory(metadata)) return { applied: false };
     if (
       input.identity.rootKiloSessionId !== undefined &&
       root !== undefined &&
@@ -292,7 +364,19 @@ export class SandboxSession extends DurableObject<Env> {
     ) {
       return { applied: false };
     }
-    if (!this.terminalLifecycle.isCurrent(epoch)) return { applied: false };
+    const message = this.loadMessages().find(
+      item => item.messageId === input.payload.triggerMessageId
+    );
+    if (
+      !this.terminalLifecycle.isCurrent(epoch) ||
+      !message ||
+      message.preparationAttemptId !== input.payload.attemptId ||
+      (input.wrapperInstanceId !== undefined &&
+        message.wrapperInstanceId !== input.wrapperInstanceId)
+    ) {
+      return { applied: false };
+    }
+    if (message.state !== 'queued') return { applied: true };
     const sessionId = this.requireSessionId();
     applyControlPlanePreparingEvent({
       sessionId,
@@ -339,7 +423,7 @@ export class SandboxSession extends DurableObject<Env> {
 
   async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {
     if (!(await this.getMetadata())) return { type: 'session-not-found' };
-    const record = (await this.loadMessages()).find(message => message.messageId === messageId);
+    const record = this.loadMessages().find(message => message.messageId === messageId);
     if (!record) return { type: 'message-not-found' };
     const status =
       record.state === 'queued'
@@ -361,80 +445,115 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async markAsInterrupted(): Promise<void> {
-    const epoch = this.terminalLifecycle.captureEpoch();
-    if (epoch === null) return;
-    const { messages } = cancelActiveMessages(await this.loadMessages());
-    await this.saveMessages(messages, epoch);
+    return;
   }
 
   async interruptExecution(): Promise<{ success: boolean; message?: string }> {
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null) return { success: false, message: 'Session not found' };
-    const before = await this.loadMessages();
+    const before = this.loadMessages();
     if (!this.terminalLifecycle.isCurrent(epoch)) {
       return { success: false, message: 'Session not found' };
     }
-    const hadWork = hasInterruptibleWork(before);
-    const { messages } = cancelActiveMessages(before);
-    if (!(await this.saveMessages(messages, epoch))) {
-      return { success: false, message: 'Session not found' };
+    const active = before.filter(
+      message => message.state === 'queued' || message.state === 'accepted'
+    );
+    if (!active.length) return { success: false, message: 'No session work to interrupt' };
+    const accepted = active.find(message => message.state === 'accepted');
+    const preparing = accepted ? undefined : active[0];
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    if (preparing?.wrapperInstanceId && metadata) {
+      this.retainRuntimeCleanup(metadata, preparing.wrapperInstanceId, 'preparation_interrupted');
     }
-    if (hadWork) {
-      this.broadcastClientEvent('interrupted', { reason: 'interrupted' });
+    this.saveMessages(
+      before.map(message =>
+        message.state === 'queued' ? { ...message, state: 'cancelled' } : message
+      ),
+      epoch
+    );
+    await this.armQueueRetry();
+    if (this.pendingRuntimeCleanup()) {
+      await this.transferRuntimeCleanup();
+      return { success: true };
     }
-    const metadata = await this.getMetadata();
     const sandboxId = metadata?.workspace?.sandboxId;
     const kiloSessionId = metadata?.auth.kiloSessionId;
-    if (sandboxId && kiloSessionId && this.sessionId && this.terminalLifecycle.isCurrent(epoch)) {
-      try {
-        await sandboxControlRpc(this.env, sandboxId).request({
+    if (!accepted) return { success: true };
+    try {
+      if (!metadata || !sandboxId || !kiloSessionId)
+        throw new Error('Accepted runtime is unavailable');
+      const response = await withTimeout(
+        sandboxControlRpc(this.env, sandboxId).request({
           operation: 'session.abort',
           session: {
-            sessionId: this.sessionId,
+            sessionId: metadata.identity.sessionId,
             kiloSessionId,
             directory: this.directory(metadata),
           },
-          payload: {},
-        });
-      } catch (error) {
-        if (this.terminalLifecycle.isCurrent(epoch)) {
-          logger
-            .withFields({
-              error: error instanceof Error ? error.message : 'abort failed',
-            })
-            .warn('session.abort failed');
-        }
-      }
+          payload: { messageId: accepted.messageId },
+        }),
+        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+        'Session abort timed out'
+      );
+      if (!this.isCurrentAcceptedMessage(accepted, epoch)) return { success: true };
+      if (!response.ok) throw new Error('Session abort failed');
+      sessionAbortResultSchema.parse(response.result);
+      this.saveMessages(
+        this.loadMessages().map(message =>
+          message.messageId === accepted.messageId ? { ...message, state: 'cancelled' } : message
+        ),
+        epoch
+      );
+      await this.armQueueRetry();
+      return { success: true };
+    } catch {
+      if (!this.isCurrentAcceptedMessage(accepted, epoch)) return { success: true };
+      await this.failDelivery(accepted.messageId, 'runtime_unhealthy', accepted.wrapperInstanceId);
+      return { success: false, message: 'The session runtime could not be interrupted' };
     }
-    return { success: hadWork, ...(hadWork ? {} : { message: 'No session work to interrupt' }) };
   }
 
   async answerPermission(input: {
     permissionId: string;
     response: 'once' | 'always' | 'reject';
   }): Promise<{ success: boolean }> {
-    return this.requestSessionOperation('session.permission.resolve', {
+    const result = await this.requestSessionOperation('session.permission.resolve', {
       permissionId: input.permissionId,
       response: input.response,
     });
+    this.recordPendingInteraction({
+      type: 'permission.replied',
+      properties: { requestID: input.permissionId },
+    });
+    return result;
   }
 
   async answerQuestion(input: {
     questionId: string;
     answers: string[][];
   }): Promise<{ success: boolean }> {
-    return this.requestSessionOperation('session.question.resolve', {
+    const result = await this.requestSessionOperation('session.question.resolve', {
       action: 'answer',
       questionId: input.questionId,
       answers: input.answers,
     });
+    this.recordPendingInteraction({
+      type: 'question.replied',
+      properties: { requestID: input.questionId },
+    });
+    return result;
   }
 
   async rejectQuestion(input: { questionId: string }): Promise<{ success: boolean }> {
-    return this.requestSessionOperation('session.question.resolve', {
+    const result = await this.requestSessionOperation('session.question.resolve', {
       action: 'reject',
       questionId: input.questionId,
     });
+    this.recordPendingInteraction({
+      type: 'question.rejected',
+      properties: { requestID: input.questionId },
+    });
+    return result;
   }
 
   async createTerminal(input?: {
@@ -442,6 +561,8 @@ export class SandboxSession extends DurableObject<Env> {
     rows?: number;
     operationId?: string;
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
+    if (this.pendingRuntimeCleanup())
+      return { success: false, error: 'Runtime cleanup is pending' };
     return this.terminalLifecycle.createTerminal(input);
   }
 
@@ -466,7 +587,7 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async isSandboxCleanupScheduled(): Promise<boolean> {
-    return false;
+    return this.pendingRuntimeCleanup() !== undefined;
   }
 
   async deleteSession(): Promise<void> {
@@ -479,9 +600,12 @@ export class SandboxSession extends DurableObject<Env> {
     await this.terminalLifecycle.cleanupSession(metadata, records);
     await this.ctx.storage.deleteAlarm();
     this.ctx.storage.transactionSync(() => {
+      const pendingCleanup = this.pendingRuntimeCleanup();
       this.eventQueries.deleteOlderThan(Number.MAX_SAFE_INTEGER);
       this.terminalLifecycle.purgeDeletedState();
+      if (pendingCleanup) this.ctx.storage.kv.put(PENDING_RUNTIME_CLEANUP_KEY, pendingCleanup);
     });
+    if (this.pendingRuntimeCleanup()) await this.armQueueRetry();
   }
 
   async registerSession(input: {
@@ -496,6 +620,14 @@ export class SandboxSession extends DurableObject<Env> {
   }): Promise<OperationResult> {
     if (this.terminalLifecycle.isBlocked()) return { success: false, error: 'Session not found' };
     if (this.terminalLifecycle.getStoredMetadata()) return { success: true };
+    try {
+      validateControlSessionOptions(input);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unsupported session options',
+      };
+    }
     const repository =
       input.repository &&
       'branch' in input.repository &&
@@ -519,6 +651,11 @@ export class SandboxSession extends DurableObject<Env> {
     });
     if (this.terminalLifecycle.isBlocked()) return { success: false, error: 'Session not found' };
     this.ctx.storage.kv.put(METADATA_KEY, serializeSessionMetadata(metadata));
+    this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
+      revision: 0,
+      questions: [],
+      permissions: [],
+    });
     return { success: true };
   }
 
@@ -533,6 +670,15 @@ export class SandboxSession extends DurableObject<Env> {
     finalization?: SessionMetadata['finalization'];
     message: { initialTurn: AcceptedExecutionTurn };
   }): Promise<SessionMessageAdmissionResult> {
+    try {
+      validateControlSessionOptions(input);
+    } catch (error) {
+      return {
+        success: false,
+        code: 'BAD_REQUEST',
+        error: error instanceof Error ? error.message : 'Unsupported session options',
+      };
+    }
     const registered = await this.registerSession(input);
     if (!registered.success) {
       return {
@@ -576,7 +722,7 @@ export class SandboxSession extends DurableObject<Env> {
     status: 'pending' | 'running';
     health: 'healthy' | 'stale';
   } | null> {
-    const messages = await this.loadMessages();
+    const messages = this.loadMessages();
     const accepted = messages.find(message => message.state === 'accepted');
     if (accepted) return { messageId: accepted.messageId, status: 'running', health: 'healthy' };
     const queued = messages.find(message => message.state === 'queued');
@@ -585,7 +731,7 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async hasMessageAdmission(messageId: string): Promise<boolean> {
-    return (await this.loadMessages()).some(message => message.messageId === messageId);
+    return this.loadMessages().some(message => message.messageId === messageId);
   }
 
   async admitSubmittedMessage(
@@ -625,30 +771,48 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
+    if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null) return;
     const now = Date.now();
-    const messages = await this.loadMessages();
+    const messages = this.loadMessages();
     if (!this.terminalLifecycle.isCurrent(epoch)) return;
-    const accepted = messages.find(
-      message => message.state === 'accepted' && message.acceptedAt !== undefined
-    );
-    if (accepted?.acceptedAt !== undefined) {
-      const decision = acceptedAlarmDecision(accepted.acceptedAt, now, accepted.lastActivityAt);
-      if (decision.action === 'fail') {
-        await this.failWaitingMessages('accepted_overdue');
-        return;
-      }
-      if (this.terminalLifecycle.isCurrent(epoch)) {
-        await this.ctx.storage.setAlarm(decision.at);
+    const accepted = messages.find(message => message.state === 'accepted');
+    if (accepted) {
+      const decision = acceptedAlarmDecision(
+        accepted.acceptedAt ?? 0,
+        now,
+        accepted.lastActivityAt
+      );
+      await this.armQueueRetry(
+        decision.action === 'rearm' ? decision.at : now + DEADLINE_MS.acceptedAlarmCap
+      );
+      if (decision.action === 'check') {
+        try {
+          const snapshot = await this.syncAcceptedMessage(accepted, epoch);
+          if (!snapshot || !this.isCurrentAcceptedMessage(accepted, epoch)) return;
+          const healthy =
+            snapshot.status.type === 'busy' ||
+            snapshot.status.type === 'retry' ||
+            snapshot.questions.length > 0 ||
+            snapshot.permissions.length > 0;
+          if (!healthy) throw new Error('Accepted execution is no longer active');
+          const active = recordAcceptedMessageActivity(this.loadMessages(), Date.now());
+          if (active) this.saveMessages(active, epoch);
+        } catch {
+          if (this.isCurrentAcceptedMessage(accepted, epoch)) {
+            await this.failDelivery(
+              accepted.messageId,
+              'runtime_unhealthy',
+              accepted.wrapperInstanceId
+            );
+          }
+        }
       }
       return;
     }
-    const queued = messages.filter(message => message.state === 'queued');
-    for (const message of queued) {
-      if (!this.terminalLifecycle.isCurrent(epoch)) return;
-      await this.dispatchQueued(message.messageId, { allowCreate: false });
-    }
+    const headId = nextQueuedMessageId(messages);
+    if (headId) await this.dispatchQueued(headId, { allowCreate: false });
   }
 
   private async queueAndDispatch(
@@ -668,6 +832,17 @@ export class SandboxSession extends DurableObject<Env> {
       : resolveSessionMessageIntent(input, origin === 'followup' ? metadata.agent : undefined);
     if (!existing && !intent) {
       return { success: false, code: 'BAD_REQUEST', error: 'Session is missing a valid model' };
+    }
+    if (!existing) {
+      try {
+        validateControlSessionOptions(metadata);
+      } catch (error) {
+        return {
+          success: false,
+          code: 'BAD_REQUEST',
+          error: error instanceof Error ? error.message : 'Unsupported session options',
+        };
+      }
     }
     let validationFailure: Extract<SessionMessageAdmissionResult, { success: false }> | undefined;
     if (intent?.turn.type === 'prompt' && origin === 'followup') {
@@ -746,11 +921,11 @@ export class SandboxSession extends DurableObject<Env> {
       return { success: true, outcome: 'queued', messageId, compatibilityDelivery: 'queued' };
     });
     if (result.success && this.terminalLifecycle.isCurrent(epoch)) {
+      await this.armQueueRetry();
+      if (!this.terminalLifecycle.isCurrent(epoch)) return result;
       if (admitted) this.broadcastQueuedMessage(messageId, renderExecutionTurnContent(input.turn));
-      const latestMessages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
-      if (nextQueuedMessageId(latestMessages) === messageId) {
-        this.ctx.waitUntil(this.dispatchQueued(messageId, { allowCreate: true }));
-      }
+      const headId = nextQueuedMessageId(this.loadMessages());
+      if (headId) this.ctx.waitUntil(this.dispatchQueued(headId, { allowCreate: true }));
     }
     return result;
   }
@@ -774,7 +949,6 @@ export class SandboxSession extends DurableObject<Env> {
     messageId: string,
     options?: { allowCreate?: boolean }
   ): Promise<void> {
-    const allowCreate = options?.allowCreate === true;
     const metadata = this.terminalLifecycle.getStoredMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
     const sandboxId = metadata?.workspace?.sandboxId;
@@ -789,14 +963,46 @@ export class SandboxSession extends DurableObject<Env> {
       if (!this.terminalLifecycle.isCurrent(epoch) || nextQueuedMessageId(messages) !== messageId) {
         return undefined;
       }
-      const frozen = freezeLegacyQueuedMessages(messages, metadata.agent);
+      const frozen = freezeLegacyQueuedMessages(messages, metadata.agent).map(message =>
+        message.messageId === messageId && message.deliveryDeadlineAt === undefined
+          ? { ...message, deliveryDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS }
+          : message
+      );
       const prepared = assignPreparationAttemptId(frozen, messageId, () => crypto.randomUUID());
       if (prepared) this.ctx.storage.kv.put(MESSAGES_KEY, prepared.messages);
       return prepared;
     });
     if (!assigned) return;
     const queued = assigned.messages.find(message => message.messageId === messageId);
-    const intent = queued?.intent;
+    const deadlineAt = queued?.deliveryDeadlineAt;
+    if (!queued || deadlineAt === undefined) return;
+    const provider = getSandboxProvider(metadata);
+    const acquisition =
+      provider === 'cloudflare' ? { id: assigned.attemptId, deadlineAt } : undefined;
+    const allowCreate = acquisition === undefined && options?.allowCreate === true;
+    let wrapperInstanceId = queued.wrapperInstanceId;
+    const isCurrent = () => this.queuedMessage(messageId, epoch, wrapperInstanceId) !== undefined;
+    const wait = <T>(operation: () => Promise<T>, timeoutMs?: number) =>
+      withDeliveryDeadline(operation, deadlineAt, timeoutMs);
+    const recordRuntime = (identity: string | undefined) => {
+      const runtime = wrapperInstanceIdSchema.safeParse(identity);
+      if (!runtime.success) return;
+      wrapperInstanceId = runtime.data;
+      this.saveMessages(
+        this.loadMessages().map(message =>
+          message.messageId === messageId ? { ...message, wrapperInstanceId } : message
+        ),
+        epoch
+      );
+    };
+    await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
+    if (!isCurrent()) return;
+    if (Date.now() >= deadlineAt) {
+      await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId);
+      return;
+    }
+    if (this.pendingRuntimeCleanup()) return;
+    const intent = queued.intent;
     const model = dispatchedKilocodeModelId(intent?.agent.model);
     const control = sandboxControlRpc(this.env, sandboxId);
     const recorder = createPreparationProgressRecorder({
@@ -818,296 +1024,352 @@ export class SandboxSession extends DurableObject<Env> {
       !intent ||
       ((intent.turn.type === 'prompt' || intent.agent.model !== undefined) && !model)
     ) {
-      const failedMessages = failQueuedMessage(assigned.messages, messageId);
+      const failedMessages = failQueuedMessage(this.loadMessages(), messageId);
       const failed = failedMessages?.find(message => message.messageId === messageId);
       if (!failedMessages || !failed) return;
       failed.failedReason = 'invalid_model';
-      if (!(await this.saveMessages(failedMessages, epoch))) return;
+      if (!this.saveMessages(failedMessages, epoch)) return;
       if (!this.terminalLifecycle.isCurrent(epoch)) return;
       recorder.finalize({ status: 'failed', safeError: 'Session is missing a valid model' });
-      this.broadcastMessageFailed(failed, Date.now());
       if (nextQueuedMessageId(failedMessages)) await this.armQueueRetry();
       return;
     }
-    let delivery: 'attach' | 'prompt' | undefined;
-    let routeAttached = false;
+    let phase: DispatchPhase = 'preparing';
     try {
-      const session = {
-        sessionId,
-        kiloSessionId,
-        directory: this.directory(metadata),
-      };
-      if (!this.terminalLifecycle.isCurrent(epoch)) return;
-      let before = await control.getStatus();
-      const stoppingDeadline = Date.now() + DEADLINE_MS.startup;
-      let status: Awaited<ReturnType<typeof control.getStatus>>;
-      while (true) {
-        if (!this.terminalLifecycle.isCurrent(epoch)) return;
-        if (allowCreate && before.physical === 'stopping') {
-          const observed = await observeControlAfterStopping(before, () => control.getStatus(), {
-            retryMs: QUEUE_RETRY_MS,
-            deadline: stoppingDeadline,
-          });
-          if (!observed) {
-            recorder.finalize({ status: 'failed', safeError: 'Environment failed' });
-            await this.failWaitingMessages('environment_failed');
-            return;
-          }
-          if (!this.terminalLifecycle.isCurrent(epoch)) return;
-          if (nextQueuedMessageId(await this.loadMessages()) !== messageId) return;
-          before = observed;
+      validateControlSessionOptions(metadata);
+      const session = { sessionId, kiloSessionId, directory: this.directory(metadata) };
+      const attachments =
+        intent.turn.type === 'prompt'
+          ? await wait(() =>
+              buildSignedPromptAttachments({
+                env: this.env,
+                userId: metadata.identity.userId,
+                sessionId,
+                attachments: intent.turn.type === 'prompt' ? intent.turn.attachments : undefined,
+                createdOnPlatform: metadata.identity.createdOnPlatform,
+              })
+            )
+          : [];
+      if (!isCurrent()) return;
+      const ensureReady = () =>
+        wait(
+          () =>
+            control.ensureReady({
+              ownerId: metadata.identity.userId,
+              provider,
+              ...(acquisition ? { acquisition } : { allowCreate }),
+              billing: buildSandboxBillingInput(
+                metadata,
+                sandboxId,
+                isCloudAgentContainerBillingEnabled(this.env, metadata.identity)
+              ),
+              ...(metadata.auth.kilocodeToken ? { kiloToken: metadata.auth.kilocodeToken } : {}),
+            }),
+          DEADLINE_MS.startup
+        );
+      if (!this.terminalLifecycle.getAttachedWrapperInstanceId()) {
+        recorder.onProgress('workspace_setup', 'Preparing environment…');
+      }
+      let status = await ensureReady();
+      if (!isCurrent()) return;
+      recordRuntime(status.wrapperInstanceId);
+      const stoppingDeadline = Math.min(deadlineAt, Date.now() + DEADLINE_MS.startup);
+      while (allowCreate && status.physical === 'stopping') {
+        const observed = await observeControlAfterStopping(
+          status,
+          () => {
+            if (!isCurrent()) throw new Error('Session delivery is no longer current');
+            return wait(() => control.getStatus());
+          },
+          { retryMs: QUEUE_RETRY_MS, deadline: stoppingDeadline }
+        );
+        if (!isCurrent()) return;
+        if (!observed) {
+          await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId);
+          return;
         }
-        const provision = provisionPreparingStep(before.physical, allowCreate);
+        const provision = provisionPreparingStep(observed.physical, allowCreate);
         if (provision) recorder.onProgress(provision.step, provision.message);
-        if (!this.terminalLifecycle.isCurrent(epoch)) return;
-        status = await control.ensureReady({
-          ownerId: metadata.identity.userId,
-          provider: getSandboxProvider(metadata),
-          allowCreate,
-          ...(metadata.auth.kilocodeToken ? { kiloToken: metadata.auth.kilocodeToken } : {}),
-        });
-        if (!this.terminalLifecycle.isCurrent(epoch)) return;
-        if (!allowCreate || status.physical !== 'stopping') break;
-        before = status;
+        status = await ensureReady();
+        if (!isCurrent()) return;
+        recordRuntime(status.wrapperInstanceId);
       }
       const boot = bootPreparingStep(status.physical, status.connection);
       if (boot) recorder.onProgress(boot.step, boot.message);
       const disposition = controlDispatchDisposition(status);
-      if (disposition === 'fail') {
-        const reason = failureReasonFromControlStatus(status.physical) ?? 'environment_failed';
-        recorder.finalize({ status: 'failed', safeError: safeErrorFromQueueReason(reason) });
-        logger
-          .withFields({
+      if (disposition.action === 'fail') {
+        await this.failDelivery(messageId, disposition.reason, wrapperInstanceId);
+        return;
+      }
+      if (disposition.action === 'wait') {
+        await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
+        return;
+      }
+      if (!wrapperInstanceId) throw new Error('Wrapper identity is missing');
+      if (this.terminalLifecycle.getAttachedWrapperInstanceId() !== wrapperInstanceId) {
+        recorder.onProgress('workspace_setup', 'Setting up workspace…');
+        const attachPayload = await wait(() =>
+          fillAttachGitToken(
+            metadata,
+            buildSessionAttachPayload(metadata, {
+              attemptId: recorder.attemptId,
+              triggerMessageId: messageId,
+            }),
+            this.env
+          )
+        );
+        if (!isCurrent()) return;
+        phase = 'attach';
+        await wait(() =>
+          control.attachSession({
             sessionId,
-            messageId,
-            connection: status.connection,
-            physical: status.physical,
+            kiloSessionId,
+            directory: session.directory,
+            ownerId: metadata.identity.userId,
           })
-          .warn('Control-plane sandbox failed; waiting messages terminalized');
-        await this.failWaitingMessages(reason);
-        return;
-      }
-      if (disposition === 'wait') {
-        logger
-          .withFields({
-            sessionId,
-            messageId,
-            connection: status.connection,
-            physical: status.physical,
-          })
-          .warn('Control-plane not ready; message stays queued');
-        if (status.physical === 'creating' || status.physical === 'running') {
-          await this.armQueueRetry();
-        }
-        return;
-      }
-      if (!this.terminalLifecycle.isCurrent(epoch)) return;
-      routeAttached = true;
-      await control.attachSession({
-        sessionId,
-        kiloSessionId,
-        directory: session.directory,
-        ownerId: metadata.identity.userId,
-      });
-      if (!this.terminalLifecycle.isCurrent(epoch)) {
-        await this.compensateSessionAttachment(metadata);
-        return;
-      }
-      recorder.onProgress('workspace_setup', 'Setting up workspace…');
-      delivery = 'attach';
-      const attachPayload = await fillAttachGitToken(
-        metadata,
-        buildSessionAttachPayload(metadata, {
-          attemptId: recorder.attemptId,
-          triggerMessageId: messageId,
-        }),
-        this.env
-      );
-      if (!this.terminalLifecycle.isCurrent(epoch)) {
-        await this.compensateSessionAttachment(metadata);
-        return;
-      }
-      const attached = await control.request({
-        operation: 'session.attach',
-        session,
-        payload: attachPayload,
-        timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
-      });
-      if (!this.terminalLifecycle.isCurrent(epoch)) {
-        await this.compensateSessionAttachment(metadata);
-        return;
-      }
-      if (!attached.ok) {
-        recorder.finalize({ status: 'failed', safeError: 'Environment preparation failed' });
-        logger
-          .withFields({
-            sessionId,
-            messageId,
-            error: attached.error?.message ?? 'session.attach failed',
-          })
-          .warn('Control-plane attach rejected');
-        await this.recordDeliveryFailure(messageId, 'attach');
-        return;
-      }
-      this.terminalLifecycle.recordAttachment({
-        metadata,
-        sandboxId,
-        wrapperInstanceId: status.wrapperInstanceId,
-        epoch,
-      });
-      if (!this.terminalLifecycle.isCurrent(epoch)) {
-        await this.compensateSessionAttachment(metadata);
-        return;
-      }
-      recorder.finalize({ status: 'completed' });
-      const latestMessages = await this.loadMessages();
-      if (
-        !this.terminalLifecycle.isCurrent(epoch) ||
-        nextQueuedMessageId(latestMessages) !== messageId
-      ) {
-        if (!this.terminalLifecycle.isCurrent(epoch)) {
-          await this.compensateSessionAttachment(metadata);
-        }
-        return;
-      }
-      delivery = 'prompt';
-      const response = await control.request({
-        operation: 'session.prompt',
-        session,
-        payload: {
-          messageId,
-          turn:
-            intent.turn.type === 'command'
-              ? {
-                  type: 'command',
-                  command: intent.turn.command,
-                  arguments: intent.turn.arguments,
-                }
-              : {
-                  type: 'prompt',
-                  prompt: intent.turn.prompt,
-                },
-          agent: {
-            mode: intent.agent.mode,
-            ...(model !== undefined ? { model } : {}),
-            ...(intent.agent.variant !== undefined ? { variant: intent.agent.variant } : {}),
-          },
-          ...(intent.finalization ? { finalization: intent.finalization } : {}),
-        },
-      });
-      if (!this.terminalLifecycle.isCurrent(epoch)) {
-        await this.compensateSessionAttachment(metadata);
-        return;
-      }
-      if (response.ok) {
-        const pending = await this.loadMessages();
-        if (!this.terminalLifecycle.isCurrent(epoch)) {
-          await this.compensateSessionAttachment(metadata);
+        );
+        if (!isCurrent()) {
+          if (!this.terminalLifecycle.isCurrent(epoch))
+            await this.compensateSessionAttachment(metadata);
           return;
         }
-        const accepted = acceptQueuedMessage(pending, messageId, Date.now());
-        if (!accepted || !(await this.saveMessages(accepted, epoch))) return;
-        if (this.terminalLifecycle.isCurrent(epoch)) {
-          await this.ctx.storage.setAlarm(Date.now() + DEADLINE_MS.acceptedAlarmCap);
+        const attached = await wait(
+          async () =>
+            controlRequestResult(
+              await control.request({
+                operation: 'session.attach',
+                session,
+                ...(provider === 'cloudflare'
+                  ? { expectedWrapperInstanceId: wrapperInstanceId }
+                  : {}),
+                payload: attachPayload,
+                timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+              })
+            ),
+          SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
+        );
+        if (!isCurrent()) {
+          if (!this.terminalLifecycle.isCurrent(epoch))
+            await this.compensateSessionAttachment(metadata);
+          return;
         }
-      } else {
-        await this.recordDeliveryFailure(messageId, 'prompt');
+        sessionAttachResultSchema.parse(attached);
       }
+      const attachedRuntime = await wait(() => control.getStatus());
+      if (!isCurrent()) return;
+      if (
+        attachedRuntime.physical !== 'running' ||
+        attachedRuntime.connection !== 'ready' ||
+        attachedRuntime.wrapperInstanceId !== wrapperInstanceId
+      )
+        throw new Error('Wrapper changed during session attachment');
+      this.terminalLifecycle.recordAttachment({ metadata, sandboxId, wrapperInstanceId, epoch });
+      recorder.finalize({ status: 'completed' });
+      phase = 'prompt';
+      const prompt = await wait(async () =>
+        controlRequestResult(
+          await control.request({
+            operation: 'session.prompt',
+            session,
+            ...(provider === 'cloudflare' ? { expectedWrapperInstanceId: wrapperInstanceId } : {}),
+            payload: {
+              messageId,
+              turn:
+                intent.turn.type === 'command'
+                  ? {
+                      type: 'command',
+                      command: intent.turn.command,
+                      arguments: intent.turn.arguments,
+                    }
+                  : { type: 'prompt', prompt: intent.turn.prompt },
+              agent: {
+                mode: intent.agent.mode,
+                ...(model !== undefined ? { model } : {}),
+                ...(intent.agent.variant !== undefined ? { variant: intent.agent.variant } : {}),
+              },
+              ...(intent.finalization ? { finalization: intent.finalization } : {}),
+              ...(attachments.length ? { attachments } : {}),
+            },
+          })
+        )
+      );
+      if (!isCurrent()) {
+        if (!this.terminalLifecycle.isCurrent(epoch))
+          await this.compensateSessionAttachment(metadata);
+        return;
+      }
+      const result = sessionPromptResultSchema.parse(prompt);
+      if (result.messageId !== messageId)
+        throw new Error('Prompt response message identity mismatch');
+      const accepted = acceptQueuedMessage(this.loadMessages(), messageId, Date.now());
+      if (!accepted || !this.saveMessages(accepted, epoch)) return;
+      await this.armQueueRetry(Date.now() + DEADLINE_MS.acceptedAlarmCap);
     } catch (error) {
-      if (!this.terminalLifecycle.isCurrent(epoch)) {
-        if (routeAttached || delivery === 'attach' || delivery === 'prompt') {
+      if (!isCurrent()) {
+        if (phase !== 'preparing' && !this.terminalLifecycle.isCurrent(epoch)) {
           await this.compensateSessionAttachment(metadata);
         }
         return;
       }
-      recorder.finalize({ status: 'failed', safeError: 'Environment preparation failed' });
-      logger
-        .withFields({
-          sessionId,
-          messageId,
-          error: error instanceof Error ? error.message : 'dispatch failed',
-        })
-        .warn('Control-plane dispatch failed; message stays queued');
-      if (delivery === 'attach' || delivery === 'prompt') {
-        await this.recordDeliveryFailure(messageId, delivery);
-        return;
-      }
-      await this.armQueueRetry();
+      logger.withFields({ sessionId, messageId, phase }).warn('Control-plane dispatch failed');
+      await this.recordDeliveryFailure({
+        messageId,
+        epoch,
+        phase,
+        wrapperInstanceId,
+        deadlineAt,
+        error,
+      });
     }
   }
 
   private async compensateSessionAttachment(metadata: SessionMetadata): Promise<void> {
     try {
-      await this.terminalLifecycle.cleanupSession(metadata, []);
+      await withTimeout(
+        this.terminalLifecycle.cleanupSession(metadata, []),
+        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+        'Session detach timed out'
+      );
     } catch {
       logger.withFields({ sessionId: this.sessionId }).warn('Control-plane session detach failed');
     }
   }
 
-  private async recordDeliveryFailure(messageId: string, kind: 'attach' | 'prompt'): Promise<void> {
-    const epoch = this.terminalLifecycle.captureEpoch();
-    if (epoch === null) return;
-    const messages = await this.loadMessages();
-    if (!this.terminalLifecycle.isCurrent(epoch)) return;
-    const updated =
-      kind === 'attach'
-        ? incrementAttachFailure(messages, messageId)
-        : incrementPromptFailure(messages, messageId);
-    if (!(await this.saveMessages(updated.messages, epoch))) return;
-    const exhausted =
-      kind === 'attach' ? isAttachExhausted(updated.failures) : isPromptExhausted(updated.failures);
-    if (exhausted) {
-      await this.failWaitingMessages(kind === 'attach' ? 'attach_exhausted' : 'prompt_exhausted');
+  private queuedMessage(
+    messageId: string,
+    epoch: number,
+    wrapperInstanceId?: string
+  ): MessageRecord | undefined {
+    if (!this.terminalLifecycle.isCurrent(epoch)) return undefined;
+    const messages = this.loadMessages();
+    if (nextQueuedMessageId(messages) !== messageId) return undefined;
+    const message = messages.find(item => item.messageId === messageId);
+    return wrapperInstanceId === undefined || message?.wrapperInstanceId === wrapperInstanceId
+      ? message
+      : undefined;
+  }
+
+  private async recordDeliveryFailure(input: {
+    messageId: string;
+    epoch: number;
+    phase: DispatchPhase;
+    wrapperInstanceId?: string;
+    deadlineAt: number;
+    error: unknown;
+  }): Promise<void> {
+    const { messageId, epoch, phase, wrapperInstanceId, deadlineAt, error } = input;
+    if (!this.queuedMessage(messageId, epoch, wrapperInstanceId)) return;
+    if (Date.now() >= deadlineAt) {
+      await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId);
       return;
     }
-    await this.armQueueRetry();
+    const updated =
+      phase === 'preparing'
+        ? undefined
+        : incrementDeliveryFailure(this.loadMessages(), messageId, phase);
+    if (updated && !this.saveMessages(updated.messages, epoch)) return;
+    if (isRetryableDeliveryError(error) && !updated?.exhausted) {
+      await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
+      return;
+    }
+    await this.failDelivery(
+      messageId,
+      phase === 'prompt'
+        ? 'prompt_exhausted'
+        : phase === 'attach'
+          ? 'attach_exhausted'
+          : 'environment_failed',
+      wrapperInstanceId
+    );
   }
 
-  async failWaitingMessages(reason: string): Promise<void> {
-    const epoch = this.terminalLifecycle.captureEpoch();
-    if (epoch === null) return;
-    const before = await this.loadMessages();
-    if (!this.terminalLifecycle.isCurrent(epoch)) return;
-    const { messages, failedIds } = applyFailWaitingMessages(before, reason);
-    if (failedIds.length === 0 || !(await this.saveMessages(messages, epoch))) return;
-    const now = Date.now();
-    const safeError = safeErrorFromQueueReason(reason);
-    for (const messageId of failedIds) {
-      if (!this.terminalLifecycle.isCurrent(epoch)) return;
-      const record = messages.find(message => message.messageId === messageId);
-      if (!record) continue;
-      if (record.preparationAttemptId) {
-        for (const event of finalizePreparationAttempt(
-          this.eventQueries,
-          record.preparationAttemptId,
-          { status: 'failed', safeError, timestamp: now }
-        )) {
-          this.broadcastStoredEvent(event);
-        }
+  private retainRuntimeCleanup(
+    metadata: SessionMetadata,
+    wrapperInstanceId: string,
+    reason: string
+  ): void {
+    const sandboxId = metadata.workspace?.sandboxId;
+    if (!sandboxId) return;
+    const pending = this.pendingRuntimeCleanup();
+    if (pending && pending.wrapperInstanceId !== wrapperInstanceId) return;
+    this.ctx.storage.kv.put(PENDING_RUNTIME_CLEANUP_KEY, {
+      ownerId: metadata.identity.userId,
+      sessionId: metadata.identity.sessionId,
+      sandboxId,
+      wrapperInstanceId,
+      reason,
+    });
+    this.terminalLifecycle.invalidateRuntime({ sandboxId, wrapperInstanceId, confirmed: false });
+  }
+
+  private pendingRuntimeCleanup() {
+    const raw = this.ctx.storage.kv.get<unknown>(PENDING_RUNTIME_CLEANUP_KEY);
+    return raw === undefined ? undefined : pendingRuntimeCleanupSchema.parse(raw);
+  }
+
+  private async transferRuntimeCleanup(): Promise<boolean> {
+    const pending = this.pendingRuntimeCleanup();
+    if (!pending) return true;
+    await this.armQueueRetry(Date.now() + SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await withTimeout(
+        withDORetry(
+          () => sandboxControlRpc(this.env, pending.sandboxId),
+          control =>
+            control.quarantineRuntime({
+              ownerId: pending.ownerId,
+              sessionId: pending.sessionId,
+              wrapperInstanceId: pending.wrapperInstanceId,
+              reason: pending.reason,
+            }),
+          'quarantineRuntime'
+        ),
+        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+        'Runtime quarantine timed out'
+      );
+      if (typeof response?.quarantined !== 'boolean')
+        throw new Error('Invalid quarantine response');
+      if (this.pendingRuntimeCleanup()?.wrapperInstanceId === pending.wrapperInstanceId) {
+        this.ctx.storage.kv.delete(PENDING_RUNTIME_CLEANUP_KEY);
       }
-      this.broadcastMessageFailed(record, now);
+      return this.pendingRuntimeCleanup() === undefined;
+    } catch {
+      logger.withFields({ sessionId: this.sessionId }).warn('Runtime quarantine transfer failed');
+      await this.armQueueRetry(Date.now() + SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
+      return false;
     }
   }
 
-  private broadcastMessageFailed(message: SessionMessageRecord, now: number): void {
-    if (this.terminalLifecycle.captureEpoch() === null) return;
-    const sessionId = this.requireSessionId();
-    const payload = JSON.stringify(failedMessageSnapshot(message, now));
-    const eventId = this.eventQueries.insert({
-      executionId: '',
-      sessionId,
-      streamEventType: 'cloud.message.failed',
-      payload,
-      timestamp: now,
-    });
-    createStreamHandler(this.ctx, this.eventQueries, sessionId).broadcastEvent({
-      id: eventId,
-      execution_id: '',
-      session_id: sessionId,
-      stream_event_type: 'cloud.message.failed',
-      payload,
-      timestamp: now,
-    });
+  private async failDelivery(
+    messageId: string,
+    reason: string,
+    wrapperInstanceId?: string
+  ): Promise<void> {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    const message = this.loadMessages().find(item => item.messageId === messageId);
+    if (
+      epoch === null ||
+      !metadata ||
+      !message ||
+      (message.state !== 'queued' && message.state !== 'accepted') ||
+      message.wrapperInstanceId !== wrapperInstanceId
+    )
+      return;
+    if (wrapperInstanceId) this.retainRuntimeCleanup(metadata, wrapperInstanceId, reason);
+    await this.failWaitingMessages(reason, wrapperInstanceId);
+    if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
+  }
+
+  async failWaitingMessages(reason: string, wrapperInstanceId?: string): Promise<void> {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null) return;
+    const before = this.loadMessages();
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
+    const { messages, failedIds } = applyFailWaitingMessages(before, reason, wrapperInstanceId);
+    if (failedIds.length === 0 || !this.saveMessages(messages, epoch)) return;
+    if (this.pendingRuntimeCleanup() || nextQueuedMessageId(this.loadMessages()))
+      await this.armQueueRetry();
   }
 
   private broadcastStoredEvent(event: StoredEvent): void {
@@ -1116,23 +1378,134 @@ export class SandboxSession extends DurableObject<Env> {
     createStreamHandler(this.ctx, this.eventQueries, sessionId).broadcastEvent(event);
   }
 
-  private async armQueueRetry(): Promise<void> {
+  private async armQueueRetry(when = Date.now() + QUEUE_RETRY_MS): Promise<void> {
     const epoch = this.terminalLifecycle.captureEpoch();
-    if (epoch === null) return;
+    if (epoch === null && !this.pendingRuntimeCleanup()) return;
     const existing = await this.ctx.storage.getAlarm();
-    if (!this.terminalLifecycle.isCurrent(epoch)) return;
-    const when = Date.now() + QUEUE_RETRY_MS;
-    if (existing === null || existing > when) {
-      await this.ctx.storage.setAlarm(when);
+    if (
+      (epoch === null || !this.terminalLifecycle.isCurrent(epoch)) &&
+      !this.pendingRuntimeCleanup()
+    )
+      return;
+    if (existing === null || existing > when) await this.ctx.storage.setAlarm(when);
+  }
+
+  private readPendingInteractions(): PendingInteractions | undefined {
+    const parsed = pendingInteractionsSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(PENDING_INTERACTIONS_KEY)
+    );
+    return parsed.success ? parsed.data : undefined;
+  }
+
+  private recordPendingInteraction(payload: {
+    type: string;
+    properties: Record<string, unknown>;
+  }): void {
+    if (this.terminalLifecycle.captureEpoch() === null) return;
+    const next = applyPendingInteractionEvent(this.readPendingInteractions(), payload);
+    if (next) this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, next);
+  }
+
+  private isCurrentAcceptedMessage(message: MessageRecord, epoch: number): boolean {
+    if (!this.terminalLifecycle.isCurrent(epoch)) return false;
+    const current = this.loadMessages().find(item => item.messageId === message.messageId);
+    return current?.state === 'accepted' && current.wrapperInstanceId === message.wrapperInstanceId;
+  }
+
+  private async syncAcceptedMessage(
+    message: MessageRecord,
+    epoch: number
+  ): Promise<SessionSyncResult | undefined> {
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    if (
+      !metadata ||
+      !sandboxId ||
+      !kiloSessionId ||
+      !message.wrapperInstanceId ||
+      this.pendingRuntimeCleanup()
+    ) {
+      throw new Error('Accepted runtime is unavailable');
     }
+    const control = sandboxControlRpc(this.env, sandboxId);
+    const status = await withTimeout(
+      control.getStatus(),
+      SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+      'Runtime status timed out'
+    );
+    if (!this.isCurrentAcceptedMessage(message, epoch)) return undefined;
+    if (
+      status.connection !== 'ready' ||
+      status.physical !== 'running' ||
+      status.wrapperInstanceId !== message.wrapperInstanceId
+    ) {
+      throw new Error('Accepted runtime is not ready');
+    }
+    const revision = this.readPendingInteractions()?.revision;
+    const response = await withTimeout(
+      control.request({
+        operation: 'session.sync',
+        session: {
+          sessionId: metadata.identity.sessionId,
+          kiloSessionId,
+          directory: this.directory(metadata),
+        },
+        payload: {},
+      }),
+      SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+      'Session sync timed out'
+    );
+    if (!this.isCurrentAcceptedMessage(message, epoch)) return undefined;
+    if (!response.ok) throw new Error('Session sync failed');
+    const result = sessionSyncResultSchema.parse(response.result);
+    if (this.readPendingInteractions()?.revision === revision) {
+      this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
+        revision: (revision ?? 0) + 1,
+        questions: result.questions,
+        permissions: result.permissions,
+      });
+    }
+    persistSandboxControlSessionEvent({
+      sessionId: metadata.identity.sessionId,
+      payload: {
+        type: 'session.status',
+        properties: { sessionID: kiloSessionId, status: result.status },
+      },
+      eventQueries: this.eventQueries,
+      broadcast: event => this.broadcastStoredEvent(event),
+    });
+    return result;
+  }
+
+  private async derivePendingInteractions(): Promise<
+    { questions: unknown[]; permissions: unknown[] } | undefined
+  > {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null) return undefined;
+    const accepted = this.loadMessages().find(message => message.state === 'accepted');
+    if (accepted) {
+      try {
+        await this.syncAcceptedMessage(accepted, epoch);
+      } catch {
+        logger
+          .withFields({ sessionId: this.sessionId })
+          .warn('Pending interaction sync unavailable');
+      }
+    }
+    if (!this.terminalLifecycle.isCurrent(epoch)) return undefined;
+    const snapshot = this.readPendingInteractions();
+    return snapshot
+      ? { questions: snapshot.questions, permissions: snapshot.permissions }
+      : undefined;
   }
 
   private async deriveQueuedMessages() {
-    return streamQueuedSnapshots(await this.loadMessages(), Date.now());
+    return streamQueuedSnapshots(this.loadMessages(), Date.now());
   }
 
   private async deriveCloudStatus() {
-    return streamCloudStatus(await this.loadMessages());
+    return streamCloudStatus(this.loadMessages());
   }
 
   private async requestSessionOperation(
@@ -1147,32 +1520,42 @@ export class SandboxSession extends DurableObject<Env> {
     if (!metadata || epoch === null || !sandboxId || !kiloSessionId || !sessionId) {
       throw new Error('No wrapper found for session');
     }
-    if (!this.terminalLifecycle.isCurrent(epoch)) {
+    if (!this.terminalLifecycle.isCurrent(epoch) || this.pendingRuntimeCleanup()) {
       throw new Error('No wrapper found for session');
     }
-    const response = await sandboxControlRpc(this.env, sandboxId).request({
-      operation,
-      session: {
-        sessionId,
-        kiloSessionId,
-        directory: this.directory(metadata),
-      },
-      payload,
-    });
-    if (!this.terminalLifecycle.isCurrent(epoch)) {
+    const response = await withTimeout(
+      sandboxControlRpc(this.env, sandboxId).request({
+        operation,
+        session: {
+          sessionId,
+          kiloSessionId,
+          directory: this.directory(metadata),
+        },
+        payload,
+      }),
+      SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+      'Session interaction timed out'
+    );
+    if (!this.terminalLifecycle.isCurrent(epoch) || this.pendingRuntimeCleanup()) {
       throw new Error('No wrapper found for session');
     }
     if (!response.ok) {
       throw new Error(response.error?.message ?? 'Control request failed');
     }
+    if (operation === 'session.permission.resolve')
+      sessionPermissionResolveResultSchema.parse(response.result);
+    else sessionQuestionResolveResultSchema.parse(response.result);
     return { success: true };
   }
 
   private directory(metadata: SessionMetadata): string {
     return (
-      buildSessionAttachPayload(metadata).directory ??
       metadata.workspace?.workspacePath ??
-      `/workspace/${metadata.identity.sessionId}`
+      getSessionWorkspacePath(
+        metadata.identity.orgId,
+        metadata.identity.userId,
+        metadata.identity.sessionId
+      )
     );
   }
 
@@ -1189,42 +1572,116 @@ export class SandboxSession extends DurableObject<Env> {
     });
   }
 
-  private broadcastClientEvent(
-    streamEventType: 'interrupted' | 'complete' | 'error',
-    data: Record<string, unknown> = {}
-  ): void {
-    if (this.terminalLifecycle.captureEpoch() === null) return;
+  private isCurrentEventRuntime(wrapperInstanceId?: string): boolean {
+    if (wrapperInstanceId === undefined) return true;
+    if (this.pendingRuntimeCleanup()?.wrapperInstanceId === wrapperInstanceId) return false;
+    const messages = this.loadMessages();
+    const current =
+      messages.find(message => message.state === 'accepted') ??
+      messages.find(message => message.state === 'queued');
+    const expected =
+      current?.wrapperInstanceId ??
+      messages.findLast(message => message.wrapperInstanceId)?.wrapperInstanceId;
+    return expected === undefined || expected === wrapperInstanceId;
+  }
+
+  private loadMessages(): MessageRecord[] {
+    if (this.terminalLifecycle.isBlocked()) return [];
+    return this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
+  }
+
+  private saveMessages(messages: MessageRecord[], epoch?: number): boolean {
+    const currentEpoch = epoch ?? this.terminalLifecycle.captureEpoch();
+    if (currentEpoch === null || !this.terminalLifecycle.isCurrent(currentEpoch)) return false;
+    const events: StoredEvent[] = [];
+    this.ctx.storage.transactionSync(() => {
+      const before = this.loadMessages();
+      const previousById = new Map(before.map(message => [message.messageId, message]));
+      const queuedHeadId = nextQueuedMessageId(before);
+      const now = Date.now();
+      const next = messages.map(message => {
+        const previous = previousById.get(message.messageId);
+        if (previous && previous.state !== 'queued' && previous.state !== 'accepted')
+          return previous;
+        if (message.state === 'queued') return message;
+        if (message.state === 'accepted') {
+          if (previous?.state !== 'accepted') {
+            const event = this.persistMessageLifecycleEvent(message);
+            if (event) events.push(event);
+          }
+          return message;
+        }
+        const terminal = { ...message, terminalAt: message.terminalAt ?? now };
+        if (previous?.state === 'accepted' || queuedHeadId === message.messageId) {
+          const interactions = this.readPendingInteractions();
+          this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
+            revision: (interactions?.revision ?? 0) + 1,
+            questions: [],
+            permissions: [],
+          });
+        }
+        const event = this.persistMessageLifecycleEvent(terminal);
+        if (event) events.push(event);
+        if (terminal.preparationAttemptId) {
+          events.push(
+            ...finalizePreparationAttempt(
+              this.eventQueries,
+              terminal.preparationAttemptId,
+              terminal.state === 'completed'
+                ? { status: 'completed', timestamp: terminal.terminalAt }
+                : {
+                    status: 'failed',
+                    safeError:
+                      terminal.state === 'cancelled'
+                        ? 'The message was interrupted'
+                        : safeErrorFromQueueReason(terminal.failedReason ?? 'environment_failed'),
+                    timestamp: terminal.terminalAt,
+                  }
+            )
+          );
+        }
+        return terminal;
+      });
+      this.ctx.storage.kv.put(MESSAGES_KEY, next);
+    });
+    for (const event of events) this.broadcastStoredEvent(event);
+    return true;
+  }
+
+  private persistMessageLifecycleEvent(message: MessageRecord): StoredEvent | undefined {
+    const accepted = message.state === 'accepted';
+    const completed = message.state === 'completed';
+    const streamEventType = accepted
+      ? 'cloud.message.sent'
+      : completed
+        ? 'cloud.message.completed'
+        : 'cloud.message.failed';
     const sessionId = this.requireSessionId();
-    const timestamp = Date.now();
-    const payload = JSON.stringify(data);
-    const eventId = this.eventQueries.insert({
+    const timestamp = (accepted ? message.acceptedAt : message.terminalAt) ?? Date.now();
+    const payload = JSON.stringify(
+      accepted
+        ? { messageId: message.messageId, delivery: 'sent' }
+        : completed
+          ? { messageId: message.messageId, status: 'completed', delivery: 'sent', accepted: true }
+          : failedMessageSnapshot(message, timestamp)
+    );
+    const id = this.eventQueries.insertUnique({
       executionId: '',
       sessionId,
       streamEventType,
       payload,
       timestamp,
+      entityId: `${accepted ? 'accepted-message' : 'terminal-message'}/${message.messageId}`,
     });
-    createStreamHandler(this.ctx, this.eventQueries, sessionId).broadcastEvent({
-      id: eventId,
+    if (id === null) return undefined;
+    return {
+      id,
       execution_id: '',
       session_id: sessionId,
       stream_event_type: streamEventType,
       payload,
       timestamp,
-    });
-  }
-
-  private async loadMessages(): Promise<MessageRecord[]> {
-    if (this.terminalLifecycle.isBlocked()) return [];
-    const messages = await this.ctx.storage.get<MessageRecord[]>(MESSAGES_KEY);
-    return this.terminalLifecycle.isBlocked() ? [] : (messages ?? []);
-  }
-
-  private async saveMessages(messages: MessageRecord[], epoch?: number): Promise<boolean> {
-    const currentEpoch = epoch ?? this.terminalLifecycle.captureEpoch();
-    if (currentEpoch === null || !this.terminalLifecycle.isCurrent(currentEpoch)) return false;
-    this.ctx.storage.kv.put(MESSAGES_KEY, messages);
-    return true;
+    };
   }
 
   private requireSessionId(): SessionId {

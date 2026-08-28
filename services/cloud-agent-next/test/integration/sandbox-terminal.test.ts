@@ -1,9 +1,10 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
 } from '../../src/sandbox-control/credential.js';
+import { createMemoryProviderAdapter } from '../../src/sandbox-control/provider.js';
 import { getSandboxSessionStub } from '../../src/sandbox-session/session-stub.js';
 import {
   requestFrameSchema,
@@ -133,6 +134,8 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
   const sessionStub = getSandboxSessionStub(env, owner, sessionId);
 
   await runInDurableObject(controlStub, async instance => {
+    const provider = createMemoryProviderAdapter();
+    Object.assign(instance, { provider, createProviderAdapter: () => provider });
     await instance.initializeOwner(owner);
     await instance.claimCreate(crypto.randomUUID());
     await instance.confirmInstance(sandboxId);
@@ -392,16 +395,14 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
     })
   );
 
-  await runInDurableObject(controlStub, instance =>
-    instance.request({ operation: 'sandbox.status', payload: {} })
-  );
-
-  await expect(
-    runInDurableObject(controlStub, instance => instance.getStatus())
-  ).resolves.toMatchObject({
-    connection: 'ready',
-    physical: 'running',
-    wrapperInstanceId,
+  await vi.waitFor(async () => {
+    await expect(
+      runInDurableObject(controlStub, instance => instance.getStatus())
+    ).resolves.toMatchObject({
+      connection: 'ready',
+      physical: 'running',
+      wrapperInstanceId,
+    });
   });
 
   const admission = await runInDurableObject(sessionStub, instance =>

@@ -23,6 +23,7 @@ import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { sessionPlaneFromId } from '../session-plane.js';
 import { logger } from '../logger.js';
 import { preflightExistingPromptModel } from './model-preflight.js';
+import { createMessageId } from './message-id.js';
 
 /** Retryable error codes that should map to 503 Service Unavailable. */
 const RETRYABLE_CODES: readonly RetryableResultCode[] = [
@@ -163,7 +164,7 @@ export async function queueMessage(
     botId: ctx.botId,
     turn: {
       ...input.turn,
-      id: input.turn.id ?? undefined,
+      id: input.turn.id ?? createMessageId(),
     },
     agent: input.agent,
     finalization: input.finalization,

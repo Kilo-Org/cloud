@@ -5,10 +5,15 @@
  * directive embedded in the prompt.
  */
 
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import {
   fetchFakeRequests,
   fetchFakeWaiters,
+  getMessageResult,
   interruptSession,
+  isMessageCompleted,
+  messageIdFromEvent,
   openStream,
   releaseGate,
   sendMessage,
@@ -22,12 +27,17 @@ import { startCallbackServer, type CallbackServerHandle } from './callback-serve
 import {
   killSandboxFamily,
   listSandboxContainers,
+  listSandboxesForAgentSession,
+  sandboxFamilyKey,
   readKiloCliLog,
   readWrapperLog,
   tailLines,
   waitForNewSandboxPresent,
   waitForSandboxFamilyGone,
+  type SandboxContainer,
 } from './sandbox-control.js';
+
+const execFileAsync = promisify(execFile);
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -69,14 +79,120 @@ function fakeDirective(conversation: ConversationScenario): string {
 
 async function collectUntilTerminal(
   stream: ReturnType<typeof openStream>,
+  messageId: string,
   timeoutMs: number
 ): Promise<{ terminal: StreamEvent | null; events: StreamEvent[] }> {
-  const terminal = await stream.waitForTerminal(timeoutMs);
+  const terminal = await stream.waitForTerminal(timeoutMs, messageId);
   return { terminal, events: [...stream.events] };
 }
 
-function hasEventOfType(events: StreamEvent[], type: string): boolean {
-  return events.some(e => e.streamEventType === type);
+function hasPreparationForMessage(events: StreamEvent[], messageId: string): boolean {
+  return events.some(
+    event => event.streamEventType === 'preparing' && event.data.triggerMessageId === messageId
+  );
+}
+
+async function openConnectedStream(config: DriverConfig, sessionId: string, replay = true) {
+  const stream = openStream(config, sessionId, { replay });
+  const connected = await stream.waitFor(event => event.streamEventType === 'connected', 10_000);
+  if (!connected) {
+    stream.close();
+    throw new Error(`Stream did not connect for ${sessionId}`);
+  }
+  return stream;
+}
+
+async function sandboxOwnsSession(containerId: string, sessionId: string): Promise<boolean> {
+  const probe = `
+    const fs = require('node:fs');
+    const sessionId = process.argv.at(-1);
+    if (!sessionId.startsWith('workspace_')) {
+      const logs = fs.readdirSync('/tmp').filter(name => /^kilocode-wrapper-agent_.+\\.log$/.test(name));
+      process.exit(logs.length > 0 && logs.every(name =>
+        name.startsWith('kilocode-wrapper-' + sessionId + '-')
+      ) ? 0 : 1);
+    }
+    const log = fs.readFileSync('/tmp/kilocode-control-wrapper.log', 'utf8');
+    const directories = [...log.matchAll(/session\\.attach ready directory=([^\\n]+)/g)];
+    process.exit(directories.length > 0 && directories.every(match =>
+      match[1].trim().split('/').at(-1) === sessionId
+    ) ? 0 : 1);
+  `;
+  try {
+    await execFileAsync('docker', ['exec', containerId, 'bun', '-e', probe, sessionId], {
+      timeout: 5_000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function findOwnedSandboxes(sessionId: string, knownIds: Set<string>) {
+  const candidates = sessionId.startsWith('workspace_')
+    ? await listSandboxContainers()
+    : await listSandboxesForAgentSession(sessionId);
+  const matches: SandboxContainer[] = [];
+  for (const container of candidates) {
+    if (container.isProxy || knownIds.has(container.id)) continue;
+    if (await sandboxOwnsSession(container.id, sessionId)) matches.push(container);
+  }
+  return matches;
+}
+
+async function waitForOwnedSandbox(
+  sessionId: string,
+  knownIds: Set<string>,
+  timeoutMs: number
+): Promise<SandboxContainer | null> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const matches = await findOwnedSandboxes(sessionId, knownIds);
+    if (matches.length > 1) {
+      throw new Error(`Multiple containers match ${sessionId}; refusing ambiguous ownership`);
+    }
+    if (matches[0]) return matches[0];
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  return null;
+}
+
+async function stopOwnedSandboxFamily(sandbox: SandboxContainer, sessionId: string) {
+  const current = (await listSandboxContainers()).find(
+    container => container.name === sandbox.name
+  );
+  if (current) {
+    if (current.id !== sandbox.id)
+      throw new Error(`Container identity changed for ${sandbox.name}`);
+    const owned = await sandboxOwnsSession(current.id, sessionId);
+    if (!owned) throw new Error(`Cannot prove exclusive ownership of ${sandbox.name}`);
+  }
+  const killed = await killSandboxFamily(sandbox);
+  if (!(await waitForSandboxFamilyGone(sandbox, 30_000))) {
+    throw new Error(`Owned sandbox family ${sandbox.name} is still running after cleanup`);
+  }
+  return killed;
+}
+
+async function sendRecoveryTurn(
+  config: DriverConfig,
+  sessionId: string,
+  api: ApiVersion,
+  timeoutMs: number
+) {
+  const stream = await openConnectedStream(config, sessionId, false);
+  try {
+    const sent = await sendMessage(
+      config,
+      { cloudAgentSessionId: sessionId, prompt: fakeDirective('echo:recovered') },
+      api
+    );
+    const collected = await collectUntilTerminal(stream, sent.messageId, timeoutMs);
+    const result = await getMessageResult(config, sessionId, sent.messageId);
+    return { ...sent, ...collected, status: result.status };
+  } finally {
+    stream.close();
+  }
 }
 
 async function snapshotSandboxIds(): Promise<Set<string>> {
@@ -100,33 +216,40 @@ export async function lifecycleCold(args: LifecycleArgs): Promise<LifecycleResul
   try {
     const knownSandboxIds = await snapshotSandboxIds();
     const sessionResult = await startSession(config, { prompt: fakeDirective(conversation) }, api);
-    const stream = openStream(config, sessionResult.cloudAgentSessionId, { replay: false });
-
-    // Per-session dev sandboxes should create a new container for this session.
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const stream = await openConnectedStream(config, sessionResult.cloudAgentSessionId);
+    const sandbox = await waitForOwnedSandbox(
+      sessionResult.cloudAgentSessionId,
+      knownSandboxIds,
+      timeoutMs
+    );
     if (!sandbox) {
       stream.close();
       return {
         name: 'cold',
         conversation,
         ok: false,
-        message: 'sandbox container did not appear within 60s',
+        message: `could not identify an exclusively owned sandbox within ${timeoutMs}ms`,
         events: [...stream.events],
         durationMs: Date.now() - start,
       };
     }
 
-    const { terminal, events } = await collectUntilTerminal(stream, timeoutMs);
+    const { terminal, events } = await collectUntilTerminal(
+      stream,
+      sessionResult.messageId,
+      timeoutMs
+    );
+    const stillConnected = stream.isOpen;
     stream.close();
 
     if (conversation === 'hang') {
       // Hang scenario: we expect NO terminal event. If we got one, fail.
-      if (terminal) {
+      if (terminal || !stillConnected) {
         return {
           name: 'cold',
           conversation,
           ok: false,
-          message: `hang scenario produced unexpected terminal: ${terminal.streamEventType}`,
+          message: `hang scenario ended unexpectedly: ${terminal?.streamEventType ?? 'stream closed'}`,
           events,
           durationMs: Date.now() - start,
         };
@@ -155,8 +278,8 @@ export async function lifecycleCold(args: LifecycleArgs): Promise<LifecycleResul
     return {
       name: 'cold',
       conversation,
-      ok: true,
-      message: `cold start completed: ${terminal.streamEventType}`,
+      ok: isMessageCompleted(terminal, sessionResult.messageId),
+      message: `session=${sessionResult.cloudAgentSessionId}, message=${sessionResult.messageId}, terminal=${terminal.streamEventType}`,
       events,
       durationMs: Date.now() - start,
     };
@@ -185,8 +308,12 @@ export async function lifecycleHot(args: LifecycleArgs): Promise<LifecycleResult
     const knownSandboxIds = await snapshotSandboxIds();
     const warmupPrompt = fakeDirective('echo:warmup');
     const session = await startSession(config, { prompt: warmupPrompt }, api);
-    const warmupStream = openStream(config, session.cloudAgentSessionId, { replay: false });
-    const warmupSandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const warmupStream = await openConnectedStream(config, session.cloudAgentSessionId);
+    const warmupSandbox = await waitForOwnedSandbox(
+      session.cloudAgentSessionId,
+      knownSandboxIds,
+      timeoutMs
+    );
     if (!warmupSandbox) {
       warmupStream.close();
       return {
@@ -198,14 +325,24 @@ export async function lifecycleHot(args: LifecycleArgs): Promise<LifecycleResult
         durationMs: Date.now() - start,
       };
     }
-    await warmupStream.waitForTerminal(60_000);
+    const warmupTerminal = await warmupStream.waitForTerminal(timeoutMs, session.messageId);
     warmupStream.close();
+    if (!isMessageCompleted(warmupTerminal, session.messageId)) {
+      return {
+        name: 'hot',
+        conversation,
+        ok: false,
+        message: `warmup ${session.messageId}: expected successful message completion`,
+        events: [...warmupStream.events],
+        durationMs: Date.now() - start,
+      };
+    }
 
     // Send follow-up prompt. Should land on the same (hot) sandbox.
     const sandboxIdsBeforeFollowup = await snapshotSandboxIds();
     const followPrompt = fakeDirective(conversation);
-    const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
-    await sendMessage(
+    const stream = await openConnectedStream(config, session.cloudAgentSessionId, false);
+    const sent = await sendMessage(
       config,
       {
         cloudAgentSessionId: session.cloudAgentSessionId,
@@ -218,18 +355,24 @@ export async function lifecycleHot(args: LifecycleArgs): Promise<LifecycleResult
     const firstKilocode = await stream.waitFor(e => e.streamEventType === 'kilocode', 10_000);
     const firstKilocodeLatency = Date.now() - firstKilocodeStart;
 
-    const { terminal, events } = await collectUntilTerminal(stream, timeoutMs);
+    const { terminal, events } = await collectUntilTerminal(stream, sent.messageId, timeoutMs);
+    const stillConnected = stream.isOpen;
     stream.close();
 
     const sandboxesAfter = await listSandboxContainers();
-    const noPrepare = !hasEventOfType(events, 'preparing');
+    const noPrepare = !hasPreparationForMessage(events, sent.messageId);
 
     const sameContainers =
       sandboxesAfter.some(sandbox => sandbox.id === warmupSandbox.id) &&
       sandboxesAfter.every(sandbox => sandboxIdsBeforeFollowup.has(sandbox.id));
 
     const terminalName = terminal?.streamEventType ?? 'none';
-    const ok = (conversation === 'hang' ? !terminal : !!terminal) && noPrepare && sameContainers;
+    const ok =
+      (conversation === 'hang'
+        ? !terminal && stillConnected
+        : isMessageCompleted(terminal, sent.messageId)) &&
+      noPrepare &&
+      sameContainers;
     return {
       name: 'hot',
       conversation,
@@ -281,24 +424,28 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
   try {
     const knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective(coldDirective) }, api);
-    const coldStream = openStream(config, session.cloudAgentSessionId, { replay: false });
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const coldStream = await openConnectedStream(config, session.cloudAgentSessionId);
+    const sandbox = await waitForOwnedSandbox(
+      session.cloudAgentSessionId,
+      knownSandboxIds,
+      timeoutMs
+    );
     if (!sandbox) {
       coldStream.close();
       return {
         name: 'cold-hot',
         conversation,
         ok: false,
-        message: 'cold turn: new sandbox did not appear within 60s',
+        message: `cold turn: could not identify an exclusively owned sandbox within ${timeoutMs}ms`,
         events: [...coldStream.events],
         durationMs: Date.now() - start,
       };
     }
 
-    const coldResult = await collectUntilTerminal(coldStream, timeoutMs);
+    const coldResult = await collectUntilTerminal(coldStream, session.messageId, timeoutMs);
     events.push(...coldResult.events);
     coldStream.close();
-    if (!coldResult.terminal || coldResult.terminal.streamEventType !== 'complete') {
+    if (!isMessageCompleted(coldResult.terminal, session.messageId)) {
       return {
         name: 'cold-hot',
         conversation,
@@ -312,8 +459,8 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
     const hotSummaries: string[] = [];
     for (const directive of hotDirectives) {
       const sandboxIdsBeforeFollowup = await snapshotSandboxIds();
-      const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
-      await sendMessage(
+      const stream = await openConnectedStream(config, session.cloudAgentSessionId, false);
+      const sent = await sendMessage(
         config,
         { cloudAgentSessionId: session.cloudAgentSessionId, prompt: fakeDirective(directive) },
         api
@@ -322,13 +469,13 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
       const firstKilocodeStart = Date.now();
       const firstKilocode = await stream.waitFor(e => e.streamEventType === 'kilocode', 10_000);
       const firstKilocodeLatency = Date.now() - firstKilocodeStart;
-      const hotResult = await collectUntilTerminal(stream, timeoutMs);
+      const hotResult = await collectUntilTerminal(stream, sent.messageId, timeoutMs);
       events.push(...hotResult.events);
       stream.close();
 
       const sandboxesAfter = await listSandboxContainers();
-      const completed = hotResult.terminal?.streamEventType === 'complete';
-      const noPrepare = !hasEventOfType(hotResult.events, 'preparing');
+      const completed = isMessageCompleted(hotResult.terminal, sent.messageId);
+      const noPrepare = !hasPreparationForMessage(hotResult.events, sent.messageId);
       const sameContainers =
         sandboxesAfter.some(candidate => candidate.id === sandbox.id) &&
         sandboxesAfter.every(candidate => sandboxIdsBeforeFollowup.has(candidate.id));
@@ -344,7 +491,7 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
       }
 
       hotSummaries.push(
-        `${directive}:${hotResult.terminal.streamEventType}/${firstKilocode ? `${firstKilocodeLatency}ms` : 'no-kilocode'}`
+        `${directive}:${hotResult.terminal?.streamEventType ?? 'none'}/${firstKilocode ? `${firstKilocodeLatency}ms` : 'no-kilocode'}`
       );
     }
 
@@ -352,7 +499,7 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
       name: 'cold-hot',
       conversation,
       ok: true,
-      message: `cold=${coldResult.terminal.streamEventType}; hot=${hotSummaries.join(', ')}`,
+      message: `session=${session.cloudAgentSessionId}; cold=${coldResult.terminal.streamEventType}; hot=${hotSummaries.join(', ')}`,
       events,
       durationMs: Date.now() - start,
     };
@@ -369,188 +516,195 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
   }
 }
 
-/**
- * External-kill: run cold, capture sandbox name, kill it, send a new prompt,
- * assert the DO surfaces the disconnect and either spawns a fresh sandbox or
- * returns a clean error.
- */
 export async function lifecycleExternalKill(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
   const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
+  const events: StreamEvent[] = [];
+  const streams: ReturnType<typeof openStream>[] = [];
+  const ownedFamilies = new Map<string, SandboxContainer>();
+  let knownSandboxIds = new Set<string>();
+  let sessionId: string | undefined;
   try {
-    // 1. Bring a sandbox up with a warm-up echo.
-    const knownSandboxIds = await snapshotSandboxIds();
+    knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective('echo:warmup') }, api);
-    const firstStream = openStream(config, session.cloudAgentSessionId, { replay: false });
-    const firstSandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
-    if (!firstSandbox) {
-      firstStream.close();
-      return {
-        name: 'external-kill',
-        conversation,
-        ok: false,
-        message: 'setup: sandbox did not appear',
-        events: [],
-        durationMs: Date.now() - start,
-      };
-    }
-    await firstStream.waitForTerminal(60_000);
+    sessionId = session.cloudAgentSessionId;
+    const firstStream = await openConnectedStream(config, sessionId);
+    streams.push(firstStream);
+    const firstSandbox = await waitForOwnedSandbox(sessionId, knownSandboxIds, timeoutMs);
+    if (!firstSandbox) throw new Error('Could not identify an exclusively owned warmup sandbox');
+    ownedFamilies.set(sandboxFamilyKey(firstSandbox), firstSandbox);
+    const warmup = await collectUntilTerminal(firstStream, session.messageId, timeoutMs);
+    events.push(...warmup.events);
     firstStream.close();
-
-    // 2. Kill this session's sandbox and wait for its container family to go away.
-    const killed = await killSandboxFamily(firstSandbox);
-    const gone = await waitForSandboxFamilyGone(firstSandbox, 30_000);
-    if (!gone) {
-      return {
-        name: 'external-kill',
-        conversation,
-        ok: false,
-        message: `killed ${killed.join(',')} but ${firstSandbox.name} did not go away`,
-        events: [],
-        durationMs: Date.now() - start,
-      };
+    if (!isMessageCompleted(warmup.terminal, session.messageId)) {
+      throw new Error(`Warmup message ${session.messageId} did not complete successfully`);
     }
 
-    // 3. Send a new prompt. Expect either a fresh sandbox (cold-start again)
-    // or a visible error on /stream.
-    const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
-    await sendMessage(
+    const killed = await stopOwnedSandboxFamily(firstSandbox, sessionId);
+    if (!killed.includes(firstSandbox.name))
+      throw new Error('Fault did not kill the owned primary');
+    const beforeRecovery = await snapshotSandboxIds();
+    const stream = await openConnectedStream(config, sessionId, false);
+    streams.push(stream);
+    const affected = await sendMessage(
       config,
-      {
-        cloudAgentSessionId: session.cloudAgentSessionId,
-        prompt: fakeDirective(conversation),
-      },
+      { cloudAgentSessionId: sessionId, prompt: fakeDirective(conversation) },
       api
     );
-    const { terminal, events } = await collectUntilTerminal(stream, timeoutMs);
+    const affectedTurn = await collectUntilTerminal(stream, affected.messageId, timeoutMs);
+    events.push(...affectedTurn.events);
     stream.close();
+    const affectedResult = await getMessageResult(config, sessionId, affected.messageId);
+    if (
+      !affectedTurn.terminal ||
+      affectedResult.status === 'queued' ||
+      affectedResult.status === 'running' ||
+      (affectedResult.status === 'completed') !==
+        isMessageCompleted(affectedTurn.terminal, affected.messageId)
+    ) {
+      throw new Error(
+        `Post-kill message ${affected.messageId} has no matching durable terminal outcome`
+      );
+    }
 
-    const terminalName = terminal?.streamEventType ?? 'none';
-    const reconnectSeen =
-      hasEventOfType(events, 'wrapper_disconnected') ||
-      hasEventOfType(events, 'wrapper_reconnected') ||
-      hasEventOfType(events, 'preparing');
-    const ok =
-      conversation === 'hang'
-        ? !!reconnectSeen // for hang, we don't expect terminal but do expect some lifecycle chatter
-        : !!terminal;
+    const recovery = await sendRecoveryTurn(config, sessionId, api, timeoutMs);
+    events.push(...recovery.events);
+    if (
+      !isMessageCompleted(recovery.terminal, recovery.messageId) ||
+      recovery.status !== 'completed'
+    ) {
+      throw new Error(`Recovery message ${recovery.messageId} did not complete in ${sessionId}`);
+    }
+    const replacement = await waitForOwnedSandbox(sessionId, beforeRecovery, timeoutMs);
+    if (!replacement) throw new Error('Could not identify the owned replacement sandbox');
+    ownedFamilies.set(sandboxFamilyKey(replacement), replacement);
+    if (
+      replacement.id === firstSandbox.id ||
+      (sessionId.startsWith('workspace_') &&
+        sandboxFamilyKey(replacement) === sandboxFamilyKey(firstSandbox))
+    ) {
+      throw new Error('Recovery reused the retired physical sandbox');
+    }
     return {
       name: 'external-kill',
       conversation,
-      ok,
-      message: `terminal=${terminalName}, reconnectSeen=${reconnectSeen}, killed=${killed.join(',')}`,
+      ok: true,
+      message: `session=${sessionId}; affected=${affected.messageId}/${affectedResult.status}; recovery=${recovery.messageId}/completed; retired family stopped`,
       events,
       durationMs: Date.now() - start,
     };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
     return {
       name: 'external-kill',
       conversation,
       ok: false,
-      message: `threw: ${msg}`,
-      events: [],
+      message: `threw: ${err instanceof Error ? err.message : String(err)}`,
+      events,
       durationMs: Date.now() - start,
     };
+  } finally {
+    for (const stream of streams) stream.close();
+    if (sessionId) {
+      await interruptSession(config, sessionId).catch(() => {});
+      for (const sandbox of await findOwnedSandboxes(sessionId, knownSandboxIds)) {
+        ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
+      }
+      for (const sandbox of ownedFamilies.values())
+        await stopOwnedSandboxFamily(sandbox, sessionId);
+    }
   }
 }
 
-/**
- * Kill mid-flight: sandbox up, kilo mid-LLM-call. `docker kill` while the
- * fake-LLM SSE response is still parked. Assert the DO surfaces the
- * disconnect or reaper-driven failure on `/stream`.
- *
- * Uses `gate:<tag>` rather than `hang` because the gate engagement is
- * observable (via `waitForGateEngaged`) — that's the only reliable signal
- * that kilo has actually dialed the LLM and is mid-stream. A fixed sleep
- * before `docker kill` races with sandbox prep and gives false negatives.
- */
 export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
   const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
-  const gateTag = 'killmid';
+  const gateTag = `killmid-${crypto.randomUUID()}`;
+  const events: StreamEvent[] = [];
+  const ownedFamilies = new Map<string, SandboxContainer>();
+  let knownSandboxIds = new Set<string>();
+  let sessionId: string | undefined;
+  let stream: ReturnType<typeof openStream> | undefined;
   try {
-    const knownSandboxIds = await snapshotSandboxIds();
+    knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
-    const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
-
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
-    if (!sandbox) {
-      stream.close();
-      return {
-        name: 'kill-mid-flight',
-        conversation,
-        ok: false,
-        message: 'sandbox did not appear',
-        events: [],
-        durationMs: Date.now() - start,
-      };
+    sessionId = session.cloudAgentSessionId;
+    stream = await openConnectedStream(config, sessionId);
+    const sandbox = await waitForOwnedSandbox(sessionId, knownSandboxIds, timeoutMs);
+    if (!sandbox) throw new Error('Could not identify an exclusively owned active sandbox');
+    ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
+    if (!(await waitForGateEngaged(config, gateTag, timeoutMs))) {
+      throw new Error(`Gate ${gateTag} did not engage before fault injection`);
     }
+    const accepted = await stream.waitFor(
+      event =>
+        event.streamEventType === 'cloud.message.sent' &&
+        messageIdFromEvent(event) === session.messageId,
+      timeoutMs
+    );
+    const active = await getMessageResult(config, sessionId, session.messageId);
+    if (!accepted || active.status !== 'running')
+      throw new Error(`Message ${session.messageId} is not running`);
 
-    // Wait until kilo has dialed the fake LLM and the turn is parked —
-    // deterministic proof the sandbox is truly mid-flight.
-    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
-    if (!engaged) {
-      stream.close();
-      return {
-        name: 'kill-mid-flight',
-        conversation,
-        ok: false,
-        message: `gate:${gateTag} did not engage on fake LLM within 90s`,
-        events: [...stream.events],
-        durationMs: Date.now() - start,
-      };
-    }
-
-    // Kill this session's sandbox. Fake-LLM sees the parked SSE socket close
-    // and drops the waiter automatically — no explicit release needed.
-    const killed = await killSandboxFamily(sandbox);
-
-    // 4. Wait for the DO to observe the disconnect — any of these signal it.
-    const terminal = await stream.waitFor(event => {
-      if (event.streamEventType === 'error') return true;
-      if (event.streamEventType === 'complete') return true;
-      if (event.streamEventType === 'interrupted') return true;
-      if (event.streamEventType === 'wrapper_disconnected') return true;
-      if (event.streamEventType === 'cloud.message.failed') return true;
-      return false;
-    }, timeoutMs);
-    const events = [...stream.events];
+    const killed = await stopOwnedSandboxFamily(sandbox, sessionId);
+    if (!killed.includes(sandbox.name)) throw new Error('Fault did not kill the owned primary');
+    const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
+    events.push(...stream.events);
     stream.close();
-
-    if (!terminal) {
-      return {
-        name: 'kill-mid-flight',
-        conversation,
-        ok: false,
-        message: `killed ${killed.join(',')} but no disconnect/error surfaced within ${timeoutMs}ms`,
-        events,
-        durationMs: Date.now() - start,
-      };
+    const affected = await getMessageResult(config, sessionId, session.messageId);
+    if (
+      terminal?.streamEventType !== 'cloud.message.failed' ||
+      (affected.status !== 'failed' && affected.status !== 'interrupted')
+    ) {
+      throw new Error(`Killed message ${session.messageId} has no matching durable failure`);
     }
 
+    const beforeRecovery = await snapshotSandboxIds();
+    const recovery = await sendRecoveryTurn(config, sessionId, api, timeoutMs);
+    events.push(...recovery.events);
+    if (
+      !isMessageCompleted(recovery.terminal, recovery.messageId) ||
+      recovery.status !== 'completed'
+    ) {
+      throw new Error(`Recovery message ${recovery.messageId} did not complete in ${sessionId}`);
+    }
+    const replacement = await waitForOwnedSandbox(sessionId, beforeRecovery, timeoutMs);
+    if (!replacement) throw new Error('Could not identify the owned replacement sandbox');
+    ownedFamilies.set(sandboxFamilyKey(replacement), replacement);
+    if (
+      replacement.id === sandbox.id ||
+      (sessionId.startsWith('workspace_') &&
+        sandboxFamilyKey(replacement) === sandboxFamilyKey(sandbox))
+    ) {
+      throw new Error('Recovery reused the retired physical sandbox');
+    }
     return {
       name: 'kill-mid-flight',
       conversation,
       ok: true,
-      message: `killed ${killed.join(',')} -> surfaced ${terminal.streamEventType}`,
+      message: `session=${sessionId}; affected=${session.messageId}/${affected.status}; recovery=${recovery.messageId}/completed; retired family stopped`,
       events,
       durationMs: Date.now() - start,
     };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
     return {
       name: 'kill-mid-flight',
       conversation,
       ok: false,
-      message: `threw: ${msg}`,
-      events: [],
+      message: `threw: ${err instanceof Error ? err.message : String(err)}`,
+      events: events.length ? events : [...(stream?.events ?? [])],
       durationMs: Date.now() - start,
     };
   } finally {
-    // Best-effort: release the gate in case the sandbox kill didn't close the
-    // socket cleanly (should be a no-op 404 normally).
+    stream?.close();
     await releaseGate(config.fakeLlmUrl, gateTag).catch(() => {});
+    if (sessionId) {
+      await interruptSession(config, sessionId).catch(() => {});
+      for (const sandbox of await findOwnedSandboxes(sessionId, knownSandboxIds)) {
+        ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
+      }
+      for (const sandbox of ownedFamilies.values())
+        await stopOwnedSandboxFamily(sandbox, sessionId);
+    }
   }
 }
 
@@ -559,11 +713,6 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
 // ---------------------------------------------------------------------------
 
 type QueuedOrCompleted = 'queued' | 'completed' | 'failed';
-
-function messageIdFromEvent(event: StreamEvent): string | undefined {
-  const data = event.data as { messageId?: string; payload?: { messageId?: string } } | undefined;
-  return data?.messageId ?? data?.payload?.messageId;
-}
 
 function messagePhase(event: StreamEvent): QueuedOrCompleted | null {
   switch (event.streamEventType) {
@@ -576,6 +725,21 @@ function messagePhase(event: StreamEvent): QueuedOrCompleted | null {
     default:
       return null;
   }
+}
+
+function successfulMessageOrder(events: StreamEvent[], messageIds: string[]): boolean {
+  const terminal = events.filter(event => {
+    const messageId = messageIdFromEvent(event);
+    return (
+      messageId !== undefined &&
+      messageIds.includes(messageId) &&
+      (messagePhase(event) === 'completed' || messagePhase(event) === 'failed')
+    );
+  });
+  return (
+    terminal.length === messageIds.length &&
+    terminal.every((event, index) => isMessageCompleted(event, messageIds[index]))
+  );
 }
 
 /**
@@ -621,16 +785,15 @@ export async function lifecycleQueueWhileBusy(args: LifecycleArgs): Promise<Life
   const start = Date.now();
   const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
   const scenarioName = 'queue-while-busy';
-  const gateTag = conversation || 'gate1';
+  const gateTag = `${conversation || 'gate1'}-${crypto.randomUUID()}`;
   let cleanupSessionId: string | undefined;
   let terminalized = false;
   try {
     const knownSandboxIds = await snapshotSandboxIds();
     const gate = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
     cleanupSessionId = gate.cloudAgentSessionId;
-    const stream = openStream(config, gate.cloudAgentSessionId, { replay: false });
-
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const stream = await openConnectedStream(config, gate.cloudAgentSessionId);
+    const sandbox = await waitForOwnedSandbox(gate.cloudAgentSessionId, knownSandboxIds, timeoutMs);
     if (!sandbox) {
       stream.close();
       return {
@@ -694,60 +857,31 @@ export async function lifecycleQueueWhileBusy(args: LifecycleArgs): Promise<Life
       timeoutMs
     );
     if (!thirdTerminal) {
-      const logs = await dumpSandboxLogsForFailure(sandbox.id);
       stream.close();
       return {
         name: scenarioName,
         conversation,
         ok: false,
-        message: `third message ${third.messageId} did not terminate within ${timeoutMs}ms${logs}`,
+        message: `third message ${third.messageId} did not terminate within ${timeoutMs}ms; owned container=${sandbox.id}`,
         events: [...stream.events],
         durationMs: Date.now() - start,
       };
     }
 
-    terminalized = true;
     const events = [...stream.events];
     stream.close();
 
-    // Build per-messageId phase ledger and assert FIFO ordering.
-    type PhaseSeen = { queued: number; terminal: number };
-    const phases = new Map<string, PhaseSeen>();
-    let idx = 0;
-    for (const event of events) {
-      const phase = messagePhase(event);
-      if (!phase) {
-        idx++;
-        continue;
-      }
-      const msgId = messageIdFromEvent(event);
-      if (!msgId) {
-        idx++;
-        continue;
-      }
-      const prev = phases.get(msgId) ?? { queued: -1, terminal: -1 };
-      if (phase === 'queued') prev.queued = idx;
-      else prev.terminal = idx;
-      phases.set(msgId, prev);
-      idx++;
-    }
-
-    const firstTerminalIdx = phases.get(gate.messageId)?.terminal ?? -1;
-    const secondTerminalIdx = phases.get(second.messageId)?.terminal ?? -1;
-    const thirdTerminalIdx = phases.get(third.messageId)?.terminal ?? -1;
-
-    const fifoOk =
-      firstTerminalIdx >= 0 &&
-      secondTerminalIdx > firstTerminalIdx &&
-      thirdTerminalIdx > secondTerminalIdx;
+    const expectedOrder = [gate.messageId, second.messageId, third.messageId];
+    const fifoOk = successfulMessageOrder(events, expectedOrder);
+    terminalized = fifoOk;
 
     return {
       name: scenarioName,
       conversation,
       ok: fifoOk,
       message: fifoOk
-        ? `FIFO: gate(${gate.messageId}) < second(${second.messageId}) < third(${third.messageId})`
-        : `FIFO violated: gateIdx=${firstTerminalIdx}, secondIdx=${secondTerminalIdx}, thirdIdx=${thirdTerminalIdx}`,
+        ? `session=${gate.cloudAgentSessionId}; successful FIFO: ${expectedOrder.join(' -> ')}`
+        : `expected successful FIFO completion for ${expectedOrder.join(' -> ')}`,
       events,
       durationMs: Date.now() - start,
     };
@@ -823,13 +957,12 @@ export async function lifecycleQueueRapidFireNoGate(args: LifecycleArgs): Promis
       timeoutMs
     );
     if (!thirdTerminal) {
-      const logs = await dumpSandboxLogsForFailure(sandbox.id);
       stream.close();
       return {
         name: scenarioName,
         conversation,
         ok: false,
-        message: `third message ${third.messageId} did not terminate within ${timeoutMs}ms (first=${first.messageId} second=${second.messageId})${logs}`,
+        message: `third message ${third.messageId} did not terminate within ${timeoutMs}ms (first=${first.messageId} second=${second.messageId})`,
         events: [...stream.events],
         durationMs: Date.now() - start,
       };
@@ -838,39 +971,16 @@ export async function lifecycleQueueRapidFireNoGate(args: LifecycleArgs): Promis
     const events = [...stream.events];
     stream.close();
 
-    type PhaseSeen = { queued: number; terminal: number };
-    const phases = new Map<string, PhaseSeen>();
-    let idx = 0;
-    for (const event of events) {
-      const phase = messagePhase(event);
-      if (!phase) {
-        idx++;
-        continue;
-      }
-      const msgId = messageIdFromEvent(event);
-      if (!msgId) {
-        idx++;
-        continue;
-      }
-      const prev = phases.get(msgId) ?? { queued: -1, terminal: -1 };
-      if (phase === 'queued') prev.queued = idx;
-      else prev.terminal = idx;
-      phases.set(msgId, prev);
-      idx++;
-    }
-
-    const firstIdx = phases.get(first.messageId)?.terminal ?? -1;
-    const secondIdx = phases.get(second.messageId)?.terminal ?? -1;
-    const thirdIdx = phases.get(third.messageId)?.terminal ?? -1;
-    const fifoOk = firstIdx >= 0 && secondIdx > firstIdx && thirdIdx > secondIdx;
+    const expectedOrder = [first.messageId, second.messageId, third.messageId];
+    const fifoOk = successfulMessageOrder(events, expectedOrder);
 
     return {
       name: scenarioName,
       conversation,
       ok: fifoOk,
       message: fifoOk
-        ? `FIFO: first(${first.messageId}) < second(${second.messageId}) < third(${third.messageId})`
-        : `FIFO violated: firstIdx=${firstIdx}, secondIdx=${secondIdx}, thirdIdx=${thirdIdx}`,
+        ? `session=${first.cloudAgentSessionId}; successful FIFO: ${expectedOrder.join(' -> ')}`
+        : `expected successful FIFO completion for ${expectedOrder.join(' -> ')}`,
       events,
       durationMs: Date.now() - start,
     };
@@ -1159,7 +1269,7 @@ export async function lifecycleLlmError(args: LifecycleArgs): Promise<LifecycleR
       };
     }
 
-    const terminal = await stream.waitForTerminal(timeoutMs);
+    const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
     const events = [...stream.events];
     stream.close();
 
@@ -1217,7 +1327,7 @@ export async function lifecycleChunkedStreaming(args: LifecycleArgs): Promise<Li
       };
     }
 
-    const terminal = await stream.waitForTerminal(timeoutMs);
+    const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
     const events = [...stream.events];
     stream.close();
 
@@ -1230,9 +1340,7 @@ export async function lifecycleChunkedStreaming(args: LifecycleArgs): Promise<Li
         (e.data as { type?: string } | undefined)?.type === 'message.part.delta'
     ).length;
 
-    const ok =
-      terminal?.streamEventType === 'complete' ||
-      terminal?.streamEventType === 'cloud.message.completed';
+    const ok = isMessageCompleted(terminal, session.messageId);
 
     return {
       name: 'chunked-streaming',
@@ -1282,7 +1390,7 @@ export async function lifecycleEmptyResponse(args: LifecycleArgs): Promise<Lifec
       };
     }
 
-    const terminal = await stream.waitForTerminal(timeoutMs);
+    const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
     const events = [...stream.events];
     stream.close();
 
@@ -1291,9 +1399,7 @@ export async function lifecycleEmptyResponse(args: LifecycleArgs): Promise<Lifec
         e.streamEventType === 'kilocode' &&
         (e.data as { type?: string } | undefined)?.type === 'message.part.delta'
     ).length;
-    const completed =
-      terminal?.streamEventType === 'complete' ||
-      terminal?.streamEventType === 'cloud.message.completed';
+    const completed = isMessageCompleted(terminal, session.messageId);
 
     return {
       name: 'empty-response',
@@ -1487,7 +1593,7 @@ export async function lifecycleWaitersClean(args: LifecycleArgs): Promise<Lifecy
       };
     }
 
-    const terminal = await stream.waitForTerminal(timeoutMs);
+    const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
     const events = [...stream.events];
     stream.close();
 
@@ -1506,7 +1612,10 @@ export async function lifecycleWaitersClean(args: LifecycleArgs): Promise<Lifecy
     await new Promise(r => setTimeout(r, 500));
     const snapshot = await fetchFakeWaiters(config.fakeLlmUrl);
     const waiterCount = snapshot.tags.reduce((sum, t) => sum + t.count, 0);
-    const ok = waiterCount === 0 && snapshot.liveResponses === 0;
+    const ok =
+      isMessageCompleted(terminal, session.messageId) &&
+      waiterCount === 0 &&
+      snapshot.liveResponses === 0;
 
     return {
       name: 'waiters-clean',
@@ -1602,7 +1711,7 @@ export async function lifecycleCallbackCompletion(args: LifecycleArgs): Promise<
       };
     }
 
-    const terminal = await stream.waitForTerminal(timeoutMs);
+    const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
     const events = [...stream.events];
     stream.close();
 
@@ -1636,7 +1745,7 @@ export async function lifecycleCallbackCompletion(args: LifecycleArgs): Promise<
     const statusOk = payload.status === 'completed';
     const messageIdOk = payload.messageId === session.messageId;
     const textOk = expectedText === undefined || payload.lastAssistantMessageText === expectedText;
-    const ok = statusOk && messageIdOk && textOk;
+    const ok = isMessageCompleted(terminal, session.messageId) && statusOk && messageIdOk && textOk;
 
     return {
       name: scenarioName,
@@ -1966,7 +2075,7 @@ export async function lifecycleCallbackInterrupt(args: LifecycleArgs): Promise<L
 
     await interruptSession(config, session.cloudAgentSessionId);
 
-    const terminal = await stream.waitForTerminal(timeoutMs);
+    const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
     const events = [...stream.events];
     stream.close();
 

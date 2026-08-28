@@ -7,18 +7,19 @@ import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
 import { createWrapperKiloClient } from '../kilo-api.js';
 import { logToFile } from '../utils.js';
 import {
+  KILO_CONTROL_REQUEST_TIMEOUT_MS,
   maybeStartSandboxControlClient,
   startSandboxControlEventFeed,
 } from './sandbox-control-runtime';
 import {
   buildHeartbeatPayload,
+  cancelControlTasks,
   handleControlRequest,
-  type HandlerSessionSnapshot,
+  type HandlerDeps,
 } from './sandbox-control-handlers';
 import {
   childFromSessionCreated,
   eventKiloSessionId,
-  permissionAskId,
   sessionEventIdentity,
   unfilteredKiloEvents,
   updateSessionSnapshots,
@@ -70,112 +71,120 @@ async function main(): Promise<void> {
     : undefined;
   logToFile(`kilo server started at ${result.server.url}`);
 
-  const sessions: HandlerSessionSnapshot[] = [];
   const abort = new AbortController();
   let control: ReturnType<typeof maybeStartSandboxControlClient> = null;
-  let kiloReady = false;
+  let feed: Awaited<ReturnType<typeof startSandboxControlEventFeed>> | undefined;
   let shuttingDown = false;
+  const deps: HandlerDeps = {
+    kiloClient,
+    version: WRAPPER_VERSION,
+    get kiloReady() {
+      return !shuttingDown && feed?.isFresh() === true;
+    },
+    sessions: [],
+    tasks: new Map(),
+    signal: abort.signal,
+    ...(terminalRuntime ? { terminalRuntime } : {}),
+    emitSessionEvent: (session, payload) => {
+      if (
+        !control?.sendEvent?.('session.event', payload, {
+          directory: session.directory,
+          kiloSessionId: session.kiloSessionId,
+          rootKiloSessionId: session.kiloSessionId,
+        })
+      ) {
+        throw new Error('Sandbox control event delivery failed');
+      }
+    },
+    retireRuntime: reason => shutdown(1, reason),
+    onShutdown: () => shutdown(0, 'Sandbox shutting down'),
+  };
 
-  const shutdown = (exitCode: number): void => {
+  function shutdown(exitCode: number, reason: string): void {
     if (shuttingDown) return;
     shuttingDown = true;
-    kiloReady = false;
+    logToFile(`control-plane wrapper retiring: ${reason}`);
+    control?.sendEvent?.('sandbox.heartbeat', buildHeartbeatPayload(deps));
+    const stopped = cancelControlTasks(deps, reason, exitCode === 0 ? 'cancelled' : 'failed');
     abort.abort();
     terminalRuntime?.shutdown();
-    control?.close();
-    result.server.close();
-    process.exit(exitCode);
-  };
-  process.once('SIGTERM', () => shutdown(0));
-  process.once('SIGINT', () => shutdown(0));
+    const finish = (): void => {
+      control?.close();
+      result.server.close();
+      process.exit(exitCode);
+    };
+    const deadline = setTimeout(finish, KILO_CONTROL_REQUEST_TIMEOUT_MS);
+    void stopped.finally(() => {
+      clearTimeout(deadline);
+      setTimeout(finish, 0);
+    });
+  }
+  process.once('SIGTERM', () => shutdown(0, 'Wrapper received SIGTERM'));
+  process.once('SIGINT', () => shutdown(0, 'Wrapper received SIGINT'));
 
   try {
-    await startSandboxControlEventFeed({
+    feed = await startSandboxControlEventFeed({
       signal: abort.signal,
       open: signal => result.client.global.event({ signal, sseMaxRetryAttempts: 1 }),
       consume: async stream => {
         for await (const event of unfilteredKiloEvents(stream)) {
-          const permId = permissionAskId(event);
-          if (event.type === 'permission.asked') {
-            if (permId) {
-              logToFile(`auto-approving permission ${permId}`);
-              kiloClient.answerPermission(permId, 'always').catch(err => {
-                logToFile(
-                  `failed to auto-approve permission ${permId}: ${err instanceof Error ? err.message : String(err)}`
-                );
-              });
-            }
-            continue;
-          }
           if (event.type === 'session.created') {
             const child = childFromSessionCreated(event.properties);
             if (child) rememberChildSession(child);
           }
-          updateSessionSnapshots(event, sessions);
+          updateSessionSnapshots(event, deps.sessions);
           const kiloSessionId = eventKiloSessionId(event.properties);
           const identity = sessionEventIdentity({
             sessionId: kiloSessionId,
             directory: event.directory,
           });
-          control?.sendEvent?.(
-            'session.event',
-            { type: event.type, properties: event.properties },
-            identity
-          );
+          if (!identity?.rootKiloSessionId) continue;
+          if (
+            !control?.sendEvent?.(
+              'session.event',
+              { type: event.type, properties: event.properties },
+              identity
+            )
+          ) {
+            throw new Error('Sandbox control event delivery failed');
+          }
         }
       },
-      onUnexpectedClose: () => {
-        logToFile('control-plane Kilo event feed closed unexpectedly');
-        shutdown(1);
-      },
+      onUnexpectedClose: () => shutdown(1, 'Kilo event feed is no longer healthy'),
     });
   } catch {
-    logToFile('control-plane Kilo event feed failed to start');
-    shutdown(1);
+    shutdown(1, 'Kilo event feed failed to start');
     return;
   }
+  if (shuttingDown) return;
 
-  kiloReady = true;
   control = maybeStartSandboxControlClient(controlConfig, logToFile, {
     wrapperVersion: WRAPPER_VERSION,
-    isReady: () => kiloReady && !abort.signal.aborted,
+    isReady: () => deps.kiloReady,
+    onDisconnected: () => shutdown(1, 'Sandbox control connection lost'),
     onRequest: (operation, session, payload) =>
       handleControlRequest(operation, session, payload, {
-        kiloClient,
-        version: WRAPPER_VERSION,
-        kiloReady,
-        getStatus: () => ({
-          state: sessions.some(item => item.state !== 'idle') ? 'active' : 'idle',
-          pendingMessages: [],
-        }),
-        sessions,
-        ...(terminalRuntime ? { terminalRuntime } : {}),
+        ...deps,
         emitPreparing: event => {
           if (!session) return;
-          control?.sendEvent?.('session.preparing', event, {
-            directory: session.directory,
-            kiloSessionId: session.kiloSessionId,
-            rootKiloSessionId: session.kiloSessionId,
-          });
+          if (
+            !control?.sendEvent?.('session.preparing', event, {
+              directory: session.directory,
+              kiloSessionId: session.kiloSessionId,
+              rootKiloSessionId: session.kiloSessionId,
+            })
+          ) {
+            shutdown(1, 'Preparation event delivery failed');
+          }
         },
       }),
-    getHeartbeatPayload: () =>
-      buildHeartbeatPayload({
-        kiloClient,
-        version: WRAPPER_VERSION,
-        kiloReady,
-        getStatus: () => ({
-          state: sessions.some(item => item.state !== 'idle') ? 'active' : 'idle',
-          pendingMessages: [],
-        }),
-        sessions,
-      }),
+    getHeartbeatPayload: () => buildHeartbeatPayload(deps),
   });
 
   logToFile(`control-plane wrapper ready callHome=${Boolean(control)}`);
 }
 
-main().catch(error => {
-  logToFile(`control-plane wrapper failed: ${error instanceof Error ? error.message : 'unknown'}`);
+main().catch(() => {
+  logToFile('control-plane wrapper failed');
   process.exit(1);
 });

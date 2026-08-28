@@ -296,7 +296,8 @@
       "networkError": "网络错误",
       "uploadFailed": "上传失败",
       "failedToUploadFile": "上传文件失败：{{reason}}",
-      "nothingToPaste": "没有可粘贴的内容"
+      "nothingToPaste": "没有可粘贴的内容",
+      "metadataStripFailed": "无法移除照片元数据。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -1759,7 +1760,8 @@
       "continueFrom": "正在继续 {{title}}",
       "importingSession": "正在导入会话",
       "cliCannotContinue": "此 CLI 无法继续会话。请选择云端代理或其他 CLI。",
-      "importFailed": "无法导入此会话。"
+      "importFailed": "无法导入此会话。",
+      "discardWithUploadsMessage": "您的提示词和未附加到已发送消息的上传文件将被删除。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件",
@@ -2121,7 +2123,9 @@
       "finalizingPlaceholder": "正在收尾...",
       "messagePlaceholder": "消息...",
       "cannotReceiveFiles": "此会话无法接收文件。请移除附件后再发送消息。",
-      "couldNotAttachFiles": "无法附加文件。点击发送以重试。"
+      "couldNotAttachFiles": "无法附加文件。点击发送以重试。",
+      "discardAttachmentsMessage": "未附加到已发送消息的上传文件将被删除。",
+      "discardAttachmentsTitle": "丢弃附件？"
     },
     "chatLink": {
       "linkCopied": "链接已复制",

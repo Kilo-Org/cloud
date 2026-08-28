@@ -296,7 +296,8 @@
       "networkError": "שגיאת רשת",
       "uploadFailed": "ההעלאה נכשלה",
       "failedToUploadFile": "העלאת הקובץ נכשלה: {{reason}}",
-      "nothingToPaste": "אין מה להדביק"
+      "nothingToPaste": "אין מה להדביק",
+      "metadataStripFailed": "לא ניתן היה להסיר את מטא-נתוני התמונה."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1767,7 +1768,8 @@
       "cliCannotContinue": "CLI זה אינו יכול להמשיך הפעלה. בחר Cloud Agent או CLI אחר.",
       "continueFrom": "ממשיך {{title}}",
       "importFailed": "לא ניתן היה לייבא את ההפעלה הזו.",
-      "importingSession": "מייבא הפעלה"
+      "importingSession": "מייבא הפעלה",
+      "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו."
     },
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",
@@ -2133,7 +2135,9 @@
       "finalizingPlaceholder": "מסיים...",
       "messagePlaceholder": "הודעה...",
       "cannotReceiveFiles": "סשן זה אינו יכול לקבל קבצים. הסר את הקבצים המצורפים כדי לשלוח את ההודעה.",
-      "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב."
+      "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב.",
+      "discardAttachmentsMessage": "קבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
+      "discardAttachmentsTitle": "למחוק את הקבצים המצורפים?"
     },
     "chatLink": {
       "linkCopied": "הקישור הועתק",

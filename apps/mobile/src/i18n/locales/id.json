@@ -296,7 +296,8 @@
       "networkError": "Kesalahan jaringan",
       "uploadFailed": "Unggahan gagal",
       "failedToUploadFile": "Gagal mengunggah file: {{reason}}",
-      "nothingToPaste": "Tidak ada yang bisa ditempel"
+      "nothingToPaste": "Tidak ada yang bisa ditempel",
+      "metadataStripFailed": "Metadata foto tidak dapat dihapus."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1759,7 +1760,8 @@
       "continueFrom": "Melanjutkan {{title}}",
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
-      "importFailed": "Tidak dapat mengimpor sesi ini."
+      "importFailed": "Tidak dapat mengimpor sesi ini.",
+      "discardWithUploadsMessage": "Prompt Anda dan unggahan yang tidak dilampirkan ke pesan terkirim akan dihapus."
     },
     "partRenderer": {
       "updatedFileCount_one": "Memperbarui {{displayCount}} file",
@@ -2121,7 +2123,9 @@
       "finalizingPlaceholder": "Menyelesaikan...",
       "messagePlaceholder": "Pesan...",
       "cannotReceiveFiles": "Sesi ini tidak dapat menerima file. Hapus lampiran untuk mengirim pesan Anda.",
-      "couldNotAttachFiles": "Tidak dapat melampirkan file. Ketuk Kirim untuk mencoba lagi."
+      "couldNotAttachFiles": "Tidak dapat melampirkan file. Ketuk Kirim untuk mencoba lagi.",
+      "discardAttachmentsMessage": "Unggahan yang tidak dilampirkan ke pesan terkirim akan dihapus.",
+      "discardAttachmentsTitle": "Buang lampiran?"
     },
     "chatLink": {
       "linkCopied": "Tautan disalin",

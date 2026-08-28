@@ -750,7 +750,8 @@
       "networkError": "Kuskuren hanyar sadarwa",
       "uploadFailed": "Ɗorawa ya gaza",
       "failedToUploadFile": "An kasa ɗora fayil: {{reason}}",
-      "nothingToPaste": "Babu abin da za a manna"
+      "nothingToPaste": "Babu abin da za a manna",
+      "metadataStripFailed": "Ba a iya cire bayanan hoto ba."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zama ba. Zaɓi Cloud Agent ko wani CLI.",
       "continueFrom": "Ci gaba da {{title}}",
       "importFailed": "An kasa shigo da wannan zaman.",
-      "importingSession": "Ana shigo da zama"
+      "importingSession": "Ana shigo da zama",
+      "discardWithUploadsMessage": "Za a share bayaninka da duk fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba."
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta {{displayCount}} fayil",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Ana gamawa...",
       "messagePlaceholder": "Saƙo",
       "cannotReceiveFiles": "Wannan zaman ba zai iya karɓar fayiloli ba. Cire abubuwan da aka haɗa don aika sakonka.",
-      "couldNotAttachFiles": "An kasa haɗa fayiloli. Danna aika don sake gwadawa."
+      "couldNotAttachFiles": "An kasa haɗa fayiloli. Danna aika don sake gwadawa.",
+      "discardAttachmentsMessage": "Za a share fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
+      "discardAttachmentsTitle": "Watsi da haɗe-haɗe?"
     },
     "chatLink": {
       "linkCopied": "An kwafa hanyar",

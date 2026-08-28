@@ -750,7 +750,8 @@
       "networkError": "Võrguviga",
       "uploadFailed": "Üleslaadimine ebaõnnestus",
       "failedToUploadFile": "Faili üleslaadimine ebaõnnestus: {{reason}}",
-      "nothingToPaste": "Pole midagi kleepida"
+      "nothingToPaste": "Pole midagi kleepida",
+      "metadataStripFailed": "Foto metaandmete eemaldamine ebaõnnestus."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "See CLI ei saa seanssi jätkata. Valige Cloud Agent või mõni muu CLI.",
       "continueFrom": "Jätkatakse {{title}}",
       "importFailed": "Seda seanssi ei õnnestunud importida.",
-      "importingSession": "Imporditakse seanssi"
+      "importingSession": "Imporditakse seanssi",
+      "discardWithUploadsMessage": "Teie päring ja üles laaditud failid, mida pole saadetud sõnumitele lisatud, kustutatakse."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendatud {{displayCount}} fail",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Lõpetamine...",
       "messagePlaceholder": "Sõnum...",
       "cannotReceiveFiles": "See seanss ei saa faile vastu võtta. Sõnumi saatmiseks eemaldage manused.",
-      "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puudutage saatmist."
+      "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puudutage saatmist.",
+      "discardAttachmentsMessage": "Üles laaditud failid, mida pole saadetud sõnumitele lisatud, kustutatakse.",
+      "discardAttachmentsTitle": "Kas loobuda manustest?"
     },
     "chatLink": {
       "linkCopied": "Link kopeeritud",

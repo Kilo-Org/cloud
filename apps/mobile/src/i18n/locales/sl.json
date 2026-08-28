@@ -764,7 +764,8 @@
       "networkError": "Napaka v omrežju",
       "uploadFailed": "Nalaganje ni uspelo",
       "failedToUploadFile": "Nalaganje datoteke ni uspelo: {{reason}}",
-      "nothingToPaste": "Ničesar ni za prilepiti"
+      "nothingToPaste": "Ničesar ni za prilepiti",
+      "metadataStripFailed": "Metapodatkov fotografije ni bilo mogoče odstraniti."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2243,7 +2244,8 @@
       "cliCannotContinue": "Ta CLI ne more nadaljevati seje. Izberite Cloud Agent ali drug CLI.",
       "continueFrom": "Nadaljujem {{title}}",
       "importFailed": "Te seje ni bilo mogoče uvoziti.",
-      "importingSession": "Uvažam sejo"
+      "importingSession": "Uvažam sejo",
+      "discardWithUploadsMessage": "Vaša zahteva in vse naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisane."
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena {{displayCount}} datoteka",
@@ -2613,7 +2615,9 @@
       "finalizingPlaceholder": "Zaključevanje...",
       "messagePlaceholder": "Sporočilo...",
       "cannotReceiveFiles": "Ta seja ne more prejemati datotek. Odstrani priponke za pošiljanje sporočila.",
-      "couldNotAttachFiles": "Priponk ni bilo mogoče priložiti. Dotakni se pošlji za ponovni poskus."
+      "couldNotAttachFiles": "Priponk ni bilo mogoče priložiti. Dotakni se pošlji za ponovni poskus.",
+      "discardAttachmentsMessage": "Naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisane.",
+      "discardAttachmentsTitle": "Zavreči priloge?"
     },
     "chatLink": {
       "linkCopied": "Povezava kopirana",

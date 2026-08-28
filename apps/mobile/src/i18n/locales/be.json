@@ -764,7 +764,8 @@
       "networkError": "Памылка сеткі",
       "uploadFailed": "Загрузка не ўдалася",
       "failedToUploadFile": "Не атрымалася загрузіць файл: {{reason}}",
-      "nothingToPaste": "Няма чаго ўставіць"
+      "nothingToPaste": "Няма чаго ўставіць",
+      "metadataStripFailed": "Не атрымалася выдаліць метаданыя фота."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2243,7 +2244,8 @@
       "continueFrom": "Працяг {{title}}",
       "importingSession": "Імпартаванне сеанса",
       "cliCannotContinue": "Гэты CLI не можа працягнуць сеанс. Выберыце Cloud Agent або іншы CLI.",
-      "importFailed": "Не атрымалася імпартаваць гэты сеанс."
+      "importFailed": "Не атрымалася імпартаваць гэты сеанс.",
+      "discardWithUploadsMessage": "Ваш запыт і загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя."
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл",
@@ -2613,7 +2615,9 @@
       "finalizingPlaceholder": "Завяршэнне...",
       "messagePlaceholder": "Паведамленне...",
       "cannotReceiveFiles": "Гэты сеанс не можа атрымліваць файлы. Прыбярыце ўкладанні, каб адправіць паведамленне.",
-      "couldNotAttachFiles": "Не ўдалося прымацаваць файлы. Націсніце «Адправіць», каб паспрабаваць яшчэ раз."
+      "couldNotAttachFiles": "Не ўдалося прымацаваць файлы. Націсніце «Адправіць», каб паспрабаваць яшчэ раз.",
+      "discardAttachmentsMessage": "Загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя.",
+      "discardAttachmentsTitle": "Выдаліць укладанні?"
     },
     "chatLink": {
       "linkCopied": "Спасылка скапіраваная",

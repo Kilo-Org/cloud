@@ -750,7 +750,8 @@
       "networkError": "Iphutha lenethiwekhi",
       "uploadFailed": "Ukulayisha kwehlulekile",
       "failedToUploadFile": "Kwehlulekile ukulayisha ifayela: {{reason}}",
-      "nothingToPaste": "Akukho okunamathiselwa"
+      "nothingToPaste": "Akukho okunamathiselwa",
+      "metadataStripFailed": "I-metadata yesithombe ayikwazanga ukususwa."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Ukuqhubeka {{title}}",
       "importingSession": "Ukungenisa iseshini",
       "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka iseshini. Khetha I-Cloud Agent noma enye i-CLI.",
-      "importFailed": "Ayikwazanga ukungenisa lesi seshini."
+      "importFailed": "Ayikwazanga ukungenisa lesi seshini.",
+      "discardWithUploadsMessage": "Isicelo osibhalile nanoma yimaphi amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Kuyaphethwa...",
       "messagePlaceholder": "Umlayezo...",
       "cannotReceiveFiles": "Lesi seshini asikwazi ukwamukela amafayela. Susa okunamathiselwe ukuze uthumele umlayezo wakho.",
-      "couldNotAttachFiles": "Asikwazanga ukunamathisela amafayela. Thepha thumela ukuzama futhi."
+      "couldNotAttachFiles": "Asikwazanga ukunamathisela amafayela. Thepha thumela ukuzama futhi.",
+      "discardAttachmentsMessage": "Amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa.",
+      "discardAttachmentsTitle": "Lahla okunamathiselwe?"
     },
     "chatLink": {
       "linkCopied": "Isixhumanisi sikopiwe",

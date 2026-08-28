@@ -750,7 +750,8 @@
       "networkError": "Erè rezo",
       "uploadFailed": "Chajman echwe",
       "failedToUploadFile": "Echwe pou chaje fichye a: {{reason}}",
-      "nothingToPaste": "Pa gen anyen pou kole"
+      "nothingToPaste": "Pa gen anyen pou kole",
+      "metadataStripFailed": "Pa t ka retire metadone foto a."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Ap kontinye {{title}}",
       "importingSession": "Ap enpòte sesyon",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
-      "importFailed": "Pa t ka enpòte sesyon sa a."
+      "importFailed": "Pa t ka enpòte sesyon sa a.",
+      "discardWithUploadsMessage": "Pwompt ou a ak nenpòt fichye telechaje ki pa atache ak mesaj voye yo pral efase."
     },
     "partRenderer": {
       "updatedFileCount_one": "Miz ajou {{displayCount}} fichye",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Ap fini...",
       "messagePlaceholder": "Mesaj...",
       "cannotReceiveFiles": "Sesyon sa a pa ka resevwa fichye. Retire pyès jwenn yo pou voye mesaj ou.",
-      "couldNotAttachFiles": "Pa t ka kole fichye. Tape voye pou eseye ankò."
+      "couldNotAttachFiles": "Pa t ka kole fichye. Tape voye pou eseye ankò.",
+      "discardAttachmentsMessage": "Fichye telechaje ki pa atache ak mesaj voye yo pral efase.",
+      "discardAttachmentsTitle": "Jete atachman yo?"
     },
     "chatLink": {
       "linkCopied": "Lyen kopye",

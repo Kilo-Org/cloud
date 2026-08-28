@@ -2093,7 +2093,9 @@
       "uploading": "正在上传…",
       "uploaded": "已上传",
       "uploadFailedRetry": "上传失败。点击重试。",
-      "uploadFailedTerminal": "无法上传此文件。"
+      "uploadFailedTerminal": "无法上传此文件。",
+      "moveLeft": "将 {{filename}} 向左移动",
+      "moveRight": "将 {{filename}} 向右移动"
     },
     "attachmentPasteHint": {
       "accessibility": "从剪贴板粘贴图片",

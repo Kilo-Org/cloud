@@ -2547,7 +2547,9 @@
       "uploading": "பதிவேற்றுகிறது…",
       "uploaded": "பதிவேற்றப்பட்டது",
       "uploadFailedRetry": "பதிவேற்றம் தோல்வியடைந்தது. மீண்டும் முயற்சிக்க தட்டவும்.",
-      "uploadFailedTerminal": "இந்த கோப்பை பதிவேற்ற முடியாது."
+      "uploadFailedTerminal": "இந்த கோப்பை பதிவேற்ற முடியாது.",
+      "moveLeft": "{{filename}} ஐ இடப்புறம் நகர்த்தவும்",
+      "moveRight": "{{filename}} ஐ வலப்புறம் நகர்த்தவும்"
     },
     "attachmentPasteHint": {
       "accessibility": "கிளிப்போர்டிலிருந்து படத்தை ஒட்டவும்",

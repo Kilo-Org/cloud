@@ -2547,7 +2547,9 @@
       "uploading": "Inapakia...",
       "uploaded": "Imepakiwa",
       "uploadFailedRetry": "Kupakia kumeshindwa. Gusa ili ujaribu tena.",
-      "uploadFailedTerminal": "Faili hili haliwezi kupakiwa."
+      "uploadFailedTerminal": "Faili hili haliwezi kupakiwa.",
+      "moveLeft": "Sogeza {{filename}} kushoto",
+      "moveRight": "Sogeza {{filename}} kulia"
     },
     "attachmentPasteHint": {
       "accessibility": "Bandika picha kutoka kwenye ubao wa kunakili",

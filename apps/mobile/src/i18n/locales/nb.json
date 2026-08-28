@@ -2547,7 +2547,9 @@
       "uploading": "Laster opp…",
       "uploaded": "Lastet opp",
       "uploadFailedRetry": "Opplastingen mislyktes. Trykk for å prøve igjen.",
-      "uploadFailedTerminal": "Denne filen kan ikke lastes opp."
+      "uploadFailedTerminal": "Denne filen kan ikke lastes opp.",
+      "moveLeft": "Flytt {{filename}} til venstre",
+      "moveRight": "Flytt {{filename}} til høyre"
     },
     "attachmentPasteHint": {
       "accessibility": "Lim inn bilde fra utklippstavlen",

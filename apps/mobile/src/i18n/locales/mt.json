@@ -2604,7 +2604,9 @@
       "uploading": "Qed jittella'…",
       "uploaded": "Imtella'",
       "uploadFailedRetry": "L-upload fallejt. Tektek biex terġa' tipprova.",
-      "uploadFailedTerminal": "Dan il-fajl ma jistax jittella'."
+      "uploadFailedTerminal": "Dan il-fajl ma jistax jittella'.",
+      "moveLeft": "Mexxi {{filename}} lejn ix-xellug",
+      "moveRight": "Mexxi {{filename}} lejn il-lemin"
     },
     "attachmentPasteHint": {
       "accessibility": "Inkolla l-immaġni mill-clipboard",

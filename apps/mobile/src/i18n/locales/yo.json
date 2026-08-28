@@ -2547,7 +2547,9 @@
       "uploading": "Ngbewọ soke…",
       "uploaded": "Ti gbewọ soke",
       "uploadFailedRetry": "Gbigbe soke kuna. Tẹ lati tun gbiyanju.",
-      "uploadFailedTerminal": "A kò lè gbé fáìlì yìí sókè."
+      "uploadFailedTerminal": "A kò lè gbé fáìlì yìí sókè.",
+      "moveLeft": "Gbe {{filename}} si osi",
+      "moveRight": "Gbe {{filename}} si ọtun"
     },
     "attachmentPasteHint": {
       "accessibility": "Lẹ aworan lati ibi-ikọsọ",

@@ -2547,7 +2547,9 @@
       "uploading": "Uploader…",
       "uploaded": "Uploadet",
       "uploadFailedRetry": "Upload mislykkedes. Tryk for at prøve igen.",
-      "uploadFailedTerminal": "Denne fil kan ikke uploades."
+      "uploadFailedTerminal": "Denne fil kan ikke uploades.",
+      "moveLeft": "Flyt {{filename}} til venstre",
+      "moveRight": "Flyt {{filename}} til højre"
     },
     "attachmentPasteHint": {
       "accessibility": "Indsæt billede fra udklipsholder",

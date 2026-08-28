@@ -2547,7 +2547,9 @@
       "uploading": "Качване…",
       "uploaded": "Качено",
       "uploadFailedRetry": "Качването не успя. Докоснете, за да опитате отново.",
-      "uploadFailedTerminal": "Този файл не може да бъде качен."
+      "uploadFailedTerminal": "Този файл не може да бъде качен.",
+      "moveLeft": "Преместете {{filename}} наляво",
+      "moveRight": "Преместете {{filename}} надясно"
     },
     "attachmentPasteHint": {
       "accessibility": "Поставете изображение от клипборда",

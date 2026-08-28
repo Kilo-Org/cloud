@@ -2089,7 +2089,9 @@
       "uploading": "Enviando…",
       "uploaded": "Enviado",
       "uploadFailedRetry": "Falha no envio. Toque para tentar novamente.",
-      "uploadFailedTerminal": "Este arquivo não pode ser enviado."
+      "uploadFailedTerminal": "Este arquivo não pode ser enviado.",
+      "moveLeft": "Mover {{filename}} para a esquerda",
+      "moveRight": "Mover {{filename}} para a direita"
     },
     "attachmentPasteHint": {
       "accessibility": "Colar imagem da área de transferência",

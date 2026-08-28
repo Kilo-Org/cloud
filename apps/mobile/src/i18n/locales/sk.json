@@ -2585,7 +2585,9 @@
       "uploading": "Nahrávam…",
       "uploaded": "Nahraté",
       "uploadFailedRetry": "Nahrávanie zlyhalo. Klepnutím skúsite znova.",
-      "uploadFailedTerminal": "Tento súbor sa nedá nahrať."
+      "uploadFailedTerminal": "Tento súbor sa nedá nahrať.",
+      "moveLeft": "Presunúť {{filename}} doľava",
+      "moveRight": "Presunúť {{filename}} doprava"
     },
     "attachmentPasteHint": {
       "accessibility": "Vložiť obrázok zo schránky",

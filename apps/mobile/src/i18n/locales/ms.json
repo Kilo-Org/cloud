@@ -2547,7 +2547,9 @@
       "uploading": "Memuat naik…",
       "uploaded": "Dimuat naik",
       "uploadFailedRetry": "Muat naik gagal. Ketik untuk mencuba semula.",
-      "uploadFailedTerminal": "Fail ini tidak boleh dimuat naik."
+      "uploadFailedTerminal": "Fail ini tidak boleh dimuat naik.",
+      "moveLeft": "Alihkan {{filename}} ke kiri",
+      "moveRight": "Alihkan {{filename}} ke kanan"
     },
     "attachmentPasteHint": {
       "accessibility": "Tampal imej daripada papan keratan",

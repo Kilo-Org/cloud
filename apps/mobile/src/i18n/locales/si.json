@@ -2547,7 +2547,9 @@
       "uploading": "උඩුගත වෙමින්…",
       "uploaded": "උඩුගත කරන ලදී",
       "uploadFailedRetry": "උඩුගත කිරීම අසාර්ථකයි. නැවත උත්සාහ කිරීමට තට්ටු කරන්න.",
-      "uploadFailedTerminal": "මෙම ගොනුව උඩුගත කළ නොහැක."
+      "uploadFailedTerminal": "මෙම ගොනුව උඩුගත කළ නොහැක.",
+      "moveLeft": "{{filename}} වමට ගෙන යන්න",
+      "moveRight": "{{filename}} දකුණට ගෙන යන්න"
     },
     "attachmentPasteHint": {
       "accessibility": "පසුරු පුවරුවෙන් රූපය අලවන්න",

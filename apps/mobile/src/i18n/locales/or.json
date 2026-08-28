@@ -2547,7 +2547,9 @@
       "uploading": "ଅପଲୋଡ୍ ହେଉଛି…",
       "uploaded": "ଅପଲୋଡ୍ ହେଲା",
       "uploadFailedRetry": "ଅପଲୋଡ୍ ବିଫଳ। ପୁନଃଚେଷ୍ଟା ପାଇଁ ଟାପ୍ କରନ୍ତୁ।",
-      "uploadFailedTerminal": "ଏହି ଫାଇଲ୍ ଅପଲୋଡ୍ ହୋଇପାରିବ ନାହିଁ।"
+      "uploadFailedTerminal": "ଏହି ଫାଇଲ୍ ଅପଲୋଡ୍ ହୋଇପାରିବ ନାହିଁ।",
+      "moveLeft": "{{filename}} କୁ ବାମକୁ ଘୁଞ୍ଚାନ୍ତୁ",
+      "moveRight": "{{filename}} କୁ ଡାହାଣକୁ ଘୁଞ୍ଚାନ୍ତୁ"
     },
     "attachmentPasteHint": {
       "accessibility": "କ୍ଲିପବୋର୍ଡରୁ ଛବି ପେଷ୍ଟ କରନ୍ତୁ",

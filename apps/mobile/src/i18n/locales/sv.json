@@ -2547,7 +2547,9 @@
       "uploading": "Laddar upp…",
       "uploaded": "Uppladdad",
       "uploadFailedRetry": "Uppladdningen misslyckades. Tryck för att försöka igen.",
-      "uploadFailedTerminal": "Den här filen kan inte laddas upp."
+      "uploadFailedTerminal": "Den här filen kan inte laddas upp.",
+      "moveLeft": "Flytta {{filename}} åt vänster",
+      "moveRight": "Flytta {{filename}} åt höger"
     },
     "attachmentPasteHint": {
       "accessibility": "Klistra in bild från urklipp",

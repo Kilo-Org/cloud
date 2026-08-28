@@ -2547,7 +2547,9 @@
       "uploading": "Duke u ngarkuar…",
       "uploaded": "U ngarkua",
       "uploadFailedRetry": "Ngarkimi dështoi. Prekni për të riprovuar.",
-      "uploadFailedTerminal": "Ky skedar nuk mund të ngarkohet."
+      "uploadFailedTerminal": "Ky skedar nuk mund të ngarkohet.",
+      "moveLeft": "Zhvendosni {{filename}} majtas",
+      "moveRight": "Zhvendosni {{filename}} djathtas"
     },
     "attachmentPasteHint": {
       "accessibility": "Ngjit imazhin nga clipboard",

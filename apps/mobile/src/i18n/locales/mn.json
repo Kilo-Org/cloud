@@ -2547,7 +2547,9 @@
       "uploading": "Байршуулж байна…",
       "uploaded": "Байршуулсан",
       "uploadFailedRetry": "Байршуулалт амжилтгүй боллоо. Дахин оролдохын тулд товшино уу.",
-      "uploadFailedTerminal": "Энэ файлыг байршуулах боломжгүй."
+      "uploadFailedTerminal": "Энэ файлыг байршуулах боломжгүй.",
+      "moveLeft": "{{filename}} файлыг зүүн тийш зөөх",
+      "moveRight": "{{filename}} файлыг баруун тийш зөөх"
     },
     "attachmentPasteHint": {
       "accessibility": "Самбараас зураг буулгах",

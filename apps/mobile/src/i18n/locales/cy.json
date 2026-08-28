@@ -2623,7 +2623,9 @@
       "uploading": "Llwytho i fyny…",
       "uploaded": "Llwythwyd i fyny",
       "uploadFailedRetry": "Methodd llwytho i fyny. Tapiwch i ailgynnig.",
-      "uploadFailedTerminal": "Ni ellir uwchlwytho'r ffeil hon."
+      "uploadFailedTerminal": "Ni ellir uwchlwytho'r ffeil hon.",
+      "moveLeft": "Symud {{filename}} i'r chwith",
+      "moveRight": "Symud {{filename}} i'r dde"
     },
     "attachmentPasteHint": {
       "accessibility": "Gludo delwedd o'r clipfwrdd",

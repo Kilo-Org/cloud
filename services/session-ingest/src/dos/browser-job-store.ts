@@ -9,6 +9,7 @@ import {
   browserJobIdSchema,
   browserJobSnapshotSchema,
   browserProviderIdSchema,
+  browserProviderInboundMessageSchema,
   browserProviderOutboundMessageSchema,
   browserRequestSchema,
   type BrowserJobHandle,
@@ -466,21 +467,20 @@ function clampedDeadline(job: BrowserJobSnapshot, at: number): string {
   return new Date(Math.min(Date.parse(job.expiresAt), at)).toISOString();
 }
 
-async function providerPage(c: Context, provider: Provider, now: number, cursor?: string) {
+async function providerPage<
+  T extends Extract<
+    BrowserProviderInboundMessage,
+    { type: 'provider_snapshot' | 'provider_status_result' }
+  >,
+>(c: Context, frame: T, now: number, cursor?: string): Promise<T> {
   const deadlines = await list(c.tx, 'deadline', deadlineSchema, BROWSER_MAX_JOBS);
   const rows = deadlines.filter(
     row =>
-      row.providerId === provider.providerId &&
-      row.generation === provider.generation &&
+      row.providerId === frame.providerId &&
+      (frame.type !== 'provider_snapshot' || row.generation === frame.generation) &&
       row.expiresAt > now &&
       (!cursor || row.jobId > cursor)
   );
-  const frame: Extract<BrowserProviderInboundMessage, { type: 'provider_snapshot' }> = {
-    type: 'provider_snapshot',
-    providerId: provider.providerId,
-    generation: provider.generation,
-    jobs: [],
-  };
   for (const row of rows) {
     const job = await required(c.tx, key.job(row.jobId), jobSchema);
     const candidate = { ...frame, jobs: [...frame.jobs, job.snapshot], nextCursor: row.jobId };
@@ -492,6 +492,7 @@ async function providerPage(c: Context, provider: Provider, now: number, cursor?
     frame.jobs.push(job.snapshot);
   }
   if (frame.jobs.length < rows.length) frame.nextCursor = frame.jobs.at(-1)?.jobId;
+  parse(browserProviderInboundMessageSchema, frame);
   return frame;
 }
 
@@ -710,6 +711,34 @@ export function createBrowserJobStore(storage: Storage) {
     });
   }
 
+  async function providerStatus(socket: BrowserStoreSocket, input: unknown, now = Date.now()) {
+    const message = parse(browserProviderOutboundMessageSchema, input);
+    if (message.type !== 'provider_status') fail('invalid_request');
+    // Status authenticates the attachment without minting or binding a socket nonce.
+    const identity = parse(attachmentSchema, socket.deserializeAttachment());
+    if (identity.role !== 'web') fail('owner_mismatch');
+    const digest = await hash([message.providerProof]);
+    const result = await transaction(identity.kiloUserId, async c => {
+      const provider = await required(c.tx, key.provider(message.providerId), providerSchema);
+      const proofBinding = await read(c.tx, key.providerProof(digest), browserProviderIdSchema);
+      if (
+        provider.kiloUserId !== identity.kiloUserId ||
+        provider.providerId !== message.providerId ||
+        provider.digest !== digest ||
+        proofBinding !== message.providerId
+      )
+        fail('owner_mismatch');
+      const frame: Extract<BrowserProviderInboundMessage, { type: 'provider_status_result' }> = {
+        type: 'provider_status_result',
+        requestId: message.requestId,
+        providerId: provider.providerId,
+        jobs: [],
+      };
+      return providerPage(c, frame, now, message.cursor);
+    });
+    return result.value;
+  }
+
   async function registerProvider(socket: BrowserStoreSocket, input: unknown, now = Date.now()) {
     const message = parse(browserProviderOutboundMessageSchema, input);
     if (message.type !== 'provider_register') fail('invalid_request');
@@ -839,7 +868,8 @@ export function createBrowserJobStore(storage: Storage) {
 
   async function updateProvider(socket: BrowserStoreSocket, input: unknown, now = Date.now()) {
     const message = parse(browserProviderOutboundMessageSchema, input);
-    if (message.type === 'provider_register') fail('invalid_request');
+    if (message.type === 'provider_register' || message.type === 'provider_status')
+      fail('invalid_request');
     const identity = peer(socket, 'web');
     return transaction(identity.kiloUserId, async c => {
       const provider = await required(c.tx, key.provider(message.providerId), providerSchema);
@@ -892,9 +922,15 @@ export function createBrowserJobStore(storage: Storage) {
           }
         }
         await put(c.tx, key.provider(provider.providerId), provider);
+        const frame: Extract<BrowserProviderInboundMessage, { type: 'provider_snapshot' }> = {
+          type: 'provider_snapshot',
+          providerId: provider.providerId,
+          generation: provider.generation,
+          jobs: [],
+        };
         return {
           leaseExpiresAt: executionLease(provider),
-          snapshot: await providerPage(c, provider, now, message.cursor),
+          snapshot: await providerPage(c, frame, now, message.cursor),
         };
       }
       const job = await required(c.tx, key.job(message.jobId), jobSchema);
@@ -1105,6 +1141,7 @@ export function createBrowserJobStore(storage: Storage) {
   return {
     invoke,
     lookup,
+    providerStatus,
     registerProvider,
     dispatch,
     updateProvider,

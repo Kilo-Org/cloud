@@ -1370,6 +1370,337 @@ describe('browser job limits and retention', () => {
   });
 });
 
+describe('browser provider historical status', () => {
+  function historyRequest(
+    n = 1
+  ): Extract<BrowserProviderOutboundMessage, { type: 'provider_status' }> {
+    const { requestId, providerId, providerProof } = registration(n);
+    return { type: 'provider_status', requestId, providerId, providerProof };
+  }
+
+  it.each([
+    { status: 'succeeded', reason: 'completed' },
+    { status: 'failed', reason: 'runner_failed' },
+    { status: 'cancelled', reason: 'cancelled' },
+    { status: 'interrupted', reason: 'provider_lost' },
+    { status: 'timed_out', reason: 'execution_timeout' },
+  ] as const)(
+    'returns the original $status result across generations after restart',
+    async terminal => {
+      const f = await setup();
+      const job = await running(f);
+      const result: BrowserResult = { ...success(job), ...terminal };
+      const settled = (await f.store.updateProvider(f.panel, resultMessage(job, result), NOW)).value
+        .job;
+      await f.store.updateProvider(f.panel, quiesced(job), NOW);
+      const panel = socket('web', 'new-panel');
+      const grant = (await f.store.registerProvider(panel, registration(), NOW)).value;
+      const current = await admit(f, 2);
+      expect(grant.generation).toBeGreaterThan(job.generation);
+      const execution = await heartbeat(f, NOW, grant.providerId, grant.generation, panel);
+      expect(execution.value.snapshot?.jobs).toEqual([current]);
+      const reader = socket('web', 'history-only');
+      const attachment = reader.deserializeAttachment();
+      const before = f.fake.snapshot();
+      const input = { ...historyRequest(), requestId: uuid(912) };
+      const page = await createBrowserJobStore(f.fake.storage).providerStatus(
+        reader,
+        input,
+        NOW + 1
+      );
+      expect(page).toMatchObject({
+        type: 'provider_status_result',
+        requestId: input.requestId,
+        providerId: job.providerId,
+      });
+      expect(page.jobs).toHaveLength(2);
+      expect(page.jobs.find(retained => retained.jobId === job.jobId)).toEqual(settled);
+      expect(page.jobs.find(retained => retained.jobId === job.jobId)?.result).toEqual(result);
+      expect(page.jobs.find(retained => retained.jobId === current.jobId)).toEqual(current);
+      expect(browserProviderInboundMessageSchema.safeParse(page).success).toBe(true);
+      expect(JSON.stringify(page)).not.toMatch(/digest|socketId|parentProof|providerProof/);
+      expect(f.fake.snapshot()).toEqual(before);
+      expect(reader.deserializeAttachment()).toEqual(attachment);
+    }
+  );
+
+  it('returns fenced interruption history when reconnect registration cannot succeed', async () => {
+    const f = await setup();
+    const active = await running(f);
+    await admit(f, 2);
+    const interrupted = await f.store.disconnectProvider(f.panel, NOW);
+    const restarted = createBrowserJobStore(f.fake.storage);
+    const reader = socket('web', 'reconnected');
+    const input = registration(1, { generation: active.generation });
+    await expect(restarted.registerProvider(reader, input, NOW + 1)).rejects.toMatchObject({
+      code: 'provider_unavailable',
+    });
+    const before = f.fake.snapshot();
+    const attachment = reader.deserializeAttachment();
+    const page = await restarted.providerStatus(reader, historyRequest(), NOW + 1);
+    expect(page.jobs).toHaveLength(2);
+    expect(page.jobs).toEqual(
+      expect.arrayContaining(interrupted.effects.updates.map(update => update.job))
+    );
+    expect(page.jobs.find(job => job.jobId === active.jobId)).toMatchObject({
+      generation: active.generation,
+      status: 'interrupted',
+      result: { reason: 'provider_lost', effectsUncertain: true },
+    });
+    expect(await restarted.providerStatus(reader, historyRequest(), NOW + 2)).toEqual(page);
+    expect(reader.deserializeAttachment()).toEqual(attachment);
+    expect(f.fake.snapshot()).toEqual(before);
+    await expect(restarted.registerProvider(reader, input, NOW + 2)).rejects.toMatchObject({
+      code: 'provider_unavailable',
+    });
+    expect((await restarted.dispatch(active.providerId, NOW + 2)).value).toBeNull();
+    expect(f.fake.snapshot()).toEqual(before);
+  });
+
+  it.each(['queued', 'awaiting_approval', 'running'] as const)(
+    'reads retained %s work without renewing or expiring execution authority',
+    async state => {
+      const f = await setup();
+      let job = await admit(f);
+      if (state !== 'queued') job = await dispatch(f);
+      if (state === 'running') job = await approve(f, job);
+      const reader = socket('web');
+      const attachment = reader.deserializeAttachment();
+      const before = f.fake.snapshot();
+      const page = await f.store.providerStatus(
+        reader,
+        historyRequest(),
+        NOW + BROWSER_EXECUTION_TIMEOUT_MS + 1
+      );
+      expect(page.jobs).toEqual([job]);
+      expect(reader.deserializeAttachment()).toEqual(attachment);
+      expect(f.fake.snapshot()).toEqual(before);
+    }
+  );
+
+  it.each(['wrong proof', 'other provider', 'wrong user', 'CLI role', 'missing identity'] as const)(
+    'denies history for a %s without granting socket or ledger authority',
+    async variant => {
+      const f = await setup();
+      await admit(f);
+      await f.store.registerProvider(socket('web', 'other-panel'), registration(2), NOW);
+      await admit(f, 2, { providerId: registration(2).providerId });
+      const reader = socket(
+        variant === 'CLI role' ? 'cli' : 'web',
+        'web',
+        variant === 'wrong user' ? 'user_2' : 'user_1'
+      );
+      if (variant === 'missing identity')
+        reader.serializeAttachment({ role: 'web', connectionId: 'web' });
+      const input = {
+        ...historyRequest(),
+        ...(variant === 'wrong proof' ? { providerProof: 'b'.repeat(64) } : {}),
+        ...(variant === 'other provider' ? { providerId: registration(2).providerId } : {}),
+      };
+      const before = f.fake.snapshot();
+      const attachment = reader.deserializeAttachment();
+      await expect(f.store.providerStatus(reader, input, NOW)).rejects.toMatchObject({
+        code: variant === 'missing identity' ? 'invalid_request' : 'owner_mismatch',
+        retryable: false,
+      });
+      expect(f.fake.snapshot()).toEqual(before);
+      expect(reader.deserializeAttachment()).toEqual(attachment);
+    }
+  );
+
+  it.each([
+    'provider user',
+    'provider ID',
+    'missing proof binding',
+    'other proof binding',
+  ] as const)('rejects an inconsistent stored %s', async variant => {
+    const f = await setup();
+    await admit(f);
+    const providerKey = `browser/provider/${f.grant.providerId}`;
+    const provider = f.fake.get(providerKey) as { digest: string };
+    if (variant === 'provider user')
+      f.fake.seed(providerKey, { ...provider, kiloUserId: 'user_2' });
+    else if (variant === 'provider ID')
+      f.fake.seed(providerKey, { ...provider, providerId: registration(2).providerId });
+    else
+      f.fake.seed(
+        `browser/provider-proof/${provider.digest}`,
+        variant === 'missing proof binding' ? undefined : registration(2).providerId
+      );
+    const before = f.fake.snapshot();
+    await expect(
+      f.store.providerStatus(socket('web'), historyRequest(), NOW)
+    ).rejects.toMatchObject({
+      code: 'owner_mismatch',
+    });
+    expect(f.fake.snapshot()).toEqual(before);
+  });
+
+  it('keeps read-only requests out of mutation methods and mutation requests out of status', async () => {
+    const f = await setup();
+    await running(f);
+    const reader = socket('web');
+    const attachment = reader.deserializeAttachment();
+    const before = f.fake.snapshot();
+    await expect(f.store.updateProvider(reader, historyRequest(), NOW)).rejects.toMatchObject({
+      code: 'invalid_request',
+    });
+    await expect(f.store.providerStatus(reader, registration(), NOW)).rejects.toMatchObject({
+      code: 'invalid_request',
+    });
+    expect(f.fake.snapshot()).toEqual(before);
+    expect(reader.deserializeAttachment()).toEqual(attachment);
+  });
+
+  it.each([{ cursor: 'invalid' }, { providerProof: undefined }, { generation: 1 }])(
+    'rejects malformed history requests before storage access: %j',
+    async changes => {
+      const f = await setup();
+      const before = f.fake.snapshot();
+      f.fake.rejectReads();
+      await expect(
+        f.store.providerStatus(socket('web'), { ...historyRequest(), ...changes }, NOW)
+      ).rejects.toMatchObject({
+        code: 'invalid_request',
+      });
+      expect(f.fake.snapshot()).toEqual(before);
+    }
+  );
+
+  it('does not allocate a provider, owner, or socket binding for unknown history', async () => {
+    const fake = transactionalStorage();
+    const reader = socket('web');
+    const attachment = reader.deserializeAttachment();
+    await expect(
+      createBrowserJobStore(fake.storage).providerStatus(reader, historyRequest(), NOW)
+    ).rejects.toMatchObject({ code: 'not_found' });
+    expect(fake.snapshot()).toEqual([]);
+    expect(reader.deserializeAttachment()).toEqual(attachment);
+  });
+
+  it('returns an empty authorized page without allocating an owner or renewing a lease', async () => {
+    const f = await setup();
+    const before = f.fake.snapshot();
+    expect(
+      await f.store.providerStatus(socket('web'), historyRequest(), NOW + BROWSER_LEASE_MS)
+    ).toEqual({
+      type: 'provider_status_result',
+      requestId: historyRequest().requestId,
+      providerId: f.grant.providerId,
+      jobs: [],
+    });
+    expect(f.fake.snapshot()).toEqual(before);
+  });
+
+  it('paginates across generations in storage order without leaking another provider or skipping jobs', async () => {
+    const f = await setup();
+    const ids: string[] = [];
+    for (let n = 1; n <= 26; n++) {
+      if (n === 14) await f.store.registerProvider(f.panel, registration(), NOW);
+      ids.push((await admit(f, n)).jobId);
+    }
+    await f.store.registerProvider(socket('web', 'other-panel'), registration(2), NOW);
+    await admit(f, 27, { providerId: registration(2).providerId });
+    const before = f.fake.snapshot();
+    const reader = socket('web', 'history-only');
+    const first = await f.store.providerStatus(reader, historyRequest(), NOW);
+    expect(first.jobs).toHaveLength(25);
+    expect(first.nextCursor).toBeDefined();
+    const last = await f.store.providerStatus(
+      reader,
+      { ...historyRequest(), cursor: first.nextCursor },
+      NOW
+    );
+    expect(last.jobs).toHaveLength(1);
+    expect(last.nextCursor).toBeUndefined();
+    expect([...first.jobs, ...last.jobs].map(job => job.jobId)).toEqual(ids.sort());
+    const empty = await f.store.providerStatus(
+      reader,
+      { ...historyRequest(), cursor: ids.at(-1) },
+      NOW
+    );
+    expect(empty.jobs).toEqual([]);
+    expect(empty.nextCursor).toBeUndefined();
+    expect(f.fake.snapshot()).toEqual(before);
+  });
+
+  it('bounds serialized history bytes without truncating escaped or multibyte results', async () => {
+    const f = await setup();
+    const jobs: BrowserJobSnapshot[] = [];
+    for (let n = 1; n <= 4; n++) {
+      await admit(f, n);
+      const job = await approve(f, await dispatch(f));
+      const result = success(job, {
+        summary: 'é'.repeat(16_384),
+        evidence: [{ text: '\u0000'.repeat(4096) }],
+      });
+      const settled = (await f.store.updateProvider(f.panel, resultMessage(job, result), NOW)).value
+        .job;
+      if (!settled) throw new Error('Missing retained result');
+      jobs.push(settled);
+      await f.store.updateProvider(f.panel, quiesced(job), NOW);
+    }
+    const before = f.fake.snapshot();
+    const collected: BrowserJobSnapshot[] = [];
+    let cursor: string | undefined;
+    for (let n = 0; n < 4; n++) {
+      const page = await f.store.providerStatus(
+        socket('web'),
+        { ...historyRequest(), cursor },
+        NOW
+      );
+      expect(page.jobs.length).toBeGreaterThan(0);
+      expect(page.jobs.length).toBeLessThan(4);
+      expect(new TextEncoder().encode(JSON.stringify(page)).byteLength).toBeLessThan(128 * 1024);
+      expect(browserProviderInboundMessageSchema.safeParse(page).success).toBe(true);
+      collected.push(...page.jobs);
+      cursor = page.nextCursor;
+      if (!cursor) break;
+    }
+    expect(cursor).toBeUndefined();
+    expect(collected.map(job => job.jobId)).toEqual(jobs.map(job => job.jobId).sort());
+    expect(collected).toEqual(expect.arrayContaining(jobs));
+    expect(f.fake.snapshot()).toEqual(before);
+  });
+
+  it('omits jobs at retention expiry without cleaning records or changing terminal outcomes', async () => {
+    const f = await setup();
+    const job = await running(f, {
+      invocationId: invocation(1, NOW - BROWSER_RETENTION_MS + 1_000),
+    });
+    await f.store.updateProvider(f.panel, resultMessage(job), NOW);
+    const reader = socket('web');
+    const before = f.fake.snapshot();
+    const retained = await f.store.providerStatus(reader, historyRequest(), NOW + 999);
+    expect(retained.jobs).toMatchObject([{ jobId: job.jobId, result: success(job) }]);
+    const expired = await f.store.providerStatus(reader, historyRequest(), NOW + 1_000);
+    expect(expired.jobs).toEqual([]);
+    expect(expired.nextCursor).toBeUndefined();
+    expect(f.fake.snapshot()).toEqual(before);
+    await f.store.expire(NOW + 1_000);
+    await f.store.cleanup(NOW + 1_000);
+    const cleaned = f.fake.snapshot();
+    expect((await f.store.providerStatus(reader, historyRequest(), NOW + 1_001)).jobs).toEqual([]);
+    expect(f.fake.snapshot()).toEqual(cleaned);
+  });
+
+  it('fails closed when a retained job belongs to another provider', async () => {
+    const f = await setup();
+    const job = await admit(f);
+    const jobKey = `browser/job/${job.jobId}`;
+    const stored = f.fake.get(jobKey) as Record<string, unknown>;
+    f.fake.seed(jobKey, {
+      ...stored,
+      snapshot: { ...job, providerId: registration(2).providerId },
+    });
+    const before = f.fake.snapshot();
+    await expect(
+      f.store.providerStatus(socket('web'), historyRequest(), NOW)
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(f.fake.snapshot()).toEqual(before);
+  });
+});
+
 describe('browser job deadlines and read-only recovery', () => {
   it('returns empty deadlines and empty discovery without allocating a provider or job', async () => {
     const fake = transactionalStorage();

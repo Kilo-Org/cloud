@@ -1,0 +1,7 @@
+{
+  "name": "local-access-privacy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Native application-window visibility boundary",
+  "license": "SEE LICENSE IN ../../../../LICENSE.md"
+}

@@ -4,13 +4,18 @@ import type { inferRouterOutputs } from '@trpc/server';
 import { AlertTriangle, ExternalLink, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import type { FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 
 import { CreateSubOrganizationButton } from '@/components/organizations/OrganizationChildOrganizationsCard';
+import {
+  MemberManagementDrawerStackProvider,
+  useMemberManagementDrawerStack,
+} from '@/components/organizations/sub-organizations/drawer/MemberManagementDrawerStack';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -30,7 +35,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatMicrodollars } from '@/lib/admin-utils';
-import { formatLargeNumber } from '@/lib/utils';
+import { cn, formatLargeNumber } from '@/lib/utils';
 import type { RootRouter } from '@/routers/root-router';
 import type { Granularity, PeriodOption } from '@/components/usage-analytics/types';
 
@@ -166,12 +171,93 @@ export function OverviewSection({
   );
 }
 
-export function PeopleSection({ data }: { data: People }) {
+/**
+ * A person's role badge for one organization, in either the memberships or
+ * invitations column. Clickable (opens the manage-members drawer for that
+ * org) when the viewer has `canManageMemberships` there, otherwise a plain
+ * read-only badge — the same manage/read-only split applies to both
+ * columns, so this is shared rather than branched inline twice.
+ */
+function OrganizationRoleBadge({
+  label,
+  variant,
+  className,
+  canManage,
+  onManage,
+}: {
+  label: string;
+  variant: 'secondary' | 'outline';
+  className?: string;
+  canManage: boolean;
+  onManage: () => void;
+}) {
+  if (!canManage) {
+    return (
+      <Badge variant={variant} className={className}>
+        {label}
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      variant={variant}
+      asChild
+      className={cn(
+        'hover:bg-accent focus-visible:ring-ring/50 cursor-pointer focus-visible:ring-[3px]',
+        className
+      )}
+    >
+      <button type="button" onClick={onManage}>
+        {label}
+      </button>
+    </Badge>
+  );
+}
+
+export function PeopleSection({ organizationId, data }: { organizationId: string; data: People }) {
+  return (
+    <MemberManagementDrawerStackProvider parentOrganizationId={organizationId} people={data}>
+      <PeopleSectionContent data={data} />
+    </MemberManagementDrawerStackProvider>
+  );
+}
+
+function PeopleSectionContent({ data }: { data: People }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const drawer = useMemberManagementDrawerStack();
   const filterKeys = ['search', 'subOrganization', 'role', 'status', 'assignment'] as const;
   const hasFilters = filterKeys.some(key => searchParams.has(key));
+
+  // The bulk-action toolbar below reads this to seed the add/remove
+  // wizards. Kept as plain local state since it never needs to survive
+  // navigation.
+  const [selectedIdentityKeys, setSelectedIdentityKeys] = useState<Set<string>>(new Set());
+  const pageIdentityKeys = data.people.map(person => person.identityKey);
+  const selectedOnPageCount = pageIdentityKeys.filter(key => selectedIdentityKeys.has(key)).length;
+  const allSelectedOnPage =
+    pageIdentityKeys.length > 0 && selectedOnPageCount === pageIdentityKeys.length;
+
+  function toggleSelectAllOnPage(checked: boolean) {
+    setSelectedIdentityKeys(previous => {
+      const next = new Set(previous);
+      for (const key of pageIdentityKeys) {
+        if (checked) next.add(key);
+        else next.delete(key);
+      }
+      return next;
+    });
+  }
+
+  function toggleSelected(identityKey: string, checked: boolean) {
+    setSelectedIdentityKeys(previous => {
+      const next = new Set(previous);
+      if (checked) next.add(identityKey);
+      else next.delete(identityKey);
+      return next;
+    });
+  }
 
   function updateQuery(updates: Record<string, string | null>, preservePage = false) {
     const next = new URLSearchParams(searchParams);
@@ -386,10 +472,60 @@ export function PeopleSection({ data }: { data: People }) {
               </div>
             )}
           </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-muted-foreground text-sm tabular-nums">
+              {selectedIdentityKeys.size} selected
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => drawer.open({ type: 'invite-person' })}
+              >
+                Invite person…
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selectedIdentityKeys.size === 0}
+                onClick={() =>
+                  drawer.open({
+                    type: 'add-people',
+                    seededIdentityKeys: [...selectedIdentityKeys],
+                  })
+                }
+              >
+                Add to sub-organization…
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selectedIdentityKeys.size === 0}
+                onClick={() =>
+                  drawer.open({
+                    type: 'remove-people',
+                    seededIdentityKeys: [...selectedIdentityKeys],
+                  })
+                }
+              >
+                Remove from sub-organization…
+              </Button>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      aria-label="Select all people on this page"
+                      checked={
+                        allSelectedOnPage ? true : selectedOnPageCount > 0 ? 'indeterminate' : false
+                      }
+                      disabled={pageIdentityKeys.length === 0}
+                      onCheckedChange={toggleSelectAllOnPage}
+                    />
+                  </TableHead>
                   <TableHead>Person</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Parent role</TableHead>
@@ -400,6 +536,13 @@ export function PeopleSection({ data }: { data: People }) {
               <TableBody>
                 {data.people.map(person => (
                   <TableRow key={person.identityKey}>
+                    <TableCell>
+                      <Checkbox
+                        aria-label={`Select ${person.name || person.email}`}
+                        checked={selectedIdentityKeys.has(person.identityKey)}
+                        onCheckedChange={checked => toggleSelected(person.identityKey, checked)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{person.name}</TableCell>
                     <TableCell className="text-muted-foreground">{person.email}</TableCell>
                     <TableCell className="capitalize">
@@ -408,9 +551,19 @@ export function PeopleSection({ data }: { data: People }) {
                     <TableCell className="min-w-72">
                       <div className="flex flex-wrap gap-2">
                         {person.memberships.map(membership => (
-                          <Badge key={membership.organizationId} variant="secondary">
-                            {membership.organizationName}: {membership.role.replace('_', ' ')}
-                          </Badge>
+                          <OrganizationRoleBadge
+                            key={membership.organizationId}
+                            label={`${membership.organizationName}: ${membership.role.replace('_', ' ')}`}
+                            variant="secondary"
+                            canManage={membership.canManageMemberships}
+                            onManage={() =>
+                              drawer.open({
+                                type: 'manage-members',
+                                childOrganizationId: membership.organizationId,
+                                childOrganizationName: membership.organizationName,
+                              })
+                            }
+                          />
                         ))}
                         {person.memberships.length === 0 && (
                           <span className="text-muted-foreground">No sub-organization</span>
@@ -428,12 +581,20 @@ export function PeopleSection({ data }: { data: People }) {
                           </Badge>
                         ))}
                         {person.invitations.map(invitation => (
-                          <span
+                          <OrganizationRoleBadge
                             key={`${invitation.organizationId}-${invitation.role}`}
-                            className="text-muted-foreground text-xs"
-                          >
-                            {invitation.organizationName}: {invitation.role.replace('_', ' ')}
-                          </span>
+                            label={`${invitation.organizationName}: ${invitation.role.replace('_', ' ')}`}
+                            variant="outline"
+                            className="text-xs font-normal"
+                            canManage={invitation.canManageMemberships}
+                            onManage={() =>
+                              drawer.open({
+                                type: 'manage-members',
+                                childOrganizationId: invitation.organizationId,
+                                childOrganizationName: invitation.organizationName,
+                              })
+                            }
+                          />
                         ))}
                       </div>
                     </TableCell>
@@ -441,7 +602,7 @@ export function PeopleSection({ data }: { data: People }) {
                 ))}
                 {data.people.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-muted-foreground py-10 text-center">
+                    <TableCell colSpan={6} className="text-muted-foreground py-10 text-center">
                       No people match the current filters.
                     </TableCell>
                   </TableRow>

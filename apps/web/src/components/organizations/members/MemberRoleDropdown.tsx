@@ -135,7 +135,15 @@ export function MemberRoleDropdown({
           <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      {/* The member-management drawer (`DrawerStack.tsx`) renders each
+          layer's panel above this menu's portaled content's default
+          `z-50` — this override matches the one already established for a
+          `Select` in the same drawer-stack family
+          (`ModelAccessPolicyEditor.tsx`), so this menu paints above the
+          drawer panel instead of invisibly behind it. Applied
+          unconditionally since it's harmless wherever this dropdown is
+          rendered, including the plain (non-drawer) Members page. */}
+      <DropdownMenuContent align="end" className="z-[70]">
         {ASSIGNABLE_ROLES.map(role => {
           const isCurrentRole = member.role === role;
           const isAllowed = availableRoles.includes(role);

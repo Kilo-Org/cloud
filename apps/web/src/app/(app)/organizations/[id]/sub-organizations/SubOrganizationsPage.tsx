@@ -224,7 +224,7 @@ export function SubOrganizationsPage({
 
         <TabsContent value="people" className="mt-6">
           <SectionState isLoading={people.isLoading} error={people.error}>
-            {people.data && <PeopleSection data={people.data} />}
+            {people.data && <PeopleSection organizationId={organizationId} data={people.data} />}
           </SectionState>
         </TabsContent>
 

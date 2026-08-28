@@ -14,7 +14,10 @@ import {
 } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganization,
+  ORGANIZATION_MANAGE_ROLES,
+} from '@kilocode/app-shared/organizations';
 import { and, asc, count, desc, eq, gt, inArray, isNull, ne, or, sql, sum } from 'drizzle-orm';
 import * as z from 'zod';
 
@@ -31,7 +34,10 @@ import {
 } from '@/lib/organizations/sub-organizations/model-policy';
 import { toMicrodollars } from '@/lib/utils';
 import { createTRPCRouter } from '@/lib/trpc/init';
-import { organizationBillingProcedure } from '@/routers/organizations/utils';
+import {
+  getOrganizationsAccessRoles,
+  organizationBillingProcedure,
+} from '@/routers/organizations/utils';
 
 const SeatCountSchema = z.object({
   used: z.number().int().nonnegative(),
@@ -91,6 +97,7 @@ const SubOrganizationPeopleOutputSchema = z.object({
         .object({
           role: OrganizationRoleSchema,
           status: z.literal('accepted'),
+          canManageMemberships: z.boolean(),
         })
         .nullable(),
       memberships: z.array(
@@ -99,15 +106,18 @@ const SubOrganizationPeopleOutputSchema = z.object({
           organizationName: z.string(),
           role: OrganizationRoleSchema,
           status: z.literal('accepted'),
+          canManageMemberships: z.boolean(),
         })
       ),
       invitations: z.array(
         z.object({
+          inviteId: z.string(),
           organizationId: z.uuid(),
           organizationName: z.string(),
           isParent: z.boolean(),
           role: OrganizationRoleSchema,
           status: z.literal('pending'),
+          canManageMemberships: z.boolean(),
         })
       ),
       statuses: z.array(z.enum(['accepted', 'pending'])),
@@ -529,49 +539,51 @@ export const organizationSubOrganizationsRouter = createTRPCRouter({
   people: subOrganizationManagementProcedure
     .input(SubOrganizationPeopleInputSchema)
     .output(SubOrganizationPeopleOutputSchema)
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const children = await getChildrenForSummary(input.organizationId);
       const childIds = children.map(child => child.id);
       const membershipOrganizationIds = [input.organizationId, ...childIds];
-      const [membershipCounts, ownerRows, invitationRows] = await Promise.all([
-        db
-          .select({
-            organizationId: organization_memberships.organization_id,
-            role: organization_memberships.role,
-            count: count(),
-          })
-          .from(organization_memberships)
-          .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-          .where(
-            and(
-              inArray(organization_memberships.organization_id, childIds),
-              eq(kilocode_users.is_bot, false)
-            )
-          )
-          .groupBy(organization_memberships.organization_id, organization_memberships.role),
-        childIds.length === 0
-          ? Promise.resolve([])
-          : db
-              .select({
-                organizationId: organization_memberships.organization_id,
-                kiloUserId: kilocode_users.id,
-                name: kilocode_users.google_user_name,
-                email: kilocode_users.google_user_email,
-              })
-              .from(organization_memberships)
-              .innerJoin(
-                kilocode_users,
-                eq(kilocode_users.id, organization_memberships.kilo_user_id)
+      const [membershipCounts, ownerRows, invitationRows, accessRolesByOrganization] =
+        await Promise.all([
+          db
+            .select({
+              organizationId: organization_memberships.organization_id,
+              role: organization_memberships.role,
+              count: count(),
+            })
+            .from(organization_memberships)
+            .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+            .where(
+              and(
+                inArray(organization_memberships.organization_id, childIds),
+                eq(kilocode_users.is_bot, false)
               )
-              .where(
-                and(
-                  inArray(organization_memberships.organization_id, childIds),
-                  eq(organization_memberships.role, 'owner'),
-                  eq(kilocode_users.is_bot, false)
+            )
+            .groupBy(organization_memberships.organization_id, organization_memberships.role),
+          childIds.length === 0
+            ? Promise.resolve([])
+            : db
+                .select({
+                  organizationId: organization_memberships.organization_id,
+                  kiloUserId: kilocode_users.id,
+                  name: kilocode_users.google_user_name,
+                  email: kilocode_users.google_user_email,
+                })
+                .from(organization_memberships)
+                .innerJoin(
+                  kilocode_users,
+                  eq(kilocode_users.id, organization_memberships.kilo_user_id)
                 )
-              ),
-        getInvitationCounts(childIds),
-      ]);
+                .where(
+                  and(
+                    inArray(organization_memberships.organization_id, childIds),
+                    eq(organization_memberships.role, 'owner'),
+                    eq(kilocode_users.is_bot, false)
+                  )
+                ),
+          getInvitationCounts(childIds),
+          getOrganizationsAccessRoles(ctx, membershipOrganizationIds),
+        ]);
       const invitationCounts = buildInvitationCountMaps(invitationRows);
       const roleCountsByChild = new Map<string, RoleBreakdown>();
       for (const row of membershipCounts) {
@@ -711,6 +723,7 @@ export const organizationSubOrganizationsRouter = createTRPCRouter({
                   identityKey: sql<string>`lower(${organization_invitations.email})`,
                   organizationId: organization_invitations.organization_id,
                   role: organization_invitations.role,
+                  inviteId: organization_invitations.id,
                 })
                 .from(organization_invitations)
                 .where(
@@ -728,6 +741,11 @@ export const organizationSubOrganizationsRouter = createTRPCRouter({
       ]);
       const membershipsByIdentity = Map.groupBy(pageMemberships, row => row.identityKey);
       const invitationsByIdentity = Map.groupBy(pageInvitations, row => row.identityKey);
+      // UX hint only: tells the client whether to render a manage affordance vs
+      // a read-only badge for this organizationId. Never a security boundary —
+      // every mutation re-checks access via ensureOrganizationAccess independently.
+      const canManageMembershipsFor = (organizationId: string) =>
+        canManageOrganization(accessRolesByOrganization.get(organizationId));
 
       return {
         children: children.map(child => {
@@ -767,7 +785,11 @@ export const organizationSubOrganizationsRouter = createTRPCRouter({
             name: identity.name,
             email: identity.email,
             parentMembership: parentMembership
-              ? { role: parentMembership.role, status: 'accepted' as const }
+              ? {
+                  role: parentMembership.role,
+                  status: 'accepted' as const,
+                  canManageMemberships: canManageMembershipsFor(parentMembership.organizationId),
+                }
               : null,
             memberships: memberships
               .filter(membership => membership.organizationId !== input.organizationId)
@@ -780,6 +802,7 @@ export const organizationSubOrganizationsRouter = createTRPCRouter({
                         organizationName: organization.name,
                         role: membership.role,
                         status: 'accepted' as const,
+                        canManageMemberships: canManageMembershipsFor(membership.organizationId),
                       },
                     ]
                   : [];
@@ -791,11 +814,13 @@ export const organizationSubOrganizationsRouter = createTRPCRouter({
                 return organization
                   ? [
                       {
+                        inviteId: invitation.inviteId,
                         organizationId: invitation.organizationId,
                         organizationName: organization.name,
                         isParent: organization.isParent,
                         role: invitation.role,
                         status: 'pending' as const,
+                        canManageMemberships: canManageMembershipsFor(invitation.organizationId),
                       },
                     ]
                   : [];

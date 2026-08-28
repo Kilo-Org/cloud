@@ -86,10 +86,19 @@ function DailyUsageLimitDisplay({ member, isSalesDemo }: DailyUsageLimitDisplayP
   return null;
 }
 
-const canManageMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
+// Exported (along with `canActOnMemberRole` and `canRemoveMember` below) for
+// reuse by the sub-organizations bulk-action wizards, which mirror these
+// same predictive checks per row instead of reimplementing them.
+export const canManageMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
   isKiloAdmin || canManageOrganization(role);
 
-const canInviteMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
+// `ChildTeamsControl` below gates its own edit affordance on this exact
+// check; the add-people wizard's permission precheck mirrors it rather than
+// the stricter owner/billing_manager check `setChildMemberships` itself
+// enforces, so an admin who fails that server check still sees the same
+// per-row failure message an existing `ChildTeamsControl` click would give
+// them, instead of two different UIs disagreeing about who can try.
+export const canInviteMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
   canManageMembers(role, isKiloAdmin) || role === 'billing_manager';
 
 /**
@@ -97,7 +106,7 @@ const canInviteMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean
  * Owner management is reserved for owners, so an admin must not be offered
  * controls the server rejects with FORBIDDEN.
  */
-const canActOnMemberRole = (
+export const canActOnMemberRole = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean,
   targetRole: OrganizationRole
@@ -108,7 +117,7 @@ const canActOnMemberRole = (
 // - Owners can remove anyone except themselves
 // - Admins can remove anyone except themselves and owners
 // - Billing managers and members cannot remove anyone
-const canRemoveMember = (
+export const canRemoveMember = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean,
   isCurrentUser: boolean,

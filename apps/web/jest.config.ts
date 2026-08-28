@@ -11,6 +11,7 @@ const config: Config = {
         jsc: {
           parser: {
             syntax: 'typescript',
+            tsx: true,
             decorators: true,
             //we're doing this to be bug-for-bug compatible with SWC, because that's what Vercel uses
             //And the whole point of testing is to be able to avoid bugs from hitting prod.
@@ -18,6 +19,12 @@ const config: Config = {
           transform: {
             legacyDecorator: true,
             decoratorMetadata: true,
+            // Matches tsconfig.json's `jsx: "react-jsx"` so component tests
+            // don't need to import React solely to satisfy the classic
+            // JSX transform's implicit `React.createElement` reference.
+            react: {
+              runtime: 'automatic',
+            },
           },
         },
       },
@@ -35,7 +42,11 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^server-only$': '<rootDir>/src/tests/setup/__mocks__/server-only.js',
   },
-  testMatch: ['**/src/**/*.test.ts', '<rootDir>/../../packages/db/src/**/*.test.ts'],
+  testMatch: [
+    '**/src/**/*.test.ts',
+    '**/src/**/*.test.tsx',
+    '<rootDir>/../../packages/db/src/**/*.test.ts',
+  ],
   testPathIgnorePatterns: [
     '<rootDir>/../../.kilocode/',
     '<rootDir>/../../services/cloud-agent-next/',
@@ -60,6 +71,7 @@ const config: Config = {
   maxWorkers: process.env.JEST_MAX_WORKERS ? process.env.JEST_MAX_WORKERS : '50%',
 
   globalSetup: '<rootDir>/src/tests/setup/globalSetup.ts',
+  setupFiles: ['<rootDir>/src/tests/setup/jsdomPolyfills.ts'],
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup/workerSetup.ts'],
 
   silent: process.env.JEST_SILENT === 'true',

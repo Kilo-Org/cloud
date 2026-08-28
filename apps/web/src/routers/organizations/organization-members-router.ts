@@ -391,6 +391,10 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       for (const membership of existingMemberships) {
         if (selectedChildOrganizationIds.has(membership.organizationId)) continue;
+        // Never silently strip an elevated child-org role just because the
+        // caller omitted it from `childOrganizationIds`; this is a bulk
+        // reconcile of ordinary memberships, not a targeted role edit.
+        if (membership.role !== 'member') continue;
 
         const wasRemoved = await db.transaction(async tx => {
           const result = await removeUserFromOrganization(

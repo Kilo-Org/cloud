@@ -137,15 +137,20 @@ jobs:
 
       # A consumer computes the hash on macOS; the gate computed it on
       # Linux. A mismatch would publish an artifact nobody can ever find,
-      # so fail loudly instead.
-      - name: Verify the hash is platform-independent
+      # so fail loudly instead. Android is checked here too: it builds on
+      # Linux but is consumed on macOS, and nothing else compares the two.
+      - name: Verify the hashes are platform-independent
         run: |
           set -euo pipefail
-          mac_hash=$(pnpm exec tsx dev/local/mobile-native-hash.ts ios)
-          if [ "$mac_hash" != "${{ needs.gate.outputs.ios_hash }}" ]; then
-            echo "::error::nativeHash differs between Linux (${{ needs.gate.outputs.ios_hash }}) and macOS ($mac_hash)"
-            exit 1
-          fi
+          check() {
+            mac_hash=$(pnpm exec tsx dev/local/mobile-native-hash.ts "$1")
+            if [ "$mac_hash" != "$2" ]; then
+              echo "::error::$1 nativeHash differs between Linux ($2) and macOS ($mac_hash)"
+              exit 1
+            fi
+          }
+          check ios "${{ needs.gate.outputs.ios_hash }}"
+          check android "${{ needs.gate.outputs.android_hash }}"
 
       - name: Expo prebuild
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform ios
@@ -163,11 +168,21 @@ jobs:
             build
 
       # A tarball keeps the executable bit that upload-artifact's zip drops.
+      # The artifact name keys only on nativeHash, but the local cache key
+      # also keys on the Xcode and simulator SDK. Record them so a consumer
+      # on a different toolchain refuses the binary (see
+      # dev/local/mobile-remote-native.ts) instead of caching an app its
+      # simulator runtime cannot launch.
       - name: Package
         run: |
           set -euo pipefail
-          tar -C "$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator" \
-            -czf "ios-${{ needs.gate.outputs.ios_hash }}.tar.gz" Kilo.app
+          products="$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator"
+          xcode=$(xcodebuild -version | sed -n 's/^Build version \(.*\)$/\1/p')
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          printf '{"xcodeBuildVersion":"%s","simulatorSdkVersion":"%s"}\n' "$xcode" "$sdk" \
+            > "$products/toolchain.json"
+          tar -C "$products" \
+            -czf "ios-${{ needs.gate.outputs.ios_hash }}.tar.gz" Kilo.app toolchain.json
 
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:

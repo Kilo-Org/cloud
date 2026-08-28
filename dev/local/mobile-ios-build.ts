@@ -901,8 +901,14 @@ export type BuildDeps = {
   sleep?: (ms: number) => Promise<void>;
   // Fetch a prebuilt Kilo.app for this nativeHash into productsDir (the
   // directory locateProducedApp reads). Returns false on a miss. When set,
-  // a cache miss tries this before compiling locally.
-  fetchRemote?: (args: { nativeHash: string; productsDir: string }) => Promise<boolean>;
+  // a cache miss tries this before compiling locally. `toolchain` is the
+  // host's own Xcode and simulator SDK: the artifact is keyed on nativeHash
+  // alone, so the fetcher must reject one built by a different toolchain.
+  fetchRemote?: (args: {
+    nativeHash: string;
+    productsDir: string;
+    toolchain: { xcodeBuildVersion: string; simulatorSdkVersion: string };
+  }) => Promise<boolean>;
 };
 
 export type RunFingerprintDeps = {
@@ -1083,6 +1089,10 @@ async function tryRemotePublish(args: {
           const fetched = await fetchRemote({
             nativeHash: args.compatibility.nativeHash,
             productsDir,
+            toolchain: {
+              xcodeBuildVersion: args.compatibility.xcodeBuildVersion,
+              simulatorSdkVersion: args.compatibility.simulatorSdkVersion,
+            },
           });
           if (!fetched) throw new Error('remote native artifact unavailable');
         },
@@ -1273,7 +1283,8 @@ async function main(): Promise<void> {
         }),
       validateClaim: (udid: string, worktreeRoot: string, claimRoot: string) =>
         validateSimulatorClaim(udid, worktreeRoot, claimRoot),
-      fetchRemote: async ({ nativeHash, productsDir }) => fetchIosApp({ nativeHash, productsDir }),
+      fetchRemote: async ({ nativeHash, productsDir, toolchain }) =>
+        fetchIosApp({ nativeHash, productsDir, toolchain }),
     });
     process.stdout.write(`Installed ${parsed.udid}\n`);
     return;

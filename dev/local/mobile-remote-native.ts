@@ -156,6 +156,7 @@ export function pickDispatchedRun(
 // Only possible when HEAD is exactly the pushed upstream commit — the
 // runner builds from the remote ref, so anything else builds the wrong tree.
 function dispatchAndWatch(platform: 'ios' | 'android'): boolean {
+  const startedAt = Date.now();
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
   if (!branch || branch === 'HEAD') {
     log('detached HEAD; cannot dispatch a remote build');
@@ -201,22 +202,64 @@ function dispatchAndWatch(platform: 'ios' | 'android'): boolean {
       stdio: ['ignore', process.stderr, process.stderr],
       timeout: WATCH_TIMEOUT_MS,
     });
+    log(`remote build run ${runId} finished after ${waited(startedAt)}`);
     return true;
   } catch (error) {
-    log(`remote build run ${runId} failed or timed out (${message(error)})`);
+    log(
+      `remote build run ${runId} failed or timed out after ${waited(startedAt)} (${message(error)})`
+    );
     return false;
+  }
+}
+
+// Wall clock spent waiting on CI. Waiting only pays while it stays under a
+// local compile; log it so that stays measurable instead of assumed.
+function waited(since: number): string {
+  return `${((Date.now() - since) / 60000).toFixed(1)}m`;
+}
+
+export type IosToolchain = { xcodeBuildVersion: string; simulatorSdkVersion: string };
+
+// The artifact name keys on nativeHash alone, but the local cache key also
+// keys on the Xcode and simulator SDK that produced the binary. Without this
+// check a host publishes a runner-built .app under its own toolchain's key;
+// when the runner's simulator SDK is newer than the host's runtime the app
+// never launches, and the entry sticks under a key the host keeps
+// recomputing. Throwing here drops us onto the local build instead.
+export function assertToolchainMatches(actual: unknown, expected: IosToolchain): void {
+  const found = actual as Partial<IosToolchain> | null;
+  if (
+    !found ||
+    found.xcodeBuildVersion !== expected.xcodeBuildVersion ||
+    found.simulatorSdkVersion !== expected.simulatorSdkVersion
+  ) {
+    throw new Error(
+      `artifact toolchain ${found?.xcodeBuildVersion}/${found?.simulatorSdkVersion} does not match local ${expected.xcodeBuildVersion}/${expected.simulatorSdkVersion}`
+    );
   }
 }
 
 // Unpack a remote iOS artifact's Kilo.app into the products directory the
 // local build pipeline reads from. The artifact carries a tarball because
 // upload-artifact's zip drops the executable bit.
-export function fetchIosApp(args: { nativeHash: string; productsDir: string }): boolean {
+export function fetchIosApp(args: {
+  nativeHash: string;
+  productsDir: string;
+  toolchain: IosToolchain;
+}): boolean {
   return withArtifact('ios', args.nativeHash, unpacked => {
     const tarball = path.join(unpacked, `ios-${args.nativeHash}.tar.gz`);
     if (!fs.existsSync(tarball))
       throw new Error(`artifact is missing ios-${args.nativeHash}.tar.gz`);
-    execFileSync('tar', ['-xzf', tarball, '-C', args.productsDir], { stdio: 'ignore' });
+    // Read the toolchain first, into scratch, so productsDir only ever
+    // receives Kilo.app. An artifact built before toolchain.json existed
+    // fails this extract, which is the same fall-back-to-local path.
+    execFileSync('tar', ['-xzf', tarball, '-C', unpacked, 'toolchain.json'], { stdio: 'ignore' });
+    assertToolchainMatches(
+      JSON.parse(fs.readFileSync(path.join(unpacked, 'toolchain.json'), 'utf8')),
+      args.toolchain
+    );
+    execFileSync('tar', ['-xzf', tarball, '-C', args.productsDir, 'Kilo.app'], { stdio: 'ignore' });
     if (!fs.existsSync(path.join(args.productsDir, 'Kilo.app'))) {
       throw new Error('artifact tarball did not contain Kilo.app');
     }

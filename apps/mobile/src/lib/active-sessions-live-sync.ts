@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the serialized loading state machine retains its existing attachment and refresh contracts */
 /**
  * App-level owner for active-sessions live-sync: retains UserWebConnection,
  * applies onSystemEvent payloads to trpc.activeSessions.list via a serialized
@@ -16,6 +17,8 @@ import {
 } from './active-sessions-live';
 
 import { type UserWebConnection, type UserWebSystemEvent } from '@kilocode/cloud-agent-sdk';
+import { type AuthenticatedOwner, subscribeAuthenticatedOwner } from '@/lib/context-scope';
+import { assertTransportOwner, isTransportOwner } from '@/lib/local-access-transport';
 
 const ENRICHMENT_RETRY_MIN_INTERVAL_MS = 10_000;
 
@@ -41,6 +44,7 @@ type CreateLiveSyncOptions = {
   queryClient: LiveSyncQueryClient;
   queryKey: QueryKey;
   queryFn: QueryFunction<CachedActiveSessionsData>;
+  readonly owner: AuthenticatedOwner;
   now?: () => number;
 };
 
@@ -51,6 +55,8 @@ export class ActiveSessionsLiveSync {
   private readonly queryKey: QueryKey;
   private readonly queryFn: QueryFunction<CachedActiveSessionsData>;
   private readonly now: () => number;
+  private readonly owner: AuthenticatedOwner;
+  private ownerUnsubscribe: (() => void) | null = null;
 
   // eslint-disable-next-line promise/prefer-await-to-then
   private writeQueue: Promise<void> = Promise.resolve();
@@ -78,7 +84,13 @@ export class ActiveSessionsLiveSync {
     this.connection = options.connection;
     this.queryClient = options.queryClient;
     this.queryKey = options.queryKey;
-    this.queryFn = options.queryFn;
+    this.owner = options.owner;
+    this.queryFn = async context => {
+      assertTransportOwner(this.owner);
+      const result = await options.queryFn(context);
+      assertTransportOwner(this.owner);
+      return result;
+    };
     this.now = options.now ?? (() => Date.now());
     this.lastConnectedState = this.connection.isConnected();
   }
@@ -100,17 +112,30 @@ export class ActiveSessionsLiveSync {
     this.connectionListenerUnsubscribe = this.connection.onConnectionChange(connected => {
       this.handleConnectionChange(connected);
     });
+    this.ownerUnsubscribe = subscribeAuthenticatedOwner(() => {
+      if (!isTransportOwner(this.owner)) {
+        this.detach();
+      }
+    });
+    if (!isTransportOwner(this.owner)) {
+      this.detach();
+    }
     return () => {
       this.detach();
     };
   }
 
   detach(): void {
+    if (this.releaseRetain === null) {
+      return;
+    }
+    this.ownerUnsubscribe?.();
+    this.ownerUnsubscribe = null;
     this.attachmentEpoch += 1;
     this.pendingReasons.clear();
     this.systemListenerUnsubscribe?.();
     this.connectionListenerUnsubscribe?.();
-    this.releaseRetain?.();
+    this.releaseRetain();
     this.systemListenerUnsubscribe = null;
     this.connectionListenerUnsubscribe = null;
     this.releaseRetain = null;
@@ -215,7 +240,7 @@ export class ActiveSessionsLiveSync {
     // Serialized cancel+setQueryData; never awaits network.
     this.writeQueue = (async () => {
       await this.writeQueue;
-      if (attachmentEpoch !== this.attachmentEpoch) {
+      if (attachmentEpoch !== this.attachmentEpoch || !isTransportOwner(this.owner)) {
         return;
       }
       // Cancel in-flight fetch so stale results cannot overwrite.
@@ -223,7 +248,7 @@ export class ActiveSessionsLiveSync {
         this.inFlightFetchCanceled = true;
       }
       await this.queryClient.cancelQueries({ queryKey: this.queryKey });
-      if (attachmentEpoch !== this.attachmentEpoch) {
+      if (attachmentEpoch !== this.attachmentEpoch || !isTransportOwner(this.owner)) {
         return;
       }
       this.queryClient.setQueryData<CachedActiveSessionsData>(this.queryKey, current => {
@@ -295,7 +320,11 @@ export class ActiveSessionsLiveSync {
   }
 
   private async processFetchQueue(attachmentEpoch: number): Promise<void> {
-    if (attachmentEpoch !== this.attachmentEpoch || this.pendingReasons.size === 0) {
+    if (
+      attachmentEpoch !== this.attachmentEpoch ||
+      !isTransportOwner(this.owner) ||
+      this.pendingReasons.size === 0
+    ) {
       return;
     }
     if (this.isFetchInFlight) {
@@ -308,7 +337,7 @@ export class ActiveSessionsLiveSync {
     let success = false;
     try {
       await this.queryClient.cancelQueries({ queryKey: this.queryKey });
-      if (attachmentEpoch === this.attachmentEpoch) {
+      if (attachmentEpoch === this.attachmentEpoch && isTransportOwner(this.owner)) {
         // staleTime:0 forces a network call after setQueryData.
         const fetchPromise = this.queryClient.fetchQuery({
           queryKey: this.queryKey,
@@ -324,7 +353,7 @@ export class ActiveSessionsLiveSync {
     } finally {
       this.isFetchInFlight = false;
     }
-    if (attachmentEpoch !== this.attachmentEpoch) {
+    if (attachmentEpoch !== this.attachmentEpoch || !isTransportOwner(this.owner)) {
       this.inFlightReasons = null;
       this.notifyFetchCompletion();
       return;

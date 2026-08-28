@@ -7,11 +7,11 @@ import {
   makeFakeQueryClient,
   makeQueryFn,
   QUERY_KEY,
-  setupTimers,
+  setupLiveSync,
   type SystemEvent,
 } from '@/lib/active-sessions-live-sync.test-helpers';
 
-setupTimers();
+setupLiveSync();
 
 describe('ActiveSessionsLiveSync — departure refetch hook still works', () => {
   // The departure-triggered stored refetch lives in use-agent-sessions
@@ -32,6 +32,7 @@ describe('ActiveSessionsLiveSync — departure refetch hook still works', () => 
     });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),

@@ -1,5 +1,12 @@
 import { type MobileRouter } from '@kilocode/trpc/mobile';
-import { createTRPCClient, httpBatchLink, httpLink, splitLink } from '@trpc/client';
+import {
+  createTRPCClient,
+  httpBatchLink,
+  httpLink,
+  type Operation,
+  TRPCClientError,
+  type TRPCLink,
+} from '@trpc/client';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
 import * as SecureStore from 'expo-secure-store';
@@ -16,18 +23,19 @@ import {
   publishActiveTokenExpiry,
 } from '@/lib/auth/token-owner';
 import { TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
+import { type AuthenticatedOwner } from '@/lib/context-scope';
+import { LocalAccessDeniedError } from '@/lib/local-access';
+import {
+  assertTransportOwner,
+  captureTransportOperation,
+  isTransportOwner,
+  type TransportOperation,
+} from '@/lib/local-access-transport';
 
 export const { TRPCProvider, useTRPC } = createTRPCContext<MobileRouter>();
-
 const trpcUrl = `${API_BASE_URL}/api/trpc`;
 
-/**
- * E2E-only artificial backend latency (repro for latency-dependent UI states,
- * e.g. the session-open empty flash). When E2E_LATENCY_* env vars are set at
- * Metro bundle time, matching procedure responses arrive late at the app —
- * the same condition a slow production backend creates. Disabled (0) unless
- * the env vars are explicitly set; never set them outside E2E.
- */
+/** E2E-only latency remains inside the extended deadline, before final admission. */
 const E2E_LATENCY_RULES: readonly (readonly [procedure: string, delayMs: number])[] = [
   ['cliSessionsV2.get', E2E_LATENCY_SESSION_MS],
   ['cliSessionsV2.getSessionMessagesPage', E2E_LATENCY_MESSAGES_MS],
@@ -53,66 +61,58 @@ function e2eLatencyForUrl(url: string): number {
   return delayMs;
 }
 
-const e2eLatencyFetch: typeof fetch = async (url, init) => {
-  const delayMs = e2eLatencyForUrl(requestUrlString(url));
-  if (delayMs > 0) {
-    await new Promise(resolve => {
-      setTimeout(resolve, delayMs);
-    });
-  }
-  return fetch(url, init);
-};
+function guardedDeadlineFetch(assertDispatch: () => void): typeof fetch {
+  return async (url, init) => {
+    const delayMs = e2eLatencyForUrl(requestUrlString(url));
+    const response = await withDeadline(
+      CONTROL_PLANE_DEADLINE_MS + delayMs,
+      async signal => {
+        if (delayMs > 0) {
+          await new Promise(resolve => {
+            setTimeout(resolve, delayMs);
+          });
+        }
+        // Hermes signals lack throwIfAborted; withDeadline already preserves the caller's reason.
+        if (signal.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+        assertDispatch();
+        const result = await fetch(url, { ...init, signal });
+        return result;
+      },
+      init?.signal ?? undefined
+    );
+    return response;
+  };
+}
 
-const e2eFetch =
-  E2E_LATENCY_SESSION_MS > 0 || E2E_LATENCY_MESSAGES_MS > 0 ? e2eLatencyFetch : fetch;
+/** Retain the standalone deadline helper; transport delegates always install their own assertion. */
+export const deadlineFetch: typeof fetch = guardedDeadlineFetch(() => undefined);
 
-/**
- * Fetch wrapper that adds a control-plane deadline (15 s). When E2E latency
- * values are set the deadline is extended by the applicable delay so the
- * synthetic latency does not eat into the real request budget.
- */
-export const deadlineFetch: typeof fetch = async (url, init) => {
-  const delayMs = e2eLatencyForUrl(requestUrlString(url));
-  const totalDeadline = CONTROL_PLANE_DEADLINE_MS + delayMs;
-  const response = await withDeadline(
-    totalDeadline,
-    async signal => {
-      const res = await e2eFetch(url, { ...init, signal });
-      return res;
-    },
-    init?.signal ?? undefined
-  );
-  return response;
-};
-
-async function getAuthHeaders() {
+async function getAuthHeaders(owner: AuthenticatedOwner, allowCleanup: boolean) {
+  const assertOwner = () => {
+    assertTransportOwner(owner, allowCleanup);
+  };
+  assertOwner();
   const token = await getAuthTokenForRequest();
+  assertOwner();
   if (!token) {
     return { ...buildAuthHeaders(token), ...buildClientMetadataHeaders() };
   }
 
-  // Proactive refresh: if the token is expiring within the margin, rotate
-  // before this request hits a 401. performRefresh handles single-flight
-  // so concurrent requests share one rotation. The expiry comes from the
-  // in-memory owner when available; only the cold path (owner warmed by
-  // getAuthTokenForRequest without an expiry) reads TOKEN_EXPIRES_AT_KEY,
-  // and the resolved value is published back into the owner so normal
-  // requests never reread it.
   const active = getActiveTokenSnapshot();
   let expiresAtMs = active?.expiresAtMs ?? null;
   if (expiresAtMs === null) {
+    assertOwner();
     const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+    assertOwner();
     const resolvedExpiresAtMs = expiresAtStr ? Number(expiresAtStr) : null;
-    // Publish the resolved expiry into the owner that the cold read warmed.
-    // A newer owner published while the expiry was read keeps its own token
-    // and expiry.
     if (active) {
       publishActiveTokenExpiry(active, resolvedExpiresAtMs);
     }
     expiresAtMs = resolvedExpiresAtMs;
   }
-  // Prefer the newest owner token: a sign-in or refresh may have published a
-  // newer one while the cold reads were in flight.
+  // A refresh can rotate the token within this credential generation, never across accounts.
   const newest = getActiveToken();
   const currentToken = newest?.token ?? token;
   const currentExpiresAtMs = newest ? newest.expiresAtMs : expiresAtMs;
@@ -120,36 +120,119 @@ async function getAuthHeaders() {
     currentExpiresAtMs !== null &&
     shouldRefreshBeforeRequest(currentExpiresAtMs, Date.now(), REFRESH_MARGIN_MS)
   ) {
+    assertOwner();
     await performRefresh();
+    assertOwner();
     const refreshedToken = getActiveToken()?.token ?? (await getAuthTokenForRequest());
+    assertOwner();
     return { ...buildAuthHeaders(refreshedToken), ...buildClientMetadataHeaders() };
   }
-
+  assertOwner();
   return { ...buildAuthHeaders(currentToken), ...buildClientMetadataHeaders() };
 }
 
-const singleLink = httpLink({
-  url: trpcUrl,
-  headers: getAuthHeaders,
-  fetch: deadlineFetch,
-  methodOverride: 'POST',
-});
+type Delegate = ReturnType<TRPCLink<MobileRouter>>;
+type Bucket = { owner: AuthenticatedOwner; delegate: Delegate; pending: Set<Operation> };
 
-const batchLink = httpBatchLink({
-  url: trpcUrl,
-  headers: getAuthHeaders,
-  fetch: deadlineFetch,
-  methodOverride: 'POST',
-});
+const transportLink: TRPCLink<MobileRouter> = runtime => {
+  const buckets = new Map<string, Bucket>();
+  // Keep cancelled members identifiable until the batch releases them; WeakMap owns no lifetime.
+  const operations = new WeakMap<Operation, TransportOperation>();
+  return operationOptions => {
+    const { op } = operationOptions;
+    // Capture before any token, header, batch scheduling, or connection wait.
+    const admission = captureTransportOperation(op);
+    operations.set(op, admission);
+    const { owner, allowCleanup } = admission;
+    const bucketKey = `${owner.authEpoch}:${owner.generation}`;
+    for (const [key, bucket] of buckets) {
+      if (key !== bucketKey && bucket.pending.size === 0) {
+        buckets.delete(key);
+      }
+    }
+    let bucket: Bucket | undefined = undefined;
+    let result: ReturnType<Delegate> | undefined = undefined;
+    if (op.type === 'mutation' || op.context.skipBatch === true) {
+      // One supported delegate per operation keeps its closure out of wire headers and input.
+      result = httpLink<MobileRouter>({
+        url: trpcUrl,
+        methodOverride: 'POST',
+        headers: async () => {
+          const headers = await getAuthHeaders(owner, allowCleanup);
+          return headers;
+        },
+        fetch: guardedDeadlineFetch(admission.assertDispatch),
+      })(runtime)(operationOptions);
+    } else {
+      bucket = buckets.get(bucketKey);
+      if (!bucket) {
+        const delegate = httpBatchLink<MobileRouter>({
+          url: trpcUrl,
+          methodOverride: 'POST',
+          headers: async ({ opList }) => {
+            for (const batchedOp of opList) {
+              const captured = operations.get(batchedOp);
+              if (
+                captured?.type !== 'query' ||
+                captured.owner.authEpoch !== owner.authEpoch ||
+                captured.owner.generation !== owner.generation
+              ) {
+                throw new LocalAccessDeniedError('owner');
+              }
+              assertTransportOwner(captured.owner);
+            }
+            const headers = await getAuthHeaders(owner, false);
+            return headers;
+          },
+          fetch: guardedDeadlineFetch(() => {
+            assertTransportOwner(owner);
+          }),
+        })(runtime);
+        bucket = { owner, delegate, pending: new Set() };
+        buckets.set(bucketKey, bucket);
+      }
+      bucket.pending.add(op);
+      result = bucket.delegate(operationOptions);
+    }
+    const finish = () => {
+      bucket?.pending.delete(op);
+      if (bucket?.pending.size === 0 && !isTransportOwner(bucket.owner)) {
+        buckets.delete(bucketKey);
+      }
+    };
+    // Decorate this operation's library observable, retaining its pipe and teardown implementation.
+    const subscribe = result.subscribe.bind(result);
+    result.subscribe = observer => {
+      const subscription = subscribe({
+        next(value) {
+          if (isTransportOwner(owner, allowCleanup)) {
+            observer.next?.(value);
+          } else {
+            observer.error?.(TRPCClientError.from(new LocalAccessDeniedError('owner')));
+          }
+        },
+        error(error) {
+          finish();
+          observer.error?.(
+            isTransportOwner(owner, allowCleanup)
+              ? error
+              : TRPCClientError.from(new LocalAccessDeniedError('owner'))
+          );
+        },
+        complete() {
+          finish();
+          observer.complete?.();
+        },
+      });
+      return {
+        unsubscribe() {
+          subscription.unsubscribe();
+          finish();
+        },
+      };
+    };
+    return result;
+  };
+};
 
-const trpcLinks = [
-  splitLink({
-    condition: op => op.context.skipBatch === true,
-    true: singleLink,
-    false: batchLink,
-  }),
-];
-
-export const trpcClient = createTRPCClient<MobileRouter>({
-  links: trpcLinks,
-});
+export const trpcClient = createTRPCClient<MobileRouter>({ links: [transportLink] });

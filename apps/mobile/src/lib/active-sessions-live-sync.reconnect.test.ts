@@ -6,10 +6,11 @@ import {
   makeFakeQueryClient,
   makeQueryFn,
   QUERY_KEY,
-  setupTimers,
+  setupLiveSync,
+  type SystemEvent,
 } from '@/lib/active-sessions-live-sync.test-helpers';
 
-setupTimers();
+setupLiveSync();
 
 describe('ActiveSessionsLiveSync — reconnect (onConnectionChange rising edge)', () => {
   it('triggers exactly one refresh per false → true transition', async () => {
@@ -19,6 +20,7 @@ describe('ActiveSessionsLiveSync — reconnect (onConnectionChange rising edge)'
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -52,6 +54,7 @@ describe('ActiveSessionsLiveSync — reconnect (onConnectionChange rising edge)'
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -81,6 +84,7 @@ describe('ActiveSessionsLiveSync — scheduled fetch invokes the queryFn', () =>
     const queryFn = makeQueryFn({ sessions: [] });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -92,5 +96,26 @@ describe('ActiveSessionsLiveSync — scheduled fetch invokes the queryFn', () =>
     qc.__triggerFetchResolve({ sessions: [] });
     await sync.getFetchCompletion();
     expect(queryFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ActiveSessionsLiveSync — cli.connected', () => {
+  it('ignores a malformed payload', async () => {
+    const conn = makeConnection();
+    const qc = makeFakeQueryClient();
+    const queryFn = makeQueryFn();
+    const sync = new ActiveSessionsLiveSync({
+      connection: conn,
+      owner: conn.owner,
+      queryClient: qc,
+      queryKey: QUERY_KEY,
+      queryFn,
+    });
+    sync.attach();
+    const event: SystemEvent = { event: 'cli.connected', data: { connectionId: 42 } };
+    conn.__fireSystem(event);
+    await Promise.resolve();
+    expect(sync.getPendingReasons()).toEqual(new Set());
+    expect(queryFn).not.toHaveBeenCalled();
   });
 });

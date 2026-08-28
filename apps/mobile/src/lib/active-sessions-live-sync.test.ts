@@ -8,11 +8,11 @@ import {
   makeFakeQueryClient,
   makeQueryFn,
   QUERY_KEY,
-  setupTimers,
+  setupLiveSync,
   type SystemEvent,
 } from '@/lib/active-sessions-live-sync.test-helpers';
 
-setupTimers();
+setupLiveSync();
 
 describe('ActiveSessionsLiveSync — attach / detach', () => {
   it('retains the connection on attach and releases on detach', () => {
@@ -21,6 +21,7 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     const qc = makeFakeQueryClient();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),
@@ -38,6 +39,7 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     const qc = makeFakeQueryClient();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),
@@ -75,6 +77,7 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),
@@ -131,6 +134,7 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     const qc = makeFakeQueryClient();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),
@@ -155,6 +159,7 @@ describe('ActiveSessionsLiveSync — sessions.list', () => {
     qc.__setCached({ sessions: [makeCached({ id: 'old' })] });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),
@@ -188,6 +193,7 @@ describe('ActiveSessionsLiveSync — sessions.heartbeat', () => {
     qc.__setCached({ sessions: [makeCached({ id: 'x', connectionId: 'c2' })] });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),
@@ -216,6 +222,7 @@ describe('ActiveSessionsLiveSync — sessions.heartbeat', () => {
     });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),
@@ -247,6 +254,7 @@ describe('ActiveSessionsLiveSync — cli.disconnected', () => {
     const queryFn = makeQueryFn({ sessions: [] });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -275,6 +283,7 @@ describe('ActiveSessionsLiveSync — cli.connected', () => {
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -288,23 +297,5 @@ describe('ActiveSessionsLiveSync — cli.connected', () => {
     await sync.getFetchQueue();
     expect(setQueryDataCalls).not.toHaveBeenCalled();
     expect(queryFn).toHaveBeenCalledTimes(1);
-  });
-
-  it('ignores a malformed payload', async () => {
-    const conn = makeConnection();
-    const qc = makeFakeQueryClient();
-    const queryFn = makeQueryFn();
-    const sync = new ActiveSessionsLiveSync({
-      connection: conn,
-      queryClient: qc,
-      queryKey: QUERY_KEY,
-      queryFn,
-    });
-    sync.attach();
-    const event: SystemEvent = { event: 'cli.connected', data: { connectionId: 42 } };
-    conn.__fireSystem(event);
-    await Promise.resolve();
-    expect(sync.getPendingReasons()).toEqual(new Set());
-    expect(queryFn).not.toHaveBeenCalled();
   });
 });

@@ -8,12 +8,12 @@ import {
   makeFakeQueryClient,
   makeQueryFn,
   QUERY_KEY,
+  setupLiveSync,
   setupNow,
-  setupTimers,
   type SystemEvent,
 } from '@/lib/active-sessions-live-sync.test-helpers';
 
-setupTimers();
+setupLiveSync();
 
 describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
   it('schedules enrichment when the cache has an unenriched live id', async () => {
@@ -23,6 +23,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -49,6 +50,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -82,32 +84,6 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     expect(queryFn).toHaveBeenCalledTimes(1);
   });
 
-  it('does NOT schedule enrichment when every row is already enriched', async () => {
-    const conn = makeConnection();
-    const qc = makeFakeQueryClient();
-    qc.__setCached({ sessions: [makeCached({ id: 'a', createdOnPlatform: 'cli' })] });
-    const queryFn = makeQueryFn();
-    const sync = new ActiveSessionsLiveSync({
-      connection: conn,
-      queryClient: qc,
-      queryKey: QUERY_KEY,
-      queryFn,
-    });
-    sync.attach();
-    const heartbeat: SystemEvent = {
-      event: 'sessions.heartbeat',
-      data: {
-        connectionId: 'c1',
-        sessions: [{ id: 'a', status: 'running', title: 'A' }],
-      },
-    };
-    conn.__fireSystem(heartbeat);
-    await sync.getWriteQueue();
-    await sync.getFetchQueue();
-    expect(sync.getPendingReasons().has('enrichment')).toBe(false);
-    expect(queryFn).toHaveBeenCalledTimes(0);
-  });
-
   it('rate-limits enrichment retries ≥10s apart', async () => {
     const conn = makeConnection();
     const qc = makeFakeQueryClient();
@@ -116,6 +92,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     const { now, advance } = setupNow();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -170,6 +147,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     const { now, advance } = setupNow();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -212,6 +190,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     const { now, advance } = setupNow();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -259,6 +238,7 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,

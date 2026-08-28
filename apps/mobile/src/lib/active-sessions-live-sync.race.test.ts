@@ -9,11 +9,11 @@ import {
   makeFakeQueryClient,
   makeQueryFn,
   QUERY_KEY,
-  setupTimers,
+  setupLiveSync,
   type SystemEvent,
 } from '@/lib/active-sessions-live-sync.test-helpers';
 
-setupTimers();
+setupLiveSync();
 
 describe('ActiveSessionsLiveSync — race tests', () => {
   it('heartbeat wins over an in-flight fetch (cache reflects heartbeat)', async () => {
@@ -25,6 +25,7 @@ describe('ActiveSessionsLiveSync — race tests', () => {
     });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -62,6 +63,7 @@ describe('ActiveSessionsLiveSync — race tests', () => {
     });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -103,6 +105,7 @@ describe('ActiveSessionsLiveSync — race tests', () => {
     });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,

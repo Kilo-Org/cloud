@@ -48,7 +48,13 @@ function useActiveSessionsLiveSync(): void {
     if (!isLoaded) {
       return undefined;
     }
-    const sync = new ActiveSessionsLiveSync({ connection, queryClient, queryKey, queryFn });
+    const sync = new ActiveSessionsLiveSync({
+      connection,
+      queryClient,
+      queryKey,
+      queryFn,
+      owner: connection.owner,
+    });
     return sync.attach();
   }, [connection, isLoaded, queryClient, queryFn, queryKey]);
 }

@@ -9,7 +9,6 @@ import {
   type ResolvedSession,
   type SessionManager,
   type SessionSnapshot,
-  type UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
 import { normalizeTransportPayload } from '@/components/agents/mobile-session-transport-payload';
 import {
@@ -29,6 +28,17 @@ import { cacheFilePart } from '@/components/agents/file-part-cache';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import * as z from 'zod';
 import { i18n } from '@/i18n';
+import { subscribeAuthenticatedOwner } from '@/lib/context-scope';
+import {
+  assertMobileActionAdmission,
+  assertTransportOwner,
+  captureMobileActionAdmission,
+  getLocalAccessDenial,
+  isTransportOwner,
+  type MobileActionAdmission,
+  type MobileUserWebConnection,
+} from '@/lib/local-access-transport';
+import { LocalAccessDeniedError } from '@/lib/local-access';
 
 type SessionWithRuntimeState =
   inferRouterOutputs<MobileRouter>['cliSessionsV2']['getWithRuntimeState'];
@@ -147,35 +157,52 @@ export async function fetchSessionWithNotFoundRetry(
 
 type CreateMobileAgentSessionManagerOptions = {
   store: JotaiStore;
-  userWebConnection: UserWebConnection;
+  userWebConnection: MobileUserWebConnection;
   organizationId?: string;
 };
-
-const skipBatchOptions = { context: { skipBatch: true } };
 
 export function createMobileAgentSessionManager({
   store,
   userWebConnection,
   organizationId,
 }: Readonly<CreateMobileAgentSessionManagerOptions>): SessionManager {
-  return createSessionManager({
+  // This boundary requires the provider's immutable socket owner, not a fresh global account.
+  const owner = userWebConnection.owner;
+  const ownerOptions = { context: { localAccessOwner: owner } };
+  const preparations = new Map<CloudAgentSessionId, MobileActionAdmission[]>();
+  const captureOptions = (
+    admission = captureMobileActionAdmission(owner, organizationId ?? null)
+  ) => {
+    assertMobileActionAdmission(admission);
+    return {
+      context: { skipBatch: true, localAccessOwner: owner, localAccessAdmission: admission },
+    };
+  };
+  const manager = createSessionManager({
     store,
     websocketBaseUrl: CLOUD_AGENT_WS_URL,
     websocketHeaders: { Origin: WEB_BASE_URL },
     lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
     userWebConnection,
     onToolAttachment: (partId, attachment) => {
-      cacheToolAttachment(partId, attachment);
+      if (isTransportOwner(owner)) {
+        cacheToolAttachment(partId, attachment);
+      }
     },
     onFilePart: (partId, file) => {
-      cacheFilePart(partId, file);
+      if (isTransportOwner(owner)) {
+        cacheFilePart(partId, file);
+      }
     },
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
-      // Read-only is only ever returned once we have successful evidence the
-      // session isn't cloud-agent or remote. A failed query here must
-      // propagate so it lands in the retryable error state instead of being
-      // silently misclassified as read-only.
-      const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
+      // Preserve loading failures; only successful evidence can classify a session as read-only.
+      assertTransportOwner(owner);
+      const session = await trpcClient.cliSessionsV2.get.query(
+        { session_id: kiloSessionId },
+        ownerOptions
+      );
+      assertTransportOwner(owner);
+      userWebConnection.setSessionScope(kiloSessionId, session.organization_id);
       if (session.cloud_agent_session_id) {
         return {
           type: 'cloud-agent',
@@ -183,17 +210,13 @@ export function createMobileAgentSessionManager({
           cloudAgentSessionId: session.cloud_agent_session_id as CloudAgentSessionId,
         };
       }
-      const active = await trpcClient.activeSessions.list.query();
+      const active = await trpcClient.activeSessions.list.query(undefined, ownerOptions);
+      assertTransportOwner(owner);
       const activeSession = active.sessions.find(s => s.id === kiloSessionId);
       if (!activeSession) {
         return { type: 'read-only', kiloSessionId };
       }
-      // Surface the owning CLI's per-session capabilities so the initial
-      // `supportsAttachments` gate reflects whatever the mobile adapter
-      // observed at resolution time. Heartbeat upgrades / downgrades
-      // arrive later via `onTransportCapabilitiesChange` from the
-      // cli-live-transport; the seed here just covers the window before
-      // the first heartbeat lands.
+      // Heartbeats can replace this initial capability seed without changing the loading contract.
       return {
         type: 'remote',
         kiloSessionId,
@@ -204,7 +227,9 @@ export function createMobileAgentSessionManager({
       sessionId: CloudAgentSessionId
     ): Promise<{ ticket: string; expiresAt: number }> => {
       const result = await withCloudAgentDiagnostics('getTicket', organizationId, async () => {
+        assertTransportOwner(owner);
         const token = await getAuthTokenForRequest();
+        assertTransportOwner(owner);
         const body = {
           cloudAgentSessionId: sessionId,
           ...(organizationId ? { organizationId } : {}),
@@ -221,6 +246,7 @@ export function createMobileAgentSessionManager({
           }
         );
         const data = StreamTicketResponseSchema.parse(await response.json());
+        assertTransportOwner(owner);
         if (!response.ok) {
           throw new Error(data.error ?? 'Failed to get stream ticket');
         }
@@ -235,10 +261,12 @@ export function createMobileAgentSessionManager({
       return result;
     },
     fetchSnapshot: async (id: KiloSessionId) => {
+      assertTransportOwner(owner);
       const [sessionData, messagesResult] = await Promise.all([
-        trpcClient.cliSessionsV2.get.query({ session_id: id }),
-        trpcClient.cliSessionsV2.getSessionMessages.query({ session_id: id }),
+        trpcClient.cliSessionsV2.get.query({ session_id: id }, ownerOptions),
+        trpcClient.cliSessionsV2.getSessionMessages.query({ session_id: id }, ownerOptions),
       ]);
+      assertTransportOwner(owner);
       const snapshotInfo = messagesResult.info as Partial<SessionSnapshot['info']>;
       return {
         info: {
@@ -249,9 +277,15 @@ export function createMobileAgentSessionManager({
         messages: messagesResult.messages as SessionSnapshot['messages'],
       };
     },
-    fetchSnapshotPage: fetchMobileSessionSnapshotPage,
+    fetchSnapshotPage: async (id, options) => {
+      assertTransportOwner(owner);
+      const page = await fetchMobileSessionSnapshotPage(id, options);
+      assertTransportOwner(owner);
+      return page;
+    },
     api: {
       send: async input => {
+        const options = captureOptions();
         await withCloudAgentDiagnostics('send', organizationId, async () => {
           const baseInput = {
             cloudAgentSessionId: input.sessionId as string,
@@ -262,29 +296,31 @@ export function createMobileAgentSessionManager({
           if (organizationId) {
             await trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
               { ...baseInput, organizationId },
-              skipBatchOptions
+              options
             );
             return;
           }
-          await trpcClient.cloudAgentNext.sendMessage.mutate(baseInput, skipBatchOptions);
+          await trpcClient.cloudAgentNext.sendMessage.mutate(baseInput, options);
         });
       },
       interrupt: async payload => {
+        const options = captureOptions();
         await withCloudAgentDiagnostics('interrupt', organizationId, async () => {
           if (organizationId) {
             await trpcClient.organizations.cloudAgentNext.interruptSession.mutate(
               { organizationId, sessionId: payload.sessionId },
-              skipBatchOptions
+              options
             );
             return;
           }
           await trpcClient.cloudAgentNext.interruptSession.mutate(
             { sessionId: payload.sessionId },
-            skipBatchOptions
+            options
           );
         });
       },
       answer: async payload => {
+        const options = captureOptions();
         await withCloudAgentDiagnostics('answer', organizationId, async () => {
           const input = {
             sessionId: payload.sessionId,
@@ -294,14 +330,15 @@ export function createMobileAgentSessionManager({
           if (organizationId) {
             await trpcClient.organizations.cloudAgentNext.answerQuestion.mutate(
               { ...input, organizationId },
-              skipBatchOptions
+              options
             );
             return;
           }
-          await trpcClient.cloudAgentNext.answerQuestion.mutate(input, skipBatchOptions);
+          await trpcClient.cloudAgentNext.answerQuestion.mutate(input, options);
         });
       },
       reject: async payload => {
+        const options = captureOptions();
         await withCloudAgentDiagnostics('reject', organizationId, async () => {
           const input = {
             sessionId: payload.sessionId,
@@ -310,14 +347,15 @@ export function createMobileAgentSessionManager({
           if (organizationId) {
             await trpcClient.organizations.cloudAgentNext.rejectQuestion.mutate(
               { ...input, organizationId },
-              skipBatchOptions
+              options
             );
             return;
           }
-          await trpcClient.cloudAgentNext.rejectQuestion.mutate(input, skipBatchOptions);
+          await trpcClient.cloudAgentNext.rejectQuestion.mutate(input, options);
         });
       },
       respondToPermission: async payload => {
+        const options = captureOptions();
         await withCloudAgentDiagnostics('permission', organizationId, async () => {
           const input = {
             sessionId: payload.sessionId,
@@ -327,15 +365,17 @@ export function createMobileAgentSessionManager({
           if (organizationId) {
             await trpcClient.organizations.cloudAgentNext.answerPermission.mutate(
               { ...input, organizationId },
-              skipBatchOptions
+              options
             );
             return;
           }
-          await trpcClient.cloudAgentNext.answerPermission.mutate(input, skipBatchOptions);
+          await trpcClient.cloudAgentNext.answerPermission.mutate(input, options);
         });
       },
     },
     prepare: async input => {
+      const admission = captureMobileActionAdmission(owner, organizationId ?? null);
+      const options = captureOptions(admission);
       const prepared = await withCloudAgentDiagnostics('prepare', organizationId, async () => {
         const castInput = {
           ...input,
@@ -347,32 +387,54 @@ export function createMobileAgentSessionManager({
         const result = organizationId
           ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate(
               { ...castInput, organizationId },
-              skipBatchOptions
+              options
             )
-          : await trpcClient.cloudAgentNext.prepareSession.mutate(castInput, skipBatchOptions);
+          : await trpcClient.cloudAgentNext.prepareSession.mutate(castInput, options);
         return {
           cloudAgentSessionId: result.cloudAgentSessionId as CloudAgentSessionId,
           kiloSessionId: result.kiloSessionId as KiloSessionId,
         };
       });
+      assertTransportOwner(owner);
+      // SDK createAndStart initiates immediately after prepare resolves. Keep that resolution order
+      // when idempotent prepares share a session ID; a later operation must not replace an old lease.
+      const pending = preparations.get(prepared.cloudAgentSessionId) ?? [];
+      pending.push(admission);
+      preparations.set(prepared.cloudAgentSessionId, pending);
       return prepared;
     },
     initiate: async input => {
+      const pending = preparations.get(input.cloudAgentSessionId);
+      const admission = pending?.shift();
+      if (pending?.length === 0) {
+        preparations.delete(input.cloudAgentSessionId);
+      }
+      if (!admission) {
+        throw new LocalAccessDeniedError('stale');
+      }
+      const options = captureOptions(admission);
       await withCloudAgentDiagnostics('initiate', organizationId, async () => {
         if (organizationId) {
           await trpcClient.organizations.cloudAgentNext.initiateFromPreparedSession.mutate(
             { cloudAgentSessionId: input.cloudAgentSessionId, organizationId },
-            skipBatchOptions
+            options
           );
           return;
         }
         await trpcClient.cloudAgentNext.initiateFromPreparedSession.mutate(
           { cloudAgentSessionId: input.cloudAgentSessionId },
-          skipBatchOptions
+          options
         );
       });
     },
     onSendFailed: (_messageText, displayMessage, error) => {
+      if (!isTransportOwner(owner)) {
+        return;
+      }
+      const denial = getLocalAccessDenial(error);
+      if (denial) {
+        throw denial;
+      }
       toast.error(
         formatSafeCloudAgentFailureDiagnostic('send', error, organizationId) ??
           displayMessage ??
@@ -380,7 +442,18 @@ export function createMobileAgentSessionManager({
       );
     },
     fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
-      const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId);
+      assertTransportOwner(owner);
+      const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId, {
+        query: async sessionId => {
+          const result = await trpcClient.cliSessionsV2.getWithRuntimeState.query(
+            { session_id: sessionId },
+            ownerOptions
+          );
+          return result;
+        },
+      });
+      assertTransportOwner(owner);
+      userWebConnection.setSessionScope(kiloSessionId, sessionResult.organization_id);
       const rs = sessionResult.runtimeState;
       return {
         kiloSessionId,
@@ -405,4 +478,19 @@ export function createMobileAgentSessionManager({
       };
     },
   });
+  const unsubscribeOwner = subscribeAuthenticatedOwner(() => {
+    if (!isTransportOwner(owner)) {
+      preparations.clear();
+      manager.destroy();
+      unsubscribeOwner();
+    }
+  });
+  return {
+    ...manager,
+    destroy() {
+      unsubscribeOwner();
+      preparations.clear();
+      manager.destroy();
+    },
+  };
 }

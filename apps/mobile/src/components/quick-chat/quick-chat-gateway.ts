@@ -1,4 +1,11 @@
 import { API_BASE_URL } from '@/lib/config';
+import { LocalAccessDeniedError } from '@/lib/local-access';
+import {
+  type AcceptedWorkReceipt,
+  assertTransportOwner,
+  dispatchAcceptedWork,
+  type MobileActionAdmission,
+} from '@/lib/local-access-transport';
 
 /**
  * The single Kilo gateway entry point for the quick-chat surface. Every call
@@ -16,6 +23,9 @@ export type QuickChatCompletionInput = {
   messages: QuickChatGatewayMessage[];
   organizationId: string | null | undefined;
   authToken: string;
+  admission: MobileActionAdmission;
+  turnId: string;
+  onDispatch: (receipt: AcceptedWorkReceipt) => void;
   signal?: AbortSignal;
 };
 
@@ -47,6 +57,9 @@ export async function* streamQuickChatCompletion({
   messages,
   organizationId,
   authToken,
+  admission,
+  turnId,
+  onDispatch,
   signal,
 }: QuickChatCompletionInput): AsyncGenerator<string> {
   const headers: QuickChatRequestHeaders = {
@@ -58,14 +71,33 @@ export async function* streamQuickChatCompletion({
     headers['X-KiloCode-OrganizationId'] = organizationId;
   }
 
-  const response = await fetch(`${API_BASE_URL}${GATEWAY_CHAT_COMPLETIONS_PATH}`, {
+  if (admission.lease.organizationId !== (organizationId ?? null)) {
+    throw new LocalAccessDeniedError('context');
+  }
+  const init = {
     method: 'POST',
     headers,
     // No `tools` key: quick-chat is a plain completion, never a tool loop.
     body: JSON.stringify({ model, messages, stream: true }),
     signal,
-  });
-
+  };
+  if (signal?.aborted) {
+    throw signal.reason instanceof Error
+      ? signal.reason
+      : new DOMException('Aborted', 'AbortError');
+  }
+  // eslint-disable-next-line typescript-eslint/promise-function-async -- a synchronous native dispatch failure must not issue a receipt
+  function dispatch() {
+    return fetch(`${API_BASE_URL}${GATEWAY_CHAT_COMPLETIONS_PATH}`, init);
+  }
+  const dispatched = dispatchAcceptedWork(
+    admission,
+    { kind: 'quick-chat-turn', workId: turnId },
+    dispatch
+  );
+  onDispatch(dispatched.receipt);
+  const response = await dispatched.result;
+  assertTransportOwner(admission.owner);
   if (!response.ok) {
     throw new Error(`Gateway request failed with status ${response.status}`);
   }
@@ -73,7 +105,11 @@ export async function* streamQuickChatCompletion({
     throw new Error('Gateway returned an empty stream');
   }
 
-  yield* readSseContent(response.body, signal);
+  for await (const delta of readSseContent(response.body, signal)) {
+    assertTransportOwner(admission.owner);
+    yield delta;
+  }
+  assertTransportOwner(admission.owner);
 }
 
 /**

@@ -1,6 +1,17 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- injectable query/sleep fakes settle without await */
 /* eslint-disable max-lines -- the manager suite pins retry cadence and attachment mints in one file. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import {
+  beginAuthenticatedOwner,
+  confirmAuthenticatedOwner,
+  getAuthenticatedOwner,
+} from '@/lib/context-scope';
+import {
+  initializeLocalAccess,
+  setLocalAccessContextReady,
+  setLocalAccessOwner,
+} from '@/lib/local-access';
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
@@ -9,6 +20,24 @@ import {
   type SessionManager,
   type SessionManagerConfig,
 } from '@kilocode/cloud-agent-sdk';
+
+let stopAccess: (() => void) | undefined = undefined;
+beforeEach(async () => {
+  confirmAuthenticatedOwner(beginAuthenticatedOwner(), 'A');
+  stopAccess = initializeLocalAccess({
+    storage: {
+      read: vi.fn().mockResolvedValue({ status: 'absent' }),
+      write: vi.fn().mockResolvedValue('committed'),
+    },
+    authenticate: vi.fn().mockResolvedValue({ status: 'authenticated' }),
+    lifecycle: { getCurrentState: () => 'active', subscribe: () => () => undefined },
+  });
+  await setLocalAccessOwner('A', currentAuthEpoch());
+  setLocalAccessContextReady(true);
+});
+afterEach(() => {
+  stopAccess?.();
+});
 
 // Keep this suite on the pure vitest project: mock every RN / Expo / SDK
 // side-effect import that `mobile-session-manager.ts` pulls transitively
@@ -25,7 +54,7 @@ const { configHolder, mockCreateSessionManager } = vi.hoisted(() => {
   const holder: { current: SessionManagerConfig | null } = { current: null };
   const createSessionManagerMock = vi.fn((config: SessionManagerConfig): SessionManager => {
     holder.current = config;
-    return { atoms: {} } as unknown as SessionManager;
+    return { atoms: {}, destroy: vi.fn() } as unknown as SessionManager;
   });
   return { configHolder: holder, mockCreateSessionManager: createSessionManagerMock };
 });
@@ -415,7 +444,7 @@ describe('getTicket', () => {
   function setup(): SessionManagerConfig {
     const options = {
       store: {},
-      userWebConnection: {},
+      userWebConnection: { owner: getAuthenticatedOwner(), setSessionScope: vi.fn() },
     };
     createMobileAgentSessionManager(options as never);
     const config = configHolder.current;
@@ -477,7 +506,7 @@ describe('createMobileAgentSessionManager api.send', () => {
   function setup(): SessionManagerConfig {
     const options = {
       store: {},
-      userWebConnection: {},
+      userWebConnection: { owner: getAuthenticatedOwner(), setSessionScope: vi.fn() },
     };
     createMobileAgentSessionManager(options as never);
     const config = configHolder.current;

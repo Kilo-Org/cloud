@@ -7,10 +7,10 @@ import {
   makeFakeQueryClient,
   makeQueryFn,
   QUERY_KEY,
-  setupTimers,
+  setupLiveSync,
 } from '@/lib/active-sessions-live-sync.test-helpers';
 
-setupTimers();
+setupLiveSync();
 
 describe('ActiveSessionsLiveSync — session.status.updated', () => {
   it('applies the lightweight sessionId payload and clears attention', async () => {
@@ -21,6 +21,7 @@ describe('ActiveSessionsLiveSync — session.status.updated', () => {
     });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),
@@ -49,6 +50,7 @@ describe('ActiveSessionsLiveSync — session.status.updated', () => {
     });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),
@@ -92,6 +94,7 @@ describe('ActiveSessionsLiveSync — session.status.updated', () => {
     setQueryDataCalls.mockClear();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),
@@ -114,6 +117,7 @@ describe('ActiveSessionsLiveSync — session.status.updated', () => {
     });
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn: makeQueryFn(),

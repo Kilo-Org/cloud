@@ -7,12 +7,12 @@ import {
   makeFakeQueryClient,
   makeQueryFn,
   QUERY_KEY,
-  setupTimers,
+  setupLiveSync,
   type SystemEvent,
 } from '@/lib/active-sessions-live-sync.test-helpers';
 import { refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
 
-setupTimers();
+setupLiveSync();
 
 let sync: ActiveSessionsLiveSync | null = null;
 
@@ -31,6 +31,7 @@ describe('ActiveSessionsLiveSync — manual refresh', () => {
     const queryFn = makeQueryFn();
     sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -54,6 +55,7 @@ describe('ActiveSessionsLiveSync — manual refresh', () => {
     const queryFn = makeQueryFn();
     sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -82,6 +84,7 @@ describe('ActiveSessionsLiveSync — manual refresh', () => {
     const queryFn = makeQueryFn();
     sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -121,6 +124,7 @@ describe('ActiveSessionsLiveSync — manual refresh', () => {
     const queryFn = makeQueryFn();
     sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -161,6 +165,7 @@ describe('ActiveSessionsLiveSync — manual refresh', () => {
     const queryFn = makeQueryFn();
     sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,

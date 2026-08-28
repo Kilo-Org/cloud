@@ -1,5 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import {
+  beginAuthenticatedOwner,
+  confirmAuthenticatedOwner,
+  getAuthenticatedOwner,
+} from '@/lib/context-scope';
+import {
+  initializeLocalAccess,
+  setLocalAccessContextReady,
+  setLocalAccessOwner,
+} from '@/lib/local-access';
+import {
+  captureMobileActionAdmission,
+  type MobileActionAdmission,
+} from '@/lib/local-access-transport';
+
 import {
   parseSseDataLine,
   type QuickChatCompletionInput,
@@ -10,12 +26,27 @@ vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://gateway.test' }));
 
 const fetchMock = vi.hoisted(() => vi.fn());
 
-beforeEach(() => {
+let admission: MobileActionAdmission | undefined = undefined;
+let stopAccess: (() => void) | undefined = undefined;
+beforeEach(async () => {
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
+  confirmAuthenticatedOwner(beginAuthenticatedOwner(), 'A');
+  stopAccess = initializeLocalAccess({
+    storage: {
+      read: vi.fn().mockResolvedValue({ status: 'absent' }),
+      write: vi.fn().mockResolvedValue('committed'),
+    },
+    authenticate: vi.fn().mockResolvedValue({ status: 'authenticated' }),
+    lifecycle: { getCurrentState: () => 'active', subscribe: () => () => undefined },
+  });
+  await setLocalAccessOwner('A', currentAuthEpoch());
+  setLocalAccessContextReady(true);
+  admission = captureMobileActionAdmission(getAuthenticatedOwner(), 'org-1');
 });
 
 afterEach(() => {
+  stopAccess?.();
   vi.unstubAllGlobals();
 });
 
@@ -40,6 +71,14 @@ const baseInput: QuickChatCompletionInput = {
   ],
   organizationId: 'org-1',
   authToken: 'token-1',
+  get admission() {
+    if (!admission) {
+      throw new Error('Missing test admission');
+    }
+    return admission;
+  },
+  turnId: 'turn-1',
+  onDispatch: () => undefined,
 };
 
 async function collect(generator: AsyncGenerator<string>): Promise<string[]> {
@@ -112,7 +151,13 @@ describe('streamQuickChatCompletion', () => {
   it('omits the organization header when organizationId is absent', async () => {
     fetchMock.mockResolvedValue({ ok: true, body: chunkedStream(['data: [DONE]\n\n']) });
 
-    await collect(streamQuickChatCompletion({ ...baseInput, organizationId: null }));
+    await collect(
+      streamQuickChatCompletion({
+        ...baseInput,
+        organizationId: null,
+        admission: captureMobileActionAdmission(getAuthenticatedOwner(), null),
+      })
+    );
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const headers = init.headers as Record<string, string>;

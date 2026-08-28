@@ -7,12 +7,12 @@ import {
   makeFakeQueryClient,
   makeQueryFn,
   QUERY_KEY,
+  setupLiveSync,
   setupNow,
-  setupTimers,
   type SystemEvent,
 } from '@/lib/active-sessions-live-sync.test-helpers';
 
-setupTimers();
+setupLiveSync();
 
 describe('ActiveSessionsLiveSync — pending-reason semantics', () => {
   it('enrichment clears only when its own fetch completes', async () => {
@@ -21,6 +21,7 @@ describe('ActiveSessionsLiveSync — pending-reason semantics', () => {
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -40,6 +41,7 @@ describe('ActiveSessionsLiveSync — pending-reason semantics', () => {
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -82,6 +84,7 @@ describe('ActiveSessionsLiveSync — pending-reason semantics', () => {
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -106,6 +109,7 @@ describe('ActiveSessionsLiveSync — pending-reason semantics', () => {
     const { now, advance } = setupNow();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -148,6 +152,7 @@ describe('ActiveSessionsLiveSync — pending-reason semantics', () => {
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -171,6 +176,7 @@ describe('ActiveSessionsLiveSync — pending-reason semantics', () => {
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -198,6 +204,7 @@ describe('ActiveSessionsLiveSync — pending-reason semantics', () => {
     const queryFn = makeQueryFn();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,
+      owner: conn.owner,
       queryClient: qc,
       queryKey: QUERY_KEY,
       queryFn,
@@ -222,5 +229,34 @@ describe('ActiveSessionsLiveSync — pending-reason semantics', () => {
     qc.__triggerFetchResolve({ sessions: [] });
     await sync.getFetchCompletion();
     expect(sync.getPendingReasons().has('reconnect')).toBe(false);
+  });
+});
+
+describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
+  it('does NOT schedule enrichment when every row is already enriched', async () => {
+    const conn = makeConnection();
+    const qc = makeFakeQueryClient();
+    qc.__setCached({ sessions: [makeCached({ id: 'a', createdOnPlatform: 'cli' })] });
+    const queryFn = makeQueryFn();
+    const sync = new ActiveSessionsLiveSync({
+      connection: conn,
+      owner: conn.owner,
+      queryClient: qc,
+      queryKey: QUERY_KEY,
+      queryFn,
+    });
+    sync.attach();
+    const heartbeat: SystemEvent = {
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId: 'c1',
+        sessions: [{ id: 'a', status: 'running', title: 'A' }],
+      },
+    };
+    conn.__fireSystem(heartbeat);
+    await sync.getWriteQueue();
+    await sync.getFetchQueue();
+    expect(sync.getPendingReasons().has('enrichment')).toBe(false);
+    expect(queryFn).toHaveBeenCalledTimes(0);
   });
 });

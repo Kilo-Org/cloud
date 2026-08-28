@@ -11,6 +11,12 @@ import {
   type CachedActiveSessionsData,
 } from '@/lib/active-sessions-live';
 import { type UserWebSystemEvent } from '@kilocode/cloud-agent-sdk';
+import {
+  type AuthenticatedOwner,
+  beginAuthenticatedOwner,
+  confirmAuthenticatedOwner,
+  getAuthenticatedOwner,
+} from '@/lib/context-scope';
 
 export type { CachedActiveSessionsData };
 
@@ -18,6 +24,7 @@ type SystemEvent = UserWebSystemEvent;
 export type { SystemEvent };
 
 type FakeConnection = LiveSyncConnection & {
+  readonly owner: AuthenticatedOwner;
   __setConnected: (value: boolean) => void;
   __fireSystem: (event: SystemEvent) => void;
   __fireConnection: (value: boolean) => void;
@@ -45,6 +52,7 @@ export function makeConnection(over: Partial<LiveSyncConnection> = {}): FakeConn
     ...over,
   };
   return Object.assign(base, {
+    owner: getAuthenticatedOwner(),
     __setConnected(value: boolean) {
       connected = value;
     },
@@ -139,14 +147,16 @@ export function makeFakeQueryClient(
         staleTime?: number;
       }): Promise<CachedActiveSessionsData> => {
         fetchQueryCalls += 1;
-        // Drive the supplied queryFn so tests can assert it was invoked,
-        // but let the test control the resolved value via __triggerFetchResolve.
-        // QueryFunction requires a context arg; the fake only needs to observe the call.
-        await (opts.queryFn as unknown as () => Promise<unknown>)();
+        // Register cancellation before the guarded queryFn yields. Publish only
+        // after both the queryFn and the test-controlled response settle.
         const d = deferred<CachedActiveSessionsData>();
         pendingFetch = d;
         try {
-          const result = await d.promise;
+          const [, result] = await Promise.all([
+            (opts.queryFn as unknown as () => Promise<unknown>)(),
+            d.promise,
+          ]);
+          cache = result;
           return result;
         } finally {
           if (pendingFetch === d) {
@@ -164,7 +174,6 @@ export function makeFakeQueryClient(
       if (pendingFetch) {
         const d = pendingFetch;
         pendingFetch = null;
-        cache = data;
         d.resolve(data);
       }
     },
@@ -224,11 +233,13 @@ export function setupNow() {
   };
 }
 
-export function setupTimers(): void {
+export function setupLiveSync(): void {
   beforeEach(() => {
     vi.useRealTimers();
+    confirmAuthenticatedOwner(beginAuthenticatedOwner(), 'A');
   });
   afterEach(() => {
+    beginAuthenticatedOwner();
     vi.useRealTimers();
   });
 }

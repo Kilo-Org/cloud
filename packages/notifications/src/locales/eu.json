@@ -7,7 +7,8 @@
       "instanceLifecycle": "Zure instantziak eguneratze bat du",
       "scheduledAction": "Programatutako ekintza batek eguneratze bat du",
       "lowBalance": "Zure saldoak arreta behar du",
-      "securityFinding": "Aurkitutako segurtasun-arazo batek arreta behar du"
+      "securityFinding": "Aurkitutako segurtasun-arazo batek arreta behar du",
+      "activeAgentsGlanceable": "Agente aktiboek eguneratze bat dute"
     }
   },
   "cloudAgentSession": {

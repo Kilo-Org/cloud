@@ -7,7 +7,8 @@
       "instanceLifecycle": "Mfano wako umepokea sasisho",
       "scheduledAction": "Kitendo kilichopangwa kimepokea sasisho",
       "lowBalance": "Usawa wako unahitaji umakini",
-      "securityFinding": "Tokeo la usalama linahitaji umakini"
+      "securityFinding": "Tokeo la usalama linahitaji umakini",
+      "activeAgentsGlanceable": "Mawakala wanaofanya kazi wana sasisho"
     }
   },
   "cloudAgentSession": {

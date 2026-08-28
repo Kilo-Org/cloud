@@ -7,7 +7,8 @@
       "instanceLifecycle": "instance ຂອງທ່ານມີການອັບເດດ",
       "scheduledAction": "ການດຳເນີນການທີ່ກຳນົດໄວ້ມີການອັບເດດ",
       "lowBalance": "ຍອດຂອງທ່ານຕ້ອງການຄວາມສົນໃຈ",
-      "securityFinding": "ການກວດພົບຄວາມປອດໄພຕ້ອງການຄວາມສົນໃຈ"
+      "securityFinding": "ການກວດພົບຄວາມປອດໄພຕ້ອງການຄວາມສົນໃຈ",
+      "activeAgentsGlanceable": "ຕົວແທນທີ່ກຳລັງເຮັດວຽກມີການອັບເດດ"
     }
   },
   "cloudAgentSession": {

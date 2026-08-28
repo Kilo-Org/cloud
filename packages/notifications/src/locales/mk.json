@@ -7,7 +7,8 @@
       "instanceLifecycle": "Вашата инстанца има ажурирање",
       "scheduledAction": "Закажана акција има ажурирање",
       "lowBalance": "Вашата состојба бара внимание",
-      "securityFinding": "Безбедносно наоѓање бара внимание"
+      "securityFinding": "Безбедносно наоѓање бара внимание",
+      "activeAgentsGlanceable": "Активните агенти имаат ажурирање"
     }
   },
   "cloudAgentSession": {

@@ -7,7 +7,8 @@
       "instanceLifecycle": "Mae gan eich achos ddiweddariad",
       "scheduledAction": "Mae gan weithred wedi'i hamserlennu ddiweddariad",
       "lowBalance": "Mae angen sylw ar eich balans",
-      "securityFinding": "Mae angen sylw ar ganfyddiad diogelwch"
+      "securityFinding": "Mae angen sylw ar ganfyddiad diogelwch",
+      "activeAgentsGlanceable": "Mae gan asiantau gweithredol ddiweddariad"
     }
   },
   "cloudAgentSession": {

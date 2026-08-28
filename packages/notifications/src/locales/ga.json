@@ -7,7 +7,8 @@
       "instanceLifecycle": "Tá nuashonrú ar do chás",
       "scheduledAction": "Tá nuashonrú ar ghníomh sceidealta",
       "lowBalance": "Teastaíonn aird ar do chothromas",
-      "securityFinding": "Teastaíonn aird ar thátal slándála"
+      "securityFinding": "Teastaíonn aird ar thátal slándála",
+      "activeAgentsGlanceable": "Tá nuashonrú ar ghníomhairí gníomhacha"
     }
   },
   "cloudAgentSession": {

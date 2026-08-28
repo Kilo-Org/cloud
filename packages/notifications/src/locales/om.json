@@ -7,7 +7,8 @@
       "instanceLifecycle": "Instance kee keessa bakka jijjiiramni jira",
       "scheduledAction": "Sochiin karoorfame keessa bakka jijjiiramni jira",
       "lowBalance": "Baalansii kee xiyyeeffannaa barbaada",
-      "securityFinding": "Arganni nagaa xiyyeeffannaa barbaada"
+      "securityFinding": "Arganni nagaa xiyyeeffannaa barbaada",
+      "activeAgentsGlanceable": "Eejentoonni hojii irra jiran odeeffannoo haaraa qabu"
     }
   },
   "cloudAgentSession": {

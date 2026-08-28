@@ -7,7 +7,8 @@
       "instanceLifecycle": "Enstans ou gen yon aktyalizasyon",
       "scheduledAction": "Yon aksyon pwograme gen yon aktyalizasyon",
       "lowBalance": "Saldo ou bezwen atansyon",
-      "securityFinding": "Yon rezilta sekirite bezwen atansyon"
+      "securityFinding": "Yon rezilta sekirite bezwen atansyon",
+      "activeAgentsGlanceable": "Ajans aktif yo gen yon aktyalizasyon"
     }
   },
   "cloudAgentSession": {

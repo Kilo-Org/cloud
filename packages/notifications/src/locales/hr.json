@@ -7,7 +7,8 @@
       "instanceLifecycle": "Vaša instanca ima ažuriranje",
       "scheduledAction": "Zakazana radnja ima ažuriranje",
       "lowBalance": "Vaš saldo zahtijeva pozornost",
-      "securityFinding": "Sigurnosni nalaz zahtijeva pozornost"
+      "securityFinding": "Sigurnosni nalaz zahtijeva pozornost",
+      "activeAgentsGlanceable": "Aktivni agenti imaju ažuriranje"
     }
   },
   "cloudAgentSession": {

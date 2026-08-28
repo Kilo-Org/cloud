@@ -7,7 +7,8 @@
       "instanceLifecycle": "Contoh anda ada kemas kini",
       "scheduledAction": "Tindakan berjadual ada kemas kini",
       "lowBalance": "Baki anda memerlukan perhatian",
-      "securityFinding": "Penemuan keselamatan memerlukan perhatian"
+      "securityFinding": "Penemuan keselamatan memerlukan perhatian",
+      "activeAgentsGlanceable": "Ejen aktif ada kemas kini"
     }
   },
   "cloudAgentSession": {

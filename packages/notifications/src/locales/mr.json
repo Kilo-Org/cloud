@@ -7,7 +7,8 @@
       "instanceLifecycle": "तुमच्या इंस्टन्समध्ये अपडेट आहे",
       "scheduledAction": "नियोजित क्रियेत अपडेट आहे",
       "lowBalance": "तुमच्या शिल्लकीकडे लक्ष आवश्यक आहे",
-      "securityFinding": "सुरक्षा निष्कर्षाकडे लक्ष आवश्यक आहे"
+      "securityFinding": "सुरक्षा निष्कर्षाकडे लक्ष आवश्यक आहे",
+      "activeAgentsGlanceable": "सक्रिय एजंट्सकडे अपडेट आहे"
     }
   },
   "cloudAgentSession": {

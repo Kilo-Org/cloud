@@ -7,7 +7,8 @@
       "instanceLifecycle": "L-instance tiegħek għandha aġġornament",
       "scheduledAction": "Azzjoni skedata għandha aġġornament",
       "lowBalance": "Il-bilanċ tiegħek għandu bżonn attenzjoni",
-      "securityFinding": "Seba ta' sigurtà għandu bżonn attenzjoni"
+      "securityFinding": "Seba ta' sigurtà għandu bżonn attenzjoni",
+      "activeAgentsGlanceable": "L-aġenti attivi għandhom aġġornament"
     }
   },
   "cloudAgentSession": {

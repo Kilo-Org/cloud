@@ -7,7 +7,8 @@
       "instanceLifecycle": "Vaša inštancia má aktualizáciu",
       "scheduledAction": "Naplánovaná akcia má aktualizáciu",
       "lowBalance": "Váš zostatok si vyžaduje pozornosť",
-      "securityFinding": "Nájdený bezpečnostný problém si vyžaduje pozornosť"
+      "securityFinding": "Nájdený bezpečnostný problém si vyžaduje pozornosť",
+      "activeAgentsGlanceable": "Aktívni agenti majú aktualizáciu"
     }
   },
   "cloudAgentSession": {

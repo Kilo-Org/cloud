@@ -7,7 +7,8 @@
       "instanceLifecycle": "ستاسو نمونه تازه شوې ده",
       "scheduledAction": "یو ټاکلی عمل تازه شوی دی",
       "lowBalance": "ستاسو توازن ته پاملرنه اړینه ده",
-      "securityFinding": "یو امنیتي موندنې ته پاملرنه اړینه ده"
+      "securityFinding": "یو امنیتي موندنې ته پاملرنه اړینه ده",
+      "activeAgentsGlanceable": "فعال اجنټان تازه معلومات لري"
     }
   },
   "cloudAgentSession": {

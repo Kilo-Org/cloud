@@ -1,8 +1,26 @@
-const MULTIPLE_GITHUB_INSTALLATION_ORGANIZATION_IDS = new Set([
-  '9d278969-5453-4ae3-a51f-a8d2274a7b56',
-  '30f1620a-4aad-4456-bf4d-550f335e6f55',
-]);
+import 'server-only';
+
+import { z } from 'zod';
+import { getEnvVariable } from '@/lib/dotenvx';
+
+export function parseMultipleGitHubInstallationOrganizationIds(value: string): Set<string> {
+  const organizationIds = value
+    .split(',')
+    .map(organizationId => organizationId.trim())
+    .filter(Boolean);
+
+  const result = z.array(z.uuid()).safeParse(organizationIds);
+  if (!result.success) {
+    throw new Error(
+      'GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS must be a comma-separated list of UUIDs'
+    );
+  }
+
+  return new Set(result.data);
+}
 
 export function canOrganizationUseMultipleGitHubInstallations(organizationId: string): boolean {
-  return MULTIPLE_GITHUB_INSTALLATION_ORGANIZATION_IDS.has(organizationId);
+  return parseMultipleGitHubInstallationOrganizationIds(
+    getEnvVariable('GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS')
+  ).has(organizationId);
 }

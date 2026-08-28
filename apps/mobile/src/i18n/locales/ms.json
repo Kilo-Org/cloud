@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Tapis sesi",
-      "sortBy": "Susun mengikut",
-      "sortLastUpdated": "Kemas kini terakhir",
-      "sortCreated": "Dicipta",
       "platform": "Platform",
       "platformCloud": "Awan",
       "platformExtension": "Penyambung",

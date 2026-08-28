@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Филтрирайте сесиите",
-      "sortBy": "Сортирай по",
-      "sortLastUpdated": "Последна актуализация",
-      "sortCreated": "Създадено",
       "platform": "Платформа",
       "platformCloud": "Облак",
       "platformExtension": "Разширение",

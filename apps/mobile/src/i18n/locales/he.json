@@ -2047,9 +2047,6 @@
     },
     "sessionFilter": {
       "title": "סנן הפעלות",
-      "sortBy": "מיין לפי",
-      "sortLastUpdated": "עודכן לאחרונה",
-      "sortCreated": "נוצר",
       "platform": "פלטפורמה",
       "platformCloud": "ענן",
       "platformExtension": "תוסף",

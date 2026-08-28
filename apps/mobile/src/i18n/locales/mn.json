@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Сессийг шүүх",
-      "sortBy": "Эрэмбэлэх",
-      "sortLastUpdated": "Сүүлд шинэчлэгдсэн",
-      "sortCreated": "Үүсгэсэн",
       "platform": "Платформ",
       "platformCloud": "Үүл",
       "platformExtension": "Өргөтгөл",

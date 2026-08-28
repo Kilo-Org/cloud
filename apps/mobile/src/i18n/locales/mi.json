@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Tātari ngā wātū",
-      "sortBy": "Whakarārangi mā",
-      "sortLastUpdated": "Nō muri whakahou",
-      "sortCreated": "I waihangatia",
       "platform": "Pātengi",
       "platformCloud": "Kapua",
       "platformExtension": "Toronga",

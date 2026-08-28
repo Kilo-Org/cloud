@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "ಸೆಷನ್ಗಳನ್ನು ಫಿಲ್ಟರ್ ಮಾಡಿ",
-      "sortBy": "ವಿಂಗಡಿಸಿ",
-      "sortLastUpdated": "ಕೊನೆಯದಾಗಿ ನವೀಕರಿಸಲಾಗಿದೆ",
-      "sortCreated": "ರಚಿಸಲಾಗಿದೆ",
       "platform": "ಪ್ಲಾಟ್ಫಾರ್ಮ್",
       "platformCloud": "ಕ್ಲೌಡ್",
       "platformExtension": "ಎಕ್ಸ್ಟೆನ್ಶನ್",

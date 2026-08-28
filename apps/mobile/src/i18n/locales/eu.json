@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Iragazi saioak",
-      "sortBy": "Ordenatu honen arabera",
-      "sortLastUpdated": "Azken eguneratzea",
-      "sortCreated": "Sortuta",
       "platform": "Plataforma",
       "platformCloud": "Hodeia",
       "platformExtension": "Hedapena",

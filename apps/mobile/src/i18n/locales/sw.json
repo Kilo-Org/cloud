@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Chuja vikao",
-      "sortBy": "Panga kwa",
-      "sortLastUpdated": "Imesasishwa mwisho",
-      "sortCreated": "Imeundwa",
       "platform": "Jukwaa",
       "platformCloud": "Wingu",
       "platformExtension": "Kiendelezi",

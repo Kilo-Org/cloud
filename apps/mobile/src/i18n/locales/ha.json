@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Tace zaman",
-      "sortBy": "Tsara ta",
-      "sortLastUpdated": "An sabunta kwanan nan",
-      "sortCreated": "An ƙirƙira",
       "platform": "Dandali",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",

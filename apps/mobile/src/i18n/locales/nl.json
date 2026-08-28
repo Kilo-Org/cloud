@@ -2035,9 +2035,6 @@
     },
     "sessionFilter": {
       "title": "Sessies filteren",
-      "sortBy": "Sorteren op",
-      "sortLastUpdated": "Laatst bijgewerkt",
-      "sortCreated": "Aangemaakt",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Extensie",

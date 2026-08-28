@@ -2008,9 +2008,6 @@
     },
     "sessionFilter": {
       "title": "सत्र फ़िल्टर करें",
-      "sortBy": "इससे क्रमबद्ध करें",
-      "sortLastUpdated": "अंतिम बार अपडेट",
-      "sortCreated": "बनाया गया",
       "platform": "प्लेटफ़ॉर्म",
       "platformCloud": "क्लाउड",
       "platformExtension": "एक्सटेंशन",

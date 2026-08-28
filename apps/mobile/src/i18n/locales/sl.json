@@ -2527,9 +2527,6 @@
     },
     "sessionFilter": {
       "title": "Filtriraj seje",
-      "sortBy": "Razvrsti po",
-      "sortLastUpdated": "Nazadnje posodobljeno",
-      "sortCreated": "Ustvarjeno",
       "platform": "Platforma",
       "platformCloud": "Oblak",
       "platformExtension": "Razširitev",

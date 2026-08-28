@@ -15,6 +15,7 @@ import { useSessionSearchInput } from '@/components/agents/use-session-search-in
 import { ScreenHeader } from '@/components/screen-header';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
+import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { SESSION_SEARCH_DRAFT_KEY } from '@/lib/persist/drafts';
@@ -37,12 +38,13 @@ export function SessionHistoryScreen() {
   const {
     platformFilter,
     projectFilter,
-    sortBy,
+    activeFilterCount,
     hasLoaded: filtersLoaded,
     setFilters,
+    clearFilters,
     setPlatformFilter,
     setProjectFilter,
-  } = usePersistedAgentSessionFilters();
+  } = usePersistedAgentSessionFilters(SESSION_FILTERS_KEY);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   // Durable session-list search draft. The input mounts immediately — typing
@@ -90,7 +92,6 @@ export function SessionHistoryScreen() {
     organizationId,
     platformFilter,
     projectFilter,
-    sortBy,
     ready,
     searchQuery,
   });
@@ -136,8 +137,7 @@ export function SessionHistoryScreen() {
     }
   }, [paging]);
 
-  const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
-  const hasActiveQuery = isSearching || hasActiveFilter;
+  const hasActiveQuery = isSearching || activeFilterCount > 0;
   // History has no live tray, so "any sessions" means stored rows or an active
   // query — never the active set.
   const hasAnySessions = storedSessions.length > 0 || hasActiveQuery;
@@ -156,8 +156,8 @@ export function SessionHistoryScreen() {
 
   const handleClearQuery = useCallback(() => {
     clearSearchInput();
-    searchController.clearBroadly(setFilters);
-  }, [clearSearchInput, searchController, setFilters]);
+    searchController.clearBroadly(clearFilters);
+  }, [clearSearchInput, searchController, clearFilters]);
 
   const isLoading =
     !ready || (isSearching ? search.isPending : storedIsFetching && storedLoadedPageCount === 0);
@@ -169,7 +169,7 @@ export function SessionHistoryScreen() {
         showBackButton
         headerRight={
           <SessionListHeaderActions
-            hasActiveFilter={hasActiveFilter}
+            activeFilterCount={activeFilterCount}
             showNewSession={false}
             onNewSession={noopCreateSession}
             onOpenFilters={() => {
@@ -218,21 +218,17 @@ export function SessionHistoryScreen() {
           searchQuery={searchQuery}
           onClearQuery={handleClearQuery}
           onCreateSession={noopCreateSession}
-          sortBy={sortBy}
         />
       </View>
       {showFilterModal && (
         <SessionFilterModal
           selectedPlatforms={platformFilter}
           selectedProjects={projectFilter}
-          selectedSortBy={sortBy}
           projectOptions={projectOptions}
           onClose={() => {
             setShowFilterModal(false);
           }}
-          onApply={filters => {
-            setFilters(filters);
-          }}
+          onApply={setFilters}
         />
       )}
     </View>

@@ -2035,9 +2035,6 @@
     },
     "sessionFilter": {
       "title": "篩選工作階段",
-      "sortBy": "排序方式",
-      "sortLastUpdated": "最後更新",
-      "sortCreated": "建立時間",
       "platform": "平台",
       "platformCloud": "雲端",
       "platformExtension": "擴充功能",

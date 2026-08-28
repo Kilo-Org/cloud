@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Filtrera session",
-      "sortBy": "Alaharo araka ny",
-      "sortLastUpdated": "Nohavaozina farany",
-      "sortCreated": "Noforonina",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",

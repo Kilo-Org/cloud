@@ -2508,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Filtriraj sesije",
-      "sortBy": "Sortiraj po",
-      "sortLastUpdated": "Poslednje ažurirano",
-      "sortCreated": "Kreirano",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Ekstenzija",

@@ -9,10 +9,8 @@ import {
   type ProjectFilterOption,
 } from '@/components/agents/session-list-helpers';
 import { Button } from '@/components/ui/button';
-import { ChoiceRow } from '@/components/ui/choice-row';
-import { RadioGroup } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
-import { type AgentSessionSortBy, DEFAULT_AGENT_SESSION_SORT } from '@/lib/agent-session-sort';
+import { type AgentSessionFilters } from '@/lib/agent-session-filters';
 import { platformLabel } from '@/lib/platform-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
@@ -22,13 +20,7 @@ export { type ProjectFilterOption };
 
 const chipScrollContentStyle = { paddingHorizontal: 22, paddingVertical: 8, gap: 8 };
 
-type SessionFilters = {
-  platformFilter: string[];
-  projectFilter: string[];
-  sortBy: AgentSessionSortBy;
-};
-
-type SessionFilterChipsProps = Omit<SessionFilters, 'sortBy'> & {
+type SessionFilterChipsProps = AgentSessionFilters & {
   projectOptions: ProjectFilterOption[];
   onRemovePlatform: (platform: string) => void;
   onRemoveProject: (gitUrl: string) => void;
@@ -37,13 +29,11 @@ type SessionFilterChipsProps = Omit<SessionFilters, 'sortBy'> & {
 type SessionFilterModalProps = {
   selectedPlatforms: string[];
   selectedProjects: string[];
-  /** Omit to hide the sort section — the live list has a fixed order. */
-  selectedSortBy?: AgentSessionSortBy;
   projectOptions: ProjectFilterOption[];
   /** Platform rows to offer. Defaults to every known platform. */
   platformOptions?: readonly string[];
   onClose: () => void;
-  onApply: (filters: SessionFilters) => void;
+  onApply: (filters: AgentSessionFilters) => void;
 };
 
 type FilterCheckboxRowProps = {
@@ -177,7 +167,6 @@ export function SessionFilterChips({
 export function SessionFilterModal({
   selectedPlatforms,
   selectedProjects,
-  selectedSortBy,
   projectOptions,
   platformOptions = PLATFORM_FILTERS,
   onClose,
@@ -186,13 +175,6 @@ export function SessionFilterModal({
   const { t } = useTranslation();
   const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
-  const [draftSortBy, setDraftSortBy] = useState<AgentSessionSortBy>(
-    selectedSortBy ?? DEFAULT_AGENT_SESSION_SORT
-  );
-  const sortOptions: readonly { value: AgentSessionSortBy; label: string }[] = [
-    { value: 'updated_at', label: t('agentChat.sessionFilter.sortLastUpdated') },
-    { value: 'created_at', label: t('agentChat.sessionFilter.sortCreated') },
-  ];
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>
@@ -233,26 +215,6 @@ export function SessionFilterModal({
           <Text className="text-base font-semibold">{t('agentChat.sessionFilter.title')}</Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="gap-4">
-              {selectedSortBy !== undefined && (
-                <View className="gap-1">
-                  <Text variant="eyebrow" className="px-3">
-                    {t('agentChat.sessionFilter.sortBy')}
-                  </Text>
-                  <RadioGroup label={t('agentChat.sessionFilter.sortBy')}>
-                    {sortOptions.map(option => (
-                      <ChoiceRow
-                        key={option.value}
-                        label={option.label}
-                        selected={draftSortBy === option.value}
-                        onPress={() => {
-                          setDraftSortBy(option.value);
-                        }}
-                        className="rounded-lg px-3"
-                      />
-                    ))}
-                  </RadioGroup>
-                </View>
-              )}
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">
                   {t('agentChat.sessionFilter.platform')}
@@ -296,7 +258,6 @@ export function SessionFilterModal({
                 onApply({
                   platformFilter: draftPlatforms,
                   projectFilter: draftProjects,
-                  sortBy: draftSortBy,
                 });
                 onClose();
               }}

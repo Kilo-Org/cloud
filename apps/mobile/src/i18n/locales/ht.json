@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Filtre sesyon",
-      "sortBy": "Triye pa",
-      "sortLastUpdated": "Dènye aktyalizasyon",
-      "sortCreated": "Kreye",
       "platform": "Platfòm",
       "platformCloud": "Nwaj",
       "platformExtension": "Ekstansyon",

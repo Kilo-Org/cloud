@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Filtreer sessies",
-      "sortBy": "Sorteer op",
-      "sortLastUpdated": "Laas bygewerk",
-      "sortCreated": "Geskep",
       "platform": "Platform",
       "platformCloud": "Wolk",
       "platformExtension": "Uitbreiding",

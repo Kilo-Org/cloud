@@ -2546,9 +2546,6 @@
     },
     "sessionFilter": {
       "title": "Iffiltra s-sessjonijiet",
-      "sortBy": "Irranġa skont",
-      "sortLastUpdated": "Aġġornat l-aħħar",
-      "sortCreated": "Maħluq",
       "platform": "Pjattaforma",
       "platformCloud": "Cloud",
       "platformExtension": "Estensjoni",

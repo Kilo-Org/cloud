@@ -2527,9 +2527,6 @@
     },
     "sessionFilter": {
       "title": "Filtruoti sesijas",
-      "sortBy": "Rūšiuoti pagal",
-      "sortLastUpdated": "Paskutinį kartą atnaujinta",
-      "sortCreated": "Sukurta",
       "platform": "Platforma",
       "platformCloud": "Debesija",
       "platformExtension": "Plėtinys",

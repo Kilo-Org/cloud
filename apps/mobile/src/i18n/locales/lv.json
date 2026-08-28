@@ -2508,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Filtrēt sesijas",
-      "sortBy": "Kārtot pēc",
-      "sortLastUpdated": "Pēdējo reizi atjaunināts",
-      "sortCreated": "Izveidots",
       "platform": "Platforma",
       "platformCloud": "Mākonis",
       "platformExtension": "Paplašinājums",

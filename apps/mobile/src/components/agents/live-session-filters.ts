@@ -7,8 +7,16 @@ import {
 
 /** The part of an active session the live filters read. */
 export type LiveFilterSession = {
+  title?: string;
   gitUrl?: string | null;
   createdOnPlatform?: string;
+};
+
+export type LiveSessionQuery = {
+  platformFilter: readonly string[];
+  projectFilter: readonly string[];
+  /** Free text, matched against the session title and its repository. */
+  searchQuery: string;
 };
 
 export type LiveFilterOptions = {
@@ -65,17 +73,28 @@ export function buildLiveFilterOptions(sessions: readonly LiveFilterSession[]): 
   };
 }
 
+function matchesSearch(session: LiveFilterSession, needle: string): boolean {
+  if (session.title?.toLowerCase().includes(needle)) {
+    return true;
+  }
+  return session.gitUrl
+    ? formatGitUrlProject(session.gitUrl).toLowerCase().includes(needle)
+    : false;
+}
+
 /**
- * Client-side live-list filter. An empty selection means "no filter"; the two
- * dimensions combine with AND. The live list is fully loaded in memory, so it
- * filters locally instead of refetching.
+ * Client-side live-list query: repository, origin, and free-text search, all
+ * combined with AND. An empty selection or an empty query means "no filter".
+ * The live list is fully loaded in memory, so it filters locally — no refetch,
+ * and no debounce needed.
  */
 export function filterLiveSessions<T extends LiveFilterSession>(
   sessions: T[],
-  platformFilter: readonly string[],
-  projectFilter: readonly string[]
+  query: LiveSessionQuery
 ): T[] {
-  if (platformFilter.length === 0 && projectFilter.length === 0) {
+  const { platformFilter, projectFilter } = query;
+  const needle = query.searchQuery.trim().toLowerCase();
+  if (platformFilter.length === 0 && projectFilter.length === 0 && needle.length === 0) {
     return sessions;
   }
   return sessions.filter(session => {
@@ -85,6 +104,7 @@ export function filterLiveSessions<T extends LiveFilterSession>(
     const projectMatches =
       projectFilter.length === 0 ||
       (session.gitUrl != null && projectFilter.includes(session.gitUrl));
-    return platformMatches && projectMatches;
+    const searchMatches = needle.length === 0 || matchesSearch(session, needle);
+    return platformMatches && projectMatches && searchMatches;
   });
 }

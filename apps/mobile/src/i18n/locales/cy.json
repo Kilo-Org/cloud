@@ -2565,9 +2565,6 @@
     },
     "sessionFilter": {
       "title": "Hidlo sesiynau",
-      "sortBy": "Trefnu yn ôl",
-      "sortLastUpdated": "Diweddarwyd ddiwethaf",
-      "sortCreated": "Crëwyd",
       "platform": "Platfform",
       "platformCloud": "Cwmwl",
       "platformExtension": "Estyniad",

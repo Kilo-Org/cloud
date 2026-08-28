@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "ክፍለ-ጊዜዎችን ያጣሩ",
-      "sortBy": "በ… ደርድር",
-      "sortLastUpdated": "በመጨረሻ የተሻሻለ",
-      "sortCreated": "የተፈጠረ",
       "platform": "መድረክ",
       "platformCloud": "ክላውድ",
       "platformExtension": "ቅጥያ",

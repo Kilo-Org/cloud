@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "ସେସନ୍ ଫିଲ୍ଟର କରନ୍ତୁ",
-      "sortBy": "କ୍ରମବଦ୍ଧ କରନ୍ତୁ",
-      "sortLastUpdated": "ସର୍ବଶେଷ ଅପଡେଟ୍",
-      "sortCreated": "ସୃଷ୍ଟି",
       "platform": "ପ୍ଲାଟଫର୍ମ",
       "platformCloud": "କ୍ଲାଉଡ୍",
       "platformExtension": "ଏକ୍ସଟେନ୍ସନ୍",

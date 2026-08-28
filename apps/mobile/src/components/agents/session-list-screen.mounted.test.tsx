@@ -29,7 +29,7 @@ const appState = vi.hoisted(() => {
 
 const focusState = vi.hoisted(() => ({ current: true as boolean }));
 const focusCallbacks = vi.hoisted(() => ({
-  current: [] as (() => void)[],
+  current: new Set<() => void>(),
 }));
 const refetchSpy = vi.hoisted(() => vi.fn());
 const routerPushSpy = vi.hoisted(() => vi.fn());
@@ -43,6 +43,7 @@ const orgState = vi.hoisted(() => ({
 type MockActiveSession = {
   id: string;
   organizationId: string | null;
+  title?: string;
   gitUrl?: string | null;
   createdOnPlatform?: string;
 };
@@ -73,7 +74,7 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => focusState.current }),
   useFocusEffect: (effect: () => void) => {
-    focusCallbacks.current.push(effect);
+    focusCallbacks.current.add(effect);
   },
   useRouter: () => ({ push: routerPushSpy, dismissTo: routerDismissToSpy }),
   useScrollToTop: () => undefined,
@@ -86,6 +87,17 @@ vi.mock('react-i18next', () => ({
 }));
 vi.mock('@/i18n', () => ({
   i18n: { t: (key: string) => key, language: 'en' },
+}));
+// The real persisted-filters hook runs; only its native edges are stubbed, so
+// the apply/clear transitions below exercise the actual filter state.
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: () => Promise.resolve(null),
+}));
+vi.mock('@/lib/auth/account-metadata-write', () => ({
+  setAccountMetadata: () => Promise.resolve(),
+}));
+vi.mock('sonner-native', () => ({
+  toast: { error: vi.fn() },
 }));
 
 // Combined-list machinery is mocked as inert string nodes so a regression that
@@ -223,7 +235,7 @@ describe('AgentSessionListScreen live tab', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     focusState.current = true;
-    focusCallbacks.current = [];
+    focusCallbacks.current = new Set();
     orgState.organizationId = null;
     orgState.isLoaded = true;
     sessionListState.activeSessions = [];
@@ -296,12 +308,11 @@ describe('AgentSessionListScreen live tab', () => {
     expect(routerPushSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/history');
   });
 
-  it('renders no search header, animated wrappers, or active-now section', async () => {
+  it('renders no history list, animated wrappers, or active-now section', async () => {
     sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
     const renderer = await renderScreen();
 
     for (const type of [
-      'SessionListSearchHeader',
       'SessionFilterModal',
       'ActiveNowSection',
       'AgentSessionListContent',
@@ -309,6 +320,35 @@ describe('AgentSessionListScreen live tab', () => {
     ]) {
       expect(findTypeCount(renderer, type)).toBe(0);
     }
+  });
+
+  it('shows the search header only once there are live rows', async () => {
+    const empty = await renderScreen();
+    expect(findTypeCount(empty, 'SessionListSearchHeader')).toBe(0);
+
+    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
+    const withRows = await renderScreen();
+    expect(findTypeCount(withRows, 'SessionListSearchHeader')).toBe(1);
+  });
+
+  it('narrows the live list to the search text', async () => {
+    sessionListState.activeSessions = [
+      { id: 'a1', organizationId: null, title: 'Fix the login redirect' },
+      { id: 'a2', organizationId: null, title: 'Bump deps' },
+    ];
+    const renderer = await renderScreen();
+
+    const searchHeader = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'SessionListSearchHeader'
+    );
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('bump');
+    });
+
+    const list = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
+    );
+    expect((list.props.data as { id: string }[]).map(session => session.id)).toEqual(['a2']);
   });
 
   it('keeps the header right to See-all alone while nothing is filterable', async () => {
@@ -325,7 +365,7 @@ describe('AgentSessionListScreen live tab', () => {
     const renderer = await renderScreen();
 
     const filterButton = requireHeaderAction(renderer, 'agents-open-filters');
-    expect(filterButton.props.accessibilityLabel).toBe('agentChat.sessionFilter.title');
+    expect(filterButton.props.activeCount).toBe(0);
   });
 
   it('filters the live list down to the applied repository', async () => {

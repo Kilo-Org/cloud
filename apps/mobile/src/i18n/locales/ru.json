@@ -2059,9 +2059,6 @@
     },
     "sessionFilter": {
       "title": "Фильтровать сеансы",
-      "sortBy": "Сортировать по",
-      "sortLastUpdated": "Последнее обновление",
-      "sortCreated": "Создано",
       "platform": "Платформа",
       "platformCloud": "Облако",
       "platformExtension": "Расширение",

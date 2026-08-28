@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "සැසි පෙරහන් කරන්න",
-      "sortBy": "අනුව වර්ග කරන්න",
-      "sortLastUpdated": "අවසන් යාවත්කාලීනය",
-      "sortCreated": "සාදන ලදී",
       "platform": "වේදිකාව",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",

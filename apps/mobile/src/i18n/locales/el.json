@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Φιλτράρισμα συνεδριών",
-      "sortBy": "Ταξινόμηση κατά",
-      "sortLastUpdated": "Τελευταία ενημέρωση",
-      "sortCreated": "Δημιουργήθηκε",
       "platform": "Πλατφόρμα",
       "platformCloud": "Cloud",
       "platformExtension": "Επέκταση",

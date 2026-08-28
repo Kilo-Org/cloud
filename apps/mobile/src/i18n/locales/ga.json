@@ -2546,9 +2546,6 @@
     },
     "sessionFilter": {
       "title": "Scag seisiúin",
-      "sortBy": "Sórtáil de réir",
-      "sortLastUpdated": "Nuashonraithe deireanach",
-      "sortCreated": "Cruthaithe",
       "platform": "Ardán",
       "platformCloud": "Scamall",
       "platformExtension": "Eisínteacht",

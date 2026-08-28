@@ -2508,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Filtrează sesiunile",
-      "sortBy": "Sortare după",
-      "sortLastUpdated": "Actualizat recent",
-      "sortCreated": "Creat",
       "platform": "Platformă",
       "platformCloud": "Cloud",
       "platformExtension": "Extensie",

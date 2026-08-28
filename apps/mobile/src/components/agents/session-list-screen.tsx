@@ -11,15 +11,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Bot, Plus, SlidersHorizontal } from '@/components/ui/icons';
+import { Bot, Plus } from '@/components/ui/icons';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import {
-  buildLiveFilterOptions,
-  filterLiveSessions,
-} from '@/components/agents/live-session-filters';
 import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { SessionFilterButton } from '@/components/agents/session-filter-button';
+import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
@@ -59,36 +58,14 @@ export function AgentSessionListScreen() {
     enabled: orgLoaded,
   });
 
-  // Repository and origin filters for the live list. The whole live set is
-  // already in memory, so filtering is local — no refetch, no extra query.
-  // Kept in component state rather than the persisted history filters: the two
-  // screens show different rows, and a filter hidden behind an app restart
-  // would silently hide running sessions.
-  const [platformFilter, setPlatformFilter] = useState<string[]>([]);
-  const [projectFilter, setProjectFilter] = useState<string[]>([]);
+  const query = useLiveSessionQuery(activeSessions);
+  const { visibleSessions, isSearching } = query;
   const [showFilterModal, setShowFilterModal] = useState(false);
-
-  const filterOptions = useMemo(() => buildLiveFilterOptions(activeSessions), [activeSessions]);
-  const visibleSessions = useMemo(
-    () => filterLiveSessions(activeSessions, platformFilter, projectFilter),
-    [activeSessions, platformFilter, projectFilter]
-  );
-
-  const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
-  const clearFilters = useCallback(() => {
-    setPlatformFilter([]);
-    setProjectFilter([]);
-  }, []);
 
   // Treat !orgLoaded as loading so the empty state cannot flash before skeletons.
   const loading = isLoading || !orgLoaded;
   const hasLiveRows = activeSessions.length > 0;
   const hasVisibleRows = visibleSessions.length > 0;
-  // Only offer the picker when there is something to pick, and keep it while a
-  // filter is applied so the user can always get back to the full list.
-  const showFilterButton =
-    hasActiveFilter ||
-    filterOptions.projectOptions.length + filterOptions.platformOptions.length > 0;
 
   const refetchRef = useRef(refetch);
   useEffect(() => {
@@ -154,23 +131,14 @@ export function AgentSessionListScreen() {
           {seeAllLabel}
         </Text>
       </Pressable>
-      {showFilterButton ? (
-        <Pressable
+      {query.canFilter ? (
+        <SessionFilterButton
+          activeCount={query.activeFilterCount}
           onPress={() => {
             setShowFilterModal(true);
           }}
-          // left slop capped against the 16px gap, right slop reaches 44pt wide
-          hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.sessionFilter.title')}
           testID="agents-open-filters"
-          className="active:opacity-70"
-        >
-          <SlidersHorizontal
-            size={20}
-            color={hasActiveFilter ? colors.foreground : colors.mutedForeground}
-          />
-        </Pressable>
+        />
       ) : null}
     </View>
   );
@@ -251,10 +219,16 @@ export function AgentSessionListScreen() {
       <EmptyState
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
-        description={t('agents.sessionList.tryAdjustFilters')}
+        description={
+          isSearching
+            ? t('agents.sessionList.tryDifferentSearch')
+            : t('agents.sessionList.tryAdjustFilters')
+        }
         action={
-          <Button variant="outline" onPress={clearFilters}>
-            <Text>{t('agents.search.clearFilters')}</Text>
+          <Button variant="outline" onPress={query.handleClearAll}>
+            <Text>
+              {isSearching ? t('agents.search.clearSearch') : t('agents.search.clearFilters')}
+            </Text>
           </Button>
         }
       />
@@ -302,16 +276,22 @@ export function AgentSessionListScreen() {
         className="px-[22px]"
         headerRight={headerRight}
       />
+      {hasLiveRows || isSearching ? (
+        <SessionListSearchHeader
+          inputRef={query.searchInputRef}
+          hasText={query.searchQuery.length > 0}
+          showSearchBusy={false}
+          showInlineError={false}
+          onChangeText={query.handleSearchChange}
+          onClearSearch={query.handleClearSearch}
+        />
+      ) : null}
       <SessionFilterChips
-        platformFilter={platformFilter}
-        projectFilter={projectFilter}
-        projectOptions={filterOptions.projectOptions}
-        onRemovePlatform={platform => {
-          setPlatformFilter(prev => prev.filter(value => value !== platform));
-        }}
-        onRemoveProject={gitUrl => {
-          setProjectFilter(prev => prev.filter(value => value !== gitUrl));
-        }}
+        platformFilter={query.platformFilter}
+        projectFilter={query.projectFilter}
+        projectOptions={query.options.projectOptions}
+        onRemovePlatform={query.handleRemovePlatform}
+        onRemoveProject={query.handleRemoveProject}
       />
       {body}
       {/* FAB visible when there are live rows — empty state already owns the creation CTA. */}
@@ -331,17 +311,14 @@ export function AgentSessionListScreen() {
       )}
       {showFilterModal && (
         <SessionFilterModal
-          selectedPlatforms={platformFilter}
-          selectedProjects={projectFilter}
-          projectOptions={filterOptions.projectOptions}
-          platformOptions={filterOptions.platformOptions}
+          selectedPlatforms={query.platformFilter}
+          selectedProjects={query.projectFilter}
+          projectOptions={query.options.projectOptions}
+          platformOptions={query.options.platformOptions}
           onClose={() => {
             setShowFilterModal(false);
           }}
-          onApply={filters => {
-            setPlatformFilter(filters.platformFilter);
-            setProjectFilter(filters.projectFilter);
-          }}
+          onApply={query.handleApplyFilters}
         />
       )}
     </View>

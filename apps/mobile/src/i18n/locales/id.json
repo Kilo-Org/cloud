@@ -2035,9 +2035,6 @@
     },
     "sessionFilter": {
       "title": "Filter sesi",
-      "sortBy": "Urutkan menurut",
-      "sortLastUpdated": "Terakhir diperbarui",
-      "sortCreated": "Dibuat",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Ekstensi",

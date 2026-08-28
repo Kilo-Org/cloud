@@ -2035,9 +2035,6 @@
     },
     "sessionFilter": {
       "title": "Oturumları filtrele",
-      "sortBy": "Sıralama ölçütü",
-      "sortLastUpdated": "Son güncellenen",
-      "sortCreated": "Oluşturulma",
       "platform": "Platform",
       "platformCloud": "Bulut",
       "platformExtension": "Eklenti",

@@ -2059,9 +2059,6 @@
     },
     "sessionFilter": {
       "title": "Фільтрувати сеанси",
-      "sortBy": "Сортувати за",
-      "sortLastUpdated": "Останнє оновлення",
-      "sortCreated": "Створено",
       "platform": "Платформа",
       "platformCloud": "Хмара",
       "platformExtension": "Розширення",

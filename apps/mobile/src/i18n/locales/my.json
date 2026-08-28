@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "session များ စစ်ထုတ်ရန်",
-      "sortBy": "စီရန်",
-      "sortLastUpdated": "နောက်ဆုံး ပြုပြင်ချိန်",
-      "sortCreated": "ဖန်တီးချိန်",
       "platform": "ပလက်ဖောင်း",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",

@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Munkamenetek szűrése",
-      "sortBy": "Rendezés",
-      "sortLastUpdated": "Utolsó módosítás",
-      "sortCreated": "Létrehozva",
       "platform": "Platform",
       "platformCloud": "Felhő",
       "platformExtension": "Bővítmény",

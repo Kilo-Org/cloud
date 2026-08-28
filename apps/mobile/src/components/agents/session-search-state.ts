@@ -3,11 +3,6 @@
 // session-list-screen.tsx so the timing + reset semantics can be unit
 // tested with an injectable timer and no react-native test renderer.
 
-import {
-  type AgentSessionFilters,
-  clearAgentSessionNarrowingFilters,
-} from '@/lib/agent-session-filters';
-
 /** Debounce delay (ms) for trimming + committing the search query. */
 export const SEARCH_DEBOUNCE_MS = 300;
 
@@ -54,13 +49,10 @@ export type SessionSearchController = {
   clearSearchOnly(): void;
   /**
    * Broad clear (empty-state "Clear search" / "Clear filters" CTAs):
-   * cancel any pending debounce, commit an empty query, AND apply the
-   * narrowing-filter reset via the provided `applyFilters` callback so
-   * the screen can preserve the persisted sort preference.
+   * cancel any pending debounce, commit an empty query, AND reset the
+   * narrowing filters through the provided callback.
    */
-  clearBroadly(
-    applyFilters: (transform: (prev: AgentSessionFilters) => AgentSessionFilters) => void
-  ): void;
+  clearBroadly(clearFilters: () => void): void;
   /** Cancel any pending debounce without committing (used on unmount). */
   dispose(): void;
   /** Test-only: whether a debounce is currently pending. */
@@ -97,10 +89,10 @@ export function createSessionSearchController({
       cancelPending();
       commitSearchQuery('');
     },
-    clearBroadly(applyFilters) {
+    clearBroadly(clearFilters) {
       cancelPending();
       commitSearchQuery('');
-      applyFilters(prev => clearAgentSessionNarrowingFilters(prev));
+      clearFilters();
     },
     dispose: cancelPending,
     hasPending: () => pending !== null,

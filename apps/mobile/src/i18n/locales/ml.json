@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "സെഷനുകൾ ഫിൽട്ടർ ചെയ്യുക",
-      "sortBy": "അടുക്കുക",
-      "sortLastUpdated": "അവസാനം അപ്ഡേറ്റ് ചെയ്തത്",
-      "sortCreated": "സൃഷ്ടിച്ചു",
       "platform": "പ്ലാറ്റ്ഫോം",
       "platformCloud": "ക്ലൗഡ്",
       "platformExtension": "എക്സ്റ്റൻഷൻ",

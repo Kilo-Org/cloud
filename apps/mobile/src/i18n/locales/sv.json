@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "Filtrera sessioner",
-      "sortBy": "Sortera efter",
-      "sortLastUpdated": "Senast uppdaterad",
-      "sortCreated": "Skapad",
       "platform": "Plattform",
       "platformCloud": "Cloud",
       "platformExtension": "Tillägg",

@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "پاڵاوتن بۆ دانیشتنەکان",
-      "sortBy": "ڕیزکردن بەپێی",
-      "sortLastUpdated": "دوایین نوێکاری",
-      "sortCreated": "دروستکراو",
       "platform": "پلاتفۆرم",
       "platformCloud": "هاور",
       "platformExtension": "ئێکستنشن",

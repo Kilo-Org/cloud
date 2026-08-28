@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "ກັ່ນຕອງເຊດຊັນ",
-      "sortBy": "ຮຽງລຳດັບໂດຍ",
-      "sortLastUpdated": "ອັບເດດຫລ້າສຸດ",
-      "sortCreated": "ສ້າງເມື່ອ",
       "platform": "ເວທີ",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",

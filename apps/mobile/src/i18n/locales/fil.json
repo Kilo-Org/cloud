@@ -2489,9 +2489,6 @@
     },
     "sessionFilter": {
       "title": "I-filter ang mga session",
-      "sortBy": "Ayusin ayon sa",
-      "sortLastUpdated": "Huling na-update",
-      "sortCreated": "Nalikha",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",

@@ -3202,9 +3202,6 @@
     "openAgents": "Агенттерді ашу",
     "running": "Орындалуда",
     "needsInput": "енгізу қажет",
-    "reconnecting": "Қайта қосылуда",
-    "channelName": "Белсенді агенттер",
-    "activityKitDisabledTitle": "Тікелей әрекеттер өшірулі",
-    "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін Параметрлерде тікелей әрекеттерді қосыңыз."
+    "reconnecting": "Қайта қосылуда"
   }
 }

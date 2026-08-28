@@ -3202,9 +3202,6 @@
     "openAgents": "Öppna agenter",
     "running": "KÖRS",
     "needsInput": "kräver indata",
-    "reconnecting": "Återansluter",
-    "channelName": "Aktiva agenter",
-    "activityKitDisabledTitle": "Liveaktiviteter är avstängda",
-    "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se Aktiva agenter på låsskärmen."
+    "reconnecting": "Återansluter"
   }
 }

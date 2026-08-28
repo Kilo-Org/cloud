@@ -3244,9 +3244,6 @@
     "openAgents": "Otwórz agentów",
     "running": "W toku",
     "needsInput": "wymaga danych",
-    "reconnecting": "Ponowne łączenie",
-    "channelName": "Aktywni agenci",
-    "activityKitDisabledTitle": "Wydarzenia na żywo są wyłączone",
-    "activityKitDisabledBody": "Włącz wydarzenia na żywo w Ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
+    "reconnecting": "Ponowne łączenie"
   }
 }

@@ -3202,9 +3202,6 @@
     "openAgents": "اجنټان پرانیزئ",
     "running": "روان",
     "needsInput": "ورودی ته اړتیا لري",
-    "reconnecting": "بیا نښلېږي",
-    "channelName": "فعال اجنټان",
-    "activityKitDisabledTitle": "ژوندي فعالیتونه بند دي",
-    "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې ژوندي فعالیتونه فعال کړئ."
+    "reconnecting": "بیا نښلېږي"
   }
 }

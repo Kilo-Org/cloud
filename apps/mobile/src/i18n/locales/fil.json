@@ -3202,9 +3202,6 @@
     "openAgents": "Buksan ang mga agent",
     "running": "TUMATAKBO",
     "needsInput": "kailangan ng input",
-    "reconnecting": "Muling kumokonekta",
-    "channelName": "Mga aktibong agent",
-    "activityKitDisabledTitle": "Naka-off ang Mga Live na Aktibidad",
-    "activityKitDisabledBody": "I-on ang Mga Live na Aktibidad sa Mga setting para makita ang Mga aktibong agent sa Naka-lock na Screen."
+    "reconnecting": "Muling kumokonekta"
   }
 }

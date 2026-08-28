@@ -3202,9 +3202,6 @@
     "openAgents": "Avage agendid",
     "running": "TÖÖTAB",
     "needsInput": "vajab sisendit",
-    "reconnecting": "Ühenduse taastamine",
-    "channelName": "Aktiivsed agendid",
-    "activityKitDisabledTitle": "Reaalajas tegevused on välja lülitatud",
-    "activityKitDisabledBody": "Lülitage seadetes reaalajas tegevused sisse, et näha aktiivseid agente lukustuskuval."
+    "reconnecting": "Ühenduse taastamine"
   }
 }

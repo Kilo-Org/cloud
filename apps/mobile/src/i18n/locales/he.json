@@ -3223,9 +3223,6 @@
     "openAgents": "פתח סוכנים",
     "running": "רץ",
     "needsInput": "נדרש קלט",
-    "reconnecting": "מתחבר מחדש",
-    "channelName": "סוכנים פעילים",
-    "activityKitDisabledTitle": "פעילויות בזמן אמת כבויות",
-    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
+    "reconnecting": "מתחבר מחדש"
   }
 }

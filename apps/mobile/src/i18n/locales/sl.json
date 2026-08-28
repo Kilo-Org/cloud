@@ -3244,9 +3244,6 @@
     "openAgents": "Odprite agente",
     "running": "DELUJE",
     "needsInput": "potrebuje vnos",
-    "reconnecting": "Ponovno povezovanje",
-    "channelName": "Aktivni agenti",
-    "activityKitDisabledTitle": "Dejavnosti v živo so izklopljene",
-    "activityKitDisabledBody": "V Nastavitvah vklopite Dejavnosti v živo, da bodo Aktivni agenti prikazani na zaklenjenem zaslonu."
+    "reconnecting": "Ponovno povezovanje"
   }
 }

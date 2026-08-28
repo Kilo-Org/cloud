@@ -2,9 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { HomeScreen } from '@/components/home/home-screen';
 
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
-}));
 vi.mock('react-native', () => ({
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
@@ -12,8 +9,6 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
-  FadeIn: { duration: vi.fn() },
-  FadeOut: { duration: vi.fn() },
   LinearTransition: {},
 }));
 vi.mock('@/components/home/agent-sessions-section', () => ({
@@ -31,9 +26,6 @@ vi.mock('@/components/home/new-task-button', () => ({
 vi.mock('@/components/home/product-choices', () => ({
   ProductChoices: () => null,
 }));
-vi.mock('@/components/query-error', () => ({
-  QueryError: () => null,
-}));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: () => null,
 }));
@@ -42,14 +34,8 @@ vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: 'ScrollView',
   useTabBarBottomPadding: () => 0,
 }));
-vi.mock('@/components/ui/skeleton', () => ({
-  Skeleton: () => null,
-}));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   useLiveAgentSessions: () => ({ activeSessions: [], hasAcceptedSuccess: false }),
-}));
-vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: null }),
 }));
 
 describe('HomeScreen copy', () => {

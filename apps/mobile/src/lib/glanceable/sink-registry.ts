@@ -1,4 +1,5 @@
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type LiveActivity } from 'expo-widgets';
 
 /**
  * One sink consumes the glanceable snapshot for one native surface (persist,
@@ -39,17 +40,32 @@ export function getGlanceableSinks(): readonly GlanceableSink[] {
  * `unregisterTokens` reports only the tokens whose unregister failed, so
  * logout can tombstone the failed tokens and retry them later.
  */
+export type GlanceableActivity = Pick<LiveActivity, 'getPushToken' | 'addPushTokenListener'>;
+
 export type GlanceableDelivery = {
+  registerScopeTokens(organizationId: string | null, userId: string | null): void;
   registerTokens(
     snapshot: GlanceableAgentsSnapshot,
     organizationId: string | null,
-    userId: string | null
+    userId: string | null,
+    activity?: GlanceableActivity
   ): void;
-  unregisterTokens(): Promise<{ ok: boolean; tokens: string[] }>;
+  /** Retire a lifetime and tombstone failures. The optional lookup starts before native end. */
+  cleanupTokens(lifetime: 'scope' | 'activity', activityToken?: Promise<string | null>): void;
+  unregisterTokens(
+    lifetime?: 'scope' | 'activity',
+    activityToken?: Promise<string | null>
+  ): Promise<{ ok: boolean; tokens: string[] }>;
 };
 
 const noopDelivery: GlanceableDelivery = {
+  registerScopeTokens() {
+    // No-op until a token slice registers a delivery.
+  },
   registerTokens() {
+    // No-op until a token slice registers a delivery.
+  },
+  cleanupTokens() {
     // No-op until a token slice registers a delivery.
   },
   async unregisterTokens() {

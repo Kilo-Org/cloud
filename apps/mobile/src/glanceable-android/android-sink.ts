@@ -213,8 +213,8 @@ export const androidSink: GlanceableSink = {
   },
 
   endImmediate() {
+    // The scope subscription also delivers widget updates while no work is active.
     endNotification();
-    void getGlanceableDelivery().unregisterTokens();
   },
 };
 

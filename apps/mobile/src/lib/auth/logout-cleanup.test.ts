@@ -371,6 +371,53 @@ describe('unregisterActivityTokensAndTombstone', () => {
     });
   });
 
+  it('retains scope delivery and tombstones only the failed ended activity', async () => {
+    const rows = new Set(['scope-token', 'ended-token']);
+    deliveryMock.unregisterTokens.mockImplementation(async (lifetime: 'scope' | 'activity') => {
+      await Promise.resolve();
+      if (lifetime !== 'activity') {
+        rows.delete('scope-token');
+      }
+      return { ok: false, tokens: ['ended-token'] };
+    });
+
+    await unregisterActivityTokensAndTombstone('activity');
+
+    expect(rows).toEqual(new Set(['scope-token', 'ended-token']));
+    expect(await readLogoutCleanupTombstone()).toMatchObject({
+      userId: 'u1',
+      needsActivityUnregister: true,
+      activityTokens: ['ended-token'],
+    });
+  });
+
+  it('finishes an earlier activity tombstone write before successful logout clears it', async () => {
+    const { setItemAsync } = await import('expo-secure-store');
+    const writing = Promise.withResolvers<undefined>();
+    const writeGate = Promise.withResolvers<undefined>();
+    vi.mocked(setItemAsync).mockImplementationOnce(async (key, value) => {
+      writing.resolve(undefined);
+      await writeGate.promise;
+      store.set(key, value);
+    });
+    deliveryMock.unregisterTokens
+      .mockResolvedValueOnce({ ok: false, tokens: ['ended-token'] })
+      .mockResolvedValue({ ok: true, tokens: [] });
+    pushOutcome('none');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+
+    const activityEnd = unregisterActivityTokensAndTombstone('activity');
+    await writing.promise;
+    const logout = runLogoutCleanup();
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+    writeGate.resolve(undefined);
+    await Promise.all([activityEnd, logout]);
+
+    expect(await readLogoutCleanupTombstone()).toBeNull();
+  });
+
   it('leaves an existing tombstone untouched on success so a pending push unregister survives', async () => {
     store.set(
       LOGOUT_CLEANUP_TOMBSTONE_KEY,

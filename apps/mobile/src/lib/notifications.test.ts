@@ -42,6 +42,12 @@ const mocks = vi.hoisted(() => {
     setPendingDeepLink: vi.fn(),
     safeParse: vi.fn(),
     getItemAsync: vi.fn(),
+    setItemAsync: vi.fn(),
+    deleteItemAsync: vi.fn(),
+    nativeInstances: vi.fn(),
+    startTokenListeners: new Set<(event: { activityPushToStartToken: string }) => void>(),
+    registerActivityToken: vi.fn(),
+    unregisterActivityToken: vi.fn(),
     defineTask: vi.fn(),
     registerTaskAsync: vi.fn(),
     captureEvent: vi.fn(),
@@ -81,9 +87,50 @@ vi.mock('expo-constants', () => ({
 
 vi.mock('expo-secure-store', () => ({
   getItemAsync: mocks.getItemAsync,
-  setItemAsync: vi.fn(),
-  deleteItemAsync: vi.fn(),
+  setItemAsync: mocks.setItemAsync,
+  deleteItemAsync: mocks.deleteItemAsync,
 }));
+
+vi.mock('expo-widgets', () => ({
+  addPushToStartTokenListener: (
+    listener: (event: { activityPushToStartToken: string }) => void
+  ) => {
+    mocks.startTokenListeners.add(listener);
+    return { remove: () => mocks.startTokenListeners.delete(listener) };
+  },
+}));
+
+vi.mock('expo-widgets/src/ExpoWidgets', () => ({
+  default: {
+    LiveActivityFactory: class {
+      getInstances = mocks.nativeInstances;
+      start = vi.fn(() => {
+        throw new Error('A remote activity must be adopted, not started locally');
+      });
+    },
+  },
+}));
+
+vi.mock('@/glanceable-ios/active-agents-live-activity', async () => {
+  // Keep the real expo-widgets wrapper between the sink and the native handles.
+  const { LiveActivityFactory } = await import('expo-widgets/src/Widgets');
+  return {
+    ActiveAgentsLiveActivity: new LiveActivityFactory('ActiveAgentsLiveActivity', () => null),
+  };
+});
+vi.mock('@/glanceable-ios/active-agents-widget', () => ({
+  ActiveAgentsWidget: { updateSnapshot: vi.fn(), updateTimeline: vi.fn() },
+}));
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {
+    user: {
+      registerActivityToken: { mutate: mocks.registerActivityToken },
+      unregisterActivityToken: { mutate: mocks.unregisterActivityToken },
+    },
+  },
+}));
+vi.mock('@/lib/query-client', () => ({ queryClient: {} }));
+vi.mock('@/lib/persist/read-cache', () => ({ readCachedUserId: () => null }));
 
 vi.mock('@kilocode/notifications', () => ({
   ANDROID_NOTIFICATION_CHANNELS: [
@@ -885,6 +932,242 @@ describe('setupNotificationBackgroundHandler', () => {
     expect(sink.publish).not.toHaveBeenCalled();
 
     unregisterGlanceableSink(sink);
+  });
+});
+
+describe('cold iOS background delivery', () => {
+  const rows = new Map<string, { kind: string; organizationId: string | null }>();
+  const native = {
+    exists: true,
+    token: null as string | null,
+    tokenRead: null as Promise<void> | null,
+    observers: new Set<(token: string) => void>(),
+  };
+
+  function emitNativeToken(token: string): void {
+    native.token = token;
+    for (const observer of native.observers) {
+      observer(token);
+    }
+  }
+
+  async function loadColdBackground() {
+    vi.resetModules();
+    await import('@/lib/glanceable/delivery-registration');
+    const [notifications, registry, persist, sink, cleanup] = await Promise.all([
+      import('./notifications'),
+      import('@/lib/glanceable/sink-registry'),
+      import('@/lib/glanceable/persist'),
+      import('@/glanceable-ios/ios-sink'),
+      import('@/lib/auth/logout-cleanup'),
+    ]);
+    persist._setSecureStoreForTests(secureStoreMock);
+    for (const listener of mocks.startTokenListeners) {
+      listener({ activityPushToStartToken: 'scope-token' });
+    }
+    notifications._setGlanceableSinksLoaderForTests(() => {
+      registry.registerGlanceableSink(persist.persistGlanceableSink);
+      registry.registerGlanceableSink(sink.iosSink);
+    });
+    notifications.setupNotificationBackgroundHandler();
+    const executor = mocks.defineTask.mock.calls[0]?.[1] as (body: {
+      data: { notification: null; data: { dataString: string } };
+      error: null;
+      executionInfo: { eventId: string; taskName: string };
+    }) => Promise<number>;
+    return {
+      cleanup,
+      deliver: async (overrides: Partial<GlanceableAgentsSnapshot>) => {
+        const result = await executor({
+          data: {
+            notification: null,
+            data: {
+              dataString: JSON.stringify(
+                activeGlanceablePush({ updatedAt: '2026-01-02T00:00:00.000Z', ...overrides })
+              ),
+            },
+          },
+          error: null,
+          executionInfo: { eventId: 'cold', taskName: 'active-agents-glanceable-background-task' },
+        });
+        return result;
+      },
+    };
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mocks.platform.OS = 'ios';
+    mocks.startTokenListeners.clear();
+    mocks.defineTask.mockReset();
+    mocks.registerTaskAsync.mockResolvedValue(null);
+    mocks.safeParse.mockImplementation((data: unknown) => ({ success: true, data }));
+    secureStore.clear();
+    secureStore.set('glanceable-snapshot', JSON.stringify(glanceableSnapshot()));
+    secureStore.set('glanceable-scope-key', SCOPE_KEY);
+    secureStore.set(ACTIVE_USER_ID_KEY, 'u1');
+    secureStore.set(ORGANIZATION_STORAGE_KEY, 'org-9');
+    mocks.getItemAsync.mockImplementation(secureStoreMock.getItemAsync);
+    mocks.setItemAsync.mockImplementation(secureStoreMock.setItemAsync);
+    mocks.deleteItemAsync.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      secureStore.delete(key);
+    });
+    rows.clear();
+    rows.set('scope-token', { kind: 'ios_push_to_start', organizationId: 'org-9' });
+    mocks.registerActivityToken.mockImplementation(
+      async ({
+        token,
+        kind,
+        organizationId,
+      }: {
+        token: string;
+        kind: string;
+        organizationId: string | null;
+      }) => {
+        await Promise.resolve();
+        rows.set(token, { kind, organizationId });
+        return { success: true };
+      }
+    );
+    mocks.unregisterActivityToken.mockImplementation(async ({ token }: { token: string }) => {
+      await Promise.resolve();
+      rows.delete(token);
+      return { success: true };
+    });
+    native.exists = true;
+    native.token = null;
+    native.tokenRead = null;
+    native.observers.clear();
+    mocks.nativeInstances.mockImplementation(() => {
+      if (!native.exists) {
+        return [];
+      }
+      const listeners = new Set<(event: { activityId: string; pushToken: string }) => void>();
+      // Model the patched native factory: adoption starts observation on this handle.
+      native.observers.add(token => {
+        for (const listener of listeners) {
+          listener({ activityId: 'remote-activity', pushToken: token });
+        }
+      });
+      return [
+        {
+          getPushToken: async () => {
+            await native.tokenRead;
+            if (!native.exists) {
+              throw new Error('Activity no longer exists');
+            }
+            return native.token;
+          },
+          addListener: (
+            name: string,
+            listener: (event: { activityId: string; pushToken: string }) => void
+          ) => {
+            if (name !== 'onExpoWidgetsTokenReceived') {
+              throw new Error('Unknown native event');
+            }
+            listeners.add(listener);
+            return { remove: () => listeners.delete(listener) };
+          },
+          update: async () => {
+            await Promise.resolve();
+          },
+          end: async () => {
+            native.exists = false;
+            native.observers.clear();
+            await Promise.resolve();
+          },
+        },
+      ];
+    });
+  });
+
+  afterEach(() => {
+    native.observers.clear();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it('registers late and rotated tokens from an adopted native handle through the real widget wrapper', async () => {
+    const background = await loadColdBackground();
+    expect(await background.deliver({})).toBe(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(rows.size).toBe(1);
+
+    emitNativeToken('late-activity-token');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(rows.get('late-activity-token')).toEqual({
+      kind: 'ios_activity',
+      organizationId: 'org-9',
+    });
+    emitNativeToken('rotated-activity-token');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(rows.get('rotated-activity-token')).toEqual({
+      kind: 'ios_activity',
+      organizationId: 'org-9',
+    });
+
+    await background.cleanup.unregisterActivityTokensAndTombstone();
+    emitNativeToken('after-cleanup');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(rows.size).toBe(0);
+  });
+
+  it('captures the cold idle token before native end and preserves scope delivery without awaiting the network', async () => {
+    native.token = 'ended-activity-token';
+    rows.set(native.token, { kind: 'ios_activity', organizationId: 'org-9' });
+    const read = deferred();
+    const deletion = deferred();
+    native.tokenRead = read.promise;
+    mocks.unregisterActivityToken.mockImplementation(async ({ token }: { token: string }) => {
+      await deletion.promise;
+      rows.delete(token);
+      return { success: true };
+    });
+    const background = await loadColdBackground();
+    expect(await background.deliver({ status: 'empty', running: 0, eligibleStartedAt: null })).toBe(
+      0
+    );
+    expect(native.exists).toBe(true);
+    read.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(native.exists).toBe(false);
+    expect(rows.has('ended-activity-token')).toBe(true);
+
+    deletion.resolve();
+    await background.cleanup.awaitActivityCleanupSettled();
+    expect(rows).toEqual(
+      new Map([['scope-token', { kind: 'ios_push_to_start', organizationId: 'org-9' }]])
+    );
+    expect(await background.cleanup.readLogoutCleanupTombstone()).toBeNull();
+  });
+
+  it('tombstones only the failed cold idle token after native discovery disappears', async () => {
+    native.token = 'failed-activity-token';
+    rows.set(native.token, { kind: 'ios_activity', organizationId: 'org-9' });
+    mocks.unregisterActivityToken.mockRejectedValueOnce(new Error('network unavailable'));
+    const background = await loadColdBackground();
+    expect(await background.deliver({ status: 'empty', running: 0, eligibleStartedAt: null })).toBe(
+      0
+    );
+    await background.cleanup.awaitActivityCleanupSettled();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(native.exists).toBe(false);
+    expect(rows.has('scope-token')).toBe(true);
+    expect(rows.has('failed-activity-token')).toBe(true);
+    expect(await background.cleanup.readLogoutCleanupTombstone()).toMatchObject({
+      userId: null,
+      needsPushUnregister: false,
+      needsActivityUnregister: true,
+      activityTokens: ['failed-activity-token'],
+    });
+    const { attemptLogoutReconciliation } = await import('@/lib/auth/logout-reconciliation');
+    await attemptLogoutReconciliation('u1');
+    expect(rows).toEqual(
+      new Map([['scope-token', { kind: 'ios_push_to_start', organizationId: 'org-9' }]])
+    );
+    expect(await background.cleanup.readLogoutCleanupTombstone()).toBeNull();
   });
 });
 

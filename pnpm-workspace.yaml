@@ -160,6 +160,7 @@ packageExtensions:
 patchedDependencies:
   expo-router@57.0.10: patches/expo-router@57.0.10.patch
   expo-server-sdk: patches/expo-server-sdk.patch
+  expo-widgets@57.0.11: patches/expo-widgets@57.0.11.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
 publicHoistPattern:
   - '@types/*'

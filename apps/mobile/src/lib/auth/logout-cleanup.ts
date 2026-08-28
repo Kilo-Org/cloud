@@ -96,6 +96,9 @@ export async function writeLogoutCleanupTombstone(
 export async function runLogoutCleanup(): Promise<void> {
   try {
     const userId = readCachedUserId(queryClient);
+    // Terminal blanking can already be retiring tokens. Finish its tombstone
+    // write before full logout decides whether to replace or delete that record.
+    await awaitActivityCleanupSettled();
 
     // Push token outcome: 'none' → nothing to unregister; 'lookup-failed' →
     // a server row may exist, so reconciliation re-reads the stable device
@@ -183,7 +186,8 @@ export async function awaitActivityCleanupSettled(): Promise<void> {
  * tombstone a failure, WITHOUT revoking the device session or unregistering
  * the Expo push token (those are logout-only). Never throws by contract.
  *
- * Called on account switch (`signIn`) and org switch (`setOrganizationId`),
+ * Ordinary activity ends pass `activity` to preserve scope delivery. Account
+ * switch (`signIn`) and org switch (`setOrganizationId`) retire the whole scope,
  * where the prior scope's activity tokens must stop receiving APNs before the
  * new scope registers its own. The cached user id is read before any switch
  * clears it, so a failed unregister tombstones the prior account's identity —
@@ -191,10 +195,13 @@ export async function awaitActivityCleanupSettled(): Promise<void> {
  * leaves any existing tombstone untouched. A failure merges the same owner's
  * pending push cleanup and failed activity tokens so both survive a switch.
  */
-export async function unregisterActivityTokensAndTombstone(): Promise<void> {
+export async function unregisterActivityTokensAndTombstone(
+  lifetime: 'scope' | 'activity' = 'scope',
+  activityToken?: Promise<string | null>
+): Promise<void> {
   const previous = activityCleanupInFlight;
   const cleanup = (async () => {
-    await Promise.all([previous, runActivityCleanup(previous)]);
+    await Promise.all([previous, runActivityCleanup(previous, lifetime, activityToken)]);
   })();
   activityCleanupInFlight = cleanup;
   try {
@@ -206,12 +213,16 @@ export async function unregisterActivityTokensAndTombstone(): Promise<void> {
   }
 }
 
-async function runActivityCleanup(previous: Promise<void> | null): Promise<void> {
+async function runActivityCleanup(
+  previous: Promise<void> | null,
+  lifetime: 'scope' | 'activity',
+  activityToken?: Promise<string | null>
+): Promise<void> {
   try {
     const userId = readCachedUserId(queryClient);
     // Start the unregister now to fence stale registration intent. Serialize
-    // only the tombstone merge behind earlier scope cleanup writes.
-    const result = await getGlanceableDelivery().unregisterTokens();
+    // only the tombstone merge behind earlier cleanup writes.
+    const result = await getGlanceableDelivery().unregisterTokens(lifetime, activityToken);
     await previous;
     if (result.ok) {
       return;

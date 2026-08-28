@@ -67,6 +67,7 @@ vi.mock('expo-widgets', () => ({
       const state = { props, url, ended: false };
       mockState.started.push(state);
       const instance = {
+        getPushToken: vi.fn().mockResolvedValue(null),
         update: async (next: unknown) => {
           mockState.updated.push(next);
           if (mockState.updatePromise !== null) {
@@ -109,9 +110,24 @@ vi.mock('expo-widgets', () => ({
 const NOW = 1_750_000_000_000;
 const CTX = { userId: 'u1', organizationId: null };
 
+const subscriptions = new Set<string>();
 const delivery = {
-  registerTokens: vi.fn(),
-  unregisterTokens: vi.fn().mockResolvedValue({ ok: true, tokens: [] }),
+  registerScopeTokens: vi.fn(() => subscriptions.add('scope')),
+  registerTokens: vi.fn(() => {
+    subscriptions.add('scope');
+    subscriptions.add('activity');
+  }),
+  cleanupTokens: vi.fn((lifetime: 'scope' | 'activity') => {
+    subscriptions.delete('activity');
+    if (lifetime === 'scope') {
+      subscriptions.delete('scope');
+    }
+  }),
+  unregisterTokens: vi.fn().mockImplementation(async () => {
+    await Promise.resolve();
+    subscriptions.clear();
+    return { ok: true, tokens: [] };
+  }),
 };
 
 function snapshotFor(
@@ -131,6 +147,7 @@ function snapshotFor(
 
 beforeEach(() => {
   _resetIosSinkForTests();
+  subscriptions.clear();
   mockState.startError = null;
   mockState.instancesError = null;
   mockState.instances = [];
@@ -151,17 +168,31 @@ afterEach(() => {
 });
 
 describe('iosSink start and update', () => {
+  it('registers an idle scope without a Live Activity and accepts later background work', () => {
+    const publisher = new GlanceablePublisher({ sinks: [iosSink], now: () => NOW });
+    publisher.handleSessions([{ status: 'idle' }], CTX);
+
+    expect(mockState.started).toEqual([]);
+    expect(mockState.snapshots.at(-1)).toMatchObject({ statusLine: 'No work in progress' });
+    expect(subscriptions).toEqual(new Set(['scope']));
+
+    publisher.applySnapshot(snapshotFor([{ status: 'busy' }], 1), CTX);
+    expect(mockState.started).toMatchObject([{ ended: false, props: { running: 1 } }]);
+    expect(subscriptions).toEqual(new Set(['scope', 'activity']));
+    publisher.dispose();
+  });
+
   it('starts once and updates the same activity on a newer revision', () => {
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
 
     expect(mockState.started.length).toBe(1);
     expect(mockState.updated.length).toBe(1);
-    expect(delivery.registerTokens).toHaveBeenCalledTimes(1);
+    expect(subscriptions).toEqual(new Set(['scope', 'activity']));
     expect(delivery.unregisterTokens).not.toHaveBeenCalled();
   });
 
-  it('discards an older revision without overwriting the newest props', () => {
+  it('discards an older revision without overwriting the newest props', async () => {
     const newer = snapshotFor([{ status: 'busy' }], 1);
     const older = {
       ...snapshotFor([{ status: 'busy' }, { status: 'busy' }], 0),
@@ -174,7 +205,9 @@ describe('iosSink start and update', () => {
     expect(mockState.updated.length).toBe(0);
 
     iosSink.endImmediate();
-    expect(mockState.ended.length).toBe(1);
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
     expect(mockState.ended[0]?.contentDate).toBeInstanceOf(Date);
     expect(
       (mockState.ended[0]?.props as GlanceableLiveActivityContentState | undefined)?.running
@@ -237,28 +270,33 @@ describe('iosSink start and update', () => {
 });
 
 describe('iosSink end', () => {
-  it('ends with a contentDate not older than the last native write', () => {
+  it('ends with a contentDate not older than the last native write', async () => {
     const writeTime = NOW + 120_000;
     vi.useFakeTimers();
     vi.setSystemTime(new Date(writeTime));
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
 
     iosSink.endImmediate();
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
 
     const contentDate = mockState.ended[0]?.contentDate as Date | undefined;
     expect(contentDate).toBeInstanceOf(Date);
     // The snapshot's updatedAt (NOW) is older than the write wall-clock; an end
     // carrying NOW instead would be discarded by ActivityKit.
-    expect(contentDate?.getTime()).toBe(writeTime);
+    expect(contentDate?.getTime()).toBeGreaterThanOrEqual(writeTime);
   });
 
-  it('unregisters tokens even when no activity handle exists', () => {
+  it('preserves scope delivery when no activity handle exists', async () => {
     mockState.instances = [];
+    delivery.registerScopeTokens();
 
     iosSink.endImmediate();
+    await Promise.resolve();
 
     expect(mockState.ended.length).toBe(0);
-    expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
+    expect(subscriptions).toEqual(new Set(['scope']));
   });
 
   it('ends immediately on signed-out with a wall-clock contentDate', async () => {
@@ -280,7 +318,7 @@ describe('iosSink end', () => {
     expect((mockState.ended[0]?.contentDate as Date | undefined)?.getTime()).toBeGreaterThanOrEqual(
       terminalTime
     );
-    expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
+    expect(subscriptions.size).toBe(0);
   });
 
   it('ends with the wall-clock of the last publish, not the eligible start', async () => {
@@ -429,9 +467,10 @@ describe('iosSink end', () => {
     );
   });
 
-  it('adopts and ends a leftover activity when the handle is null after restart', () => {
+  it('adopts and ends a leftover activity when the handle is null after restart', async () => {
     mockState.instances = [
       {
+        getPushToken: vi.fn().mockResolvedValue(null),
         update: (next: unknown) => {
           mockState.updated.push(next);
         },
@@ -442,9 +481,30 @@ describe('iosSink end', () => {
 
     iosSink.endImmediate();
 
-    expect(mockState.ended.length).toBe(1);
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
     expect(mockState.ended[0]?.policy).toBe('immediate');
-    expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
+    expect(subscriptions.has('activity')).toBe(false);
+  });
+
+  it('ends the native activity even when its token lookup rejects', async () => {
+    mockState.instances = [
+      {
+        getPushToken: vi.fn().mockRejectedValue(new Error('native token unavailable')),
+        end: (policy: unknown, props?: unknown, contentDate?: unknown) =>
+          mockState.ended.push({ policy, props, contentDate }),
+      },
+    ];
+    delivery.registerScopeTokens();
+
+    iosSink.endImmediate();
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
+
+    expect(mockState.ended[0]?.policy).toBe('immediate');
+    expect(subscriptions).toEqual(new Set(['scope']));
   });
 
   it('ends after the 8s terminal window when work becomes empty', async () => {
@@ -463,6 +523,7 @@ describe('iosSink end', () => {
       expect(mockState.ended.length).toBe(1);
     });
     expect(mockState.ended[0]?.policy).toBe('immediate');
+    expect(subscriptions).toEqual(new Set(['scope']));
     publisher.dispose();
   });
 });
@@ -601,9 +662,10 @@ describe('iosSink Live Activity content-state', () => {
     expect(delivery.registerTokens).not.toHaveBeenCalled();
   });
 
-  it('ends an adopted leftover activity when publish receives ineligible work', () => {
+  it('ends an adopted leftover activity when publish receives ineligible work', async () => {
     mockState.instances = [
       {
+        getPushToken: vi.fn().mockResolvedValue(null),
         update: (next: unknown) => mockState.updated.push(next),
         end: (policy: unknown, props?: unknown, contentDate?: unknown) =>
           mockState.ended.push({ policy, props, contentDate }),
@@ -612,10 +674,12 @@ describe('iosSink Live Activity content-state', () => {
 
     iosSink.publish(snapshotFor([], 1, 'empty'));
 
-    expect(mockState.ended.length).toBe(1);
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
     expect(mockState.ended[0]?.policy).toBe('immediate');
     expect(mockState.updated.length).toBe(0);
-    expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
+    expect(subscriptions.has('activity')).toBe(false);
   });
 });
 

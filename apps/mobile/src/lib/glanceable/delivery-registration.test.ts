@@ -11,6 +11,7 @@ const logoutMock = vi.hoisted(() => ({
 
 const expoWidgetsMock = vi.hoisted(() => ({
   pushToStartListener: null as ((event: { activityPushToStartToken: string }) => void) | null,
+  listeners: new Set<(event: { activityPushToStartToken: string }) => void>(),
 }));
 
 const trpcMock = vi.hoisted(() => ({
@@ -20,12 +21,19 @@ const trpcMock = vi.hoisted(() => ({
 
 const activityMock = vi.hoisted(() => ({
   getPushToken: vi.fn(),
+  addPushTokenListener: vi.fn(),
+  listeners: new Set<(event: { activityId: string; pushToken: string }) => void>(),
 }));
 
 const platformMock = vi.hoisted(() => ({ OS: 'ios' as string }));
 
 /* eslint-disable import/first */
 vi.mock('@/lib/auth/logout-reconciliation', () => logoutMock);
+vi.mock('@/lib/auth/logout-cleanup', () => ({
+  unregisterActivityTokensAndTombstone: async (lifetime: 'scope' | 'activity') => {
+    await getGlanceableDelivery().unregisterTokens(lifetime);
+  },
+}));
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     user: {
@@ -39,6 +47,8 @@ vi.mock('expo-widgets', () => ({
     listener: (event: { activityPushToStartToken: string }) => void
   ) => {
     expoWidgetsMock.pushToStartListener = listener;
+    expoWidgetsMock.listeners.add(listener);
+    return { remove: () => expoWidgetsMock.listeners.delete(listener) };
   },
 }));
 vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
@@ -50,6 +60,14 @@ vi.mock('react-native', () => ({
   Platform: platformMock,
 }));
 
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+
+import {
+  getTerminalBlankEpoch,
+  writePrivacySnapshotAndEnd,
+  writeSignedOutSnapshotAndEnd,
+} from './cleanup';
+import { GlanceablePublisher } from './publisher';
 import { getGlanceableDelivery } from './sink-registry';
 // Import side effect: registers the real delivery under the mocks above.
 import {
@@ -93,6 +111,13 @@ function snapshot() {
   });
 }
 
+function emitActivityToken(pushToken: string): void {
+  activityMock.getPushToken.mockResolvedValue(pushToken);
+  for (const listener of activityMock.listeners) {
+    listener({ activityId: 'activity-1', pushToken });
+  }
+}
+
 describe('delivery registerTokens', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -100,6 +125,13 @@ describe('delivery registerTokens', () => {
     _setGetDevicePushTokenForTests(null);
     _resetDeliveryRegistrationForTests();
     activityMock.getPushToken.mockResolvedValue('token-1');
+    activityMock.listeners.clear();
+    activityMock.addPushTokenListener.mockImplementation(
+      (listener: (event: { activityId: string; pushToken: string }) => void) => {
+        activityMock.listeners.add(listener);
+        return { remove: () => activityMock.listeners.delete(listener) };
+      }
+    );
     trpcMock.registerActivityToken.mutate.mockResolvedValue({ success: true });
     trpcMock.unregisterActivityToken.mutate.mockResolvedValue({ success: true });
     logoutMock.attemptLogoutReconciliation.mockResolvedValue({ kind: 'no-tombstone' });
@@ -513,6 +545,315 @@ describe('delivery registerTokens', () => {
       expect(rows).toEqual(new Map([['stable-token', 'new-org']]));
     }
   );
+
+  it.each(['ios', 'android'])(
+    'registers an initially idle %s scope without observing an activity',
+    async platform => {
+      platformMock.OS = platform;
+      const rows = trackRemoteTokens();
+      expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+      _setGetDevicePushTokenForTests(async () => {
+        await Promise.resolve();
+        return 'scope-token';
+      });
+      const publisher = new GlanceablePublisher({ sinks: [], now: () => NOW });
+
+      publisher.handleSessions([{ status: 'idle' }], { organizationId: 'org-1', userId: 'u1' });
+      await flushRegistration();
+      publisher.dispose();
+
+      expect(rows).toEqual(new Map([['scope-token', 'org-1']]));
+      expect(activityMock.listeners.size).toBe(0);
+    }
+  );
+
+  it.each(['ios', 'android'])(
+    'keeps %s scope delivery after an ordinary activity end',
+    async platform => {
+      platformMock.OS = platform;
+      const rows = trackRemoteTokens();
+      expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+      _setGetDevicePushTokenForTests(async () => {
+        await Promise.resolve();
+        return 'scope-token';
+      });
+      getGlanceableDelivery().registerTokens(snapshot(), 'org-1', 'u1');
+      await flushRegistration();
+
+      await getGlanceableDelivery().unregisterTokens('activity');
+      expect(rows).toEqual(new Map([['scope-token', 'org-1']]));
+
+      // Background delivery can still find the scope after the visible surface ends.
+      expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'late-scope-token' });
+      await flushRegistration();
+      expect(rows.get(platform === 'ios' ? 'late-scope-token' : 'scope-token')).toBe('org-1');
+      await getGlanceableDelivery().unregisterTokens();
+      expect(rows.size).toBe(0);
+    }
+  );
+
+  it('registers late and rotated iOS tokens and removes every recorded version on scope cleanup', async () => {
+    const rows = trackRemoteTokens();
+    activityMock.getPushToken.mockResolvedValue(null);
+    getGlanceableDelivery().registerTokens(snapshot(), 'org-1', 'u1');
+    await flushRegistration();
+    expect(rows.size).toBe(0);
+
+    for (const suffix of ['first', 'rotated']) {
+      expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: `start-${suffix}` });
+      emitActivityToken(`activity-${suffix}`);
+      // eslint-disable-next-line no-await-in-loop -- each rotation must settle before the next native event
+      await flushRegistration();
+      expect(rows.get(`start-${suffix}`)).toBe('org-1');
+      expect(rows.get(`activity-${suffix}`)).toBe('org-1');
+    }
+
+    await getGlanceableDelivery().unregisterTokens();
+    expect(rows.size).toBe(0);
+    expect(activityMock.listeners.size).toBe(0);
+  });
+
+  it('holds late token events behind pending cleanup and registers them after it clears', async () => {
+    const rows = trackRemoteTokens();
+    logoutMock.hasPendingActivityUnregister.mockResolvedValue(true);
+    getGlanceableDelivery().registerTokens(snapshot(), 'org-1', 'u1');
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    emitActivityToken('activity-token');
+    await flushRegistration();
+    expect(rows.size).toBe(0);
+
+    logoutMock.hasPendingActivityUnregister.mockResolvedValue(false);
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    emitActivityToken('activity-token');
+    await flushRegistration();
+    expect(rows).toEqual(
+      new Map([
+        ['scope-token', 'org-1'],
+        ['activity-token', 'org-1'],
+      ])
+    );
+  });
+
+  it('cleans up an uncertain upsert even after its token rotates', async () => {
+    const rows = trackRemoteTokens();
+    trpcMock.registerActivityToken.mutate.mockImplementationOnce(
+      async (input: { token: string; organizationId: string | null }) => {
+        await Promise.resolve();
+        rows.set(input.token, input.organizationId);
+        throw new Error('registration response lost');
+      }
+    );
+    getGlanceableDelivery().registerTokens(snapshot(), 'org-1', 'u1');
+    await flushRegistration();
+    emitActivityToken('rotated-token');
+    await flushRegistration();
+    expect(rows.get('rotated-token')).toBe('org-1');
+
+    await getGlanceableDelivery().unregisterTokens();
+    expect(rows.size).toBe(0);
+  });
+
+  it('does not overwrite a token event with an older initial token read', async () => {
+    const rows = trackRemoteTokens();
+    const initialToken = Promise.withResolvers<string | null>();
+    activityMock.getPushToken.mockReturnValueOnce(initialToken.promise);
+    getGlanceableDelivery().registerTokens(snapshot(), 'org-1', 'u1');
+
+    emitActivityToken('current-token');
+    await flushRegistration();
+    initialToken.resolve('outdated-token');
+    await flushRegistration();
+
+    expect(rows).toEqual(new Map([['current-token', 'org-1']]));
+  });
+
+  it('replaces the activity listener and rejects delayed events from the ended activity', async () => {
+    const rows = trackRemoteTokens();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    getGlanceableDelivery().registerTokens(snapshot(), 'org-1', 'u1');
+    await flushRegistration();
+    const oldListener = [...activityMock.listeners][0];
+    const replacement = {
+      getPushToken: async () => {
+        await Promise.resolve();
+        return 'replacement-token';
+      },
+      addPushTokenListener: () => ({ remove: () => undefined }),
+    };
+
+    getGlanceableDelivery().registerTokens(snapshot(), 'org-1', 'u1', replacement);
+    oldListener?.({ activityId: 'old-activity', pushToken: 'stale-event-token' });
+    await flushRegistration();
+
+    expect(rows).toEqual(
+      new Map([
+        ['scope-token', 'org-1'],
+        ['replacement-token', 'org-1'],
+      ])
+    );
+    expect(activityMock.listeners.size).toBe(0);
+  });
+
+  it('fences old scope listeners while cleanup waits and after a replacement scope registers', async () => {
+    const rows = trackRemoteTokens();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    getGlanceableDelivery().registerTokens(snapshot(), 'old-org', 'u1');
+    await flushRegistration();
+    const oldStartListener = expoWidgetsMock.pushToStartListener;
+    const oldActivityListener = [...activityMock.listeners][0];
+    const deleting = Promise.withResolvers<undefined>();
+    const deleteGate = Promise.withResolvers<undefined>();
+    trpcMock.unregisterActivityToken.mutate.mockImplementationOnce(
+      async (input: { token: string }) => {
+        deleting.resolve(undefined);
+        await deleteGate.promise;
+        rows.delete(input.token);
+        return { success: true };
+      }
+    );
+
+    const cleanup = getGlanceableDelivery().unregisterTokens();
+    await deleting.promise;
+    oldStartListener?.({ activityPushToStartToken: 'stale-start-during-cleanup' });
+    oldActivityListener?.({
+      activityId: 'old-activity',
+      pushToken: 'stale-activity-during-cleanup',
+    });
+    getGlanceableDelivery().registerTokens(snapshot(), 'new-org', 'u1');
+    deleteGate.resolve(undefined);
+    await cleanup;
+    await flushRegistration();
+    oldStartListener?.({ activityPushToStartToken: 'stale-start-after-cleanup' });
+    oldActivityListener?.({
+      activityId: 'old-activity',
+      pushToken: 'stale-activity-after-cleanup',
+    });
+    await flushRegistration();
+
+    expect(rows).toEqual(
+      new Map([
+        ['scope-token', 'new-org'],
+        ['token-1', 'new-org'],
+      ])
+    );
+    expect(expoWidgetsMock.listeners.size).toBe(1);
+    expect(activityMock.listeners.size).toBe(1);
+  });
+
+  it.each(['signed_out', 'privacy'] as const)(
+    'invalidates listeners and the publisher on %s without losing cleanup',
+    async status => {
+      const rows = trackRemoteTokens();
+      expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+      getGlanceableDelivery().registerTokens(snapshot(), 'org-1', 'u1');
+      await flushRegistration();
+      const oldStartListener = expoWidgetsMock.pushToStartListener;
+      const oldActivityListener = [...activityMock.listeners][0];
+      const publisher = new GlanceablePublisher({
+        sinks: [],
+        terminalBlankEpoch: getTerminalBlankEpoch,
+      });
+
+      if (status === 'signed_out') {
+        writeSignedOutSnapshotAndEnd();
+      } else {
+        writePrivacySnapshotAndEnd();
+      }
+      oldStartListener?.({ activityPushToStartToken: 'late-start' });
+      oldActivityListener?.({ activityId: 'old-activity', pushToken: 'late-activity' });
+      publisher.handleSessions([{ status: 'busy' }], { organizationId: 'org-1', userId: 'u1' });
+      await flushRegistration();
+      publisher.dispose();
+
+      expect(rows.size).toBe(0);
+      expect(activityMock.listeners.size).toBe(0);
+    }
+  );
+
+  it('rejects token events when the authentication epoch changes', async () => {
+    const rows = trackRemoteTokens();
+    getGlanceableDelivery().registerTokens(snapshot(), 'org-1', 'u1');
+    await flushRegistration();
+
+    bumpAuthEpoch();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'wrong-auth-start' });
+    emitActivityToken('wrong-auth-activity');
+    await flushRegistration();
+
+    expect(rows).toEqual(new Map([['token-1', 'org-1']]));
+  });
+
+  it('waits for an in-flight activity upsert before removing only activity tokens', async () => {
+    const rows = trackRemoteTokens();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
+    await flushRegistration();
+    const registering = Promise.withResolvers<undefined>();
+    const registerGate = Promise.withResolvers<undefined>();
+    trpcMock.registerActivityToken.mutate.mockImplementationOnce(
+      async (input: { token: string; organizationId: string | null }) => {
+        registering.resolve(undefined);
+        await registerGate.promise;
+        rows.set(input.token, input.organizationId);
+        return { success: true };
+      }
+    );
+    getGlanceableDelivery().registerTokens(snapshot(), 'org-1', 'u1');
+    await registering.promise;
+
+    const ending = getGlanceableDelivery().unregisterTokens('activity');
+    registerGate.resolve(undefined);
+    await ending;
+
+    expect(rows).toEqual(new Map([['scope-token', 'org-1']]));
+  });
+
+  it('retains only failed retired activity tokens for cleanup without deleting the scope', async () => {
+    const rows = trackRemoteTokens();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    getGlanceableDelivery().registerTokens(snapshot(), 'org-1', 'u1');
+    await flushRegistration();
+    emitActivityToken('rotated-activity');
+    await flushRegistration();
+    trpcMock.unregisterActivityToken.mutate.mockRejectedValueOnce(new Error('network'));
+
+    const result = await getGlanceableDelivery().unregisterTokens('activity');
+
+    expect(result).toEqual({ ok: false, tokens: ['token-1'] });
+    expect(rows).toEqual(
+      new Map([
+        ['scope-token', 'org-1'],
+        ['token-1', 'org-1'],
+      ])
+    );
+    await getGlanceableDelivery().unregisterTokens();
+    expect(rows.size).toBe(0);
+  });
+
+  it('discovers a cold activity without a scope registration and retains a failed token after native end', async () => {
+    const rows = trackRemoteTokens();
+    rows.set('scope-token', 'org-1');
+    rows.set('token-1', 'org-1');
+    trpcMock.unregisterActivityToken.mutate.mockRejectedValueOnce(new Error('network'));
+
+    expect(await getGlanceableDelivery().unregisterTokens('activity')).toEqual({
+      ok: false,
+      tokens: ['token-1'],
+    });
+    expect(rows).toEqual(
+      new Map([
+        ['scope-token', 'org-1'],
+        ['token-1', 'org-1'],
+      ])
+    );
+
+    activityMock.getPushToken.mockResolvedValue(null);
+    expect(await getGlanceableDelivery().unregisterTokens('activity')).toEqual({
+      ok: true,
+      tokens: [],
+    });
+    expect(rows).toEqual(new Map([['scope-token', 'org-1']]));
+  });
 
   it('returns only the failed iOS tokens on a partial unregister failure', async () => {
     expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'ptt-token' });

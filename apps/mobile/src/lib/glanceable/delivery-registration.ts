@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 import { addPushToStartTokenListener } from 'expo-widgets';
 
 import { ActiveAgentsLiveActivity } from '@/glanceable-ios/active-agents-live-activity';
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import {
   attemptLogoutReconciliation,
   awaitLogoutReconciliationSettled,
@@ -10,31 +12,38 @@ import {
 } from '@/lib/auth/logout-reconciliation';
 import { trpcClient } from '@/lib/trpc';
 
-import { type GlanceableDelivery, setGlanceableDelivery } from './sink-registry';
+import {
+  type GlanceableActivity,
+  type GlanceableDelivery,
+  type GlanceableSinkContext,
+  setGlanceableDelivery,
+} from './sink-registry';
 
-/**
- * Activity-token registrar. Wires the glanceable publisher's delivery hooks to
- * `user.registerActivityToken`/`user.unregisterActivityToken` so the server can
- * reach this device's surface token: on iOS the Live Activity and push-to-start
- * token via APNs, on Android the per-device Expo push token (`android_ongoing`).
- */
+/** Scope delivery survives idle work; only the activity registration ends with its surface. */
+type Registration = GlanceableSinkContext & {
+  kind: 'ios_push_to_start' | 'ios_activity' | 'android_ongoing';
+  epoch: number;
+  authEpoch: number;
+  token: string | null;
+  registeredToken: string | null;
+  tokens: Set<string>;
+};
 
 let pushToStartToken: string | null = null;
-
-/** The last Android device token registered, so end/cleanup can unregister it. */
-let androidOngoingToken: string | null = null;
-
-/** Epoch bumped on every unregister/end. A register that started before
- * the bump must abort instead of recreating the row after end/logout. */
+let scopeRegistration: Registration | null = null;
+let activityRegistration: Registration | null = null;
+let observedActivity: GlanceableActivity | null = null;
+let startSubscription: ReturnType<typeof addPushToStartTokenListener> | null = null;
+let activitySubscription: ReturnType<GlanceableActivity['addPushTokenListener']> | null = null;
+// Keep every attempted token until its delete succeeds, including tokens rotated away by native.
+const scopeTokens = new Set<string>();
+const activityTokens = new Set<string>();
 let registerEpoch = 0;
 
-/** FIFO chain serializing activity-token mutations so the last client intent
- * wins: an upsert and a delete must not race for stable iOS or Android tokens. */
+/** FIFO chain: an upsert and delete of a stable token must never race. */
 let mutationTail: Promise<void> | null = null;
-
 const NOOP = (): void => undefined;
 
-/** Serialize one mutation; a rejected prior mutation never blocks the next. */
 async function enqueueTokenMutation<T>(op: () => Promise<T>): Promise<T> {
   const previous = mutationTail;
   let release: () => void = NOOP;
@@ -42,13 +51,8 @@ async function enqueueTokenMutation<T>(op: () => Promise<T>): Promise<T> {
     release = resolve;
   });
   mutationTail = gate;
-  if (previous !== null) {
-    try {
-      await previous;
-    } catch {
-      // A prior mutation failure must not block the next one.
-    }
-  }
+  // The tail is a release gate, not the mutation promise; it always resolves.
+  await previous;
   try {
     return await op();
   } finally {
@@ -56,10 +60,8 @@ async function enqueueTokenMutation<T>(op: () => Promise<T>): Promise<T> {
   }
 }
 
-// Test-only override so pure suites never load @/lib/notifications
-// (→ expo-notifications → expo-modules-core → RN).
+// Pure suites must not load the native notification graph.
 let getDevicePushTokenForTests: (() => Promise<string | null>) | null = null;
-
 function getDevicePushTokenLazy(): () => Promise<string | null> {
   if (getDevicePushTokenForTests !== null) {
     return getDevicePushTokenForTests;
@@ -71,229 +73,270 @@ function getDevicePushTokenLazy(): () => Promise<string | null> {
   return getDevicePushToken;
 }
 
-async function register(input: {
-  token: string;
-  kind: 'ios_push_to_start' | 'ios_activity' | 'android_ongoing';
-  platform: 'ios' | 'android';
-  organizationId: string | null;
-}): Promise<void> {
-  try {
-    await trpcClient.user.registerActivityToken.mutate(input);
-  } catch {
-    // Best effort: a failed registration is retried on the next start.
-  }
+function isCurrent(target: Registration): boolean {
+  return (
+    target.epoch === registerEpoch &&
+    isCurrentAuthEpoch(target.authEpoch) &&
+    (target === scopeRegistration || target === activityRegistration)
+  );
 }
 
-async function unregister(token: string): Promise<boolean> {
-  try {
-    await trpcClient.user.unregisterActivityToken.mutate({ token });
-    return true;
-  } catch {
-    // The caller aggregates success and tombstones the token on failure.
+async function canRegister(target: Registration): Promise<boolean> {
+  if (!isCurrent(target)) {
     return false;
   }
+  // Never wait for cleanup inside the mutation queue: cleanup needs that queue itself.
+  if (target.userId !== null) {
+    void attemptLogoutReconciliation(target.userId);
+  }
+  await awaitLogoutReconciliationSettled();
+  return (
+    isCurrent(target) && !(await hasPendingActivityUnregister(target.userId)) && isCurrent(target)
+  );
 }
 
-if (Platform.OS === 'ios') {
-  // Push-to-start token events are emitted whenever the system rotates the
-  // token; cache the latest and register on the next activity start.
-  addPushToStartTokenListener(({ activityPushToStartToken }) => {
-    pushToStartToken = activityPushToStartToken;
-  });
-}
-
-/**
- * Android: register the device Expo push token as the `android_ongoing`
- * activity token. The device-token lookup happens outside the mutation chain
- * (the chain must never await logout reconciliation or it can deadlock against
- * `runLogoutCleanup`); only the server mutation and the slot write are
- * serialized, so the last client intent wins even for a stable token.
- */
-async function registerAndroidOngoingToken(
-  organizationId: string | null,
-  userId: string | null
-): Promise<void> {
-  // Capture the epoch before the first await so an unregister/end that lands
-  // during reconciliation or the token lookup aborts this stale register.
-  const epoch = registerEpoch;
-  if (userId !== null) {
-    void attemptLogoutReconciliation(userId);
+async function registerToken(target: Registration, token: string): Promise<void> {
+  if (!isCurrent(target) || !token) {
+    return;
+  }
+  target.token = token;
+  if (target.registeredToken === token) {
+    return;
   }
   try {
-    await awaitLogoutReconciliationSettled();
-    if (epoch !== registerEpoch) {
-      return;
-    }
-    if (await hasPendingActivityUnregister(userId)) {
-      // A pending retry owns the recorded activity tokens; re-registering this
-      // device token now would only be deleted by the next attempt.
-      return;
-    }
-    const token = await getDevicePushTokenLazy()();
-    if (token === null) {
-      return;
-    }
-    if (epoch !== registerEpoch) {
+    if (!(await canRegister(target))) {
       return;
     }
     await enqueueTokenMutation(async () => {
-      if (epoch !== registerEpoch) {
+      if (!isCurrent(target) || target.token !== token || target.registeredToken === token) {
         return;
       }
-      await register({ token, kind: 'android_ongoing', platform: 'android', organizationId });
-      androidOngoingToken = token;
+      target.tokens.add(token);
+      await trpcClient.user.registerActivityToken.mutate({
+        token,
+        kind: target.kind,
+        platform: target.kind === 'android_ongoing' ? 'android' : 'ios',
+        organizationId: target.organizationId,
+      });
+      target.registeredToken = token;
     });
   } catch {
-    // Best effort: a failed lookup is retried on the next start.
+    // Retry on the next token event or scope refresh; an uncertain upsert still needs cleanup.
   }
 }
 
-/** Android: unregister the recorded device token, tombstoning it on failure.
- * Bumps the epoch (invalidating in-flight registers) and serializes the delete
- * against register so a delete never races an upsert of the same token: the
- * FIFO order decides the final state. */
-async function unregisterAndroidOngoingToken(): Promise<{ ok: boolean; tokens: string[] }> {
-  registerEpoch += 1;
-  const result = enqueueTokenMutation(async () => {
-    const token = androidOngoingToken;
-    if (token === null) {
-      return { ok: true, tokens: [] as string[] };
+function observePushToStart(target: Registration | null): void {
+  startSubscription?.remove();
+  const epoch = registerEpoch;
+  startSubscription = addPushToStartTokenListener(({ activityPushToStartToken }) => {
+    if (epoch !== registerEpoch || (target !== null && !isCurrent(target))) {
+      return;
     }
-    const ok = await unregister(token);
-    if (ok) {
-      androidOngoingToken = null;
+    pushToStartToken = activityPushToStartToken;
+    if (target !== null) {
+      void registerToken(target, activityPushToStartToken);
     }
-    return { ok, tokens: [token] };
   });
-  await result;
-  return result;
+}
+
+function detachActivity(): void {
+  activityRegistration = null;
+  observedActivity = null;
+  activitySubscription?.remove();
+  activitySubscription = null;
+}
+
+function getScope(organizationId: string | null, userId: string | null): Registration {
+  if (
+    scopeRegistration === null ||
+    scopeRegistration.organizationId !== organizationId ||
+    scopeRegistration.userId !== userId ||
+    !isCurrent(scopeRegistration)
+  ) {
+    registerEpoch += 1;
+    detachActivity();
+    scopeRegistration = {
+      organizationId,
+      userId,
+      kind: Platform.OS === 'android' ? 'android_ongoing' : 'ios_push_to_start',
+      epoch: registerEpoch,
+      authEpoch: currentAuthEpoch(),
+      token: null,
+      registeredToken: null,
+      tokens: scopeTokens,
+    };
+    if (Platform.OS === 'ios') {
+      observePushToStart(scopeRegistration);
+    }
+  }
+  return scopeRegistration;
+}
+
+async function registerAndroidToken(target: Registration): Promise<void> {
+  try {
+    if (target.registeredToken !== null || !(await canRegister(target))) {
+      return;
+    }
+    const token = await getDevicePushTokenLazy()();
+    if (token !== null) {
+      await registerToken(target, token);
+    }
+  } catch {
+    // A failed lookup retries on the next authorized scope refresh.
+  }
+}
+
+async function observeActivity(target: Registration, instance: GlanceableActivity): Promise<void> {
+  try {
+    if (observedActivity === instance && activityRegistration !== null) {
+      if (activityRegistration.token !== null) {
+        await registerToken(activityRegistration, activityRegistration.token);
+      }
+      return;
+    }
+    if (activityRegistration !== null) {
+      delivery.cleanupTokens('activity');
+    }
+    const registration: Registration = {
+      ...target,
+      kind: 'ios_activity',
+      token: null,
+      registeredToken: null,
+      tokens: activityTokens,
+    };
+    activityRegistration = registration;
+    observedActivity = instance;
+    activitySubscription = instance.addPushTokenListener(({ pushToken }) => {
+      void registerToken(registration, pushToken);
+    });
+    const token = await instance.getPushToken();
+    // A token event is newer than the initial asynchronous read.
+    if (token !== null && registration.token === null) {
+      await registerToken(registration, token);
+    }
+  } catch {
+    // Unsupported or transient native reads must not discard the scope subscription.
+  }
+}
+
+async function collectActivityToken(
+  instance: GlanceableActivity | null,
+  activityToken?: Promise<string | null>
+): Promise<string | null> {
+  try {
+    return (await (activityToken ?? instance?.getPushToken())) ?? null;
+  } catch {
+    // Recorded tokens still need deletion when a native read fails.
+    return null;
+  }
 }
 
 const delivery: GlanceableDelivery = {
-  registerTokens(_snapshot, organizationId, userId) {
+  registerScopeTokens(organizationId, userId) {
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+      return;
+    }
+    const target = getScope(organizationId, userId);
     if (Platform.OS === 'android') {
-      void registerAndroidOngoingToken(organizationId, userId);
-      return;
+      void registerAndroidToken(target);
+    } else if (pushToStartToken !== null) {
+      void registerToken(target, pushToStartToken);
     }
-    if (Platform.OS !== 'ios') {
-      return;
-    }
-    void (async () => {
-      const epoch = registerEpoch;
-      // Keep reconciliation and scope-cleanup waits outside the mutation queue:
-      // cleanup itself needs that queue to finish its unregister.
-      if (userId !== null) {
-        void attemptLogoutReconciliation(userId);
-      }
-      await awaitLogoutReconciliationSettled();
-      if ((await hasPendingActivityUnregister(userId)) || epoch !== registerEpoch) {
-        return;
-      }
-      const startToken = pushToStartToken;
-      if (startToken !== null) {
-        await enqueueTokenMutation(async () => {
-          if (epoch !== registerEpoch) {
-            return;
-          }
-          await register({
-            token: startToken,
-            kind: 'ios_push_to_start',
-            platform: 'ios',
-            organizationId,
-          });
-        });
-      }
-      if (epoch !== registerEpoch) {
-        return;
-      }
-      try {
-        const activity = ActiveAgentsLiveActivity.getInstances().at(-1);
-        if (activity) {
-          const token = await activity.getPushToken();
-          if (token) {
-            await enqueueTokenMutation(async () => {
-              if (epoch !== registerEpoch) {
-                return;
-              }
-              await register({ token, kind: 'ios_activity', platform: 'ios', organizationId });
-            });
-          }
-        }
-      } catch {
-        // getInstances can throw on unsupported surfaces; the sink owns retry.
-      }
-    })();
   },
 
-  async unregisterTokens() {
-    if (Platform.OS === 'android') {
-      return unregisterAndroidOngoingToken();
+  // eslint-disable-next-line max-params -- preserve the existing delivery arguments and pass the sink's stable native handle
+  registerTokens(_snapshot, organizationId, userId, instance) {
+    delivery.registerScopeTokens(organizationId, userId);
+    if (Platform.OS !== 'ios' || scopeRegistration === null) {
+      return;
     }
-    if (Platform.OS !== 'ios') {
-      return { ok: true, tokens: [] };
+    try {
+      const current = instance ?? ActiveAgentsLiveActivity.getInstances().at(-1);
+      if (current) {
+        void observeActivity(scopeRegistration, current);
+      }
+    } catch {
+      // getInstances can throw on unsupported surfaces; the sink owns retry.
     }
-    registerEpoch += 1;
-    const tokens = collectIosActivityTokens();
-    const result = await enqueueTokenMutation(async () => unregisterActivityTokens(await tokens));
+  },
+
+  cleanupTokens(lifetime, activityToken) {
+    void unregisterActivityTokensAndTombstone(lifetime, activityToken);
+  },
+
+  async unregisterTokens(lifetime, activityToken) {
+    const includeScope = lifetime !== 'activity';
+    let instance = observedActivity;
+    if (Platform.OS === 'ios' && instance === null && activityToken === undefined) {
+      try {
+        instance = ActiveAgentsLiveActivity.getInstances().at(-1) ?? null;
+      } catch {
+        // Recorded tokens remain available when native discovery fails.
+      }
+    }
+    if (includeScope) {
+      registerEpoch += 1;
+      scopeRegistration = null;
+      if (Platform.OS === 'ios') {
+        if (pushToStartToken !== null) {
+          scopeTokens.add(pushToStartToken);
+        }
+        observePushToStart(null);
+      }
+    }
+    detachActivity();
+    const nativeToken = collectActivityToken(instance, activityToken);
+    const result = await enqueueTokenMutation(async () => {
+      const capturedToken = await nativeToken;
+      if (capturedToken) {
+        activityTokens.add(capturedToken);
+      }
+      // Read the sets inside the FIFO so an already-running upsert is included.
+      const tokens = [
+        ...new Set(includeScope ? [...scopeTokens, ...activityTokens] : activityTokens),
+      ];
+      const results = await Promise.all(
+        tokens.map(async token => {
+          try {
+            await trpcClient.user.unregisterActivityToken.mutate({ token });
+            scopeTokens.delete(token);
+            activityTokens.delete(token);
+            return true;
+          } catch {
+            return false;
+          }
+        })
+      );
+      const failed = tokens.filter((_token, index) => !results[index]);
+      // Keep Android's existing successful-cleanup result contract.
+      return {
+        ok: failed.length === 0,
+        tokens: Platform.OS === 'android' && failed.length === 0 ? tokens : failed,
+      };
+    });
     return result;
   },
 };
 
-/** Capture the current iOS tokens before a later scope replaces the native instance. */
-async function collectIosActivityTokens(): Promise<string[]> {
-  const tokens: string[] = [];
-  if (pushToStartToken !== null) {
-    tokens.push(pushToStartToken);
-  }
-  try {
-    const activity = ActiveAgentsLiveActivity.getInstances().at(-1);
-    if (activity) {
-      const token = await activity.getPushToken();
-      if (token) {
-        tokens.push(token);
-      }
-    }
-  } catch {
-    // Nothing to unregister when no activity survives.
-  }
-  return tokens;
+if (Platform.OS === 'ios') {
+  // Cache early tokens without registering an unauthenticated scope.
+  observePushToStart(null);
 }
-
-/**
- * Unregister the captured iOS tokens in parallel and report only failures.
- * The caller tombstones those tokens, so a retry never re-deletes a token
- * that already succeeded and can belong to the new session.
- */
-async function unregisterActivityTokens(
-  tokens: string[]
-): Promise<{ ok: boolean; tokens: string[] }> {
-  if (tokens.length === 0) {
-    return { ok: true, tokens };
-  }
-  const results = await Promise.allSettled(
-    tokens.map(async token => {
-      const ok = await unregister(token);
-      return ok;
-    })
-  );
-  const failedTokens = tokens.filter((_token, index) => {
-    const result = results[index];
-    return result === undefined || result.status === 'rejected' || !result.value;
-  });
-  return { ok: failedTokens.length === 0, tokens: failedTokens };
-}
-
 setGlanceableDelivery(delivery);
-
-// ── Test-only helpers ──────────────────────────────────────────────────────
 
 export function _setGetDevicePushTokenForTests(fn: (() => Promise<string | null>) | null): void {
   getDevicePushTokenForTests = fn;
 }
 
 export function _resetDeliveryRegistrationForTests(): void {
-  androidOngoingToken = null;
-  pushToStartToken = null;
   registerEpoch += 1;
+  detachActivity();
+  scopeRegistration = null;
+  scopeTokens.clear();
+  activityTokens.clear();
+  pushToStartToken = null;
   mutationTail = null;
+  if (Platform.OS === 'ios') {
+    observePushToStart(null);
+  }
 }

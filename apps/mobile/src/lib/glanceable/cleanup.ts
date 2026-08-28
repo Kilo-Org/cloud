@@ -6,7 +6,7 @@ import {
 
 import { getLastGlanceableSnapshot } from './persist';
 import { withStatus } from './publisher';
-import { getGlanceableSinks } from './sink-registry';
+import { getGlanceableDelivery, getGlanceableSinks } from './sink-registry';
 
 // Monotonic epoch bumped on every terminal blank (signed-out or privacy). The
 // publisher captures it at construction and refuses to emit once it advances,
@@ -77,6 +77,7 @@ function writeTerminalAndEnd(status: 'signed_out' | 'privacy'): void {
   // Arm the publisher gate before any sink writes, so a cache success that
   // lands during this window can never emit for the torn-down session.
   terminalBlankEpoch += 1;
+  getGlanceableDelivery().cleanupTokens('scope');
   const snapshot = buildTerminalSnapshot(status);
   const sinks = getGlanceableSinks();
   // Write the snapshot first, then end: the surface shows the terminal copy

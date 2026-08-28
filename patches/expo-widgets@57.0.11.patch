@@ -1,0 +1,14 @@
+diff --git a/ios/LiveActivityFactory.swift b/ios/LiveActivityFactory.swift
+--- a/ios/LiveActivityFactory.swift
++++ b/ios/LiveActivityFactory.swift
+@@ -43,7 +43,9 @@ final class LiveActivityFactory: SharedObject {
+     guard #available(iOS 16.1, *) else { throw LiveActivitiesNotSupportedException() }
+ 
+     return Activity<LiveActivityAttributes>.activities.map { activity in
+-      LiveActivity(id: activity.id, name: name)
++      let instance = LiveActivity(id: activity.id, name: name)
++      instance.observePushTokenUpdates(for: activity, pushNotificationsEnabled: LiveActivityFactory.pushNotificationsEnabled)
++      return instance
+     }
+   }
+ }

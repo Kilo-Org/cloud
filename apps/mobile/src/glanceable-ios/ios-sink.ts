@@ -83,14 +83,22 @@ function buildExpiredProps(snapshot: GlanceableAgentsSnapshot): Partial<Glanceab
   );
 }
 
+async function readEndingToken(instance: Activity): Promise<string | null> {
+  try {
+    return await instance.getPushToken();
+  } catch {
+    // Recorded tokens still need cleanup when the native lookup fails.
+    return null;
+  }
+}
+
 async function endNow(): Promise<void> {
-  // Unregister push-to-start tokens even when no Live Activity handle exists:
-  // an account or org switch with no live handle must not keep the prior
-  // scope's token registered.
-  void getGlanceableDelivery().unregisterTokens();
   // A process restart leaves the JS handle null while ActivityKit still
   // holds the activity; adopt it so the end actually clears the Lock Screen.
   activity ??= adoptExistingActivity();
+  const endingToken = activity === null ? undefined : readEndingToken(activity);
+  // Capture before end removes native discovery, without waiting for the network.
+  getGlanceableDelivery().cleanupTokens('activity', endingToken);
   if (activity === null) {
     return;
   }
@@ -116,6 +124,7 @@ async function endNow(): Promise<void> {
     }
   }
   try {
+    await endingToken;
     await endingActivity.end('immediate', endingProps ?? undefined, new Date());
   } finally {
     pendingEnds -= 1;
@@ -227,13 +236,16 @@ export const iosSink: GlanceableSink = {
 
       lastProps = contentState;
       revision = snapshot.revision;
-      getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId);
+      getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
       if (adopted) {
         inFlightUpdate = activity.update(contentState);
       }
       return;
     }
 
+    // publish can adopt an activity before this method sees it. Bind its token
+    // listener here too; delivery deduplicates the sink's stable native handle.
+    getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
     // The publisher coalesces and guards revisions, but keep the sink monotonic
     // so a late or replayed emit can never move the surface backwards.
     if (snapshot.revision <= revision) {

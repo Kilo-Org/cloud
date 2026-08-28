@@ -9,7 +9,11 @@ import {
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
-import { type GlanceableSink, type GlanceableSinkContext } from './sink-registry';
+import {
+  getGlanceableDelivery,
+  type GlanceableSink,
+  type GlanceableSinkContext,
+} from './sink-registry';
 
 /**
  * Framework-agnostic publisher state machine. Derives one versioned snapshot
@@ -100,6 +104,7 @@ export class GlanceablePublisher {
     if (this.isGated()) {
       return;
     }
+    getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     const now = this.now();
     this.applyExpiry(now, ctx);
 
@@ -138,6 +143,7 @@ export class GlanceablePublisher {
     if (this.isGated()) {
       return;
     }
+    getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     if (this.current !== null) {
       return;
     }
@@ -182,6 +188,9 @@ export class GlanceablePublisher {
     }
     if (this.current !== null && shouldDiscardGlanceableRevision(incoming, this.current)) {
       return;
+    }
+    if (incoming.status !== 'signed_out' && incoming.status !== 'privacy') {
+      getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     }
     // A late background delivery supersedes a pending coalesced emit and any
     // pending 8 s terminal, so neither can fire after the newer snapshot.

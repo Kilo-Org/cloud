@@ -5,6 +5,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import { setGlanceableDelivery } from '@/lib/glanceable/sink-registry';
 import { i18n } from '@/i18n';
 
@@ -88,9 +89,20 @@ vi.mock('react-native-android-widget', () => ({
 const NOW = 1_750_000_000_000;
 const CTX = { organizationId: null, userId: 'u1' };
 
+const subscriptions = new Set<string>();
 const delivery = {
-  registerTokens: vi.fn(),
-  unregisterTokens: vi.fn().mockResolvedValue({ ok: true, tokens: [] }),
+  registerScopeTokens: vi.fn(() => subscriptions.add('scope')),
+  registerTokens: vi.fn(() => subscriptions.add('scope')),
+  cleanupTokens: vi.fn((lifetime: 'scope' | 'activity') => {
+    if (lifetime === 'scope') {
+      subscriptions.clear();
+    }
+  }),
+  unregisterTokens: vi.fn().mockImplementation(async () => {
+    await Promise.resolve();
+    subscriptions.clear();
+    return { ok: true, tokens: [] };
+  }),
 };
 
 function snapshotFor(
@@ -147,7 +159,10 @@ beforeEach(() => {
   // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
   _setPermissionReaderForTests(() => Promise.resolve('granted'));
   setGlanceableDelivery(delivery);
+  subscriptions.clear();
+  delivery.registerScopeTokens.mockClear();
   delivery.registerTokens.mockClear();
+  delivery.cleanupTokens.mockClear();
   delivery.unregisterTokens.mockClear();
   mocks.native.isPromotionCapable.mockReturnValue(true);
   mocks.native.end();
@@ -164,6 +179,25 @@ afterEach(() => {
 });
 
 describe('androidSink start and update', () => {
+  it('keeps idle delivery available before and after work arrives in the background', async () => {
+    const publisher = new GlanceablePublisher({ sinks: [androidSink], now: () => NOW });
+    publisher.handleSessions([{ status: 'idle' }], CTX);
+    await flushAsync();
+    expect(mocks.getNotification()).toBeNull();
+    expect(getCurrentWidgetProps()?.statusLine).toBe('No work in progress');
+    expect(subscriptions).toEqual(new Set(['scope']));
+
+    publisher.applySnapshot(snapshotFor([{ status: 'busy' }], 1), CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.text).toBe('1 Running');
+
+    publisher.handleSessions([{ status: 'idle' }], CTX);
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(mocks.getNotification()).toBeNull();
+    expect(subscriptions).toEqual(new Set(['scope']));
+    publisher.dispose();
+  });
+
   it('forwards the ranked compact number and all counts on start and update', async () => {
     androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
@@ -426,13 +460,15 @@ describe('androidSink widget publish and end', () => {
     expect(getCurrentWidgetProps()?.primaryCount).toBe(1);
   });
 
-  it('unregisters the token on endImmediate', async () => {
+  it('ends the ongoing notification without removing widget delivery', async () => {
     androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
     await flushAsync();
-    expect(delivery.registerTokens).toHaveBeenCalledTimes(1);
+    expect(mocks.getNotification()).not.toBeNull();
 
     androidSink.endImmediate();
-    expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
+    await flushAsync();
+    expect(mocks.getNotification()).toBeNull();
+    expect(subscriptions).toEqual(new Set(['scope']));
   });
 
   it.each(['happy', 'stale'] as const)(

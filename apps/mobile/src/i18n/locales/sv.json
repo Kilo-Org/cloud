@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Den föregående uppgiften håller fortfarande på att avslutas. Vänta en stund.",
       "serviceUnavailable": "Tjänsten är inte tillgänglig just nu. Försök igen.",
       "connectionTrouble": "Anslutningsproblem. Försök igen om en liten stund.",
-      "modelUnavailable": "Den här modellen är inte tillgänglig för Cloud Agent. Välj en annan modell och försök igen."
+      "modelUnavailable": "Den här modellen är inte tillgänglig för Cloud Agent. Välj en annan modell och försök igen.",
+      "cancelQueuedFailed": "Kunde inte avbryta meddelandet.",
+      "cancelQueuedRestoreAvailable": "Meddelandet avbröts. Tryck på Återställ för att återföra det till meddelandefältet.",
+      "cancelQueuedRestored": "Meddelandet avbröts. Prompten finns åter i meddelandefältet.",
+      "cancelQueuedUpgradeRequired": "Att avbryta köade meddelanden kräver en nyare Kilo CLI. Uppdatera Kilo CLI och återanslut."
     },
     "remoteSession": {
       "failedToCreate": "Det gick inte att skapa fjärrsession",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Meddelandet är i kö",
       "userMessage": "Användarmeddelande",
       "assistantMessage": "Assistentmeddelande",
-      "longPressHint": "Tryck länge för meddelandedetaljer"
+      "longPressHint": "Tryck länge för meddelandedetaljer",
+      "cancelQueued": "Avbryt meddelande",
+      "cancelQueuedAccessibility": "Avbryt köat meddelande",
+      "restoreQueued": "Återställ",
+      "restoreQueuedAccessibility": "Återställ avbrutet meddelande till meddelandefältet"
     },
     "olderMessages": {
       "arrived": "Tidigare meddelanden lästes in",

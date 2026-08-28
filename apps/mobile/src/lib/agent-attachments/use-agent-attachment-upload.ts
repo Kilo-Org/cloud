@@ -16,6 +16,7 @@ import {
   classifyAttachment,
   describeClassificationFailure,
   mimeForExtension,
+  normalizeAttachmentExtension,
 } from '@/lib/agent-attachments/validate';
 import {
   type AgentAttachment,
@@ -93,6 +94,94 @@ async function runBestEffort(task: () => Promise<void>): Promise<void> {
   }
 }
 
+// A cloud-agent sandbox URL encodes the R2 key of a stored attachment:
+//   file:///tmp/attachments/<sessionId>/<userId>/<messageUuid>/<filename>
+// whose R2 key is `<userId>/cloud-agent/<messageUuid>/<filename>` (see
+// services/cloud-agent-next/src/utils/attachment-download.ts). The last
+// segment is the wire's remote filename.
+const RESTORED_ATTACHMENT_URL = /^file:\/\/\/tmp\/attachments\/([^/]+)\/([^/]+)\/([^/]+)\/([^/]+)$/;
+
+// The optimistic cloud-agent file part's `url` encodes the original upload
+// path and remote filename as `cloud-agent://<messageUuid>/<filename>`. The
+// SDK has the upload `attachments.path` but not the userId, so the sandbox
+// form above cannot be satisfied; this form is what
+// `buildOptimisticFileParts` can produce and lets a cancel-restore recover
+// both the filename and the messageUuid (the re-send wire's `path`).
+const CLOUD_AGENT_RESTORE_URL = /^cloud-agent:\/\/([^/]+)\/([^/]+)$/;
+
+// A presigned R2 GET URL (remote attachment parts) carries the object key in
+// its path: `<endpoint>/<bucket>/<userId>/cloud-agent/<messageUuid>/<filename>`
+// (see services/cloud-agent-next/src/utils/attachment-download.ts). Recover
+// the message UUID and the remote filename from that path so a cancel-restore
+// re-sends under the original upload path instead of the rotated one, and so
+// the admission marker never carries the signed URL's query credentials.
+const SIGNED_CLOUD_AGENT_URL = /\/cloud-agent\/([^/]+)\/([^/]+)$/;
+
+type ResolvedRestoredAttachmentReference = {
+  remoteKey: string;
+  remoteFilename: string;
+  messageUuid?: string;
+};
+
+/**
+ * Derive the R2 object reference a restored file part points at. Restored
+ * parts are already uploaded and linked, so the chip must be re-admitted on
+ * the next send without a false "ready" chip that sends nothing. The remote
+ * key is only an admission marker for an already-linked object (a release of a
+ * non-pending key is a no-op server-side), so it never needs to be the raw
+ * signed URL; the message UUID and remote filename are recovered from the
+ * key's `/cloud-agent/<uuid>/<filename>` path segment instead.
+ */
+function resolveRestoredAttachmentReference(input: {
+  filename?: string;
+  url: string;
+}): ResolvedRestoredAttachmentReference {
+  const sandbox = RESTORED_ATTACHMENT_URL.exec(input.url);
+  if (sandbox) {
+    const userId = sandbox[2];
+    const messageUuid = sandbox[3];
+    const filename = sandbox[4];
+    if (userId !== undefined && messageUuid !== undefined && filename !== undefined) {
+      return {
+        remoteKey: `${userId}/cloud-agent/${messageUuid}/${filename}`,
+        remoteFilename: filename,
+        messageUuid,
+      };
+    }
+  }
+  const cloudRestore = CLOUD_AGENT_RESTORE_URL.exec(input.url);
+  if (cloudRestore) {
+    const messageUuid = cloudRestore[1];
+    const filename = cloudRestore[2];
+    if (messageUuid !== undefined && filename !== undefined) {
+      return {
+        remoteKey: input.url,
+        remoteFilename: filename,
+        messageUuid,
+      };
+    }
+  }
+  const withoutQueryHash = input.url.split(/[?#]/)[0] ?? input.url;
+  const signed = SIGNED_CLOUD_AGENT_URL.exec(withoutQueryHash);
+  if (signed) {
+    const messageUuid = signed[1];
+    const filename = signed[2];
+    if (messageUuid !== undefined && filename !== undefined) {
+      return {
+        remoteKey: `cloud-agent/${messageUuid}/${filename}`,
+        remoteFilename: filename,
+        messageUuid,
+      };
+    }
+  }
+  const basename = /[^/]+$/.exec(withoutQueryHash)?.[0];
+  const extension = normalizeAttachmentExtension(basename ?? input.filename ?? 'file');
+  const remoteFilename = basename
+    ? normalizeFilename(basename, extension)
+    : normalizeFilename(input.filename ?? 'file', extension);
+  return { remoteKey: input.url, remoteFilename };
+}
+
 type UseAgentAttachmentUploadOptions = {
   organizationId?: string;
 };
@@ -117,6 +206,14 @@ type UseAgentAttachmentUploadReturn = {
   reset: () => void;
   /** Release every admitted-but-unsent key (leave/abandon). Never blocks or throws. */
   releaseUnclaimedUploads: () => void;
+  /** Re-attach recoverable canceled-message file parts as already-uploaded chips. */
+  restoreFileParts: (parts: readonly { filename?: string; mime: string; url: string }[]) => void;
+  /** Clear chips for an optimistic send without deleting their local files. */
+  clearOptimistic: () => void;
+  /** Re-add chips after a failed optimistic send. */
+  restoreChips: (chips: readonly AgentAttachment[]) => void;
+  /** Rotate the upload path and submission messageUuid after a successful send. */
+  commitSent: () => void;
   isUploading: boolean;
   hasFailedAttachments: boolean;
   hasUnclaimedAttachments: boolean;
@@ -647,6 +744,91 @@ export function useAgentAttachmentUpload(
   const hasFailedAttachments = hasAnyFailedAttachment(attachments);
   const hasUnclaimedAttachments = hasAnyUnclaimedAttachment(attachments);
 
+  // Re-attach the recoverable file parts of a canceled queued message as
+  // already-uploaded chips (their remote objects already exist). A file part
+  // without a URL is not recoverable and is skipped.
+  const restoreFileParts = useCallback(
+    (parts: readonly { filename?: string; mime: string; url: string }[]) => {
+      const recoverable = parts.filter(part => part.url !== '');
+      if (recoverable.length === 0) {
+        return;
+      }
+      // All restored parts come from one canceled message, so they share one
+      // message UUID. Point the current upload path at that UUID so the next
+      // send's wire `{path, files}` addresses the existing R2 objects instead
+      // of the rotated path (`commitSent` advanced it after the prior send).
+      const firstPart = recoverable[0];
+      if (firstPart === undefined) {
+        return;
+      }
+      const firstReference = resolveRestoredAttachmentReference(firstPart);
+      if (firstReference.messageUuid !== undefined) {
+        pathRef.current = firstReference.messageUuid;
+        messageUuidRef.current = firstReference.messageUuid;
+      }
+      const additions: AgentAttachment[] = recoverable.map(part => {
+        const extension = normalizeAttachmentExtension(part.filename ?? 'file');
+        const filename = normalizeFilename(part.filename ?? 'file', extension);
+        const kind = part.mime.startsWith('image/') ? 'image' : 'document';
+        const { remoteKey, remoteFilename } = resolveRestoredAttachmentReference(part);
+        return {
+          id: Crypto.randomUUID(),
+          filename,
+          remoteFilename,
+          remoteKey,
+          kind,
+          extension,
+          mimeType:
+            part.mime !== ''
+              ? (part.mime as AgentAttachment['mimeType'])
+              : mimeForExtension(extension),
+          size: 0,
+          localUri: part.url,
+          localFileOwned: false,
+          status: 'uploaded',
+          progress: null,
+        };
+      });
+      commitAttachments(current => [...current, ...additions]);
+    },
+    [commitAttachments]
+  );
+
+  // Optimistic-send chip clear: like `reset` but keeps the local cache files
+  // so a transport failure can restore the same chips. Orphaned files on a
+  // successful send are reclaimed by the temp-file reaper. The path is NOT
+  // rotated here: the files were already uploaded under the current path, so a
+  // failed-send restore must retry them under that same path. A genuinely new
+  // message starts only on `reset`.
+  const clearOptimistic = useCallback(() => {
+    generationRef.current += 1;
+    for (const id of liveIdsRef.current) {
+      cancelUpload(id);
+    }
+    liveIdsRef.current.clear();
+    commitAttachments(() => []);
+  }, [cancelUpload, commitAttachments]);
+
+  // Re-add chips after a failed optimistic send (restore recoverable attachments).
+  const restoreChips = useCallback(
+    (chips: readonly AgentAttachment[]) => {
+      if (chips.length === 0) {
+        return;
+      }
+      commitAttachments(current => [...current, ...chips]);
+    },
+    [commitAttachments]
+  );
+
+  // Rotate the upload path and submission messageUuid after a successful send.
+  // `clearOptimistic` deliberately does NOT rotate (a failed-send restore must
+  // retry under the original path); only a completed send starts a genuinely
+  // new message, so the next upload presigns fresh UUIDs.
+  const commitSent = useCallback(() => {
+    pathRef.current = Crypto.randomUUID();
+    messageUuidRef.current = Crypto.randomUUID();
+  }, []);
+
   return useMemo(
     () => ({
       attachments,
@@ -657,6 +839,10 @@ export function useAgentAttachmentUpload(
       reorderAttachments,
       reset,
       releaseUnclaimedUploads,
+      restoreFileParts,
+      clearOptimistic,
+      restoreChips,
+      commitSent,
       isUploading,
       hasFailedAttachments,
       hasUnclaimedAttachments,
@@ -671,6 +857,10 @@ export function useAgentAttachmentUpload(
       reorderAttachments,
       reset,
       releaseUnclaimedUploads,
+      restoreFileParts,
+      clearOptimistic,
+      restoreChips,
+      commitSent,
       isUploading,
       hasFailedAttachments,
       hasUnclaimedAttachments,

@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Өмнөх ажил дуусаагүй байна. Түр хүлээнэ үү.",
       "serviceUnavailable": "Үйлчилгээ яг одоо боломжгүй байна. Дахин оролдоно уу.",
       "connectionTrouble": "Холболтын асуудал. Түр хүлээгээд дахин оролдоно уу.",
-      "modelUnavailable": "Энэ загвар Cloud Agent-д байхгүй. Өөр загвар сонгоод дахин оролдоно уу."
+      "modelUnavailable": "Энэ загвар Cloud Agent-д байхгүй. Өөр загвар сонгоод дахин оролдоно уу.",
+      "cancelQueuedFailed": "Мессежийг цуцалж чадсангүй.",
+      "cancelQueuedRestoreAvailable": "Мессеж цуцлагдсан. Мессеж оруулах талбарт буцаахын тулд «Сэргээх» товчийг товшино уу.",
+      "cancelQueuedRestored": "Мессеж цуцлагдсан. Заавар мессеж оруулах талбарт буцаж орсон.",
+      "cancelQueuedUpgradeRequired": "Дараалалд буй мессежийг цуцлахад Kilo CLI-ийн шинэ хувилбар шаардлагатай. Kilo CLI-ээ шинэчлээд дахин холбоно уу."
     },
     "remoteSession": {
       "failedToCreate": "Алсын сесс үүсгэхэд амжилтгүй болсон",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Мэдээлэл дараалалд орлоо",
       "userMessage": "Хэрэглэгчийн мэдээлэл",
       "assistantMessage": "Туслахын мэдээлэл",
-      "longPressHint": "Мэдээллийн дэлгэрэнгүйг үзэхийн тулд удаан дарна уу"
+      "longPressHint": "Мэдээллийн дэлгэрэнгүйг үзэхийн тулд удаан дарна уу",
+      "cancelQueued": "Мессежийг цуцлах",
+      "cancelQueuedAccessibility": "Дараалалд буй мессежийг цуцлах",
+      "restoreQueued": "Сэргээх",
+      "restoreQueuedAccessibility": "Цуцалсан мессежийг мессеж оруулах талбарт сэргээх"
     },
     "olderMessages": {
       "arrived": "Өмнөх мэдээллүүд ачаалагдлаа",

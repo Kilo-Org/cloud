@@ -88,6 +88,20 @@ export function isCloudPrepareRetryableError(error: unknown): boolean {
   return CLOUD_PREPARE_TRANSIENT_CODES.has(code);
 }
 
+const CANCEL_QUEUED_UPGRADE_REQUIRED_CODE = 'CLI_UPGRADE_REQUIRED';
+
+export function isCancelQueuedUpgradeRequired(error: unknown): boolean {
+  return readFetchSessionErrorCode(error) === CANCEL_QUEUED_UPGRADE_REQUIRED_CODE;
+}
+
+export type CancelQueuedRestoreOutcome = 'restore' | 'keep-restore';
+
+export function resolveCancelQueuedRestoreOutcome(
+  composerHasContent: boolean
+): CancelQueuedRestoreOutcome {
+  return composerHasContent ? 'keep-restore' : 'restore';
+}
+
 /* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
 async function defaultFetchSessionQuery(
   sessionId: KiloSessionId
@@ -269,6 +283,21 @@ export function createMobileAgentSessionManager({
           await trpcClient.cloudAgentNext.sendMessage.mutate(baseInput, skipBatchOptions);
         });
       },
+      /* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
+      cancelQueuedMessage: async input =>
+        withCloudAgentDiagnostics('cancelQueuedMessage', organizationId, async () => {
+          if (organizationId) {
+            return trpcClient.organizations.cloudAgentNext.cancelQueuedMessage.mutate(
+              { sessionId: input.sessionId, messageId: input.messageId, organizationId },
+              skipBatchOptions
+            );
+          }
+          return trpcClient.cloudAgentNext.cancelQueuedMessage.mutate(
+            { sessionId: input.sessionId, messageId: input.messageId },
+            skipBatchOptions
+          );
+        }),
+      /* eslint-enable @typescript-eslint/promise-function-async, require-await */
       interrupt: async payload => {
         await withCloudAgentDiagnostics('interrupt', organizationId, async () => {
           if (organizationId) {

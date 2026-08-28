@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Tinatapos pa lang ang nakaraang gawain. Pakihintay sandali.",
       "serviceUnavailable": "Hindi available ang serbisyo ngayon. Pakisubukan muli.",
       "connectionTrouble": "Problema sa koneksyon. Pakisubukan muli pagkalipas ng ilang sandali.",
-      "modelUnavailable": "Hindi available ang modelong ito para sa Cloud Agent. Pumili ng ibang modelo at subukang muli."
+      "modelUnavailable": "Hindi available ang modelong ito para sa Cloud Agent. Pumili ng ibang modelo at subukang muli.",
+      "cancelQueuedFailed": "Hindi makansela ang mensahe.",
+      "cancelQueuedRestoreAvailable": "Kinansela ang mensahe. I-tap ang I-restore para ibalik ito sa input ng mensahe.",
+      "cancelQueuedRestored": "Kinansela ang mensahe. Nasa input ng mensahe na muli ang prompt.",
+      "cancelQueuedUpgradeRequired": "Ang pagkansela ng mga nakapilang mensahe ay nangangailangan ng mas bagong Kilo CLI. I-update ang Kilo CLI at muling kumonekta."
     },
     "remoteSession": {
       "failedToCreate": "Nabigong gumawa ng remote session",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Naka-queue ang mensahe",
       "userMessage": "Mensahe ng user",
       "assistantMessage": "Mensahe ng assistant",
-      "longPressHint": "Pindutin nang matagal para sa mga detalye ng mensahe"
+      "longPressHint": "Pindutin nang matagal para sa mga detalye ng mensahe",
+      "cancelQueued": "Kanselahin ang mensahe",
+      "cancelQueuedAccessibility": "Kanselahin ang nakapilang mensahe",
+      "restoreQueued": "I-restore",
+      "restoreQueuedAccessibility": "I-restore ang kinanselang mensahe sa input ng mensahe"
     },
     "olderMessages": {
       "arrived": "Ni-load ang mga naunang mensahe",

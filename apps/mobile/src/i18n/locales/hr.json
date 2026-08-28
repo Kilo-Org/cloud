@@ -2157,7 +2157,11 @@
       "previousTaskFinishing": "Prethodni zadatak još uvijek završava. Pričekajte trenutak.",
       "serviceUnavailable": "Usluga trenutačno nije dostupna. Pokušajte ponovno.",
       "connectionTrouble": "Problem s vezom. Pokušajte ponovno za trenutak.",
-      "modelUnavailable": "Ovaj model nije dostupan za Cloud Agent. Odaberite drugi model i pokušajte ponovno."
+      "modelUnavailable": "Ovaj model nije dostupan za Cloud Agent. Odaberite drugi model i pokušajte ponovno.",
+      "cancelQueuedFailed": "Nije moguće otkazati poruku.",
+      "cancelQueuedRestoreAvailable": "Poruka je otkazana. Dodirnite „Vratite” da biste je vratili u polje za unos poruke.",
+      "cancelQueuedRestored": "Poruka je otkazana. Upit je ponovno u polju za unos poruke.",
+      "cancelQueuedUpgradeRequired": "Otkazivanje poruka na čekanju zahtijeva noviju verziju Kilo CLI-ja. Ažurirajte Kilo CLI i ponovno se povežite."
     },
     "remoteSession": {
       "failedToCreate": "Stvaranje udaljene sesije nije uspjelo",
@@ -2479,7 +2483,11 @@
       "queuedAccessibility": "Poruka u redu čekanja",
       "userMessage": "Korisnička poruka",
       "assistantMessage": "Poruka asistenta",
-      "longPressHint": "Dugo pritisnite za pojedinosti poruke"
+      "longPressHint": "Dugo pritisnite za pojedinosti poruke",
+      "cancelQueued": "Otkažite poruku",
+      "cancelQueuedAccessibility": "Otkažite poruku na čekanju",
+      "restoreQueued": "Vratite",
+      "restoreQueuedAccessibility": "Vratite otkazanu poruku u polje za unos poruke"
     },
     "olderMessages": {
       "arrived": "Ranije poruke učitane",

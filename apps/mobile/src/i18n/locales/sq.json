@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Detyra e mëparshme ende po përfundon. Ju lutemi prisni një moment.",
       "serviceUnavailable": "Shërbimi nuk është i disponueshëm tani. Ju lutemi provoni përsëri.",
       "connectionTrouble": "Probleme me lidhjen. Ju lutemi provoni përsëri pas një momenti.",
-      "modelUnavailable": "Ky model nuk është i disponueshëm për Cloud Agent. Zgjidhni një model tjetër dhe provoni përsëri."
+      "modelUnavailable": "Ky model nuk është i disponueshëm për Cloud Agent. Zgjidhni një model tjetër dhe provoni përsëri.",
+      "cancelQueuedFailed": "Mesazhi nuk mund të anulohej.",
+      "cancelQueuedRestoreAvailable": "Mesazhi u anulua. Prekni Rivendosni për ta kthyer në fushën e mesazhit.",
+      "cancelQueuedRestored": "Mesazhi u anulua. Kërkesa është sërish në fushën e mesazhit.",
+      "cancelQueuedUpgradeRequired": "Anulimi i mesazheve në pritje kërkon një Kilo CLI më të ri. Përditësoni Kilo CLI dhe rilidhuni."
     },
     "remoteSession": {
       "failedToCreate": "Dështoi krijimi i seancës në distancë",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Mesazhi në radhë",
       "userMessage": "Mesazh përdoruesi",
       "assistantMessage": "Mesazh asistenti",
-      "longPressHint": "Shtypni gjatë për detaje të mesazhit"
+      "longPressHint": "Shtypni gjatë për detaje të mesazhit",
+      "cancelQueued": "Anuloni mesazhin",
+      "cancelQueuedAccessibility": "Anuloni mesazhin në pritje",
+      "restoreQueued": "Rivendosni",
+      "restoreQueuedAccessibility": "Rivendosni mesazhin e anuluar në fushën e mesazhit"
     },
     "olderMessages": {
       "arrived": "U ngarkuan mesazhet e mëparshme",

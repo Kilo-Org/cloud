@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "ਪਿਛਲਾ ਕੰਮ ਅਜੇ ਖਤਮ ਹੋ ਰਿਹਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਪਲ ਉਡੀਕੋ।",
       "serviceUnavailable": "ਸੇਵਾ ਇਸ ਸਮੇਂ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "connectionTrouble": "ਕਨੈਕਸ਼ਨ ਸਮੱਸਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਪਲ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "modelUnavailable": "ਇਹ ਮਾਡਲ Cloud Agent ਲਈ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕੋਈ ਹੋਰ ਮਾਡਲ ਚੁਣੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "modelUnavailable": "ਇਹ ਮਾਡਲ Cloud Agent ਲਈ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕੋਈ ਹੋਰ ਮਾਡਲ ਚੁਣੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "cancelQueuedFailed": "ਸੁਨੇਹਾ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "cancelQueuedRestoreAvailable": "ਸੁਨੇਹਾ ਰੱਦ ਕੀਤਾ ਗਿਆ। ਇਸਨੂੰ ਕੰਪੋਜ਼ਰ ਵਿੱਚ ਵਾਪਸ ਲਿਆਉਣ ਲਈ ਬਹਾਲ ਕਰੋ 'ਤੇ ਟੈਪ ਕਰੋ।",
+      "cancelQueuedRestored": "ਸੁਨੇਹਾ ਰੱਦ ਕੀਤਾ ਗਿਆ। ਪ੍ਰੰਪਟ ਕੰਪੋਜ਼ਰ ਵਿੱਚ ਵਾਪਸ ਆ ਗਿਆ ਹੈ।",
+      "cancelQueuedUpgradeRequired": "ਕਤਾਰ ਵਿੱਚ ਪਏ ਸੁਨੇਹੇ ਰੱਦ ਕਰਨ ਲਈ Kilo CLI ਦੇ ਨਵੇਂ ਸੰਸਕਰਣ ਦੀ ਲੋੜ ਹੈ। Kilo CLI ਅੱਪਡੇਟ ਕਰੋ ਅਤੇ ਮੁੜ ਕਨੈਕਟ ਕਰੋ।"
     },
     "remoteSession": {
       "failedToCreate": "ਰਿਮੋਟ ਸੈਸ਼ਨ ਬਣਾਉਣ ਵਿੱਚ ਅਸਫਲ",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "ਸੁਨੇਹਾ ਕਤਾਰ ਵਿੱਚ",
       "userMessage": "ਵਰਤੋਂਕਾਰ ਸੁਨੇਹਾ",
       "assistantMessage": "ਸਹਾਇਕ ਸੁਨੇਹਾ",
-      "longPressHint": "ਸੁਨੇਹੇ ਦੇ ਵੇਰਵਿਆਂ ਲਈ ਲੰਬਾ ਦਬਾਓ"
+      "longPressHint": "ਸੁਨੇਹੇ ਦੇ ਵੇਰਵਿਆਂ ਲਈ ਲੰਬਾ ਦਬਾਓ",
+      "cancelQueued": "ਸੁਨੇਹਾ ਰੱਦ ਕਰੋ",
+      "cancelQueuedAccessibility": "ਕਤਾਰ ਵਿੱਚ ਪਿਆ ਸੁਨੇਹਾ ਰੱਦ ਕਰੋ",
+      "restoreQueued": "ਬਹਾਲ ਕਰੋ",
+      "restoreQueuedAccessibility": "ਰੱਦ ਕੀਤਾ ਸੁਨੇਹਾ ਕੰਪੋਜ਼ਰ ਵਿੱਚ ਬਹਾਲ ਕਰੋ"
     },
     "olderMessages": {
       "arrived": "ਪਹਿਲੇ ਸੁਨੇਹੇ ਲੋਡ ਹੋ ਗਏ",

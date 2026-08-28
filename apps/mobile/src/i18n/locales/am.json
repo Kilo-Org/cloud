@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "የቀደመው ተግባር አሁንም እያለቀ ነው። እባክዎ ጠብቅ።",
       "serviceUnavailable": "አገልግሎቱ አሁን አይገኝም። እባክዎ እንደገና ይሞክሩ።",
       "connectionTrouble": "የግንኙነት ችግር። እባክዎ በአጭር ጊዜ ውስጥ እንደገና ይሞክሩ።",
-      "modelUnavailable": "ይህ ሞዴል ለ Cloud Agent አይገኝም። ሌላ ሞዴል ይምረጡ እና እንደገና ይሞክሩ።"
+      "modelUnavailable": "ይህ ሞዴል ለ Cloud Agent አይገኝም። ሌላ ሞዴል ይምረጡ እና እንደገና ይሞክሩ።",
+      "cancelQueuedFailed": "መልእክቱን መሰረዝ አልተቻለም።",
+      "cancelQueuedRestoreAvailable": "መልእክቱ ተሰርዟል። ወደ መልእክት ማስገቢያው ለመመለስ «ይመልሱ»ን ይንኩ።",
+      "cancelQueuedRestored": "መልእክቱ ተሰርዟል። ጥያቄው ወደ መልእክት ማስገቢያው ተመልሷል።",
+      "cancelQueuedUpgradeRequired": "በተራ የሚጠባበቁ መልእክቶችን መሰረዝ አዲስ የKilo CLI ስሪት ይፈልጋል። Kilo CLIን ያዘምኑ እና እንደገና ያገናኙ።"
     },
     "remoteSession": {
       "failedToCreate": "የርቀት ክፍለ ጊዜ መፍጠር አልተሳካም",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "መልእክት ወረፋ ውስጥ ገብቷል",
       "userMessage": "የተጠቃሚ መልእክት",
       "assistantMessage": "የረዳት መልእክት",
-      "longPressHint": "ለመልእክት ዝርዝሮች ረጅም ይጫኑ"
+      "longPressHint": "ለመልእክት ዝርዝሮች ረጅም ይጫኑ",
+      "cancelQueued": "መልእክቱን ይሰርዙ",
+      "cancelQueuedAccessibility": "በተራ የሚጠባበቀውን መልእክት ይሰርዙ",
+      "restoreQueued": "ይመልሱ",
+      "restoreQueuedAccessibility": "የተሰረዘውን መልእክት ወደ መልእክት ማስገቢያው ይመልሱ"
     },
     "olderMessages": {
       "arrived": "የቀደሙ መልእክቶች ተጭነዋል",

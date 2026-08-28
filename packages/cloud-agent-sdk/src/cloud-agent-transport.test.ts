@@ -536,7 +536,9 @@ describe('CloudAgentTransport command delegation', () => {
     const api = createMockApi();
     const { transport } = createTransportWithSinks(undefined, undefined, api);
 
-    await transport.dropQueuedMessage!('msg-queued-1');
+    await expect(transport.dropQueuedMessage!('msg-queued-1')).resolves.toEqual({
+      dropped: true,
+    });
 
     expect(api.cancelQueuedMessage).toHaveBeenCalledWith({
       sessionId: 'ses-1',

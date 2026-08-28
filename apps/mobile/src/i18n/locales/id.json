@@ -1688,7 +1688,11 @@
       "previousTaskFinishing": "Tugas sebelumnya masih selesai. Tunggu sebentar.",
       "serviceUnavailable": "Layanan tidak tersedia saat ini. Coba lagi.",
       "connectionTrouble": "Gangguan koneksi. Coba lagi sebentar lagi.",
-      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan coba lagi."
+      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan coba lagi.",
+      "cancelQueuedFailed": "Tidak dapat membatalkan pesan.",
+      "cancelQueuedRestoreAvailable": "Pesan dibatalkan. Ketuk Pulihkan untuk mengembalikannya ke kolom pesan.",
+      "cancelQueuedRestored": "Pesan dibatalkan. Prompt kembali ke kolom pesan.",
+      "cancelQueuedUpgradeRequired": "Pembatalan pesan dalam antrean memerlukan Kilo CLI yang lebih baru. Perbarui Kilo CLI dan sambungkan kembali."
     },
     "remoteSession": {
       "failedToCreate": "Gagal membuat sesi jarak jauh",
@@ -2009,7 +2013,11 @@
       "queuedAccessibility": "Pesan dalam antrean",
       "userMessage": "Pesan pengguna",
       "assistantMessage": "Pesan asisten",
-      "longPressHint": "Tekan lama untuk detail pesan"
+      "longPressHint": "Tekan lama untuk detail pesan",
+      "cancelQueued": "Batalkan pesan",
+      "cancelQueuedAccessibility": "Batalkan pesan dalam antrean",
+      "restoreQueued": "Pulihkan",
+      "restoreQueuedAccessibility": "Pulihkan pesan yang dibatalkan ke kolom pesan"
     },
     "olderMessages": {
       "arrived": "Pesan sebelumnya dimuat",

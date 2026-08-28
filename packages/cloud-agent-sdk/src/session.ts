@@ -196,7 +196,7 @@ type CloudAgentSession = {
   // Commands
   send: (input: CloudAgentSessionSendInput) => unknown | Promise<unknown>;
   interrupt: () => unknown | Promise<unknown>;
-  cancelQueuedMessage: (messageId: string) => unknown | Promise<unknown>;
+  cancelQueuedMessage: (messageId: string) => Promise<{ dropped: boolean }>;
   answer: (payload: CloudAgentSessionAnswerInput) => unknown | Promise<unknown>;
   reject: (payload: CloudAgentSessionRejectInput) => unknown | Promise<unknown>;
   respondToPermission: (

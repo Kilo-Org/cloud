@@ -1688,7 +1688,11 @@
       "previousTaskFinishing": "Tác vụ trước vẫn đang hoàn tất. Vui lòng chờ một chút.",
       "serviceUnavailable": "Dịch vụ hiện không khả dụng. Vui lòng thử lại.",
       "connectionTrouble": "Sự cố kết nối. Vui lòng thử lại sau giây lát.",
-      "modelUnavailable": "Mô hình này không khả dụng cho Cloud Agent. Vui lòng chọn mô hình khác và thử lại."
+      "modelUnavailable": "Mô hình này không khả dụng cho Cloud Agent. Vui lòng chọn mô hình khác và thử lại.",
+      "cancelQueuedFailed": "Không thể hủy tin nhắn.",
+      "cancelQueuedRestoreAvailable": "Đã hủy tin nhắn. Chạm vào Khôi phục để đưa tin nhắn trở lại ô nhập tin nhắn.",
+      "cancelQueuedRestored": "Đã hủy tin nhắn. Lời nhắc đã trở lại ô nhập tin nhắn.",
+      "cancelQueuedUpgradeRequired": "Việc hủy tin nhắn đang chờ yêu cầu Kilo CLI mới hơn. Hãy cập nhật Kilo CLI và kết nối lại."
     },
     "remoteSession": {
       "failedToCreate": "Không thể tạo phiên từ xa",
@@ -2009,7 +2013,11 @@
       "queuedAccessibility": "Tin nhắn đã xếp hàng đợi",
       "userMessage": "Tin nhắn người dùng",
       "assistantMessage": "Tin nhắn trợ lý",
-      "longPressHint": "Nhấn giữ để xem chi tiết tin nhắn"
+      "longPressHint": "Nhấn giữ để xem chi tiết tin nhắn",
+      "cancelQueued": "Hủy tin nhắn",
+      "cancelQueuedAccessibility": "Hủy tin nhắn đang chờ",
+      "restoreQueued": "Khôi phục",
+      "restoreQueuedAccessibility": "Khôi phục tin nhắn đã hủy vào ô nhập tin nhắn"
     },
     "olderMessages": {
       "arrived": "Đã tải các tin nhắn trước đó",

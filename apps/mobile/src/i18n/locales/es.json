@@ -1696,7 +1696,11 @@
       "previousTaskFinishing": "La tarea anterior aún está finalizando. Espera un momento.",
       "serviceUnavailable": "El servicio no está disponible en este momento. Inténtalo de nuevo.",
       "connectionTrouble": "Problema de conexión. Inténtalo de nuevo en un momento.",
-      "modelUnavailable": "Este modelo no está disponible para Cloud Agent. Elige otro modelo e inténtalo de nuevo."
+      "modelUnavailable": "Este modelo no está disponible para Cloud Agent. Elige otro modelo e inténtalo de nuevo.",
+      "cancelQueuedFailed": "No se pudo cancelar el mensaje.",
+      "cancelQueuedRestoreAvailable": "Mensaje cancelado. Toca Restaurar para devolverlo al campo de mensaje.",
+      "cancelQueuedRestored": "Mensaje cancelado. El prompt vuelve a estar en el campo de mensaje.",
+      "cancelQueuedUpgradeRequired": "Cancelar mensajes en cola requiere una versión más reciente de Kilo CLI. Actualiza Kilo CLI y vuelve a conectarte."
     },
     "remoteSession": {
       "failedToCreate": "No se pudo crear la sesión remota",
@@ -2018,7 +2022,11 @@
       "queuedAccessibility": "Mensaje en cola",
       "userMessage": "Mensaje del usuario",
       "assistantMessage": "Mensaje del asistente",
-      "longPressHint": "Mantén pulsado para ver los detalles del mensaje"
+      "longPressHint": "Mantén pulsado para ver los detalles del mensaje",
+      "cancelQueued": "Cancelar mensaje",
+      "cancelQueuedAccessibility": "Cancelar mensaje en cola",
+      "restoreQueued": "Restaurar",
+      "restoreQueuedAccessibility": "Restaurar el mensaje cancelado en el campo de mensaje"
     },
     "olderMessages": {
       "arrived": "Mensajes anteriores cargados",

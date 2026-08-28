@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaqhubeka. Uyacelwa ukuthi ulinde isikhashana.",
       "serviceUnavailable": "Inkonzo ayitholakali njengamanje. Uyacelwa ukuthi uzame futhi.",
       "connectionTrouble": "Inkinga yokuxhumana. Uyacelwa ukuthi uzame futhi emuva kwesikhashana.",
-      "modelUnavailable": "Le modeli ayitholakali ku-Cloud Agent. Khetha enye bese uzama futhi."
+      "modelUnavailable": "Le modeli ayitholakali ku-Cloud Agent. Khetha enye bese uzama futhi.",
+      "cancelQueuedFailed": "Akukwazanga ukukhansela umlayezo.",
+      "cancelQueuedRestoreAvailable": "Umlayezo ukhanseliwe. Thepha u-Buyisela ukuze uwubuyisele ku-composer.",
+      "cancelQueuedRestored": "Umlayezo ukhanseliwe. Isicelo osibhalile sesibuyile ku-composer.",
+      "cancelQueuedUpgradeRequired": "Ukukhansela imilayezo efakiwe kuqoqo kudinga i-Kilo CLI entsha. Buyekeza i-Kilo CLI bese uxhumana futhi."
     },
     "remoteSession": {
       "failedToCreate": "Kwehlulekile ukudala iseshini ekude",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Umlayezo ufakiwe kuqoqo",
       "userMessage": "Umlayezo womsebenzisi",
       "assistantMessage": "Umlayezo womsizi",
-      "longPressHint": "Cindezela isikhathi eside ukuze ubone imininingwane yomlayezo"
+      "longPressHint": "Cindezela isikhathi eside ukuze ubone imininingwane yomlayezo",
+      "cancelQueued": "Khansela umlayezo",
+      "cancelQueuedAccessibility": "Khansela umlayezo ofakiwe kuqoqo",
+      "restoreQueued": "Buyisela",
+      "restoreQueuedAccessibility": "Buyisela umlayezo okhanseliwe ku-composer"
     },
     "olderMessages": {
       "arrived": "Imilayezo yangaphambili ilayishiwe",

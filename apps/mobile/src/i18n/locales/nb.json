@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Den forrige oppgaven er fortsatt i gang. Vent et øyeblikk.",
       "serviceUnavailable": "Tjenesten er utilgjengelig akkurat nå. Prøv igjen.",
       "connectionTrouble": "Tilkoblingsproblemer. Prøv igjen om et øyeblikk.",
-      "modelUnavailable": "Denne modellen er ikke tilgjengelig for Cloud Agent. Velg en annen modell og prøv igjen."
+      "modelUnavailable": "Denne modellen er ikke tilgjengelig for Cloud Agent. Velg en annen modell og prøv igjen.",
+      "cancelQueuedFailed": "Kunne ikke avbryte meldingen.",
+      "cancelQueuedRestoreAvailable": "Meldingen er avbrutt. Trykk på Gjenopprett for å legge den tilbake i meldingsfeltet.",
+      "cancelQueuedRestored": "Meldingen er avbrutt. Forespørselen er tilbake i meldingsfeltet.",
+      "cancelQueuedUpgradeRequired": "Avbryting av meldinger i kø krever en nyere Kilo CLI. Oppdater Kilo CLI og koble til på nytt."
     },
     "remoteSession": {
       "failedToCreate": "Klarte ikke å opprette ekstern økt",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Melding satt i kø",
       "userMessage": "Brukermelding",
       "assistantMessage": "Assistentmelding",
-      "longPressHint": "Trykk og hold for meldingsdetaljer"
+      "longPressHint": "Trykk og hold for meldingsdetaljer",
+      "cancelQueued": "Avbryt melding",
+      "cancelQueuedAccessibility": "Avbryt melding i kø",
+      "restoreQueued": "Gjenopprett",
+      "restoreQueuedAccessibility": "Gjenopprett avbrutt melding i meldingsfeltet"
     },
     "olderMessages": {
       "arrived": "Tidligere meldinger lastet inn",

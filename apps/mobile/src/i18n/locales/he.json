@@ -1696,7 +1696,11 @@
       "previousTaskFinishing": "המשימה הקודמת עדיין מסתיימת. אנא המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. אנא נסה שוב.",
       "connectionTrouble": "בעיית חיבור. אנא נסה שוב בעוד רגע.",
-      "modelUnavailable": "המודל הזה אינו זמין עבור Cloud Agent. בחר מודל אחר ונסה שוב."
+      "modelUnavailable": "המודל הזה אינו זמין עבור Cloud Agent. בחר מודל אחר ונסה שוב.",
+      "cancelQueuedFailed": "לא ניתן היה לבטל את ההודעה.",
+      "cancelQueuedRestoreAvailable": "ההודעה בוטלה. הקש על שחזר כדי להחזיר אותה לשדה ההודעה.",
+      "cancelQueuedRestored": "ההודעה בוטלה. ההנחיה חזרה לשדה ההודעה.",
+      "cancelQueuedUpgradeRequired": "ביטול הודעות בתור דורש Kilo CLI חדש יותר. עדכן את Kilo CLI והתחבר מחדש."
     },
     "remoteSession": {
       "failedToCreate": "לא ניתן היה ליצור הפעלה מרוחקת",
@@ -2018,7 +2022,11 @@
       "queuedAccessibility": "ההודעה בתור",
       "userMessage": "הודעת משתמש",
       "assistantMessage": "הודעת עוזר",
-      "longPressHint": "לחיצה ארוכה לפרטי ההודעה"
+      "longPressHint": "לחיצה ארוכה לפרטי ההודעה",
+      "cancelQueued": "בטל הודעה",
+      "cancelQueuedAccessibility": "בטל הודעה בתור",
+      "restoreQueued": "שחזר",
+      "restoreQueuedAccessibility": "שחזר הודעה שבוטלה לשדה ההודעה"
     },
     "olderMessages": {
       "arrived": "הודעות קודמות נטענו",

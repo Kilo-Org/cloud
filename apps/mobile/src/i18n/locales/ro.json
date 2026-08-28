@@ -2157,7 +2157,11 @@
       "previousTaskFinishing": "Sarcina anterioară încă se finalizează. Te rugăm să aștepți un moment.",
       "serviceUnavailable": "Serviciul nu este disponibil acum. Te rugăm să încerci din nou.",
       "connectionTrouble": "Probleme de conexiune. Te rugăm să reîncerci într-un moment.",
-      "modelUnavailable": "Acest model nu este disponibil pentru Cloud Agent. Alege alt model și încearcă din nou."
+      "modelUnavailable": "Acest model nu este disponibil pentru Cloud Agent. Alege alt model și încearcă din nou.",
+      "cancelQueuedFailed": "Nu s-a putut anula mesajul.",
+      "cancelQueuedRestoreAvailable": "Mesaj anulat. Atinge Restabilește pentru a-l readuce în câmpul de mesaj.",
+      "cancelQueuedRestored": "Mesaj anulat. Promptul este din nou în câmpul de mesaj.",
+      "cancelQueuedUpgradeRequired": "Anularea mesajelor în așteptare necesită un Kilo CLI mai nou. Actualizează Kilo CLI și reconectează-te."
     },
     "remoteSession": {
       "failedToCreate": "Nu s-a putut crea sesiunea de la distanță",
@@ -2479,7 +2483,11 @@
       "queuedAccessibility": "Mesaj pus în coadă",
       "userMessage": "Mesaj de utilizator",
       "assistantMessage": "Mesaj de asistent",
-      "longPressHint": "Atingere lungă pentru detaliile mesajului"
+      "longPressHint": "Atingere lungă pentru detaliile mesajului",
+      "cancelQueued": "Anulează mesajul",
+      "cancelQueuedAccessibility": "Anulează mesajul în așteptare",
+      "restoreQueued": "Restabilește",
+      "restoreQueuedAccessibility": "Restabilește mesajul anulat în câmpul de mesaj"
     },
     "olderMessages": {
       "arrived": "Mesajele anterioare au fost încărcate",

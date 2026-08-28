@@ -1688,7 +1688,11 @@
       "previousTaskFinishing": "이전 작업이 아직 끝나지 않았습니다. 잠시 기다려 주세요.",
       "serviceUnavailable": "지금 서비스를 사용할 수 없습니다. 다시 시도하세요.",
       "connectionTrouble": "연결 문제가 발생했습니다. 잠시 후 다시 시도하세요.",
-      "modelUnavailable": "이 모델은 Cloud Agent에서 사용할 수 없습니다. 다른 모델을 선택하고 다시 시도하세요."
+      "modelUnavailable": "이 모델은 Cloud Agent에서 사용할 수 없습니다. 다른 모델을 선택하고 다시 시도하세요.",
+      "cancelQueuedFailed": "메시지를 취소하지 못했습니다.",
+      "cancelQueuedRestoreAvailable": "메시지가 취소되었습니다. 복원을 탭하여 메시지 입력란으로 되돌리세요.",
+      "cancelQueuedRestored": "메시지가 취소되었습니다. 프롬프트가 메시지 입력란으로 돌아왔습니다.",
+      "cancelQueuedUpgradeRequired": "대기 중인 메시지를 취소하려면 최신 Kilo CLI가 필요합니다. Kilo CLI를 업데이트하고 다시 연결하세요."
     },
     "remoteSession": {
       "failedToCreate": "원격 세션을 만들지 못했습니다",
@@ -2009,7 +2013,11 @@
       "queuedAccessibility": "메시지 대기 중",
       "userMessage": "사용자 메시지",
       "assistantMessage": "어시스턴트 메시지",
-      "longPressHint": "메시지 세부 정보를 보려면 길게 누르세요"
+      "longPressHint": "메시지 세부 정보를 보려면 길게 누르세요",
+      "cancelQueued": "메시지 취소",
+      "cancelQueuedAccessibility": "대기 중인 메시지 취소",
+      "restoreQueued": "복원",
+      "restoreQueuedAccessibility": "취소된 메시지를 메시지 입력란으로 복원"
     },
     "olderMessages": {
       "arrived": "이전 메시지 로드됨",

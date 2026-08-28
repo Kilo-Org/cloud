@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "আগের কাজটি এখনও শেষ হচ্ছে। একটু অপেক্ষা করুন।",
       "serviceUnavailable": "সেবাটি এখন অনুপলব্ধ। আবার চেষ্টা করুন।",
       "connectionTrouble": "সংযোগ সমস্যা। কিছুক্ষণ পরে আবার চেষ্টা করুন।",
-      "modelUnavailable": "এই মডেলটি Cloud Agent-এর জন্য উপলব্ধ নয়। অন্য একটি মডেল বেছে নিন এবং আবার চেষ্টা করুন।"
+      "modelUnavailable": "এই মডেলটি Cloud Agent-এর জন্য উপলব্ধ নয়। অন্য একটি মডেল বেছে নিন এবং আবার চেষ্টা করুন।",
+      "cancelQueuedFailed": "বার্তাটি বাতিল করা যায়নি।",
+      "cancelQueuedRestoreAvailable": "বার্তা বাতিল হয়েছে। বার্তা লেখার ঘরে এটি ফেরাতে ‘পুনরুদ্ধার করুন’-এ আলতো চাপুন।",
+      "cancelQueuedRestored": "বার্তা বাতিল হয়েছে। প্রম্পটটি বার্তা লেখার ঘরে ফিরে এসেছে।",
+      "cancelQueuedUpgradeRequired": "অপেক্ষমাণ বার্তা বাতিল করতে Kilo CLI-এর নতুন সংস্করণ প্রয়োজন। Kilo CLI আপডেট করুন এবং পুনরায় সংযুক্ত করুন।"
     },
     "remoteSession": {
       "failedToCreate": "দূরবর্তী সেশন তৈরি করতে ব্যর্থ",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "বার্তা সারিবদ্ধ",
       "userMessage": "ব্যবহারকারী বার্তা",
       "assistantMessage": "সহায়ক বার্তা",
-      "longPressHint": "বার্তার বিবরণের জন্য দীর্ঘ চাপ দিন"
+      "longPressHint": "বার্তার বিবরণের জন্য দীর্ঘ চাপ দিন",
+      "cancelQueued": "বার্তা বাতিল করুন",
+      "cancelQueuedAccessibility": "অপেক্ষমাণ বার্তা বাতিল করুন",
+      "restoreQueued": "পুনরুদ্ধার করুন",
+      "restoreQueuedAccessibility": "বাতিল করা বার্তাটি বার্তা লেখার ঘরে পুনরুদ্ধার করুন"
     },
     "olderMessages": {
       "arrived": "আগের বার্তাগুলি লোড হয়েছে",

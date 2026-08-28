@@ -2187,7 +2187,11 @@
       "previousTaskFinishing": "Il-kompitu preċedenti għadu qed jintemm. Jekk jogħġbok stenna mument.",
       "serviceUnavailable": "Is-servizz mhux disponibbli bħalissa. Jekk jogħġbok erġa' pprova.",
       "connectionTrouble": "Problema ta' konnessjoni. Jekk jogħġbok erġa' pprova fi ftit.",
-      "modelUnavailable": "Dan il-mudell mhux disponibbli għal Cloud Agent. Agħżel mudell ieħor u erġa' pprova."
+      "modelUnavailable": "Dan il-mudell mhux disponibbli għal Cloud Agent. Agħżel mudell ieħor u erġa' pprova.",
+      "cancelQueuedFailed": "Ma setax jiġi kkanċellat il-messaġġ.",
+      "cancelQueuedRestoreAvailable": "Il-messaġġ ġie kkanċellat. Tektek Irrestawra biex terġa' tqiegħdu fil-qasam tad-dħul tal-messaġġ.",
+      "cancelQueuedRestored": "Il-messaġġ ġie kkanċellat. Il-prompt reġa' jinsab fil-qasam tad-dħul tal-messaġġ.",
+      "cancelQueuedUpgradeRequired": "Il-kanċellazzjoni tal-messaġġi fil-kju teħtieġ Kilo CLI aktar ġdid. Aġġorna l-Kilo CLI u erġa' kkonnetta."
     },
     "remoteSession": {
       "failedToCreate": "Ma rnexxiliex tinħoloq sessjoni remota",
@@ -2511,7 +2515,11 @@
       "queuedAccessibility": "Il-messaġġ qiegħed f'kju",
       "userMessage": "Messaġġ tal-utent",
       "assistantMessage": "Messaġġ tal-assistent",
-      "longPressHint": "Agħfas fit-tul għad-dettalji tal-messaġġ"
+      "longPressHint": "Agħfas fit-tul għad-dettalji tal-messaġġ",
+      "cancelQueued": "Ikkanċella l-messaġġ",
+      "cancelQueuedAccessibility": "Ikkanċella l-messaġġ fil-kju",
+      "restoreQueued": "Irrestawra",
+      "restoreQueuedAccessibility": "Irrestawra l-messaġġ ikkanċellat fil-qasam tad-dħul tal-messaġġ"
     },
     "olderMessages": {
       "arrived": "Messaġġi aktar bikrin mibgħuta",

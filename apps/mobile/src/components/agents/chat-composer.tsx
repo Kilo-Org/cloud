@@ -127,14 +127,19 @@ type AndroidDismissKeyboardGesture = {
 /** Imperative handle the host uses to set composer text (Retry / Copy to composer). */
 export type ChatComposerControl = {
   setText: (text: string) => void;
+  hasContent: () => boolean;
+  restoreAttachments: (parts: readonly { filename?: string; mime: string; url: string }[]) => void;
+};
+
+/** Optional send extras the composer threads through to the host's `onSend`. */
+export type ChatComposerSendOptions = {
+  attachments?: AgentAttachmentWire;
+  submission?: AgentAttachmentSubmissionPayload;
+  onOptimisticSend?: () => void;
 };
 
 type ChatComposerProps = {
-  onSend: (
-    text: string,
-    attachments?: AgentAttachmentWire,
-    submission?: AgentAttachmentSubmissionPayload
-  ) => void | Promise<void>;
+  onSend: (text: string, options?: ChatComposerSendOptions) => void | Promise<void>;
   onSendCommand: (command: string, argumentsText: string) => Promise<boolean>;
   onCreateSession: () => Promise<boolean>;
   onRestartSession: () => Promise<boolean>;
@@ -464,11 +469,25 @@ export function ChatComposer({
   const applyComposerTextRef = useRef(applyComposerText);
   applyComposerTextRef.current = applyComposerText;
 
+  // Imperative occupancy check: the host asks whether the composer holds any
+  // text or attachment so a queued-message cancel can pick restore vs drop.
+  const hasContentRef = useRef(
+    () => textRef.current.trim().length > 0 || upload.attachments.length > 0
+  );
+  hasContentRef.current = () => textRef.current.trim().length > 0 || upload.attachments.length > 0;
+
+  const restoreFilePartsRef = useRef(upload.restoreFileParts);
+  restoreFilePartsRef.current = upload.restoreFileParts;
+
   useImperativeHandle(
     controlRef,
     () => ({
       setText: (text: string) => {
         applyComposerTextRef.current(text);
+      },
+      hasContent: () => hasContentRef.current(),
+      restoreAttachments: parts => {
+        restoreFilePartsRef.current(parts);
       },
     }),
     []
@@ -820,14 +839,40 @@ export function ChatComposer({
           },
           confirmExitSession: showRemoteSessionExitConfirmation,
           onSendPrompt: async prompt => {
-            await onSend(prompt, uploaded?.wire, uploaded?.submission);
+            const optimisticChips = upload.attachments;
+            try {
+              await onSend(prompt, {
+                attachments: uploaded?.wire,
+                submission: uploaded?.submission,
+                onOptimisticSend: () => {
+                  // The optimistic row is already in the transcript. Clear the
+                  // draft and chips (non-destructively) and stop the spinner so
+                  // the prompt never renders in both the transcript and the input.
+                  clearDraft();
+                  upload.clearOptimistic();
+                  Keyboard.dismiss();
+                  setIsSending(false);
+                },
+              });
+              // The optimistic clear keeps the path so a failed-send restore
+              // can retry under it. Only a completed send rotates the upload
+              // path and submission messageUuid for the next message.
+              upload.commitSent();
+            } catch (error) {
+              // Transport failure: restore only when the composer is still
+              // empty, so a newer draft is never overwritten.
+              if (!hasContentRef.current()) {
+                if (prompt !== '') {
+                  applyComposerText(prompt);
+                }
+                upload.restoreChips(optimisticChips);
+              }
+              throw error;
+            }
           },
         },
         {
           clearDraft,
-          resetAttachments: () => {
-            upload.reset();
-          },
           dismiss: () => {
             Keyboard.dismiss();
           },

@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Hojii duraan ture amma iyyuu xumurameera. Mee yeroo xinnoo eegi.",
       "serviceUnavailable": "Tajaajilli amma hin jiraatu. Mee deebi'ii yaali.",
       "connectionTrouble": "Hidhannaan rakkoo qaba. Mee yeroo xinnoo booda deebi'ii yaali.",
-      "modelUnavailable": "Moodelii kun Cloud Agentf hin jiraatu. Mee moodelii biraa filadhuu deebi'ii yaali."
+      "modelUnavailable": "Moodelii kun Cloud Agentf hin jiraatu. Mee moodelii biraa filadhuu deebi'ii yaali.",
+      "cancelQueuedFailed": "Ergaa dhaabuu hin danda'ame.",
+      "cancelQueuedRestoreAvailable": "Ergaan dhaabbateera. Gara iddoo ergaa galchuutti deebisuuf Deebisaa tuqaa.",
+      "cancelQueuedRestored": "Ergaan dhaabbateera. Gaaffiin gara iddoo ergaa galchuutti deebi'eera.",
+      "cancelQueuedUpgradeRequired": "Ergaawwan tarree keessa jiran dhaabuun Kilo CLI haaraa barbaada. Kilo CLI haaromsaa, deebi'aatii walqabaa."
     },
     "remoteSession": {
       "failedToCreate": "Xalayyii fagoo uumuu hin danda'ame",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Ergaan terraa keessa jira",
       "userMessage": "Ergaa fayyadamaa",
       "assistantMessage": "Ergaa gargaaraa",
-      "longPressHint": "Odeeffannoo ergaaf yeroo dheeraa cuqaasa"
+      "longPressHint": "Odeeffannoo ergaaf yeroo dheeraa cuqaasa",
+      "cancelQueued": "Ergaa dhaabaa",
+      "cancelQueuedAccessibility": "Ergaa tarree keessa jiru dhaabaa",
+      "restoreQueued": "Deebisaa",
+      "restoreQueuedAccessibility": "Ergaa dhaabbate gara iddoo ergaa galchuutti deebisaa"
     },
     "olderMessages": {
       "arrived": "Ergaawwan duraanii baay'amanii jiru",

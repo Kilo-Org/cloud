@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "ວຽກກ່ອນໜ້າຍັງບໍ່ທັນສຳເລັດ. ກະລຸນາລໍຖ້າເລັກນ້ອຍ.",
       "serviceUnavailable": "ບໍລິການບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້. ກະລຸນາລອງໃໝ່.",
       "connectionTrouble": "ມີບັນຫາການເຊື່ອມຕໍ່. ກະລຸນາລອງໃໝ່ໃນອີກເລັກນ້ອຍ.",
-      "modelUnavailable": "ຮູບແບບນີ້ບໍ່ສາມາດໃຊ້ກັບ Cloud Agent ໄດ້. ກະລຸນາເລືອກຮູບແບບອື່ນ ແລ້ວລອງໃໝ່."
+      "modelUnavailable": "ຮູບແບບນີ້ບໍ່ສາມາດໃຊ້ກັບ Cloud Agent ໄດ້. ກະລຸນາເລືອກຮູບແບບອື່ນ ແລ້ວລອງໃໝ່.",
+      "cancelQueuedFailed": "ບໍ່ສາມາດຍົກເລີກຂໍ້ຄວາມໄດ້.",
+      "cancelQueuedRestoreAvailable": "ຍົກເລີກຂໍ້ຄວາມແລ້ວ. ແຕະ ກູ້ຄືນ ເພື່ອນຳມັນກັບໄປຍັງຊ່ອງປ້ອນຂໍ້ຄວາມ.",
+      "cancelQueuedRestored": "ຍົກເລີກຂໍ້ຄວາມແລ້ວ. ຂໍ້ຄວາມກັບຄືນມາຢູ່ໃນຊ່ອງປ້ອນຂໍ້ຄວາມແລ້ວ.",
+      "cancelQueuedUpgradeRequired": "ການຍົກເລີກຂໍ້ຄວາມທີ່ລໍຖ້າສົ່ງຕ້ອງໃຊ້ Kilo CLI ລຸ້ນໃໝ່ກວ່າ. ອັບເດດ Kilo CLI ແລ້ວເຊື່ອມຕໍ່ໃໝ່."
     },
     "remoteSession": {
       "failedToCreate": "ບໍ່ສາມາດສ້າງເຊດຊັນທາງໄກ",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "ຂໍ້ຄວາມເຂົ້າຄິວ",
       "userMessage": "ຂໍ້ຄວາມຜູ້ໃຊ້",
       "assistantMessage": "ຂໍ້ຄວາມຜູ້ຊ່ວຍ",
-      "longPressHint": "ກົດຄ້າງເພື່ອເບິ່ງລາຍລະອຽດຂໍ້ຄວາມ"
+      "longPressHint": "ກົດຄ້າງເພື່ອເບິ່ງລາຍລະອຽດຂໍ້ຄວາມ",
+      "cancelQueued": "ຍົກເລີກຂໍ້ຄວາມ",
+      "cancelQueuedAccessibility": "ຍົກເລີກຂໍ້ຄວາມທີ່ລໍຖ້າສົ່ງ",
+      "restoreQueued": "ກູ້ຄືນ",
+      "restoreQueuedAccessibility": "ກູ້ຄືນຂໍ້ຄວາມທີ່ຍົກເລີກໄປຍັງຊ່ອງປ້ອນຂໍ້ຄວາມ"
     },
     "olderMessages": {
       "arrived": "ຂໍ້ຄວາມກ່ອນໜ້າໂຫລດແລ້ວ",

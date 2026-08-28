@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Tugas sebelumnya masih selesai. Sila tunggu sebentar.",
       "serviceUnavailable": "Perkhidmatan tidak tersedia buat masa ini. Sila cuba semula.",
       "connectionTrouble": "Masalah sambungan. Sila cuba semula sebentar lagi.",
-      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan cuba semula."
+      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan cuba semula.",
+      "cancelQueuedFailed": "Tidak dapat membatalkan mesej.",
+      "cancelQueuedRestoreAvailable": "Mesej dibatalkan. Ketik Pulihkan untuk mengembalikannya ke komposer.",
+      "cancelQueuedRestored": "Mesej dibatalkan. Gesaan kembali dalam komposer.",
+      "cancelQueuedUpgradeRequired": "Pembatalan mesej dalam baris gilir memerlukan Kilo CLI yang lebih baharu. Kemas kini Kilo CLI dan sambung semula."
     },
     "remoteSession": {
       "failedToCreate": "Gagal mencipta sesi jauh",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Mesej dalam baris gilir",
       "userMessage": "Mesej pengguna",
       "assistantMessage": "Mesej pembantu",
-      "longPressHint": "Tekan lama untuk butiran mesej"
+      "longPressHint": "Tekan lama untuk butiran mesej",
+      "cancelQueued": "Batalkan mesej",
+      "cancelQueuedAccessibility": "Batalkan mesej dalam baris gilir",
+      "restoreQueued": "Pulihkan",
+      "restoreQueuedAccessibility": "Pulihkan mesej yang dibatalkan ke komposer"
     },
     "olderMessages": {
       "arrived": "Mesej awal dimuatkan",

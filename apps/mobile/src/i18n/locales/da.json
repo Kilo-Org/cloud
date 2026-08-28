@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Den forrige opgave er stadig i gang. Vent et øjeblik.",
       "serviceUnavailable": "Tjenesten er ikke tilgængelig lige nu. Prøv igen.",
       "connectionTrouble": "Forbindelsesproblem. Prøv igen om et øjeblik.",
-      "modelUnavailable": "Denne model er ikke tilgængelig for Cloud Agent. Vælg en anden model og prøv igen."
+      "modelUnavailable": "Denne model er ikke tilgængelig for Cloud Agent. Vælg en anden model og prøv igen.",
+      "cancelQueuedFailed": "Kunne ikke annullere beskeden.",
+      "cancelQueuedRestoreAvailable": "Besked annulleret. Tryk på Gendan for at føre den tilbage til beskedfeltet.",
+      "cancelQueuedRestored": "Besked annulleret. Prompten er tilbage i beskedfeltet.",
+      "cancelQueuedUpgradeRequired": "Annullering af beskeder i kø kræver en nyere Kilo CLI. Opdater Kilo CLI, og opret forbindelse igen."
     },
     "remoteSession": {
       "failedToCreate": "Kunne ikke oprette fjernsession",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Besked i kø",
       "userMessage": "Brugerbesked",
       "assistantMessage": "Assistentbesked",
-      "longPressHint": "Hold nede for beskeddetaljer"
+      "longPressHint": "Hold nede for beskeddetaljer",
+      "cancelQueued": "Annuller besked",
+      "cancelQueuedAccessibility": "Annuller besked i kø",
+      "restoreQueued": "Gendan",
+      "restoreQueuedAccessibility": "Gendan annulleret besked i beskedfeltet"
     },
     "olderMessages": {
       "arrived": "Tidligere beskeder indlæst",

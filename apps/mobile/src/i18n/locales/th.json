@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "งานก่อนหน้ายังไม่เสร็จสิ้น โปรดรอสักครู่",
       "serviceUnavailable": "ขณะนี้บริการไม่พร้อมใช้งาน โปรดลองอีกครั้ง",
       "connectionTrouble": "เกิดปัญหาการเชื่อมต่อ โปรดลองอีกครั้งในอีกสักครู่",
-      "modelUnavailable": "โมเดลนี้ไม่พร้อมใช้งานสำหรับ Cloud Agent โปรดเลือกโมเดลอื่นแล้วลองอีกครั้ง"
+      "modelUnavailable": "โมเดลนี้ไม่พร้อมใช้งานสำหรับ Cloud Agent โปรดเลือกโมเดลอื่นแล้วลองอีกครั้ง",
+      "cancelQueuedFailed": "ไม่สามารถยกเลิกข้อความได้",
+      "cancelQueuedRestoreAvailable": "ยกเลิกข้อความแล้ว แตะ กู้คืน เพื่อส่งข้อความกลับไปยังช่องป้อนข้อความ",
+      "cancelQueuedRestored": "ยกเลิกข้อความแล้ว พรอมต์กลับมาอยู่ในช่องป้อนข้อความแล้ว",
+      "cancelQueuedUpgradeRequired": "การยกเลิกข้อความที่อยู่ในคิวต้องใช้ Kilo CLI เวอร์ชันใหม่กว่า อัปเดต Kilo CLI แล้วเชื่อมต่ออีกครั้ง"
     },
     "remoteSession": {
       "failedToCreate": "ไม่สามารถสร้าง remote session ได้",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "ข้อความอยู่ในคิว",
       "userMessage": "ข้อความผู้ใช้",
       "assistantMessage": "ข้อความผู้ช่วย",
-      "longPressHint": "กดค้างเพื่อดูรายละเอียดข้อความ"
+      "longPressHint": "กดค้างเพื่อดูรายละเอียดข้อความ",
+      "cancelQueued": "ยกเลิกข้อความ",
+      "cancelQueuedAccessibility": "ยกเลิกข้อความที่อยู่ในคิว",
+      "restoreQueued": "กู้คืน",
+      "restoreQueuedAccessibility": "กู้คืนข้อความที่ยกเลิกไปยังช่องป้อนข้อความ"
     },
     "olderMessages": {
       "arrived": "โหลดข้อความก่อนหน้าแล้ว",

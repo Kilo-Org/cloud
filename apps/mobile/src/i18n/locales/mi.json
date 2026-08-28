@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Kei te oti tonu te mahi o mua. Tatari kia iti.",
       "serviceUnavailable": "Kāore te ratonga e wātea ana ināianei. Whakamātau anō.",
       "connectionTrouble": "He raruraru hononga. Whakamātau anō i muri i tētahi wā poto.",
-      "modelUnavailable": "Kāore tēnei tauira e wātea ana mō Cloud Agent. Kōwhiria tētahi atu tauira, whakamātau anō."
+      "modelUnavailable": "Kāore tēnei tauira e wātea ana mō Cloud Agent. Kōwhiria tētahi atu tauira, whakamātau anō.",
+      "cancelQueuedFailed": "Kāore i taea te whakakore i te karere.",
+      "cancelQueuedRestoreAvailable": "Kua whakakorea te karere. Pāwhiri ki Whakaora kia whakahokia ki te kaitito.",
+      "cancelQueuedRestored": "Kua whakakorea te karere. Kua hoki te pātai ki te kaitito.",
+      "cancelQueuedUpgradeRequired": "E hiahiatia ana he Kilo CLI hōu ake hei whakakore i ngā karere kua rārangi. Whakamohoatia te Kilo CLI ka hono anō."
     },
     "remoteSession": {
       "failedToCreate": "I rahua te hanga wātūtū mamao",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Kua rārangi te karere",
       "userMessage": "Karere kaiwhakamahi",
       "assistantMessage": "Karere kaiāwhina",
-      "longPressHint": "Pēhi roa mō ngā taipitopito karere"
+      "longPressHint": "Pēhi roa mō ngā taipitopito karere",
+      "cancelQueued": "Whakakore i te karere",
+      "cancelQueuedAccessibility": "Whakakore i te karere kua rārangi",
+      "restoreQueued": "Whakaora",
+      "restoreQueuedAccessibility": "Whakaora i te karere kua whakakorea ki te kaitito"
     },
     "olderMessages": {
       "arrived": "Kua uta ngā karere o mua",

@@ -1704,7 +1704,11 @@
       "previousTaskFinishing": "Poprzednie zadanie wciąż się kończy. Proszę chwilę poczekać.",
       "serviceUnavailable": "Usługa jest teraz niedostępna. Spróbuj ponownie.",
       "connectionTrouble": "Problem z połączeniem. Spróbuj ponownie za chwilę.",
-      "modelUnavailable": "Ten model nie jest dostępny dla Cloud Agent. Wybierz inny model i spróbuj ponownie."
+      "modelUnavailable": "Ten model nie jest dostępny dla Cloud Agent. Wybierz inny model i spróbuj ponownie.",
+      "cancelQueuedFailed": "Nie udało się anulować wiadomości.",
+      "cancelQueuedRestoreAvailable": "Wiadomość anulowana. Dotknij „Przywróć”, aby przywrócić ją do pola wiadomości.",
+      "cancelQueuedRestored": "Wiadomość anulowana. Polecenie jest ponownie w polu wiadomości.",
+      "cancelQueuedUpgradeRequired": "Anulowanie wiadomości w kolejce wymaga nowszej wersji Kilo CLI. Zaktualizuj Kilo CLI i połącz się ponownie."
     },
     "remoteSession": {
       "failedToCreate": "Nie udało się utworzyć sesji zdalnej",
@@ -2027,7 +2031,11 @@
       "queuedAccessibility": "Wiadomość w kolejce",
       "userMessage": "Wiadomość użytkownika",
       "assistantMessage": "Wiadomość asystenta",
-      "longPressHint": "Przytrzymaj, aby zobaczyć szczegóły wiadomości"
+      "longPressHint": "Przytrzymaj, aby zobaczyć szczegóły wiadomości",
+      "cancelQueued": "Anuluj wiadomość",
+      "cancelQueuedAccessibility": "Anuluj wiadomość w kolejce",
+      "restoreQueued": "Przywróć",
+      "restoreQueuedAccessibility": "Przywróć anulowaną wiadomość do pola wiadomości"
     },
     "olderMessages": {
       "arrived": "Załadowano wcześniejsze wiadomości",

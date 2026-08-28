@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Aurreko zeregina oraindik amaitzen ari da. Itxaron pixka bat.",
       "serviceUnavailable": "Zerbitzua ez dago eskuragarri oraintxe. Saiatu berriro.",
       "connectionTrouble": "Konexio-arazoa. Saiatu berriro minutu baten buruan.",
-      "modelUnavailable": "Modelu hau ez dago eskuragarri Cloud Agent-erako. Aukeratu beste modelo bat eta saiatu berriro."
+      "modelUnavailable": "Modelu hau ez dago eskuragarri Cloud Agent-erako. Aukeratu beste modelo bat eta saiatu berriro.",
+      "cancelQueuedFailed": "Ezin izan da mezua bertan behera utzi.",
+      "cancelQueuedRestoreAvailable": "Mezua bertan behera utzi da. Sakatu Berreskuratu konpositorera itzultzeko.",
+      "cancelQueuedRestored": "Mezua bertan behera utzi da. Proposamena berriro konpositorean dago.",
+      "cancelQueuedUpgradeRequired": "Ilaran dauden mezuak bertan behera uzteko Kilo CLI bertsio berriago bat behar da. Eguneratu Kilo CLI eta konektatu berriro."
     },
     "remoteSession": {
       "failedToCreate": "Ezin da urruneko saioa sortu",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Mezua antolatuta",
       "userMessage": "Erabiltzailearen mezua",
       "assistantMessage": "Laguntzailearen mezua",
-      "longPressHint": "Sakatuta eduki mezuen xehetasunak ikusteko"
+      "longPressHint": "Sakatuta eduki mezuen xehetasunak ikusteko",
+      "cancelQueued": "Utzi mezua bertan behera",
+      "cancelQueuedAccessibility": "Utzi ilaran dagoen mezua bertan behera",
+      "restoreQueued": "Berreskuratu",
+      "restoreQueuedAccessibility": "Berreskuratu bertan behera utzitako mezua konpositorean"
     },
     "olderMessages": {
       "arrived": "Aurreko mezuak kargatu dira",

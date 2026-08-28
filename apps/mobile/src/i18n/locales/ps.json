@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "مخکینی کار لا هم روان دی. مهرباني وکړئ یوه شېبه انتظار وکړئ.",
       "serviceUnavailable": "خدمت اوس مهال شتون نلري. مهرباني وکړئ بیا هڅه وکړئ.",
       "connectionTrouble": "د اړیکې ستونزه. مهرباني وکړئ یوه شېبه وروسته بیا هڅه وکړئ.",
-      "modelUnavailable": "دا ماډل د Cloud Agent لپاره شتون نلري. بل ماډل غوره کړئ او بیا هڅه وکړئ."
+      "modelUnavailable": "دا ماډل د Cloud Agent لپاره شتون نلري. بل ماډل غوره کړئ او بیا هڅه وکړئ.",
+      "cancelQueuedFailed": "پیغام لغوه نه شو.",
+      "cancelQueuedRestoreAvailable": "پیغام لغوه شو. د پیغام لیکلو ځای ته د بیرته راوړلو لپاره «بیرته راوړئ» ټک کړئ.",
+      "cancelQueuedRestored": "پیغام لغوه شو. پرامپټ بیرته د پیغام لیکلو په ځای کې دی.",
+      "cancelQueuedUpgradeRequired": "په کتار کې د پیغامونو لغوه کولو لپاره نوې Kilo CLI اړینه ده. Kilo CLI تازه کړئ او بیا ونښلئ."
     },
     "remoteSession": {
       "failedToCreate": "لیرې ناسته جوړه نه شوه",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "پیغام په قطار کې ایښودل شوی",
       "userMessage": "د کاروونکي پیغام",
       "assistantMessage": "د مرستیال پیغام",
-      "longPressHint": "د پیغام د تفصیل لپاره اوږد فشار ورکړئ"
+      "longPressHint": "د پیغام د تفصیل لپاره اوږد فشار ورکړئ",
+      "cancelQueued": "پیغام لغوه کړئ",
+      "cancelQueuedAccessibility": "په کتار کې پیغام لغوه کړئ",
+      "restoreQueued": "بیرته راوړئ",
+      "restoreQueuedAccessibility": "لغوه شوی پیغام د پیغام لیکلو ځای ته بیرته راوړئ"
     },
     "olderMessages": {
       "arrived": "پخواني پیغامونه پورته شول",

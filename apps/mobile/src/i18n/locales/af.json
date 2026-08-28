@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Die vorige taak is nog besig. Wag asseblief 'n oomblik.",
       "serviceUnavailable": "Die diens is tans onbeskikbaar. Probeer asseblief weer.",
       "connectionTrouble": "Verbindingsprobleem. Probeer asseblief oor 'n oomblik weer.",
-      "modelUnavailable": "Hierdie model is nie beskikbaar vir Cloud Agent nie. Kies 'n ander model en probeer weer."
+      "modelUnavailable": "Hierdie model is nie beskikbaar vir Cloud Agent nie. Kies 'n ander model en probeer weer.",
+      "cancelQueuedFailed": "Kon die boodskap nie kanselleer nie.",
+      "cancelQueuedRestoreAvailable": "Boodskap gekanselleer. Tik Herstel om dit na die boodskapinvoer terug te plaas.",
+      "cancelQueuedRestored": "Boodskap gekanselleer. Die aansporing is terug in die boodskapinvoer.",
+      "cancelQueuedUpgradeRequired": "Om boodskappe in die wagry te kanselleer, vereis 'n nuwer Kilo CLI. Dateer Kilo CLI op en maak weer verbinding."
     },
     "remoteSession": {
       "failedToCreate": "Kon afgeleë sessie nie skep nie",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Boodskap in die ry",
       "userMessage": "Gebruikerboodskap",
       "assistantMessage": "Assistentboodskap",
-      "longPressHint": "Hou lank in vir boodskapbesonderhede"
+      "longPressHint": "Hou lank in vir boodskapbesonderhede",
+      "cancelQueued": "Kanselleer boodskap",
+      "cancelQueuedAccessibility": "Kanselleer boodskap in die wagry",
+      "restoreQueued": "Herstel",
+      "restoreQueuedAccessibility": "Herstel gekanselleerde boodskap na die boodskapinvoer"
     },
     "olderMessages": {
       "arrived": "Vroeër boodskappe gelaai",

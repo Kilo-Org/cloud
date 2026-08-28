@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "ئەرکی پێشوو هێشتا تەواو دەبێت. تکایە کەمێک چاوەڕێ بکە.",
       "serviceUnavailable": "خزمەتگوزارییەکە ئێستا بەردەست نییە. تکایە دووبارە هەوڵ بدەرەوە.",
       "connectionTrouble": "کێشەی پەیوەندی. تکایە کەمێک دواتر دووبارە هەوڵ بدەرەوە.",
-      "modelUnavailable": "ئەم مۆدێلە بۆ Cloud Agent بەردەست نییە. مۆدێلێکی تر هەڵبژێرە و دووبارە هەوڵ بدەرەوە."
+      "modelUnavailable": "ئەم مۆدێلە بۆ Cloud Agent بەردەست نییە. مۆدێلێکی تر هەڵبژێرە و دووبارە هەوڵ بدەرەوە.",
+      "cancelQueuedFailed": "نەتوانرا پەیامەکە هەڵبوەشێنرێتەوە.",
+      "cancelQueuedRestoreAvailable": "پەیامەکە هەڵوەشایەوە. لە «گەڕاندنەوە» بدە بۆ گەڕاندنەوەی بۆ خانەی نووسینی پەیام.",
+      "cancelQueuedRestored": "پەیامەکە هەڵوەشایەوە. داواکارییەکە گەڕایەوە بۆ خانەی نووسینی پەیام.",
+      "cancelQueuedUpgradeRequired": "هەڵوەشاندنەوەی پەیامەکانی ناو ڕیز پێویستی بە وەشانێکی نوێتری Kilo CLI هەیە. Kilo CLI نوێ بکەرەوە و دووبارە پەیوەندی بکەوە."
     },
     "remoteSession": {
       "failedToCreate": "شکستی هێنا لە دروستکردنی سێشنی دوور",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "نامە لە ڕیزدا دانرا",
       "userMessage": "نامەی بەکارهێنەر",
       "assistantMessage": "نامەی یاریدەدەر",
-      "longPressHint": "پەستانی درێژ بۆ وردەکاری نامەکە"
+      "longPressHint": "پەستانی درێژ بۆ وردەکاری نامەکە",
+      "cancelQueued": "هەڵوەشاندنەوەی پەیام",
+      "cancelQueuedAccessibility": "هەڵوەشاندنەوەی پەیامی ناو ڕیز",
+      "restoreQueued": "گەڕاندنەوە",
+      "restoreQueuedAccessibility": "گەڕاندنەوەی پەیامی هەڵوەشاوە بۆ خانەی نووسینی پەیام"
     },
     "olderMessages": {
       "arrived": "نامە پێشووەکان بارکران",

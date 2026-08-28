@@ -410,6 +410,15 @@ async function settle(): Promise<void> {
   await Promise.resolve();
 }
 
+/** Runs `uploadPending` inside `act` and returns the settled, non-undefined result. */
+async function uploadPendingResult(): Promise<Awaited<ReturnType<HookApi['uploadPending']>>> {
+  let result: Awaited<ReturnType<HookApi['uploadPending']>> | undefined = undefined;
+  await act(async () => {
+    result = await hookApi().uploadPending();
+  });
+  return result as unknown as Awaited<ReturnType<HookApi['uploadPending']>>;
+}
+
 describe('addCandidates uploads documents at selection (Step 2)', () => {
   beforeEach(() => {
     hoisted.uploadOne.mockReset();
@@ -530,6 +539,212 @@ describe('uploadPending', () => {
         files: [{ remoteName: 'doc.pdf', originalName: 'doc.pdf', size: 1024 }],
       },
     });
+    renderer.unmount();
+  });
+
+  it('retries restored chips under the original upload path after a failed optimistic send', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+    expect(hookApi().attachments[0]?.status).toBe('uploaded');
+
+    const original = await uploadPendingResult();
+    expect(original).toEqual(expect.objectContaining({ ok: true }));
+    expect(original.ok).toBe(true);
+    if (!original.ok) {
+      throw new Error('expected upload to succeed');
+    }
+    const originalPath = original.wire?.path;
+    expect(originalPath).toBeDefined();
+
+    // The optimistic clear must keep the path; a transport failure then
+    // restores the same chips so the retry reuses the original upload path.
+    const chips = hookApi().attachments;
+    await act(async () => {
+      hookApi().clearOptimistic();
+      await settle();
+    });
+    expect(hookApi().attachments).toHaveLength(0);
+    await act(async () => {
+      hookApi().restoreChips(chips);
+      await settle();
+    });
+
+    const retry = await uploadPendingResult();
+    expect(retry).toEqual(expect.objectContaining({ ok: true }));
+    expect(retry.ok).toBe(true);
+    if (!retry.ok) {
+      throw new Error('expected retry upload to succeed');
+    }
+    expect(retry.wire?.path).toBe(originalPath);
+    expect(retry.wire?.files).toEqual(['doc.pdf']);
+    renderer.unmount();
+  });
+
+  it('rotates the upload path and submission messageUuid after commitSent', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+    expect(hookApi().attachments[0]?.status).toBe('uploaded');
+
+    const first = await uploadPendingResult();
+    expect(first).toEqual(expect.objectContaining({ ok: true }));
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      throw new Error('expected first upload to succeed');
+    }
+    const firstPath = first.wire?.path;
+    const firstUuid = first.submission?.messageUuid;
+    expect(firstPath).toBeDefined();
+    expect(firstUuid).toBeDefined();
+
+    // A successful send rotates both refs: the next message must presign and
+    // submit under fresh UUIDs instead of reusing the previous message's.
+    await act(async () => {
+      hookApi().commitSent();
+      await settle();
+    });
+
+    const second = await uploadPendingResult();
+    expect(second).toEqual(expect.objectContaining({ ok: true }));
+    expect(second.ok).toBe(true);
+    if (!second.ok) {
+      throw new Error('expected second upload to succeed');
+    }
+    expect(second.wire?.path).toBeDefined();
+    expect(second.wire?.path).not.toBe(firstPath);
+    expect(second.submission?.messageUuid).not.toBe(firstUuid);
+    renderer.unmount();
+  });
+});
+
+describe('restoreFileParts — cancel/restore re-send admission', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
+    hoisted.announceForA11y.mockReset();
+    hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+  });
+
+  it('re-admits a restored file chip on the next send with its remote key', async () => {
+    const renderer = await mountHook();
+    const remoteName = '8f14e45f-ceea-4b2a-8c6d-1a2b3c4d5e6f.pdf';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: remoteName,
+          mime: 'application/pdf',
+          url: `file:///tmp/attachments/session-1/user-1/msg-uuid-1/${remoteName}`,
+        },
+      ]);
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('uploaded');
+    expect(chip?.remoteKey).toBe(`user-1/cloud-agent/msg-uuid-1/${remoteName}`);
+    expect(chip?.remoteFilename).toBe(remoteName);
+
+    const result = await uploadPendingResult();
+
+    // The restored chip must appear in the wire and submission, not be
+    // silently dropped as a "ready" chip that sends nothing.
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('expected restored-chip upload to succeed');
+    }
+    expect(result.wire?.files).toEqual([remoteName]);
+    // The restored chip's objects live under the canceled message's UUID, so
+    // the wire path must be that UUID, not the rotated current path.
+    expect(result.wire?.path).toBe('msg-uuid-1');
+    expect(result.submission?.files.map(file => file.remoteName)).toEqual([remoteName]);
+    renderer.unmount();
+  });
+
+  it('re-admits an optimistic cloud-agent file part on the next send', async () => {
+    const renderer = await mountHook();
+    const remoteName = '87654321-4321-4321-8321-cba987654321.md';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: remoteName,
+          mime: '',
+          url: `cloud-agent://12345678-1234-4234-9234-123456789abc/${remoteName}`,
+        },
+      ]);
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('uploaded');
+    expect(chip?.remoteFilename).toBe(remoteName);
+
+    const result = await uploadPendingResult();
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('expected restored-chip upload to succeed');
+    }
+    expect(result.wire?.files).toEqual([remoteName]);
+    // The wire path is the original upload messageUuid the optimistic part encoded.
+    expect(result.wire?.path).toBe('12345678-1234-4234-9234-123456789abc');
+    expect(result.submission?.files.map(file => file.remoteName)).toEqual([remoteName]);
+    renderer.unmount();
+  });
+
+  it('recovers messageUuid and remoteKey from a presigned https URL', async () => {
+    const renderer = await mountHook();
+    const remoteName = '87654321-4321-4321-8321-cba987654321.md';
+    const messageUuid = '12345678-1234-4234-9234-123456789abc';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: 'notes.md',
+          mime: 'text/markdown',
+          url: `https://r2.example.com/attachments/user-1/cloud-agent/${messageUuid}/${remoteName}?X-Amz-Expires=3600&X-Amz-Signature=deadbeef`,
+        },
+      ]);
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('uploaded');
+    // The remote filename comes from the key path, not the picker filename.
+    expect(chip?.remoteFilename).toBe(remoteName);
+    // The admission marker is the credential-free key, not the signed URL.
+    expect(chip?.remoteKey).toBe(`cloud-agent/${messageUuid}/${remoteName}`);
+
+    const result = await uploadPendingResult();
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('expected restored-chip upload to succeed');
+    }
+    expect(result.wire?.files).toEqual([remoteName]);
+    // The re-send must reuse the canceled message's path, not the rotated one.
+    expect(result.wire?.path).toBe(messageUuid);
+    expect(result.submission?.files.map(file => file.remoteName)).toEqual([remoteName]);
+    renderer.unmount();
+  });
+
+  it('skips a part with no URL (not recoverable)', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      hookApi().restoreFileParts([{ filename: 'ghost.pdf', mime: 'application/pdf', url: '' }]);
+      await settle();
+    });
+    expect(hookApi().attachments).toHaveLength(0);
     renderer.unmount();
   });
 });

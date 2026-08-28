@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Əvvəlki tapşırıq hələ də tamamlanır. Bir an gözləyin.",
       "serviceUnavailable": "Xidmət hazırda əlçatan deyil. Yenidən cəhd edin.",
       "connectionTrouble": "Əlaqə problemi. Bir dəqiqə sonra yenidən cəhd edin.",
-      "modelUnavailable": "Bu model Cloud Agent üçün mövcud deyil. Başqa bir model seçin və yenidən cəhd edin."
+      "modelUnavailable": "Bu model Cloud Agent üçün mövcud deyil. Başqa bir model seçin və yenidən cəhd edin.",
+      "cancelQueuedFailed": "Mesaj ləğv edilə bilmədi.",
+      "cancelQueuedRestoreAvailable": "Mesaj ləğv edildi. Onu kompozitora qaytarmaq üçün «Bərpa edin» düyməsinə toxunun.",
+      "cancelQueuedRestored": "Mesaj ləğv edildi. İstək kompozitora qaytarıldı.",
+      "cancelQueuedUpgradeRequired": "Növbəyə alınmış mesajları ləğv etmək üçün daha yeni Kilo CLI tələb olunur. Kilo CLI-ni yeniləyin və yenidən qoşulun."
     },
     "remoteSession": {
       "failedToCreate": "Uzaq sessiya yaradıla bilmədi",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Mesaj növbəyə alınıb",
       "userMessage": "İstifadəçi mesajı",
       "assistantMessage": "Köməkçi mesajı",
-      "longPressHint": "Mesaj detalları üçün uzun basın"
+      "longPressHint": "Mesaj detalları üçün uzun basın",
+      "cancelQueued": "Mesajı ləğv edin",
+      "cancelQueuedAccessibility": "Növbəyə alınmış mesajı ləğv edin",
+      "restoreQueued": "Bərpa edin",
+      "restoreQueuedAccessibility": "Ləğv edilmiş mesajı kompozitora bərpa edin"
     },
     "olderMessages": {
       "arrived": "Əvvəlki mesajlar yükləndi",

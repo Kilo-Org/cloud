@@ -1720,7 +1720,11 @@
       "previousTaskFinishing": "لا تزال المهمة السابقة قيد الإنجاز. يرجى الانتظار لحظة.",
       "serviceUnavailable": "الخدمة غير متاحة الآن. يرجى المحاولة مرة أخرى.",
       "connectionTrouble": "مشكلة في الاتصال. يرجى إعادة المحاولة بعد لحظة.",
-      "modelUnavailable": "هذا النموذج غير متاح لـ Cloud Agent. اختر نموذجًا آخر وحاول مرة أخرى."
+      "modelUnavailable": "هذا النموذج غير متاح لـ Cloud Agent. اختر نموذجًا آخر وحاول مرة أخرى.",
+      "cancelQueuedFailed": "تعذّر إلغاء الرسالة.",
+      "cancelQueuedRestoreAvailable": "تم إلغاء الرسالة. اضغط على «استعادة» لإعادتها إلى حقل إدخال الرسالة.",
+      "cancelQueuedRestored": "تم إلغاء الرسالة. عادت المطالبة إلى حقل إدخال الرسالة.",
+      "cancelQueuedUpgradeRequired": "يتطلب إلغاء الرسائل في قائمة الانتظار إصدارًا أحدث من Kilo CLI. حدّث Kilo CLI وأعد الاتصال."
     },
     "remoteSession": {
       "failedToCreate": "تعذّر إنشاء الجلسة البعيدة",
@@ -2045,7 +2049,11 @@
       "queuedAccessibility": "الرسالة في قائمة الانتظار",
       "userMessage": "رسالة المستخدم",
       "assistantMessage": "رسالة المساعد",
-      "longPressHint": "اضغط مطولًا لعرض تفاصيل الرسالة"
+      "longPressHint": "اضغط مطولًا لعرض تفاصيل الرسالة",
+      "cancelQueued": "إلغاء الرسالة",
+      "cancelQueuedAccessibility": "إلغاء الرسالة في قائمة الانتظار",
+      "restoreQueued": "استعادة",
+      "restoreQueuedAccessibility": "استعادة الرسالة الملغاة إلى حقل إدخال الرسالة"
     },
     "olderMessages": {
       "arrived": "تم تحميل الرسائل السابقة",

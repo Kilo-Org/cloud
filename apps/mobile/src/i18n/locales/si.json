@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "පෙර කාර්යය තවමත් අවසන් වෙමින් පවතී. කරුණාකර මොහොතක් රැඳී සිටින්න.",
       "serviceUnavailable": "සේවාව දැනට ලබා ගත නොහැක. කරුණාකර නැවත උත්සාහ කරන්න.",
       "connectionTrouble": "සම්බන්ධතා ගැටලුවකි. කරුණාකර මොහොතකට පසු නැවත උත්සාහ කරන්න.",
-      "modelUnavailable": "මෙම මාදිලිය Cloud Agent සඳහා ලබා ගත නොහැක. වෙනත් මාදිලියක් තෝරා නැවත උත්සාහ කරන්න."
+      "modelUnavailable": "මෙම මාදිලිය Cloud Agent සඳහා ලබා ගත නොහැක. වෙනත් මාදිලියක් තෝරා නැවත උත්සාහ කරන්න.",
+      "cancelQueuedFailed": "පණිවිඩය අවලංගු කළ නොහැකි විය.",
+      "cancelQueuedRestoreAvailable": "පණිවිඩය අවලංගු විය. එය පණිවිඩ ආදාන කොටුවට ආපසු ගෙන ඒමට ප්‍රතිස්ථාපනය කරන්න තට්ටු කරන්න.",
+      "cancelQueuedRestored": "පණිවිඩය අවලංගු විය. ඉල්ලීම නැවත පණිවිඩ ආදාන කොටුවේ ඇත.",
+      "cancelQueuedUpgradeRequired": "පෝලිමේ ඇති පණිවිඩ අවලංගු කිරීමට වඩා නව Kilo CLI අනුවාදයක් අවශ්‍ය වේ. Kilo CLI යාවත්කාලීන කර නැවත සම්බන්ධ කරන්න."
     },
     "remoteSession": {
       "failedToCreate": "දුරස්ථ සැසියක් සෑදීමට අසාර්ථක විය",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "පණිවිඩය පෝලිමේ ඇත",
       "userMessage": "පරිශීලක පණිවිඩය",
       "assistantMessage": "සහායක පණිවිඩය",
-      "longPressHint": "පණිවිඩ විස්තර සඳහා දිගු ඔබන්න"
+      "longPressHint": "පණිවිඩ විස්තර සඳහා දිගු ඔබන්න",
+      "cancelQueued": "පණිවිඩය අවලංගු කරන්න",
+      "cancelQueuedAccessibility": "පෝලිමේ ඇති පණිවිඩය අවලංගු කරන්න",
+      "restoreQueued": "ප්‍රතිස්ථාපනය කරන්න",
+      "restoreQueuedAccessibility": "අවලංගු කළ පණිවිඩය පණිවිඩ ආදාන කොටුවට ප්‍රතිස්ථාපනය කරන්න"
     },
     "olderMessages": {
       "arrived": "පෙර පණිවිඩ පූරණය විය",

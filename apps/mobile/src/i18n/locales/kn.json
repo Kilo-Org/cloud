@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "ಹಿಂದಿನ ಕಾರ್ಯ ಇನ್ನೂ ಮುಗಿಯುತ್ತಿದೆ. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಕಾಯಿರಿ.",
       "serviceUnavailable": "ಸೇವೆ ಈಗ ಲಭ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "connectionTrouble": "ಸಂಪರ್ಕ ಸಮಸ್ಯೆ. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "modelUnavailable": "ಈ ಮಾದರಿ Cloud Agent ಗೆ ಲಭ್ಯವಿಲ್ಲ. ಬೇರೆ ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "modelUnavailable": "ಈ ಮಾದರಿ Cloud Agent ಗೆ ಲಭ್ಯವಿಲ್ಲ. ಬೇರೆ ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "cancelQueuedFailed": "ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "cancelQueuedRestoreAvailable": "ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಲಾಗಿದೆ. ಅದನ್ನು ಸಂಯೋಜಕಕ್ಕೆ ಹಿಂತಿರುಗಿಸಲು ಮರುಸ್ಥಾಪಿಸಿ ಟ್ಯಾಪ್ ಮಾಡಿ.",
+      "cancelQueuedRestored": "ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಲಾಗಿದೆ. ಪ್ರಾಂಪ್ಟ್ ಮತ್ತೆ ಸಂಯೋಜಕದಲ್ಲಿದೆ.",
+      "cancelQueuedUpgradeRequired": "ಸರದಿಯಲ್ಲಿರುವ ಸಂದೇಶಗಳನ್ನು ರದ್ದುಮಾಡಲು ಹೊಸ ಆವೃತ್ತಿಯ Kilo CLI ಅಗತ್ಯವಿದೆ. Kilo CLI ಅನ್ನು ನವೀಕರಿಸಿ ಮತ್ತು ಮತ್ತೆ ಸಂಪರ್ಕಿಸಿ."
     },
     "remoteSession": {
       "failedToCreate": "ರಿಮೋಟ್ ಸೆಶನ್ ರಚಿಸಲು ವಿಫಲವಾಗಿದೆ",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "ಸಂದೇಶ ಕ್ಯೂ ಮಾಡಲಾಗಿದೆ",
       "userMessage": "ಬಳಕೆದಾರ ಸಂದೇಶ",
       "assistantMessage": "ಸಹಾಯಕ ಸಂದೇಶ",
-      "longPressHint": "ಸಂದೇಶ ವಿವರಗಳಿಗಾಗಿ ದೀರ್ಘ ಒತ್ತಿ"
+      "longPressHint": "ಸಂದೇಶ ವಿವರಗಳಿಗಾಗಿ ದೀರ್ಘ ಒತ್ತಿ",
+      "cancelQueued": "ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಿ",
+      "cancelQueuedAccessibility": "ಸರದಿಯಲ್ಲಿರುವ ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಿ",
+      "restoreQueued": "ಮರುಸ್ಥಾಪಿಸಿ",
+      "restoreQueuedAccessibility": "ರದ್ದುಮಾಡಿದ ಸಂದೇಶವನ್ನು ಸಂಯೋಜಕಕ್ಕೆ ಮರುಸ್ಥಾಪಿಸಿ"
     },
     "olderMessages": {
       "arrived": "ಹಿಂದಿನ ಸಂದೇಶಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",

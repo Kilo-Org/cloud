@@ -1688,7 +1688,11 @@
       "previousTaskFinishing": "पिछला कार्य अभी भी पूरा हो रहा है. कृपया थोड़ा इंतज़ार करें.",
       "serviceUnavailable": "सेवा अभी उपलब्ध नहीं है. कृपया फिर से प्रयास करें.",
       "connectionTrouble": "कनेक्शन समस्या. कृपया थोड़ी देर में फिर से प्रयास करें.",
-      "modelUnavailable": "यह मॉडल Cloud Agent के लिए उपलब्ध नहीं है. दूसरा मॉडल चुनें और फिर से प्रयास करें."
+      "modelUnavailable": "यह मॉडल Cloud Agent के लिए उपलब्ध नहीं है. दूसरा मॉडल चुनें और फिर से प्रयास करें.",
+      "cancelQueuedFailed": "संदेश रद्द नहीं किया जा सका।",
+      "cancelQueuedRestoreAvailable": "संदेश रद्द कर दिया गया। इसे संदेश इनपुट में वापस लाने के लिए पुनर्स्थापित करें पर टैप करें।",
+      "cancelQueuedRestored": "संदेश रद्द कर दिया गया। प्रॉम्प्ट संदेश इनपुट में वापस आ गया है।",
+      "cancelQueuedUpgradeRequired": "कतार में लगे संदेशों को रद्द करने के लिए Kilo CLI का नया संस्करण आवश्यक है। Kilo CLI अपडेट करें और फिर से कनेक्ट करें।"
     },
     "sessionConnection": {
       "connecting": "कनेक्ट हो रहा है…",
@@ -1982,7 +1986,11 @@
       "queuedAccessibility": "संदेश कतार में",
       "userMessage": "उपयोगकर्ता संदेश",
       "assistantMessage": "सहायक संदेश",
-      "longPressHint": "संदेश विवरण के लिए देर तक दबाएँ"
+      "longPressHint": "संदेश विवरण के लिए देर तक दबाएँ",
+      "cancelQueued": "संदेश रद्द करें",
+      "cancelQueuedAccessibility": "कतार में लगा संदेश रद्द करें",
+      "restoreQueued": "पुनर्स्थापित करें",
+      "restoreQueuedAccessibility": "रद्द किए गए संदेश को संदेश इनपुट में पुनर्स्थापित करें"
     },
     "olderMessages": {
       "arrived": "पहले के संदेश लोड हो गए",

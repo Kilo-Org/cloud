@@ -23,10 +23,12 @@ import type {
   CloudAgentSessionDismissSuggestionInput,
 } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
+import { createChatProcessor } from './chat-processor';
 import type { AssistantMessage, UserMessage, TextPart } from '@kilocode/app-shared/opencode';
 import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
 import type {
   CloudStatus,
+  FilePart,
   MessageDeliveryState,
   ResolvedSession,
   SessionActivity,
@@ -1670,7 +1672,7 @@ describe('createSessionManager', () => {
       });
     });
 
-    it('does not write to storage before cloud.message.queued arrives', async () => {
+    it('inserts one optimistic row before cloud.message.queued arrives', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
@@ -1681,7 +1683,7 @@ describe('createSessionManager', () => {
         payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
       });
 
-      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(1);
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
         payload: {
@@ -1692,6 +1694,61 @@ describe('createSessionManager', () => {
         },
         images: undefined,
       });
+    });
+
+    it('queued event does not duplicate or overwrite the optimistic row', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      const [messageId] = storage!.getMessageIds();
+      expect(messageId).toBeDefined();
+
+      // The server's cloud.message.queued synthesizer must see the optimistic
+      // row already present and no-op: the prompt text must stay the optimistic
+      // one, not the server echo.
+      createChatProcessor(storage!).synthesizeQueuedUserMessage({
+        messageId: messageId!,
+        sessionId: kiloId('ses-1'),
+        content: 'server echo',
+      });
+
+      expect(storage!.getMessageIds()).toHaveLength(1);
+      expect((storage!.getParts(messageId!)[0] as TextPart).text).toBe('Hello');
+    });
+
+    it('deletes the optimistic row on transport failure', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      let rejectSend: (error: Error) => void;
+      mockSession.send.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectSend = reject;
+          })
+      );
+      const sendPromise = mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
+
+      // The optimistic row is present while the send is in flight…
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(1);
+
+      // …and is deleted once the transport rejects.
+      rejectSend!(new Error('ECONNREFUSED'));
+      await sendPromise;
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
     });
 
     it('uses cloud-agent model override on send and clears it on switchSession', async () => {
@@ -1795,7 +1852,7 @@ describe('createSessionManager', () => {
       });
     });
 
-    it('does not persist any optimistic message for remote sessions', async () => {
+    it('persists one optimistic row for remote sessions', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
@@ -1812,7 +1869,130 @@ describe('createSessionManager', () => {
         payload: { type: 'prompt', prompt: 'Hello', mode: 'code' },
         images: undefined,
       });
-      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(1);
+    });
+
+    it('remote retarget keeps one row when the CLI assigns its own id', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      // The retarget runs in the live phase, after the snapshot replay ends.
+      mockSessionCallbacks.onReplayComplete?.();
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({ payload: { type: 'prompt', prompt: 'Hello', mode: 'code' } });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      expect(storage!.getMessageIds()).toHaveLength(1);
+      const [optimisticId] = storage!.getMessageIds();
+
+      // Old CLI: it ignores our messageId and materializes the user message
+      // under its own id. The manager retargets the optimistic row.
+      const authoritative = stubUserMessage({
+        id: 'cli-assigned-id',
+        sessionID: kiloId('ses-1'),
+        time: { created: 2 },
+        agent: 'test-agent',
+        model: { providerID: 'test-provider', modelID: 'test-model' },
+      });
+      storage!.upsertMessage(authoritative);
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: authoritative,
+      } as NormalizedEvent);
+
+      const ids = storage!.getMessageIds();
+      expect(ids).toHaveLength(1);
+      expect(ids[0]).toBe('cli-assigned-id');
+      expect(ids).not.toContain(optimisticId);
+    });
+
+    it('keeps the optimistic row when a queue snapshot omits the in-flight id', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({ payload: { type: 'prompt', prompt: 'Hello', mode: 'code' } });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      expect(storage!.getMessageIds()).toHaveLength(1);
+      const [optimisticId] = storage!.getMessageIds();
+
+      // A root FIFO snapshot omits the in-flight send and the just-started
+      // message. It must not delete the optimistic row; only the authoritative
+      // `message.updated` retarget reconciles it.
+      mockSessionCallbacks.onEvent?.({
+        type: 'queue.changed',
+        sessionId: kiloId('ses-1'),
+        queued: [],
+      } as NormalizedEvent);
+
+      expect(storage!.getMessageIds()).toContain(optimisticId);
+    });
+
+    it('keeps the optimistic row when a child-session queue snapshot arrives', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({ payload: { type: 'prompt', prompt: 'Hello', mode: 'code' } });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      expect(storage!.getMessageIds()).toHaveLength(1);
+      const [optimisticId] = storage!.getMessageIds();
+
+      // A child/subagent snapshot must not delete the root session's row.
+      mockSessionCallbacks.onEvent?.({
+        type: 'queue.changed',
+        sessionId: kiloId('child-ses-1'),
+        queued: [],
+      } as NormalizedEvent);
+
+      expect(storage!.getMessageIds()).toContain(optimisticId);
+    });
+
+    it('keeps the optimistic row when a historical message.updated arrives during replay', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({ payload: { type: 'prompt', prompt: 'Hello', mode: 'code' } });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      expect(storage!.getMessageIds()).toHaveLength(1);
+      const [optimisticId] = storage!.getMessageIds();
+
+      // The manager is still replaying (`remoteHistoryReplaying` stays true
+      // until onReplayComplete), so a historical user message must not
+      // retarget-delete the in-flight optimistic row.
+      const historical = stubUserMessage({
+        id: 'historical-id',
+        sessionID: kiloId('ses-1'),
+        time: { created: 1 },
+        agent: 'test-agent',
+        model: { providerID: 'test-provider', modelID: 'test-model' },
+      });
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: historical,
+      } as NormalizedEvent);
+
+      expect(storage!.getMessageIds()).toContain(optimisticId);
     });
 
     it('leaves storage empty and sets error indicator + failedPrompt on failure', async () => {
@@ -2168,6 +2348,33 @@ describe('createSessionManager', () => {
         attachments,
         images: undefined,
       });
+    });
+
+    it('records the cloud-agent upload path in the optimistic file part url for cancel-restore', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const attachments = {
+        path: '12345678-1234-4234-9234-123456789abc',
+        files: ['87654321-4321-4321-8321-cba987654321.md'],
+      };
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachments,
+      });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      const [messageId] = storage!.getMessageIds();
+      expect(messageId).toBeDefined();
+      const filePart = storage!.getParts(messageId!).find(part => part.type === 'file') as
+        | FilePart
+        | undefined;
+      expect(filePart?.url).toBe(`cloud-agent://${attachments.path}/${attachments.files[0]}`);
+      expect(filePart?.filename).toBe(attachments.files[0]);
     });
 
     it('rejects canonical attachments for resolved remote sessions before transport send', async () => {
@@ -4583,15 +4790,24 @@ describe('createSessionManager', () => {
   });
 
   describe('cancelQueuedMessage', () => {
-    it('delegates to the active session without interrupting', async () => {
+    it('delegates to the active session without interrupting and returns its { dropped } result', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
       await mgr.switchSession(kiloId('ses-1'));
-      await mgr.cancelQueuedMessage('msg-queued-1');
+      mockSession.cancelQueuedMessage.mockResolvedValue({ dropped: true });
+      await expect(mgr.cancelQueuedMessage('msg-queued-1')).resolves.toEqual({ dropped: true });
 
       expect(mockSession.cancelQueuedMessage).toHaveBeenCalledWith('msg-queued-1');
       expect(mockSession.interrupt).not.toHaveBeenCalled();
+    });
+
+    it('returns { dropped: false } when no active session exists', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await expect(mgr.cancelQueuedMessage('msg-queued-1')).resolves.toEqual({ dropped: false });
+      expect(mockSession.cancelQueuedMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -5049,9 +5265,14 @@ describe('createSessionManager', () => {
       latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_post_clear', sessionID: 'ses-1' }));
       mockSessionCallbacks.onReplayComplete?.();
 
-      expect(
-        atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
-      ).toEqual(['msg_post_clear', 'msg_pre_clear']);
+      // The successful send left its optimistic row (a `msg_<hex>…` id sorts
+      // before any `msg_p…`), plus the replayed pre- and post-clear history.
+      const ids = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(
+        m => m.info.id
+      );
+      expect(ids).toHaveLength(3);
+      expect(ids[0]).toMatch(/^msg_[0-9a-f]{12}/);
+      expect(ids.slice(1)).toEqual(['msg_post_clear', 'msg_pre_clear']);
     });
 
     it('re-sets marker on a second /clear after send so reconnect purges again', async () => {

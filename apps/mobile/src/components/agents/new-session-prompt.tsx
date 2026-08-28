@@ -1,21 +1,19 @@
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   type LayoutChangeEvent,
   Platform,
-  Pressable,
   TextInput as RNTextInput,
   type TextInput,
   type TextInputSelectionChangeEvent,
   type TextStyle,
   View,
 } from 'react-native';
-import { Paperclip } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
-import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import {
   type ComposerSelection,
   pasteTextIntoComposer,
@@ -24,14 +22,17 @@ import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
+import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
 import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { cn } from '@/lib/utils';
-import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
+import {
+  applyVoiceDraftAtSelection,
+  type VoiceInputSelection,
+} from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
-import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { AGENT_ATTACHMENT_MAX_BYTES } from '@/lib/agent-attachments/constants';
 import {
@@ -105,6 +106,18 @@ export function NewSessionPrompt({
   // Last caret the input reported. Paste inserts here so the button behaves
   // like the platform paste.
   const promptSelectionRef = useRef<ComposerSelection | null>(null);
+  // Selection-aware dictation state: the caret captured at session start, the
+  // draft the last speech result produced, and the abort trigger. A user edit
+  // (including an IME edit, which fires onChangeText) diverges the live draft
+  // from the expected draft, so the next speech result aborts instead of
+  // inserting into the edit.
+  const voiceBaseDraftRef = useRef('');
+  const voiceBaseSelectionRef = useRef<VoiceInputSelection | null>(null);
+  const voiceExpectedDraftRef = useRef('');
+  // RN 0.86 exposes no IME composition event, so this stays false; the draft
+  // divergence above is what aborts dictation when an IME session edits text.
+  const isComposingRef = useRef(false);
+  const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptMeasure = useTextHeight({
     minHeight: PROMPT_INPUT_MIN_HEIGHT,
@@ -139,16 +152,38 @@ export function NewSessionPrompt({
 
   const voiceInput = useVoiceInput({
     disabled: isCloneEntry || isCreating,
-    getDraft: () => promptRef.current,
+    getDraft: () => {
+      // The controller calls getDraft exactly once, at session start, to
+      // snapshot the base draft. Capture the caret at the same instant so the
+      // selection-aware insert path knows where to splice the transcript.
+      voiceBaseDraftRef.current = promptRef.current;
+      voiceBaseSelectionRef.current = promptSelectionRef.current;
+      voiceExpectedDraftRef.current = promptRef.current;
+      return promptRef.current;
+    },
     onDraftChange: draft => {
-      applyVoiceDraftToInput({
+      const result = applyVoiceDraftAtSelection({
+        baseDraft: voiceBaseDraftRef.current,
+        baseSelection: voiceBaseSelectionRef.current,
+        currentDraft: promptRef.current,
+        expectedDraft: voiceExpectedDraftRef.current,
+        mergedDraft: draft,
+        isComposing: isComposingRef.current,
         input: promptInputRef.current,
-        draft,
         maxLength: PROMPT_INPUT_MAX_CHARS,
         onChangeText: handlePromptChange,
       });
+      if (result.kind === 'aborted') {
+        // The user edited the live speech range or an IME session is composing:
+        // keep their text, stop recognition, and announce the stop once.
+        AccessibilityInfo.announceForAccessibility(t('voiceInput.listeningStopped'));
+        void abortVoiceInputRef.current?.();
+        return;
+      }
+      voiceExpectedDraftRef.current = result.draft;
     },
   });
+  abortVoiceInputRef.current = voiceInput.abort;
 
   useEffect(() => {
     voiceInputSettlerRef.current = voiceInput.settleBeforeSubmit;
@@ -164,8 +199,6 @@ export function NewSessionPrompt({
     rawPrompt: promptRef.current,
     voiceInputActive: voiceInput.isActive,
   });
-
-  const paperclipDisabled = control.paperclipDisabled;
 
   const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
@@ -202,14 +235,6 @@ export function NewSessionPrompt({
 
   function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
     promptSelectionRef.current = event.nativeEvent.selection;
-  }
-
-  function handlePaperclipPress() {
-    onAddAttachment();
-  }
-
-  function handleVoiceToggle() {
-    void voiceInput.toggle();
   }
 
   // Clone entry has no composer: render the models error or the toolbar as a
@@ -274,40 +299,12 @@ export function NewSessionPrompt({
           // arrival hides the attachment strip and the Start button.
           autoFocus={shareId === undefined || shareId === ''}
         />
-        <View className="flex-row items-center justify-between pb-2">
-          <View className="flex-row items-center gap-1">
-            <Pressable
-              onPress={handlePaperclipPress}
-              disabled={paperclipDisabled}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              className={cn(
-                'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
-                paperclipDisabled && 'opacity-50'
-              )}
-              accessibilityRole="button"
-              accessibilityLabel={t('agentChat.newSession.addAttachment')}
-              accessibilityState={{ disabled: paperclipDisabled }}
-            >
-              <Paperclip size={18} color={colors.mutedForeground} />
-            </Pressable>
-            {/* Follows the input, not the paperclip: a full attachment list
-                still allows a text paste. */}
-            <ComposerPasteButton onPress={pasteClipboard} disabled={!control.inputEditable} />
-          </View>
-          {voiceInput.available ? (
-            <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
-              <VoiceInputStatus status={voiceInput.status} />
-            </View>
-          ) : null}
-          {voiceInput.available ? (
-            <VoiceInputButton
-              disabled={control.voiceDisabled}
-              size="md"
-              status={voiceInput.status}
-              onPress={handleVoiceToggle}
-            />
-          ) : null}
-        </View>
+        <NewSessionPromptControls
+          control={control}
+          voiceInput={voiceInput}
+          onAddAttachment={onAddAttachment}
+          pasteClipboard={pasteClipboard}
+        />
       </View>
       {isModelsError && modelOptions.length === 0 ? (
         <QueryError

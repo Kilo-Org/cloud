@@ -2825,7 +2825,8 @@
     "busy": "Balss ievade ir aizņemta. Mēģiniet vēlreiz.",
     "stopped": "Balss ievade tika apturēta. Pieskarieties mikrofonam, lai mēģinātu vēlreiz.",
     "unavailableDevice": "Balss ievade šajā ierīcē nav pieejama.",
-    "unavailableLanguage": "Balss ievade nav pieejama šai ierīces valodai."
+    "unavailableLanguage": "Balss ievade nav pieejama šai ierīces valodai.",
+    "listeningStopped": "Klausīšanās apturēta."
   },
   "share": {
     "title": "Kopīgot Kilo",

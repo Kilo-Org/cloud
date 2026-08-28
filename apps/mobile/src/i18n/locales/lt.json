@@ -2845,7 +2845,8 @@
     "busy": "Balso įvestis užimta. Bandykite dar kartą.",
     "stopped": "Balso įvestis sustabdyta. Bakstelėkite mikrofoną, kad bandytumėte dar kartą.",
     "unavailableDevice": "Balso įvestis šiame įrenginyje nepasiekiama.",
-    "unavailableLanguage": "Balso įvestis nepasiekiama šios įrenginio kalbos."
+    "unavailableLanguage": "Balso įvestis nepasiekiama šios įrenginio kalbos.",
+    "listeningStopped": "Klausymasis sustabdytas."
   },
   "share": {
     "title": "Dalintis į Kilo",

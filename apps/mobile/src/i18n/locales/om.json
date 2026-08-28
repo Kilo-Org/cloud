@@ -2805,7 +2805,8 @@
     "busy": "Galchuun sagalee qabanaa jira. Irra deebi'ii yaali.",
     "stopped": "Galchuun sagalee dhaabbateera. Irra deebi'uuf maayikirofoonii tuqi.",
     "unavailableDevice": "Galchuun sagalee meeshaa kana irratti hin jiru.",
-    "unavailableLanguage": "Galchuun sagalee afaan meeshaa kanaaf hin jiru."
+    "unavailableLanguage": "Galchuun sagalee afaan meeshaa kanaaf hin jiru.",
+    "listeningStopped": "Dhaggeeffachuun dhaabbateera."
   },
   "share": {
     "title": "Kilo wajjin qoodi",

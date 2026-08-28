@@ -2805,7 +2805,8 @@
     "busy": "Saika miasa ny fidirana amin'ny feo. Andramana indray.",
     "stopped": "Nijanona ny fidirana amin'ny feo. Tsindrio ny mikrô mba andramana indray.",
     "unavailableDevice": "Tsy misy ny fidirana amin'ny feo amin'ity fitaovana ity.",
-    "unavailableLanguage": "Tsy misy ny fidirana amin'ny feo ho an'ny fitenin'ity fitaovana ity."
+    "unavailableLanguage": "Tsy misy ny fidirana amin'ny feo ho an'ny fitenin'ity fitaovana ity.",
+    "listeningStopped": "Nijanona ny fihainoana."
   },
   "share": {
     "title": "Zarao amin'ny Kilo",

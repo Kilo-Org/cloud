@@ -2351,7 +2351,8 @@
     "busy": "Spraakinvoer is bezet. Probeer het opnieuw.",
     "stopped": "Spraakinvoer gestopt. Tik op de microfoon om opnieuw te proberen.",
     "unavailableDevice": "Spraakinvoer is niet beschikbaar op dit apparaat.",
-    "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat."
+    "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat.",
+    "listeningStopped": "Luisteren gestopt."
   },
   "share": {
     "title": "Delen naar Kilo",

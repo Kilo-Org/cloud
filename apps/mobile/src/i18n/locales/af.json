@@ -2805,7 +2805,8 @@
     "busy": "Steminvoer is besig. Probeer weer.",
     "stopped": "Steminvoer het gestop. Tik die mikrofoon om weer te probeer.",
     "unavailableDevice": "Steminvoer is nie op hierdie toestel beskikbaar nie.",
-    "unavailableLanguage": "Steminvoer is nie vir hierdie toesteltaal beskikbaar nie."
+    "unavailableLanguage": "Steminvoer is nie vir hierdie toesteltaal beskikbaar nie.",
+    "listeningStopped": "Luister het gestop."
   },
   "share": {
     "title": "Deel na Kilo",

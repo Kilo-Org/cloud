@@ -2805,7 +2805,8 @@
     "busy": "Ukufaka ngezwi kumatasatasa. Zama futhi.",
     "stopped": "Ukufaka ngezwi kumisiwe. Thepha imakrofoni ukuze uzame futhi.",
     "unavailableDevice": "Ukufaka ngezwi akutholakali kule divayisi.",
-    "unavailableLanguage": "Ukufaka ngezwi akutholakali kulolu limi lwedivayisi."
+    "unavailableLanguage": "Ukufaka ngezwi akutholakali kulolu limi lwedivayisi.",
+    "listeningStopped": "Ukulalela kumisiwe."
   },
   "share": {
     "title": "Yabelana nge-Kilo",

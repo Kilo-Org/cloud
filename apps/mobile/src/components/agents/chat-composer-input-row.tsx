@@ -1,6 +1,7 @@
 import { ArrowUp, Paperclip, Square } from '@/components/ui/icons';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type RefObject } from 'react';
+import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -87,6 +88,7 @@ export function ChatComposerInputRow({
 }: Readonly<ChatComposerInputRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const reducedMotion = useReducedMotion();
   const inputScrollable = shouldEnableComposerInputScroll(measureHeight, maxInputHeight);
 
   return (
@@ -138,11 +140,11 @@ export function ChatComposerInputRow({
         />
       </View>
 
-      {!isStreaming && voiceInputAvailable ? (
+      {voiceInputAvailable ? (
         <View className="ml-1">
           <VoiceInputButton
             disabled={voiceDisabled}
-            size="sm"
+            size="lg"
             status={voiceInputStatus}
             onPress={onToggleVoice}
           />
@@ -150,42 +152,54 @@ export function ChatComposerInputRow({
       ) : null}
 
       {isStreaming && !hasSendableContent && !isSending ? (
-        <Pressable
-          onPress={onStop}
-          disabled={disabled}
-          hitSlop={CONTROL_HIT_SLOP}
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.composer.stopGenerating')}
-          accessibilityState={{ disabled }}
-          className={cn(
-            'h-8 w-8 items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500',
-            disabled && 'opacity-50'
-          )}
+        <Animated.View
+          key="stop"
+          entering={reducedMotion ? undefined : FadeIn.duration(150)}
+          exiting={reducedMotion ? undefined : FadeOut.duration(100)}
         >
-          <Square size={14} color="white" fill="white" />
-        </Pressable>
+          <Pressable
+            onPress={onStop}
+            disabled={disabled}
+            hitSlop={CONTROL_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel={t('agentChat.composer.stopGenerating')}
+            accessibilityState={{ disabled }}
+            className={cn(
+              'h-8 w-8 items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500',
+              disabled && 'opacity-50'
+            )}
+          >
+            <Square size={14} color="white" fill="white" />
+          </Pressable>
+        </Animated.View>
       ) : (
-        <Pressable
-          onPress={onSubmit}
-          disabled={!canSend}
-          hitSlop={CONTROL_HIT_SLOP}
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.composer.sendMessage')}
-          accessibilityState={{ disabled: !canSend, busy: isSending }}
-          className={`h-8 w-8 items-center justify-center rounded-full active:opacity-70 ${
-            canSend ? 'bg-accent-soft' : 'bg-muted'
-          }`}
+        <Animated.View
+          key="send"
+          entering={reducedMotion ? undefined : FadeIn.duration(150)}
+          exiting={reducedMotion ? undefined : FadeOut.duration(100)}
         >
-          {isSending ? (
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
-          ) : (
-            <ArrowUp
-              size={18}
-              color={canSend ? colors.accentSoftForeground : colors.mutedForeground}
-              strokeWidth={2.5}
-            />
-          )}
-        </Pressable>
+          <Pressable
+            onPress={onSubmit}
+            disabled={!canSend}
+            hitSlop={CONTROL_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel={t('agentChat.composer.sendMessage')}
+            accessibilityState={{ disabled: !canSend, busy: isSending }}
+            className={`h-8 w-8 items-center justify-center rounded-full active:opacity-70 ${
+              canSend ? 'bg-accent-soft' : 'bg-muted'
+            }`}
+          >
+            {isSending ? (
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+            ) : (
+              <ArrowUp
+                size={18}
+                color={canSend ? colors.accentSoftForeground : colors.mutedForeground}
+                strokeWidth={2.5}
+              />
+            )}
+          </Pressable>
+        </Animated.View>
       )}
     </View>
   );

@@ -2805,7 +2805,8 @@
     "busy": "Ìfẹ̀sí ohùn dí. Gbìyànjú lẹ́ẹ̀kan sí i.",
     "stopped": "Ìfẹ̀sí ohùn dúró. Tẹ míkírọ́fóònù láti gbìyànjú lẹ́ẹ̀kan sí i.",
     "unavailableDevice": "Ìfẹ̀sí ohùn kò sí lórí ẹ̀rọ yìí.",
-    "unavailableLanguage": "Ìfẹ̀sí ohùn kò sí fún èdè ẹ̀rọ yìí."
+    "unavailableLanguage": "Ìfẹ̀sí ohùn kò sí fún èdè ẹ̀rọ yìí.",
+    "listeningStopped": "Gbigbọ ti duro."
   },
   "share": {
     "title": "Pin si Kilo",

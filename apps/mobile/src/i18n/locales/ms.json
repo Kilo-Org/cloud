@@ -2805,7 +2805,8 @@
     "busy": "Input suara sibuk. Cuba lagi.",
     "stopped": "Input suara dihentikan. Ketik mikrofon untuk mencuba lagi.",
     "unavailableDevice": "Input suara tidak tersedia pada peranti ini.",
-    "unavailableLanguage": "Input suara tidak tersedia untuk bahasa peranti ini."
+    "unavailableLanguage": "Input suara tidak tersedia untuk bahasa peranti ini.",
+    "listeningStopped": "Pendengaran dihentikan."
   },
   "share": {
     "title": "Kongsi ke Kilo",

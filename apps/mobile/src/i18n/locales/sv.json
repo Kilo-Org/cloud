@@ -2805,7 +2805,8 @@
     "busy": "Röstinmatningen är upptagen. Försök igen.",
     "stopped": "Röstinmatningen stoppades. Tryck på mikrofonen för att försöka igen.",
     "unavailableDevice": "Röstinmatning är inte tillgänglig på den här enheten.",
-    "unavailableLanguage": "Röstinmatning är inte tillgänglig för den här enhetens språk."
+    "unavailableLanguage": "Röstinmatning är inte tillgänglig för den här enhetens språk.",
+    "listeningStopped": "Lyssningen stoppades."
   },
   "share": {
     "title": "Dela till Kilo",

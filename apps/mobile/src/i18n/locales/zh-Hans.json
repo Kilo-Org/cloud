@@ -2351,7 +2351,8 @@
     "busy": "语音输入正忙。请重试。",
     "stopped": "语音输入已停止。点击麦克风重试。",
     "unavailableDevice": "此设备不支持语音输入。",
-    "unavailableLanguage": "语音输入不支持此设备的语言。"
+    "unavailableLanguage": "语音输入不支持此设备的语言。",
+    "listeningStopped": "已停止聆听。"
   },
   "share": {
     "title": "分享到 Kilo",

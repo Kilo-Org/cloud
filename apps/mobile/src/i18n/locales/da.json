@@ -2805,7 +2805,8 @@
     "busy": "Taleinput er optaget. Prøv igen.",
     "stopped": "Taleinput stoppede. Tryk på mikrofonen for at prøve igen.",
     "unavailableDevice": "Taleinput er ikke tilgængeligt på denne enhed.",
-    "unavailableLanguage": "Taleinput er ikke tilgængeligt for dette enhedssprog."
+    "unavailableLanguage": "Taleinput er ikke tilgængeligt for dette enhedssprog.",
+    "listeningStopped": "Lytning stoppet."
   },
   "share": {
     "title": "Del til Kilo",

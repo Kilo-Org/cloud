@@ -2825,7 +2825,8 @@
     "busy": "L'entrada de veu està ocupada. Torna-ho a provar.",
     "stopped": "L'entrada de veu s'ha aturat. Toca el micròfon per tornar-ho a provar.",
     "unavailableDevice": "L'entrada de veu no està disponible en aquest dispositiu.",
-    "unavailableLanguage": "L'entrada de veu no està disponible per a l'idioma d'aquest dispositiu."
+    "unavailableLanguage": "L'entrada de veu no està disponible per a l'idioma d'aquest dispositiu.",
+    "listeningStopped": "S'ha aturat l'escolta."
   },
   "share": {
     "title": "Comparteix a Kilo",

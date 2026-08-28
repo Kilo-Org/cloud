@@ -2825,7 +2825,8 @@
     "busy": "Introducerea vocală este ocupată. Încearcă din nou.",
     "stopped": "Introducerea vocală s-a oprit. Atinge microfonul pentru a încerca din nou.",
     "unavailableDevice": "Introducerea vocală nu este disponibilă pe acest dispozitiv.",
-    "unavailableLanguage": "Introducerea vocală nu este disponibilă pentru limba acestui dispozitiv."
+    "unavailableLanguage": "Introducerea vocală nu este disponibilă pentru limba acestui dispozitiv.",
+    "listeningStopped": "Ascultarea s-a oprit."
   },
   "share": {
     "title": "Distribuie către Kilo",

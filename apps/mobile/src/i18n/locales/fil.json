@@ -2805,7 +2805,8 @@
     "busy": "Abala ang voice input. Subukan muli.",
     "stopped": "Huminto ang voice input. Tap ang mikropono para subukan muli.",
     "unavailableDevice": "Hindi available ang voice input sa device na ito.",
-    "unavailableLanguage": "Hindi available ang voice input para sa wikang ito ng device."
+    "unavailableLanguage": "Hindi available ang voice input para sa wikang ito ng device.",
+    "listeningStopped": "Huminto ang pakikinig."
   },
   "share": {
     "title": "I-share sa Kilo",

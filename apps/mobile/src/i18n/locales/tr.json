@@ -2351,7 +2351,8 @@
     "busy": "Sesli giriş meşgul. Tekrar deneyin.",
     "stopped": "Sesli giriş durdu. Tekrar denemek için mikrofona dokunun.",
     "unavailableDevice": "Sesli giriş bu cihazda kullanılamıyor.",
-    "unavailableLanguage": "Sesli giriş bu cihaz dili için kullanılamıyor."
+    "unavailableLanguage": "Sesli giriş bu cihaz dili için kullanılamıyor.",
+    "listeningStopped": "Dinleme durdu."
   },
   "share": {
     "title": "Kilo'ya paylaş",

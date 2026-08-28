@@ -2825,7 +2825,8 @@
     "busy": "Glasovni unos je zauzet. Pokušajte ponovo.",
     "stopped": "Glasovni unos je zaustavljen. Dodirnite mikrofon da pokušate ponovo.",
     "unavailableDevice": "Glasovni unos nije dostupan na ovom uređaju.",
-    "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja."
+    "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja.",
+    "listeningStopped": "Slušanje je zaustavljeno."
   },
   "share": {
     "title": "Podeli u Kilo",

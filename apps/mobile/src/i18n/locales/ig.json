@@ -2805,7 +2805,8 @@
     "busy": "Ntinye olu na-arụ ọrụ. Nwaa ọzọ.",
     "stopped": "Ntinye olu kwụsịrị. Pịa igwe okwu ka ị nwaa ọzọ.",
     "unavailableDevice": "Ntinye olu adịghị na ngwaọrụ a.",
-    "unavailableLanguage": "Ntinye olu adịghị maka asụsụ ngwaọrụ a."
+    "unavailableLanguage": "Ntinye olu adịghị maka asụsụ ngwaọrụ a.",
+    "listeningStopped": "Ịge ntị kwụsịrị."
   },
   "share": {
     "title": "Kekọrịta na Kilo",

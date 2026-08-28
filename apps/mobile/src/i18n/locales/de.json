@@ -2351,7 +2351,8 @@
     "busy": "Spracheingabe ist beschäftigt. Versuche es erneut.",
     "stopped": "Die Spracheingabe wurde gestoppt. Tippe auf das Mikrofon, um es erneut zu versuchen.",
     "unavailableDevice": "Spracheingabe ist auf diesem Gerät nicht verfügbar.",
-    "unavailableLanguage": "Spracheingabe ist für diese Gerätesprache nicht verfügbar."
+    "unavailableLanguage": "Spracheingabe ist für diese Gerätesprache nicht verfügbar.",
+    "listeningStopped": "Zuhören beendet."
   },
   "share": {
     "title": "An Kilo teilen",

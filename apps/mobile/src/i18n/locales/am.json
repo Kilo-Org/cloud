@@ -2805,7 +2805,8 @@
     "busy": "የድምፅ ግብዓት ስራ ላይ ነው። እንደገና ይሞክሩ።",
     "stopped": "የድምፅ ግብዓት ቆሟል። እንደገና ለመሞከር ማይክሮፎኑን ይንኩ።",
     "unavailableDevice": "የድምፅ ግብዓት በዚህ መሣሪያ ላይ አይገኝም።",
-    "unavailableLanguage": "የድምፅ ግብዓት ለዚህ የመሣሪያ ቋንቋ አይገኝም።"
+    "unavailableLanguage": "የድምፅ ግብዓት ለዚህ የመሣሪያ ቋንቋ አይገኝም።",
+    "listeningStopped": "ማዳመጥ ቆሟል።"
   },
   "share": {
     "title": "ወደ Kilo ያጋሩ",

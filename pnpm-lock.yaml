@@ -151,6 +151,7 @@ overrides:
 packageExtensionsChecksum: sha256-1pgKZxx87NNMe1poF5N5u5kZB/qlEyILBQPxofM1shE=
 
 patchedDependencies:
+  expo-router@57.0.10: 616f8a79932a3ebc7d31343b53b3fc425a14bfb89bb86cdafa614cefa4e603ed
   expo-server-sdk: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
   react-native-appsflyer@6.18.0: 82df99378c830e774b0f01796d8be595da114d1d13393d85ddd47d565c5c2aab
 
@@ -182,6 +183,9 @@ importers:
       ink:
         specifier: 6.8.0
         version: 6.8.0(@types/react@19.2.14)(bufferutil@4.1.0)(react-devtools-core@6.1.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(react@19.2.6)(utf-8-validate@6.0.6)
+      js-yaml:
+        specifier: 4.3.1
+        version: 4.3.1
       oxfmt:
         specifier: 0.40.0
         version: 0.40.0
@@ -488,7 +492,7 @@ importers:
         version: 57.0.8(expo@57.0.10)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@6.0.3)
       expo-router:
         specifier: ~57.0.10
-        version: 57.0.10(95016413e10ac4b2f99a030c8fabf35b)
+        version: 57.0.10(patch_hash=616f8a79932a3ebc7d31343b53b3fc425a14bfb89bb86cdafa614cefa4e603ed)(95016413e10ac4b2f99a030c8fabf35b)
       expo-screen-capture:
         specifier: 57.0.1
         version: 57.0.1(expo@57.0.10)(react@19.2.3)
@@ -625,6 +629,9 @@ importers:
       knip:
         specifier: 6.29.0
         version: 6.29.0
+      postcss:
+        specifier: '>=8.5.23'
+        version: 8.5.25
       react-test-renderer:
         specifier: ^19.2.7
         version: 19.2.7(react@19.2.3)
@@ -21219,7 +21226,7 @@ snapshots:
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     optionalDependencies:
-      expo-router: 57.0.10(95016413e10ac4b2f99a030c8fabf35b)
+      expo-router: 57.0.10(patch_hash=616f8a79932a3ebc7d31343b53b3fc425a14bfb89bb86cdafa614cefa4e603ed)(95016413e10ac4b2f99a030c8fabf35b)
       react-native: 0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - '@expo/metro-runtime'
@@ -21295,7 +21302,7 @@ snapshots:
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     optionalDependencies:
-      expo-router: 57.0.10(a55ba02c2fb18b26174eabf24192d484)
+      expo-router: 57.0.10(patch_hash=616f8a79932a3ebc7d31343b53b3fc425a14bfb89bb86cdafa614cefa4e603ed)(a55ba02c2fb18b26174eabf24192d484)
       react-native: 0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - '@expo/metro-runtime'
@@ -21773,7 +21780,7 @@ snapshots:
       react: 19.2.3
     optionalDependencies:
       '@expo/metro-runtime': 57.0.8(expo@57.0.10)(react-dom@19.2.6(react@19.2.3))(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
-      expo-router: 57.0.10(95016413e10ac4b2f99a030c8fabf35b)
+      expo-router: 57.0.10(patch_hash=616f8a79932a3ebc7d31343b53b3fc425a14bfb89bb86cdafa614cefa4e603ed)(95016413e10ac4b2f99a030c8fabf35b)
       react-dom: 19.2.6(react@19.2.3)
     transitivePeerDependencies:
       - supports-color
@@ -21788,7 +21795,7 @@ snapshots:
       react: 19.2.6
     optionalDependencies:
       '@expo/metro-runtime': 57.0.8(expo@57.0.10)(react-dom@19.2.6(react@19.2.6))(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
-      expo-router: 57.0.10(a55ba02c2fb18b26174eabf24192d484)
+      expo-router: 57.0.10(patch_hash=616f8a79932a3ebc7d31343b53b3fc425a14bfb89bb86cdafa614cefa4e603ed)(a55ba02c2fb18b26174eabf24192d484)
       react-dom: 19.2.6(react@19.2.6)
     transitivePeerDependencies:
       - supports-color
@@ -30204,7 +30211,7 @@ snapshots:
       - supports-color
       - typescript
 
-  expo-router@57.0.10(95016413e10ac4b2f99a030c8fabf35b):
+  expo-router@57.0.10(patch_hash=616f8a79932a3ebc7d31343b53b3fc425a14bfb89bb86cdafa614cefa4e603ed)(95016413e10ac4b2f99a030c8fabf35b):
     dependencies:
       '@expo/log-box': 57.0.2(expo@57.0.10)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       '@expo/metro-runtime': 57.0.8(expo@57.0.10)(react-dom@19.2.6(react@19.2.3))(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
@@ -30254,7 +30261,7 @@ snapshots:
       - react-native-worklets
       - supports-color
 
-  expo-router@57.0.10(a55ba02c2fb18b26174eabf24192d484):
+  expo-router@57.0.10(patch_hash=616f8a79932a3ebc7d31343b53b3fc425a14bfb89bb86cdafa614cefa4e603ed)(a55ba02c2fb18b26174eabf24192d484):
     dependencies:
       '@expo/log-box': 57.0.2(expo@57.0.10)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
       '@expo/metro-runtime': 57.0.8(expo@57.0.10)(react-dom@19.2.6(react@19.2.6))(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)

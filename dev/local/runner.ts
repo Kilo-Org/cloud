@@ -661,9 +661,11 @@ export async function waitForEnvValueChange(
   key: string,
   previousValue: string | undefined,
   timeoutMs: number,
-  previousMtimeMs?: number
+  previousMtimeMs?: number,
+  isRunning?: () => boolean
 ): Promise<boolean> {
   const start = Date.now();
+  let hasWaited = false;
   while (Date.now() - start < timeoutMs) {
     const current = readEnvValue(filePath, key);
     const currentMtimeMs = readEnvMtime(filePath);
@@ -673,6 +675,11 @@ export async function waitForEnvValueChange(
       currentMtimeMs > previousMtimeMs;
 
     if (current !== undefined && (current !== previousValue || fileWasRewritten)) return true;
+    // Give the process one polling interval to start. After that, avoid
+    // waiting for the full timeout when the capture wrapper has already
+    // exited (for example, Stripe rejected an expired API key).
+    if (hasWaited && isRunning !== undefined && !isRunning()) return false;
+    hasWaited = true;
     await sleep(500);
   }
   return false;

@@ -665,7 +665,8 @@
     "profile": "Профил",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, раздел, {{position}} от {{total}}"
+    "position": "{{name}}, раздел, {{position}} от {{total}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Изпълнение на проверката",
       "status": "Статус",
       "threshold": "Праг",
-      "pullRequest": "заявка за сливане"
+      "pullRequest": "заявка за сливане",
+      "transcriptWaiting": "Изчакване на препис на прегледа.",
+      "transcriptEmpty": "Няма препис за този преглед.",
+      "transcriptRetry": "Не можа да се зареди преписът на прегледа.",
+      "transcriptLive": "НА ЖИВО",
+      "agentIdle": "Агентът е неактивен",
+      "agentWorking": "Агентът работи...",
+      "anErrorOccurred": "Възникна грешка",
+      "errorWithMessage": "Грешка: {{message}}",
+      "executionStarted": "Изпълнението започна",
+      "reviewCompleted": "Прегледът завърши",
+      "reviewInterrupted": "Прегледът беше прекъснат",
+      "sessionError": "Грешка в сесията: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Инструмент: {{name}}",
+      "toolNameError": "Инструмент: {{name}} — грешка",
+      "unknownError": "Неизвестна грешка"
     },
     "reviewMemory": {
       "title": "Памет за прегледа",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Активен сега",
     "search": {
       "searching": "Търсене",
       "searchSessions": "Търсене на сесии",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Не може да се заредят сесиите",
       "couldNotLoadActive": "Не може да се заредят активните сесии",
-      "noSessionsYet": "Все още няма сесии",
       "noSessionsYetDescription": "Започни задача за кодиране от телефона си. Сесиите ти ще се появят тук.",
       "noMatches": "Няма съвпадащи сесии",
       "tryDifferentSearch": "Опитай с различен термин за търсене.",
       "tryAdjustFilters": "Опитай да промениш или изчистиш филтрите си.",
       "couldNotSearch": "Не може да се търсят сесии",
-      "allActive": "Всички сесии са активни",
       "completedWillAppear": "Завършените сесии ще се появят тук.",
       "noPastSessions": "Няма минали сесии",
       "live": "НА ЖИВО"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Превърти до дъното",
       "emptyTitle": "Все още няма съобщения",
       "renameAccessibility": "Преименувай сесията: {{title}}",
-      "connectRepository": "Свържи хранилище",
       "cloningSession": "Клониране на сесия",
       "continue": "Продължи",
       "couldNotLoadThisSession": "Не можа да се зареди тази сесия",
-      "cloneFailed": "Не можа да се клонира тази сесия.",
       "cloneFailedRetry": "Не можа да се клонира тази сесия. Опитай отново.",
-      "connectRepositoryToContinue": "Свържи хранилище, за да продължиш.",
       "notEnoughCredits": "Няма достатъчно кредити за стартиране на Cloud Agent. Добавете кредити и опитайте отново.",
       "previousTaskFinishing": "Предишната задача все още приключва. Моля, изчакайте момент.",
       "serviceUnavailable": "Услугата в момента е недостъпна. Моля, опитайте отново.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Няма видими хранилища. Проверете достъпа до хранилищата за GitLab, след което опреснете.",
       "openBitbucket": "Отваряне на Bitbucket",
       "openGitlab": "Отваряне на GitLab",
-      "recentlyUsed": "Наскоро използвани"
+      "recentlyUsed": "Наскоро използвани",
+      "continueFrom": "Продължаване на {{title}}",
+      "importingSession": "Импортиране на сесията",
+      "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
+      "importFailed": "Тази сесия не можа да бъде импортирана."
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран {{displayCount}} файл",
@@ -2462,6 +2477,8 @@
       "viewTable": "Вижте таблицата",
       "title": "Таблица",
       "close": "Затворете таблицата",
+      "loading": "Зареждане на таблицата",
+      "empty": "Тази таблица няма редове.",
       "columnCount_one": "колона",
       "columnCount": "колони",
       "columnCount_other": "колони",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Тази връзка отваря {{host}} в браузъра ви.",
       "open": "Отвори",
       "trustThisHost": "Доверявай се на този хост"
+    },
+    "folderPicker": {
+      "accessibility": "Папка: {{label}}",
+      "emptyDescription": "Готово използва тази папка.",
+      "emptyTitle": "Няма папки вътре",
+      "fieldLabel": "Папка",
+      "retryableDescription": "Провери връзката си и опитай отново. Готово пак потвърждава тази папка.",
+      "retryableTitle": "Не можаха да се изброят папките",
+      "tapToListHint": "Докосни папка, за да изброиш съдържанието ѝ",
+      "unsupportedDescription": "Този CLI не може да изброи папките. Готово запазва стартовата папка и Започни сесия започва от нея.",
+      "unsupportedTitle": "Не може да се изброят папките"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Когато се доверите на хоста на връзка, тя се отваря без да пита отново.",
     "revoke": "Отмени {{host}}",
     "backToPreferences": "Обратно към предпочитанията"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Съобщение"
+    },
+    "empty": {
+      "title": "Започнете разговор",
+      "description": "Изпратете съобщение, за да говорите с модел."
+    },
+    "working": "Работи",
+    "historyRetry": "Не можа да се зареди историята на чата.",
+    "catalogRetry": "Не може да се заредят моделите",
+    "sendError": "Не можахме да изпратим съобщението. Опитайте отново."
   }
 }

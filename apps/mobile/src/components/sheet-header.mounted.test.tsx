@@ -110,4 +110,18 @@ describe('SheetHeader share action', () => {
 
     renderer.unmount();
   });
+
+  it('labels the leading control with cancelLabel so Back is not announced as Cancel', async () => {
+    const renderer = await mount({
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+      cancelLabel: 'Back',
+    });
+
+    expect(pressablesByLabel(renderer.root, 'Back')).toHaveLength(1);
+    expect(pressablesByLabel(renderer.root, 'Cancel')).toHaveLength(0);
+
+    renderer.unmount();
+  });
 });

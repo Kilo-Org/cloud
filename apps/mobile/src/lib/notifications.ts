@@ -10,7 +10,12 @@ import {
   type PushData,
   pushDataSchema,
 } from '@kilocode/notifications';
+import {
+  NOTIFICATION_PERMISSION_RESPONDED_EVENT,
+  NOTIFICATION_TOKEN_UPDATED_EVENT,
+} from '@kilocode/app-shared/analytics';
 
+import { captureEvent } from '@/lib/analytics/posthog';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
 import { notificationPathForData } from './notification-path';
@@ -201,6 +206,9 @@ export async function registerForPushNotifications(): Promise<string | null> {
   if (existingStatus !== Notifications.PermissionStatus.GRANTED) {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
+    // Only a live permission request emits an outcome; a pre-granted status
+    // does not. Any non-granted result maps to denied.
+    emitNotificationPermissionResponded(finalStatus === Notifications.PermissionStatus.GRANTED);
   }
 
   if (finalStatus !== Notifications.PermissionStatus.GRANTED) {
@@ -212,6 +220,18 @@ export async function registerForPushNotifications(): Promise<string | null> {
   });
 
   return tokenResponse.data;
+}
+
+/** Emit the permission-request outcome as an accepted-phase event. */
+export function emitNotificationPermissionResponded(granted: boolean): void {
+  captureEvent(NOTIFICATION_PERMISSION_RESPONDED_EVENT, {
+    outcome: granted ? 'granted' : 'denied',
+  });
+}
+
+/** Emit a token register/unregister outcome as an accepted-phase event. */
+export function emitNotificationTokenUpdated(action: 'registered' | 'unregistered'): void {
+  captureEvent(NOTIFICATION_TOKEN_UPDATED_EVENT, { action });
 }
 
 /**

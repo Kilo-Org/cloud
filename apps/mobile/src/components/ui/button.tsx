@@ -118,5 +118,5 @@ function Button({
   );
 }
 
-export { Button, buttonTextVariants, buttonVariants };
+export { Button };
 export type { ButtonProps };

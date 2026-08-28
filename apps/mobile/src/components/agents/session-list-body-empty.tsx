@@ -1,4 +1,4 @@
-import { Activity, History, SearchX } from '@/components/ui/icons';
+import { History, SearchX } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -7,10 +7,9 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 
 type BodyEmptyProps = {
-  kind: 'filtered-empty' | 'query-error-empty' | 'no-past-sessions' | 'all-active';
+  kind: 'filtered-empty' | 'query-error-empty' | 'no-past-sessions';
   isSearching: boolean;
   secondaryAction?: 'clear-search' | 'clear-filters' | 'none';
-  emptyStateAction: ReactNode;
   clearQueryAction: ReactNode;
   onRetry: () => void;
 };
@@ -19,15 +18,13 @@ type BodyEmptyProps = {
  * Renders the body empty-state for the Agents session list, switched on the
  * `kind` returned by the body render model. Each branch is a compact
  * `View` matching the design language of the rest of the list (icon + title
- * + description). Every branch keeps its action, except `all-active`, which
- * intentionally has no CTA: the tray, the FAB, and the header action already
- * offer creation.
+ * + description). `no-past-sessions` carries no CTA: creation is offered by
+ * the FAB/tray on the live screen.
  */
 export function BodyEmpty({
   kind,
   isSearching,
   secondaryAction,
-  emptyStateAction,
   clearQueryAction,
   onRetry,
 }: Readonly<BodyEmptyProps>) {
@@ -74,33 +71,14 @@ export function BodyEmpty({
       </View>
     );
   }
-  if (kind === 'all-active') {
-    // Every loaded stored session is excluded by the live active set, so the
-    // body is empty only because the active set consumed the history. In the
-    // full view the exclusion set also covers WS-written rows awaiting org
-    // attribution, so the tray can be momentarily empty here. No creation
-    // CTA: the tray, the FAB, and the header action already offer creation.
-    return (
-      <View className="items-center justify-center pt-12">
-        <EmptyState
-          icon={Activity}
-          title={t('agents.sessionList.allActive')}
-          description={t('agents.sessionList.completedWillAppear')}
-          placement="top"
-        />
-      </View>
-    );
-  }
-  // 'no-past-sessions' — body is empty but the tray is populated. The
-  // screen-level first-use empty ("No sessions yet") is handled by the
-  // caller when there is no tray either.
+  // 'no-past-sessions' — body is empty but the screen offers creation via
+  // the FAB/tray, so no CTA is rendered here.
   return (
     <View className="items-center justify-center pt-12">
       <EmptyState
         icon={History}
         title={t('agents.sessionList.noPastSessions')}
         description={t('agents.sessionList.completedWillAppear')}
-        action={emptyStateAction}
         placement="top"
       />
     </View>

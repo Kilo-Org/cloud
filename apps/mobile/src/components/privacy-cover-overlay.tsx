@@ -103,9 +103,9 @@ export function PrivacyCoverOverlay({ segments }: Readonly<PrivacyCoverOverlayPr
  * other view mounted in the root tree — draws behind it. This one lives inside
  * the presented screen's own tree, so it blanks that screen.
  *
- * Pass it as `screenLayout` on every Stack that declares a sheet route. It
- * costs nothing on an uncovered route, so it is set per navigator rather than
- * per screen, and a sheet route added later is covered without a code change.
+ * Pass it as `screenLayout` on every Stack inside the profile tab that
+ * declares a sheet route. It costs nothing on an uncovered route, so it is set
+ * per navigator rather than per screen.
  */
 export function privacyScreenLayout({
   children,

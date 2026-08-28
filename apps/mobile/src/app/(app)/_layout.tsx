@@ -6,7 +6,6 @@ import { UserWebConnectionProvider } from '@/components/agents/user-web-connecti
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
-import { privacyScreenLayout } from '@/components/privacy-cover-overlay';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
 import { attemptLogoutReconciliation } from '@/lib/auth/logout-reconciliation';
 import {
@@ -120,7 +119,6 @@ export default function AppLayout() {
       <KiloChatProvider>
         <KiloChatPresenceMount>
           <Stack
-            screenLayout={privacyScreenLayout}
             screenOptions={{
               contentStyle: { backgroundColor: colors.background },
               headerShown: false,
@@ -165,6 +163,15 @@ export default function AppLayout() {
             />
             <Stack.Screen
               name="agent-chat/instance-picker"
+              options={{
+                presentation: 'formSheet',
+                sheetAllowedDetents: [0.5, fullSheetDetent],
+                sheetGrabberVisible: true,
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="agent-chat/folder-picker"
               options={{
                 presentation: 'formSheet',
                 sheetAllowedDetents: [0.5, fullSheetDetent],

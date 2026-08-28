@@ -269,6 +269,19 @@ describe('restoreSession', () => {
     }
   });
 
+  it('returns an upstream failure for unauthorized snapshot responses', async () => {
+    mockFetchStatus(401);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'download failed status=401',
+      code: 502,
+      step: 'download',
+    });
+  });
+
   it('returns a fixed download error when fetch throws', async () => {
     globalThis.fetch = asFetch(() => Promise.reject(new Error('network token secret')));
     const result = await restoreSession(SESSION_ID, workspace);
@@ -308,20 +321,38 @@ describe('restoreSession', () => {
     });
   });
 
-  it('does not treat an empty export with an extra error field as a missing snapshot', async () => {
-    mockFetchOk(
-      JSON.stringify({ info: {}, messages: [], sessionDiff: [], detail: 'upstream error' })
-    );
+  for (const [description, snapshot] of [
+    ['null session metadata', { info: null, messages: [], sessionDiff: [] }],
+    ['same-size malformed session diffs', { info: {}, messages: [], sessionDiff: {} }],
+    ['missing session diffs', { info: {}, messages: [] }],
+    [
+      'session metadata without an id',
+      { info: { title: 'Existing session' }, messages: [], sessionDiff: [] },
+    ],
+    [
+      'existing messages',
+      { info: {}, messages: [{ info: { id: 'msg_existing' } }], sessionDiff: [] },
+    ],
+    ['existing session diffs', { info: {}, messages: [], sessionDiff: [{ file: 'existing.txt' }] }],
+    [
+      'additional export fields',
+      { info: {}, messages: [], sessionDiff: [], detail: 'upstream error' },
+    ],
+  ] as const) {
+    it(`does not identify ${description} as an empty session export`, async () => {
+      mockFetchOk(JSON.stringify(snapshot));
 
-    const result = await restoreSession(SESSION_ID, workspace);
+      const result = await restoreSession(SESSION_ID, workspace);
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain('snapshot missing info.id');
-      expect(result.code).toBeNull();
-      expect(result.step).toBe('download');
-    }
-  });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toContain('snapshot missing info.id');
+        expect(result.code).toBeNull();
+        expect(result.step).toBe('download');
+        expect(result).not.toHaveProperty('emptySnapshot');
+      }
+    });
+  }
 
   it('returns download error when the snapshot metadata is not JSON', async () => {
     mockFetchOk('not valid JSON {{{');

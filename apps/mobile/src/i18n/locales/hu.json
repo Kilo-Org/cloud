@@ -665,7 +665,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, fül, {{position}} a {{total}} közül"
+    "position": "{{name}}, fül, {{position}} a {{total}} közül",
+    "chat": "Csevegés"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Ellenőrzés futtatása",
       "status": "Állapot",
       "threshold": "Küszöb",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptEmpty": "Ehhez az áttekintéshez nincs átirat.",
+      "transcriptLive": "ÉLŐ",
+      "transcriptRetry": "Nem sikerült betölteni az áttekintés átiratát.",
+      "transcriptWaiting": "Várakozás az áttekintés átiratára.",
+      "agentIdle": "Ügynök tétlen",
+      "agentWorking": "Ügynök feldolgozás...",
+      "anErrorOccurred": "Hiba történt",
+      "errorWithMessage": "Hiba: {{message}}",
+      "executionStarted": "Végrehajtás elindítva",
+      "reviewCompleted": "Áttekintés befejezve",
+      "reviewInterrupted": "Áttekintés megszakítva",
+      "sessionError": "Munkamenet hiba: {{error}}",
+      "statusWithValue": "Állapot: {{status}}",
+      "toolName": "Eszköz: {{name}}",
+      "toolNameError": "Eszköz: {{name}} — hiba",
+      "unknownError": "Ismeretlen hiba"
     },
     "reviewMemory": {
       "title": "Áttekintési memória",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Most aktív",
     "search": {
       "searching": "Keresés",
       "searchSessions": "Munkamenetek keresése",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "A munkamenetek betöltése nem sikerült",
       "couldNotLoadActive": "Az aktív munkamenetek betöltése nem sikerült",
-      "noSessionsYet": "Még nincs munkamenet",
       "noSessionsYetDescription": "Indítson egy kódolási feladatot a telefonjáról. A munkamenetei itt jelennek meg.",
       "noMatches": "Nincs egyező munkamenet",
       "tryDifferentSearch": "Próbáljon másik keresőszót.",
       "tryAdjustFilters": "Próbálja módosítani vagy törölni a szűrőket.",
       "couldNotSearch": "A munkamenetek keresése nem sikerült",
-      "allActive": "Minden munkamenet aktív",
       "completedWillAppear": "A befejezett munkamenetek itt jelennek meg.",
       "noPastSessions": "Nincs korábbi munkamenet",
       "live": "ÉLŐ"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
       "renameAccessibility": "Munkamenet átnevezése: {{title}}",
-      "connectRepository": "Adattár csatlakoztatása",
       "cloningSession": "Munkamenet klónozása",
       "continue": "Folytatás",
       "couldNotLoadThisSession": "Ennek a munkamenetnek a betöltése nem sikerült",
-      "cloneFailed": "Ennek a munkamenetnek a klónozása nem sikerült.",
       "cloneFailedRetry": "Ennek a munkamenetnek a klónozása nem sikerült. Próbálja újra.",
-      "connectRepositoryToContinue": "Csatlakoztasson egy adattárat a folytatáshoz.",
       "notEnoughCredits": "Nincs elég kredit a Cloud Agent futtatásához. Adjon hozzá krediteket, és próbálja újra.",
       "previousTaskFinishing": "Az előző feladat még befejeződik. Kérjük, várjon egy pillanatot.",
       "serviceUnavailable": "A szolgáltatás jelenleg nem érhető el. Kérjük, próbálja újra.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Nincs látható tároló. Ellenőrizd a GitLab-tárolókhoz való hozzáférést, majd frissíts.",
       "openBitbucket": "Bitbucket megnyitása",
       "openGitlab": "GitLab megnyitása",
-      "recentlyUsed": "Legutóbb használt"
+      "recentlyUsed": "Legutóbb használt",
+      "continueFrom": "Folytatás {{title}}",
+      "importingSession": "Munkamenet importálása",
+      "cliCannotContinue": "Ez a CLI nem tudja folytatni a munkamenetet. Válasszon Cloud Agentet vagy másik CLI-t.",
+      "importFailed": "Nem sikerült importálni ezt a munkamenetet."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissítve",
@@ -2462,6 +2477,8 @@
       "viewTable": "Táblázat megtekintése",
       "title": "Táblázat",
       "close": "Táblázat bezárása",
+      "loading": "Táblázat betöltése",
+      "empty": "A táblázat nem tartalmaz sorokat.",
       "columnCount_one": "oszlop",
       "columnCount": "oszlop",
       "columnCount_other": "oszlop",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Ez a link a(z) {{host}} oldalt nyitja meg a böngészőjében.",
       "open": "Megnyitás",
       "trustThisHost": "Megbízás ebben a hostban"
+    },
+    "folderPicker": {
+      "accessibility": "Mappa: {{label}}",
+      "emptyDescription": "A Kész ezt a mappát használja.",
+      "emptyTitle": "Nincs mappa benne",
+      "fieldLabel": "Mappa",
+      "retryableDescription": "Ellenőrizze a kapcsolatot, majd érintse meg az Újra gombot. A Kész továbbra is megerősíti ezt a mappát.",
+      "retryableTitle": "Nem sikerült listázni a mappákat",
+      "tapToListHint": "Érintsen meg egy mappát a tartalmának listázásához",
+      "unsupportedDescription": "Ez a CLI nem tudja listázni a mappákat. A Kész megtartja az indítási mappát, és a Munkamenet indítása ott indul.",
+      "unsupportedTitle": "Nem lehet listázni a mappákat"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Ha megbízik egy link hostjában, az a továbbiakban kérdezés nélkül megnyílik.",
     "revoke": "Visszavonás ({{host}})",
     "backToPreferences": "Vissza a beállításokhoz"
+  },
+  "quickChat": {
+    "title": "Csevegés",
+    "composer": {
+      "placeholder": "Üzenet"
+    },
+    "empty": {
+      "title": "Kezdjen csevegést",
+      "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."
+    },
+    "working": "Feldolgozás",
+    "historyRetry": "Nem sikerült betölteni a csevegés előzményeit.",
+    "catalogRetry": "Nem sikerült betölteni a modelleket",
+    "sendError": "Az üzenet küldése nem sikerült. Próbálja újra."
   }
 }

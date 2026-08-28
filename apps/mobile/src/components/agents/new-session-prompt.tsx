@@ -23,6 +23,7 @@ import {
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
+import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
 import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -94,6 +95,7 @@ export function NewSessionPrompt({
   shareId,
   voiceInputSettlerRef,
   initialPrompt,
+  isCloneEntry = false,
 }: Readonly<NewSessionPromptProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -136,7 +138,7 @@ export function NewSessionPrompt({
   });
 
   const voiceInput = useVoiceInput({
-    disabled: isCreating,
+    disabled: isCloneEntry || isCreating,
     getDraft: () => promptRef.current,
     onDraftChange: draft => {
       applyVoiceDraftToInput({
@@ -208,6 +210,29 @@ export function NewSessionPrompt({
 
   function handleVoiceToggle() {
     void voiceInput.toggle();
+  }
+
+  // Clone entry has no composer: render the models error or the toolbar as a
+  // standalone block, never an empty rounded composer card. The input, the
+  // attachment strip, the paperclip, the paste button, and voice are unmounted.
+  if (isCloneEntry) {
+    return (
+      <NewSessionPromptClone
+        isModelsError={isModelsError}
+        modelOptions={modelOptions}
+        mode={mode}
+        model={model}
+        variant={variant}
+        onModeChange={onModeChange}
+        onModelSelect={onModelSelect}
+        customOptions={customOptions}
+        modelLocked={modelLocked}
+        modelLockLabel={modelLockLabel}
+        isLoadingModels={isLoadingModels}
+        isCreating={isCreating}
+        onRefetchModels={onRefetchModels}
+      />
+    );
   }
 
   return (

@@ -47,14 +47,19 @@ import {
 // working unchanged.
 export {
   APP_STARTUP_EVENT,
+  CONSENT_OUTCOME_EVENT,
   CONVERSATION_CREATED_EVENT,
   FEEDBACK_SUBMITTED_EVENT,
   INSTANCE_ACTION_EVENT,
   KILO_PASS_PURCHASE_COMPLETED_EVENT,
   KILO_PASS_PURCHASE_FAILED_EVENT,
   KILO_PASS_PURCHASE_STARTED_EVENT,
+  LOGOUT_EVENT,
   MESSAGE_SENT_EVENT,
+  NOTIFICATION_PERMISSION_RESPONDED_EVENT,
+  NOTIFICATION_TOKEN_UPDATED_EVENT,
   ORGANIZATION_MEMBER_INVITED_EVENT,
+  ORGANIZATION_MEMBER_JOINED_EVENT,
   PERMISSION_RESPONDED_EVENT,
   QUESTION_ANSWERED_EVENT,
   SESSION_CREATED_EVENT,
@@ -67,11 +72,17 @@ export type AnalyticsSurface = (typeof ANALYTICS_SURFACES)[number];
 // PostHog feature flags. The project is shared with web, so mobile-only flags
 // are prefixed to avoid colliding with web flag keys.
 export const FEATURE_FLAG_PR_REVIEW = 'mobile-pr-review';
+export const FEATURE_FLAG_QUICK_CHAT = 'mobile-quick-chat';
 
 let client: PostHog | null = null;
 /** Generation that created the client. Stale events from a prior account
  *  are dropped — they must not transmit under the new identity. */
 let clientGeneration: number | null = null;
+
+/** Test-only fetch wrapper (slice P3-AH-16a). Applied to the current client on
+ *  registration and to any client created later by `initPostHog`. */
+type PostHogFetch = PostHog['fetch'];
+let fetchWrap: ((fetch: PostHogFetch) => PostHogFetch) | null = null;
 
 // `useFeatureFlag` subscribers register here rather than on `client`, because
 // the client is created lazily (after consent) — a component that mounts before
@@ -200,6 +211,12 @@ export function initPostHog(): void {
       listener();
     }
   });
+  // Apply a test fetch wrap registered before this client existed, so the
+  // first init already routes through it.
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- guards a client that violates its own type's contract in tests
+  if (fetchWrap && typeof client.fetch === 'function') {
+    client.fetch = fetchWrap(client.fetch.bind(client));
+  }
 }
 
 export function captureEvent<K extends keyof AnalyticsEventMap>(
@@ -259,6 +276,37 @@ export function identifyUser(email: string): void {
 
 export function resetAnalyticsUser(): void {
   client?.reset();
+}
+
+/**
+ * Flush the last live PostHog client's queue. Never rejects: a flush failure
+ * is swallowed so a sign-out or consent transition is never blocked by a
+ * telemetry transport error. Returns immediately when no client exists or the
+ * client lacks a `flush` method (a bare test double).
+ */
+export async function flushLastPostHogEvent(): Promise<void> {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- guards a client that violates its own type's contract in tests
+  if (!client || typeof client.flush !== 'function') {
+    return;
+  }
+  try {
+    await client.flush();
+  } catch {
+    // Best-effort: a flush rejection must never reject the caller.
+  }
+}
+
+/**
+ * Register a test fetch wrapper (slice P3-AH-16a). The wrap is stored so a
+ * later `initPostHog` applies it to the client it creates; if a client already
+ * exists, its `fetch` is replaced immediately.
+ */
+export function wrapPostHogFetchForTests(wrap: (fetch: PostHogFetch) => PostHogFetch): void {
+  fetchWrap = wrap;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- guards a client that violates its own type's contract in tests
+  if (client && typeof client.fetch === 'function') {
+    client.fetch = wrap(client.fetch.bind(client));
+  }
 }
 
 /**

@@ -211,7 +211,8 @@
     "profile": "个人资料",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}，标签页，{{total}} 中的第 {{position}} 个"
+    "position": "{{name}}，标签页，{{total}} 中的第 {{position}} 个",
+    "chat": "聊天"
   },
   "chat": {
     "instancePicker": {
@@ -898,7 +899,23 @@
       "title": "审查",
       "tokens": "令牌",
       "tokensInOut": "输入 {{input}} / 输出 {{output}}",
-      "pullRequest": "拉取请求"
+      "pullRequest": "拉取请求",
+      "transcriptWaiting": "正在等待审查转录。",
+      "transcriptEmpty": "此审查没有转录。",
+      "transcriptRetry": "无法加载审查转录。",
+      "transcriptLive": "实时",
+      "agentIdle": "代理空闲",
+      "agentWorking": "代理工作中...",
+      "anErrorOccurred": "发生错误",
+      "errorWithMessage": "错误：{{message}}",
+      "executionStarted": "执行已开始",
+      "reviewCompleted": "审查已完成",
+      "reviewInterrupted": "审查已中断",
+      "sessionError": "会话错误：{{error}}",
+      "statusWithValue": "状态：{{status}}",
+      "toolName": "工具：{{name}}",
+      "toolNameError": "工具：{{name}} — 错误",
+      "unknownError": "未知错误"
     },
     "reviewList": {
       "configureProvider": "配置提供商",
@@ -1579,7 +1596,6 @@
     }
   },
   "agents": {
-    "activeNow": "当前活跃",
     "search": {
       "searching": "正在搜索",
       "searchSessions": "搜索会话",
@@ -1590,13 +1606,11 @@
     "sessionList": {
       "couldNotLoad": "无法加载会话",
       "couldNotLoadActive": "无法加载活动会话",
-      "noSessionsYet": "暂无会话",
       "noSessionsYetDescription": "从您的手机开始编程任务。您的会话将显示在这里。",
       "noMatches": "没有匹配的会话",
       "tryDifferentSearch": "请尝试其他搜索词。",
       "tryAdjustFilters": "请尝试调整或清除您的筛选条件。",
       "couldNotSearch": "无法搜索会话",
-      "allActive": "所有会话均处于活动状态",
       "completedWillAppear": "已完成的会话将显示在这里。",
       "noPastSessions": "没有过去的会话",
       "live": "实时"
@@ -1665,13 +1679,10 @@
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
       "renameAccessibility": "重命名会话：{{title}}",
-      "connectRepository": "连接仓库",
       "cloningSession": "正在克隆会话",
       "continue": "继续",
       "couldNotLoadThisSession": "无法加载此会话",
-      "cloneFailed": "无法克隆此会话。",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
-      "connectRepositoryToContinue": "连接一个仓库以继续。",
       "notEnoughCredits": "运行 Cloud Agent 的积分不足。请添加积分后重试。",
       "previousTaskFinishing": "上一个任务仍在进行中。请稍等片刻。",
       "serviceUnavailable": "服务当前不可用。请重试。",
@@ -1744,7 +1755,11 @@
       "noRepositoriesVisibleGitlab": "没有可见的仓库。请检查 GitLab 的仓库访问权限，然后刷新。",
       "openBitbucket": "打开 Bitbucket",
       "openGitlab": "打开 GitLab",
-      "recentlyUsed": "最近使用"
+      "recentlyUsed": "最近使用",
+      "continueFrom": "正在继续 {{title}}",
+      "importingSession": "正在导入会话",
+      "cliCannotContinue": "此 CLI 无法继续会话。请选择云端代理或其他 CLI。",
+      "importFailed": "无法导入此会话。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件",
@@ -2008,6 +2023,8 @@
       "viewTable": "查看表格",
       "title": "表格",
       "close": "关闭表格",
+      "loading": "正在加载表格",
+      "empty": "此表格没有任何行。",
       "columnCount_one": "列",
       "columnCount": "列",
       "columnCount_other": "列",
@@ -2196,6 +2213,17 @@
       "hostConfirmMessage": "此链接将在你的浏览器中打开 {{host}}。",
       "open": "打开",
       "trustThisHost": "信任此主机"
+    },
+    "folderPicker": {
+      "accessibility": "文件夹：{{label}}",
+      "emptyDescription": "完成将使用此文件夹。",
+      "emptyTitle": "里面没有文件夹",
+      "fieldLabel": "文件夹",
+      "retryableDescription": "检查连接并重试。完成仍将确认此文件夹。",
+      "retryableTitle": "无法列出文件夹",
+      "tapToListHint": "点击文件夹以列出其内容",
+      "unsupportedDescription": "此 CLI 无法列出文件夹。完成将保留启动文件夹，开始会话将从那里启动。",
+      "unsupportedTitle": "无法列出文件夹"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "当你信任某个链接的主机后，它将无需再次询问即可打开。",
     "revoke": "撤销 {{host}}",
     "backToPreferences": "返回偏好设置"
+  },
+  "quickChat": {
+    "title": "聊天",
+    "composer": {
+      "placeholder": "消息"
+    },
+    "empty": {
+      "title": "开始聊天",
+      "description": "发送消息以与模型对话。"
+    },
+    "working": "工作中",
+    "historyRetry": "无法加载聊天历史。",
+    "catalogRetry": "无法加载模型",
+    "sendError": "无法发送消息。请重试。"
   }
 }

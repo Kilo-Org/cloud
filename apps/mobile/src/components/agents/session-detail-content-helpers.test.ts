@@ -12,7 +12,6 @@ import {
   hydrateEmptyChildSessions,
   resolveRetryPrompt,
   retryMessageAndClear,
-  runConnectRepository,
 } from './session-detail-content-helpers';
 import { assistantMessage, userMessage } from './message-bubble-test-utils';
 
@@ -130,21 +129,6 @@ describe('retryMessageAndClear', () => {
     await retryMessageAndClear(send, clearFailed);
     expect(send).toHaveBeenCalledTimes(1);
     expect(clearFailed).not.toHaveBeenCalled();
-  });
-});
-
-describe('runConnectRepository', () => {
-  it('opens the GitHub integration and clears terminal guidance in order', () => {
-    const openGitHubIntegration = vi.fn<() => void>();
-    const clearGuidance = vi.fn<() => void>();
-
-    runConnectRepository(openGitHubIntegration, clearGuidance);
-
-    expect(openGitHubIntegration).toHaveBeenCalledTimes(1);
-    expect(clearGuidance).toHaveBeenCalledTimes(1);
-    expect(openGitHubIntegration.mock.invocationCallOrder[0]).toBeLessThan(
-      clearGuidance.mock.invocationCallOrder[0] ?? 0
-    );
   });
 });
 

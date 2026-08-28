@@ -87,6 +87,53 @@ export function shouldHideTabBar(pathname: string): boolean {
   return isKiloClawInstancePicker || isSecurityFindingFilter;
 }
 
+/** One tab bar entry, in render order. */
+export type TabBarTab = 'home' | 'kiloclaw' | 'agents' | 'chat' | 'profile';
+
+/** Flag state that changes which tabs render. */
+export type TabBarTabFlags = {
+  showKiloClaw: boolean;
+  showQuickChat: boolean;
+};
+
+/**
+ * Number of rendered tabs. Base three (Home, Agents, Profile) plus the two
+ * flagged tabs when shown.
+ */
+export function visibleTabCount(showKiloClaw: boolean, showQuickChat: boolean): number {
+  return 3 + Number(showKiloClaw) + Number(showQuickChat);
+}
+
+/**
+ * One-based render position of a tab, or null when the tab is hidden. Home is
+ * always 1; KiloClaw sits at 2 when shown; Agents follows KiloClaw; Chat
+ * follows Agents when shown; Profile is always last.
+ */
+export function tabBarPosition(tab: TabBarTab, flags: TabBarTabFlags): number | null {
+  switch (tab) {
+    case 'home': {
+      return 1;
+    }
+    case 'kiloclaw': {
+      return flags.showKiloClaw ? 2 : null;
+    }
+    case 'agents': {
+      return 2 + Number(flags.showKiloClaw);
+    }
+    case 'chat': {
+      return flags.showQuickChat ? 3 + Number(flags.showKiloClaw) : null;
+    }
+    case 'profile': {
+      return visibleTabCount(flags.showKiloClaw, flags.showQuickChat);
+    }
+    default: {
+      // `TabBarTab` is a closed union; this branch is unreachable but keeps
+      // `consistent-return` satisfied for an exhaustive switch.
+      return null;
+    }
+  }
+}
+
 /**
  * Accessibility label for a tab bar entry. The position and the total must match
  * the rendered tab count, which changes when the KiloClaw tab is hidden.

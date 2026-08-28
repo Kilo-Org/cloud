@@ -7,18 +7,22 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  ActivityIndicator,
   type LayoutChangeEvent,
   Modal,
   Pressable,
   type Text as RNText,
   Text,
+  useColorScheme,
   useWindowDimensions,
   View,
+  type ViewStyle,
 } from 'react-native';
 import {
   Gesture,
@@ -28,6 +32,7 @@ import {
 } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useMarkdown } from 'react-native-marked';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { withRtlWritingDirection } from '@/lib/rtl-text';
@@ -36,9 +41,15 @@ import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 
 import { containsPressable, extractNodeText, linearRowLabel } from './markdown-a11y';
-import { type MarkdownPalette } from './markdown-palette';
+import { getMarkdownStyles, type MarkdownPalette } from './markdown-palette';
+import {
+  type MarkdownLinkLongPressHandler,
+  type MarkdownLinkPressHandler,
+  MarkdownRenderer,
+} from './markdown-renderer';
 
 const MODAL_COLUMN_MIN_WIDTH = 148;
 const MODAL_HORIZONTAL_PADDING = 16;
@@ -49,19 +60,19 @@ const ZOOM_DEFAULT = 1;
 
 type MarkdownTableProps = {
   palette: MarkdownPalette;
-  header: ReactNode[][];
-  rows: ReactNode[][][];
+  /** The table token's raw markdown source, parsed only while the modal is open. */
+  raw?: string;
+  tableKey: string;
+  columnCount: number;
+  rowCount: number;
+  selectable: boolean;
+  /** Parser-built cell trees for a nested table (the renderer fallback path). */
+  header?: ReactNode[][];
+  /** Parser-built row trees for a nested table (the renderer fallback path). */
+  rows?: ReactNode[][][];
+  onLongPressLink?: MarkdownLinkLongPressHandler;
+  onPressLink?: MarkdownLinkPressHandler;
 };
-
-function getColumnCount(header: ReactNode[][], rows: ReactNode[][][]): number {
-  let columnCount = header.length;
-  for (const row of rows) {
-    if (row.length > columnCount) {
-      columnCount = row.length;
-    }
-  }
-  return columnCount;
-}
 
 function formatCount(count: number, key: 'columnCount' | 'rowCount'): string {
   const unit =
@@ -83,23 +94,26 @@ function formatChipAccessibilityLabel(columnCount: number, rowCount: number): st
 // width-constrained bubble both mis-measures its height on Fabric (overlapping
 // messages) and fights the swipe-to-reply pan gesture. Instead we render a
 // compact "View table" chip inline and show the full table in a modal, where
-// it can scroll both ways with the whole screen available.
+// it can scroll both ways with the whole screen available. The cell tree is
+// parsed only when the modal opens (MarkdownTableBody), so a streamed table
+// stays cheap behind the chip.
 
-export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableProps>) {
+export function MarkdownTable({
+  palette,
+  raw,
+  tableKey,
+  columnCount,
+  rowCount,
+  selectable,
+  header,
+  rows,
+  onLongPressLink,
+  onPressLink,
+}: Readonly<MarkdownTableProps>) {
   const [open, setOpen] = useState(false);
   const colors = useThemeColors();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
-
-  const columnCount = getColumnCount(header, rows);
-  const columnWidth = Math.max(
-    MODAL_COLUMN_MIN_WIDTH,
-    Math.floor((windowWidth - MODAL_HORIZONTAL_PADDING * 2) / Math.max(columnCount, 1))
-  );
-
-  // Column titles, flattened to spoken text once so every body row reuses them.
-  const headerTexts = header.map(node => extractNodeText(node));
 
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [natural, setNatural] = useState<{ width: number; height: number } | undefined>(undefined);
@@ -222,7 +236,8 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
           setOpen(true);
         }}
         accessibilityRole="button"
-        accessibilityLabel={formatChipAccessibilityLabel(columnCount, rows.length)}
+        accessibilityLabel={formatChipAccessibilityLabel(columnCount, rowCount)}
+        testID={tableKey}
         className="my-1 flex-row items-center gap-2.5 self-start rounded-lg border px-3 py-2 active:opacity-70"
         // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant colors
         style={{ backgroundColor: palette.codeBackground, borderColor: palette.borderColor }}
@@ -241,109 +256,318 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
             className="text-xs"
             style={withRtlWritingDirection({ color: palette.mutedTextColor })}
           >
-            {formatTableSummary(columnCount, rows.length)}
+            {formatTableSummary(columnCount, rowCount)}
           </Text>
         </View>
       </Pressable>
 
-      <Modal
-        visible={open}
-        animationType="slide"
-        // Best-effort focus after native presentation; moveA11yFocus is a no-op
-        // when the title handle is not mounted yet, so no retry loop is needed.
-        onShow={() => {
-          moveA11yFocus(titleRef);
-        }}
-        onRequestClose={() => {
-          session.value += 1;
-          setOpen(false);
-        }}
-      >
-        <View className="flex-1 bg-background">
-          <View
-            className="flex-row items-center justify-between border-b border-border bg-background px-4"
-            style={{ paddingTop: insets.top, height: insets.top + 56 }}
-          >
-            <Text
-              ref={titleRef}
-              accessibilityRole="header"
-              className="text-lg font-semibold text-foreground"
-              style={withRtlWritingDirection(undefined)}
+      {open ? (
+        <Modal
+          visible
+          animationType="slide"
+          // Best-effort focus after native presentation; moveA11yFocus is a no-op
+          // when the title handle is not mounted yet, so no retry loop is needed.
+          onShow={() => {
+            moveA11yFocus(titleRef);
+          }}
+          onRequestClose={() => {
+            session.value += 1;
+            setOpen(false);
+          }}
+        >
+          <View className="flex-1 bg-background">
+            <View
+              className="flex-row items-center justify-between border-b border-border bg-background px-4"
+              style={{ paddingTop: insets.top, height: insets.top + 56 }}
             >
-              {t('agentChat.markdownTable.title')}
-            </Text>
-            <Pressable
-              onPress={() => {
-                session.value += 1;
-                setOpen(false);
-              }}
-              className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70"
-              accessibilityLabel={t('agentChat.markdownTable.close')}
-              accessibilityRole="button"
-              hitSlop={8}
-            >
-              <X size={20} color={colors.foreground} />
-            </Pressable>
-          </View>
-          {/* RNGH gestures need their own root inside an RN Modal — see image-viewer-modal.tsx. */}
-          <GestureHandlerRootView className="flex-1">
-            <ScrollView
-              ref={verticalRef}
-              className="flex-1"
-              // eslint-disable-next-line react-native/no-inline-styles -- padding must be combined after contentContainerClassName removal
-              contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 16 }}
-            >
-              <ScrollView ref={horizontalRef} horizontal showsHorizontalScrollIndicator>
-                <GestureDetector gesture={zoomGesture}>
-                  {/* Sizer: gives both scrollers the zoomed extent. The table keeps its
-                      natural layout size (self-start) and is scaled from its top-left. */}
-                  {/* eslint-disable-next-line react-native/no-inline-styles -- dynamic measured sizer dimensions */}
-                  <View style={sizerStyle}>
-                    <Animated.View
-                      className="self-start"
-                      onLayout={handleTableLayout}
-                      // eslint-disable-next-line react-native/no-inline-styles -- animated transform + transformOrigin
-                      style={[tableStyle, { transformOrigin: 'top left' }]}
-                    >
-                      <View
-                        className="self-start overflow-hidden rounded-md border"
-                        // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant colors
-                        style={{
-                          borderColor: palette.borderColor,
-                          backgroundColor: palette.surfaceColor,
-                        }}
+              <Text
+                ref={titleRef}
+                accessibilityRole="header"
+                className="text-lg font-semibold text-foreground"
+                style={withRtlWritingDirection(undefined)}
+              >
+                {t('agentChat.markdownTable.title')}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  session.value += 1;
+                  setOpen(false);
+                }}
+                className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70"
+                accessibilityLabel={t('agentChat.markdownTable.close')}
+                accessibilityRole="button"
+                hitSlop={8}
+              >
+                <X size={20} color={colors.foreground} />
+              </Pressable>
+            </View>
+            {/* RNGH gestures need their own root inside an RN Modal — see image-viewer-modal.tsx. */}
+            <GestureHandlerRootView className="flex-1">
+              <ScrollView
+                ref={verticalRef}
+                className="flex-1"
+                // eslint-disable-next-line react-native/no-inline-styles -- padding must be combined after contentContainerClassName removal
+                contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 16 }}
+              >
+                <ScrollView ref={horizontalRef} horizontal showsHorizontalScrollIndicator>
+                  <GestureDetector gesture={zoomGesture}>
+                    {/* Sizer: gives both scrollers the zoomed extent. The table keeps its
+                        natural layout size (self-start) and is scaled from its top-left. */}
+                    {/* eslint-disable-next-line react-native/no-inline-styles -- dynamic measured sizer dimensions */}
+                    <View style={sizerStyle}>
+                      <Animated.View
+                        className="self-start"
+                        onLayout={handleTableLayout}
+                        // eslint-disable-next-line react-native/no-inline-styles -- animated transform + transformOrigin
+                        style={[tableStyle, { transformOrigin: 'top left' }]}
                       >
-                        <TableRow
-                          palette={palette}
-                          cells={header}
-                          columnCount={columnCount}
-                          columnWidth={columnWidth}
-                          isHeader
-                          isLastRow={rows.length === 0}
-                          headerTexts={headerTexts}
-                        />
-                        {rows.map((row, rowIdx) => (
-                          <TableRow
-                            key={rowIdx}
+                        {raw !== undefined ? (
+                          <MarkdownTableBody
                             palette={palette}
-                            cells={row}
+                            raw={raw}
                             columnCount={columnCount}
-                            columnWidth={columnWidth}
-                            isLastRow={rows.length - 1 === rowIdx}
-                            headerTexts={headerTexts}
+                            rowCount={rowCount}
+                            selectable={selectable}
+                            onLongPressLink={onLongPressLink}
+                            onPressLink={onPressLink}
                           />
-                        ))}
-                      </View>
-                    </Animated.View>
-                  </View>
-                </GestureDetector>
+                        ) : (
+                          <MarkdownTableCells
+                            palette={palette}
+                            header={header ?? []}
+                            rows={rows ?? []}
+                            columnCount={columnCount}
+                          />
+                        )}
+                      </Animated.View>
+                    </View>
+                  </GestureDetector>
+                </ScrollView>
               </ScrollView>
-            </ScrollView>
-          </GestureHandlerRootView>
-        </View>
-      </Modal>
+            </GestureHandlerRootView>
+          </View>
+        </Modal>
+      ) : null}
     </>
   );
+}
+
+type MarkdownTableCellsProps = {
+  palette: MarkdownPalette;
+  header: ReactNode[][];
+  rows: ReactNode[][][];
+  columnCount: number;
+};
+
+// A nested table (inside a blockquote or list item) is not extracted by
+// splitMarkdownTables, so the base MarkdownRenderer.table() fallback already
+// built these cell trees. Render them directly here with TableRow instead of
+// re-parsing raw, reusing MarkdownTableBody's column-width formula.
+function MarkdownTableCells({
+  palette,
+  header,
+  rows,
+  columnCount,
+}: Readonly<MarkdownTableCellsProps>) {
+  const { width: windowWidth } = useWindowDimensions();
+  const columnWidth = Math.max(
+    MODAL_COLUMN_MIN_WIDTH,
+    Math.floor((windowWidth - MODAL_HORIZONTAL_PADDING * 2) / Math.max(columnCount, 1))
+  );
+  const headerTexts = header.map(node => extractNodeText(node));
+  return (
+    <View
+      className="self-start overflow-hidden rounded-md border"
+      // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant colors
+      style={{
+        borderColor: palette.borderColor,
+        backgroundColor: palette.surfaceColor,
+      }}
+    >
+      <TableRow
+        palette={palette}
+        cells={header}
+        columnCount={columnCount}
+        columnWidth={columnWidth}
+        isHeader
+        isLastRow={rows.length === 0}
+        headerTexts={headerTexts}
+      />
+      {rows.map((row, rowIdx) => (
+        <TableRow
+          key={rowIdx}
+          palette={palette}
+          cells={row}
+          columnCount={columnCount}
+          columnWidth={columnWidth}
+          isLastRow={rows.length - 1 === rowIdx}
+          headerTexts={headerTexts}
+        />
+      ))}
+    </View>
+  );
+}
+
+type MarkdownTableBodyProps = {
+  palette: MarkdownPalette;
+  raw: string;
+  columnCount: number;
+  rowCount: number;
+  selectable: boolean;
+  onLongPressLink?: MarkdownLinkLongPressHandler;
+  onPressLink?: MarkdownLinkPressHandler;
+};
+
+// The body runs only while the modal is open, so useMarkdown (and the cell
+// parse it drives) never runs while the table is just a chip. It keeps the
+// last good cells while `raw` changes so a streaming update re-parses without
+// flashing the wait or empty states, and leaves the parent's chrome and zoom
+// untouched.
+function MarkdownTableBody({
+  palette,
+  raw,
+  columnCount,
+  rowCount,
+  selectable,
+  onLongPressLink,
+  onPressLink,
+}: Readonly<MarkdownTableBodyProps>) {
+  const { t } = useTranslation();
+  const colorScheme = useColorScheme();
+  const { width: windowWidth } = useWindowDimensions();
+
+  const columnWidth = Math.max(
+    MODAL_COLUMN_MIN_WIDTH,
+    Math.floor((windowWidth - MODAL_HORIZONTAL_PADDING * 2) / Math.max(columnCount, 1))
+  );
+
+  const styles = useMemo(() => getMarkdownStyles(palette), [palette]);
+
+  const theme = useMemo(
+    () => ({
+      colors: {
+        text: palette.textColor,
+        code: palette.textColor,
+        link: palette.textColor,
+        border: palette.borderColor,
+      },
+    }),
+    [palette]
+  );
+
+  const renderer = useMemo(
+    () =>
+      new MarkdownTableBodyRenderer(palette, columnWidth, columnCount, selectable, {
+        onLongPressLink,
+        onPressLink,
+      }),
+    [palette, columnWidth, columnCount, selectable, onLongPressLink, onPressLink]
+  );
+
+  const elements = useMarkdown(raw, { colorScheme, theme, styles, renderer });
+
+  // Keep the last good cells while `raw` changes with the modal open. A fresh
+  // parse replaces them; a transient empty parse keeps the previous cells.
+  const lastCellsRef = useRef<ReactNode[] | null>(null);
+  if (elements.length > 0) {
+    lastCellsRef.current = elements;
+  }
+  const cells = elements.length > 0 ? elements : lastCellsRef.current;
+
+  if (cells !== null) {
+    return <>{cells}</>;
+  }
+
+  if (rowCount === 0) {
+    return (
+      <AccessibleStatus
+        className="px-4 py-4"
+        message={t('agentChat.markdownTable.empty')}
+        tone="status"
+      />
+    );
+  }
+
+  return (
+    <View className="flex-row items-center gap-3 px-4 py-4">
+      <ActivityIndicator />
+      <AccessibleStatus message={t('agentChat.markdownTable.loading')} tone="status" />
+    </View>
+  );
+}
+
+// Body-only renderer: the one place the cell tree is parsed, and only while
+// the modal is open. `table()` returns the modal TableRow tree (not a chip),
+// and returns null for a header with no rows so MarkdownTableBody can show the
+// empty status. `headerTexts` is computed here from the nodes the library
+// passes in, so the constructor never needs to know them.
+// The export keeps the body table semantics testable without mounting the modal.
+export class MarkdownTableBodyRenderer extends MarkdownRenderer {
+  private readonly tablePalette: MarkdownPalette;
+  private readonly columnWidth: number;
+  private readonly columnCount: number;
+
+  // eslint-disable-next-line eslint/max-params -- the slice contract fixes this five-arg grouping; the first three shape the table and the last two mirror MarkdownRenderer's constructor tail
+  constructor(
+    palette: MarkdownPalette,
+    columnWidth: number,
+    columnCount: number,
+    selectable: boolean,
+    handlers: {
+      onLongPressLink?: MarkdownLinkLongPressHandler;
+      onPressLink?: MarkdownLinkPressHandler;
+    }
+  ) {
+    super(palette, selectable, handlers);
+    this.tablePalette = palette;
+    this.columnWidth = columnWidth;
+    this.columnCount = columnCount;
+  }
+
+  // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
+  override table(
+    header: ReactNode[][],
+    rows: ReactNode[][][],
+    _tableStyle?: ViewStyle,
+    _rowStyle?: ViewStyle,
+    _cellStyle?: ViewStyle
+  ): ReactNode {
+    if (rows.length === 0) {
+      return null;
+    }
+    const headerTexts = header.map(node => extractNodeText(node));
+    return (
+      <View
+        className="self-start overflow-hidden rounded-md border"
+        // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant colors
+        style={{
+          borderColor: this.tablePalette.borderColor,
+          backgroundColor: this.tablePalette.surfaceColor,
+        }}
+      >
+        <TableRow
+          palette={this.tablePalette}
+          cells={header}
+          columnCount={this.columnCount}
+          columnWidth={this.columnWidth}
+          isHeader
+          isLastRow={rows.length === 0}
+          headerTexts={headerTexts}
+        />
+        {rows.map((row, rowIdx) => (
+          <TableRow
+            key={rowIdx}
+            palette={this.tablePalette}
+            cells={row}
+            columnCount={this.columnCount}
+            columnWidth={this.columnWidth}
+            isLastRow={rows.length - 1 === rowIdx}
+            headerTexts={headerTexts}
+          />
+        ))}
+      </View>
+    );
+  }
 }
 
 type TableRowProps = {

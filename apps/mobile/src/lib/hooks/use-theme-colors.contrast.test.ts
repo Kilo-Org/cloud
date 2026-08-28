@@ -10,14 +10,9 @@ import {
 vi.mock('react-native', () => ({ useColorScheme: () => 'light' }));
 vi.mock('expo-router', () => ({ DarkTheme: {}, DefaultTheme: {} }));
 
-// These are the actual static hex values shipped in
-// `src/lib/hooks/use-theme-colors.ts`. The contrast assertions below fail if
-// the shipped pair regresses below 4.5:1, so any drift in the hook itself
-// breaks the build.
-//
-// `src/global.css` must stay in lockstep with the hook; the CSS file is not
-// read here because vitest's `?raw` does not process .css files in this node
-// environment and `node:fs` is lint-banned.
+// The color maps come from `src/lib/hooks/theme-colors.generated.ts`, which is
+// generated from `src/global.css` and checked by `scripts/assert-theme-colors.mjs`.
+// The contrast assertions below fail if a shipped pair regresses below 4.5:1.
 
 const MIN_TEXT_RATIO = 4.5;
 

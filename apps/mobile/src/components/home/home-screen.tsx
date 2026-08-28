@@ -1,57 +1,39 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { type TFunction } from 'i18next';
 import { RefreshControl, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { TabScreenScrollView } from '@/components/tab-screen';
-
 import {
   AgentSessionsSection,
-  HOME_LIVE_SLOT_MIN_CLASS,
+  useLiveSessionContext,
 } from '@/components/home/agent-sessions-section';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { ProductChoices } from '@/components/home/product-choices';
-import { QueryError } from '@/components/query-error';
 import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
-import { useOrganization } from '@/lib/organization-context';
-import { cn } from '@/lib/utils';
+import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 
 export function HomeScreen() {
-  const queryClient = useQueryClient();
-  const { t } = useTranslation();
   const [refreshing, setRefreshing] = useState(false);
-
-  const { organizationId, isLoaded: orgLoaded } = useOrganization();
-
-  const {
-    isLoading: sessionsLoading,
-    storedIsError,
-    activeIsError,
-    refetch: refetchSessions,
-  } = useAgentSessions({
-    organizationId,
-    enabled: orgLoaded,
+  const context = useLiveSessionContext();
+  const sessions = useLiveAgentSessions({
+    organizationId: context.organizationId,
+    enabled: context.isReady,
   });
-
-  const isLoading = sessionsLoading || !orgLoaded;
+  const { refetch } = sessions;
   const headerTitle = buildTimedGreeting();
 
   const handleRefresh = useCallback(() => {
     void (async () => {
       setRefreshing(true);
       try {
-        await queryClient.invalidateQueries({ refetchType: 'active' });
+        await refetch();
       } finally {
         setRefreshing(false);
       }
     })();
-  }, [queryClient]);
+  }, [refetch]);
 
   return (
     <View className="flex-1 bg-background">
@@ -60,76 +42,29 @@ export function HomeScreen() {
         size="large"
         showBackButton={false}
         className="px-[22px]"
-        context={<ContextControl />}
+        context={
+          <ContextControl
+            scope={context.accountReady ? undefined : { organizationId: null, isResolved: false }}
+          />
+        }
       />
       <TabScreenScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
-        <Animated.View layout={LinearTransition}>
-          {isLoading ? (
-            <Animated.View exiting={FadeOut.duration(150)} className="gap-2">
-              <View className="px-4 pb-2 pt-5">
-                <Skeleton className="h-3 w-28 rounded" />
-              </View>
-              <View className="gap-2 px-4">
-                {/* One slot: the loaded state is one row per live session, or a
-                    single empty card, so a single skeleton avoids a jump. */}
-                <Skeleton className={cn('w-full rounded-2xl', HOME_LIVE_SLOT_MIN_CLASS)} />
-              </View>
-            </Animated.View>
-          ) : (
-            <Animated.View entering={FadeIn.duration(200)} className="gap-2">
-              {renderSessionsOrError({
-                organizationId,
-                storedIsError,
-                activeIsError,
-                handleRetrySessions: () => void refetchSessions(),
-                t,
-              })}
-
+        <Animated.View layout={LinearTransition} className="gap-2">
+          <AgentSessionsSection context={context} sessions={sessions} />
+          {context.isReady && (
+            <>
               <View className="pt-4">
-                <NewTaskButton organizationId={organizationId} />
+                <NewTaskButton organizationId={context.organizationId} />
               </View>
-
-              <ProductChoices organizationId={organizationId} />
-            </Animated.View>
+              <ProductChoices organizationId={context.organizationId} />
+            </>
           )}
         </Animated.View>
       </TabScreenScrollView>
     </View>
   );
-}
-
-function renderSessionsOrError(params: {
-  organizationId: string | null;
-  storedIsError: boolean;
-  activeIsError: boolean;
-  handleRetrySessions: () => void;
-  t: TFunction;
-}) {
-  // A stored-list failure blocks all sessions, so it wins. A cold active poll
-  // failure is retryable but still hides the section until it recovers.
-  // Otherwise Home always renders the section, which shows an empty card when
-  // nothing is live.
-  if (params.storedIsError) {
-    return (
-      <QueryError
-        placement="top"
-        title={params.t('home.couldNotLoadSessions')}
-        onRetry={params.handleRetrySessions}
-      />
-    );
-  }
-  if (params.activeIsError) {
-    return (
-      <QueryError
-        placement="top"
-        title={params.t('home.couldNotLoadActiveSessions')}
-        onRetry={params.handleRetrySessions}
-      />
-    );
-  }
-  return <AgentSessionsSection organizationId={params.organizationId} />;
 }

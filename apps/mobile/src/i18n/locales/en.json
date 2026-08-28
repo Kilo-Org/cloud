@@ -2081,6 +2081,7 @@
     "sessionList": {
       "couldNotLoad": "Could not load sessions",
       "couldNotLoadActive": "Could not load active sessions",
+      "updating": "Updating",
       "noSessionsYetDescription": "Start a coding task from your phone. Your sessions will appear here.",
       "noMatches": "No sessions match",
       "tryDifferentSearch": "Try a different search term.",

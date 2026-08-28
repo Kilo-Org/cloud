@@ -25,8 +25,8 @@ on:
       - 'pnpm-workspace.yaml'
       - 'patches/**'
       - '.github/workflows/mobile-native-build.yml'
-  # Self-validation: a PR that edits this workflow builds both platforms,
-  # under a pr<N>- artifact prefix so hosts never install it.
+  # Self-validation: a PR that edits this workflow builds it once, under a
+  # pr<N>-<workflow hash>- artifact prefix so hosts never install it.
   # (workflow_dispatch only works after the file exists on main.)
   pull_request:
     paths:
@@ -82,12 +82,14 @@ jobs:
           android_hash=$(pnpm exec tsx dev/local/mobile-native-hash.ts android)
           echo "ios_hash=$ios_hash" >> "$GITHUB_OUTPUT"
           echo "android_hash=$android_hash" >> "$GITHUB_OUTPUT"
-          # A pull_request run validates this workflow, so it must always
-          # build, and it must not publish into the namespace hosts install
-          # from (dev/local/mobile-remote-native.ts).
+          # A pull_request run validates this workflow. Its artifacts stay out
+          # of the namespace hosts install from (dev/local/mobile-remote-native.ts)
+          # and are keyed on the workflow file as well, so each edit of it
+          # builds exactly once and a re-push of the same file skips.
           prefix=''
           if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-            prefix="pr$PR_NUMBER-"
+            workflow_hash=$(sha256sum .github/workflows/mobile-native-build.yml | cut -c1-8)
+            prefix="pr$PR_NUMBER-$workflow_hash-"
           fi
           echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
           exists() {
@@ -100,11 +102,8 @@ jobs:
             if [ "$PLATFORM" != all ] && [ "$PLATFORM" != "$platform" ]; then
               echo false; return
             fi
-            if [ -n "$prefix" ]; then
-              echo true; return
-            fi
-            if exists "mobile-native-$platform-$hash"; then
-              echo "artifact mobile-native-$platform-$hash already exists" >&2
+            if exists "${prefix}mobile-native-$platform-$hash"; then
+              echo "artifact ${prefix}mobile-native-$platform-$hash already exists" >&2
               echo false
             else
               echo true
@@ -192,7 +191,7 @@ jobs:
           name: ${{ needs.gate.outputs.prefix }}mobile-native-ios-${{ needs.gate.outputs.ios_hash }}
           path: ios-${{ needs.gate.outputs.ios_hash }}.tar.gz
           compression-level: 0
-          retention-days: 90
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 90 }}
           if-no-files-found: error
 
   android:
@@ -241,5 +240,5 @@ jobs:
           name: ${{ needs.gate.outputs.prefix }}mobile-native-android-${{ needs.gate.outputs.android_hash }}
           path: ${{ runner.temp }}/Kilo.apk
           compression-level: 0
-          retention-days: 90
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 90 }}
           if-no-files-found: error

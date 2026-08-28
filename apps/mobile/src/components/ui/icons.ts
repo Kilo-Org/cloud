@@ -69,7 +69,7 @@ export { default as GitPullRequestClosed } from 'lucide-react-native/icons/git-p
 export { default as GitPullRequestDraft } from 'lucide-react-native/icons/git-pull-request-draft';
 export { default as Globe } from 'lucide-react-native/icons/globe';
 export { default as HelpCircle } from 'lucide-react-native/icons/circle-question-mark';
-export { default as History } from 'lucide-react-native/icons/history';
+export { default as History } from 'lucide-react-native/icons/rotate-ccw-clock';
 export { default as House } from 'lucide-react-native/icons/house';
 export { default as ImageOff } from 'lucide-react-native/icons/image-off';
 export { default as Inbox } from 'lucide-react-native/icons/inbox';
@@ -139,7 +139,7 @@ export { default as ShieldOff } from 'lucide-react-native/icons/shield-off';
 export { default as Shuffle } from 'lucide-react-native/icons/shuffle';
 export { default as SlidersHorizontal } from 'lucide-react-native/icons/sliders-horizontal';
 export { default as Smartphone } from 'lucide-react-native/icons/smartphone';
-export { default as SmilePlus } from 'lucide-react-native/icons/smile-plus';
+export { default as SmilePlus } from 'lucide-react-native/icons/face-slightly-smiling-plus';
 export { default as Sparkles } from 'lucide-react-native/icons/sparkles';
 export { default as Square } from 'lucide-react-native/icons/square';
 export { default as Star } from 'lucide-react-native/icons/star';

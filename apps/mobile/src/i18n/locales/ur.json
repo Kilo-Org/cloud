@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "اٹیچمنٹس ضائع کریں؟",
       "charactersRemaining": "{{count}} حروف باقی ہیں",
       "insertNewline": "نئی سطر داخل کریں",
-      "starterChipBuild": "ایک فیچر بنائیں",
-      "starterChipEmpty": "ایک خیال سے شروع کریں",
-      "starterChipFix": "ایک خرابی درست کریں",
-      "starterChipPrepare": "میرا ماحول ترتیب دیں",
-      "starterChipWrapUp": "میرا سیشن مکمل کریں",
-      "starterChipWriteTests": "ٹیسٹ لکھیں"
+      "starterChipBuild": "ایک فیچر بناؤ",
+      "starterChipEmpty": "ایک خیال سے شروع کرو",
+      "starterChipFix": "ایک خرابی درست کرو",
+      "starterChipPrepare": "میرا ماحول ترتیب دو",
+      "starterChipWrapUp": "میرا سیشن مکمل کرو",
+      "starterChipWriteTests": "ٹیسٹ لکھو"
     },
     "chatLink": {
       "linkCopied": "لنک کاپی ہو گیا",

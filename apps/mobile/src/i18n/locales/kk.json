@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "Қосымшаларды жою керек пе?",
       "charactersRemaining": "{{count}} таңба қалды",
       "insertNewline": "Жаңа жол енгізу",
-      "starterChipBuild": "Мүмкіндік жасау",
-      "starterChipEmpty": "Идеядан бастау",
-      "starterChipFix": "Қатені түзету",
-      "starterChipPrepare": "Ортамды баптау",
-      "starterChipWrapUp": "Сессиямды аяқтау",
-      "starterChipWriteTests": "Тесттер жазу"
+      "starterChipBuild": "Мүмкіндік жаса",
+      "starterChipEmpty": "Идеядан баста",
+      "starterChipFix": "Қатені түзет",
+      "starterChipPrepare": "Ортамды бапта",
+      "starterChipWrapUp": "Сессиямды аяқта",
+      "starterChipWriteTests": "Тесттер жаз"
     },
     "chatLink": {
       "linkCopied": "Сілтеме көшірілді",

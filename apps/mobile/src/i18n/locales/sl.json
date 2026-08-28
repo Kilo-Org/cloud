@@ -2629,12 +2629,12 @@
       "discardAttachmentsTitle": "Zavreči priloge?",
       "charactersRemaining": "Preostalo znakov: {{count}}",
       "insertNewline": "Vstavite novo vrstico",
-      "starterChipBuild": "Razvijte funkcijo",
-      "starterChipEmpty": "Začnite z zamislijo",
-      "starterChipFix": "Odpravite napako",
-      "starterChipPrepare": "Nastavite moje okolje",
-      "starterChipWrapUp": "Zaključite mojo sejo",
-      "starterChipWriteTests": "Napišite preizkuse"
+      "starterChipBuild": "Razvij funkcijo",
+      "starterChipEmpty": "Začni z zamislijo",
+      "starterChipFix": "Odpravi napako",
+      "starterChipPrepare": "Nastavi moje okolje",
+      "starterChipWrapUp": "Zaključi mojo sejo",
+      "starterChipWriteTests": "Napiši preizkuse"
     },
     "chatLink": {
       "linkCopied": "Povezava kopirana",

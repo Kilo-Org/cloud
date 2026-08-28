@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "Biriktirilgan fayllar bekor qilinsinmi?",
       "charactersRemaining": "{{count}} ta belgi qoldi",
       "insertNewline": "Yangi qator kiritish",
-      "starterChipBuild": "Funksiya yaratish",
-      "starterChipEmpty": "G'oya bilan boshlash",
-      "starterChipFix": "Xatoni tuzatish",
-      "starterChipPrepare": "Muhitimni sozlash",
-      "starterChipWrapUp": "Sessiyamni yakunlash",
-      "starterChipWriteTests": "Sinovlar yozish"
+      "starterChipBuild": "Funksiya yarat",
+      "starterChipEmpty": "G'oya bilan boshla",
+      "starterChipFix": "Xatoni tuzat",
+      "starterChipPrepare": "Muhitimni sozla",
+      "starterChipWrapUp": "Sessiyamni yakunla",
+      "starterChipWriteTests": "Sinovlar yoz"
     },
     "chatLink": {
       "linkCopied": "Havola nusxalandi",

@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "Faayiloota qabachiifaman haqnaa?",
       "charactersRemaining": "Qubeelaa {{count}} hafe",
       "insertNewline": "Sarara haaraa galchaa",
-      "starterChipBuild": "Amala haaraa ijaaraa",
-      "starterChipEmpty": "Yaada tokkoon jalqabaa",
-      "starterChipFix": "Dogoggora sirreessaa",
-      "starterChipPrepare": "Naannoo koo qopheessaa",
-      "starterChipWrapUp": "Xalayyii koo xumuraa",
-      "starterChipWriteTests": "Qormaata barreessaa"
+      "starterChipBuild": "Amala haaraa ijaari",
+      "starterChipEmpty": "Yaada tokkoon jalqabi",
+      "starterChipFix": "Dogoggora sirreessi",
+      "starterChipPrepare": "Naannoo koo qopheessi",
+      "starterChipWrapUp": "Turtii koo xumuri",
+      "starterChipWriteTests": "Qormaata barreessi"
     },
     "chatLink": {
       "linkCopied": "Geessituun maxxanameera",

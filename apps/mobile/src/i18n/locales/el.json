@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "Απόρριψη συνημμένων;",
       "charactersRemaining": "Απομένουν {{count}} χαρακτήρες",
       "insertNewline": "Εισαγωγή νέας γραμμής",
-      "starterChipBuild": "Δημιουργία λειτουργίας",
-      "starterChipEmpty": "Ξεκινήστε με μια ιδέα",
-      "starterChipFix": "Διόρθωση σφάλματος",
-      "starterChipPrepare": "Ρύθμιση του περιβάλλοντός μου",
-      "starterChipWrapUp": "Ολοκλήρωση της συνεδρίας μου",
-      "starterChipWriteTests": "Σύνταξη δοκιμών"
+      "starterChipBuild": "Δημιούργησε μια λειτουργία",
+      "starterChipEmpty": "Ξεκίνα με μια ιδέα",
+      "starterChipFix": "Διόρθωσε ένα σφάλμα",
+      "starterChipPrepare": "Ρύθμισε το περιβάλλον μου",
+      "starterChipWrapUp": "Ολοκλήρωσε τη συνεδρία μου",
+      "starterChipWriteTests": "Γράψε δοκιμές"
     },
     "chatLink": {
       "linkCopied": "Ο σύνδεσμος αντιγράφηκε",

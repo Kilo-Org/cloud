@@ -2593,10 +2593,10 @@
       "insertNewline": "Magpasok ng bagong linya",
       "starterChipBuild": "Gumawa ng feature",
       "starterChipEmpty": "Magsimula sa isang ideya",
-      "starterChipFix": "Ayusin ang depekto",
-      "starterChipPrepare": "Ihanda ang aking environment",
-      "starterChipWrapUp": "Tapusin ang aking session",
-      "starterChipWriteTests": "Sumulat ng mga pagsubok"
+      "starterChipFix": "Ayusin ang bug",
+      "starterChipPrepare": "Ihanda ang environment ko",
+      "starterChipWrapUp": "Tapusin ang session ko",
+      "starterChipWriteTests": "Sumulat ng mga test"
     },
     "chatLink": {
       "linkCopied": "Na-kopya ang link",

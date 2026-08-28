@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "ပူးတွဲဖိုင်များကို ပယ်ဖျက်မည်လား။",
       "charactersRemaining": "အက္ခရာ {{count}} လုံး ကျန်သည်",
       "insertNewline": "စာကြောင်းအသစ် ထည့်ပါ",
-      "starterChipBuild": "လုပ်ဆောင်ချက်တစ်ခု တည်ဆောက်ပါ",
-      "starterChipEmpty": "စိတ်ကူးတစ်ခုဖြင့် စတင်ပါ",
-      "starterChipFix": "ချို့ယွင်းချက်တစ်ခု ပြင်ဆင်ပါ",
-      "starterChipPrepare": "ကျွန်ုပ်၏ လုပ်ငန်းပတ်ဝန်းကျင်ကို ပြင်ဆင်ပါ",
-      "starterChipWrapUp": "ကျွန်ုပ်၏ ဆက်ရှင်ကို အဆုံးသတ်ပါ",
-      "starterChipWriteTests": "စမ်းသပ်မှုများ ရေးပါ"
+      "starterChipBuild": "လုပ်ဆောင်ချက်တစ်ခု တည်ဆောက်",
+      "starterChipEmpty": "စိတ်ကူးတစ်ခုနဲ့ စလိုက်",
+      "starterChipFix": "ချို့ယွင်းချက်တစ်ခု ပြင်",
+      "starterChipPrepare": "ငါ့လုပ်ငန်းပတ်ဝန်းကျင်ကို ပြင်ဆင်",
+      "starterChipWrapUp": "ငါ့ဆက်ရှင်ကို အဆုံးသတ်",
+      "starterChipWriteTests": "စမ်းသပ်မှုတွေ ရေး"
     },
     "chatLink": {
       "linkCopied": "link ကို ကူးယူပြီးပါပြီ",

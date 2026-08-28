@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "അറ്റാച്ച്മെന്റുകൾ ഉപേക്ഷിക്കണോ?",
       "charactersRemaining": "{{count}} അക്ഷരങ്ങൾ ശേഷിക്കുന്നു",
       "insertNewline": "പുതിയ വരി ചേർക്കുക",
-      "starterChipBuild": "ഒരു ഫീച്ചർ നിർമ്മിക്കുക",
-      "starterChipEmpty": "ഒരു ആശയത്തോടെ ആരംഭിക്കുക",
-      "starterChipFix": "ഒരു ബഗ് പരിഹരിക്കുക",
-      "starterChipPrepare": "എന്റെ എൻവയോൺമെന്റ് സജ്ജീകരിക്കുക",
-      "starterChipWrapUp": "എന്റെ സെഷൻ പൂർത്തിയാക്കുക",
-      "starterChipWriteTests": "ടെസ്റ്റുകൾ എഴുതുക"
+      "starterChipBuild": "ഒരു ഫീച്ചർ നിർമ്മിക്ക്",
+      "starterChipEmpty": "ഒരു ആശയത്തോടെ ആരംഭിക്ക്",
+      "starterChipFix": "ഒരു ബഗ് പരിഹരിക്ക്",
+      "starterChipPrepare": "എന്റെ എൻവയോൺമെന്റ് സജ്ജീകരിക്ക്",
+      "starterChipWrapUp": "എന്റെ സെഷൻ പൂർത്തിയാക്ക്",
+      "starterChipWriteTests": "ടെസ്റ്റുകൾ എഴുത്"
     },
     "chatLink": {
       "linkCopied": "ലിങ്ക് പകർത്തി",

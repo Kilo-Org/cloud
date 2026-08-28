@@ -2610,12 +2610,12 @@
       "discardAttachmentsTitle": "Atmest pielikumus?",
       "charactersRemaining": "Atlikušās rakstzīmes: {{count}}",
       "insertNewline": "Ievietot jaunu rindu",
-      "starterChipBuild": "Izveidot funkciju",
-      "starterChipEmpty": "Sākt ar ideju",
-      "starterChipFix": "Izlabot kļūdu",
-      "starterChipPrepare": "Iestatīt manu vidi",
-      "starterChipWrapUp": "Pabeigt manu sesiju",
-      "starterChipWriteTests": "Rakstīt testus"
+      "starterChipBuild": "Izveido funkciju",
+      "starterChipEmpty": "Sāc ar ideju",
+      "starterChipFix": "Izlabo kļūdu",
+      "starterChipPrepare": "Iestati manu vidi",
+      "starterChipWrapUp": "Pabeidz manu sesiju",
+      "starterChipWriteTests": "Raksti testus"
     },
     "chatLink": {
       "linkCopied": "Saite kopēta",

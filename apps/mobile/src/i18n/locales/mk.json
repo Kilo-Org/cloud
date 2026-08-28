@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "Да се отфрлат прилозите?",
       "charactersRemaining": "Преостануваат {{count}} знаци",
       "insertNewline": "Вметнете нов ред",
-      "starterChipBuild": "Изградете функционалност",
-      "starterChipEmpty": "Започнете со идеја",
-      "starterChipFix": "Поправете грешка",
-      "starterChipPrepare": "Поставете ја мојата околина",
-      "starterChipWrapUp": "Завршете ја мојата сесија",
-      "starterChipWriteTests": "Напишете тестови"
+      "starterChipBuild": "Изгради функционалност",
+      "starterChipEmpty": "Започни со идеја",
+      "starterChipFix": "Поправи грешка",
+      "starterChipPrepare": "Постави ја мојата околина",
+      "starterChipWrapUp": "Заврши ја мојата сесија",
+      "starterChipWriteTests": "Напиши тестови"
     },
     "chatLink": {
       "linkCopied": "Линкот е копиран",

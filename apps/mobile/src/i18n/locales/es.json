@@ -2149,12 +2149,12 @@
       "discardAttachmentsTitle": "¿Descartar adjuntos?",
       "charactersRemaining": "Quedan {{count}} caracteres",
       "insertNewline": "Insertar salto de línea",
-      "starterChipBuild": "Crear una función",
-      "starterChipEmpty": "Empezar con una idea",
-      "starterChipFix": "Corregir un error",
-      "starterChipPrepare": "Configurar mi entorno",
-      "starterChipWrapUp": "Finalizar mi sesión",
-      "starterChipWriteTests": "Escribir pruebas"
+      "starterChipBuild": "Crea una función",
+      "starterChipEmpty": "Empieza con una idea",
+      "starterChipFix": "Corrige un error",
+      "starterChipPrepare": "Configura mi entorno",
+      "starterChipWrapUp": "Finaliza mi sesión",
+      "starterChipWriteTests": "Escribe pruebas"
     },
     "chatLink": {
       "linkCopied": "Enlace copiado",

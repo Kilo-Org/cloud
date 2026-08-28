@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "پیوست‌ها دور انداخته شوند؟",
       "charactersRemaining": "{{count}} نویسه باقی مانده",
       "insertNewline": "درج خط جدید",
-      "starterChipBuild": "ساخت یک ویژگی",
-      "starterChipEmpty": "شروع با یک ایده",
-      "starterChipFix": "رفع یک اشکال",
-      "starterChipPrepare": "راه‌اندازی محیط من",
-      "starterChipWrapUp": "پایان دادن به نشست من",
-      "starterChipWriteTests": "نوشتن آزمون‌ها"
+      "starterChipBuild": "یک ویژگی بساز",
+      "starterChipEmpty": "با یک ایده شروع کن",
+      "starterChipFix": "یک اشکال را رفع کن",
+      "starterChipPrepare": "محیط من را راه‌اندازی کن",
+      "starterChipWrapUp": "به نشست من پایان بده",
+      "starterChipWriteTests": "آزمون‌ها را بنویس"
     },
     "chatLink": {
       "linkCopied": "پیوند کپی شد",

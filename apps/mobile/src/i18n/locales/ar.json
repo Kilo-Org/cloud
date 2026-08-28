@@ -2185,12 +2185,12 @@
       "discardAttachmentsTitle": "تجاهل المرفقات؟",
       "charactersRemaining": "الأحرف المتبقية: {{count}}",
       "insertNewline": "إدراج سطر جديد",
-      "starterChipBuild": "إنشاء ميزة",
-      "starterChipEmpty": "البدء بفكرة",
-      "starterChipFix": "إصلاح خلل",
-      "starterChipPrepare": "إعداد بيئتي",
-      "starterChipWrapUp": "إنهاء جلستي",
-      "starterChipWriteTests": "كتابة اختبارات"
+      "starterChipBuild": "أنشئ ميزة",
+      "starterChipEmpty": "ابدأ بفكرة",
+      "starterChipFix": "أصلح خللًا",
+      "starterChipPrepare": "جهّز بيئتي",
+      "starterChipWrapUp": "أنهِ جلستي",
+      "starterChipWriteTests": "اكتب اختبارات"
     },
     "chatLink": {
       "linkCopied": "تم نسخ الرابط",

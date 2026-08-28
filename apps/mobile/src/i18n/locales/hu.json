@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "Elveti a csatolmányokat?",
       "charactersRemaining": "{{count}} karakter maradt",
       "insertNewline": "Új sor beszúrása",
-      "starterChipBuild": "Funkció fejlesztése",
-      "starterChipEmpty": "Kezdés egy ötlettel",
-      "starterChipFix": "Hiba javítása",
-      "starterChipPrepare": "A környezetem beállítása",
-      "starterChipWrapUp": "A munkamenetem lezárása",
-      "starterChipWriteTests": "Tesztek írása"
+      "starterChipBuild": "Fejlessz egy funkciót",
+      "starterChipEmpty": "Kezdj egy ötlettel",
+      "starterChipFix": "Javíts ki egy hibát",
+      "starterChipPrepare": "Állítsd be a környezetemet",
+      "starterChipWrapUp": "Zárd le a munkamenetemet",
+      "starterChipWriteTests": "Írj teszteket"
     },
     "chatLink": {
       "linkCopied": "Hivatkozás másolva",

@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "فڕێدانی هاوپێچەکان؟",
       "charactersRemaining": "{{count}} پیت ماوە",
       "insertNewline": "تێخستنی دێڕێکی نوێ",
-      "starterChipBuild": "دروستکردنی تایبەتمەندییەک",
-      "starterChipEmpty": "دەستپێکردن بە بیرۆکەیەک",
-      "starterChipFix": "چاککردنەوەی هەڵەیەک",
-      "starterChipPrepare": "ڕێکخستنی ژینگەکەم",
-      "starterChipWrapUp": "تەواوکردنی سێشنەکەم",
-      "starterChipWriteTests": "نووسینی تاقیکردنەوەکان"
+      "starterChipBuild": "تایبەتمەندییەک دروست بکە",
+      "starterChipEmpty": "بە بیرۆکەیەک دەست پێ بکە",
+      "starterChipFix": "هەڵەیەک چاک بکەرەوە",
+      "starterChipPrepare": "ژینگەکەم ڕێک بخە",
+      "starterChipWrapUp": "سێشنەکەم تەواو بکە",
+      "starterChipWriteTests": "تاقیکردنەوەکان بنووسە"
     },
     "chatLink": {
       "linkCopied": "بەستەرەکە کۆپی کرا",

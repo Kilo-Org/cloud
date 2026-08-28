@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "એટેચમેન્ટ્સ કાઢી નાખવા છે?",
       "charactersRemaining": "{{count}} અક્ષરો બાકી",
       "insertNewline": "નવી લાઇન દાખલ કરો",
-      "starterChipBuild": "સુવિધા બનાવો",
-      "starterChipEmpty": "વિચારથી શરૂઆત કરો",
-      "starterChipFix": "ભૂલ સુધારો",
-      "starterChipPrepare": "મારું એન્વાયર્નમેન્ટ સેટ કરો",
-      "starterChipWrapUp": "મારું સત્ર પૂર્ણ કરો",
-      "starterChipWriteTests": "પરીક્ષણો લખો"
+      "starterChipBuild": "સુવિધા બનાવ",
+      "starterChipEmpty": "વિચારથી શરૂઆત કર",
+      "starterChipFix": "ભૂલ સુધાર",
+      "starterChipPrepare": "મારું એન્વાયર્નમેન્ટ સેટ કર",
+      "starterChipWrapUp": "મારું સત્ર પૂર્ણ કર",
+      "starterChipWriteTests": "પરીક્ષણો લખ"
     },
     "chatLink": {
       "linkCopied": "લિંક કૉપિ થઈ",

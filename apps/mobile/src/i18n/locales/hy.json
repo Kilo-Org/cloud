@@ -152,7 +152,9 @@
     "appearanceDark": "Մուգ",
     "account": "Հաշիվ",
     "prReviewAttribution": "Ավելացնել հավելվածի վերագրումը PR ակնարկներին",
-    "prReviewAttributionSubtitle": "Ավելացնել «Վերանայվել է Kilo-ի միջոցով» ստորագիրը, երբ ներկայացնում եք ակնարկ:"
+    "prReviewAttributionSubtitle": "Ավելացնել «Վերանայվել է Kilo-ի միջոցով» ստորագիրը, երբ ներկայացնում եք ակնարկ:",
+    "returnSendsMessage": "Վերադարձի ստեղնն ուղարկում է հաղորդագրությունը",
+    "returnSendsMessageSubtitle": "Երբ անջատված է, վերադարձի ստեղնը նոր տող է տեղադրում գործակալների հաղորդագրության մուտքագրման դաշտերում։"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-ը հասանելի չէ",
@@ -665,7 +667,8 @@
     "profile": "Պրոֆիլ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ներդիր, {{position}} / {{total}}"
+    "position": "{{name}}, ներդիր, {{position}} / {{total}}",
+    "chat": "Զրույց"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "Ցանցի սխալ",
       "uploadFailed": "Վերբեռնումը ձախողվեց",
       "failedToUploadFile": "Չհաջողվեց վերբեռնել ֆայլը: {{reason}}",
-      "nothingToPaste": "Կպցնելու բան չկա"
+      "nothingToPaste": "Կպցնելու բան չկա",
+      "metadataStripFailed": "Չհաջողվեց հեռացնել լուսանկարի մետատվյալները։"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "Ստուգման գործարկում",
       "status": "Կարգավիճակ",
       "threshold": "Շեմ",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Սպասում ենք ստուգման արձանագրությանը:",
+      "transcriptEmpty": "Այս ստուգման համար արձանագրություն չկա:",
+      "transcriptRetry": "Հնարավոր չեղավ բեռնել ստուգման արձանագրությունը:",
+      "transcriptLive": "Ուղիղ",
+      "agentIdle": "Գործակալը պարապ է",
+      "agentWorking": "Գործակալն աշխատում է...",
+      "anErrorOccurred": "Սխալ է տեղի ունեցել",
+      "errorWithMessage": "Սխալ: {{message}}",
+      "executionStarted": "Կատարումը սկսվել է",
+      "reviewCompleted": "Ստուգումն ավարտված է",
+      "reviewInterrupted": "Ստուգումն ընդհատվել է",
+      "sessionError": "Նիստի սխալ: {{error}}",
+      "statusWithValue": "Կարգավիճակ: {{status}}",
+      "toolName": "Գործիք: {{name}}",
+      "toolNameError": "Գործիք: {{name}} — սխալ",
+      "unknownError": "Անհայտ սխալ"
     },
     "reviewMemory": {
       "title": "Ստուգման հիշողություն",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "Նախորդ առաջադրանքը դեռ ավարտվում է։ Խնդրում ենք սպասել մի պահ։",
       "serviceUnavailable": "Ծառայությունն այս պահին հասանելի չէ։ Խնդրում ենք փորձեք կրկին։",
       "connectionTrouble": "Կապի խնդիր։ Խնդրում ենք փորձեք կրկին մի պահ հետո։",
-      "modelUnavailable": "Այս մոդելը հասանելի չէ Cloud Agent-ի համար։ Ընտրեք մեկ այլ մոդել և փորձեք կրկին։"
+      "modelUnavailable": "Այս մոդելը հասանելի չէ Cloud Agent-ի համար։ Ընտրեք մեկ այլ մոդել և փորձեք կրկին։",
+      "cancelQueuedFailed": "Չհաջողվեց չեղարկել հաղորդագրությունը։",
+      "cancelQueuedRestoreAvailable": "Հաղորդագրությունը չեղարկված է։ Հպեք «Վերականգնել»՝ այն հաղորդագրության մուտքագրման դաշտ վերադարձնելու համար։",
+      "cancelQueuedRestored": "Հաղորդագրությունը չեղարկված է։ Հուշումը կրկին հաղորդագրության մուտքագրման դաշտում է։",
+      "cancelQueuedUpgradeRequired": "Հերթագրված հաղորդագրությունները չեղարկելու համար անհրաժեշտ է Kilo CLI-ի ավելի նոր տարբերակ։ Թարմացրեք Kilo CLI-ն և կրկին միացեք։"
     },
     "remoteSession": {
       "failedToCreate": "Չհաջողվեց ստեղծել հեռավոր նիստ",
@@ -2196,7 +2220,8 @@
       "continueFrom": "Շարունակվում է {{title}}",
       "importingSession": "Ներմուծվում է նիստ",
       "cliCannotContinue": "Այս CLI-ն չի կարող շարունակել նիստը: Ընտրեք Ամպային գործակալ կամ մեկ այլ CLI:",
-      "importFailed": "Չհաջողվեց ներմուծել այս նիստը:"
+      "importFailed": "Չհաջողվեց ներմուծել այս նիստը:",
+      "discardWithUploadsMessage": "Ձեր հուշումը և ուղարկված հաղորդագրություններին չկցված վերբեռնված բոլոր ֆայլերը կջնջվեն։"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "Հաղորդագրությունը հերթում է",
       "userMessage": "Օգտատիրոջ հաղորդագրություն",
       "assistantMessage": "Օգնականի հաղորդագրություն",
-      "longPressHint": "Երկար սեղմեք՝ հաղորդագրության մանրամասները տեսնելու համար"
+      "longPressHint": "Երկար սեղմեք՝ հաղորդագրության մանրամասները տեսնելու համար",
+      "cancelQueued": "Չեղարկել հաղորդագրությունը",
+      "cancelQueuedAccessibility": "Չեղարկել հերթագրված հաղորդագրությունը",
+      "restoreQueued": "Վերականգնել",
+      "restoreQueuedAccessibility": "Վերականգնել չեղարկված հաղորդագրությունը հաղորդագրության մուտքագրման դաշտում"
     },
     "olderMessages": {
       "arrived": "Ավելի վաղ հաղորդագրությունները բեռնված են",
@@ -2460,6 +2489,8 @@
       "viewTable": "Դիտել աղյուսակը",
       "title": "Աղյուսակ",
       "close": "Փակել աղյուսակը",
+      "loading": "Բեռնվում է աղյուսակը",
+      "empty": "Այս աղյուսակում տողեր չկան։",
       "columnCount_one": "սյունակ",
       "columnCount": "սյունակներ",
       "columnCount_other": "սյունակներ",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Զտել նիստերը",
-      "sortBy": "Դասավորել ըստ",
-      "sortLastUpdated": "Վերջին թարմացում",
-      "sortCreated": "Ստեղծված",
       "platform": "Հարթակ",
       "platformCloud": "Cloud",
       "platformExtension": "Ընդլայնում",
@@ -2526,7 +2554,9 @@
       "uploading": "Վերբեռնվում է…",
       "uploaded": "Վերբեռնված",
       "uploadFailedRetry": "Վերբեռնումը ձախողվեց: Հպեք՝ նորից փորձելու համար:",
-      "uploadFailedTerminal": "Այս ֆայլը հնարավոր չէ վերբեռնել:"
+      "uploadFailedTerminal": "Այս ֆայլը հնարավոր չէ վերբեռնել:",
+      "moveLeft": "Տեղափոխել {{filename}} ձախ",
+      "moveRight": "Տեղափոխել {{filename}} աջ"
     },
     "attachmentPasteHint": {
       "accessibility": "Տեղադրել պատկերը սեղմատախտակից",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "Ամփոփվում է...",
       "messagePlaceholder": "Հաղորդագրություն...",
       "cannotReceiveFiles": "Այս նիստը չի կարող ընդունել ֆայլեր: Հեռացրեք կցումները՝ հաղորդագրությունն ուղարկելու համար:",
-      "couldNotAttachFiles": "Հնարավոր չեղավ կցել ֆայլերը: Հպեք «Ուղարկել»՝ նորից փորձելու համար:"
+      "couldNotAttachFiles": "Հնարավոր չեղավ կցել ֆայլերը: Հպեք «Ուղարկել»՝ նորից փորձելու համար:",
+      "discardAttachmentsMessage": "Ուղարկված հաղորդագրություններին չկցված վերբեռնված ֆայլերը կջնջվեն։",
+      "discardAttachmentsTitle": "Մերժե՞լ կցորդները",
+      "charactersRemaining": "Մնացել է {{count}} նիշ",
+      "insertNewline": "Տեղադրել նոր տող",
+      "starterChipBuild": "Ստեղծել գործառույթ",
+      "starterChipEmpty": "Սկսել գաղափարից",
+      "starterChipFix": "Շտկել սխալը",
+      "starterChipPrepare": "Կարգավորել իմ միջավայրը",
+      "starterChipWrapUp": "Ավարտել իմ նիստը",
+      "starterChipWriteTests": "Գրել թեստեր"
     },
     "chatLink": {
       "linkCopied": "Հղումը պատճենված է",
@@ -2775,7 +2815,8 @@
     "busy": "Ձայնային մուտքագրումը զբաղված է: Կրկին փորձեք:",
     "stopped": "Ձայնային մուտքագրումը դադարեցված է: Հպեք խոսափողին՝ կրկին փորձելու համար:",
     "unavailableDevice": "Ձայնային մուտքագրումը հասանելի չէ այս սարքում:",
-    "unavailableLanguage": "Ձայնային մուտքագրումը հասանելի չէ այս սարքի լեզվի համար:"
+    "unavailableLanguage": "Ձայնային մուտքագրումը հասանելի չէ այս սարքի լեզվի համար:",
+    "listeningStopped": "Լսումը դադարեցված է։"
   },
   "share": {
     "title": "Տարածել Kilo-ում",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "Երբ վստահում եք հղման հոսթին, այն բացվում է առանց կրկին հարցնելու։",
     "revoke": "Հեռացնել {{host}}",
     "backToPreferences": "Վերադառնալ կարգավորումներ"
+  },
+  "quickChat": {
+    "title": "Զրույց",
+    "composer": {
+      "placeholder": "Հաղորդագրություն"
+    },
+    "empty": {
+      "title": "Սկսել զրույց",
+      "description": "Ուղարկեք հաղորդագրություն մոդելի հետ խոսելու համար."
+    },
+    "working": "Մշակվում է",
+    "historyRetry": "Հնարավոր չեղավ բեռնել զրույցի պատմությունը.",
+    "catalogRetry": "Հնարավոր չեղավ բեռնել մոդելները",
+    "sendError": "Հնարավոր չեղավ ուղարկել հաղորդագրությունը։ Կրկին փորձեք։"
   }
 }

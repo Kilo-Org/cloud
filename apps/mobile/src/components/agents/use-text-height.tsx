@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { type LayoutChangeEvent, Text, type TextStyle, View, type ViewStyle } from 'react-native';
 
 type UseTextHeightOptions = {
@@ -8,6 +8,13 @@ type UseTextHeightOptions = {
   textContentWidth: number;
   fontSize: number;
   lineHeight: number;
+  /**
+   * System Dynamic Type scale. When set, the caller pre-scales `fontSize` and
+   * `lineHeight` here and native scaling is disabled on the measure node, so
+   * the scale applies exactly once. When omitted, the base sizes are rendered
+   * and native scaling applies (the kilo-chat message input path).
+   */
+  fontScale?: number;
   initialText?: string;
 };
 
@@ -22,43 +29,63 @@ export function useTextHeight({
   textContentWidth,
   fontSize,
   lineHeight,
+  fontScale,
   initialText = '',
 }: UseTextHeightOptions) {
   const [text, setMeasuredText] = useState(initialText);
+  // The padded, unclamped mirror height, measured by the hidden Text node.
+  const [contentHeight, setContentHeight] = useState(minHeight);
+  // The clamped height published to the caller, re-clamped whenever the
+  // content, the minimum, or the remaining-space cap changes.
   const [height, setHeight] = useState(minHeight);
   const measuredText = text.length === 0 || text.endsWith('\n') ? `${text} ` : text;
   const measurementWidth = Math.max(textContentWidth, 0);
+  // Pre-scale only when the caller opted in (the agent composers). The
+  // kilo-chat message input omits `fontScale` and relies on native scaling.
+  const scaledFontSize = fontScale == null ? fontSize : fontSize * fontScale;
+  const scaledLineHeight = fontScale == null ? lineHeight : lineHeight * fontScale;
+  // Disable native scaling only when the caller pre-scaled, so the scale is
+  // applied exactly once instead of twice.
+  const maxFontSizeMultiplier = fontScale == null ? undefined : 1;
 
   function handleMeasureLayout(event: LayoutChangeEvent) {
     const textHeight = event.nativeEvent.layout.height;
     const paddedHeight = Math.ceil(textHeight + verticalPadding);
-    const nextHeight = Math.min(Math.max(paddedHeight, minHeight), maxHeight);
-    setHeight(current => (current === nextHeight ? current : nextHeight));
+    setContentHeight(paddedHeight);
   }
+
+  useEffect(() => {
+    const nextHeight = Math.min(Math.max(contentHeight, minHeight), maxHeight);
+    setHeight(current => (current === nextHeight ? current : nextHeight));
+  }, [contentHeight, minHeight, maxHeight]);
 
   function setText(nextText: string) {
     setMeasuredText(nextText);
     if (nextText.length === 0) {
-      setHeight(minHeight);
+      setContentHeight(minHeight);
     }
   }
 
   function reset() {
     setMeasuredText('');
-    setHeight(minHeight);
+    setContentHeight(minHeight);
   }
 
   const textStyle: TextStyle = {
-    fontSize,
+    fontSize: scaledFontSize,
     includeFontPadding: false,
-    lineHeight,
+    lineHeight: scaledLineHeight,
     width: measurementWidth,
   };
 
   const measureElement =
     measurementWidth > 0 ? (
       <View style={hiddenContainer} pointerEvents="none">
-        <Text style={textStyle} onLayout={handleMeasureLayout}>
+        <Text
+          style={textStyle}
+          onLayout={handleMeasureLayout}
+          maxFontSizeMultiplier={maxFontSizeMultiplier}
+        >
           {measuredText}
         </Text>
       </View>

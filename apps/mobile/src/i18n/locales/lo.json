@@ -152,7 +152,9 @@
     "appearanceDark": "ມືດ",
     "account": "ບັນຊີ",
     "prReviewAttribution": "ຕື່ມການລະບຸແຫຼ່ງຂອງແອັບລົງໃນການທົບທວນ PR",
-    "prReviewAttributionSubtitle": "ຕື່ມ footer ທີ່ລະບຸວ່າ \"ທົບທວນຜ່ານ Kilo\" ເມື່ອທ່ານສົ່ງການທົບທວນ."
+    "prReviewAttributionSubtitle": "ຕື່ມ footer ທີ່ລະບຸວ່າ \"ທົບທວນຜ່ານ Kilo\" ເມື່ອທ່ານສົ່ງການທົບທວນ.",
+    "returnSendsMessage": "ປຸ່ມຂຶ້ນແຖວໃໝ່ສົ່ງຂໍ້ຄວາມ",
+    "returnSendsMessageSubtitle": "ເມື່ອປິດ, ປຸ່ມຂຶ້ນແຖວໃໝ່ຈະແຊກແຖວໃໝ່ໃນຊ່ອງປ້ອນຂໍ້ຄວາມຂອງຕົວແທນ."
   },
   "prReview": {
     "pullRequestUnavailable": "pull request ບໍ່ພ້ອມໃຊ້",
@@ -665,7 +667,8 @@
     "profile": "ໂປຣຟາຍ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ແຖບ, {{position}} ຈາກ {{total}}"
+    "position": "{{name}}, ແຖບ, {{position}} ຈາກ {{total}}",
+    "chat": "ສົນທະນາ"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "ຂໍ້ຜິດພາດເຄືອຂ່າຍ",
       "uploadFailed": "ການອັບໂຫລດລົ້ມເຫລວ",
       "failedToUploadFile": "ການອັບໂຫລດໄຟລ໌ລົ້ມເຫລວ: {{reason}}",
-      "nothingToPaste": "ບໍ່ມີຫຍັງໃຫ້ວາງ"
+      "nothingToPaste": "ບໍ່ມີຫຍັງໃຫ້ວາງ",
+      "metadataStripFailed": "ບໍ່ສາມາດລຶບຂໍ້ມູນ metadata ຂອງຮູບໄດ້."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "ການແລ່ນກວດ",
       "status": "ສະຖານະ",
       "threshold": "ຂອບເຂດ",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "ກຳລັງລໍຖ້າການຖອດຄວາມຂອງການທົບທວນ.",
+      "transcriptEmpty": "ບໍ່ມີການຖອດຄວາມຂອງການທົບທວນນີ້.",
+      "transcriptRetry": "ບໍ່ສາມາດໂຫຼດການຖອດຄວາມຂອງການທົບທວນ.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "ເອເຈນວ່າງ",
+      "agentWorking": "ເອເຈນກຳລັງເຮັດວຽກ...",
+      "anErrorOccurred": "ເກີດຂໍ້ຜິດພາດ",
+      "errorWithMessage": "ຂໍ້ຜິດພາດ: {{message}}",
+      "executionStarted": "ການດຳເນີນງານເລີ່ມຂຶ້ນ",
+      "reviewCompleted": "ການກວດສອບສຳເລັດ",
+      "reviewInterrupted": "ການກວດສອບຖືກຂັດຈັງຫວະ",
+      "sessionError": "ຂໍ້ຜິດພາດເຊດຊັນ: {{error}}",
+      "statusWithValue": "ສະຖານະ: {{status}}",
+      "toolName": "ເຄື່ອງມື: {{name}}",
+      "toolNameError": "ເຄື່ອງມື: {{name}} — ຂໍ້ຜິດພາດ",
+      "unknownError": "ຂໍ້ຜິດພາດທີ່ບໍ່ຮູ້ຈັກ"
     },
     "reviewMemory": {
       "title": "ຄວາມຈຳການທົບທວນ",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "ວຽກກ່ອນໜ້າຍັງບໍ່ທັນສຳເລັດ. ກະລຸນາລໍຖ້າເລັກນ້ອຍ.",
       "serviceUnavailable": "ບໍລິການບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້. ກະລຸນາລອງໃໝ່.",
       "connectionTrouble": "ມີບັນຫາການເຊື່ອມຕໍ່. ກະລຸນາລອງໃໝ່ໃນອີກເລັກນ້ອຍ.",
-      "modelUnavailable": "ຮູບແບບນີ້ບໍ່ສາມາດໃຊ້ກັບ Cloud Agent ໄດ້. ກະລຸນາເລືອກຮູບແບບອື່ນ ແລ້ວລອງໃໝ່."
+      "modelUnavailable": "ຮູບແບບນີ້ບໍ່ສາມາດໃຊ້ກັບ Cloud Agent ໄດ້. ກະລຸນາເລືອກຮູບແບບອື່ນ ແລ້ວລອງໃໝ່.",
+      "cancelQueuedFailed": "ບໍ່ສາມາດຍົກເລີກຂໍ້ຄວາມໄດ້.",
+      "cancelQueuedRestoreAvailable": "ຍົກເລີກຂໍ້ຄວາມແລ້ວ. ແຕະ ກູ້ຄືນ ເພື່ອນຳມັນກັບໄປຍັງຊ່ອງປ້ອນຂໍ້ຄວາມ.",
+      "cancelQueuedRestored": "ຍົກເລີກຂໍ້ຄວາມແລ້ວ. ຂໍ້ຄວາມກັບຄືນມາຢູ່ໃນຊ່ອງປ້ອນຂໍ້ຄວາມແລ້ວ.",
+      "cancelQueuedUpgradeRequired": "ການຍົກເລີກຂໍ້ຄວາມທີ່ລໍຖ້າສົ່ງຕ້ອງໃຊ້ Kilo CLI ລຸ້ນໃໝ່ກວ່າ. ອັບເດດ Kilo CLI ແລ້ວເຊື່ອມຕໍ່ໃໝ່."
     },
     "remoteSession": {
       "failedToCreate": "ບໍ່ສາມາດສ້າງເຊດຊັນທາງໄກ",
@@ -2196,7 +2220,8 @@
       "continueFrom": "ກຳລັງສືບຕໍ່ {{title}}",
       "importingSession": "ກຳລັງນຳເຂົ້າເຊດຊັນ",
       "cliCannotContinue": "CLI ນີ້ບໍ່ສາມາດສືບຕໍ່ເຊດຊັນໄດ້. ເລືອກ Cloud Agent ຫຼື CLI ອື່ນ.",
-      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້."
+      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້.",
+      "discardWithUploadsMessage": "ຂໍ້ຄວາມຂອງທ່ານ ແລະ ໄຟລ໌ທີ່ອັບໂຫລດແຕ່ບໍ່ໄດ້ແນບກັບຂໍ້ຄວາມທີ່ສົ່ງແລ້ວຈະຖືກລຶບ."
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດ {{displayCount}} ໄຟລ໌",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "ຂໍ້ຄວາມເຂົ້າຄິວ",
       "userMessage": "ຂໍ້ຄວາມຜູ້ໃຊ້",
       "assistantMessage": "ຂໍ້ຄວາມຜູ້ຊ່ວຍ",
-      "longPressHint": "ກົດຄ້າງເພື່ອເບິ່ງລາຍລະອຽດຂໍ້ຄວາມ"
+      "longPressHint": "ກົດຄ້າງເພື່ອເບິ່ງລາຍລະອຽດຂໍ້ຄວາມ",
+      "cancelQueued": "ຍົກເລີກຂໍ້ຄວາມ",
+      "cancelQueuedAccessibility": "ຍົກເລີກຂໍ້ຄວາມທີ່ລໍຖ້າສົ່ງ",
+      "restoreQueued": "ກູ້ຄືນ",
+      "restoreQueuedAccessibility": "ກູ້ຄືນຂໍ້ຄວາມທີ່ຍົກເລີກໄປຍັງຊ່ອງປ້ອນຂໍ້ຄວາມ"
     },
     "olderMessages": {
       "arrived": "ຂໍ້ຄວາມກ່ອນໜ້າໂຫລດແລ້ວ",
@@ -2460,6 +2489,8 @@
       "viewTable": "ເບິ່ງຕາຕະລາງ",
       "title": "ຕາຕະລາງ",
       "close": "ປິດຕາຕະລາງ",
+      "loading": "ກຳລັງໂຫຼດຕາຕະລາງ",
+      "empty": "ຕາຕະລາງນີ້ບໍ່ມີແຖວ",
       "columnCount_one": "ຖັນ",
       "columnCount": "ຖັນ",
       "columnCount_other": "ຖັນ",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "ກັ່ນຕອງເຊດຊັນ",
-      "sortBy": "ຮຽງລຳດັບໂດຍ",
-      "sortLastUpdated": "ອັບເດດຫລ້າສຸດ",
-      "sortCreated": "ສ້າງເມື່ອ",
       "platform": "ເວທີ",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2526,7 +2554,9 @@
       "uploading": "ກຳລັງອັບໂຫລດ…",
       "uploaded": "ອັບໂຫລດແລ້ວ",
       "uploadFailedRetry": "ການອັບໂຫລດລົ້ມເຫລວ. ແຕະເພື່ອລອງອີກ.",
-      "uploadFailedTerminal": "ໄຟລ໌ນີ້ບໍ່ສາມາດອັບໂຫລດໄດ້."
+      "uploadFailedTerminal": "ໄຟລ໌ນີ້ບໍ່ສາມາດອັບໂຫລດໄດ້.",
+      "moveLeft": "ຍ້າຍ {{filename}} ໄປທາງຊ້າຍ",
+      "moveRight": "ຍ້າຍ {{filename}} ໄປທາງຂວາ"
     },
     "attachmentPasteHint": {
       "accessibility": "ວາງຮູບພາບຈາກຄລິບບອດ",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "ກຳລັງສຳເລັດ...",
       "messagePlaceholder": "ຂໍ້ຄວາມ...",
       "cannotReceiveFiles": "ເຊດຊັນນີ້ບໍ່ສາມາດຮັບໄຟລ໌. ລຶບໄຟລ໌ແນບອອກເພື່ອສົ່ງຂໍ້ຄວາມ.",
-      "couldNotAttachFiles": "ບໍ່ສາມາດແນບໄຟລ໌. ແຕະສົ່ງເພື່ອລອງອີກ."
+      "couldNotAttachFiles": "ບໍ່ສາມາດແນບໄຟລ໌. ແຕະສົ່ງເພື່ອລອງອີກ.",
+      "discardAttachmentsMessage": "ໄຟລ໌ທີ່ອັບໂຫລດແຕ່ບໍ່ໄດ້ແນບກັບຂໍ້ຄວາມທີ່ສົ່ງແລ້ວຈະຖືກລຶບ.",
+      "discardAttachmentsTitle": "ຍົກເລີກໄຟລ໌ແນບ?",
+      "charactersRemaining": "ເຫຼືອ {{count}} ຕົວອັກສອນ",
+      "insertNewline": "ແຊກແຖວໃໝ່",
+      "starterChipBuild": "ສ້າງຄຸນສົມບັດ",
+      "starterChipEmpty": "ເລີ່ມດ້ວຍແນວຄິດ",
+      "starterChipFix": "ແກ້ໄຂຂໍ້ຜິດພາດ",
+      "starterChipPrepare": "ຕັ້ງສະພາບແວດລ້ອມຂອງຂ້ອຍ",
+      "starterChipWrapUp": "ສິ້ນສຸດເຊດຊັນຂອງຂ້ອຍ",
+      "starterChipWriteTests": "ຂຽນການທົດສອບ"
     },
     "chatLink": {
       "linkCopied": "ສຳເນົາລິ້ງແລ້ວ",
@@ -2775,7 +2815,8 @@
     "busy": "ການປ້ອນສຽງກຳລັງຫຍຸ້ງ. ລອງອີກຄັ້ງ.",
     "stopped": "ການປ້ອນສຽງຢຸດແລ້ວ. ແຕະໄມໂຄຣໂຟນເພື່ອລອງອີກຄັ້ງ.",
     "unavailableDevice": "ການປ້ອນສຽງບໍ່ມີໃນອຸປະກອນນີ້.",
-    "unavailableLanguage": "ການປ້ອນສຽງບໍ່ມີສຳລັບພາສາຂອງອຸປະກອນນີ້."
+    "unavailableLanguage": "ການປ້ອນສຽງບໍ່ມີສຳລັບພາສາຂອງອຸປະກອນນີ້.",
+    "listeningStopped": "ຢຸດການຟັງແລ້ວ."
   },
   "share": {
     "title": "ແບ່ງປັນໄປ Kilo",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "ເມື່ອທ່ານໄວ້ໃຈໂຮສຂອງລິ້ງ, ມັນຈະເປີດໂດຍບໍ່ຖາມອີກ.",
     "revoke": "ຖອນ {{host}}",
     "backToPreferences": "ກັບໄປທີ່ການຕັ້ງຄ່າ"
+  },
+  "quickChat": {
+    "title": "ສົນທະນາ",
+    "composer": {
+      "placeholder": "ຂໍ້ຄວາມ"
+    },
+    "empty": {
+      "title": "ເລີ່ມການສົນທະນາ",
+      "description": "ສົ່ງຂໍ້ຄວາມເພື່ອສົນທະນາກັບໂມເດວ."
+    },
+    "working": "ກຳລັງດຳເນີນການ",
+    "historyRetry": "ບໍ່ສາມາດໂຫຼດປະຫວັດການສົນທະນາໄດ້.",
+    "catalogRetry": "ບໍ່ສາມາດໂຫຼດໂມເດວ",
+    "sendError": "ບໍ່ສາມາດສົ່ງຂໍ້ຄວາມໄດ້. ລອງອີກຄັ້ງ."
   }
 }

@@ -152,7 +152,9 @@
     "appearanceDark": "गहरा",
     "account": "खाता",
     "prReviewAttribution": "PR समीक्षाओं में ऐप एट्रिब्यूशन जोड़ें",
-    "prReviewAttributionSubtitle": "समीक्षा सबमिट करने पर Reviewed via Kilo फ़ुटर जोड़ें।"
+    "prReviewAttributionSubtitle": "समीक्षा सबमिट करने पर Reviewed via Kilo फ़ुटर जोड़ें।",
+    "returnSendsMessage": "रिटर्न कुंजी संदेश भेजती है",
+    "returnSendsMessageSubtitle": "बंद होने पर, रिटर्न कुंजी एजेंट के संदेश इनपुट में नई पंक्ति डालती है।"
   },
   "notifications": {
     "title": "सूचनाएँ",
@@ -211,7 +213,8 @@
     "profile": "प्रोफ़ाइल",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, टैब, {{position}} में से {{total}}"
+    "position": "{{name}}, टैब, {{position}} में से {{total}}",
+    "chat": "चैट"
   },
   "chat": {
     "instancePicker": {
@@ -265,7 +268,8 @@
       "networkError": "नेटवर्क त्रुटि",
       "uploadFailed": "अपलोड विफल",
       "failedToUploadFile": "फ़ाइल अपलोड करने में विफल: {{reason}}",
-      "nothingToPaste": "चिपकाने के लिए कुछ नहीं"
+      "nothingToPaste": "चिपकाने के लिए कुछ नहीं",
+      "metadataStripFailed": "फ़ोटो का मेटाडेटा हटाया नहीं जा सका।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -898,7 +902,23 @@
       "title": "समीक्षा",
       "tokens": "टोकन",
       "tokensInOut": "{{input}} इन / {{output}} आउट",
-      "pullRequest": "पुल रिक्वेस्ट"
+      "pullRequest": "पुल रिक्वेस्ट",
+      "transcriptWaiting": "समीक्षा प्रतिलेख की प्रतीक्षा की जा रही है।",
+      "transcriptEmpty": "इस समीक्षा के लिए कोई प्रतिलेख नहीं है।",
+      "transcriptRetry": "समीक्षा प्रतिलेख लोड नहीं किया जा सका।",
+      "transcriptLive": "लाइव",
+      "agentIdle": "एजेंट निष्क्रिय",
+      "agentWorking": "एजेंट कार्य कर रहा है...",
+      "anErrorOccurred": "एक त्रुटि हुई",
+      "errorWithMessage": "त्रुटि: {{message}}",
+      "executionStarted": "निष्पादन प्रारंभ हुआ",
+      "reviewCompleted": "समीक्षा पूर्ण हुई",
+      "reviewInterrupted": "समीक्षा बाधित हुई",
+      "sessionError": "सत्र त्रुटि: {{error}}",
+      "statusWithValue": "स्थिति: {{status}}",
+      "toolName": "उपकरण: {{name}}",
+      "toolNameError": "उपकरण: {{name}} — त्रुटि",
+      "unknownError": "अज्ञात त्रुटि"
     },
     "reviewList": {
       "configureProvider": "प्रदाता कॉन्फ़िगर करें",
@@ -1670,7 +1690,11 @@
       "previousTaskFinishing": "पिछला कार्य अभी भी पूरा हो रहा है. कृपया थोड़ा इंतज़ार करें.",
       "serviceUnavailable": "सेवा अभी उपलब्ध नहीं है. कृपया फिर से प्रयास करें.",
       "connectionTrouble": "कनेक्शन समस्या. कृपया थोड़ी देर में फिर से प्रयास करें.",
-      "modelUnavailable": "यह मॉडल Cloud Agent के लिए उपलब्ध नहीं है. दूसरा मॉडल चुनें और फिर से प्रयास करें."
+      "modelUnavailable": "यह मॉडल Cloud Agent के लिए उपलब्ध नहीं है. दूसरा मॉडल चुनें और फिर से प्रयास करें.",
+      "cancelQueuedFailed": "संदेश रद्द नहीं किया जा सका।",
+      "cancelQueuedRestoreAvailable": "संदेश रद्द कर दिया गया। इसे संदेश इनपुट में वापस लाने के लिए पुनर्स्थापित करें पर टैप करें।",
+      "cancelQueuedRestored": "संदेश रद्द कर दिया गया। प्रॉम्प्ट संदेश इनपुट में वापस आ गया है।",
+      "cancelQueuedUpgradeRequired": "कतार में लगे संदेशों को रद्द करने के लिए Kilo CLI का नया संस्करण आवश्यक है। Kilo CLI अपडेट करें और फिर से कनेक्ट करें।"
     },
     "sessionConnection": {
       "connecting": "कनेक्ट हो रहा है…",
@@ -1742,7 +1766,8 @@
       "cliCannotContinue": "यह CLI सत्र जारी नहीं रख सकता। Cloud Agent या कोई अन्य CLI चुनें।",
       "continueFrom": "{{title}} जारी रखा जा रहा है",
       "importFailed": "यह सत्र आयात नहीं हो सका।",
-      "importingSession": "सत्र आयात किया जा रहा है"
+      "importingSession": "सत्र आयात किया जा रहा है",
+      "discardWithUploadsMessage": "आपका प्रॉम्प्ट और भेजे गए संदेशों से न जुड़ी अपलोड की गई फ़ाइलें हटा दी जाएँगी।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई",
@@ -1963,7 +1988,11 @@
       "queuedAccessibility": "संदेश कतार में",
       "userMessage": "उपयोगकर्ता संदेश",
       "assistantMessage": "सहायक संदेश",
-      "longPressHint": "संदेश विवरण के लिए देर तक दबाएँ"
+      "longPressHint": "संदेश विवरण के लिए देर तक दबाएँ",
+      "cancelQueued": "संदेश रद्द करें",
+      "cancelQueuedAccessibility": "कतार में लगा संदेश रद्द करें",
+      "restoreQueued": "पुनर्स्थापित करें",
+      "restoreQueuedAccessibility": "रद्द किए गए संदेश को संदेश इनपुट में पुनर्स्थापित करें"
     },
     "olderMessages": {
       "arrived": "पहले के संदेश लोड हो गए",
@@ -1979,6 +2008,8 @@
       "viewTable": "तालिका देखें",
       "title": "तालिका",
       "close": "तालिका बंद करें",
+      "loading": "तालिका लोड हो रही है",
+      "empty": "इस तालिका में कोई पंक्ति नहीं है।",
       "columnCount_one": "कॉलम",
       "columnCount": "कॉलम",
       "columnCount_other": "कॉलम",
@@ -1989,9 +2020,6 @@
     },
     "sessionFilter": {
       "title": "सत्र फ़िल्टर करें",
-      "sortBy": "इससे क्रमबद्ध करें",
-      "sortLastUpdated": "अंतिम बार अपडेट",
-      "sortCreated": "बनाया गया",
       "platform": "प्लेटफ़ॉर्म",
       "platformCloud": "क्लाउड",
       "platformExtension": "एक्सटेंशन",
@@ -2038,7 +2066,9 @@
       "uploading": "अपलोड हो रहा है…",
       "uploaded": "अपलोड हो गया",
       "uploadFailedRetry": "अपलोड विफल रहा। फिर से कोशिश करने के लिए टैप करें।",
-      "uploadFailedTerminal": "यह फ़ाइल अपलोड नहीं की जा सकती।"
+      "uploadFailedTerminal": "यह फ़ाइल अपलोड नहीं की जा सकती।",
+      "moveLeft": "{{filename}} को बाएँ ले जाएँ",
+      "moveRight": "{{filename}} को दाएँ ले जाएँ"
     },
     "attachmentPasteHint": {
       "accessibility": "क्लिपबोर्ड से छवि पेस्ट करें",
@@ -2068,7 +2098,17 @@
       "finalizingPlaceholder": "समाप्त किया जा रहा है...",
       "messagePlaceholder": "संदेश...",
       "cannotReceiveFiles": "यह सत्र फ़ाइलें प्राप्त नहीं कर सकता। अपना संदेश भेजने के लिए अटैचमेंट हटाएँ।",
-      "couldNotAttachFiles": "फ़ाइलें संलग्न नहीं की जा सकीं। फिर से कोशिश करने के लिए भेजें पर टैप करें।"
+      "couldNotAttachFiles": "फ़ाइलें संलग्न नहीं की जा सकीं। फिर से कोशिश करने के लिए भेजें पर टैप करें।",
+      "discardAttachmentsMessage": "भेजे गए संदेशों से न जुड़ी अपलोड की गई फ़ाइलें हटा दी जाएँगी।",
+      "discardAttachmentsTitle": "संलग्नक ख़ारिज करें?",
+      "charactersRemaining": "{{count}} अक्षर शेष",
+      "insertNewline": "नई पंक्ति डालें",
+      "starterChipBuild": "एक सुविधा बनाएँ",
+      "starterChipEmpty": "एक विचार से शुरू करें",
+      "starterChipFix": "एक त्रुटि ठीक करें",
+      "starterChipPrepare": "मेरा परिवेश तैयार करें",
+      "starterChipWrapUp": "मेरा सत्र समाप्त करें",
+      "starterChipWriteTests": "परीक्षण लिखें"
     },
     "chatLink": {
       "linkCopied": "लिंक कॉपी किया गया",
@@ -2321,7 +2361,8 @@
     "busy": "वॉइस इनपुट व्यस्त है। फिर से प्रयास करें।",
     "stopped": "वॉइस इनपुट रुक गया। फिर से प्रयास करने के लिए माइक्रोफ़ोन पर टैप करें।",
     "unavailableDevice": "इस डिवाइस पर वॉइस इनपुट उपलब्ध नहीं है।",
-    "unavailableLanguage": "इस डिवाइस की भाषा के लिए वॉइस इनपुट उपलब्ध नहीं है।"
+    "unavailableLanguage": "इस डिवाइस की भाषा के लिए वॉइस इनपुट उपलब्ध नहीं है।",
+    "listeningStopped": "सुनना बंद हो गया।"
   },
   "share": {
     "title": "Kilo पर साझा करें",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "जब आप किसी लिंक के होस्ट पर भरोसा करते हैं, तो यह बिना फिर से पूछे खुलता है।",
     "revoke": "हटाएँ {{host}}",
     "backToPreferences": "प्राथमिकताओं पर वापस जाएँ"
+  },
+  "quickChat": {
+    "title": "चैट",
+    "composer": {
+      "placeholder": "संदेश"
+    },
+    "empty": {
+      "title": "चैट शुरू करें",
+      "description": "किसी मॉडल से बात करने के लिए संदेश भेजें।"
+    },
+    "working": "काम कर रहा है",
+    "historyRetry": "चैट इतिहास लोड नहीं किया जा सका।",
+    "catalogRetry": "मॉडल लोड नहीं हो सके",
+    "sendError": "संदेश भेजा नहीं जा सका। फिर से कोशिश करें।"
   }
 }

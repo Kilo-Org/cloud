@@ -152,7 +152,9 @@
     "appearanceDark": "Tamsi",
     "account": "Paskyra",
     "prReviewAttribution": "Pridėti programėlės atribuciją prie PR peržiūrų",
-    "prReviewAttributionSubtitle": "Kai pateikiate peržiūrą, apačioje pridėkite poraštę „Peržiūrėta per Kilo“."
+    "prReviewAttributionSubtitle": "Kai pateikiate peržiūrą, apačioje pridėkite poraštę „Peržiūrėta per Kilo“.",
+    "returnSendsMessage": "Grįžimo klavišas siunčia žinutę",
+    "returnSendsMessageSubtitle": "Kai išjungta, grįžimo klavišas įterpia naują eilutę agentų žinučių įvesties laukuose."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nepasiekiamas",
@@ -679,7 +681,8 @@
     "profile": "Profilis",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, skirtukas, {{position}} iš {{total}}"
+    "position": "{{name}}, skirtukas, {{position}} iš {{total}}",
+    "chat": "Pokalbis"
   },
   "chat": {
     "instancePicker": {
@@ -763,7 +766,8 @@
       "networkError": "Tinklo klaida",
       "uploadFailed": "Įkelti nepavyko",
       "failedToUploadFile": "Nepavyko įkelti failo: {{reason}}",
-      "nothingToPaste": "Nėra ko įklijuoti"
+      "nothingToPaste": "Nėra ko įklijuoti",
+      "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1317,7 +1321,23 @@
       "checkRun": "Patikros paleidimas",
       "status": "Būsena",
       "threshold": "Slenkstis",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptEmpty": "Šiai peržiūrai transkripto nėra.",
+      "transcriptLive": "Tiesiogiai",
+      "transcriptRetry": "Nepavyko įkelti peržiūros transkripto.",
+      "transcriptWaiting": "Laukiama peržiūros transkripto.",
+      "agentIdle": "Agentas neaktyvus",
+      "agentWorking": "Agentas dirba...",
+      "anErrorOccurred": "Įvyko klaida",
+      "errorWithMessage": "Klaida: {{message}}",
+      "executionStarted": "Vykdymas pradėtas",
+      "reviewCompleted": "Peržiūra baigta",
+      "reviewInterrupted": "Peržiūra nutraukta",
+      "sessionError": "Sesijos klaida: {{error}}",
+      "statusWithValue": "Būsena: {{status}}",
+      "toolName": "Įrankis: {{name}}",
+      "toolNameError": "Įrankis: {{name}} — klaida",
+      "unknownError": "Nežinoma klaida"
     },
     "reviewMemory": {
       "title": "Peržiūros atmintis",
@@ -2154,7 +2174,11 @@
       "previousTaskFinishing": "Ankstesnė užduotis dar baigiama. Palaukite akimirką.",
       "serviceUnavailable": "Paslauga šiuo metu nepasiekiama. Bandykite dar kartą.",
       "connectionTrouble": "Ryšio problema. Bandykite dar kartą po akimirkos.",
-      "modelUnavailable": "Šis modelis nėra pasiekiamas Cloud Agent. Pasirinkite kitą modelį ir bandykite dar kartą."
+      "modelUnavailable": "Šis modelis nėra pasiekiamas Cloud Agent. Pasirinkite kitą modelį ir bandykite dar kartą.",
+      "cancelQueuedFailed": "Nepavyko atšaukti žinutės.",
+      "cancelQueuedRestoreAvailable": "Žinutė atšaukta. Bakstelėkite „Atkurti“, kad grąžintumėte ją į žinutės įvesties lauką.",
+      "cancelQueuedRestored": "Žinutė atšaukta. Užklausa grąžinta į žinutės įvesties lauką.",
+      "cancelQueuedUpgradeRequired": "Norint atšaukti eilėje esančias žinutes, reikia naujesnės Kilo CLI versijos. Atnaujinkite Kilo CLI ir prisijunkite iš naujo."
     },
     "remoteSession": {
       "failedToCreate": "Nepavyko sukurti nuotolinės sesijos",
@@ -2226,7 +2250,8 @@
       "continueFrom": "Tęsiama {{title}}",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šis CLI negali tęsti sesijos. Pasirinkite Cloud Agent arba kitą CLI.",
-      "importFailed": "Nepavyko importuoti šios sesijos."
+      "importFailed": "Nepavyko importuoti šios sesijos.",
+      "discardWithUploadsMessage": "Jūsų užklausa ir visos prie išsiųstų žinučių nepridėtos įkeltos rinkmenos bus ištrintos."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujinta {{displayCount}} rinkmena",
@@ -2476,7 +2501,11 @@
       "queuedAccessibility": "Žinutė įdėta į eilę",
       "userMessage": "Vartotojo žinutė",
       "assistantMessage": "Asistento žinutė",
-      "longPressHint": "Paspauskite ir palaikykite, kad pamatytumėte žinutės detales"
+      "longPressHint": "Paspauskite ir palaikykite, kad pamatytumėte žinutės detales",
+      "cancelQueued": "Atšaukti žinutę",
+      "cancelQueuedAccessibility": "Atšaukti eilėje esančią žinutę",
+      "restoreQueued": "Atkurti",
+      "restoreQueuedAccessibility": "Atkurti atšauktą žinutę žinutės įvesties lauke"
     },
     "olderMessages": {
       "arrived": "Ankstesnės žinutės įkeltos",
@@ -2494,6 +2523,8 @@
       "viewTable": "Peržiūrėti lentelę",
       "title": "Lentelė",
       "close": "Uždaryti lentelę",
+      "loading": "Kraunama lentelė",
+      "empty": "Šioje lentelėje nėra eilučių.",
       "columnCount_one": "stulpelis",
       "columnCount": "stulpeliai",
       "columnCount_other": "stulpeliai",
@@ -2508,9 +2539,6 @@
     },
     "sessionFilter": {
       "title": "Filtruoti sesijas",
-      "sortBy": "Rūšiuoti pagal",
-      "sortLastUpdated": "Paskutinį kartą atnaujinta",
-      "sortCreated": "Sukurta",
       "platform": "Platforma",
       "platformCloud": "Debesija",
       "platformExtension": "Plėtinys",
@@ -2564,7 +2592,9 @@
       "uploading": "Įkeliama…",
       "uploaded": "Įkelta",
       "uploadFailedRetry": "Įkelti nepavyko. Bakstelėkite, kad bandytumėte dar kartą.",
-      "uploadFailedTerminal": "Šis failas negali būti įkeltas."
+      "uploadFailedTerminal": "Šis failas negali būti įkeltas.",
+      "moveLeft": "Perkelti {{filename}} į kairę",
+      "moveRight": "Perkelti {{filename}} į dešinę"
     },
     "attachmentPasteHint": {
       "accessibility": "Įklijuoti paveikslėlį iš iškarpinės",
@@ -2594,7 +2624,17 @@
       "finalizingPlaceholder": "Baigiama...",
       "messagePlaceholder": "Žinutė...",
       "cannotReceiveFiles": "Ši sesija negali gauti failų. Pašalinkite priedus, kad išsiųstumėte žinutę.",
-      "couldNotAttachFiles": "Nepavyko pridėti failų. Bakstelėkite siųsti, kad bandytumėte dar kartą."
+      "couldNotAttachFiles": "Nepavyko pridėti failų. Bakstelėkite siųsti, kad bandytumėte dar kartą.",
+      "discardAttachmentsMessage": "Prie išsiųstų žinučių nepridėtos įkeltos rinkmenos bus ištrintos.",
+      "discardAttachmentsTitle": "Atmesti priedus?",
+      "charactersRemaining": "Liko simbolių: {{count}}",
+      "insertNewline": "Įterpti naują eilutę",
+      "starterChipBuild": "Sukurti funkciją",
+      "starterChipEmpty": "Pradėti nuo idėjos",
+      "starterChipFix": "Ištaisyti klaidą",
+      "starterChipPrepare": "Paruošti mano aplinką",
+      "starterChipWrapUp": "Užbaigti mano sesiją",
+      "starterChipWriteTests": "Parašyti testus"
     },
     "chatLink": {
       "linkCopied": "Nuoroda nukopijuota",
@@ -2815,7 +2855,8 @@
     "busy": "Balso įvestis užimta. Bandykite dar kartą.",
     "stopped": "Balso įvestis sustabdyta. Bakstelėkite mikrofoną, kad bandytumėte dar kartą.",
     "unavailableDevice": "Balso įvestis šiame įrenginyje nepasiekiama.",
-    "unavailableLanguage": "Balso įvestis nepasiekiama šios įrenginio kalbos."
+    "unavailableLanguage": "Balso įvestis nepasiekiama šios įrenginio kalbos.",
+    "listeningStopped": "Klausymasis sustabdytas."
   },
   "share": {
     "title": "Dalintis į Kilo",
@@ -3200,5 +3241,19 @@
     "emptyDescription": "Kai pasitikite nuorodos serveriu, ji atidaroma be pakartotino klausimo.",
     "revoke": "Atšaukti {{host}}",
     "backToPreferences": "Grįžti į nuostatas"
+  },
+  "quickChat": {
+    "title": "Pokalbis",
+    "composer": {
+      "placeholder": "Žinutė"
+    },
+    "empty": {
+      "title": "Pradėti pokalbį",
+      "description": "Siųskite žinutę, kad pakalbėtumėte su modeliu."
+    },
+    "working": "Vykdoma",
+    "historyRetry": "Nepavyko įkelti pokalbio istorijos.",
+    "catalogRetry": "Nepavyko įkelti modelių",
+    "sendError": "Nepavyko išsiųsti žinutės. Bandykite dar kartą."
   }
 }

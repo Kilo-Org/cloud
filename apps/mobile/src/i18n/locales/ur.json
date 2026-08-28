@@ -152,7 +152,9 @@
     "appearanceDark": "تاریک",
     "account": "اکاؤنٹ",
     "prReviewAttribution": "PR جائزوں میں ایپ انتساب شامل کریں",
-    "prReviewAttributionSubtitle": "جائزہ جمع کرتے وقت Reviewed via Kilo فوٹر جوڑیں۔"
+    "prReviewAttributionSubtitle": "جائزہ جمع کرتے وقت Reviewed via Kilo فوٹر جوڑیں۔",
+    "returnSendsMessage": "ریٹرن کلید پیغام بھیجتی ہے",
+    "returnSendsMessageSubtitle": "بند ہونے پر، ریٹرن ایجنٹ کے پیغام لکھنے کے خانوں میں نئی سطر داخل کرتی ہے۔"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -665,7 +667,8 @@
     "profile": "پروفائل",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}، ٹیب، {{total}} میں سے {{position}}"
+    "position": "{{name}}، ٹیب، {{total}} میں سے {{position}}",
+    "chat": "چیٹ"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "نیٹ ورک کی خرابی",
       "uploadFailed": "اپ لوڈ ناکام",
       "failedToUploadFile": "فائل اپ لوڈ نہیں ہو سکی: {{reason}}",
-      "nothingToPaste": "چسپاں کرنے کے لیے کچھ نہیں"
+      "nothingToPaste": "چسپاں کرنے کے لیے کچھ نہیں",
+      "metadataStripFailed": "تصویر کا میٹاڈیٹا نہیں ہٹایا جا سکا۔"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "چیک رن",
       "status": "حالت",
       "threshold": "حد",
-      "pullRequest": "پل ریکویسٹ"
+      "pullRequest": "پل ریکویسٹ",
+      "transcriptWaiting": "جائزہ ٹرانسکرپٹ کا انتظار ہے۔",
+      "transcriptEmpty": "اس جائزے کے لیے کوئی ٹرانسکرپٹ نہیں۔",
+      "transcriptRetry": "جائزہ ٹرانسکرپٹ لوڈ نہیں ہو سکا۔",
+      "transcriptLive": "لائیو",
+      "agentIdle": "ایجنٹ غیر مصروف",
+      "agentWorking": "ایجنٹ کام جاری ہے...",
+      "anErrorOccurred": "ایک خرابی پیش آئی",
+      "errorWithMessage": "خرابی: {{message}}",
+      "executionStarted": "عمل شروع ہو گیا",
+      "reviewCompleted": "جائزہ مکمل ہو گیا",
+      "reviewInterrupted": "جائزہ روکا گیا",
+      "sessionError": "سیشن کی خرابی: {{error}}",
+      "statusWithValue": "حالت: {{status}}",
+      "toolName": "ٹول: {{name}}",
+      "toolNameError": "ٹول: {{name}} — خرابی",
+      "unknownError": "نامعلوم خرابی"
     },
     "reviewMemory": {
       "title": "جائزہ میموری",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "پچھلا کام ابھی مکمل ہو رہا ہے۔ براہ کرم ایک لمحہ انتظار کریں۔",
       "serviceUnavailable": "سروس اس وقت دستیاب نہیں ہے۔ براہ کرم دوبارہ کوشش کریں۔",
       "connectionTrouble": "کنکشن کا مسئلہ۔ براہ کرم ایک لمحے بعد دوبارہ کوشش کریں۔",
-      "modelUnavailable": "یہ ماڈل Cloud Agent کے لیے دستیاب نہیں ہے۔ کوئی اور ماڈل منتخب کر کے دوبارہ کوشش کریں۔"
+      "modelUnavailable": "یہ ماڈل Cloud Agent کے لیے دستیاب نہیں ہے۔ کوئی اور ماڈل منتخب کر کے دوبارہ کوشش کریں۔",
+      "cancelQueuedFailed": "پیغام منسوخ نہیں ہو سکا۔",
+      "cancelQueuedRestoreAvailable": "پیغام منسوخ ہو گیا۔ اسے پیغام لکھنے کے خانے میں واپس لانے کے لیے «بحال کریں» پر ٹیپ کریں۔",
+      "cancelQueuedRestored": "پیغام منسوخ ہو گیا۔ پرامپٹ پیغام لکھنے کے خانے میں واپس آ گیا ہے۔",
+      "cancelQueuedUpgradeRequired": "قطار میں موجود پیغامات منسوخ کرنے کے لیے نئے Kilo CLI کی ضرورت ہے۔ Kilo CLI اپ ڈیٹ کریں اور دوبارہ جڑیں۔"
     },
     "remoteSession": {
       "failedToCreate": "ریموٹ سیشن بنانا ناکام",
@@ -2196,7 +2220,8 @@
       "continueFrom": "{{title}} جاری کیا جا رہا ہے",
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
-      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔"
+      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔",
+      "discardWithUploadsMessage": "آپ کا پرامپٹ اور بھیجے گئے پیغامات سے غیر منسلک اپ لوڈز حذف ہو جائیں گے۔"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہوئی",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "پیغام قطار میں ہے",
       "userMessage": "صارف کا پیغام",
       "assistantMessage": "معاون کا پیغام",
-      "longPressHint": "پیغام کی تفصیلات کے لیے دیر تک دبائیں"
+      "longPressHint": "پیغام کی تفصیلات کے لیے دیر تک دبائیں",
+      "cancelQueued": "پیغام منسوخ کریں",
+      "cancelQueuedAccessibility": "قطار میں موجود پیغام منسوخ کریں",
+      "restoreQueued": "بحال کریں",
+      "restoreQueuedAccessibility": "منسوخ شدہ پیغام کو پیغام لکھنے کے خانے میں بحال کریں"
     },
     "olderMessages": {
       "arrived": "پہلے کے پیغامات لوڈ ہو گئے",
@@ -2460,6 +2489,8 @@
       "viewTable": "ٹیبل دیکھیں",
       "title": "ٹیبل",
       "close": "ٹیبل بند کریں",
+      "loading": "ٹیبل لوڈ ہو رہا ہے",
+      "empty": "اس ٹیبل میں کوئی قطاریں نہیں ہیں۔",
       "columnCount_one": "کالم",
       "columnCount": "کالمز",
       "columnCount_other": "کالمز",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "سیشن فلٹر کریں",
-      "sortBy": "ترتیب دیں",
-      "sortLastUpdated": "آخری اپڈیٹ",
-      "sortCreated": "تخلیق شدہ",
       "platform": "پلیٹ فارم",
       "platformCloud": "کلاؤڈ",
       "platformExtension": "ایکسٹینشن",
@@ -2526,7 +2554,9 @@
       "uploading": "اپ لوڈ ہو رہا ہے…",
       "uploaded": "اپ لوڈ ہو گیا",
       "uploadFailedRetry": "اپ لوڈ ناکام۔ دوبارہ کوشش کے لیے تھپتھپائیں۔",
-      "uploadFailedTerminal": "یہ فائل اپ لوڈ نہیں کی جا سکتی۔"
+      "uploadFailedTerminal": "یہ فائل اپ لوڈ نہیں کی جا سکتی۔",
+      "moveLeft": "{{filename}} کو بائیں منتقل کریں",
+      "moveRight": "{{filename}} کو دائیں منتقل کریں"
     },
     "attachmentPasteHint": {
       "accessibility": "کلپ بورڈ سے تصویر چسپاں کریں",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "ختم کیا جا رہا ہے...",
       "messagePlaceholder": "پیغام...",
       "cannotReceiveFiles": "یہ سیشن فائلیں وصول نہیں کر سکتا۔ اپنا پیغام بھیجنے کے لیے اٹیچمنٹ ہٹائیں۔",
-      "couldNotAttachFiles": "فائلیں منسلک نہیں ہو سکیں۔ دوبارہ کوشش کے لیے بھیجنے پر تھپتھپائیں۔"
+      "couldNotAttachFiles": "فائلیں منسلک نہیں ہو سکیں۔ دوبارہ کوشش کے لیے بھیجنے پر تھپتھپائیں۔",
+      "discardAttachmentsMessage": "بھیجے گئے پیغامات سے غیر منسلک اپ لوڈز حذف ہو جائیں گے۔",
+      "discardAttachmentsTitle": "اٹیچمنٹس ضائع کریں؟",
+      "charactersRemaining": "{{count}} حروف باقی ہیں",
+      "insertNewline": "نئی سطر داخل کریں",
+      "starterChipBuild": "ایک فیچر بنائیں",
+      "starterChipEmpty": "ایک خیال سے شروع کریں",
+      "starterChipFix": "ایک خرابی درست کریں",
+      "starterChipPrepare": "میرا ماحول ترتیب دیں",
+      "starterChipWrapUp": "میرا سیشن مکمل کریں",
+      "starterChipWriteTests": "ٹیسٹ لکھیں"
     },
     "chatLink": {
       "linkCopied": "لنک کاپی ہو گیا",
@@ -2775,7 +2815,8 @@
     "busy": "وائس انپٹ مصروف ہے۔ دوبارہ کوشش کریں۔",
     "stopped": "وائس انپٹ رک گیا۔ دوبارہ کوشش کرنے کے لیے مائیکروفون پر ٹیپ کریں۔",
     "unavailableDevice": "وائس انپٹ اس ڈیوائس پر دستیاب نہیں ہے۔",
-    "unavailableLanguage": "وائس انپٹ اس ڈیوائس کی زبان کے لیے دستیاب نہیں ہے۔"
+    "unavailableLanguage": "وائس انپٹ اس ڈیوائس کی زبان کے لیے دستیاب نہیں ہے۔",
+    "listeningStopped": "سننا رک گیا۔"
   },
   "share": {
     "title": "Kilo پر شیئر کریں",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "جب آپ کسی لنک کے ہوسٹ پر بھروسہ کرتے ہیں، تو یہ دوبارہ بغیر پوچھے کھل جاتا ہے۔",
     "revoke": "{{host}} کو منسوخ کریں",
     "backToPreferences": "ترجیحات پر واپس جائیں"
+  },
+  "quickChat": {
+    "title": "چیٹ",
+    "composer": {
+      "placeholder": "پیغام"
+    },
+    "empty": {
+      "title": "چیٹ شروع کریں",
+      "description": "کسی ماڈل سے بات کرنے کے لیے پیغام بھیجیں۔"
+    },
+    "working": "کام جاری ہے",
+    "historyRetry": "چیٹ کی سرگزشت لوڈ نہیں ہو سکی۔",
+    "catalogRetry": "ماڈلز لوڈ نہیں ہو سکے",
+    "sendError": "پیغام نہیں بھیجا جا سکا۔ دوبارہ کوشش کریں۔"
   }
 }

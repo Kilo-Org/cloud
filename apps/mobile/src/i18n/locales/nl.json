@@ -152,7 +152,9 @@
     "appearanceDark": "Donker",
     "account": "Account",
     "prReviewAttribution": "App-attributie aan PR-reviews toevoegen",
-    "prReviewAttributionSubtitle": "Voeg een 'Reviewed via Kilo'-voettekst toe wanneer je een review indient."
+    "prReviewAttributionSubtitle": "Voeg een 'Reviewed via Kilo'-voettekst toe wanneer je een review indient.",
+    "returnSendsMessage": "Return-toets verzendt bericht",
+    "returnSendsMessageSubtitle": "Als dit uitstaat, voegt Return een nieuwe regel in de berichtinvoervelden van agents in."
   },
   "notifications": {
     "channel": {
@@ -211,7 +213,8 @@
     "profile": "Profiel",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tabblad, {{position}} van {{total}}"
+    "position": "{{name}}, tabblad, {{position}} van {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +298,8 @@
       "networkError": "Netwerkfout",
       "uploadFailed": "Uploaden mislukt",
       "failedToUploadFile": "Bestand uploaden mislukt: {{reason}}",
-      "nothingToPaste": "Niets om te plakken"
+      "nothingToPaste": "Niets om te plakken",
+      "metadataStripFailed": "De metagegevens van de foto konden niet worden verwijderd."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -898,7 +902,23 @@
       "title": "Review",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} in / {{output}} uit",
-      "pullRequest": "pull-aanvraag"
+      "pullRequest": "pull-aanvraag",
+      "transcriptWaiting": "Wachten op het reviewtranscript.",
+      "transcriptEmpty": "Geen transcript voor deze review.",
+      "transcriptRetry": "Het reviewtranscript kon niet worden geladen.",
+      "transcriptLive": "Live",
+      "agentIdle": "Agent inactief",
+      "agentWorking": "Agent bezig...",
+      "anErrorOccurred": "Er is een fout opgetreden",
+      "errorWithMessage": "Fout: {{message}}",
+      "executionStarted": "Uitvoering gestart",
+      "reviewCompleted": "Review voltooid",
+      "reviewInterrupted": "Review onderbroken",
+      "sessionError": "Sessiefout: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Tool: {{name}}",
+      "toolNameError": "Tool: {{name}} — fout",
+      "unknownError": "Onbekende fout"
     },
     "reviewList": {
       "configureProvider": "Provider configureren",
@@ -1670,7 +1690,11 @@
       "previousTaskFinishing": "De vorige taak is nog bezig. Even geduld.",
       "serviceUnavailable": "De service is momenteel niet beschikbaar. Probeer het opnieuw.",
       "connectionTrouble": "Verbindingsprobleem. Probeer het over een moment opnieuw.",
-      "modelUnavailable": "Dit model is niet beschikbaar voor Cloud Agent. Kies een ander model en probeer het opnieuw."
+      "modelUnavailable": "Dit model is niet beschikbaar voor Cloud Agent. Kies een ander model en probeer het opnieuw.",
+      "cancelQueuedFailed": "Bericht kon niet worden geannuleerd.",
+      "cancelQueuedRestoreAvailable": "Bericht geannuleerd. Tik op Herstellen om het terug te zetten in het berichtinvoerveld.",
+      "cancelQueuedRestored": "Bericht geannuleerd. De prompt staat weer in het berichtinvoerveld.",
+      "cancelQueuedUpgradeRequired": "Berichten in de wachtrij annuleren vereist een nieuwere Kilo CLI. Werk Kilo CLI bij en maak opnieuw verbinding."
     },
     "remoteSession": {
       "failedToCreate": "Externe sessie maken mislukt",
@@ -1742,7 +1766,8 @@
       "continueFrom": "Doorgaan met {{title}}",
       "importingSession": "Sessie importeren",
       "cliCannotContinue": "Deze CLI kan een sessie niet voortzetten. Kies Cloud Agent of een andere CLI.",
-      "importFailed": "Deze sessie kan niet worden geïmporteerd."
+      "importFailed": "Deze sessie kan niet worden geïmporteerd.",
+      "discardWithUploadsMessage": "Je prompt en alle geüploade bestanden die niet aan verzonden berichten zijn bijgevoegd, worden verwijderd."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} bestand bijgewerkt",
@@ -1990,7 +2015,11 @@
       "queuedAccessibility": "Bericht in wachtrij",
       "userMessage": "Gebruikersbericht",
       "assistantMessage": "Assistentbericht",
-      "longPressHint": "Lang indrukken voor berichtdetails"
+      "longPressHint": "Lang indrukken voor berichtdetails",
+      "cancelQueued": "Bericht annuleren",
+      "cancelQueuedAccessibility": "Bericht in de wachtrij annuleren",
+      "restoreQueued": "Herstellen",
+      "restoreQueuedAccessibility": "Geannuleerd bericht herstellen naar het berichtinvoerveld"
     },
     "olderMessages": {
       "arrived": "Eerdere berichten geladen",
@@ -2006,6 +2035,8 @@
       "viewTable": "Tabel bekijken",
       "title": "Tabel",
       "close": "Tabel sluiten",
+      "loading": "Tabel laden",
+      "empty": "Deze tabel bevat geen rijen.",
       "columnCount_one": "kolom",
       "columnCount": "kolommen",
       "columnCount_other": "kolommen",
@@ -2016,9 +2047,6 @@
     },
     "sessionFilter": {
       "title": "Sessies filteren",
-      "sortBy": "Sorteren op",
-      "sortLastUpdated": "Laatst bijgewerkt",
-      "sortCreated": "Aangemaakt",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Extensie",
@@ -2072,7 +2100,9 @@
       "uploading": "Uploaden…",
       "uploaded": "Geüpload",
       "uploadFailedRetry": "Uploaden mislukt. Tik om opnieuw te proberen.",
-      "uploadFailedTerminal": "Dit bestand kan niet worden geüpload."
+      "uploadFailedTerminal": "Dit bestand kan niet worden geüpload.",
+      "moveLeft": "{{filename}} naar links verplaatsen",
+      "moveRight": "{{filename}} naar rechts verplaatsen"
     },
     "attachmentPasteHint": {
       "accessibility": "Afbeelding plakken vanaf klembord",
@@ -2102,7 +2132,17 @@
       "finalizingPlaceholder": "Afronden...",
       "messagePlaceholder": "Bericht...",
       "cannotReceiveFiles": "Deze sessie kan geen bestanden ontvangen. Verwijder de bijlagen om je bericht te verzenden.",
-      "couldNotAttachFiles": "Bestanden konden niet worden bijgevoegd. Tik op Verzenden om opnieuw te proberen."
+      "couldNotAttachFiles": "Bestanden konden niet worden bijgevoegd. Tik op Verzenden om opnieuw te proberen.",
+      "discardAttachmentsMessage": "Geüploade bestanden die niet aan verzonden berichten zijn bijgevoegd, worden verwijderd.",
+      "discardAttachmentsTitle": "Bijlagen weggooien?",
+      "charactersRemaining": "{{count}} tekens resterend",
+      "insertNewline": "Nieuwe regel invoegen",
+      "starterChipBuild": "Een functie bouwen",
+      "starterChipEmpty": "Beginnen met een idee",
+      "starterChipFix": "Een fout oplossen",
+      "starterChipPrepare": "Mijn omgeving instellen",
+      "starterChipWrapUp": "Mijn sessie afronden",
+      "starterChipWriteTests": "Tests schrijven"
     },
     "chatLink": {
       "linkCopied": "Link gekopieerd",
@@ -2321,7 +2361,8 @@
     "busy": "Spraakinvoer is bezet. Probeer het opnieuw.",
     "stopped": "Spraakinvoer gestopt. Tik op de microfoon om opnieuw te proberen.",
     "unavailableDevice": "Spraakinvoer is niet beschikbaar op dit apparaat.",
-    "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat."
+    "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat.",
+    "listeningStopped": "Luisteren gestopt."
   },
   "share": {
     "title": "Delen naar Kilo",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "Wanneer u de host van een link vertrouwt, wordt deze zonder opnieuw te vragen geopend.",
     "revoke": "{{host}} intrekken",
     "backToPreferences": "Terug naar voorkeuren"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Bericht"
+    },
+    "empty": {
+      "title": "Start een chat",
+      "description": "Stuur een bericht om met een model te praten."
+    },
+    "working": "Bezig",
+    "historyRetry": "Kon de chatgeschiedenis niet laden.",
+    "catalogRetry": "Kon modellen niet laden",
+    "sendError": "Kan het bericht niet verzenden. Probeer het opnieuw."
   }
 }

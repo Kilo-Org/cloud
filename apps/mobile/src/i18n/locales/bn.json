@@ -152,7 +152,9 @@
     "appearanceDark": "ডার্ক",
     "account": "অ্যাকাউন্ট",
     "prReviewAttribution": "PR পর্যালোচনায় অ্যাপ অ্যাট্রিবিউশন যোগ করুন",
-    "prReviewAttributionSubtitle": "আপনি একটি পর্যালোচনা জমা দিলে একটি Reviewed via Kilo ফুটার যুক্ত করুন।"
+    "prReviewAttributionSubtitle": "আপনি একটি পর্যালোচনা জমা দিলে একটি Reviewed via Kilo ফুটার যুক্ত করুন।",
+    "returnSendsMessage": "রিটার্ন কী বার্তা পাঠায়",
+    "returnSendsMessageSubtitle": "বন্ধ থাকলে, রিটার্ন কী এজেন্টের বার্তা লেখার ঘরে নতুন লাইন যোগ করে।"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট অনুপলব্ধ",
@@ -665,7 +667,8 @@
     "profile": "প্রোফাইল",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ট্যাব, {{total}}-এর মধ্যে {{position}}"
+    "position": "{{name}}, ট্যাব, {{total}}-এর মধ্যে {{position}}",
+    "chat": "চ্যাট"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "নেটওয়ার্ক ত্রুটি",
       "uploadFailed": "আপলোড ব্যর্থ হয়েছে",
       "failedToUploadFile": "ফাইল আপলোড করা যায়নি: {{reason}}",
-      "nothingToPaste": "পেস্ট করার মতো কিছু নেই"
+      "nothingToPaste": "পেস্ট করার মতো কিছু নেই",
+      "metadataStripFailed": "ছবির মেটাডেটা সরানো যায়নি।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "চেক রান",
       "status": "স্থিতি",
       "threshold": "সীমা",
-      "pullRequest": "পুল রিকোয়েস্ট"
+      "pullRequest": "পুল রিকোয়েস্ট",
+      "transcriptWaiting": "পর্যালোচনার ট্রান্সক্রিপ্টের জন্য অপেক্ষা করছে।",
+      "transcriptEmpty": "এই পর্যালোচনার জন্য কোনো ট্রান্সক্রিপ্ট নেই।",
+      "transcriptRetry": "পর্যালোচনার ট্রান্সক্রিপ্ট লোড করা যায়নি।",
+      "transcriptLive": "LIVE",
+      "agentIdle": "এজেন্ট নিষ্ক্রিয়",
+      "agentWorking": "এজেন্ট কাজ করছে...",
+      "anErrorOccurred": "একটি ত্রুটি ঘটেছে",
+      "errorWithMessage": "ত্রুটি: {{message}}",
+      "executionStarted": "সম্পাদন শুরু হয়েছে",
+      "reviewCompleted": "পর্যালোচনা সম্পন্ন হয়েছে",
+      "reviewInterrupted": "পর্যালোচনা বাধাগ্রস্ত হয়েছে",
+      "sessionError": "সেশন ত্রুটি: {{error}}",
+      "statusWithValue": "স্ট্যাটাস: {{status}}",
+      "toolName": "টুল: {{name}}",
+      "toolNameError": "টুল: {{name}} — ত্রুটি",
+      "unknownError": "অজানা ত্রুটি"
     },
     "reviewMemory": {
       "title": "পর্যালোচনা মেমরি",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "আগের কাজটি এখনও শেষ হচ্ছে। একটু অপেক্ষা করুন।",
       "serviceUnavailable": "সেবাটি এখন অনুপলব্ধ। আবার চেষ্টা করুন।",
       "connectionTrouble": "সংযোগ সমস্যা। কিছুক্ষণ পরে আবার চেষ্টা করুন।",
-      "modelUnavailable": "এই মডেলটি Cloud Agent-এর জন্য উপলব্ধ নয়। অন্য একটি মডেল বেছে নিন এবং আবার চেষ্টা করুন।"
+      "modelUnavailable": "এই মডেলটি Cloud Agent-এর জন্য উপলব্ধ নয়। অন্য একটি মডেল বেছে নিন এবং আবার চেষ্টা করুন।",
+      "cancelQueuedFailed": "বার্তাটি বাতিল করা যায়নি।",
+      "cancelQueuedRestoreAvailable": "বার্তা বাতিল হয়েছে। বার্তা লেখার ঘরে এটি ফেরাতে ‘পুনরুদ্ধার করুন’-এ আলতো চাপুন।",
+      "cancelQueuedRestored": "বার্তা বাতিল হয়েছে। প্রম্পটটি বার্তা লেখার ঘরে ফিরে এসেছে।",
+      "cancelQueuedUpgradeRequired": "অপেক্ষমাণ বার্তা বাতিল করতে Kilo CLI-এর নতুন সংস্করণ প্রয়োজন। Kilo CLI আপডেট করুন এবং পুনরায় সংযুক্ত করুন।"
     },
     "remoteSession": {
       "failedToCreate": "দূরবর্তী সেশন তৈরি করতে ব্যর্থ",
@@ -2196,7 +2220,8 @@
       "continueFrom": "{{title}} চালিয়ে যাওয়া হচ্ছে",
       "importingSession": "সেশন আমদানি হচ্ছে",
       "cliCannotContinue": "এই CLI একটি সেশন চালিয়ে যেতে পারে না। Cloud Agent বা অন্য একটি CLI বেছে নিন।",
-      "importFailed": "এই সেশনটি আমদানি করা যায়নি।"
+      "importFailed": "এই সেশনটি আমদানি করা যায়নি।",
+      "discardWithUploadsMessage": "আপনার প্রম্পট এবং পাঠানো বার্তায় সংযুক্ত নয় এমন আপলোড করা ফাইলগুলি মুছে ফেলা হবে।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}টি ফাইল আপডেট হয়েছে",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "বার্তা সারিবদ্ধ",
       "userMessage": "ব্যবহারকারী বার্তা",
       "assistantMessage": "সহায়ক বার্তা",
-      "longPressHint": "বার্তার বিবরণের জন্য দীর্ঘ চাপ দিন"
+      "longPressHint": "বার্তার বিবরণের জন্য দীর্ঘ চাপ দিন",
+      "cancelQueued": "বার্তা বাতিল করুন",
+      "cancelQueuedAccessibility": "অপেক্ষমাণ বার্তা বাতিল করুন",
+      "restoreQueued": "পুনরুদ্ধার করুন",
+      "restoreQueuedAccessibility": "বাতিল করা বার্তাটি বার্তা লেখার ঘরে পুনরুদ্ধার করুন"
     },
     "olderMessages": {
       "arrived": "আগের বার্তাগুলি লোড হয়েছে",
@@ -2460,6 +2489,8 @@
       "viewTable": "টেবিল দেখুন",
       "title": "টেবিল",
       "close": "টেবিল বন্ধ করুন",
+      "loading": "টেবিল লোড হচ্ছে",
+      "empty": "এই টেবিলে কোনো সারি নেই।",
       "columnCount_one": "কলাম",
       "columnCount": "কলাম",
       "columnCount_other": "কলাম",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "সেশন ফিল্টার করুন",
-      "sortBy": "সাজান",
-      "sortLastUpdated": "সর্বশেষ আপডেট",
-      "sortCreated": "তৈরি হয়েছে",
       "platform": "প্ল্যাটফর্ম",
       "platformCloud": "ক্লাউড",
       "platformExtension": "এক্সটেনশন",
@@ -2526,7 +2554,9 @@
       "uploading": "আপলোড হচ্ছে…",
       "uploaded": "আপলোড হয়েছে",
       "uploadFailedRetry": "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করতে ট্যাপ করুন।",
-      "uploadFailedTerminal": "এই ফাইলটি আপলোড করা যাবে না।"
+      "uploadFailedTerminal": "এই ফাইলটি আপলোড করা যাবে না।",
+      "moveLeft": "{{filename}} বামে সরান",
+      "moveRight": "{{filename}} ডানে সরান"
     },
     "attachmentPasteHint": {
       "accessibility": "ক্লিপবোর্ড থেকে ছবি পেস্ট করুন",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "মোড়ানো হচ্ছে...",
       "messagePlaceholder": "বার্তা...",
       "cannotReceiveFiles": "এই সেশনটি ফাইল গ্রহণ করতে পারে না। আপনার বার্তা পাঠাতে সংযুক্তিগুলি সরান।",
-      "couldNotAttachFiles": "ফাইল সংযুক্ত করা যায়নি। আবার চেষ্টা করতে পাঠান ট্যাপ করুন।"
+      "couldNotAttachFiles": "ফাইল সংযুক্ত করা যায়নি। আবার চেষ্টা করতে পাঠান ট্যাপ করুন।",
+      "discardAttachmentsMessage": "পাঠানো বার্তায় সংযুক্ত নয় এমন আপলোড করা ফাইলগুলি মুছে ফেলা হবে।",
+      "discardAttachmentsTitle": "সংযুক্তিগুলি বাতিল করবেন?",
+      "charactersRemaining": "{{count}}টি অক্ষর বাকি",
+      "insertNewline": "নতুন লাইন যোগ করুন",
+      "starterChipBuild": "একটি ফিচার তৈরি করুন",
+      "starterChipEmpty": "একটি ধারণা দিয়ে শুরু করুন",
+      "starterChipFix": "একটি ত্রুটি ঠিক করুন",
+      "starterChipPrepare": "আমার পরিবেশ প্রস্তুত করুন",
+      "starterChipWrapUp": "আমার সেশন শেষ করুন",
+      "starterChipWriteTests": "পরীক্ষা লিখুন"
     },
     "chatLink": {
       "linkCopied": "লিঙ্ক কপি হয়েছে",
@@ -2775,7 +2815,8 @@
     "busy": "ভয়েস ইনপুট ব্যস্ত। আবার চেষ্টা করুন।",
     "stopped": "ভয়েস ইনপুট বন্ধ হয়েছে। আবার চেষ্টা করতে মাইক্রোফোনে আলতো চাপুন।",
     "unavailableDevice": "এই ডিভাইসে ভয়েস ইনপুট উপলব্ধ নয়।",
-    "unavailableLanguage": "এই ডিভাইসের ভাষার জন্য ভয়েস ইনপুট উপলব্ধ নয়।"
+    "unavailableLanguage": "এই ডিভাইসের ভাষার জন্য ভয়েস ইনপুট উপলব্ধ নয়।",
+    "listeningStopped": "শোনা বন্ধ হয়েছে।"
   },
   "share": {
     "title": "Kilo-তে শেয়ার করুন",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "আপনি কোনো লিঙ্কের হোস্ট বিশ্বাস করলে তা আবার জিজ্ঞেস না করেই খোলে।",
     "revoke": "{{host}} প্রত্যাহার করুন",
     "backToPreferences": "পছন্দে ফিরুন"
+  },
+  "quickChat": {
+    "title": "চ্যাট",
+    "composer": {
+      "placeholder": "বার্তা"
+    },
+    "empty": {
+      "title": "চ্যাট শুরু করুন",
+      "description": "মডেলের সাথে কথা বলতে একটি বার্তা পাঠান।"
+    },
+    "working": "কাজ চলছে",
+    "historyRetry": "চ্যাট ইতিহাস লোড করা যায়নি।",
+    "catalogRetry": "মডেল লোড করা যায়নি",
+    "sendError": "বার্তাটি পাঠানো যায়নি। আবার চেষ্টা করুন।"
   }
 }

@@ -152,7 +152,9 @@
     "appearanceDark": "Dark",
     "account": "အကောင့်",
     "prReviewAttribution": "PR သုံးသပ်ချက်များတွင် app ရင်းမြစ် သတ်မှတ်ခြင်း ထည့်ပါ",
-    "prReviewAttributionSubtitle": "သင်သုံးသပ်ချက် တင်သွင်းသည့်အခါ Reviewed via Kilo footer ကို ထည့်ပါ။"
+    "prReviewAttributionSubtitle": "သင်သုံးသပ်ချက် တင်သွင်းသည့်အခါ Reviewed via Kilo footer ကို ထည့်ပါ။",
+    "returnSendsMessage": "စာကြောင်းပြန်ခလုတ်က စာပို့သည်",
+    "returnSendsMessageSubtitle": "ပိတ်ထားပါက စာကြောင်းပြန်ခလုတ်သည် အေးဂျင့်၏ စာထည့်သွင်းရာအကွက်များတွင် စာကြောင်းအသစ် ထည့်သည်။"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request မရနိုင်ပါ",
@@ -665,7 +667,8 @@
     "profile": "ပရိုဖိုင်",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}၊ tab၊ {{total}} အနက် {{position}}"
+    "position": "{{name}}၊ tab၊ {{total}} အနက် {{position}}",
+    "chat": "စကားဝိုင်း"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "ကွန်ရက်အမှား",
       "uploadFailed": "အပ်လုဒ် မအောင်မြင်ပါ",
       "failedToUploadFile": "ဖိုင်အပ်လုဒ် မအောင်မြင်ပါ: {{reason}}",
-      "nothingToPaste": "ကူးထည့်စရာ မရှိပါ"
+      "nothingToPaste": "ကူးထည့်စရာ မရှိပါ",
+      "metadataStripFailed": "ဓာတ်ပုံ၏ နောက်ခံအချက်အလက်များကို ဖယ်ရှား၍မရခဲ့ပါ။"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "Check run",
       "status": "အခြေအနေ",
       "threshold": "အဆင့်သတ်မှတ်ချက်",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "သုံးသပ်ချက် မှတ်တမ်းကို စောင့်နေသည်။",
+      "transcriptEmpty": "ဤသုံးသပ်ချက်အတွက် မှတ်တမ်း မရှိပါ။",
+      "transcriptRetry": "သုံးသပ်ချက် မှတ်တမ်းကို တင်မရပါ။",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Agent လှုပ်ရှားမှုမရှိ",
+      "agentWorking": "Agent လုပ်ဆောင်နေသည်…",
+      "anErrorOccurred": "အမှားတစ်ခု ဖြစ်ပွားခဲ့သည်",
+      "errorWithMessage": "အမှား: {{message}}",
+      "executionStarted": "လုပ်ဆောင်မှု စတင်ခဲ့သည်",
+      "reviewCompleted": "စစ်ဆေးမှု ပြီးစီးခဲ့သည်",
+      "reviewInterrupted": "စစ်ဆေးမှု ကြားဖြတ်ခံခဲ့ရသည်",
+      "sessionError": "Session အမှား: {{error}}",
+      "statusWithValue": "အခြေအနေ: {{status}}",
+      "toolName": "Tool: {{name}}",
+      "toolNameError": "Tool: {{name}} — အမှား",
+      "unknownError": "အမည်မသိ အမှား"
     },
     "reviewMemory": {
       "title": "စစ်ဆေးမှု မှတ်ဉာဏ်",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "ယခင်လုပ်ငန်း ပြီးဆုံးနေဆဲဖြစ်သည်။ ခဏ စောင့်ပါ။",
       "serviceUnavailable": "ဝန်ဆောင်မှုသည် ယခုအခါ မရရှိနိုင်ပါ။ ထပ်စမ်းကြည့်ပါ။",
       "connectionTrouble": "ချိတ်ဆက်မှု ပြဿနာ။ ခဏနေမှ ထပ်စမ်းကြည့်ပါ။",
-      "modelUnavailable": "ဤမော်ဒယ်သည် Cloud Agent အတွက် မရရှိနိုင်ပါ။ အခြားမော်ဒယ်တစ်ခု ရွေးပြီး ထပ်စမ်းကြည့်ပါ။"
+      "modelUnavailable": "ဤမော်ဒယ်သည် Cloud Agent အတွက် မရရှိနိုင်ပါ။ အခြားမော်ဒယ်တစ်ခု ရွေးပြီး ထပ်စမ်းကြည့်ပါ။",
+      "cancelQueuedFailed": "စာကို ပယ်ဖျက်၍မရခဲ့ပါ။",
+      "cancelQueuedRestoreAvailable": "စာကို ပယ်ဖျက်ပြီးပါပြီ။ စာထည့်သွင်းရာအကွက်သို့ ပြန်ယူရန် “ပြန်ယူပါ” ကို နှိပ်ပါ။",
+      "cancelQueuedRestored": "စာကို ပယ်ဖျက်ပြီးပါပြီ။ ညွှန်ကြားချက်သည် စာထည့်သွင်းရာအကွက်တွင် ပြန်ရှိနေပါပြီ။",
+      "cancelQueuedUpgradeRequired": "တန်းစီထားသော စာများကို ပယ်ဖျက်ရန် ပိုသစ်သော Kilo CLI လိုအပ်သည်။ Kilo CLI ကို မွမ်းမံပြီး ပြန်ချိတ်ဆက်ပါ။"
     },
     "remoteSession": {
       "failedToCreate": "အဝေးစက်ရှင်ကို ဖန်တီးရန် မအောင်မြင်ခဲ့ပါ",
@@ -2196,7 +2220,8 @@
       "continueFrom": "{{title}} ကို ဆက်လုပ်နေသည်",
       "importingSession": "ဆက်ရှင် တင်သွင်းနေသည်",
       "cliCannotContinue": "ဤ CLI သည် ဆက်ရှင်ကို ဆက်လုပ်နိုင်မည် မဟုတ်ပါ။ Cloud Agent သို့မဟုတ် အခြား CLI တစ်ခုကို ရွေးပါ။",
-      "importFailed": "ဤဆက်ရှင်ကို တင်သွင်း၍မရပါ။"
+      "importFailed": "ဤဆက်ရှင်ကို တင်သွင်း၍မရပါ။",
+      "discardWithUploadsMessage": "သင့်ညွှန်ကြားချက်နှင့် ပို့ပြီးသော စာများတွင် မပူးတွဲထားသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။"
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခု မွမ်းမံပြီး",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "စာတန်းစီထားသည်",
       "userMessage": "အသုံးပြုသူ စာ",
       "assistantMessage": "Assistant စာ",
-      "longPressHint": "စာအသေးစိတ်အတွက် ကြာကြာနှိပ်ပါ"
+      "longPressHint": "စာအသေးစိတ်အတွက် ကြာကြာနှိပ်ပါ",
+      "cancelQueued": "စာကို ပယ်ဖျက်ပါ",
+      "cancelQueuedAccessibility": "တန်းစီထားသော စာကို ပယ်ဖျက်ပါ",
+      "restoreQueued": "ပြန်ယူပါ",
+      "restoreQueuedAccessibility": "ပယ်ဖျက်ထားသော စာကို စာထည့်သွင်းရာအကွက်သို့ ပြန်ယူပါ"
     },
     "olderMessages": {
       "arrived": "အစောပိုင်း စာများ တင်ပြီးပါပြီ",
@@ -2460,6 +2489,8 @@
       "viewTable": "ဇယားကြည့်ရန်",
       "title": "ဇယား",
       "close": "ဇယားပိတ်ရန်",
+      "loading": "ဇယားဖွင့်နေသည်",
+      "empty": "ဤဇယားတွင် အတန်းများမရှိပါ။",
       "columnCount_one": "ကော်လံ",
       "columnCount": "ကော်လံများ",
       "columnCount_other": "ကော်လံများ",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "session များ စစ်ထုတ်ရန်",
-      "sortBy": "စီရန်",
-      "sortLastUpdated": "နောက်ဆုံး ပြုပြင်ချိန်",
-      "sortCreated": "ဖန်တီးချိန်",
       "platform": "ပလက်ဖောင်း",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2526,7 +2554,9 @@
       "uploading": "တင်နေသည်…",
       "uploaded": "တင်ပြီးပါပြီ",
       "uploadFailedRetry": "တင်မှု မအောင်မြင်ပါ။ ထပ်ကြိုးစားရန် နှိပ်ပါ။",
-      "uploadFailedTerminal": "ဤဖိုင်ကို အပ်လုဒ်တင်၍မရပါ။"
+      "uploadFailedTerminal": "ဤဖိုင်ကို အပ်လုဒ်တင်၍မရပါ။",
+      "moveLeft": "{{filename}} ကို ဘယ်ဘက်သို့ ရွှေ့ပါ",
+      "moveRight": "{{filename}} ကို ညာဘက်သို့ ရွှေ့ပါ"
     },
     "attachmentPasteHint": {
       "accessibility": "clipboard မှ ပုံ ထည့်ပါ",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "အကျဉ်းချုပ် ပြုလုပ်နေသည်...",
       "messagePlaceholder": "မက်ဆေ့ချ်",
       "cannotReceiveFiles": "ဤ session သည် ဖိုင်များကို မလက်ခံနိုင်ပါ။ စာပို့ရန် ပူးတွဲဖိုင်များကို ဖယ်ရှားပါ။",
-      "couldNotAttachFiles": "ဖိုင်များကို မပူးတွဲနိုင်ပါ။ ထပ်ကြိုးစားရန် ပို့ရန် နှိပ်ပါ။"
+      "couldNotAttachFiles": "ဖိုင်များကို မပူးတွဲနိုင်ပါ။ ထပ်ကြိုးစားရန် ပို့ရန် နှိပ်ပါ။",
+      "discardAttachmentsMessage": "ပို့ပြီးသော စာများတွင် မပူးတွဲထားသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။",
+      "discardAttachmentsTitle": "ပူးတွဲဖိုင်များကို ပယ်ဖျက်မည်လား။",
+      "charactersRemaining": "အက္ခရာ {{count}} လုံး ကျန်သည်",
+      "insertNewline": "စာကြောင်းအသစ် ထည့်ပါ",
+      "starterChipBuild": "လုပ်ဆောင်ချက်တစ်ခု တည်ဆောက်ပါ",
+      "starterChipEmpty": "စိတ်ကူးတစ်ခုဖြင့် စတင်ပါ",
+      "starterChipFix": "ချို့ယွင်းချက်တစ်ခု ပြင်ဆင်ပါ",
+      "starterChipPrepare": "ကျွန်ုပ်၏ လုပ်ငန်းပတ်ဝန်းကျင်ကို ပြင်ဆင်ပါ",
+      "starterChipWrapUp": "ကျွန်ုပ်၏ ဆက်ရှင်ကို အဆုံးသတ်ပါ",
+      "starterChipWriteTests": "စမ်းသပ်မှုများ ရေးပါ"
     },
     "chatLink": {
       "linkCopied": "link ကို ကူးယူပြီးပါပြီ",
@@ -2775,7 +2815,8 @@
     "busy": "အသံထည့်သွင်းမှု အလုပ်ရှုပ်နေသည်။ ထပ်စမ်းကြည့်ပါ။",
     "stopped": "အသံထည့်သွင်းမှု ရပ်သွားသည်။ ထပ်စမ်းရန် မိုက်ခရိုဖုန်းကို နှိပ်ပါ။",
     "unavailableDevice": "ဤစက်တွင် အသံထည့်သွင်းမှု မရနိုင်ပါ။",
-    "unavailableLanguage": "ဤစက်၏ ဘာသာစကားအတွက် အသံထည့်သွင်းမှု မရနိုင်ပါ။"
+    "unavailableLanguage": "ဤစက်၏ ဘာသာစကားအတွက် အသံထည့်သွင်းမှု မရနိုင်ပါ။",
+    "listeningStopped": "နားထောင်ခြင်း ရပ်သွားသည်။"
   },
   "share": {
     "title": "Kilo သို့ မျှဝေရန်",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "လင့်တစ်ခု၏ host ကို သင်ယုံကြည်သောအခါ ၎င်းကို ထပ်မံမေးစရာမလိုဘဲ ဖွင့်ပါသည်။",
     "revoke": "{{host}} ကို ပယ်ဖျက်မည်",
     "backToPreferences": "နှစ်သက်မှုများသို့ ပြန်သွားမည်"
+  },
+  "quickChat": {
+    "title": "စကားဝိုင်း",
+    "composer": {
+      "placeholder": "မက်ဆေ့ချ်"
+    },
+    "empty": {
+      "title": "စကားဝိုင်းစတင်ပါ",
+      "description": "မော်ဒယ်တစ်ခုနှင့် စကားပြောရန် မက်ဆေ့ချ်ပို့ပါ။"
+    },
+    "working": "လုပ်ဆောင်နေသည်",
+    "historyRetry": "စကားဝိုင်းသမိုင်းကို တင်မရပါ။",
+    "catalogRetry": "မော်ဒယ်များ ဖွင့်၍ မရပါ",
+    "sendError": "မက်ဆေ့ခ်ျ ပို့ရန် မအောင်မြင်ခဲ့ပါ။ ထပ်ကြိုးစားပါ။"
   }
 }

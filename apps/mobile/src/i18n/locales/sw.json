@@ -152,7 +152,9 @@
     "appearanceDark": "Nyeusi",
     "account": "Akaunti",
     "prReviewAttribution": "Ongeza sifa ya app kwenye ukaguzi wa PR",
-    "prReviewAttributionSubtitle": "Ongeza 'Reviewed via Kilo' kwenye sehemu ya chini unapowasilisha ukaguzi."
+    "prReviewAttributionSubtitle": "Ongeza 'Reviewed via Kilo' kwenye sehemu ya chini unapowasilisha ukaguzi.",
+    "returnSendsMessage": "Kitufe cha kurudi hutuma ujumbe",
+    "returnSendsMessageSubtitle": "Kikiwa kimezimwa, kitufe cha kurudi huingiza mstari mpya kwenye sehemu za kuandika ujumbe kwa mawakala."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request haipatikani",
@@ -665,7 +667,8 @@
     "profile": "Wasifu",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, kichupo, {{position}} kati ya {{total}}"
+    "position": "{{name}}, kichupo, {{position}} kati ya {{total}}",
+    "chat": "Mazungumzo"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "Hitilafu ya mtandao",
       "uploadFailed": "Kupakia kumeshindwa",
       "failedToUploadFile": "Imeshindwa kupakia faili: {{reason}}",
-      "nothingToPaste": "Hakuna cha kubandika"
+      "nothingToPaste": "Hakuna cha kubandika",
+      "metadataStripFailed": "Imeshindwa kuondoa metadata ya picha."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "Endesha ukaguzi",
       "status": "Hali",
       "threshold": "Kizingiti",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Inasubiri nakala ya ukaguzi.",
+      "transcriptEmpty": "Hakuna nakala ya ukaguzi huu.",
+      "transcriptRetry": "Haikuweza kupakia nakala ya ukaguzi.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Wakala hakikazi",
+      "agentWorking": "Wakala anafanya kazi...",
+      "anErrorOccurred": "Hitilafu imetokea",
+      "errorWithMessage": "Hitilafu: {{message}}",
+      "executionStarted": "Utekelezaji umeanza",
+      "reviewCompleted": "Ukaguzi umekamilika",
+      "reviewInterrupted": "Ukaguzi umeingiliwa",
+      "sessionError": "Hitilafu ya kikao: {{error}}",
+      "statusWithValue": "Hali: {{status}}",
+      "toolName": "Zana: {{name}}",
+      "toolNameError": "Zana: {{name}} — hitilafu",
+      "unknownError": "Hitilafu isiyojulikana"
     },
     "reviewMemory": {
       "title": "Kumbukumbu ya ukaguzi",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
       "serviceUnavailable": "Huduma haipatikani sasa hivi. Tafadhali jaribu tena.",
       "connectionTrouble": "Tatizo la muunganisho. Tafadhali jaribu tena baada ya muda mfupi.",
-      "modelUnavailable": "Mfano huu haupatikani kwa Cloud Agent. Chagua mfano mwingine na ujaribu tena."
+      "modelUnavailable": "Mfano huu haupatikani kwa Cloud Agent. Chagua mfano mwingine na ujaribu tena.",
+      "cancelQueuedFailed": "Imeshindwa kughairi ujumbe.",
+      "cancelQueuedRestoreAvailable": "Ujumbe umeghairiwa. Gusa Rejesha ili kuurudisha kwenye sehemu ya kuandika ujumbe.",
+      "cancelQueuedRestored": "Ujumbe umeghairiwa. Maagizo yamerudi kwenye sehemu ya kuandika ujumbe.",
+      "cancelQueuedUpgradeRequired": "Kughairi ujumbe ulio kwenye foleni kunahitaji Kilo CLI mpya zaidi. Sasisha Kilo CLI na unganisha tena."
     },
     "remoteSession": {
       "failedToCreate": "Imeshindwa kuunda kikao cha mbali",
@@ -2196,7 +2220,8 @@
       "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
       "continueFrom": "Endelea na {{title}}",
       "importFailed": "Haikuweza kuingiza kikao hiki.",
-      "importingSession": "Inaingiza kikao"
+      "importingSession": "Inaingiza kikao",
+      "discardWithUploadsMessage": "Maagizo yako na faili zozote zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa."
     },
     "partRenderer": {
       "updatedFileCount_one": "Imesasisha faili {{displayCount}}",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "Ujumbe umepangwa",
       "userMessage": "Ujumbe wa mtumiaji",
       "assistantMessage": "Ujumbe wa msaidizi",
-      "longPressHint": "Bonyeza kwa muda mrefu kwa maelezo ya ujumbe"
+      "longPressHint": "Bonyeza kwa muda mrefu kwa maelezo ya ujumbe",
+      "cancelQueued": "Ghairi ujumbe",
+      "cancelQueuedAccessibility": "Ghairi ujumbe ulio kwenye foleni",
+      "restoreQueued": "Rejesha",
+      "restoreQueuedAccessibility": "Rejesha ujumbe ulioghairiwa kwenye sehemu ya kuandika ujumbe"
     },
     "olderMessages": {
       "arrived": "Ujumbe wa awali umepakiwa",
@@ -2460,6 +2489,8 @@
       "viewTable": "Tazama jedwali",
       "title": "Jedwali",
       "close": "Funga jedwali",
+      "loading": "Inapakia jedwali",
+      "empty": "Jedwali hili halina safu mlalo",
       "columnCount_one": "safu",
       "columnCount": "safu",
       "columnCount_other": "safu",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Chuja vikao",
-      "sortBy": "Panga kwa",
-      "sortLastUpdated": "Imesasishwa mwisho",
-      "sortCreated": "Imeundwa",
       "platform": "Jukwaa",
       "platformCloud": "Wingu",
       "platformExtension": "Kiendelezi",
@@ -2526,7 +2554,9 @@
       "uploading": "Inapakia...",
       "uploaded": "Imepakiwa",
       "uploadFailedRetry": "Kupakia kumeshindwa. Gusa ili ujaribu tena.",
-      "uploadFailedTerminal": "Faili hili haliwezi kupakiwa."
+      "uploadFailedTerminal": "Faili hili haliwezi kupakiwa.",
+      "moveLeft": "Sogeza {{filename}} kushoto",
+      "moveRight": "Sogeza {{filename}} kulia"
     },
     "attachmentPasteHint": {
       "accessibility": "Bandika picha kutoka kwenye ubao wa kunakili",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "Inahitimisha...",
       "messagePlaceholder": "Ujumbe...",
       "cannotReceiveFiles": "Kikao hiki hakiwezi kupokea faili. Ondoa viambatisho ili utume ujumbe wako.",
-      "couldNotAttachFiles": "Haikuweza kuambatisha faili. Gusa tuma ili ujaribu tena."
+      "couldNotAttachFiles": "Haikuweza kuambatisha faili. Gusa tuma ili ujaribu tena.",
+      "discardAttachmentsMessage": "Faili zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa.",
+      "discardAttachmentsTitle": "Tupa viambatisho?",
+      "charactersRemaining": "Herufi {{count}} zimesalia",
+      "insertNewline": "Ingiza mstari mpya",
+      "starterChipBuild": "Unda kipengele",
+      "starterChipEmpty": "Anza na wazo",
+      "starterChipFix": "Rekebisha hitilafu",
+      "starterChipPrepare": "Sanidi mazingira yangu",
+      "starterChipWrapUp": "Kamilisha kikao changu",
+      "starterChipWriteTests": "Andika majaribio"
     },
     "chatLink": {
       "linkCopied": "Kiungo kimenakiliwa",
@@ -2775,7 +2815,8 @@
     "busy": "Ingizo la sauti linashughulika. Jaribu tena.",
     "stopped": "Ingizo la sauti limesimama. Gusa kipaza sauti kujaribu tena.",
     "unavailableDevice": "Ingizo la sauti halipatikani kwenye kifaa hiki.",
-    "unavailableLanguage": "Ingizo la sauti halipatikani kwa lugha hii ya kifaa."
+    "unavailableLanguage": "Ingizo la sauti halipatikani kwa lugha hii ya kifaa.",
+    "listeningStopped": "Usikilizaji umesimama."
   },
   "share": {
     "title": "Shiriki kwa Kilo",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "Unapoamini mwenyeji wa kiungo, hufunguka bila kuuliza tena.",
     "revoke": "Ondoa {{host}}",
     "backToPreferences": "Rudi kwenye mapendeleo"
+  },
+  "quickChat": {
+    "title": "Mazungumzo",
+    "composer": {
+      "placeholder": "Ujumbe"
+    },
+    "empty": {
+      "title": "Anza mazungumzo",
+      "description": "Tuma ujumbe ili uongee na mfano."
+    },
+    "working": "Inafanya kazi",
+    "historyRetry": "Haikuweza kupakia historia ya mazungumzo.",
+    "catalogRetry": "Imeshindwa kupakia miundo",
+    "sendError": "Haikuweza kutuma ujumbe. Jaribu tena."
   }
 }

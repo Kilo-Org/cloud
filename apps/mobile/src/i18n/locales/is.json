@@ -152,7 +152,9 @@
     "appearanceDark": "Dökkt",
     "account": "Reikningur",
     "prReviewAttribution": "Bæta við app-eignarmerki í PR-úttektir",
-    "prReviewAttributionSubtitle": "Bæta við „Reviewed via Kilo“-fótlið þegar þú skilar úttekt."
+    "prReviewAttributionSubtitle": "Bæta við „Reviewed via Kilo“-fótlið þegar þú skilar úttekt.",
+    "returnSendsMessage": "Færslulykill sendir skilaboð",
+    "returnSendsMessageSubtitle": "Þegar slökkt er setur færslulykillinn inn línuskil í ritlum umboða."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ótiltækur",
@@ -665,7 +667,8 @@
     "profile": "Notandasnið",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, flipi, {{position}} af {{total}}"
+    "position": "{{name}}, flipi, {{position}} af {{total}}",
+    "chat": "Spjall"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "Netvilla",
       "uploadFailed": "Upphleðsla mistókst",
       "failedToUploadFile": "Ekki tókst að hlaða upp skrá: {{reason}}",
-      "nothingToPaste": "Ekkert til að líma"
+      "nothingToPaste": "Ekkert til að líma",
+      "metadataStripFailed": "Ekki tókst að fjarlægja lýsigögn myndar."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "Athugunarkeyrsla",
       "status": "Staða",
       "threshold": "Þröskuldur",
-      "pullRequest": "pull-beiðni"
+      "pullRequest": "pull-beiðni",
+      "transcriptWaiting": "Bíða eftir úttektarafritinu.",
+      "transcriptEmpty": "Ekkert afrit fyrir þessa úttekt.",
+      "transcriptRetry": "Ekki tókst að hlaða úttektarafritið.",
+      "transcriptLive": "BEIN",
+      "agentIdle": "Umboð í bið",
+      "agentWorking": "Umboð að vinna...",
+      "anErrorOccurred": "Villa kom upp",
+      "errorWithMessage": "Villa: {{message}}",
+      "executionStarted": "Framkvæmd hafin",
+      "reviewCompleted": "Úttekt lokið",
+      "reviewInterrupted": "Úttekt rofin",
+      "sessionError": "Fundarvilla: {{error}}",
+      "statusWithValue": "Staða: {{status}}",
+      "toolName": "Tól: {{name}}",
+      "toolNameError": "Tól: {{name}} — villa",
+      "unknownError": "Óþekkt villa"
     },
     "reviewMemory": {
       "title": "Yfirferðarminni",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "Fyrra verkefni er enn að klárast. Bíddu augnablik.",
       "serviceUnavailable": "Þjónustan er ekki tiltæk núna. Reyndu aftur.",
       "connectionTrouble": "Tengingarvandræði. Reyndu aftur eftir augnablik.",
-      "modelUnavailable": "Þetta líkan er ekki tiltækt fyrir Cloud Agent. Veldu annað líkan og reyndu aftur."
+      "modelUnavailable": "Þetta líkan er ekki tiltækt fyrir Cloud Agent. Veldu annað líkan og reyndu aftur.",
+      "cancelQueuedFailed": "Ekki tókst að hætta við skilaboðin.",
+      "cancelQueuedRestoreAvailable": "Hætt var við skilaboðin. Bankaðu á Endurheimta til að færa þau aftur í ritilinn.",
+      "cancelQueuedRestored": "Hætt var við skilaboðin. Skilaboðin eru aftur í ritlinum.",
+      "cancelQueuedUpgradeRequired": "Til að hætta við skilaboð í biðröð þarf nýrri Kilo CLI. Uppfærðu Kilo CLI og tengdu aftur."
     },
     "remoteSession": {
       "failedToCreate": "Ekki tókst að búa til fjarlota lotu",
@@ -2196,7 +2220,8 @@
       "continueFrom": "Halda áfram með {{title}}",
       "importingSession": "Flytur inn lotu",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
-      "importFailed": "Ekki tókst að flytja inn þessa lotu."
+      "importFailed": "Ekki tókst að flytja inn þessa lotu.",
+      "discardWithUploadsMessage": "Skilaboðunum þínum og upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppfærði {{displayCount}} skrá",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "Skilaboð sett í biðröð",
       "userMessage": "Skilaboð frá notanda",
       "assistantMessage": "Skilaboð frá aðstoðarmanni",
-      "longPressHint": "Haltu lengi inni fyrir skilaboðaupplýsingar"
+      "longPressHint": "Haltu lengi inni fyrir skilaboðaupplýsingar",
+      "cancelQueued": "Hætta við skilaboð",
+      "cancelQueuedAccessibility": "Hætta við skilaboð í biðröð",
+      "restoreQueued": "Endurheimta",
+      "restoreQueuedAccessibility": "Endurheimta afturkölluð skilaboð í ritilinn"
     },
     "olderMessages": {
       "arrived": "Eldri skilaboð hlaðin",
@@ -2460,6 +2489,8 @@
       "viewTable": "Skoða töflu",
       "title": "Tafla",
       "close": "Loka töflu",
+      "loading": "Hleð töflu",
+      "empty": "Þessi tafla hefur engar línur.",
       "columnCount_one": "dálkur",
       "columnCount": "dálkar",
       "columnCount_other": "dálkar",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Sía lotur",
-      "sortBy": "Raða eftir",
-      "sortLastUpdated": "Síðast uppfært",
-      "sortCreated": "Búið til",
       "platform": "Vettvangur",
       "platformCloud": "Ský",
       "platformExtension": "Viðbót",
@@ -2526,7 +2554,9 @@
       "uploading": "Hleð upp…",
       "uploaded": "Hlaðið upp",
       "uploadFailedRetry": "Upphleðsla mistókst. Bankaðu til að reyna aftur.",
-      "uploadFailedTerminal": "Ekki er hægt að hlaða þessari skrá upp."
+      "uploadFailedTerminal": "Ekki er hægt að hlaða þessari skrá upp.",
+      "moveLeft": "Færa {{filename}} til vinstri",
+      "moveRight": "Færa {{filename}} til hægri"
     },
     "attachmentPasteHint": {
       "accessibility": "Líma mynd af klippispjaldi",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "Ljýkur máli...",
       "messagePlaceholder": "Skilaboð...",
       "cannotReceiveFiles": "Þessi lota getur ekki tekið við skrám. Fjarlægðu viðhengin til að senda skilaboðin.",
-      "couldNotAttachFiles": "Ekki tókst að hengja skrár við. Bankaðu á senda til að reyna aftur."
+      "couldNotAttachFiles": "Ekki tókst að hengja skrár við. Bankaðu á senda til að reyna aftur.",
+      "discardAttachmentsMessage": "Upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
+      "discardAttachmentsTitle": "Farga viðhengjum?",
+      "charactersRemaining": "{{count}} stafir eftir",
+      "insertNewline": "Setja inn línuskil",
+      "starterChipBuild": "Búa til eiginleika",
+      "starterChipEmpty": "Byrja með hugmynd",
+      "starterChipFix": "Laga villu",
+      "starterChipPrepare": "Setja upp umhverfið mitt",
+      "starterChipWrapUp": "Ljúka lotunni minni",
+      "starterChipWriteTests": "Skrifa próf"
     },
     "chatLink": {
       "linkCopied": "Krækja afrituð",
@@ -2775,7 +2815,8 @@
     "busy": "Raddinnsláttur er upptekinn. Reyndu aftur.",
     "stopped": "Raddinnsláttur stöðvaðist. Bankaðu á hljóðnemann til að reyna aftur.",
     "unavailableDevice": "Raddinnsláttur er ekki í boði á þessu tæki.",
-    "unavailableLanguage": "Raddinnsláttur er ekki í boði fyrir tækjatungumálið."
+    "unavailableLanguage": "Raddinnsláttur er ekki í boði fyrir tækjatungumálið.",
+    "listeningStopped": "Hlustun stöðvaðist."
   },
   "share": {
     "title": "Deila í Kilo",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "Þegar þú treystir gestgjafa tengils opnast hann án þess að spyrja aftur.",
     "revoke": "Draga til baka {{host}}",
     "backToPreferences": "Til baka í stillingar"
+  },
+  "quickChat": {
+    "title": "Spjall",
+    "composer": {
+      "placeholder": "Skilaboð"
+    },
+    "empty": {
+      "title": "Byrjaðu spjall",
+      "description": "Sendu skilaboð til að tala við líkan."
+    },
+    "working": "Vinnur",
+    "historyRetry": "Ekki tókst að hlaða samtalsferilinn.",
+    "catalogRetry": "Ekki tókst að hlaða líkön",
+    "sendError": "Ekki tókst að senda skilaboðin. Reyndu aftur."
   }
 }

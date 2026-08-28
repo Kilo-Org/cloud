@@ -152,7 +152,9 @@
     "appearanceDark": "Gelap",
     "account": "Akun",
     "prReviewAttribution": "Tambahkan atribusi aplikasi ke ulasan PR",
-    "prReviewAttributionSubtitle": "Tambahkan footer Ditinjau melalui Kilo saat Anda mengirimkan ulasan."
+    "prReviewAttributionSubtitle": "Tambahkan footer Ditinjau melalui Kilo saat Anda mengirimkan ulasan.",
+    "returnSendsMessage": "Tombol Enter mengirim pesan",
+    "returnSendsMessageSubtitle": "Saat nonaktif, Enter menyisipkan baris baru di kolom pesan agen."
   },
   "notifications": {
     "title": "Notifikasi",
@@ -211,7 +213,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} dari {{total}}"
+    "position": "{{name}}, tab, {{position}} dari {{total}}",
+    "chat": "Obrolan"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +298,8 @@
       "networkError": "Kesalahan jaringan",
       "uploadFailed": "Unggahan gagal",
       "failedToUploadFile": "Gagal mengunggah file: {{reason}}",
-      "nothingToPaste": "Tidak ada yang bisa ditempel"
+      "nothingToPaste": "Tidak ada yang bisa ditempel",
+      "metadataStripFailed": "Metadata foto tidak dapat dihapus."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -898,7 +902,23 @@
       "title": "Tinjauan",
       "tokens": "Token",
       "tokensInOut": "{{input}} masuk / {{output}} keluar",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Menunggu transkrip tinjauan.",
+      "transcriptEmpty": "Tidak ada transkrip untuk tinjauan ini.",
+      "transcriptRetry": "Tidak dapat memuat transkrip tinjauan.",
+      "transcriptLive": "Langsung",
+      "agentIdle": "Agen menganggur",
+      "agentWorking": "Agen sedang bekerja...",
+      "anErrorOccurred": "Terjadi kesalahan",
+      "errorWithMessage": "Kesalahan: {{message}}",
+      "executionStarted": "Eksekusi dimulai",
+      "reviewCompleted": "Tinjauan selesai",
+      "reviewInterrupted": "Tinjauan terganggu",
+      "sessionError": "Kesalahan sesi: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Alat: {{name}}",
+      "toolNameError": "Alat: {{name}} — kesalahan",
+      "unknownError": "Kesalahan tidak dikenal"
     },
     "reviewList": {
       "configureProvider": "Konfigurasikan penyedia",
@@ -1670,7 +1690,11 @@
       "previousTaskFinishing": "Tugas sebelumnya masih selesai. Tunggu sebentar.",
       "serviceUnavailable": "Layanan tidak tersedia saat ini. Coba lagi.",
       "connectionTrouble": "Gangguan koneksi. Coba lagi sebentar lagi.",
-      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan coba lagi."
+      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan coba lagi.",
+      "cancelQueuedFailed": "Tidak dapat membatalkan pesan.",
+      "cancelQueuedRestoreAvailable": "Pesan dibatalkan. Ketuk Pulihkan untuk mengembalikannya ke kolom pesan.",
+      "cancelQueuedRestored": "Pesan dibatalkan. Prompt kembali ke kolom pesan.",
+      "cancelQueuedUpgradeRequired": "Pembatalan pesan dalam antrean memerlukan Kilo CLI yang lebih baru. Perbarui Kilo CLI dan sambungkan kembali."
     },
     "remoteSession": {
       "failedToCreate": "Gagal membuat sesi jarak jauh",
@@ -1742,7 +1766,8 @@
       "continueFrom": "Melanjutkan {{title}}",
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
-      "importFailed": "Tidak dapat mengimpor sesi ini."
+      "importFailed": "Tidak dapat mengimpor sesi ini.",
+      "discardWithUploadsMessage": "Prompt Anda dan unggahan yang tidak dilampirkan ke pesan terkirim akan dihapus."
     },
     "partRenderer": {
       "updatedFileCount_one": "Memperbarui {{displayCount}} file",
@@ -1990,7 +2015,11 @@
       "queuedAccessibility": "Pesan dalam antrean",
       "userMessage": "Pesan pengguna",
       "assistantMessage": "Pesan asisten",
-      "longPressHint": "Tekan lama untuk detail pesan"
+      "longPressHint": "Tekan lama untuk detail pesan",
+      "cancelQueued": "Batalkan pesan",
+      "cancelQueuedAccessibility": "Batalkan pesan dalam antrean",
+      "restoreQueued": "Pulihkan",
+      "restoreQueuedAccessibility": "Pulihkan pesan yang dibatalkan ke kolom pesan"
     },
     "olderMessages": {
       "arrived": "Pesan sebelumnya dimuat",
@@ -2006,6 +2035,8 @@
       "viewTable": "Lihat tabel",
       "title": "Tabel",
       "close": "Tutup tabel",
+      "loading": "Memuat tabel",
+      "empty": "Tabel ini tidak memiliki baris.",
       "columnCount_one": "kolom",
       "columnCount": "kolom",
       "columnCount_other": "kolom",
@@ -2016,9 +2047,6 @@
     },
     "sessionFilter": {
       "title": "Filter sesi",
-      "sortBy": "Urutkan menurut",
-      "sortLastUpdated": "Terakhir diperbarui",
-      "sortCreated": "Dibuat",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Ekstensi",
@@ -2072,7 +2100,9 @@
       "uploading": "Mengunggah…",
       "uploaded": "Terunggah",
       "uploadFailedRetry": "Unggahan gagal. Ketuk untuk mencoba lagi.",
-      "uploadFailedTerminal": "File ini tidak dapat diunggah."
+      "uploadFailedTerminal": "File ini tidak dapat diunggah.",
+      "moveLeft": "Pindahkan {{filename}} ke kiri",
+      "moveRight": "Pindahkan {{filename}} ke kanan"
     },
     "attachmentPasteHint": {
       "accessibility": "Tempel gambar dari papan klip",
@@ -2102,7 +2132,17 @@
       "finalizingPlaceholder": "Menyelesaikan...",
       "messagePlaceholder": "Pesan...",
       "cannotReceiveFiles": "Sesi ini tidak dapat menerima file. Hapus lampiran untuk mengirim pesan Anda.",
-      "couldNotAttachFiles": "Tidak dapat melampirkan file. Ketuk Kirim untuk mencoba lagi."
+      "couldNotAttachFiles": "Tidak dapat melampirkan file. Ketuk Kirim untuk mencoba lagi.",
+      "discardAttachmentsMessage": "Unggahan yang tidak dilampirkan ke pesan terkirim akan dihapus.",
+      "discardAttachmentsTitle": "Buang lampiran?",
+      "charactersRemaining": "{{count}} karakter tersisa",
+      "insertNewline": "Sisipkan baris baru",
+      "starterChipBuild": "Buat fitur",
+      "starterChipEmpty": "Mulai dengan ide",
+      "starterChipFix": "Perbaiki kesalahan",
+      "starterChipPrepare": "Siapkan lingkungan saya",
+      "starterChipWrapUp": "Akhiri sesi saya",
+      "starterChipWriteTests": "Tulis pengujian"
     },
     "chatLink": {
       "linkCopied": "Tautan disalin",
@@ -2321,7 +2361,8 @@
     "busy": "Masukan suara sedang sibuk. Coba lagi.",
     "stopped": "Masukan suara berhenti. Ketuk mikrofon untuk mencoba lagi.",
     "unavailableDevice": "Masukan suara tidak tersedia di perangkat ini.",
-    "unavailableLanguage": "Masukan suara tidak tersedia untuk bahasa perangkat ini."
+    "unavailableLanguage": "Masukan suara tidak tersedia untuk bahasa perangkat ini.",
+    "listeningStopped": "Mendengarkan berhenti."
   },
   "share": {
     "title": "Bagikan ke Kilo",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "Saat Anda mempercayai host suatu tautan, tautan tersebut dibuka tanpa bertanya lagi.",
     "revoke": "Cabut {{host}}",
     "backToPreferences": "Kembali ke preferensi"
+  },
+  "quickChat": {
+    "title": "Obrolan",
+    "composer": {
+      "placeholder": "Pesan"
+    },
+    "empty": {
+      "title": "Mulai obrolan",
+      "description": "Kirim pesan untuk berbicara dengan model."
+    },
+    "working": "Mengerjakan",
+    "historyRetry": "Tidak dapat memuat riwayat obrolan.",
+    "catalogRetry": "Tidak dapat memuat model",
+    "sendError": "Tidak dapat mengirim pesan. Coba lagi."
   }
 }

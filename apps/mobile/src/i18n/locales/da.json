@@ -152,7 +152,9 @@
     "appearanceDark": "Mørk",
     "account": "Konto",
     "prReviewAttribution": "Tilføj app-tilskrivning til PR-anmeldelser",
-    "prReviewAttributionSubtitle": "Tilføj en \"Reviewed via Kilo\"-sidefod, når du sender en anmeldelse."
+    "prReviewAttributionSubtitle": "Tilføj en \"Reviewed via Kilo\"-sidefod, når du sender en anmeldelse.",
+    "returnSendsMessage": "Returtasten sender beskeden",
+    "returnSendsMessageSubtitle": "Når dette er slået fra, indsætter returtasten et linjeskift i agenternes beskedfelter."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgængelig",
@@ -665,7 +667,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, fane, {{position}} af {{total}}"
+    "position": "{{name}}, fane, {{position}} af {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "Netværksfejl",
       "uploadFailed": "Upload mislykkedes",
       "failedToUploadFile": "Kunne ikke uploade fil: {{reason}}",
-      "nothingToPaste": "Intet at indsætte"
+      "nothingToPaste": "Intet at indsætte",
+      "metadataStripFailed": "Billedets metadata kunne ikke fjernes."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "Tjekkørsel",
       "status": "Status",
       "threshold": "Tærskel",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Venter på gennemgangens transskription.",
+      "transcriptEmpty": "Ingen transskription for denne gennemgang.",
+      "transcriptRetry": "Kunne ikke indlæse gennemgangens transskription.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Agent inaktiv",
+      "agentWorking": "Agent arbejder...",
+      "anErrorOccurred": "Der opstod en fejl",
+      "errorWithMessage": "Fejl: {{message}}",
+      "executionStarted": "Udførelse startet",
+      "reviewCompleted": "Gennemgang fuldført",
+      "reviewInterrupted": "Gennemgang afbrudt",
+      "sessionError": "Sessionsfejl: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Værktøj: {{name}}",
+      "toolNameError": "Værktøj: {{name}} — fejl",
+      "unknownError": "Ukendt fejl"
     },
     "reviewMemory": {
       "title": "Gennemgangshukommelse",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "Den forrige opgave er stadig i gang. Vent et øjeblik.",
       "serviceUnavailable": "Tjenesten er ikke tilgængelig lige nu. Prøv igen.",
       "connectionTrouble": "Forbindelsesproblem. Prøv igen om et øjeblik.",
-      "modelUnavailable": "Denne model er ikke tilgængelig for Cloud Agent. Vælg en anden model og prøv igen."
+      "modelUnavailable": "Denne model er ikke tilgængelig for Cloud Agent. Vælg en anden model og prøv igen.",
+      "cancelQueuedFailed": "Kunne ikke annullere beskeden.",
+      "cancelQueuedRestoreAvailable": "Besked annulleret. Tryk på Gendan for at føre den tilbage til beskedfeltet.",
+      "cancelQueuedRestored": "Besked annulleret. Prompten er tilbage i beskedfeltet.",
+      "cancelQueuedUpgradeRequired": "Annullering af beskeder i kø kræver en nyere Kilo CLI. Opdater Kilo CLI, og opret forbindelse igen."
     },
     "remoteSession": {
       "failedToCreate": "Kunne ikke oprette fjernsession",
@@ -2196,7 +2220,8 @@
       "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
       "continueFrom": "Fortsætter {{title}}",
       "importFailed": "Kunne ikke importere denne session.",
-      "importingSession": "Importerer session"
+      "importingSession": "Importerer session",
+      "discardWithUploadsMessage": "Din prompt og eventuelle uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet."
     },
     "partRenderer": {
       "updatedFileCount_one": "Opdaterede {{displayCount}} fil",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "Besked i kø",
       "userMessage": "Brugerbesked",
       "assistantMessage": "Assistentbesked",
-      "longPressHint": "Hold nede for beskeddetaljer"
+      "longPressHint": "Hold nede for beskeddetaljer",
+      "cancelQueued": "Annuller besked",
+      "cancelQueuedAccessibility": "Annuller besked i kø",
+      "restoreQueued": "Gendan",
+      "restoreQueuedAccessibility": "Gendan annulleret besked i beskedfeltet"
     },
     "olderMessages": {
       "arrived": "Tidligere beskeder indlæst",
@@ -2460,6 +2489,8 @@
       "viewTable": "Vis tabel",
       "title": "Tabel",
       "close": "Luk tabel",
+      "loading": "Indlæser tabel",
+      "empty": "Denne tabel har ingen rækker.",
       "columnCount_one": "kolonne",
       "columnCount": "kolonner",
       "columnCount_other": "kolonner",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Filtrér sessioner",
-      "sortBy": "Sortér efter",
-      "sortLastUpdated": "Sidst opdateret",
-      "sortCreated": "Oprettet",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Udvidelse",
@@ -2526,7 +2554,9 @@
       "uploading": "Uploader…",
       "uploaded": "Uploadet",
       "uploadFailedRetry": "Upload mislykkedes. Tryk for at prøve igen.",
-      "uploadFailedTerminal": "Denne fil kan ikke uploades."
+      "uploadFailedTerminal": "Denne fil kan ikke uploades.",
+      "moveLeft": "Flyt {{filename}} til venstre",
+      "moveRight": "Flyt {{filename}} til højre"
     },
     "attachmentPasteHint": {
       "accessibility": "Indsæt billede fra udklipsholder",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "Afslutter...",
       "messagePlaceholder": "Besked...",
       "cannotReceiveFiles": "Denne session kan ikke modtage filer. Fjern vedhæftningerne for at sende din besked.",
-      "couldNotAttachFiles": "Kunne ikke vedhæfte filer. Tryk send for at prøve igen."
+      "couldNotAttachFiles": "Kunne ikke vedhæfte filer. Tryk send for at prøve igen.",
+      "discardAttachmentsMessage": "Uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
+      "discardAttachmentsTitle": "Kassér vedhæftninger?",
+      "charactersRemaining": "{{count}} tegn tilbage",
+      "insertNewline": "Indsæt linjeskift",
+      "starterChipBuild": "Byg en funktion",
+      "starterChipEmpty": "Start med en idé",
+      "starterChipFix": "Ret en fejl",
+      "starterChipPrepare": "Konfigurér mit miljø",
+      "starterChipWrapUp": "Afslut min session",
+      "starterChipWriteTests": "Skriv test"
     },
     "chatLink": {
       "linkCopied": "Link kopieret",
@@ -2775,7 +2815,8 @@
     "busy": "Taleinput er optaget. Prøv igen.",
     "stopped": "Taleinput stoppede. Tryk på mikrofonen for at prøve igen.",
     "unavailableDevice": "Taleinput er ikke tilgængeligt på denne enhed.",
-    "unavailableLanguage": "Taleinput er ikke tilgængeligt for dette enhedssprog."
+    "unavailableLanguage": "Taleinput er ikke tilgængeligt for dette enhedssprog.",
+    "listeningStopped": "Lytning stoppet."
   },
   "share": {
     "title": "Del til Kilo",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "Når du stoler på et links host, åbnes det uden at spørge igen.",
     "revoke": "Tilbagekald {{host}}",
     "backToPreferences": "Tilbage til indstillinger"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Besked"
+    },
+    "empty": {
+      "title": "Start en chat",
+      "description": "Send en besked for at tale med en model."
+    },
+    "working": "Arbejder",
+    "historyRetry": "Kunne ikke indlæse chathistorik.",
+    "catalogRetry": "Kunne ikke indlæse modeller",
+    "sendError": "Kunne ikke sende beskeden. Prøv igen."
   }
 }

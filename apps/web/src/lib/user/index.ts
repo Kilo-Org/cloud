@@ -116,6 +116,8 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
+  quick_chat_threads,
+  quick_chat_messages,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count, ne } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -1049,7 +1051,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   device_auth_requests, auto_top_up_configs,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
- *   user_notification_preferences)
+ *   user_notification_preferences, quick_chat_threads, quick_chat_messages)
  * - operation_ledgers (keyed by kilo_user_id)
  * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
  *   writer's email lookup failed, the user id)
@@ -1482,6 +1484,22 @@ export async function anonymizeCloudUserData(
   await tx.delete(user_moderation_blocks).where(eq(user_moderation_blocks.blocker_user_id, userId));
   await tx.delete(user_moderation_mutes).where(eq(user_moderation_mutes.blocker_user_id, userId));
   await tx.delete(user_terms_acceptances).where(eq(user_terms_acceptances.kilo_user_id, userId));
+
+  // Quick chat threads and messages are user-owned, so they are hard-deleted
+  // with the account. Messages go first so the thread delete below cannot race
+  // a cascade that would leave them behind.
+  await tx
+    .delete(quick_chat_messages)
+    .where(
+      inArray(
+        quick_chat_messages.thread_id,
+        tx
+          .select({ id: quick_chat_threads.id })
+          .from(quick_chat_threads)
+          .where(eq(quick_chat_threads.user_id, userId))
+      )
+    );
+  await tx.delete(quick_chat_threads).where(eq(quick_chat_threads.user_id, userId));
 
   // Code indexing data
   await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));

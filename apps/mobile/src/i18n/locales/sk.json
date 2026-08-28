@@ -152,7 +152,9 @@
     "appearanceDark": "Tmavý",
     "account": "Účet",
     "prReviewAttribution": "Pridať atribúciu aplikácie do kontrol PR",
-    "prReviewAttributionSubtitle": "Keď odošlete kontrolu, pridajte pätičku Reviewed via Kilo."
+    "prReviewAttributionSubtitle": "Keď odošlete kontrolu, pridajte pätičku Reviewed via Kilo.",
+    "returnSendsMessage": "Kláves Enter odošle správu",
+    "returnSendsMessageSubtitle": "Keď je táto možnosť vypnutá, kláves Enter vloží nový riadok do polí na zadávanie správy agentom."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nie je dostupný",
@@ -679,7 +681,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, karta, {{position}} z {{total}}"
+    "position": "{{name}}, karta, {{position}} z {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -763,7 +766,8 @@
       "networkError": "Chyba siete",
       "uploadFailed": "Nahrávanie zlyhalo",
       "failedToUploadFile": "Súbor sa nepodarilo nahrať: {{reason}}",
-      "nothingToPaste": "Nie je čo vložiť"
+      "nothingToPaste": "Nie je čo vložiť",
+      "metadataStripFailed": "Metaúdaje fotografie sa nepodarilo odstrániť."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1317,7 +1321,23 @@
       "checkRun": "Spustenie kontroly",
       "status": "Stav",
       "threshold": "Prah",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Čaká sa na prepis kontroly.",
+      "transcriptEmpty": "Žiadny prepis pre túto kontrolu.",
+      "transcriptRetry": "Prepis kontroly sa nepodarilo načítať.",
+      "transcriptLive": "NAŽIVO",
+      "agentIdle": "Agent nečinný",
+      "agentWorking": "Agent pracuje...",
+      "anErrorOccurred": "Vyskytla sa chyba",
+      "errorWithMessage": "Chyba: {{message}}",
+      "executionStarted": "Spustenie sa začalo",
+      "reviewCompleted": "Preskúmanie dokončené",
+      "reviewInterrupted": "Preskúmanie prerušené",
+      "sessionError": "Chyba relácie: {{error}}",
+      "statusWithValue": "Stav: {{status}}",
+      "toolName": "Nástroj: {{name}}",
+      "toolNameError": "Nástroj: {{name}} — chyba",
+      "unknownError": "Neznáma chyba"
     },
     "reviewMemory": {
       "title": "Pamäť preskúmaní",
@@ -2154,7 +2174,11 @@
       "previousTaskFinishing": "Predchádzajúca úloha sa ešte dokončuje. Počkajte chvíľu.",
       "serviceUnavailable": "Služba je momentálne nedostupná. Skúste to znova.",
       "connectionTrouble": "Problém s pripojením. Skúste to znova o chvíľu.",
-      "modelUnavailable": "Tento model nie je dostupný pre Cloud Agent. Vyberte iný model a skúste to znova."
+      "modelUnavailable": "Tento model nie je dostupný pre Cloud Agent. Vyberte iný model a skúste to znova.",
+      "cancelQueuedFailed": "Správu sa nepodarilo zrušiť.",
+      "cancelQueuedRestoreAvailable": "Správa zrušená. Klepnutím na Obnoviť ju vrátite do poľa na zadávanie správy.",
+      "cancelQueuedRestored": "Správa zrušená. Prompt je späť v poli na zadávanie správy.",
+      "cancelQueuedUpgradeRequired": "Zrušenie správ vo fronte vyžaduje novšie Kilo CLI. Aktualizujte Kilo CLI a znovu sa pripojte."
     },
     "remoteSession": {
       "failedToCreate": "Vzdialené sedenie sa nepodarilo vytvoriť",
@@ -2226,7 +2250,8 @@
       "continueFrom": "Pokračovať v {{title}}",
       "importingSession": "Importuje sa relácia",
       "cliCannotContinue": "Tento CLI nemôže pokračovať v relácii. Vyberte Cloud Agent alebo iný CLI.",
-      "importFailed": "Túto reláciu sa nepodarilo importovať."
+      "importFailed": "Túto reláciu sa nepodarilo importovať.",
+      "discardWithUploadsMessage": "Váš prompt a všetky nahrané súbory nepriložené k odoslaným správam sa odstránia."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizovaný {{displayCount}} súbor",
@@ -2476,7 +2501,11 @@
       "queuedAccessibility": "Správa je vo fronte",
       "userMessage": "Správa používateľa",
       "assistantMessage": "Správa asistenta",
-      "longPressHint": "Dlhé stlačenie zobrazí podrobnosti správy"
+      "longPressHint": "Dlhé stlačenie zobrazí podrobnosti správy",
+      "cancelQueued": "Zrušiť správu",
+      "cancelQueuedAccessibility": "Zrušiť správu vo fronte",
+      "restoreQueued": "Obnoviť",
+      "restoreQueuedAccessibility": "Obnoviť zrušenú správu v poli na zadávanie správy"
     },
     "olderMessages": {
       "arrived": "Staršie správy sa načítali",
@@ -2494,6 +2523,8 @@
       "viewTable": "Zobraziť tabuľku",
       "title": "Tabuľka",
       "close": "Zavrieť tabuľku",
+      "loading": "Načítava sa tabuľka",
+      "empty": "Táto tabuľka nemá žiadne riadky.",
       "columnCount_one": "stĺpec",
       "columnCount": "stĺpce",
       "columnCount_other": "stĺpce",
@@ -2508,9 +2539,6 @@
     },
     "sessionFilter": {
       "title": "Filtrovať relácie",
-      "sortBy": "Zoradiť podľa",
-      "sortLastUpdated": "Naposledy upravené",
-      "sortCreated": "Vytvorené",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Rozšírenie",
@@ -2564,7 +2592,9 @@
       "uploading": "Nahrávam…",
       "uploaded": "Nahraté",
       "uploadFailedRetry": "Nahrávanie zlyhalo. Klepnutím skúsite znova.",
-      "uploadFailedTerminal": "Tento súbor sa nedá nahrať."
+      "uploadFailedTerminal": "Tento súbor sa nedá nahrať.",
+      "moveLeft": "Presunúť {{filename}} doľava",
+      "moveRight": "Presunúť {{filename}} doprava"
     },
     "attachmentPasteHint": {
       "accessibility": "Vložiť obrázok zo schránky",
@@ -2594,7 +2624,17 @@
       "finalizingPlaceholder": "Finalizujem...",
       "messagePlaceholder": "Správa...",
       "cannotReceiveFiles": "Táto relácia nemôže prijímať súbory. Odstráňte prílohy, aby ste mohli odoslať správu.",
-      "couldNotAttachFiles": "Súbory sa nepodarilo pripojiť. Klepnutím na odoslať to skúsite znova."
+      "couldNotAttachFiles": "Súbory sa nepodarilo pripojiť. Klepnutím na odoslať to skúsite znova.",
+      "discardAttachmentsMessage": "Nahrané súbory nepriložené k odoslaným správam sa odstránia.",
+      "discardAttachmentsTitle": "Zahodiť prílohy?",
+      "charactersRemaining": "Počet zostávajúcich znakov: {{count}}",
+      "insertNewline": "Vložiť nový riadok",
+      "starterChipBuild": "Vytvoriť funkciu",
+      "starterChipEmpty": "Začať nápadom",
+      "starterChipFix": "Opraviť chybu",
+      "starterChipPrepare": "Nastaviť moje prostredie",
+      "starterChipWrapUp": "Dokončiť moje sedenie",
+      "starterChipWriteTests": "Napísať testy"
     },
     "chatLink": {
       "linkCopied": "Odkaz skopírovaný",
@@ -2815,7 +2855,8 @@
     "busy": "Hlasový vstup je zaneprázdnený. Skúste to znova.",
     "stopped": "Hlasový vstup sa zastavil. Klepnutím na mikrofón to skúste znova.",
     "unavailableDevice": "Hlasový vstup nie je na tomto zariadení dostupný.",
-    "unavailableLanguage": "Hlasový vstup nie je dostupný pre jazyk tohto zariadenia."
+    "unavailableLanguage": "Hlasový vstup nie je dostupný pre jazyk tohto zariadenia.",
+    "listeningStopped": "Počúvanie sa zastavilo."
   },
   "share": {
     "title": "Zdieľať do Kilo",
@@ -3200,5 +3241,19 @@
     "emptyDescription": "Keď dôverujete hostiteľovi odkazu, otvorí sa bez ďalšieho opýtania.",
     "revoke": "Odvolať {{host}}",
     "backToPreferences": "Späť na predvoľby"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Správa"
+    },
+    "empty": {
+      "title": "Začať chat",
+      "description": "Pošlite správu a porozprávajte sa s modelom."
+    },
+    "working": "Pracuje sa",
+    "historyRetry": "Históriu chatu sa nepodarilo načítať.",
+    "catalogRetry": "Modely sa nepodarilo načítať",
+    "sendError": "Nepodarilo sa odoslať správu. Skúste to znova."
   }
 }

@@ -152,7 +152,9 @@
     "appearanceDark": "Madow",
     "account": "Xisaabta",
     "prReviewAttribution": "Ku dar astaanta app dib-u-eegista PR",
-    "prReviewAttributionSubtitle": "Ku dheji qoraal 'Reviewed via Kilo' oo hoose markaad gudbiso dib-u-eegis."
+    "prReviewAttributionSubtitle": "Ku dheji qoraal 'Reviewed via Kilo' oo hoose markaad gudbiso dib-u-eegis.",
+    "returnSendsMessage": "Furaha soo noqoshada wuxuu diraa fariinta",
+    "returnSendsMessageSubtitle": "Marka uu dansan yahay, furaha soo noqoshada wuxuu geliyaa sadar cusub composer-ka wakiilka."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ma heli karo",
@@ -665,7 +667,8 @@
     "profile": "Koontada",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} oo {{total}} ah"
+    "position": "{{name}}, tab, {{position}} oo {{total}} ah",
+    "chat": "Wada sheekaysi"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "Khalad shabakadeed",
       "uploadFailed": "Soo gudbintu way fashilantay",
       "failedToUploadFile": "Soo gudbinta faylka way fashilantay: {{reason}}",
-      "nothingToPaste": "Waxba ma jiraan wax la dhajiyo"
+      "nothingToPaste": "Waxba ma jiraan wax la dhajiyo",
+      "metadataStripFailed": "Macluumaadka sawirka lama saari karin."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "Hubinta socodka",
       "status": "Heerka",
       "threshold": "Heerka",
-      "pullRequest": "codsiga isku-dhafka"
+      "pullRequest": "codsiga isku-dhafka",
+      "transcriptWaiting": "Sugaya qoraalka dib-u-eegista.",
+      "transcriptEmpty": "Qoraal kama jiro dib-u-eegistan.",
+      "transcriptRetry": "Qoraalka dib-u-eegista lama soo dejin karin.",
+      "transcriptLive": "TOOS AH",
+      "agentIdle": "Wakiilku waa fadhiisan",
+      "agentWorking": "Wakiilku wuu shaqaynayaa...",
+      "anErrorOccurred": "Khalad baa dhacay",
+      "errorWithMessage": "Khalad: {{message}}",
+      "executionStarted": "Fulinta waa la bilaabay",
+      "reviewCompleted": "Dib-u-eegista waa la dhammeeyay",
+      "reviewInterrupted": "Dib-u-eegista waa la joojiyay",
+      "sessionError": "Khalad kalfadhi: {{error}}",
+      "statusWithValue": "Heerka: {{status}}",
+      "toolName": "Qalab: {{name}}",
+      "toolNameError": "Qalab: {{name}} — khalad",
+      "unknownError": "Khalad aan la aqoon"
     },
     "reviewMemory": {
       "title": "Xusuusta dib-u-eegista",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "Hawsha hore weli way dhammaanaysaa. Fadlan sug daqiiqad.",
       "serviceUnavailable": "Adeeggu hadda ma jiro. Fadlan mar kale isku day.",
       "connectionTrouble": "Dhibaato xiriir. Fadlan mar kale isku day daqiiqad.",
-      "modelUnavailable": "Moodeelkani looma heli karo Cloud Agent. Dooro moodeel kale oo mar kale isku day."
+      "modelUnavailable": "Moodeelkani looma heli karo Cloud Agent. Dooro moodeel kale oo mar kale isku day.",
+      "cancelQueuedFailed": "Fariinta lama joojin karin.",
+      "cancelQueuedRestoreAvailable": "Fariinta waa la joojiyay. Taabo Soo celi si aad ugu soo celiso composer-ka.",
+      "cancelQueuedRestored": "Fariinta waa la joojiyay. Weydintu waxay ku soo noqotay composer-ka.",
+      "cancelQueuedUpgradeRequired": "Joojinta fariimaha safan waxay u baahan tahay Kilo CLI ka cusub. Cusboonaysii Kilo CLI oo dib u xir."
     },
     "remoteSession": {
       "failedToCreate": "Abuuridda kalfadhiga fog way fashilantay",
@@ -2196,7 +2220,8 @@
       "continueFrom": "Sii wadaya {{title}}",
       "importingSession": "Soo dejinta kalfadhiga",
       "cliCannotContinue": "CLI-kan kuma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",
-      "importFailed": "Kalfadhigan lama soo dejin karin."
+      "importFailed": "Kalfadhigan lama soo dejin karin.",
+      "discardWithUploadsMessage": "Weydintaada iyo faylasha la soo gudbiyay ee aan lagu lifaaqin fariimo la diray waa la tirtiri doonaa."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "Fariinta waa la saf dhigay",
       "userMessage": "Fariinta isticmaalaha",
       "assistantMessage": "Fariinta kaaliyaha",
-      "longPressHint": "Riix oo hay si aad u aragto faahfaahinta fariinta"
+      "longPressHint": "Riix oo hay si aad u aragto faahfaahinta fariinta",
+      "cancelQueued": "Jooji fariinta",
+      "cancelQueuedAccessibility": "Jooji fariinta safan",
+      "restoreQueued": "Soo celi",
+      "restoreQueuedAccessibility": "Ku soo celi fariinta la joojiyay composer-ka"
     },
     "olderMessages": {
       "arrived": "Fariimihii hore waa la soo dejiyay",
@@ -2460,6 +2489,8 @@
       "viewTable": "Fiiri shaxda",
       "title": "Shax",
       "close": "Xidh shaxda",
+      "loading": "Shaxda waa la soo shubayaa",
+      "empty": "Shaxdani ma laha safarro.",
       "columnCount_one": "tiir",
       "columnCount": "tiirar",
       "columnCount_other": "tiirar",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Shaandhee kalfadhiyada",
-      "sortBy": "Ku kala saar",
-      "sortLastUpdated": "Markii ugu dambaysay ee la cusboonaysiiyay",
-      "sortCreated": "Waa la abuuray",
       "platform": "Platform",
       "platformCloud": "Dar",
       "platformExtension": "Extension",
@@ -2526,7 +2554,9 @@
       "uploading": "Soo gudbinaya…",
       "uploaded": "Waa la soo gudbiyay",
       "uploadFailedRetry": "Soo gudbintu way ku guuldarraystay. Taabo si aad mar kale isku daydo.",
-      "uploadFailedTerminal": "Faylkan lama soo gudbin karo."
+      "uploadFailedTerminal": "Faylkan lama soo gudbin karo.",
+      "moveLeft": "U dhaqaaji {{filename}} bidix",
+      "moveRight": "U dhaqaaji {{filename}} midig"
     },
     "attachmentPasteHint": {
       "accessibility": "Ku dheji sawirka saxanka qorista",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "Dhamaynaya...",
       "messagePlaceholder": "Fariin...",
       "cannotReceiveFiles": "Kalfadhigan ma heli karo faylasha. Ka saar lifaaqyada si aad u dirto fariintaada.",
-      "couldNotAttachFiles": "Faylasha lama lifaaqi karin. Taabo dir si aad mar kale isku daydo."
+      "couldNotAttachFiles": "Faylasha lama lifaaqi karin. Taabo dir si aad mar kale isku daydo.",
+      "discardAttachmentsMessage": "Faylasha la soo gudbiyay ee aan lagu lifaaqin fariimo la diray waa la tirtiri doonaa.",
+      "discardAttachmentsTitle": "Tuur lifaaqyada?",
+      "charactersRemaining": "{{count}} xaraf ayaa harsan",
+      "insertNewline": "Geli sadar cusub",
+      "starterChipBuild": "Dhis sifo",
+      "starterChipEmpty": "Ku bilow fikrad",
+      "starterChipFix": "Hagaaji cilad",
+      "starterChipPrepare": "Diyaari deegaankayga",
+      "starterChipWrapUp": "Dhammee kalfadhigayga",
+      "starterChipWriteTests": "Qor tijaabooyin"
     },
     "chatLink": {
       "linkCopied": "Xiriirka waa la koobiyay",
@@ -2775,7 +2815,8 @@
     "busy": "Gelinta codka waa mashquul. Mar kale isku day.",
     "stopped": "Gelinta codku way joogsatay. Taabo makarafoonka si aad mar kale isku daydo.",
     "unavailableDevice": "Gelinta codka aaladdan kuma heli karto.",
-    "unavailableLanguage": "Gelinta codka looma heli karo luqaddan aaladda."
+    "unavailableLanguage": "Gelinta codka looma heli karo luqaddan aaladda.",
+    "listeningStopped": "Dhageysigu wuu joogsaday."
   },
   "share": {
     "title": "Wadaag Kilo",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "Markaad amini host-ka link, wuxuu isku furaa isagoon mar kale weydiinin.",
     "revoke": "Jooji {{host}}",
     "backToPreferences": "Ku noqo doorashooyinka"
+  },
+  "quickChat": {
+    "title": "Wada sheekaysi",
+    "composer": {
+      "placeholder": "Fariin"
+    },
+    "empty": {
+      "title": "Bilow wada sheekaysi",
+      "description": "Dir fariin si aad ula hadasho model."
+    },
+    "working": "Waa shaqaynayaa",
+    "historyRetry": "Taariikhda wada sheekaysiga lama soo gelin karin.",
+    "catalogRetry": "Moodeelada lama soo dejin karin",
+    "sendError": "Fariinta lama diri karin. Mar kale isku day."
   }
 }

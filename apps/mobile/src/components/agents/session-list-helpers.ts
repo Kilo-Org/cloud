@@ -5,11 +5,6 @@ import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
-// Re-exported so existing importers of `platformLabel` from this module keep
-// working while `@/lib/platform-label` stays the single source of truth for
-// the platform→label mapping (no duplicate definition to drift).
-export { platformLabel };
-
 /**
  * One stored-history section. A stored session that is also live still
  * appears in its section; the stored list is rendered as-is.
@@ -17,6 +12,23 @@ export { platformLabel };
 export type SessionSection = {
   title: string;
   data: StoredSession[];
+};
+
+/** Platform buckets offered by the session filters, in display order. */
+export const PLATFORM_FILTERS = [
+  'cloud-agent',
+  'extension',
+  'cli',
+  'slack',
+  'github',
+  'linear',
+  'other',
+] as const;
+
+/** One repository the session filters can select. */
+export type ProjectFilterOption = {
+  gitUrl: string;
+  displayName: string;
 };
 
 const platformExpansion: ReadonlyMap<string, string[]> = new Map([

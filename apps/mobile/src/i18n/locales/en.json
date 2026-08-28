@@ -152,7 +152,9 @@
     "appearanceDark": "Dark",
     "account": "Account",
     "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
+    "returnSendsMessage": "Return key sends message",
+    "returnSendsMessageSubtitle": "When off, Return inserts a newline in agent composers."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
@@ -662,10 +664,25 @@
   "tabs": {
     "home": "Home",
     "agents": "Agents",
+    "chat": "Chat",
     "profile": "Profile",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, tab, {{position}} of {{total}}"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Message"
+    },
+    "empty": {
+      "title": "Start a chat",
+      "description": "Send a message to talk to a model."
+    },
+    "working": "Working",
+    "historyRetry": "Could not load chat history.",
+    "catalogRetry": "Could not load models",
+    "sendError": "Could not send the message. Try again."
   },
   "chat": {
     "instancePicker": {
@@ -746,6 +763,7 @@
       "classificationUnreadable": "Couldn't read this file",
       "announceUploaded": "Attachment uploaded",
       "cantUpload": "This file can't be uploaded.",
+      "metadataStripFailed": "Photo metadata could not be removed.",
       "networkError": "Network error",
       "uploadFailed": "Upload failed",
       "failedToUploadFile": "Failed to upload file: {{reason}}",
@@ -1291,6 +1309,10 @@
       "tokens": "Tokens",
       "tokensInOut": "{{input}} in / {{output}} out",
       "openPullRequest": "Open pull request",
+      "transcriptWaiting": "Waiting for the review transcript.",
+      "transcriptEmpty": "No transcript for this review.",
+      "transcriptRetry": "Could not load the review transcript.",
+      "transcriptLive": "Live",
       "council": "Council",
       "decision": "Decision",
       "gate": "Gate",
@@ -1299,7 +1321,19 @@
       "checkRun": "Check run",
       "status": "Status",
       "threshold": "Threshold",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "toolName": "Tool: {{name}}",
+      "toolNameError": "Tool: {{name}} — error",
+      "agentIdle": "Agent idle",
+      "agentWorking": "Agent working...",
+      "sessionError": "Session error: {{error}}",
+      "unknownError": "Unknown error",
+      "executionStarted": "Execution started",
+      "reviewCompleted": "Review completed",
+      "reviewInterrupted": "Review interrupted",
+      "errorWithMessage": "Error: {{message}}",
+      "anErrorOccurred": "An error occurred",
+      "statusWithValue": "Status: {{status}}"
     },
     "reviewMemory": {
       "title": "Review memory",
@@ -2124,7 +2158,11 @@
       "previousTaskFinishing": "The previous task is still finishing. Please wait a moment.",
       "serviceUnavailable": "The service is unavailable right now. Please try again.",
       "connectionTrouble": "Connection trouble. Please retry in a moment.",
-      "modelUnavailable": "This model isn't available for Cloud Agent. Choose another model and try again."
+      "modelUnavailable": "This model isn't available for Cloud Agent. Choose another model and try again.",
+      "cancelQueuedRestored": "Message canceled. The prompt is back in the composer.",
+      "cancelQueuedRestoreAvailable": "Message canceled. Tap Restore to return it to the composer.",
+      "cancelQueuedUpgradeRequired": "Canceling queued messages requires a newer Kilo CLI. Update Kilo CLI and reconnect.",
+      "cancelQueuedFailed": "Could not cancel the message."
     },
     "remoteSession": {
       "failedToCreate": "Failed to create remote session",
@@ -2189,6 +2227,7 @@
       "couldNotRefreshRepositories": "Could not refresh repositories. Please try again.",
       "discardDraftTitle": "Discard draft?",
       "discardDraftMessage": "Your prompt will be lost.",
+      "discardWithUploadsMessage": "Your prompt and any unclaimed uploads will be deleted.",
       "keepEditing": "Keep editing",
       "discard": "Discard",
       "discardFailed": "Could not discard the draft. Please try again.",
@@ -2458,6 +2497,10 @@
       "copyToComposer": "Copy to composer",
       "queued": "Queued",
       "queuedAccessibility": "Message queued",
+      "cancelQueued": "Cancel message",
+      "cancelQueuedAccessibility": "Cancel queued message",
+      "restoreQueued": "Restore",
+      "restoreQueuedAccessibility": "Restore canceled message to the composer",
       "userMessage": "User message",
       "assistantMessage": "Assistant message",
       "longPressHint": "Long press for message details"
@@ -2476,6 +2519,8 @@
       "viewTable": "View table",
       "title": "Table",
       "close": "Close table",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "column",
       "columnCount": "columns",
       "columnCount_other": "columns",
@@ -2486,9 +2531,6 @@
     },
     "sessionFilter": {
       "title": "Filter sessions",
-      "sortBy": "Sort by",
-      "sortLastUpdated": "Last updated",
-      "sortCreated": "Created",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2539,6 +2581,8 @@
       "openFailedRetry": "Failed to open file. Please try again.",
       "retryUploading": "Retry uploading {{filename}}",
       "removeAttachment": "Remove attachment {{filename}}",
+      "moveLeft": "Move {{filename}} left",
+      "moveRight": "Move {{filename}} right",
       "uploading": "Uploading…",
       "uploaded": "Uploaded",
       "uploadFailedRetry": "Upload failed. Tap to retry.",
@@ -2563,10 +2607,20 @@
       "removeOrRetryFailed": "Remove or retry failed attachments first.",
       "attachmentsWithSlashCommands": "Attachments cannot be sent with slash commands.",
       "photoMetadataNotRemoved": "Photo metadata could not be removed from an attachment.",
+      "charactersRemaining": "{{count}} characters remaining",
+      "discardAttachmentsTitle": "Discard attachments?",
+      "discardAttachmentsMessage": "Unclaimed uploads will be deleted.",
       "waitForUploads": "Wait for attachments to finish uploading.",
       "pasteFromClipboard": "Paste from clipboard",
       "stopGenerating": "Stop generating",
       "sendMessage": "Send message",
+      "insertNewline": "Insert newline",
+      "starterChipBuild": "Build a feature",
+      "starterChipFix": "Fix a bug",
+      "starterChipWriteTests": "Write tests",
+      "starterChipPrepare": "Set up my environment",
+      "starterChipWrapUp": "Wrap up my session",
+      "starterChipEmpty": "Start with an idea",
       "selectModelBeforeSending": "Select a model before sending",
       "preparingPlaceholder": "Setting up environment...",
       "finalizingPlaceholder": "Wrapping up...",
@@ -2768,6 +2822,7 @@
   },
   "voiceInput": {
     "listening": "Listening...",
+    "listeningStopped": "Listening stopped.",
     "staysOff": "Speech stays off until you allow online transcription.",
     "onlineTitle": "Speech is processed online",
     "onlineMessage": "This device cannot transcribe offline. Your recording is sent to {{provider}} to turn it into text. Kilo does not store the audio.",

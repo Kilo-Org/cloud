@@ -152,7 +152,9 @@
     "appearanceDark": "Mørk",
     "account": "Konto",
     "prReviewAttribution": "Legg til appattribusjon i PR-anmeldelser",
-    "prReviewAttributionSubtitle": "Legg til en «Anmeldt via Kilo»-bunntekst når du sender inn en anmeldelse."
+    "prReviewAttributionSubtitle": "Legg til en «Anmeldt via Kilo»-bunntekst når du sender inn en anmeldelse.",
+    "returnSendsMessage": "Returtasten sender meldingen",
+    "returnSendsMessageSubtitle": "Når dette er av, setter returtasten inn et linjeskift i agentenes meldingsfelt."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgjengelig",
@@ -665,7 +667,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, fane, {{position}} av {{total}}"
+    "position": "{{name}}, fane, {{position}} av {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "Nettverksfeil",
       "uploadFailed": "Opplasting mislyktes",
       "failedToUploadFile": "Kunne ikke laste opp filen: {{reason}}",
-      "nothingToPaste": "Ingenting å lime inn"
+      "nothingToPaste": "Ingenting å lime inn",
+      "metadataStripFailed": "Kunne ikke fjerne bildets metadata."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "Sjekkkjøring",
       "status": "Status",
       "threshold": "Terskel",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Venter på gjennomgangsutskriften.",
+      "transcriptEmpty": "Ingen utskrift for denne gjennomgangen.",
+      "transcriptRetry": "Kunne ikke laste gjennomgangsutskriften.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Agenten er inaktiv",
+      "agentWorking": "Agenten jobber...",
+      "anErrorOccurred": "Det oppstod en feil",
+      "errorWithMessage": "Feil: {{message}}",
+      "executionStarted": "Kjøringen startet",
+      "reviewCompleted": "Gjennomgang fullført",
+      "reviewInterrupted": "Gjennomgang avbrutt",
+      "sessionError": "Øktfeil: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Verktøy: {{name}}",
+      "toolNameError": "Verktøy: {{name}} — feil",
+      "unknownError": "Ukjent feil"
     },
     "reviewMemory": {
       "title": "Gjennomgangsminne",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "Den forrige oppgaven er fortsatt i gang. Vent et øyeblikk.",
       "serviceUnavailable": "Tjenesten er utilgjengelig akkurat nå. Prøv igjen.",
       "connectionTrouble": "Tilkoblingsproblemer. Prøv igjen om et øyeblikk.",
-      "modelUnavailable": "Denne modellen er ikke tilgjengelig for Cloud Agent. Velg en annen modell og prøv igjen."
+      "modelUnavailable": "Denne modellen er ikke tilgjengelig for Cloud Agent. Velg en annen modell og prøv igjen.",
+      "cancelQueuedFailed": "Kunne ikke avbryte meldingen.",
+      "cancelQueuedRestoreAvailable": "Meldingen er avbrutt. Trykk på Gjenopprett for å legge den tilbake i meldingsfeltet.",
+      "cancelQueuedRestored": "Meldingen er avbrutt. Forespørselen er tilbake i meldingsfeltet.",
+      "cancelQueuedUpgradeRequired": "Avbryting av meldinger i kø krever en nyere Kilo CLI. Oppdater Kilo CLI og koble til på nytt."
     },
     "remoteSession": {
       "failedToCreate": "Klarte ikke å opprette ekstern økt",
@@ -2196,7 +2220,8 @@
       "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",
       "continueFrom": "Fortsetter {{title}}",
       "importFailed": "Kunne ikke importere denne økten.",
-      "importingSession": "Importerer økt"
+      "importingSession": "Importerer økt",
+      "discardWithUploadsMessage": "Forespørselen din og opplastede filer som ikke er vedlagt sendte meldinger, blir slettet."
     },
     "partRenderer": {
       "updatedFileCount_one": "Oppdaterte {{displayCount}} fil",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "Melding satt i kø",
       "userMessage": "Brukermelding",
       "assistantMessage": "Assistentmelding",
-      "longPressHint": "Trykk og hold for meldingsdetaljer"
+      "longPressHint": "Trykk og hold for meldingsdetaljer",
+      "cancelQueued": "Avbryt melding",
+      "cancelQueuedAccessibility": "Avbryt melding i kø",
+      "restoreQueued": "Gjenopprett",
+      "restoreQueuedAccessibility": "Gjenopprett avbrutt melding i meldingsfeltet"
     },
     "olderMessages": {
       "arrived": "Tidligere meldinger lastet inn",
@@ -2460,6 +2489,8 @@
       "viewTable": "Vis tabell",
       "title": "Tabell",
       "close": "Lukk tabell",
+      "loading": "Laster tabell",
+      "empty": "Denne tabellen har ingen rader.",
       "columnCount_one": "kolonne",
       "columnCount": "kolonner",
       "columnCount_other": "kolonner",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Filtrer økter",
-      "sortBy": "Sorter etter",
-      "sortLastUpdated": "Sist oppdatert",
-      "sortCreated": "Opprettet",
       "platform": "Plattform",
       "platformCloud": "Sky",
       "platformExtension": "Utvidelse",
@@ -2526,7 +2554,9 @@
       "uploading": "Laster opp…",
       "uploaded": "Lastet opp",
       "uploadFailedRetry": "Opplastingen mislyktes. Trykk for å prøve igjen.",
-      "uploadFailedTerminal": "Denne filen kan ikke lastes opp."
+      "uploadFailedTerminal": "Denne filen kan ikke lastes opp.",
+      "moveLeft": "Flytt {{filename}} til venstre",
+      "moveRight": "Flytt {{filename}} til høyre"
     },
     "attachmentPasteHint": {
       "accessibility": "Lim inn bilde fra utklippstavlen",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "Avrunder...",
       "messagePlaceholder": "Melding...",
       "cannotReceiveFiles": "Denne økten kan ikke motta filer. Fjern vedleggene for å sende meldingen din.",
-      "couldNotAttachFiles": "Kunne ikke legge til filer. Trykk send for å prøve igjen."
+      "couldNotAttachFiles": "Kunne ikke legge til filer. Trykk send for å prøve igjen.",
+      "discardAttachmentsMessage": "Opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",
+      "discardAttachmentsTitle": "Forkaste vedlegg?",
+      "charactersRemaining": "{{count}} tegn igjen",
+      "insertNewline": "Sett inn linjeskift",
+      "starterChipBuild": "Lag en funksjon",
+      "starterChipEmpty": "Start med en idé",
+      "starterChipFix": "Fiks en feil",
+      "starterChipPrepare": "Sett opp miljøet mitt",
+      "starterChipWrapUp": "Avslutt økten min",
+      "starterChipWriteTests": "Skriv tester"
     },
     "chatLink": {
       "linkCopied": "Lenke kopiert",
@@ -2775,7 +2815,8 @@
     "busy": "Taleinntasting er opptatt. Prøv igjen.",
     "stopped": "Taleinntasting stoppet. Trykk på mikrofonen for å prøve igjen.",
     "unavailableDevice": "Taleinntasting er ikke tilgjengelig på denne enheten.",
-    "unavailableLanguage": "Taleinntasting er ikke tilgjengelig for dette enhetsspråket."
+    "unavailableLanguage": "Taleinntasting er ikke tilgjengelig for dette enhetsspråket.",
+    "listeningStopped": "Lyttingen er stoppet."
   },
   "share": {
     "title": "Del til Kilo",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "Når du stoler på en lenkes vert, åpnes den uten å spørre igjen.",
     "revoke": "Fjern {{host}}",
     "backToPreferences": "Tilbake til innstillinger"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Melding"
+    },
+    "empty": {
+      "title": "Start en chat",
+      "description": "Send en melding for å snakke med en modell."
+    },
+    "working": "Jobber",
+    "historyRetry": "Kunne ikke laste inn chathistorikken.",
+    "catalogRetry": "Kunne ikke laste modeller",
+    "sendError": "Kunne ikke sende meldingen. Prøv igjen."
   }
 }

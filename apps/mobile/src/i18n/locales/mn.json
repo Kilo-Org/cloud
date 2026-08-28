@@ -152,7 +152,9 @@
     "appearanceDark": "Харанхуй",
     "account": "Бүртгэл",
     "prReviewAttribution": "PR хяналтуудад аппын хамааралыг нэмэх",
-    "prReviewAttributionSubtitle": "Үнэлгээ илгээхдээ 'Kilo-гаар хянасан' тайлбарыг нэмнэ."
+    "prReviewAttributionSubtitle": "Үнэлгээ илгээхдээ 'Kilo-гаар хянасан' тайлбарыг нэмнэ.",
+    "returnSendsMessage": "Мөр шилжүүлэх товч мессеж илгээнэ",
+    "returnSendsMessageSubtitle": "Унтраалттай үед мөр шилжүүлэх товч агентын мессеж оруулах талбарт шинэ мөр оруулна."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request боломжгүй",
@@ -665,7 +667,8 @@
     "profile": "Профайл",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, таб, нийт {{total}} -ийн {{position}}"
+    "position": "{{name}}, таб, нийт {{total}} -ийн {{position}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "Сүлжээний алдаа",
       "uploadFailed": "Байршуулалт амжилтгүй боллоо",
       "failedToUploadFile": "Файл байршуулах боломжгүй боллоо: {{reason}}",
-      "nothingToPaste": "Буулгах зүйл алга"
+      "nothingToPaste": "Буулгах зүйл алга",
+      "metadataStripFailed": "Зургийн мета өгөгдлийг устгаж чадсангүй."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "Шалгалтын ажиллагаа",
       "status": "Статус",
       "threshold": "Босго",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Шалгалтын бичлэгийг хүлээж байна.",
+      "transcriptEmpty": "Энэ шалгалтын бичлэг байхгүй.",
+      "transcriptRetry": "Шалгалтын бичлэгийг ачаалж чадсангүй.",
+      "transcriptLive": "ШУУД",
+      "agentIdle": "Агент идэвхгүй",
+      "agentWorking": "Агент ажиллаж байна...",
+      "anErrorOccurred": "Алдаа гарлаа",
+      "errorWithMessage": "Алдаа: {{message}}",
+      "executionStarted": "Гүйцэтгэл эхэлсэн",
+      "reviewCompleted": "Шалгалт дууссан",
+      "reviewInterrupted": "Шалгалт тасарсан",
+      "sessionError": "Сессийн алдаа: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Хэрэгсэл: {{name}}",
+      "toolNameError": "Хэрэгсэл: {{name}} — алдаа",
+      "unknownError": "Тодорхойгүй алдаа"
     },
     "reviewMemory": {
       "title": "Шалгалтын санах ой",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "Өмнөх ажил дуусаагүй байна. Түр хүлээнэ үү.",
       "serviceUnavailable": "Үйлчилгээ яг одоо боломжгүй байна. Дахин оролдоно уу.",
       "connectionTrouble": "Холболтын асуудал. Түр хүлээгээд дахин оролдоно уу.",
-      "modelUnavailable": "Энэ загвар Cloud Agent-д байхгүй. Өөр загвар сонгоод дахин оролдоно уу."
+      "modelUnavailable": "Энэ загвар Cloud Agent-д байхгүй. Өөр загвар сонгоод дахин оролдоно уу.",
+      "cancelQueuedFailed": "Мессежийг цуцалж чадсангүй.",
+      "cancelQueuedRestoreAvailable": "Мессеж цуцлагдсан. Мессеж оруулах талбарт буцаахын тулд «Сэргээх» товчийг товшино уу.",
+      "cancelQueuedRestored": "Мессеж цуцлагдсан. Заавар мессеж оруулах талбарт буцаж орсон.",
+      "cancelQueuedUpgradeRequired": "Дараалалд буй мессежийг цуцлахад Kilo CLI-ийн шинэ хувилбар шаардлагатай. Kilo CLI-ээ шинэчлээд дахин холбоно уу."
     },
     "remoteSession": {
       "failedToCreate": "Алсын сесс үүсгэхэд амжилтгүй болсон",
@@ -2196,7 +2220,8 @@
       "continueFrom": "{{title}} үргэлжлүүлж байна",
       "importingSession": "Сесс импортлож байна",
       "cliCannotContinue": "Энэ CLI сесс үргэлжлүүлэх боломжгүй. Cloud Agent эсвэл өөр CLI сонгоно уу.",
-      "importFailed": "Энэ сессийг импортлох боломжгүй."
+      "importFailed": "Энэ сессийг импортлох боломжгүй.",
+      "discardWithUploadsMessage": "Таны заавар болон илгээсэн мессежид хавсаргаагүй байршуулсан файлууд устах болно."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл шинэчлэгдсэн",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "Мэдээлэл дараалалд орлоо",
       "userMessage": "Хэрэглэгчийн мэдээлэл",
       "assistantMessage": "Туслахын мэдээлэл",
-      "longPressHint": "Мэдээллийн дэлгэрэнгүйг үзэхийн тулд удаан дарна уу"
+      "longPressHint": "Мэдээллийн дэлгэрэнгүйг үзэхийн тулд удаан дарна уу",
+      "cancelQueued": "Мессежийг цуцлах",
+      "cancelQueuedAccessibility": "Дараалалд буй мессежийг цуцлах",
+      "restoreQueued": "Сэргээх",
+      "restoreQueuedAccessibility": "Цуцалсан мессежийг мессеж оруулах талбарт сэргээх"
     },
     "olderMessages": {
       "arrived": "Өмнөх мэдээллүүд ачаалагдлаа",
@@ -2460,6 +2489,8 @@
       "viewTable": "Хүснэгт үзэх",
       "title": "Хүснэгт",
       "close": "Хүснэгтийг хаах",
+      "loading": "Хүснэгт ачаалж байна",
+      "empty": "Энэ хүснэгтэд мөр байхгүй байна.",
       "columnCount_one": "багана",
       "columnCount": "баганууд",
       "columnCount_other": "баганууд",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Сессийг шүүх",
-      "sortBy": "Эрэмбэлэх",
-      "sortLastUpdated": "Сүүлд шинэчлэгдсэн",
-      "sortCreated": "Үүсгэсэн",
       "platform": "Платформ",
       "platformCloud": "Үүл",
       "platformExtension": "Өргөтгөл",
@@ -2526,7 +2554,9 @@
       "uploading": "Байршуулж байна…",
       "uploaded": "Байршуулсан",
       "uploadFailedRetry": "Байршуулалт амжилтгүй боллоо. Дахин оролдохын тулд товшино уу.",
-      "uploadFailedTerminal": "Энэ файлыг байршуулах боломжгүй."
+      "uploadFailedTerminal": "Энэ файлыг байршуулах боломжгүй.",
+      "moveLeft": "{{filename}} файлыг зүүн тийш зөөх",
+      "moveRight": "{{filename}} файлыг баруун тийш зөөх"
     },
     "attachmentPasteHint": {
       "accessibility": "Самбараас зураг буулгах",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "Дуусгаж байна...",
       "messagePlaceholder": "Мессеж",
       "cannotReceiveFiles": "Энэ сесси файл хүлээн авах боломжгүй. Мэдээлэл илгээхийн тулд хавсралтуудыг арилгана уу.",
-      "couldNotAttachFiles": "Файлуудыг хавсаргаж чадсангүй. Дахин оролдохын тулд илгээх товчийг дарна уу."
+      "couldNotAttachFiles": "Файлуудыг хавсаргаж чадсангүй. Дахин оролдохын тулд илгээх товчийг дарна уу.",
+      "discardAttachmentsMessage": "Илгээсэн мессежид хавсаргаагүй байршуулсан файлууд устах болно.",
+      "discardAttachmentsTitle": "Хавсралтуудыг хаях уу?",
+      "charactersRemaining": "{{count}} тэмдэгт үлдсэн",
+      "insertNewline": "Шинэ мөр оруулах",
+      "starterChipBuild": "Шинэ функц бүтээх",
+      "starterChipEmpty": "Санаанаас эхлэх",
+      "starterChipFix": "Алдаа засах",
+      "starterChipPrepare": "Орчноо тохируулах",
+      "starterChipWrapUp": "Сессээ дуусгах",
+      "starterChipWriteTests": "Тест бичих"
     },
     "chatLink": {
       "linkCopied": "Холбоос хуулагдлаа",
@@ -2775,7 +2815,8 @@
     "busy": "Дуу оруулалт завгүй байна. Дахин оролдоно уу.",
     "stopped": "Дуу оруулалт зогссон. Дахин оролдохын тулд микрофоныг товшино уу.",
     "unavailableDevice": "Энэ төхөөрөмж дээр дуу оруулалт боломжгүй.",
-    "unavailableLanguage": "Энэ төхөөрөмжийн хэлэнд дуу оруулалт боломжгүй."
+    "unavailableLanguage": "Энэ төхөөрөмжийн хэлэнд дуу оруулалт боломжгүй.",
+    "listeningStopped": "Сонсох ажиллагаа зогссон."
   },
   "share": {
     "title": "Kilo руу хуваалцах",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "Холбоосын хостыг итгэмжлэхэд дахин асуултгүй нээгдэнэ.",
     "revoke": "{{host}} цуцлах",
     "backToPreferences": "Тохиргоо руу буцах"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Мессеж"
+    },
+    "empty": {
+      "title": "Чат эхлүүлэх",
+      "description": "Загвартай ярилцахын тулд мессеж илгээнэ үү."
+    },
+    "working": "Ажиллаж байна",
+    "historyRetry": "Чат түүхийг ачаалж чадсангүй.",
+    "catalogRetry": "Загваруудыг ачаалж чадсангүй",
+    "sendError": "Мессежийг илгээж чадсангүй. Дахин оролдоно уу."
   }
 }

@@ -152,7 +152,9 @@
     "appearanceDark": "Întunecat",
     "account": "Cont",
     "prReviewAttribution": "Adaugă atribuirea aplicației la revizuirile PR",
-    "prReviewAttributionSubtitle": "Adaugă un subsol „Revizuit prin Kilo” când trimiți o revizuire."
+    "prReviewAttributionSubtitle": "Adaugă un subsol „Revizuit prin Kilo” când trimiți o revizuire.",
+    "returnSendsMessage": "Tasta Enter trimite mesajul",
+    "returnSendsMessageSubtitle": "Când opțiunea este dezactivată, tasta Enter inserează o linie nouă în câmpurile de mesaj ale agenților."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request indisponibil",
@@ -672,7 +674,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, filă, {{position}} din {{total}}"
+    "position": "{{name}}, filă, {{position}} din {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -756,7 +759,8 @@
       "networkError": "Eroare de rețea",
       "uploadFailed": "Încărcarea a eșuat",
       "failedToUploadFile": "Încărcarea fișierului a eșuat: {{reason}}",
-      "nothingToPaste": "Nimic de lipit"
+      "nothingToPaste": "Nimic de lipit",
+      "metadataStripFailed": "Nu s-au putut elimina metadatele fotografiei."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1308,7 +1312,23 @@
       "checkRun": "Rulare verificare",
       "status": "Stare",
       "threshold": "Prag",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Se așteaptă transcrierea revizuirii.",
+      "transcriptEmpty": "Nu există o transcriere pentru această revizuire.",
+      "transcriptRetry": "Nu s-a putut încărca transcrierea revizuirii.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Agent inactiv",
+      "agentWorking": "Agent lucrează...",
+      "anErrorOccurred": "A apărut o eroare",
+      "errorWithMessage": "Eroare: {{message}}",
+      "executionStarted": "Execuție începută",
+      "reviewCompleted": "Revizuire finalizată",
+      "reviewInterrupted": "Revizuire întreruptă",
+      "sessionError": "Eroare de sesiune: {{error}}",
+      "statusWithValue": "Stare: {{status}}",
+      "toolName": "Unealtă: {{name}}",
+      "toolNameError": "Unealtă: {{name}} — eroare",
+      "unknownError": "Eroare necunoscută"
     },
     "reviewMemory": {
       "title": "Memorie de revizuire",
@@ -2139,7 +2159,11 @@
       "previousTaskFinishing": "Sarcina anterioară încă se finalizează. Te rugăm să aștepți un moment.",
       "serviceUnavailable": "Serviciul nu este disponibil acum. Te rugăm să încerci din nou.",
       "connectionTrouble": "Probleme de conexiune. Te rugăm să reîncerci într-un moment.",
-      "modelUnavailable": "Acest model nu este disponibil pentru Cloud Agent. Alege alt model și încearcă din nou."
+      "modelUnavailable": "Acest model nu este disponibil pentru Cloud Agent. Alege alt model și încearcă din nou.",
+      "cancelQueuedFailed": "Nu s-a putut anula mesajul.",
+      "cancelQueuedRestoreAvailable": "Mesaj anulat. Atinge Restabilește pentru a-l readuce în câmpul de mesaj.",
+      "cancelQueuedRestored": "Mesaj anulat. Promptul este din nou în câmpul de mesaj.",
+      "cancelQueuedUpgradeRequired": "Anularea mesajelor în așteptare necesită un Kilo CLI mai nou. Actualizează Kilo CLI și reconectează-te."
     },
     "remoteSession": {
       "failedToCreate": "Nu s-a putut crea sesiunea de la distanță",
@@ -2211,7 +2235,8 @@
       "continueFrom": "Continuare {{title}}",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
-      "importFailed": "Nu s-a putut importa această sesiune."
+      "importFailed": "Nu s-a putut importa această sesiune.",
+      "discardWithUploadsMessage": "Promptul tău și fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizat {{displayCount}} fișier",
@@ -2460,7 +2485,11 @@
       "queuedAccessibility": "Mesaj pus în coadă",
       "userMessage": "Mesaj de utilizator",
       "assistantMessage": "Mesaj de asistent",
-      "longPressHint": "Atingere lungă pentru detaliile mesajului"
+      "longPressHint": "Atingere lungă pentru detaliile mesajului",
+      "cancelQueued": "Anulează mesajul",
+      "cancelQueuedAccessibility": "Anulează mesajul în așteptare",
+      "restoreQueued": "Restabilește",
+      "restoreQueuedAccessibility": "Restabilește mesajul anulat în câmpul de mesaj"
     },
     "olderMessages": {
       "arrived": "Mesajele anterioare au fost încărcate",
@@ -2477,6 +2506,8 @@
       "viewTable": "Vezi tabelul",
       "title": "Tabel",
       "close": "Închide tabelul",
+      "loading": "Se încarcă tabelul",
+      "empty": "Acest tabel nu are rânduri.",
       "columnCount_one": "coloană",
       "columnCount": "coloane",
       "columnCount_other": "coloane",
@@ -2489,9 +2520,6 @@
     },
     "sessionFilter": {
       "title": "Filtrează sesiunile",
-      "sortBy": "Sortare după",
-      "sortLastUpdated": "Actualizat recent",
-      "sortCreated": "Creat",
       "platform": "Platformă",
       "platformCloud": "Cloud",
       "platformExtension": "Extensie",
@@ -2545,7 +2573,9 @@
       "uploading": "Se încarcă…",
       "uploaded": "Încărcat",
       "uploadFailedRetry": "Încărcarea a eșuat. Atinge pentru a reîncerca.",
-      "uploadFailedTerminal": "Acest fișier nu poate fi încărcat."
+      "uploadFailedTerminal": "Acest fișier nu poate fi încărcat.",
+      "moveLeft": "Mută {{filename}} la stânga",
+      "moveRight": "Mută {{filename}} la dreapta"
     },
     "attachmentPasteHint": {
       "accessibility": "Inserează imaginea din clipboard",
@@ -2575,7 +2605,17 @@
       "finalizingPlaceholder": "Se finalizează...",
       "messagePlaceholder": "Mesaj...",
       "cannotReceiveFiles": "Această sesiune nu poate primi fișiere. Elimină atașamentele pentru a trimite mesajul.",
-      "couldNotAttachFiles": "Fișierele nu au putut fi atașate. Atinge trimitere pentru a încerca din nou."
+      "couldNotAttachFiles": "Fișierele nu au putut fi atașate. Atinge trimitere pentru a încerca din nou.",
+      "discardAttachmentsMessage": "Fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
+      "discardAttachmentsTitle": "Renunți la atașamente?",
+      "charactersRemaining": "{{count}} caractere rămase",
+      "insertNewline": "Inserează o linie nouă",
+      "starterChipBuild": "Dezvoltă o funcționalitate",
+      "starterChipEmpty": "Începe cu o idee",
+      "starterChipFix": "Remediază o eroare",
+      "starterChipPrepare": "Configurează mediul meu",
+      "starterChipWrapUp": "Încheie sesiunea mea",
+      "starterChipWriteTests": "Scrie teste"
     },
     "chatLink": {
       "linkCopied": "Link copiat",
@@ -2795,7 +2835,8 @@
     "busy": "Introducerea vocală este ocupată. Încearcă din nou.",
     "stopped": "Introducerea vocală s-a oprit. Atinge microfonul pentru a încerca din nou.",
     "unavailableDevice": "Introducerea vocală nu este disponibilă pe acest dispozitiv.",
-    "unavailableLanguage": "Introducerea vocală nu este disponibilă pentru limba acestui dispozitiv."
+    "unavailableLanguage": "Introducerea vocală nu este disponibilă pentru limba acestui dispozitiv.",
+    "listeningStopped": "Ascultarea s-a oprit."
   },
   "share": {
     "title": "Distribuie către Kilo",
@@ -3179,5 +3220,19 @@
     "emptyDescription": "Când ai încredere în gazda unui link, acesta se deschide fără a te mai întreba.",
     "revoke": "Revocă {{host}}",
     "backToPreferences": "Înapoi la preferințe"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Mesaj"
+    },
+    "empty": {
+      "title": "Începe un chat",
+      "description": "Trimite un mesaj pentru a vorbi cu un model."
+    },
+    "working": "Se procesează",
+    "historyRetry": "Nu s-a putut încărca istoricul de chat.",
+    "catalogRetry": "Modelele nu au putut fi încărcate",
+    "sendError": "Mesajul nu a putut fi trimis. Încercați din nou."
   }
 }

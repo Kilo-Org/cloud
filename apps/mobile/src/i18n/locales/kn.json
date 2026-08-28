@@ -152,7 +152,9 @@
     "appearanceDark": "ಡಾರ್ಕ್",
     "account": "ಖಾತೆ",
     "prReviewAttribution": "PR ವಿಮರ್ಶೆಗಳಿಗೆ ಅಪ್ಲಿಕೇಶನ್ ಗುಣಲಕ್ಷಣವನ್ನು ಸೇರಿಸಿ",
-    "prReviewAttributionSubtitle": "ನೀವು ವಿಮರ್ಶೆ ಸಲ್ಲಿಸಿದಾಗ Kilo ಮೂಲಕ ವಿಮರ್ಶಿಸಲಾಗಿದೆ ಫೂಟರ್ ಅನ್ನು ಸೇರಿಸಿ."
+    "prReviewAttributionSubtitle": "ನೀವು ವಿಮರ್ಶೆ ಸಲ್ಲಿಸಿದಾಗ Kilo ಮೂಲಕ ವಿಮರ್ಶಿಸಲಾಗಿದೆ ಫೂಟರ್ ಅನ್ನು ಸೇರಿಸಿ.",
+    "returnSendsMessage": "ರಿಟರ್ನ್ ಕೀ ಸಂದೇಶವನ್ನು ಕಳುಹಿಸುತ್ತದೆ",
+    "returnSendsMessageSubtitle": "ಆಫ್ ಆಗಿದ್ದಾಗ, ರಿಟರ್ನ್ ಕೀ ಏಜೆಂಟ್ ಸಂಯೋಜಕಗಳಲ್ಲಿ ಹೊಸ ಸಾಲನ್ನು ಸೇರಿಸುತ್ತದೆ."
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
@@ -665,7 +667,8 @@
     "profile": "ಪ್ರೊಫೈಲ್",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ಟ್ಯಾಬ್, {{total}} ರಲ್ಲಿ {{position}}"
+    "position": "{{name}}, ಟ್ಯಾಬ್, {{total}} ರಲ್ಲಿ {{position}}",
+    "chat": "ಚಾಟ್"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "ನೆಟ್ವರ್ಕ್ ದೋಷ",
       "uploadFailed": "ಅಪ್‌ಲೋಡ್ ವಿಫಲವಾಗಿದೆ",
       "failedToUploadFile": "ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ವಿಫಲವಾಗಿದೆ: {{reason}}",
-      "nothingToPaste": "ಅಂಟಿಸಲು ಏನೂ ಇಲ್ಲ"
+      "nothingToPaste": "ಅಂಟಿಸಲು ಏನೂ ಇಲ್ಲ",
+      "metadataStripFailed": "ಫೋಟೋ ಮೆಟಾಡೇಟಾ ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "ಚೆಕ್ ಚಲಾಯಿಸಿ",
       "status": "ಸ್ಥಿತಿ",
       "threshold": "ಮಿತಿ",
-      "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್"
+      "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್",
+      "transcriptWaiting": "ವಿಮರ್ಶೆ ಟ್ರಾನ್ಸ್‌ಕ್ರಿಪ್ಟ್ ಗಾಗಿ ಕಾಯುತ್ತಿದೆ.",
+      "transcriptEmpty": "ಈ ವಿಮರ್ಶೆಗೆ ಯಾವುದೇ ಟ್ರಾನ್ಸ್‌ಕ್ರಿಪ್ಟ್ ಇಲ್ಲ.",
+      "transcriptRetry": "ವಿಮರ್ಶೆ ಟ್ರಾನ್ಸ್‌ಕ್ರಿಪ್ಟ್ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "ಏಜೆಂಟ್ ನಿಷ್ಕ್ರಿಯ",
+      "agentWorking": "ಏಜೆಂಟ್ ಕೆಲಸ ಮಾಡುತ್ತಿದೆ...",
+      "anErrorOccurred": "ದೋಷ ಸಂಭವಿಸಿದೆ",
+      "errorWithMessage": "ದೋಷ: {{message}}",
+      "executionStarted": "ಕಾರ್ಯಗತಗೊಳಿಸುವಿಕೆ ಪ್ರಾರಂಭವಾಗಿದೆ",
+      "reviewCompleted": "ವಿಮರ್ಶೆ ಪೂರ್ಣಗೊಂಡಿದೆ",
+      "reviewInterrupted": "ವಿಮರ್ಶೆ ಅಡಚಣೆಯಾಗಿದೆ",
+      "sessionError": "ಸೆಷನ್ ದೋಷ: {{error}}",
+      "statusWithValue": "ಸ್ಥಿತಿ: {{status}}",
+      "toolName": "ಟೂಲ್: {{name}}",
+      "toolNameError": "ಟೂಲ್: {{name}} — ದೋಷ",
+      "unknownError": "ಅಪರಿಚಿತ ದೋಷ"
     },
     "reviewMemory": {
       "title": "ಪರಿಶೀಲನೆ ಮೆಮೊರಿ",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "ಹಿಂದಿನ ಕಾರ್ಯ ಇನ್ನೂ ಮುಗಿಯುತ್ತಿದೆ. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಕಾಯಿರಿ.",
       "serviceUnavailable": "ಸೇವೆ ಈಗ ಲಭ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "connectionTrouble": "ಸಂಪರ್ಕ ಸಮಸ್ಯೆ. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "modelUnavailable": "ಈ ಮಾದರಿ Cloud Agent ಗೆ ಲಭ್ಯವಿಲ್ಲ. ಬೇರೆ ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "modelUnavailable": "ಈ ಮಾದರಿ Cloud Agent ಗೆ ಲಭ್ಯವಿಲ್ಲ. ಬೇರೆ ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "cancelQueuedFailed": "ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "cancelQueuedRestoreAvailable": "ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಲಾಗಿದೆ. ಅದನ್ನು ಸಂಯೋಜಕಕ್ಕೆ ಹಿಂತಿರುಗಿಸಲು ಮರುಸ್ಥಾಪಿಸಿ ಟ್ಯಾಪ್ ಮಾಡಿ.",
+      "cancelQueuedRestored": "ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಲಾಗಿದೆ. ಪ್ರಾಂಪ್ಟ್ ಮತ್ತೆ ಸಂಯೋಜಕದಲ್ಲಿದೆ.",
+      "cancelQueuedUpgradeRequired": "ಸರದಿಯಲ್ಲಿರುವ ಸಂದೇಶಗಳನ್ನು ರದ್ದುಮಾಡಲು ಹೊಸ ಆವೃತ್ತಿಯ Kilo CLI ಅಗತ್ಯವಿದೆ. Kilo CLI ಅನ್ನು ನವೀಕರಿಸಿ ಮತ್ತು ಮತ್ತೆ ಸಂಪರ್ಕಿಸಿ."
     },
     "remoteSession": {
       "failedToCreate": "ರಿಮೋಟ್ ಸೆಶನ್ ರಚಿಸಲು ವಿಫಲವಾಗಿದೆ",
@@ -2196,7 +2220,8 @@
       "continueFrom": "ಮುಂದುವರಿಸುತ್ತಿದೆ {{title}}",
       "importingSession": "ಸೆಷನ್ ಆಮದು ಮಾಡುತ್ತಿದೆ",
       "cliCannotContinue": "ಈ CLI ಒಂದು ಸೆಷನ್ ಅನ್ನು ಮುಂದುವರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. Cloud Agent ಅಥವಾ ಮತ್ತೊಂದು CLI ಅನ್ನು ಆಯ್ಕೆ ಮಾಡಿ.",
-      "importFailed": "ಈ ಸೆಷನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+      "importFailed": "ಈ ಸೆಷನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "discardWithUploadsMessage": "ನಿಮ್ಮ ಪ್ರಾಂಪ್ಟ್ ಮತ್ತು ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳಿಗೆ ಲಗತ್ತಿಸದ ಯಾವುದೇ ಅಪ್‌ಲೋಡ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ಫೈಲ್ ನವೀಕರಿಸಲಾಗಿದೆ",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "ಸಂದೇಶ ಕ್ಯೂ ಮಾಡಲಾಗಿದೆ",
       "userMessage": "ಬಳಕೆದಾರ ಸಂದೇಶ",
       "assistantMessage": "ಸಹಾಯಕ ಸಂದೇಶ",
-      "longPressHint": "ಸಂದೇಶ ವಿವರಗಳಿಗಾಗಿ ದೀರ್ಘ ಒತ್ತಿ"
+      "longPressHint": "ಸಂದೇಶ ವಿವರಗಳಿಗಾಗಿ ದೀರ್ಘ ಒತ್ತಿ",
+      "cancelQueued": "ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಿ",
+      "cancelQueuedAccessibility": "ಸರದಿಯಲ್ಲಿರುವ ಸಂದೇಶವನ್ನು ರದ್ದುಮಾಡಿ",
+      "restoreQueued": "ಮರುಸ್ಥಾಪಿಸಿ",
+      "restoreQueuedAccessibility": "ರದ್ದುಮಾಡಿದ ಸಂದೇಶವನ್ನು ಸಂಯೋಜಕಕ್ಕೆ ಮರುಸ್ಥಾಪಿಸಿ"
     },
     "olderMessages": {
       "arrived": "ಹಿಂದಿನ ಸಂದೇಶಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
@@ -2460,6 +2489,8 @@
       "viewTable": "ಟೇಬಲ್ ವೀಕ್ಷಿಸಿ",
       "title": "ಟೇಬಲ್",
       "close": "ಟೇಬಲ್ ಮುಚ್ಚಿ",
+      "loading": "ಟೇಬಲ್ ಲೋಡ್ ಆಗುತ್ತಿದೆ",
+      "empty": "ಈ ಟೇಬಲ್‌ನಲ್ಲಿ ಸಾಲುಗಳಿಲ್ಲ.",
       "columnCount_one": "ಕಾಲಮ್",
       "columnCount": "ಕಾಲಮ್ಗಳು",
       "columnCount_other": "ಕಾಲಮ್ಗಳು",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "ಸೆಷನ್ಗಳನ್ನು ಫಿಲ್ಟರ್ ಮಾಡಿ",
-      "sortBy": "ವಿಂಗಡಿಸಿ",
-      "sortLastUpdated": "ಕೊನೆಯದಾಗಿ ನವೀಕರಿಸಲಾಗಿದೆ",
-      "sortCreated": "ರಚಿಸಲಾಗಿದೆ",
       "platform": "ಪ್ಲಾಟ್ಫಾರ್ಮ್",
       "platformCloud": "ಕ್ಲೌಡ್",
       "platformExtension": "ಎಕ್ಸ್ಟೆನ್ಶನ್",
@@ -2526,7 +2554,9 @@
       "uploading": "ಅಪ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "uploaded": "ಅಪ್‌ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
       "uploadFailedRetry": "ಅಪ್‌ಲೋಡ್ ವಿಫಲವಾಗಿದೆ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ.",
-      "uploadFailedTerminal": "ಈ ಫೈಲ್ ಅನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ."
+      "uploadFailedTerminal": "ಈ ಫೈಲ್ ಅನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+      "moveLeft": "{{filename}} ಅನ್ನು ಎಡಕ್ಕೆ ಸರಿಸಿ",
+      "moveRight": "{{filename}} ಅನ್ನು ಬಲಕ್ಕೆ ಸರಿಸಿ"
     },
     "attachmentPasteHint": {
       "accessibility": "ಕ್ಲಿಪ್‌ಬೋರ್ಡ್‌ನಿಂದ ಚಿತ್ರ ಅಂಟಿಸಿ",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "ಮುಕ್ತಾಯಗೊಳಿಸುತ್ತಿದೆ...",
       "messagePlaceholder": "ಸಂದೇಶ...",
       "cannotReceiveFiles": "ಈ ಸೆಷನ್ ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ನಿಮ್ಮ ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಲು ಲಗತ್ತುಗಳನ್ನು ತೆಗೆದುಹಾಕಿ.",
-      "couldNotAttachFiles": "ಫೈಲ್‌ಗಳನ್ನು ಲಗತ್ತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಕಳುಹಿಸಿ ಟ್ಯಾಪ್ ಮಾಡಿ."
+      "couldNotAttachFiles": "ಫೈಲ್‌ಗಳನ್ನು ಲಗತ್ತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಕಳುಹಿಸಿ ಟ್ಯಾಪ್ ಮಾಡಿ.",
+      "discardAttachmentsMessage": "ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳಿಗೆ ಲಗತ್ತಿಸದ ಅಪ್‌ಲೋಡ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ.",
+      "discardAttachmentsTitle": "ಲಗತ್ತುಗಳನ್ನು ತೆಗೆದುಹಾಕಬೇಕೆ?",
+      "charactersRemaining": "{{count}} ಅಕ್ಷರಗಳು ಉಳಿದಿವೆ",
+      "insertNewline": "ಹೊಸ ಸಾಲನ್ನು ಸೇರಿಸಿ",
+      "starterChipBuild": "ವೈಶಿಷ್ಟ್ಯವನ್ನು ನಿರ್ಮಿಸಿ",
+      "starterChipEmpty": "ಒಂದು ಆಲೋಚನೆಯೊಂದಿಗೆ ಪ್ರಾರಂಭಿಸಿ",
+      "starterChipFix": "ದೋಷವನ್ನು ಸರಿಪಡಿಸಿ",
+      "starterChipPrepare": "ನನ್ನ ಪರಿಸರವನ್ನು ಹೊಂದಿಸಿ",
+      "starterChipWrapUp": "ನನ್ನ ಸೆಶನ್ ಮುಕ್ತಾಯಗೊಳಿಸಿ",
+      "starterChipWriteTests": "ಪರೀಕ್ಷೆಗಳನ್ನು ಬರೆಯಿರಿ"
     },
     "chatLink": {
       "linkCopied": "ಲಿಂಕ್ ನಕಲಿಸಲಾಗಿದೆ",
@@ -2775,7 +2815,8 @@
     "busy": "ಧ್ವನಿ ಇನ್ಪುಟ್ ಕಾರ್ಯನಿರತವಾಗಿದೆ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "stopped": "ಧ್ವನಿ ಇನ್ಪುಟ್ ನಿಂತಿದೆ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಮೈಕ್ರೋಫೋನ್ ಟ್ಯಾಪ್ ಮಾಡಿ.",
     "unavailableDevice": "ಈ ಸಾಧನದಲ್ಲಿ ಧ್ವನಿ ಇನ್ಪುಟ್ ಲಭ್ಯವಿಲ್ಲ.",
-    "unavailableLanguage": "ಈ ಸಾಧನ ಭಾಷೆಗೆ ಧ್ವನಿ ಇನ್ಪುಟ್ ಲಭ್ಯವಿಲ್ಲ."
+    "unavailableLanguage": "ಈ ಸಾಧನ ಭಾಷೆಗೆ ಧ್ವನಿ ಇನ್ಪುಟ್ ಲಭ್ಯವಿಲ್ಲ.",
+    "listeningStopped": "ಆಲಿಸುವುದು ನಿಂತಿದೆ."
   },
   "share": {
     "title": "Kilo ಗೆ ಹಂಚಿಕೊಳ್ಳಿ",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "ನೀವು ಲಿಂಕ್ನ ಹೋಸ್ಟ್ ಅನ್ನು ವಿಶ್ವಾಸಿಸಿದಾಗ, ಅದು ಮತ್ತೆ ಕೇಳದೆ ತೆರೆಯುತ್ತದೆ.",
     "revoke": "{{host}} ರದ್ದುಗೊಳಿಸಿ",
     "backToPreferences": "ಆದ್ಯತೆಗಳಿಗೆ ಹಿಂತಿರುಗಿ"
+  },
+  "quickChat": {
+    "title": "ಚಾಟ್",
+    "composer": {
+      "placeholder": "ಸಂದೇಶ"
+    },
+    "empty": {
+      "title": "ಚಾಟ್ ಪ್ರಾರಂಭಿಸಿ",
+      "description": "ಮಾಡೆಲ್‌ನೊಂದಿಗೆ ಮಾತನಾಡಲು ಸಂದೇಶ ಕಳುಹಿಸಿ."
+    },
+    "working": "ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
+    "historyRetry": "ಚಾಟ್ ಇತಿಹಾಸವನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "catalogRetry": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
+    "sendError": "ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   }
 }

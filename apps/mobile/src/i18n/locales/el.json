@@ -152,7 +152,9 @@
     "appearanceDark": "Σκούρο",
     "account": "Λογαριασμός",
     "prReviewAttribution": "Προσθήκη αναφοράς της εφαρμογής στις ανασκοπήσεις PR",
-    "prReviewAttributionSubtitle": "Προσθέστε μια υποσημείωση «Reviewed via Kilo» όταν υποβάλλετε μια ανασκόπηση."
+    "prReviewAttributionSubtitle": "Προσθέστε μια υποσημείωση «Reviewed via Kilo» όταν υποβάλλετε μια ανασκόπηση.",
+    "returnSendsMessage": "Το πλήκτρο επιστροφής στέλνει το μήνυμα",
+    "returnSendsMessageSubtitle": "Όταν είναι απενεργοποιημένο, το πλήκτρο επιστροφής εισάγει νέα γραμμή στα πεδία εισαγωγής μηνύματος των πρακτόρων."
   },
   "prReview": {
     "pullRequestUnavailable": "Το pull request δεν είναι διαθέσιμο",
@@ -665,7 +667,8 @@
     "profile": "Προφίλ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, καρτέλα, {{position}} από {{total}}"
+    "position": "{{name}}, καρτέλα, {{position}} από {{total}}",
+    "chat": "Συνομιλία"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "Σφάλμα δικτύου",
       "uploadFailed": "Η μεταφόρτωση απέτυχε",
       "failedToUploadFile": "Δεν ήταν δυνατή η μεταφόρτωση του αρχείου: {{reason}}",
-      "nothingToPaste": "Δεν υπάρχει τίποτα για επικόλληση"
+      "nothingToPaste": "Δεν υπάρχει τίποτα για επικόλληση",
+      "metadataStripFailed": "Δεν ήταν δυνατή η αφαίρεση των μεταδεδομένων της φωτογραφίας."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "Εκτέλεση ελέγχου",
       "status": "Κατάσταση",
       "threshold": "Κατώφλι",
-      "pullRequest": "αίτημα έλξης"
+      "pullRequest": "αίτημα έλξης",
+      "transcriptEmpty": "Δεν υπάρχει απομαγνητοφώνηση για αυτή την αναθεώρηση.",
+      "transcriptLive": "ΖΩΝΤΑΝΑ",
+      "transcriptRetry": "Δεν ήταν δυνατή η φόρτωση της απομαγνητοφώνησης της αναθεώρησης.",
+      "transcriptWaiting": "Αναμονή για την απομαγνητοφώνηση της αναθεώρησης.",
+      "agentIdle": "Πράκτορας σε αναμονή",
+      "agentWorking": "Ο πράκτορας εργάζεται...",
+      "anErrorOccurred": "Παρουσιάστηκε σφάλμα",
+      "errorWithMessage": "Σφάλμα: {{message}}",
+      "executionStarted": "Ξεκίνησε η εκτέλεση",
+      "reviewCompleted": "Ολοκληρώθηκε η αναθεώρηση",
+      "reviewInterrupted": "Η αναθεώρηση διακόπηκε",
+      "sessionError": "Σφάλμα περιόδου λειτουργίας: {{error}}",
+      "statusWithValue": "Κατάσταση: {{status}}",
+      "toolName": "Εργαλείο: {{name}}",
+      "toolNameError": "Εργαλείο: {{name}} — σφάλμα",
+      "unknownError": "Άγνωστο σφάλμα"
     },
     "reviewMemory": {
       "title": "Μνήμη αναθεώρησης",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "Η προηγούμενη εργασία ολοκληρώνεται ακόμα. Περιμένετε μια στιγμή.",
       "serviceUnavailable": "Η υπηρεσία δεν είναι διαθέσιμη αυτή τη στιγμή. Δοκιμάστε ξανά.",
       "connectionTrouble": "Πρόβλημα σύνδεσης. Δοκιμάστε ξανά σε λίγο.",
-      "modelUnavailable": "Αυτό το μοντέλο δεν είναι διαθέσιμο για το Cloud Agent. Επιλέξτε άλλο μοντέλο και δοκιμάστε ξανά."
+      "modelUnavailable": "Αυτό το μοντέλο δεν είναι διαθέσιμο για το Cloud Agent. Επιλέξτε άλλο μοντέλο και δοκιμάστε ξανά.",
+      "cancelQueuedFailed": "Δεν ήταν δυνατή η ακύρωση του μηνύματος.",
+      "cancelQueuedRestoreAvailable": "Το μήνυμα ακυρώθηκε. Πατήστε Επαναφορά για να το επαναφέρετε στο πεδίο εισαγωγής μηνύματος.",
+      "cancelQueuedRestored": "Το μήνυμα ακυρώθηκε. Το μήνυμα βρίσκεται ξανά στο πεδίο εισαγωγής μηνύματος.",
+      "cancelQueuedUpgradeRequired": "Η ακύρωση μηνυμάτων σε αναμονή απαιτεί νεότερη έκδοση του Kilo CLI. Ενημερώστε το Kilo CLI και συνδεθείτε ξανά."
     },
     "remoteSession": {
       "failedToCreate": "Αποτυχία δημιουργίας απομακρυσμένης συνεδρίας",
@@ -2196,7 +2220,8 @@
       "continueFrom": "Συνέχιση του {{title}}",
       "importingSession": "Εισαγωγή συνεδρίας",
       "cliCannotContinue": "Αυτό το CLI δεν μπορεί να συνεχίσει μια συνεδρία. Επιλέξτε Cloud Agent ή άλλο CLI.",
-      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας."
+      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας.",
+      "discardWithUploadsMessage": "Το μήνυμά σας και τυχόν μεταφορτωμένα αρχεία που δεν έχουν προσαρτηθεί σε απεσταλμένα μηνύματα θα διαγραφούν."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "Το μήνυμα είναι σε αναμονή",
       "userMessage": "Μήνυμα χρήστη",
       "assistantMessage": "Μήνυμα βοηθού",
-      "longPressHint": "Παρατεταμένο πάτημα για λεπτομέρειες μηνύματος"
+      "longPressHint": "Παρατεταμένο πάτημα για λεπτομέρειες μηνύματος",
+      "cancelQueued": "Ακύρωση μηνύματος",
+      "cancelQueuedAccessibility": "Ακύρωση μηνύματος σε αναμονή",
+      "restoreQueued": "Επαναφορά",
+      "restoreQueuedAccessibility": "Επαναφορά ακυρωμένου μηνύματος στο πεδίο εισαγωγής μηνύματος"
     },
     "olderMessages": {
       "arrived": "Φορτώθηκαν προηγούμενα μηνύματα",
@@ -2460,6 +2489,8 @@
       "viewTable": "Προβολή πίνακα",
       "title": "Πίνακας",
       "close": "Κλείσιμο πίνακα",
+      "loading": "Φόρτωση πίνακα",
+      "empty": "Αυτός ο πίνακας δεν έχει γραμμές.",
       "columnCount_one": "στήλη",
       "columnCount": "στήλες",
       "columnCount_other": "στήλες",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Φιλτράρισμα συνεδριών",
-      "sortBy": "Ταξινόμηση κατά",
-      "sortLastUpdated": "Τελευταία ενημέρωση",
-      "sortCreated": "Δημιουργήθηκε",
       "platform": "Πλατφόρμα",
       "platformCloud": "Cloud",
       "platformExtension": "Επέκταση",
@@ -2526,7 +2554,9 @@
       "uploading": "Μεταφόρτωση…",
       "uploaded": "Μεταφορτώθηκε",
       "uploadFailedRetry": "Η μεταφόρτωση απέτυχε. Πατήστε για επανάληψη.",
-      "uploadFailedTerminal": "Αυτό το αρχείο δεν μπορεί να μεταφορτωθεί."
+      "uploadFailedTerminal": "Αυτό το αρχείο δεν μπορεί να μεταφορτωθεί.",
+      "moveLeft": "Μετακίνηση του {{filename}} αριστερά",
+      "moveRight": "Μετακίνηση του {{filename}} δεξιά"
     },
     "attachmentPasteHint": {
       "accessibility": "Επικόλληση εικόνας από το πρόχειρο",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "Ολοκλήρωση...",
       "messagePlaceholder": "Μήνυμα...",
       "cannotReceiveFiles": "Αυτή η συνεδρία δεν μπορεί να λάβει αρχεία. Αφαιρέστε τα συνημμένα για να στείλετε το μήνυμά σας.",
-      "couldNotAttachFiles": "Δεν ήταν δυνατή η προσάρτηση αρχείων. Πατήστε αποστολή για να δοκιμάσετε ξανά."
+      "couldNotAttachFiles": "Δεν ήταν δυνατή η προσάρτηση αρχείων. Πατήστε αποστολή για να δοκιμάσετε ξανά.",
+      "discardAttachmentsMessage": "Τα μεταφορτωμένα αρχεία που δεν έχουν προσαρτηθεί σε απεσταλμένα μηνύματα θα διαγραφούν.",
+      "discardAttachmentsTitle": "Απόρριψη συνημμένων;",
+      "charactersRemaining": "Απομένουν {{count}} χαρακτήρες",
+      "insertNewline": "Εισαγωγή νέας γραμμής",
+      "starterChipBuild": "Δημιουργία λειτουργίας",
+      "starterChipEmpty": "Ξεκινήστε με μια ιδέα",
+      "starterChipFix": "Διόρθωση σφάλματος",
+      "starterChipPrepare": "Ρύθμιση του περιβάλλοντός μου",
+      "starterChipWrapUp": "Ολοκλήρωση της συνεδρίας μου",
+      "starterChipWriteTests": "Σύνταξη δοκιμών"
     },
     "chatLink": {
       "linkCopied": "Ο σύνδεσμος αντιγράφηκε",
@@ -2775,7 +2815,8 @@
     "busy": "Η φωνητική είσοδος είναι απασχολημένη. Δοκιμάστε ξανά.",
     "stopped": "Η φωνητική είσοδος σταμάτησε. Πατήστε το μικρόφωνο για να δοκιμάσετε ξανά.",
     "unavailableDevice": "Η φωνητική είσοδος δεν είναι διαθέσιμη σε αυτή τη συσκευή.",
-    "unavailableLanguage": "Η φωνητική είσοδος δεν είναι διαθέσιμη για τη γλώσσα αυτής της συσκευής."
+    "unavailableLanguage": "Η φωνητική είσοδος δεν είναι διαθέσιμη για τη γλώσσα αυτής της συσκευής.",
+    "listeningStopped": "Η ακρόαση σταμάτησε."
   },
   "share": {
     "title": "Κοινή χρήση στο Kilo",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "Όταν εμπιστεύεστε τον κεντρικό υπολογιστή ενός συνδέσμου, ανοίγει χωρίς να ρωτά ξανά.",
     "revoke": "Ανάκληση {{host}}",
     "backToPreferences": "Επιστροφή στις προτιμήσεις"
+  },
+  "quickChat": {
+    "title": "Συνομιλία",
+    "composer": {
+      "placeholder": "Μήνυμα"
+    },
+    "empty": {
+      "title": "Ξεκινήστε μια συνομιλία",
+      "description": "Στείλτε ένα μήνυμα για να συνομιλήσετε με ένα μοντέλο."
+    },
+    "working": "Εργασία",
+    "historyRetry": "Δεν ήταν δυνατή η φόρτωση του ιστορικού συνομιλίας.",
+    "catalogRetry": "Δεν ήταν δυνατή η φόρτωση των μοντέλων",
+    "sendError": "Δεν ήταν δυνατή η αποστολή του μηνύματος. Δοκιμάστε ξανά."
   }
 }

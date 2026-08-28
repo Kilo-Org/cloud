@@ -152,7 +152,9 @@
     "appearanceDark": "მუქი",
     "account": "ანგარიში",
     "prReviewAttribution": "აპლიკაციის მითითების დამატება PR რეცენზიებში",
-    "prReviewAttributionSubtitle": "დაამატეთ „განხილულია Kilo-ს მეშვეობით“ ქვედა წარწერა, როცა რეცენზიას გაგზავნით."
+    "prReviewAttributionSubtitle": "დაამატეთ „განხილულია Kilo-ს მეშვეობით“ ქვედა წარწერა, როცა რეცენზიას გაგზავნით.",
+    "returnSendsMessage": "დაბრუნების კლავიში აგზავნის შეტყობინებას",
+    "returnSendsMessageSubtitle": "როცა გამორთულია, დაბრუნების კლავიში აგენტის შეტყობინების შეყვანის ველებში ახალ ხაზს ამატებს."
   },
   "prReview": {
     "pullRequestUnavailable": "პულ-რექვესთი მიუწვდომელია",
@@ -665,7 +667,8 @@
     "profile": "პროფილი",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ჩანართი, {{position}} {{total}}-დან"
+    "position": "{{name}}, ჩანართი, {{position}} {{total}}-დან",
+    "chat": "ჩატი"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "ქსელის შეცდომა",
       "uploadFailed": "ატვირთვა ვერ მოხერხდა",
       "failedToUploadFile": "ფაილის ატვირთვა ვერ მოხერხდა: {{reason}}",
-      "nothingToPaste": "ჩასასმელი არაფერია"
+      "nothingToPaste": "ჩასასმელი არაფერია",
+      "metadataStripFailed": "ფოტოს მეტამონაცემების წაშლა ვერ მოხერხდა."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "შემოწმების გაშვება",
       "status": "სტატუსი",
       "threshold": "ზღვარი",
-      "pullRequest": "პულ-რექვესთი"
+      "pullRequest": "პულ-რექვესთი",
+      "transcriptEmpty": "ამ მიმოხილვისთვის ტრანსკრიფცია არ არის.",
+      "transcriptLive": "პირდაპირი",
+      "transcriptRetry": "მიმოხილვის ტრანსკრიფციის ჩატვირთვა ვერ მოხერხდა.",
+      "transcriptWaiting": "ველოდებით მიმოხილვის ტრანსკრიფციას.",
+      "agentIdle": "აგენტი უქმე",
+      "agentWorking": "აგენტი მუშავდება...",
+      "anErrorOccurred": "შეცდომა მოხდა",
+      "errorWithMessage": "შეცდომა: {{message}}",
+      "executionStarted": "შესრულება დაიწყო",
+      "reviewCompleted": "მიმოხილვა დასრულდა",
+      "reviewInterrupted": "მიმოხილვა შეწყვეტილია",
+      "sessionError": "სესიის შეცდომა: {{error}}",
+      "statusWithValue": "სტატუსი: {{status}}",
+      "toolName": "ინსტრუმენტი: {{name}}",
+      "toolNameError": "ინსტრუმენტი: {{name}} — შეცდომა",
+      "unknownError": "უცნობი შეცდომა"
     },
     "reviewMemory": {
       "title": "მიმოხილვის მეხსიერება",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "წინა დავალება ჯერ კიდევ სრულდება. გთხოვთ, ცოტა ხანს დაელოდოთ.",
       "serviceUnavailable": "სერვისი ამ დროისთვის მიუწვდომელია. გთხოვთ, სცადოთ თავიდან.",
       "connectionTrouble": "კავშირის პრობლემა. გთხოვთ, ცოტა ხანში სცადოთ თავიდან.",
-      "modelUnavailable": "ეს მოდელი Cloud Agent-ისთვის მიუწვდომელია. აირჩიეთ სხვა მოდელი და სცადეთ თავიდან."
+      "modelUnavailable": "ეს მოდელი Cloud Agent-ისთვის მიუწვდომელია. აირჩიეთ სხვა მოდელი და სცადეთ თავიდან.",
+      "cancelQueuedFailed": "შეტყობინების გაუქმება ვერ მოხერხდა.",
+      "cancelQueuedRestoreAvailable": "შეტყობინება გაუქმდა. შეეხეთ ღილაკს „აღდგენა“, რომ დააბრუნოთ იგი შეტყობინების შეყვანის ველში.",
+      "cancelQueuedRestored": "შეტყობინება გაუქმდა. მოთხოვნა დაბრუნდა შეტყობინების შეყვანის ველში.",
+      "cancelQueuedUpgradeRequired": "რიგში მდგომი შეტყობინებების გასაუქმებლად საჭიროა Kilo CLI-ის უფრო ახალი ვერსია. განაახლეთ Kilo CLI და ხელახლა დაუკავშირდით."
     },
     "remoteSession": {
       "failedToCreate": "დისტანციური სესიის შექმნა ვერ მოხერხდა",
@@ -2196,7 +2220,8 @@
       "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
       "continueFrom": "ვაგრძელებთ {{title}}",
       "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
-      "importingSession": "სესიის იმპორტირება"
+      "importingSession": "სესიის იმპორტირება",
+      "discardWithUploadsMessage": "თქვენი მოთხოვნა და ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება."
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "შეტყობინება რიგშია",
       "userMessage": "მომხმარებლის შეტყობინება",
       "assistantMessage": "ასისტენტის შეტყობინება",
-      "longPressHint": "ხანგრძლივი დაჭერა შეტყობინების დეტალებისთვის"
+      "longPressHint": "ხანგრძლივი დაჭერა შეტყობინების დეტალებისთვის",
+      "cancelQueued": "შეტყობინების გაუქმება",
+      "cancelQueuedAccessibility": "რიგში მდგომი შეტყობინების გაუქმება",
+      "restoreQueued": "აღდგენა",
+      "restoreQueuedAccessibility": "გაუქმებული შეტყობინების აღდგენა შეტყობინების შეყვანის ველში"
     },
     "olderMessages": {
       "arrived": "ადრინდელი შეტყობინებები ჩაიტვირთა",
@@ -2460,6 +2489,8 @@
       "viewTable": "ცხრილის ნახვა",
       "title": "ცხრილი",
       "close": "ცხრილის დახურვა",
+      "loading": "ცხრილის ჩატვირთვა",
+      "empty": "ამ ცხრილს სტრიქონები არ აქვს.",
       "columnCount_one": "სვეტი",
       "columnCount": "სვეტი",
       "columnCount_other": "სვეტი",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "სესიების გაფილტვრა",
-      "sortBy": "დალაგება",
-      "sortLastUpdated": "ბოლო განახლება",
-      "sortCreated": "შექმნის თარიღი",
       "platform": "პლატფორმა",
       "platformCloud": "Cloud",
       "platformExtension": "გაფართოება",
@@ -2526,7 +2554,9 @@
       "uploading": "ატვირთვა…",
       "uploaded": "ატვირთულია",
       "uploadFailedRetry": "ატვირთვა ვერ მოხერხდა. ხელახლა სცადეთ.",
-      "uploadFailedTerminal": "ამ ფაილის ატვირთვა შეუძლებელია."
+      "uploadFailedTerminal": "ამ ფაილის ატვირთვა შეუძლებელია.",
+      "moveLeft": "გადაიტანეთ {{filename}} მარცხნივ",
+      "moveRight": "გადაიტანეთ {{filename}} მარჯვნივ"
     },
     "attachmentPasteHint": {
       "accessibility": "სურათის ჩასმა ბუფერიდან",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "დასრულება...",
       "messagePlaceholder": "შეტყობინება...",
       "cannotReceiveFiles": "ამ სესიას ფაილების მიღება არ შეუძლია. შეტყობინების გასაგზავნად ამოიღეთ დანართები.",
-      "couldNotAttachFiles": "ფაილების მიმაგრება ვერ მოხერხდა. ხელახლა სცადეთ."
+      "couldNotAttachFiles": "ფაილების მიმაგრება ვერ მოხერხდა. ხელახლა სცადეთ.",
+      "discardAttachmentsMessage": "აიტვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
+      "discardAttachmentsTitle": "გავაუქმოთ დანართები?",
+      "charactersRemaining": "დარჩენილია {{count}} სიმბოლო",
+      "insertNewline": "ახალი ხაზის ჩასმა",
+      "starterChipBuild": "შექმენით ფუნქცია",
+      "starterChipEmpty": "დაიწყეთ იდეით",
+      "starterChipFix": "შეასწორეთ შეცდომა",
+      "starterChipPrepare": "გამართეთ ჩემი გარემო",
+      "starterChipWrapUp": "დაასრულეთ ჩემი სესია",
+      "starterChipWriteTests": "დაწერეთ ტესტები"
     },
     "chatLink": {
       "linkCopied": "ბმული დაკოპირდა",
@@ -2775,7 +2815,8 @@
     "busy": "ხმოვანი შეყვანა დაკავებულია. სცადეთ კიდევ.",
     "stopped": "ხმოვანი შეყვანა შეჩერდა. შეეხეთ მიკროფონს ხელახლა საცდელად.",
     "unavailableDevice": "ამ მოწყობილობაზე ხმოვანი შეყვანა მიუწვდომელია.",
-    "unavailableLanguage": "ხმოვანი შეყვანა მიუწვდომელია ამ მოწყობილობის ენისთვის."
+    "unavailableLanguage": "ხმოვანი შეყვანა მიუწვდომელია ამ მოწყობილობის ენისთვის.",
+    "listeningStopped": "მოსმენა შეჩერდა."
   },
   "share": {
     "title": "Kilo-ში გაზიარება",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "როდესაც ენდობით ბმულის ჰოსტს, ის იხსნება ხელახლა კითხვის გარეშე.",
     "revoke": "გაუქმება {{host}}",
     "backToPreferences": "დაბრუნება პარამეტრებში"
+  },
+  "quickChat": {
+    "title": "ჩატი",
+    "composer": {
+      "placeholder": "შეტყობინება"
+    },
+    "empty": {
+      "title": "დაიწყეთ ჩატი",
+      "description": "გაგზავნეთ შეტყობინება მოდელთან სასაუბროდ."
+    },
+    "working": "მუშავდება",
+    "historyRetry": "ჩატის ისტორიის ჩატვირთვა ვერ მოხერხდა.",
+    "catalogRetry": "მოდელების ჩატვირთვა ვერ მოხერხდა",
+    "sendError": "შეტყობინების გაგზავნა ვერ მოხერხდა. სცადეთ ხელახლა."
   }
 }

@@ -152,7 +152,9 @@
     "appearanceDark": "Темная",
     "account": "Аккаунт",
     "prReviewAttribution": "Добавить атрибуцию приложения в проверки PR",
-    "prReviewAttributionSubtitle": "Добавлять нижний колонтитул «Проверено с помощью Kilo» при отправке проверки."
+    "prReviewAttributionSubtitle": "Добавлять нижний колонтитул «Проверено с помощью Kilo» при отправке проверки.",
+    "returnSendsMessage": "Клавиша ввода отправляет сообщение",
+    "returnSendsMessageSubtitle": "Если выключено, клавиша ввода вставляет новую строку в полях ввода сообщений агентам."
   },
   "notifications": {
     "title": "Уведомления",
@@ -211,7 +213,8 @@
     "profile": "Профиль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, вкладка, {{position}} из {{total}}"
+    "position": "{{name}}, вкладка, {{position}} из {{total}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +298,8 @@
       "networkError": "Ошибка сети",
       "uploadFailed": "Загрузка не удалась",
       "failedToUploadFile": "Не удалось загрузить файл: {{reason}}",
-      "nothingToPaste": "Нечего вставлять"
+      "nothingToPaste": "Нечего вставлять",
+      "metadataStripFailed": "Не удалось удалить метаданные фотографии."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -902,7 +906,23 @@
       "title": "Проверка",
       "tokens": "Токены",
       "tokensInOut": "{{input}} вх. / {{output}} исх.",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Ожидание протокола проверки.",
+      "transcriptEmpty": "Для этой проверки нет протокола.",
+      "transcriptRetry": "Не удалось загрузить протокол проверки.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Агент простаивает",
+      "agentWorking": "Агент работает...",
+      "anErrorOccurred": "Произошла ошибка",
+      "errorWithMessage": "Ошибка: {{message}}",
+      "executionStarted": "Выполнение начато",
+      "reviewCompleted": "Проверка завершена",
+      "reviewInterrupted": "Проверка прервана",
+      "sessionError": "Ошибка сеанса: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Инструмент: {{name}}",
+      "toolNameError": "Инструмент: {{name}} — ошибка",
+      "unknownError": "Неизвестная ошибка"
     },
     "reviewList": {
       "configureProvider": "Настроить провайдера",
@@ -1686,7 +1706,11 @@
       "previousTaskFinishing": "Предыдущая задача ещё завершается. Подождите немного.",
       "serviceUnavailable": "Сервис сейчас недоступен. Попробуйте ещё раз.",
       "connectionTrouble": "Проблемы с подключением. Повторите через мгновение.",
-      "modelUnavailable": "Эта модель недоступна для Cloud Agent. Выберите другую модель и попробуйте снова."
+      "modelUnavailable": "Эта модель недоступна для Cloud Agent. Выберите другую модель и попробуйте снова.",
+      "cancelQueuedFailed": "Не удалось отменить сообщение.",
+      "cancelQueuedRestoreAvailable": "Сообщение отменено. Нажмите «Восстановить», чтобы вернуть его в поле ввода.",
+      "cancelQueuedRestored": "Сообщение отменено. Запрос снова в поле ввода.",
+      "cancelQueuedUpgradeRequired": "Для отмены сообщений в очереди требуется более новая версия Kilo CLI. Обновите Kilo CLI и подключитесь заново."
     },
     "remoteSession": {
       "failedToCreate": "Не удалось создать удаленный сеанс",
@@ -1758,7 +1782,8 @@
       "cliCannotContinue": "Этот CLI не может продолжить сеанс. Выберите Cloud Agent или другой CLI.",
       "continueFrom": "Продолжение {{title}}",
       "importFailed": "Не удалось импортировать этот сеанс.",
-      "importingSession": "Импорт сеанса"
+      "importingSession": "Импорт сеанса",
+      "discardWithUploadsMessage": "Ваш запрос и все загруженные файлы, не прикрепленные к отправленным сообщениям, будут удалены."
     },
     "partRenderer": {
       "updatedFileCount_one": "Обновлен {{displayCount}} файл",
@@ -2008,7 +2033,11 @@
       "queuedAccessibility": "Сообщение в очереди",
       "userMessage": "Сообщение пользователя",
       "assistantMessage": "Сообщение ассистента",
-      "longPressHint": "Долгое нажатие для сведений о сообщении"
+      "longPressHint": "Долгое нажатие для сведений о сообщении",
+      "cancelQueued": "Отменить сообщение",
+      "cancelQueuedAccessibility": "Отменить сообщение в очереди",
+      "restoreQueued": "Восстановить",
+      "restoreQueuedAccessibility": "Восстановить отмененное сообщение в поле ввода"
     },
     "olderMessages": {
       "arrived": "Более ранние сообщения загружены",
@@ -2026,6 +2055,8 @@
       "viewTable": "Просмотреть таблицу",
       "title": "Таблица",
       "close": "Закрыть таблицу",
+      "loading": "Загружаем таблицу",
+      "empty": "В этой таблице нет строк.",
       "columnCount_one": "столбец",
       "columnCount": "столбцы",
       "columnCount_other": "столбцы",
@@ -2040,9 +2071,6 @@
     },
     "sessionFilter": {
       "title": "Фильтровать сеансы",
-      "sortBy": "Сортировать по",
-      "sortLastUpdated": "Последнее обновление",
-      "sortCreated": "Создано",
       "platform": "Платформа",
       "platformCloud": "Облако",
       "platformExtension": "Расширение",
@@ -2096,7 +2124,9 @@
       "uploading": "Загрузка…",
       "uploaded": "Загружено",
       "uploadFailedRetry": "Загрузка не удалась. Нажмите, чтобы повторить.",
-      "uploadFailedTerminal": "Этот файл нельзя загрузить."
+      "uploadFailedTerminal": "Этот файл нельзя загрузить.",
+      "moveLeft": "Переместить {{filename}} влево",
+      "moveRight": "Переместить {{filename}} вправо"
     },
     "attachmentPasteHint": {
       "accessibility": "Вставить изображение из буфера обмена",
@@ -2126,7 +2156,17 @@
       "finalizingPlaceholder": "Завершение...",
       "messagePlaceholder": "Сообщение...",
       "cannotReceiveFiles": "Эта сессия не может получать файлы. Удалите вложения, чтобы отправить сообщение.",
-      "couldNotAttachFiles": "Не удалось прикрепить файлы. Нажмите «Отправить», чтобы повторить."
+      "couldNotAttachFiles": "Не удалось прикрепить файлы. Нажмите «Отправить», чтобы повторить.",
+      "discardAttachmentsMessage": "Загруженные файлы, не прикрепленные к отправленным сообщениям, будут удалены.",
+      "discardAttachmentsTitle": "Удалить вложения?",
+      "charactersRemaining": "Осталось символов: {{count}}",
+      "insertNewline": "Вставить новую строку",
+      "starterChipBuild": "Создать функцию",
+      "starterChipEmpty": "Начать с идеи",
+      "starterChipFix": "Исправить ошибку",
+      "starterChipPrepare": "Настроить мое окружение",
+      "starterChipWrapUp": "Завершить мой сеанс",
+      "starterChipWriteTests": "Написать тесты"
     },
     "chatLink": {
       "linkCopied": "Ссылка скопирована",
@@ -2347,7 +2387,8 @@
     "busy": "Голосовой ввод занят. Попробуйте снова.",
     "stopped": "Голосовой ввод остановлен. Нажмите на микрофон, чтобы попробовать снова.",
     "unavailableDevice": "Голосовой ввод недоступен на этом устройстве.",
-    "unavailableLanguage": "Голосовой ввод недоступен для языка этого устройства."
+    "unavailableLanguage": "Голосовой ввод недоступен для языка этого устройства.",
+    "listeningStopped": "Прослушивание остановлено."
   },
   "share": {
     "title": "Поделиться в Kilo",
@@ -3200,5 +3241,19 @@
     "emptyDescription": "Когда вы доверяете хосту ссылки, он открывается без повторного запроса.",
     "revoke": "Отозвать {{host}}",
     "backToPreferences": "Назад к настройкам"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Сообщение"
+    },
+    "empty": {
+      "title": "Начать чат",
+      "description": "Отправьте сообщение, чтобы поговорить с моделью."
+    },
+    "working": "Работаю...",
+    "historyRetry": "Не удалось загрузить историю чата.",
+    "catalogRetry": "Не удалось загрузить модели",
+    "sendError": "Не удалось отправить сообщение. Попробуйте еще раз."
   }
 }

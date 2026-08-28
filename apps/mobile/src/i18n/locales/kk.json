@@ -152,7 +152,9 @@
     "appearanceDark": "Қараңғы",
     "account": "Тіркелгі",
     "prReviewAttribution": "PR рецензияларына қосымшаның атрибуциясын қосу",
-    "prReviewAttributionSubtitle": "Рецензия жібергенде төменге Reviewed via Kilo жолын қосыңыз."
+    "prReviewAttributionSubtitle": "Рецензия жібергенде төменге Reviewed via Kilo жолын қосыңыз.",
+    "returnSendsMessage": "Қайтару пернесі хабарламаны жібереді",
+    "returnSendsMessageSubtitle": "Өшірулі кезде Қайтару пернесі агенттердің хабарлама енгізу өрістеріне жаңа жол енгізеді."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request қолжетімсіз",
@@ -665,7 +667,8 @@
     "profile": "Профиль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, қойынды, {{total}} ішінде {{position}}"
+    "position": "{{name}}, қойынды, {{total}} ішінде {{position}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "Желі қатесі",
       "uploadFailed": "Жүктеу сәтсіз аяқталды",
       "failedToUploadFile": "Файлды жүктеу сәтсіз аяқталды: {{reason}}",
-      "nothingToPaste": "Қоятын ештеңе жоқ"
+      "nothingToPaste": "Қоятын ештеңе жоқ",
+      "metadataStripFailed": "Фотосуреттің метадеректерін жою мүмкін болмады."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "Тексеруді орындау",
       "status": "Күй",
       "threshold": "Шек",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Шолу транскрипті күтілуде.",
+      "transcriptEmpty": "Бұл шолу үшін транскрипт жоқ.",
+      "transcriptRetry": "Шолу транскриптін жүктеу мүмкін болмады.",
+      "transcriptLive": "ТІКІ",
+      "agentIdle": "Агент бос тұр",
+      "agentWorking": "Агент орындалуда...",
+      "anErrorOccurred": "Қате орын алды",
+      "errorWithMessage": "Қате: {{message}}",
+      "executionStarted": "Орындалу басталды",
+      "reviewCompleted": "Шолу аяқталды",
+      "reviewInterrupted": "Шолу үзілді",
+      "sessionError": "Сессия қатесі: {{error}}",
+      "statusWithValue": "Күй: {{status}}",
+      "toolName": "Құрал: {{name}}",
+      "toolNameError": "Құрал: {{name}} — қате",
+      "unknownError": "Белгісіз қате"
     },
     "reviewMemory": {
       "title": "Шолу жады",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "Алдыңғы тапсырма әлі аяқталуда. Сәл күте тұрыңыз.",
       "serviceUnavailable": "Қызмет қазір қолжетімсіз. Қайталап көріңіз.",
       "connectionTrouble": "Байланыс ақауы. Сәлден кейін қайта көріңіз.",
-      "modelUnavailable": "Бұл модель Cloud Agent үшін қолжетімсіз. Басқа модельді таңдап, қайталап көріңіз."
+      "modelUnavailable": "Бұл модель Cloud Agent үшін қолжетімсіз. Басқа модельді таңдап, қайталап көріңіз.",
+      "cancelQueuedFailed": "Хабарламадан бас тарту мүмкін болмады.",
+      "cancelQueuedRestoreAvailable": "Хабарламадан бас тартылды. Оны хабарлама енгізу өрісіне қайтару үшін «Қалпына келтіру» түймесін түртіңіз.",
+      "cancelQueuedRestored": "Хабарламадан бас тартылды. Сұрақ хабарлама енгізу өрісіне қайтарылды.",
+      "cancelQueuedUpgradeRequired": "Кезектегі хабарламалардан бас тарту Kilo CLI-дің жаңа нұсқасын қажет етеді. Kilo CLI жаңартып, қайта қосылыңыз."
     },
     "remoteSession": {
       "failedToCreate": "Қашықтағы сессияны құру сәтсіз аяқталды",
@@ -2196,7 +2220,8 @@
       "continueFrom": "Жалғастыру {{title}}",
       "importingSession": "Сессияны импорттау",
       "cliCannotContinue": "Бұл CLI сессияны жалғастыра алмайды. Cloud Agent немесе басқа CLI таңдаңыз.",
-      "importFailed": "Бұл сессияны импорттау мүмкін болмады."
+      "importFailed": "Бұл сессияны импорттау мүмкін болмады.",
+      "discardWithUploadsMessage": "Сұрағыңыз және жіберілген хабарламаларға қосылмаған жүктелген файлдар жойылады."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "Хабарлама кезекте",
       "userMessage": "Пайдаланушы хабарламасы",
       "assistantMessage": "Көмекші хабарламасы",
-      "longPressHint": "Хабарлама мәліметтері үшін ұзақ басыңыз"
+      "longPressHint": "Хабарлама мәліметтері үшін ұзақ басыңыз",
+      "cancelQueued": "Хабарламадан бас тарту",
+      "cancelQueuedAccessibility": "Кезектегі хабарламадан бас тарту",
+      "restoreQueued": "Қалпына келтіру",
+      "restoreQueuedAccessibility": "Бас тартылған хабарламаны хабарлама енгізу өрісіне қалпына келтіру"
     },
     "olderMessages": {
       "arrived": "Алдыңғы хабарламалар жүктелді",
@@ -2460,6 +2489,8 @@
       "viewTable": "Кестені қарау",
       "title": "Кесте",
       "close": "Кестені жабу",
+      "loading": "Кестені жүктеу",
+      "empty": "Бұл кестеде жолдар жоқ.",
       "columnCount_one": "баған",
       "columnCount": "баған",
       "columnCount_other": "баған",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Сессияларды сүзу",
-      "sortBy": "Сұрыптау",
-      "sortLastUpdated": "Соңғы жаңарту",
-      "sortCreated": "Жасалған",
       "platform": "Платформа",
       "platformCloud": "Cloud",
       "platformExtension": "Кеңейтім",
@@ -2526,7 +2554,9 @@
       "uploading": "Жүктелуде…",
       "uploaded": "Жүктелді",
       "uploadFailedRetry": "Жүктеу сәтсіз аяқталды. Қайталау үшін түртіңіз.",
-      "uploadFailedTerminal": "Бұл файлды жүктеу мүмкін емес."
+      "uploadFailedTerminal": "Бұл файлды жүктеу мүмкін емес.",
+      "moveLeft": "{{filename}} файлын солға жылжыту",
+      "moveRight": "{{filename}} файлын оңға жылжыту"
     },
     "attachmentPasteHint": {
       "accessibility": "Ауыстырма буферінен суретті қою",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "Аяқталуда...",
       "messagePlaceholder": "Хабарлама...",
       "cannotReceiveFiles": "Бұл сессия файл қабылдай алмайды. Хабарлама жіберу үшін қосымшаларды алып тастаңыз.",
-      "couldNotAttachFiles": "Файлдарды қосу мүмкін болмады. Қайталау үшін жіберуді түртіңіз."
+      "couldNotAttachFiles": "Файлдарды қосу мүмкін болмады. Қайталау үшін жіберуді түртіңіз.",
+      "discardAttachmentsMessage": "Жіберілген хабарламаларға қосылмаған жүктелген файлдар жойылады.",
+      "discardAttachmentsTitle": "Қосымшаларды жою керек пе?",
+      "charactersRemaining": "{{count}} таңба қалды",
+      "insertNewline": "Жаңа жол енгізу",
+      "starterChipBuild": "Мүмкіндік жасау",
+      "starterChipEmpty": "Идеядан бастау",
+      "starterChipFix": "Қатені түзету",
+      "starterChipPrepare": "Ортамды баптау",
+      "starterChipWrapUp": "Сессиямды аяқтау",
+      "starterChipWriteTests": "Тесттер жазу"
     },
     "chatLink": {
       "linkCopied": "Сілтеме көшірілді",
@@ -2775,7 +2815,8 @@
     "busy": "Дауыстық енгізу бос емес. Қайта көріңіз.",
     "stopped": "Дауыстық енгізу тоқтатылды. Микрофонды түртіп, қайта көріңіз.",
     "unavailableDevice": "Бұл құрылғыда дауыстық енгізу қолжетімсіз.",
-    "unavailableLanguage": "Бұл құрылғы тілі үшін дауыстық енгізу қолжетімсіз."
+    "unavailableLanguage": "Бұл құрылғы тілі үшін дауыстық енгізу қолжетімсіз.",
+    "listeningStopped": "Тыңдау тоқтатылды."
   },
   "share": {
     "title": "Kilo-ға бөлісу",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "Сілтеме хостына сенсеңіз, ол қайта сұрамай ашылады.",
     "revoke": "{{host}} кері қайтару",
     "backToPreferences": "Баптауларға оралу"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Хабарлама"
+    },
+    "empty": {
+      "title": "Чатты бастаңыз",
+      "description": "Модельмен сөйлесу үшін хабарлама жіберіңіз."
+    },
+    "working": "Орындалуда",
+    "historyRetry": "Чат тарихын жүктеу мүмкін болмады.",
+    "catalogRetry": "Модельдерді жүктеу мүмкін болмады",
+    "sendError": "Хабарламаны жіберу мүмкін болмады. Қайта көріңіз."
   }
 }

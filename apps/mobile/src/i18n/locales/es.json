@@ -152,7 +152,9 @@
     "appearanceDark": "Oscuro",
     "account": "Cuenta",
     "prReviewAttribution": "Añadir atribución de la app a las revisiones de PR",
-    "prReviewAttributionSubtitle": "Añade un pie de página Revisado vía Kilo cuando envías una revisión."
+    "prReviewAttributionSubtitle": "Añade un pie de página Revisado vía Kilo cuando envías una revisión.",
+    "returnSendsMessage": "La tecla Intro envía el mensaje",
+    "returnSendsMessageSubtitle": "Si está desactivado, Intro inserta un salto de línea en los campos de mensaje del agente."
   },
   "notifications": {
     "channel": {
@@ -211,7 +213,8 @@
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, pestaña, {{position}} de {{total}}"
+    "position": "{{name}}, pestaña, {{position}} de {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +298,8 @@
       "networkError": "Error de red",
       "uploadFailed": "Subida fallida",
       "failedToUploadFile": "No se pudo subir el archivo: {{reason}}",
-      "nothingToPaste": "No hay nada que pegar"
+      "nothingToPaste": "No hay nada que pegar",
+      "metadataStripFailed": "No se pudieron eliminar los metadatos de la foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -900,7 +904,23 @@
       "title": "Revisión",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} entrada / {{output}} salida",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Esperando la transcripción de la revisión.",
+      "transcriptEmpty": "No hay transcripción para esta revisión.",
+      "transcriptRetry": "No se pudo cargar la transcripción de la revisión.",
+      "transcriptLive": "EN VIVO",
+      "agentIdle": "Agente inactivo",
+      "agentWorking": "Agente trabajando...",
+      "anErrorOccurred": "Se produjo un error",
+      "errorWithMessage": "Error: {{message}}",
+      "executionStarted": "Ejecución iniciada",
+      "reviewCompleted": "Revisión completada",
+      "reviewInterrupted": "Revisión interrumpida",
+      "sessionError": "Error de sesión: {{error}}",
+      "statusWithValue": "Estado: {{status}}",
+      "toolName": "Herramienta: {{name}}",
+      "toolNameError": "Herramienta: {{name}} — error",
+      "unknownError": "Error desconocido"
     },
     "reviewList": {
       "configureProvider": "Configurar proveedor",
@@ -1678,7 +1698,11 @@
       "previousTaskFinishing": "La tarea anterior aún está finalizando. Espera un momento.",
       "serviceUnavailable": "El servicio no está disponible en este momento. Inténtalo de nuevo.",
       "connectionTrouble": "Problema de conexión. Inténtalo de nuevo en un momento.",
-      "modelUnavailable": "Este modelo no está disponible para Cloud Agent. Elige otro modelo e inténtalo de nuevo."
+      "modelUnavailable": "Este modelo no está disponible para Cloud Agent. Elige otro modelo e inténtalo de nuevo.",
+      "cancelQueuedFailed": "No se pudo cancelar el mensaje.",
+      "cancelQueuedRestoreAvailable": "Mensaje cancelado. Toca Restaurar para devolverlo al campo de mensaje.",
+      "cancelQueuedRestored": "Mensaje cancelado. El prompt vuelve a estar en el campo de mensaje.",
+      "cancelQueuedUpgradeRequired": "Cancelar mensajes en cola requiere una versión más reciente de Kilo CLI. Actualiza Kilo CLI y vuelve a conectarte."
     },
     "remoteSession": {
       "failedToCreate": "No se pudo crear la sesión remota",
@@ -1750,7 +1774,8 @@
       "continueFrom": "Continuando {{title}}",
       "importingSession": "Importando sesión",
       "cliCannotContinue": "Esta CLI no puede continuar una sesión. Elige Cloud Agent u otra CLI.",
-      "importFailed": "No se pudo importar esta sesión."
+      "importFailed": "No se pudo importar esta sesión.",
+      "discardWithUploadsMessage": "Se eliminarán tu prompt y los archivos subidos que no estén adjuntos a mensajes enviados."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} archivo actualizado",
@@ -1999,7 +2024,11 @@
       "queuedAccessibility": "Mensaje en cola",
       "userMessage": "Mensaje del usuario",
       "assistantMessage": "Mensaje del asistente",
-      "longPressHint": "Mantén pulsado para ver los detalles del mensaje"
+      "longPressHint": "Mantén pulsado para ver los detalles del mensaje",
+      "cancelQueued": "Cancelar mensaje",
+      "cancelQueuedAccessibility": "Cancelar mensaje en cola",
+      "restoreQueued": "Restaurar",
+      "restoreQueuedAccessibility": "Restaurar el mensaje cancelado en el campo de mensaje"
     },
     "olderMessages": {
       "arrived": "Mensajes anteriores cargados",
@@ -2016,6 +2045,8 @@
       "viewTable": "Ver tabla",
       "title": "Tabla",
       "close": "Cerrar tabla",
+      "loading": "Cargando tabla",
+      "empty": "Esta tabla no tiene filas.",
       "columnCount_one": "columna",
       "columnCount": "columnas",
       "columnCount_other": "columnas",
@@ -2028,9 +2059,6 @@
     },
     "sessionFilter": {
       "title": "Filtrar sesiones",
-      "sortBy": "Ordenar por",
-      "sortLastUpdated": "Última actualización",
-      "sortCreated": "Creado",
       "platform": "Plataforma",
       "platformCloud": "Nube",
       "platformExtension": "Extensión",
@@ -2084,7 +2112,9 @@
       "uploading": "Subiendo…",
       "uploaded": "Subido",
       "uploadFailedRetry": "La subida falló. Toca para reintentar.",
-      "uploadFailedTerminal": "Este archivo no se puede subir."
+      "uploadFailedTerminal": "Este archivo no se puede subir.",
+      "moveLeft": "Mover {{filename}} a la izquierda",
+      "moveRight": "Mover {{filename}} a la derecha"
     },
     "attachmentPasteHint": {
       "accessibility": "Pegar imagen del portapapeles",
@@ -2114,7 +2144,17 @@
       "finalizingPlaceholder": "Finalizando...",
       "messagePlaceholder": "Mensaje...",
       "cannotReceiveFiles": "Esta sesión no puede recibir archivos. Quita los archivos adjuntos para enviar tu mensaje.",
-      "couldNotAttachFiles": "No se pudieron adjuntar los archivos. Toca enviar para reintentar."
+      "couldNotAttachFiles": "No se pudieron adjuntar los archivos. Toca enviar para reintentar.",
+      "discardAttachmentsMessage": "Se eliminarán los archivos subidos que no estén adjuntos a mensajes enviados.",
+      "discardAttachmentsTitle": "¿Descartar adjuntos?",
+      "charactersRemaining": "Quedan {{count}} caracteres",
+      "insertNewline": "Insertar salto de línea",
+      "starterChipBuild": "Crear una función",
+      "starterChipEmpty": "Empezar con una idea",
+      "starterChipFix": "Corregir un error",
+      "starterChipPrepare": "Configurar mi entorno",
+      "starterChipWrapUp": "Finalizar mi sesión",
+      "starterChipWriteTests": "Escribir pruebas"
     },
     "chatLink": {
       "linkCopied": "Enlace copiado",
@@ -2334,7 +2374,8 @@
     "busy": "La entrada de voz está ocupada. Inténtalo de nuevo.",
     "stopped": "La entrada de voz se detuvo. Toca el micrófono para intentarlo de nuevo.",
     "unavailableDevice": "La entrada de voz no está disponible en este dispositivo.",
-    "unavailableLanguage": "La entrada de voz no está disponible para el idioma de este dispositivo."
+    "unavailableLanguage": "La entrada de voz no está disponible para el idioma de este dispositivo.",
+    "listeningStopped": "Escucha detenida."
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -3179,5 +3220,19 @@
     "emptyDescription": "Cuando confías en el host de un enlace, se abre sin volver a preguntar.",
     "revoke": "Revocar {{host}}",
     "backToPreferences": "Volver a preferencias"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Mensaje"
+    },
+    "empty": {
+      "title": "Inicia un chat",
+      "description": "Envía un mensaje para hablar con un modelo."
+    },
+    "working": "Trabajando",
+    "historyRetry": "No se pudo cargar el historial del chat.",
+    "catalogRetry": "No se pudieron cargar los modelos",
+    "sendError": "No se pudo enviar el mensaje. Inténtalo de nuevo."
   }
 }

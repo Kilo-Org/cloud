@@ -152,7 +152,9 @@
     "appearanceDark": "ጨለማ",
     "account": "መለያ",
     "prReviewAttribution": "የመተግበሪያ መለያን ወደ PR ግምገማዎች ያክሉ",
-    "prReviewAttributionSubtitle": "ግምገማ ሲያስገቡ የ'በKilo ተገምግሟል' ግርጌ ያክሉ።"
+    "prReviewAttributionSubtitle": "ግምገማ ሲያስገቡ የ'በKilo ተገምግሟል' ግርጌ ያክሉ።",
+    "returnSendsMessage": "የመመለሻ ቁልፍ መልእክት ይልካል",
+    "returnSendsMessageSubtitle": "ሲጠፋ፣ የመመለሻ ቁልፍ በወኪል መልእክት ማስገቢያዎች ውስጥ አዲስ መስመር ያስገባል።"
   },
   "prReview": {
     "pullRequestUnavailable": "የጎተራ ጥያቄ የለም",
@@ -665,7 +667,8 @@
     "profile": "መገለጫ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}፣ ትር፣ {{position}} ከ{{total}}"
+    "position": "{{name}}፣ ትር፣ {{position}} ከ{{total}}",
+    "chat": "ውይይት"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +752,8 @@
       "networkError": "የአውታረ መረብ ስህተት",
       "uploadFailed": "መጫን አልተሳካም",
       "failedToUploadFile": "ፋይሉን መጫን አልተሳካም: {{reason}}",
-      "nothingToPaste": "የሚለጠፍ ነገር የለም"
+      "nothingToPaste": "የሚለጠፍ ነገር የለም",
+      "metadataStripFailed": "የፎቶውን ሜታዳታ ማስወገድ አልተቻለም።"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}፣ {{status}}",
@@ -1299,7 +1303,23 @@
       "checkRun": "የቼክ ሂደት",
       "status": "ሁኔታ",
       "threshold": "ደረጃ",
-      "pullRequest": "የመጎተቻ ጥያቄ"
+      "pullRequest": "የመጎተቻ ጥያቄ",
+      "transcriptWaiting": "የግምገማ ግልባጩን በመጠበቅ ላይ።",
+      "transcriptEmpty": "ለዚህ ግምገማ ግልባጭ የለም።",
+      "transcriptRetry": "የግምገማ ግልባጩን መጫን አልተቻለም።",
+      "transcriptLive": "ቀጥታ",
+      "agentIdle": "ወኪል በስራ ፈት",
+      "agentWorking": "ወኪል በመስራት ላይ...",
+      "anErrorOccurred": "ስህተት ተከስቷል",
+      "errorWithMessage": "ስህተት: {{message}}",
+      "executionStarted": "አፈጻጸም ተጀምሯል",
+      "reviewCompleted": "ግምገማ ተጠናቋል",
+      "reviewInterrupted": "ግምገማ ተቋርጧል",
+      "sessionError": "የክፍለ-ጊዜ ስህተት: {{error}}",
+      "statusWithValue": "ሁኔታ: {{status}}",
+      "toolName": "መሳሪያ: {{name}}",
+      "toolNameError": "መሳሪያ: {{name}} — ስህተት",
+      "unknownError": "የማይታወቅ ስህተት"
     },
     "reviewMemory": {
       "title": "የግምገማ ትውስታ",
@@ -2124,7 +2144,11 @@
       "previousTaskFinishing": "የቀደመው ተግባር አሁንም እያለቀ ነው። እባክዎ ጠብቅ።",
       "serviceUnavailable": "አገልግሎቱ አሁን አይገኝም። እባክዎ እንደገና ይሞክሩ።",
       "connectionTrouble": "የግንኙነት ችግር። እባክዎ በአጭር ጊዜ ውስጥ እንደገና ይሞክሩ።",
-      "modelUnavailable": "ይህ ሞዴል ለ Cloud Agent አይገኝም። ሌላ ሞዴል ይምረጡ እና እንደገና ይሞክሩ።"
+      "modelUnavailable": "ይህ ሞዴል ለ Cloud Agent አይገኝም። ሌላ ሞዴል ይምረጡ እና እንደገና ይሞክሩ።",
+      "cancelQueuedFailed": "መልእክቱን መሰረዝ አልተቻለም።",
+      "cancelQueuedRestoreAvailable": "መልእክቱ ተሰርዟል። ወደ መልእክት ማስገቢያው ለመመለስ «ይመልሱ»ን ይንኩ።",
+      "cancelQueuedRestored": "መልእክቱ ተሰርዟል። ጥያቄው ወደ መልእክት ማስገቢያው ተመልሷል።",
+      "cancelQueuedUpgradeRequired": "በተራ የሚጠባበቁ መልእክቶችን መሰረዝ አዲስ የKilo CLI ስሪት ይፈልጋል። Kilo CLIን ያዘምኑ እና እንደገና ያገናኙ።"
     },
     "remoteSession": {
       "failedToCreate": "የርቀት ክፍለ ጊዜ መፍጠር አልተሳካም",
@@ -2196,7 +2220,8 @@
       "cliCannotContinue": "ይህ CLI ክፍለ-ጊዜ መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
       "continueFrom": "{{title}}ን በመቀጠል ላይ",
       "importFailed": "ይህን ክፍለ-ጊዜ ማስመጣት አልተቻለም።",
-      "importingSession": "ክፍለ-ጊዜን በማስመጣት ላይ"
+      "importingSession": "ክፍለ-ጊዜን በማስመጣት ላይ",
+      "discardWithUploadsMessage": "ጥያቄዎ እና ከተላኩ መልእክቶች ጋር ያልተያያዙ የተጫኑ ፋይሎች ይሰረዛሉ።"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል",
@@ -2444,7 +2469,11 @@
       "queuedAccessibility": "መልእክት ወረፋ ውስጥ ገብቷል",
       "userMessage": "የተጠቃሚ መልእክት",
       "assistantMessage": "የረዳት መልእክት",
-      "longPressHint": "ለመልእክት ዝርዝሮች ረጅም ይጫኑ"
+      "longPressHint": "ለመልእክት ዝርዝሮች ረጅም ይጫኑ",
+      "cancelQueued": "መልእክቱን ይሰርዙ",
+      "cancelQueuedAccessibility": "በተራ የሚጠባበቀውን መልእክት ይሰርዙ",
+      "restoreQueued": "ይመልሱ",
+      "restoreQueuedAccessibility": "የተሰረዘውን መልእክት ወደ መልእክት ማስገቢያው ይመልሱ"
     },
     "olderMessages": {
       "arrived": "የቀደሙ መልእክቶች ተጭነዋል",
@@ -2460,6 +2489,8 @@
       "viewTable": "ሰንጠረዥ ይመልከቱ",
       "title": "ሰንጠረዥ",
       "close": "ሰንጠረዥ ይዝጉ",
+      "loading": "ሰንጠረዥ በመጫን ላይ",
+      "empty": "ይህ ሰንጠረዥ ምንም ረድፍ የለውም።",
       "columnCount_one": "ዓምድ",
       "columnCount": "ዓምዶች",
       "columnCount_other": "ዓምዶች",
@@ -2470,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "ክፍለ-ጊዜዎችን ያጣሩ",
-      "sortBy": "በ… ደርድር",
-      "sortLastUpdated": "በመጨረሻ የተሻሻለ",
-      "sortCreated": "የተፈጠረ",
       "platform": "መድረክ",
       "platformCloud": "ክላውድ",
       "platformExtension": "ቅጥያ",
@@ -2526,7 +2554,9 @@
       "uploading": "በመጫን ላይ…",
       "uploaded": "ተጭኗል",
       "uploadFailedRetry": "መጫን አልተሳካም። እንደገና ለመሞከር ይንኩ።",
-      "uploadFailedTerminal": "ይህ ፋይል ሊጫን አይችልም።"
+      "uploadFailedTerminal": "ይህ ፋይል ሊጫን አይችልም።",
+      "moveLeft": "{{filename}}ን ወደ ግራ ያንቀሳቅሱ",
+      "moveRight": "{{filename}}ን ወደ ቀኝ ያንቀሳቅሱ"
     },
     "attachmentPasteHint": {
       "accessibility": "ምስል ከቅንጥብ ጠረጴዛ ይለጥፉ",
@@ -2556,7 +2586,17 @@
       "finalizingPlaceholder": "እያጠናቀቀ ነው...",
       "messagePlaceholder": "መልእክት",
       "cannotReceiveFiles": "ይህ ክፍለ-ጊዜ ፋይሎች መቀበል አይችልም። መልእክትዎን ለመላክ አባሪዎቹን ያስወግዱ።",
-      "couldNotAttachFiles": "ፋይሎችን ማያያዝ አልተቻለም። እንደገና ለመሞከር ላክ ይንኩ።"
+      "couldNotAttachFiles": "ፋይሎችን ማያያዝ አልተቻለም። እንደገና ለመሞከር ላክ ይንኩ።",
+      "discardAttachmentsMessage": "ከተላኩ መልእክቶች ጋር ያልተያያዙ የተጫኑ ፋይሎች ይሰረዛሉ።",
+      "discardAttachmentsTitle": "አባሪዎችን ያስወግዱ?",
+      "charactersRemaining": "{{count}} ቁምፊዎች ይቀራሉ",
+      "insertNewline": "አዲስ መስመር ያስገቡ",
+      "starterChipBuild": "ባህሪ ይገንቡ",
+      "starterChipEmpty": "በሀሳብ ይጀምሩ",
+      "starterChipFix": "ስህተት ያስተካክሉ",
+      "starterChipPrepare": "የስራ አካባቢዬን ያዋቅሩ",
+      "starterChipWrapUp": "ክፍለ ጊዜዬን ያጠናቅቁ",
+      "starterChipWriteTests": "ሙከራዎችን ይፃፉ"
     },
     "chatLink": {
       "linkCopied": "አገናኝ ተቀድቷል",
@@ -2775,7 +2815,8 @@
     "busy": "የድምፅ ግብዓት ስራ ላይ ነው። እንደገና ይሞክሩ።",
     "stopped": "የድምፅ ግብዓት ቆሟል። እንደገና ለመሞከር ማይክሮፎኑን ይንኩ።",
     "unavailableDevice": "የድምፅ ግብዓት በዚህ መሣሪያ ላይ አይገኝም።",
-    "unavailableLanguage": "የድምፅ ግብዓት ለዚህ የመሣሪያ ቋንቋ አይገኝም።"
+    "unavailableLanguage": "የድምፅ ግብዓት ለዚህ የመሣሪያ ቋንቋ አይገኝም።",
+    "listeningStopped": "ማዳመጥ ቆሟል።"
   },
   "share": {
     "title": "ወደ Kilo ያጋሩ",
@@ -3158,5 +3199,19 @@
     "emptyDescription": "የአገናኝ አስተናጋጅ ስትመን፣ እንደገና ሳይጠይቅ ይከፈታል።",
     "revoke": "{{host}} አስቀር",
     "backToPreferences": "ወደ ምርጫዎች ተመለስ"
+  },
+  "quickChat": {
+    "title": "ውይይት",
+    "composer": {
+      "placeholder": "መልእክት"
+    },
+    "empty": {
+      "title": "ውይይት ጀምር",
+      "description": "ከሞዴል ጋር ለመወያየት መልእክት ይላኩ።"
+    },
+    "working": "በመስራት ላይ",
+    "historyRetry": "የውይይት ታሪክ መጫን አልተቻለም።",
+    "catalogRetry": "ሞዴሎችን መጫን አልተቻለም",
+    "sendError": "መልእክቱን መላክ አልተቻለም። እንደገና ይሞክሩ።"
   }
 }

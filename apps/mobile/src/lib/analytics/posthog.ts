@@ -72,6 +72,7 @@ export type AnalyticsSurface = (typeof ANALYTICS_SURFACES)[number];
 // PostHog feature flags. The project is shared with web, so mobile-only flags
 // are prefixed to avoid colliding with web flag keys.
 export const FEATURE_FLAG_PR_REVIEW = 'mobile-pr-review';
+export const FEATURE_FLAG_QUICK_CHAT = 'mobile-quick-chat';
 
 let client: PostHog | null = null;
 /** Generation that created the client. Stale events from a prior account

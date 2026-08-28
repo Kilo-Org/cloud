@@ -152,7 +152,9 @@
     "appearanceDark": "Temno",
     "account": "Račun",
     "prReviewAttribution": "Dodaj pripis aplikacije k pregledom PR",
-    "prReviewAttributionSubtitle": "K oddaji pregleda dodaj nogo »Reviewed via Kilo«."
+    "prReviewAttributionSubtitle": "K oddaji pregleda dodaj nogo »Reviewed via Kilo«.",
+    "returnSendsMessage": "Tipka Enter pošlje sporočilo",
+    "returnSendsMessageSubtitle": "Ko je možnost izklopljena, tipka Enter vstavi novo vrstico v polja za vnos sporočil agentom."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ni na voljo",
@@ -679,7 +681,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, zavihek, {{position}} od {{total}}"
+    "position": "{{name}}, zavihek, {{position}} od {{total}}",
+    "chat": "Sporočila klepeta"
   },
   "chat": {
     "instancePicker": {
@@ -763,7 +766,8 @@
       "networkError": "Napaka v omrežju",
       "uploadFailed": "Nalaganje ni uspelo",
       "failedToUploadFile": "Nalaganje datoteke ni uspelo: {{reason}}",
-      "nothingToPaste": "Ničesar ni za prilepiti"
+      "nothingToPaste": "Ničesar ni za prilepiti",
+      "metadataStripFailed": "Metapodatkov fotografije ni bilo mogoče odstraniti."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1317,7 +1321,23 @@
       "checkRun": "Preverjanje izvajanja",
       "status": "Stanje",
       "threshold": "Prag",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptEmpty": "Za ta pregled ni prepiseka.",
+      "transcriptLive": "V živo",
+      "transcriptRetry": "Prepiseka pregleda ni bilo mogoče naložiti.",
+      "transcriptWaiting": "Čakanje na prepisek pregleda.",
+      "agentIdle": "Agent miruje",
+      "agentWorking": "Agent dela...",
+      "anErrorOccurred": "Prišlo je do napake",
+      "errorWithMessage": "Napaka: {{message}}",
+      "executionStarted": "Izvedba se je začela",
+      "reviewCompleted": "Pregled dokončan",
+      "reviewInterrupted": "Pregled prekinjen",
+      "sessionError": "Napaka seje: {{error}}",
+      "statusWithValue": "Stanje: {{status}}",
+      "toolName": "Orodje: {{name}}",
+      "toolNameError": "Orodje: {{name}} — napaka",
+      "unknownError": "Neznana napaka"
     },
     "reviewMemory": {
       "title": "Pomnilnik pregleda",
@@ -2154,7 +2174,11 @@
       "previousTaskFinishing": "Prejšnja naloga se še dokončuje. Počakajte trenutek.",
       "serviceUnavailable": "Storitev trenutno ni na voljo. Poskusite znova.",
       "connectionTrouble": "Težava s povezavo. Poskusite znova čez trenutek.",
-      "modelUnavailable": "Ta model ni na voljo za Cloud Agent. Izberite drug model in poskusite znova."
+      "modelUnavailable": "Ta model ni na voljo za Cloud Agent. Izberite drug model in poskusite znova.",
+      "cancelQueuedFailed": "Sporočila ni bilo mogoče preklicati.",
+      "cancelQueuedRestoreAvailable": "Sporočilo je preklicano. Tapnite »Obnovite«, da ga vrnete v polje za vnos sporočila.",
+      "cancelQueuedRestored": "Sporočilo je preklicano. Zahteva je spet v polju za vnos sporočila.",
+      "cancelQueuedUpgradeRequired": "Preklic sporočil v čakalni vrsti zahteva novejši Kilo CLI. Posodobite Kilo CLI in se ponovno povežite."
     },
     "remoteSession": {
       "failedToCreate": "Oddaljene seje ni bilo mogoče ustvariti",
@@ -2226,7 +2250,8 @@
       "cliCannotContinue": "Ta CLI ne more nadaljevati seje. Izberite Cloud Agent ali drug CLI.",
       "continueFrom": "Nadaljujem {{title}}",
       "importFailed": "Te seje ni bilo mogoče uvoziti.",
-      "importingSession": "Uvažam sejo"
+      "importingSession": "Uvažam sejo",
+      "discardWithUploadsMessage": "Vaša zahteva in vse naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisane."
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena {{displayCount}} datoteka",
@@ -2476,7 +2501,11 @@
       "queuedAccessibility": "Sporočilo je v čakalni vrsti",
       "userMessage": "Sporočilo uporabnika",
       "assistantMessage": "Sporočilo asistenta",
-      "longPressHint": "Dolg pritisk za podrobnosti sporočila"
+      "longPressHint": "Dolg pritisk za podrobnosti sporočila",
+      "cancelQueued": "Prekličite sporočilo",
+      "cancelQueuedAccessibility": "Prekličite sporočilo v čakalni vrsti",
+      "restoreQueued": "Obnovite",
+      "restoreQueuedAccessibility": "Obnovite preklicano sporočilo v polju za vnos sporočila"
     },
     "olderMessages": {
       "arrived": "Naložena so bila prejšnja sporočila",
@@ -2494,6 +2523,8 @@
       "viewTable": "Prikaži tabelo",
       "title": "Tabela",
       "close": "Zapri tabelo",
+      "loading": "Nalaganje tabele",
+      "empty": "Ta tabela nima vrstic.",
       "columnCount_one": "stolpec",
       "columnCount": "stolpci",
       "columnCount_other": "stolpci",
@@ -2508,9 +2539,6 @@
     },
     "sessionFilter": {
       "title": "Filtriraj seje",
-      "sortBy": "Razvrsti po",
-      "sortLastUpdated": "Nazadnje posodobljeno",
-      "sortCreated": "Ustvarjeno",
       "platform": "Platforma",
       "platformCloud": "Oblak",
       "platformExtension": "Razširitev",
@@ -2564,7 +2592,9 @@
       "uploading": "Nalaganje…",
       "uploaded": "Naloženo",
       "uploadFailedRetry": "Nalaganje ni uspelo. Dotakni se za ponovni poskus.",
-      "uploadFailedTerminal": "Te datoteke ni mogoče naložiti."
+      "uploadFailedTerminal": "Te datoteke ni mogoče naložiti.",
+      "moveLeft": "Premaknite {{filename}} levo",
+      "moveRight": "Premaknite {{filename}} desno"
     },
     "attachmentPasteHint": {
       "accessibility": "Prilepi sliko iz odložišča",
@@ -2594,7 +2624,17 @@
       "finalizingPlaceholder": "Zaključevanje...",
       "messagePlaceholder": "Sporočilo...",
       "cannotReceiveFiles": "Ta seja ne more prejemati datotek. Odstrani priponke za pošiljanje sporočila.",
-      "couldNotAttachFiles": "Priponk ni bilo mogoče priložiti. Dotakni se pošlji za ponovni poskus."
+      "couldNotAttachFiles": "Priponk ni bilo mogoče priložiti. Dotakni se pošlji za ponovni poskus.",
+      "discardAttachmentsMessage": "Naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisane.",
+      "discardAttachmentsTitle": "Zavreči priloge?",
+      "charactersRemaining": "Preostalo znakov: {{count}}",
+      "insertNewline": "Vstavite novo vrstico",
+      "starterChipBuild": "Razvijte funkcijo",
+      "starterChipEmpty": "Začnite z zamislijo",
+      "starterChipFix": "Odpravite napako",
+      "starterChipPrepare": "Nastavite moje okolje",
+      "starterChipWrapUp": "Zaključite mojo sejo",
+      "starterChipWriteTests": "Napišite preizkuse"
     },
     "chatLink": {
       "linkCopied": "Povezava kopirana",
@@ -2815,7 +2855,8 @@
     "busy": "Glasovni vnos je zaseden. Poskusite znova.",
     "stopped": "Glasovni vnos je bil ustavljen. Dotaknite se mikrofona za ponovni poskus.",
     "unavailableDevice": "Glasovni vnos na tej napravi ni na voljo.",
-    "unavailableLanguage": "Glasovni vnos ni na voljo za ta jezik naprave."
+    "unavailableLanguage": "Glasovni vnos ni na voljo za ta jezik naprave.",
+    "listeningStopped": "Poslušanje je ustavljeno."
   },
   "share": {
     "title": "Deli s Kilo",
@@ -3200,5 +3241,19 @@
     "emptyDescription": "Ko zaupaš gostitelju povezave, se odpre brez ponovnega vprašanja.",
     "revoke": "Prekliči {{host}}",
     "backToPreferences": "Nazaj na nastavitve"
+  },
+  "quickChat": {
+    "title": "Sporočila klepeta",
+    "composer": {
+      "placeholder": "Sporočilo"
+    },
+    "empty": {
+      "title": "Začni klepet",
+      "description": "Pošlji sporočilo za pogovor z modelom."
+    },
+    "working": "Delam",
+    "historyRetry": "Zgodovine klepeta ni bilo mogoče naložiti.",
+    "catalogRetry": "Nalaganje modelov ni uspelo",
+    "sendError": "Sporočila ni bilo mogoče poslati. Poskusite znova."
   }
 }

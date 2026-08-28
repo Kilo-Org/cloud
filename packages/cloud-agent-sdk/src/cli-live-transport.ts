@@ -990,6 +990,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         return sendCommand('send_message', {
           sessionID: config.kiloSessionId,
           parts,
+          // Old form is `send_message` without `messageID`; include it once the
+          // client assigns an id so the CLI can correlate the queued turn.
+          // Remove the omission when every client sends it.
+          ...(input.messageId ? { messageID: input.messageId } : {}),
           ...(payload.mode ? { agent: payload.mode } : {}),
           ...(remoteModel.kind === 'none'
             ? {}
@@ -1000,6 +1004,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
       },
       interrupt: () => sendCommand('interrupt', {}),
+      dropQueuedMessage: messageId =>
+        sendCommand('drop_queued_message', { protocolVersion: 1, messageID: messageId }),
       answer: payload =>
         sendCommand('question_reply', {
           requestID: payload.requestId,

@@ -1062,6 +1062,74 @@ describe('CliLiveTransport unified user web connection', () => {
     transport.destroy();
   });
 
+  it('includes messageID on send_message when the client assigns a message id', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
+      );
+    const { transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(connection.sendCommand).mockClear();
+
+    await transport.send?.({
+      payload: { type: 'prompt', prompt: 'hello' },
+      messageId: 'msg-queued-1',
+    });
+
+    expect(connection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'send_message',
+      {
+        sessionID: KILO_SESSION_ID,
+        parts: [{ type: 'text', text: 'hello' }],
+        messageID: 'msg-queued-1',
+      },
+      'owner'
+    );
+    transport.destroy();
+  });
+
+  it('relays drop_queued_message with messageID without sending interrupt', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
+      );
+    const { transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(connection.sendCommand).mockClear();
+
+    await transport.dropQueuedMessage?.('msg-drop-1');
+
+    expect(connection.sendCommand).toHaveBeenCalledTimes(1);
+    expect(connection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'drop_queued_message',
+      { protocolVersion: 1, messageID: 'msg-drop-1' },
+      'owner'
+    );
+    expect(connection.sendCommand).not.toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'interrupt',
+      expect.anything(),
+      'owner'
+    );
+    transport.destroy();
+  });
+
   it.each([
     ['Kilo', { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' }],
     ['non-Kilo', { providerID: 'anthropic', modelID: 'claude-sonnet-4' }],

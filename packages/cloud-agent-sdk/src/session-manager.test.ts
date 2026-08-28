@@ -49,6 +49,7 @@ type MockSession = Omit<
   | 'storage'
   | 'send'
   | 'interrupt'
+  | 'cancelQueuedMessage'
   | 'answer'
   | 'reject'
   | 'respondToPermission'
@@ -60,6 +61,7 @@ type MockSession = Omit<
   storage: JotaiSessionStorage | null;
   send: jest.Mock<Promise<unknown>, [CloudAgentSessionSendInput]>;
   interrupt: jest.Mock<Promise<unknown>, []>;
+  cancelQueuedMessage: jest.Mock<Promise<unknown>, [string]>;
   answer: jest.Mock<Promise<unknown>, [CloudAgentSessionAnswerInput]>;
   reject: jest.Mock<Promise<unknown>, [CloudAgentSessionRejectInput]>;
   respondToPermission: jest.Mock<Promise<unknown>, [CloudAgentSessionRespondToPermissionInput]>;
@@ -74,6 +76,7 @@ const mockSession = {
   destroy: jest.fn(),
   send: jest.fn(),
   interrupt: jest.fn(),
+  cancelQueuedMessage: jest.fn(),
   answer: jest.fn(),
   reject: jest.fn(),
   respondToPermission: jest.fn(),
@@ -402,6 +405,8 @@ describe('createSessionManager', () => {
     mockSession.send.mockClear();
     mockSession.interrupt.mockClear();
     mockSession.interrupt.mockResolvedValue({});
+    mockSession.cancelQueuedMessage.mockClear();
+    mockSession.cancelQueuedMessage.mockResolvedValue(undefined);
     mockSession.createRemoteSession.mockClear();
     mockSession.createRemoteSession.mockResolvedValue(kiloId('ses_12345678901234567890123456'));
     mockSession.exitRemoteSession.mockClear();
@@ -4574,6 +4579,19 @@ describe('createSessionManager', () => {
       expect(pending.has('m1')).toBe(false);
       expect(pending.get('m2')).toEqual({ status: 'failed', error: 'y', reason: 'execution' });
       expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m1');
+    });
+  });
+
+  describe('cancelQueuedMessage', () => {
+    it('delegates to the active session without interrupting', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.cancelQueuedMessage('msg-queued-1');
+
+      expect(mockSession.cancelQueuedMessage).toHaveBeenCalledWith('msg-queued-1');
+      expect(mockSession.interrupt).not.toHaveBeenCalled();
     });
   });
 

@@ -108,6 +108,7 @@ const MAX_MUTATION_ID_LENGTH = 128;
 export const ALLOWED_VIEWER_COMMANDS: ReadonlySet<string> = new Set([
   'send_message',
   'interrupt',
+  'drop_queued_message',
   'question_reply',
   'question_reject',
   'permission_respond',
@@ -129,11 +130,14 @@ const CATALOG_DEDUPE_COMMANDS: ReadonlySet<string> = new Set(['list_models', 'li
 // Operations that older CLIs reject with a precise "unknown command: <op>"
 // string. Only these commands get mapped to a structured CLI_UPGRADE_REQUIRED
 // response; any other CLI error is preserved verbatim.
+// Old remotes return upgrade-required for `drop_queued_message`; remove the
+// upgrade mapping when every remote supports drop.
 const CLI_UPGRADE_REQUIRED_COMMANDS: ReadonlySet<string> = new Set([
   'list_commands',
   'send_command',
   'create_session',
   'exit_cli',
+  'drop_queued_message',
   'list_directories',
 ]);
 

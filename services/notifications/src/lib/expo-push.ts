@@ -49,9 +49,12 @@ function sleep(ms: number): Promise<void> {
 
 async function sendChunkWithTransientRetry(
   expo: ExpoClient,
-  chunk: ExpoPushChunk
+  chunk: ExpoPushChunk,
+  isCurrent?: () => Promise<boolean>
 ): Promise<ExpoPushTicket[]> {
   for (let attempt = 0; ; attempt++) {
+    // A newer refresh can supersede this chunk during a retry delay.
+    if (isCurrent && !(await isCurrent())) return [];
     try {
       return await expo.sendPushNotificationsAsync(chunk);
     } catch (err) {
@@ -71,7 +74,8 @@ function isRetryableTicketError(errorCode: string | undefined): boolean {
 
 export async function sendPushNotifications(
   messages: ExpoPushMessage[],
-  accessToken: string
+  accessToken: string,
+  isCurrent?: () => Promise<boolean>
 ): Promise<SendResult> {
   if (messages.length === 0) return { ticketTokenPairs: [], staleTokens: [], ticketErrors: [] };
 
@@ -86,7 +90,7 @@ export async function sendPushNotifications(
     let pendingChunk = chunk;
 
     for (let attempt = 0; ; attempt++) {
-      const tickets = await sendChunkWithTransientRetry(expo, pendingChunk);
+      const tickets = await sendChunkWithTransientRetry(expo, pendingChunk, isCurrent);
       const retryChunk: ExpoPushMessage[] = [];
 
       for (let i = 0; i < tickets.length; i++) {

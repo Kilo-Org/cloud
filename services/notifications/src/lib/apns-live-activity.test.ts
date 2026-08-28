@@ -152,6 +152,62 @@ describe('sendLiveActivityApns', () => {
     expect(body.aps['content-state']).toEqual({ revision: 1, running: 1 });
   });
 
+  it('keeps the snapshot timestamp when signing occurs after a delayed read', async () => {
+    const privateKeyPem = await generateTestPrivateKeyPem();
+    const requests: Array<{ timestamp: number; issuedAt: number }> = [];
+    await sendLiveActivityApns({
+      credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem, topic: TOPIC },
+      tokens: [{ token: 'token-delayed', event: 'update' }],
+      contentState: { running: 1 },
+      nowSeconds: 1_750_000_100,
+      timestampSeconds: 1_750_000_000,
+      fetchFn: async (_url, init) => {
+        if (typeof init?.body !== 'string') throw new Error('Expected a JSON body');
+        const body = JSON.parse(init.body) as { aps: { timestamp: number } };
+        const authorization = new Headers(init.headers).get('authorization');
+        if (!authorization) throw new Error('Missing provider token');
+        const claimsPart = authorization.split('.')[1];
+        const claims = JSON.parse(atob(claimsPart.replace(/-/g, '+').replace(/_/g, '/'))) as {
+          iat: number;
+        };
+        requests.push({ timestamp: body.aps.timestamp, issuedAt: claims.iat });
+        return new Response(null, { status: 200 });
+      },
+    });
+    expect(requests).toEqual([{ timestamp: 1_750_000_000, issuedAt: 1_750_000_100 }]);
+  });
+
+  it('checks each token after signing and excludes superseded sends from the result', async () => {
+    const privateKeyPem = await generateTestPrivateKeyPem();
+    const secondCheck = Promise.withResolvers<boolean>();
+    let first = true;
+    const delivered: string[] = [];
+
+    const result = await sendLiveActivityApns({
+      credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem, topic: TOPIC },
+      tokens: [
+        { token: 'token-current', event: 'start' },
+        { token: 'token-superseded', event: 'start' },
+      ],
+      contentState: { running: 1 },
+      nowSeconds: 1_750_000_000,
+      isCurrent: async () => {
+        if (!first) return secondCheck.promise;
+        first = false;
+        return true;
+      },
+      fetchFn: async url => {
+        if (typeof url !== 'string') throw new Error('Expected a string URL');
+        delivered.push(url);
+        secondCheck.resolve(false);
+        return new Response(null, { status: 200 });
+      },
+    });
+
+    expect(delivered).toEqual(['https://api.push.apple.com/3/device/token-current']);
+    expect(result).toEqual({ attempted: 1, ok: 1, failed: 0 });
+  });
+
   it('counts rejected pushes as failures', async () => {
     const privateKeyPem = await generateTestPrivateKeyPem();
     const fetchFn = vi

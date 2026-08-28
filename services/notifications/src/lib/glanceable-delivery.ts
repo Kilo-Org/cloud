@@ -1,8 +1,8 @@
 /**
  * Aggregate glanceable snapshot delivery for the Active Agents Live Activity,
- * widgets, and Android ongoing notification. Runs after a cloud-agent session
- * notification send: it fetches the fresh snapshot from the web internal route,
- * then pushes it to the registered iOS activity tokens over APNs and to the
+ * widgets, and Android ongoing notification. Committed metadata and live-session
+ * transitions trigger a fresh snapshot fetch from the web internal route,
+ * which is then pushed to the registered iOS activity tokens over APNs and to the
  * user's Expo tokens on iOS and Android. Pure orchestrator — all IO is injected
  * via `deps` so tests substitute in-memory fakes.
  */
@@ -106,15 +106,21 @@ export type GlanceableDeliveryDeps = {
   ) => Promise<IosActivityToken[]>;
   sendIosLiveActivity: (
     tokens: readonly { token: string; event: LiveActivityEvent }[],
-    contentState: GlanceableApnsContentState
+    contentState: GlanceableApnsContentState,
+    timestampSeconds: number,
+    isCurrent?: () => Promise<boolean>
   ) => Promise<void>;
+  /** Reserved before reading; do not assign a new timestamp after a delayed send. */
+  apnsTimestampSeconds?: number;
+  /** Durable generation fence, also checked by adapters after awaits and before outbound sends. */
+  isCurrent?: () => Promise<boolean>;
   listIosExpoTokens: (userId: string, organizationId: string | null) => Promise<ExpoPushToken[]>;
   listAndroidExpoTokens: (
     userId: string,
     organizationId: string | null
   ) => Promise<ExpoPushToken[]>;
   hasAndroidOngoingToken: (userId: string, organizationId: string | null) => Promise<boolean>;
-  sendExpoPush: (messages: ExpoPushMessage[]) => Promise<void>;
+  sendExpoPush: (messages: ExpoPushMessage[], isCurrent?: () => Promise<boolean>) => Promise<void>;
 };
 
 export async function deliverGlanceableSnapshot(
@@ -128,22 +134,30 @@ export async function deliverGlanceableSnapshot(
   const contentState = toGlanceableContentState(snapshot);
 
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
+  if (deps.isCurrent && !(await deps.isCurrent())) return;
   const iosSends = apnsSendsForTokens(iosTokens);
   if (iosSends.length > 0) {
-    await deps.sendIosLiveActivity(iosSends, contentState);
+    await deps.sendIosLiveActivity(
+      iosSends,
+      contentState,
+      deps.apnsTimestampSeconds ?? Math.floor(Date.parse(snapshot.updatedAt) / 1000),
+      deps.isCurrent
+    );
   }
 
   // iOS Expo tokens always need the data-only wake: it drives the widget
   // timeline through the background task while the app is not foregrounded.
   const iosExpoTokens = await deps.listIosExpoTokens(params.userId, params.organizationId);
+  if (deps.isCurrent && !(await deps.isCurrent())) return;
   if (iosExpoTokens.length > 0) {
-    await deps.sendExpoPush(buildGlanceableExpoMessages(iosExpoTokens, snapshot));
+    await deps.sendExpoPush(buildGlanceableExpoMessages(iosExpoTokens, snapshot), deps.isCurrent);
   }
 
   if (await deps.hasAndroidOngoingToken(params.userId, params.organizationId)) {
     const expoTokens = await deps.listAndroidExpoTokens(params.userId, params.organizationId);
+    if (deps.isCurrent && !(await deps.isCurrent())) return;
     if (expoTokens.length > 0) {
-      await deps.sendExpoPush(buildGlanceableExpoMessages(expoTokens, snapshot));
+      await deps.sendExpoPush(buildGlanceableExpoMessages(expoTokens, snapshot), deps.isCurrent);
     }
   }
 }

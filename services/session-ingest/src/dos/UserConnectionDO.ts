@@ -3,6 +3,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
 import { resolveAccessibleKiloSession } from '../services/session-access';
+import { refreshGlanceableSessions } from '../remote-session-notifications';
 import {
   CLIOutboundMessageSchema,
   type CLIInboundMessage,
@@ -590,6 +591,9 @@ export class UserConnectionDO extends DurableObject<Env> {
     instance: Instance | undefined
   ): void {
     const { connectionId } = attachment;
+    const previousStatuses = new Map(
+      this.aggregateSessions().map(session => [session.id, session.status])
+    );
     const now = Date.now();
     this.lastHeartbeatAt.set(connectionId, now);
     this.connectionProtocolVersion.set(connectionId, protocolVersion);
@@ -670,6 +674,23 @@ export class UserConnectionDO extends DurableObject<Env> {
       ...(instance ? { instance } : {}),
     };
     ws.serializeAttachment(updatedAttachment);
+
+    if (attachment.kiloUserId) {
+      const changedSessionIds = new Set<string>();
+      for (const session of this.aggregateSessions()) {
+        if (previousStatuses.get(session.id) !== session.status) changedSessionIds.add(session.id);
+        previousStatuses.delete(session.id);
+      }
+      for (const sessionId of previousStatuses.keys()) changedSessionIds.add(sessionId);
+      if (changedSessionIds.size > 0) {
+        this.ctx.waitUntil(
+          refreshGlanceableSessions(this.env, {
+            userId: attachment.kiloUserId,
+            cliSessionIds: [...changedSessionIds],
+          })
+        );
+      }
+    }
 
     // Broadcast the heartbeat to every one of the user's web sockets. Subscribers
     // and non-subscribers both receive it: a removed session id is detectable
@@ -1792,6 +1813,18 @@ export class UserConnectionDO extends DurableObject<Env> {
     // kiloUserId comes from the CLI attachment (authenticated /user/cli route);
     // without it we cannot safely target rows and must no-op.
     await this.resetOwnedSessionAttentionOnDisconnect(attachment.kiloUserId, ownedSessions);
+
+    const rootSessionIds = sessions
+      .filter(session => !session.parentSessionId && ownedSessions.has(session.id))
+      .map(session => session.id);
+    if (attachment.kiloUserId && rootSessionIds.length > 0) {
+      this.ctx.waitUntil(
+        refreshGlanceableSessions(this.env, {
+          userId: attachment.kiloUserId,
+          cliSessionIds: rootSessionIds,
+        })
+      );
+    }
 
     this.broadcastToWeb({
       type: 'system',

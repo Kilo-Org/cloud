@@ -1,4 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
+} from '../../../../packages/app-shared/src/glanceable-agents-snapshot';
+import { deliverGlanceableSnapshot } from '../../../notifications/src/lib/glanceable-delivery';
+import type { ExpoPushMessage } from '../../../notifications/src/lib/expo-push';
+import type { RefreshGlanceableSessionsParams } from '@kilocode/notifications';
+import type { SessionEventDbRow } from '../session-events';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {
@@ -20,10 +28,12 @@ vi.mock('../dos/SessionAccessCacheDO', () => ({
 }));
 
 vi.mock('../session-events', () => ({
-  mapSessionEventRow: vi.fn((row: { session_id: string; status: string | null }) => ({
+  mapSessionEventRow: vi.fn((row: SessionEventDbRow) => ({
     source: 'v2' as const,
     sessionId: row.session_id,
     status: row.status,
+    organizationId: row.organization_id,
+    parentSessionId: row.parent_session_id,
     statusUpdatedAt: '2026-07-25T00:00:00.000Z',
     updatedAt: '2026-07-25T00:00:00.000Z',
   })),
@@ -124,6 +134,8 @@ type ApplyMetadataDbOptions = {
   initialTitle?: string | null;
   /** git_url stored on the row before applyMetadataChanges runs. Defaults to NULL. */
   initialGitUrl?: string | null;
+  initialOrganizationId?: string | null;
+  beforeCommit?: () => Promise<void>;
 };
 
 /**
@@ -162,20 +174,21 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     };
   }
 
-  function persistedSessionRow() {
-    return {
+  function persistedSessionRow(): SessionEventDbRow {
+    const row: SessionEventDbRow = {
       session_id: 'ses_1',
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:01.000Z',
       title: 'T',
       created_on_platform: 'cli',
-      organization_id: null,
+      organization_id: options.initialOrganizationId ?? null,
       git_url: options.initialGitUrl ?? null,
       git_branch: null,
-      parent_session_id: null,
+      parent_session_id: options.parentSessionId ?? null,
       status: options.initialStatus ?? 'idle',
       status_updated_at: '2026-07-25T00:00:00.000Z',
     };
+    return Object.assign(row, ...updateSets);
   }
 
   function sessionLimitResult() {
@@ -237,11 +250,16 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
   const execute = vi.fn(async () => ({
     rows: [{ creates_cycle: options.createsCycle ?? false }],
   }));
-  const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-    fn({ select, update: applyUpdate, execute })
-  );
+  let committedSession = persistedSessionRow();
+  const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+    const result = await fn({ select, update: applyUpdate, execute });
+    await options.beforeCommit?.();
+    committedSession = persistedSessionRow();
+    return result;
+  });
 
   return {
+    readCommittedSession: () => committedSession,
     transaction,
     select,
     applyUpdate,
@@ -251,6 +269,53 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
     execute,
     queryLog,
     membershipQueryCount: () => queryLog.filter(k => k === 'membership').length,
+  };
+}
+
+function metadataDelivery(db: ReturnType<typeof createApplyMetadataDb>) {
+  const messages: ExpoPushMessage[] = [];
+  const tasks: Promise<unknown>[] = [];
+  const env = {
+    HYPERDRIVE: { connectionString: 'postgres://unused' },
+    NOTIFICATIONS: {
+      async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams) {
+        if (params.userId !== 'usr_1' || !params.cliSessionIds.includes('ses_1')) return;
+        const row = db.readCommittedSession();
+        await deliverGlanceableSnapshot(
+          { userId: params.userId, organizationId: row.organization_id },
+          {
+            buildSnapshot: async (userId, organizationId) => ({
+              type: 'active_agents_glanceable',
+              ...buildGlanceableSnapshot({
+                userId,
+                organizationId,
+                sessions:
+                  row.parent_session_id === null && row.status ? [{ status: row.status }] : [],
+                now: Date.now(),
+              }),
+            }),
+            listIosActivityTokens: async () => [],
+            sendIosLiveActivity: async () => undefined,
+            listIosExpoTokens: async () => [{ token: 'ExponentPushToken[ios]', locale: null }],
+            hasAndroidOngoingToken: async () => false,
+            listAndroidExpoTokens: async () => [],
+            sendExpoPush: async incoming => {
+              messages.push(...incoming);
+            },
+          }
+        );
+      },
+    },
+  };
+  return {
+    env,
+    messages,
+    tasks,
+    ctx: {
+      waitUntil: (task: Promise<unknown>) => {
+        tasks.push(task);
+      },
+    },
   };
 }
 
@@ -371,6 +436,140 @@ describe('applyMetadataChanges', () => {
       remove: cacheRemove,
     } as never);
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  describe('glanceable aggregate refresh', () => {
+    it.each([
+      ['idle', 'busy', { status: 'happy', running: 1, needsInput: 0, reconnecting: 0 }],
+      ['busy', 'retry', { status: 'happy', running: 0, needsInput: 0, reconnecting: 1 }],
+      ['question', 'busy', { status: 'happy', running: 1, needsInput: 0, reconnecting: 0 }],
+      ['permission', 'idle', { status: 'empty', running: 0, needsInput: 0, reconnecting: 0 }],
+      ['busy', 'idle', { status: 'empty', running: 0, needsInput: 0, reconnecting: 0 }],
+    ] as const)(
+      'delivers persisted cloud status %s → %s without attention or stream clients',
+      async (initialStatus, status, expected) => {
+        const db = createApplyMetadataDb({ initialStatus, cloudAgentSessionId: 'cloud-1' });
+        vi.mocked(getWorkerDb).mockReturnValue(db as never);
+        const delivery = metadataDelivery(db);
+        await applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([['status', status]]),
+          delivery.ctx
+        );
+        await Promise.all(delivery.tasks);
+        expect(delivery.messages.map(message => message.data)).toMatchObject([expected]);
+        expect(db.readCommittedSession().status).toBe(status);
+      }
+    );
+
+    it('does not deliver the old snapshot while the transaction still awaits commit', async () => {
+      const commit = Promise.withResolvers<void>();
+      const db = createApplyMetadataDb({
+        initialStatus: 'idle',
+        beforeCommit: () => commit.promise,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      const applying = applyMetadataChanges(
+        delivery.env as never,
+        'usr_1',
+        'ses_1',
+        new Map([['status', 'busy']]),
+        delivery.ctx
+      );
+      await vi.waitFor(() => expect(db.queryLog).toContain('read-back'));
+      expect(db.readCommittedSession().status).toBe('idle');
+      expect(delivery.messages).toEqual([]);
+      commit.resolve();
+      await applying;
+      await Promise.all(delivery.tasks);
+      expect(delivery.messages.map(message => message.data)).toMatchObject([
+        { running: 1, status: 'happy' },
+      ]);
+    });
+
+    it('does not deliver a transaction that fails to commit', async () => {
+      const db = createApplyMetadataDb({
+        beforeCommit: async () => {
+          throw new Error('commit failed');
+        },
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      await expect(
+        applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([['status', 'busy']]),
+          delivery.ctx
+        )
+      ).rejects.toThrow('commit failed');
+      await Promise.all(delivery.tasks);
+      expect(db.readCommittedSession().status).toBe('idle');
+      expect(delivery.messages).toEqual([]);
+    });
+
+    it.each([{ initialStatus: 'busy' }, { rowMissing: true }, { parentSessionId: 'root' }])(
+      'skips unchanged, inaccessible, and child rows: %j',
+      async options => {
+        const db = createApplyMetadataDb(options);
+        vi.mocked(getWorkerDb).mockReturnValue(db as never);
+        const delivery = metadataDelivery(db);
+        await applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([['status', 'busy']])
+        );
+        expect(delivery.messages).toEqual([]);
+      }
+    );
+
+    it.each([null, 'org_live'])(
+      'uses the persisted scope %s instead of an unauthorized org claim',
+      async organizationId => {
+        const db = createApplyMetadataDb({
+          initialOrganizationId: organizationId,
+          membershipRows: 0,
+        });
+        vi.mocked(getWorkerDb).mockReturnValue(db as never);
+        const delivery = metadataDelivery(db);
+        await applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([
+            ['status', 'busy'],
+            ['orgId', 'org_foreign'],
+          ])
+        );
+        expect(db.readCommittedSession().organization_id).toBe(organizationId);
+        expect(delivery.messages.map(message => message.data)).toMatchObject([
+          {
+            running: 1,
+            scopeKey: buildOpaqueScopeKey({ userId: 'usr_1', organizationId }),
+            organizationBound: organizationId !== null,
+          },
+        ]);
+      }
+    );
+
+    it('keeps committed ingestion successful when aggregate transport fails', async () => {
+      const db = createApplyMetadataDb();
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      delivery.env.NOTIFICATIONS.refreshGlanceableSessions = async () => {
+        throw new Error('transport unavailable');
+      };
+      await expect(
+        applyMetadataChanges(delivery.env as never, 'usr_1', 'ses_1', new Map([['status', 'busy']]))
+      ).resolves.toBeUndefined();
+      expect(db.readCommittedSession().status).toBe('busy');
+      expect(delivery.messages).toEqual([]);
+    });
   });
 
   it('persists organization_id and invalidates access cache when the user is a member', async () => {

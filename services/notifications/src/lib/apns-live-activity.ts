@@ -120,6 +120,10 @@ export async function sendLiveActivityApns(params: {
   tokens: readonly { token: string; event: LiveActivityEvent }[];
   contentState: Record<string, unknown>;
   nowSeconds: number;
+  /** Snapshot ordering time, independent of the provider token's signing time. */
+  timestampSeconds?: number;
+  /** Recheck the durable generation after signing, before each request. */
+  isCurrent?: () => Promise<boolean>;
   fetchFn?: typeof fetch;
 }): Promise<LiveActivityApnsSendResult> {
   if (params.tokens.length === 0) {
@@ -137,8 +141,9 @@ export async function sendLiveActivityApns(params: {
         contentState: params.contentState,
         credentials: params.credentials,
         authorizationJwt,
-        timestampSeconds: params.nowSeconds,
+        timestampSeconds: params.timestampSeconds ?? params.nowSeconds,
       });
+      if (params.isCurrent && !(await params.isCurrent())) return false;
       const response = await fetchFn(request.url, {
         method: 'POST',
         headers: request.headers,
@@ -147,13 +152,11 @@ export async function sendLiveActivityApns(params: {
       if (!response.ok) {
         throw new Error(`APNs rejected the push with status ${response.status}`);
       }
+      return true;
     })
   );
 
-  const ok = results.filter(result => result.status === 'fulfilled').length;
-  return {
-    attempted: params.tokens.length,
-    ok,
-    failed: params.tokens.length - ok,
-  };
+  const ok = results.filter(result => result.status === 'fulfilled' && result.value).length;
+  const failed = results.filter(result => result.status === 'rejected').length;
+  return { attempted: ok + failed, ok, failed };
 }

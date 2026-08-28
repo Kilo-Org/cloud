@@ -15,7 +15,12 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { kiloId, stubTextPart, stubUserMessage } from '@kilocode/cloud-agent-sdk/test-helpers';
 
+import '@/i18n';
 import { useSessionManager } from '@/components/agents/session-provider';
+import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
+import { QueryError } from '@/components/query-error';
+import { Button } from '@/components/ui/button';
+import { clearActiveToken, setActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import {
@@ -55,8 +60,30 @@ const queryState = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
+const confirmationRequests = vi.hoisted(() => ({
+  getMe: vi.fn<() => Promise<{ id: string }>>(),
+  ticket: vi.fn<() => Promise<{ token: string }>>(),
+}));
+
 vi.mock('react-native', () => ({
   View: 'View',
+  Pressable: 'Pressable',
+  ActivityIndicator: 'ActivityIndicator',
+  Platform: { OS: 'android' },
+}));
+vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn() }));
+vi.mock('@/lib/config', () => ({ SESSION_INGEST_WS_URL: 'wss://ingest.example.com' }));
+vi.mock('@/lib/user-web-connection-lifecycle', () => ({
+  createNativeUserWebConnectionLifecycleHooks: () => ({}),
+}));
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  Lock: 'Lock',
+  SearchX: 'SearchX',
+  ServerCrash: 'ServerCrash',
+  WifiOff: 'WifiOff',
 }));
 
 vi.mock('expo-router', () => ({
@@ -87,6 +114,10 @@ vi.mock('@/lib/trpc', () => ({
       },
     },
   }),
+  trpcClient: {
+    user: { getMe: { query: confirmationRequests.getMe } },
+    activeSessions: { createWebTicket: { mutate: confirmationRequests.ticket } },
+  },
 }));
 
 vi.mock('@/components/invalid-route-state', () => ({
@@ -139,13 +170,6 @@ vi.mock('@/components/agents/mobile-session-manager', () => ({
   createMobileAgentSessionManager: createMobileManagerMock,
 }));
 
-vi.mock('@/components/agents/user-web-connection-provider', () => ({
-  useUserWebConnection: () => ({
-    subscribeToCliSession: vi.fn(() => vi.fn()),
-    onSystemEvent: vi.fn(() => vi.fn()),
-  }),
-}));
-
 vi.mock('@/components/agents/session-terminal-error', () => ({
   buildTerminalErrorCopyText: () => '',
 }));
@@ -154,21 +178,14 @@ vi.mock('@/components/agents/use-message-copy', () => ({
   performCopy: vi.fn(),
 }));
 
-vi.mock('@/components/query-error', () => ({
-  QueryError: 'QueryError',
-}));
-
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: 'ScreenHeader',
 }));
 
-vi.mock('@/components/ui/button', () => ({
-  Button: 'Button',
-}));
-
-vi.mock('@/components/ui/text', () => ({
-  Text: 'Text',
-}));
+vi.mock('@/components/ui/text', async () => {
+  const { createContext } = await import('react');
+  return { Text: 'Text', TextClassContext: createContext<string | undefined>(undefined) };
+});
 
 vi.mock('@/lib/spawned-not-found-retry', () => ({
   shouldRetryNotFoundOnSpawnedRoute: () => false,
@@ -178,6 +195,12 @@ function findByType(
   root: TestRenderer.ReactTestInstance,
   type: string
 ): TestRenderer.ReactTestInstance[] {
+  if (type === 'QueryError') {
+    return root.findAllByType(QueryError);
+  }
+  if (type === 'Button') {
+    return root.findAllByType(Button);
+  }
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
 }
 
@@ -195,7 +218,7 @@ async function mountRoute(
 ): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
-    ref.current = TestRenderer.create(element);
+    ref.current = TestRenderer.create(createElement(UserWebConnectionProvider, null, element));
     await Promise.resolve();
   });
   if (!ref.current) {
@@ -212,7 +235,9 @@ async function mountRoute(
 
 async function updateRoute(renderer: TestRenderer.ReactTestRenderer) {
   await act(async () => {
-    renderer.update(createElement(SessionDetailScreen));
+    renderer.update(
+      createElement(UserWebConnectionProvider, null, createElement(SessionDetailScreen))
+    );
     await Promise.resolve();
   });
 }
@@ -228,24 +253,39 @@ function queryInput(): { session_id?: string } | undefined {
 
 function beginReplacement() {
   setSignOutActive(true);
+  setSignOutTeardownActive(true);
   authState.isSigningOut = true;
   authState.token = undefined;
   bumpAuthEpoch();
   authState.authEpoch = currentAuthEpoch();
   beginAuthenticatedOwner();
+  clearActiveToken();
+}
+
+function commitCredentials(account: 'A' | 'B') {
+  requestAccount = account;
+  authState.token = account === 'A' ? 'account-a-token' : 'account-b-token';
+  setActiveToken(authState.token, null);
+  authState.isSigningOut = false;
+  setSignOutTeardownActive(false);
+  setSignOutActive(false);
 }
 
 function commitAccount(account: 'A' | 'B') {
-  requestAccount = account;
-  authState.token = account === 'A' ? 'account-a-token' : 'account-b-token';
-  authState.isSigningOut = false;
-  setSignOutActive(false);
+  commitCredentials(account);
   confirmAuthenticatedOwner(getAuthenticatedOwner(), `user-${account}`);
 }
 
 beforeEach(() => {
   beginReplacement();
   commitAccount('A');
+  confirmationRequests.getMe
+    .mockReset()
+    .mockReturnValue(Promise.withResolvers<{ id: string }>().promise);
+  // Keep sockets deterministic; connection integration has its own real-SDK socket suite.
+  confirmationRequests.ticket
+    .mockReset()
+    .mockReturnValue(Promise.withResolvers<{ token: string }>().promise);
   managers.length = 0;
   requestAccount = 'A';
   rootRequests.length = 0;
@@ -728,4 +768,190 @@ describe('SessionDetailScreen fresh authentication scope', () => {
     const reentered = await mountRoute();
     expect(transcriptText(reentered, 'RootText')).toBe('Account A root row');
   });
+});
+
+function retryControl(renderer: TestRenderer.ReactTestRenderer) {
+  const retry = findByType(renderer.root, 'Pressable').find(
+    node => propOf(node, 'accessibilityLabel') === 'Retry'
+  );
+  if (!retry) {
+    throw new Error('confirmation Retry is missing');
+  }
+  return retry;
+}
+
+function pressControl(control: TestRenderer.ReactTestInstance | undefined) {
+  const onPress = propOf(control, 'onPress') as (() => void) | undefined;
+  if (!onPress) {
+    throw new Error('route control is not operable');
+  }
+  onPress();
+}
+
+describe('SessionDetailScreen identity confirmation feedback', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    beginReplacement();
+    commitCredentials('B');
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+  });
+
+  it.each([undefined, 'org-a'])(
+    'shows the header and existing skeletons while identity is pending with organization %s',
+    async organizationId => {
+      useLocalSearchParamsMock.mockReturnValue({
+        'session-id': 'sess-1',
+        organizationId,
+        title: 'Account A private title',
+      });
+      const renderer = await mountRoute(
+        createElement(
+          'RouteAndSibling',
+          null,
+          createElement(SessionDetailScreen),
+          createElement('UnrelatedScreen')
+        )
+      );
+
+      const header = findByType(renderer.root, 'ScreenHeader')[0];
+      expect(propOf(header, 'title')).toBeTruthy();
+      expect(propOf(header, 'title')).not.toBe('Account A private title');
+      expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+      expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(1);
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+      expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+      expect(findByType(renderer.root, 'Pressable')).toHaveLength(0);
+      expect(findByType(renderer.root, 'UnrelatedScreen')).toHaveLength(1);
+      expect(transcriptText(renderer, 'RootText')).toBe('');
+      expect(rootRequests).toEqual([]);
+      expect(queryEnabled()).toBe(false);
+    }
+  );
+
+  it('keeps repeated failures recoverable and opens current root and child rows after user Retry', async () => {
+    const repeatedFailure = Promise.withResolvers<{ id: string }>();
+    const success = Promise.withResolvers<{ id: string }>();
+    confirmationRequests.getMe
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockReturnValueOnce(repeatedFailure.promise)
+      .mockReturnValueOnce(success.promise);
+    const renderer = await mountRoute();
+
+    expect(transcriptText(renderer)).toContain('Could not load your account');
+    expect(transcriptText(renderer)).toContain('Check your connection and try again.');
+    expect(propOf(retryControl(renderer), 'accessibilityState')).toMatchObject({
+      disabled: false,
+      busy: false,
+    });
+    act(() => {
+      pressControl(retryControl(renderer));
+    });
+    expect(findByType(renderer.root, 'QueryError')).toHaveLength(1);
+    expect(propOf(retryControl(renderer), 'disabled')).toBe(true);
+    expect(propOf(retryControl(renderer), 'accessibilityState')).toMatchObject({
+      disabled: true,
+      busy: true,
+    });
+    expect(findByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+    expect(rootRequests).toEqual([]);
+
+    await act(async () => {
+      repeatedFailure.reject(new Error('still offline'));
+      await Promise.resolve();
+    });
+    expect(transcriptText(renderer)).toContain('Could not load your account');
+    expect(transcriptText(renderer)).toContain('Back to sessions');
+    expect(propOf(retryControl(renderer), 'accessibilityState')).toMatchObject({
+      disabled: false,
+      busy: false,
+    });
+    expect(transcriptText(renderer, 'RootText')).toBe('');
+    act(() => {
+      pressControl(retryControl(renderer));
+    });
+    expect(propOf(retryControl(renderer), 'accessibilityState')).toMatchObject({
+      disabled: true,
+      busy: true,
+    });
+    await act(async () => {
+      success.resolve({ id: 'user-B' });
+      await success.promise;
+    });
+
+    expect(getAuthenticatedOwner().userId).toBe('user-B');
+    expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+    expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
+    const current = managers.at(-1);
+    if (!current) {
+      throw new Error('confirmed route did not initialize its manager');
+    }
+    childPageMock.mockResolvedValueOnce(childPage('msg-current-child', 'Account B child row'));
+    await act(async () => {
+      await current.manager.hydrateChildSession(CHILD_ID);
+    });
+    expect(transcriptText(renderer)).toBe('Account B child row');
+  });
+
+  it('leaves failed confirmation through Back to sessions', async () => {
+    confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
+    let destination = 'session-detail';
+    useRouterMock.mockReturnValue({
+      replace: (href: string) => {
+        destination = href;
+      },
+    });
+    const renderer = await mountRoute();
+    const back = findByType(renderer.root, 'Button').find(button =>
+      findByType(button, 'Text').some(text => text.children.includes('Back to sessions'))
+    );
+    act(() => {
+      pressControl(back);
+    });
+
+    expect(destination).toBe('/(app)/(tabs)/(2_agents)');
+    expect(rootRequests).toEqual([]);
+  });
+
+  it.each(['success', 'failure'] as const)(
+    'keeps successor feedback and ownership unchanged after retired identity %s',
+    async outcome => {
+      beginReplacement();
+      commitCredentials('A');
+      const retired = Promise.withResolvers<{ id: string }>();
+      const current = Promise.withResolvers<{ id: string }>();
+      confirmationRequests.getMe
+        .mockReturnValueOnce(retired.promise)
+        .mockReturnValueOnce(current.promise);
+      const renderer = await mountRoute();
+      act(beginReplacement);
+      commitCredentials('B');
+      await updateRoute(renderer);
+      const owner = getAuthenticatedOwner();
+      await act(async () => {
+        if (outcome === 'success') {
+          retired.resolve({ id: 'user-A' });
+        } else {
+          retired.reject(new Error('retired account failure'));
+        }
+        await Promise.resolve();
+      });
+
+      expect(getAuthenticatedOwner()).toBe(owner);
+      expect(owner.userId).toBeNull();
+      expect(findByType(renderer.root, 'ScreenHeader')).toHaveLength(1);
+      expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+      expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+      expect(transcriptText(renderer, 'RootText')).toBe('');
+      expect(rootRequests).toEqual([]);
+      await act(async () => {
+        current.resolve({ id: 'user-B' });
+        await current.promise;
+      });
+      expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
+      expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+    }
+  );
 });

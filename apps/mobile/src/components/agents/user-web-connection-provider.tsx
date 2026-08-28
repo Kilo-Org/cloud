@@ -3,7 +3,9 @@ import {
   type ReactNode,
   useContext,
   useEffect,
+  useMemo,
   useRef,
+  useState,
   useSyncExternalStore,
 } from 'react';
 import { type UserWebConnection } from '@kilocode/cloud-agent-sdk';
@@ -24,6 +26,14 @@ import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-conn
 import { trpcClient } from '@/lib/trpc';
 
 const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
+
+type IdentityConfirmation = {
+  isPending: boolean;
+  isError: boolean;
+  retry: () => void;
+};
+
+const IdentityConfirmationContext = createContext<IdentityConfirmation | null>(null);
 
 type UserWebConnectionProviderProps = {
   children: ReactNode;
@@ -51,6 +61,12 @@ function OwnedUserWebConnectionProvider({
   owner,
 }: Readonly<OwnedUserWebConnectionProviderProps>) {
   const captured = useRef(owner).current;
+  const [confirmation, setConfirmation] = useState({
+    isPending: captured.userId === null,
+    isError: false,
+  });
+  const retryRef = useRef<(() => void) | null>(null);
+  const nativeLifecycle = useMemo(() => createNativeUserWebConnectionLifecycleHooks(), []);
   const connectionRef = useRef<UserWebConnection | null>(null);
   connectionRef.current ??= createUserWebConnection({
     websocketUrl: `${SESSION_INGEST_WS_URL}/api/user/web`,
@@ -59,10 +75,19 @@ function OwnedUserWebConnectionProvider({
         throw new Error('Authenticated owner changed');
       }
       if (getAuthenticatedOwner().userId === null) {
-        // Never confirm from a cached getMe result or a decoded bearer token.
-        const user = await trpcClient.user.getMe.query();
-        if (!confirmAuthenticatedOwner(captured, user.id)) {
-          throw new Error('Authenticated owner changed');
+        setConfirmation(state => ({ ...state, isPending: true }));
+        try {
+          // Never confirm from a cached getMe result or a decoded bearer token.
+          const user = await trpcClient.user.getMe.query();
+          if (!confirmAuthenticatedOwner(captured, user.id)) {
+            throw new Error('Authenticated owner changed');
+          }
+          setConfirmation({ isPending: false, isError: false });
+        } catch (error) {
+          if (isCurrentOwner(captured) && getAuthenticatedOwner().userId === null) {
+            setConfirmation({ isPending: false, isError: true });
+          }
+          throw error;
         }
       }
       if (!isCurrentOwner(captured)) {
@@ -74,9 +99,31 @@ function OwnedUserWebConnectionProvider({
       }
       return result.token;
     },
-    lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
+    lifecycleHooks: {
+      ...nativeLifecycle,
+      onOnline: retry => {
+        // Reuse SDK recovery before a socket exists, including its backoff and single-flight guard.
+        retryRef.current = retry;
+        const unsubscribe = nativeLifecycle.onOnline?.(retry);
+        return () => {
+          retryRef.current = null;
+          unsubscribe?.();
+        };
+      },
+    },
   });
   const connection = connectionRef.current;
+  const identityConfirmation = useMemo(
+    () => ({
+      ...confirmation,
+      retry: () => {
+        if (isCurrentOwner(captured) && getAuthenticatedOwner().userId === null) {
+          retryRef.current?.();
+        }
+      },
+    }),
+    [captured, confirmation]
+  );
 
   useEffect(() => {
     // Ownership revocation must win even while a session holds another retain.
@@ -98,9 +145,19 @@ function OwnedUserWebConnectionProvider({
 
   return (
     <UserWebConnectionContext.Provider value={connection}>
-      {children}
+      <IdentityConfirmationContext.Provider value={identityConfirmation}>
+        {children}
+      </IdentityConfirmationContext.Provider>
     </UserWebConnectionContext.Provider>
   );
+}
+
+export function useIdentityConfirmation(): IdentityConfirmation {
+  const confirmation = useContext(IdentityConfirmationContext);
+  if (!confirmation) {
+    throw new Error('useIdentityConfirmation must be used within UserWebConnectionProvider');
+  }
+  return confirmation;
 }
 
 export function useUserWebConnection(): UserWebConnection {

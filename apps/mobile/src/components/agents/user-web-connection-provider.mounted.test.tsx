@@ -18,7 +18,11 @@ import {
   getAuthenticatedOwner,
   isAuthenticatedOwner,
 } from '@/lib/context-scope';
-import { UserWebConnectionProvider, useUserWebConnection } from './user-web-connection-provider';
+import {
+  useIdentityConfirmation,
+  UserWebConnectionProvider,
+  useUserWebConnection,
+} from './user-web-connection-provider';
 
 const mocks = vi.hoisted(() => ({
   getMe: vi.fn<() => Promise<{ id: string }>>(),
@@ -91,7 +95,13 @@ const ticketCredentials: (string | undefined)[] = [];
 
 function Consumer() {
   connections.push(useUserWebConnection());
-  return createElement('ConnectionConsumer');
+  return createElement('ConnectionConsumer', useIdentityConfirmation());
+}
+
+function confirmationFeedback(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findByType('ConnectionConsumer').props as ReturnType<
+    typeof useIdentityConfirmation
+  >;
 }
 
 function connectionTree() {
@@ -353,6 +363,77 @@ describe('UserWebConnectionProvider ownership', () => {
     currentSocket().open();
     expect(currentConnection().isConnected()).toBe(true);
   });
+
+  it('retries current confirmation without replacing the connection or duplicating pending requests', async () => {
+    mocks.getMe.mockRejectedValueOnce(new Error('offline'));
+    const renderer = await mountConnection();
+    const connection = currentConnection();
+    const releaseConsumer = connection.retain();
+    expect(confirmationFeedback(renderer)).toMatchObject({ isError: true, isPending: false });
+    expect(getAuthenticatedOwner().userId).toBeNull();
+
+    const identity = Promise.withResolvers<{ id: string }>();
+    mocks.getMe.mockReturnValueOnce(identity.promise);
+    const retry = confirmationFeedback(renderer).retry;
+    act(() => {
+      retry();
+      retry();
+    });
+    expect(confirmationFeedback(renderer)).toMatchObject({ isError: true, isPending: true });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(mocks.getMe).toHaveBeenCalledTimes(2);
+    expect(sockets).toHaveLength(0);
+
+    await act(async () => {
+      identity.resolve({ id: 'user-a' });
+      await identity.promise;
+    });
+    currentSocket().open();
+    expect(confirmationFeedback(renderer)).toMatchObject({ isError: false, isPending: false });
+    expect(getAuthenticatedOwner().userId).toBe('user-a');
+    expect(currentConnection()).toBe(connection);
+    expect(connection.isConnected()).toBe(true);
+    expect(sockets).toHaveLength(1);
+    releaseConsumer();
+  });
+
+  it.each(['success', 'failure'] as const)(
+    'ignores stale confirmation %s and Retry after replacement',
+    async outcome => {
+      const identity = Promise.withResolvers<{ id: string }>();
+      mocks.getMe.mockReturnValueOnce(identity.promise);
+      const renderer = await mountConnection();
+      const retiredRetry = confirmationFeedback(renderer).retry;
+      expect(confirmationFeedback(renderer)).toMatchObject({ isError: false, isPending: true });
+
+      act(beginReplacement);
+      commitCredentials();
+      await updateConnection(renderer);
+      currentSocket().open();
+      const owner = getAuthenticatedOwner();
+      const connection = currentConnection();
+      await act(async () => {
+        if (outcome === 'success') {
+          identity.resolve({ id: 'user-a' });
+        } else {
+          identity.reject(new Error('retired account failure'));
+        }
+        await Promise.resolve();
+        retiredRetry();
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      expect(getAuthenticatedOwner()).toBe(owner);
+      expect(owner.userId).toBe('user-b');
+      expect(confirmationFeedback(renderer)).toMatchObject({ isError: false, isPending: false });
+      expect(currentConnection()).toBe(connection);
+      expect(connection.isConnected()).toBe(true);
+      expect(ticketCredentials).toEqual(['account-b-token']);
+      expect(sockets).toHaveLength(1);
+    }
+  );
 
   it('keeps a current connection usable after StrictMode effect replay', async () => {
     await mountConnection(true);

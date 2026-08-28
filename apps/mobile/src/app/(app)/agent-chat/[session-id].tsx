@@ -19,6 +19,7 @@ import {
 import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
+import { useIdentityConfirmation } from '@/components/agents/user-web-connection-provider';
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { InvalidRouteState } from '@/components/invalid-route-state';
@@ -33,6 +34,9 @@ import { useTRPC } from '@/lib/trpc';
 
 export default function SessionDetailScreen() {
   const owner = useSyncExternalStore(subscribeAuthenticatedOwner, getAuthenticatedOwner);
+  const confirmation = useIdentityConfirmation();
+  const identityPending = !isAuthenticatedOwner(owner);
+  const identityFailed = identityPending && confirmation.isError;
   const {
     'session-id': rawSessionId,
     organizationId: routeOrganizationId,
@@ -125,17 +129,20 @@ export default function SessionDetailScreen() {
     return <InvalidRouteState backTo={'/(app)' as Href} />;
   }
 
-  if (!isAuthenticatedOwner(owner)) {
-    return null;
-  }
-
-  if (routeOrganizationId === undefined && sessionQuery.isPending) {
+  if (
+    !identityFailed &&
+    (identityPending || (routeOrganizationId === undefined && sessionQuery.isPending))
+  ) {
     // The composer placeholder holds its own height: nothing may shift when
-    // the query resolves.
+    // the query resolves. An unconfirmed account must not show a cached title.
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          title={cachedTitle ?? t('agentChat.session.title')}
+          title={
+            identityPending
+              ? t('agentChat.session.title')
+              : (cachedTitle ?? t('agentChat.session.title'))
+          }
           headerRight={
             <SessionContextMetrics
               info={undefined}
@@ -152,17 +159,25 @@ export default function SessionDetailScreen() {
     );
   }
 
-  if (routeOrganizationId === undefined && sessionQuery.isError) {
+  if (identityFailed || (routeOrganizationId === undefined && sessionQuery.isError)) {
     // A NOT_FOUND (e.g. the stored session was deleted) or UNAUTHORIZED
     // (org-access denial) can't be recovered by retrying — show a permanent
     // state with no Retry. Other errors stay transient and retriable. All
     // get Back and Copy.
-    const errorCode = sessionQuery.error.data?.code;
+    const errorCode = identityFailed ? undefined : sessionQuery.error?.data?.code;
     const notFound = errorCode === 'NOT_FOUND';
     const unauthorized = errorCode === 'UNAUTHORIZED';
-    let title = t('agentChat.session.couldNotLoad');
-    let message = t('agentChat.session.failedToLoadDetails');
-    let variant: 'not-found' | 'permission' | 'server' = 'server';
+    let title = t(
+      identityFailed ? 'bootstrap.couldNotLoadAccount' : 'agentChat.session.couldNotLoad'
+    );
+    let message = t(
+      identityFailed
+        ? 'bootstrap.couldNotLoadAccountDescription'
+        : 'agentChat.session.failedToLoadDetails'
+    );
+    let variant: 'neutral' | 'not-found' | 'permission' | 'server' = identityFailed
+      ? 'neutral'
+      : 'server';
     if (notFound) {
       title = t('agentChat.session.notFound');
       message = t('agentChat.session.notFoundDescription');
@@ -172,6 +187,7 @@ export default function SessionDetailScreen() {
       message = t('agentChat.session.accessDeniedDescription');
       variant = 'permission';
     }
+    const retry = identityFailed ? confirmation.retry : () => void sessionQuery.refetch();
     const copyText = buildTerminalErrorCopyText({ sessionId, title, message });
     return (
       <View className="flex-1 bg-background">
@@ -184,8 +200,8 @@ export default function SessionDetailScreen() {
             className="px-0 pt-0"
             title={title}
             message={message}
-            onRetry={notFound || unauthorized ? undefined : () => void sessionQuery.refetch()}
-            isRetrying={sessionQuery.isFetching}
+            onRetry={notFound || unauthorized ? undefined : retry}
+            isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
           />
           <View className="flex-row gap-3">
             <Button

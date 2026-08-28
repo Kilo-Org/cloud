@@ -32,6 +32,7 @@ export function useAgentSessionListData(options: {
   );
   const {
     storedSessions,
+    activeSessionIds,
     dateGroups,
     activeIsError,
     storedIsError,
@@ -147,6 +148,7 @@ export function useAgentSessionListData(options: {
 
   return {
     storedSessions,
+    activeSessionIds,
     storedIsFetching,
     storedLoadedPageCount,
     paging,

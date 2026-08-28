@@ -39,6 +39,7 @@ type AgentSessionListContentProps = {
   /** Post-deletion focus anchor: the screen's always-mounted search input. */
   searchInputRef: Parameters<typeof moveA11yFocus>[0];
   sections: SessionSection[];
+  activeSessionIds: ReadonlySet<string>;
   hasAnySessions: boolean;
   isLoading: boolean;
   /** Body-driving error flag — a search failure (when searching) OR a
@@ -62,6 +63,7 @@ type AgentSessionListContentProps = {
 export function AgentSessionListContent({
   searchInputRef,
   sections,
+  activeSessionIds,
   hasAnySessions,
   isLoading,
   isError,
@@ -170,6 +172,8 @@ export function AgentSessionListContent({
       <StoredSessionRow
         session={item}
         sortBy={sortBy}
+        live={activeSessionIds.has(item.session_id)}
+        metaWhileLive
         onPress={() => {
           onSessionPress(item.session_id, item.organization_id, item.title ?? undefined);
         }}
@@ -186,7 +190,7 @@ export function AgentSessionListContent({
         }}
       />
     ),
-    [onSessionPress, deleteSession, renameSession, sortBy, searchInputRef]
+    [activeSessionIds, onSessionPress, deleteSession, renameSession, sortBy, searchInputRef]
   );
 
   const renderSectionHeader = useCallback(

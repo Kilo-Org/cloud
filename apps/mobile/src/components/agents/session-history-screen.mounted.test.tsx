@@ -3,7 +3,10 @@ import { createElement, type ReactElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 import { i18n } from '@/i18n';
+import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
 import { SessionHistoryScreen } from './session-history-screen';
 
 const listState = vi.hoisted(() => ({
@@ -68,7 +71,7 @@ vi.mock('@/components/screen-header', () => ({
 }));
 vi.mock('@/components/agents/use-session-search-input', () => ({
   useSessionSearchInput: () => ({
-    searchQuery: '',
+    searchQuery: listState.isSearching ? 'title' : '',
     searchInputRef: { current: null },
     hasText: false,
     awaitingCommit: false,
@@ -83,30 +86,45 @@ vi.mock('@/components/agents/use-session-search-input', () => ({
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({
   useAgentSessionNavigator: () => vi.fn(),
 }));
-vi.mock('@/components/agents/use-agent-session-list-data', () => ({
-  useAgentSessionListData: () => ({
-    storedSessions: listState.storedSessions,
-    activeSessions: [],
-    isLoading: false,
-    storedIsFetching: false,
-    storedLoadedPageCount: 1,
-    paging: {
+vi.mock('@/lib/hooks/use-agent-sessions', async () => {
+  const { useQuery } = await import('@tanstack/react-query');
+  return {
+    useAgentSessions: () => {
+      // This dependency owns the existing live query subscription. Keep the
+      // data hook real so the test covers the complete set handoff.
+      const active = useQuery({
+        queryKey: ['existing-active-sessions'],
+        queryFn: () => new Set<string>(),
+        initialData: () => new Set<string>(),
+      });
+      return {
+        storedSessions: listState.storedSessions,
+        activeSessionIds: active.data,
+        dateGroups: [],
+        activeIsError: false,
+        storedIsError: false,
+        storedIsFetching: false,
+        storedLoadedPageCount: 1,
+        hasNextPage: false,
+        isFetchingNextPage: false,
+        fetchNextPage: vi.fn(),
+        refetch: handleRefetchSpy,
+      };
+    },
+    useAgentSessionSearch: () => ({
+      dateGroups: [],
+      isFetching: false,
+      isPending: false,
+      isError: false,
       hasNextPage: false,
       isFetchingNextPage: false,
       isPlaceholderData: false,
       fetchNextPage: vi.fn(),
-    },
-    refetch: vi.fn(),
-    handleRetry: vi.fn(),
-    handleRefetch: handleRefetchSpy,
-    isSearching: listState.isSearching,
-    search: { isFetching: false, isPending: false },
-    projectOptions: [],
-    contentIsError: false,
-    pinnedActive: [],
-    sections: [],
-  }),
-}));
+      refetch: vi.fn(),
+    }),
+    useRecentAgentRepositories: () => ({ data: { repositories: [] } }),
+  };
+});
 vi.mock('@/lib/hooks/use-persisted-agent-session-filters', () => ({
   usePersistedAgentSessionFilters: () => ({
     platformFilter: [],
@@ -153,13 +171,21 @@ function fireFocus(): void {
   }
 }
 
-async function renderScreen(): Promise<TestRenderer.ReactTestRenderer> {
+async function renderScreen(
+  queryClient: QueryClient = createTestQueryClient()
+): Promise<TestRenderer.ReactTestRenderer> {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
   };
   await act(async () => {
     await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(SessionHistoryScreen));
+    rendererRef.current = TestRenderer.create(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(SessionHistoryScreen)
+      )
+    );
   });
   const renderer = rendererRef.current;
   if (!renderer) {
@@ -240,6 +266,34 @@ describe('SessionHistoryScreen', () => {
     const content = findNodeByType(renderer, 'AgentSessionListContent');
     expect(content.props.hasActiveQuery).toBe(true);
     expect(content.props.hasAnySessions).toBe(true);
+  });
+
+  it('hands the existing live query set through data and screen without another subscription', async () => {
+    listState.storedSessions = [{ session_id: 'stored-1', organization_id: null }];
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    const queryKey = ['existing-active-sessions'];
+    const activeQuery = queryClient.getQueryCache().find({ queryKey });
+
+    expect(content.props.activeSessionIds).toEqual(new Set());
+    expect(activeQuery?.getObserversCount()).toBe(1);
+    const liveIds = new Set(['stored-1']);
+    act(() => {
+      queryClient.setQueryData(queryKey, liveIds);
+    });
+    await waitFor(() => content.props.activeSessionIds === liveIds);
+    expect(findNodeByType(renderer, 'AgentSessionListContent')).toBe(content);
+    expect(content.props.activeSessionIds).toBe(liveIds);
+
+    const nextIds = new Set(['stored-2']);
+    act(() => {
+      queryClient.setQueryData(queryKey, nextIds);
+    });
+    await waitFor(() => content.props.activeSessionIds === nextIds);
+    expect(content.props.activeSessionIds).toBe(nextIds);
+    expect(activeQuery?.getObserversCount()).toBe(1);
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(1);
   });
 
   it('refetches stored sessions through the wrapped refetch on route focus', async () => {

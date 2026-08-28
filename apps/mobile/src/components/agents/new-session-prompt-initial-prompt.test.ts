@@ -5,10 +5,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { NewSessionPromptControls as renderPromptControls } from '@/components/agents/new-session-prompt-controls';
+import { Text as renderText } from '@/components/ui/text';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
 
 import '@/i18n';
 import * as ReactI18next from 'react-i18next';
+
+const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const TEXT_DIRECTIONS = [
+  { direction: 'LTR', isRTL: false, style: undefined },
+  { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }, undefined] },
+];
+
+vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -34,6 +43,7 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
+    useContext: vi.fn(() => undefined),
     useEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
@@ -41,7 +51,13 @@ vi.mock('react', async () => {
       const ref: React.RefObject<T> = { current: initial };
       return ref;
     }),
-    useState: vi.fn(<T>(initial: T) => [initial, vi.fn() as () => void] as [T, (value: T) => void]),
+    useState: vi.fn(
+      <T>(initial: T | (() => T)) =>
+        [
+          typeof initial === 'function' ? (initial as () => T)() : initial,
+          vi.fn() as () => void,
+        ] as [T, (value: T) => void]
+    ),
   };
 });
 
@@ -53,6 +69,7 @@ vi.mock('react-native', () => ({
   Keyboard: {
     addListener: vi.fn(() => ({ remove: vi.fn() })),
   },
+  I18nManager: layoutDirection,
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   Text: 'Text',
@@ -190,6 +207,13 @@ function findElementByType(
   ) {
     return node.props ?? {};
   }
+  if (nodeType === renderText) {
+    return findElementByType(
+      renderText(props as React.ComponentProps<typeof renderText>),
+      target,
+      accessibilityLabel
+    );
+  }
   if (nodeType === renderPromptControls) {
     return findElementByType(
       renderPromptControls(props as React.ComponentProps<typeof renderPromptControls>),
@@ -238,7 +262,59 @@ describe('NewSessionPrompt initialPrompt seed', () => {
   beforeEach(() => {
     voiceInputAvailable.current = false;
     returnSendsMessage.current = false;
+    layoutDirection.isRTL = false;
   });
+
+  it.each(TEXT_DIRECTIONS)(
+    'preserves starter text and insertion in $direction',
+    async ({ isRTL, style }) => {
+      const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+      layoutDirection.isRTL = isRTL;
+      let draft = '';
+      let started = false;
+      const element = renderPrompt({
+        ...defaultProps(),
+        onChangeText: text => {
+          draft = text;
+        },
+        onStartSession: () => {
+          started = true;
+        },
+      });
+      const chip = findElementByType(element, 'Pressable', 'Build a feature');
+      if (chip === null) {
+        throw new Error('starter chip not found');
+      }
+      expect(findElementByType(chip.children as Node, 'Text')).toMatchObject({
+        children: 'Build a feature',
+        className: 'text-sm font-normal text-muted-foreground',
+        style,
+      });
+      expect(findElementByType(element, 'Text', '100000 characters remaining')).toBeNull();
+
+      const onPress = chip.onPress as () => void;
+      onPress();
+
+      expect(draft).toBe('Build a feature');
+      expect(started).toBe(false);
+    }
+  );
+
+  it.each(TEXT_DIRECTIONS)(
+    'preserves the seeded counter and its accessible label in $direction',
+    async ({ isRTL, style }) => {
+      const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+      layoutDirection.isRTL = isRTL;
+      const element = renderPrompt({ ...defaultProps(), initialPrompt: 'hello' });
+
+      expect(findElementByType(element, 'Text', '99995 characters remaining')).toMatchObject({
+        children: 99_995,
+        className: 'text-xs font-normal text-muted-foreground',
+        style,
+      });
+      expect(findElementByType(element, 'Pressable', 'Build a feature')).toBeNull();
+    }
+  );
 
   it('does not invoke onChangeText when initialPrompt seeds the uncontrolled input on mount', async () => {
     const { NewSessionPrompt } = await import('./new-session-prompt');

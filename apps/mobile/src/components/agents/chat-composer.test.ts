@@ -6,8 +6,17 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { Text as renderText } from '@/components/ui/text';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type ChatComposer } from './chat-composer';
+
+const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const TEXT_DIRECTIONS = [
+  { direction: 'LTR', isRTL: false, style: undefined },
+  { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }, undefined] },
+];
+
+vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
 
 // The composer's uncontrolled input is covered by Appium E2E; this suite pins
 // the draft-restore contract that a native E2E cannot easily prove: a restored
@@ -41,6 +50,7 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
+    useContext: vi.fn(() => undefined),
     useEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
@@ -76,6 +86,7 @@ vi.mock('react-native', () => ({
     addListener: vi.fn(() => ({ remove: vi.fn() })),
     dismiss: vi.fn(),
   },
+  I18nManager: layoutDirection,
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   Text: 'Text',
@@ -385,6 +396,9 @@ function findNode(
   if (props !== undefined && predicate(type, props)) {
     return { type, props };
   }
+  if (type === renderText && props !== undefined) {
+    return findNode(renderText(props as React.ComponentProps<typeof renderText>), predicate);
+  }
   const children = props?.children;
   for (const child of Array.isArray(children) ? children : [children]) {
     const found = findNode(child as Node, predicate);
@@ -429,6 +443,7 @@ beforeEach(() => {
   stateSlots.cursor = 0;
   returnSendsPref.returnSendsMessage = false;
   reducedMotionOn.value = false;
+  layoutDirection.isRTL = false;
 });
 
 // The restore contract has one axis: whether the host resolved a draft. Both
@@ -550,43 +565,60 @@ describe('ChatComposer starter chips', () => {
     expect(findStarterChip(rerendered, 'Build a feature')).toBeNull();
   });
 
-  it('inserts a starter chip into the draft without submitting', async () => {
-    const render = await mount(makeProps({}));
-    const chip = findStarterChip(render, 'Build a feature');
-    if (!chip) {
-      throw new Error('starter chip not found');
-    }
-    const onPress = chip.props.onPress as (() => void) | undefined;
-    if (!onPress) {
-      throw new Error('starter chip missing onPress');
-    }
+  it.each(TEXT_DIRECTIONS)(
+    'preserves starter text and inserts it without submitting in $direction',
+    async ({ isRTL, style }) => {
+      layoutDirection.isRTL = isRTL;
+      const render = await mount(makeProps({}));
+      const chip = findStarterChip(render, 'Build a feature');
+      if (!chip) {
+        throw new Error('starter chip not found');
+      }
+      expect(findNode(chip, type => type === 'Text')?.props).toMatchObject({
+        children: 'Build a feature',
+        className: 'text-sm font-normal text-muted-foreground',
+        style,
+      });
+      const onPress = chip.props.onPress as (() => void) | undefined;
+      if (!onPress) {
+        throw new Error('starter chip missing onPress');
+      }
 
-    onPress();
-    await settle();
+      onPress();
+      await settle();
 
-    expect(refSlots.slots[0]?.current).toBe('Build a feature');
-    expect(onSendMock).not.toHaveBeenCalled();
-  });
+      expect(refSlots.slots[0]?.current).toBe('Build a feature');
+      expect(onSendMock).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('ChatComposer counter', () => {
-  it('shows the remaining-character counter once the input holds text', async () => {
-    const render = await mount(makeProps({}));
-    expect(
-      findNode(render, (type, props) => type === 'Text' && typeof props.children === 'number')
-    ).toBeNull();
+  it.each(TEXT_DIRECTIONS)(
+    'shows the remaining-character counter once the input holds text in $direction',
+    async ({ isRTL, style }) => {
+      layoutDirection.isRTL = isRTL;
+      const render = await mount(makeProps({}));
+      expect(
+        findNode(render, (type, props) => type === 'Text' && typeof props.children === 'number')
+      ).toBeNull();
 
-    requireInputRowOnChangeText(render)('hello');
-    await settle();
+      requireInputRowOnChangeText(render)('hello');
+      await settle();
 
-    const rerendered = await rerender(makeProps({}));
-    expect(
-      findNode(
+      const rerendered = await rerender(makeProps({}));
+      const counter = findNode(
         rerendered,
         (type, props) => type === 'Text' && props.children === CLOUD_AGENT_PROMPT_MAX_LENGTH - 5
-      )
-    ).not.toBeNull();
-  });
+      );
+      expect(counter).not.toBeNull();
+      expect(counter?.props).toMatchObject({
+        accessibilityLabel: '99995 characters remaining',
+        className: 'text-xs font-normal text-muted-foreground',
+        style,
+      });
+    }
+  );
 });
 
 describe('ChatComposer reduced motion', () => {

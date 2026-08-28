@@ -26,7 +26,6 @@ import {
   type LayoutChangeEvent,
   Platform,
   Pressable,
-  Text,
   type TextInput,
   type TextInputSelectionChangeEvent,
   type TextStyle,
@@ -45,6 +44,7 @@ import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Text } from '@/components/ui/text';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import {
   createMobileSlashCommandList,
@@ -1204,7 +1204,7 @@ export function ChatComposer({
               style={{ minHeight: COMPOSER_HIT_TARGET }}
               className="min-h-11 items-center justify-center rounded-full border border-border bg-card px-3 py-2 active:opacity-70"
             >
-              <Text className="text-sm text-muted-foreground">{chip}</Text>
+              <Text className="text-sm font-normal text-muted-foreground">{chip}</Text>
             </Pressable>
           ))}
         </View>
@@ -1213,7 +1213,7 @@ export function ChatComposer({
       {characterCount > 0 ? (
         <View className="flex-row justify-end px-4 pb-1">
           <Text
-            className="text-xs text-muted-foreground"
+            className="text-xs font-normal text-muted-foreground"
             accessibilityLabel={i18n.t('agentChat.composer.charactersRemaining', {
               count: CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount,
             })}

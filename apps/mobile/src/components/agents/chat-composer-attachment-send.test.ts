@@ -60,6 +60,8 @@ vi.mock('react', async () => {
 });
 
 // ── react-native and native bridges ────────────────────────────────────────
+vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
+
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   AppState: {

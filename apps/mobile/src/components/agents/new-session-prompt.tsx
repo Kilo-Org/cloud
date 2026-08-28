@@ -8,7 +8,6 @@ import {
   Platform,
   Pressable,
   TextInput as RNTextInput,
-  Text,
   type TextInput,
   type TextInputSelectionChangeEvent,
   type TextStyle,
@@ -22,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Text } from '@/components/ui/text';
 import {
   type ComposerSelection,
   pasteTextIntoComposer,
@@ -438,7 +438,7 @@ export function NewSessionPrompt({
                 style={{ minHeight: PROMPT_HIT_TARGET }}
                 className="min-h-11 items-center justify-center rounded-full border border-border bg-card px-3 py-2 active:opacity-70"
               >
-                <Text className="text-sm text-muted-foreground">{chip}</Text>
+                <Text className="text-sm font-normal text-muted-foreground">{chip}</Text>
               </Pressable>
             ))}
           </View>
@@ -446,7 +446,7 @@ export function NewSessionPrompt({
         {promptCharacterCount > 0 ? (
           <View className="flex-row justify-end px-1 pb-1">
             <Text
-              className="text-xs text-muted-foreground"
+              className="text-xs font-normal text-muted-foreground"
               accessibilityLabel={t('agentChat.composer.charactersRemaining', {
                 count: PROMPT_INPUT_MAX_CHARS - promptCharacterCount,
               })}

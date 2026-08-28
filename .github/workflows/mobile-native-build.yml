@@ -34,7 +34,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  # Never cancel a push build: it is producing an artifact hosts will
+  # install. A superseded pull_request build produces nothing anyone
+  # keeps, so it must not hold a macOS runner for 90 minutes.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

@@ -1688,7 +1688,11 @@
       "previousTaskFinishing": "Önceki görev hâlâ tamamlanıyor. Lütfen bir dakika bekleyin.",
       "serviceUnavailable": "Hizmet şu anda kullanılamıyor. Lütfen tekrar deneyin.",
       "connectionTrouble": "Bağlantı sorunu. Lütfen birazdan tekrar deneyin.",
-      "modelUnavailable": "Bu model Cloud Agent için kullanılamıyor. Başka bir model seçip tekrar deneyin."
+      "modelUnavailable": "Bu model Cloud Agent için kullanılamıyor. Başka bir model seçip tekrar deneyin.",
+      "cancelQueuedFailed": "Mesaj iptal edilemedi.",
+      "cancelQueuedRestoreAvailable": "Mesaj iptal edildi. Mesaj giriş alanına geri getirmek için “Geri yükleyin” düğmesine dokunun.",
+      "cancelQueuedRestored": "Mesaj iptal edildi. İstem, mesaj giriş alanına geri getirildi.",
+      "cancelQueuedUpgradeRequired": "Kuyruktaki mesajları iptal etmek daha yeni bir Kilo CLI gerektirir. Kilo CLI'yı güncelleyin ve yeniden bağlanın."
     },
     "remoteSession": {
       "failedToCreate": "Uzak oturum oluşturulamadı",
@@ -2009,7 +2013,11 @@
       "queuedAccessibility": "Mesaj kuyruğa alındı",
       "userMessage": "Kullanıcı mesajı",
       "assistantMessage": "Asistan mesajı",
-      "longPressHint": "Mesaj ayrıntıları için uzun basın"
+      "longPressHint": "Mesaj ayrıntıları için uzun basın",
+      "cancelQueued": "Mesajı iptal edin",
+      "cancelQueuedAccessibility": "Kuyruktaki mesajı iptal edin",
+      "restoreQueued": "Geri yükleyin",
+      "restoreQueuedAccessibility": "İptal edilen mesajı mesaj giriş alanına geri yükleyin"
     },
     "olderMessages": {
       "arrived": "Önceki mesajlar yüklendi",

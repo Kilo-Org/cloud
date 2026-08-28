@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Aikin da ya gabata har yanzu yana ƙarewa. Da fatan za ka jira ɗan lokaci.",
       "serviceUnavailable": "Sabis ɗin ba ya aiki a yanzu. Da fatan za ka sake gwadawa.",
       "connectionTrouble": "Matsalar haɗi. Da fatan za ka sake gwadawa bayan ɗan lokaci.",
-      "modelUnavailable": "Wannan samfurin ba shi da aiki ga Cloud Agent. Zaɓi wani samfurin kuma sake gwadawa."
+      "modelUnavailable": "Wannan samfurin ba shi da aiki ga Cloud Agent. Zaɓi wani samfurin kuma sake gwadawa.",
+      "cancelQueuedFailed": "An kasa soke saƙon.",
+      "cancelQueuedRestoreAvailable": "An soke saƙon. Danna Maido don mayar da shi zuwa wurin shigar da saƙo.",
+      "cancelQueuedRestored": "An soke saƙon. Bayanin ya koma wurin shigar da saƙo.",
+      "cancelQueuedUpgradeRequired": "Soke saƙonnin da ke jira yana buƙatar sabuwar Kilo CLI. Sabunta Kilo CLI kuma sake haɗawa."
     },
     "remoteSession": {
       "failedToCreate": "An kasa ƙirƙirar zaman na nesa",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "An jera saƙon",
       "userMessage": "Saƙon mai amfani",
       "assistantMessage": "Saƙon mataimaki",
-      "longPressHint": "Danna tsayin lokaci don cikakkun bayanan saƙo"
+      "longPressHint": "Danna tsayin lokaci don cikakkun bayanan saƙo",
+      "cancelQueued": "Soke saƙo",
+      "cancelQueuedAccessibility": "Soke saƙon da ke jira",
+      "restoreQueued": "Maido",
+      "restoreQueuedAccessibility": "Maido da saƙon da aka soke zuwa wurin shigar da saƙo"
     },
     "olderMessages": {
       "arrived": "An ɗora saƙonnin farko",

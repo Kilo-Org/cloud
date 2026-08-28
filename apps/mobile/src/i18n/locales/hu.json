@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Az előző feladat még befejeződik. Kérjük, várjon egy pillanatot.",
       "serviceUnavailable": "A szolgáltatás jelenleg nem érhető el. Kérjük, próbálja újra.",
       "connectionTrouble": "Kapcsolódási probléma. Kérjük, próbálja újra egy pillanat múlva.",
-      "modelUnavailable": "Ez a modell nem érhető el a Cloud Agent számára. Válasszon másik modellt, és próbálja újra."
+      "modelUnavailable": "Ez a modell nem érhető el a Cloud Agent számára. Válasszon másik modellt, és próbálja újra.",
+      "cancelQueuedFailed": "Nem sikerült visszavonni az üzenetet.",
+      "cancelQueuedRestoreAvailable": "Üzenet visszavonva. Koppintson a Visszaállítás gombra, hogy visszakerüljön az üzenetbeviteli mezőbe.",
+      "cancelQueuedRestored": "Üzenet visszavonva. A prompt visszakerült az üzenetbeviteli mezőbe.",
+      "cancelQueuedUpgradeRequired": "A várakozó üzenetek visszavonásához újabb Kilo CLI szükséges. Frissítse a Kilo CLI-t, és csatlakozzon újra."
     },
     "remoteSession": {
       "failedToCreate": "A távoli munkamenet létrehozása nem sikerült",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Üzenet sorban",
       "userMessage": "Felhasználói üzenet",
       "assistantMessage": "Asszisztens üzenet",
-      "longPressHint": "Az üzenet részleteihez tartsd nyomva"
+      "longPressHint": "Az üzenet részleteihez tartsd nyomva",
+      "cancelQueued": "Üzenet visszavonása",
+      "cancelQueuedAccessibility": "Várakozó üzenet visszavonása",
+      "restoreQueued": "Visszaállítás",
+      "restoreQueuedAccessibility": "Visszavont üzenet visszaállítása az üzenetbeviteli mezőbe"
     },
     "olderMessages": {
       "arrived": "Korábbi üzenetek betöltve",

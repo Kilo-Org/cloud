@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Ny asa teo aloha mbola vita. Andraso kely azafady.",
       "serviceUnavailable": "Tsy misy ny serivisy amin'izao fotoana izao. Andramo indray azafady.",
       "connectionTrouble": "Olana amin'ny fifandraisana. Andramo indray rehefa afaka kely.",
-      "modelUnavailable": "Tsy misy io modely io ho an'ny Cloud Agent. Misafidìa modely hafa ary andramo indray."
+      "modelUnavailable": "Tsy misy io modely io ho an'ny Cloud Agent. Misafidìa modely hafa ary andramo indray.",
+      "cancelQueuedFailed": "Tsy afaka nanafoana ny hafatra.",
+      "cancelQueuedRestoreAvailable": "Nofoanana ny hafatra. Tsindrio ny Avereno mba hamerenana azy ao amin'ny fampidirana hafatra.",
+      "cancelQueuedRestored": "Nofoanana ny hafatra. Niverina ao amin'ny fampidirana hafatra ny hafatrao.",
+      "cancelQueuedUpgradeRequired": "Mitaky Kilo CLI vaovao kokoa ny fanafoanana hafatra miandry. Havaozy ny Kilo CLI ary ampifandraiso indray."
     },
     "remoteSession": {
       "failedToCreate": "Tsy nahomby namorona session lavitra",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Eo amin'ny filaharana ny hafatra",
       "userMessage": "Hafatra mpampiasa",
       "assistantMessage": "Hafatra mpanampy",
-      "longPressHint": "Tsindrio maharitra raha hita ny antsipirian'ny hafatra"
+      "longPressHint": "Tsindrio maharitra raha hita ny antsipirian'ny hafatra",
+      "cancelQueued": "Foano ny hafatra",
+      "cancelQueuedAccessibility": "Foano ny hafatra miandry",
+      "restoreQueued": "Avereno",
+      "restoreQueuedAccessibility": "Avereno ao amin'ny fampidirana hafatra ny hafatra nofoanana"
     },
     "olderMessages": {
       "arrived": "Voaray ny hafatra taloha",

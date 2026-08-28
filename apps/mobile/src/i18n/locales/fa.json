@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "وظیفه قبلی هنوز در حال پایان است. لطفاً لحظهای صبر کنید.",
       "serviceUnavailable": "سرویس در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.",
       "connectionTrouble": "مشکل در اتصال. لطفاً لحظهای دیگر دوباره تلاش کنید.",
-      "modelUnavailable": "این مدل برای Cloud Agent در دسترس نیست. مدل دیگری انتخاب کنید و دوباره تلاش کنید."
+      "modelUnavailable": "این مدل برای Cloud Agent در دسترس نیست. مدل دیگری انتخاب کنید و دوباره تلاش کنید.",
+      "cancelQueuedFailed": "لغو پیام ممکن نشد.",
+      "cancelQueuedRestoreAvailable": "پیام لغو شد. برای بازگرداندن آن به کادر ورودی پیام، روی بازیابی ضربه بزنید.",
+      "cancelQueuedRestored": "پیام لغو شد. پرسش به کادر ورودی پیام بازگشت.",
+      "cancelQueuedUpgradeRequired": "لغو پیام‌های در صف به نسخه جدیدتری از Kilo CLI نیاز دارد. Kilo CLI را به‌روزرسانی کنید و دوباره متصل شوید."
     },
     "remoteSession": {
       "failedToCreate": "ایجاد نشست از راه دور شکست خورد",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "پیام در صف قرار گرفت",
       "userMessage": "پیام کاربر",
       "assistantMessage": "پیام دستیار",
-      "longPressHint": "برای جزئیات پیام، لمس طولانی کنید"
+      "longPressHint": "برای جزئیات پیام، لمس طولانی کنید",
+      "cancelQueued": "لغو پیام",
+      "cancelQueuedAccessibility": "لغو پیام در صف",
+      "restoreQueued": "بازیابی",
+      "restoreQueuedAccessibility": "بازیابی پیام لغوشده در کادر ورودی پیام"
     },
     "olderMessages": {
       "arrived": "پیام‌های قبلی بارگذاری شدند",

@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "Претходната задача сè уште се завршува. Почекај момент.",
       "serviceUnavailable": "Услугата во моментов не е достапна. Обиди се повторно.",
       "connectionTrouble": "Проблем со врската. Обиди се повторно по момент.",
-      "modelUnavailable": "Овој модел не е достапен за Cloud Agent. Избери друг модел и обиди се повторно."
+      "modelUnavailable": "Овој модел не е достапен за Cloud Agent. Избери друг модел и обиди се повторно.",
+      "cancelQueuedFailed": "Не можеше да се откаже пораката.",
+      "cancelQueuedRestoreAvailable": "Пораката е откажана. Допрете „Вратете“ за да ја вратите во полето за внес на пораки.",
+      "cancelQueuedRestored": "Пораката е откажана. Предлогот е повторно во полето за внес на пораки.",
+      "cancelQueuedUpgradeRequired": "Откажувањето пораки во чекање бара понов Kilo CLI. Ажурирајте го Kilo CLI и поврзете се повторно."
     },
     "remoteSession": {
       "failedToCreate": "Не успеа да се создаде далечинска сесија",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "Пораката е во ред",
       "userMessage": "Корисничка порака",
       "assistantMessage": "Порака од асистентот",
-      "longPressHint": "Долго притиснете за детали за пораката"
+      "longPressHint": "Долго притиснете за детали за пораката",
+      "cancelQueued": "Откажете ја пораката",
+      "cancelQueuedAccessibility": "Откажете ја пораката во чекање",
+      "restoreQueued": "Вратете",
+      "restoreQueuedAccessibility": "Вратете ја откажаната порака во полето за внес на пораки"
     },
     "olderMessages": {
       "arrived": "Пораните пораки се вчитани",

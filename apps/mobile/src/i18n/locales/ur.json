@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "پچھلا کام ابھی مکمل ہو رہا ہے۔ براہ کرم ایک لمحہ انتظار کریں۔",
       "serviceUnavailable": "سروس اس وقت دستیاب نہیں ہے۔ براہ کرم دوبارہ کوشش کریں۔",
       "connectionTrouble": "کنکشن کا مسئلہ۔ براہ کرم ایک لمحے بعد دوبارہ کوشش کریں۔",
-      "modelUnavailable": "یہ ماڈل Cloud Agent کے لیے دستیاب نہیں ہے۔ کوئی اور ماڈل منتخب کر کے دوبارہ کوشش کریں۔"
+      "modelUnavailable": "یہ ماڈل Cloud Agent کے لیے دستیاب نہیں ہے۔ کوئی اور ماڈل منتخب کر کے دوبارہ کوشش کریں۔",
+      "cancelQueuedFailed": "پیغام منسوخ نہیں ہو سکا۔",
+      "cancelQueuedRestoreAvailable": "پیغام منسوخ ہو گیا۔ اسے پیغام لکھنے کے خانے میں واپس لانے کے لیے «بحال کریں» پر ٹیپ کریں۔",
+      "cancelQueuedRestored": "پیغام منسوخ ہو گیا۔ پرامپٹ پیغام لکھنے کے خانے میں واپس آ گیا ہے۔",
+      "cancelQueuedUpgradeRequired": "قطار میں موجود پیغامات منسوخ کرنے کے لیے نئے Kilo CLI کی ضرورت ہے۔ Kilo CLI اپ ڈیٹ کریں اور دوبارہ جڑیں۔"
     },
     "remoteSession": {
       "failedToCreate": "ریموٹ سیشن بنانا ناکام",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "پیغام قطار میں ہے",
       "userMessage": "صارف کا پیغام",
       "assistantMessage": "معاون کا پیغام",
-      "longPressHint": "پیغام کی تفصیلات کے لیے دیر تک دبائیں"
+      "longPressHint": "پیغام کی تفصیلات کے لیے دیر تک دبائیں",
+      "cancelQueued": "پیغام منسوخ کریں",
+      "cancelQueuedAccessibility": "قطار میں موجود پیغام منسوخ کریں",
+      "restoreQueued": "بحال کریں",
+      "restoreQueuedAccessibility": "منسوخ شدہ پیغام کو پیغام لکھنے کے خانے میں بحال کریں"
     },
     "olderMessages": {
       "arrived": "پہلے کے پیغامات لوڈ ہو گئے",

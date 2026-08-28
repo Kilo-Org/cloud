@@ -2172,7 +2172,11 @@
       "previousTaskFinishing": "Ankstesnė užduotis dar baigiama. Palaukite akimirką.",
       "serviceUnavailable": "Paslauga šiuo metu nepasiekiama. Bandykite dar kartą.",
       "connectionTrouble": "Ryšio problema. Bandykite dar kartą po akimirkos.",
-      "modelUnavailable": "Šis modelis nėra pasiekiamas Cloud Agent. Pasirinkite kitą modelį ir bandykite dar kartą."
+      "modelUnavailable": "Šis modelis nėra pasiekiamas Cloud Agent. Pasirinkite kitą modelį ir bandykite dar kartą.",
+      "cancelQueuedFailed": "Nepavyko atšaukti žinutės.",
+      "cancelQueuedRestoreAvailable": "Žinutė atšaukta. Bakstelėkite „Atkurti“, kad grąžintumėte ją į žinutės įvesties lauką.",
+      "cancelQueuedRestored": "Žinutė atšaukta. Užklausa grąžinta į žinutės įvesties lauką.",
+      "cancelQueuedUpgradeRequired": "Norint atšaukti eilėje esančias žinutes, reikia naujesnės Kilo CLI versijos. Atnaujinkite Kilo CLI ir prisijunkite iš naujo."
     },
     "remoteSession": {
       "failedToCreate": "Nepavyko sukurti nuotolinės sesijos",
@@ -2495,7 +2499,11 @@
       "queuedAccessibility": "Žinutė įdėta į eilę",
       "userMessage": "Vartotojo žinutė",
       "assistantMessage": "Asistento žinutė",
-      "longPressHint": "Paspauskite ir palaikykite, kad pamatytumėte žinutės detales"
+      "longPressHint": "Paspauskite ir palaikykite, kad pamatytumėte žinutės detales",
+      "cancelQueued": "Atšaukti žinutę",
+      "cancelQueuedAccessibility": "Atšaukti eilėje esančią žinutę",
+      "restoreQueued": "Atkurti",
+      "restoreQueuedAccessibility": "Atkurti atšauktą žinutę žinutės įvesties lauke"
     },
     "olderMessages": {
       "arrived": "Ankstesnės žinutės įkeltos",

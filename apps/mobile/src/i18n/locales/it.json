@@ -1680,7 +1680,11 @@
       "previousTaskFinishing": "L'attività precedente sta ancora terminando. Attendere un momento.",
       "serviceUnavailable": "Il servizio non è disponibile al momento. Riprova.",
       "connectionTrouble": "Problemi di connessione. Riprova tra un momento.",
-      "modelUnavailable": "Questo modello non è disponibile per Cloud Agent. Scegli un altro modello e riprova."
+      "modelUnavailable": "Questo modello non è disponibile per Cloud Agent. Scegli un altro modello e riprova.",
+      "cancelQueuedFailed": "Impossibile annullare il messaggio.",
+      "cancelQueuedRestoreAvailable": "Messaggio annullato. Tocca Ripristina per riportarlo nel campo di inserimento del messaggio.",
+      "cancelQueuedRestored": "Messaggio annullato. Il prompt è di nuovo nel campo di inserimento del messaggio.",
+      "cancelQueuedUpgradeRequired": "Per annullare i messaggi in coda è necessaria una versione più recente di Kilo CLI. Aggiorna Kilo CLI e riconnettiti."
     },
     "remoteSession": {
       "failedToCreate": "Impossibile creare la sessione remota",
@@ -2002,7 +2006,11 @@
       "queuedAccessibility": "Messaggio in coda",
       "userMessage": "Messaggio utente",
       "assistantMessage": "Messaggio assistente",
-      "longPressHint": "Tieni premuto per i dettagli del messaggio"
+      "longPressHint": "Tieni premuto per i dettagli del messaggio",
+      "cancelQueued": "Annulla messaggio",
+      "cancelQueuedAccessibility": "Annulla messaggio in coda",
+      "restoreQueued": "Ripristina",
+      "restoreQueuedAccessibility": "Ripristina il messaggio annullato nel campo di inserimento del messaggio"
     },
     "olderMessages": {
       "arrived": "Messaggi precedenti caricati",

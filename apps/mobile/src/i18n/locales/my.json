@@ -2142,7 +2142,11 @@
       "previousTaskFinishing": "ယခင်လုပ်ငန်း ပြီးဆုံးနေဆဲဖြစ်သည်။ ခဏ စောင့်ပါ။",
       "serviceUnavailable": "ဝန်ဆောင်မှုသည် ယခုအခါ မရရှိနိုင်ပါ။ ထပ်စမ်းကြည့်ပါ။",
       "connectionTrouble": "ချိတ်ဆက်မှု ပြဿနာ။ ခဏနေမှ ထပ်စမ်းကြည့်ပါ။",
-      "modelUnavailable": "ဤမော်ဒယ်သည် Cloud Agent အတွက် မရရှိနိုင်ပါ။ အခြားမော်ဒယ်တစ်ခု ရွေးပြီး ထပ်စမ်းကြည့်ပါ။"
+      "modelUnavailable": "ဤမော်ဒယ်သည် Cloud Agent အတွက် မရရှိနိုင်ပါ။ အခြားမော်ဒယ်တစ်ခု ရွေးပြီး ထပ်စမ်းကြည့်ပါ။",
+      "cancelQueuedFailed": "စာကို ပယ်ဖျက်၍မရခဲ့ပါ။",
+      "cancelQueuedRestoreAvailable": "စာကို ပယ်ဖျက်ပြီးပါပြီ။ စာထည့်သွင်းရာအကွက်သို့ ပြန်ယူရန် “ပြန်ယူပါ” ကို နှိပ်ပါ။",
+      "cancelQueuedRestored": "စာကို ပယ်ဖျက်ပြီးပါပြီ။ ညွှန်ကြားချက်သည် စာထည့်သွင်းရာအကွက်တွင် ပြန်ရှိနေပါပြီ။",
+      "cancelQueuedUpgradeRequired": "တန်းစီထားသော စာများကို ပယ်ဖျက်ရန် ပိုသစ်သော Kilo CLI လိုအပ်သည်။ Kilo CLI ကို မွမ်းမံပြီး ပြန်ချိတ်ဆက်ပါ။"
     },
     "remoteSession": {
       "failedToCreate": "အဝေးစက်ရှင်ကို ဖန်တီးရန် မအောင်မြင်ခဲ့ပါ",
@@ -2463,7 +2467,11 @@
       "queuedAccessibility": "စာတန်းစီထားသည်",
       "userMessage": "အသုံးပြုသူ စာ",
       "assistantMessage": "Assistant စာ",
-      "longPressHint": "စာအသေးစိတ်အတွက် ကြာကြာနှိပ်ပါ"
+      "longPressHint": "စာအသေးစိတ်အတွက် ကြာကြာနှိပ်ပါ",
+      "cancelQueued": "စာကို ပယ်ဖျက်ပါ",
+      "cancelQueuedAccessibility": "တန်းစီထားသော စာကို ပယ်ဖျက်ပါ",
+      "restoreQueued": "ပြန်ယူပါ",
+      "restoreQueuedAccessibility": "ပယ်ဖျက်ထားသော စာကို စာထည့်သွင်းရာအကွက်သို့ ပြန်ယူပါ"
     },
     "olderMessages": {
       "arrived": "အစောပိုင်း စာများ တင်ပြီးပါပြီ",

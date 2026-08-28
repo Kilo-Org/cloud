@@ -128,7 +128,42 @@ const cliEvents = [
   { type: 'browser_event', requestId, event: 'progress', job },
   { type: 'browser_event', requestId, event: 'result', result: completed },
 ];
+const providerStatusRequest = {
+  type: 'provider_status',
+  requestId,
+  providerId: handle.providerId,
+  providerProof: registration.providerProof,
+} as const;
+const interruptedHandle = {
+  ...handle,
+  jobId: 'bj_00000000-0000-4000-8000-000000000005',
+  invocationId: `b1.1787875200000.${'e'.repeat(64)}`,
+} as const;
+const providerStatusResult = {
+  type: 'provider_status_result',
+  requestId,
+  providerId: handle.providerId,
+  jobs: [
+    finishedJob,
+    {
+      ...finishedJob,
+      ...interruptedHandle,
+      generation: 2,
+      status: 'interrupted',
+      result: {
+        ...completed,
+        ...interruptedHandle,
+        status: 'interrupted',
+        reason: 'effects_uncertain',
+        effectsUncertain: true,
+      },
+    },
+  ],
+  nextCursor: interruptedHandle.jobId,
+} as const;
 const providerOutbound = [
+  providerStatusRequest,
+  { ...providerStatusRequest, cursor: handle.jobId },
   registration,
   {
     ...registration,
@@ -164,7 +199,159 @@ const providerInbound = [
   },
   { type: 'provider_snapshot', ...binding, jobs: [] },
   { type: 'provider_lease_ack', requestId, ...binding, leaseExpiresAt: '2026-08-28T00:00:15.000Z' },
+  providerStatusResult,
+  { type: 'provider_status_result', requestId, providerId: handle.providerId, jobs: [] },
 ];
+
+describe.each([
+  { name: 'SDK', contract: browser },
+  { name: 'relay', contract: relay },
+])('read-only provider status: $name', ({ contract }) => {
+  it('keeps historical generations separate from execution snapshots', () => {
+    expect(contract.browserProviderInboundMessageSchema.parse(providerStatusResult)).toEqual(
+      providerStatusResult
+    );
+    for (const generation of [1, 2]) {
+      expect(
+        contract.browserProviderInboundMessageSchema.safeParse({
+          ...providerStatusResult,
+          type: 'provider_snapshot',
+          generation,
+        }).success
+      ).toBe(false);
+    }
+  });
+
+  it.each([
+    { requestId: undefined },
+    { requestId: 'invalid' },
+    { providerId: undefined },
+    { providerId: handle.jobId },
+    { providerProof: undefined },
+    { providerProof: 'd'.repeat(63) },
+    { providerProof: 'D'.repeat(64) },
+    { cursor: handle.providerId },
+    { cursor: '' },
+  ])('rejects malformed status requests: %j', fields => {
+    expect(
+      contract.browserProviderOutboundMessageSchema.safeParse({
+        ...providerStatusRequest,
+        ...fields,
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    { requestId: undefined },
+    { requestId: 'invalid' },
+    { providerId: undefined },
+    { providerId: handle.jobId },
+    { jobs: undefined },
+    { jobs: null },
+    { jobs: [{ ...job, generation: undefined }] },
+    { jobs: [{ ...job, generation: 0 }] },
+    { jobs: [{ ...finishedJob, result: undefined }] },
+    { jobs: [{ ...finishedJob, result: { ...completed, jobId: interruptedHandle.jobId } }] },
+    { nextCursor: handle.providerId },
+    { nextCursor: '' },
+  ])('rejects malformed provider history: %j', fields => {
+    expect(
+      contract.browserProviderInboundMessageSchema.safeParse({ ...providerStatusResult, ...fields })
+        .success
+    ).toBe(false);
+  });
+
+  it.each([
+    { generation: 1 },
+    { enabled: true },
+    { leaseExpiresAt: '2026-08-28T00:00:15.000Z' },
+    { approval: { decision: 'approved', tab } },
+    {
+      recovery: {
+        invocationId: handle.invocationId,
+        tabId: tab.tabId,
+        tabClosed: true,
+        locksDrained: true,
+      },
+    },
+  ])('rejects authority fields on status frames: %j', fields => {
+    expect(
+      contract.browserProviderOutboundMessageSchema.safeParse({
+        ...providerStatusRequest,
+        ...fields,
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserProviderInboundMessageSchema.safeParse({ ...providerStatusResult, ...fields })
+        .success
+    ).toBe(false);
+  });
+
+  it('rejects otherwise valid history from another provider', () => {
+    const providerId = 'bp_00000000-0000-4000-8000-000000000006';
+    const foreignJob = { ...finishedJob, providerId, result: { ...completed, providerId } };
+    expect(contract.browserJobSnapshotSchema.parse(foreignJob)).toEqual(foreignJob);
+    expect(
+      contract.browserProviderInboundMessageSchema.safeParse({
+        ...providerStatusResult,
+        jobs: [...providerStatusResult.jobs, foreignJob],
+      }).success
+    ).toBe(false);
+  });
+
+  it('redacts status proofs and attacker-controlled keys from parse errors', () => {
+    const secret = 'private-status-proof-must-not-appear';
+    const cases = [
+      {
+        schema: contract.browserProviderOutboundMessageSchema,
+        frame: { ...providerStatusRequest, providerProof: secret },
+      },
+      {
+        schema: contract.webOutboundWithBrowserMessageSchema,
+        frame: { ...providerStatusRequest, [secret]: true },
+      },
+      {
+        schema: contract.browserProviderInboundMessageSchema,
+        frame: { ...providerStatusResult, [secret]: true },
+      },
+      {
+        schema: contract.webInboundWithBrowserMessageSchema,
+        frame: { ...providerStatusResult, providerProof: secret },
+      },
+    ];
+    for (const { schema, frame } of cases) {
+      const parsed = schema.safeParse(frame);
+      expect(parsed.success).toBe(false);
+      if (parsed.success) throw new Error('Invalid status frame was accepted');
+      expect(parsed.error.message).not.toContain(secret);
+      expect(JSON.stringify(parsed.error)).not.toContain(secret);
+    }
+  });
+
+  it('accepts 25 historical jobs but rejects a 26th job', () => {
+    const page = { ...providerStatusResult, jobs: Array.from({ length: 25 }, () => job) };
+    expect(contract.browserProviderInboundMessageSchema.parse(page)).toEqual(page);
+    expect(
+      contract.browserProviderInboundMessageSchema.safeParse({ ...page, jobs: [...page.jobs, job] })
+        .success
+    ).toBe(false);
+  });
+
+  it('bounds historical pages by serialized UTF-8 bytes', () => {
+    const largeJob = {
+      ...finishedJob,
+      result: { ...completed, summary: '\u00e9'.repeat(16384) },
+    };
+    const page = { ...providerStatusResult, jobs: Array.from({ length: 3 }, () => largeJob) };
+    expect(contract.browserProviderInboundMessageSchema.parse(page)).toEqual(page);
+    expect(
+      contract.browserProviderInboundMessageSchema.safeParse({
+        ...page,
+        jobs: [...page.jobs, largeJob],
+      }).success
+    ).toBe(false);
+  });
+});
 
 describe('browser jobs v1 Cloud parity', () => {
   const boundaries = [

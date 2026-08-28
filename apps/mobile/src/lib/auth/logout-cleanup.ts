@@ -4,6 +4,7 @@ import * as z from 'zod';
 
 import { emitNotificationTokenUpdated, getDevicePushTokenOutcome } from '@/lib/notifications';
 import { getGlanceableDelivery } from '@/lib/glanceable/sink-registry';
+import { chainSave } from '@/lib/hooks/save-chain';
 import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
@@ -168,6 +169,15 @@ export async function runLogoutCleanup(): Promise<void> {
   }
 }
 
+let activityCleanupInFlight: Promise<void> | null = null;
+
+/** Wait for scope cleanup, including its tombstone write, before checking registration safety. */
+export async function awaitActivityCleanupSettled(): Promise<void> {
+  if (activityCleanupInFlight !== null) {
+    await activityCleanupInFlight;
+  }
+}
+
 /**
  * Unregister the recorded activity tokens (Live Activity / push-to-start) and
  * tombstone a failure, WITHOUT revoking the device session or unregistering
@@ -178,23 +188,52 @@ export async function runLogoutCleanup(): Promise<void> {
  * new scope registers its own. The cached user id is read before any switch
  * clears it, so a failed unregister tombstones the prior account's identity —
  * the same ordering `runLogoutCleanup` relies on. A successful unregister
- * leaves any existing tombstone untouched: only a full logout deletes it, so a
- * pending push unregister survives a switch.
+ * leaves any existing tombstone untouched. A failure merges the same owner's
+ * pending push cleanup and failed activity tokens so both survive a switch.
  */
 export async function unregisterActivityTokensAndTombstone(): Promise<void> {
+  const previous = activityCleanupInFlight;
+  const cleanup = (async () => {
+    await Promise.all([previous, runActivityCleanup(previous)]);
+  })();
+  activityCleanupInFlight = cleanup;
+  try {
+    await cleanup;
+  } finally {
+    if (activityCleanupInFlight === cleanup) {
+      activityCleanupInFlight = null;
+    }
+  }
+}
+
+async function runActivityCleanup(previous: Promise<void> | null): Promise<void> {
   try {
     const userId = readCachedUserId(queryClient);
+    // Start the unregister now to fence stale registration intent. Serialize
+    // only the tombstone merge behind earlier scope cleanup writes.
     const result = await getGlanceableDelivery().unregisterTokens();
+    await previous;
     if (result.ok) {
       return;
     }
-    await writeLogoutCleanupTombstone({
-      userId,
-      pushToken: null,
-      needsPushUnregister: false,
-      needsActivityUnregister: true,
-      activityTokens: result.tokens,
-      failedAt: Date.now(),
+    // Reconciliation must finish with its captured record before this merge
+    // adds obligations that its deletion or partial-success rewrite cannot see.
+    await chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {
+      const tombstone = await readLogoutCleanupTombstone();
+      const pending = tombstone?.userId === userId ? tombstone : null;
+      await writeLogoutCleanupTombstone({
+        userId,
+        pushToken: pending?.pushToken ?? null,
+        needsPushUnregister: pending?.needsPushUnregister ?? false,
+        needsActivityUnregister: true,
+        activityTokens: [
+          ...new Set([
+            ...(pending?.needsActivityUnregister ? pending.activityTokens : []),
+            ...result.tokens,
+          ]),
+        ],
+        failedAt: Date.now(),
+      });
     });
   } catch (error) {
     // Never throw: a failed unregister or tombstone write must not block the

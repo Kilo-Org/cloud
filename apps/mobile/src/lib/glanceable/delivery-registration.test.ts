@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one stateful delivery suite shares native mocks and remote-token state across ordering regressions */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildGlanceableSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -52,12 +53,35 @@ vi.mock('react-native', () => ({
 import { getGlanceableDelivery } from './sink-registry';
 // Import side effect: registers the real delivery under the mocks above.
 import {
-  _resetAndroidOngoingTokenForTests,
+  _resetDeliveryRegistrationForTests,
   _setGetDevicePushTokenForTests,
 } from './delivery-registration';
 /* eslint-enable import/first */
 
 const NOW = 1_750_000_000_000;
+
+function trackRemoteTokens(): Map<string, string | null> {
+  const rows = new Map<string, string | null>();
+  trpcMock.registerActivityToken.mutate.mockImplementation(
+    async (input: { token: string; organizationId: string | null }) => {
+      await Promise.resolve(undefined);
+      rows.set(input.token, input.organizationId);
+      return { success: true };
+    }
+  );
+  trpcMock.unregisterActivityToken.mutate.mockImplementation(async (input: { token: string }) => {
+    await Promise.resolve(undefined);
+    rows.delete(input.token);
+    return { success: true };
+  });
+  return rows;
+}
+
+async function flushRegistration(): Promise<void> {
+  await new Promise<void>(resolve => {
+    setTimeout(resolve, 0);
+  });
+}
 
 function snapshot() {
   return buildGlanceableSnapshot({
@@ -74,7 +98,7 @@ describe('delivery registerTokens', () => {
     vi.clearAllMocks();
     platformMock.OS = 'ios';
     _setGetDevicePushTokenForTests(null);
-    _resetAndroidOngoingTokenForTests();
+    _resetDeliveryRegistrationForTests();
     activityMock.getPushToken.mockResolvedValue('token-1');
     trpcMock.registerActivityToken.mutate.mockResolvedValue({ success: true });
     trpcMock.unregisterActivityToken.mutate.mockResolvedValue({ success: true });
@@ -339,6 +363,156 @@ describe('delivery registerTokens', () => {
 
     expect(trpcMock.registerActivityToken.mutate).not.toHaveBeenCalled();
   });
+
+  it('keeps both stable iOS tokens in the new org after the old deletes settle', async () => {
+    const rows = trackRemoteTokens();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'stable-start' });
+    activityMock.getPushToken.mockResolvedValue('stable-activity');
+    getGlanceableDelivery().registerTokens(snapshot(), 'old-org', 'u1');
+    await vi.waitFor(() => {
+      expect(rows).toEqual(
+        new Map([
+          ['stable-start', 'old-org'],
+          ['stable-activity', 'old-org'],
+        ])
+      );
+    });
+
+    const deleteGate = Promise.withResolvers<undefined>();
+    trpcMock.unregisterActivityToken.mutate.mockImplementation(async (input: { token: string }) => {
+      await deleteGate.promise;
+      rows.delete(input.token);
+      return { success: true };
+    });
+    const cleanup = getGlanceableDelivery().unregisterTokens();
+    getGlanceableDelivery().registerTokens(snapshot(), 'new-org', 'u1');
+    await flushRegistration();
+    const rowsBeforeDelete = new Map(rows);
+
+    deleteGate.resolve(undefined);
+    await cleanup;
+    await flushRegistration();
+
+    expect(rowsBeforeDelete).toEqual(
+      new Map([
+        ['stable-start', 'old-org'],
+        ['stable-activity', 'old-org'],
+      ])
+    );
+    expect(rows).toEqual(
+      new Map([
+        ['stable-start', 'new-org'],
+        ['stable-activity', 'new-org'],
+      ])
+    );
+  });
+
+  it.each(['ios', 'android'])(
+    'cancels a queued %s registration when a later end supersedes it',
+    async platform => {
+      platformMock.OS = platform;
+      const rows = trackRemoteTokens();
+      expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'stable-token' });
+      activityMock.getPushToken.mockResolvedValue(null);
+      _setGetDevicePushTokenForTests(async () => {
+        await Promise.resolve(undefined);
+        return 'stable-token';
+      });
+      getGlanceableDelivery().registerTokens(snapshot(), 'old-org', 'u1');
+      await vi.waitFor(() => {
+        expect(rows.get('stable-token')).toBe('old-org');
+      });
+
+      const firstDelete = Promise.withResolvers<undefined>();
+      const lastDelete = Promise.withResolvers<undefined>();
+      trpcMock.unregisterActivityToken.mutate
+        .mockImplementationOnce(async () => {
+          await firstDelete.promise;
+          rows.delete('stable-token');
+          return { success: true };
+        })
+        .mockImplementationOnce(async () => {
+          await lastDelete.promise;
+          rows.delete('stable-token');
+          return { success: true };
+        });
+
+      const firstEnd = getGlanceableDelivery().unregisterTokens();
+      getGlanceableDelivery().registerTokens(snapshot(), 'stale-org', 'u1');
+      await flushRegistration();
+      const lastEnd = getGlanceableDelivery().unregisterTokens();
+      firstDelete.resolve(undefined);
+      await firstEnd;
+      await flushRegistration();
+      const rowsBeforeLastDelete = new Map(rows);
+      lastDelete.resolve(undefined);
+      await lastEnd;
+
+      expect(rowsBeforeLastDelete.size).toBe(0);
+      expect(rows.size).toBe(0);
+    }
+  );
+
+  it.each(['reconciliation', 'token lookup'])(
+    'cancels iOS registration paused at %s after a later end',
+    async phase => {
+      const rows = trackRemoteTokens();
+      const gate = Promise.withResolvers<undefined>();
+      let paused = false;
+      if (phase === 'reconciliation') {
+        logoutMock.awaitLogoutReconciliationSettled.mockImplementationOnce(async () => {
+          paused = true;
+          await gate.promise;
+        });
+      } else {
+        activityMock.getPushToken.mockImplementationOnce(async () => {
+          paused = true;
+          await gate.promise;
+          return 'late-token';
+        });
+      }
+      getGlanceableDelivery().registerTokens(snapshot(), 'old-org', 'u1');
+      await vi.waitFor(() => {
+        expect(paused).toBe(true);
+      });
+
+      await getGlanceableDelivery().unregisterTokens();
+      gate.resolve(undefined);
+      await flushRegistration();
+
+      expect(rows.size).toBe(0);
+    }
+  );
+
+  it.each(['ios', 'android'])(
+    'allows %s registration for a new known account despite an old account cleanup',
+    async platform => {
+      platformMock.OS = platform;
+      const rows = trackRemoteTokens();
+      expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'stable-token' });
+      activityMock.getPushToken.mockResolvedValue(null);
+      _setGetDevicePushTokenForTests(async () => {
+        await Promise.resolve(undefined);
+        return 'stable-token';
+      });
+      logoutMock.attemptLogoutReconciliation.mockResolvedValue({ kind: 'spacing-skipped' });
+      logoutMock.hasPendingActivityUnregister.mockImplementation(
+        async (currentUser: string | null) => {
+          await Promise.resolve(undefined);
+          return currentUser !== 'u2';
+        }
+      );
+
+      getGlanceableDelivery().registerTokens(snapshot(), 'old-org', 'u1');
+      await flushRegistration();
+      expect(rows.size).toBe(0);
+
+      getGlanceableDelivery().registerTokens(snapshot(), 'new-org', 'u2');
+      await flushRegistration();
+
+      expect(rows).toEqual(new Map([['stable-token', 'new-org']]));
+    }
+  );
 
   it('returns only the failed iOS tokens on a partial unregister failure', async () => {
     expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'ptt-token' });

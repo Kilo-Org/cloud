@@ -24,25 +24,24 @@ let pushToStartToken: string | null = null;
 /** The last Android device token registered, so end/cleanup can unregister it. */
 let androidOngoingToken: string | null = null;
 
-/** Epoch bumped on every Android unregister/end. A register that started before
+/** Epoch bumped on every unregister/end. A register that started before
  * the bump must abort instead of recreating the row after end/logout. */
-let androidRegisterEpoch = 0;
+let registerEpoch = 0;
 
-/** FIFO chain serializing Android register/unregister mutations so the last
- * client intent wins: an upsert and a delete of the same per-device token must
- * never race, because the device token is stable across sign-ins. */
-let androidMutationTail: Promise<void> | null = null;
+/** FIFO chain serializing activity-token mutations so the last client intent
+ * wins: an upsert and a delete must not race for stable iOS or Android tokens. */
+let mutationTail: Promise<void> | null = null;
 
 const NOOP = (): void => undefined;
 
 /** Serialize one mutation; a rejected prior mutation never blocks the next. */
-async function enqueueAndroidMutation<T>(op: () => Promise<T>): Promise<T> {
-  const previous = androidMutationTail;
+async function enqueueTokenMutation<T>(op: () => Promise<T>): Promise<T> {
+  const previous = mutationTail;
   let release: () => void = NOOP;
   const gate = new Promise<void>(resolve => {
     release = resolve;
   });
-  androidMutationTail = gate;
+  mutationTail = gate;
   if (previous !== null) {
     try {
       await previous;
@@ -116,16 +115,16 @@ async function registerAndroidOngoingToken(
 ): Promise<void> {
   // Capture the epoch before the first await so an unregister/end that lands
   // during reconciliation or the token lookup aborts this stale register.
-  const epoch = androidRegisterEpoch;
+  const epoch = registerEpoch;
   if (userId !== null) {
     void attemptLogoutReconciliation(userId);
   }
   try {
     await awaitLogoutReconciliationSettled();
-    if (epoch !== androidRegisterEpoch) {
+    if (epoch !== registerEpoch) {
       return;
     }
-    if (await hasPendingActivityUnregister()) {
+    if (await hasPendingActivityUnregister(userId)) {
       // A pending retry owns the recorded activity tokens; re-registering this
       // device token now would only be deleted by the next attempt.
       return;
@@ -134,10 +133,13 @@ async function registerAndroidOngoingToken(
     if (token === null) {
       return;
     }
-    if (epoch !== androidRegisterEpoch) {
+    if (epoch !== registerEpoch) {
       return;
     }
-    await enqueueAndroidMutation(async () => {
+    await enqueueTokenMutation(async () => {
+      if (epoch !== registerEpoch) {
+        return;
+      }
       await register({ token, kind: 'android_ongoing', platform: 'android', organizationId });
       androidOngoingToken = token;
     });
@@ -151,8 +153,8 @@ async function registerAndroidOngoingToken(
  * against register so a delete never races an upsert of the same token: the
  * FIFO order decides the final state. */
 async function unregisterAndroidOngoingToken(): Promise<{ ok: boolean; tokens: string[] }> {
-  androidRegisterEpoch += 1;
-  const result = enqueueAndroidMutation(async () => {
+  registerEpoch += 1;
+  const result = enqueueTokenMutation(async () => {
     const token = androidOngoingToken;
     if (token === null) {
       return { ok: true, tokens: [] as string[] };
@@ -177,35 +179,44 @@ const delivery: GlanceableDelivery = {
       return;
     }
     void (async () => {
-      // Order against logout cleanup: an in-flight logout unregister for the
-      // activity tokens must settle before this session re-registers them, or
-      // a later retry could delete this session's rows. Trigger the logout
-      // attempt first (it starts a fresh run only when none is running), then
-      // await its settle so registration cannot start until any in-flight
-      // unregister for this sign-in has settled.
+      const epoch = registerEpoch;
+      // Keep reconciliation and scope-cleanup waits outside the mutation queue:
+      // cleanup itself needs that queue to finish its unregister.
       if (userId !== null) {
         void attemptLogoutReconciliation(userId);
       }
       await awaitLogoutReconciliationSettled();
-      if (await hasPendingActivityUnregister()) {
-        // A pending retry owns the recorded activity tokens; re-registering
-        // them now would only be deleted by the next reconciliation attempt.
+      if ((await hasPendingActivityUnregister(userId)) || epoch !== registerEpoch) {
         return;
       }
-      if (pushToStartToken !== null) {
-        await register({
-          token: pushToStartToken,
-          kind: 'ios_push_to_start',
-          platform: 'ios',
-          organizationId,
+      const startToken = pushToStartToken;
+      if (startToken !== null) {
+        await enqueueTokenMutation(async () => {
+          if (epoch !== registerEpoch) {
+            return;
+          }
+          await register({
+            token: startToken,
+            kind: 'ios_push_to_start',
+            platform: 'ios',
+            organizationId,
+          });
         });
+      }
+      if (epoch !== registerEpoch) {
+        return;
       }
       try {
         const activity = ActiveAgentsLiveActivity.getInstances().at(-1);
         if (activity) {
           const token = await activity.getPushToken();
           if (token) {
-            await register({ token, kind: 'ios_activity', platform: 'ios', organizationId });
+            await enqueueTokenMutation(async () => {
+              if (epoch !== registerEpoch) {
+                return;
+              }
+              await register({ token, kind: 'ios_activity', platform: 'ios', organizationId });
+            });
           }
         }
       } catch {
@@ -221,20 +232,15 @@ const delivery: GlanceableDelivery = {
     if (Platform.OS !== 'ios') {
       return { ok: true, tokens: [] };
     }
-    const result = await unregisterActivityTokens();
+    registerEpoch += 1;
+    const tokens = collectIosActivityTokens();
+    const result = await enqueueTokenMutation(async () => unregisterActivityTokens(await tokens));
     return result;
   },
 };
 
-/**
- * Gathers the push-to-start token plus the current activity's push token, runs
- * each `unregister(token)` in parallel, and reports success plus only the
- * tokens whose unregister failed. Never rejects: the caller tombstones
- * `tokens` when `ok` is false and retries exactly those tokens at the next
- * authenticated opportunity, so a partial failure never re-deletes a token
- * that already succeeded (and may be re-registered by the new session).
- */
-async function unregisterActivityTokens(): Promise<{ ok: boolean; tokens: string[] }> {
+/** Capture the current iOS tokens before a later scope replaces the native instance. */
+async function collectIosActivityTokens(): Promise<string[]> {
   const tokens: string[] = [];
   if (pushToStartToken !== null) {
     tokens.push(pushToStartToken);
@@ -250,6 +256,17 @@ async function unregisterActivityTokens(): Promise<{ ok: boolean; tokens: string
   } catch {
     // Nothing to unregister when no activity survives.
   }
+  return tokens;
+}
+
+/**
+ * Unregister the captured iOS tokens in parallel and report only failures.
+ * The caller tombstones those tokens, so a retry never re-deletes a token
+ * that already succeeded and can belong to the new session.
+ */
+async function unregisterActivityTokens(
+  tokens: string[]
+): Promise<{ ok: boolean; tokens: string[] }> {
   if (tokens.length === 0) {
     return { ok: true, tokens };
   }
@@ -274,7 +291,9 @@ export function _setGetDevicePushTokenForTests(fn: (() => Promise<string | null>
   getDevicePushTokenForTests = fn;
 }
 
-export function _resetAndroidOngoingTokenForTests(): void {
+export function _resetDeliveryRegistrationForTests(): void {
   androidOngoingToken = null;
-  androidMutationTail = null;
+  pushToStartToken = null;
+  registerEpoch += 1;
+  mutationTail = null;
 }

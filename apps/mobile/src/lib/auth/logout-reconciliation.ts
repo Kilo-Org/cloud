@@ -1,11 +1,14 @@
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
+  awaitActivityCleanupSettled,
   deleteLogoutCleanupTombstone,
   type LogoutCleanupTombstone,
   readLogoutCleanupTombstone,
   writeLogoutCleanupTombstone,
 } from '@/lib/auth/logout-cleanup';
+import { chainSave } from '@/lib/hooks/save-chain';
 import { getDevicePushTokenOutcome } from '@/lib/notifications';
+import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
 import { trpcClient } from '@/lib/trpc';
 
 /**
@@ -63,7 +66,13 @@ export async function attemptLogoutReconciliation(
     return { kind: 'spacing-skipped' };
   }
   lastAttemptAtMs = now;
-  attemptInFlight = runReconciliation(userId);
+  const epoch = currentAuthEpoch();
+  // Serialize the whole read/cleanup/write attempt with scope-cleanup merges.
+  // Capture auth before queueing so a later account change still fences it.
+  attemptInFlight = chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {
+    const outcome = await runReconciliation(userId, epoch);
+    return outcome;
+  });
   try {
     return await attemptInFlight;
   } finally {
@@ -89,15 +98,23 @@ export async function awaitLogoutReconciliationSettled(): Promise<void> {
  * reconciliation retry owns those recorded tokens, so a new session must not
  * re-register them: the next attempt would delete the new session's rows. This
  * covers the spacing-skipped case where `attemptLogoutReconciliation` made no
- * new in-flight attempt to await.
+ * new in-flight attempt to await. Wait for scope cleanup to finish its write.
+ * A different known owner cannot retry under this user's auth; unknown
+ * ownership remains conservative.
  */
-export async function hasPendingActivityUnregister(): Promise<boolean> {
+export async function hasPendingActivityUnregister(userId: string | null): Promise<boolean> {
+  await awaitActivityCleanupSettled();
   const tombstone = await readLogoutCleanupTombstone();
-  return tombstone?.needsActivityUnregister ?? false;
+  return (
+    tombstone?.needsActivityUnregister === true &&
+    (userId === null || tombstone.userId === null || tombstone.userId === userId)
+  );
 }
 
-async function runReconciliation(userId: string): Promise<ReconciliationAttemptOutcome> {
-  const epoch = currentAuthEpoch();
+async function runReconciliation(
+  userId: string,
+  epoch: number
+): Promise<ReconciliationAttemptOutcome> {
   const tombstone = await readLogoutCleanupTombstone();
   if (!tombstone) {
     return { kind: 'no-tombstone' };

@@ -750,7 +750,8 @@
       "networkError": "Khalad shabakadeed",
       "uploadFailed": "Soo gudbintu way fashilantay",
       "failedToUploadFile": "Soo gudbinta faylka way fashilantay: {{reason}}",
-      "nothingToPaste": "Waxba ma jiraan wax la dhajiyo"
+      "nothingToPaste": "Waxba ma jiraan wax la dhajiyo",
+      "metadataStripFailed": "Macluumaadka sawirka lama saari karin."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "continueFrom": "Sii wadaya {{title}}",
       "importingSession": "Soo dejinta kalfadhiga",
       "cliCannotContinue": "CLI-kan kuma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",
-      "importFailed": "Kalfadhigan lama soo dejin karin."
+      "importFailed": "Kalfadhigan lama soo dejin karin.",
+      "discardWithUploadsMessage": "Weydintaada iyo faylasha la soo gudbiyay ee aan lagu lifaaqin fariimo la diray waa la tirtiri doonaa."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Dhamaynaya...",
       "messagePlaceholder": "Fariin...",
       "cannotReceiveFiles": "Kalfadhigan ma heli karo faylasha. Ka saar lifaaqyada si aad u dirto fariintaada.",
-      "couldNotAttachFiles": "Faylasha lama lifaaqi karin. Taabo dir si aad mar kale isku daydo."
+      "couldNotAttachFiles": "Faylasha lama lifaaqi karin. Taabo dir si aad mar kale isku daydo.",
+      "discardAttachmentsMessage": "Faylasha la soo gudbiyay ee aan lagu lifaaqin fariimo la diray waa la tirtiri doonaa.",
+      "discardAttachmentsTitle": "Tuur lifaaqyada?"
     },
     "chatLink": {
       "linkCopied": "Xiriirka waa la koobiyay",

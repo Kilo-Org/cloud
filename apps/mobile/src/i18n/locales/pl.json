@@ -296,7 +296,8 @@
       "networkError": "Błąd sieci",
       "uploadFailed": "Przesyłanie nie powiodło się",
       "failedToUploadFile": "Nie udało się przesłać pliku: {{reason}}",
-      "nothingToPaste": "Nie ma nic do wklejenia"
+      "nothingToPaste": "Nie ma nic do wklejenia",
+      "metadataStripFailed": "Nie udało się usunąć metadanych zdjęcia."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1775,7 +1776,8 @@
       "continueFrom": "Kontynuowanie {{title}}",
       "importingSession": "Importowanie sesji",
       "cliCannotContinue": "To CLI nie może kontynuować sesji. Wybierz Cloud Agent lub inne CLI.",
-      "importFailed": "Nie udało się zaimportować tej sesji."
+      "importFailed": "Nie udało się zaimportować tej sesji.",
+      "discardWithUploadsMessage": "Twoje polecenie i wszystkie przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte."
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik",
@@ -2145,7 +2147,9 @@
       "finalizingPlaceholder": "Kończenie...",
       "messagePlaceholder": "Wiadomość...",
       "cannotReceiveFiles": "Ta sesja nie może odbierać plików. Usuń załączniki, aby wysłać wiadomość.",
-      "couldNotAttachFiles": "Nie udało się dołączyć plików. Dotknij Wyślij, aby spróbować ponownie."
+      "couldNotAttachFiles": "Nie udało się dołączyć plików. Dotknij Wyślij, aby spróbować ponownie.",
+      "discardAttachmentsMessage": "Przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",
+      "discardAttachmentsTitle": "Odrzucić załączniki?"
     },
     "chatLink": {
       "linkCopied": "Link skopiowany",

@@ -771,7 +771,8 @@
       "networkError": "Żball tan-netwerk",
       "uploadFailed": "L-upload fallejt",
       "failedToUploadFile": "Ma rnexxiliex ttella' l-fajl: {{reason}}",
-      "nothingToPaste": "Xejn x'tippejstja"
+      "nothingToPaste": "Xejn x'tippejstja",
+      "metadataStripFailed": "Il-metadata tar-ritratt ma setgħetx titneħħa."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2258,7 +2259,8 @@
       "continueFrom": "Qed tkompli {{title}}",
       "importingSession": "Qed timporta s-sessjoni",
       "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
-      "importFailed": "Ma setgħetx timporta din is-sessjoni."
+      "importFailed": "Ma setgħetx timporta din is-sessjoni.",
+      "discardWithUploadsMessage": "Il-prompt tiegħek u kwalunkwe fajl imtella' li mhuwiex mehmuż ma' messaġġ mibgħut se jitħassru."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aġġornat {{displayCount}} fajl",
@@ -2632,7 +2634,9 @@
       "finalizingPlaceholder": "Qed jitlesta...",
       "messagePlaceholder": "Messaġġ...",
       "cannotReceiveFiles": "Din is-sessjoni ma tistax tirċievi fajls. Neħħi l-annessi biex tibgħat il-messaġġ tiegħek.",
-      "couldNotAttachFiles": "Ma setgħux jintrabtu l-fajls. Tektek biex tibgħat u erġa' ipprova."
+      "couldNotAttachFiles": "Ma setgħux jintrabtu l-fajls. Tektek biex tibgħat u erġa' ipprova.",
+      "discardAttachmentsMessage": "Il-fajls imtellgħin li mhumiex mehmuża ma' messaġġi mibgħuta se jitħassru.",
+      "discardAttachmentsTitle": "Twarrab l-annessi?"
     },
     "chatLink": {
       "linkCopied": "Ir-rabta ġiet ikkupjata",

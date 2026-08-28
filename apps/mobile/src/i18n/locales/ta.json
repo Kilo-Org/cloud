@@ -750,7 +750,8 @@
       "networkError": "நெட்வொர்க் பிழை",
       "uploadFailed": "பதிவேற்றம் தோல்வியடைந்தது",
       "failedToUploadFile": "கோப்பை பதிவேற்ற முடியவில்லை: {{reason}}",
-      "nothingToPaste": "ஒட்டுவதற்கு எதுவும் இல்லை"
+      "nothingToPaste": "ஒட்டுவதற்கு எதுவும் இல்லை",
+      "metadataStripFailed": "புகைப்பட மெட்டாடேட்டாவை அகற்ற முடியவில்லை."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "இந்த CLI ஒரு அமர்வைத் தொடர முடியாது. Cloud Agent அல்லது மற்றொரு CLIஐ தேர்ந்தெடுக்கவும்.",
       "continueFrom": "{{title}} தொடர்கிறது",
       "importFailed": "இந்த அமர்வை இறக்குமதி செய்ய முடியவில்லை.",
-      "importingSession": "அமர்வை இறக்குமதி செய்கிறது"
+      "importingSession": "அமர்வை இறக்குமதி செய்கிறது",
+      "discardWithUploadsMessage": "உங்கள் வினவலும் அனுப்பிய செய்திகளில் இணைக்கப்படாத பதிவேற்றங்களும் நீக்கப்படும்."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "முடிக்கிறது...",
       "messagePlaceholder": "செய்தி...",
       "cannotReceiveFiles": "இந்த அமர்வு கோப்புகளைப் பெற முடியாது. உங்கள் செய்தியை அனுப்ப இணைப்புகளை அகற்றவும்.",
-      "couldNotAttachFiles": "கோப்புகளை இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்க அனுப்பு என்பதைத் தட்டவும்."
+      "couldNotAttachFiles": "கோப்புகளை இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்க அனுப்பு என்பதைத் தட்டவும்.",
+      "discardAttachmentsMessage": "அனுப்பிய செய்திகளில் இணைக்கப்படாத பதிவேற்றங்கள் நீக்கப்படும்.",
+      "discardAttachmentsTitle": "இணைப்புகளை நிராகரிக்கவா?"
     },
     "chatLink": {
       "linkCopied": "இணைப்பு நகலெடுக்கப்பட்டது",

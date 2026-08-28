@@ -296,7 +296,8 @@
       "networkError": "Ошибка сети",
       "uploadFailed": "Загрузка не удалась",
       "failedToUploadFile": "Не удалось загрузить файл: {{reason}}",
-      "nothingToPaste": "Нечего вставлять"
+      "nothingToPaste": "Нечего вставлять",
+      "metadataStripFailed": "Не удалось удалить метаданные фотографии."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1775,7 +1776,8 @@
       "cliCannotContinue": "Этот CLI не может продолжить сеанс. Выберите Cloud Agent или другой CLI.",
       "continueFrom": "Продолжение {{title}}",
       "importFailed": "Не удалось импортировать этот сеанс.",
-      "importingSession": "Импорт сеанса"
+      "importingSession": "Импорт сеанса",
+      "discardWithUploadsMessage": "Ваш запрос и все загруженные файлы, не прикрепленные к отправленным сообщениям, будут удалены."
     },
     "partRenderer": {
       "updatedFileCount_one": "Обновлен {{displayCount}} файл",
@@ -2145,7 +2147,9 @@
       "finalizingPlaceholder": "Завершение...",
       "messagePlaceholder": "Сообщение...",
       "cannotReceiveFiles": "Эта сессия не может получать файлы. Удалите вложения, чтобы отправить сообщение.",
-      "couldNotAttachFiles": "Не удалось прикрепить файлы. Нажмите «Отправить», чтобы повторить."
+      "couldNotAttachFiles": "Не удалось прикрепить файлы. Нажмите «Отправить», чтобы повторить.",
+      "discardAttachmentsMessage": "Загруженные файлы, не прикрепленные к отправленным сообщениям, будут удалены.",
+      "discardAttachmentsTitle": "Удалить вложения?"
     },
     "chatLink": {
       "linkCopied": "Ссылка скопирована",

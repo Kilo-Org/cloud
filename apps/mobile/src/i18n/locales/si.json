@@ -750,7 +750,8 @@
       "networkError": "ජාල දෝෂය",
       "uploadFailed": "උඩුගත කිරීම අසාර්ථකයි",
       "failedToUploadFile": "ගොනුව උඩුගත කිරීමට අසමත් විය: {{reason}}",
-      "nothingToPaste": "ඇලවීමට කිසිවක් නැත"
+      "nothingToPaste": "ඇලවීමට කිසිවක් නැත",
+      "metadataStripFailed": "ඡායාරූපයේ පාරදත්ත ඉවත් කළ නොහැකි විය."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "මෙම CLI සැසියක් දිගටම කරගෙන යා නොහැක. Cloud Agent හෝ වෙනත් CLI එකක් තෝරන්න.",
       "continueFrom": "{{title}} දිගටම කරගෙන යමින්",
       "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය.",
-      "importingSession": "සැසිය ආයාත කරමින්"
+      "importingSession": "සැසිය ආයාත කරමින්",
+      "discardWithUploadsMessage": "ඔබේ ඉල්ලීම සහ යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ගොනුවක් යාවත්කාලීන කර ඇත",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "අවසන් කරමින්...",
       "messagePlaceholder": "පණිවිඩය...",
       "cannotReceiveFiles": "මෙම සැසියට ගොනු ලබා ගත නොහැක. ඔබගේ පණිවිඩය යැවීමට ඇමුණුම් ඉවත් කරන්න.",
-      "couldNotAttachFiles": "ගොනු ඇමිණිය නොහැකි විය. නැවත උත්සාහ කිරීමට යැවීම තට්ටු කරන්න."
+      "couldNotAttachFiles": "ගොනු ඇමිණිය නොහැකි විය. නැවත උත්සාහ කිරීමට යැවීම තට්ටු කරන්න.",
+      "discardAttachmentsMessage": "යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත.",
+      "discardAttachmentsTitle": "ඇමුණුම් ඉවතලන්නද?"
     },
     "chatLink": {
       "linkCopied": "සබැඳිය පිටපත් කරන ලදී",

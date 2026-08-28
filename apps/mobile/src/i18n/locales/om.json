@@ -750,7 +750,8 @@
       "networkError": "Dogoggorri network",
       "uploadFailed": "Ol fe'uun hin milkoofne",
       "failedToUploadFile": "Faayilii ol fe'uu dadhabe: {{reason}}",
-      "nothingToPaste": "Maxxansuuf wanti hin jiru"
+      "nothingToPaste": "Maxxansuuf wanti hin jiru",
+      "metadataStripFailed": "Odeeffannoon suuraa baafamuu hin danda'ame."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2213,7 +2214,8 @@
       "cliCannotContinue": "CLI kuni shumarra itti fufuu hin danda'u. Cloud Agent ykn CLI biraa filadhu.",
       "continueFrom": "{{title}} itti fufaa jira",
       "importFailed": "Shumarra kana galchuu hin danda'ine.",
-      "importingSession": "Shumarra galchaa jira"
+      "importingSession": "Shumarra galchaa jira",
+      "discardWithUploadsMessage": "Gaaffiin keessanii fi faayiloonni ol fe'aman kan ergaawwan ergamanitti hin qabachiifamne ni haqamu."
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayilii {{displayCount}} haaromfame",
@@ -2575,7 +2577,9 @@
       "finalizingPlaceholder": "Xumuraa jira...",
       "messagePlaceholder": "Ergaa...",
       "cannotReceiveFiles": "Shumarri kun faayiloota fudhachuu hin danda'u. Ergaa kee erguuf faayiloota baasi.",
-      "couldNotAttachFiles": "Faayiloota qabachiisuu hin danda'ine. Erguuf ergi cuqaasa."
+      "couldNotAttachFiles": "Faayiloota qabachiisuu hin danda'ine. Erguuf ergi cuqaasa.",
+      "discardAttachmentsMessage": "Faayiloonni ol fe'aman kan ergaawwan ergamanitti hin qabachiifamne ni haqamu.",
+      "discardAttachmentsTitle": "Faayiloota qabachiifaman haqnaa?"
     },
     "chatLink": {
       "linkCopied": "Geessituun maxxanameera",

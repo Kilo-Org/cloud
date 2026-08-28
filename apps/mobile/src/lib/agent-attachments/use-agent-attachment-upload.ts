@@ -109,6 +109,14 @@ const RESTORED_ATTACHMENT_URL = /^file:\/\/\/tmp\/attachments\/([^/]+)\/([^/]+)\
 // both the filename and the messageUuid (the re-send wire's `path`).
 const CLOUD_AGENT_RESTORE_URL = /^cloud-agent:\/\/([^/]+)\/([^/]+)$/;
 
+// A presigned R2 GET URL (remote attachment parts) carries the object key in
+// its path: `<endpoint>/<bucket>/<userId>/cloud-agent/<messageUuid>/<filename>`
+// (see services/cloud-agent-next/src/utils/attachment-download.ts). Recover
+// the message UUID and the remote filename from that path so a cancel-restore
+// re-sends under the original upload path instead of the rotated one, and so
+// the admission marker never carries the signed URL's query credentials.
+const SIGNED_CLOUD_AGENT_URL = /\/cloud-agent\/([^/]+)\/([^/]+)$/;
+
 type ResolvedRestoredAttachmentReference = {
   remoteKey: string;
   remoteFilename: string;
@@ -120,8 +128,9 @@ type ResolvedRestoredAttachmentReference = {
  * parts are already uploaded and linked, so the chip must be re-admitted on
  * the next send without a false "ready" chip that sends nothing. The remote
  * key is only an admission marker for an already-linked object (a release of a
- * non-pending key is a no-op server-side), so a presigned https URL that does
- * not expose its key safely falls back to the URL itself.
+ * non-pending key is a no-op server-side), so it never needs to be the raw
+ * signed URL; the message UUID and remote filename are recovered from the
+ * key's `/cloud-agent/<uuid>/<filename>` path segment instead.
  */
 function resolveRestoredAttachmentReference(input: {
   filename?: string;
@@ -153,6 +162,18 @@ function resolveRestoredAttachmentReference(input: {
     }
   }
   const withoutQueryHash = input.url.split(/[?#]/)[0] ?? input.url;
+  const signed = SIGNED_CLOUD_AGENT_URL.exec(withoutQueryHash);
+  if (signed) {
+    const messageUuid = signed[1];
+    const filename = signed[2];
+    if (messageUuid !== undefined && filename !== undefined) {
+      return {
+        remoteKey: `cloud-agent/${messageUuid}/${filename}`,
+        remoteFilename: filename,
+        messageUuid,
+      };
+    }
+  }
   const basename = /[^/]+$/.exec(withoutQueryHash)?.[0];
   const extension = normalizeAttachmentExtension(basename ?? input.filename ?? 'file');
   const remoteFilename = basename

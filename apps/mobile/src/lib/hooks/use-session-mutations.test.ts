@@ -1,391 +1,302 @@
-/* eslint-disable max-lines -- one file for the rename/delete optimistic mutation wiring and rollback suites */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as ReactQuery from '@tanstack/react-query';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  mutationActiveTitle as activeTitle,
+  deferred,
+  flushQueryUpdates as flush,
+  makeCached,
+  makeTestQueryClient,
+  QUERY_KEY,
+  replaceMutationAccount,
+  seedMutationSessions,
+  mutationStoredTitles as titles,
+} from '@/lib/active-sessions-live-sync.test-helpers';
+import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
+import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
+import { getActiveSessionsQueryMetadata } from '@/lib/query-client';
 import { useSessionMutations } from './use-session-mutations';
 
-type MutationOptions = {
-  onMutate?: (input: { session_id: string; title?: string }) => Promise<unknown> | unknown;
-  onError?: (error: Error, input: unknown, context: unknown) => void;
-  onSettled?: () => unknown;
-  scope?: { id: string };
-  [key: string]: unknown;
-};
-type TrpcMock = {
-  cliSessionsV2: {
-    list: { infiniteQueryKey: () => readonly unknown[] };
-    recentRepositories: unknown;
-    rename: { mutationOptions: (opts: MutationOptions) => MutationOptions };
-    delete: { mutationOptions: (opts: MutationOptions) => MutationOptions };
+type Input = { session_id: string; title?: string };
+type MutationOptions = ReactQuery.MutationOptions<unknown, Error, Input>;
+let client = makeTestQueryClient();
+const rpc = { rename: vi.fn(), delete: vi.fn() };
+const messages: string[] = [];
+const settled: (() => void)[] = [];
+const listKey = [['cliSessionsV2', 'list'], { type: 'infinite' }] as const;
+const activeFilter = { queryKey: [['activeSessions', 'list']] };
+
+// Execute real mutations, including cancellation, context, and late rejection.
+vi.mock('@tanstack/react-query', async importOriginal => {
+  const actual = await importOriginal<typeof ReactQuery>();
+  return {
+    ...actual,
+    useQueryClient: () => client,
+    useMutation: (options: MutationOptions) => {
+      const owner = client;
+      return {
+        mutateAsync: async (input: Input) => {
+          const result = await owner.getMutationCache().build(owner, options).execute(input);
+          return result;
+        },
+      };
+    },
   };
-  activeSessions: {
-    list: { pathFilter: () => { queryKey: readonly unknown[] } };
-  };
-};
-
-const mutationOptionsSpy = vi.fn<(opts: MutationOptions) => MutationOptions>();
-const capturedOptions: { rename: MutationOptions | null; delete: MutationOptions | null } = {
-  rename: null,
-  delete: null,
-};
-const mutateAsyncMock = vi.fn();
-const cancelQueriesMock = vi.fn();
-const getQueriesDataMock = vi.fn();
-const setQueriesDataMock = vi.fn();
-const setQueryDataMock = vi.fn();
-const invalidateQueriesMock = vi.fn();
-const invalidateAgentSessionsMock = vi.fn();
-const scheduleCacheMaintenanceMock = vi.fn<(run: () => void) => void>();
-const toastErrorMock = vi.fn();
-const toastSuccessMock = vi.fn();
-// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-const chainSaveMock = vi.fn((_id: string, op: () => Promise<unknown>) => op());
-
-const listKey = ['cliSessionsV2', 'list'] as const;
-const activeFilter = { queryKey: ['activeSessions', 'list'] as const };
-
-const makeMutationOptions = (opts: MutationOptions) => {
-  mutationOptionsSpy(opts);
-  return opts;
-};
-
-vi.mock('@tanstack/react-query', () => ({
-  useMutation: (opts: MutationOptions) => {
-    // rename is registered second in useSessionMutations; capture both.
-    if (capturedOptions.delete === null) {
-      capturedOptions.delete = opts;
-    } else {
-      capturedOptions.rename = opts;
-    }
-    return { mutateAsync: mutateAsyncMock };
-  },
-  useQueryClient: () => ({
-    cancelQueries: cancelQueriesMock,
-    getQueriesData: getQueriesDataMock,
-    setQueriesData: setQueriesDataMock,
-    setQueryData: setQueryDataMock,
-    invalidateQueries: invalidateQueriesMock,
-  }),
-  hashKey: (key: unknown) => JSON.stringify(key),
-}));
-
+});
 vi.mock('@/lib/trpc', () => ({
-  useTRPC: () =>
-    ({
-      cliSessionsV2: {
-        list: { infiniteQueryKey: () => listKey },
-        recentRepositories: {},
-        rename: { mutationOptions: makeMutationOptions },
-        delete: { mutationOptions: makeMutationOptions },
+  useTRPC: () => ({
+    cliSessionsV2: {
+      list: { infiniteQueryKey: () => listKey },
+      rename: {
+        mutationOptions: (options: MutationOptions) => ({ ...options, mutationFn: rpc.rename }),
       },
-      activeSessions: {
-        list: { pathFilter: () => activeFilter },
+      delete: {
+        mutationOptions: (options: MutationOptions) => ({ ...options, mutationFn: rpc.delete }),
       },
-    }) satisfies TrpcMock,
+    },
+    activeSessions: { list: { pathFilter: () => activeFilter } },
+  }),
 }));
-
 vi.mock('@/lib/agent-session-cache', () => ({
-  // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-  invalidateAgentSessionQueries: (...args: unknown[]) => {
-    invalidateAgentSessionsMock(...args);
-    return Promise.resolve();
+  invalidateAgentSessionQueries: async (owner: ReactQuery.QueryClient) => {
+    await owner.invalidateQueries();
   },
 }));
-
 vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
   scheduleCacheMaintenance: (run: () => void) => {
-    scheduleCacheMaintenanceMock(run);
+    settled.push(run);
   },
 }));
+vi.mock('@/lib/a11y/announcing-toast', () => {
+  const record = (message: string) => {
+    messages.push(message);
+  };
+  return { announcingToast: { error: record, success: record } };
+});
 
-vi.mock('sonner-native', () => ({
-  toast: { error: (msg: string) => toastErrorMock(msg) },
-}));
+function expectAccountBUnchanged() {
+  expect(titles(client, listKey)).toEqual(['Account B', 'Other']);
+  expect(activeTitle(client)).toBe('Account B');
+  expect(messages).toEqual([]);
+  expect(client.getQueryState(listKey)?.isInvalidated).toBe(false);
+  expect(isSignOutActive()).toBe(false);
+}
+afterAll(
+  setTrpcUnauthorizedHandler(() => {
+    setSignOutActive(true);
+  })
+);
+beforeEach(() => {
+  setSignOutActive(false);
+  client = makeTestQueryClient();
+  rpc.rename.mockReset().mockResolvedValue(undefined);
+  rpc.delete.mockReset().mockResolvedValue(undefined);
+  messages.length = 0;
+  settled.length = 0;
+  seedMutationSessions(client, listKey);
+});
+afterEach(() => {
+  client.clear();
+  setSignOutActive(false);
+});
 
-vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: {
-    error: (msg: string) => toastErrorMock(msg),
-    success: (msg: string) => toastSuccessMock(msg),
-  },
-}));
-
-vi.mock('@/lib/hooks/save-chain', () => ({
-  // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-  chainSave: (id: string, op: () => Promise<unknown>) => chainSaveMock(id, op),
-}));
-
-describe('useSessionMutations', () => {
-  beforeEach(() => {
-    mutationOptionsSpy.mockClear();
-    capturedOptions.rename = null;
-    capturedOptions.delete = null;
-    mutateAsyncMock.mockReset();
-    cancelQueriesMock.mockReset();
-    getQueriesDataMock.mockReset();
-    setQueriesDataMock.mockReset();
-    setQueryDataMock.mockReset();
-    invalidateQueriesMock.mockReset();
-    invalidateAgentSessionsMock.mockReset();
-    scheduleCacheMaintenanceMock.mockReset();
-    toastErrorMock.mockReset();
-    toastSuccessMock.mockReset();
-    chainSaveMock.mockClear();
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    chainSaveMock.mockImplementation((_id, op) => op());
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe('renameSessionAsync', () => {
-    it('rejects after the mutation onError has toasted and rolled back list cache', async () => {
-      const error = new Error('rename failed');
-      mutateAsyncMock.mockRejectedValueOnce(error);
-      getQueriesDataMock.mockReturnValue([]);
-
-      const { renameSessionAsync } = useSessionMutations();
-      await expect(renameSessionAsync('s1', 'New title')).rejects.toBe(error);
-
-      expect(chainSaveMock).toHaveBeenCalledWith('s1', expect.any(Function));
-      // The mutation's onError must run before the rejection propagates so the
-      // existing list-cache rollback and user-visible toast still fire.
-      const options = capturedOptions.rename;
-      expect(options?.onError).toBeDefined();
-      options?.onError?.(error, { session_id: 's1', title: 'New title' }, undefined);
-      expect(toastErrorMock).toHaveBeenCalledWith('rename failed');
+describe('useSessionMutations account publication', () => {
+  it('retitles and rolls back both caches without accepting manual writes or clearing a fetch failure', async () => {
+    const query = client.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
+    await client.fetchQuery({
+      queryKey: QUERY_KEY,
+      queryFn: () => ({ sessions: [makeCached({ id: 's1', title: 'Old' })] }),
     });
-
-    it('reuses the same rename mutation options as renameSession', () => {
-      // The detail hook relies on the async variant being backed by the exact
-      // same mutation (and therefore the same onError/onSettled wiring) as
-      // the list's fire-and-forget variant.
-      const { renameSessionAsync } = useSessionMutations();
-      void renameSessionAsync;
-      expect(mutationOptionsSpy).toHaveBeenCalled();
+    await expect(
+      client.fetchQuery({
+        queryKey: QUERY_KEY,
+        queryFn: () => {
+          throw new Error('offline');
+        },
+      })
+    ).rejects.toThrow('offline');
+    const metadata = getActiveSessionsQueryMetadata(query);
+    const request = deferred<undefined>();
+    rpc.rename.mockReturnValue(request.promise);
+    const error = new Error('rename failed');
+    const rejection = expect(useSessionMutations().renameSessionAsync('s1', 'New')).rejects.toBe(
+      error
+    );
+    await vi.waitFor(() => {
+      expect(activeTitle(client)).toBe('New');
     });
+    expect(titles(client, listKey)).toEqual(['New', 'Other']);
+    expect(getActiveSessionsQueryMetadata(query)).toBe(metadata);
+    request.reject(error);
+    await rejection;
+    expect(activeTitle(client)).toBe('Old');
+    expect(titles(client, listKey)).toEqual(['Old', 'Other']);
+    expect(getActiveSessionsQueryMetadata(query)).toBe(metadata);
+    expect(messages).toEqual(['rename failed']);
+    expect(rpc.rename.mock.calls[0]?.[0]).toEqual({ session_id: 's1', title: 'New' });
   });
 
-  describe('rename optimistic tray patch', () => {
-    it('onMutate cancels and patches both the stored-list and active-list caches', async () => {
-      const storedSnapshot: [unknown, unknown][] = [[listKey, { pages: [], pageParams: [] }]];
-      const activeSnapshot: [unknown, unknown][] = [
-        [
-          activeFilter.queryKey,
-          {
-            sessions: [
-              { id: 's1', title: 'Old' },
-              { id: 's2', title: 'Other' },
-            ],
-          },
-        ],
-      ];
-      // First getQueriesData = stored list; second = active list.
-      getQueriesDataMock.mockReturnValueOnce(storedSnapshot).mockReturnValueOnce(activeSnapshot);
+  it('deletes only stored rows and moves focus after server confirmation', async () => {
+    const request = deferred<undefined>();
+    rpc.delete.mockReturnValue(request.promise);
+    let focused = 'row';
+    useSessionMutations().deleteSession('s1', () => {
+      focused = 'list';
+    });
+    await vi.waitFor(() => {
+      expect(titles(client, listKey)).toEqual(['Other']);
+    });
+    expect(activeTitle(client)).toBe('Old');
+    expect(focused).toBe('row');
+    request.resolve(undefined);
+    await vi.waitFor(() => {
+      expect(focused).toBe('list');
+    });
+    expect(messages).toEqual(['Session deleted']);
+    expect(rpc.delete.mock.calls[0]?.[0]).toEqual({ session_id: 's1' });
+  });
 
-      useSessionMutations();
-      const onMutate = capturedOptions.rename?.onMutate;
-      expect(onMutate).toBeDefined();
-      if (!onMutate) {
-        throw new Error('expected rename onMutate');
+  it.each([
+    { operation: 'rename', fails: true },
+    { operation: 'delete', fails: true },
+    { operation: 'rename', fails: false },
+    { operation: 'delete', fails: false },
+  ] as const)(
+    'fences late $operation settlement, fails=$fails, after real clear and replacement',
+    async ({ operation, fails }) => {
+      const mutations = useSessionMutations();
+      await mutations.renameSessionAsync('s1', 'Prepared');
+      const request = deferred<undefined>();
+      rpc[operation].mockReturnValue(request.promise);
+      const outcomes: Promise<unknown>[] = [];
+      let focused = 'account-b';
+      if (operation === 'rename') {
+        outcomes.push(
+          expect(mutations.renameSessionAsync('s1', 'New')).rejects.toBeInstanceOf(Error)
+        );
+      } else {
+        mutations.deleteSession('s1', () => {
+          focused = 'stale-row';
+        });
       }
-
-      const context = await onMutate({ session_id: 's1', title: 'New title' });
-
-      expect(cancelQueriesMock).toHaveBeenCalledWith({ queryKey: listKey });
-      expect(cancelQueriesMock).toHaveBeenCalledWith(activeFilter);
-      expect(setQueriesDataMock).toHaveBeenCalledTimes(2);
-
-      // Stored-list updater (first setQueriesData call).
-      const storedUpdater = setQueriesDataMock.mock.calls[0]?.[1] as
-        | ((old: unknown) => unknown)
-        | undefined;
-      expect(storedUpdater).toBeTypeOf('function');
-
-      // Active-list updater retitles only the target row.
-      const activeUpdater = setQueriesDataMock.mock.calls[1]?.[1] as
-        | ((old: { sessions: { id: string; title: string }[] } | undefined) => unknown)
-        | undefined;
-      expect(setQueriesDataMock.mock.calls[1]?.[0]).toBe(activeFilter);
-      expect(activeUpdater).toBeTypeOf('function');
-      expect(
-        activeUpdater?.({
-          sessions: [
-            { id: 's1', title: 'Old' },
-            { id: 's2', title: 'Other' },
-          ],
-        })
-      ).toEqual({
-        sessions: [
-          { id: 's1', title: 'New title' },
-          { id: 's2', title: 'Other' },
-        ],
-      });
-      expect(activeUpdater?.(undefined)).toBeUndefined();
-
-      expect(context).toEqual({
-        previous: storedSnapshot,
-        previousActive: activeSnapshot,
-        generation: expect.any(Number),
-      });
-    });
-
-    it('onError restores both snapshots and toasts the error', async () => {
-      const storedSnapshot: [unknown, unknown][] = [[['stored-key'], { pages: ['stored'] }]];
-      const activeSnapshot: [unknown, unknown][] = [
-        [['active-key'], { sessions: [{ id: 's1', title: 'Old' }] }],
-      ];
-      getQueriesDataMock.mockReturnValueOnce(storedSnapshot).mockReturnValueOnce(activeSnapshot);
-
-      useSessionMutations();
-      const options = capturedOptions.rename;
-      const onMutate = options?.onMutate;
-      if (!onMutate) {
-        throw new Error('expected rename onMutate');
-      }
-      const context = await onMutate({ session_id: 's1', title: 'New' });
-
-      setQueryDataMock.mockClear();
-      options.onError?.(new Error('rename failed'), { session_id: 's1', title: 'New' }, context);
-
-      expect(setQueryDataMock).toHaveBeenCalledWith(['stored-key'], { pages: ['stored'] });
-      expect(setQueryDataMock).toHaveBeenCalledWith(['active-key'], {
-        sessions: [{ id: 's1', title: 'Old' }],
-      });
-      expect(toastErrorMock).toHaveBeenCalledWith('rename failed');
-    });
-
-    it('onSettled still invalidates agent session queries', () => {
-      useSessionMutations();
-      const options = capturedOptions.rename;
-      options?.onSettled?.();
-
-      // The invalidation is deferred behind the interaction scheduler; drive
-      // the injected callback to run it in this turn.
-      const scheduled = scheduleCacheMaintenanceMock.mock.calls[0]?.[0];
-      expect(scheduled).toBeTypeOf('function');
-      scheduled?.();
-
-      expect(invalidateAgentSessionsMock).toHaveBeenCalled();
-    });
-  });
-
-  describe('delete does not touch the active cache', () => {
-    it('onMutate only patches the stored-list cache', async () => {
-      getQueriesDataMock.mockReturnValue([]);
-
-      useSessionMutations();
-      const onMutate = capturedOptions.delete?.onMutate;
-      expect(onMutate).toBeDefined();
-      if (!onMutate) {
-        throw new Error('expected delete onMutate');
-      }
-
-      await onMutate({ session_id: 's1' });
-
-      expect(cancelQueriesMock).toHaveBeenCalledWith({ queryKey: listKey });
-      expect(cancelQueriesMock).not.toHaveBeenCalledWith(activeFilter);
-      expect(setQueriesDataMock).toHaveBeenCalledTimes(1);
-      expect(setQueriesDataMock.mock.calls[0]?.[0]).toEqual({ queryKey: listKey });
-    });
-  });
-
-  describe('generation guard (shared cliSessionsV2.list cache)', () => {
-    it('adds no scope.id (callers already serialize per session via chainSave)', () => {
-      useSessionMutations();
-      expect(capturedOptions.delete?.scope).toBeUndefined();
-      expect(capturedOptions.rename?.scope).toBeUndefined();
-    });
-
-    it('a failing older delete does not roll back while a newer rename owns the shared list cache', async () => {
-      const deleteSnapshot: [unknown, unknown][] = [[['delete-key'], { pages: ['delete'] }]];
-      const renameStoredSnapshot: [unknown, unknown][] = [[['stored-key'], { pages: ['stored'] }]];
-      const renameActiveSnapshot: [unknown, unknown][] = [
-        [['active-key'], { sessions: [{ id: 's2', title: 'Old' }] }],
-      ];
-      getQueriesDataMock
-        .mockReturnValueOnce(deleteSnapshot)
-        .mockReturnValueOnce(renameStoredSnapshot)
-        .mockReturnValueOnce(renameActiveSnapshot);
-
-      useSessionMutations();
-      const deleteOnMutate = capturedOptions.delete?.onMutate;
-      const renameOnMutate = capturedOptions.rename?.onMutate;
-      if (!deleteOnMutate || !renameOnMutate) {
-        throw new Error('expected onMutate');
-      }
-
-      const olderDelete = await deleteOnMutate({ session_id: 's1' });
-      const newerRename = await renameOnMutate({ session_id: 's2', title: 'New' });
-
-      setQueryDataMock.mockClear();
-      capturedOptions.delete?.onError?.(
-        new Error('delete failed'),
-        { session_id: 's1' },
-        olderDelete
-      );
-      // The older delete's rollback must not restore its snapshot over the
-      // newer rename's optimistic write.
-      expect(setQueryDataMock).not.toHaveBeenCalled();
-      expect(toastErrorMock).toHaveBeenCalledWith('delete failed');
-
-      capturedOptions.rename?.onError?.(
-        new Error('rename failed'),
-        { session_id: 's2', title: 'New' },
-        newerRename
-      );
-      expect(setQueryDataMock).toHaveBeenCalledWith(['stored-key'], { pages: ['stored'] });
-      expect(setQueryDataMock).toHaveBeenCalledWith(['active-key'], {
-        sessions: [{ id: 's2', title: 'Old' }],
-      });
-      expect(toastErrorMock).toHaveBeenCalledWith('rename failed');
-    });
-
-    it('a failing latest delete rolls back its snapshot and toasts', async () => {
-      const deleteSnapshot: [unknown, unknown][] = [[['delete-key'], { pages: ['delete'] }]];
-      getQueriesDataMock.mockReturnValue(deleteSnapshot);
-
-      useSessionMutations();
-      const onMutate = capturedOptions.delete?.onMutate;
-      if (!onMutate) {
-        throw new Error('expected delete onMutate');
-      }
-      const context = await onMutate({ session_id: 's1' });
-
-      setQueryDataMock.mockClear();
-      capturedOptions.delete?.onError?.(new Error('delete failed'), { session_id: 's1' }, context);
-      expect(setQueryDataMock).toHaveBeenCalledWith(['delete-key'], { pages: ['delete'] });
-      expect(toastErrorMock).toHaveBeenCalledWith('delete failed');
-    });
-  });
-
-  describe('deleteSession completion callback', () => {
-    it('toasts success and invokes onDeleted after a successful delete', async () => {
-      mutateAsyncMock.mockResolvedValue(undefined);
-      const onDeleted = vi.fn(() => undefined);
-
-      const { deleteSession } = useSessionMutations();
-      deleteSession('s1', onDeleted);
-
       await vi.waitFor(() => {
-        expect(onDeleted).toHaveBeenCalledTimes(1);
+        expect(titles(client, listKey)).not.toContain('Prepared');
       });
-      expect(chainSaveMock).toHaveBeenCalledWith('s1', expect.any(Function));
-      expect(toastSuccessMock).toHaveBeenCalledWith('Session deleted');
-    });
+      replaceMutationAccount(client, listKey);
+      for (const run of settled) {
+        run();
+      }
+      if (fails) {
+        request.reject(
+          Object.assign(new Error('late unauthorized'), { data: { authRequired: true } })
+        );
+      } else {
+        request.resolve(undefined);
+      }
+      await Promise.all(outcomes);
+      await flush();
+      expectAccountBUnchanged();
+      expect(focused).toBe('account-b');
+    }
+  );
 
-    it('does not invoke onDeleted or the success toast when the delete fails', async () => {
-      mutateAsyncMock.mockRejectedValueOnce(new Error('delete failed'));
-      const onDeleted = vi.fn(() => undefined);
-
-      const { deleteSession } = useSessionMutations();
-      deleteSession('s1', onDeleted);
-
-      // Flush the async IIFE so the internal catch has definitely run.
-      await new Promise<void>(resolve => {
-        setTimeout(resolve, 0);
+  it.each(['stored-rename', 'active-rename', 'stored-delete'] as const)(
+    'rechecks the account after delayed %s cancellation',
+    async stage => {
+      const gate = deferred<undefined>();
+      const cancel = client.cancelQueries.bind(client);
+      const target = stage === 'active-rename' ? activeFilter.queryKey : listKey;
+      let waiting = false;
+      vi.spyOn(client, 'cancelQueries').mockImplementation(async filters => {
+        if (JSON.stringify(filters?.queryKey) === JSON.stringify(target)) {
+          waiting = true;
+          await gate.promise;
+        }
+        await cancel(filters);
       });
-      expect(onDeleted).not.toHaveBeenCalled();
-      expect(toastSuccessMock).not.toHaveBeenCalled();
+      const mutations = useSessionMutations();
+      if (stage === 'stored-delete') {
+        mutations.deleteSession('s1');
+      } else {
+        mutations.renameSession('s1', 'New');
+      }
+      await vi.waitFor(() => {
+        expect(waiting).toBe(true);
+      });
+      replaceMutationAccount(client, listKey);
+      gate.resolve(undefined);
+      await flush();
+      expectAccountBUnchanged();
+      expect(rpc.rename.mock.calls).toEqual([]);
+      expect(rpc.delete.mock.calls).toEqual([]);
+    }
+  );
+
+  it.each(['rename', 'delete'] as const)(
+    'rejects queued %s work from the previous account',
+    async queued => {
+      const request = deferred<undefined>();
+      rpc.rename.mockReturnValueOnce(request.promise);
+      const mutations = useSessionMutations();
+      mutations.renameSession('s1', 'New');
+      if (queued === 'rename') {
+        mutations.renameSession('s1', 'Later');
+      } else {
+        mutations.deleteSession('s1');
+      }
+      await vi.waitFor(() => {
+        expect(activeTitle(client)).toBe('New');
+      });
+      replaceMutationAccount(client, listKey);
+      request.resolve(undefined);
+      await flush();
+      expectAccountBUnchanged();
+      expect(rpc.rename.mock.calls.map(call => call[0])).toEqual([
+        { session_id: 's1', title: 'New' },
+      ]);
+      expect(rpc.delete.mock.calls).toEqual([]);
+    }
+  );
+
+  it('does not send a mutation after replacement between onMutate and mutationFn', async () => {
+    const unsubscribe = client.getMutationCache().subscribe(event => {
+      if (
+        event.type === 'updated' &&
+        event.action.type === 'pending' &&
+        event.mutation.state.context
+      ) {
+        replaceMutationAccount(client, listKey);
+      }
     });
+    await expect(useSessionMutations().renameSessionAsync('s1', 'New')).rejects.toThrow(
+      'inactive account'
+    );
+    unsubscribe();
+    expectAccountBUnchanged();
+    expect(rpc.rename.mock.calls).toEqual([]);
+  });
+
+  it('keeps the latest same-account mutation generation in control of rollback', async () => {
+    const deletion = deferred<undefined>();
+    const rename = deferred<undefined>();
+    rpc.delete.mockReturnValue(deletion.promise);
+    rpc.rename.mockReturnValue(rename.promise);
+    const mutations = useSessionMutations();
+    mutations.deleteSession('s1');
+    await vi.waitFor(() => {
+      expect(titles(client, listKey)).toEqual(['Other']);
+    });
+    const error = new Error('rename failed');
+    const rejection = expect(mutations.renameSessionAsync('s2', 'Newer')).rejects.toBe(error);
+    await vi.waitFor(() => {
+      expect(titles(client, listKey)).toEqual(['Newer']);
+    });
+    deletion.reject(new Error('delete failed'));
+    await flush();
+    expect(titles(client, listKey)).toEqual(['Newer']);
+    rename.reject(error);
+    await rejection;
+    expect(titles(client, listKey)).toEqual(['Other']);
+    expect(messages).toEqual(['delete failed', 'rename failed']);
   });
 });

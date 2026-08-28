@@ -58,7 +58,8 @@ export function buildLiveFilterOptions(sessions: readonly LiveFilterSession[]): 
   return {
     projectOptions: [...projects]
       .map(([gitUrl, displayName]) => ({ gitUrl, displayName }))
-      .toSorted((a, b) => a.displayName.localeCompare(b.displayName)),
+      // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; map already copies so nothing shared is mutated
+      .sort((a, b) => a.displayName.localeCompare(b.displayName)),
     // Keep the canonical platform order the filter modal uses.
     platformOptions: PLATFORM_FILTERS.filter(bucket => platforms.has(bucket)),
   };

@@ -75,7 +75,7 @@ export type CreateRemoteSessionRawResult = unknown;
  * subclass contract.
  */
 export async function createRemoteSessionOnConnection(
-  connection: Pick<UserWebConnection, 'sendCommandToConnection'>,
+  connection: Pick<UserWebConnection, 'sendCommandToConnection' | 'captureActionAdmission'>,
   connectionId: string,
   input?: CreateRemoteSessionInput
 ): Promise<CreateRemoteSessionRawResult> {
@@ -89,6 +89,13 @@ export async function createRemoteSessionOnConnection(
       ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
       : {}),
   };
+  // Capture before either attempt. Old connection objects omit this method;
+  // remove that fallback only after every supported producer exposes capture.
+  const actionAdmission = connection.captureActionAdmission?.({
+    command: 'create_session',
+    data,
+    connectionId,
+  });
   // `directory` is an extended field; the `:bare` retry omits it for old CLIs.
   // Remove `:bare` when every supported CLI accepts it.
   const hasExtendedFields =
@@ -106,6 +113,7 @@ export async function createRemoteSessionOnConnection(
       data,
       expectedConnectionId: connectionId,
       ...(extendedMutationId !== undefined ? { mutationId: extendedMutationId } : {}),
+      ...(actionAdmission ? { actionAdmission } : {}),
     });
   } catch (error) {
     // Only bare-retry when extended fields made the original wire differ from
@@ -124,6 +132,7 @@ export async function createRemoteSessionOnConnection(
         data: { protocolVersion: 1 },
         expectedConnectionId: connectionId,
         ...(bareMutationId !== undefined ? { mutationId: bareMutationId } : {}),
+        ...(actionAdmission ? { actionAdmission } : {}),
       });
     }
     throw error;

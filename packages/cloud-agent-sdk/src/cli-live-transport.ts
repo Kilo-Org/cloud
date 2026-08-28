@@ -30,6 +30,7 @@ import type {
 import {
   CommandDeliveredError,
   UserWebCommandError,
+  type SendCommandOptions,
   type UserWebCliEvent,
   type UserWebConnection,
 } from './user-web-connection';
@@ -608,10 +609,16 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     async function sendCommand(
       command: string,
       data: unknown,
-      mutationId?: string
+      mutationId?: string,
+      options?: SendCommandOptions
     ): Promise<unknown> {
       const expectedOwnerConnectionId = ownerConnectionId;
       if (!expectedOwnerConnectionId) throw new Error('Remote session has no connected owner');
+      const localOptions: [mutationId?: string, options?: SendCommandOptions] = options
+        ? [mutationId, options]
+        : mutationId !== undefined
+          ? [mutationId]
+          : [];
 
       try {
         return await config.userWebConnection.sendCommand(
@@ -619,7 +626,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           command,
           data,
           expectedOwnerConnectionId,
-          ...(mutationId !== undefined ? [mutationId] : [])
+          ...localOptions
         );
       } catch (error) {
         if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
@@ -884,6 +891,16 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         // old-CLI delivered error; other failures are hard rejects.
         const mutationId = input?.mutationId ?? cloudAgentSdkRuntime.randomUUID();
         const wireData = buildCreateSessionWireData(input);
+        if (!ownerConnectionId) throw new Error('Remote session has no connected owner');
+        // Old connection objects omit capture. Remove this fallback only after
+        // every supported producer exposes it; never recapture for the bare retry.
+        const actionAdmission = config.userWebConnection.captureActionAdmission?.({
+          command: 'create_session',
+          data: wireData,
+          sessionId: config.kiloSessionId,
+          connectionId: ownerConnectionId,
+        });
+        const options = actionAdmission ? { actionAdmission } : undefined;
         const hasExtendedFields =
           wireData.agent !== undefined ||
           wireData.model !== undefined ||
@@ -892,13 +909,14 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         const hasCloneField = input?.cloneFromKiloSessionId !== undefined;
         let result: unknown;
         try {
-          result = await sendCommand('create_session', wireData, mutationId);
+          result = await sendCommand('create_session', wireData, mutationId, options);
         } catch (error) {
           // Only bare-retry when extended fields made the original wire differ
           // from `{ protocolVersion: 1 }`; otherwise the retry is identical.
           // Old form is one bare protocolVersion 1 retry for extended fields;
           // a clone id must never use that fallback because it would create a
-          // fresh session.
+          // fresh session. Remove this fallback when all supported CLIs accept
+          // the extended fields.
           if (
             !hasCloneField &&
             hasExtendedFields &&
@@ -908,7 +926,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             result = await sendCommand(
               'create_session',
               { protocolVersion: 1 },
-              cloudAgentSdkRuntime.randomUUID()
+              cloudAgentSdkRuntime.randomUUID(),
+              options
             );
           } else {
             throw error;

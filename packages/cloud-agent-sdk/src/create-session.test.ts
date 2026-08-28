@@ -335,6 +335,24 @@ describe('createRemoteSessionOnConnection', () => {
     expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    new Error('invalid create_session command'),
+    new CommandDeliveredError('invalid create_session command '),
+    new UserWebCommandError({
+      code: 'CLI_UPGRADE_REQUIRED',
+      message: 'invalid create_session command',
+    }),
+  ])('does not bare-retry a non-matching rejection: %s', async error => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: VALID_SESSION_ID });
+
+    await expect(
+      createRemoteSessionOnConnection(connection, 'cli-owner-1', { agent: 'code' })
+    ).rejects.toBe(error);
+  });
+
   it('surfaces the shared bad-sessionId string after one bare retry', async () => {
     // Same delivered string covers malformed sessionId (harmless retry).
     const connection = makeFakeConnection();

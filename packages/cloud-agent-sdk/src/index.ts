@@ -74,6 +74,9 @@ export {
   UserWebCommandError,
 } from './user-web-connection';
 export type {
+  SendCommandOptions,
+  UserWebActionAdmission,
+  UserWebActionTarget,
   UserWebConnection,
   UserWebConnectionConfig,
   UserWebSessionEventName,

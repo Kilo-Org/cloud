@@ -5,6 +5,10 @@ import {
   UserWebCommandError,
   VIEWER_PING_INTERVAL_MS,
   VIEWER_PONG_TIMEOUT_MS,
+  type SendCommandOptions,
+  type UserWebActionTarget,
+  type UserWebConnection,
+  type UserWebConnectionConfig,
 } from './user-web-connection';
 
 const WS_URL = 'wss://localhost:9999/api/user/web';
@@ -1925,6 +1929,342 @@ describe('createUserWebConnection connection-state API', () => {
 
     releaseC();
     client.destroy();
+  });
+});
+
+describe('createUserWebConnection action admission', () => {
+  const clients: UserWebConnection[] = [];
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    for (const client of clients.splice(0)) client.destroy();
+    jest.useRealTimers();
+  });
+
+  function makeClient(config: Partial<UserWebConnectionConfig> = {}) {
+    const client = createUserWebConnection({
+      websocketUrl: WS_URL,
+      getAuthToken: () => 'token',
+      ...config,
+    });
+    clients.push(client);
+    return client;
+  }
+
+  function createAuthority() {
+    const owner = { userId: 'user-a', authEpoch: 1, unlockGeneration: 1, unlocked: true };
+    const targets: UserWebActionTarget[] = [];
+    const denied = new Error('Original action admission expired');
+    return {
+      owner,
+      targets,
+      denied,
+      captureActionAdmission(target: UserWebActionTarget) {
+        const captured = { ...owner };
+        targets.push(target);
+        const assert = () => {
+          if (
+            !owner.unlocked ||
+            captured.userId !== owner.userId ||
+            captured.authEpoch !== owner.authEpoch ||
+            captured.unlockGeneration !== owner.unlockGeneration
+          )
+            throw denied;
+        };
+        assert();
+        return assert;
+      },
+    };
+  }
+
+  function frames(ws = sockets.at(-1)): Record<string, unknown>[] {
+    return (ws?.send.mock.calls ?? []).map(([value]) => JSON.parse(value as string));
+  }
+
+  function acceptCommands(ws = sockets.at(-1)) {
+    ws?.send.mockImplementation((value: string) => {
+      const frame = JSON.parse(value) as { type: string; id: string };
+      if (frame.type === 'command') {
+        inbound({ type: 'response', id: frame.id, result: { accepted: true } }, ws);
+      }
+    });
+  }
+
+  describe.each(['session', 'connection'] as const)('%s commands', targetKind => {
+    function send(
+      client: UserWebConnection,
+      command: string,
+      data: unknown = {},
+      options?: SendCommandOptions
+    ) {
+      return targetKind === 'session'
+        ? client.sendCommand('ses-1', command, data, 'cli-owner-1', 'intent-1', options)
+        : client.sendCommandToConnection({
+            command,
+            data,
+            expectedConnectionId: 'cli-owner-1',
+            mutationId: 'intent-1',
+            ...options,
+          });
+    }
+
+    it.each([
+      'send_message',
+      'send_command',
+      'interrupt',
+      'question_reply',
+      'question_reject',
+      'permission_respond',
+      'suggestion_accept',
+      'suggestion_dismiss',
+      'create_session',
+      'exit_cli',
+    ])('requires final socket admission for %s', async command => {
+      const authority = createAuthority();
+      const client = makeClient(authority);
+      const pending = send(client, command);
+      authority.owner.unlocked = false;
+      acceptCommands();
+      open();
+
+      await expect(pending).rejects.toBe(authority.denied);
+      expect(frames()).toEqual([]);
+      expect(sockets[0].readyState).toBe(3);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    describe.each(['auth', 'socket'] as const)('while waiting for %s', wait => {
+      it.each(['account replacement', 'auth epoch', 'lock/unlock'] as const)(
+        'rejects %s without replay and permits only a fresh action',
+        async change => {
+          const authority = createAuthority();
+          const auth = createDeferred<string>();
+          const client = makeClient({
+            captureActionAdmission: authority.captureActionAdmission,
+            getAuthToken: () => (wait === 'auth' ? auth.promise : 'token'),
+          });
+          const pending = send(client, 'create_session', { orgId: 'original-org' });
+          expect(authority.targets).toEqual([
+            {
+              command: 'create_session',
+              data: { orgId: 'original-org' },
+              connectionId: 'cli-owner-1',
+              ...(targetKind === 'session' ? { sessionId: 'ses-1' } : {}),
+            },
+          ]);
+          if (change === 'account replacement') authority.owner.userId = 'user-b';
+          else if (change === 'auth epoch') authority.owner.authEpoch += 1;
+          else {
+            authority.owner.unlocked = false;
+            authority.owner.unlockGeneration += 1;
+            authority.owner.unlocked = true;
+          }
+          auth.resolve('token');
+          await Promise.resolve();
+          acceptCommands();
+          open();
+
+          await expect(pending).rejects.toBe(authority.denied);
+          await jest.advanceTimersByTimeAsync(60_000);
+          expect(frames()).toEqual([]);
+          expect(authority.targets).toHaveLength(1);
+          expect(jest.getTimerCount()).toBe(0);
+
+          const fresh = send(client, 'create_session', { orgId: 'original-org' });
+          await Promise.resolve();
+          acceptCommands();
+          open();
+          await expect(fresh).resolves.toEqual({ accepted: true });
+          expect(frames()).toHaveLength(1);
+          expect(authority.targets).toHaveLength(2);
+        }
+      );
+    });
+
+    it('preserves a capture rejection before retaining or opening the socket', async () => {
+      const authority = createAuthority();
+      authority.owner.unlocked = false;
+      const client = makeClient(authority);
+
+      await expect(send(client, 'interrupt')).rejects.toBe(authority.denied);
+      expect(sockets).toEqual([]);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('asserts after serialization, immediately before the socket send', async () => {
+      const authority = createAuthority();
+      const client = makeClient(authority);
+      const pending = send(client, 'send_message', {
+        toJSON() {
+          authority.owner.unlocked = false;
+          return { text: 'must not leave the client' };
+        },
+      });
+      acceptCommands();
+      open();
+
+      await expect(pending).rejects.toBe(authority.denied);
+      expect(frames()).toEqual([]);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it.each(['serialization', 'socket'] as const)(
+      'preserves a %s failure and releases the command lifetime',
+      async failurePoint => {
+        const client = makeClient(createAuthority());
+        const failure = new Error('Local command failed');
+        const pending = send(
+          client,
+          'send_message',
+          failurePoint === 'serialization'
+            ? {
+                toJSON() {
+                  throw failure;
+                },
+              }
+            : {}
+        );
+        if (failurePoint === 'socket') {
+          sockets[0].send.mockImplementation(() => {
+            throw failure;
+          });
+        }
+        open();
+
+        await expect(pending).rejects.toBe(failure);
+        expect(sockets[0].readyState).toBe(3);
+        expect(jest.getTimerCount()).toBe(0);
+      }
+    );
+
+    it('reuses an explicit handle without serializing it or changing mutation IDs', async () => {
+      const authority = createAuthority();
+      const client = makeClient(authority);
+      const actionAdmission = client.captureActionAdmission?.({
+        command: 'create_session',
+        data: { orgId: 'original-org' },
+        connectionId: 'cli-owner-1',
+        ...(targetKind === 'session' ? { sessionId: 'ses-1' } : {}),
+      });
+      const pending = send(client, 'create_session', { protocolVersion: 1 }, { actionAdmission });
+      acceptCommands();
+      open();
+
+      await expect(pending).resolves.toEqual({ accepted: true });
+      expect(frames()).toEqual([
+        {
+          type: 'command',
+          id: 'uuid-2',
+          command: 'create_session',
+          data: { protocolVersion: 1 },
+          connectionId: 'cli-owner-1',
+          ...(targetKind === 'session' ? { sessionId: 'ses-1' } : {}),
+          mutationId: 'intent-1',
+        },
+      ]);
+      expect(authority.targets).toHaveLength(1);
+    });
+
+    it('rejects unknown commands when admission is configured', async () => {
+      const client = makeClient(createAuthority());
+      await expect(send(client, 'future_effect')).rejects.toThrow(
+        'Unknown command requires action admission classification'
+      );
+      expect(sockets).toEqual([]);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('preserves unknown-command compatibility without a construction hook', async () => {
+      const client = makeClient();
+      const pending = send(client, 'future_effect', { old: 'payload' });
+      acceptCommands();
+      open();
+
+      await expect(pending).resolves.toEqual({ accepted: true });
+      expect(frames()).toEqual([
+        {
+          type: 'command',
+          id: 'uuid-2',
+          command: 'future_effect',
+          data: { old: 'payload' },
+          connectionId: 'cli-owner-1',
+          ...(targetKind === 'session' ? { sessionId: 'ses-1' } : {}),
+          mutationId: 'intent-1',
+        },
+      ]);
+    });
+
+    it.each(['list_models', 'list_commands', 'list_directories'])(
+      'keeps %s and read subscriptions independent from denied effects',
+      async command => {
+        const authority = createAuthority();
+        authority.owner.unlocked = false;
+        const client = makeClient(authority);
+        const release = client.subscribeToCliSession('ses-1');
+        acceptCommands();
+        open();
+        await expect(send(client, command, { protocolVersion: 1 })).resolves.toEqual({
+          accepted: true,
+        });
+        release();
+
+        expect(frames()).toEqual([
+          { type: 'subscribe', sessionId: 'ses-1' },
+          {
+            type: 'command',
+            id: 'uuid-2',
+            command,
+            data: { protocolVersion: 1 },
+            connectionId: 'cli-owner-1',
+            ...(targetKind === 'session' ? { sessionId: 'ses-1' } : {}),
+            mutationId: 'intent-1',
+          },
+          { type: 'unsubscribe', sessionId: 'ses-1' },
+        ]);
+        expect(authority.targets).toEqual([]);
+      }
+    );
+  });
+
+  it.each([
+    { command: 'exit_cli', sessionId: 'ses-1', connectionId: 'cli-owner-1' },
+    { command: 'create_session', sessionId: 'ses-2', connectionId: 'cli-owner-1' },
+    { command: 'create_session', sessionId: 'ses-1', connectionId: 'cli-owner-2' },
+  ])('rejects a handle reused for a different target: %j', async target => {
+    const client = makeClient(createAuthority());
+    const actionAdmission = client.captureActionAdmission?.({
+      command: 'create_session',
+      data: {},
+      sessionId: 'ses-1',
+      connectionId: 'cli-owner-1',
+    });
+    await expect(
+      client.sendCommand(target.sessionId, target.command, {}, target.connectionId, undefined, {
+        actionAdmission,
+      })
+    ).rejects.toThrow('Action admission does not match this command target');
+    expect(sockets).toEqual([]);
+  });
+
+  it('rejects a handle from another connection instead of bypassing admission', async () => {
+    const source = makeClient(createAuthority());
+    const actionAdmission = source.captureActionAdmission?.({
+      command: 'create_session',
+      data: {},
+      connectionId: 'cli-owner-1',
+    });
+    const destination = makeClient();
+    await expect(
+      destination.sendCommandToConnection({
+        command: 'create_session',
+        data: {},
+        expectedConnectionId: 'cli-owner-1',
+        actionAdmission,
+      })
+    ).rejects.toThrow('Action admission does not match this command target');
+    expect(sockets).toEqual([]);
   });
 });
 

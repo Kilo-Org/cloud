@@ -54,6 +54,23 @@ class CommandDeliveredError extends Error {
   }
 }
 
+const actionAdmissionBrand = Symbol('UserWebActionAdmission');
+
+/** Local-only authority captured for one command target, including its compatibility retry. */
+type UserWebActionAdmission = Readonly<{ [actionAdmissionBrand]: true }>;
+
+type UserWebActionTarget = Readonly<{
+  command: string;
+  data: unknown;
+  sessionId?: string;
+  connectionId?: string;
+}>;
+
+type SendCommandOptions = {
+  /** Opaque handle from this connection. Never serialized or used as a wire mutation ID. */
+  actionAdmission?: UserWebActionAdmission;
+};
+
 type UserWebConnectionConfig = {
   websocketUrl: string;
   getAuthToken: () => string | Promise<string>;
@@ -61,9 +78,20 @@ type UserWebConnectionConfig = {
   onReconnect?: () => void;
   lifecycleHooks?: ConnectionLifecycleHooks;
   maxReconnectAttempts?: number;
+  /**
+   * Capture authority synchronously from the target or the caller's bound scope.
+   * The returned assertion must validate that original authority, not recapture
+   * a later global context. It runs immediately before each effect socket send.
+   * Discovery, directory listing, and subscriptions do not call this hook.
+   *
+   * The old constructor omits this hook and keeps unrestricted command admission.
+   * Remove that fallback only in a breaking SDK release after web, extension,
+   * and external producers supply admission hooks.
+   */
+  captureActionAdmission?: (target: UserWebActionTarget) => () => void;
 };
 
-type SendCommandToConnectionInput = {
+type SendCommandToConnectionInput = SendCommandOptions & {
   command: string;
   data: unknown;
   expectedConnectionId: string;
@@ -97,6 +125,12 @@ type UserWebConnection = {
   onReconnectExhaustionChange: (listener: (exhausted: boolean) => void) => () => void;
   retryConnection: () => void;
   subscribeToCliSession: (sessionId: string) => () => void;
+  /**
+   * Capture once at a logical action's entry and forward the handle on every attempt.
+   * Old custom connection objects can omit this method. Remove that fallback only
+   * after every supported connection producer exposes admission capture.
+   */
+  captureActionAdmission?: (target: UserWebActionTarget) => UserWebActionAdmission | undefined;
   sendCommand: (
     sessionId: string,
     command: string,
@@ -104,7 +138,8 @@ type UserWebConnection = {
     expectedOwnerConnectionId?: string,
     // Stable intent id forwarded to the relay for durable dedupe.
     // Absent on legacy paths that do not re-issue (D5).
-    mutationId?: string
+    mutationId?: string,
+    options?: SendCommandOptions
   ) => Promise<unknown>;
   /**
    * Send a viewer command that is scoped to a specific CLI connection and has
@@ -581,6 +616,45 @@ function createUserWebConnection(
     mutationId?: string;
   };
 
+  const actionAdmissions = new WeakMap<
+    UserWebActionAdmission,
+    { target: UserWebActionTarget; assert: () => void }
+  >();
+
+  function captureActionAdmission(target: UserWebActionTarget): UserWebActionAdmission | undefined {
+    if (!config.captureActionAdmission) return undefined;
+    switch (target.command) {
+      case 'list_models':
+      case 'list_commands':
+        return undefined; // Catalog discovery is not an effect.
+      case 'list_directories':
+        return undefined; // Directory reads are separate from action admission.
+      case 'send_message':
+      case 'send_command':
+      case 'interrupt':
+      case 'question_reply':
+      case 'question_reject':
+      case 'permission_respond':
+      case 'suggestion_accept':
+      case 'suggestion_dismiss':
+      case 'create_session':
+      case 'exit_cli':
+        break;
+      default:
+        throw new Error('Unknown command requires action admission classification');
+    }
+    const capturedTarget = Object.freeze({
+      command: target.command,
+      data: target.data,
+      ...(target.sessionId !== undefined ? { sessionId: target.sessionId } : {}),
+      ...(target.connectionId !== undefined ? { connectionId: target.connectionId } : {}),
+    });
+    const assert = config.captureActionAdmission(capturedTarget);
+    const admission: UserWebActionAdmission = Object.freeze({ [actionAdmissionBrand]: true });
+    actionAdmissions.set(admission, { target: capturedTarget, assert });
+    return admission;
+  }
+
   /**
    * Shared private sender for both `sendCommand` and `sendCommandToConnection`.
    * Owns the command-scoped connection retain, the pending-commands map
@@ -588,7 +662,29 @@ function createUserWebConnection(
    * the wire shape (`sessionId` present vs omitted). `connectionId` is always
    * serialized; the relay tolerates it without a `sessionId`.
    */
-  function sendRawCommand(wire: RawCommandWire): Promise<unknown> {
+  function sendRawCommand(wire: RawCommandWire, options?: SendCommandOptions): Promise<unknown> {
+    let assertActionAdmission: (() => void) | undefined;
+    try {
+      // Old direct callers omit the handle, so capture at sender entry, before
+      // auth or socket waits. Remove this fallback only when all effect callers
+      // forward a handle captured at their logical action's entry.
+      const admission = options?.actionAdmission ?? captureActionAdmission(wire);
+      if (admission) {
+        const captured = actionAdmissions.get(admission);
+        if (
+          !captured ||
+          captured.target.command !== wire.command ||
+          captured.target.sessionId !== wire.sessionId ||
+          captured.target.connectionId !== wire.connectionId
+        ) {
+          throw new Error('Action admission does not match this command target');
+        }
+        assertActionAdmission = captured.assert;
+      }
+    } catch (error) {
+      return Promise.reject(error);
+    }
+
     const hasOwnerLifetime = retainCount > commandRetainCount;
     const releaseCommandLifetime = hasOwnerLifetime ? null : retainConnection();
     if (releaseCommandLifetime) commandRetainCount += 1;
@@ -607,7 +703,7 @@ function createUserWebConnection(
         releaseLifetime();
         resolve(value);
       };
-      const rejectCommand = (reason: Error) => {
+      const rejectCommand = (reason: unknown) => {
         releaseLifetime();
         reject(reason);
       };
@@ -626,8 +722,8 @@ function createUserWebConnection(
             rejectCommand(new Error('Command timed out'));
           }, COMMAND_TIMEOUT_MS);
           pendingCommands.set(id, { resolve: resolveCommand, reject: rejectCommand, timer });
-          ws.send(
-            JSON.stringify({
+          try {
+            const frame = JSON.stringify({
               type: 'command',
               id,
               command: wire.command,
@@ -635,8 +731,14 @@ function createUserWebConnection(
               ...(wire.connectionId ? { connectionId: wire.connectionId } : {}),
               ...(wire.mutationId ? { mutationId: wire.mutationId } : {}),
               data: wire.data,
-            })
-          );
+            });
+            assertActionAdmission?.();
+            ws.send(frame);
+          } catch (error) {
+            clearTimeout(timer);
+            pendingCommands.delete(id);
+            rejectCommand(error);
+          }
         },
         reason => {
           rejectCommand(reason instanceof Error ? reason : new Error('WebSocket is not connected'));
@@ -708,25 +810,32 @@ function createUserWebConnection(
         releaseConnection();
       };
     },
-    sendCommand(sessionId, command, data, expectedOwnerConnectionId, mutationId) {
-      return sendRawCommand({
-        command,
-        // `expectedOwnerConnectionId` undefined still flows through `connectionId`
-        // as a top-level field on the wire (the relay tolerates a `connectionId`
-        // without a `sessionId`), so reuse the shared sender.
-        ...(expectedOwnerConnectionId ? { connectionId: expectedOwnerConnectionId } : {}),
-        sessionId,
-        data,
-        ...(mutationId ? { mutationId } : {}),
-      });
+    ...(config.captureActionAdmission ? { captureActionAdmission } : {}),
+    sendCommand(sessionId, command, data, expectedOwnerConnectionId, mutationId, options) {
+      return sendRawCommand(
+        {
+          command,
+          // `expectedOwnerConnectionId` undefined still flows through `connectionId`
+          // as a top-level field on the wire (the relay tolerates a `connectionId`
+          // without a `sessionId`), so reuse the shared sender.
+          ...(expectedOwnerConnectionId ? { connectionId: expectedOwnerConnectionId } : {}),
+          sessionId,
+          data,
+          ...(mutationId ? { mutationId } : {}),
+        },
+        options
+      );
     },
     sendCommandToConnection(input) {
-      return sendRawCommand({
-        command: input.command,
-        connectionId: input.expectedConnectionId,
-        data: input.data,
-        ...(input.mutationId ? { mutationId: input.mutationId } : {}),
-      });
+      return sendRawCommand(
+        {
+          command: input.command,
+          connectionId: input.expectedConnectionId,
+          data: input.data,
+          ...(input.mutationId ? { mutationId: input.mutationId } : {}),
+        },
+        input
+      );
     },
     onCliEvent(sessionId, listener) {
       const listeners = cliListeners.get(sessionId) ?? new Set<(event: CliEvent) => void>();
@@ -759,7 +868,10 @@ function createUserWebConnection(
 
 export { createUserWebConnection, CommandDeliveredError, UserWebCommandError };
 export type {
+  SendCommandOptions,
   SendCommandToConnectionInput,
+  UserWebActionAdmission,
+  UserWebActionTarget,
   UserWebConnection,
   UserWebConnectionConfig,
   UserWebSessionEventName,

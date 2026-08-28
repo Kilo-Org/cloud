@@ -15,10 +15,6 @@ const store = createSecureStorePreference<boolean>({
   serialize: value => (value ? 'true' : 'false'),
 });
 
-export function clearReturnSendsMessagePreference() {
-  store.clear();
-}
-
 function setReturnSendsMessage(value: boolean) {
   store.set(value);
 }

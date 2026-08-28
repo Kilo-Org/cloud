@@ -411,6 +411,7 @@ async function processWebhookMessage(
         prompt: string;
         mode: string;
         model: string;
+        variant?: string;
         githubRepo: string;
         kilocodeOrganizationId?: string;
         callbackTarget: { url: string; headers: Record<string, string> };
@@ -438,6 +439,9 @@ async function processWebhookMessage(
       }
       if (triggerConfig.condenseOnComplete !== undefined) {
         prepareSessionBody.condenseOnComplete = triggerConfig.condenseOnComplete;
+      }
+      if (triggerConfig.variant !== undefined) {
+        prepareSessionBody.variant = triggerConfig.variant;
       }
 
       logger.debug('Calling prepareSession', {

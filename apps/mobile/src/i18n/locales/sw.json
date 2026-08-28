@@ -665,7 +665,8 @@
     "profile": "Wasifu",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, kichupo, {{position}} kati ya {{total}}"
+    "position": "{{name}}, kichupo, {{position}} kati ya {{total}}",
+    "chat": "Mazungumzo"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Endesha ukaguzi",
       "status": "Hali",
       "threshold": "Kizingiti",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Inasubiri nakala ya ukaguzi.",
+      "transcriptEmpty": "Hakuna nakala ya ukaguzi huu.",
+      "transcriptRetry": "Haikuweza kupakia nakala ya ukaguzi.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Wakala hakikazi",
+      "agentWorking": "Wakala anafanya kazi...",
+      "anErrorOccurred": "Hitilafu imetokea",
+      "errorWithMessage": "Hitilafu: {{message}}",
+      "executionStarted": "Utekelezaji umeanza",
+      "reviewCompleted": "Ukaguzi umekamilika",
+      "reviewInterrupted": "Ukaguzi umeingiliwa",
+      "sessionError": "Hitilafu ya kikao: {{error}}",
+      "statusWithValue": "Hali: {{status}}",
+      "toolName": "Zana: {{name}}",
+      "toolNameError": "Zana: {{name}} — hitilafu",
+      "unknownError": "Hitilafu isiyojulikana"
     },
     "reviewMemory": {
       "title": "Kumbukumbu ya ukaguzi",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Inafanya kazi sasa",
     "search": {
       "searching": "Inatafuta",
       "searchSessions": "Tafuta vikao",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Haikuweza kupakia vikao",
       "couldNotLoadActive": "Haikuweza kupakia vikao vinavyofanya kazi",
-      "noSessionsYet": "Hakuna vikao bado",
       "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako. Vikao vyako vitaonekana hapa.",
       "noMatches": "Hakuna vikao vinavyolingana",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",
       "tryAdjustFilters": "Jaribu kurekebisha au kuondoa vichujio vyako.",
       "couldNotSearch": "Haikuweza kutafuta vikao",
-      "allActive": "Vikao vyote vinafanya kazi",
       "completedWillAppear": "Vikao vilivyokamilika vitaonekana hapa.",
       "noPastSessions": "Hakuna vikao vya zamani",
       "live": "LIVE"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Hakuna ujumbe bado",
       "renameAccessibility": "Badilisha jina la kikao: {{title}}",
-      "connectRepository": "Unganisha hazina",
       "cloningSession": "Inanakili kikao",
       "continue": "Endelea",
       "couldNotLoadThisSession": "Haikuweza kupakia kikao hiki",
-      "cloneFailed": "Haikuweza kunakili kikao hiki.",
       "cloneFailedRetry": "Haikuweza kunakili kikao hiki. Jaribu tena.",
-      "connectRepositoryToContinue": "Unganisha hazina kuendelea.",
       "notEnoughCredits": "Salio hazitoshi kuendesha Cloud Agent. Ongeza salio na ujaribu tena.",
       "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
       "serviceUnavailable": "Huduma haipatikani sasa hivi. Tafadhali jaribu tena.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Hakuna hazina zinazoonekana. Angalia ufikiaji wa hazina kwa GitLab, kisha onyesha upya.",
       "openBitbucket": "Fungua Bitbucket",
       "openGitlab": "Fungua GitLab",
-      "recentlyUsed": "Zilizotumika hivi karibuni"
+      "recentlyUsed": "Zilizotumika hivi karibuni",
+      "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
+      "continueFrom": "Endelea na {{title}}",
+      "importFailed": "Haikuweza kuingiza kikao hiki.",
+      "importingSession": "Inaingiza kikao"
     },
     "partRenderer": {
       "updatedFileCount_one": "Imesasisha faili {{displayCount}}",
@@ -2462,6 +2477,8 @@
       "viewTable": "Tazama jedwali",
       "title": "Jedwali",
       "close": "Funga jedwali",
+      "loading": "Inapakia jedwali",
+      "empty": "Jedwali hili halina safu mlalo",
       "columnCount_one": "safu",
       "columnCount": "safu",
       "columnCount_other": "safu",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Kiungo hiki kinafungua {{host}} kwenye kivinjari chako.",
       "open": "Fungua",
       "trustThisHost": "Amini mwenyeji huyu"
+    },
+    "folderPicker": {
+      "accessibility": "Folda: {{label}}",
+      "emptyDescription": "Imefanyika hutumia folda hii.",
+      "emptyTitle": "Hakuna folda ndani",
+      "fieldLabel": "Folda",
+      "retryableDescription": "Angalia muunganisho wako na Jaribu tena. Imefanyika bado inathibitisha folda hii.",
+      "retryableTitle": "Haikuweza kuorodhesha folda",
+      "tapToListHint": "Gusa folda kuorodhesha yaliyomo",
+      "unsupportedDescription": "CLI hii haiwezi kuorodhesha folda. Imefanyika hudumisha folda ya kuanzia na Anza kikao huanzia hapo.",
+      "unsupportedTitle": "Haiwezi kuorodhesha folda"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Unapoamini mwenyeji wa kiungo, hufunguka bila kuuliza tena.",
     "revoke": "Ondoa {{host}}",
     "backToPreferences": "Rudi kwenye mapendeleo"
+  },
+  "quickChat": {
+    "title": "Mazungumzo",
+    "composer": {
+      "placeholder": "Ujumbe"
+    },
+    "empty": {
+      "title": "Anza mazungumzo",
+      "description": "Tuma ujumbe ili uongee na mfano."
+    },
+    "working": "Inafanya kazi",
+    "historyRetry": "Haikuweza kupakia historia ya mazungumzo.",
+    "catalogRetry": "Imeshindwa kupakia miundo",
+    "sendError": "Haikuweza kutuma ujumbe. Jaribu tena."
   }
 }

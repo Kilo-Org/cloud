@@ -665,7 +665,8 @@
     "profile": "Iphrofayili",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ithebhu, {{position}} kwe-{{total}}"
+    "position": "{{name}}, ithebhu, {{position}} kwe-{{total}}",
+    "chat": "Ingxoxo"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Ukuhlolwa kwerejista",
       "status": "Isimo",
       "threshold": "Umkhawulo",
-      "pullRequest": "isicelo sokudonsa"
+      "pullRequest": "isicelo sokudonsa",
+      "transcriptEmpty": "Awukho umbhalo walokhu kubuyekezwa.",
+      "transcriptLive": "LIVE",
+      "transcriptRetry": "Ayikwazanga ukulayisha umbhalo wokubuyekezwa.",
+      "transcriptWaiting": "Ilinde umbhalo wokubuyekezwa.",
+      "agentIdle": "I-agent ibanga",
+      "agentWorking": "I-agent iyasebenza...",
+      "anErrorOccurred": "Kwenzeke iphutha",
+      "errorWithMessage": "Iphutha: {{message}}",
+      "executionStarted": "Ukusetshenziswa kuqalwe",
+      "reviewCompleted": "Ukubuyekeza kupheliwe",
+      "reviewInterrupted": "Ukubuyekeza kuphazamisekile",
+      "sessionError": "Iphutha leseshini: {{error}}",
+      "statusWithValue": "Isimo: {{status}}",
+      "toolName": "Ithuluzi: {{name}}",
+      "toolNameError": "Ithuluzi: {{name}} — iphutha",
+      "unknownError": "Iphutha elingaziwa"
     },
     "reviewMemory": {
       "title": "Inkumbulo yokubuyekeza",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Kusebenzayo manje",
     "search": {
       "searching": "Kusesha",
       "searchSessions": "Sesha iziseshini",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Akukwazanga ukulayisha iziseshini",
       "couldNotLoadActive": "Akukwazanga ukulayisha iziseshini ezisebenzayo",
-      "noSessionsYet": "Akukho ziseshini okwamanje",
       "noSessionsYetDescription": "Qala umsebenzi wokufaka ikhodi kusukela kufoni yakho. Iziseshini zakho zizovela lapha.",
       "noMatches": "Akukho ziseshini ezihambisanayo",
       "tryDifferentSearch": "Zama igama lokusesha elihlukile.",
       "tryAdjustFilters": "Zama ukulungisa noma ukusula izihlungi zakho.",
       "couldNotSearch": "Akukwazanga ukusesha iziseshini",
-      "allActive": "Zonke iziseshini ziyasebenza",
       "completedWillAppear": "Iziseshini eziqediwe zizovela lapha.",
       "noPastSessions": "Akukho ziseshini ezidlule",
       "live": "LIVE"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Akukho mlayezo okwamanje",
       "renameAccessibility": "Qamba kabusha iseshini: {{title}}",
-      "connectRepository": "Xhuma i-repository",
       "cloningSession": "Iklonywa iseshini",
       "continue": "Qhubeka",
       "couldNotLoadThisSession": "Akukwazanga ukulayisha lesi seshini",
-      "cloneFailed": "Akukwazanga ukuklona lesi seshini.",
       "cloneFailedRetry": "Akukwazanga ukuklona lesi seshini. Zama futhi.",
-      "connectRepositoryToContinue": "Xhuma i-repository ukuze uqhubeke.",
       "notEnoughCredits": "Azikho amakhredithi anele ukusebenzisa i-Cloud Agent. Engeza amakhredithi bese uzama futhi.",
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaqhubeka. Uyacelwa ukuthi ulinde isikhashana.",
       "serviceUnavailable": "Inkonzo ayitholakali njengamanje. Uyacelwa ukuthi uzame futhi.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Awekho ama-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-GitLab, bese uvuselela.",
       "openBitbucket": "Vula i-Bitbucket",
       "openGitlab": "Vula i-GitLab",
-      "recentlyUsed": "Esetshenziswe muva nje"
+      "recentlyUsed": "Esetshenziswe muva nje",
+      "continueFrom": "Ukuqhubeka {{title}}",
+      "importingSession": "Ukungenisa iseshini",
+      "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka iseshini. Khetha I-Cloud Agent noma enye i-CLI.",
+      "importFailed": "Ayikwazanga ukungenisa lesi seshini."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}",
@@ -2462,6 +2477,8 @@
       "viewTable": "Buka itafula",
       "title": "Itafula",
       "close": "Vala itafula",
+      "loading": "Iyalayisha itafula",
+      "empty": "Leli itafula alinayo imigqa.",
       "columnCount_one": "ikholomu",
       "columnCount": "amakholomu",
       "columnCount_other": "amakholomu",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Leli isixhumanisi livula {{host}} kubrawuza yakho.",
       "open": "Vula",
       "trustThisHost": "Themba leli host"
+    },
+    "folderPicker": {
+      "fieldLabel": "Ifolda",
+      "accessibility": "Ifolda: {{label}}",
+      "tapToListHint": "Thepha ifolda ukuhlisa okuqukethwe kwayo",
+      "emptyTitle": "Azikho amafolda ngaphakathi",
+      "emptyDescription": "Kwenziwe kusebenzisa le folda.",
+      "retryableTitle": "Akukwazanga ukuhlisa amafolda",
+      "retryableDescription": "Bheka ukuxhumana kwakho bese uzama futhi. Kwenziwe kusaqinisekisa le folda.",
+      "unsupportedTitle": "Ayikwazi ukuhlisa amafolda",
+      "unsupportedDescription": "Le CLI ayikwazi ukuhlisa amafolda. Kwenziwe kugcina ifolda yokugalisa futhi i-Qala iseshini iqala lapho."
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Uma uthemba i-host yesixhumanisi, ivula ngaphandle kokubuza futhi.",
     "revoke": "Hlehlisa {{host}}",
     "backToPreferences": "Buyela kokuthandwayo"
+  },
+  "quickChat": {
+    "title": "Ingxoxo",
+    "composer": {
+      "placeholder": "Umlayezo"
+    },
+    "empty": {
+      "title": "Qala ingxoxo",
+      "description": "Thumela umlayezo ukuze uxoxe nomodeli."
+    },
+    "working": "Iyasebenza",
+    "historyRetry": "Asikwazanga ukulayisha umlando wengxoxo.",
+    "catalogRetry": "Akukwazanga ukulayisha amamodeli",
+    "sendError": "Asikwazanga ukuthumela umlayezo. Uzama futhi."
   }
 }

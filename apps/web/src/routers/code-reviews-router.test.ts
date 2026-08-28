@@ -3,6 +3,7 @@ const mockTryDispatchPendingReviews = jest.fn();
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
 const mockGetBlobContent = jest.fn();
+const mockFetchSessionSnapshot = jest.fn();
 const mockEnsureBitbucketCodeReviewWorkspaceWebhook = jest.fn();
 const mockDeleteBitbucketCodeReviewWorkspaceWebhooksBestEffort = jest.fn();
 const mockEnsureBotUserForOrg = jest.fn();
@@ -66,6 +67,16 @@ jest.mock('@/lib/r2/cli-sessions', () => ({
   getBlobContent: (...args: unknown[]) => mockGetBlobContent(...args),
 }));
 
+// The router only calls `fetchSessionSnapshot` from the session-ingest client;
+// the rest of the module keeps its real implementation via `requireActual`.
+jest.mock('@/lib/session-ingest-client', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@/lib/session-ingest-client');
+  return {
+    ...actual,
+    fetchSessionSnapshot: (...args: unknown[]) => mockFetchSessionSnapshot(...args),
+  };
+});
+
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   createCheckRun: jest.fn(),
   updateCheckRun: jest.fn(),
@@ -90,6 +101,7 @@ import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   cliSessions,
+  cli_sessions_v2,
   kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -2381,6 +2393,57 @@ describe('codeReviewRouter attempts', () => {
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+});
+
+describe('codeReviewRouter.getSessionMessages session-source edge cases', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+    await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, testUser.id));
+    await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, testUser.id));
+    mockFetchSessionSnapshot.mockReset();
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('returns empty entries when both cli ids are missing', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues(testUser.id, 'completed'))
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+    expect(result).toEqual({ success: true, entries: [] });
+    expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('returns success false when the snapshot fetch throws', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues(testUser.id, 'completed', { cli_session_id: 'ses_snapshot_throw' }))
+      .returning({ id: cloud_agent_code_reviews.id });
+    await db.insert(cli_sessions_v2).values({
+      session_id: 'ses_snapshot_throw',
+      kilo_user_id: testUser.id,
+    });
+    mockFetchSessionSnapshot.mockRejectedValue(new Error('Snapshot worker down'));
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+    expect(result).toEqual({ success: false, error: 'Snapshot worker down' });
   });
 });
 

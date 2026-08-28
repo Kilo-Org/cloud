@@ -41,6 +41,9 @@ export const INSTANCE_ACTIONS = [
 ] as const;
 export const PERMISSION_RESPONSES = ['once', 'always', 'reject'] as const;
 export const FEEDBACK_SENTIMENTS = ['positive', 'negative'] as const;
+export const CONSENT_OUTCOME_ACTIONS = ['accepted', 'optional_changed', 'revoked'] as const;
+export const NOTIFICATION_PERMISSION_OUTCOMES = ['granted', 'denied'] as const;
+export const NOTIFICATION_TOKEN_ACTIONS = ['registered', 'unregistered'] as const;
 
 /** App cold-start outcome values (mirrors apps/mobile/src/lib/startup-timing.ts). */
 export const STARTUP_OUTCOMES = [
@@ -132,6 +135,15 @@ export const CLAW_WEATHER_LOCATION_SKIPPED_EVENT = 'claw_weather_location_skippe
 
 /** AppsFlyer-only mirrored event (raw string at the auth call site). */
 export const LOGIN_EVENT = 'login';
+
+// New accepted-phase privacy-minimal events (P1-A-07d). Each captures only the
+// stable enum (and, for consent, boolean) outcome at the authoritative client
+// or server boundary — no free text, no PII.
+export const LOGOUT_EVENT = 'logout';
+export const CONSENT_OUTCOME_EVENT = 'consent_outcome';
+export const NOTIFICATION_PERMISSION_RESPONDED_EVENT = 'notification_permission_responded';
+export const NOTIFICATION_TOKEN_UPDATED_EVENT = 'notification_token_updated';
+export const ORGANIZATION_MEMBER_JOINED_EVENT = 'organization_member_joined';
 
 // New terminal outcome events (Wave 2 ledger settle path only).
 export const SESSION_CREATE_SETTLED_EVENT = 'session_create_settled';
@@ -268,6 +280,30 @@ export const ANALYTICS_EVENT_SCHEMAS = {
 
   // AppsFlyer-only mirrored auth event (no properties today).
   [LOGIN_EVENT]: z.object({}).strict(),
+
+  // --- new accepted-phase privacy-minimal events (P1-A-07d) ---
+  [LOGOUT_EVENT]: z.object({}).strict(),
+  [CONSENT_OUTCOME_EVENT]: z
+    .object({
+      action: z.enum(CONSENT_OUTCOME_ACTIONS),
+      optional: z.boolean(),
+    })
+    .strict(),
+  [NOTIFICATION_PERMISSION_RESPONDED_EVENT]: z
+    .object({
+      outcome: z.enum(NOTIFICATION_PERMISSION_OUTCOMES),
+    })
+    .strict(),
+  [NOTIFICATION_TOKEN_UPDATED_EVENT]: z
+    .object({
+      action: z.enum(NOTIFICATION_TOKEN_ACTIONS),
+    })
+    .strict(),
+  [ORGANIZATION_MEMBER_JOINED_EVENT]: z
+    .object({
+      role: z.enum(ORGANIZATION_ROLES),
+    })
+    .strict(),
 
   // --- new terminal outcome events (DEC-05 base fields) ---
   [SESSION_CREATE_SETTLED_EVENT]: z

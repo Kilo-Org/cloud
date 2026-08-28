@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import {
+  directoryForSession,
+  forgetAttachedRoot,
   rememberAttachedRoot,
   rememberChildSession,
   resetSessionDirectoryState,
@@ -54,5 +56,32 @@ describe('session directory root mappings', () => {
 
     expect(rememberChildSession({ childId: 'c1', parentId: 'root' })).toBeUndefined();
     expect(rootForSession('c1')).toBe('root');
+  });
+
+  it('forgets only the detached root and its child sessions', () => {
+    rememberAttachedRoot('first', '/first');
+    rememberChildSession({ childId: 'first-child', parentId: 'first', directory: '/first' });
+    rememberAttachedRoot('second', '/second');
+    rememberChildSession({ childId: 'second-child', parentId: 'second', directory: '/second' });
+
+    forgetAttachedRoot('first', '/first');
+
+    expect(rootForSession('first')).toBeUndefined();
+    expect(rootForSession('first-child')).toBeUndefined();
+    expect(rootForSession(undefined, '/first')).toBeUndefined();
+    expect(directoryForSession('first')).toBeUndefined();
+    expect(directoryForSession('first-child')).toBeUndefined();
+    expect(rootForSession('second')).toBe('second');
+    expect(rootForSession('second-child')).toBe('second');
+    expect(directoryForSession('second-child')).toBe('/second');
+  });
+
+  it('preserves a root when the requested detach directory does not match', () => {
+    rememberAttachedRoot('root', '/ws');
+
+    forgetAttachedRoot('root', '/different');
+
+    expect(rootForSession('root')).toBe('root');
+    expect(directoryForSession('root')).toBe('/ws');
   });
 });

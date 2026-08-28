@@ -2427,6 +2427,7 @@ describe('UserConnectionDO', () => {
       'suggestion_dismiss',
       'list_models',
       'list_commands',
+      'list_directories',
       'send_command',
       'create_session',
       'exit_cli',
@@ -2773,6 +2774,39 @@ describe('UserConnectionDO', () => {
       await sendCliResponse(doInstance, cliWs, {
         id: correlationId,
         error: 'unknown command: list_commands',
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'CLI_UPGRADE_REQUIRED',
+          message: 'Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect.',
+        },
+      });
+    });
+
+    it('maps "unknown command: list_directories" to CLI_UPGRADE_REQUIRED with slash message', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'list_directories',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1, path: 'src' },
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      await sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: 'unknown command: list_directories',
       });
 
       expect(parseSent(webWs)).toEqual({

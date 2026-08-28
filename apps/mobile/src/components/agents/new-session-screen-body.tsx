@@ -2,32 +2,49 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
-import { type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
+import { toast } from 'sonner-native';
+import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { lockedModelOption, resolvePinnedAgentModel } from '@/components/agents/mode-normalize';
+import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { useNewSessionModelState } from '@/components/agents/new-session-model-provider';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { useNewSessionPrefillTargets } from '@/components/agents/use-new-session-prefill';
+import {
+  readCloneFromKiloSessionId,
+  readCloneSourceTitle,
+} from '@/components/agents/new-session-prefill';
+import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { ScreenHeader } from '@/components/screen-header';
+import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { useNewSessionDiscardGuard } from '@/app/(app)/agent-chat/use-new-session-discard-guard';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
-import { useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import {
+  type AgentAttachmentCandidate,
+  useAgentAttachmentUpload,
+} from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
+import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
-import { resolveNewSessionStartDisabled } from '@/lib/new-session-submit';
+import {
+  resolveContinueStartDisabled,
+  resolveNewSessionStartDisabled,
+} from '@/lib/new-session-submit';
+import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import {
   clearDraft,
   NEW_SESSION_DRAFT_KEY,
@@ -44,15 +61,42 @@ import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
+/**
+ * Mounted only for the ordinary new-session entry (not the Continue clone
+ * entry): the clone form has no composer, so the Android pending-picker
+ * recovery must not consume a pending result that belongs to the composer.
+ * `useAndroidPendingPickerRecovery` has no `enabled` flag, so a conditional
+ * mount is the smallest way to skip it on clone entry.
+ */
+function AndroidPendingPickerRecovery({
+  addCandidates,
+}: {
+  addCandidates: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
+}) {
+  useAndroidPendingPickerRecovery({
+    surface: 'agent-new',
+    sessionId: null,
+    addCandidates,
+  });
+  return null;
+}
+
 export function NewSessionScreenBody() {
   const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
   const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
-  const { organizationId, shareId: shareIdParam } = useLocalSearchParams<{
+  const searchParams = useLocalSearchParams<{
     organizationId?: string;
     shareId?: string;
+    cloneFromKiloSessionId?: string;
+    cloneSourceTitle?: string;
   }>();
+  const organizationId = searchParams.organizationId;
+  const shareIdParam = searchParams.shareId;
   const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
+  const cloneFromKiloSessionId = readCloneFromKiloSessionId(searchParams);
+  const cloneSourceTitle = readCloneSourceTitle(searchParams);
+  const isCloneEntry = cloneFromKiloSessionId !== '';
 
   const [runOnInstance, setRunOnInstance] = useState<InstancePickerInstance | null>(null);
   const [remoteOverride, setRemoteOverride] = useState<RemoteModelOverride | null>(null);
@@ -61,6 +105,8 @@ export function NewSessionScreenBody() {
   const [hasPrompt, setHasPrompt] = useState(false);
   // Commit choice for the cloud session: Leave changes (false) is the default.
   const [autoCommit, setAutoCommit] = useState(false);
+  // Relative launch folder the folder picker confirmed (`""` = launch directory).
+  const [folderPath, setFolderPath] = useLaunchFolder(runOnInstance?.connectionId);
   const submissionLockRef = useRef(false);
   const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
   // Armed right before a successful Start/spawn navigation so the discard
@@ -78,8 +124,12 @@ export function NewSessionScreenBody() {
   // mount reaches it only through the remount keyed on `promptSeed` below, and
   // that remount happens only while the user has typed nothing.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  // Clone entry never touches the shared new-session draft: pass an undefined
+  // identity so `useFencedDraftLoad` performs no fetch (its entity key is
+  // typed non-optional, unlike `useDraftFlushOnBackground` below). The
+  // `initialPrompt` below already ignores the draft on clone entry.
   const draftState = useFencedDraftLoad({
-    userId,
+    userId: isCloneEntry ? undefined : userId,
     isIdentityLoading,
     entityKey: NEW_SESSION_DRAFT_KEY,
   });
@@ -92,17 +142,17 @@ export function NewSessionScreenBody() {
   );
   // The share prefill is known synchronously and always beats a stored draft,
   // so it seeds the first render; the stored draft only exists once the load
-  // settles.
-  const initialPrompt = resolvePrefillOverDraft(
-    sharePrefillText,
-    draftState.settled ? draftState.value : null
-  );
+  // settles. A clone entry has no composer, so it ignores both and starts
+  // with no prompt.
+  const initialPrompt = isCloneEntry
+    ? undefined
+    : resolvePrefillOverDraft(sharePrefillText, draftState.settled ? draftState.value : null);
 
   // Save the new-session draft debounced on every text change, and flush the
   // pending write when the app leaves `active`. The draft's fate on unmount —
   // flush to preserve, or clear after a consumed remote spawn — is owned by
   // `useRemoteSpawnDraftCleanup`.
-  useDraftFlushOnBackground(userId, NEW_SESSION_DRAFT_KEY, false);
+  useDraftFlushOnBackground(userId, isCloneEntry ? undefined : NEW_SESSION_DRAFT_KEY, false);
 
   const {
     models,
@@ -142,7 +192,9 @@ export function NewSessionScreenBody() {
   // The lock applies only to the Cloud Agent target; a remote target keeps the
   // unlocked model view and never sends a gateway pin.
   const { customOptions, profileAgents } = useEffectiveProfileCustomModes(organizationId);
-  const pinned = resolvePinnedAgentModel({ slug: mode, profileAgents });
+  // Clone entry keeps the source prefill model and an unlocked toolbar: no
+  // pinned-agent lock, no gateway pin override.
+  const pinned = isCloneEntry ? {} : resolvePinnedAgentModel({ slug: mode, profileAgents });
   const displayModel = pinned.model ?? modelView.selectedValue;
   const displayVariant = pinned.model ? (pinned.variant ?? '') : modelView.selectedVariant;
   const modelOptionsForToolbar =
@@ -227,7 +279,9 @@ export function NewSessionScreenBody() {
   // failed spawn keeps the screen mounted (draft preserved for retry); a
   // blocked admission or cancelled voice submit never arms the marker, so
   // the unmount flush preserves the draft.
-  const { markRemoteSpawnAttempted } = useRemoteSpawnDraftCleanup({ userId });
+  const { markRemoteSpawnAttempted } = useRemoteSpawnDraftCleanup({
+    userId: isCloneEntry ? undefined : userId,
+  });
 
   // A committed remote spawn arms the discard-confirm bypass alongside the
   // draft-clearing marker. The bypass is reset when the spawn settles without
@@ -236,6 +290,21 @@ export function NewSessionScreenBody() {
     markRemoteSpawnAttempted();
     skipDiscardGuardRef.current = true;
   }, [markRemoteSpawnAttempted]);
+
+  // Clone entry never touches the shared draft. The inline "Run on" reason is
+  // a delivered clone/import failure (or an incapable CLI, derived below) and
+  // clears when Run-on changes. The one-shot bypass lets the success replace
+  // through the busy leave-lock while back/swipe stays blocked in flight.
+  const [cloneImportFailureKey, setCloneImportFailureKey] = useState<string | null>(null);
+  const cloneNavigateBypassRef = useRef(false);
+
+  const handleCloneImportFailure = useCallback((key: string) => {
+    setCloneImportFailureKey(key);
+  }, []);
+
+  const armCloneNavigateBypass = useCallback(() => {
+    cloneNavigateBypassRef.current = true;
+  }, []);
 
   const { createSessionFromDraft, promptRef } = useNewSessionCreator({
     attachments,
@@ -298,6 +367,7 @@ export function NewSessionScreenBody() {
     setRunOnInstance,
     refetchInstances,
     instanceList,
+    folderPath,
     promptRef,
     attachments: attachments.attachments,
     selection: modelView.spawnSelection,
@@ -311,7 +381,15 @@ export function NewSessionScreenBody() {
     onSpawnFailed: () => {
       skipDiscardGuardRef.current = false;
     },
+    // Clone entry: the dispatch sends the source id only when the selected
+    // CLI advertises `sessionClone`, and surfaces delivered clone/import
+    // failures through this inline-reason callback.
+    cloneFromKiloSessionId: isCloneEntry ? cloneFromKiloSessionId : null,
+    onCloneImportFailure: handleCloneImportFailure,
+    onSpawnReady: armCloneNavigateBypass,
   });
+
+  const runCloudCreate = useContinueCloudCreate(organizationId, armCloneNavigateBypass);
 
   const handleModelSelect = useCallback(
     (modelId: string, newVariant: string, pickerSelection?: ModelPickerSelection) => {
@@ -332,6 +410,7 @@ export function NewSessionScreenBody() {
   const handleRunOnChange = useCallback(
     (next: InstancePickerInstance | null) => {
       setRemoteOverride(null);
+      setCloneImportFailureKey(null);
       handleRunOnInstanceChange(next);
     },
     [handleRunOnInstanceChange]
@@ -341,7 +420,7 @@ export function NewSessionScreenBody() {
     promptRef.current = text;
     const nextHasPrompt = text.trim().length > 0;
     setHasPrompt(current => (current === nextHasPrompt ? current : nextHasPrompt));
-    if (userId) {
+    if (userId && !isCloneEntry) {
       saveDraft(userId, NEW_SESSION_DRAFT_KEY, text);
     }
   }
@@ -366,10 +445,23 @@ export function NewSessionScreenBody() {
   }, [userId, promptRef, attachments]);
 
   useNewSessionDiscardGuard({
-    dirty: hasPrompt || attachments.hasUnclaimedAttachments,
+    dirty: (isCloneEntry ? false : hasPrompt) || attachments.hasUnclaimedAttachments,
     hasUnclaimedAttachments: attachments.hasUnclaimedAttachments,
     onDiscard: handleDiscardDraft,
     skipNextGuardRef: skipDiscardGuardRef,
+  });
+
+  // Clone-entry busy leave-lock: while a clone/import is in flight, back and
+  // swipe are blocked with no discard alert. The one-shot bypass, armed by the
+  // success callbacks right before the replace, lets the success navigation
+  // through so back from the new session returns to the source session.
+  const navigation = useNavigation();
+  const isStarting = runOnInstance !== null ? remoteSpawn.isSpawningRemote : isCreating;
+  usePreventRemove(isCloneEntry && isStarting, ({ data }) => {
+    if (cloneNavigateBypassRef.current) {
+      cloneNavigateBypassRef.current = false;
+      navigation.dispatch(data.action);
+    }
   });
 
   const submitWithVoiceSettled = useCallback(async (submit: () => Promise<void>) => {
@@ -390,12 +482,6 @@ export function NewSessionScreenBody() {
 
   const { addCandidates, removeAttachment, retryAttachment, moveAttachment, reorderAttachments } =
     attachments;
-
-  useAndroidPendingPickerRecovery({
-    surface: 'agent-new',
-    sessionId: null,
-    addCandidates,
-  });
 
   const handleAddAttachment = useCallback(async () => {
     void addCandidates(
@@ -422,27 +508,90 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null;
-  const isStartDisabled = isRemoteTargetSelected
-    ? remoteSpawn.isSpawningRemote ||
-      isSubmitting ||
-      attachments.hasFailedAttachments ||
-      attachments.isUploading ||
-      modelView.isSelectionUnavailable ||
-      instanceCatalog.isLoading
-    : resolveNewSessionStartDisabled({
-        attachmentsHasFailed: attachments.hasFailedAttachments,
-        attachmentsIsUploading: attachments.isUploading,
-        hasPrompt,
+  const instanceHasSessionClone = runOnInstance?.capabilities?.sessionClone === true;
+  // Clone entry: an incapable CLI shows the inline "cannot continue" reason
+  // immediately; a delivered clone/import failure overrides it after a Start
+  // attempt. Both clear when Run-on changes (see handleRunOnChange).
+  const incapableCliSelected = isCloneEntry && runOnInstance !== null && !instanceHasSessionClone;
+  let runOnInlineNote: string | null = null;
+  if (incapableCliSelected) {
+    runOnInlineNote = t('agentChat.newSession.cliCannotContinue');
+  } else if (cloneImportFailureKey !== null) {
+    runOnInlineNote = t(cloneImportFailureKey);
+  }
+
+  function resolveStartDisabled(): boolean {
+    if (isCloneEntry) {
+      return resolveContinueStartDisabled({
         isCreating,
-        isRemoteTargetSelected,
         isSubmitting,
-        model: displayModel,
+        isSpawningRemote: remoteSpawn.isSpawningRemote,
+        model: isRemoteTargetSelected ? modelView.selectedValue : displayModel,
         selectedRepo,
         selectedRepositoryResolved: selectedRepository !== null,
-        isProfileLoading,
+        isRemoteTargetSelected,
+        instanceCatalogLoading: instanceCatalog.isLoading,
+        instanceHasSessionClone,
+        cloneImportFailureKey,
+        isModelUnavailable: modelView.isSelectionUnavailable,
       });
+    }
+    if (isRemoteTargetSelected) {
+      return (
+        remoteSpawn.isSpawningRemote ||
+        isSubmitting ||
+        attachments.hasFailedAttachments ||
+        attachments.isUploading ||
+        modelView.isSelectionUnavailable ||
+        instanceCatalog.isLoading
+      );
+    }
+    return resolveNewSessionStartDisabled({
+      attachmentsHasFailed: attachments.hasFailedAttachments,
+      attachmentsIsUploading: attachments.isUploading,
+      hasPrompt,
+      isCreating,
+      isRemoteTargetSelected,
+      isSubmitting,
+      model: displayModel,
+      selectedRepo,
+      selectedRepositoryResolved: selectedRepository !== null,
+      isProfileLoading,
+    });
+  }
+
+  const isStartDisabled = resolveStartDisabled();
 
   const handleStartSession = useCallback(() => {
+    if (isCloneEntry) {
+      if (runOnInstance !== null) {
+        // Live CLI import: the dispatch carries the clone source id only when
+        // the instance advertises `sessionClone` (fail-closed otherwise).
+        remoteSpawn.onStart();
+        return;
+      }
+      // Cloud Agent clone: submit the clone-only prepare with the source id and
+      // the form's repo/model/variant; success replaces the form.
+      void (async () => {
+        setIsCreating(true);
+        try {
+          await runCloudCreate(
+            cloneFromKiloSessionId as KiloSessionId,
+            { repository: selectedRepository, model: displayModel, variant: displayVariant },
+            mode
+          );
+        } catch (error) {
+          const message =
+            isCloudPrepareRetryableError(error) || !(error instanceof Error) || !error.message
+              ? i18n.t('agentChat.session.cloneFailedRetry')
+              : error.message;
+          toast.error(message);
+        } finally {
+          setIsCreating(false);
+        }
+      })();
+      return;
+    }
     if (runOnInstance !== null) {
       void submitWithVoiceSettled(async () => {
         remoteSpawn.onStart();
@@ -451,11 +600,35 @@ export function NewSessionScreenBody() {
       return;
     }
     void submitWithVoiceSettled(createSessionFromDraft);
-  }, [createSessionFromDraft, remoteSpawn, runOnInstance, submitWithVoiceSettled]);
+  }, [
+    isCloneEntry,
+    runOnInstance,
+    cloneFromKiloSessionId,
+    selectedRepository,
+    displayModel,
+    displayVariant,
+    mode,
+    runCloudCreate,
+    remoteSpawn,
+    createSessionFromDraft,
+    submitWithVoiceSettled,
+  ]);
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('agentChat.newSession.title')} />
+      {!isCloneEntry ? <AndroidPendingPickerRecovery addCandidates={addCandidates} /> : null}
+      <ScreenHeader
+        title={isCloneEntry ? t('agentChat.session.continue') : t('agentChat.newSession.title')}
+      />
+      {isCloneEntry ? (
+        <View className="px-4 pt-4">
+          <Text className="text-sm text-muted-foreground">
+            {t('agentChat.newSession.continueFrom', {
+              title: cloneSourceTitle || t('agentChat.session.title'),
+            })}
+          </Text>
+        </View>
+      ) : null}
       <NewSessionConfigureForm
         key={promptSeed === 'restore' ? 'draft' : 'empty'}
         attachments={attachments.attachments}
@@ -489,6 +662,10 @@ export function NewSessionScreenBody() {
         isLoadingInstances={isLoadingInstances}
         onChangeRunOnInstance={handleRunOnChange}
         showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
+        folderPath={folderPath}
+        onChangeFolderPath={setFolderPath}
+        runOnInlineNote={runOnInlineNote}
+        isCloneEntry={isCloneEntry}
         groups={groups}
         isRetrying={isRetrying}
         onChangeRepo={setSelectedRepo}

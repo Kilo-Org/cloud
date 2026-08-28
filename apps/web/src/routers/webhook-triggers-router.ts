@@ -27,7 +27,12 @@ import {
 } from '@/lib/webhook-agent/webhook-agent-client';
 
 // Input schemas
-const WebhookTriggerCreateInput = z
+const variantSchema = z
+  .string()
+  .max(50)
+  .regex(/^[a-zA-Z]+$/);
+
+export const WebhookTriggerCreateInput = z
   .object({
     triggerId: triggerIdCreateSchema,
     organizationId: z.string().uuid().optional(),
@@ -38,6 +43,7 @@ const WebhookTriggerCreateInput = z
     githubRepo: z.string().min(1, 'GitHub repo is required').optional(),
     mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
     model: z.string().min(1, 'Model is required').optional(),
+    variant: variantSchema.optional(),
     profileId: z.string().uuid().optional(),
     // Shared fields
     promptTemplate: z
@@ -117,12 +123,13 @@ const WebhookTriggerCreateInput = z
 
 // Note: targetType and kiloclawInstanceId are immutable after creation.
 // To change the target type or instance, delete and recreate the trigger.
-const WebhookTriggerUpdateInput = z
+export const WebhookTriggerUpdateInput = z
   .object({
     triggerId: triggerIdSchema,
     organizationId: z.string().uuid().optional(),
     mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
     model: z.string().min(1).optional(),
+    variant: variantSchema.nullable().optional(),
     promptTemplate: z.string().min(1).max(10000).optional(),
     profileId: z.string().uuid().optional(),
     autoCommit: z.boolean().nullable().optional(),
@@ -478,6 +485,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           githubRepo: input.githubRepo,
           mode: input.mode,
           model: input.model,
+          variant: input.variant,
           promptTemplate: input.promptTemplate,
           profileId: input.profileId,
           autoCommit: input.autoCommit,
@@ -568,6 +576,7 @@ export const webhookTriggersRouter = createTRPCRouter({
     const hasUpdates = [
       input.mode,
       input.model,
+      input.variant,
       input.promptTemplate,
       input.profileId,
       input.autoCommit,
@@ -592,6 +601,7 @@ export const webhookTriggersRouter = createTRPCRouter({
     const updatePayload: Parameters<typeof updateWorkerTrigger>[3] = {
       mode: input.mode,
       model: input.model,
+      variant: input.variant,
       promptTemplate: input.promptTemplate,
       isActive: input.isActive,
       profileId: input.profileId,

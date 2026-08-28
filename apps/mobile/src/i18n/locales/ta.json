@@ -665,7 +665,8 @@
     "profile": "சுயவிவரம்",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, தாவல், மொத்தம் {{total}} இல் {{position}}"
+    "position": "{{name}}, தாவல், மொத்தம் {{total}} இல் {{position}}",
+    "chat": "அரட்டை"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "சரிபார்ப்பு இயக்கம்",
       "status": "நிலை",
       "threshold": "வரம்பு",
-      "pullRequest": "இழுப்பு கோரிக்கை"
+      "pullRequest": "இழுப்பு கோரிக்கை",
+      "transcriptWaiting": "மதிப்பாய்வு டிரான்ஸ்கிரிப்டுக்காக காத்திருக்கிறது",
+      "transcriptEmpty": "இந்த மதிப்பாய்வுக்கு டிரான்ஸ்கிரிப்ட் இல்லை",
+      "transcriptRetry": "மதிப்பாய்வு டிரான்ஸ்கிரிப்டை ஏற்ற முடியவில்லை",
+      "transcriptLive": "நேரலை",
+      "agentIdle": "முகவர் செயலற்றது",
+      "agentWorking": "முகவர் வேலை செய்கிறார்...",
+      "anErrorOccurred": "பிழை ஏற்பட்டது",
+      "errorWithMessage": "பிழை: {{message}}",
+      "executionStarted": "செயல்படுத்தல் தொடங்கியது",
+      "reviewCompleted": "மதிப்பாய்வு முடிந்தது",
+      "reviewInterrupted": "மதிப்பாய்வு இடையூறு செய்யப்பட்டது",
+      "sessionError": "அமர்வு பிழை: {{error}}",
+      "statusWithValue": "நிலை: {{status}}",
+      "toolName": "கருவி: {{name}}",
+      "toolNameError": "கருவி: {{name}} — பிழை",
+      "unknownError": "தெரியாத பிழை"
     },
     "reviewMemory": {
       "title": "மதிப்பாய்வு நினைவகம்",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "இப்போது செயலில் உள்ளது",
     "search": {
       "searching": "தேடுகிறது",
       "searchSessions": "அமர்வுகளைத் தேடு",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "அமர்வுகளை ஏற்ற முடியவில்லை",
       "couldNotLoadActive": "செயலில் உள்ள அமர்வுகளை ஏற்ற முடியவில்லை",
-      "noSessionsYet": "இன்னும் அமர்வுகள் இல்லை",
       "noSessionsYetDescription": "உங்கள் மொபைலில் இருந்து ஒரு குறியீட்டு பணியைத் தொடங்கவும். உங்கள் அமர்வுகள் இங்கே தோன்றும்.",
       "noMatches": "பொருந்தும் அமர்வுகள் இல்லை",
       "tryDifferentSearch": "வேறு தேடல் சொல்லை முயற்சிக்கவும்.",
       "tryAdjustFilters": "உங்கள் வடிகட்டிகளை சரிசெய்யவும் அல்லது அழிக்கவும்.",
       "couldNotSearch": "அமர்வுகளைத் தேட முடியவில்லை",
-      "allActive": "அனைத்து அமர்வுகளும் செயலில் உள்ளன",
       "completedWillAppear": "நிறைவடைந்த அமர்வுகள் இங்கே தோன்றும்.",
       "noPastSessions": "கடந்த அமர்வுகள் இல்லை",
       "live": "நேரலை"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "கீழே உருட்டு",
       "emptyTitle": "இன்னும் செய்திகள் இல்லை",
       "renameAccessibility": "அமர்வை மறுபெயரிடு: {{title}}",
-      "connectRepository": "களஞ்சியத்தை இணை",
       "cloningSession": "அமர்வை குளோன் செய்கிறது",
       "continue": "தொடரவும்",
       "couldNotLoadThisSession": "இந்த அமர்வை ஏற்ற முடியவில்லை",
-      "cloneFailed": "இந்த அமர்வை குளோன் செய்ய முடியவில்லை.",
       "cloneFailedRetry": "இந்த அமர்வை குளோன் செய்ய முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "connectRepositoryToContinue": "தொடர ஒரு களஞ்சியத்தை இணைக்கவும்.",
       "notEnoughCredits": "Cloud Agent ஐ இயக்க போதுமான கிரெடிட்கள் இல்லை. கிரெடிட்களைச் சேர்த்து மீண்டும் முயற்சிக்கவும்.",
       "previousTaskFinishing": "முந்தைய பணி இன்னும் முடிவடைந்து கொண்டிருக்கிறது. சிறிது காத்திருக்கவும்.",
       "serviceUnavailable": "சேவை இப்போது கிடைக்கவில்லை. மீண்டும் முயற்சிக்கவும்.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "களஞ்சியங்கள் எதுவும் காணப்படவில்லை. GitLab-க்கான களஞ்சிய அணுகலைச் சரிபார்த்து, பின்னர் புதுப்பிக்கவும்.",
       "openBitbucket": "பிட்பக்கெட்டைத் திறக்கவும்",
       "openGitlab": "GitLab-ஐத் திறக்கவும்",
-      "recentlyUsed": "சமீபத்தில் பயன்படுத்தியவை"
+      "recentlyUsed": "சமீபத்தில் பயன்படுத்தியவை",
+      "cliCannotContinue": "இந்த CLI ஒரு அமர்வைத் தொடர முடியாது. Cloud Agent அல்லது மற்றொரு CLIஐ தேர்ந்தெடுக்கவும்.",
+      "continueFrom": "{{title}} தொடர்கிறது",
+      "importFailed": "இந்த அமர்வை இறக்குமதி செய்ய முடியவில்லை.",
+      "importingSession": "அமர்வை இறக்குமதி செய்கிறது"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது",
@@ -2462,6 +2477,8 @@
       "viewTable": "அட்டவணையைப் பார்க்கவும்",
       "title": "அட்டவணை",
       "close": "அட்டவணையை மூடு",
+      "loading": "அட்டவணை ஏற்றப்படுகிறது",
+      "empty": "இந்த அட்டவணையில் வரிசைகள் இல்லை.",
       "columnCount_one": "நெடுவரிசை",
       "columnCount": "நெடுவரிசைகள்",
       "columnCount_other": "நெடுவரிசைகள்",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "இந்த இணைப்பு உங்கள் உலாவியில் {{host}} ஐத் திறக்கும்.",
       "open": "திறக்கவும்",
       "trustThisHost": "இந்த ஹோஸ்டை நம்பு"
+    },
+    "folderPicker": {
+      "fieldLabel": "கோப்புறை",
+      "accessibility": "கோப்புறை: {{label}}",
+      "tapToListHint": "அதன் உள்ளடக்கங்களை பட்டியலிட கோப்புறையைத் தட்டவும்",
+      "emptyTitle": "உள்ளே கோப்புறைகள் இல்லை",
+      "emptyDescription": "முடிந்தது இந்த கோப்புறையைப் பயன்படுத்துகிறது.",
+      "retryableTitle": "கோப்புறைகளை பட்டியலிட முடியவில்லை",
+      "retryableDescription": "உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும். முடிந்தது இன்னும் இந்த கோப்புறையை உறுதிப்படுத்துகிறது.",
+      "unsupportedTitle": "கோப்புறைகளை பட்டியலிட முடியாது",
+      "unsupportedDescription": "இந்த CLI கோப்புறைகளை பட்டியலிட முடியாது. முடிந்தது தொடக்க கோப்புறையை வைத்திருக்கிறது மற்றும் அமர்வைத் தொடங்கு அங்கே தொடங்குகிறது."
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "ஒரு இணைப்பின் ஹோஸ்டை நீங்கள் நம்பும்போது, அது மீண்டும் கேட்காமல் திறக்கும்.",
     "revoke": "{{host}} ஐ திரும்பப் பெறு",
     "backToPreferences": "விருப்பங்களுக்குத் திரும்பு"
+  },
+  "quickChat": {
+    "title": "அரட்டை",
+    "composer": {
+      "placeholder": "செய்தி"
+    },
+    "empty": {
+      "title": "அரட்டையைத் தொடங்கு",
+      "description": "ஒரு மாதிரியுடன் பேசுவதற்கு ஒரு செய்தியை அனுப்பவும்."
+    },
+    "working": "வேலை செய்கிறது",
+    "historyRetry": "அரட்டை வரலாற்றை ஏற்ற முடியவில்லை.",
+    "catalogRetry": "மாதிரிகளை ஏற்ற முடியவில்லை",
+    "sendError": "செய்தியை அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
   }
 }

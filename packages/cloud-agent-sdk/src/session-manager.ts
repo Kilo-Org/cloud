@@ -2288,9 +2288,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       ...(agent !== undefined ? { agent } : {}),
       ...(model !== undefined ? { model } : {}),
       ...(orgId !== undefined ? { orgId } : {}),
+      ...(input?.directory !== undefined ? { directory: input.directory } : {}),
     };
     const hasFields =
-      merged.agent !== undefined || merged.model !== undefined || merged.orgId !== undefined;
+      merged.agent !== undefined ||
+      merged.model !== undefined ||
+      merged.orgId !== undefined ||
+      merged.directory !== undefined;
     return currentSession.createRemoteSession(hasFields ? merged : undefined);
   }
 

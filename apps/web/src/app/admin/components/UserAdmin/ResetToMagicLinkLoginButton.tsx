@@ -15,16 +15,19 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 export default function ResetToMagicLinkLoginButton({ userId }: { userId: string }) {
   const [isDialogOpen, setDialogOpen] = useState(false);
   const trpc = useTRPC();
+  const router = useRouter();
 
   const resetToMagicLinkMutation = useMutation(
     trpc.admin.users.resetToMagicLinkLogin.mutationOptions({
       onSuccess: () => {
         toast.success('Account reset to magic link login!');
         setDialogOpen(false);
+        router.refresh();
       },
     })
   );

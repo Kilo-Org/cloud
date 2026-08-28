@@ -25,6 +25,10 @@ import {
   enqueueUserDeletionTargets,
 } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
+import {
+  enqueueHistoricalUserDeletion,
+  type BackfillResult,
+} from '@/lib/user/deletion-queue/deletion-legacy-backfill';
 import { inspectDeletionTargets } from '@/lib/user/deletion-queue/deletion-preview';
 import {
   markTaskManuallyVerified,
@@ -78,6 +82,30 @@ const EntriesInputSchema = z.object({
   entries: z.array(EntrySchema).min(1).max(100),
 });
 
+const HistoricalUserIdSchema = z
+  .string()
+  .refine(
+    userId =>
+      [...userId].every(character => {
+        const code = character.charCodeAt(0);
+        return code > 0x1f && (code < 0x7f || code > 0x9f) && code !== 0x2028 && code !== 0x2029;
+      }),
+    { message: 'User IDs must not contain control characters or line breaks' }
+  )
+  .trim()
+  .min(1)
+  .max(1024);
+
+const HistoricalUsersInputSchema = z
+  .object({
+    userIds: z
+      .array(HistoricalUserIdSchema)
+      .min(1)
+      .max(100)
+      .transform(userIds => [...new Set(userIds)]),
+  })
+  .strict();
+
 const ListInputSchema = z.object({
   tab: ListTabSchema,
   searchEmail: z.string().trim().min(1).max(320).optional(),
@@ -112,6 +140,28 @@ const ReplaceCredentialInputSchema = z.object({
 const COMPLETED_WINDOW_DAYS = 7;
 
 type ListTab = z.infer<typeof ListTabSchema>;
+type HistoricalUserResult = { userId: string } & (BackfillResult | { status: 'failed' });
+
+async function processHistoricalUsers(params: {
+  userIds: string[];
+  adminUserId: string;
+  execute: boolean;
+}): Promise<HistoricalUserResult[]> {
+  const results: HistoricalUserResult[] = [];
+  for (const userId of params.userIds) {
+    try {
+      const result = await enqueueHistoricalUserDeletion({
+        userId,
+        adminUserId: params.adminUserId,
+        execute: params.execute,
+      });
+      results.push({ userId, ...result });
+    } catch {
+      results.push({ userId, status: 'failed' });
+    }
+  }
+  return results;
+}
 
 function iso(value: string): string {
   return new Date(value).toISOString();
@@ -306,6 +356,26 @@ export const adminUserDeletionQueueRouter = createTRPCRouter({
       catalogVersion: 2,
     });
   }),
+
+  previewHistoricalUsers: adminProcedure
+    .input(HistoricalUsersInputSchema)
+    .mutation(({ ctx, input }) => {
+      return processHistoricalUsers({
+        userIds: input.userIds,
+        adminUserId: ctx.user.id,
+        execute: false,
+      });
+    }),
+
+  submitHistoricalUsers: adminProcedure
+    .input(HistoricalUsersInputSchema)
+    .mutation(({ ctx, input }) => {
+      return processHistoricalUsers({
+        userIds: input.userIds,
+        adminUserId: ctx.user.id,
+        execute: true,
+      });
+    }),
 
   list: adminProcedure.input(ListInputSchema).query(async ({ input }) => {
     const asOfResult = await readDb.execute<{ as_of: string }>(sql`SELECT now() AS as_of`);

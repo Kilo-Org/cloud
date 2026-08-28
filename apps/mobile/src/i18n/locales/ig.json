@@ -665,7 +665,8 @@
     "profile": "Profaịlụ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} nke {{total}}"
+    "position": "{{name}}, tab, {{position}} nke {{total}}",
+    "chat": "Nkata"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Check run",
       "status": "Ọnọdụ",
       "threshold": "Ọkwa",
-      "pullRequest": "arịrịọ ndọrọ"
+      "pullRequest": "arịrịọ ndọrọ",
+      "transcriptWaiting": "Na-echere Nsụgharị nyocha.",
+      "transcriptEmpty": "Enweghị Nsụgharị maka nyocha a.",
+      "transcriptRetry": "Enweghị ike ibudata Nsụgharị nyocha.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Onye nnọchite na-ezu ike",
+      "agentWorking": "Onye nnọchite na-arụ ọrụ...",
+      "anErrorOccurred": "Njehie mere",
+      "errorWithMessage": "Njehie: {{message}}",
+      "executionStarted": "Mmezu malitere",
+      "reviewCompleted": "Nyocha gwụchara",
+      "reviewInterrupted": "Nyocha kwụsịrị",
+      "sessionError": "Njehie nnọkọ: {{error}}",
+      "statusWithValue": "Ọnọdụ: {{status}}",
+      "toolName": "Ngwa ọrụ: {{name}}",
+      "toolNameError": "Ngwa ọrụ: {{name}} — njehie",
+      "unknownError": "Njehie a na-amaghị"
     },
     "reviewMemory": {
       "title": "Ebe nchekwa nyocha",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Na-arụ ọrụ ugbu a",
     "search": {
       "searching": "Na-achọ",
       "searchSessions": "Chọọ nzukọ",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Enweghị ike ibudata nzukọ",
       "couldNotLoadActive": "Enweghị ike ibudata nzukọ na-arụ ọrụ",
-      "noSessionsYet": "Enweghị nzukọ aka",
       "noSessionsYetDescription": "Malite ọrụ koodu site na ekwentị gị. Nzukọ gị ga-apụta ebe a.",
       "noMatches": "Enweghị nzukọ dabara",
       "tryDifferentSearch": "Nwaa okwu ọchụchọ dị iche.",
       "tryAdjustFilters": "Nwaa ịhazigharị ma ọ bụ kpochapụ nzacha gị.",
       "couldNotSearch": "Enweghị ike ịchọ nzukọ",
-      "allActive": "Nzukọ niile na-arụ ọrụ",
       "completedWillAppear": "Nzukọ ndị emechara ga-apụta ebe a.",
       "noPastSessions": "Enweghị nzukọ gara aga",
       "live": "LIVE"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Pịgharịa ruo n'ala",
       "emptyTitle": "Enweghị ozi aka",
       "renameAccessibility": "Gbanwee aha nzukọ: {{title}}",
-      "connectRepository": "Jikọọ ebe nchekwa",
       "cloningSession": "Na-emepụta oyiri nzukọ",
       "continue": "Gaa n'ihu",
       "couldNotLoadThisSession": "Enweghị ike ibudata nzukọ a",
-      "cloneFailed": "Enweghị ike imepụta oyiri nzukọ a.",
       "cloneFailedRetry": "Enweghị ike imepụta oyiri nzukọ a. Nwaa ọzọ.",
-      "connectRepositoryToContinue": "Jikọọ ebe nchekwa iji gaa n'ihu.",
       "notEnoughCredits": "Kredit ezughị ezu ịgba Cloud Agent. Tinye kredit ma nwaa ọzọ.",
       "previousTaskFinishing": "Ọrụ gara aga ka na-agwụcha. Biko chere obere oge.",
       "serviceUnavailable": "Ọrụ ahụ adịghị ugbu a. Biko nwaa ọzọ.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Ọ dịghị ebe nchekwa a na-ahụ. Lelee ohere ebe nchekwa maka GitLab, wee melite.",
       "openBitbucket": "Meghee Bitbucket",
       "openGitlab": "Meghee GitLab",
-      "recentlyUsed": "Ejiri ya nso nso a"
+      "recentlyUsed": "Ejiri ya nso nso a",
+      "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
+      "continueFrom": "Na-aga n'ihu na {{title}}",
+      "importFailed": "Enweghị ike ibubata nnọkọ a.",
+      "importingSession": "Na-ebubata nnọkọ"
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere {{displayCount}} faịlụ",
@@ -2462,6 +2477,8 @@
       "viewTable": "Lelee tebụl",
       "title": "Tebụl",
       "close": "Mechi tebụl",
+      "loading": "Na-ebunye tebụl",
+      "empty": "Tebụl a enweghị ahịrị.",
       "columnCount_one": "ogidi",
       "columnCount": "ogidi",
       "columnCount_other": "ogidi",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Njikọ a na-emeghe {{host}} na ihe nchọgharị gị.",
       "open": "Meghe",
       "trustThisHost": "Tụkwasị obi n'onye nlekọta a"
+    },
+    "folderPicker": {
+      "accessibility": "Fọlda: {{label}}",
+      "emptyDescription": "Emere na-eji fọlda a.",
+      "emptyTitle": "Enweghị fọlda n'ime",
+      "fieldLabel": "Fọlda",
+      "retryableDescription": "Lelee njikọ gị ma nwaa ọzọ. Emere ka na-ekwado fọlda a.",
+      "retryableTitle": "Enweghị ike ịdepụta fọlda",
+      "tapToListHint": "Pịa fọlda ka ị depụta ọdịnaya ya",
+      "unsupportedDescription": "CLI a enweghị ike ịdepụta fọlda. Emere na-edobe fọlda mmalite ma Malite nzukọ na-amalite ebe ahụ.",
+      "unsupportedTitle": "Enweghị ike ịdepụta fọlda"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Mgbe ị tụkwasịrị obi n'onye nlekọta njikọ, ọ na-emeghe na-enweghị ịjụ ọzọ.",
     "revoke": "Weghachite {{host}}",
     "backToPreferences": "Laghachi na mmasị"
+  },
+  "quickChat": {
+    "title": "Nkata",
+    "composer": {
+      "placeholder": "Ozi"
+    },
+    "empty": {
+      "title": "Malite nkata",
+      "description": "Ziga ozi ka ị soro ihe nlereanya kparịta ụka."
+    },
+    "working": "Na-arụ ọrụ",
+    "historyRetry": "Enweghị ike ibutu akụkọ nkata.",
+    "catalogRetry": "Enweghị ike ibunye ụdị",
+    "sendError": "Enweghị ike izipu ozi ahụ. Nwaa ọzọ."
   }
 }

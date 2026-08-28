@@ -86,6 +86,7 @@ export { default as LogOut } from 'lucide-react-native/icons/log-out';
 export { default as Mail } from 'lucide-react-native/icons/mail';
 export { default as MapPin } from 'lucide-react-native/icons/map-pin';
 export { default as MemoryStick } from 'lucide-react-native/icons/memory-stick';
+export { default as MessageCircle } from 'lucide-react-native/icons/message-circle';
 export { default as MessageCirclePlus } from 'lucide-react-native/icons/message-circle-plus';
 export { default as MessageSquare } from 'lucide-react-native/icons/message-square';
 export { default as MessageSquarePlus } from 'lucide-react-native/icons/message-square-plus';

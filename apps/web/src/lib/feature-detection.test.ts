@@ -28,6 +28,7 @@ describe('validateFeatureHeader', () => {
     'github',
     'linear',
     'scheduled',
+    'quick-chat',
   ])('accepts emitted feature %s', feature => {
     expect(validateFeatureHeader(feature)).toBe(feature);
   });

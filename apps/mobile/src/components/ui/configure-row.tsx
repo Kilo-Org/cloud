@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
  * title block so long labels never clip against the chevron in a side row.
  * Matches the tab-label wrap threshold used elsewhere in the shell.
  */
-export const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
+const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
 
 type ConfigureRowProps = {
   icon: LucideIcon;

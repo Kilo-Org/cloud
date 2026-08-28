@@ -61,6 +61,14 @@ vi.mock('@/components/agents/new-session-repository-section', () => ({
   NewSessionRepositorySection: 'NewSessionRepositorySection',
 }));
 
+vi.mock('@/components/agents/folder-selector', () => ({
+  LaunchFolderField: 'LaunchFolderField',
+}));
+
+vi.mock('@/components/agents/new-session-start-button', () => ({
+  NewSessionStartButton: 'NewSessionStartButton',
+}));
+
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
@@ -162,6 +170,8 @@ function defaultProps() {
     isLoadingInstances: false,
     onChangeRunOnInstance: vi.fn(),
     showInstanceDisconnectedNote: false,
+    folderPath: '',
+    onChangeFolderPath: vi.fn(),
     groups: [] as RepositoryGroup[],
     isRetrying: false,
     onChangeRepo: vi.fn(),
@@ -356,7 +366,8 @@ describe('NewSessionConfigureForm', () => {
       isSpawningRemote: true,
     }) as Node;
 
-    expect(findElementByType(element, 'ActivityIndicator')).not.toBeNull();
+    const startButton = findElementByType(element, 'NewSessionStartButton');
+    expect(startButton?.isStarting).toBe(true);
   });
 
   it('shows spinner for cloud session creation', async () => {
@@ -369,7 +380,8 @@ describe('NewSessionConfigureForm', () => {
       isCreating: true,
     }) as Node;
 
-    expect(findElementByType(element, 'ActivityIndicator')).not.toBeNull();
+    const startButton = findElementByType(element, 'NewSessionStartButton');
+    expect(startButton?.isStarting).toBe(true);
   });
 
   it('does not show spinner when neither flag is set', async () => {
@@ -383,7 +395,8 @@ describe('NewSessionConfigureForm', () => {
       isSpawningRemote: false,
     }) as Node;
 
-    expect(findElementByType(element, 'ActivityIndicator')).toBeNull();
+    const startButton = findElementByType(element, 'NewSessionStartButton');
+    expect(startButton?.isStarting).toBe(false);
   });
 
   // ── Case 7: remote target keeps its context in the selector value ──

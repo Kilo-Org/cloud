@@ -211,7 +211,8 @@
     "profile": "Профиль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, вкладка, {{position}} из {{total}}"
+    "position": "{{name}}, вкладка, {{position}} из {{total}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -902,7 +903,23 @@
       "title": "Проверка",
       "tokens": "Токены",
       "tokensInOut": "{{input}} вх. / {{output}} исх.",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Ожидание протокола проверки.",
+      "transcriptEmpty": "Для этой проверки нет протокола.",
+      "transcriptRetry": "Не удалось загрузить протокол проверки.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Агент простаивает",
+      "agentWorking": "Агент работает...",
+      "anErrorOccurred": "Произошла ошибка",
+      "errorWithMessage": "Ошибка: {{message}}",
+      "executionStarted": "Выполнение начато",
+      "reviewCompleted": "Проверка завершена",
+      "reviewInterrupted": "Проверка прервана",
+      "sessionError": "Ошибка сеанса: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Инструмент: {{name}}",
+      "toolNameError": "Инструмент: {{name}} — ошибка",
+      "unknownError": "Неизвестная ошибка"
     },
     "reviewList": {
       "configureProvider": "Настроить провайдера",
@@ -1591,7 +1608,6 @@
     }
   },
   "agents": {
-    "activeNow": "Активен сейчас",
     "search": {
       "searching": "Поиск",
       "searchSessions": "Поиск сеансов",
@@ -1602,13 +1618,11 @@
     "sessionList": {
       "couldNotLoad": "Не удалось загрузить сеансы",
       "couldNotLoadActive": "Не удалось загрузить активные сеансы",
-      "noSessionsYet": "Сеансов пока нет",
       "noSessionsYetDescription": "Начните задачу кодирования с телефона. Ваши сеансы появятся здесь.",
       "noMatches": "Нет подходящих сеансов",
       "tryDifferentSearch": "Попробуйте другой поисковый запрос.",
       "tryAdjustFilters": "Попробуйте изменить или очистить фильтры.",
       "couldNotSearch": "Не удалось выполнить поиск сеансов",
-      "allActive": "Все сеансы активны",
       "completedWillAppear": "Завершенные сеансы появятся здесь.",
       "noPastSessions": "Нет прошлых сеансов",
       "live": "LIVE"
@@ -1681,13 +1695,10 @@
       "scrollToBottom": "Прокрутить вниз",
       "emptyTitle": "Сообщений пока нет",
       "renameAccessibility": "Переименовать сессию: {{title}}",
-      "connectRepository": "Подключить репозиторий",
       "cloningSession": "Клонирование сессии",
       "continue": "Продолжить",
       "couldNotLoadThisSession": "Не удалось загрузить эту сессию",
-      "cloneFailed": "Не удалось клонировать эту сессию.",
       "cloneFailedRetry": "Не удалось клонировать эту сессию. Попробуйте снова.",
-      "connectRepositoryToContinue": "Подключите репозиторий, чтобы продолжить.",
       "notEnoughCredits": "Недостаточно кредитов для запуска Cloud Agent. Добавьте кредиты и попробуйте снова.",
       "previousTaskFinishing": "Предыдущая задача ещё завершается. Подождите немного.",
       "serviceUnavailable": "Сервис сейчас недоступен. Попробуйте ещё раз.",
@@ -1760,7 +1771,11 @@
       "noRepositoriesVisibleGitlab": "Репозитории не отображаются. Проверьте доступ к репозиториям GitLab, затем обновите.",
       "openBitbucket": "Открыть Bitbucket",
       "openGitlab": "Открыть GitLab",
-      "recentlyUsed": "Недавно использованные"
+      "recentlyUsed": "Недавно использованные",
+      "cliCannotContinue": "Этот CLI не может продолжить сеанс. Выберите Cloud Agent или другой CLI.",
+      "continueFrom": "Продолжение {{title}}",
+      "importFailed": "Не удалось импортировать этот сеанс.",
+      "importingSession": "Импорт сеанса"
     },
     "partRenderer": {
       "updatedFileCount_one": "Обновлен {{displayCount}} файл",
@@ -2028,6 +2043,8 @@
       "viewTable": "Просмотреть таблицу",
       "title": "Таблица",
       "close": "Закрыть таблицу",
+      "loading": "Загружаем таблицу",
+      "empty": "В этой таблице нет строк.",
       "columnCount_one": "столбец",
       "columnCount": "столбцы",
       "columnCount_other": "столбцы",
@@ -2222,6 +2239,17 @@
       "hostConfirmMessage": "Эта ссылка откроет {{host}} в вашем браузере.",
       "open": "Открыть",
       "trustThisHost": "Доверять этому хосту"
+    },
+    "folderPicker": {
+      "accessibility": "Папка: {{label}}",
+      "emptyDescription": "Готово использует эту папку.",
+      "emptyTitle": "Внутри нет папок",
+      "fieldLabel": "Папка",
+      "retryableDescription": "Проверьте подключение и повторите. Готово по-прежнему подтверждает эту папку.",
+      "retryableTitle": "Не удалось получить список папок",
+      "tapToListHint": "Коснитесь папки, чтобы просмотреть её содержимое",
+      "unsupportedDescription": "Этот CLI не может получить список папок. Готово сохраняет папку запуска, а «Начать сеанс» запустится там.",
+      "unsupportedTitle": "Не удаётся получить список папок"
     }
   },
   "bootstrap": {
@@ -3191,5 +3219,19 @@
     "emptyDescription": "Когда вы доверяете хосту ссылки, он открывается без повторного запроса.",
     "revoke": "Отозвать {{host}}",
     "backToPreferences": "Назад к настройкам"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Сообщение"
+    },
+    "empty": {
+      "title": "Начать чат",
+      "description": "Отправьте сообщение, чтобы поговорить с моделью."
+    },
+    "working": "Работаю...",
+    "historyRetry": "Не удалось загрузить историю чата.",
+    "catalogRetry": "Не удалось загрузить модели",
+    "sendError": "Не удалось отправить сообщение. Попробуйте еще раз."
   }
 }

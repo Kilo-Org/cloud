@@ -1,12 +1,14 @@
 import * as Haptics from 'expo-haptics';
-import { type Href, Tabs, usePathname, useRouter } from 'expo-router';
-import { Bot, House, MessageSquare, UserRound } from '@/components/ui/icons';
+import { type Href, Tabs, usePathname, useRouter, useSegments } from 'expo-router';
+import { Bot, House, MessageCircle, MessageSquare, UserRound } from '@/components/ui/icons';
+import { useEffect } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
+import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -17,6 +19,8 @@ import {
   shouldShowTabLabel,
   TAB_LABEL_WRAP_FONT_SCALE,
   tabAccessibilityLabel,
+  tabBarPosition,
+  visibleTabCount,
 } from '@/lib/tab-bar-layout';
 
 const TAB_BAR_ICON_STYLE = {
@@ -54,6 +58,7 @@ function TabLabel({ label, focused }: Readonly<{ label: string; focused: boolean
 export default function TabsLayout() {
   const router = useRouter();
   const pathname = usePathname();
+  const segments = useSegments();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
@@ -66,8 +71,19 @@ export default function TabsLayout() {
   });
   const tabIconSize = getTabBarIconSize(fontScale);
   const showKiloClawTab = useKiloClawTabVisible();
-  const tabCount = showKiloClawTab ? 4 : 3;
+  const showQuickChatTab = useFeatureFlag(FEATURE_FLAG_QUICK_CHAT, false);
+  const tabFlags = { showKiloClaw: showKiloClawTab, showQuickChat: showQuickChatTab };
+  const tabCount = visibleTabCount(showKiloClawTab, showQuickChatTab);
   const { t } = useTranslation();
+
+  // If the flag flips off while the Chat tab is focused, its `href` becomes
+  // null but the route is still mounted — move to Home instead.
+  const onChatTab = segments.some(segment => segment === '(4_chat)');
+  useEffect(() => {
+    if (!showQuickChatTab && onChatTab) {
+      router.replace('/(app)/(tabs)/(0_home)' as Href);
+    }
+  }, [showQuickChatTab, onChatTab, router]);
 
   return (
     <Tabs
@@ -95,7 +111,11 @@ export default function TabsLayout() {
         name="(0_home)"
         options={{
           title: t('tabs.home'),
-          tabBarAccessibilityLabel: tabAccessibilityLabel(t('tabs.home'), 1, tabCount),
+          tabBarAccessibilityLabel: tabAccessibilityLabel(
+            t('tabs.home'),
+            tabBarPosition('home', tabFlags) ?? 1,
+            tabCount
+          ),
           tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.home')} focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
             <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
@@ -112,7 +132,11 @@ export default function TabsLayout() {
         options={{
           href: showKiloClawTab ? undefined : null,
           title: t('tabs.kiloclaw'),
-          tabBarAccessibilityLabel: tabAccessibilityLabel(t('tabs.kiloclaw'), 2, tabCount),
+          tabBarAccessibilityLabel: tabAccessibilityLabel(
+            t('tabs.kiloclaw'),
+            tabBarPosition('kiloclaw', tabFlags) ?? 2,
+            tabCount
+          ),
           tabBarLabel: ({ focused }) => (
             <TabLabel
               label={
@@ -141,7 +165,7 @@ export default function TabsLayout() {
           title: t('tabs.agents'),
           tabBarAccessibilityLabel: tabAccessibilityLabel(
             t('tabs.agents'),
-            showKiloClawTab ? 3 : 2,
+            tabBarPosition('agents', tabFlags) ?? 2,
             tabCount
           ),
           tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.agents')} focused={focused} />,
@@ -156,14 +180,31 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="(4_chat)"
+        options={{
+          href: showQuickChatTab ? undefined : null,
+          title: t('tabs.chat'),
+          tabBarAccessibilityLabel: tabAccessibilityLabel(
+            t('tabs.chat'),
+            tabBarPosition('chat', tabFlags) ?? 3,
+            tabCount
+          ),
+          tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.chat')} focused={focused} />,
+          tabBarIcon: ({ color, focused }) => (
+            <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
+          ),
+        }}
+        listeners={{
+          tabPress: () => {
+            void Haptics.selectionAsync();
+          },
+        }}
+      />
+      <Tabs.Screen
         name="(3_profile)"
         options={{
           title: t('tabs.profile'),
-          tabBarAccessibilityLabel: tabAccessibilityLabel(
-            t('tabs.profile'),
-            showKiloClawTab ? 4 : 3,
-            tabCount
-          ),
+          tabBarAccessibilityLabel: tabAccessibilityLabel(t('tabs.profile'), tabCount, tabCount),
           tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.profile')} focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
             <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />

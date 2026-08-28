@@ -138,7 +138,8 @@ function dispatchAndWatch(platform: 'ios' | 'android'): boolean {
   try {
     gh(['workflow', 'run', WORKFLOW_FILE, '--ref', branch, '-f', `platform=${platform}`]);
   } catch (error) {
-    // Typical cause: the workflow file does not exist on this branch yet.
+    // Typical cause: the workflow is not on the default branch yet —
+    // workflow_dispatch only resolves workflows registered there.
     log(`workflow dispatch failed (${message(error)})`);
     return false;
   }

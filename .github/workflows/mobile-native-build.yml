@@ -25,6 +25,11 @@ on:
       - 'pnpm-workspace.yaml'
       - 'patches/**'
       - '.github/workflows/mobile-native-build.yml'
+  # Self-validation: a PR that edits this workflow runs it once.
+  # (workflow_dispatch only works after the file exists on main.)
+  pull_request:
+    paths:
+      - '.github/workflows/mobile-native-build.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

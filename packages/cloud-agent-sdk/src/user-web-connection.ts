@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import {
   createBaseConnection,
   type Connection,
@@ -5,13 +6,23 @@ import {
 } from './base-connection';
 import { cloudAgentSdkRuntime } from './runtime';
 import {
+  browserFailureReasonSchema,
+  browserProviderOutboundMessageSchema,
+  normalizedBrowserCapabilitiesSchema,
   sessionEventPayloadSchema,
   userWebCommandErrorDataSchema,
   webInboundMessageSchema,
+  webInboundWithBrowserMessageSchema,
+  type BrowserJobHandle,
+  type BrowserJobSnapshot,
+  type BrowserProviderInboundMessage,
+  type BrowserProviderOutboundMessage,
   type SessionEventPayload,
   type WebInboundMessage,
+  type WebInboundWithBrowserMessage,
 } from './schemas';
 
+const BROWSER_PROVIDER_REQUEST_TIMEOUT_MS = 10_000;
 const COMMAND_TIMEOUT_MS = 30_000;
 const INITIAL_AUTH_RETRY_BASE_MS = 1_000;
 const INITIAL_AUTH_RETRY_CAP_MS = 30_000;
@@ -54,6 +65,102 @@ class CommandDeliveredError extends Error {
   }
 }
 
+type BrowserProviderLease = Extract<BrowserProviderInboundMessage, { type: 'provider_lease_ack' }>;
+type BrowserProviderSnapshot = Extract<
+  BrowserProviderInboundMessage,
+  { type: 'provider_snapshot' }
+>;
+type BrowserProviderStatusResult = Extract<
+  BrowserProviderInboundMessage,
+  { type: 'provider_status_result' }
+>;
+type BrowserProviderRegisterWire = Extract<
+  BrowserProviderOutboundMessage,
+  { type: 'provider_register' }
+>;
+type BrowserProviderHeartbeatWire = Extract<
+  BrowserProviderOutboundMessage,
+  { type: 'provider_heartbeat' }
+>;
+type BrowserProviderStatusWire = Extract<
+  BrowserProviderOutboundMessage,
+  { type: 'provider_status' }
+>;
+type BrowserProviderRegistration = Omit<
+  BrowserProviderRegisterWire,
+  'type' | 'requestId' | 'enabled'
+>;
+type BrowserProviderApprovalInput = Omit<
+  Extract<BrowserProviderOutboundMessage, { type: 'provider_approval' }>,
+  'type'
+>;
+type BrowserProviderCancelInput = Omit<
+  Extract<BrowserProviderOutboundMessage, { type: 'provider_cancel' }>,
+  'type'
+>;
+type BrowserProviderResultInput = Omit<
+  Extract<BrowserProviderOutboundMessage, { type: 'provider_result' }>,
+  'type'
+>;
+type BrowserProviderQuiescenceInput = Omit<
+  Extract<BrowserProviderOutboundMessage, { type: 'provider_quiesced' }>,
+  'type'
+>;
+type BrowserProviderUnavailableInput = Omit<
+  Extract<BrowserProviderOutboundMessage, { type: 'provider_unavailable' }>,
+  'type'
+>;
+type BrowserProviderErrorCode =
+  | BrowserProviderUnavailableInput['reason']
+  | 'disabled'
+  | 'disconnected'
+  | 'not_negotiated'
+  | 'request_timeout';
+
+class BrowserProviderError extends Error {
+  constructor(
+    readonly code: BrowserProviderErrorCode,
+    readonly retryable: boolean
+  ) {
+    // Never include relay text, validation issues, registration proofs, or socket errors.
+    super(`Browser provider request failed: ${code}`);
+    this.name = 'BrowserProviderError';
+  }
+}
+
+const browserProviderErrorSchema = z.object({
+  source: z.literal('relay'),
+  code: browserFailureReasonSchema,
+  retryable: z.boolean(),
+});
+
+type BrowserProviderState =
+  | { status: 'disabled' | 'disconnected' | 'negotiating' | 'ready' }
+  | { status: 'registered'; lease: BrowserProviderLease }
+  | { status: 'unavailable'; reason: BrowserProviderErrorCode; retryable: boolean };
+
+/** Additive API; the legacy UserWebConnection structural contract remains unchanged. */
+type BrowserProviderConnection = {
+  getBrowserProviderState: () => BrowserProviderState;
+  onBrowserProviderStateChange: (listener: (state: BrowserProviderState) => void) => () => void;
+  /** Snapshots and history reconcile persisted state. Only provider_job offers new work for approval. */
+  onBrowserProviderMessage: (
+    listener: (message: BrowserProviderInboundMessage) => void
+  ) => () => void;
+  /** Requires an explicitly retained, negotiated connection. Keeps only stable registration data for reconnect. */
+  registerBrowserProvider: (input: BrowserProviderRegistration) => Promise<BrowserProviderLease>;
+  /** Renews the current lease and reconciles only its generation. */
+  heartbeatBrowserProvider: (cursor?: string) => Promise<BrowserProviderSnapshot>;
+  /** Reads history with the stable proof, even without registration. Never authorizes execution. */
+  requestBrowserProviderStatus: (cursor?: string) => Promise<BrowserProviderStatusResult>;
+  /** Sends consent only. Wait for a running snapshot before starting browser actions. */
+  approveBrowserProviderJob: (input: BrowserProviderApprovalInput) => void;
+  cancelBrowserProviderJob: (input: BrowserProviderCancelInput) => void;
+  sendBrowserProviderResult: (input: BrowserProviderResultInput) => void;
+  quiesceBrowserProviderJob: (input: BrowserProviderQuiescenceInput) => void;
+  markBrowserProviderUnavailable: (input: BrowserProviderUnavailableInput) => void;
+};
+
 type UserWebConnectionConfig = {
   websocketUrl: string;
   getAuthToken: () => string | Promise<string>;
@@ -61,6 +168,8 @@ type UserWebConnectionConfig = {
   onReconnect?: () => void;
   lifecycleHooks?: ConnectionLifecycleHooks;
   maxReconnectAttempts?: number;
+  /** Old callers omit this flag and stay disabled. This compatibility default is permanent. */
+  browserProvider?: boolean;
 };
 
 type SendCommandToConnectionInput = {
@@ -145,8 +254,37 @@ function parseCommandError(error: unknown): Error {
 
 function createUserWebConnection(
   config: UserWebConnectionConfig
-): UserWebConnection & { retain: () => () => void } {
+): UserWebConnection & BrowserProviderConnection {
   const connectionId = cloudAgentSdkRuntime.randomUUID();
+  const browserProviderEnabled = config.browserProvider ?? false;
+  let providerNegotiated = false;
+  let providerEpoch = 0;
+  let providerState: BrowserProviderState = {
+    status: browserProviderEnabled ? 'disconnected' : 'disabled',
+  };
+  let providerRegistration: BrowserProviderRegistration | null = null;
+  let providerLease: BrowserProviderLease | null = null;
+  // A lost lease can still acknowledge drained work, but cannot authorize another action.
+  let providerBinding: Pick<BrowserProviderLease, 'providerId' | 'generation'> | null = null;
+  let providerLeaseTimer: ReturnType<typeof setTimeout> | null = null;
+  let providerHeartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+  const providerListeners = new Set<(message: BrowserProviderInboundMessage) => void>();
+  const providerStateListeners = new Set<(state: BrowserProviderState) => void>();
+  const providerSnapshots = new Map<string, BrowserJobSnapshot>();
+  const dispatchedProviderJobs = new Set<string>();
+  const cancelledProviderJobs = new Set<string>();
+  const pendingProviderRequests = new Map<
+    string,
+    {
+      wire: BrowserProviderRegisterWire | BrowserProviderHeartbeatWire | BrowserProviderStatusWire;
+      acknowledged: boolean;
+      resolve: (
+        reply: BrowserProviderLease | BrowserProviderSnapshot | BrowserProviderStatusResult
+      ) => void;
+      reject: (error: BrowserProviderError) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
+  >();
   let token = '';
   let baseConnection: Connection | null = null;
   let currentWs: WebSocket | null = null;
@@ -209,6 +347,485 @@ function createUserWebConnection(
     if (exhausted === value) return;
     exhausted = value;
     for (const listener of exhaustionChangeListeners) listener(value);
+  }
+
+  function setProviderState(state: BrowserProviderState): void {
+    if (state.status === providerState.status && state.status !== 'registered') {
+      if (state.status !== 'unavailable') return;
+      if (
+        providerState.status === 'unavailable' &&
+        state.reason === providerState.reason &&
+        state.retryable === providerState.retryable
+      )
+        return;
+    }
+    providerState = state;
+    for (const listener of providerStateListeners) {
+      if (providerState !== state) break;
+      listener(state);
+    }
+  }
+
+  function invalidateProvider(error: BrowserProviderError, disconnected = false): void {
+    if (!browserProviderEnabled) return;
+    providerEpoch += 1;
+    providerLease = null;
+    if (providerLeaseTimer !== null) clearTimeout(providerLeaseTimer);
+    if (providerHeartbeatTimer !== null) clearTimeout(providerHeartbeatTimer);
+    providerLeaseTimer = null;
+    providerHeartbeatTimer = null;
+    for (const [id, pending] of pendingProviderRequests) {
+      if (!disconnected && pending.wire.type === 'provider_status') continue;
+      clearTimeout(pending.timer);
+      pendingProviderRequests.delete(id);
+      pending.reject(error);
+    }
+    if (disconnected) {
+      currentWs = null;
+      providerNegotiated = false;
+      providerBinding = null;
+      providerSnapshots.clear();
+      dispatchedProviderJobs.clear();
+      cancelledProviderJobs.clear();
+    }
+    // Fence actions and reject requests before notifying the owner, including during teardown.
+    setProviderState(
+      disconnected
+        ? { status: 'disconnected' }
+        : { status: 'unavailable', reason: error.code, retryable: error.retryable }
+    );
+  }
+
+  function requireProviderSocket(): WebSocket {
+    if (!browserProviderEnabled) throw new BrowserProviderError('disabled', false);
+    if (destroyed || !hasLifetime() || !currentWs || currentWs.readyState !== WebSocket.OPEN) {
+      const error = new BrowserProviderError('disconnected', true);
+      if (currentWs) {
+        invalidateProvider(error, true);
+        clearLiveness();
+        setConnected(false);
+      }
+      throw error;
+    }
+    if (!providerNegotiated) {
+      if (providerState.status === 'unavailable')
+        throw new BrowserProviderError(providerState.reason, providerState.retryable);
+      throw new BrowserProviderError('not_negotiated', true);
+    }
+    return currentWs;
+  }
+
+  function requireProviderLease(): BrowserProviderLease {
+    requireProviderSocket();
+    if (providerLease && Date.parse(providerLease.leaseExpiresAt) <= Date.now()) {
+      invalidateProvider(new BrowserProviderError('lease_expired', true));
+    }
+    if (!providerLease) {
+      throw providerState.status === 'unavailable'
+        ? new BrowserProviderError(providerState.reason, providerState.retryable)
+        : new BrowserProviderError('provider_unavailable', true);
+    }
+    return providerLease;
+  }
+
+  function validateProviderMessage(input: unknown): BrowserProviderOutboundMessage {
+    const parsed = browserProviderOutboundMessageSchema.safeParse(input);
+    if (!parsed.success) throw new BrowserProviderError('invalid_request', false);
+    return parsed.data;
+  }
+
+  function sendProviderWire(wire: BrowserProviderOutboundMessage): void {
+    const ws = requireProviderSocket();
+    try {
+      ws.send(JSON.stringify(wire));
+    } catch {
+      const error = new BrowserProviderError('disconnected', true);
+      invalidateProvider(error, true);
+      replaceUnresponsiveSocket();
+      throw error;
+    }
+  }
+
+  function rejectProviderRequest(requestId: string, error: BrowserProviderError): void {
+    const pending = pendingProviderRequests.get(requestId);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    pendingProviderRequests.delete(requestId);
+    pending.reject(error);
+  }
+
+  function requestProvider(
+    wire: BrowserProviderRegisterWire | BrowserProviderHeartbeatWire | BrowserProviderStatusWire
+  ): Promise<BrowserProviderLease | BrowserProviderSnapshot | BrowserProviderStatusResult> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const error = new BrowserProviderError('request_timeout', true);
+        if (wire.type === 'provider_status') rejectProviderRequest(wire.requestId, error);
+        else invalidateProvider(error);
+      }, BROWSER_PROVIDER_REQUEST_TIMEOUT_MS);
+      pendingProviderRequests.set(wire.requestId, {
+        wire,
+        acknowledged: false,
+        resolve,
+        reject,
+        timer,
+      });
+      try {
+        sendProviderWire(wire);
+      } catch {
+        rejectProviderRequest(wire.requestId, new BrowserProviderError('disconnected', true));
+      }
+    });
+  }
+
+  function finishProviderRequest(
+    requestId: string,
+    reply: BrowserProviderLease | BrowserProviderSnapshot | BrowserProviderStatusResult
+  ): void {
+    const pending = pendingProviderRequests.get(requestId);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    pendingProviderRequests.delete(requestId);
+    pending.resolve(reply);
+  }
+
+  async function registerBrowserProvider(
+    input: BrowserProviderRegistration
+  ): Promise<BrowserProviderLease> {
+    const ws = requireProviderSocket();
+    if (
+      providerLease ||
+      [...pendingProviderRequests.values()].some(
+        pending => pending.wire.type === 'provider_register'
+      )
+    ) {
+      throw new BrowserProviderError('invalid_request', false);
+    }
+    const wire = validateProviderMessage({
+      ...input,
+      type: 'provider_register',
+      enabled: true,
+      requestId: cloudAgentSdkRuntime.randomUUID(),
+    });
+    if (wire.type !== 'provider_register') throw new BrowserProviderError('invalid_request', false);
+    // Recovery is an explicit, one-shot assertion. Never replay it after a lost acknowledgement.
+    const registration = {
+      providerId: wire.providerId,
+      providerProof: wire.providerProof,
+      generation: wire.generation,
+      label: wire.label,
+    };
+    providerRegistration = registration;
+    try {
+      const reply = await requestProvider(wire);
+      if (reply.type !== 'provider_lease_ack')
+        throw new BrowserProviderError('invalid_request', false);
+      return reply;
+    } finally {
+      // A rejected registration can leave a fence whose history still needs reconciliation.
+      if (
+        currentWs === ws &&
+        providerRegistration === registration &&
+        providerNegotiated &&
+        hasLifetime() &&
+        !destroyed
+      )
+        void requestBrowserProviderStatus().catch(() => {});
+    }
+  }
+
+  async function requestBrowserProviderStatus(
+    cursor?: string
+  ): Promise<BrowserProviderStatusResult> {
+    requireProviderSocket();
+    if (!providerRegistration) throw new BrowserProviderError('provider_unavailable', true);
+    const wire = validateProviderMessage({
+      type: 'provider_status',
+      requestId: cloudAgentSdkRuntime.randomUUID(),
+      providerId: providerRegistration.providerId,
+      providerProof: providerRegistration.providerProof,
+      ...(cursor === undefined ? {} : { cursor }),
+    });
+    if (wire.type !== 'provider_status') throw new BrowserProviderError('invalid_request', false);
+    const reply = await requestProvider(wire);
+    if (reply.type !== 'provider_status_result')
+      throw new BrowserProviderError('invalid_request', false);
+    return reply;
+  }
+
+  async function heartbeatBrowserProvider(cursor?: string): Promise<BrowserProviderSnapshot> {
+    const lease = requireProviderLease();
+    const wire = validateProviderMessage({
+      type: 'provider_heartbeat',
+      requestId: cloudAgentSdkRuntime.randomUUID(),
+      providerId: lease.providerId,
+      generation: lease.generation,
+      ...(cursor === undefined ? {} : { cursor }),
+    });
+    if (wire.type !== 'provider_heartbeat')
+      throw new BrowserProviderError('invalid_request', false);
+    const reply = await requestProvider(wire);
+    if (reply.type !== 'provider_snapshot')
+      throw new BrowserProviderError('invalid_request', false);
+    return reply;
+  }
+
+  function renewProviderLease(lease: BrowserProviderLease): void {
+    if (providerLeaseTimer !== null) clearTimeout(providerLeaseTimer);
+    if (providerHeartbeatTimer !== null) clearTimeout(providerHeartbeatTimer);
+    const remaining = Date.parse(lease.leaseExpiresAt) - Date.now();
+    if (remaining <= 0) {
+      invalidateProvider(new BrowserProviderError('lease_expired', true));
+      return;
+    }
+    providerLease = lease;
+    providerLeaseTimer = setTimeout(
+      () => invalidateProvider(new BrowserProviderError('lease_expired', true)),
+      remaining
+    );
+    providerHeartbeatTimer = setTimeout(
+      () => {
+        providerHeartbeatTimer = null;
+        void heartbeatBrowserProvider().catch(() => {});
+      },
+      Math.max(1, Math.floor(remaining / 2))
+    );
+    setProviderState({ status: 'registered', lease });
+  }
+
+  function matchesProviderJob(left: BrowserJobHandle, right: BrowserJobHandle): boolean {
+    return (
+      left.providerId === right.providerId &&
+      left.browserTaskId === right.browserTaskId &&
+      left.jobId === right.jobId &&
+      left.invocationId === right.invocationId
+    );
+  }
+
+  function sendProviderUpdate(input: BrowserProviderOutboundMessage): void {
+    const wire = validateProviderMessage(input);
+    if (
+      wire.type === 'provider_register' ||
+      wire.type === 'provider_heartbeat' ||
+      wire.type === 'provider_status'
+    )
+      throw new BrowserProviderError('invalid_request', false);
+    if (
+      wire.type === 'provider_unavailable' &&
+      wire.providerId === providerRegistration?.providerId &&
+      wire.generation === providerRegistration.generation
+    ) {
+      // Keep the owner's disable intent even if this socket cannot deliver it.
+      providerRegistration = null;
+      if (!providerLease) invalidateProvider(new BrowserProviderError(wire.reason, false));
+    }
+    requireProviderSocket();
+    const binding = wire.type === 'provider_quiesced' ? providerBinding : requireProviderLease();
+    if (
+      !binding ||
+      wire.providerId !== binding.providerId ||
+      wire.generation !== binding.generation
+    )
+      throw new BrowserProviderError('owner_mismatch', false);
+    if (wire.type !== 'provider_unavailable') {
+      const job = providerSnapshots.get(wire.jobId);
+      if (!job || !matchesProviderJob(job, wire) || job.generation !== wire.generation)
+        throw new BrowserProviderError('owner_mismatch', false);
+      if (wire.type === 'provider_approval' || wire.type === 'provider_result') {
+        if (
+          !dispatchedProviderJobs.has(wire.jobId) ||
+          cancelledProviderJobs.has(wire.jobId) ||
+          job.status !== (wire.type === 'provider_approval' ? 'awaiting_approval' : 'running')
+        )
+          throw new BrowserProviderError('invalid_request', false);
+      }
+      if (wire.type === 'provider_result') {
+        const tab = job.approvedTab;
+        if (
+          !tab ||
+          tab.tabId !== wire.tab.tabId ||
+          tab.title !== wire.tab.title ||
+          tab.url !== wire.tab.url ||
+          tab.effectiveMode !== wire.tab.effectiveMode
+        )
+          throw new BrowserProviderError('invalid_request', false);
+      }
+      if (
+        wire.type === 'provider_quiesced' &&
+        ((!job.result && !cancelledProviderJobs.has(job.jobId)) ||
+          (job.approvedTab && job.approvedTab.tabId !== wire.tabId))
+      )
+        throw new BrowserProviderError('invalid_request', false);
+    }
+    sendProviderWire(wire);
+    if (wire.type === 'provider_unavailable') {
+      providerRegistration = null;
+      invalidateProvider(new BrowserProviderError(wire.reason, false));
+    }
+  }
+
+  function emitProviderMessage(message: BrowserProviderInboundMessage, epoch: number): void {
+    for (const listener of providerListeners) {
+      if (
+        destroyed ||
+        !hasLifetime() ||
+        !currentWs ||
+        !providerNegotiated ||
+        epoch !== providerEpoch
+      )
+        break;
+      listener(message);
+    }
+  }
+
+  function handleProviderMessage(message: BrowserProviderInboundMessage): void {
+    if (!providerNegotiated || !currentWs || destroyed || !hasLifetime()) return;
+    const epoch = providerEpoch;
+    switch (message.type) {
+      case 'provider_lease_ack': {
+        const pending = pendingProviderRequests.get(message.requestId);
+        if (
+          !pending ||
+          pending.wire.type === 'provider_status' ||
+          pending.acknowledged ||
+          message.providerId !== pending.wire.providerId
+        )
+          return;
+        const registering = pending.wire.type === 'provider_register';
+        if (
+          registering
+            ? message.generation <= pending.wire.generation
+            : message.generation !== providerLease?.generation ||
+              message.generation !== pending.wire.generation
+        )
+          return;
+        // A suspended timer cannot turn a late heartbeat into renewed execution authority.
+        if (
+          !registering &&
+          providerLease &&
+          Date.parse(providerLease.leaseExpiresAt) <= Date.now()
+        ) {
+          invalidateProvider(new BrowserProviderError('lease_expired', true));
+          return;
+        }
+        if (registering) {
+          providerBinding = { providerId: message.providerId, generation: message.generation };
+          providerSnapshots.clear();
+          dispatchedProviderJobs.clear();
+          cancelledProviderJobs.clear();
+          if (providerRegistration) providerRegistration.generation = message.generation;
+        }
+        pending.acknowledged = true;
+        renewProviderLease(message);
+        if (epoch !== providerEpoch || !providerLease) return;
+        if (registering) finishProviderRequest(message.requestId, message);
+        emitProviderMessage(message, epoch);
+        return;
+      }
+      case 'provider_status_result': {
+        const pending = pendingProviderRequests.get(message.requestId);
+        if (
+          !pending ||
+          pending.wire.type !== 'provider_status' ||
+          message.providerId !== pending.wire.providerId
+        )
+          return;
+        // History never enters the live snapshot cache or changes execution authority.
+        finishProviderRequest(message.requestId, message);
+        emitProviderMessage(message, epoch);
+        return;
+      }
+      case 'provider_snapshot': {
+        if (
+          message.providerId !== providerBinding?.providerId ||
+          message.generation !== providerBinding.generation
+        )
+          return;
+        if (message.requestId) {
+          const pending = pendingProviderRequests.get(message.requestId);
+          if (!pending || pending.wire.type !== 'provider_heartbeat' || !pending.acknowledged)
+            return;
+        }
+        if (providerLease && Date.parse(providerLease.leaseExpiresAt) <= Date.now()) {
+          invalidateProvider(new BrowserProviderError('lease_expired', true));
+          return;
+        }
+        const jobs = message.jobs.filter(job => {
+          if (job.status === 'running' && !providerLease) return false;
+          const previous = providerSnapshots.get(job.jobId);
+          if (
+            previous &&
+            (!matchesProviderJob(previous, job) ||
+              (previous.result && previous.status !== job.status) ||
+              (previous.status === 'running' &&
+                (job.status === 'queued' || job.status === 'awaiting_approval')))
+          )
+            return false;
+          providerSnapshots.set(job.jobId, job);
+          return true;
+        });
+        const snapshot = { ...message, jobs };
+        if (message.requestId) finishProviderRequest(message.requestId, snapshot);
+        emitProviderMessage(snapshot, epoch);
+        return;
+      }
+      case 'provider_job': {
+        if (
+          message.job.providerId !== providerLease?.providerId ||
+          message.job.generation !== providerLease.generation
+        )
+          return;
+        if (Date.parse(providerLease.leaseExpiresAt) <= Date.now()) {
+          invalidateProvider(new BrowserProviderError('lease_expired', true));
+          return;
+        }
+        const job = message.job;
+        const previous = providerSnapshots.get(job.jobId);
+        if (
+          dispatchedProviderJobs.has(job.jobId) ||
+          cancelledProviderJobs.has(job.jobId) ||
+          (previous &&
+            (!matchesProviderJob(previous, job) ||
+              (previous.status !== 'queued' && previous.status !== 'awaiting_approval')))
+        )
+          return;
+        providerSnapshots.set(job.jobId, job);
+        dispatchedProviderJobs.add(job.jobId);
+        emitProviderMessage(message, epoch);
+        return;
+      }
+      case 'provider_job_cancel': {
+        if (
+          message.providerId !== providerBinding?.providerId ||
+          message.generation !== providerBinding.generation ||
+          cancelledProviderJobs.has(message.jobId)
+        )
+          return;
+        const job = providerSnapshots.get(message.jobId);
+        if (job && !matchesProviderJob(job, message)) return;
+        cancelledProviderJobs.add(message.jobId);
+        const leaseLost =
+          message.reason === 'lease_expired' ||
+          message.reason === 'provider_lost' ||
+          message.reason === 'provider_unavailable' ||
+          message.reason === 'effects_uncertain' ||
+          message.reason === 'approval_timeout' ||
+          message.reason === 'execution_timeout' ||
+          message.reason === 'invocation_expired' ||
+          (message.reason === 'cancelled' && job?.approvedTab !== undefined);
+        if (leaseLost) {
+          invalidateProvider(
+            new BrowserProviderError(message.reason, message.reason !== 'effects_uncertain')
+          );
+        }
+        emitProviderMessage(message, leaseLost ? epoch + 1 : epoch);
+        return;
+      }
+      default: {
+        const exhaustive: never = message;
+        return exhaustive;
+      }
+    }
   }
 
   function hasLifetime(): boolean {
@@ -316,7 +933,11 @@ function createUserWebConnection(
 
     const nonce = cloudAgentSdkRuntime.randomUUID();
     outstandingPingNonce = nonce;
-    sendWire({ type: 'ping', nonce });
+    sendWire({
+      type: 'ping',
+      nonce,
+      ...(browserProviderEnabled ? { capabilities: { browserJobsV1: true } } : {}),
+    });
     pongTimeout = setTimeout(replaceUnresponsiveSocket, VIEWER_PONG_TIMEOUT_MS);
   }
 
@@ -381,37 +1002,73 @@ function createUserWebConnection(
     });
   }
 
-  function handleInboundMessage(msg: WebInboundMessage): void {
-    if (msg.type === 'pong') {
-      if (msg.nonce === outstandingPingNonce) clearPongTimeout();
-      return;
-    }
-
-    if (msg.type === 'event') {
-      for (const key of [msg.sessionId, msg.parentSessionId]) {
-        if (!key) continue;
-        for (const listener of cliListeners.get(key) ?? []) listener(msg);
-      }
-      return;
-    }
-
-    if (msg.type === 'system') {
-      for (const listener of systemListeners) listener(msg);
-      const parsed = sessionEventPayloadSchema.safeParse({ type: msg.event, data: msg.data });
-      if (parsed.success) {
-        for (const listener of sessionListeners.get(parsed.data.type) ?? []) {
-          listener(parsed.data.data as never);
+  function handleInboundMessage(msg: WebInboundWithBrowserMessage): void {
+    if (destroyed || !hasLifetime() || !currentWs) return;
+    switch (msg.type) {
+      case 'pong': {
+        if (msg.nonce !== outstandingPingNonce) return;
+        clearPongTimeout();
+        if (!browserProviderEnabled) return;
+        const supported = normalizedBrowserCapabilitiesSchema.parse(msg.capabilities).browserJobsV1;
+        if (!supported) {
+          providerNegotiated = false;
+          invalidateProvider(new BrowserProviderError('unsupported', false));
+        } else if (!providerNegotiated) {
+          providerNegotiated = true;
+          setProviderState({ status: 'ready' });
+          if (providerRegistration && providerNegotiated && hasLifetime() && !destroyed) {
+            void registerBrowserProvider(providerRegistration).catch(() => {});
+          }
         }
+        return;
       }
-      return;
+      case 'event':
+        for (const key of [msg.sessionId, msg.parentSessionId]) {
+          if (!key) continue;
+          for (const listener of cliListeners.get(key) ?? []) listener(msg);
+        }
+        return;
+      case 'system': {
+        for (const listener of systemListeners) listener(msg);
+        const parsed = sessionEventPayloadSchema.safeParse({ type: msg.event, data: msg.data });
+        if (parsed.success) {
+          for (const listener of sessionListeners.get(parsed.data.type) ?? []) {
+            listener(parsed.data.data as never);
+          }
+        }
+        return;
+      }
+      case 'response': {
+        const providerRequest = pendingProviderRequests.get(msg.id);
+        if (providerRequest) {
+          const parsed = browserProviderErrorSchema.safeParse(msg.error);
+          const error = parsed.success
+            ? new BrowserProviderError(parsed.data.code, parsed.data.retryable)
+            : new BrowserProviderError('invalid_request', false);
+          if (providerRequest.wire.type === 'provider_status') rejectProviderRequest(msg.id, error);
+          else invalidateProvider(error);
+          return;
+        }
+        const pending = pendingCommands.get(msg.id);
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        pendingCommands.delete(msg.id);
+        if (msg.error) pending.reject(parseCommandError(msg.error));
+        else pending.resolve(msg.result);
+        return;
+      }
+      case 'provider_lease_ack':
+      case 'provider_snapshot':
+      case 'provider_status_result':
+      case 'provider_job':
+      case 'provider_job_cancel':
+        handleProviderMessage(msg);
+        return;
+      default: {
+        const exhaustive: never = msg;
+        return exhaustive;
+      }
     }
-
-    const pending = pendingCommands.get(msg.id);
-    if (!pending) return;
-    clearTimeout(pending.timer);
-    pendingCommands.delete(msg.id);
-    if (msg.error) pending.reject(parseCommandError(msg.error));
-    else pending.resolve(msg.result);
   }
 
   function createLifecycleHooks(): ConnectionLifecycleHooks | undefined {
@@ -447,7 +1104,8 @@ function createUserWebConnection(
     if (baseConnection) return;
     removePreSocketLifecycleListeners();
     hasEverOpened = false;
-    baseConnection = createBaseConnection({
+    const expectedGeneration = generation;
+    baseConnection = createBaseConnection<WebInboundWithBrowserMessage>({
       lifecycleHooks: createLifecycleHooks(),
       maxReconnectAttempts: config.maxReconnectAttempts,
       onReconnectExhaustionChange: setExhausted,
@@ -456,7 +1114,11 @@ function createUserWebConnection(
         if (typeof data !== 'string') return null;
         try {
           const parsed: unknown = JSON.parse(data);
-          const result = webInboundMessageSchema.safeParse(parsed);
+          const schema =
+            browserProviderEnabled && providerNegotiated
+              ? webInboundWithBrowserMessageSchema
+              : webInboundMessageSchema;
+          const result = schema.safeParse(parsed);
           if (!result.success) return null;
           return { type: 'event', payload: result.data };
         } catch {
@@ -465,12 +1127,22 @@ function createUserWebConnection(
       },
       onEvent: handleInboundMessage,
       onOpen: ws => {
+        if (
+          destroyed ||
+          expectedGeneration !== generation ||
+          !hasLifetime() ||
+          ws.readyState !== WebSocket.OPEN
+        )
+          return;
         hasEverOpened = true;
-        if (!hasLifetime()) return;
         currentWs = ws;
         resolveOpenWaiters(ws);
         for (const sessionId of subscriptionCounts.keys()) sendSubscribe(sessionId);
         startLiveness();
+        if (browserProviderEnabled) {
+          setProviderState({ status: 'negotiating' });
+          sendPing();
+        }
       },
       onConnected: () => {
         setConnected(true);
@@ -481,14 +1153,22 @@ function createUserWebConnection(
         for (const listener of reconnectListeners) listener();
       },
       onReplacingConnection: () => {
+        invalidateProvider(new BrowserProviderError('disconnected', true), true);
+        if (browserProviderEnabled) {
+          clearLiveness();
+          setConnected(false);
+        }
         rejectPending('Connection lost during reconnect');
       },
       onDisconnected: () => {
         currentWs = null;
         clearLiveness();
+        invalidateProvider(new BrowserProviderError('disconnected', true), true);
         setConnected(false);
       },
       onUnexpectedDisconnect: () => {
+        invalidateProvider(new BrowserProviderError('disconnected', true), true);
+        if (browserProviderEnabled) clearLiveness();
         rejectPending('Connection lost during reconnect');
         setConnected(false);
       },
@@ -501,7 +1181,24 @@ function createUserWebConnection(
       // `hasEverOpened` (set on first `onOpen`) scopes the refresh to reconnects.
       shouldRefreshAuthBeforeConnect: () => hasEverOpened,
       refreshAuth: async () => {
-        token = await config.getAuthToken();
+        if (browserProviderEnabled) {
+          invalidateProvider(new BrowserProviderError('disconnected', true), true);
+          clearLiveness();
+          setConnected(false);
+          token = '';
+        }
+        try {
+          const refreshed = await config.getAuthToken();
+          if (
+            !browserProviderEnabled ||
+            (!destroyed && expectedGeneration === generation && hasLifetime())
+          )
+            token = refreshed;
+        } catch (error) {
+          // The base connection logs refresh failures. Never pass it a proof-bearing error.
+          if (browserProviderEnabled) throw new Error('Failed to get auth token');
+          throw error;
+        }
       },
     });
   }
@@ -526,6 +1223,7 @@ function createUserWebConnection(
     const rejectAuthFailure = (): void => {
       if (expectedGeneration !== generation) return;
       started = false;
+      invalidateProvider(new BrowserProviderError('provider_unavailable', true));
       rejectPending('Failed to get auth token');
       config.onError?.('Failed to get auth token');
       scheduleInitialAuthRetry(expectedGeneration);
@@ -554,6 +1252,7 @@ function createUserWebConnection(
     clearLiveness();
     clearInitialAuthRetry();
     removePreSocketLifecycleListeners();
+    invalidateProvider(new BrowserProviderError('disconnected', true), true);
     rejectPending(message);
     baseConnection?.destroy();
     baseConnection = null;
@@ -646,6 +1345,30 @@ function createUserWebConnection(
   }
 
   return {
+    getBrowserProviderState: () => providerState,
+    onBrowserProviderStateChange(listener) {
+      if (destroyed) return () => {};
+      providerStateListeners.add(listener);
+      return () => {
+        providerStateListeners.delete(listener);
+      };
+    },
+    onBrowserProviderMessage(listener) {
+      if (destroyed) return () => {};
+      providerListeners.add(listener);
+      return () => {
+        providerListeners.delete(listener);
+      };
+    },
+    registerBrowserProvider,
+    heartbeatBrowserProvider,
+    requestBrowserProviderStatus,
+    approveBrowserProviderJob: input => sendProviderUpdate({ ...input, type: 'provider_approval' }),
+    cancelBrowserProviderJob: input => sendProviderUpdate({ ...input, type: 'provider_cancel' }),
+    sendBrowserProviderResult: input => sendProviderUpdate({ ...input, type: 'provider_result' }),
+    quiesceBrowserProviderJob: input => sendProviderUpdate({ ...input, type: 'provider_quiesced' }),
+    markBrowserProviderUnavailable: input =>
+      sendProviderUpdate({ ...input, type: 'provider_unavailable' }),
     retain: retainConnection,
     connect,
     disconnect() {
@@ -661,6 +1384,9 @@ function createUserWebConnection(
       retainCount = 0;
       commandRetainCount = 0;
       stopConnection('Connection destroyed');
+      providerRegistration = null;
+      providerListeners.clear();
+      providerStateListeners.clear();
       subscriptionCounts.clear();
       cliListeners.clear();
       systemListeners.clear();
@@ -757,8 +1483,25 @@ function createUserWebConnection(
   };
 }
 
-export { createUserWebConnection, CommandDeliveredError, UserWebCommandError };
+export {
+  createUserWebConnection,
+  BrowserProviderError,
+  CommandDeliveredError,
+  UserWebCommandError,
+};
 export type {
+  BrowserProviderApprovalInput,
+  BrowserProviderCancelInput,
+  BrowserProviderConnection,
+  BrowserProviderErrorCode,
+  BrowserProviderLease,
+  BrowserProviderQuiescenceInput,
+  BrowserProviderRegistration,
+  BrowserProviderResultInput,
+  BrowserProviderSnapshot,
+  BrowserProviderState,
+  BrowserProviderStatusResult,
+  BrowserProviderUnavailableInput,
   SendCommandToConnectionInput,
   UserWebConnection,
   UserWebConnectionConfig,

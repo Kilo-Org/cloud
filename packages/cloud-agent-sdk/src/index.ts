@@ -4,7 +4,14 @@ export type { CloudAgentEvent, StreamError, StreamErrorCode } from './event-type
 export { formatError as formatSessionError } from './session-manager';
 export { createSessionManager } from './session-manager';
 export { customerBillingFailureSchema, parseCustomerBillingFailure } from './schemas';
-export type { CustomerBillingFailure } from './schemas';
+export type {
+  BrowserJobHandle,
+  BrowserJobSnapshot,
+  BrowserProviderInboundMessage,
+  BrowserProviderOutboundMessage,
+  BrowserResult,
+  CustomerBillingFailure,
+} from './schemas';
 export { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 export type {
   ActiveSessionType,
@@ -70,10 +77,23 @@ export type { CliLiveTransportConfig } from './cli-live-transport';
 
 export {
   createUserWebConnection,
+  BrowserProviderError,
   CommandDeliveredError,
   UserWebCommandError,
 } from './user-web-connection';
 export type {
+  BrowserProviderApprovalInput,
+  BrowserProviderCancelInput,
+  BrowserProviderConnection,
+  BrowserProviderErrorCode,
+  BrowserProviderLease,
+  BrowserProviderQuiescenceInput,
+  BrowserProviderRegistration,
+  BrowserProviderResultInput,
+  BrowserProviderSnapshot,
+  BrowserProviderState,
+  BrowserProviderStatusResult,
+  BrowserProviderUnavailableInput,
   UserWebConnection,
   UserWebConnectionConfig,
   UserWebSessionEventName,

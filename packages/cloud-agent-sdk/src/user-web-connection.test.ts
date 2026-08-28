@@ -1,11 +1,45 @@
 import { configureCloudAgentSdkRuntime, resetCloudAgentSdkRuntime } from './runtime';
 import {
+  browserCLIInboundMessageSchema,
+  browserJobSnapshotSchema,
+  webOutboundWithBrowserMessageSchema,
+  type BrowserJobSnapshot,
+  type BrowserProviderInboundMessage,
+  type BrowserProviderOutboundMessage,
+} from './schemas';
+import {
+  BrowserProviderError,
   CommandDeliveredError,
   createUserWebConnection,
   UserWebCommandError,
   VIEWER_PING_INTERVAL_MS,
   VIEWER_PONG_TIMEOUT_MS,
+  type BrowserProviderRegistration,
+  type BrowserProviderState,
 } from './user-web-connection';
+
+jest.mock(
+  'cloudflare:workers',
+  () => ({
+    DurableObject: class {
+      constructor(
+        readonly ctx: unknown,
+        readonly env: unknown
+      ) {}
+    },
+  }),
+  { virtual: true }
+);
+jest.mock('../../../services/session-ingest/src/dos/SessionIngestDO', () => ({
+  getSessionIngestDO: () => {
+    throw new Error('Unexpected session ingest access');
+  },
+}));
+jest.mock('../../../services/session-ingest/src/services/session-access', () => ({
+  resolveAccessibleKiloSession: () => {
+    throw new Error('Unexpected session access lookup');
+  },
+}));
 
 const WS_URL = 'wss://localhost:9999/api/user/web';
 
@@ -1993,5 +2027,1348 @@ describe('createUserWebConnection reconnect-exhaustion API', () => {
 
     expect(listener).not.toHaveBeenCalled();
     expect(client.isReconnectExhausted()).toBe(false);
+  });
+});
+
+describe('createUserWebConnection browser provider', () => {
+  const now = Date.UTC(2026, 7, 28);
+  const uuid = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
+  const registration = {
+    providerId: `bp_${uuid(1)}`,
+    providerProof: 'c'.repeat(64),
+    generation: 0,
+    label: 'Work profile',
+  } satisfies BrowserProviderRegistration;
+  const tab = {
+    tabId: 42,
+    title: 'Approved page',
+    url: 'https://example.com/',
+    effectiveMode: 'safe' as const,
+  };
+  let clients: ReturnType<typeof createUserWebConnection>[];
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(now);
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    let nextId = 100;
+    configureCloudAgentSdkRuntime({ randomUUID: () => uuid(++nextId) });
+    clients = [];
+  });
+
+  afterEach(() => {
+    for (const client of clients) client.destroy();
+    jest.useRealTimers();
+  });
+
+  function createProvider(options: Partial<Parameters<typeof createUserWebConnection>[0]> = {}) {
+    const client = createUserWebConnection({
+      websocketUrl: WS_URL,
+      getAuthToken: () => 'private-ticket',
+      browserProvider: true,
+      ...options,
+    });
+    clients.push(client);
+    return client;
+  }
+
+  function frames(ws = sockets.at(-1)) {
+    if (!ws) throw new Error('Expected a socket');
+    return ws.send.mock.calls.map(call =>
+      webOutboundWithBrowserMessageSchema.parse(JSON.parse(call[0] as string))
+    );
+  }
+
+  function lastFrame<T extends ReturnType<typeof frames>[number]['type']>(
+    type: T,
+    ws = sockets.at(-1)
+  ) {
+    const frame = frames(ws)
+      .reverse()
+      .find(message => message.type === type);
+    if (!frame) throw new Error(`Expected a ${type} frame`);
+    return frame as Extract<ReturnType<typeof frames>[number], { type: T }>;
+  }
+
+  function negotiate(ws = sockets.at(-1)) {
+    open(ws);
+    const ping = lastFrame('ping', ws);
+    inbound({ type: 'pong', nonce: ping.nonce, capabilities: { browserJobsV1: true } }, ws);
+  }
+
+  function leaseAck(
+    request: Extract<
+      BrowserProviderOutboundMessage,
+      { type: 'provider_register' | 'provider_heartbeat' }
+    >,
+    generation = 1,
+    ws = sockets.at(-1)
+  ) {
+    const ack = {
+      type: 'provider_lease_ack',
+      requestId: request.requestId,
+      providerId: request.providerId,
+      generation,
+      leaseExpiresAt: new Date(Date.now() + 15_000).toISOString(),
+    } as const;
+    inbound(ack, ws);
+    return ack;
+  }
+
+  function heartbeatReply(jobs: BrowserJobSnapshot[] = [], ws = sockets.at(-1)) {
+    const request = lastFrame('provider_heartbeat', ws);
+    leaseAck(request, request.generation, ws);
+    const snapshot = {
+      type: 'provider_snapshot',
+      requestId: request.requestId,
+      providerId: request.providerId,
+      generation: request.generation,
+      jobs,
+    } as const;
+    inbound(snapshot, ws);
+    return snapshot;
+  }
+
+  function statusReply(jobs: BrowserJobSnapshot[] = [], ws = sockets.at(-1)) {
+    const request = lastFrame('provider_status', ws);
+    const history = {
+      type: 'provider_status_result',
+      requestId: request.requestId,
+      providerId: request.providerId,
+      jobs,
+    } as const;
+    inbound(history, ws);
+    return history;
+  }
+
+  async function registered(
+    generation = 1,
+    options: Partial<Parameters<typeof createUserWebConnection>[0]> = {}
+  ) {
+    const client = createProvider(options);
+    client.retain();
+    negotiate();
+    const pending = client.registerBrowserProvider(registration);
+    leaseAck(lastFrame('provider_register'), generation);
+    await pending;
+    statusReply();
+    return client;
+  }
+
+  function job(n = 1, changes: Partial<BrowserJobSnapshot> = {}): BrowserJobSnapshot {
+    return {
+      providerId: registration.providerId,
+      browserTaskId: `bt_${uuid(n)}`,
+      jobId: `bj_${uuid(n)}`,
+      invocationId: `b1.${now}.${n.toString(16).padStart(64, '0')}`,
+      generation: 1,
+      payloadFingerprint: 'd'.repeat(64),
+      createdAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      deadlines: {
+        queue: new Date(now + 60_000).toISOString(),
+        approval: new Date(now + 60_000).toISOString(),
+      },
+      status: 'awaiting_approval',
+      ...changes,
+    };
+  }
+
+  function dispatch(snapshot = job(), ws = sockets.at(-1)) {
+    inbound(
+      {
+        type: 'provider_job',
+        job: snapshot,
+        goal: 'Observe the requested page',
+        ownerLabel: 'ses_parent',
+      },
+      ws
+    );
+  }
+
+  function binding(snapshot: BrowserJobSnapshot) {
+    return {
+      providerId: snapshot.providerId,
+      browserTaskId: snapshot.browserTaskId,
+      jobId: snapshot.jobId,
+      invocationId: snapshot.invocationId,
+      generation: snapshot.generation,
+    };
+  }
+
+  function update(snapshot: BrowserJobSnapshot, ws = sockets.at(-1)) {
+    inbound(
+      {
+        type: 'provider_snapshot',
+        providerId: snapshot.providerId,
+        generation: snapshot.generation,
+        jobs: [snapshot],
+      },
+      ws
+    );
+  }
+
+  function completion(snapshot: BrowserJobSnapshot) {
+    return {
+      ...binding(snapshot),
+      tab,
+      result: {
+        providerId: snapshot.providerId,
+        browserTaskId: snapshot.browserTaskId,
+        jobId: snapshot.jobId,
+        invocationId: snapshot.invocationId,
+        status: 'succeeded' as const,
+        reason: 'completed' as const,
+        effectsUncertain: false as const,
+        summary: 'Observed the requested page.',
+        evidence: [{ text: 'The page contains the requested value.', url: tab.url }],
+      },
+    };
+  }
+
+  async function relayRegistered(
+    options: Partial<Parameters<typeof createUserWebConnection>[0]> = {}
+  ) {
+    // Load the real relay without adding Worker-only ambient types to the browser SDK project.
+    const { UserConnectionDO } = jest.requireActual<{
+      UserConnectionDO: new (
+        ctx: unknown,
+        env: unknown
+      ) => {
+        webSocketMessage(ws: unknown, message: string): Promise<void>;
+        webSocketClose(
+          ws: unknown,
+          code: number,
+          reason: string,
+          clean: boolean
+        ): void | Promise<void>;
+        alarm(): Promise<void>;
+      };
+    }>('../../../services/session-ingest/src/dos/UserConnectionDO');
+    type RelaySocket = {
+      role: 'cli' | 'web';
+      readyState: number;
+      send: (data: string) => void;
+      close: () => void;
+      serializeAttachment: (value: unknown) => void;
+      deserializeAttachment: () => unknown;
+    };
+    const records = new Map<string, unknown>();
+    function kv(data: Map<string, unknown>) {
+      return {
+        async get(key: string) {
+          return structuredClone(data.get(key));
+        },
+        async put(key: string, value: unknown) {
+          data.set(key, structuredClone(value));
+        },
+        async delete(key: string) {
+          return data.delete(key);
+        },
+        async list(options: { prefix?: string; limit?: number } = {}) {
+          return new Map(
+            [...data]
+              .filter(([key]) => key.startsWith(options.prefix ?? ''))
+              .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+              .slice(0, options.limit)
+              .map(([key, value]) => [key, structuredClone(value)])
+          );
+        },
+      };
+    }
+    let serial: Promise<unknown> = Promise.resolve();
+    let alarmAt: number | null = null;
+    const storage = {
+      ...kv(records),
+      transaction<T>(run: (tx: ReturnType<typeof kv>) => Promise<T>): Promise<T> {
+        const next = serial.then(async () => {
+          const working = new Map(records);
+          const result = await run(kv(working));
+          records.clear();
+          for (const [key, value] of working) records.set(key, value);
+          return result;
+        });
+        serial = next.catch(() => undefined);
+        return next;
+      },
+      async setAlarm(at: number) {
+        alarmAt = at;
+      },
+      async getAlarm() {
+        return alarmAt;
+      },
+      async deleteAlarm() {
+        alarmAt = null;
+      },
+    };
+    const peers: RelaySocket[] = [];
+    const queued: Array<() => Promise<void>> = [];
+    const background: Promise<unknown>[] = [];
+    const relay = new UserConnectionDO(
+      {
+        storage,
+        getWebSockets: (role?: string) => peers.filter(peer => !role || peer.role === role),
+        waitUntil: (work: Promise<unknown>) => background.push(work),
+      },
+      {}
+    );
+    function peer(role: 'cli' | 'web', send: (data: string) => void): RelaySocket {
+      let attachment: unknown = {
+        role,
+        connectionId: uuid(1_000 + peers.length),
+        kiloUserId: 'usr_1',
+        sessions: [],
+        subscribedSessions: [],
+      };
+      const socket: RelaySocket = {
+        role,
+        readyState: 1,
+        send,
+        close: () => {
+          socket.readyState = 3;
+        },
+        serializeAttachment: value => {
+          attachment = structuredClone(value);
+        },
+        deserializeAttachment: () => structuredClone(attachment),
+      };
+      peers.push(socket);
+      return socket;
+    }
+    async function flush() {
+      while (queued.length || background.length) {
+        for (const work of queued.splice(0)) await work();
+        await Promise.all(background.splice(0));
+      }
+    }
+    const cliMessages: ReturnType<typeof browserCLIInboundMessageSchema.parse>[] = [];
+    const cli = peer('cli', data => {
+      const parsed = browserCLIInboundMessageSchema.safeParse(JSON.parse(data));
+      if (parsed.success) cliMessages.push(parsed.data);
+    });
+    const client = createProvider(options);
+    const messages: BrowserProviderInboundMessage[] = [];
+    client.onBrowserProviderMessage(message => messages.push(message));
+    const panels = new Map<MockWebSocket, RelaySocket>();
+    async function connect(ws = sockets.at(-1)) {
+      if (!ws) throw new Error('Expected an SDK socket');
+      const panel = peer('web', data => ws.onmessage?.({ data } as MessageEvent));
+      panels.set(ws, panel);
+      ws.send.mockImplementation((data: string) => {
+        queued.push(() => relay.webSocketMessage(panel, data));
+      });
+      open(ws);
+      await flush();
+    }
+    function snapshot(jobId: string) {
+      const row = records.get(`browser/job/${jobId}`);
+      if (!row || typeof row !== 'object' || !('snapshot' in row)) {
+        throw new Error('Expected a persisted job');
+      }
+      return browserJobSnapshotSchema.parse(row.snapshot);
+    }
+    client.retain();
+    await connect();
+    const pending = client.registerBrowserProvider(registration);
+    await flush();
+    await pending;
+    return {
+      client,
+      messages,
+      connect,
+      flush,
+      snapshot,
+      async invoke(n = 1, createdAt = now) {
+        await relay.webSocketMessage(
+          cli,
+          JSON.stringify({ type: 'heartbeat', sessions: [], capabilities: { browserJobsV1: true } })
+        );
+        const requestId = uuid(2_000 + n);
+        await relay.webSocketMessage(
+          cli,
+          JSON.stringify({
+            type: 'browser_request',
+            operation: 'invoke',
+            requestId,
+            owner: { parentSessionId: 'ses_parent', parentProof: 'a'.repeat(64) },
+            providerId: registration.providerId,
+            invocationId: `b1.${createdAt}.${n.toString(16).padStart(64, '0')}`,
+            goal: 'Observe the requested page',
+          })
+        );
+        await flush();
+        const reply = [...cliMessages].reverse().find(message => message.requestId === requestId);
+        if (reply?.type !== 'browser_event' || reply.event !== 'progress') {
+          throw new Error('Expected admitted browser work');
+        }
+        return snapshot(reply.job.jobId);
+      },
+      async disconnect(code: number, ws = sockets.at(-1)) {
+        if (!ws) throw new Error('Expected an SDK socket');
+        const panel = panels.get(ws);
+        if (!panel) throw new Error('Expected a relay socket');
+        ws.readyState = 3;
+        panel.readyState = 3;
+        ws.onclose?.({ code } as CloseEvent);
+        await relay.webSocketClose(panel, code, '', false);
+        await flush();
+      },
+      async alarm() {
+        await relay.alarm();
+        await flush();
+      },
+    };
+  }
+
+  it('leaves legacy callers disabled and keeps their wire protocol unchanged', async () => {
+    const client = createProvider({ browserProvider: undefined });
+    const received: BrowserProviderInboundMessage[] = [];
+    client.onBrowserProviderMessage(message => received.push(message));
+    expect(sockets).toHaveLength(0);
+    client.retain();
+    open();
+    expect(frames()).toEqual([]);
+    await expect(client.registerBrowserProvider(registration)).rejects.toMatchObject({
+      code: 'disabled',
+      retryable: false,
+    });
+    dispatch();
+    jest.advanceTimersByTime(VIEWER_PING_INTERVAL_MS);
+    expect(frames()).toEqual([{ type: 'ping', nonce: expect.any(String) }]);
+    expect(received).toEqual([]);
+    expect(client.getBrowserProviderState()).toEqual({ status: 'disabled' });
+  });
+
+  it('requires a matching capability pong before registration or dispatch', async () => {
+    const client = createProvider();
+    const goals: string[] = [];
+    client.onBrowserProviderMessage(message => {
+      if (message.type === 'provider_job') goals.push(message.goal);
+    });
+    client.retain();
+    open();
+    const ping = lastFrame('ping');
+    expect(ping.capabilities).toEqual({ browserJobsV1: true });
+    await expect(client.registerBrowserProvider(registration)).rejects.toMatchObject({
+      code: 'not_negotiated',
+    });
+    inbound({ type: 'pong', nonce: uuid(999), capabilities: { browserJobsV1: true } });
+    dispatch();
+    expect(client.getBrowserProviderState()).toEqual({ status: 'negotiating' });
+    expect(frames()).toHaveLength(1);
+    expect(goals).toEqual([]);
+
+    inbound({ type: 'pong', nonce: ping.nonce, capabilities: { browserJobsV1: true } });
+    const pending = client.registerBrowserProvider(registration);
+    const request = lastFrame('provider_register');
+    leaseAck({ ...request, requestId: uuid(999) });
+    dispatch();
+    expect(client.getBrowserProviderState()).toEqual({ status: 'ready' });
+    const ack = leaseAck(request);
+    await expect(pending).resolves.toEqual(ack);
+    expect(frames().map(frame => frame.type)).toEqual([
+      'ping',
+      'provider_register',
+      'provider_status',
+    ]);
+    statusReply();
+    dispatch();
+    expect(goals).toEqual(['Observe the requested page']);
+  });
+
+  it.each([undefined, {}, { browserJobsV1: false }])(
+    'reports unsupported capability acknowledgement %j without breaking legacy commands',
+    async capabilities => {
+      const client = createProvider();
+      client.retain();
+      open();
+      inbound({ type: 'pong', nonce: lastFrame('ping').nonce, capabilities });
+      expect(client.getBrowserProviderState()).toEqual({
+        status: 'unavailable',
+        reason: 'unsupported',
+        retryable: false,
+      });
+      await expect(client.registerBrowserProvider(registration)).rejects.toMatchObject({
+        code: 'unsupported',
+        retryable: false,
+      });
+      expect(frames().map(frame => frame.type)).toEqual(['ping']);
+      const command = client.sendCommand('ses-1', 'list_models', {});
+      await Promise.resolve();
+      inbound({ type: 'response', id: lastFrame('command').id, result: { models: [] } });
+      await expect(command).resolves.toEqual({ models: [] });
+    }
+  );
+
+  it('times out missing registration acknowledgement and ignores a late grant', async () => {
+    const client = createProvider();
+    client.retain();
+    negotiate();
+    const pending = client.registerBrowserProvider(registration);
+    const request = lastFrame('provider_register');
+    jest.advanceTimersByTime(10_000);
+    await expect(pending).rejects.toMatchObject({ code: 'request_timeout', retryable: true });
+    leaseAck(request);
+    expect(client.getBrowserProviderState()).toEqual({
+      status: 'unavailable',
+      reason: 'request_timeout',
+      retryable: true,
+    });
+    expect(frames().map(frame => frame.type)).toEqual([
+      'ping',
+      'provider_register',
+      'provider_status',
+    ]);
+  });
+
+  it.each(['ack', 'snapshot'])(
+    'requires both correlated heartbeat replies when %s is missing',
+    async missing => {
+      const client = await registered();
+      const snapshots: BrowserJobSnapshot[][] = [];
+      client.onBrowserProviderMessage(message => {
+        if (message.type === 'provider_snapshot') snapshots.push(message.jobs);
+      });
+      const pending = client.heartbeatBrowserProvider();
+      const request = lastFrame('provider_heartbeat');
+      if (missing === 'ack') {
+        inbound({
+          type: 'provider_snapshot',
+          providerId: registration.providerId,
+          generation: 1,
+          requestId: request.requestId,
+          jobs: [job()],
+        });
+      } else {
+        leaseAck(request);
+      }
+      jest.advanceTimersByTime(10_000);
+      await expect(pending).rejects.toMatchObject({ code: 'request_timeout' });
+      expect(snapshots).toEqual([]);
+      expect(client.getBrowserProviderState()).toMatchObject({
+        status: 'unavailable',
+        reason: 'request_timeout',
+      });
+    }
+  );
+
+  it('returns an empty status page and renews a short lease before viewer ping', async () => {
+    const client = await registered();
+    const pending = client.heartbeatBrowserProvider(`bj_${uuid(9)}`);
+    expect(lastFrame('provider_heartbeat').cursor).toBe(`bj_${uuid(9)}`);
+    const snapshot = heartbeatReply();
+    await expect(pending).resolves.toEqual(snapshot);
+    jest.advanceTimersByTime(7_500);
+    expect(frames().filter(frame => frame.type === 'ping')).toHaveLength(1);
+    heartbeatReply();
+    jest.advanceTimersByTime(8_000);
+    dispatch();
+    client.approveBrowserProviderJob({
+      ...binding(job()),
+      approval: { decision: 'approved', tab },
+    });
+    expect(lastFrame('provider_approval').approval).toEqual({ decision: 'approved', tab });
+    expect(client.getBrowserProviderState().status).toBe('registered');
+  });
+
+  it('deduplicates jobs and cancellations and rejects stale or foreign generations', async () => {
+    const client = await registered(2);
+    const received: string[] = [];
+    client.onBrowserProviderMessage(message => {
+      if (message.type === 'provider_job') received.push(`job:${message.job.jobId}`);
+      if (message.type === 'provider_job_cancel') received.push(`cancel:${message.reason}`);
+    });
+    const current = job(1, { generation: 2 });
+    dispatch(job());
+    dispatch({ ...current, providerId: `bp_${uuid(2)}` });
+    dispatch(current);
+    dispatch(current);
+    inbound({ type: 'provider_job_cancel', ...binding(job()), reason: 'cancelled' });
+    inbound({
+      type: 'provider_job_cancel',
+      ...binding(current),
+      invocationId: `b1.${now}.${'f'.repeat(64)}`,
+      reason: 'cancelled',
+    });
+    const cancellation = { type: 'provider_job_cancel', ...binding(current), reason: 'cancelled' };
+    inbound(cancellation);
+    inbound(cancellation);
+    dispatch(current);
+    expect(received).toEqual([`job:${current.jobId}`, 'cancel:cancelled']);
+    expect(() =>
+      client.approveBrowserProviderJob({
+        ...binding(current),
+        approval: { decision: 'approved', tab },
+      })
+    ).toThrow(BrowserProviderError);
+    expect(frames().filter(frame => frame.type === 'provider_approval')).toEqual([]);
+  });
+
+  it('sends approval, result, quiescence, denial, and provider Stop on exact job bindings', async () => {
+    const client = await registered();
+    const current = job();
+    dispatch(current);
+    client.approveBrowserProviderJob({
+      ...binding(current),
+      approval: { decision: 'approved', tab },
+    });
+    expect(lastFrame('provider_approval')).toEqual({
+      type: 'provider_approval',
+      ...binding(current),
+      approval: { decision: 'approved', tab },
+    });
+    const result = completion(current);
+    expect(() => client.sendBrowserProviderResult(result)).toThrow(BrowserProviderError);
+    const running = { ...current, status: 'running' as const, approvedTab: tab };
+    update(running);
+    expect(() =>
+      client.sendBrowserProviderResult({ ...result, tab: { ...tab, tabId: 99 } })
+    ).toThrow(BrowserProviderError);
+    client.sendBrowserProviderResult(result);
+    expect(lastFrame('provider_result')).toEqual({ type: 'provider_result', ...result });
+    update({ ...running, status: 'succeeded', result: result.result });
+    client.quiesceBrowserProviderJob({ ...binding(current), tabId: tab.tabId });
+    expect(lastFrame('provider_quiesced')).toEqual({
+      type: 'provider_quiesced',
+      ...binding(current),
+      tabId: tab.tabId,
+    });
+    const denied = job(2);
+    dispatch(denied);
+    client.approveBrowserProviderJob({
+      ...binding(denied),
+      approval: { decision: 'denied', reason: 'approval_denied' },
+    });
+    expect(lastFrame('provider_approval').approval).toEqual({
+      decision: 'denied',
+      reason: 'approval_denied',
+    });
+    const queued = job(3, { status: 'queued' });
+    update(queued);
+    client.cancelBrowserProviderJob(binding(queued));
+    expect(lastFrame('provider_cancel')).toEqual({ type: 'provider_cancel', ...binding(queued) });
+    expect(frames().filter(frame => frame.type === 'command')).toEqual([]);
+  });
+
+  it('makes unavailable explicit while permitting drained-work acknowledgement and disabling automatic registration', async () => {
+    const client = await registered();
+    const current = job();
+    dispatch(current);
+    update({ ...current, status: 'running', approvedTab: tab });
+    client.markBrowserProviderUnavailable({
+      providerId: current.providerId,
+      generation: 1,
+      reason: 'effects_uncertain',
+      effectsUncertain: true,
+    });
+    expect(lastFrame('provider_unavailable')).toEqual({
+      type: 'provider_unavailable',
+      providerId: current.providerId,
+      generation: 1,
+      reason: 'effects_uncertain',
+      effectsUncertain: true,
+    });
+    expect(client.getBrowserProviderState()).toMatchObject({
+      status: 'unavailable',
+      reason: 'effects_uncertain',
+    });
+    expect(() => client.sendBrowserProviderResult(completion(current))).toThrow(
+      BrowserProviderError
+    );
+    inbound({ type: 'provider_job_cancel', ...binding(current), reason: 'effects_uncertain' });
+    client.quiesceBrowserProviderJob({ ...binding(current), tabId: tab.tabId });
+    expect(lastFrame('provider_quiesced').tabId).toBe(tab.tabId);
+    sockets[0].onclose?.({ code: 4001 } as CloseEvent);
+    await jest.advanceTimersByTimeAsync(0);
+    negotiate();
+    expect(frames().map(frame => frame.type)).toEqual(['ping']);
+  });
+
+  it('correlates history without renewing a lease or buffering running and terminal work', async () => {
+    const client = await registered(2);
+    const current = job(1, { generation: 2 });
+    dispatch(current);
+    client.approveBrowserProviderJob({
+      ...binding(current),
+      approval: { decision: 'approved', tab },
+    });
+    const before = client.getBrowserProviderState();
+    const histories: BrowserJobSnapshot[][] = [];
+    const actions: string[] = [];
+    client.onBrowserProviderMessage(message => {
+      if (message.type === 'provider_status_result') histories.push(message.jobs);
+      if (
+        message.type === 'provider_snapshot' &&
+        message.jobs.some(job => job.status === 'running')
+      ) {
+        actions.push('browser action');
+      }
+    });
+    jest.setSystemTime(now + 1_000);
+    const pending = client.requestBrowserProviderStatus();
+    const request = lastFrame('provider_status');
+    inbound({
+      type: 'provider_status_result',
+      requestId: uuid(999),
+      providerId: registration.providerId,
+      jobs: [],
+    });
+    inbound({
+      type: 'provider_status_result',
+      requestId: request.requestId,
+      providerId: `bp_${uuid(2)}`,
+      jobs: [],
+    });
+    inbound({
+      type: 'provider_lease_ack',
+      requestId: request.requestId,
+      providerId: registration.providerId,
+      generation: 2,
+      leaseExpiresAt: new Date(now + 30_000).toISOString(),
+    });
+    expect(histories).toEqual([]);
+    const terminal = job(2, {
+      generation: 2,
+      status: 'succeeded',
+      approvedTab: tab,
+      result: completion(job(2)).result,
+    });
+    const history = statusReply([{ ...current, status: 'running', approvedTab: tab }, terminal]);
+    await expect(pending).resolves.toEqual(history);
+    inbound(history);
+    expect(histories).toEqual([history.jobs]);
+    expect(actions).toEqual([]);
+    expect(client.getBrowserProviderState()).toEqual(before);
+    expect(() => client.sendBrowserProviderResult(completion(current))).toThrow(
+      BrowserProviderError
+    );
+    expect(() =>
+      client.quiesceBrowserProviderJob({ ...binding(terminal), tabId: tab.tabId })
+    ).toThrow(BrowserProviderError);
+    expect(
+      frames().filter(
+        frame => frame.type === 'provider_result' || frame.type === 'provider_quiesced'
+      )
+    ).toEqual([]);
+  });
+
+  it('finishes an in-flight history read after registration loss without restoring availability', async () => {
+    const client = await registered();
+    const current = job();
+    dispatch(current);
+    const pending = client.requestBrowserProviderStatus();
+    inbound({ type: 'provider_job_cancel', ...binding(current), reason: 'lease_expired' });
+    const interrupted = {
+      ...current,
+      status: 'interrupted',
+      result: {
+        ...completion(current).result,
+        status: 'interrupted',
+        reason: 'lease_expired',
+        effectsUncertain: true,
+      },
+    } satisfies BrowserJobSnapshot;
+    const history = statusReply([interrupted]);
+    await expect(pending).resolves.toEqual(history);
+    expect(client.getBrowserProviderState()).toEqual({
+      status: 'unavailable',
+      reason: 'lease_expired',
+      retryable: true,
+    });
+  });
+
+  it.each([
+    { code: 'request_timeout', retryable: true },
+    { code: 'owner_mismatch', retryable: false },
+  ])('keeps history failure $code separate from the live lease', async failure => {
+    const client = await registered();
+    const current = job();
+    dispatch(current);
+    update({ ...current, status: 'running', approvedTab: tab });
+    const pending = client.requestBrowserProviderStatus().catch(error => error);
+    if (failure.code === 'request_timeout') {
+      jest.advanceTimersByTime(10_000);
+    } else {
+      inbound({
+        type: 'response',
+        id: lastFrame('provider_status').requestId,
+        error: { source: 'relay', ...failure, message: registration.providerProof },
+      });
+    }
+    await expect(pending).resolves.toMatchObject({
+      ...failure,
+      message: `Browser provider request failed: ${failure.code}`,
+    });
+    expect(client.getBrowserProviderState().status).toBe('registered');
+    client.sendBrowserProviderResult(completion(current));
+    expect(lastFrame('provider_result').result).toEqual(completion(current).result);
+  });
+
+  it('does not retain or buffer provider requests without an owner lifetime', async () => {
+    const client = createProvider();
+    const messages: BrowserProviderInboundMessage[] = [];
+    client.onBrowserProviderMessage(message => messages.push(message));
+    await expect(client.registerBrowserProvider(registration)).rejects.toMatchObject({
+      code: 'disconnected',
+    });
+    await expect(client.requestBrowserProviderStatus()).rejects.toMatchObject({
+      code: 'disconnected',
+    });
+    expect(() => client.sendBrowserProviderResult(completion(job()))).toThrow('disconnected');
+    expect(sockets).toHaveLength(0);
+    client.retain();
+    negotiate();
+    expect(frames().map(frame => frame.type)).toEqual(['ping']);
+    expect(messages).toEqual([]);
+  });
+
+  it('delivers a correlated lease acknowledgement only once while status is pending', async () => {
+    const client = await registered();
+    const grants: string[] = [];
+    client.onBrowserProviderMessage(message => {
+      if (message.type === 'provider_lease_ack') grants.push(message.requestId);
+    });
+    const pending = client.heartbeatBrowserProvider();
+    const request = lastFrame('provider_heartbeat');
+    const ack = leaseAck(request);
+    inbound(ack);
+    heartbeatReply();
+    await expect(pending).resolves.toMatchObject({ jobs: [] });
+    inbound(ack);
+    expect(grants).toEqual([request.requestId]);
+  });
+
+  it('does not renew an expired lease when its acknowledgement beats a suspended timer', async () => {
+    const client = await registered();
+    const pending = client.heartbeatBrowserProvider();
+    const outcome = pending.catch(error => error);
+    jest.setSystemTime(now + 15_001);
+    leaseAck(lastFrame('provider_heartbeat'));
+    expect(client.getBrowserProviderState()).toMatchObject({
+      status: 'unavailable',
+      reason: 'lease_expired',
+    });
+    await expect(outcome).resolves.toMatchObject({ code: 'lease_expired' });
+  });
+
+  it('notifies the owner when an action detects a closed socket before its close event', async () => {
+    const client = await registered();
+    dispatch();
+    const states: string[] = [];
+    client.onBrowserProviderStateChange(state => states.push(state.status));
+    sockets[0].readyState = 3;
+    expect(() =>
+      client.approveBrowserProviderJob({
+        ...binding(job()),
+        approval: { decision: 'approved', tab },
+      })
+    ).toThrow('disconnected');
+    expect(states).toEqual(['disconnected']);
+    expect(frames().filter(frame => frame.type === 'provider_approval')).toEqual([]);
+  });
+
+  it('stops approved work when a running snapshot beats the expired lease timer', async () => {
+    const client = await registered();
+    const current = job();
+    dispatch(current);
+    client.approveBrowserProviderJob({
+      ...binding(current),
+      approval: { decision: 'approved', tab },
+    });
+    const events: string[] = [];
+    let canRun = true;
+    client.onBrowserProviderStateChange(state => {
+      if (state.status === 'unavailable') {
+        canRun = false;
+        events.push(state.reason);
+      }
+    });
+    client.onBrowserProviderMessage(message => {
+      if (
+        message.type === 'provider_snapshot' &&
+        message.jobs.some(job => job.status === 'running') &&
+        canRun
+      ) {
+        events.push('browser action');
+      }
+    });
+    // Move wall time without running the suspended lease timer.
+    jest.setSystemTime(now + 15_001);
+    update({ ...current, status: 'running', approvedTab: tab });
+    expect(events).toEqual(['lease_expired']);
+    expect(client.getBrowserProviderState()).toMatchObject({
+      status: 'unavailable',
+      reason: 'lease_expired',
+    });
+    expect(() => client.sendBrowserProviderResult(completion(current))).toThrow('lease_expired');
+  });
+
+  it.each(['approval_timeout', 'execution_timeout', 'invocation_expired'] as const)(
+    'reports %s revocation before cancellation and permits drained acknowledgement',
+    async reason => {
+      const f = await relayRegistered();
+      const current = await f.invoke(
+        1,
+        reason === 'invocation_expired' ? now - 7 * 24 * 60 * 60 * 1_000 + 10_000 : now
+      );
+      if (reason !== 'approval_timeout') {
+        f.client.approveBrowserProviderJob({
+          ...binding(current),
+          approval: { decision: 'approved', tab },
+        });
+        await f.flush();
+      }
+      const active = f.snapshot(current.jobId);
+      const deadlineText =
+        reason === 'invocation_expired'
+          ? active.expiresAt
+          : active.deadlines[reason === 'approval_timeout' ? 'approval' : 'execution'];
+      if (!deadlineText) throw new Error('Expected a relay deadline');
+      const deadline = Date.parse(deadlineText);
+      for (let time = now + 10_000; time < deadline; time += 10_000) {
+        jest.setSystemTime(time);
+        const heartbeat = f.client.heartbeatBrowserProvider();
+        await f.flush();
+        await heartbeat;
+      }
+      const events: string[] = [];
+      f.client.onBrowserProviderStateChange(state => {
+        if (state.status === 'unavailable') events.push(state.reason);
+      });
+      f.client.onBrowserProviderMessage(message => {
+        if (message.type === 'provider_job_cancel') {
+          events.push(`cancel:${f.client.getBrowserProviderState().status}`);
+        }
+      });
+      jest.setSystemTime(deadline);
+      await f.alarm();
+      expect(events).toEqual([reason, 'cancel:unavailable']);
+      expect(f.client.getBrowserProviderState()).toEqual({
+        status: 'unavailable',
+        reason,
+        retryable: true,
+      });
+      f.client.quiesceBrowserProviderJob({ ...binding(current), tabId: tab.tabId });
+      await f.flush();
+      const registrationResult = f.client.registerBrowserProvider({
+        ...registration,
+        generation: current.generation,
+      });
+      await f.flush();
+      await expect(registrationResult).resolves.toMatchObject({ generation: 2 });
+    }
+  );
+
+  it.each(['queued', 'unapproved'] as const)(
+    'preserves registration when Stop cancels %s work without revoking the relay lease',
+    async phase => {
+      const f = await relayRegistered();
+      const active = await f.invoke();
+      const cancelled = phase === 'queued' ? await f.invoke(2) : active;
+      const cancellationStates: string[] = [];
+      f.client.onBrowserProviderMessage(message => {
+        if (message.type === 'provider_job_cancel') {
+          cancellationStates.push(f.client.getBrowserProviderState().status);
+        }
+      });
+      f.client.cancelBrowserProviderJob(binding(cancelled));
+      await f.flush();
+      expect(f.client.getBrowserProviderState().status).toBe('registered');
+      expect(cancellationStates).toEqual(phase === 'queued' ? [] : ['registered']);
+      expect(f.snapshot(cancelled.jobId)).toMatchObject({
+        status: 'cancelled',
+        result: { effectsUncertain: false },
+      });
+      if (phase === 'unapproved') {
+        f.client.quiesceBrowserProviderJob({ ...binding(cancelled), tabId: tab.tabId });
+        await f.flush();
+      }
+      const next = phase === 'queued' ? active : await f.invoke(3);
+      f.client.approveBrowserProviderJob({
+        ...binding(next),
+        approval: { decision: 'approved', tab },
+      });
+      await f.flush();
+      expect(f.snapshot(next.jobId)).toMatchObject({
+        status: 'running',
+        generation: active.generation,
+      });
+    }
+  );
+
+  it('reports running Stop revocation before cancellation and retains safe quiescence', async () => {
+    const f = await relayRegistered();
+    const current = await f.invoke();
+    f.client.approveBrowserProviderJob({
+      ...binding(current),
+      approval: { decision: 'approved', tab },
+    });
+    await f.flush();
+    const events: string[] = [];
+    f.client.onBrowserProviderStateChange(state => {
+      if (state.status === 'unavailable') events.push(state.reason);
+    });
+    f.client.onBrowserProviderMessage(message => {
+      if (message.type === 'provider_job_cancel') {
+        events.push(`cancel:${f.client.getBrowserProviderState().status}`);
+      }
+    });
+    f.client.cancelBrowserProviderJob(binding(current));
+    await f.flush();
+    expect(events).toEqual(['cancelled', 'cancel:unavailable']);
+    expect(f.snapshot(current.jobId)).toMatchObject({
+      status: 'cancelled',
+      result: { effectsUncertain: true },
+    });
+    const retry = f.client
+      .registerBrowserProvider({ ...registration, generation: current.generation })
+      .catch(error => error);
+    await f.flush();
+    await expect(retry).resolves.toMatchObject({ code: 'provider_unavailable' });
+    f.client.quiesceBrowserProviderJob({ ...binding(current), tabId: tab.tabId });
+    await f.flush();
+    const registrationResult = f.client.registerBrowserProvider({
+      ...registration,
+      generation: current.generation,
+    });
+    await f.flush();
+    await expect(registrationResult).resolves.toMatchObject({ generation: 2 });
+  });
+
+  it('fences relay lease loss before cancellation callbacks or another job can run', async () => {
+    const client = await registered();
+    const current = job();
+    dispatch(current);
+    const events: string[] = [];
+    client.onBrowserProviderStateChange(state => {
+      if (state.status === 'unavailable') events.push(state.reason);
+    });
+    client.onBrowserProviderMessage(message => {
+      if (message.type === 'provider_job_cancel') events.push('cancel');
+      if (message.type === 'provider_job') events.push('execute');
+    });
+    inbound({ type: 'provider_job_cancel', ...binding(current), reason: 'lease_expired' });
+    dispatch(job(2));
+    expect(events).toEqual(['lease_expired', 'cancel']);
+    expect(client.getBrowserProviderState()).toMatchObject({
+      status: 'unavailable',
+      reason: 'lease_expired',
+    });
+    client.quiesceBrowserProviderJob({ ...binding(current), tabId: tab.tabId });
+    expect(lastFrame('provider_quiesced').jobId).toBe(current.jobId);
+  });
+
+  it.each(['send failure', 'disconnect'])(
+    'does not re-enable an unavailable provider after %s',
+    async loss => {
+      const client = await registered();
+      if (loss === 'send failure') {
+        sockets[0].send.mockImplementationOnce(() => {
+          throw new Error('socket closed');
+        });
+      } else {
+        sockets[0].onclose?.({ code: 4001 } as CloseEvent);
+      }
+      expect(() =>
+        client.markBrowserProviderUnavailable({
+          providerId: registration.providerId,
+          generation: 1,
+          reason: 'provider_unavailable',
+          effectsUncertain: false,
+        })
+      ).toThrow(BrowserProviderError);
+      await jest.advanceTimersByTimeAsync(0);
+      negotiate();
+      expect(frames().map(frame => frame.type)).toEqual(['ping']);
+    }
+  );
+
+  it('fences an expired lease before owner callbacks can send another action', async () => {
+    const client = await registered();
+    const current = job();
+    dispatch(current);
+    const ordering: string[] = [];
+    client.onBrowserProviderStateChange(state => {
+      if (state.status !== 'unavailable') return;
+      ordering.push(state.reason);
+      try {
+        client.approveBrowserProviderJob({
+          ...binding(current),
+          approval: { decision: 'approved', tab },
+        });
+      } catch (error) {
+        ordering.push(error instanceof BrowserProviderError ? error.code : 'wrong error');
+      }
+    });
+    jest.advanceTimersByTime(15_000);
+    expect(ordering).toEqual(['lease_expired', 'lease_expired']);
+    leaseAck(lastFrame('provider_heartbeat'));
+    dispatch(job(2));
+    expect(client.getBrowserProviderState()).toMatchObject({
+      status: 'unavailable',
+      reason: 'lease_expired',
+    });
+    expect(frames().filter(frame => frame.type === 'provider_approval')).toEqual([]);
+  });
+
+  it.each([1006, 4001, 1008])(
+    'recovers prior-generation terminal history after ticket loss (%i) without replay',
+    async code => {
+      const auth = createDeferred<string>();
+      let authCalls = 0;
+      const f = await relayRegistered({
+        getAuthToken: () => (++authCalls === 1 ? 'old-ticket' : auth.promise),
+      });
+      const { client } = f;
+      const current = await f.invoke();
+      client.approveBrowserProviderJob({
+        ...binding(current),
+        approval: { decision: 'approved', tab },
+      });
+      await f.flush();
+      client.sendBrowserProviderResult(completion(current));
+      await f.flush();
+      client.quiesceBrowserProviderJob({ ...binding(current), tabId: tab.tabId });
+      await f.flush();
+      const completed = f.snapshot(current.jobId);
+      const order: string[] = [];
+      client.onBrowserProviderStateChange(state => {
+        if (state.status !== 'disconnected') return;
+        order.push('stop');
+        try {
+          client.sendBrowserProviderResult(completion(current));
+        } catch (error) {
+          order.push(error instanceof BrowserProviderError ? error.code : 'wrong error');
+        }
+      });
+      client.onConnectionChange(connected => {
+        if (!connected) order.push('connection lost');
+      });
+      const pending = client.requestBrowserProviderStatus().catch(error => error);
+      const oldSocket = sockets[0];
+      await f.disconnect(code, oldSocket);
+      await expect(pending).resolves.toMatchObject({ code: 'disconnected' });
+      expect(order).toEqual(['stop', 'disconnected', 'connection lost']);
+      if (code === 1006) jest.advanceTimersByTime(500);
+      expect(sockets).toHaveLength(1);
+      dispatch(job(2), oldSocket);
+      expect(() => client.sendBrowserProviderResult(completion(current))).toThrow(
+        BrowserProviderError
+      );
+      auth.resolve('new-ticket');
+      await jest.advanceTimersByTimeAsync(0);
+      expect(sockets).toHaveLength(2);
+      expect(
+        new URL(webSocketConstructor.mock.calls[1][0] as string).searchParams.get('ticket')
+      ).toBe('new-ticket');
+      await f.connect();
+      expect(lastFrame('provider_register')).toMatchObject({ ...registration, generation: 1 });
+      expect(lastFrame('provider_register')).not.toHaveProperty('recovery');
+      const recovered = f.messages
+        .filter(message => message.type === 'provider_status_result')
+        .at(-1);
+      expect(recovered?.jobs).toEqual([completed]);
+      expect(recovered?.jobs[0]).toMatchObject({
+        generation: current.generation,
+        status: 'succeeded',
+        result: completion(current).result,
+      });
+      expect(client.getBrowserProviderState()).toMatchObject({
+        status: 'registered',
+        lease: { generation: 2 },
+      });
+      const heartbeat = client.heartbeatBrowserProvider();
+      await f.flush();
+      await expect(heartbeat).resolves.toMatchObject({ generation: 2, jobs: [] });
+      dispatch(current, oldSocket);
+      dispatch(current);
+      expect(f.messages.filter(message => message.type === 'provider_job')).toHaveLength(1);
+      expect(() => client.sendBrowserProviderResult(completion(current))).toThrow(
+        BrowserProviderError
+      );
+      expect(
+        frames().filter(
+          frame => frame.type === 'provider_result' || frame.type === 'provider_approval'
+        )
+      ).toEqual([]);
+    }
+  );
+
+  it('recovers fenced interruption history even when reconnect registration is rejected', async () => {
+    const f = await relayRegistered();
+    const current = await f.invoke();
+    f.client.approveBrowserProviderJob({
+      ...binding(current),
+      approval: { decision: 'approved', tab },
+    });
+    await f.flush();
+    await f.disconnect(4001);
+    await jest.advanceTimersByTimeAsync(0);
+    await f.connect();
+    const interrupted = f.snapshot(current.jobId);
+    const recovered = f.messages
+      .filter(message => message.type === 'provider_status_result')
+      .at(-1);
+    expect(recovered?.jobs).toEqual([interrupted]);
+    expect(interrupted).toMatchObject({
+      generation: current.generation,
+      status: 'interrupted',
+      result: { reason: 'provider_lost', effectsUncertain: true },
+    });
+    expect(f.client.getBrowserProviderState()).toEqual({
+      status: 'unavailable',
+      reason: 'provider_unavailable',
+      retryable: true,
+    });
+    const status = f.client.requestBrowserProviderStatus(current.jobId);
+    await f.flush();
+    await expect(status).resolves.toMatchObject({ jobs: [] });
+    expect(() => f.client.sendBrowserProviderResult(completion(current))).toThrow(
+      BrowserProviderError
+    );
+    expect(() =>
+      f.client.quiesceBrowserProviderJob({ ...binding(current), tabId: tab.tabId })
+    ).toThrow(BrowserProviderError);
+    const retry = f.client
+      .registerBrowserProvider({ ...registration, generation: current.generation })
+      .catch(error => error);
+    await f.flush();
+    await expect(retry).resolves.toMatchObject({ code: 'provider_unavailable' });
+    expect(f.messages.filter(message => message.type === 'provider_job')).toHaveLength(1);
+    expect(
+      frames().filter(
+        frame =>
+          frame.type === 'provider_approval' ||
+          frame.type === 'provider_result' ||
+          frame.type === 'provider_quiesced'
+      )
+    ).toEqual([]);
+  });
+
+  it('stops later callbacks when a listener releases the connection and ignores late socket events', async () => {
+    const client = createProvider();
+    const release = client.retain();
+    negotiate();
+    const pending = client.registerBrowserProvider(registration);
+    leaseAck(lastFrame('provider_register'));
+    await pending;
+    statusReply();
+    const actions: string[] = [];
+    const unsubscribe = client.onBrowserProviderMessage(message => {
+      if (message.type === 'provider_job') {
+        actions.push('stop');
+        release();
+      }
+    });
+    client.onBrowserProviderMessage(message => {
+      if (message.type === 'provider_job') actions.push('execute');
+    });
+    dispatch();
+    expect(actions).toEqual(['stop']);
+    const oldSocket = sockets[0];
+    unsubscribe();
+    client.retain();
+    open(oldSocket);
+    dispatch(job(2), oldSocket);
+    expect(client.getBrowserProviderState()).toEqual({ status: 'disconnected' });
+    expect(actions).toEqual(['stop']);
+    client.destroy();
+    const states: BrowserProviderState[] = [];
+    client.onBrowserProviderStateChange(state => states.push(state));
+    open();
+    dispatch(job(3));
+    expect(states).toEqual([]);
+    expect(actions).toEqual(['stop']);
+  });
+
+  it('never repeats an explicit recovery assertion after its registration acknowledgement is lost', async () => {
+    const client = createProvider();
+    client.retain();
+    negotiate();
+    const pending = client.registerBrowserProvider({
+      ...registration,
+      recovery: {
+        invocationId: job().invocationId,
+        tabId: 42,
+        tabClosed: true,
+        locksDrained: true,
+      },
+    });
+    sockets[0].onclose?.({ code: 4001 } as CloseEvent);
+    await expect(pending).rejects.toMatchObject({ code: 'disconnected' });
+    await jest.advanceTimersByTimeAsync(0);
+    negotiate();
+    expect(lastFrame('provider_register')).not.toHaveProperty('recovery');
+    expect(lastFrame('provider_register').providerProof).toBe(registration.providerProof);
+  });
+
+  it.each([
+    { code: 'owner_mismatch', retryable: false },
+    { code: 'provider_unavailable', retryable: true },
+  ])(
+    'surfaces safe relay failure $code without exposing the proof-bearing error text',
+    async failure => {
+      const client = createProvider();
+      client.retain();
+      negotiate();
+      await expect(
+        client.registerBrowserProvider({
+          ...registration,
+          providerProof: `private-proof:${registration.providerProof}`,
+        })
+      ).rejects.toMatchObject({ message: 'Browser provider request failed: invalid_request' });
+      const pending = client.registerBrowserProvider(registration);
+      inbound({
+        type: 'response',
+        id: lastFrame('provider_register').requestId,
+        error: {
+          source: 'relay',
+          ...failure,
+          message: `private-ticket ${registration.providerProof}`,
+          [registration.providerProof]: 'secret',
+        },
+      });
+      await expect(pending).rejects.toMatchObject({
+        ...failure,
+        message: `Browser provider request failed: ${failure.code}`,
+      });
+      expect(client.getBrowserProviderState()).toEqual({
+        status: 'unavailable',
+        reason: failure.code,
+        retryable: failure.retryable,
+      });
+    }
+  );
+
+  it('redacts socket send failures and refresh failures before the base connection logs them', async () => {
+    const logs: string[] = [];
+    jest.spyOn(console, 'error').mockImplementation((...values: unknown[]) => {
+      logs.push(
+        values.map(value => (value instanceof Error ? value.message : String(value))).join(' ')
+      );
+    });
+    let calls = 0;
+    const client = createProvider({
+      getAuthToken: () => {
+        if (++calls === 1) return 'private-ticket';
+        throw new Error(`private-ticket ${registration.providerProof}`);
+      },
+    });
+    client.retain();
+    negotiate();
+    sockets[0].send.mockImplementationOnce(() => {
+      throw new Error(registration.providerProof);
+    });
+    await expect(client.registerBrowserProvider(registration)).rejects.toMatchObject({
+      code: 'disconnected',
+      message: 'Browser provider request failed: disconnected',
+    });
+    await jest.advanceTimersByTimeAsync(0);
+    // Exercise the base connection's logging auth-close path on the replacement socket.
+    sockets.at(-1)?.onclose?.({ code: 4001 } as CloseEvent);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(logs.join('\n')).toContain('Failed to refresh auth');
+    expect(logs.join('\n')).not.toContain('private-ticket');
+    expect(logs.join('\n')).not.toContain(registration.providerProof);
   });
 });

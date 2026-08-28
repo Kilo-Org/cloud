@@ -6,7 +6,7 @@ import { requireOptionalNativeModule } from 'expo';
  * side owns the translated copy and the revision guard (see android-sink).
  */
 
-export type LiveUpdateNativeModule = {
+type LiveUpdateNativeModule = {
   isPromotionCapable(): boolean;
   start(title: string, text: string, promotion: boolean): void;
   update(title: string, text: string, promotion: boolean): void;
@@ -19,7 +19,7 @@ const nativeModule = requireOptionalNativeModule<LiveUpdateNativeModule>('Active
  * API 36.1+ promotion capability: SDK_INT_FULL >= 36_001_000 and
  * NotificationManager.canPostPromotedNotifications(). Mirrors the native gate.
  */
-export function isPromotionCapable(): boolean {
+function isPromotionCapable(): boolean {
   return nativeModule?.isPromotionCapable() ?? false;
 }
 

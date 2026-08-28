@@ -10,7 +10,7 @@ import {
 } from '@/lib/glanceable/presentation';
 
 /** One translated count line for an Android surface. */
-export type AndroidWidgetCount = { label: string; count: number };
+type AndroidWidgetCount = { label: string; count: number };
 
 /**
  * The props the Android widget renders. The builder below is the only producer,

@@ -126,7 +126,7 @@ async function tryStartOrUpdate(
 }
 
 /** Retry a pending start after permission turns granted. Caller owns the check. */
-export function retryPendingStart(): void {
+function retryPendingStart(): void {
   const p = pending;
   if (p === null || notificationActive || !isEligibleGlanceableWork(p.snapshot)) {
     return;
@@ -139,18 +139,19 @@ export function retryPendingStart(): void {
 }
 
 /**
- * A widget tap: when the ongoing cannot start (denied) and work is pending,
+ * App foreground: when the ongoing cannot start (denied) and work is pending,
  * show the Open Settings alert once. When permission is granted, start at once.
+ * The alert needs a foreground Activity, so this never runs on the headless path.
  */
-export async function handleWidgetOpenTap(): Promise<void> {
-  const granted = await isNotificationPermissionGranted();
-  if (granted) {
+export async function handleAppStateActive(): Promise<void> {
+  if (pending === null) {
+    return;
+  }
+  if (await isNotificationPermissionGranted()) {
     retryPendingStart();
     return;
   }
-  if (pending !== null) {
-    showAndroidPermissionAlertOnce();
-  }
+  showAndroidPermissionAlertOnce();
 }
 
 export const androidSink: GlanceableSink = {
@@ -161,6 +162,11 @@ export const androidSink: GlanceableSink = {
     scheduleExpiryRedraw(snapshot);
     if (!isEligibleGlanceableWork(snapshot)) {
       pending = null;
+      if (!notificationActive) {
+        // Dismiss a leftover native notification from a previous process. `end`
+        // cancels the fixed id, which is a no-op when nothing is posted.
+        endLiveUpdate();
+      }
     }
     // Mirror the newest revision onto an already-started notification so the
     // empty/stale/privacy copy shows during the terminal window before end.

@@ -5,7 +5,12 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { _resetAndroidSinkForTests, androidSink, getCurrentWidgetProps } from './android-sink';
+import {
+  _resetAndroidSinkForTests,
+  androidSink,
+  getCurrentWidgetProps,
+  handleAppStateActive,
+} from './android-sink';
 import { _setPermissionReaderForTests, type NotificationPermissionStatus } from './permission';
 import { _resetAndroidPermissionAlertForTests } from './permission-alert';
 
@@ -17,6 +22,7 @@ const mocks = vi.hoisted(() => ({
     end: vi.fn(),
   },
   requestWidgetUpdate: vi.fn(),
+  alert: vi.fn(),
 }));
 
 vi.mock('expo', () => ({
@@ -26,7 +32,7 @@ vi.mock('expo', () => ({
 // permission-alert statically imports react-native; stub it so the pure
 // node test graph never parses react-native's Flow sources.
 vi.mock('react-native', () => ({
-  Alert: { alert: (): void => undefined },
+  Alert: { alert: (...args: unknown[]) => mocks.alert(...args) },
   Linking: { openSettings: (): void => undefined },
 }));
 
@@ -89,6 +95,7 @@ beforeEach(() => {
   mocks.native.update.mockClear();
   mocks.native.end.mockClear();
   mocks.requestWidgetUpdate.mockClear();
+  mocks.alert.mockClear();
 });
 
 afterEach(() => {
@@ -212,6 +219,12 @@ describe('androidSink widget publish and end', () => {
     expect(mocks.native.update).not.toHaveBeenCalled();
   });
 
+  it('dismisses a leftover native notification for an ineligible snapshot', () => {
+    androidSink.publish(snapshotFor([], 1, 'empty'));
+
+    expect(mocks.native.end).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the widget truthful after end', () => {
     androidSink.publish(snapshotFor([{ status: 'busy' }], 0));
     expect(getCurrentWidgetProps()).not.toBeNull();
@@ -242,5 +255,35 @@ describe('androidSink widget publish and end', () => {
     expect(getCurrentWidgetProps()?.countLines).toEqual([]);
     expect(getCurrentWidgetProps()?.primaryCount).toBe(0);
     expect(getCurrentWidgetProps()?.showOpenAgents).toBe(false);
+  });
+});
+
+describe('handleAppStateActive permission alert', () => {
+  it('shows the permission alert once for denied work when the app foregrounds', async () => {
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('denied'));
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    await flushAsync();
+    expect(mocks.native.start).not.toHaveBeenCalled();
+
+    await handleAppStateActive();
+    expect(mocks.alert).toHaveBeenCalledTimes(1);
+
+    await handleAppStateActive();
+    expect(mocks.alert).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries the pending start when permission is granted on foreground', async () => {
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('denied'));
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    await flushAsync();
+    expect(mocks.native.start).not.toHaveBeenCalled();
+
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('granted'));
+    await handleAppStateActive();
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(mocks.alert).not.toHaveBeenCalled();
   });
 });

@@ -1,11 +1,14 @@
+/* eslint-disable max-lines -- The shared native hook mocks support prompt seeding and merged control-order regression coverage in one suite. */
 import * as React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
+import { NewSessionPromptControls as renderPromptControls } from '@/components/agents/new-session-prompt-controls';
+import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
 
 import '@/i18n';
-import type * as ReactI18next from 'react-i18next';
+import * as ReactI18next from 'react-i18next';
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -71,6 +74,7 @@ vi.mock('react-native-safe-area-context', () => ({
 // ── icons ──────────────────────────────────────────────────────────
 vi.mock('@/components/ui/icons', () => ({
   ClipboardPaste: () => null,
+  CornerDownLeft: () => null,
   Paperclip: () => null,
 }));
 
@@ -103,18 +107,7 @@ vi.mock('@/components/agents/use-text-height', () => ({
   }),
 }));
 
-const controlState = vi.hoisted(() => ({ inputEditable: true }));
-
-vi.mock('@/components/agents/new-session-prompt-state', () => ({
-  resolveNewSessionPromptControlState: () => ({
-    createDisabled: false,
-    hasPrompt: false,
-    inputAccessibilityDisabled: false,
-    inputEditable: controlState.inputEditable,
-    paperclipDisabled: false,
-    voiceDisabled: false,
-  }),
-}));
+const voiceInputAvailable = vi.hoisted(() => ({ current: false }));
 
 vi.mock('@/components/query-error', () => ({
   QueryError: () => null,
@@ -134,9 +127,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 
+const returnSendsMessage = vi.hoisted(() => ({ current: false }));
+
 vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
   useReturnSendsMessagePreference: () => ({
-    returnSendsMessage: false,
+    returnSendsMessage: returnSendsMessage.current,
     hasLoaded: true,
     setReturnSendsMessage: vi.fn(),
   }),
@@ -162,7 +157,7 @@ vi.mock('@/lib/share-prefill', () => ({
 vi.mock('@/lib/voice-input/use-voice-input', () => ({
   useVoiceInput: () => ({
     abort: vi.fn(),
-    available: false,
+    available: voiceInputAvailable.current,
     isActive: false,
     settleBeforeSubmit: vi.fn(),
     status: 'idle' as const,
@@ -178,18 +173,32 @@ vi.mock('@/lib/voice-input/voice-input-draft', () => ({
 type Node = { props?: Record<string, unknown> } | null | undefined | string | number | boolean;
 type ElementType = string | ((...args: never[]) => unknown);
 
-function findElementByType(node: Node, target: ElementType): Record<string, unknown> | null {
+function findElementByType(
+  node: Node,
+  target: ElementType,
+  accessibilityLabel?: string
+): Record<string, unknown> | null {
   if (node === null || typeof node !== 'object') {
     return null;
   }
   const props = node.props ?? {};
   const children = props.children;
   const nodeType = (node as { type?: unknown }).type;
-  if (nodeType === target) {
+  if (
+    nodeType === target &&
+    (accessibilityLabel === undefined || props.accessibilityLabel === accessibilityLabel)
+  ) {
     return node.props ?? {};
   }
+  if (nodeType === renderPromptControls) {
+    return findElementByType(
+      renderPromptControls(props as React.ComponentProps<typeof renderPromptControls>),
+      target,
+      accessibilityLabel
+    );
+  }
   for (const child of Array.isArray(children) ? children : [children]) {
-    const found = findElementByType(child as Node, target);
+    const found = findElementByType(child as Node, target, accessibilityLabel);
     if (found) {
       return found;
     }
@@ -226,6 +235,11 @@ function defaultProps() {
 }
 
 describe('NewSessionPrompt initialPrompt seed', () => {
+  beforeEach(() => {
+    voiceInputAvailable.current = false;
+    returnSendsMessage.current = false;
+  });
+
   it('does not invoke onChangeText when initialPrompt seeds the uncontrolled input on mount', async () => {
     const { NewSessionPrompt } = await import('./new-session-prompt');
 
@@ -312,15 +326,10 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     const { NewSessionPrompt } = await import('./new-session-prompt');
 
     onChangeTextMock.mockClear();
-    controlState.inputEditable = false;
-    try {
-      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-      NewSessionPrompt({ ...defaultProps(), initialPrompt: 'fix the bug' });
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt({ ...defaultProps(), initialPrompt: 'fix the bug', isCreating: true });
 
-      clipboardHintOptions.current?.addText?.('really ');
-    } finally {
-      controlState.inputEditable = true;
-    }
+    clipboardHintOptions.current?.addText?.('really ');
 
     expect(onChangeTextMock).not.toHaveBeenCalled();
   });
@@ -336,5 +345,68 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     const props = pasteButtonProps ?? {};
     expect(props.onPress).toBe(pasteClipboardImageMock);
     expect(props.disabled).toBe(false);
+  });
+
+  it.each([
+    { isCreating: false, attachmentMax: 5, voiceAvailable: false, paperclipDisabled: false },
+    { isCreating: false, attachmentMax: 0, voiceAvailable: true, paperclipDisabled: true },
+    { isCreating: true, attachmentMax: 5, voiceAvailable: true, paperclipDisabled: true },
+  ])('preserves control availability and disabled states for %j', async options => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    const { isCreating, attachmentMax, voiceAvailable, paperclipDisabled } = options;
+    voiceInputAvailable.current = voiceAvailable;
+    const element = renderPrompt({ ...defaultProps(), isCreating, attachmentMax });
+
+    expect(
+      findElementByType(
+        element,
+        'Pressable',
+        ReactI18next.getI18n().t('agentChat.newSession.addAttachment')
+      )
+    ).toMatchObject({
+      disabled: paperclipDisabled,
+      accessibilityState: { disabled: paperclipDisabled },
+      hitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
+    });
+    expect(findElementByType(element, ComposerPasteButton)).toMatchObject({ disabled: isCreating });
+    expect(findElementByType(element, VoiceInputButton)).toEqual(
+      voiceAvailable ? expect.objectContaining({ disabled: isCreating, size: 'lg' }) : null
+    );
+    expect(findElementByType(element, VoiceInputStatus)).toEqual(
+      voiceAvailable ? { status: 'idle' } : null
+    );
+  });
+
+  it('keeps the newline button between the voice status and voice button', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    voiceInputAvailable.current = true;
+    returnSendsMessage.current = true;
+    const element = renderPrompt(defaultProps());
+    const controlsProps = findElementByType(element, renderPromptControls);
+    expect(controlsProps).not.toBeNull();
+
+    const controls: React.ReactElement<{ children: Node[] }> = renderPromptControls(
+      controlsProps as React.ComponentProps<typeof renderPromptControls>
+    );
+    const [, status, newline, voice] = controls.props.children;
+
+    expect(findElementByType(status, VoiceInputStatus)).not.toBeNull();
+    expect(
+      findElementByType(
+        newline,
+        'Pressable',
+        ReactI18next.getI18n().t('agentChat.composer.insertNewline')
+      )
+    ).not.toBeNull();
+    expect(findElementByType(voice, VoiceInputButton)).not.toBeNull();
+  });
+
+  it('keeps the extracted controls unmounted for clone entry', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    voiceInputAvailable.current = true;
+    const element = renderPrompt({ ...defaultProps(), isCloneEntry: true });
+
+    expect(findElementByType(element, 'TextInput')).toBeNull();
+    expect(findElementByType(element, renderPromptControls)).toBeNull();
   });
 });

@@ -15,14 +15,13 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { CornerDownLeft, Paperclip } from '@/components/ui/icons';
+import { CornerDownLeft } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import {
   type ComposerSelection,
   pasteTextIntoComposer,
@@ -37,6 +36,7 @@ import {
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
+import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
 import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -47,7 +47,6 @@ import {
   type VoiceInputSelection,
 } from '@/lib/voice-input/voice-input-draft';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
-import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { AGENT_ATTACHMENT_MAX_BYTES } from '@/lib/agent-attachments/constants';
 import {
@@ -266,8 +265,6 @@ export function NewSessionPrompt({
     voiceInputActive: voiceInput.isActive,
   });
 
-  const paperclipDisabled = control.paperclipDisabled;
-
   const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
       await onPrefillAttachments([file]);
@@ -353,14 +350,6 @@ export function NewSessionPrompt({
       return;
     }
     onStartSession?.();
-  }
-
-  function handlePaperclipPress() {
-    onAddAttachment();
-  }
-
-  function handleVoiceToggle() {
-    void voiceInput.toggle();
   }
 
   // Clone entry has no composer: render the models error or the toolbar as a
@@ -466,31 +455,12 @@ export function NewSessionPrompt({
             </Text>
           </View>
         ) : null}
-        <View className="flex-row items-center justify-between pb-2">
-          <View className="flex-row items-center gap-1">
-            <Pressable
-              onPress={handlePaperclipPress}
-              disabled={paperclipDisabled}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              className={cn(
-                'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
-                paperclipDisabled && 'opacity-50'
-              )}
-              accessibilityRole="button"
-              accessibilityLabel={t('agentChat.newSession.addAttachment')}
-              accessibilityState={{ disabled: paperclipDisabled }}
-            >
-              <Paperclip size={18} color={colors.mutedForeground} />
-            </Pressable>
-            {/* Follows the input, not the paperclip: a full attachment list
-                still allows a text paste. */}
-            <ComposerPasteButton onPress={pasteClipboard} disabled={!control.inputEditable} />
-          </View>
-          {voiceInput.available ? (
-            <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
-              <VoiceInputStatus status={voiceInput.status} />
-            </View>
-          ) : null}
+        <NewSessionPromptControls
+          control={control}
+          voiceInput={voiceInput}
+          onAddAttachment={onAddAttachment}
+          pasteClipboard={pasteClipboard}
+        >
           {returnSendsMessage ? (
             <View className="ml-1">
               <Pressable
@@ -510,15 +480,7 @@ export function NewSessionPrompt({
               </Pressable>
             </View>
           ) : null}
-          {voiceInput.available ? (
-            <VoiceInputButton
-              disabled={control.voiceDisabled}
-              size="lg"
-              status={voiceInput.status}
-              onPress={handleVoiceToggle}
-            />
-          ) : null}
-        </View>
+        </NewSessionPromptControls>
       </View>
       {isModelsError && modelOptions.length === 0 ? (
         <QueryError

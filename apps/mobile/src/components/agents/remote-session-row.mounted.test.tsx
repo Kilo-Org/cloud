@@ -12,6 +12,7 @@ import {
 import { ActiveSessionsLiveSync } from '@/lib/active-sessions-live-sync';
 import {
   deferred,
+  flushQueryUpdates as flush,
   makeCached,
   makeConnection,
   QUERY_KEY,
@@ -96,14 +97,6 @@ const otherKey = [
 ];
 const session: ActiveSession = makeCached({ createdOnPlatform: 'cli' });
 
-async function flush() {
-  await new Promise<void>(resolve => {
-    setTimeout(resolve, 0);
-  });
-  await new Promise<void>(resolve => {
-    setTimeout(resolve, 0);
-  });
-}
 async function render() {
   await act(async () => {
     const tree = createElement(

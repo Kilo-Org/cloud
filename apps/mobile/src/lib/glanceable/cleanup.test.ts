@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
@@ -8,7 +8,11 @@ import {
   writePrivacySnapshotAndEnd,
   writeSignedOutSnapshotAndEnd,
 } from './cleanup';
-import { _resetGlanceablePersistForTests, _setLastGlanceableSnapshotForTests } from './persist';
+import {
+  _resetGlanceablePersistForTests,
+  _setLastGlanceableSnapshotForTests,
+  getLastGlanceableSnapshot,
+} from './persist';
 import {
   type GlanceableSink,
   registerGlanceableSink,
@@ -24,6 +28,7 @@ function makeSink() {
   const calls: SinkCall[] = [];
   const sink: GlanceableSink = {
     publish(snapshot) {
+      _setLastGlanceableSnapshotForTests(snapshot);
       calls.push({ type: 'publish', snapshot });
     },
     startOrUpdate(snapshot) {
@@ -46,6 +51,7 @@ function lastSnapshot(calls: SinkCall[]): GlanceableAgentsSnapshot {
 
 afterEach(() => {
   _resetGlanceablePersistForTests();
+  vi.useRealTimers();
 });
 
 describe('cleanup', () => {
@@ -115,7 +121,8 @@ describe('cleanup', () => {
     ).toBe('none');
   });
 
-  it('marks stale (keeps counts) when the org list errors', () => {
+  it('keeps the original deadline through repeated org list failures', () => {
+    vi.useFakeTimers();
     expect(
       planOrgFenceAction({
         organizationId: 'kept-org',
@@ -131,11 +138,12 @@ describe('cleanup', () => {
       updatedAt: '2026-08-27T00:00:00.000Z',
       expiresAt: '2026-08-27T08:00:00.000Z',
       scopeKey: 'deadbeef',
-      organizationBound: false,
+      accountEpoch: 7,
+      organizationBound: true,
       status: 'happy',
       running: 2,
       needsInput: 1,
-      reconnecting: 0,
+      reconnecting: 1,
       eligibleStartedAt: '2026-08-26T23:00:00.000Z',
     };
     _setLastGlanceableSnapshotForTests(seeded);
@@ -143,40 +151,74 @@ describe('cleanup', () => {
     const { sink, calls } = makeSink();
     registerGlanceableSink(sink);
     try {
-      republishLastSnapshotStale();
-      const snapshot = lastSnapshot(calls);
-      expect(snapshot.status).toBe('stale');
-      expect(snapshot.running).toBe(2);
-      expect(snapshot.needsInput).toBe(1);
-      expect(snapshot.revision).toBe(4);
+      for (const [index, now] of [
+        '2026-08-27T01:00:00.000Z',
+        '2026-08-27T07:59:59.999Z',
+      ].entries()) {
+        vi.setSystemTime(new Date(now));
+        republishLastSnapshotStale();
+        expect(lastSnapshot(calls)).toEqual({ ...seeded, revision: index + 4, status: 'stale' });
+      }
+      for (const [index, now] of [
+        '2026-08-27T08:00:00.000Z',
+        '2026-08-27T09:00:00.000Z',
+      ].entries()) {
+        vi.setSystemTime(new Date(now));
+        republishLastSnapshotStale();
+        expect(lastSnapshot(calls)).toEqual({
+          ...seeded,
+          revision: index + 6,
+          status: 'expired',
+          running: 0,
+          needsInput: 0,
+          reconnecting: 0,
+          eligibleStartedAt: null,
+        });
+      }
     } finally {
       unregisterGlanceableSink(sink);
     }
   });
 
-  it('does not overwrite a terminal blank with a stale republish', () => {
-    const terminal: GlanceableAgentsSnapshot = {
-      schemaVersion: 1,
-      revision: 5,
-      updatedAt: '2026-08-27T00:00:00.000Z',
-      expiresAt: '2026-08-27T08:00:00.000Z',
-      scopeKey: 'terminal:privacy',
-      organizationBound: false,
-      status: 'privacy',
-      running: 0,
-      needsInput: 0,
-      reconnecting: 0,
-      eligibleStartedAt: null,
-    };
-    _setLastGlanceableSnapshotForTests(terminal);
+  it.each(['signed_out', 'privacy', 'expired'] as const)(
+    'does not replace %s with stale before or after its deadline',
+    status => {
+      vi.useFakeTimers();
+      const terminal: GlanceableAgentsSnapshot = {
+        schemaVersion: 1,
+        revision: 5,
+        updatedAt: '2026-08-27T00:00:00.000Z',
+        expiresAt: '2026-08-27T08:00:00.000Z',
+        scopeKey: `terminal:${status}`,
+        organizationBound: false,
+        status,
+        running: 0,
+        needsInput: 0,
+        reconnecting: 0,
+        eligibleStartedAt: null,
+      };
+      _setLastGlanceableSnapshotForTests(terminal);
 
-    const { sink, calls } = makeSink();
-    registerGlanceableSink(sink);
-    try {
-      republishLastSnapshotStale();
-      expect(calls).toEqual([]);
-    } finally {
-      unregisterGlanceableSink(sink);
+      const { sink } = makeSink();
+      registerGlanceableSink(sink);
+      try {
+        for (const now of ['2026-08-27T01:00:00.000Z', '2026-08-27T09:00:00.000Z']) {
+          vi.setSystemTime(new Date(now));
+          republishLastSnapshotStale();
+          expect(getLastGlanceableSnapshot()).toMatchObject({
+            status,
+            scopeKey: terminal.scopeKey,
+            updatedAt: terminal.updatedAt,
+            expiresAt: terminal.expiresAt,
+            running: 0,
+            needsInput: 0,
+            reconnecting: 0,
+            eligibleStartedAt: null,
+          });
+        }
+      } finally {
+        unregisterGlanceableSink(sink);
+      }
     }
-  });
+  );
 });

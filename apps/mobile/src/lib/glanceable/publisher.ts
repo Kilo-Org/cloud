@@ -40,12 +40,24 @@ export type GlanceablePublisherOptions = {
 
 type TimerHandle = ReturnType<typeof setTimeout>;
 
-/** Copy a snapshot with a new status and a fresh revision/updatedAt/expiresAt. */
+/** Advance the status and revision without renewing stale data's lifetime. */
 export function withStatus(
   snapshot: GlanceableAgentsSnapshot,
   status: GlanceableAgentsSnapshotStatus,
   now: number
 ): GlanceableAgentsSnapshot {
+  if (status === 'stale') {
+    if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {
+      return snapshot;
+    }
+    const expired = snapshot.status === 'expired' || now >= Date.parse(snapshot.expiresAt);
+    return {
+      ...snapshot,
+      revision: snapshot.revision + 1,
+      status: expired ? 'expired' : 'stale',
+      ...(expired ? { running: 0, needsInput: 0, reconnecting: 0, eligibleStartedAt: null } : {}),
+    };
+  }
   const updatedAt = new Date(now).toISOString();
   return {
     ...snapshot,
@@ -140,19 +152,22 @@ export class GlanceablePublisher {
     this.current = snapshot;
   }
 
-  /** Cache update failed: republish the last counts with a stale status. */
-  handleFetchError(ctx: GlanceablePublisherContext): void {
-    if (this.isGated()) {
-      return;
-    }
-    const now = this.now();
-    if (this.applyExpiry(now, ctx) || this.current === null) {
+  /** Cache update failed: keep the last counts only until their original deadline. */
+  handleFetchError(_ctx: GlanceablePublisherContext): void {
+    if (this.isGated() || this.current === null) {
       return;
     }
     // A fetch error supersedes any pending coalesced happy emit: otherwise the
     // pre-error snapshot would fire later and overwrite the stale counts.
     this.cancelCoalesce();
-    const snapshot = withStatus(this.current, 'stale', now);
+    const snapshot = withStatus(this.current, 'stale', this.now());
+    if (snapshot === this.current) {
+      return;
+    }
+    if (snapshot.status === 'expired') {
+      this.cancelTerminal();
+      this.activityStarted = false;
+    }
     this.publish(snapshot);
     this.current = snapshot;
   }

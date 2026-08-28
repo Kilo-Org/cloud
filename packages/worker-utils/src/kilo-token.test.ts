@@ -102,6 +102,18 @@ describe('signKiloToken', () => {
     expect(payloadWithoutEnv.env).toBeUndefined();
   });
 
+  it('omits the apiTokenPepper claim entirely when pepper is not provided', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-internal',
+      secret: SECRET,
+      expiresInSeconds: 60,
+    });
+
+    const payload = await verifyKiloToken(token, SECRET);
+
+    expect('apiTokenPepper' in payload).toBe(false);
+  });
+
   it('produces payloads accepted by the closed schema', async () => {
     const { token } = await signKiloToken({
       userId: 'user-schema',

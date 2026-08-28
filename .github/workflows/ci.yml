@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 # Cancel in-progress runs when a new commit is pushed to the same PR
 concurrency:
@@ -41,6 +40,9 @@ jobs:
 
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
+
+      - name: Check stacked CI admission
+        run: node --test scripts/stacked-ci.test.mjs
 
       - name: Test dependency change detection
         run: node --test scripts/changed-dependencies.test.mjs

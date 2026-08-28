@@ -1,5 +1,6 @@
 import { adminProcedure, createTRPCRouter, creditManagerProcedure } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
+import { retireHarnessConversations } from '@/lib/agent-harness/retirement';
 import {
   organizations,
   organization_memberships,
@@ -971,6 +972,9 @@ export const organizationAdminRouter = createTRPCRouter({
     try {
       await db.transaction(async tx => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+        // Retirement locks threads and registry first, as runtime admission does.
+        // A hierarchy rejection rolls retirement back with the organization update.
+        await retireHarnessConversations(tx, { organizationId });
         await assertOrganizationHierarchyChangeAllowed(tx, organizationId);
         await markOrganizationAsDeleted(organizationId, tx);
       });

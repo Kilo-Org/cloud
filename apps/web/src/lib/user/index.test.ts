@@ -151,6 +151,10 @@ import {
   getCrossAccountEmailConflicts,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
+import {
+  createHarnessRetirementStore,
+  drainHarnessRetirements,
+} from '@/lib/agent-harness/retirement';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
@@ -1869,10 +1873,29 @@ describe('User', () => {
           }),
         ])
       );
+      const cleanup = createHarnessRetirementStore(db);
+      expect(
+        await drainHarnessRetirements(cleanup, async () => {
+          throw new Error('Worker unavailable');
+        })
+      ).toEqual({ acknowledged: 0, retry: 3 });
       await db
         .update(agent_harness_retirements)
-        .set({ acknowledged_at: sql`now()` })
-        .where(eq(agent_harness_retirements.thread_id, personalThreadId));
+        .set({ lease_expires_at: sql`clock_timestamp() - interval '1 second'` })
+        .where(inArray(agent_harness_retirements.thread_id, deletedThreadIds));
+      expect(
+        await drainHarnessRetirements(cleanup, async request => ({
+          threadId: request.threadId,
+          generation: request.generation,
+          durable: true,
+        }))
+      ).toEqual({ acknowledged: 3, retry: 0 });
+      expect(
+        await db
+          .select()
+          .from(agent_harness_conversation_registry)
+          .where(inArray(agent_harness_conversation_registry.thread_id, allThreadIds))
+      ).toEqual([expect.objectContaining({ thread_id: otherThreadId, user_id: otherUser.id })]);
       const readFences = () =>
         db
           .select()

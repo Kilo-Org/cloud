@@ -116,12 +116,8 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
-  quick_chat_threads,
-  quick_chat_messages,
   agent_harness_clients,
   agent_harness_conversation_grants,
-  agent_harness_conversation_registry,
-  agent_harness_retirements,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count, ne } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -160,6 +156,7 @@ import {
 } from '@/lib/impact/referral-utils';
 import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
 import { revokeGatewayStateForUser } from '@/lib/mcp-gateway/lifecycle-service';
+import { retireHarnessConversations } from '@/lib/agent-harness/retirement';
 import {
   USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
   USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
@@ -1491,43 +1488,11 @@ export async function anonymizeCloudUserData(
   await tx.delete(user_moderation_mutes).where(eq(user_moderation_mutes.blocker_user_id, userId));
   await tx.delete(user_terms_acceptances).where(eq(user_terms_acceptances.kilo_user_id, userId));
 
-  const userThreadIds = tx
-    .select({ id: quick_chat_threads.id })
-    .from(quick_chat_threads)
-    .where(eq(quick_chat_threads.user_id, userId));
-
-  // Persist fences before deleting payloads, including coordinators whose thread already cascaded away.
-  // Old threads have no registry generation. Keep generation zero until old threads and writers are gone.
-  await tx.execute(sql`
-    INSERT INTO ${agent_harness_retirements} (thread_id, generation, reason)
-    SELECT thread.id, COALESCE(registry.generation, 0), 'account_deleted'
-    FROM ${quick_chat_threads} AS thread
-    LEFT JOIN ${agent_harness_conversation_registry} AS registry ON registry.thread_id = thread.id
-    WHERE thread.user_id = ${userId}
-    UNION
-    SELECT thread_id, generation, 'account_deleted'
-    FROM ${agent_harness_conversation_registry}
-    WHERE user_id = ${userId}
-    ON CONFLICT (thread_id, generation) DO NOTHING
-  `);
-  await tx
-    .update(agent_harness_conversation_registry)
-    .set({ user_id: null, organization_id: null })
-    .where(
-      or(
-        eq(agent_harness_conversation_registry.user_id, userId),
-        inArray(agent_harness_conversation_registry.thread_id, userThreadIds)
-      )
-    );
+  await retireHarnessConversations(tx, { userId });
   await tx
     .delete(agent_harness_conversation_grants)
     .where(eq(agent_harness_conversation_grants.user_id, userId));
   await tx.delete(agent_harness_clients).where(eq(agent_harness_clients.user_id, userId));
-
-  // Thread deletion also deletes conversation grants and canonical invitation results.
-  // Discovery rows and retirement fences have no cascading foreign keys.
-  await tx.delete(quick_chat_messages).where(inArray(quick_chat_messages.thread_id, userThreadIds));
-  await tx.delete(quick_chat_threads).where(eq(quick_chat_threads.user_id, userId));
 
   // Code indexing data
   await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));

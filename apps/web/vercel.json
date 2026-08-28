@@ -93,6 +93,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/agent-harness-cleanup",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/dispatch-pending-code-reviews",
       "schedule": "*/10 * * * *"
     },

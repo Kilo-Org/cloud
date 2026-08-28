@@ -195,7 +195,9 @@ export function AgentSessionListScreen() {
   );
 
   let body: ReactNode = null;
-  if (loading && !hasLiveRows) {
+  // An unread filter record holds the skeletons even over cached rows: painting
+  // the unfiltered list first would drop rows once the stored filter arrives.
+  if (!query.hasLoaded || (loading && !hasLiveRows)) {
     body = (
       <View className="pt-[18px]">
         {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
@@ -225,7 +227,10 @@ export function AgentSessionListScreen() {
             : t('agents.sessionList.tryAdjustFilters')
         }
         action={
-          <Button variant="outline" onPress={query.handleClearAll}>
+          <Button
+            variant="outline"
+            onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
+          >
             <Text>
               {isSearching ? t('agents.search.clearSearch') : t('agents.search.clearFilters')}
             </Text>

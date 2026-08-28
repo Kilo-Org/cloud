@@ -19,6 +19,7 @@ export function useLiveSessionQuery<T extends LiveFilterSession>(sessions: T[]) 
     platformFilter,
     projectFilter,
     activeFilterCount,
+    hasLoaded,
     setFilters,
     clearFilters,
     setPlatformFilter,
@@ -35,11 +36,6 @@ export function useLiveSessionQuery<T extends LiveFilterSession>(sessions: T[]) 
     searchInputRef.current?.blur();
     setSearchQuery('');
   }, []);
-
-  const handleClearAll = useCallback(() => {
-    handleClearSearch();
-    clearFilters();
-  }, [handleClearSearch, clearFilters]);
 
   const options = useMemo(() => buildLiveFilterOptions(sessions), [sessions]);
   const visibleSessions = useMemo(
@@ -64,6 +60,9 @@ export function useLiveSessionQuery<T extends LiveFilterSession>(sessions: T[]) 
     platformFilter,
     projectFilter,
     activeFilterCount,
+    /** False until the stored record resolves — the screen must not paint the
+     * list before then, or persisted filters would drop rows after the fact. */
+    hasLoaded,
     options,
     visibleSessions,
     searchInputRef,
@@ -75,7 +74,7 @@ export function useLiveSessionQuery<T extends LiveFilterSession>(sessions: T[]) 
     handleSearchChange: setSearchQuery,
     handleApplyFilters: setFilters,
     handleClearSearch,
-    handleClearAll,
+    handleClearFilters: clearFilters,
     handleRemovePlatform,
     handleRemoveProject,
   };

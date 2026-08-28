@@ -89,9 +89,11 @@ vi.mock('@/i18n', () => ({
   i18n: { t: (key: string) => key, language: 'en' },
 }));
 // The real persisted-filters hook runs; only its native edges are stubbed, so
-// the apply/clear transitions below exercise the actual filter state.
+// the apply/clear transitions below exercise the actual filter state. The
+// stored record resolves through `filterRecord` so a test can hold it pending.
+const readFilterRecord = vi.hoisted(() => vi.fn<() => Promise<string | null>>());
 vi.mock('expo-secure-store', () => ({
-  getItemAsync: vi.fn().mockResolvedValue(null),
+  getItemAsync: readFilterRecord,
 }));
 vi.mock('@/lib/auth/account-metadata-write', () => ({
   setAccountMetadata: vi.fn().mockResolvedValue(undefined),
@@ -241,6 +243,8 @@ describe('AgentSessionListScreen live tab', () => {
     sessionListState.activeSessions = [];
     sessionListState.isLoading = false;
     sessionListState.isError = false;
+    readFilterRecord.mockReset();
+    readFilterRecord.mockResolvedValue(null);
     refetchSpy.mockClear();
     refetchSpy.mockResolvedValue(true);
     routerPushSpy.mockClear();
@@ -329,6 +333,70 @@ describe('AgentSessionListScreen live tab', () => {
     sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
     const withRows = await renderScreen();
     expect(findTypeCount(withRows, 'SessionListSearchHeader')).toBe(1);
+  });
+
+  it('holds the skeletons until the persisted filter record resolves', async () => {
+    // A never-settling read stands in for a slow SecureStore: the list must not
+    // paint unfiltered rows that a stored filter would then remove.
+    readFilterRecord.mockReturnValue(new Promise<string | null>(() => undefined));
+    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
+
+    const renderer = await renderScreen();
+
+    expect(findTypeCount(renderer, 'Skeleton')).toBe(8);
+    expect(findTypeCount(renderer, 'FlatList')).toBe(0);
+  });
+
+  it('applies a persisted filter without first painting the unfiltered list', async () => {
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ platformFilter: [], projectFilter: ['https://github.com/kilo/cloud.git'] })
+    );
+    sessionListState.activeSessions = [
+      { id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
+      { id: 'a2', organizationId: null, gitUrl: 'https://github.com/kilo/other.git' },
+    ];
+
+    const renderer = await renderScreen();
+
+    const list = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
+    );
+    expect((list.props.data as { id: string }[]).map(session => session.id)).toEqual(['a1']);
+    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(1);
+  });
+
+  it('clears only the search when the no-match CTA says Clear search', async () => {
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ platformFilter: [], projectFilter: ['https://github.com/kilo/cloud.git'] })
+    );
+    sessionListState.activeSessions = [
+      {
+        id: 'a1',
+        organizationId: null,
+        title: 'Ship it',
+        gitUrl: 'https://github.com/kilo/cloud.git',
+      },
+    ];
+    const renderer = await renderScreen();
+
+    const searchHeader = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'SessionListSearchHeader'
+    );
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+
+    const emptyState = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'EmptyState'
+    );
+    expect(emptyState.props.description).toBe('agents.sessionList.tryDifferentSearch');
+    act(() => {
+      (emptyState.props.action as { props: { onPress: () => void } }).props.onPress();
+    });
+
+    // The row is back, and the persisted repository filter survived.
+    expect(findTypeCount(renderer, 'FlatList')).toBe(1);
+    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(1);
   });
 
   it('narrows the live list to the search text', async () => {

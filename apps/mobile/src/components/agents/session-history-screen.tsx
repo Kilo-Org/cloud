@@ -154,10 +154,17 @@ export function SessionHistoryScreen() {
     [contentIsError, hasActiveQuery, isSearching, sections]
   );
 
+  // The empty-state CTA reads "Clear search" or "Clear filters" depending on
+  // isSearching, so it must clear exactly that. Clearing both under a label
+  // naming one would silently drop the persisted filters.
   const handleClearQuery = useCallback(() => {
-    clearSearchInput();
-    searchController.clearBroadly(clearFilters);
-  }, [clearSearchInput, searchController, clearFilters]);
+    if (isSearching) {
+      clearSearchInput();
+      searchController.clearSearchOnly();
+      return;
+    }
+    clearFilters();
+  }, [clearSearchInput, searchController, clearFilters, isSearching]);
 
   const isLoading =
     !ready || (isSearching ? search.isPending : storedIsFetching && storedLoadedPageCount === 0);

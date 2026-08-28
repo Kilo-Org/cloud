@@ -115,35 +115,6 @@ describe('createSessionSearchController', () => {
     expect(commits).toEqual(['']);
   });
 
-  it('clearBroadly commits an empty query AND applies the narrowing-filter reset (preserving sort)', () => {
-    const timer = createFakeTimer();
-    const commits: string[] = [];
-    const controller = createController(timer, commits);
-
-    controller.scheduleSearch('still pending');
-    let clearCalls = 0;
-    controller.clearBroadly(() => {
-      clearCalls += 1;
-    });
-
-    expect(clearCalls).toBe(1);
-    expect(commits).toEqual(['']);
-    expect(controller.hasPending()).toBe(false);
-  });
-
-  it('clearBroadly is safe to call when no debounce is pending and still clears filters', () => {
-    const timer = createFakeTimer();
-    const commits: string[] = [];
-    const controller = createController(timer, commits);
-
-    let clearCalls = 0;
-    controller.clearBroadly(() => {
-      clearCalls += 1;
-    });
-    expect(commits).toEqual(['']);
-    expect(clearCalls).toBe(1);
-  });
-
   it('dispose cancels a pending debounce without committing', () => {
     const timer = createFakeTimer();
     const commits: string[] = [];

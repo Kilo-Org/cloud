@@ -47,12 +47,6 @@ export type SessionSearchController = {
    * "Clear filters" CTA's.
    */
   clearSearchOnly(): void;
-  /**
-   * Broad clear (empty-state "Clear search" / "Clear filters" CTAs):
-   * cancel any pending debounce, commit an empty query, AND reset the
-   * narrowing filters through the provided callback.
-   */
-  clearBroadly(clearFilters: () => void): void;
   /** Cancel any pending debounce without committing (used on unmount). */
   dispose(): void;
   /** Test-only: whether a debounce is currently pending. */
@@ -88,11 +82,6 @@ export function createSessionSearchController({
     clearSearchOnly() {
       cancelPending();
       commitSearchQuery('');
-    },
-    clearBroadly(clearFilters) {
-      cancelPending();
-      commitSearchQuery('');
-      clearFilters();
     },
     dispose: cancelPending,
     hasPending: () => pending !== null,

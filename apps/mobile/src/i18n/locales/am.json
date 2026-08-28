@@ -2547,7 +2547,9 @@
       "uploading": "በመጫን ላይ…",
       "uploaded": "ተጭኗል",
       "uploadFailedRetry": "መጫን አልተሳካም። እንደገና ለመሞከር ይንኩ።",
-      "uploadFailedTerminal": "ይህ ፋይል ሊጫን አይችልም።"
+      "uploadFailedTerminal": "ይህ ፋይል ሊጫን አይችልም።",
+      "moveLeft": "{{filename}}ን ወደ ግራ ያንቀሳቅሱ",
+      "moveRight": "{{filename}}ን ወደ ቀኝ ያንቀሳቅሱ"
     },
     "attachmentPasteHint": {
       "accessibility": "ምስል ከቅንጥብ ጠረጴዛ ይለጥፉ",

@@ -2547,7 +2547,9 @@
       "uploading": "അപ്ലോഡ് ചെയ്യുന്നു…",
       "uploaded": "അപ്ലോഡ് ചെയ്തു",
       "uploadFailedRetry": "അപ്ലോഡ് പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കാൻ ടാപ്പ് ചെയ്യുക.",
-      "uploadFailedTerminal": "ഈ ഫയൽ അപ്ലോഡ് ചെയ്യാൻ കഴിയില്ല."
+      "uploadFailedTerminal": "ഈ ഫയൽ അപ്ലോഡ് ചെയ്യാൻ കഴിയില്ല.",
+      "moveLeft": "{{filename}} ഇടത്തേക്ക് നീക്കുക",
+      "moveRight": "{{filename}} വലത്തേക്ക് നീക്കുക"
     },
     "attachmentPasteHint": {
       "accessibility": "ക്ലിപ്പ്ബോർഡിൽ നിന്ന് ചിത്രം ഒട്ടിക്കുക",

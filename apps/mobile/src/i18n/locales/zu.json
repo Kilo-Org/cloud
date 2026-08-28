@@ -2547,7 +2547,9 @@
       "uploading": "Kuyalayishwa…",
       "uploaded": "Kulayishiwe",
       "uploadFailedRetry": "Ukulayisha kwehlulekile. Thepha ukuzama futhi.",
-      "uploadFailedTerminal": "Leli fayela alikwazi ukulayishwa."
+      "uploadFailedTerminal": "Leli fayela alikwazi ukulayishwa.",
+      "moveLeft": "Hambisa {{filename}} kwesokunxele",
+      "moveRight": "Hambisa {{filename}} kwesokudla"
     },
     "attachmentPasteHint": {
       "accessibility": "Namathisela isithombe esivela ku-clipboard",

@@ -2117,7 +2117,9 @@
       "uploading": "Przesyłanie…",
       "uploaded": "Przesłano",
       "uploadFailedRetry": "Przesyłanie nie powiodło się. Dotknij, aby ponowić.",
-      "uploadFailedTerminal": "Tego pliku nie można przesłać."
+      "uploadFailedTerminal": "Tego pliku nie można przesłać.",
+      "moveLeft": "Przesuń {{filename}} w lewo",
+      "moveRight": "Przesuń {{filename}} w prawo"
     },
     "attachmentPasteHint": {
       "accessibility": "Wklej obraz ze schowka",

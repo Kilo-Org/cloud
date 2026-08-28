@@ -2547,7 +2547,9 @@
       "uploading": "Испраќање…",
       "uploaded": "Испратено",
       "uploadFailedRetry": "Испраќањето не успеа. Допрете за да се обидете повторно.",
-      "uploadFailedTerminal": "Оваа датотека не може да се испрати."
+      "uploadFailedTerminal": "Оваа датотека не може да се испрати.",
+      "moveLeft": "Поместете ја {{filename}} налево",
+      "moveRight": "Поместете ја {{filename}} надесно"
     },
     "attachmentPasteHint": {
       "accessibility": "Залепи слика од таблата со исечоци",

@@ -2547,7 +2547,9 @@
       "uploading": "અપલોડ થઈ રહ્યું છે…",
       "uploaded": "અપલોડ થયું",
       "uploadFailedRetry": "અપલોડ નિષ્ફળ. ફરી પ્રયાસ કરવા ટેપ કરો.",
-      "uploadFailedTerminal": "આ ફાઇલ અપલોડ કરી શકાતી નથી."
+      "uploadFailedTerminal": "આ ફાઇલ અપલોડ કરી શકાતી નથી.",
+      "moveLeft": "{{filename}} ડાબે ખસેડો",
+      "moveRight": "{{filename}} જમણે ખસેડો"
     },
     "attachmentPasteHint": {
       "accessibility": "ક્લિપબોર્ડમાંથી ઇમેજ પેસ્ટ કરો",

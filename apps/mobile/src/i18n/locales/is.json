@@ -2547,7 +2547,9 @@
       "uploading": "Hleð upp…",
       "uploaded": "Hlaðið upp",
       "uploadFailedRetry": "Upphleðsla mistókst. Bankaðu til að reyna aftur.",
-      "uploadFailedTerminal": "Ekki er hægt að hlaða þessari skrá upp."
+      "uploadFailedTerminal": "Ekki er hægt að hlaða þessari skrá upp.",
+      "moveLeft": "Færa {{filename}} til vinstri",
+      "moveRight": "Færa {{filename}} til hægri"
     },
     "attachmentPasteHint": {
       "accessibility": "Líma mynd af klippispjaldi",

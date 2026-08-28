@@ -2547,7 +2547,9 @@
       "uploading": "پورته کېږي…",
       "uploaded": "پورته شو",
       "uploadFailedRetry": "پورته کول ناکام شول. د بیا هڅې لپاره ټایپ کړئ.",
-      "uploadFailedTerminal": "دا فایل نه شي پورته کېدلای."
+      "uploadFailedTerminal": "دا فایل نه شي پورته کېدلای.",
+      "moveLeft": "{{filename}} کیڼ لوري ته ولېږدوئ",
+      "moveRight": "{{filename}} ښي لوري ته ولېږدوئ"
     },
     "attachmentPasteHint": {
       "accessibility": "له کلیپ بورډ څخه انځور ولګوئ",

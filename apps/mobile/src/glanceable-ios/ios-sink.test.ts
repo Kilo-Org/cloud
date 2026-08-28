@@ -43,7 +43,7 @@ const mockState = vi.hoisted(() => ({
   started: [] as { props: unknown; url?: string }[],
   updated: [] as unknown[],
   snapshots: [] as unknown[],
-  timelines: [] as { date: Date; props: unknown }[][],
+  timeline: [] as { date: Date; props: unknown }[],
   ended: [] as { policy: unknown; props?: unknown; contentDate?: unknown }[],
 }));
 
@@ -71,9 +71,10 @@ vi.mock('expo-widgets', () => ({
   createWidget: () => ({
     updateSnapshot: (props: unknown) => {
       mockState.snapshots.push(props);
+      mockState.timeline = [{ date: new Date(), props }];
     },
     updateTimeline: (entries: { date: Date; props: unknown }[]) => {
-      mockState.timelines.push(entries);
+      mockState.timeline = entries;
     },
     reload: () => undefined,
     getTimeline: () => [],
@@ -110,7 +111,7 @@ beforeEach(() => {
   mockState.started = [];
   mockState.updated = [];
   mockState.snapshots = [];
-  mockState.timelines = [];
+  mockState.timeline = [];
   mockState.ended = [];
   setGlanceableDelivery(delivery);
   registerGlanceableSink(iosSink);
@@ -270,22 +271,71 @@ describe('iosSink end', () => {
 });
 
 describe('iosSink widget publish', () => {
-  it('writes a live snapshot plus one expired frame at expiresAt with zero counts', () => {
-    const happy = snapshotFor([{ status: 'busy' }], 0);
+  it.each(['happy', 'stale'] as const)(
+    'writes a %s snapshot plus one expired frame at expiresAt with zero counts',
+    status => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+      const snapshot = snapshotFor([{ status: 'busy' }], 0, status);
 
-    iosSink.publish(happy);
+      iosSink.publish(snapshot);
 
-    expect(mockState.snapshots.length).toBe(1);
-    const entries = mockState.timelines[0];
-    expect(entries).toHaveLength(2);
-    const expired = entries?.[1];
-    expect(expired?.date.getTime()).toBe(Date.parse(happy.expiresAt));
+      expect(mockState.snapshots.length).toBe(1);
+      expect(mockState.timeline).toHaveLength(2);
+      expect(mockState.timeline[0]?.props).toMatchObject({
+        primaryCount: 1,
+        showOpenAgents: true,
+      });
+      const expired = mockState.timeline[1];
+      expect(expired?.date.getTime()).toBe(Date.parse(snapshot.expiresAt));
 
-    const expiredProps = expired?.props as GlanceableViewProps;
-    expect(expiredProps.countLines).toEqual([]);
-    expect(expiredProps.primaryCount).toBe(0);
-    expect(expiredProps.statusLine).toBe('Status expired');
-    expect(expiredProps.showOpenAgents).toBe(false);
+      const expiredProps = expired?.props as GlanceableViewProps;
+      expect(expiredProps.countLines).toEqual([]);
+      expect(expiredProps.primaryCount).toBe(0);
+      expect(expiredProps.statusLine).toBe('Status expired');
+      expect(expiredProps.showOpenAgents).toBe(false);
+    }
+  );
+
+  it.each([
+    ['signed_out', 'Sign in to see agents'],
+    ['privacy', 'Agents hidden'],
+  ] as const)('keeps %s copy after a previous active timeline expires', (status, statusLine) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const active = snapshotFor([{ status: 'busy' }]);
+    iosSink.publish(active);
+    expect(mockState.timeline[0]?.props).toMatchObject({ primaryCount: 1 });
+
+    const terminalTime = NOW + 60_000;
+    vi.setSystemTime(terminalTime);
+    const terminal = buildGlanceableSnapshot({
+      ...CTX,
+      sessions: [],
+      now: terminalTime,
+      previousRevision: active.revision,
+      status,
+    });
+    iosSink.publish(terminal);
+
+    for (const time of [
+      terminalTime,
+      Date.parse(active.expiresAt),
+      Date.parse(terminal.expiresAt),
+      Date.parse(terminal.expiresAt) + 1,
+    ]) {
+      vi.setSystemTime(time);
+      const visible = mockState.timeline.findLast(entry => entry.date.getTime() <= Date.now());
+      expect(visible?.props).toMatchObject({
+        statusLine,
+        countLines: [],
+        primaryCount: 0,
+        primaryLabel: null,
+        elapsedAnchor: null,
+        showOpenAgents: false,
+      });
+    }
+    expect(mockState.timeline).toHaveLength(1);
   });
 
   it('publishes the four-state widget props', () => {

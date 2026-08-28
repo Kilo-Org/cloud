@@ -17,11 +17,9 @@ export function requireNumericPlatformRepositories(
   return repositories;
 }
 
-/**
- * Represents ownership of an integration
- * Can be either a user or an organization
- */
-export type Owner = { type: 'user'; id: string } | { type: 'org'; id: string };
+// Compatibility: retain the old web import path until all Owner imports migrate.
+// Database helpers and exports stay here; the shared Owner has no database dependency.
+export type { Owner } from '@kilocode/app-shared/code-review/repository-identity';
 
 export type WebhookEvent = {
   platform: string;

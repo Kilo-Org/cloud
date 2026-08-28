@@ -786,6 +786,9 @@ importers:
       '@emoji-mart/react':
         specifier: 1.1.1
         version: 1.1.1(emoji-mart@5.6.0)(react@19.2.6)
+      '@gitbeaker/rest':
+        specifier: 43.8.0
+        version: 43.8.0
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../../packages/app-shared
@@ -1219,6 +1222,9 @@ importers:
       '@types/pg':
         specifier: 8.18.0
         version: 8.18.0
+      '@types/picomatch':
+        specifier: 2.3.4
+        version: 2.3.4
       '@types/react':
         specifier: 19.2.14
         version: 19.2.14
@@ -1252,6 +1258,9 @@ importers:
       madge:
         specifier: 8.0.0
         version: 8.0.0(typescript@5.9.3)
+      picomatch:
+        specifier: 2.3.2
+        version: 2.3.2
       postcss:
         specifier: '>=8.5.23'
         version: 8.5.25
@@ -2482,6 +2491,9 @@ importers:
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(expo-sqlite@57.0.1(expo@57.0.10)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.20.0)
+      openapi-fetch:
+        specifier: 0.17.0
+        version: 0.17.0
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -2492,6 +2504,9 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260514.1
+      openapi-typescript:
+        specifier: 7.13.0
+        version: 7.13.0(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -5266,6 +5281,18 @@ packages:
     resolution: {integrity: sha512-PyUXQWB42s4jBli435TDiYuVsadwRHnMc27YaLouINktvTWsL3FcKrRMGawTayFk46X+n5bE23RjUTWQwrukWw==}
     engines: {node: '>= 0.10.0'}
 
+  '@gitbeaker/core@43.8.0':
+    resolution: {integrity: sha512-H+LfKuf4dExBinb79c+CXViRBvTVQNf5BYLNSizm2SiqdED5JruhKX88payefleY0szp7G/mySlFSXPyGRH1dQ==}
+    engines: {node: '>=18.20.0'}
+
+  '@gitbeaker/requester-utils@43.8.0':
+    resolution: {integrity: sha512-d/SiJdxijc+aH5ZBQOw83XLxNSXqsBZNm5k3nPu1EHxGxK0fajXmxdMl0/vNXbKRggnIquFCxURkrQSEzfjqxQ==}
+    engines: {node: '>=18.20.0'}
+
+  '@gitbeaker/rest@43.8.0':
+    resolution: {integrity: sha512-xxqsNsUXaFang9b2e/NTIgqUeuUlifA2Opy1mOVqTDuJZZNIOTgUNyziwBJoleBhMC0XuvY3JNVMWthufcVjRw==}
+    engines: {node: '>=18.20.0'}
+
   '@google/genai@2.10.0':
     resolution: {integrity: sha512-e4cFxj3tiuMtsgOT4G9c1hXyGJhg7/Buj7VVeBacRY3fRtkRZZ59Q3nuVp2xbq8BGQXLXCDB253qMhklMOeUDg==}
     engines: {node: '>=20.0.0'}
@@ -7930,6 +7957,16 @@ packages:
     peerDependencies:
       '@redis/client': ^5.11.0
 
+  '@redocly/ajv@8.11.2':
+    resolution: {integrity: sha512-io1JpnwtIcvojV7QKDUSIuMN/ikdOUd1ReEnUnMKGfDVridQZ31J0MmIuqwuRjWDZfmvr+Q0MqCcfHM2gTivOg==}
+
+  '@redocly/config@0.22.0':
+    resolution: {integrity: sha512-gAy93Ddo01Z3bHuVdPWfCwzgfaYgMdaZPcfL7JZ7hWJoK9V0lXDbigTWkhiPFAaLWzbOJ+kbUQG1+XwIm0KRGQ==}
+
+  '@redocly/openapi-core@1.34.19':
+    resolution: {integrity: sha512-o/0VgsBXgwcY1lyeqcVtSGdTQAPnVggo0fbFVPlxl5XVDKUcVH0OLRqt3CbkwByT5FU305E0iE0O7MzThjDblw==}
+    engines: {node: '>=18.17.0', npm: '>=9.5.0'}
+
   '@reduxjs/toolkit@2.11.2':
     resolution: {integrity: sha512-Kd6kAHTA6/nUpp8mySPqj3en3dm0tdMIgbttnQ1xFMVpufoj+ADi8pXLBsd4xzTRHQa7t/Jv8W5UnCuW4kuWMQ==}
     peerDependencies:
@@ -9881,6 +9918,9 @@ packages:
   '@types/pg@8.18.0':
     resolution: {integrity: sha512-gT+oueVQkqnj6ajGJXblFR4iavIXWsGAFCk3dP4Kki5+a9R4NMt0JARdk6s8cUKcfUoqP5dAtDSLU8xYUTFV+Q==}
 
+  '@types/picomatch@2.3.4':
+    resolution: {integrity: sha512-0so8lU8O5zatZS/2Fi4zrwks+vZv7e0dygrgEZXljODXBig97l4cPQD+9LabXfGJOWwoRkTVz6Q4edZvD12UOA==}
+
   '@types/proper-lockfile@4.1.4':
     resolution: {integrity: sha512-uo2ABllncSqg9F1D4nugVl9v93RmjxF6LJzQLMLDdPaXCUIDPeOJ21Gbqi43xNKzBi/WQ0Q0dICqufzQbMjipQ==}
 
@@ -10529,6 +10569,10 @@ packages:
   ansi-align@3.0.1:
     resolution: {integrity: sha512-IOfwwBF5iczOjp/WeY4YxyjqAFMQoZufdQWDd19SEExbVLNXqvpzSJ/M7Za4/sCPmQ0+GRquoA7bGcINcxew6w==}
 
+  ansi-colors@4.1.3:
+    resolution: {integrity: sha512-/6w/C21Pm1A7aZitlI5Ni/2J6FFQN8i1Cvz3kHABAAbw93v/NlvKdVOqz7CCWz/3iv/JplRSEEZ83XION15ovw==}
+    engines: {node: '>=6'}
+
   ansi-escapes@4.3.2:
     resolution: {integrity: sha512-gKXj5ALrKWQLsYG9jlTRmR/xKluxHV+Z9QEwNIgCfM1/uwPMCuzVVnh5mwTd+OuBZcwSIMbqssNWRm1lE51QaQ==}
     engines: {node: '>=8'}
@@ -11120,6 +11164,9 @@ packages:
     resolution: {integrity: sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA==}
     engines: {node: ^12.17.0 || ^14.13 || >=16.0.0}
 
+  change-case@5.4.4:
+    resolution: {integrity: sha512-HRQyTk2/YPEkt9TnUPbOpr64Uw3KOicFWPVBb+xiHvd6eBx/qPr9xqfBFDT8P2vWsvvz4jbEkfDe71W3VyNu2w==}
+
   char-regex@1.0.2:
     resolution: {integrity: sha512-kWWXztvZ5SBQV+eRgKFeh8q5sLuZY2+8WUIzlxWVTg+oGwY14qylx1KbKzHd8P6ZYkAg0xyIDU9JMHhyJMZ1jw==}
     engines: {node: '>=10'}
@@ -11378,6 +11425,9 @@ packages:
   color@4.2.3:
     resolution: {integrity: sha512-1rXeuUUiGGrykh+CeBdu5Ie7OJwinCgQY0bc7GCRxy5xVHy+moaqkpL/jqQq0MtQOeYcrqEz4abc5f0KtU7W4A==}
     engines: {node: '>=12.5.0'}
+
+  colorette@1.4.0:
+    resolution: {integrity: sha512-Y2oEozpomLn7Q3HFP7dpww7AtMJplbM9lGZP6RDfHqmbeRjiwRg4n6VM6j4KLmRke85uWEI7JqF17f3pqdRA0g==}
 
   colorette@2.0.20:
     resolution: {integrity: sha512-IfEDxwoWIjkeXL1eXcDiow4UbKjhLdq6/EuSVR9GMN7KVH3r9gQ83e73hsz1Nd1T3ijd5xv1wcWRYO+D6kCI2w==}
@@ -14369,6 +14419,10 @@ packages:
   js-cookie@3.0.8:
     resolution: {integrity: sha512-yeJd4aNAdYZQjaon2bpD/Gb0B/omw7HQOsynXXcOiWVCacbBcPlgn8S/d1X6blFSaHao7ozqtW7NZW19xpCtIw==}
 
+  js-levenshtein@1.1.6:
+    resolution: {integrity: sha512-X2BB11YZtrRqY4EnQcLX5Rh373zbK4alC1FW7D7MBhL2gtcC17cTnr6DmfHZeS0s2rTHjUTMMHfG7gO8SSdw+g==}
+    engines: {node: '>=0.10.0'}
+
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
 
@@ -15613,6 +15667,18 @@ packages:
       zod:
         optional: true
 
+  openapi-fetch@0.17.0:
+    resolution: {integrity: sha512-PsbZR1wAPcG91eEthKhN+Zn92FMHxv+/faECIwjXdxfTODGSGegYv0sc1Olz+HYPvKOuoXfp+0pA2XVt2cI0Ig==}
+
+  openapi-typescript-helpers@0.1.0:
+    resolution: {integrity: sha512-OKTGPthhivLw/fHz6c3OPtg72vi86qaMlqbJuVJ23qOvQ+53uw1n7HdmkJFibloF7QEjDrDkzJiOJuockM/ljw==}
+
+  openapi-typescript@7.13.0:
+    resolution: {integrity: sha512-EFP392gcqXS7ntPvbhBzbF8TyBA+baIYEm791Hy5YkjDYKTnk/Tn5OQeKm5BIZvJihpp8Zzr4hzx0Irde1LNGQ==}
+    hasBin: true
+    peerDependencies:
+      typescript: ^5.x
+
   openclaw@2026.7.1:
     resolution: {integrity: sha512-ge/Xss99CHAjPL/ikmH/UFoiOrjcxDB4sW3y9mhyCD+dYW3wzV7TKbAVdkrXFgAG2d2BjpJofP97zUZ+umxo8g==}
     engines: {node: '>=22.22.3 <23 || >=24.15.0 <25 || >=25.9.0'}
@@ -15908,6 +15974,10 @@ packages:
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
+
+  picomatch-browser@2.2.6:
+    resolution: {integrity: sha512-0ypsOQt9D4e3hziV8O4elD9uN0z/jtUEfxVRtNaAAtXIyUx9m/SzlO020i8YNL2aL/E6blOvvHQcin6HZlFy/w==}
+    engines: {node: '>=8.6'}
 
   picomatch@2.3.2:
     resolution: {integrity: sha512-V7+vQEJ06Z+c5tSye8S+nHUfI51xoXIXjHQ99cQtKUkQqqO1kO/KCJUfZXuB47h/YBlDhah2H3hdUGXn8ie0oA==}
@@ -16339,6 +16409,9 @@ packages:
   rastermill@0.3.1:
     resolution: {integrity: sha512-CX4nij6+ZLHYIaojJNfLTr7W+AiH/IPJi6E9Aw1br2///1KZL2KBOHd68rkcLedc47MPvb4hhH+fzYeGFa4A/Q==}
     engines: {node: '>=22'}
+
+  rate-limiter-flexible@8.3.0:
+    resolution: {integrity: sha512-mzwlfipDLlRinPgELqVDJetke6Snq26nL565m8nLWXIcWgosYSeNRgqwh7ZrZ4MfYs8CNfmLvR5SBVz3rISQsQ==}
 
   raw-body@3.0.2:
     resolution: {integrity: sha512-K5zQjDllxWkf7Z5xJdV0/B0WTNqx6vxG70zJE4N0kBs4LovmEYWJzQGxC9bS9RAKu3bgM40lrd5zoLJ12MQ5BA==}
@@ -18099,6 +18172,9 @@ packages:
     resolution: {integrity: sha512-+dwUY4L35XFYEzE+OAL3sarJdUioVovq+8f7lcIJ7wnmnYQV5UD1Y/lcwaMSyaQ6Bj3JMj1XSTjZbNLHn/19yA==}
     engines: {node: '>=18'}
 
+  uri-js-replace@1.0.1:
+    resolution: {integrity: sha512-W+C9NWNLFOoBI2QWDp4UT9pv65r2w5Cx+3sTYFvtMdDBxkKt1syCqsUdSFAChbEe1uK5TfS04wt/nGwmaeIQ0g==}
+
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
 
@@ -18598,6 +18674,9 @@ packages:
   x-path@0.0.2:
     resolution: {integrity: sha512-zQ4WFI0XfJN1uEkkrB19Y4TuXOlHqKSxUJo0Yt+axPjRm8tCG6SJ6+Wo3/+Kjg4c2c8IvBXuJ0uYoshxNn4qMw==}
 
+  xcase@2.0.1:
+    resolution: {integrity: sha512-UmFXIPU+9Eg3E9m/728Bii0lAIuoc+6nbrNUKaRPJOFp91ih44qqGlWtxMB6kXFrRD6po+86ksHM5XHCfk6iPw==}
+
   xcode@3.0.1:
     resolution: {integrity: sha512-kCz5k7J7XbJtjABOvkc5lJmkiDh8VhjVCGNiqdKCscmVpdVUpEAyXv1xmCLkQJ5dsHqx3IPO4XW+NTDhU/fatA==}
     engines: {node: '>=10.0.0'}
@@ -18652,6 +18731,9 @@ packages:
   yallist@5.0.0:
     resolution: {integrity: sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==}
     engines: {node: '>=18'}
+
+  yaml-ast-parser@0.0.43:
+    resolution: {integrity: sha512-2PTINUwsRqSd+s8XxKaJWQlUuEMHJQyEuh2edBbW8KNJz0SJPwUSD2zRWqezFEdN7IzAgeuYHFUCF7o8zRdZ0A==}
 
   yaml-loader@0.8.1:
     resolution: {integrity: sha512-BCEndnUoi3BaZmePkwGGe93txRxLgMhBa/gE725v1/GHnura8QvNs7c4+4C1yyhhKoj3Dg63M7IqhA++15j6ww==}
@@ -21937,6 +22019,24 @@ snapshots:
 
   '@fregante/relaxed-json@2.0.0': {}
 
+  '@gitbeaker/core@43.8.0':
+    dependencies:
+      '@gitbeaker/requester-utils': 43.8.0
+      qs: 6.15.2
+      xcase: 2.0.1
+
+  '@gitbeaker/requester-utils@43.8.0':
+    dependencies:
+      picomatch-browser: 2.2.6
+      qs: 6.15.2
+      rate-limiter-flexible: 8.3.0
+      xcase: 2.0.1
+
+  '@gitbeaker/rest@43.8.0':
+    dependencies:
+      '@gitbeaker/core': 43.8.0
+      '@gitbeaker/requester-utils': 43.8.0
+
   '@google/genai@2.10.0(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
       google-auth-library: 10.6.2
@@ -24844,6 +24944,29 @@ snapshots:
     dependencies:
       '@redis/client': 5.11.0
 
+  '@redocly/ajv@8.11.2':
+    dependencies:
+      fast-deep-equal: 3.1.3
+      json-schema-traverse: 1.0.0
+      require-from-string: 2.0.2
+      uri-js-replace: 1.0.1
+
+  '@redocly/config@0.22.0': {}
+
+  '@redocly/openapi-core@1.34.19':
+    dependencies:
+      '@redocly/ajv': 8.11.2
+      '@redocly/config': 0.22.0
+      colorette: 1.4.0
+      https-proxy-agent: 7.0.6
+      js-levenshtein: 1.1.6
+      js-yaml: 4.3.1
+      minimatch: 5.1.9
+      pluralize: 8.0.0
+      yaml-ast-parser: 0.0.43
+    transitivePeerDependencies:
+      - supports-color
+
   '@reduxjs/toolkit@2.11.2(react-redux@9.2.0(@types/react@19.2.14)(react@19.2.6)(redux@5.0.1))(react@19.2.6)':
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -27039,6 +27162,8 @@ snapshots:
       pg-protocol: 1.13.0
       pg-types: 2.2.0
 
+  '@types/picomatch@2.3.4': {}
+
   '@types/proper-lockfile@4.1.4':
     dependencies:
       '@types/retry': 0.12.0
@@ -27737,6 +27862,8 @@ snapshots:
   ansi-align@3.0.1:
     dependencies:
       string-width: 4.2.3
+
+  ansi-colors@4.1.3: {}
 
   ansi-escapes@4.3.2:
     dependencies:
@@ -28443,6 +28570,8 @@ snapshots:
 
   chalk@5.6.2: {}
 
+  change-case@5.4.4: {}
+
   char-regex@1.0.2: {}
 
   character-entities-html4@2.1.0: {}
@@ -28700,6 +28829,8 @@ snapshots:
     dependencies:
       color-convert: 2.0.1
       color-string: 1.9.1
+
+  colorette@1.4.0: {}
 
   colorette@2.0.20: {}
 
@@ -32509,6 +32640,8 @@ snapshots:
 
   js-cookie@3.0.8: {}
 
+  js-levenshtein@1.1.6: {}
+
   js-tokens@10.0.0: {}
 
   js-tokens@4.0.0: {}
@@ -34273,6 +34406,22 @@ snapshots:
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.4.3
 
+  openapi-fetch@0.17.0:
+    dependencies:
+      openapi-typescript-helpers: 0.1.0
+
+  openapi-typescript-helpers@0.1.0: {}
+
+  openapi-typescript@7.13.0(typescript@5.9.3):
+    dependencies:
+      '@redocly/openapi-core': 1.34.19
+      ansi-colors: 4.1.3
+      change-case: 5.4.4
+      parse-json: 8.3.0
+      supports-color: 10.2.2
+      typescript: 5.9.3
+      yargs-parser: 21.1.1
+
   openclaw@2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       '@agentclientprotocol/sdk': 1.1.0(zod@4.4.3)
@@ -34778,6 +34927,8 @@ snapshots:
 
   picocolors@1.1.1: {}
 
+  picomatch-browser@2.2.6: {}
+
   picomatch@2.3.2: {}
 
   picomatch@4.0.4: {}
@@ -35212,6 +35363,8 @@ snapshots:
   rastermill@0.3.1:
     dependencies:
       '@silvia-odwyer/photon-node': 0.3.4
+
+  rate-limiter-flexible@8.3.0: {}
 
   raw-body@3.0.2:
     dependencies:
@@ -37467,6 +37620,8 @@ snapshots:
       semver: 7.8.5
       xdg-basedir: 5.1.0
 
+  uri-js-replace@1.0.1: {}
+
   uri-js@4.4.1:
     dependencies:
       punycode: 2.3.1
@@ -38427,6 +38582,8 @@ snapshots:
     dependencies:
       path-extra: 1.0.3
 
+  xcase@2.0.1: {}
+
   xcode@3.0.1:
     dependencies:
       simple-plist: 1.3.1
@@ -38465,6 +38622,8 @@ snapshots:
   yallist@4.0.0: {}
 
   yallist@5.0.0: {}
+
+  yaml-ast-parser@0.0.43: {}
 
   yaml-loader@0.8.1:
     dependencies:

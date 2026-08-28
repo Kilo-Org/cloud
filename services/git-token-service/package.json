@@ -19,11 +19,13 @@
     "@octokit/auth-app": "catalog:",
     "@octokit/rest": "22.0.1",
     "drizzle-orm": "catalog:",
+    "openapi-fetch": "0.17.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
+    "openapi-typescript": "7.13.0",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

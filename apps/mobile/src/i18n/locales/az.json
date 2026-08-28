@@ -2547,7 +2547,9 @@
       "uploading": "Yüklənir…",
       "uploaded": "Yükləndi",
       "uploadFailedRetry": "Yükləmə uğursuz oldu. Yenidən cəhd etmək üçün toxunun.",
-      "uploadFailedTerminal": "Bu fayl yüklənə bilməz."
+      "uploadFailedTerminal": "Bu fayl yüklənə bilməz.",
+      "moveLeft": "{{filename}} faylını sola köçürün",
+      "moveRight": "{{filename}} faylını sağa köçürün"
     },
     "attachmentPasteHint": {
       "accessibility": "Panodan şəkil yapışdır",

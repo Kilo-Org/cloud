@@ -2547,7 +2547,9 @@
       "uploading": "Feltöltés…",
       "uploaded": "Feltöltve",
       "uploadFailedRetry": "A feltöltés nem sikerült. Az újrapróbáláshoz koppints.",
-      "uploadFailedTerminal": "Ezt a fájlt nem lehet feltölteni."
+      "uploadFailedTerminal": "Ezt a fájlt nem lehet feltölteni.",
+      "moveLeft": "{{filename}} mozgatása balra",
+      "moveRight": "{{filename}} mozgatása jobbra"
     },
     "attachmentPasteHint": {
       "accessibility": "Kép beillesztése a vágólapról",

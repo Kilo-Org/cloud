@@ -2547,7 +2547,9 @@
       "uploading": "అప్లోడ్ చేస్తోంది…",
       "uploaded": "అప్లోడ్ చేయబడింది",
       "uploadFailedRetry": "అప్లోడ్ విఫలమైంది. మళ్లీ ప్రయత్నించడానికి నొక్కండి.",
-      "uploadFailedTerminal": "ఈ ఫైల్ను అప్లోడ్ చేయలేము."
+      "uploadFailedTerminal": "ఈ ఫైల్ను అప్లోడ్ చేయలేము.",
+      "moveLeft": "{{filename}}ను ఎడమకు తరలించండి",
+      "moveRight": "{{filename}}ను కుడికి తరలించండి"
     },
     "attachmentPasteHint": {
       "accessibility": "క్లిప్బోర్డ్ నుండి చిత్రాన్ని అతికించండి",

@@ -2547,7 +2547,9 @@
       "uploading": "در حال بارگذاری…",
       "uploaded": "بارگذاری شد",
       "uploadFailedRetry": "بارگذاری ناموفق بود. برای تلاش مجدد لمس کنید.",
-      "uploadFailedTerminal": "این فایل قابل بارگذاری نیست."
+      "uploadFailedTerminal": "این فایل قابل بارگذاری نیست.",
+      "moveLeft": "انتقال {{filename}} به چپ",
+      "moveRight": "انتقال {{filename}} به راست"
     },
     "attachmentPasteHint": {
       "accessibility": "چسباندن تصویر از کلیپ‌بورد",

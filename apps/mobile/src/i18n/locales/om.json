@@ -2547,7 +2547,9 @@
       "uploading": "Ol fe'aa jira…",
       "uploaded": "Ol fe'ameera",
       "uploadFailedRetry": "Ol fe'uun hin milkoofne. Deebi'i yaaluuf cuqaasa.",
-      "uploadFailedTerminal": "Faayiliin kun ol fe'uun hin danda'amu."
+      "uploadFailedTerminal": "Faayiliin kun ol fe'uun hin danda'amu.",
+      "moveLeft": "{{filename}} gara bitaatti siqsaa",
+      "moveRight": "{{filename}} gara mirgaatti siqsaa"
     },
     "attachmentPasteHint": {
       "accessibility": "Suuraa kilaapbootaa irraa maxxan",

@@ -2547,7 +2547,9 @@
       "uploading": "Ap chaje…",
       "uploaded": "Chaje",
       "uploadFailedRetry": "Chajman echwe. Tape pou eseye ankò.",
-      "uploadFailedTerminal": "Fichye sa a pa ka chaje."
+      "uploadFailedTerminal": "Fichye sa a pa ka chaje.",
+      "moveLeft": "Deplase {{filename}} agoch",
+      "moveRight": "Deplase {{filename}} adwat"
     },
     "attachmentPasteHint": {
       "accessibility": "Kole imaj soti nan clipboard",

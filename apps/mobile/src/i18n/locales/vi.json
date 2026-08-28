@@ -2093,7 +2093,9 @@
       "uploading": "Đang tải lên…",
       "uploaded": "Đã tải lên",
       "uploadFailedRetry": "Tải lên thất bại. Chạm để thử lại.",
-      "uploadFailedTerminal": "Không thể tải lên tệp này."
+      "uploadFailedTerminal": "Không thể tải lên tệp này.",
+      "moveLeft": "Di chuyển {{filename}} sang trái",
+      "moveRight": "Di chuyển {{filename}} sang phải"
     },
     "attachmentPasteHint": {
       "accessibility": "Dán hình ảnh từ bảng nhớ tạm",

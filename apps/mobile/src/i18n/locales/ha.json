@@ -2547,7 +2547,9 @@
       "uploading": "Ana ɗorawa…",
       "uploaded": "An ɗora",
       "uploadFailedRetry": "Ɗorawa ya gaza. Danna don sake gwadawa.",
-      "uploadFailedTerminal": "Ba za a iya ɗora wannan fayil ba."
+      "uploadFailedTerminal": "Ba za a iya ɗora wannan fayil ba.",
+      "moveLeft": "Matsar da {{filename}} zuwa hagu",
+      "moveRight": "Matsar da {{filename}} zuwa dama"
     },
     "attachmentPasteHint": {
       "accessibility": "Manna hoto daga clipboard",

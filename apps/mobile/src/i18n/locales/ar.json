@@ -2141,7 +2141,9 @@
       "uploading": "جارٍ الرفع…",
       "uploaded": "تم الرفع",
       "uploadFailedRetry": "تعذّر الرفع. اضغط لإعادة المحاولة.",
-      "uploadFailedTerminal": "لا يمكن رفع هذا الملف."
+      "uploadFailedTerminal": "لا يمكن رفع هذا الملف.",
+      "moveLeft": "نقل {{filename}} إلى اليسار",
+      "moveRight": "نقل {{filename}} إلى اليمين"
     },
     "attachmentPasteHint": {
       "accessibility": "لصق صورة من الحافظة",

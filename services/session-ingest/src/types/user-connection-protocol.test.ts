@@ -6,6 +6,1023 @@ import {
   WebInboundMessageSchema,
   SessionEventPayloadSchema,
 } from './user-connection-protocol';
+import * as browser from './user-connection-protocol';
+import * as sdk from '../../../../packages/cloud-agent-sdk/src/schemas';
+
+// Canonical v1 examples also appear in the SDK schema tests.
+const requestId = '00000000-0000-4000-8000-000000000001';
+const handle = {
+  providerId: 'bp_00000000-0000-4000-8000-000000000002',
+  browserTaskId: 'bt_00000000-0000-4000-8000-000000000003',
+  jobId: 'bj_00000000-0000-4000-8000-000000000004',
+  invocationId: `b1.1787875200000.${'a'.repeat(64)}`,
+} as const;
+const owner = { parentSessionId: 'ses_parent', parentProof: 'b'.repeat(64) };
+const binding = { providerId: handle.providerId, generation: 1 };
+const jobBinding = { ...handle, generation: 1 };
+const tab = {
+  tabId: 7,
+  title: 'Example',
+  url: 'https://example.com/',
+  effectiveMode: 'safe',
+} as const;
+const job = {
+  ...jobBinding,
+  payloadFingerprint: 'c'.repeat(64),
+  createdAt: '2026-08-28T00:00:00.000Z',
+  expiresAt: '2026-09-04T00:00:00.000Z',
+  deadlines: { queue: '2026-08-28T00:10:00.000Z', approval: '2026-08-28T00:02:00.000Z' },
+  status: 'awaiting_approval',
+} as const;
+const completed = {
+  ...handle,
+  status: 'succeeded',
+  reason: 'completed',
+  effectsUncertain: false,
+  summary: 'Read the example page',
+  evidence: [{ text: 'Example Domain', title: tab.title, url: tab.url }],
+} satisfies browser.BrowserResult;
+const finishedJob = { ...job, status: 'succeeded', approvedTab: tab, result: completed } as const;
+const invoke = {
+  type: 'browser_request',
+  requestId,
+  operation: 'invoke',
+  owner,
+  providerId: handle.providerId,
+  invocationId: handle.invocationId,
+  goal: 'Read the example page',
+} as const;
+const registration = {
+  type: 'provider_register',
+  requestId,
+  providerId: handle.providerId,
+  generation: 0,
+  providerProof: 'd'.repeat(64),
+  label: 'Work browser',
+  enabled: true,
+} as const;
+const provider = {
+  providerId: handle.providerId,
+  label: registration.label,
+  availability: 'available',
+  queueDepth: 0,
+} as const;
+const cliRequests = [
+  { type: 'browser_request', requestId, operation: 'list' },
+  { type: 'browser_request', requestId, operation: 'list', cursor: handle.providerId },
+  invoke,
+  { ...invoke, browserTaskId: handle.browserTaskId },
+  ...(['status', 'cancel'] as const).flatMap(operation => [
+    { type: 'browser_request', requestId, operation, owner, browserTaskId: handle.browserTaskId },
+    {
+      type: 'browser_request',
+      requestId,
+      operation,
+      owner,
+      browserTaskId: handle.browserTaskId,
+      jobId: handle.jobId,
+    },
+  ]),
+  {
+    type: 'browser_request',
+    requestId,
+    operation: 'recover',
+    owner,
+    invocationId: handle.invocationId,
+  },
+];
+const cliResponses = [
+  { type: 'browser_response', requestId, response: { kind: 'providers', providers: [] } },
+  {
+    type: 'browser_response',
+    requestId,
+    response: { kind: 'providers', providers: [provider], nextCursor: handle.providerId },
+  },
+  ...(['invoke', 'cancel'] as const).map(operation => ({
+    type: 'browser_response',
+    requestId,
+    response: { kind: 'ack', operation, ...handle },
+  })),
+  { type: 'browser_response', requestId, response: { kind: 'status', job } },
+  { type: 'browser_response', requestId, response: { kind: 'recovered', job: finishedJob } },
+  {
+    type: 'browser_response',
+    requestId,
+    response: { kind: 'not_found', invocationId: handle.invocationId },
+  },
+  {
+    type: 'browser_response',
+    requestId,
+    response: {
+      kind: 'error',
+      code: 'provider_unavailable',
+      message: 'Open the browser panel',
+      retryable: true,
+    },
+  },
+  {
+    type: 'browser_response',
+    requestId,
+    response: {
+      kind: 'error',
+      code: 'owner_mismatch',
+      message: 'This parent does not own the job',
+      retryable: false,
+    },
+  },
+];
+const cliEvents = [
+  { type: 'browser_event', requestId, event: 'progress', job },
+  { type: 'browser_event', requestId, event: 'result', result: completed },
+];
+const providerOutbound = [
+  registration,
+  {
+    ...registration,
+    generation: 1,
+    recovery: {
+      invocationId: handle.invocationId,
+      tabId: tab.tabId,
+      tabClosed: true,
+      locksDrained: true,
+    },
+  },
+  { type: 'provider_heartbeat', requestId, ...binding, cursor: handle.jobId },
+  { type: 'provider_approval', ...jobBinding, approval: { decision: 'approved', tab } },
+  {
+    type: 'provider_approval',
+    ...jobBinding,
+    approval: { decision: 'denied', reason: 'approval_denied' },
+  },
+  { type: 'provider_result', ...jobBinding, tab, result: completed },
+  { type: 'provider_quiesced', ...jobBinding, tabId: tab.tabId },
+  { type: 'provider_unavailable', ...binding, reason: 'provider_lost', effectsUncertain: true },
+  { type: 'provider_cancel', ...jobBinding },
+];
+const providerInbound = [
+  { type: 'provider_job', job, goal: invoke.goal, ownerLabel: 'Parent chat' },
+  { type: 'provider_job_cancel', ...jobBinding, reason: 'cancelled' },
+  {
+    type: 'provider_snapshot',
+    requestId,
+    ...binding,
+    jobs: [job, finishedJob],
+    nextCursor: handle.jobId,
+  },
+  { type: 'provider_snapshot', ...binding, jobs: [] },
+  { type: 'provider_lease_ack', requestId, ...binding, leaseExpiresAt: '2026-08-28T00:00:15.000Z' },
+];
+const modelArguments = [
+  { operation: 'list' },
+  { operation: 'run', provider_id: handle.providerId, goal: invoke.goal },
+  {
+    operation: 'run',
+    provider_id: handle.providerId,
+    goal: invoke.goal,
+    browser_task_id: handle.browserTaskId,
+  },
+  ...(['status', 'cancel'] as const).flatMap(operation => [
+    { operation, browser_task_id: handle.browserTaskId },
+    { operation, browser_task_id: handle.browserTaskId, job_id: handle.jobId },
+  ]),
+  { operation: 'recover' },
+];
+
+describe.each([
+  { name: 'relay', contract: browser },
+  { name: 'SDK', contract: sdk },
+])('browser jobs v1: $name', ({ contract }) => {
+  const directions = [
+    { name: 'CLI requests', schema: contract.browserRequestSchema, frames: cliRequests },
+    {
+      name: 'CLI replies',
+      schema: contract.browserCLIInboundMessageSchema,
+      frames: [...cliResponses, ...cliEvents],
+    },
+    {
+      name: 'provider outbound',
+      schema: contract.browserProviderOutboundMessageSchema,
+      frames: providerOutbound,
+    },
+    {
+      name: 'provider inbound',
+      schema: contract.browserProviderInboundMessageSchema,
+      frames: providerInbound,
+    },
+  ];
+
+  it.each(directions)(
+    'round-trips canonical $name only in the correct direction',
+    ({ schema, frames }) => {
+      for (const frame of frames) {
+        expect(schema.parse(JSON.parse(JSON.stringify(frame)))).toEqual(frame);
+        expect(schema.safeParse({ ...frame, extra: true }).success).toBe(false);
+        for (const other of directions) {
+          if (other.schema !== schema) expect(other.schema.safeParse(frame).success).toBe(false);
+        }
+        for (const legacy of [
+          CLIOutboundMessageSchema,
+          CLIInboundMessageSchema,
+          WebOutboundMessageSchema,
+          WebInboundMessageSchema,
+          sdk.webInboundMessageSchema,
+        ]) {
+          expect(legacy.safeParse(frame).success).toBe(false);
+        }
+      }
+    }
+  );
+
+  it.each(modelArguments)('accepts the model operation matrix: %j', args => {
+    expect(contract.browserTaskArgumentsSchema.parse(args)).toEqual(args);
+  });
+
+  it.each([
+    'owner',
+    'parentSessionId',
+    'parentProof',
+    'providerProof',
+    'userId',
+    'connectionId',
+    'invocationId',
+    'sessionID',
+    'messageID',
+    'callID',
+  ])('rejects model-selected authority: %s', field => {
+    for (const args of modelArguments) {
+      expect(
+        contract.browserTaskArgumentsSchema.safeParse({ ...args, [field]: 'untrusted' }).success
+      ).toBe(false);
+    }
+  });
+
+  it('requires a conversation for status and cancel, even with an exact job ID', () => {
+    for (const operation of ['status', 'cancel']) {
+      expect(
+        contract.browserTaskArgumentsSchema.safeParse({ operation, job_id: handle.jobId }).success
+      ).toBe(false);
+      expect(
+        contract.browserRequestSchema.safeParse({
+          type: 'browser_request',
+          requestId,
+          operation,
+          owner,
+          jobId: handle.jobId,
+        }).success
+      ).toBe(false);
+      expect(
+        contract.browserRequestSchema.safeParse({
+          type: 'browser_request',
+          requestId,
+          operation,
+          owner,
+          browserTaskId: handle.jobId,
+        }).success
+      ).toBe(false);
+    }
+  });
+
+  it('requires a run target and goal, and keeps recover lookup-only', () => {
+    for (const args of [
+      { operation: 'run', goal: invoke.goal },
+      { operation: 'run', provider_id: handle.providerId },
+      { operation: 'invoke', provider_id: handle.providerId, goal: invoke.goal },
+      { operation: 'list', provider_id: handle.providerId },
+    ])
+      expect(contract.browserTaskArgumentsSchema.safeParse(args).success).toBe(false);
+    const recover = {
+      type: 'browser_request',
+      requestId,
+      operation: 'recover',
+      owner,
+      invocationId: handle.invocationId,
+    };
+    for (const extra of [
+      { goal: invoke.goal },
+      { providerId: handle.providerId },
+      { jobId: handle.jobId },
+      { browserTaskId: handle.browserTaskId },
+    ]) {
+      expect(contract.browserRequestSchema.safeParse({ ...recover, ...extra }).success).toBe(false);
+    }
+    for (const extra of [
+      { goal: invoke.goal },
+      { provider_id: handle.providerId },
+      { browser_task_id: handle.browserTaskId },
+      { job_id: handle.jobId },
+    ]) {
+      expect(
+        contract.browserTaskArgumentsSchema.safeParse({ operation: 'recover', ...extra }).success
+      ).toBe(false);
+    }
+    expect(contract.browserRequestSchema.safeParse({ ...recover, owner: undefined }).success).toBe(
+      false
+    );
+    expect(
+      contract.browserRequestSchema.safeParse({ ...recover, invocationId: undefined }).success
+    ).toBe(false);
+  });
+
+  it('keeps parent proof on owned requests and provider proof on registration', () => {
+    for (const frame of [...cliResponses, ...cliEvents]) {
+      for (const extra of [
+        { owner },
+        { parentProof: owner.parentProof },
+        { providerProof: registration.providerProof },
+      ]) {
+        expect(
+          contract.browserCLIInboundMessageSchema.safeParse({ ...frame, ...extra }).success
+        ).toBe(false);
+      }
+    }
+    for (const frame of providerInbound) {
+      expect(
+        contract.browserProviderInboundMessageSchema.safeParse({ ...frame, owner }).success
+      ).toBe(false);
+      expect(
+        contract.browserProviderInboundMessageSchema.safeParse({
+          ...frame,
+          providerProof: registration.providerProof,
+        }).success
+      ).toBe(false);
+    }
+    for (const frame of providerOutbound) {
+      expect(
+        contract.browserProviderOutboundMessageSchema.safeParse({ ...frame, owner }).success
+      ).toBe(false);
+      if (frame.type !== 'provider_register') {
+        expect(
+          contract.browserProviderOutboundMessageSchema.safeParse({
+            ...frame,
+            providerProof: registration.providerProof,
+          }).success
+        ).toBe(false);
+      }
+    }
+    expect(
+      contract.browserRequestSchema.safeParse({
+        ...invoke,
+        providerProof: registration.providerProof,
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserRequestSchema.safeParse({
+        type: 'browser_request',
+        requestId,
+        operation: 'list',
+        owner,
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserRequestSchema.safeParse({
+        ...invoke,
+        owner: { parentSessionId: owner.parentSessionId },
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserProviderOutboundMessageSchema.safeParse({
+        ...registration,
+        providerProof: undefined,
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserResponseSchema.safeParse({
+        type: 'browser_response',
+        requestId,
+        response: {
+          kind: 'providers',
+          providers: [{ ...provider, providerProof: registration.providerProof }],
+        },
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserProviderInboundMessageSchema.safeParse({
+        type: 'provider_job',
+        job: { ...job, owner },
+        goal: invoke.goal,
+        ownerLabel: 'Parent chat',
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserEventSchema.safeParse({
+        type: 'browser_event',
+        requestId,
+        event: 'result',
+        result: { ...completed, parentProof: owner.parentProof },
+      }).success
+    ).toBe(false);
+  });
+
+  it('redacts invalid proof values and attacker-controlled key names from errors', () => {
+    const secret = 'private-proof-must-not-appear';
+    const cases = [
+      {
+        schema: contract.browserRequestSchema,
+        frame: { ...invoke, owner: { ...owner, parentProof: secret, [secret]: true } },
+      },
+      {
+        schema: contract.browserProviderOutboundMessageSchema,
+        frame: { ...registration, providerProof: secret, [secret]: true },
+      },
+      {
+        schema: contract.browserTaskArgumentsSchema,
+        frame: { operation: 'recover', [secret]: true },
+      },
+      {
+        schema: contract.webOutboundWithBrowserMessageSchema,
+        frame: { ...registration, providerProof: secret, [secret]: true },
+      },
+      {
+        schema: contract.webInboundWithBrowserMessageSchema,
+        frame: { ...providerInbound[0], [secret]: true },
+      },
+    ];
+    for (const { schema, frame } of cases) {
+      const parsed = schema.safeParse(frame);
+      expect(parsed.success).toBe(false);
+      if (parsed.success) throw new Error('Invalid proof-bearing input was accepted');
+      expect(parsed.error.message).not.toContain(secret);
+      expect(JSON.stringify(parsed.error)).not.toContain(secret);
+    }
+  });
+
+  it.each([
+    { requestId: 'request-1' },
+    { requestId: '' },
+    { providerId: handle.browserTaskId },
+    { browserTaskId: handle.jobId },
+    { providerId: 'bp_not-a-uuid' },
+    { invocationId: `b1.0.${'a'.repeat(64)}` },
+    { invocationId: `b1.01787875200000.${'a'.repeat(64)}` },
+    { invocationId: `b1.8640000000000001.${'a'.repeat(64)}` },
+    { invocationId: `b1.9007199254740992.${'a'.repeat(64)}` },
+    { invocationId: `b1.1787875200000.${'A'.repeat(64)}` },
+    { owner: { ...owner, parentSessionId: 'parent' } },
+    { owner: { ...owner, connectionId: 'untrusted' } },
+  ])('rejects malformed request identities: %j', fields => {
+    expect(contract.browserRequestSchema.safeParse({ ...invoke, ...fields }).success).toBe(false);
+  });
+
+  it('requires correlation IDs and separates acknowledgements from progress and results', () => {
+    for (const frame of cliRequests)
+      expect(
+        contract.browserRequestSchema.safeParse({ ...frame, requestId: undefined }).success
+      ).toBe(false);
+    for (const frame of [...cliResponses, ...cliEvents])
+      expect(
+        contract.browserCLIInboundMessageSchema.safeParse({ ...frame, requestId: undefined })
+          .success
+      ).toBe(false);
+    expect(
+      contract.browserResponseSchema.safeParse({
+        type: 'browser_response',
+        requestId,
+        response: { kind: 'ack', operation: 'cancel', ...handle, result: completed },
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserEventSchema.safeParse({
+        type: 'browser_event',
+        requestId,
+        event: 'progress',
+        job: finishedJob,
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserEventSchema.safeParse({
+        type: 'browser_event',
+        requestId,
+        event: 'result',
+        result: { ...completed, status: 'running' },
+      }).success
+    ).toBe(false);
+  });
+
+  const statusResults = {
+    queued: null,
+    awaiting_approval: null,
+    running: null,
+    succeeded: completed,
+    failed: { ...completed, status: 'failed', reason: 'runner_failed', effectsUncertain: false },
+    cancelled: { ...completed, status: 'cancelled', reason: 'cancelled', effectsUncertain: false },
+    interrupted: {
+      ...completed,
+      status: 'interrupted',
+      reason: 'effects_uncertain',
+      effectsUncertain: true,
+    },
+    timed_out: {
+      ...completed,
+      status: 'timed_out',
+      reason: 'execution_timeout',
+      effectsUncertain: true,
+    },
+  } satisfies Record<
+    browser.BrowserJobSnapshot['status'],
+    browser.BrowserResult | null
+  > satisfies Record<sdk.BrowserJobSnapshot['status'], sdk.BrowserResult | null>;
+
+  it.each(Object.entries(statusResults))(
+    'enforces the observable result contract for %s',
+    (status, result) => {
+      const snapshot = {
+        ...job,
+        status,
+        ...(status === 'running' ? { approvedTab: tab } : {}),
+        ...(result ? { result } : {}),
+      };
+      expect(contract.browserJobSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+      if (result) {
+        expect(
+          contract.browserEventSchema.parse({
+            type: 'browser_event',
+            requestId,
+            event: 'result',
+            result,
+          })
+        ).toEqual({ type: 'browser_event', requestId, event: 'result', result });
+        expect(
+          contract.browserJobSnapshotSchema.safeParse({ ...snapshot, result: undefined }).success
+        ).toBe(false);
+      } else {
+        expect(
+          contract.browserEventSchema.parse({
+            type: 'browser_event',
+            requestId,
+            event: 'progress',
+            job: snapshot,
+          })
+        ).toEqual({ type: 'browser_event', requestId, event: 'progress', job: snapshot });
+        expect(
+          contract.browserJobSnapshotSchema.safeParse({ ...snapshot, result: completed }).success
+        ).toBe(false);
+      }
+    }
+  );
+
+  it('rejects unknown states, false success, empty evidence, and mismatched job results', () => {
+    expect(contract.browserJobSnapshotSchema.safeParse({ ...job, status: 'idle' }).success).toBe(
+      false
+    );
+    expect(
+      contract.browserResultSchema.safeParse({ ...completed, effectsUncertain: true }).success
+    ).toBe(false);
+    expect(
+      contract.browserResultSchema.safeParse({ ...completed, reason: 'runner_failed' }).success
+    ).toBe(false);
+    expect(contract.browserResultSchema.safeParse({ ...completed, status: 'failed' }).success).toBe(
+      false
+    );
+    expect(contract.browserResultSchema.safeParse({ ...completed, evidence: [{}] }).success).toBe(
+      false
+    );
+    expect(
+      contract.browserResultSchema.safeParse({
+        ...completed,
+        evidence: [{ text: 'Observed', screenshot: 'data:image/png;base64,AAAA' }],
+      }).success
+    ).toBe(false);
+    for (const field of ['providerId', 'browserTaskId', 'jobId', 'invocationId'] as const) {
+      const result = { ...completed, [field]: handle[field].replace(/.$/, '5') };
+      expect(contract.browserJobSnapshotSchema.safeParse({ ...finishedJob, result }).success).toBe(
+        false
+      );
+      expect(
+        contract.browserProviderOutboundMessageSchema.safeParse({
+          type: 'provider_result',
+          ...jobBinding,
+          tab,
+          result,
+        }).success
+      ).toBe(false);
+    }
+    expect(
+      contract.browserJobSnapshotSchema.safeParse({ ...finishedJob, status: 'failed' }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    'approval_denied',
+    'permission_denied',
+    'invocation_expired',
+    'invocation_conflict',
+    'conversation_busy',
+    'capacity_exceeded',
+    'tab_lost',
+    'provider_lost',
+    'provider_unavailable',
+    'queue_timeout',
+    'approval_timeout',
+    'execution_timeout',
+    'lease_expired',
+    'effects_uncertain',
+    'cancelled',
+    'runner_failed',
+    'unsupported',
+    'invalid_request',
+    'owner_mismatch',
+    'not_found',
+  ])('retains finite error reason %s', code => {
+    const frame = {
+      type: 'browser_response',
+      requestId,
+      response: { kind: 'error', code, message: 'Browser request rejected', retryable: false },
+    };
+    expect(contract.browserResponseSchema.parse(frame)).toEqual(frame);
+    expect(
+      contract.browserResponseSchema.safeParse({
+        ...frame,
+        response: { ...frame.response, code: `${code}_unknown` },
+      }).success
+    ).toBe(false);
+  });
+
+  it('binds approval and cancellation to an invocation and generation, not parent authority', () => {
+    const approval = {
+      type: 'provider_approval',
+      ...jobBinding,
+      approval: { decision: 'approved', tab },
+    };
+    const cancel = { type: 'provider_cancel', ...jobBinding };
+    for (const frame of [approval, cancel]) {
+      for (const field of Object.keys(jobBinding))
+        expect(
+          contract.browserProviderOutboundMessageSchema.safeParse({ ...frame, [field]: undefined })
+            .success
+        ).toBe(false);
+      expect(
+        contract.browserProviderOutboundMessageSchema.safeParse({ ...frame, generation: 0 }).success
+      ).toBe(false);
+      expect(
+        contract.browserProviderOutboundMessageSchema.safeParse({ ...frame, owner }).success
+      ).toBe(false);
+    }
+    for (const fields of [
+      { tabId: -1 },
+      { tabId: 1.5 },
+      { title: undefined },
+      { url: 'not-a-url' },
+      { effectiveMode: 'automatic' },
+      { extra: true },
+    ]) {
+      expect(
+        contract.browserProviderOutboundMessageSchema.safeParse({
+          ...approval,
+          approval: { decision: 'approved', tab: { ...tab, ...fields } },
+        }).success
+      ).toBe(false);
+    }
+    expect(contract.browserJobSnapshotSchema.safeParse({ ...job, status: 'running' }).success).toBe(
+      false
+    );
+    for (const status of ['queued', 'awaiting_approval'])
+      expect(
+        contract.browserJobSnapshotSchema.safeParse({ ...job, status, approvedTab: tab }).success
+      ).toBe(false);
+    expect(
+      contract.browserProviderInboundMessageSchema.safeParse({
+        type: 'provider_job',
+        job: { ...job, status: 'running', approvedTab: tab },
+        goal: invoke.goal,
+        ownerLabel: 'Parent chat',
+      }).success
+    ).toBe(false);
+    for (const fields of [
+      { generation: 2 },
+      { providerId: handle.providerId.replace(/.$/, '5') },
+    ]) {
+      expect(
+        contract.browserProviderInboundMessageSchema.safeParse({
+          type: 'provider_snapshot',
+          ...binding,
+          jobs: [{ ...job, ...fields }],
+        }).success
+      ).toBe(false);
+    }
+  });
+
+  it('requires closed tabs and drained locks on provider recovery registration', () => {
+    const recovery = {
+      invocationId: handle.invocationId,
+      tabId: tab.tabId,
+      tabClosed: true,
+      locksDrained: true,
+    };
+    for (const fields of [
+      { tabClosed: false },
+      { locksDrained: false },
+      { tabId: undefined },
+      { invocationId: undefined },
+      { owner },
+    ]) {
+      expect(
+        contract.browserProviderOutboundMessageSchema.safeParse({
+          ...registration,
+          generation: 1,
+          recovery: { ...recovery, ...fields },
+        }).success
+      ).toBe(false);
+    }
+    for (const generation of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(
+        contract.browserProviderOutboundMessageSchema.safeParse({ ...registration, generation })
+          .success
+      ).toBe(false);
+    }
+  });
+
+  it.each([
+    { createdAt: '2026-08-28' },
+    { createdAt: '2026-08-28T00:00:00Z' },
+    { createdAt: '2026-02-30T00:00:00.000Z' },
+    { createdAt: '2026-08-28T00:00:00.000+01:00' },
+    { expiresAt: '2026-08-27T00:00:00.000Z' },
+    { payloadFingerprint: 'not-a-digest' },
+    { deadlines: { queue: '2026-08-27T00:00:00.000Z' } },
+    { deadlines: { queue: '2026-09-04T00:00:00.001Z' } },
+    { deadlines: { ...job.deadlines, execution: '2026-09-04T00:00:00.001Z' } },
+    { deadlines: { ...job.deadlines, lease: 'invalid' } },
+    { deadlines: { ...job.deadlines, extra: true } },
+  ])('rejects malformed metadata and out-of-retention deadlines: %j', fields => {
+    expect(contract.browserJobSnapshotSchema.safeParse({ ...job, ...fields }).success).toBe(false);
+  });
+
+  it('applies UTF-8 byte limits instead of JavaScript string lengths', () => {
+    const goal = '\u00e9'.repeat(8192);
+    expect(contract.browserRequestSchema.parse({ ...invoke, goal })).toMatchObject({ goal });
+    expect(
+      contract.browserTaskArgumentsSchema.parse({
+        operation: 'run',
+        provider_id: handle.providerId,
+        goal,
+      })
+    ).toMatchObject({ goal });
+    expect(contract.browserRequestSchema.safeParse({ ...invoke, goal: `${goal}a` }).success).toBe(
+      false
+    );
+    expect(
+      contract.browserTaskArgumentsSchema.safeParse({
+        operation: 'run',
+        provider_id: handle.providerId,
+        goal: `${goal}a`,
+      }).success
+    ).toBe(false);
+    expect(contract.browserRequestSchema.safeParse({ ...invoke, goal: '' }).success).toBe(false);
+    expect(
+      contract.browserProviderOutboundMessageSchema.safeParse({
+        ...registration,
+        label: '\u00e9'.repeat(65),
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserResultSchema.safeParse({ ...completed, summary: '\u00e9'.repeat(16385) })
+        .success
+    ).toBe(false);
+    expect(
+      contract.browserResultSchema.safeParse({
+        ...completed,
+        evidence: [{ text: '\u00e9'.repeat(4097) }],
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserResultSchema.safeParse({
+        ...completed,
+        evidence: [{ title: '\u00e9'.repeat(513) }],
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserResultSchema.safeParse({
+        ...completed,
+        evidence: [{ url: `https://example.com/${'\u00e9'.repeat(4096)}` }],
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserResponseSchema.safeParse({
+        type: 'browser_response',
+        requestId,
+        response: {
+          kind: 'error',
+          code: 'invalid_request',
+          message: '\u00e9'.repeat(513),
+          retryable: false,
+        },
+      }).success
+    ).toBe(false);
+  });
+
+  it('bounds serialized results at 64 KiB and complete frames below 128 KiB', () => {
+    const evidence = [
+      { text: 'x'.repeat(8192) },
+      { text: 'x'.repeat(8192) },
+      { text: 'x'.repeat(8192) },
+      { text: '' },
+    ];
+    const result = { ...completed, summary: 'x'.repeat(32768), evidence };
+    evidence[3].text = 'x'.repeat(65536 - Buffer.byteLength(JSON.stringify(result), 'utf8'));
+    expect(contract.browserResultSchema.parse(result)).toEqual(result);
+    expect(
+      contract.browserResultSchema.safeParse({
+        ...result,
+        summary: `${result.summary.slice(1)}\u00e9`,
+      }).success
+    ).toBe(false);
+    const snapshot = { ...finishedJob, result };
+    expect(
+      contract.browserProviderInboundMessageSchema.parse({
+        type: 'provider_snapshot',
+        ...binding,
+        jobs: [snapshot],
+      })
+    ).toMatchObject({ jobs: [snapshot] });
+    expect(
+      contract.browserProviderInboundMessageSchema.safeParse({
+        type: 'provider_snapshot',
+        ...binding,
+        jobs: [snapshot, snapshot],
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserResultSchema.safeParse({
+        ...completed,
+        evidence: Array.from({ length: 33 }, () => ({ text: 'Observed' })),
+      }).success
+    ).toBe(false);
+  });
+
+  it('bounds discovery pages, snapshot pages, and queue depth', () => {
+    const response = {
+      type: 'browser_response',
+      requestId,
+      response: { kind: 'providers', providers: Array.from({ length: 25 }, () => provider) },
+    };
+    expect(contract.browserResponseSchema.parse(response)).toEqual(response);
+    expect(
+      contract.browserResponseSchema.safeParse({
+        ...response,
+        response: { ...response.response, providers: [...response.response.providers, provider] },
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserResponseSchema.safeParse({
+        ...response,
+        response: { ...response.response, providers: [{ ...provider, queueDepth: 101 }] },
+      }).success
+    ).toBe(false);
+    expect(
+      contract.browserProviderInboundMessageSchema.safeParse({
+        type: 'provider_snapshot',
+        ...binding,
+        jobs: Array.from({ length: 26 }, () => job),
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('browser opt-in compatibility', () => {
+  it('adds new frames only through explicitly selected composite parsers', () => {
+    for (const frame of cliRequests)
+      expect(browser.cliOutboundWithBrowserMessageSchema.parse(frame)).toEqual(frame);
+    for (const frame of [...cliResponses, ...cliEvents])
+      expect(browser.cliInboundWithBrowserMessageSchema.parse(frame)).toEqual(frame);
+    for (const frame of providerOutbound)
+      expect(browser.webOutboundWithBrowserMessageSchema.parse(frame)).toEqual(frame);
+    for (const frame of providerInbound)
+      expect(browser.webInboundWithBrowserMessageSchema.parse(frame)).toEqual(frame);
+    expect(browser.cliOutboundWithBrowserMessageSchema.safeParse(registration).success).toBe(false);
+    expect(browser.webOutboundWithBrowserMessageSchema.safeParse(invoke).success).toBe(false);
+    expect(browser.webInboundWithBrowserMessageSchema.safeParse(cliEvents[0]).success).toBe(false);
+    expect(browser.cliInboundWithBrowserMessageSchema.safeParse(providerInbound[0]).success).toBe(
+      false
+    );
+  });
+
+  it.each([
+    { capabilities: undefined, supported: false },
+    { capabilities: {}, supported: false },
+    { capabilities: { browserJobsV1: false }, supported: false },
+    { capabilities: { browserJobsV1: true }, supported: true },
+  ])(
+    'normalizes negotiation without changing legacy envelopes: %j',
+    ({ capabilities, supported }) => {
+      const cases = [
+        { schema: CLIOutboundMessageSchema, frame: { type: 'heartbeat', sessions: [] } },
+        { schema: CLIInboundMessageSchema, frame: { type: 'heartbeat_ack' } },
+        { schema: WebOutboundMessageSchema, frame: { type: 'ping', nonce: 'legacy-nonce' } },
+        { schema: WebInboundMessageSchema, frame: { type: 'pong', nonce: 'legacy-nonce' } },
+      ];
+      for (const { schema, frame } of cases) {
+        const input = { ...frame, ...(capabilities === undefined ? {} : { capabilities }) };
+        const parsed = schema.parse(input);
+        expect(parsed).toEqual(input);
+        const advertised = 'capabilities' in parsed ? parsed.capabilities : undefined;
+        expect(browser.normalizedBrowserCapabilitiesSchema.parse(advertised)).toEqual({
+          browserJobsV1: supported,
+        });
+        expect(sdk.normalizedBrowserCapabilitiesSchema.parse(advertised)).toEqual({
+          browserJobsV1: supported,
+        });
+        expect(schema.safeParse({ ...frame, capabilities: { browserJobsV1: 'yes' } }).success).toBe(
+          false
+        );
+      }
+    }
+  );
+
+  // Frozen pre-browser callbacks must remain assignable to the parser output.
+  type LegacyCliInbound =
+    | { type: 'subscribe' | 'unsubscribe'; sessionId: string }
+    | { type: 'command'; id: string; command: string }
+    | { type: 'system'; event: string; data?: unknown }
+    | { type: 'heartbeat_ack' };
+  type LegacyWebInbound =
+    | { type: 'event'; sessionId: string; event: string; data?: unknown }
+    | { type: 'system'; event: string; data?: unknown }
+    | { type: 'response'; id: string; result?: unknown; error?: unknown }
+    | { type: 'pong'; nonce: string };
+  const cliCallback: (message: browser.CLIInboundMessage) => string = (
+    message: LegacyCliInbound
+  ) => {
+    switch (message.type) {
+      case 'subscribe':
+      case 'unsubscribe':
+        return `${message.type}:${message.sessionId}`;
+      case 'command':
+        return `${message.command}:${message.id}`;
+      case 'system':
+        return message.event;
+      case 'heartbeat_ack':
+        return 'alive';
+    }
+  };
+  const webCallback: (message: browser.WebInboundMessage) => unknown = (
+    message: LegacyWebInbound
+  ) => {
+    switch (message.type) {
+      case 'event':
+        return `${message.sessionId}:${message.event}`;
+      case 'system':
+        return message.event;
+      case 'response':
+        return message.error ?? message.result;
+      case 'pong':
+        return message.nonce;
+    }
+  };
+
+  it('preserves legacy callback types and delivered values', () => {
+    const cliExamples = [
+      {
+        frame: { type: 'subscribe', sessionId: 'legacy-session' },
+        value: 'subscribe:legacy-session',
+      },
+      {
+        frame: { type: 'unsubscribe', sessionId: 'legacy-session' },
+        value: 'unsubscribe:legacy-session',
+      },
+      {
+        frame: { type: 'command', id: 'legacy-request', command: 'list_sessions', data: null },
+        value: 'list_sessions:legacy-request',
+      },
+      { frame: { type: 'system', event: 'web.connected', data: {} }, value: 'web.connected' },
+      { frame: { type: 'heartbeat_ack' }, value: 'alive' },
+    ];
+    const webExamples = [
+      {
+        frame: { type: 'event', sessionId: 'legacy-session', event: 'message.updated', data: {} },
+        value: 'legacy-session:message.updated',
+      },
+      { frame: { type: 'system', event: 'cli.connected', data: {} }, value: 'cli.connected' },
+      {
+        frame: { type: 'response', id: 'legacy-request', result: { ok: true } },
+        value: { ok: true },
+      },
+      { frame: { type: 'response', id: 'legacy-request', error: 'not found' }, value: 'not found' },
+      { frame: { type: 'pong', nonce: 'legacy-nonce' }, value: 'legacy-nonce' },
+    ];
+    for (const { frame, value } of cliExamples) {
+      expect(cliCallback(CLIInboundMessageSchema.parse(frame))).toEqual(value);
+      expect(browser.cliInboundWithBrowserMessageSchema.parse(frame)).toEqual(frame);
+    }
+    for (const { frame, value } of webExamples) {
+      expect(webCallback(WebInboundMessageSchema.parse(frame))).toEqual(value);
+      expect(browser.webInboundWithBrowserMessageSchema.parse(frame)).toEqual(frame);
+    }
+    for (const frame of [
+      { type: 'heartbeat', sessions: [] },
+      { type: 'event', sessionId: 'legacy-session', event: 'message.updated', data: {} },
+      { type: 'response', id: 'legacy-request', error: { arbitrary: ['legacy'] } },
+    ]) {
+      expect(browser.cliOutboundWithBrowserMessageSchema.parse(frame)).toEqual(frame);
+    }
+    expect(
+      WebOutboundMessageSchema.parse({
+        type: 'subscribe',
+        sessionId: 'legacy-session',
+        extra: true,
+      })
+    ).toEqual({ type: 'subscribe', sessionId: 'legacy-session' });
+  });
+});
 
 const validSessionId = 'ses_12345678901234567890123456';
 

@@ -2544,7 +2544,9 @@
       "uploading": "Yuklanmoqda…",
       "uploaded": "Yuklandi",
       "uploadFailedRetry": "Yuklash amalga oshmadi. Qayta urinish uchun bosing.",
-      "uploadFailedTerminal": "Bu faylni yuklab bo'lmaydi."
+      "uploadFailedTerminal": "Bu faylni yuklab bo'lmaydi.",
+      "moveLeft": "{{filename}} faylini chapga surish",
+      "moveRight": "{{filename}} faylini o'ngga surish"
     },
     "attachmentPasteHint": {
       "accessibility": "Almashinuv buferidan rasm qo'yish",

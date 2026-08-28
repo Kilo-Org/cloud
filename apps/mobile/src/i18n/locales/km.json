@@ -2544,7 +2544,9 @@
       "uploading": "កំពុងផ្ទុកឡើង…",
       "uploaded": "បានផ្ទុកឡើង",
       "uploadFailedRetry": "ការផ្ទុកឡើងបានបរាជ័យ។ ប៉ះដើម្បីព្យាយាមម្តងទៀត។",
-      "uploadFailedTerminal": "ឯកសារនេះមិនអាចផ្ទុកឡើងបានទេ។"
+      "uploadFailedTerminal": "ឯកសារនេះមិនអាចផ្ទុកឡើងបានទេ។",
+      "moveLeft": "ផ្លាស់ទី {{filename}} ទៅឆ្វេង",
+      "moveRight": "ផ្លាស់ទី {{filename}} ទៅស្តាំ"
     },
     "attachmentPasteHint": {
       "accessibility": "បិទភ្ជាប់រូបភាពពីក្តារតម្បៀតខ្ទាស់",

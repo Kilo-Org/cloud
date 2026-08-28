@@ -2544,7 +2544,9 @@
       "uploading": "กำลังอัปโหลด…",
       "uploaded": "อัปโหลดแล้ว",
       "uploadFailedRetry": "อัปโหลดล้มเหลว แตะเพื่อลองอีกครั้ง",
-      "uploadFailedTerminal": "ไม่สามารถอัปโหลดไฟล์นี้ได้"
+      "uploadFailedTerminal": "ไม่สามารถอัปโหลดไฟล์นี้ได้",
+      "moveLeft": "ย้าย {{filename}} ไปทางซ้าย",
+      "moveRight": "ย้าย {{filename}} ไปทางขวา"
     },
     "attachmentPasteHint": {
       "accessibility": "วางรูปภาพจากคลิปบอร์ด",

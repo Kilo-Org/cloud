@@ -2102,7 +2102,9 @@
       "uploading": "Subiendo…",
       "uploaded": "Subido",
       "uploadFailedRetry": "La subida falló. Toca para reintentar.",
-      "uploadFailedTerminal": "Este archivo no se puede subir."
+      "uploadFailedTerminal": "Este archivo no se puede subir.",
+      "moveLeft": "Mover {{filename}} a la izquierda",
+      "moveRight": "Mover {{filename}} a la derecha"
     },
     "attachmentPasteHint": {
       "accessibility": "Pegar imagen del portapapeles",

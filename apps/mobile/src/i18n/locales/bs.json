@@ -2563,7 +2563,9 @@
       "uploading": "Otpremanje…",
       "uploaded": "Otpremljeno",
       "uploadFailedRetry": "Otpremanje nije uspjelo. Dodirnite za ponovni pokušaj.",
-      "uploadFailedTerminal": "Ova datoteka se ne može otpremiti."
+      "uploadFailedTerminal": "Ova datoteka se ne može otpremiti.",
+      "moveLeft": "Pomaknite {{filename}} lijevo",
+      "moveRight": "Pomaknite {{filename}} desno"
     },
     "attachmentPasteHint": {
       "accessibility": "Zalijepi sliku iz međuspremnika",

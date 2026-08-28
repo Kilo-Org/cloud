@@ -2582,7 +2582,9 @@
       "uploading": "Nalaganje…",
       "uploaded": "Naloženo",
       "uploadFailedRetry": "Nalaganje ni uspelo. Dotakni se za ponovni poskus.",
-      "uploadFailedTerminal": "Te datoteke ni mogoče naložiti."
+      "uploadFailedTerminal": "Te datoteke ni mogoče naložiti.",
+      "moveLeft": "Premaknite {{filename}} levo",
+      "moveRight": "Premaknite {{filename}} desno"
     },
     "attachmentPasteHint": {
       "accessibility": "Prilepi sliko iz odložišča",

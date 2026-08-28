@@ -2086,7 +2086,9 @@
       "uploading": "Caricamento…",
       "uploaded": "Caricato",
       "uploadFailedRetry": "Caricamento non riuscito. Tocca per riprovare.",
-      "uploadFailedTerminal": "Questo file non può essere caricato."
+      "uploadFailedTerminal": "Questo file non può essere caricato.",
+      "moveLeft": "Sposta {{filename}} a sinistra",
+      "moveRight": "Sposta {{filename}} a destra"
     },
     "attachmentPasteHint": {
       "accessibility": "Incolla immagine dagli appunti",

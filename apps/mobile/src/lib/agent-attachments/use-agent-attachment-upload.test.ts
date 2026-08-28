@@ -534,6 +534,136 @@ describe('uploadPending', () => {
   });
 });
 
+describe('useAgentAttachmentUpload — attachment reorder (attachment reorder)', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
+    hoisted.announceForA11y.mockReset();
+    hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+    const controlled = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValue(controlled);
+  });
+
+  async function addThreeDocuments(): Promise<void> {
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'a.pdf', uri: 'file:///cache/a.pdf' },
+        { name: 'b.pdf', uri: 'file:///cache/b.pdf' },
+        { name: 'c.pdf', uri: 'file:///cache/c.pdf' },
+      ]);
+    });
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+  }
+
+  async function pendingResult(): Promise<Awaited<ReturnType<HookApi['uploadPending']>>> {
+    const resultRef: { current: Awaited<ReturnType<HookApi['uploadPending']>> | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      resultRef.current = await hookApi().uploadPending();
+    });
+    const result = resultRef.current;
+    if (result === undefined) {
+      throw new Error('uploadPending did not resolve');
+    }
+    return result;
+  }
+
+  it('moves a chip one slot and keeps submission order in sync', async () => {
+    const renderer = await mountHook();
+    await addThreeDocuments();
+
+    const b = hookApi().attachments[1];
+    if (!b) {
+      throw new Error('attachment missing');
+    }
+    // Move b left: [a, b, c] -> [b, a, c].
+    await act(async () => {
+      hookApi().moveAttachment(b.id, 'left');
+      await settle();
+    });
+    expect(hookApi().attachments.map(item => item.filename)).toEqual(['b.pdf', 'a.pdf', 'c.pdf']);
+
+    const result = await pendingResult();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.submission?.files.map(file => file.originalName)).toEqual([
+        'b.pdf',
+        'a.pdf',
+        'c.pdf',
+      ]);
+    }
+    renderer.unmount();
+  });
+
+  it('clamps moveAttachment at both strip edges', async () => {
+    const renderer = await mountHook();
+    await addThreeDocuments();
+
+    const a = hookApi().attachments[0];
+    const c = hookApi().attachments[2];
+    if (!a || !c) {
+      throw new Error('attachment missing');
+    }
+    await act(async () => {
+      hookApi().moveAttachment(a.id, 'left');
+      hookApi().moveAttachment(c.id, 'right');
+      await settle();
+    });
+    expect(hookApi().attachments.map(item => item.filename)).toEqual(['a.pdf', 'b.pdf', 'c.pdf']);
+    renderer.unmount();
+  });
+
+  it('reorders by index and keeps wire/submission order in sync', async () => {
+    const renderer = await mountHook();
+    await addThreeDocuments();
+
+    // Move the last chip to the front: [a, b, c] -> [c, a, b].
+    await act(async () => {
+      hookApi().reorderAttachments(2, 0);
+      await settle();
+    });
+    expect(hookApi().attachments.map(item => item.filename)).toEqual(['c.pdf', 'a.pdf', 'b.pdf']);
+
+    const result = await pendingResult();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.submission?.files.map(file => file.originalName)).toEqual([
+        'c.pdf',
+        'a.pdf',
+        'b.pdf',
+      ]);
+      // The wire path carries the same slot order as the submission files.
+      expect(result.wire?.files).toHaveLength(3);
+    }
+    renderer.unmount();
+  });
+
+  it('no-ops an out-of-range reorder', async () => {
+    const renderer = await mountHook();
+    await addThreeDocuments();
+
+    await act(async () => {
+      hookApi().reorderAttachments(0, 3);
+      hookApi().reorderAttachments(-1, 0);
+      hookApi().reorderAttachments(1, 1);
+      await settle();
+    });
+    expect(hookApi().attachments.map(item => item.filename)).toEqual(['a.pdf', 'b.pdf', 'c.pdf']);
+    renderer.unmount();
+  });
+});
+
 describe('selection-time image upload (Step 2)', () => {
   beforeEach(() => {
     hoisted.uploadOne.mockReset();

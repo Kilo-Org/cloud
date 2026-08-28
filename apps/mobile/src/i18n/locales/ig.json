@@ -2544,7 +2544,9 @@
       "uploading": "Na-ebugote…",
       "uploaded": "Ebugoro",
       "uploadFailedRetry": "Ibugote dara. Pịa ka ị nwaa ọzọ.",
-      "uploadFailedTerminal": "Enweghị ike ibutu faịlụ a."
+      "uploadFailedTerminal": "Enweghị ike ibutu faịlụ a.",
+      "moveLeft": "Bugharịa {{filename}} n'aka ekpe",
+      "moveRight": "Bugharịa {{filename}} n'aka nri"
     },
     "attachmentPasteHint": {
       "accessibility": "Pịnye foto site na mbadamba",

@@ -2544,7 +2544,9 @@
       "uploading": "Μεταφόρτωση…",
       "uploaded": "Μεταφορτώθηκε",
       "uploadFailedRetry": "Η μεταφόρτωση απέτυχε. Πατήστε για επανάληψη.",
-      "uploadFailedTerminal": "Αυτό το αρχείο δεν μπορεί να μεταφορτωθεί."
+      "uploadFailedTerminal": "Αυτό το αρχείο δεν μπορεί να μεταφορτωθεί.",
+      "moveLeft": "Μετακίνηση του {{filename}} αριστερά",
+      "moveRight": "Μετακίνηση του {{filename}} δεξιά"
     },
     "attachmentPasteHint": {
       "accessibility": "Επικόλληση εικόνας από το πρόχειρο",

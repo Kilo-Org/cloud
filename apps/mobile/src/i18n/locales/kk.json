@@ -2544,7 +2544,9 @@
       "uploading": "Жүктелуде…",
       "uploaded": "Жүктелді",
       "uploadFailedRetry": "Жүктеу сәтсіз аяқталды. Қайталау үшін түртіңіз.",
-      "uploadFailedTerminal": "Бұл файлды жүктеу мүмкін емес."
+      "uploadFailedTerminal": "Бұл файлды жүктеу мүмкін емес.",
+      "moveLeft": "{{filename}} файлын солға жылжыту",
+      "moveRight": "{{filename}} файлын оңға жылжыту"
     },
     "attachmentPasteHint": {
       "accessibility": "Ауыстырма буферінен суретті қою",

@@ -2544,7 +2544,9 @@
       "uploading": "اپ لوڈ ہو رہا ہے…",
       "uploaded": "اپ لوڈ ہو گیا",
       "uploadFailedRetry": "اپ لوڈ ناکام۔ دوبارہ کوشش کے لیے تھپتھپائیں۔",
-      "uploadFailedTerminal": "یہ فائل اپ لوڈ نہیں کی جا سکتی۔"
+      "uploadFailedTerminal": "یہ فائل اپ لوڈ نہیں کی جا سکتی۔",
+      "moveLeft": "{{filename}} کو بائیں منتقل کریں",
+      "moveRight": "{{filename}} کو دائیں منتقل کریں"
     },
     "attachmentPasteHint": {
       "accessibility": "کلپ بورڈ سے تصویر چسپاں کریں",

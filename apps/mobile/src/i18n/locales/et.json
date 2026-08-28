@@ -2544,7 +2544,9 @@
       "uploading": "Üleslaadimine…",
       "uploaded": "Üles laaditud",
       "uploadFailedRetry": "Üleslaadimine ebaõnnestus. Puudutage uuesti proovimiseks.",
-      "uploadFailedTerminal": "Seda faili ei saa üles laadida."
+      "uploadFailedTerminal": "Seda faili ei saa üles laadida.",
+      "moveLeft": "Liigutage {{filename}} vasakule",
+      "moveRight": "Liigutage {{filename}} paremale"
     },
     "attachmentPasteHint": {
       "accessibility": "Kleebi pilt lõikelaualt",

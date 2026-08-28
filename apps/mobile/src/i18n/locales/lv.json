@@ -2563,7 +2563,9 @@
       "uploading": "Augšupielādē…",
       "uploaded": "Augšupielādēts",
       "uploadFailedRetry": "Augšupielāde neizdevās. Pieskarieties, lai mēģinātu vēlreiz.",
-      "uploadFailedTerminal": "Šo failu nevar augšupielādēt."
+      "uploadFailedTerminal": "Šo failu nevar augšupielādēt.",
+      "moveLeft": "Pārvietot {{filename}} pa kreisi",
+      "moveRight": "Pārvietot {{filename}} pa labi"
     },
     "attachmentPasteHint": {
       "accessibility": "Ielīmēt attēlu no starpliktuves",

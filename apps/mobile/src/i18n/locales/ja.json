@@ -2090,7 +2090,9 @@
       "uploading": "アップロード中…",
       "uploaded": "アップロード済み",
       "uploadFailedRetry": "アップロードに失敗しました。タップして再試行してください。",
-      "uploadFailedTerminal": "このファイルはアップロードできません。"
+      "uploadFailedTerminal": "このファイルはアップロードできません。",
+      "moveLeft": "{{filename}}を左に移動",
+      "moveRight": "{{filename}}を右に移動"
     },
     "attachmentPasteHint": {
       "accessibility": "クリップボードから画像を貼り付け",

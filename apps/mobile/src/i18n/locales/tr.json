@@ -2090,7 +2090,9 @@
       "uploading": "Yükleniyor…",
       "uploaded": "Yüklendi",
       "uploadFailedRetry": "Yükleme başarısız oldu. Tekrar denemek için dokunun.",
-      "uploadFailedTerminal": "Bu dosya yüklenemiyor."
+      "uploadFailedTerminal": "Bu dosya yüklenemiyor.",
+      "moveLeft": "{{filename}} dosyasını sola taşıyın",
+      "moveRight": "{{filename}} dosyasını sağa taşıyın"
     },
     "attachmentPasteHint": {
       "accessibility": "Panodan görüntü yapıştır",

@@ -2563,7 +2563,9 @@
       "uploading": "Penjant…",
       "uploaded": "Penjat",
       "uploadFailedRetry": "La pujada ha fallat. Toqueu per tornar-ho a provar.",
-      "uploadFailedTerminal": "Aquest fitxer no es pot penjar."
+      "uploadFailedTerminal": "Aquest fitxer no es pot penjar.",
+      "moveLeft": "Mou {{filename}} a l'esquerra",
+      "moveRight": "Mou {{filename}} a la dreta"
     },
     "attachmentPasteHint": {
       "accessibility": "Enganxa la imatge del portapapers",

@@ -2544,7 +2544,9 @@
       "uploading": "Mandefa…",
       "uploaded": "Voaray",
       "uploadFailedRetry": "Tsy nahomby ny fandefasana. Tsindrio raha handramana indray.",
-      "uploadFailedTerminal": "Tsy azo alefa ity rakitra ity."
+      "uploadFailedTerminal": "Tsy azo alefa ity rakitra ity.",
+      "moveLeft": "Afindrao miankavia ny {{filename}}",
+      "moveRight": "Afindrao miankavanana ny {{filename}}"
     },
     "attachmentPasteHint": {
       "accessibility": "Ampio sary avy amin'ny clipboard",

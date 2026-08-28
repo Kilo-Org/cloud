@@ -2020,7 +2020,9 @@
       "uploading": "Envoi…",
       "uploaded": "Envoyé",
       "uploadFailedRetry": "Échec de l'envoi. Touchez pour réessayer.",
-      "uploadFailedTerminal": "Ce fichier ne peut pas être envoyé."
+      "uploadFailedTerminal": "Ce fichier ne peut pas être envoyé.",
+      "moveLeft": "Déplacer {{filename}} vers la gauche",
+      "moveRight": "Déplacer {{filename}} vers la droite"
     },
     "attachmentPasteHint": {
       "accessibility": "Coller l'image depuis le presse-papiers",

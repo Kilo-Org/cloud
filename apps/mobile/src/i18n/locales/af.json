@@ -2544,7 +2544,9 @@
       "uploading": "Laai op…",
       "uploaded": "Opgelaai",
       "uploadFailedRetry": "Oplaai het misluk. Tik om weer te probeer.",
-      "uploadFailedTerminal": "Hierdie lêer kan nie opgelaai word nie."
+      "uploadFailedTerminal": "Hierdie lêer kan nie opgelaai word nie.",
+      "moveLeft": "Skuif {{filename}} links",
+      "moveRight": "Skuif {{filename}} regs"
     },
     "attachmentPasteHint": {
       "accessibility": "Plak beeld van knipbord",

@@ -2544,7 +2544,9 @@
       "uploading": "Igotzen…",
       "uploaded": "Igota",
       "uploadFailedRetry": "Igoerak huts egin du. Sakatu berriro saiatzeko.",
-      "uploadFailedTerminal": "Fitxategi hau ezin da igo."
+      "uploadFailedTerminal": "Fitxategi hau ezin da igo.",
+      "moveLeft": "Mugitu {{filename}} ezkerrera",
+      "moveRight": "Mugitu {{filename}} eskuinera"
     },
     "attachmentPasteHint": {
       "accessibility": "Itsatsi irudia arbelatik",

@@ -2544,7 +2544,9 @@
       "uploading": "Ladataan…",
       "uploaded": "Ladattu",
       "uploadFailedRetry": "Lataus epäonnistui. Napauta yrittääksesi uudelleen.",
-      "uploadFailedTerminal": "Tätä tiedostoa ei voi ladata."
+      "uploadFailedTerminal": "Tätä tiedostoa ei voi ladata.",
+      "moveLeft": "Siirrä {{filename}} vasemmalle",
+      "moveRight": "Siirrä {{filename}} oikealle"
     },
     "attachmentPasteHint": {
       "accessibility": "Liitä kuva leikepöydältä",

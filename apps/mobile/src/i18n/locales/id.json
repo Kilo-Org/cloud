@@ -2090,7 +2090,9 @@
       "uploading": "Mengunggah…",
       "uploaded": "Terunggah",
       "uploadFailedRetry": "Unggahan gagal. Ketuk untuk mencoba lagi.",
-      "uploadFailedTerminal": "File ini tidak dapat diunggah."
+      "uploadFailedTerminal": "File ini tidak dapat diunggah.",
+      "moveLeft": "Pindahkan {{filename}} ke kiri",
+      "moveRight": "Pindahkan {{filename}} ke kanan"
     },
     "attachmentPasteHint": {
       "accessibility": "Tempel gambar dari papan klip",

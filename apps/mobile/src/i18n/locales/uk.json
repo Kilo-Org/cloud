@@ -2114,7 +2114,9 @@
       "uploading": "Завантаження…",
       "uploaded": "Завантажено",
       "uploadFailedRetry": "Завантаження не вдалося. Торкніться, щоб повторити.",
-      "uploadFailedTerminal": "Цей файл не можна завантажити."
+      "uploadFailedTerminal": "Цей файл не можна завантажити.",
+      "moveLeft": "Перемістити {{filename}} ліворуч",
+      "moveRight": "Перемістити {{filename}} праворуч"
     },
     "attachmentPasteHint": {
       "accessibility": "Вставити зображення з буфера обміну",

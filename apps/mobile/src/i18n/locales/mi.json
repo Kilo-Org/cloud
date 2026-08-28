@@ -2544,7 +2544,9 @@
       "uploading": "E tuku ake ana…",
       "uploaded": "Kua tukua ake",
       "uploadFailedRetry": "I rahua te tuku ake. Pāwhiri ki te whakamātau anō.",
-      "uploadFailedTerminal": "Kāore e taea te tuku ake tēnei kōnae."
+      "uploadFailedTerminal": "Kāore e taea te tuku ake tēnei kōnae.",
+      "moveLeft": "Nukuhia {{filename}} ki mauī",
+      "moveRight": "Nukuhia {{filename}} ki matau"
     },
     "attachmentPasteHint": {
       "accessibility": "Whakapiri te whakaahua mai i te papatopu",

@@ -2544,7 +2544,9 @@
       "uploading": "ກຳລັງອັບໂຫລດ…",
       "uploaded": "ອັບໂຫລດແລ້ວ",
       "uploadFailedRetry": "ການອັບໂຫລດລົ້ມເຫລວ. ແຕະເພື່ອລອງອີກ.",
-      "uploadFailedTerminal": "ໄຟລ໌ນີ້ບໍ່ສາມາດອັບໂຫລດໄດ້."
+      "uploadFailedTerminal": "ໄຟລ໌ນີ້ບໍ່ສາມາດອັບໂຫລດໄດ້.",
+      "moveLeft": "ຍ້າຍ {{filename}} ໄປທາງຊ້າຍ",
+      "moveRight": "ຍ້າຍ {{filename}} ໄປທາງຂວາ"
     },
     "attachmentPasteHint": {
       "accessibility": "ວາງຮູບພາບຈາກຄລິບບອດ",

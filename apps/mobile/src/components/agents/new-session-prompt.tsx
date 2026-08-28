@@ -88,6 +88,8 @@ export function NewSessionPrompt({
   onAddAttachment,
   onRemoveAttachment,
   onRetryAttachment,
+  onMoveAttachment,
+  onReorderAttachments,
   onRefetchModels,
   onPrefillAttachments,
   shareId,
@@ -239,6 +241,8 @@ export function NewSessionPrompt({
         attachments={attachments}
         onRemove={onRemoveAttachment}
         onRetry={onRetryAttachment}
+        onMove={onMoveAttachment}
+        onReorder={onReorderAttachments}
       />
       <View className="px-2 pt-2">
         {promptMeasure.measureElement}

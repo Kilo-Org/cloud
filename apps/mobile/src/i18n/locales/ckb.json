@@ -2544,7 +2544,9 @@
       "uploading": "بارکردن…",
       "uploaded": "بارکرا",
       "uploadFailedRetry": "بارکردن سەرکەوتوو نەبوو. دابکە بۆ دووبارە هەوڵدان.",
-      "uploadFailedTerminal": "ئەم فایلە ناتوانرێت بار بکرێت."
+      "uploadFailedTerminal": "ئەم فایلە ناتوانرێت بار بکرێت.",
+      "moveLeft": "گواستنەوەی {{filename}} بۆ چەپ",
+      "moveRight": "گواستنەوەی {{filename}} بۆ ڕاست"
     },
     "attachmentPasteHint": {
       "accessibility": "لە کلپبۆردەوە وێنە بلکێنە",

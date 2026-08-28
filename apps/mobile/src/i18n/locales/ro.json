@@ -2563,7 +2563,9 @@
       "uploading": "Se încarcă…",
       "uploaded": "Încărcat",
       "uploadFailedRetry": "Încărcarea a eșuat. Atinge pentru a reîncerca.",
-      "uploadFailedTerminal": "Acest fișier nu poate fi încărcat."
+      "uploadFailedTerminal": "Acest fișier nu poate fi încărcat.",
+      "moveLeft": "Mută {{filename}} la stânga",
+      "moveRight": "Mută {{filename}} la dreapta"
     },
     "attachmentPasteHint": {
       "accessibility": "Inserează imaginea din clipboard",

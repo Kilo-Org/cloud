@@ -2056,7 +2056,9 @@
       "uploading": "अपलोड हो रहा है…",
       "uploaded": "अपलोड हो गया",
       "uploadFailedRetry": "अपलोड विफल रहा। फिर से कोशिश करने के लिए टैप करें।",
-      "uploadFailedTerminal": "यह फ़ाइल अपलोड नहीं की जा सकती।"
+      "uploadFailedTerminal": "यह फ़ाइल अपलोड नहीं की जा सकती।",
+      "moveLeft": "{{filename}} को बाएँ ले जाएँ",
+      "moveRight": "{{filename}} को दाएँ ले जाएँ"
     },
     "attachmentPasteHint": {
       "accessibility": "क्लिपबोर्ड से छवि पेस्ट करें",

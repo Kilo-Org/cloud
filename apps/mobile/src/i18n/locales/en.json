@@ -2571,6 +2571,8 @@
       "openFailedRetry": "Failed to open file. Please try again.",
       "retryUploading": "Retry uploading {{filename}}",
       "removeAttachment": "Remove attachment {{filename}}",
+      "moveLeft": "Move {{filename}} left",
+      "moveRight": "Move {{filename}} right",
       "uploading": "Uploading…",
       "uploaded": "Uploaded",
       "uploadFailedRetry": "Upload failed. Tap to retry.",

@@ -2582,7 +2582,9 @@
       "uploading": "Nahrává se…",
       "uploaded": "Nahráno",
       "uploadFailedRetry": "Nahrávání se nezdařilo. Klepnutím opakujte.",
-      "uploadFailedTerminal": "Tento soubor nelze nahrát."
+      "uploadFailedTerminal": "Tento soubor nelze nahrát.",
+      "moveLeft": "Posunout {{filename}} doleva",
+      "moveRight": "Posunout {{filename}} doprava"
     },
     "attachmentPasteHint": {
       "accessibility": "Vložit obrázek ze schránky",

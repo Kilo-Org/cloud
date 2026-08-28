@@ -2090,7 +2090,9 @@
       "uploading": "업로드 중…",
       "uploaded": "업로드됨",
       "uploadFailedRetry": "업로드에 실패했습니다. 탭하여 다시 시도하세요.",
-      "uploadFailedTerminal": "이 파일은 업로드할 수 없습니다."
+      "uploadFailedTerminal": "이 파일은 업로드할 수 없습니다.",
+      "moveLeft": "{{filename}} 왼쪽으로 이동",
+      "moveRight": "{{filename}} 오른쪽으로 이동"
     },
     "attachmentPasteHint": {
       "accessibility": "클립보드에서 이미지 붙여넣기",

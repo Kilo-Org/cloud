@@ -2090,7 +2090,9 @@
       "uploading": "Uploaden…",
       "uploaded": "Geüpload",
       "uploadFailedRetry": "Uploaden mislukt. Tik om opnieuw te proberen.",
-      "uploadFailedTerminal": "Dit bestand kan niet worden geüpload."
+      "uploadFailedTerminal": "Dit bestand kan niet worden geüpload.",
+      "moveLeft": "{{filename}} naar links verplaatsen",
+      "moveRight": "{{filename}} naar rechts verplaatsen"
     },
     "attachmentPasteHint": {
       "accessibility": "Afbeelding plakken vanaf klembord",

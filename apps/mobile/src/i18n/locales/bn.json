@@ -2544,7 +2544,9 @@
       "uploading": "আপলোড হচ্ছে…",
       "uploaded": "আপলোড হয়েছে",
       "uploadFailedRetry": "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করতে ট্যাপ করুন।",
-      "uploadFailedTerminal": "এই ফাইলটি আপলোড করা যাবে না।"
+      "uploadFailedTerminal": "এই ফাইলটি আপলোড করা যাবে না।",
+      "moveLeft": "{{filename}} বামে সরান",
+      "moveRight": "{{filename}} ডানে সরান"
     },
     "attachmentPasteHint": {
       "accessibility": "ক্লিপবোর্ড থেকে ছবি পেস্ট করুন",

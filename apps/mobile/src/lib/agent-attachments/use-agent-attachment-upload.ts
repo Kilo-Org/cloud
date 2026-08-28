@@ -44,6 +44,9 @@ import { registerTempFile } from '@/lib/temp-file-registry';
 // Re-export only the types consumers import from this module.
 export type { AgentAttachment, AgentAttachmentSubmissionPayload, AgentAttachmentWire };
 
+/** One-step chip reorder direction for the strip's accessible Move actions. */
+export type AttachmentMoveDirection = 'left' | 'right';
+
 export type AgentAttachmentCandidate = {
   name: string;
   uri: string;
@@ -107,6 +110,10 @@ type UseAgentAttachmentUploadReturn = {
   addCandidates: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
   removeAttachment: (id: string) => void;
   retryAttachment: (id: string) => void;
+  /** Move a chip one position left or right. No-op at the strip edges. */
+  moveAttachment: (id: string, direction: AttachmentMoveDirection) => void;
+  /** Move a chip from `fromIndex` to `toIndex` (drag reorder). No-op out of range. */
+  reorderAttachments: (fromIndex: number, toIndex: number) => void;
   reset: () => void;
   /** Release every admitted-but-unsent key (leave/abandon). Never blocks or throws. */
   releaseUnclaimedUploads: () => void;
@@ -461,6 +468,56 @@ export function useAgentAttachmentUpload(
     [cancelUpload, commitAttachments, organizationId]
   );
 
+  const reorderAttachments = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      commitAttachments(current => {
+        if (
+          fromIndex === toIndex ||
+          fromIndex < 0 ||
+          fromIndex >= current.length ||
+          toIndex < 0 ||
+          toIndex >= current.length
+        ) {
+          // Keep the same array reference on an out-of-range move so a stale
+          // drag continuation cannot replace the attachment list.
+          return current;
+        }
+        const next = [...current];
+        const [moved] = next.splice(fromIndex, 1);
+        if (moved === undefined) {
+          return current;
+        }
+        next.splice(toIndex, 0, moved);
+        return next;
+      });
+    },
+    [commitAttachments]
+  );
+
+  const moveAttachment = useCallback(
+    (id: string, direction: AttachmentMoveDirection) => {
+      commitAttachments(current => {
+        const fromIndex = current.findIndex(item => item.id === id);
+        if (fromIndex === -1) {
+          return current;
+        }
+        const toIndex = direction === 'left' ? fromIndex - 1 : fromIndex + 1;
+        if (toIndex < 0 || toIndex >= current.length) {
+          // Edge clamp: the first/last chip stays put instead of wrapping.
+          return current;
+        }
+        const next = [...current];
+        const [moved] = next.splice(fromIndex, 1);
+        if (moved === undefined) {
+          return current;
+        }
+        next.splice(toIndex, 0, moved);
+        return next;
+      });
+    },
+    [commitAttachments]
+  );
+
   const retryAttachment = useCallback(
     (id: string) => {
       const attachment = attachments.find(item => item.id === id);
@@ -596,6 +653,8 @@ export function useAgentAttachmentUpload(
       addCandidates,
       removeAttachment,
       retryAttachment,
+      moveAttachment,
+      reorderAttachments,
       reset,
       releaseUnclaimedUploads,
       isUploading,
@@ -608,6 +667,8 @@ export function useAgentAttachmentUpload(
       addCandidates,
       removeAttachment,
       retryAttachment,
+      moveAttachment,
+      reorderAttachments,
       reset,
       releaseUnclaimedUploads,
       isUploading,

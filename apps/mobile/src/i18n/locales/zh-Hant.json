@@ -2090,7 +2090,9 @@
       "uploading": "正在上傳…",
       "uploaded": "已上傳",
       "uploadFailedRetry": "上傳失敗。點按重試。",
-      "uploadFailedTerminal": "此檔案無法上傳。"
+      "uploadFailedTerminal": "此檔案無法上傳。",
+      "moveLeft": "將 {{filename}} 向左移動",
+      "moveRight": "將 {{filename}} 向右移動"
     },
     "attachmentPasteHint": {
       "accessibility": "從剪貼簿貼上圖片",

@@ -2582,7 +2582,9 @@
       "uploading": "Įkeliama…",
       "uploaded": "Įkelta",
       "uploadFailedRetry": "Įkelti nepavyko. Bakstelėkite, kad bandytumėte dar kartą.",
-      "uploadFailedTerminal": "Šis failas negali būti įkeltas."
+      "uploadFailedTerminal": "Šis failas negali būti įkeltas.",
+      "moveLeft": "Perkelti {{filename}} į kairę",
+      "moveRight": "Perkelti {{filename}} į dešinę"
     },
     "attachmentPasteHint": {
       "accessibility": "Įklijuoti paveikslėlį iš iškarpinės",

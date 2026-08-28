@@ -2544,7 +2544,9 @@
       "uploading": "တင်နေသည်…",
       "uploaded": "တင်ပြီးပါပြီ",
       "uploadFailedRetry": "တင်မှု မအောင်မြင်ပါ။ ထပ်ကြိုးစားရန် နှိပ်ပါ။",
-      "uploadFailedTerminal": "ဤဖိုင်ကို အပ်လုဒ်တင်၍မရပါ။"
+      "uploadFailedTerminal": "ဤဖိုင်ကို အပ်လုဒ်တင်၍မရပါ။",
+      "moveLeft": "{{filename}} ကို ဘယ်ဘက်သို့ ရွှေ့ပါ",
+      "moveRight": "{{filename}} ကို ညာဘက်သို့ ရွှေ့ပါ"
     },
     "attachmentPasteHint": {
       "accessibility": "clipboard မှ ပုံ ထည့်ပါ",

@@ -82,6 +82,11 @@ function createFixture() {
         name: null,
         defaultTitle: sessions[0].title,
         prSession: null,
+        sessions: sessions.map(session => ({
+          sessionId: session.session_id,
+          sessionStatus: session.status,
+          sessionStatusUpdatedAt: session.status_updated_at,
+        })),
       },
     },
   });

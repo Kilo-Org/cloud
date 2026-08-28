@@ -120,6 +120,7 @@ describe('publishControlPlaneSessionIngest', () => {
     expect(request.headers.get(cloudAgentSessionScopeHeaders.cloudAgentSessionId)).toBeNull();
     expect(request.headers.get(cloudAgentSessionScopeHeaders.rootKiloSessionId)).toBeNull();
     expect(request.headers.get(cloudAgentSessionScopeHeaders.protocolVersion)).toBeNull();
+    expect(request.headers.get(cloudAgentSessionScopeHeaders.trustedLineage)).toBeNull();
     expect(await request.json()).toEqual({ data: [{ type: 'message', data: { id: 'msg_1' } }] });
   });
 
@@ -165,6 +166,7 @@ describe('publishControlPlaneSessionIngest', () => {
       expect(request.headers.get(cloudAgentSessionScopeHeaders.protocolVersion)).toBe(
         cloudAgentSessionScopeProtocolVersion
       );
+      expect(request.headers.get(cloudAgentSessionScopeHeaders.trustedLineage)).toBeNull();
     }
     expect(await createRequest.json()).toEqual({ sessionId: child });
     expect(await ingestRequest.json()).toEqual({
@@ -194,6 +196,7 @@ describe('publishControlPlaneSessionIngest', () => {
       }),
     });
     expect(requests).toHaveLength(2);
+    expect(requests[0].headers.get(cloudAgentSessionScopeHeaders.trustedLineage)).toBe('1');
     expect(await requests[0].json()).toEqual({ sessionId: child, parentSessionId: root });
   });
 

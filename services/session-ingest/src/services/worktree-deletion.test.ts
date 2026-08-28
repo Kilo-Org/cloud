@@ -21,6 +21,7 @@ import {
   registerCloudAgentWorktree,
 } from './worktree-deletion';
 import type { Env } from '../env';
+import type { SessionEventPayload } from '../types/user-connection-protocol';
 
 const mocks = vi.hoisted(() => ({
   getDb: vi.fn(),
@@ -39,6 +40,7 @@ const otherWorktreeId = 'worktree_22222222-2222-4222-8222-222222222222';
 const organizationId = '33333333-3333-4333-8333-333333333333';
 const userId = 'oauth/github:worktree-owner';
 const location = { sandboxId: 'ses-original', provider: 'cloudflare' as const };
+const createdAt = '2026-08-27 01:00:00+00';
 const params = { worktreeId, kiloUserId: userId } satisfies CloudAgentWorktreeDeletionParams;
 const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } } as Env;
 const kiloId = (index: number) => `ses_${String(index).padStart(26, '0')}`;
@@ -51,7 +53,7 @@ function worktree(values: Partial<CloudAgentWorktree> = {}): CloudAgentWorktree 
     kilo_user_id: userId,
     organization_id: null,
     name: 'Private worktree name',
-    created_at: '2026-08-27 01:00:00+00',
+    created_at: createdAt,
     updated_at: '2026-08-27 01:00:00+00',
     deletion_started_at: null,
     deletion_completed_at: null,
@@ -70,6 +72,10 @@ type Member = {
   worktreeId: string | null;
   userId: string;
   parentSessionId: string | null;
+  createdAt?: string;
+  gitUrl?: string;
+  gitBranch?: string;
+  createdOnPlatform?: string;
 };
 
 function database(rootCount = 1, descendantCount = 0) {
@@ -101,12 +107,14 @@ function database(rootCount = 1, descendantCount = 0) {
   }> = [];
   const events: string[] = [];
   const sqlQueries: { sql: string; params: unknown[] }[] = [];
+  const candidateQueries: { sql: string; params: unknown[] }[] = [];
   let membershipAllowed = true;
   const valuesOf = (condition: SQL | undefined) =>
     condition ? new PgDialect().sqlToQuery(condition).params : [];
   const select = (columns?: Record<string, unknown>) => {
     let table: unknown;
     let condition: SQL | undefined;
+    let orderedColumn: unknown;
     let limit: number | undefined;
     const rows = () => {
       const bound = valuesOf(condition);
@@ -122,7 +130,12 @@ function database(rootCount = 1, descendantCount = 0) {
       if (table === cli_sessions_v2) {
         const querySql = condition ? new PgDialect().sqlToQuery(condition).sql : '';
         if (querySql.includes('"cloud_agent_session_id" is null')) {
+          candidateQueries.push({ sql: querySql, params: bound });
           const cursor = bound.find(value => typeof value === 'string' && value.startsWith('ses_'));
+          const createdAtParameter = querySql.match(/"created_at" >= \$(\d+)/)?.[1];
+          const minimumCreatedAt = createdAtParameter
+            ? bound[Number(createdAtParameter) - 1]
+            : undefined;
           return members
             .filter(
               row =>
@@ -134,6 +147,8 @@ function database(rootCount = 1, descendantCount = 0) {
                 (querySql.includes('"organization_id" is null')
                   ? row.organizationId === null
                   : bound.includes(row.organizationId)) &&
+                (typeof minimumCreatedAt !== 'string' ||
+                  Date.parse(row.createdAt ?? createdAt) >= Date.parse(minimumCreatedAt)) &&
                 (typeof cursor !== 'string' || row.sessionId > cursor)
             )
             .sort((a, b) => a.sessionId.localeCompare(b.sessionId))
@@ -142,7 +157,16 @@ function database(rootCount = 1, descendantCount = 0) {
         if (columns && 'userId' in columns)
           return members
             .filter(row => row.worktreeId === worktreeId)
-            .map(row => ({ userId: row.userId, organizationId: row.organizationId }));
+            .map(row => ({
+              userId: row.userId,
+              organizationId: row.organizationId,
+              createdAt: row.createdAt ?? createdAt,
+            }))
+            .sort((a, b) =>
+              orderedColumn === cli_sessions_v2.created_at
+                ? Date.parse(a.createdAt) - Date.parse(b.createdAt)
+                : 0
+            );
         if (
           columns &&
           'worktreeId' in columns &&
@@ -173,7 +197,10 @@ function database(rootCount = 1, descendantCount = 0) {
         condition = value;
         return query;
       },
-      orderBy: () => query,
+      orderBy: (column: unknown) => {
+        orderedColumn = column;
+        return query;
+      },
       limit: (value: number) => {
         limit = value;
         return query;
@@ -227,13 +254,23 @@ function database(rootCount = 1, descendantCount = 0) {
     },
   });
   const remove = () => ({
-    where: async (condition: SQL) => {
-      const ids = valuesOf(condition);
-      events.push('deleteRows');
-      for (let index = members.length - 1; index >= 0; index--)
-        if (members[index].userId === userId && ids.includes(members[index].sessionId))
-          members.splice(index, 1);
-    },
+    where: (condition: SQL) => ({
+      returning: async () => {
+        const ids = valuesOf(condition);
+        const deleted = members.filter(row => row.userId === userId && ids.includes(row.sessionId));
+        events.push('deleteRows');
+        for (let index = members.length - 1; index >= 0; index--)
+          if (deleted.includes(members[index])) members.splice(index, 1);
+        return deleted.map(row => ({
+          sessionId: row.sessionId,
+          parentSessionId: row.parentSessionId,
+          organizationId: row.organizationId,
+          gitUrl: row.gitUrl ?? null,
+          gitBranch: row.gitBranch ?? null,
+          createdOnPlatform: row.createdOnPlatform ?? null,
+        }));
+      },
+    }),
   });
   const tx = {
     select,
@@ -284,16 +321,32 @@ function database(rootCount = 1, descendantCount = 0) {
       };
     },
   };
+  let commitError: Error | undefined;
   const db = {
     ...tx,
-    transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx),
+    transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => {
+      const previousWorktrees = structuredClone(worktrees);
+      const previousMembers = structuredClone(members);
+      try {
+        const result = await callback(tx);
+        if (commitError) throw commitError;
+        events.push('commit');
+        return result;
+      } catch (error) {
+        worktrees.splice(0, worktrees.length, ...previousWorktrees);
+        members.splice(0, members.length, ...previousMembers);
+        throw error;
+      }
+    },
   };
   mocks.getDb.mockReturnValue(db);
   const cleared = new Set<string>();
   const snapshots = new Map<string, Record<string, unknown>>();
+  const snapshotReads: string[] = [];
   let failure: string | undefined;
   mocks.ingest.mockImplementation((_env: Env, identity: { sessionId: string }) => ({
     readKiloSdkSessionSnapshot: async () => {
+      snapshotReads.push(identity.sessionId);
       const info = snapshots.get(identity.sessionId);
       return info
         ? {
@@ -317,7 +370,22 @@ function database(rootCount = 1, descendantCount = 0) {
     },
   }));
   mocks.cache.mockReturnValue({ deleteSession: async () => undefined });
-  mocks.connection.mockReturnValue({ clearSession: async () => undefined });
+  const notifications: { kiloUserId: string; event: SessionEventPayload }[] = [];
+  const pendingNotifications: Promise<unknown>[] = [];
+  const executionContext: ExecutionContext = {
+    waitUntil: promise => {
+      pendingNotifications.push(promise);
+    },
+    passThroughOnException: () => undefined,
+    props: {},
+  };
+  mocks.connection.mockImplementation((_env: Env, { kiloUserId }: { kiloUserId: string }) => ({
+    clearSession: async () => undefined,
+    notifySessionEvent: async (event: SessionEventPayload) => {
+      notifications.push({ kiloUserId, event });
+      events.push('notifySessionEvent');
+    },
+  }));
   return {
     db,
     tx,
@@ -326,8 +394,16 @@ function database(rootCount = 1, descendantCount = 0) {
     allocations,
     events,
     sqlQueries,
+    candidateQueries,
     cleared,
     snapshots,
+    snapshotReads,
+    notifications,
+    pendingNotifications,
+    executionContext,
+    failCommit: (error?: Error) => {
+      commitError = error;
+    },
     denyMembership: () => {
       membershipAllowed = false;
     },
@@ -340,6 +416,89 @@ function database(rootCount = 1, descendantCount = 0) {
 beforeEach(() => vi.resetAllMocks());
 
 describe('durable worktree deletion journal', () => {
+  it.each([null, organizationId])(
+    'publishes only committed root and descendant deletions in scope %s, once per deleted row',
+    async scope => {
+      const f = database(2, 2);
+      const scopedParams = { ...params, ...(scope ? { organizationId: scope } : {}) };
+      f.worktrees[0].organization_id = scope;
+      for (const row of f.members) {
+        row.organizationId = scope;
+        row.gitUrl = `https://github.com/acme/repo-${row.sessionId}`;
+        row.gitBranch = `branch-${row.sessionId}`;
+        row.createdOnPlatform = row.cloudAgentSessionId ? 'cloud-agent-web' : 'cli';
+      }
+      const expectedEvents = f.members.map(row => ({
+        kiloUserId: userId,
+        event: {
+          type: 'session.deleted',
+          data: {
+            source: 'v2',
+            sessionId: row.sessionId,
+            parentSessionId: row.parentSessionId,
+            organizationId: scope,
+            gitUrl: row.gitUrl,
+            gitBranch: row.gitBranch,
+            createdOnPlatform: row.createdOnPlatform,
+            deletedAt: expect.any(String),
+          },
+        },
+      }));
+      const unrelated: Member = {
+        sessionId: kiloId(50),
+        cloudAgentSessionId: cloudId(50),
+        organizationId: scope,
+        worktreeId: otherWorktreeId,
+        userId,
+        parentSessionId: null,
+      };
+      f.members.push(unrelated);
+      await beginWorktreeDeletion(env, scopedParams);
+      await recordWorktreeCleanup(env, { ...scopedParams, sessionIds: [kiloId(99)] });
+      expect(f.notifications).toEqual([]);
+
+      const result = await completeWorktreeDeletion(env, scopedParams, f.executionContext);
+      await Promise.all(f.pendingNotifications);
+      expect(result).toEqual({
+        success: true,
+        deletedSessionIds: [kiloId(0), kiloId(1), kiloId(2), kiloId(3), kiloId(99)],
+      });
+      expect(f.notifications).toHaveLength(4);
+      expect(f.notifications).toEqual(expect.arrayContaining(expectedEvents));
+      expect(f.pendingNotifications).toHaveLength(4);
+      expect(f.events.indexOf('notifySessionEvent')).toBeGreaterThan(
+        f.events.lastIndexOf('commit')
+      );
+      expect(f.members).toEqual([unrelated]);
+
+      await expect(
+        completeWorktreeDeletion(env, scopedParams, f.executionContext)
+      ).resolves.toEqual(result);
+      expect(f.notifications).toHaveLength(4);
+      expect(f.pendingNotifications).toHaveLength(4);
+    }
+  );
+
+  it('does not publish deletions when SQL commit fails and publishes once after a successful retry', async () => {
+    const f = database(2, 1);
+    await beginWorktreeDeletion(env, params);
+    f.failCommit(new Error('transaction commit failed'));
+    await expect(completeWorktreeDeletion(env, params, f.executionContext)).rejects.toThrow(
+      'transaction commit failed'
+    );
+    expect(f.events).toContain('deleteRows');
+    expect(f.members).toHaveLength(3);
+    expect(f.worktrees[0].deletion_completed_at).toBeNull();
+    expect(f.notifications).toEqual([]);
+    expect(f.pendingNotifications).toEqual([]);
+
+    f.failCommit();
+    await completeWorktreeDeletion(env, params, f.executionContext);
+    await Promise.all(f.pendingNotifications);
+    expect(f.members).toEqual([]);
+    expect(f.notifications).toHaveLength(3);
+  });
+
   it('includes a never-run orphan in cold cleanup using retained authoritative root lineage', async () => {
     const f = database();
     f.members.push({
@@ -380,6 +539,7 @@ describe('durable worktree deletion journal', () => {
   it('recovers an older never-run orphan snapshot after the runtime and creation event are gone', async () => {
     const f = database();
     const directory = `/workspace/owner/worktrees/${worktreeId}`;
+    f.worktrees[0].created_at = '2026-07-01 01:00:00.123+00';
     f.members.push({
       sessionId: kiloId(1),
       cloudAgentSessionId: null,
@@ -388,6 +548,7 @@ describe('durable worktree deletion journal', () => {
       worktreeId: null,
       userId,
       parentSessionId: null,
+      createdAt: '2026-07-02 01:00:00.123+00',
     });
     f.snapshots.set(kiloId(1), { id: kiloId(1), parentID: kiloId(0), directory });
     await beginWorktreeDeletion(env, params);
@@ -398,6 +559,53 @@ describe('durable worktree deletion journal', () => {
     });
     expect(f.members).toEqual([]);
     expect(f.cleared.has(kiloId(1))).toBe(true);
+  });
+
+  it('excludes pre-worktree history from every recovery pass but includes boundary and late children', async () => {
+    const f = database();
+    const directory = `/workspace/owner/worktrees/${worktreeId}`;
+    for (const [index, childCreatedAt] of [
+      [1, '2026-08-27 00:59:59.999+00'],
+      [2, createdAt],
+    ] as const) {
+      f.members.push({
+        sessionId: kiloId(index),
+        cloudAgentSessionId: null,
+        organizationId: null,
+        worktreeId: null,
+        userId,
+        parentSessionId: null,
+        createdAt: childCreatedAt,
+      });
+      f.snapshots.set(kiloId(index), { id: kiloId(index), parentID: kiloId(0), directory });
+    }
+    await beginWorktreeDeletion(env, params);
+    await recordWorktreeCleanup(env, { ...params, directory });
+    expect(f.snapshotReads).toEqual([kiloId(2)]);
+
+    f.members.push({
+      sessionId: kiloId(3),
+      cloudAgentSessionId: null,
+      organizationId: null,
+      worktreeId: null,
+      userId,
+      parentSessionId: null,
+      createdAt: new Date(Date.now() + 1_000).toISOString(),
+    });
+    f.snapshots.set(kiloId(3), { id: kiloId(3), parentID: kiloId(2), directory });
+    await recordWorktreeCleanup(env, { ...params, directory });
+    expect(f.snapshotReads).toEqual([kiloId(2), kiloId(3)]);
+    expect(f.candidateQueries).toHaveLength(2);
+    for (const query of f.candidateQueries) {
+      expect(query.sql).toContain('"created_at" >=');
+      expect(query.params).toContain(createdAt);
+    }
+    await expect(completeWorktreeDeletion(env, params)).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0), kiloId(2), kiloId(3)],
+    });
+    expect(f.members.map(row => row.sessionId)).toEqual([kiloId(1)]);
+    expect(f.worktrees[0].created_at).toBe(createdAt);
   });
 
   it('does not infer snapshot ownership from directory alone or cross owner, organization, or established root scope', async () => {
@@ -755,13 +963,16 @@ describe('durable worktree deletion journal', () => {
     );
   });
 
-  it('lazily creates metadata for existing groups without inventing a name', async () => {
-    const f = database();
+  it('lazily creates metadata from the oldest existing member without resetting the worktree lifetime', async () => {
+    const f = database(2);
+    f.members[1].createdAt = '2026-07-01 01:00:00.123+00';
     f.worktrees.length = 0;
     const state = await beginWorktreeDeletion(env, params);
-    expect(state.manifest.sessions).toHaveLength(1);
+    expect(state.manifest.sessions).toHaveLength(2);
     expect(f.worktrees[0].kilo_user_id).toBe(userId);
     expect(f.worktrees[0].organization_id).toBeNull();
+    expect(f.worktrees[0].name).toBeNull();
+    expect(f.worktrees[0].created_at).toBe(f.members[1].createdAt);
   });
 
   it('rejects new root registration under the same locked worktree after deletion begins', async () => {
@@ -791,6 +1002,7 @@ describe('durable worktree deletion journal', () => {
     expect(f.members).toHaveLength(3);
     expect(f.worktrees[0].deletion_completed_at).toBeNull();
     expect(f.worktrees[0].runtime_locations).toEqual([location]);
+    expect(f.notifications).toEqual([]);
     f.fail();
     await expect(completeWorktreeDeletion(env, params)).resolves.toEqual({
       success: true,

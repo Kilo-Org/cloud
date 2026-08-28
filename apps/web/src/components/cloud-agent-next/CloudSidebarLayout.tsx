@@ -253,6 +253,13 @@ export function CloudSidebarLayout({
       pendingMessages,
     ]
   );
+  const foregroundSession = useMemo(
+    () =>
+      currentSessionId && foregroundSessionStatus !== null
+        ? { sessionId: currentSessionId, status: foregroundSessionStatus }
+        : null,
+    [currentSessionId, foregroundSessionStatus]
+  );
   const sidebarSessions = useMemo(() => {
     if (foregroundSessionStatus === null) return sessions;
     return sessions.map(session =>
@@ -698,6 +705,7 @@ export function CloudSidebarLayout({
               creatingWorktreeSourceSessionId={creatingWorktreeSourceSessionId}
               isInSheet
               activeSessions={activeSessions}
+              foregroundSession={foregroundSession}
               deletingSessionIds={deletingSessionIds}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
@@ -728,6 +736,7 @@ export function CloudSidebarLayout({
             onCreateWorktreeChat={handleCreateWorktreeChat}
             creatingWorktreeSourceSessionId={creatingWorktreeSourceSessionId}
             activeSessions={activeSessions}
+            foregroundSession={foregroundSession}
             deletingSessionIds={deletingSessionIds}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}

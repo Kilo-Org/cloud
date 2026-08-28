@@ -1,3 +1,4 @@
+import { projectPrivateWorktreePaths } from '@kilocode/session-ingest-contracts';
 import type {
   CloudAgentRootSessionSummary,
   KiloSdkAssistantMessage,
@@ -167,60 +168,15 @@ export function projectPublicPart(part: KiloSdkPart, kiloSessionId: string): Kil
   return part;
 }
 
-function privateWorktreeDirectory(message: KiloSdkStoredMessage): string | undefined {
-  if (message.info.role !== 'assistant') return undefined;
-  return [message.info.path.cwd, message.info.path.root].find(directory =>
-    /^\/.*\/worktrees\/worktree_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      directory
-    )
-  );
-}
-
-function projectPrivateWorktreeValue(
-  value: unknown,
-  privateDirectory: string,
-  publicDirectory: string
-): unknown {
-  if (typeof value === 'string') return value.replaceAll(privateDirectory, publicDirectory);
-  if (Array.isArray(value)) {
-    return value.map(item => projectPrivateWorktreeValue(item, privateDirectory, publicDirectory));
-  }
-  if (typeof value === 'object' && value !== null) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        projectPrivateWorktreeValue(item, privateDirectory, publicDirectory),
-      ])
-    );
-  }
-  return value;
-}
-
-function projectPrivateWorktreeMessage(
-  message: KiloSdkStoredMessage,
-  privateDirectory: string,
-  kiloSessionId: string
-): KiloSdkStoredMessage {
-  const projected = { ...message };
-  const publicDirectory = publicCloudAgentDirectory(kiloSessionId);
-  for (const [key, value] of Object.entries(message)) {
-    Reflect.set(
-      projected,
-      key,
-      projectPrivateWorktreeValue(value, privateDirectory, publicDirectory)
-    );
-  }
-  return projected;
-}
-
 export function projectPublicStoredMessage(
   message: KiloSdkStoredMessage,
   kiloSessionId: string
 ): KiloSdkStoredMessage {
-  const privateDirectory = privateWorktreeDirectory(message);
-  const sanitized = privateDirectory
-    ? projectPrivateWorktreeMessage(message, privateDirectory, kiloSessionId)
-    : message;
+  const sanitized = projectPrivateWorktreePaths(
+    message,
+    [message.info],
+    publicCloudAgentDirectory(kiloSessionId)
+  );
   return {
     info: projectPublicMessageInfo(sanitized.info, kiloSessionId),
     parts: sanitized.parts.map(part => projectPublicPart(part, kiloSessionId)),

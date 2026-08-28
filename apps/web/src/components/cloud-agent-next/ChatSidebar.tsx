@@ -25,6 +25,7 @@ import {
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
   groupSidebarSessionsByDate,
+  type SidebarForegroundSessionStatus,
   type SidebarWorktreeDetails,
   type SidebarWorktreeGroup,
 } from './hooks/useSidebarSessions';
@@ -67,6 +68,7 @@ type ChatSidebarProps = {
   deletingWorktreeId?: string;
   isInSheet?: boolean;
   activeSessions?: ActiveSession[];
+  foregroundSession?: SidebarForegroundSessionStatus | null;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   platformFilter?: string[];
@@ -256,6 +258,7 @@ function WorktreeGroupRow({
   onDeleteWorktree,
   isDeleting,
   activeSessionStatuses,
+  foregroundSession,
 }: {
   group: SidebarWorktreeGroup;
   currentSessionId?: string;
@@ -267,6 +270,7 @@ function WorktreeGroupRow({
   onDeleteWorktree?: (worktreeId: string) => void;
   isDeleting: boolean;
   activeSessionStatuses: ReadonlyMap<string, string>;
+  foregroundSession?: SidebarForegroundSessionStatus | null;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -282,7 +286,12 @@ function WorktreeGroupRow({
   const renameErrorId = useId();
   const label = getSidebarWorktreeLabel(group);
   const prSession = getSidebarWorktreePrSession(group);
-  const activity = getSidebarWorktreeActivity(group.sessions, activeSessionStatuses);
+  const activity = getSidebarWorktreeActivity(
+    group.sessions,
+    activeSessionStatuses,
+    group.details?.sessions,
+    foregroundSession
+  );
   const shouldReplaceTime = activity.isLive || activity.status !== null;
   const hasActions = Boolean(onCreateWorktreeChat || onRenameWorktree || onDeleteWorktree);
   const isActive =
@@ -558,6 +567,7 @@ export function ChatSidebar({
   deletingWorktreeId,
   isInSheet = false,
   activeSessions = [],
+  foregroundSession,
   searchQuery = '',
   onSearchChange,
   platformFilter,
@@ -894,6 +904,7 @@ export function ChatSidebar({
                       onDeleteWorktree={onDeleteWorktree}
                       isDeleting={deletingWorktreeId === item.worktreeId}
                       activeSessionStatuses={activeSessionStatuses}
+                      foregroundSession={foregroundSession}
                     />
                   );
                 })}

@@ -6,6 +6,7 @@ export const cloudAgentSessionScopeHeaders = {
   cloudAgentSessionId: 'X-Kilo-Cloud-Agent-Session',
   rootKiloSessionId: 'X-Kilo-Root-Session',
   protocolVersion: 'X-Kilo-Session-Scope-Protocol',
+  trustedLineage: 'X-Kilo-Trusted-Session-Lineage',
 } as const;
 
 export const containedKiloSessionIdSchema = z.string().regex(/^ses_[A-Za-z0-9]{26}$/);

@@ -21,6 +21,7 @@ import {
   groupSidebarSessions,
   groupSidebarSessionsByDate,
   mergeWorktreeChatSessions,
+  patchSidebarWorktreeSessionStatus,
   removeSidebarDbSession,
   sessionCacheKey,
   SIDEBAR_RECONCILE_DELAY_MS,
@@ -616,6 +617,7 @@ describe('useSidebarSessions live update helpers', () => {
           name: details.name,
           defaultTitle: details.defaultTitle,
           prSession: null,
+          sessions: [first, latest],
         },
       } satisfies Record<string, SidebarWorktreeDetails>;
 
@@ -636,6 +638,7 @@ describe('useSidebarSessions live update helpers', () => {
         name: 'Named worktree',
         defaultTitle: 'First chat outside the filtered list',
         prSession: null,
+        sessions: [visible],
       };
       const result = groupSidebarSessionsByDate([visible], new Date('2026-01-03T18:00:00.000Z'), {
         worktree_shared: details,
@@ -720,7 +723,12 @@ describe('useSidebarSessions live update helpers', () => {
 
       for (const prSession of [hidden, { ...hidden, associatedPr: undefined }, null]) {
         const [group] = groupSidebarSessions([visible], {
-          worktree_shared: { name: null, defaultTitle: null, prSession },
+          worktree_shared: {
+            name: null,
+            defaultTitle: null,
+            prSession,
+            sessions: [visible, hidden],
+          },
         });
         if (group?.type !== 'worktree') throw new Error('Expected worktree group');
 
@@ -779,6 +787,183 @@ describe('useSidebarSessions live update helpers', () => {
         statusUpdatedAt: null,
         isLive: true,
       });
+    });
+
+    it.each(['question', 'permission', 'busy', 'retry'])(
+      'includes a hidden sibling with %s status outside the displayed slice',
+      status => {
+        const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
+        const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z', {
+          sessionStatus: status,
+          sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
+        });
+
+        expect(getSidebarWorktreeActivity([visible], new Map(), [visible, hidden])).toEqual({
+          status,
+          statusUpdatedAt: hidden.sessionStatusUpdatedAt,
+          isLive: false,
+        });
+      }
+    );
+
+    it('matches hidden live sessions only against authorized group membership', () => {
+      const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
+      const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z');
+      const active = new Map([
+        ['ses_hidden', 'retry'],
+        ['ses_other_tenant', 'permission'],
+      ]);
+
+      expect(getSidebarWorktreeActivity([visible], active, [visible, hidden])).toEqual({
+        status: 'retry',
+        statusUpdatedAt: null,
+        isLive: true,
+      });
+      expect(getSidebarWorktreeActivity([visible], active, [visible])).toEqual({
+        status: null,
+        statusUpdatedAt: null,
+        isLive: false,
+      });
+    });
+
+    it.each([false, true])(
+      'prefers the newer idle completion over a stale busy snapshot (newer visible=%s)',
+      newerVisible => {
+        const busy = makeStoredSession('ses_same', '2026-01-03T12:00:00.000Z', {
+          sessionStatus: 'busy',
+          sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
+        });
+        const idle = {
+          ...busy,
+          sessionStatus: 'idle',
+          sessionStatusUpdatedAt: '2026-01-03T12:01:00.000Z',
+        };
+
+        expect(
+          getSidebarWorktreeActivity([newerVisible ? idle : busy], new Map(), [
+            newerVisible ? busy : idle,
+          ])
+        ).toEqual({ status: null, statusUpdatedAt: null, isLive: false });
+      }
+    );
+
+    it('lets live idle completion clear stale stored attention instead of taking maximum priority', () => {
+      const waiting = makeStoredSession('ses_waiting', '2026-01-03T12:00:00.000Z', {
+        sessionStatus: 'question',
+      });
+
+      expect(getSidebarWorktreeActivity([], new Map([['ses_waiting', 'idle']]), [waiting])).toEqual(
+        {
+          status: null,
+          statusUpdatedAt: null,
+          isLive: true,
+        }
+      );
+      expect(
+        getSidebarWorktreeActivity([], new Map([['ses_waiting', 'busy']]), [waiting]).status
+      ).toBe('question');
+    });
+
+    it('lets a hidden foreground completion override stale snapshots without idling another sibling', () => {
+      const foreground = makeStoredSession('ses_foreground', '2026-01-03T12:00:00.000Z', {
+        sessionStatus: 'question',
+      });
+      const background = makeStoredSession('ses_background', '2026-01-03T12:00:00.000Z', {
+        sessionStatus: 'busy',
+      });
+      const active = new Map([['ses_foreground', 'busy']]);
+      const completed = { sessionId: 'ses_foreground', status: 'idle' };
+
+      expect(getSidebarWorktreeActivity([], active, [foreground], completed).status).toBeNull();
+      expect(
+        getSidebarWorktreeActivity([background], active, [foreground, background], completed).status
+      ).toBe('busy');
+      expect(
+        getSidebarWorktreeActivity([], active, [foreground], {
+          sessionId: 'ses_other_tenant',
+          status: 'idle',
+        }).status
+      ).toBe('question');
+    });
+
+    it('prioritizes hidden attention over a foreground session that starts running', () => {
+      const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
+      const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z');
+
+      expect(
+        getSidebarWorktreeActivity(
+          [visible],
+          new Map([['ses_hidden', 'permission']]),
+          [visible, hidden],
+          { sessionId: 'ses_visible', status: 'busy' }
+        ).status
+      ).toBe('permission');
+    });
+  });
+
+  describe('patchSidebarWorktreeSessionStatus', () => {
+    const initial = {
+      worktrees: {
+        worktree_shared: {
+          name: 'Named worktree',
+          defaultTitle: null,
+          prSession: null,
+          sessions: [
+            {
+              sessionId: 'ses_hidden',
+              sessionStatus: 'busy',
+              sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
+            },
+          ],
+        },
+      },
+    } satisfies Parameters<typeof patchSidebarWorktreeSessionStatus>[0];
+
+    it('updates a hidden member through attention and completion without changing membership', () => {
+      const waiting = patchSidebarWorktreeSessionStatus(initial, {
+        sessionId: 'ses_hidden',
+        sessionStatus: 'question',
+        sessionStatusUpdatedAt: '2026-01-03T12:01:00.000Z',
+      });
+      expect(
+        getSidebarWorktreeActivity([], new Map(), waiting.worktrees.worktree_shared.sessions).status
+      ).toBe('question');
+
+      const completed = patchSidebarWorktreeSessionStatus(waiting, {
+        sessionId: 'ses_hidden',
+        sessionStatus: 'idle',
+        sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
+      });
+      expect(completed.worktrees.worktree_shared.sessions).toHaveLength(1);
+      expect(
+        getSidebarWorktreeActivity([], new Map(), completed.worktrees.worktree_shared.sessions)
+          .status
+      ).toBeNull();
+      expect(initial.worktrees.worktree_shared.sessions[0].sessionStatus).toBe('busy');
+      expect(completed.worktrees.worktree_shared.name).toBe(initial.worktrees.worktree_shared.name);
+      expect(
+        patchSidebarWorktreeSessionStatus(completed, waiting.worktrees.worktree_shared.sessions[0])
+      ).toBe(completed);
+    });
+
+    it('ignores unknown or foreign session identities and older or duplicate status updates', () => {
+      expect(
+        patchSidebarWorktreeSessionStatus(initial, {
+          sessionId: 'ses_foreign',
+          sessionStatus: 'permission',
+          sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
+        })
+      ).toBe(initial);
+      expect(
+        patchSidebarWorktreeSessionStatus(initial, {
+          sessionId: 'ses_hidden',
+          sessionStatus: 'idle',
+          sessionStatusUpdatedAt: '2026-01-03T11:59:00.000Z',
+        })
+      ).toBe(initial);
+      expect(
+        patchSidebarWorktreeSessionStatus(initial, initial.worktrees.worktree_shared.sessions[0])
+      ).toBe(initial);
     });
   });
 
@@ -886,6 +1071,62 @@ function getSidebarButtonMarkup(html: string, label: string): string {
 }
 
 describe('ChatSidebar worktree controls', () => {
+  it('renders hidden sibling activity from complete worktree details during search', () => {
+    const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z', {
+      worktreeId: 'worktree_shared',
+      associatedPr: null,
+    });
+    const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z', {
+      worktreeId: 'worktree_shared',
+      sessionStatus: 'question',
+    });
+    const props: Partial<ChatSidebarProps> = {
+      sessions: [visible],
+      searchQuery: 'visible',
+      worktreeDetails: {
+        worktree_shared: {
+          name: null,
+          defaultTitle: null,
+          prSession: null,
+          sessions: [visible, hidden],
+        },
+      },
+    };
+
+    expect(renderChatSidebar(props)).toContain('aria-label="Waiting for answer"');
+    expect(
+      renderChatSidebar({
+        ...props,
+        foregroundSession: { sessionId: hidden.sessionId, status: 'idle' },
+      })
+    ).not.toContain('Waiting for answer');
+  });
+
+  it('renders a hidden live sibling on its worktree rather than relying on displayed chats', () => {
+    const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z', {
+      worktreeId: 'worktree_shared',
+      associatedPr: null,
+    });
+    const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z');
+    const html = renderChatSidebar({
+      sessions: [visible],
+      activeSessions: [
+        { id: hidden.sessionId, status: 'retry', title: 'Hidden chat', connectionId: 'cli' },
+      ],
+      worktreeDetails: {
+        worktree_shared: {
+          name: null,
+          defaultTitle: null,
+          prSession: null,
+          sessions: [visible, hidden],
+        },
+      },
+    });
+    const worktreeMarkup = html.slice(html.indexOf('aria-label="Open worktree'));
+
+    expect(worktreeMarkup).toContain('<title>Retrying</title>');
+  });
+
   it.each([
     { create: false, rename: false, remove: false },
     { create: true, rename: false, remove: false },
@@ -1013,6 +1254,7 @@ describe('ChatSidebar worktree controls', () => {
       name: 'Custom worktree',
       defaultTitle: 'Authoritative first chat',
       prSession: source,
+      sessions: [source],
     };
     const html = renderChatSidebar({ worktreeDetails: { worktree_shared: details } });
 

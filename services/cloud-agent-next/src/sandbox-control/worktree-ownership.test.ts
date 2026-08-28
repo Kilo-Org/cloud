@@ -128,13 +128,60 @@ describe('physical sandbox ownership resolution', () => {
     await expect(resolveSandboxExclusivity(f.env, f.params)).resolves.toBe(false);
   });
 
-  it('does not report unknown history as confirmed sharing', async () => {
+  it('keeps expired legacy ownership non-exclusive so scoped cleanup can proceed without destroying the sandbox', async () => {
     const f = fixture();
     f.getStoredMetadata.mockResolvedValue(null);
+    await expect(resolveSandboxExclusivity(f.env, f.params)).resolves.toBe(false);
+    expect(mocks.legacySession).toHaveBeenCalledWith(f.env, userId, legacyId);
+  });
+
+  it('still validates later owners after encountering missing historical ownership', async () => {
+    const f = fixture(true);
+    f.getStoredMetadata.mockResolvedValue(null);
+    f.ownership.mockResolvedValue({
+      kind: 'unresolved',
+      owners: [
+        {
+          worktreeId: null,
+          organizationId: null,
+          sessions: [{ sessionId: kiloId, cloudAgentSessionId: legacyId }],
+        },
+        {
+          worktreeId: otherWorktreeId,
+          organizationId: null,
+          sessions: [{ sessionId: kiloId, cloudAgentSessionId: controlId }],
+        },
+      ],
+    });
+    f.getRuntimeLocation.mockResolvedValue({
+      ...(await f.getRuntimeLocation()),
+      kiloUserId: 'another-owner',
+    });
     await expect(resolveSandboxExclusivity(f.env, f.params)).rejects.toThrow(
       'worktree_runtime_history_unavailable'
     );
+    expect(f.getStoredMetadata).toHaveBeenCalledOnce();
   });
+
+  it('rejects corrupt historical metadata rather than treating it as expired', async () => {
+    const f = fixture();
+    f.getStoredMetadata.mockResolvedValue({
+      ...f.metadata,
+      workspace: { sandboxId: 123 },
+    });
+    await expect(resolveSandboxExclusivity(f.env, f.params)).rejects.toThrow();
+  });
+
+  it.each(['ownership', 'getStoredMetadata'] as const)(
+    'propagates real %s I/O failures instead of allowing cleanup',
+    async method => {
+      const f = fixture();
+      f[method].mockRejectedValue(new Error('storage unavailable'));
+      await expect(resolveSandboxExclusivity(f.env, f.params)).rejects.toThrow(
+        'storage unavailable'
+      );
+    }
+  );
 
   it('rejects conflicting ownership metadata instead of inferring a route', async () => {
     const f = fixture(true);

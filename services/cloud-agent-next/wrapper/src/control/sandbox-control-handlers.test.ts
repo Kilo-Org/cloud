@@ -978,6 +978,29 @@ describe('handleControlRequest', () => {
     expect(rootForSession('child_2', '/workspace')).toBeUndefined();
   });
 
+  it('retains an attached root for retry until native cancellation is confirmed', async () => {
+    const sibling = { ...session, sessionId: 'ses_sibling', kiloSessionId: 'kilo_sibling' };
+    rememberAttachedRoot(sibling.kiloSessionId, sibling.directory);
+    let confirmed = false;
+    const handlerDeps = deps({ kiloClient: fakeKilo({ abortSession: async () => confirmed }) });
+    const runtime = handlerDeps.kiloRuntimes?.get(session.directory);
+    expect(handlerDeps.tasks.size).toBe(0);
+    expect(await handleControlRequest('session.detach', session, {}, handlerDeps)).toMatchObject({
+      ok: false,
+      error: { code: 'not_ready' },
+    });
+    expect(rootForSession(session.kiloSessionId)).toBe(session.kiloSessionId);
+    expect(rootForSession(sibling.kiloSessionId)).toBe(sibling.kiloSessionId);
+    expect(handlerDeps.kiloRuntimes?.get(session.directory)).toBe(runtime);
+    confirmed = true;
+    expect(await handleControlRequest('session.detach', session, {}, handlerDeps)).toEqual({
+      ok: true,
+      result: { detached: true },
+    });
+    expect(rootForSession(session.kiloSessionId)).toBeUndefined();
+    expect(rootForSession(sibling.kiloSessionId)).toBe(sibling.kiloSessionId);
+  });
+
   it('preserves root lineage, sibling activity, tasks, and terminals when the detach directory does not match', async () => {
     const sibling = { ...session, sessionId: 'ses_2', kiloSessionId: 'kilo_2' };
     const activity = createSessionActivityRegistry(() => 100);
@@ -1049,7 +1072,7 @@ describe('handleControlRequest', () => {
     }
   });
 
-  it('detaches a root without stopping its worktree runtime or sibling roots', async () => {
+  it('aborts a native root without an owned task and detaches without stopping its sibling', async () => {
     const sibling = { ...session, sessionId: 'ses_sibling', kiloSessionId: 'kilo_sibling' };
     rememberAttachedRoot(sibling.kiloSessionId, sibling.directory);
     const started = Promise.withResolvers<void>();
@@ -1091,11 +1114,12 @@ describe('handleControlRequest', () => {
     expect(runtimes.get(session.directory)).toBe(runtime);
     expect(handlerDeps.tasks.get(sibling.kiloSessionId)?.signal.aborted).toBe(false);
     expect(events).toEqual([]);
+    expect(aborted).toEqual([session.kiloSessionId]);
     expect(await handleControlRequest('session.abort', sibling, {}, handlerDeps)).toEqual({
       ok: true,
       result: { status: 'aborted' },
     });
-    expect(aborted).toEqual([sibling.kiloSessionId]);
+    expect(aborted).toEqual([session.kiloSessionId, sibling.kiloSessionId]);
     expect(events).toEqual([
       {
         type: 'session.message.outcome',
@@ -3651,6 +3675,15 @@ describe('control interactions and sync', () => {
     const queried = new Set<string>();
     const handlerDeps = deps({
       kiloClient: fakeKilo({
+        getSessionStatuses: async (
+          directory,
+          signal
+        ): ReturnType<WrapperKiloClient['getSessionStatuses']> => {
+          expect(signal?.aborted).toBe(false);
+          return directory === session.directory
+            ? { kilo_1: { type: 'busy' }, sibling: { type: 'idle' } }
+            : {};
+        },
         getQuestions: async directory => {
           if (directory) queried.add(directory);
           return directory === childDirectory
@@ -3678,7 +3711,7 @@ describe('control interactions and sync', () => {
     expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toEqual({
       ok: true,
       result: {
-        status: { type: 'idle' },
+        status: { type: 'busy' },
         questions: [question, { ...childQuestion, rootKiloSessionId: session.kiloSessionId }],
         permissions: [permission, { ...childPermission, rootKiloSessionId: session.kiloSessionId }],
       },
@@ -4268,21 +4301,29 @@ describe('refreshHeartbeatPayload', () => {
   it('reconciles attached roots in a shared directory with exactly one status read per heartbeat', async () => {
     let now = 100;
     const activity = createSessionActivityRegistry(() => now);
-    rememberAttachedRoot('kilo_2', session.directory);
-    activity.attach('kilo_1');
-    activity.attach('kilo_2');
-    now = 150;
+    const sibling = { ...session, sessionId: 'ses_2', kiloSessionId: 'kilo_2' };
     const reads: unknown[] = [];
     const handlerDeps = deps({
       activity,
       kiloClient: fakeKilo({
-        getSessionStatuses: async (directory, signal) => {
+        getSessionStatuses: async (
+          directory,
+          signal
+        ): ReturnType<WrapperKiloClient['getSessionStatuses']> => {
           reads.push(directory);
           expect(signal?.aborted).toBe(false);
-          return { kilo_1: { type: 'idle' }, kilo_2: { type: 'busy' } };
+          return directory === session.directory
+            ? { kilo_1: { type: 'idle' }, kilo_2: { type: 'busy' } }
+            : {};
         },
       }),
     });
+    for (const identity of [session, sibling]) {
+      expect(
+        (await handleControlRequest('session.attach', identity, { kilo }, handlerDeps)).ok
+      ).toBe(true);
+    }
+    now = 150;
 
     const payload = await refreshHeartbeatPayload(handlerDeps);
     expect(reads).toEqual([session.directory]);
@@ -4296,15 +4337,75 @@ describe('refreshHeartbeatPayload', () => {
     expect(reads).toEqual([session.directory, session.directory]);
   });
 
+  it('reconciles each attached worktree from its own directory-scoped statuses', async () => {
+    let now = 100;
+    const first = session;
+    const second = { sessionId: 'ses_2', kiloSessionId: 'kilo_2', directory: '/workspace/second' };
+    const activity = createSessionActivityRegistry(() => now);
+    const handlerDeps = deps(
+      {
+        activity,
+        kiloClient: fakeKilo({
+          getSessionStatuses: async (
+            directory,
+            signal
+          ): ReturnType<WrapperKiloClient['getSessionStatuses']> => {
+            expect(signal?.aborted).toBe(false);
+            return directory === first.directory
+              ? { kilo_1: { type: 'busy', waitingOn: 'tool' } }
+              : {};
+          },
+        }),
+      },
+      first
+    );
+    const otherDeps = deps(
+      {
+        activity,
+        kiloClient: fakeKilo({
+          getSessionStatuses: async (
+            directory,
+            signal
+          ): ReturnType<WrapperKiloClient['getSessionStatuses']> => {
+            expect(signal?.aborted).toBe(false);
+            return directory === second.directory ? { kilo_2: { type: 'finalizing' } } : {};
+          },
+        }),
+      },
+      second
+    );
+    expect((await handleControlRequest('session.attach', first, { kilo }, handlerDeps)).ok).toBe(
+      true
+    );
+    expect((await handleControlRequest('session.attach', second, { kilo }, otherDeps)).ok).toBe(
+      true
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    const firstRuntime = runtimes?.get(first.directory);
+    const secondRuntime = otherDeps.kiloRuntimes?.get(second.directory);
+    if (!runtimes || !firstRuntime || !secondRuntime)
+      throw new Error('Expected directory runtimes');
+    runtimes.get = directory =>
+      directory === first.directory
+        ? firstRuntime
+        : directory === second.directory
+          ? secondRuntime
+          : undefined;
+    now = 150;
+
+    const payload = await refreshHeartbeatPayload(handlerDeps);
+
+    expect(payload.state).toBe('active');
+    expect(payload.sessions).toEqual([
+      { kiloSessionId: 'kilo_1', state: 'active', idleForMs: 0, waitingOn: 'tool' },
+      { kiloSessionId: 'kilo_2', state: 'finalizing', idleForMs: 0, waitingOn: 'finalizing' },
+    ]);
+  });
+
   it('retains the previous active or finalizing state when its status read fails', async () => {
     let now = 100;
     const activity = createSessionActivityRegistry(() => now);
-    rememberAttachedRoot('kilo_2', session.directory);
-    activity.attach('kilo_1');
-    activity.attach('kilo_2');
-    activity.markActive('kilo_1');
-    activity.reconcile({ kilo_1: { type: 'busy' }, kilo_2: { type: 'finalizing' } });
-    now = 180;
+    const sibling = { ...session, sessionId: 'ses_2', kiloSessionId: 'kilo_2' };
     const handlerDeps = deps({
       activity,
       kiloClient: fakeKilo({
@@ -4313,14 +4414,134 @@ describe('refreshHeartbeatPayload', () => {
         },
       }),
     });
+    expect((await handleControlRequest('session.attach', session, { kilo }, handlerDeps)).ok).toBe(
+      true
+    );
+    expect((await handleControlRequest('session.attach', sibling, { kilo }, handlerDeps)).ok).toBe(
+      true
+    );
+    activity.reconcile({ kilo_1: { type: 'busy' }, kilo_2: { type: 'finalizing' } }, [
+      'kilo_1',
+      'kilo_2',
+    ]);
+    now = 180;
 
     const payload = await refreshHeartbeatPayload(handlerDeps);
+
     expect(payload.state).toBe('active');
     expect(payload.pendingMessages).toBe(0);
     expect(payload.sessions).toEqual([
       { kiloSessionId: 'kilo_1', state: 'active', idleForMs: 80, waitingOn: 'model' },
       { kiloSessionId: 'kilo_2', state: 'finalizing', idleForMs: 80, waitingOn: 'finalizing' },
     ]);
+  });
+
+  it('preserves failed-directory activity while a successful empty poll idles only its own root', async () => {
+    let now = 100;
+    let failFirstDirectory = false;
+    const first = session;
+    const firstSibling = { ...first, sessionId: 'ses_2', kiloSessionId: 'kilo_2' };
+    const second = {
+      sessionId: 'ses_3',
+      kiloSessionId: 'kilo_3',
+      directory: '/workspace/second',
+    };
+    const activity = createSessionActivityRegistry(() => now);
+    const handlerDeps = deps(
+      {
+        activity,
+        kiloClient: fakeKilo({
+          getSessionStatuses: async (
+            directory,
+            signal
+          ): ReturnType<WrapperKiloClient['getSessionStatuses']> => {
+            expect(signal?.aborted).toBe(false);
+            if (directory !== first.directory) return {};
+            if (failFirstDirectory) throw new Error('status unavailable');
+            return { kilo_1: { type: 'busy', waitingOn: 'tool' }, kilo_2: { type: 'finalizing' } };
+          },
+        }),
+      },
+      first
+    );
+    const otherDeps = deps(
+      {
+        activity,
+        kiloClient: fakeKilo({
+          getSessionStatuses: async (
+            directory,
+            signal
+          ): ReturnType<WrapperKiloClient['getSessionStatuses']> => {
+            expect(signal?.aborted).toBe(false);
+            return directory === second.directory && !failFirstDirectory
+              ? { kilo_3: { type: 'busy' } }
+              : {};
+          },
+        }),
+      },
+      second
+    );
+    for (const identity of [first, firstSibling]) {
+      expect(
+        (await handleControlRequest('session.attach', identity, { kilo }, handlerDeps)).ok
+      ).toBe(true);
+    }
+    expect((await handleControlRequest('session.attach', second, { kilo }, otherDeps)).ok).toBe(
+      true
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    const firstRuntime = runtimes?.get(first.directory);
+    const secondRuntime = otherDeps.kiloRuntimes?.get(second.directory);
+    if (!runtimes || !firstRuntime || !secondRuntime)
+      throw new Error('Expected directory runtimes');
+    runtimes.get = directory =>
+      directory === first.directory
+        ? firstRuntime
+        : directory === second.directory
+          ? secondRuntime
+          : undefined;
+    expect((await refreshHeartbeatPayload(handlerDeps)).sessions).toEqual([
+      { kiloSessionId: 'kilo_1', state: 'active', idleForMs: 0, waitingOn: 'tool' },
+      { kiloSessionId: 'kilo_2', state: 'finalizing', idleForMs: 0, waitingOn: 'finalizing' },
+      { kiloSessionId: 'kilo_3', state: 'active', idleForMs: 0, waitingOn: 'model' },
+    ]);
+    now = 180;
+    failFirstDirectory = true;
+
+    const payload = await refreshHeartbeatPayload(handlerDeps);
+
+    expect(payload.state).toBe('active');
+    expect(payload.sessions).toEqual([
+      { kiloSessionId: 'kilo_1', state: 'active', idleForMs: 80, waitingOn: 'tool' },
+      { kiloSessionId: 'kilo_2', state: 'finalizing', idleForMs: 80, waitingOn: 'finalizing' },
+      { kiloSessionId: 'kilo_3', state: 'idle', idleForMs: 0 },
+    ]);
+  });
+
+  it('does not use a directoryless poll to idle a root without a directory mapping', async () => {
+    let now = 100;
+    let reads = 0;
+    const activity = createSessionActivityRegistry(() => now);
+    activity.attach('unmapped_root');
+    activity.markActive('unmapped_root');
+    now = 180;
+    const handlerDeps = deps({
+      activity,
+      kiloClient: fakeKilo({
+        getSessionStatuses: async () => {
+          reads += 1;
+          return {};
+        },
+      }),
+    });
+
+    const payload = await refreshHeartbeatPayload(handlerDeps);
+    expect(payload.state).toBe('active');
+    expect(payload.pendingMessages).toBe(0);
+    expect(payload.sessions).toEqual([
+      { kiloSessionId: 'unmapped_root', state: 'active', idleForMs: 80, waitingOn: 'model' },
+    ]);
+    expect(reads).toBe(0);
   });
 
   it.each([false, true])(
@@ -4498,7 +4719,10 @@ describe('createSessionActivityRegistry', () => {
     activity.attach('root_b');
     activity.markActive('root_a');
     activity.markActive('root_b');
-    activity.reconcile({ root_a: { type: 'busy', waitingOn: 'tool' }, child_b: { type: 'busy' } });
+    activity.reconcile({ root_a: { type: 'busy', waitingOn: 'tool' }, child_b: { type: 'busy' } }, [
+      'root_a',
+      'root_b',
+    ]);
     expect(activity.snapshots()).toEqual([
       { kiloSessionId: 'root_a', state: 'active', idleForMs: 0, waitingOn: 'tool' },
       { kiloSessionId: 'root_b', state: 'idle', idleForMs: 0 },

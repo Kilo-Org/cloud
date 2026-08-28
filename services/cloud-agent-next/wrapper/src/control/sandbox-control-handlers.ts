@@ -650,6 +650,10 @@ async function handleDetach(
     if (!result.ok && task.kind !== 'preparation') return result;
   }
   try {
+    if (!task) {
+      const runtime = sessionKiloRuntime(session, deps);
+      if (runtime) await abortKiloSession(session, runtime.kiloClient);
+    }
     deps.kiloRuntimes?.detach(session);
     const terminalCleanup = deps.terminalRuntime?.detachSession(session);
     forgetAttachedRoot(session.kiloSessionId, session.directory);

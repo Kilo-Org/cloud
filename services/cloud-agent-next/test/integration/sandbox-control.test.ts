@@ -19,6 +19,10 @@ import type {
   VercelSandboxSession,
 } from '../../src/agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { parseVercelSandboxRuntimeConfig } from '../../src/agent-sandbox/vercel/vercel-runtime-config.js';
+import { TRPCError } from '@trpc/server';
+import { router } from '../../src/router/auth.js';
+import { createSessionManagementHandlers } from '../../src/router/handlers/session-management.js';
+import { requireCurrentSessionAccess } from '../../src/session-access.js';
 import type {
   AgentSelectionOverride,
   SubmittedSessionMessageRequest,
@@ -57,6 +61,7 @@ import {
   type DeadlineId,
   type DeadlineTable,
 } from '../../src/sandbox-control/deadlines.js';
+import type { VercelProviderLocator } from '../../src/sandbox-control/vercel-provider.js';
 import {
   loadDeadlines,
   loadRouteTable,
@@ -99,6 +104,10 @@ import {
   type ResponseFrame,
   type SessionAttachPayload,
 } from '../../src/shared/sandbox-control-protocol.js';
+
+vi.mock('../../src/session-access.js', () => ({
+  requireCurrentSessionAccess: vi.fn(),
+}));
 
 vi.mock('../../src/db/pg.js', () => ({
   getPgDb: () => {
@@ -7906,149 +7915,150 @@ describe('SandboxSession control-plane regressions', () => {
     }
   });
 
-  it('aborts and detaches a deleted session without stopping active sibling work', async () => {
-    const userId = 'user_control_delete';
-    const sessionId = GRANT_SESSION_ID;
-    const siblingSessionId = SECOND_GRANT_SESSION_ID;
-    const controlId = 'usr-de1e7ed';
-    const credential = generateSandboxCredential();
-    const control = env.SANDBOX_CONTROL.getByName(controlId);
-    const { provider } = await installProvider(control, cloudflareRef(controlId));
-    await runInDurableObject(control, async (instance, state) => {
-      await instance.initializeOwner(userId);
-      await seedRunningCloudflare(instance);
-      await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
-      await attachGrantedSession(instance, state, {
-        sessionId,
-        kiloSessionId: ROOT_ID,
-        directory: '/workspace/deleted',
-        ownerId: userId,
-      });
-      await attachGrantedSession(instance, state, {
-        sessionId: siblingSessionId,
-        kiloSessionId: SECOND_ROOT_ID,
-        directory: '/workspace/sibling',
-        ownerId: userId,
-      });
-      const routes = await loadRouteTable(state.storage);
-      for (const kiloSessionId of [ROOT_ID, SECOND_ROOT_ID]) {
-        applyReportedSessionState(
-          routes,
-          kiloSessionId,
-          { state: 'active', idleForMs: 0 },
-          Date.now()
+  it.each(['accepted', 'failed', 'accepted_overdue'] as const)(
+    'detaches a deleted root with %s work while preserving its sibling and message-scoped interrupts',
+    async messageState => {
+      const userId = 'user_control_delete';
+      const sessionId = GRANT_SESSION_ID;
+      const siblingSessionId = SECOND_GRANT_SESSION_ID;
+      const controlId = `usr-${crypto.randomUUID().replaceAll('-', '')}` as const;
+      const wrapperInstanceId = crypto.randomUUID();
+      const credential = generateSandboxCredential();
+      const control = env.SANDBOX_CONTROL.getByName(controlId);
+      const { provider } = await installProvider(control, cloudflareRef(controlId));
+      await runInDurableObject(control, async (instance, state) => {
+        await instance.initializeOwner(userId);
+        await seedRunningCloudflare(instance);
+        await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
+        await attachGrantedSession(instance, state, groupedRoute(sessionId, ROOT_ID, userId));
+        await attachGrantedSession(
+          instance,
+          state,
+          groupedRoute(siblingSessionId, SECOND_ROOT_ID, userId)
         );
-      }
-      await saveRouteTable(state.storage, routes);
-    });
-
-    const session = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
-    await runInDurableObject(session, async (instance, state) => {
-      await instance.registerSession({
-        identity: { sessionId, userId },
-        auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
-        agent: { mode: 'code', model: 'test' },
-        workspace: { sandboxId: controlId, workspacePath: '/workspace/deleted' },
-      });
-      await state.storage.put('session_messages', [
-        {
-          messageId: 'msg_deleted',
-          state: 'accepted',
-          acceptedAt: 1,
-          lastActivityAt: 1,
-        } satisfies SessionMessageRecord,
-      ]);
-    });
-
-    const ws = await connect(credential, controlId);
-    await completeHello(ws, 'hello-shared-delete', {
-      providerInstanceId: cloudflareRef(controlId),
-      wrapperInstanceId: crypto.randomUUID(),
-    });
-    signalWrapperReady(ws);
-    await vi.waitFor(async () => {
-      await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
-    });
-    ws.send(
-      JSON.stringify({
-        type: 'event',
-        event: 'sandbox.heartbeat',
-        payload: {
-          state: 'active',
-          kilo: { ready: true },
-          sessions: [ROOT_ID, SECOND_ROOT_ID].map(kiloSessionId => ({
+        const routes = await loadRouteTable(state.storage);
+        for (const kiloSessionId of [ROOT_ID, SECOND_ROOT_ID]) {
+          applyReportedSessionState(
+            routes,
             kiloSessionId,
-            state: 'active',
-            idleForMs: 0,
-          })),
-        },
-      })
-    );
-    await vi.waitFor(async () => {
-      await runInDurableObject(control, async (_instance, state) => {
-        expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+            { state: 'active', idleForMs: 0 },
+            Date.now()
+          );
+        }
+        await saveRouteTable(state.storage, routes);
       });
-    });
-    const abortRequests: {
-      operation: string;
-      session: { sessionId: string; kiloSessionId: string; directory: string };
-    }[] = [];
-    ws.addEventListener('message', event => {
-      const request = JSON.parse(String(event.data)) as {
-        operation?: string;
-        requestId: string;
-        session: { sessionId: string; kiloSessionId: string; directory: string };
-      };
-      if (request.operation !== 'session.abort' && request.operation !== 'session.detach') return;
-      abortRequests.push({ operation: request.operation, session: request.session });
+
+      const session = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+      await runInDurableObject(session, async (instance, state) => {
+        await instance.registerSession({
+          identity: { sessionId, userId },
+          auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+          agent: { mode: 'code', model: 'test' },
+          workspace: {
+            sandboxId: controlId,
+            workspacePath: '/workspace/shared',
+            worktreeId: WORKTREE_ID,
+          },
+        });
+        const acceptedAt = messageState === 'accepted_overdue' ? 1 : Date.now();
+        await state.storage.put('session_messages', [
+          {
+            messageId: 'msg_deleted',
+            state: messageState === 'accepted' ? 'accepted' : 'failed',
+            ...(messageState === 'accepted_overdue' ? { failedReason: 'accepted_overdue' } : {}),
+            wrapperInstanceId,
+            acceptedAt,
+            lastActivityAt: acceptedAt,
+          } satisfies SessionMessageRecord,
+        ]);
+        if (messageState !== 'accepted') {
+          await expect(instance.getCurrentMessageWork()).resolves.toBeNull();
+        }
+      });
+
+      const ws = await connect(credential, controlId);
+      await completeHello(ws, 'hello-shared-delete', {
+        providerInstanceId: cloudflareRef(controlId),
+        wrapperInstanceId,
+      });
+      signalWrapperReady(ws);
+      await vi.waitFor(async () => {
+        await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
+      });
       ws.send(
         JSON.stringify({
-          type: 'response',
-          requestId: request.requestId,
-          ok: true,
-          result:
-            request.operation === 'session.abort' ? { status: 'aborted' } : { detached: true },
+          type: 'event',
+          event: 'sandbox.heartbeat',
+          payload: {
+            state: 'active',
+            kilo: { ready: true },
+            sessions: [ROOT_ID, SECOND_ROOT_ID].map(kiloSessionId => ({
+              kiloSessionId,
+              state: 'active',
+              idleForMs: 0,
+            })),
+          },
         })
       );
-    });
+      await vi.waitFor(async () => {
+        await runInDurableObject(control, async (_instance, state) => {
+          expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+        });
+      });
+      const lifecycleRequests: {
+        operation: string;
+        session: { sessionId: string; kiloSessionId: string; directory: string };
+      }[] = [];
+      ws.addEventListener('message', event => {
+        const request = JSON.parse(String(event.data)) as {
+          operation?: string;
+          requestId: string;
+          session: { sessionId: string; kiloSessionId: string; directory: string };
+        };
+        if (request.operation !== 'session.abort' && request.operation !== 'session.detach') return;
+        lifecycleRequests.push({ operation: request.operation, session: request.session });
+        ws.send(
+          JSON.stringify({
+            type: 'response',
+            requestId: request.requestId,
+            ok: true,
+            result:
+              request.operation === 'session.abort' ? { status: 'aborted' } : { detached: true },
+          })
+        );
+      });
 
-    await runInDurableObject(session, instance => instance.deleteSession());
-    await runInDurableObject(control, async (instance, state) => {
-      await expect(instance.listRoutes()).resolves.toEqual([
-        expect.objectContaining({
-          sessionId: siblingSessionId,
-          kiloSessionId: SECOND_ROOT_ID,
-          lastState: 'active',
-        }),
-      ]);
-      await expect(instance.getPhysicalRecord()).resolves.toMatchObject({ state: 'running' });
-      expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
-    });
-    await runInDurableObject(session, async instance => {
-      await expect(instance.getMetadata()).resolves.toBeNull();
-    });
-    expect(abortRequests).toEqual([
-      {
-        operation: 'session.abort',
-        session: {
-          sessionId,
-          kiloSessionId: ROOT_ID,
-          directory: '/workspace/deleted',
-        },
-      },
-      {
-        operation: 'session.detach',
-        session: {
-          sessionId,
-          kiloSessionId: ROOT_ID,
-          directory: '/workspace/deleted',
-        },
-      },
-    ]);
-    expect(provider.stop).not.toHaveBeenCalled();
-    expect(provider.create).not.toHaveBeenCalled();
-    ws.close();
-  });
+      await runInDurableObject(session, instance => instance.deleteSession());
+      await runInDurableObject(control, async (instance, state) => {
+        await expect(instance.listRoutes()).resolves.toEqual([
+          expect.objectContaining({
+            sessionId: siblingSessionId,
+            kiloSessionId: SECOND_ROOT_ID,
+            lastState: 'active',
+          }),
+        ]);
+        await expect(instance.getPhysicalRecord()).resolves.toMatchObject({ state: 'running' });
+        expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+        expect(
+          (await loadSessionCredentialGrants(state.storage)).flatMap(grant => grant.members)
+        ).toEqual([{ sessionId: siblingSessionId, kiloSessionId: SECOND_ROOT_ID }]);
+      });
+      await runInDurableObject(session, async instance => {
+        await expect(instance.getMetadata()).resolves.toBeNull();
+      });
+      const operations =
+        messageState === 'accepted' ? ['session.abort', 'session.detach'] : ['session.detach'];
+      expect(lifecycleRequests).toEqual(
+        operations.map(operation => ({
+          operation,
+          session: { sessionId, kiloSessionId: ROOT_ID, directory: '/workspace/shared' },
+        }))
+      );
+      expect(provider.stop).not.toHaveBeenCalled();
+      expect(provider.create).not.toHaveBeenCalled();
+      ws.close();
+    }
+  );
 
   it('preserves repository branches and structured initial and follow-up command turns', async () => {
     const userId = 'user_control_commands' as const;
@@ -10573,6 +10583,301 @@ describe('SandboxSession root-scoped reconnect sync', () => {
   });
 });
 
+describe('SandboxControl Vercel runtime identity', () => {
+  const ownerId = 'user_vercel_rotation';
+  const originalLocator: VercelProviderLocator = {
+    teamId: 'team_original',
+    projectId: 'project_original',
+    snapshotId: 'snapshot_original',
+    runtimeBuildId: 'build_original',
+    runtime: 'node24',
+  };
+  const currentLocator: VercelProviderLocator = {
+    teamId: 'team_current',
+    projectId: 'project_current',
+    snapshotId: 'snapshot_current',
+    runtimeBuildId: 'build_current',
+    runtime: 'node24',
+  };
+
+  function runtimeEnv(locator: VercelProviderLocator) {
+    return {
+      VERCEL_TOKEN: 'test-vercel-token',
+      VERCEL_TEAM_ID: locator.teamId,
+      VERCEL_PROJECT_ID: locator.projectId,
+      VERCEL_SANDBOX_SNAPSHOT_ID: locator.snapshotId,
+      VERCEL_SANDBOX_RUNTIME_BUILD_ID: locator.runtimeBuildId,
+      VERCEL_SANDBOX_RUNTIME: locator.runtime,
+      VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+      VERCEL_SANDBOX_EXTEND_DURATION_MS: '120000',
+      WORKER_URL: 'https://worker.test',
+      KILOCODE_BACKEND_BASE_URL: CONTAINMENT_TARGETS.backendBaseUrl,
+      KILO_OPENROUTER_BASE: CONTAINMENT_TARGETS.providerBaseUrl,
+      KILO_SESSION_INGEST_URL: CONTAINMENT_TARGETS.sessionIngestBaseUrl,
+      GIT_TOKEN_SERVICE: fakeCredentialBroker().binding,
+    };
+  }
+
+  function providerEnvelope(name: string, locator: VercelProviderLocator, intentId: string) {
+    return {
+      sandbox: {
+        name,
+        currentSessionId: 'vsess_1',
+        status: 'running',
+        persistent: false,
+        createdAt: 1,
+        updatedAt: 1,
+        tags: {
+          'kilo-managed-by': 'cloud-agent-session',
+          'kilo-create-operation': intentId,
+          'kilo-runtime-build': locator.runtimeBuildId,
+        },
+      },
+      session: {
+        id: 'vsess_1',
+        sourceSandboxName: name,
+        projectId: locator.projectId,
+        sourceSnapshotId: locator.snapshotId,
+        runtime: locator.runtime,
+        status: 'running',
+        memory: 2048,
+        vcpus: 2,
+        region: 'iad1',
+        timeout: 300000,
+        requestedAt: 1,
+        cwd: '/',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      routes: [],
+    };
+  }
+
+  async function seedRuntime(physicalState: 'stopped' | 'running' | 'creating' | 'failed') {
+    const name = `ses-${crypto.randomUUID().replaceAll('-', '')}` as const;
+    const stub = env.SANDBOX_CONTROL.getByName(name);
+    await env.SANDBOX_SESSION.getByName(`${ownerId}:${GRANT_SESSION_ID}`).registerSession({
+      identity: { sessionId: GRANT_SESSION_ID, userId: ownerId },
+      auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+      agent: {},
+      workspace: {
+        sandboxId: name,
+        sandboxProvider: 'vercel',
+        workspacePath: '/workspace/contained',
+      },
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      const originalEnv = instance['env'];
+      Object.assign(instance, { env: { ...originalEnv, ...runtimeEnv(originalLocator) } });
+      try {
+        await instance.ensureReady({
+          ownerId,
+          sessionId: GRANT_SESSION_ID,
+          provider: 'vercel',
+          allowCreate: false,
+        });
+        const physical = await instance.claimCreate(
+          'intent_original',
+          false,
+          name,
+          WORKTREE_CREDENTIAL_CONTAINMENT
+        );
+        if (!physical.createIntent) throw new Error('Missing persisted create intent');
+        await savePhysicalRecord(state.storage, {
+          ...physical,
+          createIntent: {
+            ...physical.createIntent,
+            createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
+          },
+        });
+        if (physicalState !== 'creating') {
+          await instance.confirmInstance(
+            encodeVercelProviderRef({ sandboxName: name, sessionId: 'vsess_1' })
+          );
+          if (physicalState === 'stopped') {
+            await instance.beginStop('idle');
+            await instance.confirmStopped();
+          } else if (physicalState === 'failed') {
+            await instance.markFailed();
+          }
+        }
+        expect(await state.storage.get('provider_locator')).toEqual(originalLocator);
+      } finally {
+        Object.assign(instance, { env: originalEnv });
+      }
+    });
+    await abortAllDurableObjects();
+    return { name, stub: env.SANDBOX_CONTROL.getByName(name) };
+  }
+
+  it.each(['stopped', 'failed'] as const)(
+    'creates from the current image after a %s runtime and config rotation',
+    async physicalState => {
+      const { name, stub } = await seedRuntime(physicalState);
+      await runInDurableObject(stub, async (instance, state) => {
+        const originalEnv = instance['env'];
+        Object.assign(instance, { env: { ...originalEnv, ...runtimeEnv(currentLocator) } });
+        const requests: Request[] = [];
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+          const request = new Request(input, init);
+          requests.push(request);
+          const pathname = new URL(request.url).pathname;
+          if (pathname.endsWith('/stop')) {
+            return Response.json({
+              session: {
+                ...providerEnvelope(name, originalLocator, 'intent_original').session,
+                status: 'stopped',
+              },
+            });
+          }
+          if (pathname === '/v2/sandboxes') {
+            const physical = await instance.getPhysicalRecord();
+            expect(physical.state).toBe('creating');
+            expect(await state.storage.get('provider_locator')).toEqual(currentLocator);
+            if (!physical.createIntent?.allocationName)
+              throw new Error('Missing persisted create intent');
+            return Response.json(
+              providerEnvelope(
+                physical.createIntent.allocationName,
+                currentLocator,
+                physical.createIntent.intentId
+              )
+            );
+          }
+          if (pathname.endsWith('/network-policy')) {
+            const physical = await instance.getPhysicalRecord();
+            if (!physical.createIntent?.allocationName)
+              throw new Error('Missing persisted create intent');
+            return Response.json({
+              session: providerEnvelope(
+                physical.createIntent.allocationName,
+                currentLocator,
+                physical.createIntent.intentId
+              ).session,
+            });
+          }
+          if (pathname.endsWith('/cmd')) {
+            return Response.json({
+              command: {
+                id: 'cmd_1',
+                name: 'sh',
+                args: [],
+                cwd: '/',
+                sessionId: 'vsess_1',
+                exitCode: null,
+                startedAt: 1,
+              },
+            });
+          }
+          throw new Error(`Unexpected provider request: ${pathname}`);
+        });
+        try {
+          await expect(
+            instance.ensureReady({
+              ownerId,
+              sessionId: GRANT_SESSION_ID,
+              provider: 'vercel',
+              allowCreate: true,
+            })
+          ).resolves.toMatchObject({ physical: 'running' });
+          const create = requests.find(
+            request => new URL(request.url).pathname === '/v2/sandboxes'
+          );
+          if (!create) throw new Error('Missing provider create request');
+          expect(new URL(create.url).searchParams.get('teamId')).toBe(currentLocator.teamId);
+          await expect(create.json()).resolves.toMatchObject({
+            projectId: currentLocator.projectId,
+            source: { type: 'snapshot', snapshotId: currentLocator.snapshotId },
+            runtime: currentLocator.runtime,
+            tags: { 'kilo-runtime-build': currentLocator.runtimeBuildId },
+          });
+          expect(await state.storage.get('provider_locator')).toEqual(currentLocator);
+          if (physicalState === 'failed') {
+            expect(new URL(requests[0].url).pathname).toBe('/v2/sandboxes/sessions/vsess_1/stop');
+            expect(new URL(requests[0].url).searchParams.get('teamId')).toBe(
+              originalLocator.teamId
+            );
+          }
+        } finally {
+          fetchMock.mockRestore();
+          Object.assign(instance, { env: originalEnv });
+        }
+      });
+    }
+  );
+
+  it.each(['running', 'creating'] as const)(
+    'preserves the original locator for %s runtime recovery and cleanup after config rotation',
+    async physicalState => {
+      const { name, stub } = await seedRuntime(physicalState);
+      await runInDurableObject(stub, async (instance, state) => {
+        const originalEnv = instance['env'];
+        Object.assign(instance, { env: { ...originalEnv, ...runtimeEnv(currentLocator) } });
+        const requests: URL[] = [];
+        const originalEnvelope = providerEnvelope(name, originalLocator, 'intent_original');
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+          const url = new URL(new Request(input, init).url);
+          requests.push(url);
+          if (url.pathname === `/v2/sandboxes/${name}`) {
+            return Response.json({ ...originalEnvelope, resumed: false });
+          }
+          if (url.pathname === '/v2/sandboxes/sessions/vsess_1/stop') {
+            return Response.json({ session: { ...originalEnvelope.session, status: 'stopped' } });
+          }
+          if (url.pathname === '/v2/sandboxes/sessions/vsess_1/network-policy') {
+            return Response.json({ session: originalEnvelope.session });
+          }
+          throw new Error(`Unexpected provider request: ${url.pathname}`);
+        });
+        try {
+          await expect(
+            instance.ensureReady({
+              ownerId,
+              sessionId: GRANT_SESSION_ID,
+              provider: 'vercel',
+              allowCreate: false,
+            })
+          ).resolves.toMatchObject({ physical: physicalState });
+          expect(requests.map(url => url.pathname)).toEqual(
+            physicalState === 'running' ? ['/v2/sandboxes/sessions/vsess_1/network-policy'] : []
+          );
+          await expect(instance.claimCreate('intent_replacement')).rejects.toThrow(
+            `claimCreate from ${physicalState}`
+          );
+          expect(await state.storage.get('provider_locator')).toEqual(originalLocator);
+          if (physicalState === 'creating') {
+            const physical = await instance.getPhysicalRecord();
+            const provider = instance['provider'];
+            if (!physical.createIntent) throw new Error('Missing create recovery');
+            const resolved = await provider.observe(physical.providerRef, physical.createIntent);
+            if (!resolved.providerRef) throw new Error('Original creation was not recovered');
+            expect(resolved.status).toBe('active');
+            await instance.confirmInstance(resolved.providerRef);
+            expect(requests[0].searchParams.get('projectId')).toBe(originalLocator.projectId);
+            expect(requests[0].searchParams.get('resume')).toBe('false');
+          }
+          await saveDeadlines(state.storage, { idleStop: Date.now() - 1 });
+          await instance.alarm();
+          await expect(instance.getPhysicalRecord()).resolves.toMatchObject({ state: 'stopped' });
+          expect(await state.storage.get('provider_locator')).toEqual(originalLocator);
+          expect(requests.map(url => url.pathname)).toEqual([
+            ...(physicalState === 'creating'
+              ? [`/v2/sandboxes/${name}`]
+              : ['/v2/sandboxes/sessions/vsess_1/network-policy']),
+            '/v2/sandboxes/sessions/vsess_1/stop',
+          ]);
+          expect(
+            requests.every(url => url.searchParams.get('teamId') === originalLocator.teamId)
+          ).toBe(true);
+        } finally {
+          fetchMock.mockRestore();
+          Object.assign(instance, { env: originalEnv });
+        }
+      });
+    }
+  );
+});
+
 describe('SandboxSession targeted deletion', () => {
   it('detaches the deleted root before removing metadata and preserves sibling state', async () => {
     const ownerId = 'user_grouped_delete';
@@ -10631,9 +10936,12 @@ describe('SandboxSession targeted deletion', () => {
     });
   });
 
-  it('retains cleanup metadata and the route but revokes credentials when live wrapper detach fails', async () => {
+  it('revokes credentials on failed detach and resumes public deletion without exposing fenced metadata or deleting sibling state', async () => {
     const ownerId = 'user_grouped_delete_failed';
     const sessionId = GRANT_SESSION_ID;
+    const siblingSessionId = SECOND_GRANT_SESSION_ID;
+    const kiloSessionId = ROOT_ID;
+    const siblingKiloSessionId = SECOND_ROOT_ID;
     const targetSandboxId = 'usr-abcdef123406';
     const credential = generateSandboxCredential();
     const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
@@ -10643,51 +10951,179 @@ describe('SandboxSession targeted deletion', () => {
       await attachGrantedSession(
         instance,
         instance['ctx'],
-        groupedRoute(sessionId, ROOT_ID, ownerId)
+        groupedRoute(sessionId, kiloSessionId, ownerId)
+      );
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(siblingSessionId, siblingKiloSessionId, ownerId)
       );
     });
     const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
-    await runInDurableObject(session, instance =>
-      instance.registerSession(
+    const sibling = env.SANDBOX_SESSION.getByName(`${ownerId}:${siblingSessionId}`);
+    for (const [stub, rootSessionId, rootKiloSessionId] of [
+      [session, sessionId, kiloSessionId],
+      [sibling, siblingSessionId, siblingKiloSessionId],
+    ] as const) {
+      await stub.registerSession(
         groupedRegistration({
           ownerId,
-          sessionId,
-          kiloSessionId: ROOT_ID,
+          sessionId: rootSessionId,
+          kiloSessionId: rootKiloSessionId,
           sandboxId: targetSandboxId,
         })
+      );
+      await stub.receiveSandboxControlEvent({
+        identity: { directory: '/workspace/shared', kiloSessionId: rootKiloSessionId },
+        payload: {
+          type: 'message.updated',
+          properties: { info: { id: INITIAL_MESSAGE_ID, sessionID: rootKiloSessionId } },
+        },
+      });
+    }
+    const siblingState = await runInDurableObject(sibling, async (_instance, state) => ({
+      metadata: await state.storage.get('session_metadata'),
+      events: persistedSessionEvents(state, ['kilocode']),
+    }));
+    const originalRoutes = await control.listRoutes();
+    const siblingGrants = await runInDurableObject(control, async (_instance, state) =>
+      (await loadSessionCredentialGrants(state.storage)).filter(grant =>
+        grant.members.some(member => member.sessionId === siblingSessionId)
       )
     );
+    expect(siblingGrants).toHaveLength(1);
+    const authorization = vi.mocked(requireCurrentSessionAccess);
+    authorization.mockResolvedValue({ kiloSessionId, organizationId: null });
+    const caller = router(createSessionManagementHandlers()).createCaller({
+      env,
+      userId: ownerId,
+      authToken: 'test-token',
+      request: new Request('http://worker.test/trpc/deleteSession'),
+    });
 
     const wrapper = await connect(credential, targetSandboxId);
-    await completeHello(wrapper, 'hello-grouped-delete-failure');
-    const incomingDetach = nextMessage(wrapper);
-    const deletion = runInDurableObject(session, instance => instance.deleteSession());
-    const detach = JSON.parse(await incomingDetach) as WrapperRequest;
-    wrapper.send(
-      JSON.stringify({
-        type: 'response',
-        requestId: detach.requestId,
-        ok: false,
-        error: { code: 'not_ready', message: 'live detach failed', retryable: true },
-      })
-    );
+    await completeHello(wrapper, 'hello-grouped-delete-failure', {
+      providerInstanceId: cloudflareRef(targetSandboxId),
+      wrapperInstanceId: crypto.randomUUID(),
+    });
+    signalWrapperReady(wrapper);
+    await vi.waitFor(async () => {
+      await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
+    });
+    const requests: RequestFrame[] = [];
+    let failDetach = true;
+    wrapper.addEventListener('message', event => {
+      const request = requestFrameSchema.parse(JSON.parse(String(event.data)));
+      requests.push(request);
+      wrapper.send(
+        JSON.stringify({
+          type: 'response',
+          requestId: request.requestId,
+          ...(request.operation === 'session.detach' && failDetach
+            ? {
+                ok: false,
+                error: { code: 'not_ready', message: 'live detach failed', retryable: true },
+              }
+            : { ok: true }),
+        })
+      );
+    });
 
-    await expect(deletion).rejects.toThrow('live detach failed');
-    await runInDurableObject(session, async (instance, state) => {
-      await expect(instance.getMetadata()).resolves.toBeNull();
-      expect(await state.storage.get('session_metadata')).toMatchObject({
-        identity: { sessionId },
+    try {
+      await expect(caller.deleteSession({ sessionId })).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to clean up session metadata',
       });
-      expect(await state.storage.get('session_lifecycle_fence')).toMatchObject({
-        state: 'deleted',
+      await runInDurableObject(session, async (instance, state) => {
+        await expect(instance.getMetadata()).resolves.toBeNull();
+        await expect(instance.getRuntimeLocation()).resolves.toMatchObject({
+          cloudAgentSessionId: sessionId,
+          sessionId: kiloSessionId,
+          location: { sandboxId: targetSandboxId },
+        });
+        expect(await state.storage.get('session_metadata')).toMatchObject({
+          identity: { sessionId },
+        });
+        expect(await state.storage.get('session_lifecycle_fence')).toMatchObject({
+          state: 'deleted',
+        });
+        expect(persistedSessionEvents(state, ['kilocode'])).toHaveLength(1);
       });
-    });
-    await runInDurableObject(control, async (instance, state) => {
-      expect(await instance.listRoutes()).toEqual([
-        expect.objectContaining({ sessionId, kiloSessionId: ROOT_ID }),
+      await expect(control.listRoutes()).resolves.toEqual(originalRoutes);
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await loadSessionCredentialGrants(state.storage)).toEqual(siblingGrants);
+      });
+      await expect(
+        session.registerSession(
+          groupedRegistration({
+            ownerId,
+            sessionId,
+            kiloSessionId,
+            sandboxId: targetSandboxId,
+          })
+        )
+      ).resolves.toMatchObject({ success: false });
+
+      const requestsBeforeRetry = requests.length;
+      authorization.mockRejectedValueOnce(
+        new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+      );
+      await expect(caller.deleteSession({ sessionId })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+      expect(requests).toHaveLength(requestsBeforeRetry);
+
+      await expect(caller.deleteSession({ sessionId })).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+      await expect(control.listRoutes()).resolves.toEqual(originalRoutes);
+      await expect(session.getRuntimeLocation()).resolves.not.toBeNull();
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await loadSessionCredentialGrants(state.storage)).toEqual(siblingGrants);
+      });
+
+      failDetach = false;
+      await expect(caller.deleteSession({ sessionId })).resolves.toEqual({ success: true });
+      await expect(control.listRoutes()).resolves.toEqual(
+        originalRoutes.filter(route => route.sessionId === siblingSessionId)
+      );
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({ state: 'running' });
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await loadSessionCredentialGrants(state.storage)).toEqual(siblingGrants);
+      });
+      await runInDurableObject(session, async (instance, state) => {
+        await expect(instance.getRuntimeLocation()).resolves.toBeNull();
+        expect(await state.storage.get('session_metadata')).toBeUndefined();
+        expect(persistedSessionEvents(state, ['kilocode'])).toEqual([]);
+        expect(await state.storage.get('session_lifecycle_fence')).toMatchObject({
+          state: 'deleted',
+        });
+      });
+      await expect(
+        runInDurableObject(sibling, async (_instance, state) => ({
+          metadata: await state.storage.get('session_metadata'),
+          events: persistedSessionEvents(state, ['kilocode']),
+        }))
+      ).resolves.toEqual(siblingState);
+      expect(requests.map(request => request.operation)).toEqual([
+        'session.detach',
+        'session.detach',
+        'session.detach',
       ]);
-      expect(await loadSessionCredentialGrants(state.storage)).toEqual([]);
-    });
-    wrapper.close();
+      expect(requests.every(request => request.session?.kiloSessionId === kiloSessionId)).toBe(
+        true
+      );
+      expect(authorization).toHaveBeenCalledTimes(4);
+
+      await expect(caller.deleteSession({ sessionId })).resolves.toEqual({
+        success: true,
+        message: 'Session not found or already deleted',
+      });
+      expect(authorization).toHaveBeenCalledTimes(4);
+      expect(requests).toHaveLength(3);
+    } finally {
+      wrapper.close();
+      authorization.mockReset();
+    }
   });
 });

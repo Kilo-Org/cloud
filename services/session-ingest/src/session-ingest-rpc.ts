@@ -117,7 +117,11 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
   }
 
   async completeCloudAgentWorktreeDeletion(params: CloudAgentWorktreeDeletionParams) {
-    return completeWorktreeDeletion(this.env, cloudAgentWorktreeDeletionSchema.parse(params));
+    return completeWorktreeDeletion(
+      this.env,
+      cloudAgentWorktreeDeletionSchema.parse(params),
+      this.ctx
+    );
   }
 
   async canDestroyCloudAgentWorktreeSandbox(params: CanDestroyCloudAgentWorktreeSandboxParams) {

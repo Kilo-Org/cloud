@@ -360,11 +360,30 @@ export default function CloudChatPage({
     workspaceTabs.activeTabId === CHAT_TAB_ID &&
     (sessionIdFromParams !== null || selectedWorktreeId === null);
   const workspaceTabScope = getWorkspaceTabScope(selectedWorktreeId, sessionIdFromParams);
+  const workspaceIdentityResolved =
+    !sessionIdFromParams ||
+    selectedWorktreeId !== null ||
+    (fetchedSessionData?.kiloSessionId === sessionIdFromParams &&
+      fetchedSessionData.organizationId === (organizationId ?? null));
+  const [resolvedWorkspaceScope, setResolvedWorkspaceScope] = useState({
+    currentUserId,
+    organizationId,
+    scope: workspaceTabScope,
+  });
 
-  useEffect(() => {
+  if (
+    resolvedWorkspaceScope.currentUserId !== currentUserId ||
+    resolvedWorkspaceScope.organizationId !== organizationId ||
+    (workspaceIdentityResolved && resolvedWorkspaceScope.scope !== workspaceTabScope)
+  ) {
+    setResolvedWorkspaceScope({
+      currentUserId,
+      organizationId,
+      scope: workspaceIdentityResolved ? workspaceTabScope : null,
+    });
     setWorkspaceTabs(resetWorkspaceTabs);
     setTerminalStatuses({});
-  }, [workspaceTabScope]);
+  }
 
   useEffect(() => {
     if (preserveTerminalSelectionRef.current) {

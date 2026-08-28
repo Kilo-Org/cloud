@@ -1631,6 +1631,7 @@ export class SandboxControl extends DurableObject<Env> {
           runtime,
         });
         await this.ctx.storage.put(PROVIDER_LOCATOR_KEY, this.vercelLocator);
+        this.provider = this.createProviderAdapter('vercel', next);
       }
       await this.persistPhysicalState(current, next, 'demand');
       return next;

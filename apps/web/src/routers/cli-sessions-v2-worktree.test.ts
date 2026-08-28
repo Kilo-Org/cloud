@@ -42,6 +42,9 @@ const mockGetRuntimeSession = jest.fn<(sessionId: string) => Promise<Record<stri
 const mockDeleteSessionIngest = jest.fn<(sessionId: string, userId: string) => Promise<void>>();
 const mockFetchSessionSnapshot = jest.fn<() => Promise<null>>();
 const mockCaptureException = jest.fn();
+const afterCallbacks: Array<() => void | Promise<void>> = [];
+const mockBatchReviewDecisionFetch =
+  jest.fn<(pending: boolean, owner: { userId: string; organizationId: string | null }) => void>();
 const mockGenerateCloudAgentToken = jest.fn((_user: User) => 'cloud-agent-token');
 const mockCreateCloudAgentNextClient = jest.fn((_token: string) => ({
   deleteSession: mockRuntimeDelete,
@@ -101,7 +104,7 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
 }));
 
 jest.mock('@/lib/integrations/platforms/github/batch-review-decisions', () => ({
-  triggerBatchReviewDecisionFetchIfNeeded: jest.fn(),
+  triggerBatchReviewDecisionFetchIfNeeded: mockBatchReviewDecisionFetch,
 }));
 
 jest.mock('@/lib/cloud-agent/session-events', () => ({
@@ -109,7 +112,9 @@ jest.mock('@/lib/cloud-agent/session-events', () => ({
 }));
 
 jest.mock('next/server', () => ({
-  after: jest.fn(),
+  after: (callback: () => void | Promise<void>) => {
+    afterCallbacks.push(callback);
+  },
 }));
 
 type WorktreeCaller = ReturnType<typeof cliSessionsV2Router.createCaller>;
@@ -196,6 +201,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  afterCallbacks.length = 0;
   const userIds = [USER_ID, OTHER_USER_ID];
   await db
     .delete(cli_sessions_v2)
@@ -349,10 +355,56 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
 
     expect(result).toEqual({
       worktrees: {
-        [WORKTREE_ID]: { name: null, defaultTitle: ownershipRow.title, prSession: null },
+        [WORKTREE_ID]: {
+          name: null,
+          defaultTitle: ownershipRow.title,
+          prSession: null,
+          sessions: [{ sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null }],
+        },
       },
     });
     expect(await readWorktree()).toBeUndefined();
+  });
+
+  it('returns activity membership only for owned roots in the exact current scope', async () => {
+    const sibling = await insertSession({
+      status: 'busy',
+      status_updated_at: '2026-04-29 01:16:12.945+00',
+    });
+    await insertSession({ kilo_user_id: OTHER_USER_ID, status: 'question' });
+    await insertSession({ organization_id: ORGANIZATION_ID, status: 'permission' });
+    await insertSession({ organization_id: OTHER_ORGANIZATION_ID, status: 'question' });
+    await insertSession({ parent_session_id: SESSION_ID, status: 'permission' });
+    const otherWorktreeId = newWorktreeId();
+    const otherWorktreeSession = await insertSession({
+      cloud_agent_worktree_id: otherWorktreeId,
+      status: 'retry',
+    });
+
+    const details = await createCaller({ user }).worktreeDetails({
+      worktreeIds: [WORKTREE_ID, otherWorktreeId],
+      organizationId: null,
+    });
+
+    expect(details.worktrees[WORKTREE_ID].sessions).toEqual(
+      [
+        { sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null },
+        {
+          sessionId: sibling.session_id,
+          sessionStatus: 'busy',
+          sessionStatusUpdatedAt: '2026-04-29T01:16:12.945Z',
+        },
+      ].sort((a, b) => a.sessionId.localeCompare(b.sessionId))
+    );
+    expect(details.worktrees[otherWorktreeId].sessions).toEqual([
+      {
+        sessionId: otherWorktreeSession.session_id,
+        sessionStatus: 'retry',
+        sessionStatusUpdatedAt: null,
+      },
+    ]);
+    expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+    expect(mockGetRuntimeSession).not.toHaveBeenCalled();
   });
 
   it('derives the first root from full history rather than recent, searched, filtered, or capped rows', async () => {
@@ -364,6 +416,8 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         git_url: 'https://github.com/worktree-tests/original',
         created_at: '2020-01-01T00:00:00.000Z',
         updated_at: '2020-01-01T00:00:00.000Z',
+        status: 'question',
+        status_updated_at: '2020-01-01 00:00:00+00',
       })
       .where(eq(cli_sessions_v2.session_id, SESSION_ID));
     await db.insert(cli_sessions_v2).values(
@@ -397,6 +451,13 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
     expect(recent.cliSessions.some(session => session.session_id === SESSION_ID)).toBe(false);
     expect(search.results.some(session => session.session_id === SESSION_ID)).toBe(false);
     expect(details.worktrees[WORKTREE_ID].defaultTitle).toBe('Original worktree purpose');
+    expect(details.worktrees[WORKTREE_ID].sessions).toHaveLength(206);
+    expect(details.worktrees[WORKTREE_ID].sessions).toContainEqual({
+      sessionId: SESSION_ID,
+      sessionStatus: 'question',
+      sessionStatusUpdatedAt: '2020-01-01T00:00:00.000Z',
+    });
+    expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
   });
 
   it.each([null, '', '  \t\n', `New session - ${INITIAL_TIME}`, `Child session - ${INITIAL_TIME}`])(
@@ -413,7 +474,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         organizationId: null,
       });
 
-      expect(details.worktrees[WORKTREE_ID]).toEqual({
+      expect(details.worktrees[WORKTREE_ID]).toMatchObject({
         name: null,
         defaultTitle: null,
         prSession: null,
@@ -519,7 +580,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
       worktreeIds: [WORKTREE_ID],
       organizationId: null,
     });
-    expect(reloaded.worktrees[WORKTREE_ID]).toEqual({
+    expect(reloaded.worktrees[WORKTREE_ID]).toMatchObject({
       name: 'Custom worktree name',
       defaultTitle: 'New automatic first title',
       prSession: null,
@@ -541,6 +602,48 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
     );
     expect(renamed.name).toBe('Second name');
   });
+
+  it.each([null, ORGANIZATION_ID])(
+    'backdates lazy rename metadata to the oldest authorized member (organization=%s)',
+    async organizationId => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ organization_id: organizationId })
+        .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+      const oldest = await insertSession({
+        organization_id: organizationId,
+        created_at: '2020-01-02 03:04:05.678+00',
+      });
+      await insertSession({
+        kilo_user_id: OTHER_USER_ID,
+        organization_id: organizationId,
+        created_at: '2010-01-01T00:00:00.000Z',
+      });
+      await insertSession({
+        organization_id: organizationId === null ? ORGANIZATION_ID : null,
+        created_at: '2010-01-01T00:00:00.000Z',
+      });
+      const sessionsBeforeRename = await readSessions();
+      expect(await readWorktree()).toBeUndefined();
+
+      await expect(
+        createCaller({ user }).renameWorktree({
+          worktreeId: WORKTREE_ID,
+          organizationId,
+          name: 'Historical worktree',
+        })
+      ).resolves.toEqual({ name: 'Historical worktree' });
+
+      const worktree = await readWorktree();
+      expect(worktree).toMatchObject({
+        kilo_user_id: USER_ID,
+        organization_id: organizationId,
+        name: 'Historical worktree',
+      });
+      expect(worktree.created_at).toBe(oldest.created_at);
+      expect(await readSessions()).toEqual(sessionsBeforeRename);
+    }
+  );
 
   it('safely serializes concurrent first renames without duplicating metadata or changing ownership', async () => {
     const caller = createCaller({ user });
@@ -625,7 +728,14 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
           organizationId: null,
         })
       ).worktrees
-    ).toEqual({ [WORKTREE_ID]: { name: null, defaultTitle: ownershipRow.title, prSession: null } });
+    ).toEqual({
+      [WORKTREE_ID]: {
+        name: null,
+        defaultTitle: ownershipRow.title,
+        prSession: null,
+        sessions: [{ sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null }],
+      },
+    });
     expect(
       (
         await caller.worktreeDetails({
@@ -634,11 +744,11 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         })
       ).worktrees
     ).toEqual({
-      [orgWorktreeId]: {
+      [orgWorktreeId]: expect.objectContaining({
         name: 'Organization name',
         defaultTitle: 'Organization first chat',
         prSession: null,
-      },
+      }),
     });
     for (const organizationId of [null, OTHER_ORGANIZATION_ID]) {
       await expect(
@@ -731,6 +841,105 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
 });
 
 describe('cliSessionsV2 worktree PR projection', () => {
+  it.each([null, ORGANIZATION_ID])(
+    'refreshes a historical search-only pending PR through the existing tenant batch (organization=%s)',
+    async organizationId => {
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          organization_id: organizationId,
+          title: 'Historical pending PR',
+          git_url: GIT_URL,
+          git_branch: BRANCH,
+          created_at: '2020-01-01T00:00:00.000Z',
+          updated_at: '2020-01-01T00:00:00.000Z',
+        })
+        .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+      await db.insert(github_branch_pull_requests).values({
+        git_url: GIT_URL,
+        git_branch: BRANCH,
+        owned_by_user_id: organizationId === null ? USER_ID : null,
+        owned_by_organization_id: organizationId,
+        pr_url: PR_URL,
+        pr_number: 42,
+        pr_state: 'open',
+        review_decision_pending: true,
+      });
+      const caller = createCaller({ user });
+      const search = await caller.search({ search_string: 'Historical pending', organizationId });
+      expect(search.results.map(session => session.session_id)).toEqual([SESSION_ID]);
+      expect(afterCallbacks).toHaveLength(0);
+      await expect(
+        createCaller({ user: otherUser }).worktreeDetails({
+          worktreeIds: [WORKTREE_ID],
+          organizationId,
+        })
+      ).resolves.toEqual({ worktrees: {} });
+      expect(afterCallbacks).toHaveLength(0);
+
+      const details = await caller.worktreeDetails({ worktreeIds: [WORKTREE_ID], organizationId });
+      expect(details.worktrees[WORKTREE_ID].prSession?.associatedPr?.reviewDecisionPending).toBe(
+        true
+      );
+      expect(mockBatchReviewDecisionFetch).not.toHaveBeenCalled();
+      expect(afterCallbacks).toHaveLength(1);
+      await Promise.all(afterCallbacks.splice(0).map(callback => callback()));
+      expect(mockBatchReviewDecisionFetch).toHaveBeenCalledTimes(1);
+      expect(mockBatchReviewDecisionFetch).toHaveBeenCalledWith(true, {
+        userId: USER_ID,
+        organizationId,
+      });
+
+      await db
+        .update(github_branch_pull_requests)
+        .set({ review_decision_pending: false, pr_review_decision: 'approved' })
+        .where(eq(github_branch_pull_requests.git_url, GIT_URL));
+      const refreshed = await caller.worktreeDetails({
+        worktreeIds: [WORKTREE_ID],
+        organizationId,
+      });
+      expect(refreshed.worktrees[WORKTREE_ID].prSession?.associatedPr).toMatchObject({
+        reviewDecision: 'approved',
+        reviewDecisionPending: false,
+      });
+      expect(afterCallbacks).toHaveLength(0);
+    }
+  );
+
+  it('does not schedule a batch for empty, non-pending, or no-longer-authorized worktrees', async () => {
+    const caller = createCaller({ user });
+    await caller.worktreeDetails({ worktreeIds: [], organizationId: null });
+    await caller.worktreeDetails({ worktreeIds: [WORKTREE_ID], organizationId: null });
+    expect(afterCallbacks).toHaveLength(0);
+    await db
+      .update(cli_sessions_v2)
+      .set({ organization_id: ORGANIZATION_ID, git_url: GIT_URL, git_branch: BRANCH })
+      .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+    await db.insert(github_branch_pull_requests).values({
+      git_url: GIT_URL,
+      git_branch: BRANCH,
+      owned_by_organization_id: ORGANIZATION_ID,
+      pr_url: PR_URL,
+      pr_number: 42,
+      pr_state: 'open',
+      review_decision_pending: true,
+    });
+    await db
+      .delete(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, ORGANIZATION_ID),
+          eq(organization_memberships.kilo_user_id, USER_ID)
+        )
+      );
+
+    await expect(
+      caller.worktreeDetails({ worktreeIds: [WORKTREE_ID], organizationId: ORGANIZATION_ID })
+    ).resolves.toEqual({ worktrees: {} });
+    expect(afterCallbacks).toHaveLength(0);
+    expect(mockBatchReviewDecisionFetch).not.toHaveBeenCalled();
+  });
+
   it('selects an older real PR source beyond the 200-session sidebar cap', async () => {
     await db
       .update(cli_sessions_v2)

@@ -88,6 +88,5 @@ export async function resolveSandboxExclusivity(
     }
     if (!located) unavailable = true;
   }
-  if (unavailable) throw new Error(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE);
-  return true;
+  return !unavailable;
 }

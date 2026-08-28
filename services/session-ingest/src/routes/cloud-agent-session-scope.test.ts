@@ -197,106 +197,180 @@ describe('Cloud Agent session scope routes', () => {
     expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
   });
 
-  it('atomically heals the root and creates a session-scoped child', async () => {
-    const child = persistedRow();
-    const { db, insertedValues, updateSets } = makeDb(
-      [
+  it.each([undefined, rootSessionId])(
+    'creates a new scoped child with untrusted parent %s',
+    async parentSessionId => {
+      const child = persistedRow();
+      const { db, insertedValues, updateSets } = makeDb(
         [
-          {
-            sessionId: rootSessionId,
-            organizationId: child.organization_id,
-            cloudAgentSessionScopeId: null,
-          },
+          [
+            {
+              sessionId: rootSessionId,
+              organizationId: child.organization_id,
+              cloudAgentSessionScopeId: null,
+            },
+          ],
         ],
-      ],
-      [child]
-    );
-    vi.mocked(getWorkerDb).mockReturnValue(db as never);
-    const putValidated = vi.fn(async () => undefined);
-    vi.mocked(getSessionAccessCacheDO).mockReturnValue({ putValidated } as never);
+        [child]
+      );
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const putValidated = vi.fn(async () => undefined);
+      vi.mocked(getSessionAccessCacheDO).mockReturnValue({ putValidated } as never);
 
-    const response = await makeApp().fetch(
-      new Request('http://local/session', {
-        method: 'POST',
-        headers: assertionHeaders(),
-        body: JSON.stringify({ sessionId: childSessionId }),
-      }),
-      env
-    );
+      const response = await makeApp().fetch(
+        new Request('http://local/session', {
+          method: 'POST',
+          headers: assertionHeaders(),
+          body: JSON.stringify({ sessionId: childSessionId, parentSessionId }),
+        }),
+        env
+      );
 
-    expect(response.status).toBe(200);
-    expect(updateSets).toContainEqual({ cloud_agent_session_scope_id: cloudAgentSessionId });
-    expect(insertedValues).toContainEqual(
-      expect.objectContaining({
-        session_id: childSessionId,
+      expect(response.status).toBe(200);
+      expect(updateSets).toContainEqual({ cloud_agent_session_scope_id: cloudAgentSessionId });
+      expect(insertedValues).toContainEqual(
+        expect.objectContaining({
+          session_id: childSessionId,
+          parent_session_id: rootSessionId,
+          cloud_agent_session_scope_id: cloudAgentSessionId,
+          cloud_agent_session_id: null,
+        })
+      );
+      expect(putValidated).toHaveBeenCalledWith({
+        sessionId: childSessionId,
+        organizationId: child.organization_id,
+        cloudAgentSessionScopeId: cloudAgentSessionId,
+      });
+    }
+  );
+
+  it.each([
+    { organizationId: null, existingOrganizationId: null },
+    { organizationId: '11111111-1111-4111-8111-111111111111', existingOrganizationId: null },
+    {
+      organizationId: '11111111-1111-4111-8111-111111111111',
+      existingOrganizationId: '11111111-1111-4111-8111-111111111111',
+    },
+  ])(
+    'adopts a public-sync-first orphan with trusted lineage from $existingOrganizationId into $organizationId',
+    async ({ organizationId, existingOrganizationId }) => {
+      const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+      const child = persistedRow({
+        organization_id: existingOrganizationId,
+        parent_session_id: null,
+        cloud_agent_session_scope_id: null,
+        title: 'Already synced child',
+        git_url: 'https://github.com/acme/repo',
+        status: 'idle',
+      });
+      const linked = {
+        ...child,
+        organization_id: organizationId,
         parent_session_id: rootSessionId,
         cloud_agent_session_scope_id: cloudAgentSessionId,
-        cloud_agent_session_id: null,
-      })
-    );
-    expect(putValidated).toHaveBeenCalledWith({
-      sessionId: childSessionId,
-      organizationId: child.organization_id,
-      cloudAgentSessionScopeId: cloudAgentSessionId,
-    });
-  });
-
-  it('persists engine-created child lineage before its first turn when public bootstrap won the race', async () => {
-    const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
-    const child = persistedRow({
-      organization_id: null,
-      parent_session_id: null,
-      cloud_agent_session_scope_id: null,
-      cloud_agent_worktree_id: null,
-      status: null,
-    });
-    const linked = {
-      ...child,
-      parent_session_id: rootSessionId,
-      cloud_agent_session_scope_id: cloudAgentSessionId,
-      cloud_agent_worktree_id: worktreeId,
-    };
-    const { db, updateSets } = makeDb(
-      [
+        cloud_agent_worktree_id: worktreeId,
+      };
+      const { db, updateSets } = makeDb(
         [
-          {
-            sessionId: rootSessionId,
-            organizationId: null,
-            cloudAgentSessionScopeId: cloudAgentSessionId,
-            worktreeId,
-          },
+          [
+            {
+              sessionId: rootSessionId,
+              organizationId,
+              cloudAgentSessionScopeId: cloudAgentSessionId,
+              worktreeId,
+            },
+          ],
+          [],
+          [child],
         ],
         [],
-        [child],
-      ],
-      [],
-      [linked]
-    );
-    vi.mocked(getWorkerDb).mockReturnValue(db as never);
-    const putValidated = vi.fn(async () => undefined);
-    vi.mocked(getSessionAccessCacheDO).mockReturnValue({ putValidated } as never);
+        [linked]
+      );
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const putValidated = vi.fn(async () => undefined);
+      vi.mocked(getSessionAccessCacheDO).mockReturnValue({ putValidated } as never);
 
-    const response = await makeApp().fetch(
-      new Request('http://local/session', {
-        method: 'POST',
-        headers: assertionHeaders(),
-        body: JSON.stringify({ sessionId: childSessionId, parentSessionId: rootSessionId }),
-      }),
-      env
-    );
+      const response = await makeApp().fetch(
+        new Request('http://local/session', {
+          method: 'POST',
+          headers: {
+            ...assertionHeaders(),
+            [cloudAgentSessionScopeHeaders.trustedLineage]: '1',
+          },
+          body: JSON.stringify({ sessionId: childSessionId, parentSessionId: rootSessionId }),
+        }),
+        env
+      );
 
-    expect(response.status).toBe(200);
-    expect(updateSets).toContainEqual({
-      parent_session_id: rootSessionId,
-      cloud_agent_session_scope_id: cloudAgentSessionId,
-      cloud_agent_worktree_id: worktreeId,
-    });
-    expect(putValidated).toHaveBeenCalledWith({
-      sessionId: childSessionId,
-      organizationId: null,
-      cloudAgentSessionScopeId: cloudAgentSessionId,
-    });
-  });
+      expect(response.status).toBe(200);
+      expect(updateSets).toEqual([
+        {
+          parent_session_id: rootSessionId,
+          cloud_agent_session_scope_id: cloudAgentSessionId,
+          cloud_agent_worktree_id: worktreeId,
+          ...(existingOrganizationId !== organizationId ? { organization_id: organizationId } : {}),
+        },
+      ]);
+      expect(putValidated).toHaveBeenCalledWith({
+        sessionId: childSessionId,
+        organizationId,
+        cloudAgentSessionScopeId: cloudAgentSessionId,
+      });
+    }
+  );
+
+  it.each([
+    { organizationId: null, title: null, status: null },
+    {
+      organizationId: '11111111-1111-4111-8111-111111111111',
+      title: 'Unrelated populated CLI session',
+      status: 'idle',
+    },
+  ])(
+    'rejects untrusted adoption with a supplied parent in scope $organizationId',
+    async ({ organizationId, title, status }) => {
+      const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+      const child = persistedRow({
+        organization_id: organizationId,
+        parent_session_id: null,
+        cloud_agent_session_scope_id: null,
+        title,
+        status,
+      });
+      const { db, updateSets } = makeDb(
+        [
+          [
+            {
+              sessionId: rootSessionId,
+              organizationId,
+              cloudAgentSessionScopeId: cloudAgentSessionId,
+              worktreeId,
+            },
+          ],
+          [],
+          [child],
+        ],
+        [],
+        [{ ...child, parent_session_id: rootSessionId, cloud_agent_worktree_id: worktreeId }]
+      );
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      vi.mocked(getSessionAccessCacheDO).mockReturnValue({ putValidated: vi.fn() } as never);
+
+      const response = await makeApp().fetch(
+        new Request('http://local/session', {
+          method: 'POST',
+          headers: assertionHeaders(),
+          body: JSON.stringify({ sessionId: childSessionId, parentSessionId: rootSessionId }),
+        }),
+        env
+      );
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ success: false, error: 'session_scope_conflict' });
+      expect(updateSets).toEqual([]);
+      expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     ['organization', { organization_id: '22222222-2222-4222-8222-222222222222' }],
@@ -331,7 +405,10 @@ describe('Cloud Agent session scope routes', () => {
     const response = await makeApp().fetch(
       new Request('http://local/session', {
         method: 'POST',
-        headers: assertionHeaders(),
+        headers: {
+          ...assertionHeaders(),
+          [cloudAgentSessionScopeHeaders.trustedLineage]: '1',
+        },
         body: JSON.stringify({ sessionId: childSessionId, parentSessionId: rootSessionId }),
       }),
       env

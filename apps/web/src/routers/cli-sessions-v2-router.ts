@@ -42,6 +42,7 @@ import {
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   cloudAgentWorktreeIdSchema,
   isDefaultSessionTitle,
+  projectPrivateWorktreePaths,
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
@@ -141,9 +142,14 @@ function projectGroupedTranscriptPaths(value: unknown, directory: string): void 
   }
 }
 
-function projectGroupedSessionTranscript<T>(value: T, kiloSessionId: string): T {
-  const projected = structuredClone(value);
-  projectGroupedTranscriptPaths(projected, `/cloud-agent/sessions/${kiloSessionId}`);
+function projectGroupedSessionTranscript<T extends object>(
+  value: T,
+  kiloSessionId: string,
+  metadata: readonly unknown[]
+): T {
+  const directory = `/cloud-agent/sessions/${kiloSessionId}`;
+  const projected = projectPrivateWorktreePaths(value, metadata, directory);
+  projectGroupedTranscriptPaths(projected, directory);
   return projected;
 }
 
@@ -529,6 +535,11 @@ function projectAssociatedPr<
 type WorktreeDetail = {
   name: string | null;
   defaultTitle: string | null;
+  sessions: {
+    sessionId: string;
+    sessionStatus: string | null;
+    sessionStatusUpdatedAt: string | null;
+  }[];
   prSession:
     | (Pick<CliSessionV2, keyof typeof commonSessionFields | 'total_cost_microdollars'> & {
         associatedPr: z.infer<typeof associatedPrSchema> | null;
@@ -849,7 +860,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       cli_sessions_v2.cloud_agent_worktree_id
     );
 
-    const [firstSessions, prRows] = await Promise.all([
+    const [firstSessions, prRows, activityRows] = await Promise.all([
       db
         .selectDistinctOn([cli_sessions_v2.cloud_agent_worktree_id], {
           worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
@@ -888,8 +899,32 @@ export const cliSessionsV2Router = createTRPCRouter({
           desc(cli_sessions_v2.updated_at),
           asc(cli_sessions_v2.session_id)
         ),
+      db
+        .select({
+          worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+          sessions: sql<WorktreeDetail['sessions']>`json_agg(json_build_object(
+            'sessionId', ${cli_sessions_v2.session_id},
+            'sessionStatus', ${cli_sessions_v2.status},
+            'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at}
+          ) ORDER BY ${cli_sessions_v2.session_id})`,
+        })
+        .from(cli_sessions_v2)
+        .leftJoin(cloud_agent_worktrees, metadataJoin)
+        .where(scopeCondition)
+        .groupBy(cli_sessions_v2.cloud_agent_worktree_id),
     ]);
 
+    const activityByWorktree = new Map(
+      activityRows.map(row => [
+        row.worktreeId,
+        row.sessions.map(session => ({
+          ...session,
+          sessionStatusUpdatedAt: session.sessionStatusUpdatedAt
+            ? new Date(session.sessionStatusUpdatedAt).toISOString()
+            : null,
+        })),
+      ])
+    );
     const prSessions = new Map<string, NonNullable<WorktreeDetail['prSession']>>();
     for (const row of prRows) {
       const session = projectAssociatedPr(row);
@@ -918,8 +953,20 @@ export const cliSessionsV2Router = createTRPCRouter({
         name: session.name,
         defaultTitle:
           session.title?.trim() && !isDefaultSessionTitle(session.title) ? session.title : null,
+        sessions: activityByWorktree.get(session.worktreeId) ?? [],
         prSession: prSessions.get(session.worktreeId) ?? null,
       };
+    }
+    const hasPendingPrRows = Object.values(worktrees).some(
+      worktree => worktree.prSession?.associatedPr?.reviewDecisionPending === true
+    );
+    if (hasPendingPrRows) {
+      after(() =>
+        triggerBatchReviewDecisionFetchIfNeeded(hasPendingPrRows, {
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+        })
+      );
     }
     return { worktrees };
   }),
@@ -930,7 +977,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       db.transaction(async tx => {
         const membershipCondition = worktreeMembershipCondition(ctx.user.id, input.organizationId);
         const [session] = await tx
-          .select({ sessionId: cli_sessions_v2.session_id })
+          .select({ createdAt: cli_sessions_v2.created_at })
           .from(cli_sessions_v2)
           .where(
             and(
@@ -942,6 +989,7 @@ export const cliSessionsV2Router = createTRPCRouter({
               membershipCondition
             )
           )
+          .orderBy(asc(cli_sessions_v2.created_at))
           .limit(1);
 
         if (session) {
@@ -951,6 +999,7 @@ export const cliSessionsV2Router = createTRPCRouter({
               worktree_id: input.worktreeId,
               kilo_user_id: ctx.user.id,
               organization_id: input.organizationId,
+              created_at: session.createdAt,
             })
             .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
         }
@@ -1334,7 +1383,10 @@ export const cliSessionsV2Router = createTRPCRouter({
           return { info: {}, messages: [] };
         }
         return session.cloud_agent_worktree_id
-          ? projectGroupedSessionTranscript(snapshot, input.session_id)
+          ? projectGroupedSessionTranscript(snapshot, input.session_id, [
+              snapshot.info,
+              ...snapshot.messages.map(message => message.info),
+            ])
           : snapshot;
       } catch (error) {
         console.error(
@@ -1420,7 +1472,13 @@ export const cliSessionsV2Router = createTRPCRouter({
 
       return {
         ...(session.cloud_agent_worktree_id
-          ? projectGroupedSessionTranscript(result, input.session_id)
+          ? projectGroupedSessionTranscript(
+              result,
+              input.session_id,
+              result.history && 'messages' in result.history
+                ? result.history.messages.map(message => message.info)
+                : []
+            )
           : result),
         watermarkEventId,
       };

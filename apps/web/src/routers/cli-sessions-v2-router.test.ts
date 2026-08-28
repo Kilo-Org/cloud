@@ -215,7 +215,8 @@ describe('cli-sessions-v2-router', () => {
     });
 
     it('projects every grouped snapshot path into the distinct public chat directory', async () => {
-      const privateDirectory = '/srv/runtime/private/worktrees/worktree-secret';
+      const privateDirectory =
+        '/srv/runtime/private/worktrees/worktree_12345678-1234-4234-9234-123456789abc';
       const publicDirectory = `/cloud-agent/sessions/${sessionId}`;
       await db
         .update(cli_sessions_v2)
@@ -250,6 +251,16 @@ describe('cli-sessions-v2-router', () => {
                     type: 'tool',
                     state: {
                       status: 'completed',
+                      output: `Updated ${privateDirectory}/src/app.ts and src/relative.ts`,
+                      metadata: {
+                        outputs: [
+                          `${privateDirectory}/result.txt`,
+                          {
+                            output: `Read ${privateDirectory}/nested.txt`,
+                            relative: 'src/relative.ts',
+                          },
+                        ],
+                      },
                       attachments: [
                         {
                           id: 'prt_nested',
@@ -264,6 +275,11 @@ describe('cli-sessions-v2-router', () => {
                     id: 'prt_patch',
                     type: 'patch',
                     files: [`${privateDirectory}/src/app.ts`, 'relative.ts'],
+                  },
+                  {
+                    id: 'prt_text',
+                    type: 'text',
+                    text: `Read ${privateDirectory}/src/app.ts and src/relative.ts`,
                   },
                 ],
               },
@@ -298,8 +314,20 @@ describe('cli-sessions-v2-router', () => {
         info: { path: { cwd: publicDirectory, root: publicDirectory } },
         parts: [
           { url: '', source: { path: publicDirectory } },
-          { state: { attachments: [{ url: '', source: { path: publicDirectory } }] } },
+          {
+            state: {
+              output: `Updated ${publicDirectory}/src/app.ts and src/relative.ts`,
+              metadata: {
+                outputs: [
+                  `${publicDirectory}/result.txt`,
+                  { output: `Read ${publicDirectory}/nested.txt`, relative: 'src/relative.ts' },
+                ],
+              },
+              attachments: [{ url: '', source: { path: publicDirectory } }],
+            },
+          },
           { files: [publicDirectory, 'relative.ts'] },
+          { text: `Read ${publicDirectory}/src/app.ts and src/relative.ts` },
         ],
       });
       expect(result.messages[1]).toMatchObject({
@@ -314,6 +342,40 @@ describe('cli-sessions-v2-router', () => {
       });
       expect(JSON.stringify(result)).not.toContain(privateDirectory);
     });
+
+    it.each([true, false])(
+      'uses validated snapshot metadata rather than discovering prefixes in free text (metadata=%s)',
+      async hasDirectoryMetadata => {
+        const privateDirectory =
+          '/srv/runtime/private/worktrees/worktree_12345678-1234-4234-9234-123456789abc';
+        await db
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+          .where(eq(cli_sessions_v2.session_id, sessionId));
+        fetchSpy.mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              info: { id: sessionId, directory: hasDirectoryMetadata ? privateDirectory : '/' },
+              messages: [
+                {
+                  info: { id: 'msg_user', role: 'user' },
+                  parts: [
+                    { id: 'prt_text', type: 'text', text: `Read ${privateDirectory}/file.txt` },
+                  ],
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+        );
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getSessionMessages({ session_id: sessionId });
+
+        expect(result.messages[0].parts[0]).toMatchObject({
+          text: `Read ${hasDirectoryMetadata ? `/cloud-agent/sessions/${sessionId}` : privateDirectory}/file.txt`,
+        });
+      }
+    );
 
     it('preserves private-path fields unchanged for legacy ungrouped snapshots', async () => {
       const privateDirectory = '/legacy/unchanged/workspace';
@@ -374,7 +436,8 @@ describe('cli-sessions-v2-router', () => {
 
   describe('getSessionMessagesPage', () => {
     const sessionId = 'ses_messages_page_test_1234';
-    const privateDirectory = '/srv/runtime/private/worktrees/grouped-history';
+    const privateDirectory =
+      '/srv/runtime/private/worktrees/worktree_12345678-1234-4234-9234-123456789abc';
     let fetchSessionMessagesPage: jest.MockedFunction<typeof FetchSessionMessagesPageType>;
 
     function privateAssistantMessage(): KiloSdkStoredMessage {
@@ -419,6 +482,34 @@ describe('cli-sessions-v2-router', () => {
             type: 'patch',
             hash: 'patch',
             files: [`${privateDirectory}/src/app.ts`, 'relative.ts'],
+          },
+          {
+            id: 'prt_tool_01',
+            sessionID: sessionId,
+            messageID: 'msg_assistant_01',
+            type: 'tool',
+            callID: 'call_read',
+            tool: 'read',
+            state: {
+              status: 'completed',
+              input: { filePath: `${privateDirectory}/src/app.ts` },
+              output: `Read ${privateDirectory}/src/app.ts and src/relative.ts`,
+              title: 'Read file',
+              time: { start: 1761000000100, end: 1761000000200 },
+              metadata: {
+                outputs: [
+                  `${privateDirectory}/result.txt`,
+                  { output: `Read ${privateDirectory}/nested.txt`, relative: 'src/relative.ts' },
+                ],
+              },
+            },
+          },
+          {
+            id: 'prt_text_01',
+            sessionID: sessionId,
+            messageID: 'msg_assistant_01',
+            type: 'text',
+            text: `Updated ${privateDirectory}/src/app.ts and src/relative.ts`,
           },
         ],
       };
@@ -498,12 +589,13 @@ describe('cli-sessions-v2-router', () => {
         .update(cli_sessions_v2)
         .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
         .where(eq(cli_sessions_v2.session_id, sessionId));
+      const message = privateAssistantMessage();
       fetchSessionMessagesPage.mockResolvedValueOnce({
         kiloSessionId: sessionId,
         history: {
-          messages: [privateAssistantMessage()],
-          nextCursor: null,
-          omittedItemCount: 0,
+          messages: [message],
+          nextCursor: 'opaque-next-cursor',
+          omittedItemCount: 2,
         },
       });
       const caller = await createCallerForUser(regularUser.id);
@@ -523,15 +615,32 @@ describe('cli-sessions-v2-router', () => {
               parts: [
                 { url: '', source: { path: publicDirectory } },
                 { files: [publicDirectory, 'relative.ts'] },
+                {
+                  state: {
+                    input: { filePath: publicDirectory },
+                    output: `Read ${publicDirectory}/src/app.ts and src/relative.ts`,
+                    metadata: {
+                      outputs: [
+                        `${publicDirectory}/result.txt`,
+                        {
+                          output: `Read ${publicDirectory}/nested.txt`,
+                          relative: 'src/relative.ts',
+                        },
+                      ],
+                    },
+                  },
+                },
+                { text: `Updated ${publicDirectory}/src/app.ts and src/relative.ts` },
               ],
             },
           ],
-          nextCursor: null,
-          omittedItemCount: 0,
+          nextCursor: 'opaque-next-cursor',
+          omittedItemCount: 2,
         },
         watermarkEventId: null,
       });
       expect(JSON.stringify(result)).not.toContain(privateDirectory);
+      expect(message).toEqual(privateAssistantMessage());
     });
 
     it('preserves private-path fields unchanged for ungrouped paginated history', async () => {
@@ -545,19 +654,21 @@ describe('cli-sessions-v2-router', () => {
       ).resolves.toEqual({ kiloSessionId: sessionId, history, watermarkEventId: null });
     });
 
-    it('preserves grouped typed history failures without fabricating a transcript', async () => {
-      await db
-        .update(cli_sessions_v2)
-        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
-        .where(eq(cli_sessions_v2.session_id, sessionId));
-      const history = { kind: 'retryable_failure' as const, phase: 'page_parts' as const };
-      fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
-      const caller = await createCallerForUser(regularUser.id);
+    it.each([null, { kind: 'retryable_failure' as const, phase: 'page_parts' as const }])(
+      'preserves grouped absent or failed history without fabricating a transcript: %j',
+      async history => {
+        await db
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+          .where(eq(cli_sessions_v2.session_id, sessionId));
+        fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
+        const caller = await createCallerForUser(regularUser.id);
 
-      await expect(
-        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
-      ).resolves.toEqual({ kiloSessionId: sessionId, history, watermarkEventId: null });
-    });
+        await expect(
+          caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+        ).resolves.toEqual({ kiloSessionId: sessionId, history, watermarkEventId: null });
+      }
+    );
 
     it('forwards the continuation cursor to the client', async () => {
       fetchSessionMessagesPage.mockResolvedValueOnce({

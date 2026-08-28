@@ -132,6 +132,7 @@ export async function publishControlPlaneSessionIngest(params: {
       cloudAgentSessionScopeHeaders.protocolVersion,
       cloudAgentSessionScopeProtocolVersion
     );
+    if (lineage) headers.set(cloudAgentSessionScopeHeaders.trustedLineage, '1');
   }
 
   const body = JSON.stringify({ data: params.items });

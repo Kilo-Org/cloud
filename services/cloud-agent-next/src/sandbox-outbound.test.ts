@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cloudAgentSessionScopeHeaders } from '@kilocode/session-ingest-contracts';
 
 const sdk = vi.hoisted(() => {
   class StockSandbox {}
@@ -1073,6 +1074,44 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
       bootstrapKiloSessionId: 'kilo-session-1',
       sessionIngestProxyVersion: 1,
     });
+  });
+
+  it('strips forged trusted lineage from proxied child bootstrap while preserving the body', async () => {
+    const root = 'ses_12345678901234567890123456';
+    const child = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const body = { sessionId: child, parentSessionId: root };
+    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_KILO_AUTHORIZATION,
+      routeClass: 'session_ingest',
+      sessionIngestScope: { cloudAgentSessionId: 'cloud-agent-session-1', rootKiloSessionId: root },
+    });
+    const scopedFetch = vi.fn(async (_request: Request) => new Response(null, { status: 200 }));
+    const publicFetch = vi.fn();
+    vi.stubGlobal('fetch', publicFetch);
+
+    const response = await handleOutbound(
+      new Request('https://ingest.kilosessions.ai/api/session', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${KILO_CAPABILITY}`,
+          'Content-Type': 'application/json',
+          [cloudAgentSessionScopeHeaders.trustedLineage]: '1',
+        },
+        body: JSON.stringify(body),
+      }),
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, scopedFetch)
+    );
+
+    expect(response.status).toBe(200);
+    expect(publicFetch).not.toHaveBeenCalled();
+    expect(scopedFetch).toHaveBeenCalledOnce();
+    const forwarded = scopedFetch.mock.calls[0]?.[0] as Request;
+    expect(new URL(forwarded.url).pathname).toBe('/internal/cloud-agent/v1/session');
+    expect(forwarded.headers.get('X-Internal-Secret')).toBe('trusted-internal-secret');
+    expect(forwarded.headers.get(cloudAgentSessionScopeHeaders.rootKiloSessionId)).toBe(root);
+    expect(forwarded.headers.get(cloudAgentSessionScopeHeaders.trustedLineage)).toBeNull();
+    await expect(forwarded.json()).resolves.toEqual(body);
   });
 
   it('routes session-scoped ingest through the internal binding and treats 404 as terminal', async () => {

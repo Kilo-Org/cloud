@@ -294,6 +294,35 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     }
   }
 
+  it('reads directory-scoped status without treating another checkout as empty', async () => {
+    const directory = '/workspace/shared checkout & tools';
+    const requests: Array<{ method: string; pathname: string; directory: string | null }> = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: request => {
+        const url = new URL(request.url);
+        requests.push({
+          method: request.method,
+          pathname: url.pathname,
+          directory: url.searchParams.get('directory'),
+        });
+        return Response.json(
+          url.searchParams.get('directory') === directory
+            ? { root_a: { type: 'busy', waitingOn: 'tool' } }
+            : {}
+        );
+      },
+    });
+    startedServers.push(server);
+    const client = createClient(server.url.toString());
+
+    expect(await client.getSessionStatuses(directory)).toEqual({
+      root_a: { type: 'busy', waitingOn: 'tool' },
+    });
+    expect(requests).toEqual([{ method: 'GET', pathname: '/session/status', directory }]);
+    expect(await client.getSessionStatuses()).toEqual({});
+  });
+
   it.each([
     { name: 'empty object', body: {} },
     { name: 'success-shaped object', body: { success: true } },

@@ -183,6 +183,7 @@ cloudAgentSessionScopeApi.post('/session', zodJsonValidator(createScopedSessionS
       return { status: 'conflict' } as const;
     }
     if (
+      c.req.header(cloudAgentSessionScopeHeaders.trustedLineage) === '1' &&
       body.parentSessionId !== undefined &&
       existing.cloud_agent_session_scope_id === null &&
       existing.cloud_agent_worktree_id === null &&

@@ -21,6 +21,7 @@ import {
   getWorkerTrigger,
   updateWorkerTrigger,
   deleteWorkerTrigger,
+  invokeWorkerScheduledTrigger,
   listWorkerRequests,
   buildInboundUrl,
   type EnrichedCapturedRequest,
@@ -179,6 +180,13 @@ export const WebhookTriggerUpdateInput = z
       });
     }
   });
+
+export const WebhookTriggerInvokeInput = z
+  .object({
+    triggerId: triggerIdSchema,
+    organizationId: z.string().uuid().optional(),
+  })
+  .strict();
 
 /**
  * Helper to verify trigger ownership via PostgreSQL.
@@ -704,6 +712,43 @@ export const webhookTriggersRouter = createTRPCRouter({
       ...workerResult.config,
       inboundUrl,
     };
+  }),
+
+  invoke: baseProcedure.input(WebhookTriggerInvokeInput).mutation(async ({ ctx, input }) => {
+    const userId = ctx.user.id;
+
+    if (input.organizationId) {
+      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
+    }
+
+    await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
+
+    const result = await invokeWorkerScheduledTrigger(
+      input.organizationId ? undefined : userId,
+      input.organizationId,
+      input.triggerId
+    );
+
+    if (result.success) {
+      return { requestId: result.requestId };
+    }
+
+    if (result.status === 404) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Trigger not found' });
+    }
+    if (result.status === 400) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Trigger is not scheduled' });
+    }
+    if (result.status === 409) {
+      throw new TRPCError({ code: 'CONFLICT', message: 'Trigger is inactive' });
+    }
+    if (result.status === 429) {
+      throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: 'Invocation limit reached' });
+    }
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Unable to confirm invocation. Check captured requests before trying again.',
+    });
   }),
 
   /**

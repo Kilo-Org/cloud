@@ -1,7 +1,7 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { describe, it, expect } from 'vitest';
-import { triggerConfig } from '../../src/db/sqlite-schema';
+import { describe, it, expect, vi } from 'vitest';
+import { requests, triggerConfig } from '../../src/db/sqlite-schema';
 import type { TriggerDO } from '../../src/dos/TriggerDO';
 
 async function expectSandboxAllocation(
@@ -504,6 +504,301 @@ describe('TriggerDO', () => {
 
       expect(overflow.success).toBe(false);
       expect(overflow.error).toBe('Too many in-flight requests');
+    });
+  });
+
+  describe('invokeScheduled', () => {
+    it.each([
+      ['cloud_agent', { githubRepo: 'owner/repo', mode: 'code', model: 'openai/gpt-4.1' }],
+      [
+        'kiloclaw_chat',
+        {
+          targetType: 'kiloclaw_chat' as const,
+          kiloclawInstanceId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
+        },
+      ],
+    ] as const)(
+      'captures distinct scheduled %s requests without changing schedule state',
+      async (_target, target) => {
+        const triggerId = 'invoke-scheduled';
+        const stub = env.TRIGGER_DO.get(
+          env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+        );
+        await stub.configure(testUserNamespace, triggerId, {
+          promptTemplate: 'Run now',
+          activationMode: 'scheduled',
+          cronExpression: '* * * * *',
+          ...target,
+        });
+        const before = await stub.getConfig();
+        let beforeAlarm: number | null = null;
+        let beforeRetry: boolean | undefined;
+        await runInDurableObject(stub, async (_instance, state) => {
+          beforeAlarm = await state.storage.getAlarm();
+          beforeRetry = await state.storage.get<boolean>('alarmRetry');
+        });
+
+        const first = await stub.invokeScheduled();
+        const second = await stub.invokeScheduled();
+        expect(first).toMatchObject({ success: true });
+        expect(second).toMatchObject({ success: true });
+        if (!first.success || !second.success)
+          throw new Error('Expected scheduled invocation to succeed');
+        expect(first.requestId).not.toBe(second.requestId);
+
+        expect(await stub.getRequest(first.requestId)).toMatchObject({
+          method: 'SCHEDULED',
+          body: '{}',
+          headers: {},
+          triggerSource: 'scheduled',
+          processStatus: 'captured',
+        });
+        expect(await stub.getConfig()).toEqual(before);
+        await runInDurableObject(stub, async (_instance, state) => {
+          expect(await state.storage.getAlarm()).toBe(beforeAlarm);
+          expect(await state.storage.get<boolean>('alarmRetry')).toBe(beforeRetry);
+          const storedConfig = await state.storage.get<Record<string, unknown>>('config');
+          expect(storedConfig).toBeDefined();
+          if (!storedConfig) throw new Error('Expected stored trigger config');
+          expect(storedConfig).not.toHaveProperty('lastScheduledAt');
+          const { lastScheduledAt: _lastScheduledAt, ...storedConfigWithoutLastScheduledAt } =
+            storedConfig;
+          const { lastScheduledAt: _beforeLastScheduledAt, ...beforeWithoutLastScheduledAt } =
+            before ?? {};
+          expect(storedConfigWithoutLastScheduledAt).toEqual(beforeWithoutLastScheduledAt);
+          const schedule = drizzle(state.storage)
+            .select({
+              lastScheduledAt: triggerConfig.last_scheduled_at,
+              nextScheduledAt: triggerConfig.next_scheduled_at,
+            })
+            .from(triggerConfig)
+            .get();
+          expect(schedule).toEqual({
+            lastScheduledAt: before?.lastScheduledAt ?? null,
+            nextScheduledAt: before?.nextScheduledAt ?? null,
+          });
+        });
+      }
+    );
+
+    it.each([
+      ['missing', undefined, 'NOT_FOUND'],
+      ['webhook', 'webhook', 'NOT_SCHEDULED'],
+      ['inactive', 'scheduled', 'INACTIVE'],
+    ] as const)('rejects %s triggers without writing a request', async (_name, mode, error) => {
+      const triggerId = `invoke-${error.toLowerCase()}`;
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      if (mode) {
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Run now',
+          activationMode: mode,
+          ...(mode === 'scheduled' ? { cronExpression: '* * * * *' } : {}),
+        });
+      }
+      if (error === 'INACTIVE') await stub.updateConfig({ isActive: false });
+
+      await expect(stub.invokeScheduled()).resolves.toEqual({ success: false, error });
+      expect((await stub.listRequests()).requests).toEqual([]);
+    });
+
+    it('allows exactly one concurrent invocation when nineteen requests are in flight', async () => {
+      const triggerId = 'invoke-cap';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Run now',
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      });
+      for (let index = 0; index < 19; index++) {
+        const captured = await stub.captureRequest({
+          method: 'POST',
+          path: `/${index}`,
+          queryString: null,
+          headers: {},
+          body: '{}',
+          contentType: null,
+          sourceIp: null,
+        });
+        if (!captured.success) throw new Error('Expected request to be captured');
+        if (index % 2 === 0)
+          await stub.updateRequest(captured.requestId, { process_status: 'inprogress' });
+      }
+
+      const results = await Promise.all([stub.invokeScheduled(), stub.invokeScheduled()]);
+      expect(results.filter(result => result.success)).toHaveLength(1);
+      expect(results.filter(result => !result.success)).toEqual([
+        { success: false, error: 'INFLIGHT_LIMIT' },
+      ]);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(drizzle(state.storage).select().from(requests).all()).toHaveLength(20);
+      });
+    });
+
+    it('preserves the captured timestamp as the alarm last-scheduled timestamp', async () => {
+      const triggerId = 'alarm-timestamp';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Run on alarm',
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      });
+
+      await runInDurableObject(stub, async instance => {
+        await instance.alarm();
+      });
+      const captured = (await stub.listRequests()).requests[0];
+      expect(captured).toMatchObject({ method: 'SCHEDULED', triggerSource: 'scheduled' });
+      expect((await stub.getConfig())?.lastScheduledAt).toBe(captured.timestamp);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(await state.storage.getAlarm()).not.toBeNull();
+      });
+    });
+
+    it('persists a failed manual invocation without changing scheduling state when enqueue fails', async () => {
+      const triggerId = 'invoke-queue-failure';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Run now',
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      });
+      const before = await stub.getConfig();
+      let beforeAlarm: number | null = null;
+      let beforeRetry: boolean | undefined;
+      await runInDurableObject(stub, async (_instance, state) => {
+        beforeAlarm = await state.storage.getAlarm();
+        beforeRetry = await state.storage.get<boolean>('alarmRetry');
+      });
+
+      await runInDurableObject(stub, async instance => {
+        const queue = (instance as unknown as { env: Env }).env.WEBHOOK_DELIVERY_QUEUE;
+        const send = vi.spyOn(queue, 'send').mockRejectedValue(new Error('queue unavailable'));
+        try {
+          await expect(instance.invokeScheduled()).resolves.toEqual({
+            success: false,
+            error: 'QUEUE_FAILED',
+          });
+        } finally {
+          send.mockRestore();
+        }
+      });
+
+      const failed = (await stub.listRequests()).requests;
+      expect(failed).toHaveLength(1);
+      expect(failed[0]).toMatchObject({
+        method: 'SCHEDULED',
+        processStatus: 'failed',
+        errorMessage: 'Queue enqueue failed',
+      });
+      expect(failed[0]?.completedAt).toEqual(expect.any(String));
+      expect(await stub.getConfig()).toEqual(before);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(await state.storage.getAlarm()).toBe(beforeAlarm);
+        expect(await state.storage.get<boolean>('alarmRetry')).toBe(beforeRetry);
+        const schedule = drizzle(state.storage)
+          .select({
+            lastScheduledAt: triggerConfig.last_scheduled_at,
+            nextScheduledAt: triggerConfig.next_scheduled_at,
+          })
+          .from(triggerConfig)
+          .get();
+        expect(schedule).toEqual({
+          lastScheduledAt: before?.lastScheduledAt ?? null,
+          nextScheduledAt: before?.nextScheduledAt ?? null,
+        });
+      });
+    });
+
+    it('advances the schedule after an alarm enqueue failure', async () => {
+      const triggerId = 'alarm-queue-failure';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Run on alarm',
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      });
+
+      await runInDurableObject(stub, async instance => {
+        const queue = (instance as unknown as { env: Env }).env.WEBHOOK_DELIVERY_QUEUE;
+        const send = vi.spyOn(queue, 'send').mockRejectedValue(new Error('queue unavailable'));
+        try {
+          await instance.alarm();
+        } finally {
+          send.mockRestore();
+        }
+      });
+
+      const failed = (await stub.listRequests()).requests[0];
+      expect(failed).toMatchObject({ method: 'SCHEDULED', processStatus: 'failed' });
+      expect((await stub.getConfig())?.lastScheduledAt).toBe(failed?.timestamp);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(await state.storage.getAlarm()).not.toBeNull();
+      });
+    });
+
+    it('rearms an alarm at the mixed in-flight cap without adding a request or advancing lastScheduledAt', async () => {
+      const triggerId = 'alarm-inflight-cap';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`)
+      );
+      await stub.configure(testUserNamespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Run on alarm',
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      });
+      for (let index = 0; index < 20; index++) {
+        const captured = await stub.captureRequest({
+          method: 'POST',
+          path: `/${index}`,
+          queryString: null,
+          headers: {},
+          body: '{}',
+          contentType: null,
+          sourceIp: null,
+        });
+        if (!captured.success) throw new Error('Expected request to be captured');
+        if (index % 2 === 0)
+          await stub.updateRequest(captured.requestId, { process_status: 'inprogress' });
+      }
+      const before = await stub.getConfig();
+
+      await runInDurableObject(stub, async instance => {
+        await instance.alarm();
+      });
+
+      expect((await stub.listRequests()).requests).toHaveLength(20);
+      expect((await stub.getConfig())?.lastScheduledAt).toBe(before?.lastScheduledAt);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(await state.storage.getAlarm()).not.toBeNull();
+      });
     });
   });
 

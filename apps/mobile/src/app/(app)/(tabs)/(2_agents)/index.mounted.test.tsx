@@ -20,6 +20,20 @@ vi.mock('react-native', () => ({
   Platform: platformMock,
 }));
 
+vi.mock('expo-router', async () => {
+  const { useEffect } = await import('react');
+  return {
+    useFocusEffect: (effect: () => void) => {
+      useEffect(effect, [effect]);
+    },
+  };
+});
+
+vi.mock('@/lib/glanceable/activity-kit-prompt', () => ({
+  showActivityKitDisabledAlertOnce: vi.fn(),
+  recoverGlanceableActivityKit: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('expo-web-browser', () => ({
   openAuthSessionAsync: openAuthSessionMock,
   openBrowserAsync: openBrowserMock,

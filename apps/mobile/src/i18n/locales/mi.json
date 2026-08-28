@@ -2808,7 +2808,8 @@
     "busy": "Kei te pukumahi te tāuru reo. Whakamātau anō.",
     "stopped": "Kua mutu te tāuru reo. Pāwhiritia te hopuoro kia whakamātau anō.",
     "unavailableDevice": "Kāore e wātea ana te tāuru reo i tēnei pūrere.",
-    "unavailableLanguage": "Kāore e wātea ana te tāuru reo mō tēnei reo o te pūrere."
+    "unavailableLanguage": "Kāore e wātea ana te tāuru reo mō tēnei reo o te pūrere.",
+    "listeningStopped": "Kua mutu te whakarongo."
   },
   "share": {
     "title": "Tuari ki Kilo",

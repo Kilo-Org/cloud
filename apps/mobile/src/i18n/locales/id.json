@@ -2354,7 +2354,8 @@
     "busy": "Masukan suara sedang sibuk. Coba lagi.",
     "stopped": "Masukan suara berhenti. Ketuk mikrofon untuk mencoba lagi.",
     "unavailableDevice": "Masukan suara tidak tersedia di perangkat ini.",
-    "unavailableLanguage": "Masukan suara tidak tersedia untuk bahasa perangkat ini."
+    "unavailableLanguage": "Masukan suara tidak tersedia untuk bahasa perangkat ini.",
+    "listeningStopped": "Mendengarkan berhenti."
   },
   "share": {
     "title": "Bagikan ke Kilo",

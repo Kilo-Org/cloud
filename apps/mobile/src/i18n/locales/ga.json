@@ -2868,7 +2868,8 @@
     "busy": "Tá an t-ionchur gutha gnóthach. Bain triail as arís.",
     "stopped": "Stop an t-ionchur gutha. Tapáil an micreafón chun triail arís a bhaint.",
     "unavailableDevice": "Níl ionchur gutha ar fáil ar an ngléas seo.",
-    "unavailableLanguage": "Níl ionchur gutha ar fáil don teanga gléis seo."
+    "unavailableLanguage": "Níl ionchur gutha ar fáil don teanga gléis seo.",
+    "listeningStopped": "Stop an éisteacht."
   },
   "share": {
     "title": "Roinn le Kilo",

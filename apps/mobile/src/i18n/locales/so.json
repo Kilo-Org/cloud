@@ -2808,7 +2808,8 @@
     "busy": "Gelinta codka waa mashquul. Mar kale isku day.",
     "stopped": "Gelinta codku way joogsatay. Taabo makarafoonka si aad mar kale isku daydo.",
     "unavailableDevice": "Gelinta codka aaladdan kuma heli karto.",
-    "unavailableLanguage": "Gelinta codka looma heli karo luqaddan aaladda."
+    "unavailableLanguage": "Gelinta codka looma heli karo luqaddan aaladda.",
+    "listeningStopped": "Dhageysigu wuu joogsaday."
   },
   "share": {
     "title": "Wadaag Kilo",

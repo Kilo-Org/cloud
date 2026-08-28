@@ -2808,7 +2808,8 @@
     "busy": "A hangbevitel foglalt. Próbálja újra.",
     "stopped": "A hangbevitel leállt. A mikrofon megérintésével próbálja újra.",
     "unavailableDevice": "A hangbevitel nem érhető el ezen az eszközön.",
-    "unavailableLanguage": "A hangbevitel nem érhető el az eszköz nyelvéhez."
+    "unavailableLanguage": "A hangbevitel nem érhető el az eszköz nyelvéhez.",
+    "listeningStopped": "A figyelés leállt."
   },
   "share": {
     "title": "Megosztás a Kilo-val",

@@ -2808,7 +2808,8 @@
     "busy": "Antre vwa okipe. Eseye ankò.",
     "stopped": "Antre vwa sispann. Tape mikwofòn nan pou eseye ankò.",
     "unavailableDevice": "Antre vwa pa disponib sou aparèy sa a.",
-    "unavailableLanguage": "Antre vwa pa disponib pou lang aparèy sa a."
+    "unavailableLanguage": "Antre vwa pa disponib pou lang aparèy sa a.",
+    "listeningStopped": "Koute a sispann."
   },
   "share": {
     "title": "Pataje nan Kilo",

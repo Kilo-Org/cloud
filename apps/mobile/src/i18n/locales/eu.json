@@ -2808,7 +2808,8 @@
     "busy": "Ahots-sarrera lanpetuta dago. Saiatu berriro.",
     "stopped": "Ahots-sarrera gelditu da. Sakatu mikrofonoa berriro saiatzeko.",
     "unavailableDevice": "Ahots-sarrera ez dago eskuragarri gailu honetan.",
-    "unavailableLanguage": "Ahots-sarrera ez dago eskuragarri gailu honen hizkuntzarako."
+    "unavailableLanguage": "Ahots-sarrera ez dago eskuragarri gailu honen hizkuntzarako.",
+    "listeningStopped": "Entzutea gelditu da."
   },
   "share": {
     "title": "Partekatu Kilo-n",

@@ -2367,7 +2367,8 @@
     "busy": "La entrada de voz está ocupada. Inténtalo de nuevo.",
     "stopped": "La entrada de voz se detuvo. Toca el micrófono para intentarlo de nuevo.",
     "unavailableDevice": "La entrada de voz no está disponible en este dispositivo.",
-    "unavailableLanguage": "La entrada de voz no está disponible para el idioma de este dispositivo."
+    "unavailableLanguage": "La entrada de voz no está disponible para el idioma de este dispositivo.",
+    "listeningStopped": "Escucha detenida."
   },
   "share": {
     "title": "Compartir en Kilo",

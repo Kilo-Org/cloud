@@ -2808,7 +2808,8 @@
     "busy": "Raddinnsláttur er upptekinn. Reyndu aftur.",
     "stopped": "Raddinnsláttur stöðvaðist. Bankaðu á hljóðnemann til að reyna aftur.",
     "unavailableDevice": "Raddinnsláttur er ekki í boði á þessu tæki.",
-    "unavailableLanguage": "Raddinnsláttur er ekki í boði fyrir tækjatungumálið."
+    "unavailableLanguage": "Raddinnsláttur er ekki í boði fyrir tækjatungumálið.",
+    "listeningStopped": "Hlustun stöðvaðist."
   },
   "share": {
     "title": "Deila í Kilo",

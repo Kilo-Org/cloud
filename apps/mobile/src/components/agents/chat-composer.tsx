@@ -124,8 +124,8 @@ const COMPOSER_FOCUS_RESTORE_DELAY_MS = 100;
 /** Match RNGH pan activeOffsetY / failOffsetX so Android JS path and iOS pan agree. */
 const DISMISS_KEYBOARD_ACTIVE_OFFSET_Y = 24;
 const DISMISS_KEYBOARD_FAIL_OFFSET_X = 16;
-/** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
-const COMPOSER_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
+/** Hide the remaining-characters counter until the draft nears the limit. */
+const COMPOSER_COUNTER_VISIBLE_REMAINING = 1000;
 
 type AndroidDismissKeyboardGesture = {
   identifier: string;
@@ -1192,7 +1192,7 @@ export function ChatComposer({
       </View>
 
       {showStarters ? (
-        <View className="flex-row flex-wrap gap-2 px-3 pb-2">
+        <View className="flex-row flex-wrap gap-2 px-3 pb-2 pt-3">
           {starterChips.map(chip => (
             <Pressable
               key={chip}
@@ -1201,8 +1201,8 @@ export function ChatComposer({
               }}
               accessibilityRole="button"
               accessibilityLabel={chip}
-              style={{ minHeight: COMPOSER_HIT_TARGET }}
-              className="min-h-11 items-center justify-center rounded-full border border-border bg-card px-3 py-2 active:opacity-70"
+              hitSlop={{ top: 8, bottom: 8 }}
+              className="items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 active:opacity-70"
             >
               <Text className="text-sm font-normal text-muted-foreground">{chip}</Text>
             </Pressable>
@@ -1210,7 +1210,7 @@ export function ChatComposer({
         </View>
       ) : null}
 
-      {characterCount > 0 ? (
+      {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount <= COMPOSER_COUNTER_VISIBLE_REMAINING ? (
         <View className="flex-row justify-end px-4 pb-1">
           <Text
             className="text-xs font-normal text-muted-foreground"

@@ -301,14 +301,20 @@ describe('NewSessionPrompt initialPrompt seed', () => {
   );
 
   it.each(TEXT_DIRECTIONS)(
-    'preserves the seeded counter and its accessible label in $direction',
+    'shows the seeded counter and its accessible label only near the limit in $direction',
     async ({ isRTL, style }) => {
       const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
       layoutDirection.isRTL = isRTL;
-      const element = renderPrompt({ ...defaultProps(), initialPrompt: 'hello' });
+      const shortSeed = renderPrompt({ ...defaultProps(), initialPrompt: 'hello' });
+      expect(findElementByType(shortSeed, 'Text', '99995 characters remaining')).toBeNull();
+      expect(findElementByType(shortSeed, 'Pressable', 'Build a feature')).toBeNull();
 
-      expect(findElementByType(element, 'Text', '99995 characters remaining')).toMatchObject({
-        children: 99_995,
+      const element = renderPrompt({
+        ...defaultProps(),
+        initialPrompt: 'x'.repeat(100_000 - 5),
+      });
+      expect(findElementByType(element, 'Text', '5 characters remaining')).toMatchObject({
+        children: 5,
         className: 'text-xs font-normal text-muted-foreground',
         style,
       });

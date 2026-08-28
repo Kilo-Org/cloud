@@ -67,6 +67,8 @@ const PROMPT_INPUT_VERTICAL_PADDING = 16;
 const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
+/** Hide the remaining-characters counter until the draft nears the limit. */
+const PROMPT_COUNTER_VISIBLE_REMAINING = 1000;
 /** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
 const PROMPT_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
 
@@ -435,15 +437,15 @@ export function NewSessionPrompt({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={chip}
-                style={{ minHeight: PROMPT_HIT_TARGET }}
-                className="min-h-11 items-center justify-center rounded-full border border-border bg-card px-3 py-2 active:opacity-70"
+                hitSlop={{ top: 8, bottom: 8 }}
+                className="items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 active:opacity-70"
               >
                 <Text className="text-sm font-normal text-muted-foreground">{chip}</Text>
               </Pressable>
             ))}
           </View>
         ) : null}
-        {promptCharacterCount > 0 ? (
+        {PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING ? (
           <View className="flex-row justify-end px-1 pb-1">
             <Text
               className="text-xs font-normal text-muted-foreground"

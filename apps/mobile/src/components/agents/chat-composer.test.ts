@@ -595,7 +595,7 @@ describe('ChatComposer starter chips', () => {
 
 describe('ChatComposer counter', () => {
   it.each(TEXT_DIRECTIONS)(
-    'shows the remaining-character counter once the input holds text in $direction',
+    'shows the remaining-character counter only once the draft nears the limit in $direction',
     async ({ isRTL, style }) => {
       layoutDirection.isRTL = isRTL;
       const render = await mount(makeProps({}));
@@ -605,15 +605,24 @@ describe('ChatComposer counter', () => {
 
       requireInputRowOnChangeText(render)('hello');
       await settle();
+      expect(
+        findNode(
+          await rerender(makeProps({})),
+          (type, props) => type === 'Text' && typeof props.children === 'number'
+        )
+      ).toBeNull();
+
+      requireInputRowOnChangeText(render)('x'.repeat(CLOUD_AGENT_PROMPT_MAX_LENGTH - 5));
+      await settle();
 
       const rerendered = await rerender(makeProps({}));
       const counter = findNode(
         rerendered,
-        (type, props) => type === 'Text' && props.children === CLOUD_AGENT_PROMPT_MAX_LENGTH - 5
+        (type, props) => type === 'Text' && props.children === 5
       );
       expect(counter).not.toBeNull();
       expect(counter?.props).toMatchObject({
-        accessibilityLabel: '99995 characters remaining',
+        accessibilityLabel: '5 characters remaining',
         className: 'text-xs font-normal text-muted-foreground',
         style,
       });

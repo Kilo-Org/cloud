@@ -75,6 +75,7 @@ import { clearTelemetryDecision } from '@/lib/telemetry/controller';
 import { clearSentryUser } from '@/lib/sentry-context';
 import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
+import { beginAuthenticatedOwner } from '@/lib/context-scope';
 
 // Pre-load tokens at module level so they're available before React mounts
 export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
@@ -210,8 +211,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // full teardown, and a sign-out queued behind a sign-in signs that new
       // session out (documented, correct FIFO semantics).
       await chainSave('auth-transition', async () => {
+        // Close admission before publishing the pending generation or writing credentials.
+        setSignOutTeardownActive(true);
+        setSignOutActive(true);
         bumpAuthEpoch();
+        beginAuthenticatedOwner();
         setAuthEpoch(currentAuthEpoch());
+        setToken(undefined);
+        clearActiveToken();
         // Bind the pending deep-link slot to the new user id at the same
         // place the auth epoch advances, so a destination captured while this
         // account is signed in restores only for this account.
@@ -271,6 +278,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // the read-cache mount unsubscribes and cannot resubscribe while the old
       // user id is still cached.
       setSignOutActive(true);
+      beginAuthenticatedOwner();
       // Drop an account-bound pending deep-link destination synchronously,
       // before the first await, so a different account signed in later in this
       // process cannot navigate to the previous account's destination. A
@@ -319,6 +327,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // fence) and before any local deletion (no deferred save can land
         // after it).
         bumpAuthEpoch();
+        beginAuthenticatedOwner();
         setAuthEpoch(currentAuthEpoch());
         // The signed-out session owns no user id: a destination captured
         // during teardown is recorded as "captured while signed out".

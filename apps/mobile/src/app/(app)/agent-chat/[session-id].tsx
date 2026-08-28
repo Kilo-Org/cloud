@@ -1,8 +1,15 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { hashKey, useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useSyncExternalStore } from 'react';
+
+import {
+  getAuthenticatedOwner,
+  isAuthenticatedOwner,
+  subscribeAuthenticatedOwner,
+} from '@/lib/context-scope';
 
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
 import {
@@ -25,6 +32,7 @@ import { shouldRetryNotFoundOnSpawnedRoute } from '@/lib/spawned-not-found-retry
 import { useTRPC } from '@/lib/trpc';
 
 export default function SessionDetailScreen() {
+  const owner = useSyncExternalStore(subscribeAuthenticatedOwner, getAuthenticatedOwner);
   const {
     'session-id': rawSessionId,
     organizationId: routeOrganizationId,
@@ -103,11 +111,22 @@ export default function SessionDetailScreen() {
         retryDelay: 1000,
       }
     ),
-    enabled: routeOrganizationId === undefined && sessionId !== null,
+    // Isolate account metadata while preserving the typed tRPC key and prefix invalidation.
+    queryHash: hashKey([
+      ...trpc.cliSessionsV2.get.queryKey({ session_id: sessionId ?? '' }),
+      owner.authEpoch,
+      owner.generation,
+      owner.userId,
+    ]),
+    enabled: isAuthenticatedOwner(owner) && routeOrganizationId === undefined && sessionId !== null,
   });
 
   if (sessionId === null) {
     return <InvalidRouteState backTo={'/(app)' as Href} />;
+  }
+
+  if (!isAuthenticatedOwner(owner)) {
+    return null;
   }
 
   if (routeOrganizationId === undefined && sessionQuery.isPending) {
@@ -196,7 +215,7 @@ export default function SessionDetailScreen() {
 
   return (
     <AgentSessionProvider
-      key={`${sessionId}:${organizationId ?? 'personal'}`}
+      key={`${owner.generation}:${owner.userId}:${sessionId}:${organizationId ?? 'personal'}`}
       organizationId={organizationId}
     >
       <SessionDetailContent

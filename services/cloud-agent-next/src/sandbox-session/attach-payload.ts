@@ -1,9 +1,21 @@
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
+import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
 import { resolveGitHubTokenForRepo } from '../services/git-token-service-client.js';
 import { readProfileBundle } from '../session-profile.js';
 import type { GitTokenService } from '../types.js';
 import { getSessionWorkspacePath } from '../workspace.js';
+
+function rejectReservedControlRuntimeEnvironment(
+  environment: Record<string, unknown> | undefined
+): void {
+  if (!environment) return;
+  for (const key of CONTROL_RUNTIME_RESERVED_ENV_VARS) {
+    if (Object.hasOwn(environment, key)) {
+      throw new Error(`Reserved control runtime environment variable: ${key}`);
+    }
+  }
+}
 
 function gitFromMetadata(
   metadata: SessionMetadata
@@ -44,10 +56,13 @@ export function buildSessionAttachPayload(
   const git = gitFromMetadata(metadata);
   const branch = metadata.workspace?.branchName ?? metadata.repository?.upstreamBranch;
   const profile = readProfileBundle(metadata);
+  rejectReservedControlRuntimeEnvironment(profile.envVars);
+  rejectReservedControlRuntimeEnvironment(profile.encryptedSecrets);
   const env = {
     ...(profile.envVars ?? {}),
     ...(metadata.auth.kilocodeToken ? { KILOCODE_TOKEN: metadata.auth.kilocodeToken } : {}),
   };
+  rejectReservedControlRuntimeEnvironment(env);
   return {
     directory,
     ...(branch ? { branch } : {}),

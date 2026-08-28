@@ -17,6 +17,9 @@ import { cn, parseTimestamp } from '@/lib/utils';
 
 export const HOME_LIVE_SLOT_MIN_CLASS = 'min-h-[72px]';
 
+// The trailing slash pins the index route.
+const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
+
 const MAX_ROWS = 3;
 const CLOUD_AGENT_PLATFORMS = new Set(expandPlatformFilter(['cloud-agent']));
 
@@ -92,7 +95,12 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
         label={t('home.agentSessions')}
         actionLabel={t('home.seeAll')}
         onActionPress={() => {
-          router.push('/(app)/(tabs)/(2_agents)' as Href);
+          // `navigate` switches to the Agents tab but keeps a pushed history
+          // screen on top (expo-router turns the cross-tab navigate into a
+          // JUMP_TO). The follow-up `dismissTo` pops that nested stack to the
+          // index route, so Home See-all always lands on the live list.
+          router.navigate(AGENTS_INDEX_HREF as Href);
+          router.dismissTo(AGENTS_INDEX_HREF as Href);
         }}
       />
       <View className="mx-4 gap-2">

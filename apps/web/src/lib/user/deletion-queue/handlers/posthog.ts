@@ -7,6 +7,7 @@ import { db } from '@/lib/drizzle';
 import { writeDeletionActivity } from '@/lib/user/deletion-queue/deletion-audit';
 import {
   USER_DELETION_DEFAULT_POSTHOG_HOST,
+  USER_DELETION_ID_ONLY_CATALOG_VERSION,
   USER_DELETION_POSTHOG_MAX_VERIFY_ATTEMPTS,
 } from '@/lib/user/deletion-queue/deletion-constants';
 import {
@@ -32,6 +33,11 @@ import type {
   DeletionHandlerContext,
   DeletionHandlerOutcome,
 } from '@/lib/user/deletion-queue/deletion-types';
+
+type PosthogIdentity = {
+  kind: 'email' | 'user_id';
+  value: string;
+};
 
 type PosthogPerson = {
   uuid: string;
@@ -72,12 +78,25 @@ function collectEmails(person: Record<string, unknown>): string[] {
   return [...emails];
 }
 
-function parsePersons(payload: unknown): ParsePersonsResult {
+function parsePersons(payload: unknown, distinctId?: string): ParsePersonsResult {
   if (!isRecord(payload) || !Array.isArray(payload.results)) return { kind: 'incomplete' };
+  if (distinctId !== undefined && payload.next) return { kind: 'incomplete' };
   const byUuid = new Map<string, PosthogPerson>();
   let missingUuid = false;
   for (const entry of payload.results) {
-    if (!isRecord(entry)) continue;
+    if (!isRecord(entry)) {
+      if (distinctId !== undefined) return { kind: 'incomplete' };
+      continue;
+    }
+    if (distinctId !== undefined) {
+      if (
+        !Array.isArray(entry.distinct_ids) ||
+        entry.distinct_ids.some(value => typeof value !== 'string')
+      ) {
+        return { kind: 'incomplete' };
+      }
+      if (!entry.distinct_ids.includes(distinctId)) continue;
+    }
     const uuid = typeof entry.uuid === 'string' && entry.uuid.length > 0 ? entry.uuid : null;
     if (!uuid) {
       missingUuid = true;
@@ -154,14 +173,16 @@ async function recordPosthogActivity(
 }
 
 async function extraKiloUserIds(
-  targetEmail: string,
+  targetEmail: string | null,
   subjectUserId: string | null,
   persons: PosthogPerson[]
 ): Promise<string[]> {
   const extraEmails = [
     ...new Set(
       persons.flatMap(person =>
-        person.emails.filter(email => !deletionEmailsEqual(email, targetEmail))
+        person.emails.filter(
+          email => targetEmail === null || !deletionEmailsEqual(email, targetEmail)
+        )
       )
     ),
   ];
@@ -186,19 +207,23 @@ async function lookupPersons(
   host: string,
   environmentId: string,
   headers: Record<string, string>,
-  email: string
+  identity: PosthogIdentity
 ): Promise<{ persons: PosthogPerson[] } | { outcome: DeletionHandlerOutcome }> {
   const base = environmentsBase(host, environmentId);
   const merged = new Map<string, PosthogPerson>();
-  for (const param of ['distinct_id', 'email'] as const) {
+  const params = identity.kind === 'user_id' ? ['distinct_id'] : ['distinct_id', 'email'];
+  for (const param of params) {
     const lookup = await deletionFetch(
       context,
-      `${base}/persons/?${param}=${encodeURIComponent(email)}`,
+      `${base}/persons/?${param}=${encodeURIComponent(identity.value)}`,
       { headers }
     );
     if ('outcome' in lookup) return lookup;
     if (!lookup.response.ok) return { outcome: classifyPosthogResponse(lookup.response) };
-    const parsed = parsePersons(await readJsonUnknown(lookup.response));
+    const parsed = parsePersons(
+      await readJsonUnknown(lookup.response),
+      identity.kind === 'user_id' ? identity.value : undefined
+    );
     if (parsed.kind === 'incomplete') {
       return { outcome: { kind: 'needs_attention', errorCode: 'posthog_lookup_incomplete' } };
     }
@@ -322,8 +347,15 @@ export const handlePosthog: DeletionHandler = async ({ request, step, context })
   const stop = continueIfLowTime(context);
   if (stop) return stop;
 
-  const emailOrOutcome = requireTargetEmail(request);
-  if (typeof emailOrOutcome !== 'string') return emailOrOutcome;
+  let identity: PosthogIdentity;
+  if (request.catalog_version === USER_DELETION_ID_ONLY_CATALOG_VERSION) {
+    if (!request.user_id) return { kind: 'needs_attention', errorCode: 'user_missing' };
+    identity = { kind: 'user_id', value: request.user_id };
+  } else {
+    const emailOrOutcome = requireTargetEmail(request);
+    if (typeof emailOrOutcome !== 'string') return emailOrOutcome;
+    identity = { kind: 'email', value: emailOrOutcome };
+  }
 
   const apiKey = getEnvVariable('POSTHOG_PERSONAL_API_KEY').trim();
   const environmentId = getEnvVariable('POSTHOG_ENVIRONMENT_ID').trim();
@@ -358,7 +390,7 @@ export const handlePosthog: DeletionHandler = async ({ request, step, context })
     personIds = decrypted;
   }
 
-  const lookup = await lookupPersons(context, host, environmentId, headers, emailOrOutcome);
+  const lookup = await lookupPersons(context, host, environmentId, headers, identity);
   if ('outcome' in lookup) return lookup.outcome;
 
   if (lookup.persons.length === 0) {
@@ -379,7 +411,11 @@ export const handlePosthog: DeletionHandler = async ({ request, step, context })
     );
   }
 
-  const extraUserIds = await extraKiloUserIds(emailOrOutcome, request.user_id, lookup.persons);
+  const extraUserIds = await extraKiloUserIds(
+    identity.kind === 'email' ? identity.value : null,
+    request.user_id,
+    lookup.persons
+  );
   for (const userId of extraUserIds) {
     await recordPosthogActivity(request.id, 'posthog_shared_identity', hmacResourceRef(userId));
   }

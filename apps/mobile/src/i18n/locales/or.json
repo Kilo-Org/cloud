@@ -665,7 +665,8 @@
     "profile": "ପ୍ରୋଫାଇଲ୍",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ଟ୍ୟାବ୍, {{total}} ରୁ {{position}}"
+    "position": "{{name}}, ଟ୍ୟାବ୍, {{total}} ରୁ {{position}}",
+    "chat": "ଚାଟ୍"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "ଚେକ୍ ରନ୍",
       "status": "ସ୍ଥିତି",
       "threshold": "ସୀମା",
-      "pullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ"
+      "pullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
+      "transcriptWaiting": "ସମୀକ୍ଷା ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ପାଇଁ ଅପେକ୍ଷା କରୁଛି।",
+      "transcriptEmpty": "ଏହି ସମୀକ୍ଷା ପାଇଁ କୌଣସି ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ନାହିଁ।",
+      "transcriptRetry": "ସମୀକ୍ଷା ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "transcriptLive": "ଲାଇଭ୍",
+      "agentIdle": "ଏଜେଣ୍ଟ ନିଷ୍କ୍ରିୟ",
+      "agentWorking": "ଏଜେଣ୍ଟ କାମ କରୁଛି...",
+      "anErrorOccurred": "ଏକ ତ୍ରୁଟି ଘଟିଲା",
+      "errorWithMessage": "ତ୍ରୁଟି: {{message}}",
+      "executionStarted": "ଏକ୍ସିକ୍ୟୁସନ ଆରମ୍ଭ ହୋଇଛି",
+      "reviewCompleted": "ସମୀକ୍ଷା ସମାପ୍ତ",
+      "reviewInterrupted": "ସମୀକ୍ଷା ବ୍ୟାହତ",
+      "sessionError": "ସେସନ୍ ତ୍ରୁଟି: {{error}}",
+      "statusWithValue": "ସ୍ଥିତି: {{status}}",
+      "toolName": "ଟୁଲ୍: {{name}}",
+      "toolNameError": "ଟୁଲ୍: {{name}} — ତ୍ରୁଟି",
+      "unknownError": "ଅଜଣା ତ୍ରୁଟି"
     },
     "reviewMemory": {
       "title": "ସମୀକ୍ଷା ସ୍ମୃତି",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "ବର୍ତ୍ତମାନ ସକ୍ରିୟ",
     "search": {
       "searching": "ଖୋଜୁଛି",
       "searchSessions": "ସେସନ୍ ଖୋଜନ୍ତୁ",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
       "couldNotLoadActive": "ସକ୍ରିୟ ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
-      "noSessionsYet": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସେସନ୍ ନାହିଁ",
       "noSessionsYetDescription": "ଆପଣଙ୍କ ଫୋନରୁ ଏକ କୋଡିଂ କାର୍ଯ୍ୟ ଆରମ୍ଭ କରନ୍ତୁ। ଆପଣଙ୍କ ସେସନ୍ ଏଠାରେ ଦେଖାଯିବ।",
       "noMatches": "କୌଣସି ସେସନ୍ ମେଳ ଖାଉନାହିଁ",
       "tryDifferentSearch": "ଏକ ଭିନ୍ନ ଖୋଜ ଶବ୍ଦ ଚେଷ୍ଟା କରନ୍ତୁ।",
       "tryAdjustFilters": "ଫିଲ୍ଟରଗୁଡ଼ିକୁ ସଜାଡ଼ିବା କିମ୍ବା ପରିଷ୍କାର କରିବାକୁ ଚେଷ୍ଟା କରନ୍ତୁ।",
       "couldNotSearch": "ସେସନ୍ ଖୋଜାଯାଇପାରିଲା ନାହିଁ",
-      "allActive": "ସମସ୍ତ ସେସନ୍ ସକ୍ରିୟ",
       "completedWillAppear": "ସମାପ୍ତ ସେସନ୍ ଏଠାରେ ଦେଖାଯିବ।",
       "noPastSessions": "କୌଣସି ପୁରୁଣା ସେସନ୍ ନାହିଁ",
       "live": "ଲାଇଭ୍"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "ତଳକୁ ସ୍କ୍ରୋଲ କରନ୍ତୁ",
       "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ",
       "renameAccessibility": "ସେସନ୍ ପୁନଃନାମକରଣ କରନ୍ତୁ: {{title}}",
-      "connectRepository": "ରିପୋଜିଟୋରୀ ସଂଯୋଗ କରନ୍ତୁ",
       "cloningSession": "ସେସନ୍ କ୍ଲୋନ କରୁଛି",
       "continue": "ଜାରି ରଖନ୍ତୁ",
       "couldNotLoadThisSession": "ଏହି ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
-      "cloneFailed": "ଏହି ସେସନ୍ କ୍ଲୋନ ହୋଇପାରିଲା ନାହିଁ।",
       "cloneFailedRetry": "ଏହି ସେସନ୍ କ୍ଲୋନ ହୋଇପାରିଲା ନାହିଁ। ପୁନଃଚେଷ୍ଟା କରନ୍ତୁ।",
-      "connectRepositoryToContinue": "ଜାରି ରଖିବାକୁ ଏକ ରିପୋଜିଟୋରୀ ସଂଯୋଗ କରନ୍ତୁ।",
       "notEnoughCredits": "Cloud Agent ଚଲାଇବାକୁ ପର୍ଯ୍ୟାପ୍ତ କ୍ରେଡିଟ୍ ନାହିଁ। କ୍ରେଡିଟ୍ ଯୋଡି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "previousTaskFinishing": "ପୂର୍ବ କାର୍ଯ୍ୟ ଏବେବି ସରୁଛି। ଦୟାକରି ଏକ ମୁହୂର୍ତ୍ତ ଅପେକ୍ଷା କରନ୍ତୁ।",
       "serviceUnavailable": "ସେବା ଏବେ ଉପଲବ୍ଧ ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "କୌଣସି ରିପୋଜିଟରୀ ଦୃଶ୍ୟମାନ ନାହିଁ। GitLab ପାଇଁ ରିପୋଜିଟରୀ ଆକ୍ସେସ୍ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
       "openBitbucket": "Bitbucket ଖୋଲନ୍ତୁ",
       "openGitlab": "GitLab ଖୋଲନ୍ତୁ",
-      "recentlyUsed": "ସାମ୍ପ୍ରତିକ ଭାବରେ ବ୍ୟବହୃତ"
+      "recentlyUsed": "ସାମ୍ପ୍ରତିକ ଭାବରେ ବ୍ୟବହୃତ",
+      "cliCannotContinue": "ଏହି CLI ଏକ ସେସନ୍ ଜାରି ରଖିପାରିବ ନାହିଁ। Cloud Agent କିମ୍ବା ଅନ୍ୟ CLI ଚୟନ କରନ୍ତୁ।",
+      "continueFrom": "{{title}} ଜାରି ରହୁଛି",
+      "importFailed": "ଏହି ସେସନ୍ ଆମଦାନୀ କରିପାରିଲା ନାହିଁ।",
+      "importingSession": "ସେସନ୍ ଆମଦାନୀ କରୁଛି"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି",
@@ -2462,6 +2477,8 @@
       "viewTable": "ଟେବୁଲ ଦେଖନ୍ତୁ",
       "title": "ଟେବୁଲ",
       "close": "ଟେବୁଲ ବନ୍ଦ କରନ୍ତୁ",
+      "loading": "ଟେବୁଲ ଲୋଡ ହେଉଛି",
+      "empty": "ଏହି ଟେବୁଲରେ କୌଣସି ଧାଡ଼ି ନାହିଁ।",
       "columnCount_one": "ସ୍ତମ୍ଭ",
       "columnCount": "ସ୍ତମ୍ଭ",
       "columnCount_other": "ସ୍ତମ୍ଭ",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "ଏହି ଲିଙ୍କ୍ ଆପଣଙ୍କ ବ୍ରାଉଜରରେ {{host}} ଖୋଲିବ।",
       "open": "ଖୋଲନ୍ତୁ",
       "trustThisHost": "ଏହି ହୋଷ୍ଟକୁ ବିଶ୍ୱାସ କରନ୍ତୁ"
+    },
+    "folderPicker": {
+      "accessibility": "ଫୋଲ୍ଡର୍: {{label}}",
+      "emptyDescription": "ସମ୍ପନ୍ନ ଏହି ଫୋଲ୍ଡର୍ ବ୍ୟବହାର କରେ।",
+      "emptyTitle": "ଭିତରେ କୌଣସି ଫୋଲ୍ଡର୍ ନାହିଁ",
+      "fieldLabel": "ଫୋଲ୍ଡର୍",
+      "retryableDescription": "ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ। ସମ୍ପନ୍ନ ତଥାପି ଏହି ଫୋଲ୍ଡର୍ ନିଶ୍ଚିତ କରେ।",
+      "retryableTitle": "ଫୋଲ୍ଡର୍ ତାଲିକା କରିପାରିଲା ନାହିଁ",
+      "tapToListHint": "ଏହାର ବିଷୟବସ୍ତୁ ତାଲିକା କରିବାକୁ ଏକ ଫୋଲ୍ଡର୍ ଟାପ୍ କରନ୍ତୁ",
+      "unsupportedDescription": "ଏହି CLI ଫୋଲ୍ଡର୍ ତାଲିକା କରିପାରିବ ନାହିଁ। ସମ୍ପନ୍ନ ଲଞ୍ଚ ଫୋଲ୍ଡର୍ ରଖେ ଏବଂ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ ସେଠାରେ ଆରମ୍ଭ ହୁଏ।",
+      "unsupportedTitle": "ଫୋଲ୍ଡର୍ ତାଲିକା କରିପାରିବ ନାହିଁ"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "ଯେତେବେଳେ ଆପଣ ଏକ ଲିଙ୍କ୍‌ର ହୋଷ୍ଟକୁ ବିଶ୍ୱାସ କରନ୍ତି, ଏହା ପୁଣି ପଚାରିବା ବିନା ଖୋଲିଥାଏ।",
     "revoke": "{{host}} ରଦ୍ଦ କରନ୍ତୁ",
     "backToPreferences": "ପସନ୍ଦକୁ ଫେରନ୍ତୁ"
+  },
+  "quickChat": {
+    "title": "ଚାଟ୍",
+    "composer": {
+      "placeholder": "ସନ୍ଦେଶ"
+    },
+    "empty": {
+      "title": "ଏକ ଚାଟ୍ ଆରମ୍ଭ କରନ୍ତୁ",
+      "description": "ଏକ ମଡେଲ୍ ସହିତ କଥା ହେବାକୁ ଏକ ସନ୍ଦେଶ ପଠାନ୍ତୁ।"
+    },
+    "working": "କାମ କରୁଛି",
+    "historyRetry": "ଚାଟ୍ ଇତିହାସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "catalogRetry": "ମଡେଲ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ",
+    "sendError": "ସନ୍ଦେଶ ପଠାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
   }
 }

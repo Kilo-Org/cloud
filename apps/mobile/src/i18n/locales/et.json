@@ -665,7 +665,8 @@
     "profile": "Profiil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, vaheleht, {{position}}/{{total}}"
+    "position": "{{name}}, vaheleht, {{position}}/{{total}}",
+    "chat": "Vestlus"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Kontrollikäit",
       "status": "Olek",
       "threshold": "Lävi",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptEmpty": "Selle ülevaate jaoks transkriptsiooni pole.",
+      "transcriptLive": "OTSE",
+      "transcriptRetry": "Ülevaate transkriptsiooni laadimine ebaõnnestus.",
+      "transcriptWaiting": "Oodatakse ülevaate transkriptsiooni.",
+      "agentIdle": "Agent on jõude",
+      "agentWorking": "Agent töötab...",
+      "anErrorOccurred": "Juhtus viga",
+      "errorWithMessage": "Viga: {{message}}",
+      "executionStarted": "Täitmine alustatud",
+      "reviewCompleted": "Ülevaade lõpetatud",
+      "reviewInterrupted": "Ülevaade katkestatud",
+      "sessionError": "Seansi viga: {{error}}",
+      "statusWithValue": "Olek: {{status}}",
+      "toolName": "Tööriist: {{name}}",
+      "toolNameError": "Tööriist: {{name}} — viga",
+      "unknownError": "Tundmatu viga"
     },
     "reviewMemory": {
       "title": "Ülevaate mälu",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiivne praegu",
     "search": {
       "searching": "Otsimine",
       "searchSessions": "Otsi seansse",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Seansse ei õnnestunud laadida",
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida",
-      "noSessionsYet": "Seansse pole veel",
       "noSessionsYetDescription": "Alusta oma telefonis kodeerimisülesannet. Sinu seansid ilmuvad siia.",
       "noMatches": "Ükski seanss ei vasta",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
       "tryAdjustFilters": "Proovi filtreid kohandada või tühjendada.",
       "couldNotSearch": "Seansside otsimine ebaõnnestus",
-      "allActive": "Kõik seansid on aktiivsed",
       "completedWillAppear": "Lõpetatud seansid ilmuvad siia.",
       "noPastSessions": "Minevikuseansse pole",
       "live": "OTSE"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Kerige alla",
       "emptyTitle": "Sõnumeid pole veel",
       "renameAccessibility": "Nimeta seanss ümber: {{title}}",
-      "connectRepository": "Ühenda hoidla",
       "cloningSession": "Seanssi kloonitakse",
       "continue": "Jätka",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida",
-      "cloneFailed": "Seda seanssi ei õnnestunud kloonida.",
       "cloneFailedRetry": "Seda seanssi ei õnnestunud kloonida. Proovi uuesti.",
-      "connectRepositoryToContinue": "Jätkamiseks ühenda hoidla.",
       "notEnoughCredits": "Cloud Agent käivitamiseks ei jätku krediiti. Lisa krediiti ja proovi uuesti.",
       "previousTaskFinishing": "Eelmine ülesanne on veel lõpetamisel. Palun oota hetk.",
       "serviceUnavailable": "Teenus pole praegu saadaval. Palun proovi uuesti.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Hoidlaid pole nähtaval. Kontrolli GitLabi hoidlate juurdepääsu ja värskenda.",
       "openBitbucket": "Ava Bitbucket",
       "openGitlab": "Ava GitLab",
-      "recentlyUsed": "Hiljuti kasutatud"
+      "recentlyUsed": "Hiljuti kasutatud",
+      "cliCannotContinue": "See CLI ei saa seanssi jätkata. Valige Cloud Agent või mõni muu CLI.",
+      "continueFrom": "Jätkatakse {{title}}",
+      "importFailed": "Seda seanssi ei õnnestunud importida.",
+      "importingSession": "Imporditakse seanssi"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendatud {{displayCount}} fail",
@@ -2462,6 +2477,8 @@
       "viewTable": "Vaata tabelit",
       "title": "Tabel",
       "close": "Sulge tabel",
+      "loading": "Laadin tabelit",
+      "empty": "Selles tabelis ei ole ridu.",
       "columnCount_one": "veerg",
       "columnCount": "veerud",
       "columnCount_other": "veerud",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "See link avab {{host}} sinu brauseris.",
       "open": "Ava",
       "trustThisHost": "Usalda seda hosti"
+    },
+    "folderPicker": {
+      "accessibility": "Kaust: {{label}}",
+      "emptyDescription": "Valmis kasutab seda kausta.",
+      "emptyTitle": "Sees pole kaustu",
+      "fieldLabel": "Kaust",
+      "retryableDescription": "Kontrolli ühendust ja proovi uuesti. Valmis kinnitab endiselt seda kausta.",
+      "retryableTitle": "Kaustu ei õnnestunud loetleda",
+      "tapToListHint": "Puuduta kausta, et selle sisu loetleda",
+      "unsupportedDescription": "See CLI ei saa kaustu loetleda. Valmis jätab käivituskausta ja Alusta seanssi algab seal.",
+      "unsupportedTitle": "Kaustu ei saa loetleda"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Kui usaldad lingi hosti, avaneb see ilma uuesti küsimata.",
     "revoke": "Tühista {{host}}",
     "backToPreferences": "Tagasi eelistuste juurde"
+  },
+  "quickChat": {
+    "title": "Vestlus",
+    "composer": {
+      "placeholder": "Sõnum"
+    },
+    "empty": {
+      "title": "Alusta vestlust",
+      "description": "Mudeliga vestlemiseks saada sõnum."
+    },
+    "working": "Töötamine",
+    "historyRetry": "Vestluse ajaloo laadimine ei õnnestunud.",
+    "catalogRetry": "Mudeleid ei õnnestunud laadida",
+    "sendError": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
   }
 }

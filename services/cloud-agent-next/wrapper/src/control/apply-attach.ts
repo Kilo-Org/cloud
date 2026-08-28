@@ -6,6 +6,7 @@ import {
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { PreparingEventDataV2, PreparingStep } from '../../../src/shared/protocol.js';
+import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import { git, isTimeoutTermination, logToFile, runProcess, type ExecResult } from '../utils.js';
 import { rememberAttachedRoot, rememberSessionDirectory } from './session-directories';
 import { authenticatedGitUrl } from './git-url';
@@ -174,6 +175,14 @@ export async function applySessionAttach(
     return fail('protocol_error', 'Invalid payload', false);
   }
   const attach = parsed.data;
+  const environment = attach.env;
+  if (
+    environment &&
+    CONTROL_RUNTIME_RESERVED_ENV_VARS.some(key => Object.hasOwn(environment, key))
+  ) {
+    return fail('protocol_error', 'Reserved control runtime environment variable', false);
+  }
+
   const directory = attach.directory ?? session.directory;
   const mkdir = deps.mkdir ?? (dir => fs.mkdir(dir, { recursive: true }).then(() => undefined));
   const hasGit = deps.hasGit ?? defaultHasGit;
@@ -267,7 +276,7 @@ export async function applySessionAttach(
         logToFile(`session.attach ready directory=${directory}`);
         return ok();
       }
-      if (restored.code !== 404) {
+      if (restored.code !== 404 && !restored.emptySnapshot) {
         progress.fail('kilo_session', 'phase:kilo_session', restored.error);
         return fail('not_ready', 'kilo session is not ready', true);
       }

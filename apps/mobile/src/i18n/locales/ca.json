@@ -672,7 +672,8 @@
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, pestanya, {{position}} de {{total}}"
+    "position": "{{name}}, pestanya, {{position}} de {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -1308,7 +1309,23 @@
       "checkRun": "Execució de comprovació",
       "status": "Estat",
       "threshold": "Llindar",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "S'espera la transcripció de la revisió.",
+      "transcriptEmpty": "No hi ha transcripció per a aquesta revisió.",
+      "transcriptRetry": "No s'ha pogut carregar la transcripció de la revisió.",
+      "transcriptLive": "EN DIRECTE",
+      "agentIdle": "Agent inactiu",
+      "agentWorking": "Agent treballant...",
+      "anErrorOccurred": "S'ha produït un error",
+      "errorWithMessage": "Error: {{message}}",
+      "executionStarted": "S'ha iniciat l'execució",
+      "reviewCompleted": "Revisió completada",
+      "reviewInterrupted": "Revisió interrompuda",
+      "sessionError": "Error de sessió: {{error}}",
+      "statusWithValue": "Estat: {{status}}",
+      "toolName": "Eina: {{name}}",
+      "toolNameError": "Eina: {{name}} — error",
+      "unknownError": "Error desconegut"
     },
     "reviewMemory": {
       "title": "Memòria de revisió",
@@ -2046,7 +2063,6 @@
     }
   },
   "agents": {
-    "activeNow": "Actius ara",
     "search": {
       "searching": "Cercant",
       "searchSessions": "Cercar sessions",
@@ -2057,13 +2073,11 @@
     "sessionList": {
       "couldNotLoad": "No s'han pogut carregar les sessions",
       "couldNotLoadActive": "No s'han pogut carregar les sessions actives",
-      "noSessionsYet": "Encara no hi ha sessions",
       "noSessionsYetDescription": "Inicia una tasca de codificació des del telèfon. Les sessions apareixeran aquí.",
       "noMatches": "Cap sessió no coincideix",
       "tryDifferentSearch": "Prova amb un altre terme de cerca.",
       "tryAdjustFilters": "Prova d'ajustar o esborrar els filtres.",
       "couldNotSearch": "No s'han pogut cercar les sessions",
-      "allActive": "Totes les sessions estan actives",
       "completedWillAppear": "Les sessions completades apareixeran aquí.",
       "noPastSessions": "Cap sessió anterior",
       "live": "EN DIRECTE"
@@ -2134,13 +2148,10 @@
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
       "renameAccessibility": "Reanomena la sessió: {{title}}",
-      "connectRepository": "Connecta un repositori",
       "cloningSession": "Clonant la sessió",
       "continue": "Continua",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió",
-      "cloneFailed": "No s'ha pogut clonar aquesta sessió.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
-      "connectRepositoryToContinue": "Connecta un repositori per continuar.",
       "notEnoughCredits": "No tens prou crèdits per executar Cloud Agent. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara s'està acabant. Espera un moment.",
       "serviceUnavailable": "El servei no està disponible ara mateix. Torna-ho a provar.",
@@ -2213,7 +2224,11 @@
       "noRepositoriesVisibleGitlab": "No hi ha repositoris visibles. Comprova l'accés als repositoris de GitLab i actualitza.",
       "openBitbucket": "Obre Bitbucket",
       "openGitlab": "Obre GitLab",
-      "recentlyUsed": "Utilitzats recentment"
+      "recentlyUsed": "Utilitzats recentment",
+      "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Trieu Cloud Agent o un altre CLI.",
+      "continueFrom": "Continuant {{title}}",
+      "importFailed": "No s'ha pogut importar aquesta sessió.",
+      "importingSession": "Important la sessió"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxer actualitzat",
@@ -2479,6 +2494,8 @@
       "viewTable": "Mostra la taula",
       "title": "Taula",
       "close": "Tanca la taula",
+      "loading": "Carregant la taula",
+      "empty": "Aquesta taula no té cap fila.",
       "columnCount_one": "columna",
       "columnCount": "columnes",
       "columnCount_other": "columnes",
@@ -2670,6 +2687,17 @@
       "hostConfirmMessage": "Aquest enllaç obre {{host}} al navegador.",
       "open": "Obrir",
       "trustThisHost": "Confia en aquest host"
+    },
+    "folderPicker": {
+      "accessibility": "Carpeta: {{label}}",
+      "emptyDescription": "Fet utilitza aquesta carpeta.",
+      "emptyTitle": "No hi ha cap carpeta",
+      "fieldLabel": "Carpeta",
+      "retryableDescription": "Comprova la connexió i torna-ho a provar. Fet encara confirma aquesta carpeta.",
+      "retryableTitle": "No s'han pogut llistar les carpetes",
+      "tapToListHint": "Toca una carpeta per llistar-ne el contingut",
+      "unsupportedDescription": "Aquesta CLI no pot llistar carpetes. Fet manté la carpeta d'inici i Inicia la sessió comença allà.",
+      "unsupportedTitle": "No es poden llistar les carpetes"
     }
   },
   "bootstrap": {
@@ -3170,5 +3198,19 @@
     "emptyDescription": "Quan confies en el host d'un enllaç, s'obre sense tornar a preguntar.",
     "revoke": "Revoca {{host}}",
     "backToPreferences": "Torna a les preferències"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Missatge"
+    },
+    "empty": {
+      "title": "Comença un xat",
+      "description": "Envia un missatge per parlar amb un model."
+    },
+    "working": "Treballant",
+    "historyRetry": "No s'ha pogut carregar l'historial del xat.",
+    "catalogRetry": "No s'han pogut carregar els models",
+    "sendError": "No s'ha pogut enviar el missatge. Torna-ho a provar."
   }
 }

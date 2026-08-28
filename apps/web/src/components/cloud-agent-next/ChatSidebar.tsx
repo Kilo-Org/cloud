@@ -108,7 +108,7 @@ type ChatSidebarProps = {
   currentSessionId?: string;
   organizationId?: string;
   onDeleteSession?: (sessionId: string) => void;
-  deletingSessionId?: string;
+  deletingSessionIds?: string[];
   onRenameSession?: (sessionId: string, title: string) => Promise<void>;
   isInSheet?: boolean;
   activeSessions?: ActiveSession[];
@@ -324,7 +324,7 @@ export function ChatSidebar({
   currentSessionId,
   organizationId,
   onDeleteSession,
-  deletingSessionId,
+  deletingSessionIds,
   onRenameSession,
   isInSheet = false,
   activeSessions = [],
@@ -607,8 +607,8 @@ export function ChatSidebar({
                     isActive={session.sessionId === currentSessionId}
                     isLive={activeSessionIds.has(session.sessionId)}
                     onDeleteSession={onDeleteSession}
+                    isDeleting={deletingSessionIds?.includes(session.sessionId) ?? false}
                     onStartRename={onRenameSession ? () => handleStartRename(session) : undefined}
-                    isDeleting={deletingSessionId === session.sessionId}
                     isEditing={editingSessionId === session.sessionId}
                     editTitle={editTitle}
                     onEditTitleChange={setEditTitle}

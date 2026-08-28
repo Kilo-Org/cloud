@@ -26,6 +26,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@/lib/notifications', () => ({
+  emitNotificationTokenUpdated: vi.fn(),
   getDevicePushTokenOutcome: vi.fn(),
 }));
 

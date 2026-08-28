@@ -16,6 +16,7 @@ export type ProcessOutputStream = 'stdout' | 'stderr';
 export type ProcessOptions = {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  inheritEnv?: boolean;
   timeoutMs?: number;
   inactivityTimeoutMs?: number;
   hardTimeoutMs?: number;
@@ -121,7 +122,11 @@ export function runProcess(
   return new Promise((resolve, reject) => {
     const proc = spawn(command, args, {
       cwd: opts?.cwd,
-      ...(opts?.env ? { env: { ...process.env, ...opts.env } } : {}),
+      ...(opts?.inheritEnv === false
+        ? { env: opts.env ?? {} }
+        : opts?.env
+          ? { env: { ...process.env, ...opts.env } }
+          : {}),
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -328,7 +333,8 @@ export async function withTimeoutAndAbort<T>(
 export async function getCurrentBranch(
   workspacePath: string,
   timeoutMs?: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<string> {
   let result: ExecResult;
   try {
@@ -336,6 +342,7 @@ export async function getCurrentBranch(
       cwd: workspacePath,
       timeoutMs,
       signal,
+      ...(env ? { env, inheritEnv: false } : {}),
     });
   } catch {
     return '';
@@ -353,13 +360,15 @@ export async function getCurrentBranch(
 export async function hasGitUpstream(
   workspacePath: string,
   timeoutMs?: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<boolean> {
   try {
     const result = await git(['rev-parse', '--abbrev-ref', '@{upstream}'], {
       cwd: workspacePath,
       timeoutMs,
       signal,
+      ...(env ? { env, inheritEnv: false } : {}),
     });
     return result.exitCode === 0 && result.stdout.trim() !== '';
   } catch {

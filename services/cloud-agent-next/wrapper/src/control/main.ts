@@ -1,15 +1,8 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { createKilo } from '@kilocode/sdk';
-import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
 import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
-import { createWrapperKiloClient } from '../kilo-api.js';
 import { logToFile } from '../utils.js';
 import {
   KILO_CONTROL_REQUEST_TIMEOUT_MS,
   maybeStartSandboxControlClient,
-  startSandboxControlEventFeed,
 } from './sandbox-control-runtime';
 import {
   buildHeartbeatPayload,
@@ -21,26 +14,13 @@ import {
   childFromSessionCreated,
   eventKiloSessionId,
   sessionEventIdentity,
-  unfilteredKiloEvents,
   updateSessionSnapshots,
 } from './feed';
 import { rememberChildSession } from './session-directories';
 import { createControlTerminalRuntime } from './terminal-runtime';
+import { createWorktreeKiloRuntimes } from './worktree-runtime';
 
-const KILO_STARTUP_TIMEOUT_MS = 30_000;
-
-function writeKiloAuthFromEnv(): void {
-  const content = process.env.KILO_AUTH_CONTENT;
-  const token = process.env.KILOCODE_TOKEN;
-  const auth =
-    content ?? (token ? JSON.stringify({ kilo: { type: 'api', key: token } }) : undefined);
-  if (!auth) return;
-  const dir = path.join(os.homedir(), '.local', 'share', 'kilo');
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'auth.json'), auth, { mode: 0o600 });
-}
-
-async function main(): Promise<void> {
+function main(): void {
   const controlConfig = {
     SANDBOX_CONTROL_URL: process.env.SANDBOX_CONTROL_URL,
     SANDBOX_CONTROL_CREDENTIAL: process.env.SANDBOX_CONTROL_CREDENTIAL,
@@ -50,36 +30,45 @@ async function main(): Promise<void> {
   delete process.env.SANDBOX_CONTROL_CREDENTIAL;
 
   logToFile(`control-plane wrapper ${WRAPPER_VERSION} starting`);
-  writeKiloAuthFromEnv();
-
-  const result = await createKilo({
-    hostname: '127.0.0.1',
-    port: 0,
-    timeout: KILO_STARTUP_TIMEOUT_MS,
-    config: {
-      autoupdate: false,
-      permission: CONTROL_PLANE_SANDBOX_PERMISSION,
+  const abort = new AbortController();
+  let control: ReturnType<typeof maybeStartSandboxControlClient> = null;
+  let shuttingDown = false;
+  const kiloRuntimes = createWorktreeKiloRuntimes({
+    onEvent: (_runtime, event) => {
+      if (event.type === 'session.created') {
+        const child = childFromSessionCreated(event.properties);
+        if (child) rememberChildSession(child);
+      }
+      updateSessionSnapshots(event, deps.sessions);
+      const identity = sessionEventIdentity({
+        sessionId: eventKiloSessionId(event.properties),
+        directory: event.directory,
+      });
+      if (!identity?.rootKiloSessionId) return;
+      if (
+        !control?.sendEvent?.(
+          'session.event',
+          { type: event.type, properties: event.properties },
+          identity
+        )
+      ) {
+        throw new Error('Sandbox control event delivery failed');
+      }
     },
+    onUnexpectedClose: () => shutdown(1, 'Kilo event feed is no longer healthy'),
   });
-  const kiloClient = createWrapperKiloClient(result.client, result.server.url, '/');
   const terminalRuntime = controlConfig.SANDBOX_CONTROL_URL
     ? createControlTerminalRuntime({
         controlUrl: controlConfig.SANDBOX_CONTROL_URL,
         wrapperInstanceId: controlConfig.wrapperInstanceId,
-        kiloClient,
+        getKiloRuntime: directory => kiloRuntimes.get(directory),
       })
     : undefined;
-  logToFile(`kilo server started at ${result.server.url}`);
-
-  const abort = new AbortController();
-  let control: ReturnType<typeof maybeStartSandboxControlClient> = null;
-  let feed: Awaited<ReturnType<typeof startSandboxControlEventFeed>> | undefined;
-  let shuttingDown = false;
   const deps: HandlerDeps = {
-    kiloClient,
+    kiloRuntimes,
     version: WRAPPER_VERSION,
     get kiloReady() {
-      return !shuttingDown && feed?.isFresh() === true;
+      return !shuttingDown && kiloRuntimes.isHealthy();
     },
     sessions: [],
     tasks: new Map(),
@@ -110,7 +99,7 @@ async function main(): Promise<void> {
     terminalRuntime?.shutdown();
     const finish = (): void => {
       control?.close();
-      result.server.close();
+      kiloRuntimes.shutdown();
       process.exit(exitCode);
     };
     const deadline = setTimeout(finish, KILO_CONTROL_REQUEST_TIMEOUT_MS);
@@ -121,42 +110,6 @@ async function main(): Promise<void> {
   }
   process.once('SIGTERM', () => shutdown(0, 'Wrapper received SIGTERM'));
   process.once('SIGINT', () => shutdown(0, 'Wrapper received SIGINT'));
-
-  try {
-    feed = await startSandboxControlEventFeed({
-      signal: abort.signal,
-      open: signal => result.client.global.event({ signal, sseMaxRetryAttempts: 1 }),
-      consume: async stream => {
-        for await (const event of unfilteredKiloEvents(stream)) {
-          if (event.type === 'session.created') {
-            const child = childFromSessionCreated(event.properties);
-            if (child) rememberChildSession(child);
-          }
-          updateSessionSnapshots(event, deps.sessions);
-          const kiloSessionId = eventKiloSessionId(event.properties);
-          const identity = sessionEventIdentity({
-            sessionId: kiloSessionId,
-            directory: event.directory,
-          });
-          if (!identity?.rootKiloSessionId) continue;
-          if (
-            !control?.sendEvent?.(
-              'session.event',
-              { type: event.type, properties: event.properties },
-              identity
-            )
-          ) {
-            throw new Error('Sandbox control event delivery failed');
-          }
-        }
-      },
-      onUnexpectedClose: () => shutdown(1, 'Kilo event feed is no longer healthy'),
-    });
-  } catch {
-    shutdown(1, 'Kilo event feed failed to start');
-    return;
-  }
-  if (shuttingDown) return;
 
   control = maybeStartSandboxControlClient(controlConfig, logToFile, {
     wrapperVersion: WRAPPER_VERSION,
@@ -184,7 +137,9 @@ async function main(): Promise<void> {
   logToFile(`control-plane wrapper ready callHome=${Boolean(control)}`);
 }
 
-main().catch(() => {
+try {
+  main();
+} catch {
   logToFile('control-plane wrapper failed');
   process.exit(1);
-});
+}

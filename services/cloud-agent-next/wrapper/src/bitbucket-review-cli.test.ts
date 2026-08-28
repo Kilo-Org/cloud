@@ -1,5 +1,6 @@
 import { describe, expect, it, spyOn } from 'bun:test';
 import { runBitbucketReviewCli } from './bitbucket-review-cli';
+import { buildWorktreeKiloEnvironment } from './control/worktree-runtime';
 
 const API_ROOT = 'https://api.bitbucket.org/2.0';
 const principalUuid = '{55555555-5555-4555-8555-555555555555}';
@@ -265,6 +266,36 @@ describe('bb', () => {
       'Bearer secret-access-token'
     );
     expect(JSON.parse(result.stdout)).toEqual(pullRequestResponse());
+  });
+
+  it('accepts the worktree runtime environment with opaque Bitbucket and Kilo credentials', async () => {
+    const requests: RecordedRequest[] = [];
+    const env = buildWorktreeKiloEnvironment(
+      '/workspace/a',
+      '/home/worktree-a',
+      {
+        scopeId: 'worktree-a',
+        token: 'opaque-kilo-token',
+        targets: {
+          backendBaseUrl: 'https://backend.example.test',
+          providerBaseUrl: 'https://provider.example.test',
+          sessionIngestBaseUrl: 'https://ingest.example.test',
+        },
+      },
+      { ...trustedEnv(), BITBUCKET_TOKEN: 'opaque-bitbucket-token' },
+      {}
+    );
+    const result = await execute(['pr', 'view', '42'], providerFetch({ requests }), undefined, env);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(JSON.parse(result.stdout)).toEqual(pullRequestResponse());
+    expect(requests.map(request => request.url)).toEqual([pullRequestUrl]);
+    expect(new Headers(requests[0]?.init.headers).get('Authorization')).toBe(
+      'Bearer opaque-bitbucket-token'
+    );
+    expect(env.KILOCODE_TOKEN).toBe('opaque-kilo-token');
+    expect(JSON.stringify(env)).not.toContain('secret-access-token');
   });
 
   it('accepts unbraced UUIDs in Bitbucket pull request responses', async () => {

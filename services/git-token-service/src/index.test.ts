@@ -349,6 +349,11 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     repositoryFullName: 'acme/widgets',
     token: 'ATCT-runtime-token',
   };
+  const oauthSubject = {
+    ...subject,
+    token: 'oauth-runtime-token',
+    oauthCredentialId: '123e4567-e89b-12d3-a456-426614174023',
+  };
   const issueParams = {
     userId: 'user-1',
     orgId: '123e4567-e89b-12d3-a456-426614174030',
@@ -409,7 +414,100 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     });
   });
 
-  it('rejects redemption from a different container', async () => {
+  it('redeems the same OAuth capability after the access token refreshes', async () => {
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: oauthSubject,
+    });
+    const capability = await issueCapability();
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: { ...oauthSubject, token: 'oauth-refreshed-token' },
+    });
+
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'POST',
+        requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: {
+        authorization: `Basic ${Buffer.from('x-token-auth:oauth-refreshed-token').toString('base64')}`,
+      },
+    });
+    expect(serviceMocks.resolveBitbucketCapabilitySubject).toHaveBeenLastCalledWith(
+      expect.anything(),
+      {
+        userId: issueParams.userId,
+        orgId: issueParams.orgId,
+        expectedIntegrationId: oauthSubject.integrationId,
+        workspaceUuid: oauthSubject.workspaceUuid,
+        repositoryUuid: oauthSubject.repositoryUuid,
+        repositoryUrl: issueParams.repositoryUrl,
+      }
+    );
+  });
+
+  it.each([
+    [
+      'a replaced OAuth credential',
+      { ...oauthSubject, oauthCredentialId: '123e4567-e89b-12d3-a456-426614174024' },
+    ],
+    ['a missing OAuth credential identity', { ...oauthSubject, oauthCredentialId: undefined }],
+    ['a workspace access token source', { ...subject, token: oauthSubject.token }],
+  ])('rejects %s even when token bytes are unchanged', async (_description, currentSubject) => {
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: oauthSubject,
+    });
+    const capability = await issueCapability();
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: currentSubject,
+    });
+
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'POST',
+        requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+      })
+    ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+  });
+
+  it.each(['not_connected', 'reconnect_required', 'integration_mismatch'])(
+    'rejects OAuth redemption when the current source is %s',
+    async reason => {
+      serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+        success: true,
+        subject: oauthSubject,
+      });
+      const capability = await issueCapability();
+      serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({ success: false, reason });
+
+      await expect(
+        createService().redeemBitbucketSessionCapability({
+          capability,
+          outboundContainerId: 'outbound-container-1',
+          requestMethod: 'POST',
+          requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+        })
+      ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+    }
+  );
+
+  it.each([
+    ['workspace access token', subject],
+    ['OAuth', oauthSubject],
+  ])('rejects %s redemption from a different container', async (_source, currentSubject) => {
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: currentSubject,
+    });
     const capability = await issueCapability();
     await expect(
       createService().redeemBitbucketSessionCapability({
@@ -421,7 +519,14 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
   });
 
-  it('rejects redemption for a different repository', async () => {
+  it.each([
+    ['workspace access token', subject],
+    ['OAuth', oauthSubject],
+  ])('rejects %s redemption for a different repository', async (_source, currentSubject) => {
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: currentSubject,
+    });
     const capability = await issueCapability();
     await expect(
       createService().redeemBitbucketSessionCapability({
@@ -433,7 +538,40 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     ).resolves.toEqual({ success: false, reason: 'repository_mismatch' });
   });
 
-  it('rejects redemption when the token was rotated after issue', async () => {
+  it('keeps legacy OAuth capabilities digest-bound after refresh', async () => {
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: { ...subject, token: oauthSubject.token },
+    });
+    const capability = await issueCapability();
+    const redeemParams = {
+      capability,
+      outboundContainerId: 'outbound-container-1',
+      requestMethod: 'POST',
+      requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+    };
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: oauthSubject,
+    });
+
+    await expect(createService().redeemBitbucketSessionCapability(redeemParams)).resolves.toEqual({
+      success: true,
+      headers: {
+        authorization: `Basic ${Buffer.from(`x-token-auth:${oauthSubject.token}`).toString('base64')}`,
+      },
+    });
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: { ...oauthSubject, token: 'oauth-refreshed-token' },
+    });
+    await expect(createService().redeemBitbucketSessionCapability(redeemParams)).resolves.toEqual({
+      success: false,
+      reason: 'source_unavailable',
+    });
+  });
+
+  it('rejects workspace access token rotation after issue', async () => {
     const capability = await issueCapability();
     serviceMocks.resolveBitbucketCapabilitySubject
       .mockReset()

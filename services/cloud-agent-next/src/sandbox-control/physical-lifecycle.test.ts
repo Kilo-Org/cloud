@@ -9,12 +9,17 @@ import {
   initialPhysicalRecord,
   observe,
   recordStopAttempt,
+  WORKTREE_CREDENTIAL_CONTAINMENT,
   type PhysicalRecord,
 } from './physical-lifecycle.js';
 
 const NOW = 1_000;
 const INTENT_ID = 'intent_1';
 const PROVIDER_REF = 'ref_1';
+const CONTAINMENT_CASES = [
+  { name: 'legacy flags', containment: { kilocode: true, github: false } },
+  { name: 'worktree scope', containment: WORKTREE_CREDENTIAL_CONTAINMENT },
+];
 
 function stopped(resumable = true): PhysicalRecord {
   return initialPhysicalRecord(resumable);
@@ -50,6 +55,19 @@ describe('physical sandbox lifecycle', () => {
     expect(record.stopTombstone).toBeNull();
   });
 
+  it.each(CONTAINMENT_CASES)(
+    'claimCreate records only requested containment $name in the creation intent',
+    ({ containment }) => {
+      const record = claimCreate(stopped(), INTENT_ID, NOW, undefined, containment);
+      expect(record.createIntent).toStrictEqual({
+        intentId: INTENT_ID,
+        createdAt: NOW,
+        containment,
+      });
+      expect(record.containment).toBeUndefined();
+    }
+  );
+
   it('claimCreate from non-stopped throws', () => {
     expect(() => claimCreate(creating(), INTENT_ID, NOW)).toThrow('claimCreate from creating');
     expect(() => claimCreate(running(), INTENT_ID, NOW)).toThrow('claimCreate from running');
@@ -63,7 +81,49 @@ describe('physical sandbox lifecycle', () => {
     expect(record.state).toBe('running');
     expect(record.providerRef).toBe(PROVIDER_REF);
     expect(record.createIntent).toEqual({ intentId: INTENT_ID, createdAt: NOW });
+    expect(record.containment).toBeUndefined();
   });
+
+  it.each(CONTAINMENT_CASES)(
+    'confirmRunning atomically binds containment $name to the exact provider reference',
+    ({ containment }) => {
+      const record = confirmRunning(
+        claimCreate(stopped(), INTENT_ID, NOW, undefined, containment),
+        PROVIDER_REF,
+        NOW
+      );
+      expect(record.createIntent).toStrictEqual({
+        intentId: INTENT_ID,
+        createdAt: NOW,
+        containment,
+      });
+      expect(record.containment).toStrictEqual({ ...containment, providerRef: PROVIDER_REF });
+      expect(confirmRunning(record, PROVIDER_REF, NOW)).toBe(record);
+    }
+  );
+
+  it.each(CONTAINMENT_CASES)(
+    'active observation promotes containment $name to the observed provider reference',
+    ({ containment }) => {
+      const record = observe(
+        {
+          ...claimCreate(stopped(), INTENT_ID, NOW, undefined, containment),
+          providerRef: PROVIDER_REF,
+        },
+        'active'
+      );
+      expect(record).toMatchObject({
+        state: 'running',
+        providerRef: PROVIDER_REF,
+      });
+      expect(record.createIntent).toStrictEqual({
+        intentId: INTENT_ID,
+        createdAt: NOW,
+        containment,
+      });
+      expect(record.containment).toStrictEqual({ ...containment, providerRef: PROVIDER_REF });
+    }
+  );
 
   it('beginStop from creating with no ref still writes a tombstone', () => {
     const record = beginStop(creating(), 'idle', NOW);
@@ -89,6 +149,45 @@ describe('physical sandbox lifecycle', () => {
       resumable: true,
     });
   });
+
+  it.each(CONTAINMENT_CASES)(
+    'retains bound containment $name through failed and unknown states until stopped',
+    ({ containment }) => {
+      const contained = confirmRunning(
+        claimCreate(stopped(), INTENT_ID, NOW, undefined, containment),
+        PROVIDER_REF,
+        NOW
+      );
+      const marker = { ...containment, providerRef: PROVIDER_REF };
+      expect(fail(contained, NOW).containment).toStrictEqual(marker);
+      const unknown = observe(contained, 'unknown');
+      expect(unknown.containment).toStrictEqual(marker);
+      expect(observe(unknown, 'active').containment).toStrictEqual(marker);
+      const stopping = beginStop(contained, 'idle', NOW);
+      expect(exhaustStopRetries(stopping).containment).toStrictEqual(marker);
+      expect(confirmStopped(stopping).containment).toBeUndefined();
+      expect(observe(fail(contained, NOW), 'terminal').containment).toBeUndefined();
+      expect(confirmStopped(unknown).containment).toBeUndefined();
+    }
+  );
+
+  it.each(CONTAINMENT_CASES)(
+    'preserves creation containment $name through failure and unknown observation',
+    ({ containment }) => {
+      const claimed = {
+        ...claimCreate(stopped(), INTENT_ID, NOW, undefined, containment),
+        providerRef: PROVIDER_REF,
+      };
+      const failed = fail(claimed, NOW);
+      expect(failed.createIntent).toStrictEqual(claimed.createIntent);
+      const unknown = observe(failed, 'unknown');
+      expect(unknown.createIntent).toStrictEqual(claimed.createIntent);
+      expect(observe(unknown, 'active')).toStrictEqual(unknown);
+      expect(unknown.containment).toBeUndefined();
+      expect(unknown.stopTombstone).toStrictEqual(failed.stopTombstone);
+      expect(confirmStopped(unknown)).toStrictEqual(stopped());
+    }
+  );
 
   it('observe unknown never goes to stopped', () => {
     expect(observe(creating(), 'unknown').state).toBe('creating');

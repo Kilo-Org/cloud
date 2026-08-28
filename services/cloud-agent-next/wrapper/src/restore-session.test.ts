@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { restoreSession, extractDiffs } from './restore-session';
+import { restoreSession, extractDiffs, seedSessionIngestRegistration } from './restore-session';
+import { buildWorktreeKiloEnvironment } from './control/worktree-runtime';
 
 const SESSION_ID = 'ses_test123';
 
@@ -121,6 +122,232 @@ function writeSignalIgnoringDescendantMockKilo(binDir: string, descendantMarker:
 // Test suite
 // ---------------------------------------------------------------------------
 
+async function rejected(operation: Promise<void>): Promise<unknown> {
+  try {
+    await operation;
+  } catch (error) {
+    return error;
+  }
+  throw new Error('Expected operation to reject');
+}
+
+describe('seedSessionIngestRegistration', () => {
+  let tmpDir: string;
+  let dataHome: string;
+  let registrationDirectory: string;
+  const sessionId = 'root_01-kilo';
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'seed-ingest-test-'));
+    dataHome = path.join(tmpDir, 'worktree data');
+    registrationDirectory = path.join(dataHome, 'kilo', 'storage', 'session_share');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes only the pinned registration with restrictive permissions in the explicit data home', async () => {
+    const home = path.join(tmpDir, 'unused-home');
+    await seedSessionIngestRegistration(sessionId, {
+      HOME: home,
+      XDG_DATA_HOME: dataHome,
+      KILOCODE_TOKEN: 'managed-token-must-not-persist',
+      KILO_AUTH_CONTENT: '{"kilo":{"type":"api","key":"auth-must-not-persist"}}',
+      SANDBOX_CONTROL_CREDENTIAL: 'control-must-not-persist',
+    });
+
+    const registrationPath = path.join(registrationDirectory, `${sessionId}.json`);
+    const contents = fs.readFileSync(registrationPath, 'utf8');
+    expect(JSON.parse(contents)).toEqual({
+      id: sessionId,
+      ingestPath: `/api/session/${sessionId}/ingest`,
+    });
+    expect(contents).not.toContain('must-not-persist');
+    expect(fs.statSync(registrationPath).mode & 0o777).toBe(0o600);
+    expect(fs.statSync(registrationDirectory).mode & 0o777).toBe(0o700);
+    expect(fs.readdirSync(registrationDirectory)).toEqual([`${sessionId}.json`]);
+    expect(fs.existsSync(home)).toBe(false);
+  });
+
+  it('isolates roots and data homes across concurrent and repeated seeds', async () => {
+    const otherRoot = 'kilo_2';
+    const otherDataHome = path.join(tmpDir, 'other-data');
+    await Promise.all([
+      seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }),
+      seedSessionIngestRegistration(otherRoot, { XDG_DATA_HOME: dataHome }),
+      seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }),
+      seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: otherDataHome }),
+    ]);
+
+    expect(fs.readdirSync(registrationDirectory).sort()).toEqual([
+      `${otherRoot}.json`,
+      `${sessionId}.json`,
+    ]);
+    const otherDirectory = path.join(otherDataHome, 'kilo', 'storage', 'session_share');
+    expect(fs.readdirSync(otherDirectory)).toEqual([`${sessionId}.json`]);
+    for (const [directory, root] of [
+      [registrationDirectory, sessionId],
+      [registrationDirectory, otherRoot],
+      [otherDirectory, sessionId],
+    ]) {
+      expect(JSON.parse(fs.readFileSync(path.join(directory, `${root}.json`), 'utf8'))).toEqual({
+        id: root,
+        ingestPath: `/api/session/${root}/ingest`,
+      });
+    }
+  });
+
+  it('accepts a 128-character safe session ID', async () => {
+    const root = 'a'.repeat(128);
+    await seedSessionIngestRegistration(root, { XDG_DATA_HOME: dataHome });
+    expect(
+      JSON.parse(fs.readFileSync(path.join(registrationDirectory, `${root}.json`), 'utf8'))
+    ).toEqual({ id: root, ingestPath: `/api/session/${root}/ingest` });
+  });
+
+  it.each([
+    '',
+    '.',
+    '..',
+    '../root',
+    '/root',
+    'root/other',
+    'root\\other',
+    'root.json',
+    'root?other',
+    'root#other',
+    'root\n',
+    'root\r',
+    'root\0',
+    'røot',
+    'a'.repeat(129),
+  ])('rejects unsafe session ID %j before writing', async root => {
+    expect(
+      await rejected(seedSessionIngestRegistration(root, { XDG_DATA_HOME: dataHome }))
+    ).toEqual(new Error('Invalid Kilo session ID for ingest registration'));
+    expect(fs.readdirSync(tmpDir)).toEqual([]);
+  });
+
+  it.each([undefined, '', 'relative/data', '../data', '~/.local/share'])(
+    'rejects a missing or relative XDG_DATA_HOME %j',
+    async invalidDataHome => {
+      expect(
+        await rejected(
+          seedSessionIngestRegistration(sessionId, {
+            HOME: tmpDir,
+            XDG_DATA_HOME: invalidDataHome,
+          })
+        )
+      ).toEqual(new Error('Ingest registration requires an explicit absolute XDG_DATA_HOME'));
+      expect(fs.readdirSync(tmpDir)).toEqual([]);
+    }
+  );
+
+  it.each(['\0', '\r', '\n'])('rejects XDG_DATA_HOME containing %j', async character => {
+    expect(
+      await rejected(
+        seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: `${dataHome}${character}` })
+      )
+    ).toEqual(new Error('Ingest registration requires an explicit absolute XDG_DATA_HOME'));
+    expect(fs.readdirSync(tmpDir)).toEqual([]);
+  });
+
+  it('does not fall back to process-global XDG_DATA_HOME', async () => {
+    const previous = process.env.XDG_DATA_HOME;
+    process.env.XDG_DATA_HOME = dataHome;
+    try {
+      expect(await rejected(seedSessionIngestRegistration(sessionId, {}))).toEqual(
+        new Error('Ingest registration requires an explicit absolute XDG_DATA_HOME')
+      );
+      expect(fs.readdirSync(tmpDir)).toEqual([]);
+    } finally {
+      if (previous === undefined) delete process.env.XDG_DATA_HOME;
+      else process.env.XDG_DATA_HOME = previous;
+    }
+  });
+
+  it('propagates a storage-directory creation failure without replacing the blocker', async () => {
+    fs.writeFileSync(dataHome, 'not a directory');
+    expect(
+      await rejected(seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }))
+    ).toBeInstanceOf(Error);
+    expect(fs.readFileSync(dataHome, 'utf8')).toBe('not a directory');
+    expect(fs.readdirSync(tmpDir)).toEqual(['worktree data']);
+  });
+
+  it('cleans temporary files when the final rename fails', async () => {
+    const registrationPath = path.join(registrationDirectory, `${sessionId}.json`);
+    fs.mkdirSync(registrationPath, { recursive: true });
+    expect(
+      await rejected(seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }))
+    ).toBeInstanceOf(Error);
+    expect(fs.statSync(registrationPath).isDirectory()).toBe(true);
+    expect(fs.readdirSync(registrationDirectory)).toEqual([`${sessionId}.json`]);
+  });
+
+  it('cleans a partial write and preserves the previous registration on write failure', async () => {
+    fs.mkdirSync(registrationDirectory, { recursive: true });
+    const registrationPath = path.join(registrationDirectory, `${sessionId}.json`);
+    fs.writeFileSync(registrationPath, 'previous registration');
+    const writeFile = fs.promises.writeFile.bind(fs.promises);
+    const failure = new Error('registration write failed');
+    const write = spyOn(fs.promises, 'writeFile').mockImplementation(
+      async (file, _data, options) => {
+        await writeFile(file, '{', options);
+        throw failure;
+      }
+    );
+    try {
+      expect(
+        await rejected(seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }))
+      ).toBe(failure);
+    } finally {
+      write.mockRestore();
+    }
+    expect(fs.readFileSync(registrationPath, 'utf8')).toBe('previous registration');
+    expect(fs.readdirSync(registrationDirectory)).toEqual([`${sessionId}.json`]);
+  });
+
+  it('does not create storage when already cancelled', async () => {
+    const controller = new AbortController();
+    const reason = new Error('workspace cancelled');
+    controller.abort(reason);
+    expect(
+      await rejected(
+        seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }, controller.signal)
+      )
+    ).toBe(reason);
+    expect(fs.readdirSync(tmpDir)).toEqual([]);
+  });
+
+  it('cleans a completed temporary write without publishing after cancellation', async () => {
+    fs.mkdirSync(registrationDirectory, { recursive: true });
+    const registrationPath = path.join(registrationDirectory, `${sessionId}.json`);
+    fs.writeFileSync(registrationPath, 'previous registration');
+    const controller = new AbortController();
+    const reason = new Error('workspace cancelled');
+    const writeFile = fs.promises.writeFile.bind(fs.promises);
+    const write = spyOn(fs.promises, 'writeFile').mockImplementation(
+      async (file, data, options) => {
+        await writeFile(file, data, options);
+        controller.abort(reason);
+      }
+    );
+    try {
+      expect(
+        await rejected(
+          seedSessionIngestRegistration(sessionId, { XDG_DATA_HOME: dataHome }, controller.signal)
+        )
+      ).toBe(reason);
+    } finally {
+      write.mockRestore();
+    }
+    expect(fs.readFileSync(registrationPath, 'utf8')).toBe('previous registration');
+    expect(fs.readdirSync(registrationDirectory)).toEqual([`${sessionId}.json`]);
+  });
+});
+
 describe('restoreSession', () => {
   let tmpDir: string;
   let workspace: string;
@@ -145,6 +372,8 @@ describe('restoreSession', () => {
       KILO_SESSION_INGEST_URL: process.env.KILO_SESSION_INGEST_URL,
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
       KILOCODE_TOKEN_FILE: process.env.KILOCODE_TOKEN_FILE,
+      SANDBOX_CONTROL_CREDENTIAL: process.env.SANDBOX_CONTROL_CREDENTIAL,
+      RESTORE_PROCESS_ONLY: process.env.RESTORE_PROCESS_ONLY,
       PATH: process.env.PATH,
       TMPDIR: process.env.TMPDIR,
     };
@@ -199,6 +428,98 @@ describe('restoreSession', () => {
       expect(result.code).toBeNull();
       expect(result.step).toBe('download');
     }
+  });
+
+  it('uses the supplied worktree auth for download and import without inheriting wrapper credentials', async () => {
+    process.env.KILOCODE_TOKEN = 'actual-managed-token';
+    process.env.SANDBOX_CONTROL_CREDENTIAL = 'actual-control-credential';
+    process.env.RESTORE_PROCESS_ONLY = 'wrapper-only-value';
+    const capturePath = path.join(tmpDir, 'import-env.json');
+    const home = path.join(tmpDir, 'worktree-home');
+    const kilo = {
+      scopeId: 'worktree_restore',
+      token: 'opaque-guest-token',
+      targets: {
+        backendBaseUrl: 'https://backend.example.test',
+        providerBaseUrl: 'https://provider.example.test',
+        sessionIngestBaseUrl: 'https://ingest.example.test/worktree',
+      },
+    };
+    const env = buildWorktreeKiloEnvironment(
+      workspace,
+      home,
+      kilo,
+      {
+        PATH: process.env.PATH ?? '',
+        RESTORE_CAPTURE_PATH: capturePath,
+      },
+      {}
+    );
+    fs.writeFileSync(
+      path.join(binDir, 'kilo'),
+      `#!${process.execPath}
+await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
+  cwd: process.cwd(),
+  args: process.argv.slice(2),
+  HOME: process.env.HOME,
+  XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+  KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
+  KILO_AUTH_CONTENT: process.env.KILO_AUTH_CONTENT,
+  KILO_CONFIG_CONTENT: process.env.KILO_CONFIG_CONTENT,
+  OPENCODE_CONFIG_CONTENT: process.env.OPENCODE_CONFIG_CONTENT,
+  SANDBOX_CONTROL_CREDENTIAL: process.env.SANDBOX_CONTROL_CREDENTIAL,
+  RESTORE_PROCESS_ONLY: process.env.RESTORE_PROCESS_ONLY,
+  ingestRegistration: await Bun.file(process.env.XDG_DATA_HOME + '/kilo/storage/session_share/${SESSION_ID}.json').json(),
+}));
+`,
+      { mode: 0o755 }
+    );
+    const requests: Array<{ url: string; authorization: string | null }> = [];
+    globalThis.fetch = asFetch((url, init) => {
+      requests.push({
+        url: typeof url === 'string' ? url : url instanceof URL ? url.href : url.url,
+        authorization: new Headers(init?.headers).get('Authorization'),
+      });
+      return Promise.resolve(new Response(makeSnapshot([]), { status: 200 }));
+    });
+
+    await seedSessionIngestRegistration(SESSION_ID, env);
+    expect((await restoreSession(SESSION_ID, workspace, undefined, { env })).ok).toBe(true);
+    expect(requests).toEqual([
+      {
+        url: `${kilo.targets.sessionIngestBaseUrl}/api/session/${SESSION_ID}/export`,
+        authorization: `Bearer ${kilo.token}`,
+      },
+    ]);
+    const imported = JSON.parse(fs.readFileSync(capturePath, 'utf8')) as Record<string, unknown>;
+    const importArgs = imported.args as string[];
+    expect(importArgs[0]).toBe('import');
+    expect(importArgs[1]).toMatch(/kilo-session-export-.*\/snapshot\.json$/);
+    expect(imported).toMatchObject({
+      cwd: fs.realpathSync(workspace),
+      HOME: home,
+      XDG_DATA_HOME: env.XDG_DATA_HOME,
+      KILOCODE_TOKEN: kilo.token,
+      KILO_AUTH_CONTENT: env.KILO_AUTH_CONTENT,
+      KILO_CONFIG_CONTENT: env.KILO_CONFIG_CONTENT,
+      OPENCODE_CONFIG_CONTENT: env.OPENCODE_CONFIG_CONTENT,
+      ingestRegistration: { id: SESSION_ID, ingestPath: `/api/session/${SESSION_ID}/ingest` },
+    });
+    expect(JSON.stringify(imported)).not.toContain('actual-');
+    expect(process.env.KILOCODE_TOKEN).toBe('actual-managed-token');
+    expect(process.env.SANDBOX_CONTROL_CREDENTIAL).toBe('actual-control-credential');
+  });
+
+  it('does not fall back to process-global auth when an explicit restore environment omits it', async () => {
+    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+      env: { KILO_SESSION_INGEST_URL: 'https://ingest.example.test' },
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: 'missing env vars: KILOCODE_TOKEN',
+      code: null,
+      step: 'download',
+    });
   });
 
   it('reads KILOCODE_TOKEN_FILE when KILOCODE_TOKEN is missing', async () => {

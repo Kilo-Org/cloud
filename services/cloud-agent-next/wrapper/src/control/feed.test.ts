@@ -205,14 +205,40 @@ describe('session event identity', () => {
     });
   });
 
-  it('uses a known directory root without inventing an event root', () => {
+  it('does not attribute an unknown session to another root in the same directory', () => {
     rememberAttachedRoot('root', '/ws');
 
     expect(sessionEventIdentity({ sessionId: 'unknown', directory: '/ws' })).toEqual({
       directory: '/ws',
       kiloSessionId: 'unknown',
-      rootKiloSessionId: 'root',
     });
+  });
+
+  it('keeps same-worktree root and child events distinct without guessing a directory-only owner', () => {
+    rememberAttachedRoot('first', '/ws');
+    rememberAttachedRoot('second', '/ws');
+    const root = childFromSessionCreated({ info: { id: 'first', directory: '/ws' } });
+    expect(root).toBeUndefined();
+    if (root) rememberChildSession(root);
+    const child = childFromSessionCreated({ info: { id: 'child', parentID: 'first' } });
+    if (child) rememberChildSession(child);
+
+    expect(sessionEventIdentity({ sessionId: 'first', directory: '/ws' })).toEqual({
+      directory: '/ws',
+      kiloSessionId: 'first',
+      rootKiloSessionId: 'first',
+    });
+    expect(sessionEventIdentity({ sessionId: 'second', directory: '/ws' })).toEqual({
+      directory: '/ws',
+      kiloSessionId: 'second',
+      rootKiloSessionId: 'second',
+    });
+    expect(sessionEventIdentity({ sessionId: 'child' })).toEqual({
+      directory: '/ws',
+      kiloSessionId: 'child',
+      rootKiloSessionId: 'first',
+    });
+    expect(sessionEventIdentity({ directory: '/ws' })).toEqual({ directory: '/ws' });
   });
 
   it('returns no identity when neither session nor directory is known', () => {

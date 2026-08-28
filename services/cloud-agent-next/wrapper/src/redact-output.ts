@@ -56,7 +56,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function createSecretRedactor(
-  environment: Record<string, string | undefined>
+  environment: Record<string, string | undefined>,
+  ...additionalEnvironments: Record<string, string | undefined>[]
 ): (text: string) => string {
   const secrets = new Set<string>();
   const remember = (value: string): void => {
@@ -79,19 +80,21 @@ export function createSecretRedactor(
       }
     }
   };
-  for (const [name, value] of Object.entries(environment)) {
-    if (!value) continue;
-    if (CONFIG_ENV_NAME.test(name)) {
-      secrets.add(value);
-      secrets.add(JSON.stringify(value).slice(1, -1));
-      try {
-        const parsed: unknown = JSON.parse(value);
-        collect(parsed);
-      } catch {
+  for (const source of [environment, ...additionalEnvironments]) {
+    for (const [name, value] of Object.entries(source)) {
+      if (!value) continue;
+      if (CONFIG_ENV_NAME.test(name)) {
+        secrets.add(value);
+        secrets.add(JSON.stringify(value).slice(1, -1));
+        try {
+          const parsed: unknown = JSON.parse(value);
+          collect(parsed);
+        } catch {
+          remember(value);
+        }
+      } else if (SECRET_NAME.test(name)) {
         remember(value);
       }
-    } else if (SECRET_NAME.test(name)) {
-      remember(value);
     }
   }
   const known = [...secrets].sort((left, right) => right.length - left.length);

@@ -20,11 +20,16 @@ export function eventKiloSessionId(properties: Record<string, unknown>): string 
 
 export function childFromSessionCreated(
   properties: Record<string, unknown>
-): { childId: string; parentId?: string; directory?: string } | undefined {
-  if (!isRecord(properties.info) || typeof properties.info.id !== 'string') return undefined;
+): { childId: string; parentId: string; directory?: string } | undefined {
+  if (
+    !isRecord(properties.info) ||
+    typeof properties.info.id !== 'string' ||
+    typeof properties.info.parentID !== 'string'
+  )
+    return undefined;
   return {
     childId: properties.info.id,
-    ...(typeof properties.info.parentID === 'string' ? { parentId: properties.info.parentID } : {}),
+    parentId: properties.info.parentID,
     ...(typeof properties.info.directory === 'string'
       ? { directory: properties.info.directory }
       : {}),

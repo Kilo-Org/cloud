@@ -3,6 +3,7 @@ import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest
 
 import { PROVIDER_CAPABILITIES } from '../agent-sandbox/capabilities.js';
 import { isGeneratedSharedSandboxId, isValidSandboxId } from '../sandbox-id.js';
+import { sessionPlaneFromId } from '../session-plane.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { type AgentSandboxProvider, type SandboxId } from '../types.js';
@@ -236,6 +237,10 @@ const MetadataWorkspaceSchema = z
     sandboxProvider: SandboxProviderSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
     workspacePath: z.string().optional(),
+    worktreeId: z
+      .string()
+      .regex(/^worktree_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+      .optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
     shallow: z.boolean().optional(),
@@ -346,9 +351,27 @@ export const CurrentSessionMetadataSchema = z
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
 export type CredentialContainment = z.infer<typeof CredentialContainmentSchema>;
 
+export function getControlPlaneCredentialContainment(
+  sessionId: string,
+  repository: SessionMetadata['repository']
+): CredentialContainment | undefined {
+  if (sessionPlaneFromId(sessionId) !== 'control') return undefined;
+  return {
+    github: repository?.type === 'github',
+    gitlab: repository?.type === 'gitlab',
+    bitbucket: repository?.type === 'bitbucket',
+    kilocode: true,
+  };
+}
+
 export function getEffectiveCredentialContainment(
   metadata: SessionMetadata
 ): CredentialContainment {
+  const controlPlaneContainment = getControlPlaneCredentialContainment(
+    metadata.identity.sessionId,
+    metadata.repository
+  );
+  if (controlPlaneContainment) return controlPlaneContainment;
   if (metadata.workspace?.credentialContainment) {
     return metadata.workspace.credentialContainment;
   }

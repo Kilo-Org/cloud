@@ -2,22 +2,42 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../logger.js';
 import type { GitTokenService } from '../types.js';
 import {
+  issueCloudAgentBitbucketSessionCapability,
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentGitLabSessionCapability,
+  issueCloudAgentKiloSessionCapability,
   resolveCloudAgentGitHubAuthForRepo,
   resolveGitHubTokenForRepo,
   resolveManagedBitbucketToken,
   resolveManagedGitLabToken,
 } from './git-token-service-client.js';
 
-vi.mock('../logger.js', () => ({
-  logger: {
+vi.mock('../logger.js', () => {
+  const logger = {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-    withFields: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() })),
-  },
-}));
+    withFields: vi.fn(),
+  };
+  logger.withFields.mockReturnValue(logger);
+  return { logger };
+});
+
+const BROKER_ERROR_SECRET = 'fixture-managed-credential-in-broker-error';
+
+beforeEach(() => vi.clearAllMocks());
+
+function expectSecretSafeLogs(): void {
+  const mockedLogger = vi.mocked(logger);
+  expect(
+    JSON.stringify([
+      mockedLogger.info.mock.calls,
+      mockedLogger.warn.mock.calls,
+      mockedLogger.error.mock.calls,
+      mockedLogger.withFields.mock.calls,
+    ])
+  ).not.toContain(BROKER_ERROR_SECRET);
+}
 
 function createGitTokenService() {
   return {
@@ -36,6 +56,94 @@ function createGitTokenService() {
 function createEnv(service: Partial<GitTokenService>) {
   return { GIT_TOKEN_SERVICE: service as GitTokenService };
 }
+
+describe('broker exception safety', () => {
+  const params = { userId: 'user_1', outboundContainerId: 'container-test' };
+  const bitbucketParams = {
+    ...params,
+    orgId: '123e4567-e89b-12d3-a456-426614174030',
+    workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+    repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    repositoryUrl: 'https://bitbucket.org/acme/repo.git',
+  };
+
+  it.each([
+    [
+      'GitHub lookup',
+      (env: ReturnType<typeof createEnv>) =>
+        resolveGitHubTokenForRepo(env, { userId: params.userId, githubRepo: 'acme/repo' }),
+    ],
+    [
+      'Kilo issuance',
+      (env: ReturnType<typeof createEnv>) =>
+        issueCloudAgentKiloSessionCapability(env, {
+          ...params,
+          cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+          kiloSessionId: 'ses_abcdefghijklmnopqrstuvwxyz',
+          userToken: BROKER_ERROR_SECRET,
+          targets: {
+            backendBaseUrl: 'https://backend.example.com',
+            providerBaseUrl: 'https://provider.example.com',
+            sessionIngestBaseUrl: 'https://ingest.example.com',
+          },
+        }),
+    ],
+    [
+      'GitLab issuance',
+      (env: ReturnType<typeof createEnv>) =>
+        issueCloudAgentGitLabSessionCapability(env, {
+          ...params,
+          gitUrl: 'https://gitlab.com/acme/repo.git',
+        }),
+    ],
+    [
+      'Bitbucket issuance',
+      (env: ReturnType<typeof createEnv>) =>
+        issueCloudAgentBitbucketSessionCapability(env, bitbucketParams),
+    ],
+    [
+      'GitLab lookup',
+      (env: ReturnType<typeof createEnv>) =>
+        resolveManagedGitLabToken(env, { userId: params.userId }),
+    ],
+    [
+      'Bitbucket lookup',
+      (env: ReturnType<typeof createEnv>) => resolveManagedBitbucketToken(env, bitbucketParams),
+    ],
+  ] as const)('keeps %s exception details out of logs and failure output', async (name, call) => {
+    const rejectedRpc = vi
+      .fn()
+      .mockRejectedValue(new Error(`Broker rejected Bearer ${BROKER_ERROR_SECRET}`));
+    const env = createEnv({
+      getTokenForRepo: rejectedRpc,
+      issueKiloSessionCapability: rejectedRpc,
+      issueGitLabSessionCapability: rejectedRpc,
+      issueBitbucketSessionCapability: rejectedRpc,
+      getGitLabToken: rejectedRpc,
+      getBitbucketToken: rejectedRpc,
+    });
+
+    const result = await call(env);
+
+    expect(JSON.stringify(result)).not.toContain(BROKER_ERROR_SECRET);
+    expectSecretSafeLogs();
+    expect(logger.error).toHaveBeenCalled();
+    expect(result).toEqual(
+      'error' in result
+        ? {
+            success: false,
+            error: {
+              reason: 'rpc_error',
+              message:
+                name === 'GitHub lookup'
+                  ? 'GitHub credential service is unavailable'
+                  : 'git-token-service RPC failed',
+            },
+          }
+        : { success: false, reason: 'rpc_error' }
+    );
+  });
+});
 
 describe('resolveManagedBitbucketToken', () => {
   const repositoryParams = {
@@ -327,7 +435,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
   it('fails closed without direct authentication when the capability RPC rejects', async () => {
     const issueGitHubSessionCapability = vi
       .fn()
-      .mockRejectedValue(new Error('service unavailable'));
+      .mockRejectedValue(new Error(`Broker rejected ${BROKER_ERROR_SECRET}`));
     const getCloudAgentAuthForRepo = vi.fn().mockResolvedValue({
       success: true,
       githubToken: 'user-token',
@@ -355,6 +463,8 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
     });
     expect(getCloudAgentAuthForRepo).not.toHaveBeenCalled();
     expect(getTokenForRepo).not.toHaveBeenCalled();
+    expectSecretSafeLogs();
+    expect(JSON.stringify(result)).not.toContain(BROKER_ERROR_SECRET);
   });
 });
 
@@ -592,7 +702,7 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
   it('does not fall back to a different authorization path when the managed RPC rejects', async () => {
     const getCloudAgentAuthForRepo = vi
       .fn()
-      .mockRejectedValue(new Error('RPC method getCloudAgentAuthForRepo is not available'));
+      .mockRejectedValue(new Error(`Broker rejected ${BROKER_ERROR_SECRET}`));
     const getTokenForRepo = vi.fn().mockResolvedValue({
       success: true,
       token: 'installation-token',
@@ -620,6 +730,8 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
       success: false,
       error: { reason: 'rpc_error', message: 'GitHub credential service is unavailable' },
     });
+    expectSecretSafeLogs();
+    expect(JSON.stringify(result)).not.toContain(BROKER_ERROR_SECRET);
   });
 
   it('preserves the expected integration id through direct and legacy authentication', async () => {

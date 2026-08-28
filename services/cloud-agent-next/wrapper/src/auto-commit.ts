@@ -1,7 +1,8 @@
 import type { IngestEvent } from '../../src/shared/protocol.js';
 import type { WrapperCommitCoAuthor } from '../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from './kilo-api.js';
-import { git, getCurrentBranch, hasGitUpstream, logToFile } from './utils.js';
+import { git, getCurrentBranch, hasGitUpstream, logToFile as writeLog } from './utils.js';
+import { createSecretRedactor } from './redact-output.js';
 
 /** Timeout for local git operations (status, add, commit) */
 const GIT_LOCAL_TIMEOUT_MS = 30_000;
@@ -9,10 +10,6 @@ const GIT_LOCAL_TIMEOUT_MS = 30_000;
 const GIT_PUSH_TIMEOUT_MS = 60_000;
 /** Timeout for commit message generation API call */
 const COMMIT_MESSAGE_TIMEOUT_MS = 30_000;
-
-function sanitizeGitOutput(output: string): string {
-  return output.replace(/(oauth2|x-access-token|x-token-auth):([^@]+)@/gi, '$1:***@');
-}
 
 function appendCommitCoAuthor(
   commitMessage: string,
@@ -24,7 +21,7 @@ function appendCommitCoAuthor(
     /[\r\n<>]/.test(commitCoAuthor.email) ||
     commitCoAuthor.email.trim() !== commitCoAuthor.email
   ) {
-    logToFile('auto-commit: ignoring invalid commit co-author identity');
+    writeLog('auto-commit: ignoring invalid commit co-author identity');
     return commitMessage;
   }
   const trailer = `Co-authored-by: ${commitCoAuthor.name} <${commitCoAuthor.email}>`;
@@ -50,6 +47,7 @@ export type AutoCommitOptions = {
   upstreamBranch?: string;
   commitCoAuthor?: WrapperCommitCoAuthor;
   signal?: AbortSignal;
+  env?: NodeJS.ProcessEnv;
 };
 
 function emitStarted(
@@ -83,13 +81,15 @@ function emitCompleted(
 }
 
 export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommitResult> {
-  const { workspacePath, onEvent, kiloClient, messageId, signal } = opts;
+  const { workspacePath, onEvent, kiloClient, messageId, signal, env } = opts;
+  const redact = createSecretRedactor(process.env, env ?? {});
+  const logToFile = (message: string): void => writeLog(redact(message));
 
   logToFile(`auto-commit: starting workspacePath=${workspacePath}`);
 
   try {
     // Check current branch (agent may have switched branches during execution)
-    const branch = await getCurrentBranch(workspacePath, GIT_LOCAL_TIMEOUT_MS, signal);
+    const branch = await getCurrentBranch(workspacePath, GIT_LOCAL_TIMEOUT_MS, signal, env);
     logToFile(`auto-commit: branch=${branch || '(detached HEAD)'}`);
     if (!branch) {
       logToFile('auto-commit: skipping - detached HEAD state');
@@ -127,12 +127,13 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     }
 
     // Check actual git upstream (not stale config) to decide push strategy
-    const trackingUpstream = await hasGitUpstream(workspacePath, GIT_LOCAL_TIMEOUT_MS, signal);
+    const trackingUpstream = await hasGitUpstream(workspacePath, GIT_LOCAL_TIMEOUT_MS, signal, env);
     logToFile(`auto-commit: hasGitUpstream=${trackingUpstream}`);
 
     // Check for uncommitted changes
     const status = await git(['status', '--porcelain'], {
       cwd: workspacePath,
+      ...(env ? { env, inheritEnv: false } : {}),
       timeoutMs: GIT_LOCAL_TIMEOUT_MS,
       signal,
     });
@@ -195,11 +196,12 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     logToFile('auto-commit: staging changes');
     const addResult = await git(['add', '-A'], {
       cwd: workspacePath,
+      ...(env ? { env, inheritEnv: false } : {}),
       timeoutMs: GIT_LOCAL_TIMEOUT_MS,
       signal,
     });
     if (addResult.exitCode !== 0) {
-      const msg = `git add failed: ${sanitizeGitOutput(addResult.stderr.trim())}`;
+      const msg = `git add failed: ${redact(addResult.stderr.trim())}`;
       logToFile(`auto-commit: ${msg}`);
       emitCompleted(onEvent, { success: false, message: msg }, messageId);
       return { success: false, error: msg };
@@ -209,6 +211,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     logToFile('auto-commit: committing');
     let commitResult = await git(['commit', '-m', commitMessage], {
       cwd: workspacePath,
+      ...(env ? { env, inheritEnv: false } : {}),
       timeoutMs: GIT_LOCAL_TIMEOUT_MS,
       signal,
     });
@@ -216,11 +219,12 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
       logToFile('auto-commit: commit failed, retrying with --no-verify');
       commitResult = await git(['commit', '--no-verify', '-m', commitMessage], {
         cwd: workspacePath,
+        ...(env ? { env, inheritEnv: false } : {}),
         timeoutMs: GIT_LOCAL_TIMEOUT_MS,
         signal,
       });
       if (commitResult.exitCode !== 0) {
-        const msg = `git commit failed: ${sanitizeGitOutput(commitResult.stderr.trim())}`;
+        const msg = `git commit failed: ${redact(commitResult.stderr.trim())}`;
         logToFile(`auto-commit: ${msg}`);
         emitCompleted(onEvent, { success: false, message: msg }, messageId);
         return { success: false, error: msg };
@@ -233,6 +237,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     try {
       const hashResult = await git(['rev-parse', '--short', 'HEAD'], {
         cwd: workspacePath,
+        ...(env ? { env, inheritEnv: false } : {}),
         timeoutMs: GIT_LOCAL_TIMEOUT_MS,
         signal,
       });
@@ -250,12 +255,13 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
 
     const pushResult = await git(pushArgs, {
       cwd: workspacePath,
+      ...(env ? { env, inheritEnv: false } : {}),
       timeoutMs: GIT_PUSH_TIMEOUT_MS,
       signal,
     });
     if (pushResult.exitCode !== 0) {
       // Push failure is non-fatal — changes are committed locally
-      const sanitizedPushError = sanitizeGitOutput(pushResult.stderr.trim());
+      const sanitizedPushError = redact(pushResult.stderr.trim());
       const msg = `git push failed: ${sanitizedPushError}`;
       logToFile(`auto-commit: ${msg}`);
       emitCompleted(
@@ -285,7 +291,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     );
     return { success: true };
   } catch (error) {
-    const errorMsg = sanitizeGitOutput(error instanceof Error ? error.message : String(error));
+    const errorMsg = redact(error instanceof Error ? error.message : String(error));
     logToFile(`auto-commit: error - ${errorMsg}`);
     emitCompleted(
       onEvent,

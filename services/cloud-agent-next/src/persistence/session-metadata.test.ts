@@ -81,6 +81,153 @@ describe('session metadata boundary', () => {
     expect(requiresContainmentSandbox(metadata)).toBe(false);
   });
 
+  describe.each(['cloudflare', 'vercel'] as const)(
+    '%s control-plane containment',
+    sandboxProvider => {
+      it.each([
+        {
+          name: 'GitHub',
+          repository: { type: 'github', repo: 'acme/repo' },
+          expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'GitLab',
+          repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+          expected: { github: false, gitlab: true, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'Bitbucket',
+          repository: {
+            type: 'bitbucket',
+            url: 'https://bitbucket.org/acme/repo.git',
+            workspaceUuid: '123e4567-e89b-12d3-a456-426614174000',
+            repositoryUuid: '123e4567-e89b-12d3-a456-426614174001',
+          },
+          expected: { github: false, gitlab: false, bitbucket: true, kilocode: true },
+        },
+        {
+          name: 'generic Git with a GitHub platform alias',
+          repository: { type: 'git', url: 'https://github.com/acme/repo.git', platform: 'github' },
+          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'generic Git with a GitLab platform alias',
+          repository: { type: 'git', url: 'https://gitlab.com/acme/repo.git', platform: 'gitlab' },
+          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'no repository',
+          repository: undefined,
+          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+        },
+      ])(
+        'requires only Kilo and the typed $name repository despite false metadata',
+        ({ repository, expected }) => {
+          const workspace = {
+            sandboxId: 'ses-abcdef',
+            sandboxProvider,
+            credentialContainment: {
+              github: false,
+              gitlab: false,
+              bitbucket: false,
+              kilocode: false,
+            },
+            managedScmContainment: true,
+          };
+          const metadata = parseSessionMetadata({
+            metadataSchemaVersion: 2,
+            identity: { sessionId: 'workspace_containment', userId: 'user_containment' },
+            auth: {},
+            repository,
+            workspace,
+            lifecycle: { version: 1, timestamp: 1 },
+          });
+
+          expect(getEffectiveCredentialContainment(metadata)).toEqual(expected);
+          expect(requiresContainmentSandbox(metadata)).toBe(true);
+          expect(serializeSessionMetadata(metadata).workspace).toEqual(workspace);
+        }
+      );
+
+      it.each([
+        { name: 'missing policy', fields: {} },
+        { name: 'disabled legacy alias', fields: { managedScmContainment: false } },
+        { name: 'enabled legacy alias', fields: { managedScmContainment: true } },
+        {
+          name: 'mixed policy',
+          fields: {
+            credentialContainment: {
+              github: false,
+              gitlab: true,
+              bitbucket: true,
+              kilocode: false,
+            },
+            managedScmContainment: false,
+          },
+        },
+      ])('ignores $name without rewriting stored fields', ({ fields }) => {
+        const workspace = { sandboxId: 'ses-abcdef', sandboxProvider, ...fields };
+        const metadata = parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'workspace_containment', userId: 'user_containment' },
+          auth: {},
+          repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+          workspace,
+          lifecycle: { version: 1, timestamp: 1 },
+        });
+
+        expect(getEffectiveCredentialContainment(metadata)).toEqual({
+          github: false,
+          gitlab: true,
+          bitbucket: false,
+          kilocode: true,
+        });
+        expect(requiresContainmentSandbox(metadata)).toBe(true);
+        expect(serializeSessionMetadata(metadata).workspace).toEqual(workspace);
+      });
+    }
+  );
+
+  it('requires Kilo containment for a control-plane session without workspace metadata', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'workspace_no_workspace', userId: 'user_containment' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(getEffectiveCredentialContainment(metadata)).toEqual({
+      github: false,
+      gitlab: false,
+      bitbucket: false,
+      kilocode: true,
+    });
+    expect(requiresContainmentSandbox(metadata)).toBe(true);
+    expect(metadata.workspace).toBeUndefined();
+  });
+
+  it('preserves legacy policy even when its SCM flags do not match the repository', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_mixed_containment', userId: 'user_containment' },
+      auth: {},
+      repository: { type: 'github', repo: 'acme/repo' },
+      workspace: {
+        credentialContainment: { github: false, gitlab: true, bitbucket: true, kilocode: false },
+        managedScmContainment: true,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(getEffectiveCredentialContainment(metadata)).toEqual({
+      github: false,
+      gitlab: true,
+      bitbucket: true,
+      kilocode: false,
+    });
+    expect(requiresContainmentSandbox(metadata)).toBe(true);
+  });
+
   it('parses and serializes current grouped metadata with canonical attachments', () => {
     const current = {
       metadataSchemaVersion: 2 as const,

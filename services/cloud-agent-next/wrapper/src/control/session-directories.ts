@@ -1,6 +1,6 @@
 const directories = new Map<string, string>();
 const rootBySessionId = new Map<string, string>();
-const rootByDirectory = new Map<string, string>();
+const rootsByDirectory = new Map<string, Set<string>>();
 
 export function rememberSessionDirectory(kiloSessionId: string, directory: string): void {
   directories.set(kiloSessionId, directory);
@@ -9,7 +9,9 @@ export function rememberSessionDirectory(kiloSessionId: string, directory: strin
 export function rememberAttachedRoot(rootKiloSessionId: string, directory: string): void {
   directories.set(rootKiloSessionId, directory);
   rootBySessionId.set(rootKiloSessionId, rootKiloSessionId);
-  rootByDirectory.set(directory, rootKiloSessionId);
+  const roots = rootsByDirectory.get(directory) ?? new Set<string>();
+  roots.add(rootKiloSessionId);
+  rootsByDirectory.set(directory, roots);
 }
 
 export function forgetAttachedRoot(rootKiloSessionId: string, directory: string): void {
@@ -26,9 +28,9 @@ export function forgetAttachedRoot(rootKiloSessionId: string, directory: string)
     directories.delete(kiloSessionId);
   }
 
-  if (rootByDirectory.get(directory) === rootKiloSessionId) {
-    rootByDirectory.delete(directory);
-  }
+  const roots = rootsByDirectory.get(directory);
+  roots?.delete(rootKiloSessionId);
+  if (roots?.size === 0) rootsByDirectory.delete(directory);
 }
 
 export function rememberChildSession(input: {
@@ -36,23 +38,23 @@ export function rememberChildSession(input: {
   parentId?: string;
   directory?: string;
 }): void {
-  const root =
-    (input.parentId ? rootBySessionId.get(input.parentId) : undefined) ??
-    (input.directory ? rootByDirectory.get(input.directory) : undefined);
+  if (!input.parentId) return;
+  const root = rootBySessionId.get(input.parentId);
   if (!root) return;
+  const existing = rootBySessionId.get(input.childId);
+  if (existing && existing !== root) return;
   rootBySessionId.set(input.childId, root);
-  if (input.directory) directories.set(input.childId, input.directory);
+  const directory = input.directory ?? directories.get(input.parentId) ?? directories.get(root);
+  if (directory) directories.set(input.childId, directory);
 }
 
 export function rootForSession(
   kiloSessionId: string | undefined,
   directory?: string
 ): string | undefined {
-  if (kiloSessionId) {
-    const root = rootBySessionId.get(kiloSessionId);
-    if (root) return root;
-  }
-  return directory ? rootByDirectory.get(directory) : undefined;
+  if (kiloSessionId) return rootBySessionId.get(kiloSessionId);
+  const roots = directory ? rootsByDirectory.get(directory) : undefined;
+  return roots?.size === 1 ? roots.values().next().value : undefined;
 }
 
 export function directoriesForRoot(rootKiloSessionId: string, directory: string): string[] {
@@ -68,7 +70,7 @@ export function directoriesForRoot(rootKiloSessionId: string, directory: string)
 export function resetSessionDirectoryState(): void {
   directories.clear();
   rootBySessionId.clear();
-  rootByDirectory.clear();
+  rootsByDirectory.clear();
 }
 
 export function directoryForSession(kiloSessionId: string | undefined): string | undefined {

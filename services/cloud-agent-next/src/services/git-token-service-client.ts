@@ -364,9 +364,8 @@ export async function issueCloudAgentBitbucketSessionCapability(
     if (!result.success) return { success: false, reason: result.reason };
     logger.info('Issued Bitbucket session capability via git-token-service');
     return { success: true, value: { capability: result.capability, gitUrl: result.gitUrl } };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.withFields({ error: message }).error('Failed to issue Bitbucket session capability');
+  } catch {
+    logger.error('Failed to issue Bitbucket session capability');
     return { success: false, reason: 'rpc_error' };
   }
 }
@@ -411,11 +410,8 @@ export async function issueCloudAgentGitLabSessionCapability(
         glabIsOAuth2: result.glabIsOAuth2,
       },
     };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger
-      .withFields({ error: message })
-      .error('Failed to issue managed GitLab session capability');
+  } catch {
+    logger.error('Failed to issue managed GitLab session capability');
     return { success: false, reason: 'rpc_error' };
   }
 }
@@ -445,9 +441,8 @@ export async function resolveManagedGitLabToken(
     }
     logger.withFields({ reason: result.reason }).info('GitLab token lookup failed');
     return { success: false, reason: result.reason };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.withFields({ error: message }).error('Failed to call git-token-service getGitLabToken');
+  } catch {
+    logger.error('Failed to call git-token-service getGitLabToken');
     return { success: false, reason: 'rpc_error' };
   }
 }
@@ -493,12 +488,11 @@ export async function issueCloudAgentKiloSessionCapability(
     }
     logger.info('Issued Kilo session capability via git-token-service');
     return { success: true, value: { capability: result.capability } };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.withFields({ error: message }).error('Failed to issue Kilo session capability');
+  } catch {
+    logger.error('Failed to issue Kilo session capability');
     return {
       success: false,
-      error: { reason: 'rpc_error', message: `git-token-service RPC failed: ${message}` },
+      error: { reason: 'rpc_error', message: 'git-token-service RPC failed' },
     };
   }
 }

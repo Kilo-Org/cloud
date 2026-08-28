@@ -2,6 +2,9 @@
  * Unit tests for auto-commit branch protection and upstream branch bypass.
  */
 
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { createKiloClient } from '@kilocode/sdk';
 import { runAutoCommit, type AutoCommitOptions } from '../../../wrapper/src/auto-commit.js';
@@ -24,7 +27,7 @@ vi.mock('../../../wrapper/src/utils.js', async () => {
 });
 
 // Import mocked functions so we can configure per-test return values
-import { git, getCurrentBranch, hasGitUpstream } from '../../../wrapper/src/utils.js';
+import { git, getCurrentBranch, hasGitUpstream, logToFile } from '../../../wrapper/src/utils.js';
 
 const mockGetCurrentBranch = vi.mocked(getCurrentBranch);
 const mockHasGitUpstream = vi.mocked(hasGitUpstream);
@@ -456,6 +459,30 @@ describe('runAutoCommit', () => {
     );
   });
 
+  it('redacts explicit worktree profile credentials from finalization failures and logs', async () => {
+    const secret = 'explicit-profile-github-credential';
+    mockGetCurrentBranch.mockResolvedValue('feature/worktree');
+    mockGit
+      .mockResolvedValueOnce(ok(' M file.ts'))
+      .mockResolvedValueOnce(ok())
+      .mockResolvedValueOnce(ok('[feature/worktree abc1234] test commit'))
+      .mockResolvedValueOnce(ok('abc1234'))
+      .mockResolvedValueOnce({
+        stdout: '',
+        stderr: `remote: rejected credential ${secret}`,
+        exitCode: 1,
+      });
+    const { opts, events } = createOpts({ env: { GH_TOKEN: secret } });
+
+    await runAutoCommit(opts);
+
+    expect(
+      events.find(event => event.streamEventType === 'autocommit_completed')?.data.message
+    ).toContain('push failed');
+    expect(JSON.stringify(events)).not.toContain(secret);
+    expect(JSON.stringify(vi.mocked(logToFile).mock.calls)).not.toContain(secret);
+  });
+
   it('redacts authenticated GitHub remotes from push failure events', async () => {
     mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
     mockGit
@@ -474,8 +501,66 @@ describe('runAutoCommit', () => {
     await runAutoCommit(opts);
 
     const completed = events.find(e => e.streamEventType === 'autocommit_completed');
-    expect(completed?.data.message).toContain('x-access-token:***@github.com');
+    expect(completed?.data.message).toContain('https://[REDACTED]@github.com/acme/repo.git');
     expect(completed?.data.message).not.toContain('user-secret');
+  });
+
+  it('commits and pushes with the isolated worktree environment instead of wrapper credentials', async () => {
+    const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'worktree-autocommit-'));
+    const workspacePath = path.join(root, 'workspace');
+    const remote = path.join(root, 'remote.git');
+    const home = path.join(root, 'home');
+    const report = path.join(root, 'hook-env.json');
+    const env = {
+      PATH: process.env.PATH,
+      HOME: home,
+      XDG_DATA_HOME: path.join(home, 'data'),
+      KILOCODE_TOKEN: 'guest-worktree-alias',
+      WORKTREE_ENV_REPORT: report,
+    };
+    vi.stubEnv('AUTOCOMMIT_PARENT_ONLY', 'wrapper-only-value');
+    mockGit.mockImplementation(actual.git);
+    mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+    mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+    try {
+      await fs.mkdir(workspacePath);
+      await fs.mkdir(home);
+      const git = async (args: string[]) => {
+        const result = await actual.git(args, { cwd: workspacePath, env, inheritEnv: false });
+        expect(result.exitCode).toBe(0);
+        return result.stdout;
+      };
+      await git(['init', '--bare', remote]);
+      await git(['init', '--initial-branch=work']);
+      await git(['config', 'user.name', 'Test Agent']);
+      await git(['config', 'user.email', 'test@example.com']);
+      await git(['config', 'commit.gpgsign', 'false']);
+      await git(['remote', 'add', 'origin', remote]);
+      await fs.writeFile(path.join(workspacePath, 'result.txt'), 'contained finalization\n');
+      const hook = `#!/bin/sh\nnode -e 'require("node:fs").writeFileSync(process.env.WORKTREE_ENV_REPORT, JSON.stringify({home:process.env.HOME,data:process.env.XDG_DATA_HOME,token:process.env.KILOCODE_TOKEN,parent:process.env.AUTOCOMMIT_PARENT_ONLY ?? null}))'\n`;
+      await fs.writeFile(path.join(workspacePath, '.git', 'hooks', 'pre-commit'), hook, {
+        mode: 0o755,
+      });
+      const { opts } = createOpts({ workspacePath, env });
+
+      await expect(runAutoCommit(opts)).resolves.toEqual({ success: true });
+      expect(JSON.parse(await fs.readFile(report, 'utf8'))).toEqual({
+        home,
+        data: env.XDG_DATA_HOME,
+        token: env.KILOCODE_TOKEN,
+        parent: null,
+      });
+      expect(await git(['--git-dir', remote, 'show', 'refs/heads/work:result.txt'])).toBe(
+        'contained finalization\n'
+      );
+    } finally {
+      vi.unstubAllEnvs();
+      mockGit.mockReset();
+      mockGetCurrentBranch.mockReset();
+      mockHasGitUpstream.mockReset();
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it('aborts the generation request on caller cancellation without staging, committing, or pushing', async () => {

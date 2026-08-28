@@ -10,7 +10,6 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
 import type { Env } from '../types.js';
 import type { SessionId } from '../types/ids.js';
-import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import { nextMetadataAfterAdmittedAgentModel } from '../persistence/persist-admitted-agent-model.js';
 import { assertKiloModelAvailable } from '../model-validation.js';
@@ -18,6 +17,7 @@ import {
   getSandboxProvider,
   parseSessionMetadata,
   serializeSessionMetadata,
+  type SessionMetadata,
 } from '../persistence/session-metadata.js';
 import type { OperationResult } from '../persistence/types.js';
 import type { CallbackTarget } from '../callbacks/index.js';
@@ -51,11 +51,7 @@ import { logger } from '../logger.js';
 import { sandboxControlRpc } from './control-rpc.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createMessageId } from '../session/message-id.js';
-import {
-  buildSessionAttachPayload,
-  fillAttachGitToken,
-  validateControlSessionOptions,
-} from './attach-payload.js';
+import { validateControlSessionOptions } from './attach-payload.js';
 import { createPreparationProgressRecorder } from '../session/preparation-progress.js';
 import {
   finalizeOtherRunningAttemptsForMessage,
@@ -399,6 +395,10 @@ export class SandboxSession extends DurableObject<Env> {
 
   async getMetadata(): Promise<SessionMetadata | null> {
     return this.terminalLifecycle.isDeleted() ? null : this.terminalLifecycle.getStoredMetadata();
+  }
+
+  async getCredentialMetadata(): Promise<SessionMetadata | null> {
+    return this.terminalLifecycle.isBlocked() ? null : this.terminalLifecycle.getStoredMetadata();
   }
 
   async validateKiloGlobalFeedProducer(_params: {
@@ -1035,6 +1035,7 @@ export class SandboxSession extends DurableObject<Env> {
       return;
     }
     let phase: DispatchPhase = 'preparing';
+    let credentialsPrepared = false;
     try {
       validateControlSessionOptions(metadata);
       const session = { sessionId, kiloSessionId, directory: this.directory(metadata) };
@@ -1051,11 +1052,13 @@ export class SandboxSession extends DurableObject<Env> {
             )
           : [];
       if (!isCurrent()) return;
-      const ensureReady = () =>
-        wait(
+      const ensureReady = () => {
+        credentialsPrepared = true;
+        return wait(
           () =>
             control.ensureReady({
               ownerId: metadata.identity.userId,
+              sessionId,
               provider,
               ...(acquisition ? { acquisition } : { allowCreate }),
               billing: buildSandboxBillingInput(
@@ -1063,15 +1066,19 @@ export class SandboxSession extends DurableObject<Env> {
                 sandboxId,
                 isCloudAgentContainerBillingEnabled(this.env, metadata.identity)
               ),
-              ...(metadata.auth.kilocodeToken ? { kiloToken: metadata.auth.kilocodeToken } : {}),
             }),
           DEADLINE_MS.startup
         );
+      };
       if (!this.terminalLifecycle.getAttachedWrapperInstanceId()) {
         recorder.onProgress('workspace_setup', 'Preparing environment…');
       }
       let status = await ensureReady();
-      if (!isCurrent()) return;
+      if (!isCurrent()) {
+        if (!this.terminalLifecycle.isCurrent(epoch))
+          await this.compensateSessionAttachment(metadata);
+        return;
+      }
       recordRuntime(status.wrapperInstanceId);
       const stoppingDeadline = Math.min(deadlineAt, Date.now() + DEADLINE_MS.startup);
       while (allowCreate && status.physical === 'stopping') {
@@ -1091,7 +1098,11 @@ export class SandboxSession extends DurableObject<Env> {
         const provision = provisionPreparingStep(observed.physical, allowCreate);
         if (provision) recorder.onProgress(provision.step, provision.message);
         status = await ensureReady();
-        if (!isCurrent()) return;
+        if (!isCurrent()) {
+          if (!this.terminalLifecycle.isCurrent(epoch))
+            await this.compensateSessionAttachment(metadata);
+          return;
+        }
         recordRuntime(status.wrapperInstanceId);
       }
       const boot = bootPreparingStep(status.physical, status.connection);
@@ -1108,20 +1119,18 @@ export class SandboxSession extends DurableObject<Env> {
       if (!wrapperInstanceId) throw new Error('Wrapper identity is missing');
       if (this.terminalLifecycle.getAttachedWrapperInstanceId() !== wrapperInstanceId) {
         recorder.onProgress('workspace_setup', 'Setting up workspace…');
-        const attachPayload = await wait(() =>
-          fillAttachGitToken(
-            metadata,
-            buildSessionAttachPayload(metadata, {
-              attemptId: recorder.attemptId,
-              triggerMessageId: messageId,
-            }),
-            this.env
-          )
-        );
-        if (!isCurrent()) return;
+        if (!status.attachment?.kilo)
+          throw new Error('Contained session attachment is unavailable');
+        const attachPayload = {
+          ...status.attachment,
+          preparation: { attemptId: recorder.attemptId, triggerMessageId: messageId },
+        };
         phase = 'attach';
         await wait(() =>
           control.attachSession({
+            ...(metadata.workspace?.worktreeId
+              ? { worktreeId: metadata.workspace.worktreeId }
+              : {}),
             sessionId,
             kiloSessionId,
             directory: session.directory,
@@ -1204,7 +1213,10 @@ export class SandboxSession extends DurableObject<Env> {
       await this.armQueueRetry(Date.now() + DEADLINE_MS.acceptedAlarmCap);
     } catch (error) {
       if (!isCurrent()) {
-        if (phase !== 'preparing' && !this.terminalLifecycle.isCurrent(epoch)) {
+        if (
+          (credentialsPrepared || phase !== 'preparing') &&
+          !this.terminalLifecycle.isCurrent(epoch)
+        ) {
           await this.compensateSessionAttachment(metadata);
         }
         return;

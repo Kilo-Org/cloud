@@ -5,8 +5,8 @@ import {
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { parseSandboxBillingInput } from '../container-usage-context.js';
-import { deriveSandboxAllocationId } from '../sandbox-id.js';
 import { DEADLINE_MS } from './deadlines.js';
+import { deriveSandboxAllocationId } from '../sandbox-id.js';
 import {
   createVercelProviderAdapter,
   decodeVercelProviderRef,
@@ -27,7 +27,7 @@ const config: VercelSandboxRuntimeConfig = {
 
 const runningSession = {
   id: 'vsess_1',
-  sourceSandboxName: 'ses-abc',
+  sourceSandboxName: 'ses-def',
   projectId: 'prj_1',
   runtime: 'node24',
   status: 'running' as const,
@@ -44,6 +44,12 @@ const runningSession = {
 
 const intent = { intentId: 'op_1', createdAt: 1_000, allocationName: 'ses-def' };
 const ref = encodeVercelProviderRef({ sandboxName: intent.allocationName, sessionId: 'vsess_1' });
+
+const networkPolicy = {
+  mode: 'custom' as const,
+  allowedDomains: ['api.kilo.ai', '*'],
+  injectionRules: [],
+};
 
 function envelope(name = intent.allocationName): VercelSandboxCreateEnvelope {
   return {
@@ -79,6 +85,7 @@ function fakeClient(overrides: Partial<VercelControlRestClient> = {}): VercelCon
     extendSessionTimeout: async () => runningSession,
     stopSession: async () => ({ ...runningSession, status: 'stopped' as const }),
     readFile: async () => new TextEncoder().encode('wrapper log'),
+    updateNetworkPolicy: async () => runningSession,
     ...overrides,
   };
 }
@@ -88,7 +95,7 @@ describe('vercel provider adapter', () => {
     const executeCommand = vi.fn().mockResolvedValue({});
     const createSandbox = vi.fn(fakeClient().createSandbox);
     const provider = createVercelProviderAdapter({
-      sandboxName: 'ses-abc',
+      sandboxName: intent.allocationName,
       config,
       restClient: fakeClient({ executeCommand, createSandbox }),
     });
@@ -116,10 +123,44 @@ describe('vercel provider adapter', () => {
     });
   });
 
+  it('installs the creation policy before launching the control wrapper', async () => {
+    const createSandbox = vi.fn(fakeClient().createSandbox);
+    const executeCommand = vi.fn(fakeClient().executeCommand);
+    const provider = createVercelProviderAdapter({
+      sandboxName: intent.allocationName,
+      config,
+      restClient: fakeClient({ createSandbox, executeCommand }),
+    });
+
+    const created = await provider.create({ ...intent, networkPolicy });
+    if (!('providerRef' in created)) throw new Error('Missing allocation');
+    expect(executeCommand).not.toHaveBeenCalled();
+    expect(createSandbox).toHaveBeenCalledWith(
+      expect.objectContaining({ name: intent.allocationName, networkPolicy })
+    );
+    await provider.launch(created.providerRef, {});
+    expect(createSandbox.mock.invocationCallOrder[0]).toBeLessThan(
+      executeCommand.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('never launches the wrapper when sandbox creation rejects its policy', async () => {
+    const createSandbox = vi.fn().mockRejectedValue(new Error('policy rejected'));
+    const executeCommand = vi.fn(fakeClient().executeCommand);
+    const provider = createVercelProviderAdapter({
+      sandboxName: intent.allocationName,
+      config,
+      restClient: fakeClient({ createSandbox, executeCommand }),
+    });
+
+    await expect(provider.create({ ...intent, networkPolicy })).rejects.toThrow('policy rejected');
+    expect(executeCommand).not.toHaveBeenCalled();
+  });
+
   it('rejects enforced billing before allocating a Vercel sandbox', async () => {
     const createSandbox = vi.fn();
     const provider = createVercelProviderAdapter({
-      sandboxName: 'ses-abc',
+      sandboxName: intent.allocationName,
       config,
       restClient: fakeClient({ createSandbox }),
     });
@@ -144,23 +185,29 @@ describe('vercel provider adapter', () => {
         return envelope(input.name);
       }
     );
-    const provider = createVercelProviderAdapter({
-      sandboxName: 'ses-abc',
+    const first = await deriveSandboxAllocationId('ses-abc', intent.intentId);
+    const second = await deriveSandboxAllocationId('ses-abc', 'op_2');
+    const original = createVercelProviderAdapter({
+      sandboxName: first,
       config,
       restClient: fakeClient({ createSandbox }),
     });
-    const first = await deriveSandboxAllocationId('ses-abc', intent.intentId);
-    const second = await deriveSandboxAllocationId('ses-abc', 'op_2');
-    const created = await provider.create({ ...intent, allocationName: first });
-    if (!('providerRef' in created)) throw new Error('allocation missing');
-    await expect(provider.stop(created.providerRef)).resolves.toBe('terminal');
-    const replacement = await provider.create({
+    const created = await original.create({ ...intent, allocationName: first });
+    if (!('providerRef' in created)) throw new Error('Missing allocation');
+    await expect(original.stop(created.providerRef)).resolves.toBe('terminal');
+    const replacement = createVercelProviderAdapter({
+      sandboxName: second,
+      config,
+      restClient: fakeClient({ createSandbox }),
+    });
+    const recreated = await replacement.create({
       ...intent,
       intentId: 'op_2',
       allocationName: second,
     });
     expect(retainedNames).toEqual(new Set([first, second]));
-    expect(replacement).not.toEqual(created);
+    expect(recreated).not.toEqual(created);
+    expect(first).not.toBe(second);
   });
 
   it('rediscovers an ambiguous create by its retained name and operation without a second create', async () => {
@@ -168,7 +215,7 @@ describe('vercel provider adapter', () => {
     const inspectByName = vi.fn(fakeClient().inspectByName);
     const executeCommand = vi.fn();
     const provider = createVercelProviderAdapter({
-      sandboxName: 'ses-abc',
+      sandboxName: intent.allocationName,
       config,
       restClient: fakeClient({ createSandbox, inspectByName, executeCommand }),
     });
@@ -191,7 +238,7 @@ describe('vercel provider adapter', () => {
   it('does not call an early not-found authoritative until the create settling window closes', async () => {
     let now = intent.createdAt;
     const provider = createVercelProviderAdapter({
-      sandboxName: 'ses-abc',
+      sandboxName: intent.allocationName,
       config,
       now: () => now,
       restClient: fakeClient({ inspectByName: async () => null }),
@@ -204,7 +251,7 @@ describe('vercel provider adapter', () => {
 
   it('propagates launch failure after returning the ref', async () => {
     const provider = createVercelProviderAdapter({
-      sandboxName: 'ses-abc',
+      sandboxName: intent.allocationName,
       config,
       restClient: fakeClient({
         executeCommand: async () => {
@@ -220,7 +267,7 @@ describe('vercel provider adapter', () => {
   it('maps a running exact session to active, 404 to terminal, and other failures to unknown', async () => {
     const getSession = vi.fn(fakeClient().getSession);
     const provider = createVercelProviderAdapter({
-      sandboxName: 'ses-abc',
+      sandboxName: intent.allocationName,
       config,
       restClient: fakeClient({ getSession }),
     });
@@ -237,7 +284,7 @@ describe('vercel provider adapter', () => {
   it('stop is terminal on 404 or stopped, retryable on failure or absent identity', async () => {
     const stopSession = vi.fn(fakeClient().stopSession);
     const provider = createVercelProviderAdapter({
-      sandboxName: 'ses-abc',
+      sandboxName: intent.allocationName,
       config,
       restClient: fakeClient({ stopSession }),
     });
@@ -256,7 +303,7 @@ describe('vercel provider adapter', () => {
   });
 
   it('keeps Vercel identity unresolved when runtime configuration is missing', async () => {
-    const provider = createVercelProviderAdapter({ sandboxName: 'ses-abc' });
+    const provider = createVercelProviderAdapter({ sandboxName: intent.allocationName });
     await expect(provider.create(intent)).rejects.toThrow('configuration is unavailable');
     await expect(provider.observe(ref)).resolves.toEqual({ status: 'unknown' });
     await expect(provider.stop(ref)).resolves.toBe('retryable');
@@ -266,7 +313,7 @@ describe('vercel provider adapter', () => {
     let now = 1_000 + 250_000;
     const extendSessionTimeout = vi.fn(fakeClient().extendSessionTimeout);
     const provider = createVercelProviderAdapter({
-      sandboxName: 'ses-abc',
+      sandboxName: intent.allocationName,
       config,
       now: () => now,
       restClient: fakeClient({ extendSessionTimeout }),
@@ -281,12 +328,143 @@ describe('vercel provider adapter', () => {
 
   it('reads bounded wrapper logs', async () => {
     const provider = createVercelProviderAdapter({
-      sandboxName: 'ses-abc',
+      sandboxName: intent.allocationName,
       config,
       restClient: fakeClient(),
     });
     await expect(provider.logs(ref)).resolves.toBe('wrapper log');
   });
+
+  it('does not inspect, extend, or read sessions from another logical sandbox', async () => {
+    const getSession = vi.fn(fakeClient().getSession);
+    const extendSessionTimeout = vi.fn(fakeClient().extendSessionTimeout);
+    const readFile = vi.fn(fakeClient().readFile);
+    const stopSession = vi.fn(fakeClient().stopSession);
+    const provider = createVercelProviderAdapter({
+      sandboxName: intent.allocationName,
+      config,
+      restClient: fakeClient({ getSession, extendSessionTimeout, readFile, stopSession }),
+    });
+    const otherRef = encodeVercelProviderRef({
+      sandboxName: 'ses-other',
+      sessionId: 'vsess_other',
+    });
+
+    await expect(provider.observe(otherRef)).resolves.toEqual({ status: 'unknown' });
+    await expect(provider.stop(otherRef)).resolves.toBe('retryable');
+    await provider.ensureLeaseAtLeast(otherRef, 60_000);
+    await provider.logs(otherRef);
+
+    expect(getSession).not.toHaveBeenCalled();
+    expect(stopSession).not.toHaveBeenCalled();
+    expect(extendSessionTimeout).not.toHaveBeenCalled();
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it('updates the firewall policy for the exact owned running session', async () => {
+    const updateNetworkPolicy = vi.fn(fakeClient().updateNetworkPolicy);
+    const provider = createVercelProviderAdapter({
+      sandboxName: intent.allocationName,
+      config,
+      restClient: fakeClient({ updateNetworkPolicy }),
+    });
+    const ownedRef = encodeVercelProviderRef({
+      sandboxName: intent.allocationName,
+      sessionId: 'vsess_1',
+    });
+
+    await expect(provider.updateNetworkPolicy?.(ownedRef, networkPolicy)).resolves.toBeUndefined();
+
+    expect(updateNetworkPolicy).toHaveBeenCalledWith(
+      'vsess_1',
+      intent.allocationName,
+      networkPolicy
+    );
+  });
+
+  it.each([
+    { description: 'null', ref: null },
+    { description: 'malformed', ref: 'not-json' },
+    { description: 'logical-only', ref: 'ses-abc' },
+    {
+      description: 'cross-sandbox',
+      ref: encodeVercelProviderRef({ sandboxName: 'ses-other', sessionId: 'vsess_1' }),
+    },
+  ])('rejects $description provider refs without sending a policy update', async ({ ref }) => {
+    const updateNetworkPolicy = vi.fn(fakeClient().updateNetworkPolicy);
+    const provider = createVercelProviderAdapter({
+      sandboxName: intent.allocationName,
+      config,
+      restClient: fakeClient({ updateNetworkPolicy }),
+    });
+
+    await expect(provider.updateNetworkPolicy?.(ref as string, networkPolicy)).rejects.toThrow(
+      'Invalid Vercel sandbox provider reference'
+    );
+    expect(updateNetworkPolicy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale session without substituting the latest physical session', async () => {
+    const updateNetworkPolicy = vi.fn(fakeClient().updateNetworkPolicy);
+    const provider = createVercelProviderAdapter({
+      sandboxName: intent.allocationName,
+      config,
+      restClient: fakeClient({ updateNetworkPolicy }),
+    });
+    const staleRef = encodeVercelProviderRef({
+      sandboxName: intent.allocationName,
+      sessionId: 'vsess_old',
+    });
+
+    await expect(provider.updateNetworkPolicy?.(staleRef, networkPolicy)).rejects.toThrow(
+      'Vercel sandbox policy update returned a different session'
+    );
+    expect(updateNetworkPolicy).toHaveBeenCalledWith(
+      'vsess_old',
+      intent.allocationName,
+      networkPolicy
+    );
+  });
+
+  it('rejects a policy update response for another logical sandbox', async () => {
+    const updateNetworkPolicy = vi.fn().mockResolvedValue({
+      ...runningSession,
+      sourceSandboxName: 'ses-other',
+    });
+    const provider = createVercelProviderAdapter({
+      sandboxName: intent.allocationName,
+      config,
+      restClient: fakeClient({ updateNetworkPolicy }),
+    });
+    const ownedRef = encodeVercelProviderRef({
+      sandboxName: intent.allocationName,
+      sessionId: 'vsess_1',
+    });
+
+    await expect(provider.updateNetworkPolicy?.(ownedRef, networkPolicy)).rejects.toThrow(
+      'Vercel sandbox policy update returned a different session'
+    );
+  });
+
+  it.each(['pending', 'stopped', 'failed'] as const)(
+    'rejects a policy update when the session is %s',
+    async status => {
+      const updateNetworkPolicy = vi.fn().mockResolvedValue({ ...runningSession, status });
+      const provider = createVercelProviderAdapter({
+        sandboxName: intent.allocationName,
+        config,
+        restClient: fakeClient({ updateNetworkPolicy }),
+      });
+      const ownedRef = encodeVercelProviderRef({
+        sandboxName: intent.allocationName,
+        sessionId: 'vsess_1',
+      });
+
+      await expect(provider.updateNetworkPolicy?.(ownedRef, networkPolicy)).rejects.toThrow(
+        'Vercel sandbox session is not running'
+      );
+    }
+  );
 
   it('round-trips the opaque provider ref', () => {
     expect(decodeVercelProviderRef(ref)).toEqual({

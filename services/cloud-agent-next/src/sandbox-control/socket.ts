@@ -50,6 +50,7 @@ export type SandboxControlConnectionIdentity = {
 };
 
 export type SandboxControlSocketHooks = {
+  validateHandshake?(providerInstanceId: string): boolean | Promise<boolean>;
   onHandshakeComplete?(identity: SandboxControlConnectionIdentity): void | Promise<void>;
   onReady?(identity: SandboxControlConnectionIdentity): void | Promise<void>;
   onHeartbeat?(
@@ -303,6 +304,25 @@ export function createSandboxControlSocketHandler(
             errorResponse(frame.requestId, 'protocol_error', 'Invalid sandbox.hello payload')
           );
           return;
+        }
+
+        if (hooks.validateHandshake) {
+          const valid = await hooks.validateHandshake(payload.providerInstanceId);
+          const currentAttachment = readAttachment(ws);
+          if (
+            !isProvisionalSocket(state, ws, currentAttachment) ||
+            currentAttachment.connectionId !== attachment.connectionId
+          ) {
+            return;
+          }
+          if (!valid) {
+            sendJson(
+              ws,
+              errorResponse(frame.requestId, 'unauthorized', 'Invalid sandbox provider instance')
+            );
+            closeSocket(ws, 1008, 'invalid_provider_instance');
+            return;
+          }
         }
 
         const identity: SandboxControlConnectionIdentity = {

@@ -7,6 +7,7 @@ export const DEADLINE_IDS = [
   'idleStop',
   'stopAttempt',
   'reconciliation',
+  'credentialExpiry',
 ] as const;
 export type DeadlineId = (typeof DEADLINE_IDS)[number];
 

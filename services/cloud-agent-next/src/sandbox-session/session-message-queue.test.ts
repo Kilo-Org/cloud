@@ -18,9 +18,11 @@ import {
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sessionPromptPayloadSchema,
   type ResponseFrame,
+  type SessionAttachPayload,
   type SessionMessageOutcome,
 } from '../shared/sandbox-control-protocol.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
+import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from './control-dispatch.js';
 import type {
   AcceptedCommandTurn,
@@ -737,9 +739,23 @@ const SANDBOX_ID = 'ses-11111111111141118111111111111111';
 const RUNTIME_ID = '22222222-2222-4222-8222-222222222222';
 const NEXT_RUNTIME_ID = '33333333-3333-4333-8333-333333333333';
 const DIRECTORY = '/workspace/session';
+const KILO_CREDENTIAL = createControlPlaneCredential(SANDBOX_ID, 'kilo');
+const ATTACHMENT: SessionAttachPayload = {
+  directory: DIRECTORY,
+  env: { KILOCODE_TOKEN: KILO_CREDENTIAL },
+  kilo: {
+    scopeId: SESSION_ID,
+    token: KILO_CREDENTIAL,
+    targets: {
+      backendBaseUrl: 'https://backend.example.test',
+      providerBaseUrl: 'https://provider.example.test',
+      sessionIngestBaseUrl: 'https://ingest.example.test',
+    },
+  },
+};
 
 type Control = ReturnType<typeof sandboxControlRpc>;
-type ControlStatus = Awaited<ReturnType<Control['getStatus']>>;
+type ControlStatus = Awaited<ReturnType<Control['ensureReady']>>;
 
 function deferred<T>() {
   let resolve: (value: T) => void = () => undefined;
@@ -844,6 +860,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}) {
     ensureReady: vi.fn(
       async (_input: Parameters<Control['ensureReady']>[0]): Promise<ControlStatus> => ({
         ...status,
+        attachment: { ...ATTACHMENT, setupCommands: metadata.profile?.setupCommands },
       })
     ),
     attachSession: vi.fn(async () => ({})),
@@ -853,6 +870,8 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}) {
     })),
     validateTerminalAccess: vi.fn(async () => ({ allowed: true })),
     recordTerminalActivity: vi.fn(async () => ({ allowed: true })),
+    prepareSessionCredentials: vi.fn(async () => ({})),
+    updateNetworkPolicy: vi.fn(async () => undefined),
     request,
   } satisfies Control;
   const env = {
@@ -1102,6 +1121,7 @@ describe('SandboxSession orchestration', () => {
         physical: 'running',
         connection: 'ready',
         wrapperInstanceId: NEXT_RUNTIME_ID,
+        attachment: ATTACHMENT,
       });
       fixture.setStatus({
         physical: 'running',
@@ -1222,7 +1242,7 @@ describe('SandboxSession orchestration', () => {
         wrapperInstanceId: NEXT_RUNTIME_ID,
       } satisfies ControlStatus;
       fixture.setStatus(ready);
-      return ready;
+      return { ...ready, attachment: ATTACHMENT };
     });
     await fixture.fireAlarm();
     expect(fixture.record('a')).toMatchObject({
@@ -1859,7 +1879,7 @@ describe('SandboxSession orchestration', () => {
         wrapperInstanceId: NEXT_RUNTIME_ID,
       } satisfies ControlStatus;
       fixture.setStatus(ready);
-      return ready;
+      return { ...ready, attachment: ATTACHMENT };
     });
     await fixture.fireAlarm();
     expect(fixture.record('b')).toMatchObject({
@@ -1999,7 +2019,7 @@ describe('SandboxSession orchestration', () => {
           wrapperInstanceId: NEXT_RUNTIME_ID,
         } satisfies ControlStatus;
         fixture.setStatus(ready);
-        return ready;
+        return { ...ready, attachment: ATTACHMENT };
       });
       await fixture.fireAlarm();
       expect(await fixture.session.isSandboxCleanupScheduled()).toBe(false);
@@ -2408,14 +2428,14 @@ describe('SandboxSession orchestration', () => {
       'session_metadata',
       serializeSessionMetadata({
         ...fixture.metadata,
-        profile: { envVars: { CUSTOM_TOKEN: 'raw-secret-must-not-leak' } },
+        profile: { envVars: { SANDBOX_CONTROL_CREDENTIAL: 'raw-secret-must-not-leak' } },
       })
     );
     const admission = await fixture.admit('warm');
     expect(admission).toMatchObject({
       success: false,
       code: 'BAD_REQUEST',
-      error: expect.stringContaining('Custom profile environment'),
+      error: expect.stringContaining('Reserved control runtime environment variable'),
     });
     expect(JSON.stringify(admission)).not.toContain('raw-secret-must-not-leak');
     expect(fixture.record('warm')).toBeUndefined();
@@ -2437,7 +2457,12 @@ describe('SandboxSession orchestration', () => {
         expect(fixture.control.getStatus).not.toHaveBeenCalled();
       }
       if (!allowed) throw new Error('Compute admission denied');
-      return { physical: 'running', connection: 'ready', wrapperInstanceId: RUNTIME_ID };
+      return {
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: RUNTIME_ID,
+        attachment: ATTACHMENT,
+      };
     });
     await fixture.admit('a');
     await fixture.admit('b');
@@ -2566,10 +2591,10 @@ describe('SandboxSession orchestration', () => {
   });
 
   it.each([
-    { envVars: { CUSTOM_API_URL: 'not-logged' } },
+    { envVars: { SANDBOX_CONTROL_URL: 'not-logged' } },
     {
       encryptedSecrets: {
-        CUSTOM_SECRET: {
+        SANDBOX_CONTROL_CREDENTIAL: {
           encryptedData: 'not-logged',
           encryptedDEK: 'not-logged',
           algorithm: 'rsa-aes-256-gcm' as const,
@@ -2577,12 +2602,12 @@ describe('SandboxSession orchestration', () => {
         },
       },
     },
-  ])('rejects custom profile environment without rejecting injected auth', async profile => {
+  ])('rejects reserved profile environment without rejecting contained auth', async profile => {
     const fixture = sessionFixture({ profile });
     await expect(fixture.admit('a')).resolves.toMatchObject({
       success: false,
       code: 'BAD_REQUEST',
-      error: expect.stringContaining('Custom profile environment'),
+      error: expect.stringContaining('Reserved control runtime environment variable'),
     });
     expect(fixture.control.ensureReady).not.toHaveBeenCalled();
     const supported = sessionFixture({ profile: { envVars: {}, setupCommands: ['pnpm install'] } });
@@ -2594,7 +2619,12 @@ describe('SandboxSession orchestration', () => {
     const attach = supported.control.request.mock.calls.find(
       ([input]) => input.operation === 'session.attach'
     )?.[0];
-    expect(attach?.payload).toMatchObject({ env: { KILOCODE_TOKEN: 'test-token' } });
+    expect(attach?.payload).toMatchObject({
+      env: { KILOCODE_TOKEN: KILO_CREDENTIAL },
+      kilo: ATTACHMENT.kilo,
+      setupCommands: ['pnpm install'],
+    });
+    expect(JSON.stringify(attach?.payload)).not.toContain('test-token');
   });
 
   it.each(['rejected', 'malformed', 'error', 'timeout'] as const)(

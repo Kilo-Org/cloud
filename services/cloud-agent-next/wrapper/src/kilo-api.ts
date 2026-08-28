@@ -327,7 +327,7 @@ export function createWrapperKiloClient(
   workspacePath: string
 ): WrapperKiloClient {
   logToFile(`creating wrapper kilo client for ${serverUrl}`);
-  const v2Client = createV2Client({ baseUrl: serverUrl });
+  const v2Client = createV2Client({ baseUrl: serverUrl, directory: workspacePath });
 
   function promptParameters(opts: PromptOptions) {
     const rawParts =

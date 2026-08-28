@@ -4,6 +4,7 @@ export type SessionRoute = {
   sessionId: string;
   kiloSessionId: string;
   directory: string;
+  worktreeId?: string;
   ownerId: string;
   lastState: SessionActivityState | null;
   lastStateAt: number | null;
@@ -15,6 +16,7 @@ export type AttachRouteInput = {
   sessionId: string;
   kiloSessionId: string;
   directory: string;
+  worktreeId?: string;
   ownerId: string;
 };
 
@@ -45,15 +47,24 @@ export function attachRoute(
 
   const existing = table.get(input.sessionId);
   if (existing) {
-    if (existing.directory === input.directory && existing.kiloSessionId === input.kiloSessionId) {
+    if (
+      existing.directory === input.directory &&
+      existing.kiloSessionId === input.kiloSessionId &&
+      existing.worktreeId === input.worktreeId &&
+      existing.ownerId === input.ownerId
+    ) {
       return { table, route: existing, changed: false };
     }
     throw new Error('Session route conflict');
   }
 
   for (const route of table.values()) {
-    if (route.directory === input.directory) {
+    const sameWorktree = Boolean(input.worktreeId) && route.worktreeId === input.worktreeId;
+    if (route.directory === input.directory && (!sameWorktree || route.ownerId !== input.ownerId)) {
       throw new Error('Directory already attached');
+    }
+    if (sameWorktree && route.directory !== input.directory) {
+      throw new Error('Worktree already attached to another directory');
     }
     if (route.kiloSessionId === input.kiloSessionId) {
       throw new Error('Kilo session already attached');
@@ -64,6 +75,7 @@ export function attachRoute(
     sessionId: input.sessionId,
     kiloSessionId: input.kiloSessionId,
     directory: input.directory,
+    ...(input.worktreeId !== undefined ? { worktreeId: input.worktreeId } : {}),
     ownerId: input.ownerId,
     lastState: null,
     lastStateAt: null,
@@ -93,10 +105,13 @@ export function getRouteByDirectory(
   table: Map<string, SessionRoute>,
   directory: string
 ): SessionRoute | undefined {
+  let match: SessionRoute | undefined;
   for (const route of table.values()) {
-    if (route.directory === directory) return route;
+    if (route.directory !== directory) continue;
+    if (match) return undefined;
+    match = route;
   }
-  return undefined;
+  return match;
 }
 
 export function getRouteByKiloSessionId(
@@ -113,20 +128,16 @@ export function resolveSessionEventRoute(
   table: Map<string, SessionRoute>,
   identity: SessionEventIdentity
 ): SessionRoute | null {
-  const route =
-    getRouteByDirectory(table, identity.directory) ??
-    (identity.rootKiloSessionId
-      ? getRouteByKiloSessionId(table, identity.rootKiloSessionId)
-      : undefined) ??
-    (identity.kiloSessionId ? getRouteByKiloSessionId(table, identity.kiloSessionId) : undefined);
-  if (!route) return null;
-  if (
-    identity.rootKiloSessionId !== undefined &&
-    identity.rootKiloSessionId !== route.kiloSessionId
-  ) {
-    return null;
+  const sessionRoute = identity.kiloSessionId
+    ? getRouteByKiloSessionId(table, identity.kiloSessionId)
+    : undefined;
+  if (identity.rootKiloSessionId !== undefined) {
+    const rootRoute = getRouteByKiloSessionId(table, identity.rootKiloSessionId);
+    if (!rootRoute || (sessionRoute && sessionRoute !== rootRoute)) return null;
+    return rootRoute;
   }
-  return route;
+  if (identity.kiloSessionId !== undefined) return sessionRoute ?? null;
+  return getRouteByDirectory(table, identity.directory) ?? null;
 }
 
 export function applyReportedSessionState(

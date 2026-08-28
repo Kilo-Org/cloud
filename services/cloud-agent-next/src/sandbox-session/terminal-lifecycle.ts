@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
-import {
-  parseSessionMetadata,
-  requiresContainmentSandbox,
-  type SessionMetadata,
-} from '../persistence/session-metadata.js';
+import { parseSessionMetadata, type SessionMetadata } from '../persistence/session-metadata.js';
 import type { OperationResult } from '../persistence/types.js';
 import {
   sessionTerminalClosePayloadSchema,
@@ -495,9 +491,6 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     if (!current) return unavailableSession();
     if (!isTerminalSessionPlatform(current.metadata.identity.createdOnPlatform)) {
       return denied('terminals are only available for interactive Cloud Agent sessions');
-    }
-    if (requiresContainmentSandbox(current.metadata)) {
-      return denied('this session requires unsupported credential containment');
     }
 
     const ready = await readyContext(current, { validateAccess: true });

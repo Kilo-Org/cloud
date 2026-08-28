@@ -13,28 +13,42 @@ import {
   isTimeoutTermination,
   logToFile,
   runProcess,
+  withTimeoutAndAbort,
   type ExecResult,
   type ProcessOutputStream,
 } from '../utils.js';
-import { rememberAttachedRoot, rememberSessionDirectory } from './session-directories';
+import {
+  directoryForSession,
+  forgetAttachedRoot,
+  rememberAttachedRoot,
+  rootForSession,
+} from './session-directories';
 import { authenticatedGitUrl } from './git-url';
 import { createOutputRedactor, createSecretRedactor } from '../redact-output';
 import { stripAnsi } from '../event-parser';
 import type { ControlHandlerResult } from './sandbox-control-handlers';
 import type { WrapperKiloClient } from '../kilo-api.js';
-import { restoreSession } from '../restore-session.js';
+import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { configureWorkspaceGitAuthor } from '../session-bootstrap.js';
 import { withKiloRequestDeadline } from './sandbox-control-runtime';
+import { ControlTerminalRuntimeError, type ControlTerminalRuntime } from './terminal-runtime.js';
+import {
+  WorktreeKiloRuntimeError,
+  type WorktreeKiloAttachment,
+  type WorktreeKiloRuntimes,
+} from './worktree-runtime.js';
 
 const BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 4 * 60_000;
 const SETUP_COMMAND_HARD_TIMEOUT_MS = 300_000;
+const workspacePreparations = new Map<string, Promise<ControlHandlerResult | undefined>>();
 
 export type AttachPreparingEmitter = (event: PreparingEventDataV2) => void;
 
 export type ApplyAttachDeps = {
-  kiloClient?: WrapperKiloClient;
+  kiloRuntimes?: WorktreeKiloRuntimes;
   signal?: AbortSignal;
+  terminalRuntime?: Pick<ControlTerminalRuntime, 'rememberAttachedSession'>;
   mkdir?: (directory: string) => Promise<void>;
   hasGit?: (directory: string) => Promise<boolean>;
   hasBootstrapMarker?: (directory: string) => Promise<boolean>;
@@ -43,7 +57,7 @@ export type ApplyAttachDeps = {
   runSetup?: (
     command: string,
     directory: string,
-    env: Record<string, string> | undefined,
+    env: Record<string, string>,
     onOutput?: (stream: ProcessOutputStream, output: string) => void,
     signal?: AbortSignal
   ) => Promise<ExecResult>;
@@ -113,18 +127,33 @@ async function defaultSessionExists(
 async function defaultRunSetup(
   command: string,
   directory: string,
-  env: Record<string, string> | undefined,
+  env: Record<string, string>,
   onOutput?: (stream: ProcessOutputStream, output: string) => void,
   signal?: AbortSignal
 ): Promise<ExecResult> {
-  return runProcess('sh', ['-lc', command], {
+  return runProcess('sh', ['-c', command], {
     cwd: directory,
+    env,
+    inheritEnv: false,
     signal,
     inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
     hardTimeoutMs: SETUP_COMMAND_HARD_TIMEOUT_MS,
-    ...(env ? { env } : {}),
     ...(onOutput ? { onOutput } : {}),
   });
+}
+
+async function serializeWorkspacePreparation(
+  directory: string,
+  prepare: () => Promise<ControlHandlerResult | undefined>
+): Promise<ControlHandlerResult | undefined> {
+  const previous = workspacePreparations.get(directory) ?? Promise.resolve();
+  const current = previous.then(prepare, prepare);
+  workspacePreparations.set(directory, current);
+  try {
+    return await current;
+  } finally {
+    if (workspacePreparations.get(directory) === current) workspacePreparations.delete(directory);
+  }
 }
 
 function createProgress(
@@ -202,166 +231,205 @@ export async function applySessionAttach(
   deps: ApplyAttachDeps
 ): Promise<ControlHandlerResult> {
   const parsed = sessionAttachPayloadSchema.safeParse(payload ?? {});
-  if (!parsed.success) {
-    return fail('protocol_error', 'Invalid payload', false);
-  }
+  if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
   const attach = parsed.data;
-  const environment = attach.env;
   if (
-    environment &&
-    CONTROL_RUNTIME_RESERVED_ENV_VARS.some(key => Object.hasOwn(environment, key))
+    attach.env &&
+    CONTROL_RUNTIME_RESERVED_ENV_VARS.some(key => Object.hasOwn(attach.env ?? {}, key))
   ) {
     return fail('protocol_error', 'Reserved control runtime environment variable', false);
   }
-
-  const kiloClient = deps.kiloClient;
-  if (!kiloClient) return fail('not_ready', 'Kilo is not ready', true);
-  const signal = deps.signal ?? AbortSignal.timeout(SANDBOX_CONTROL_ATTACH_TIMEOUT_MS);
+  if (!attach.kilo) return fail('protocol_error', 'Kilo auth context is required', false);
   const directory = attach.directory ?? session.directory;
-  const mkdir = deps.mkdir ?? (dir => fs.mkdir(dir, { recursive: true }).then(() => undefined));
-  const hasGit = deps.hasGit ?? defaultHasGit;
-  const hasBootstrapMarker = deps.hasBootstrapMarker ?? defaultHasBootstrapMarker;
-  const writeBootstrapMarker = deps.writeBootstrapMarker ?? defaultWriteBootstrapMarker;
-  const runGit = deps.runGit ?? ((args, cwd, signal) => git(args, { cwd, signal }));
-  const runSetup = deps.runSetup ?? defaultRunSetup;
-  if (signal.aborted) return fail('not_ready', 'Session attachment cancelled', true);
-  const progress = createProgress(attach.preparation, deps.emitPreparing);
-  const redact = createSecretRedactor({
-    ...process.env,
-    ...environment,
-    ...(attach.git?.token ? { GIT_TOKEN: attach.git.token } : {}),
-  });
+  if (directory !== session.directory)
+    return fail('protocol_error', 'Attachment directory mismatch', false);
+  const existingDirectory = directoryForSession(session.kiloSessionId);
+  if (existingDirectory && existingDirectory !== directory) {
+    return fail('unauthorized', 'Session directory mismatch', false);
+  }
+  if (!deps.kiloRuntimes) return fail('not_ready', 'Kilo is not ready', true);
 
+  let attachment: WorktreeKiloAttachment | undefined;
+  const taskSignal = deps.signal ?? AbortSignal.timeout(SANDBOX_CONTROL_ATTACH_TIMEOUT_MS);
   try {
+    taskSignal.throwIfAborted();
+    attachment = deps.kiloRuntimes.attach(session, attach.kilo, attach.env);
+    const signal = AbortSignal.any([taskSignal, attachment.signal]);
+    const { kiloClient, env } = await withTimeoutAndAbort(attachment.ready, {
+      signal,
+      timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+      timeoutMessage: 'Session attachment timed out',
+      abortMessage: 'Session attachment cancelled',
+    });
     signal.throwIfAborted();
-    const alreadyBootstrapped = await hasBootstrapMarker(directory);
-    signal.throwIfAborted();
-    const setupCommands = attach.setupCommands ?? [];
-    const needsWorkspace = Boolean(attach.git) || setupCommands.length > 0;
-    if (!alreadyBootstrapped && needsWorkspace) {
-      await mkdir(directory);
-      signal.throwIfAborted();
-      if (attach.git) {
-        const needsClone = !(await hasGit(directory));
+    const mkdir = deps.mkdir ?? (dir => fs.mkdir(dir, { recursive: true }).then(() => undefined));
+    const hasGit = deps.hasGit ?? defaultHasGit;
+    const hasBootstrapMarker = deps.hasBootstrapMarker ?? defaultHasBootstrapMarker;
+    const writeBootstrapMarker = deps.writeBootstrapMarker ?? defaultWriteBootstrapMarker;
+    const runGit =
+      deps.runGit ?? ((args, cwd, signal) => git(args, { cwd, env, inheritEnv: false, signal }));
+    const runSetup = deps.runSetup ?? defaultRunSetup;
+    const progress = createProgress(attach.preparation, deps.emitPreparing);
+    const redact = createSecretRedactor(process.env, attach.env ?? {}, {
+      ...env,
+      ...(attach.git?.token ? { GIT_TOKEN: attach.git.token } : {}),
+    });
+
+    const workspaceFailure = await serializeWorkspacePreparation(directory, async () => {
+      try {
         signal.throwIfAborted();
-        if (needsClone || attach.branch) {
-          const cloneStepId = 'phase:cloning';
-          progress.start('cloning', cloneStepId, 'Cloning repository…');
-          if (needsClone) {
-            progress.progress('cloning', cloneStepId, 'Cloning repository…');
-            const cloneUrl = authenticatedGitUrl(
-              attach.git.url,
-              attach.git.token,
-              attach.git.platform
-            );
-            const cloned = await runGit(['clone', cloneUrl, directory], undefined, signal);
+        const alreadyBootstrapped = await hasBootstrapMarker(directory);
+        signal.throwIfAborted();
+        const setupCommands = attach.setupCommands ?? [];
+        const needsWorkspace = Boolean(attach.git) || setupCommands.length > 0;
+        if (!alreadyBootstrapped && needsWorkspace) {
+          await mkdir(directory);
+          signal.throwIfAborted();
+          if (attach.git) {
+            const needsClone = !(await hasGit(directory));
             signal.throwIfAborted();
-            if (cloned.exitCode !== 0) {
-              progress.fail('cloning', cloneStepId, 'git clone failed');
-              return fail('not_ready', 'git clone failed', true);
+            if (needsClone || attach.branch) {
+              const cloneStepId = 'phase:cloning';
+              progress.start('cloning', cloneStepId, 'Cloning repository…');
+              if (needsClone) {
+                progress.progress('cloning', cloneStepId, 'Cloning repository…');
+                const cloneUrl = authenticatedGitUrl(
+                  attach.git.url,
+                  attach.git.token,
+                  attach.git.platform
+                );
+                const cloned = await runGit(['clone', cloneUrl, directory], undefined, signal);
+                signal.throwIfAborted();
+                if (cloned.exitCode !== 0) {
+                  progress.fail('cloning', cloneStepId, 'git clone failed');
+                  return fail('not_ready', 'git clone failed', true);
+                }
+              }
+              if (attach.branch) {
+                const checked = await runGit(
+                  ['checkout', '-B', attach.branch, `origin/${attach.branch}`],
+                  directory,
+                  signal
+                );
+                signal.throwIfAborted();
+                if (checked.exitCode !== 0) {
+                  progress.fail('cloning', cloneStepId, 'git checkout failed');
+                  return fail('not_ready', 'git checkout failed', true);
+                }
+              }
+              progress.complete('cloning', cloneStepId);
             }
-          }
-          if (attach.branch) {
-            const checked = await runGit(
-              ['checkout', '-B', attach.branch, `origin/${attach.branch}`],
+            await configureWorkspaceGitAuthor(
               directory,
+              (args, options) => runGit(args, options?.cwd, options?.signal),
+              undefined,
               signal
             );
             signal.throwIfAborted();
-            if (checked.exitCode !== 0) {
-              progress.fail('cloning', cloneStepId, 'git checkout failed');
-              return fail('not_ready', 'git checkout failed', true);
+          }
+          for (const [index, command] of setupCommands.entries()) {
+            signal.throwIfAborted();
+            const stepId = `setup_command:${index}`;
+            progress.start('setup_commands', stepId, `Running setup command ${index + 1}`, {
+              kind: 'setup_command',
+              label: `Setup command ${index + 1}`,
+              command: redact(command),
+              commandIndex: index,
+              commandCount: setupCommands.length,
+            });
+            const output = createOutputRedactor(
+              text => redact(stripAnsi(text)),
+              text => {
+                if (signal.aborted) return;
+                const cleaned = text.trim();
+                if (cleaned) progress.output(stepId, `${cleaned}\n`);
+              }
+            );
+            const result = await runSetup(command, directory, env, output.onOutput, signal);
+            signal.throwIfAborted();
+            output.flush();
+            if (result.exitCode !== 0) {
+              const safeError = `Setup command ${index + 1} ${isTimeoutTermination(result) ? 'timed out' : 'failed'}`;
+              progress.fail('setup_commands', stepId, safeError);
+              return fail('not_ready', safeError, true);
             }
+            progress.complete('setup_commands', stepId);
           }
-          progress.complete('cloning', cloneStepId);
+          signal.throwIfAborted();
+          await writeBootstrapMarker(directory);
+          signal.throwIfAborted();
         }
-        await configureWorkspaceGitAuthor(
-          directory,
-          (args, options) => runGit(args, options?.cwd, options?.signal),
-          undefined,
-          signal
+      } catch {
+        return fail(
+          'not_ready',
+          signal.aborted ? 'Session attachment cancelled' : 'workspace restore failed',
+          true
         );
-        signal.throwIfAborted();
       }
-      for (const [index, command] of setupCommands.entries()) {
+    });
+    if (workspaceFailure) return workspaceFailure;
+
+    const kiloSessionId = attach.snapshotIdentity ?? session.kiloSessionId;
+    const restore = deps.restoreSession ?? restoreSession;
+    const sessionExists =
+      deps.sessionExists ??
+      ((id, directory, signal) => defaultSessionExists(kiloClient, id, directory, signal));
+    try {
+      signal.throwIfAborted();
+      progress.start('kilo_session', 'phase:kilo_session', 'Starting session…');
+      await seedSessionIngestRegistration(session.kiloSessionId, env, signal);
+      signal.throwIfAborted();
+      const exists = await withKiloRequestDeadline(
+        probeSignal => sessionExists(kiloSessionId, directory, probeSignal),
+        signal
+      );
+      signal.throwIfAborted();
+      if (!exists) {
+        progress.progress('kilo_session', 'phase:kilo_session', 'Restoring session…');
+        const restored = await restore(kiloSessionId, directory, undefined, { env, signal });
         signal.throwIfAborted();
-        const stepId = `setup_command:${index}`;
-        const safeCommand = redact(command);
-        progress.start('setup_commands', stepId, `Running setup command ${index + 1}`, {
-          kind: 'setup_command',
-          label: `Setup command ${index + 1}`,
-          command: safeCommand,
-          commandIndex: index,
-          commandCount: setupCommands.length,
-        });
-        const output = createOutputRedactor(
-          text => redact(stripAnsi(text)),
-          text => {
-            if (signal.aborted) return;
-            const cleaned = text.trim();
-            if (cleaned) progress.output(stepId, `${cleaned}\n`);
+        if (!restored.ok) {
+          if (restored.code !== 404 && !restored.emptySnapshot) {
+            progress.fail('kilo_session', 'phase:kilo_session', restored.error);
+            return fail('not_ready', 'kilo session is not ready', true);
           }
-        );
-        const result = await runSetup(command, directory, attach.env, output.onOutput, signal);
-        signal.throwIfAborted();
-        output.flush();
-        if (result.exitCode !== 0) {
-          const safeError = `Setup command ${index + 1} ${isTimeoutTermination(result) ? 'timed out' : 'failed'}`;
-          progress.fail('setup_commands', stepId, safeError);
-          return fail('not_ready', safeError, true);
+          progress.progress('kilo_session', 'phase:kilo_session', 'Starting session…');
+          await withKiloRequestDeadline(
+            probeSignal => kiloClient.ensureSession(kiloSessionId, directory, probeSignal),
+            signal
+          );
         }
-        progress.complete('setup_commands', stepId);
       }
       signal.throwIfAborted();
-      await writeBootstrapMarker(directory);
-      signal.throwIfAborted();
+      progress.complete('kilo_session', 'phase:kilo_session');
+    } catch {
+      const message = signal.aborted ? 'Session attachment cancelled' : 'kilo session is not ready';
+      progress.fail('kilo_session', 'phase:kilo_session', message);
+      return fail('not_ready', message, true);
     }
-  } catch {
+    signal.throwIfAborted();
+    const alreadyAttached = rootForSession(session.kiloSessionId) === session.kiloSessionId;
+    rememberAttachedRoot(session.kiloSessionId, directory);
+    try {
+      if (kiloSessionId === session.kiloSessionId)
+        deps.terminalRuntime?.rememberAttachedSession(session);
+      attachment.commit();
+    } catch (error) {
+      if (!alreadyAttached) forgetAttachedRoot(session.kiloSessionId, directory);
+      throw error;
+    }
+    logToFile(`session.attach ready directory=${directory}`);
+    return ok();
+  } catch (error) {
+    if (error instanceof WorktreeKiloRuntimeError || error instanceof ControlTerminalRuntimeError) {
+      return fail(error.code, error.message, error.retryable);
+    }
     return fail(
       'not_ready',
-      signal.aborted ? 'Session attachment cancelled' : 'workspace restore failed',
+      taskSignal.aborted ? 'Session attachment cancelled' : 'Session attachment failed',
       true
     );
+  } finally {
+    attachment?.release();
   }
-
-  const kiloSessionId = attach.snapshotIdentity ?? session.kiloSessionId;
-  const restore = deps.restoreSession ?? restoreSession;
-  const sessionExists =
-    deps.sessionExists ??
-    ((id, directory, signal) => defaultSessionExists(kiloClient, id, directory, signal));
-  try {
-    signal.throwIfAborted();
-    progress.start('kilo_session', 'phase:kilo_session', 'Starting session…');
-    const exists = await withKiloRequestDeadline(
-      probeSignal => sessionExists(kiloSessionId, directory, probeSignal),
-      signal
-    );
-    signal.throwIfAborted();
-    if (!exists) {
-      progress.progress('kilo_session', 'phase:kilo_session', 'Restoring session…');
-      const restored = await restore(kiloSessionId, directory, undefined, { signal });
-      signal.throwIfAborted();
-      if (!restored.ok) {
-        if (restored.code !== 404 && !restored.emptySnapshot) {
-          progress.fail('kilo_session', 'phase:kilo_session', restored.error);
-          return fail('not_ready', 'kilo session is not ready', true);
-        }
-        progress.progress('kilo_session', 'phase:kilo_session', 'Starting session…');
-        await withKiloRequestDeadline(
-          probeSignal => kiloClient.ensureSession(kiloSessionId, directory, probeSignal),
-          signal
-        );
-      }
-    }
-    signal.throwIfAborted();
-    progress.complete('kilo_session', 'phase:kilo_session');
-  } catch {
-    const message = signal.aborted ? 'Session attachment cancelled' : 'kilo session is not ready';
-    progress.fail('kilo_session', 'phase:kilo_session', message);
-    return fail('not_ready', message, true);
-  }
-  rememberSessionDirectory(session.kiloSessionId, directory);
-  rememberAttachedRoot(session.kiloSessionId, directory);
-  logToFile(`session.attach ready directory=${directory}`);
-  return ok();
 }

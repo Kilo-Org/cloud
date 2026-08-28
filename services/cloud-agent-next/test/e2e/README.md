@@ -28,18 +28,31 @@ cloud-agent-next refactor.
 
 ## Credential containment
 
-`CREDENTIAL_CONTAINMENT_ENABLED` controls GitHub, GitLab, Bitbucket, and Kilo
-credential containment together for new non-devcontainer sessions. Containment
-is enabled unless this variable is set to `false`.
+Control-plane sessions (`workspace_*`) always contain managed Kilo and repository
+credentials, including sessions whose older metadata disabled containment.
+`CREDENTIAL_CONTAINMENT_ENABLED` cannot disable control-plane containment.
+Cloudflare uses contained sandbox classes and the existing credential broker;
+Vercel uses native network policies. Each worktree has stable credential aliases
+shared by its registered Kilo roots, while different worktrees have separate Kilo
+authentication contexts. Unsupported credential configurations fail closed rather
+than exposing raw tokens.
 
-Local `dev` defaults to `false` because of Cloudflare's local outbound proxy
-limitations. Set `CREDENTIAL_CONTAINMENT_ENABLED=true` in `.dev.vars` to opt in
-when using proxy-compatible upstreams. Devcontainer sessions remain excluded
-because DIND does not support managed SCM containment.
+Cloudflare's native outbound handler intercepts ports 80 and 443. Local targets
+such as `http://host.docker.internal:<offset-port>` can bypass interception and
+reject the aliases with HTTP 401. A control-plane E2E run needs sandbox-facing
+endpoints that actually traverse the native handler, plus the running
+`cloudflare-git-token-service` and its capability-encryption configuration. Do not
+disable containment to work around a local transport limitation.
 
-Containment flags are persisted on the workspace at session creation, so
-changing this variable requires a new session; existing sessions keep their
-original containment flags.
+For new legacy sessions (`agent_*`), `CREDENTIAL_CONTAINMENT_ENABLED` controls
+GitHub, GitLab, Bitbucket, and Kilo credential containment together. Containment
+is enabled unless this variable is set to `false`. Local `dev` defaults to
+`false`; set `CREDENTIAL_CONTAINMENT_ENABLED=true` in `.dev.vars` when using
+proxy-compatible upstreams. Legacy devcontainer sessions remain excluded because
+DIND does not support managed SCM containment.
+
+Legacy containment flags are persisted at session creation, so changing the
+variable affects new legacy sessions, not existing ones.
 
 ## Running
 

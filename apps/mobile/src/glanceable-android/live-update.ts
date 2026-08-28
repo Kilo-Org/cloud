@@ -8,8 +8,20 @@ import { requireOptionalNativeModule } from 'expo';
 
 type LiveUpdateNativeModule = {
   isPromotionCapable(): boolean;
-  start(title: string, text: string, openAgentsLabel: string, promotion: boolean): void;
-  update(title: string, text: string, openAgentsLabel: string, promotion: boolean): void;
+  start(
+    title: string,
+    text: string,
+    openAgentsLabel: string,
+    compactText: string | null,
+    promotion: boolean
+  ): void;
+  update(
+    title: string,
+    text: string,
+    openAgentsLabel: string,
+    compactText: string | null,
+    promotion: boolean
+  ): void;
   end(): void;
 };
 
@@ -23,12 +35,24 @@ function isPromotionCapable(): boolean {
   return nativeModule?.isPromotionCapable() ?? false;
 }
 
-export function start(title: string, text: string, openAgentsLabel: string): void {
-  nativeModule?.start(title, text, openAgentsLabel, isPromotionCapable());
+// eslint-disable-next-line max-params -- mirrors the native presentation fields
+export function start(
+  title: string,
+  text: string,
+  openAgentsLabel: string,
+  compactText: string | null
+): void {
+  nativeModule?.start(title, text, openAgentsLabel, compactText, isPromotionCapable());
 }
 
-export function update(title: string, text: string, openAgentsLabel: string): void {
-  nativeModule?.update(title, text, openAgentsLabel, isPromotionCapable());
+// eslint-disable-next-line max-params -- mirrors the native presentation fields
+export function update(
+  title: string,
+  text: string,
+  openAgentsLabel: string,
+  compactText: string | null
+): void {
+  nativeModule?.update(title, text, openAgentsLabel, compactText, isPromotionCapable());
 }
 
 export function end(): void {

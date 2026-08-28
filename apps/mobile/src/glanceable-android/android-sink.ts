@@ -22,6 +22,7 @@ import { showAndroidPermissionAlertOnce } from './permission-alert';
 import {
   type AndroidWidgetProps,
   buildAndroidWidgetProps,
+  buildCompactNotificationText,
   buildExpiredWidgetProps,
   buildOngoingNotificationText,
 } from './widget-props';
@@ -101,9 +102,10 @@ async function tryStartOrUpdate(
   const title = translate(NOTIFICATION_TITLE_KEY);
   const text = buildOngoingNotificationText(snapshot, {}, translate);
   const openAgentsLabel = translate(OPEN_AGENTS_LABEL_KEY);
+  const compactText = buildCompactNotificationText(snapshot, {});
 
   if (notificationActive) {
-    updateLiveUpdate(title, text, openAgentsLabel);
+    updateLiveUpdate(title, text, openAgentsLabel, compactText);
     revision = snapshot.revision;
     return;
   }
@@ -117,12 +119,12 @@ async function tryStartOrUpdate(
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
     if (notificationActive) {
       if (snapshot.revision > revision) {
-        updateLiveUpdate(title, text, openAgentsLabel);
+        updateLiveUpdate(title, text, openAgentsLabel, compactText);
         revision = snapshot.revision;
       }
       return;
     }
-    startLiveUpdate(title, text, openAgentsLabel);
+    startLiveUpdate(title, text, openAgentsLabel, compactText);
     notificationActive = true;
     revision = snapshot.revision;
     pending = null;
@@ -139,8 +141,12 @@ function retryPendingStart(): void {
     return;
   }
   const title = translate(NOTIFICATION_TITLE_KEY);
-  const openAgentsLabel = translate(OPEN_AGENTS_LABEL_KEY);
-  startLiveUpdate(title, buildOngoingNotificationText(p.snapshot, {}, translate), openAgentsLabel);
+  startLiveUpdate(
+    title,
+    buildOngoingNotificationText(p.snapshot, {}, translate),
+    translate(OPEN_AGENTS_LABEL_KEY),
+    buildCompactNotificationText(p.snapshot, {})
+  );
   notificationActive = true;
   revision = p.snapshot.revision;
   pending = null;
@@ -183,7 +189,8 @@ export const androidSink: GlanceableSink = {
       updateLiveUpdate(
         translate(NOTIFICATION_TITLE_KEY),
         buildOngoingNotificationText(snapshot, {}, translate),
-        translate(OPEN_AGENTS_LABEL_KEY)
+        translate(OPEN_AGENTS_LABEL_KEY),
+        buildCompactNotificationText(snapshot, {})
       );
       revision = snapshot.revision;
     }

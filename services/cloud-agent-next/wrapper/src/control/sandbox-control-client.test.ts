@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { createSandboxControlClient } from './sandbox-control-client';
+import {
+  createSandboxControlClient,
+  type SandboxControlClientOptions,
+} from './sandbox-control-client';
 
 class FakeWebSocket {
   readyState = 0;
@@ -102,6 +105,29 @@ describe('createSandboxControlClient', () => {
     );
     client.close();
     expect(fake.readyState).toBe(3);
+  });
+
+  it('includes the wrapper process instance in sandbox.hello without exposing the credential', async () => {
+    const fake = new FakeWebSocket();
+    const wrapperInstanceId = crypto.randomUUID();
+    const client = createSandboxControlClient({
+      url: 'wss://example.test/sandbox-control/sbx_1',
+      credential: 'master-control-secret',
+      providerInstanceId: 'inst_1',
+      wrapperInstanceId,
+      openWebSocket: () => fake as unknown as WebSocket,
+    });
+
+    const connecting = client.connect();
+    await handshake(fake);
+    await connecting;
+
+    expect(JSON.parse(fake.sent[0] ?? '{}')).toMatchObject({
+      operation: 'sandbox.hello',
+      payload: { providerInstanceId: 'inst_1', wrapperInstanceId },
+    });
+    expect(fake.sent[0]).not.toContain('master-control-secret');
+    client.close();
   });
 
   it('answers inbound sandbox.status after handshake when onRequest is provided', async () => {
@@ -224,13 +250,15 @@ describe('createSandboxControlClient', () => {
     client.close();
   });
 
-  it('opens a second socket after close and completes hello plus status again', async () => {
+  it('retains its original wrapper process instance across socket reconnects', async () => {
     const sockets: FakeWebSocket[] = [];
+    const wrapperInstanceId = crypto.randomUUID();
     let reconnects = 0;
-    const client = createSandboxControlClient({
+    const options: SandboxControlClientOptions = {
       url: 'wss://example.test/sandbox-control/sbx_1',
       credential: 'secret',
       providerInstanceId: 'inst_1',
+      wrapperInstanceId,
       reconnectDelayMs: () => 0,
       onReconnect: () => {
         reconnects += 1;
@@ -240,19 +268,27 @@ describe('createSandboxControlClient', () => {
         sockets.push(next);
         return next as unknown as WebSocket;
       },
-    });
+    };
+    const client = createSandboxControlClient(options);
 
     const connecting = client.connect();
     await handshake(sockets[0]);
     await connecting;
     expect(reconnects).toBe(0);
+    expect(JSON.parse(sockets[0]?.sent[0] ?? '{}')).toMatchObject({
+      payload: { wrapperInstanceId },
+    });
 
+    options.wrapperInstanceId = crypto.randomUUID();
     sockets[0]?.close();
     await waitForReconnect();
     expect(sockets).toHaveLength(2);
     await handshake(sockets[1]);
     expect(reconnects).toBe(1);
-    expect(sockets[1]?.sent[0]).toContain('sandbox.hello');
+    expect(JSON.parse(sockets[1]?.sent[0] ?? '{}')).toMatchObject({
+      operation: 'sandbox.hello',
+      payload: { wrapperInstanceId },
+    });
     client.close();
   });
 
@@ -406,6 +442,52 @@ describe('createSandboxControlClient', () => {
       type: 'event',
       event: 'sandbox.ready',
     });
+    client.close();
+  });
+
+  it('does not log credentials included in an untrusted handshake failure', async () => {
+    const credential = 'super-secret-token';
+    const logs: string[] = [];
+    const sockets: FakeWebSocket[] = [];
+    const client = createSandboxControlClient({
+      url: 'wss://example.test/sandbox-control/sbx_1?token=signed-url-secret',
+      credential,
+      providerInstanceId: 'inst_1',
+      reconnectDelayMs: () => 0,
+      log: message => logs.push(message),
+      openWebSocket: () => {
+        const next = new FakeWebSocket();
+        sockets.push(next);
+        return next as unknown as WebSocket;
+      },
+    });
+
+    const connecting = client.connect();
+    await Promise.resolve();
+    const first = sockets[0];
+    if (!first) throw new Error('missing first socket');
+    first.open();
+    await Promise.resolve();
+    const hello = JSON.parse(first.sent[0] ?? '{}') as { requestId: string };
+    first.respond(
+      JSON.stringify({
+        type: 'response',
+        requestId: hello.requestId,
+        ok: false,
+        error: {
+          code: 'unauthorized',
+          message: `rejected ${credential} signed-url-secret`,
+          retryable: true,
+        },
+      })
+    );
+    await waitForReconnect();
+    await handshake(sockets[1]);
+    await connecting;
+
+    expect(logs.join('\n')).not.toContain(credential);
+    expect(logs.join('\n')).not.toContain('signed-url-secret');
+    expect(logs).toContain('sandbox control connect failed');
     client.close();
   });
 

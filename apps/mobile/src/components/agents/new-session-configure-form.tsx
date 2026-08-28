@@ -1,8 +1,9 @@
 import { type ReactNode, type RefObject } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { InstanceSelector } from '@/components/agents/instance-selector';
+import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import {
@@ -10,6 +11,7 @@ import {
   type RepositoryGroup,
   type RepositoryPlatform,
 } from '@/components/agents/new-session-repository-state';
+import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { type ModeOption } from '@/components/agents/mode-normalize';
@@ -23,7 +25,6 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
@@ -64,6 +65,13 @@ type NewSessionConfigureFormProps = {
   isLoadingInstances: boolean;
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   showInstanceDisconnectedNote: boolean;
+  // Launch folder (remote CLI only). `""` means the launch directory.
+  folderPath: string;
+  onChangeFolderPath: (path: string) => void;
+  /** Continue-form inline reason shown under "Run on" (e.g. an incapable CLI or a failed clone/import). */
+  runOnInlineNote?: string | null;
+  /** True for the Continue clone entry: hides Changes and Environment. */
+  isCloneEntry?: boolean;
   // Repository (Cloud Agent only).
   groups: RepositoryGroup[];
   isRetrying: boolean;
@@ -126,6 +134,10 @@ export function NewSessionConfigureForm({
   isLoadingInstances,
   onChangeRunOnInstance,
   showInstanceDisconnectedNote,
+  folderPath,
+  onChangeFolderPath,
+  runOnInlineNote,
+  isCloneEntry = false,
   groups,
   isRetrying,
   onChangeRepo,
@@ -144,10 +156,12 @@ export function NewSessionConfigureForm({
   isStartDisabled,
   onStartSession,
 }: Readonly<NewSessionConfigureFormProps>) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
+  const runOnNote =
+    runOnInlineNote ??
+    (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
   const targetLabel = isRemote ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
   let runTargetBlock: ReactNode = null;
   if (showRunOnSelector) {
@@ -181,51 +195,50 @@ export function NewSessionConfigureForm({
     if (isProfileLoading) {
       return null;
     }
-    if (isProfileError) {
-      return (
-        <View className="mt-5">
-          <Text className="mb-2 text-sm font-medium text-muted-foreground">
-            {t('agentChat.newSession.environment')}
-          </Text>
-          <View className="flex-row items-center gap-2">
-            <Text className="text-sm text-destructive">
-              {t('agentChat.newSession.couldNotLoadEnvironment')}
-            </Text>
-            <Button
-              variant="link"
-              size="sm"
-              onPress={onRetryProfile}
-              accessibilityLabel={t('agentChat.newSession.retryLoadingEnvironment')}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          </View>
-        </View>
-      );
-    }
     return (
       <View className="mt-5">
         <Text className="mb-2 text-sm font-medium text-muted-foreground">
           {t('agentChat.newSession.environment')}
         </Text>
-        {profile ? (
-          <View className="gap-1">
-            <Text className="text-sm font-semibold text-foreground">{profile.name}</Text>
-            <Text className="text-sm text-muted-foreground">
-              {t('agentChat.newSession.environmentSummary', {
-                commands: profile.commandCount,
-                mcp: profile.mcpServerCount,
-                skills: profile.skillCount,
-                agents: profile.agentCount,
-              })}
-            </Text>
-          </View>
-        ) : (
-          <Text className="text-sm text-foreground">
-            {t('agentChat.newSession.defaultEnvironment')}
-          </Text>
-        )}
+        {renderProfileBody()}
       </View>
+    );
+  }
+
+  function renderProfileBody(): ReactNode {
+    if (isProfileError) {
+      return (
+        <View className="flex-row items-center gap-2">
+          <Text className="text-sm text-destructive">
+            {t('agentChat.newSession.couldNotLoadEnvironment')}
+          </Text>
+          <Button
+            variant="link"
+            size="sm"
+            onPress={onRetryProfile}
+            accessibilityLabel={t('agentChat.newSession.retryLoadingEnvironment')}
+          >
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        </View>
+      );
+    }
+    return profile ? (
+      <View className="gap-1">
+        <Text className="text-sm font-semibold text-foreground">{profile.name}</Text>
+        <Text className="text-sm text-muted-foreground">
+          {t('agentChat.newSession.environmentSummary', {
+            commands: profile.commandCount,
+            mcp: profile.mcpServerCount,
+            skills: profile.skillCount,
+            agents: profile.agentCount,
+          })}
+        </Text>
+      </View>
+    ) : (
+      <Text className="text-sm text-foreground">
+        {t('agentChat.newSession.defaultEnvironment')}
+      </Text>
     );
   }
 
@@ -262,19 +275,25 @@ export function NewSessionConfigureForm({
         shareId={shareId}
         voiceInputSettlerRef={voiceInputSettlerRef}
         initialPrompt={initialPrompt}
+        isCloneEntry={isCloneEntry}
       />
 
       {runTargetBlock}
+
+      {isRemote ? (
+        <LaunchFolderField
+          folderPath={folderPath}
+          runOnInstance={runOnInstance}
+          onChangeFolderPath={onChangeFolderPath}
+          disabled={isStarting}
+        />
+      ) : null}
 
       <Text className="mt-2 text-xs text-muted-foreground">
         {t('agentChat.newSession.remoteHint')}
       </Text>
 
-      {showInstanceDisconnectedNote ? (
-        <Text className="mt-2 text-sm text-muted-foreground">
-          {remoteSpawnInstanceDisconnectedNote()}
-        </Text>
-      ) : null}
+      {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
 
       {!isRemote ? (
         <NewSessionRepositorySection
@@ -290,7 +309,7 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      {!isRemote ? (
+      {!isRemote && !isCloneEntry ? (
         <View className="mt-5">
           <Text className="mb-2 text-sm font-medium text-muted-foreground">
             {t('agentChat.newSession.changes')}
@@ -309,15 +328,15 @@ export function NewSessionConfigureForm({
         </View>
       ) : null}
 
-      {!isRemote ? renderProfileRow() : null}
+      {!isRemote && !isCloneEntry ? renderProfileRow() : null}
 
-      <Button size="lg" className="mt-6" disabled={isStartDisabled} onPress={onStartSession}>
-        {isStarting ? (
-          <ActivityIndicator size="small" color={colors.primaryForeground} />
-        ) : (
-          <Text>{t('agentChat.newSession.startSession')}</Text>
-        )}
-      </Button>
+      <NewSessionStartButton
+        isCloneEntry={isCloneEntry}
+        isRemote={isRemote}
+        isStartDisabled={isStartDisabled}
+        isStarting={isStarting}
+        onStartSession={onStartSession}
+      />
     </ScrollView>
   );
 }

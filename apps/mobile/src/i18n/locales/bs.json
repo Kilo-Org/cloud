@@ -672,7 +672,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, kartica, {{position}} od {{total}}"
+    "position": "{{name}}, kartica, {{position}} od {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -1308,7 +1309,23 @@
       "checkRun": "Provera izvođenja",
       "status": "Status",
       "threshold": "Prag",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Čeka se transkript pregleda.",
+      "transcriptEmpty": "Nema transkripta za ovaj pregled.",
+      "transcriptRetry": "Nije moguće učitati transkript pregleda.",
+      "transcriptLive": "UŽIVO",
+      "agentIdle": "Agent neaktivan",
+      "agentWorking": "Agent radi...",
+      "anErrorOccurred": "Došlo je do greške",
+      "errorWithMessage": "Greška: {{message}}",
+      "executionStarted": "Izvršenje pokrenuto",
+      "reviewCompleted": "Pregled završen",
+      "reviewInterrupted": "Pregled prekinut",
+      "sessionError": "Greška sesije: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Alat: {{name}}",
+      "toolNameError": "Alat: {{name}} — greška",
+      "unknownError": "Nepoznata greška"
     },
     "reviewMemory": {
       "title": "Pamćenje pregleda",
@@ -2046,7 +2063,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktivan sada",
     "search": {
       "searching": "Pretraživanje",
       "searchSessions": "Pretraži sesije",
@@ -2057,13 +2073,11 @@
     "sessionList": {
       "couldNotLoad": "Nije moguće učitati sesije",
       "couldNotLoadActive": "Nije moguće učitati aktivne sesije",
-      "noSessionsYet": "Još nema sesija",
       "noSessionsYetDescription": "Započnite zadatak kodiranja s telefona. Vaše sesije pojavit će se ovdje.",
       "noMatches": "Nijedna sesija se ne podudara",
       "tryDifferentSearch": "Pokušajte drugi pojam pretrage.",
       "tryAdjustFilters": "Pokušajte prilagoditi ili očistiti filtre.",
       "couldNotSearch": "Nije moguće pretražiti sesije",
-      "allActive": "Sve sesije su aktivne",
       "completedWillAppear": "Dovršene sesije pojavit će se ovdje.",
       "noPastSessions": "Nema prošlih sesija",
       "live": "UŽIVO"
@@ -2134,13 +2148,10 @@
       "scrollToBottom": "Pomakni na dno",
       "emptyTitle": "Još nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
-      "connectRepository": "Poveži repozitorij",
       "cloningSession": "Kloniranje sesije",
       "continue": "Nastavi",
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju",
-      "cloneFailed": "Nije moguće klonirati ovu sesiju.",
       "cloneFailedRetry": "Nije moguće klonirati ovu sesiju. Pokušajte ponovo.",
-      "connectRepositoryToContinue": "Povežite repozitorij za nastavak.",
       "notEnoughCredits": "Nedovoljno kredita za pokretanje Cloud Agent. Dodajte kredite i pokušajte ponovo.",
       "previousTaskFinishing": "Prethodni zadatak se još uvijek završava. Pričekajte trenutak.",
       "serviceUnavailable": "Usluga trenutno nije dostupna. Pokušajte ponovo.",
@@ -2213,7 +2224,11 @@
       "noRepositoriesVisibleGitlab": "Nema vidljivih spremišta. Provjeri pristup spremištima za GitLab, zatim osvježi.",
       "openBitbucket": "Otvori Bitbucket",
       "openGitlab": "Otvori GitLab",
-      "recentlyUsed": "Nedavno korišteno"
+      "recentlyUsed": "Nedavno korišteno",
+      "continueFrom": "Nastavljanje {{title}}",
+      "importingSession": "Uvoz sesije",
+      "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberite Cloud Agent ili drugi CLI.",
+      "importFailed": "Nije moguće uvesti ovu sesiju."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirano {{displayCount}} datoteka",
@@ -2479,6 +2494,8 @@
       "viewTable": "Pogledaj tabelu",
       "title": "Tabela",
       "close": "Zatvori tabelu",
+      "loading": "Učitavanje tabele",
+      "empty": "Ova tabela nema redova.",
       "columnCount_one": "kolona",
       "columnCount": "kolone",
       "columnCount_other": "kolone",
@@ -2670,6 +2687,17 @@
       "hostConfirmMessage": "Ova veza otvara {{host}} u vašem pregledniku.",
       "open": "Otvori",
       "trustThisHost": "Vjeruj ovom hostu"
+    },
+    "folderPicker": {
+      "fieldLabel": "Mapa",
+      "accessibility": "Mapa: {{label}}",
+      "tapToListHint": "Dodirnite mapu da biste prikazali njen sadržaj",
+      "emptyTitle": "Nema mapa unutra",
+      "emptyDescription": "Gotovo koristi ovu mapu.",
+      "retryableTitle": "Nije moguće prikazati mape",
+      "retryableDescription": "Provjerite vezu i pokušajte ponovo. Gotovo i dalje potvrđuje ovu mapu.",
+      "unsupportedTitle": "Ne mogu se prikazati mape",
+      "unsupportedDescription": "Ovaj CLI ne može prikazati mape. Gotovo zadržava početnu mapu, a Započni sesiju tamo počinje."
     }
   },
   "bootstrap": {
@@ -3170,5 +3198,19 @@
     "emptyDescription": "Kada vjerujete hostu veze, ona se otvara bez ponovnog pitanja.",
     "revoke": "Opozovi {{host}}",
     "backToPreferences": "Nazad na postavke"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Poruka"
+    },
+    "empty": {
+      "title": "Započni razgovor",
+      "description": "Pošalji poruku za razgovor s modelom."
+    },
+    "working": "U toku",
+    "historyRetry": "Nije moguće učitati istoriju razgovora.",
+    "catalogRetry": "Nije moguće učitati modele",
+    "sendError": "Poruka nije mogla biti poslana. Pokušajte ponovo."
   }
 }

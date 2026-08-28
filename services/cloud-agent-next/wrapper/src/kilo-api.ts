@@ -255,6 +255,9 @@ export type WrapperKiloClient = {
     command: string;
     args?: string;
     messageId?: string;
+    agent?: string;
+    model?: { providerID?: string; modelID: string };
+    variant?: string;
     snapshotInitialization?: 'wait';
   }) => Promise<unknown>;
   /** Fetch the full slash command catalog from kilo, trimmed to wire shape. */
@@ -291,8 +294,8 @@ export type WrapperKiloClient = {
     title: string;
     env: Record<string, string>;
   }) => Promise<WrapperPty>;
-  resizePty: (ptyId: string, size: WrapperPtySize) => Promise<WrapperPty>;
-  deletePty: (ptyId: string) => Promise<boolean>;
+  resizePty: (ptyId: string, size: WrapperPtySize, directory?: string) => Promise<WrapperPty>;
+  deletePty: (ptyId: string, directory?: string) => Promise<boolean>;
 
   /**
    * Subscribe to kilo events. The stream yields typed events until the abort
@@ -456,6 +459,11 @@ export function createWrapperKiloClient(
         command: opts.command,
         arguments: opts.args ?? '',
         ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
+        ...(opts.agent ? { agent: opts.agent } : {}),
+        ...(opts.model
+          ? { model: `${opts.model.providerID ?? 'kilo'}/${opts.model.modelID}` }
+          : {}),
+        ...(opts.variant ? { variant: opts.variant } : {}),
         ...(opts.snapshotInitialization
           ? { snapshotInitialization: opts.snapshotInitialization }
           : {}),
@@ -579,10 +587,10 @@ export function createWrapperKiloClient(
       return result.data as WrapperPty;
     },
 
-    resizePty: async (ptyId, size) => {
+    resizePty: async (ptyId, size, directory = workspacePath) => {
       const result = await v2Client.pty.update({
         ptyID: ptyId,
-        directory: workspacePath,
+        directory,
         size,
       });
       if (!result.data) {
@@ -591,10 +599,10 @@ export function createWrapperKiloClient(
       return result.data as WrapperPty;
     },
 
-    deletePty: async ptyId => {
+    deletePty: async (ptyId, directory = workspacePath) => {
       const result = await v2Client.pty.remove({
         ptyID: ptyId,
-        directory: workspacePath,
+        directory,
       });
       return Boolean(result.data);
     },

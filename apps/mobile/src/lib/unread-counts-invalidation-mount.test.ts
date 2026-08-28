@@ -107,6 +107,13 @@ vi.mock('@sentry/react-native', () => ({
   captureException: vi.fn(),
 }));
 
+// `@/lib/notifications` imports `@/lib/analytics/posthog`, which imports
+// expo-application (and friends), failing this node suite with `__DEV__ is not
+// defined`. Mock posthog with the single export `notifications.ts` references.
+vi.mock('@/lib/analytics/posthog', () => ({
+  captureEvent: vi.fn(),
+}));
+
 beforeEach(() => {
   testState.appStateListeners = [];
   testState.cleanups = [];

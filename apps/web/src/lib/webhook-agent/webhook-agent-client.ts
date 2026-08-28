@@ -17,6 +17,7 @@ export type TriggerConfigResponse = {
   githubRepo: string | null;
   mode: string | null;
   model: string | null;
+  variant?: string | null;
   promptTemplate: string;
   profileId?: string | null;
   autoCommit?: boolean;
@@ -40,6 +41,7 @@ export type CreateTriggerInput = {
   githubRepo?: string;
   mode?: string;
   model?: string;
+  variant?: string;
   promptTemplate: string;
   profileId?: string;
   autoCommit?: boolean;
@@ -61,6 +63,7 @@ export type CreateTriggerInput = {
 export type UpdateTriggerInput = {
   mode?: string;
   model?: string;
+  variant?: string | null;
   promptTemplate?: string;
   isActive?: boolean;
   profileId?: string;

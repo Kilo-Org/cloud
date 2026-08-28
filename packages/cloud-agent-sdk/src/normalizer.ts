@@ -212,10 +212,6 @@ export function isChatEvent(event: NormalizedEvent): event is ChatEvent {
   return CHAT_EVENT_TYPES.has(event.type);
 }
 
-export function isServiceEvent(event: NormalizedEvent): event is ServiceEvent {
-  return !CHAT_EVENT_TYPES.has(event.type);
-}
-
 /** Best-effort error message extraction from a loosely-typed error field. */
 function extractErrorMessage(rawError: unknown): string {
   if (typeof rawError === 'string') return rawError;

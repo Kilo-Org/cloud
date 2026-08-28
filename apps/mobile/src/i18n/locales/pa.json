@@ -665,7 +665,8 @@
     "profile": "ਪ੍ਰੋਫਾਈਲ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ਟੈਬ, {{total}} ਵਿੱਚੋਂ {{position}}"
+    "position": "{{name}}, ਟੈਬ, {{total}} ਵਿੱਚੋਂ {{position}}",
+    "chat": "ਚੈਟ"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "ਚੈੱਕ ਚਲਾਓ",
       "status": "ਸਥਿਤੀ",
       "threshold": "ਸੀਮਾ",
-      "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ"
+      "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ",
+      "transcriptWaiting": "ਸਮੀਖਿਆ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਦੀ ਉਡੀਕ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ।",
+      "transcriptEmpty": "ਇਸ ਸਮੀਖਿਆ ਲਈ ਕੋਈ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਨਹੀਂ ਹੈ।",
+      "transcriptRetry": "ਸਮੀਖਿਆ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਲੋਡ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
+      "transcriptLive": "ਲਾਈਵ",
+      "agentIdle": "ਏਜੰਟ ਨਿਸ਼ਕ੍ਰਿਅ",
+      "agentWorking": "ਏਜੰਟ ਕੰਮ ਕਰ ਰਿਹਾ ਹੈ…",
+      "anErrorOccurred": "ਇੱਕ ਗਲਤੀ ਆਈ",
+      "errorWithMessage": "ਗਲਤੀ: {{message}}",
+      "executionStarted": "ਕਾਰਜ ਸ਼ੁਰੂ ਹੋਇਆ",
+      "reviewCompleted": "ਸਮੀਖਿਆ ਪੂਰੀ ਹੋਈ",
+      "reviewInterrupted": "ਸਮੀਖਿਆ ਵਿਘਨ ਪਾਈ ਗਈ",
+      "sessionError": "ਸੈਸ਼ਨ ਗਲਤੀ: {{error}}",
+      "statusWithValue": "ਸਥਿਤੀ: {{status}}",
+      "toolName": "ਟੂਲ: {{name}}",
+      "toolNameError": "ਟੂਲ: {{name}} — ਗਲਤੀ",
+      "unknownError": "ਅਣਜਾਣ ਗਲਤੀ"
     },
     "reviewMemory": {
       "title": "ਸਮੀਖਿਆ ਮੈਮੋਰੀ",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "ਹੁਣ ਕਿਰਿਆਸ਼ੀਲ",
     "search": {
       "searching": "ਖੋਜ ਰਿਹਾ ਹੈ",
       "searchSessions": "ਸੈਸ਼ਨ ਖੋਜੋ",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ",
       "couldNotLoadActive": "ਕਿਰਿਆਸ਼ੀਲ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ",
-      "noSessionsYet": "ਅਜੇ ਕੋਈ ਸੈਸ਼ਨ ਨਹੀਂ",
       "noSessionsYetDescription": "ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਕੋਡਿੰਗ ਕੰਮ ਸ਼ੁਰੂ ਕਰੋ। ਤੁਹਾਡੇ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
       "noMatches": "ਕੋਈ ਸੈਸ਼ਨ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
       "tryDifferentSearch": "ਵੱਖਰਾ ਖੋਜ ਸ਼ਬਦ ਅਜ਼ਮਾਓ।",
       "tryAdjustFilters": "ਆਪਣੇ ਫਿਲਟਰ ਵਿਵਸਥਿਤ ਜਾਂ ਸਾਫ਼ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "couldNotSearch": "ਸੈਸ਼ਨ ਖੋਜੇ ਨਹੀਂ ਜਾ ਸਕੇ",
-      "allActive": "ਸਾਰੇ ਸੈਸ਼ਨ ਕਿਰਿਆਸ਼ੀਲ ਹਨ",
       "completedWillAppear": "ਮੁਕੰਮਲ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
       "noPastSessions": "ਕੋਈ ਪਿਛਲੇ ਸੈਸ਼ਨ ਨਹੀਂ",
       "live": "ਲਾਈਵ"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "ਹੇਠਾਂ ਸਕ੍ਰੋਲ ਕਰੋ",
       "emptyTitle": "ਅਜੇ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
       "renameAccessibility": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ ਬਦਲੋ: {{title}}",
-      "connectRepository": "ਰਿਪੋਜ਼ਟਰੀ ਕਨੈਕਟ ਕਰੋ",
       "cloningSession": "ਸੈਸ਼ਨ ਕਲੋਨ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
       "continue": "ਜਾਰੀ ਰੱਖੋ",
       "couldNotLoadThisSession": "ਇਹ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
-      "cloneFailed": "ਇਹ ਸੈਸ਼ਨ ਕਲੋਨ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "cloneFailedRetry": "ਇਹ ਸੈਸ਼ਨ ਕਲੋਨ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "connectRepositoryToContinue": "ਜਾਰੀ ਰੱਖਣ ਲਈ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਕਨੈਕਟ ਕਰੋ।",
       "notEnoughCredits": "Cloud Agent ਚਲਾਉਣ ਲਈ ਕਾਫ਼ੀ ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹਨ। ਕ੍ਰੈਡਿਟ ਜੋੜੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "previousTaskFinishing": "ਪਿਛਲਾ ਕੰਮ ਅਜੇ ਖਤਮ ਹੋ ਰਿਹਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਪਲ ਉਡੀਕੋ।",
       "serviceUnavailable": "ਸੇਵਾ ਇਸ ਸਮੇਂ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦਿੰਦੀ। GitLab ਲਈ ਰਿਪੋਜ਼ਟਰੀ ਪਹੁੰਚ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫ੍ਰੈਸ਼ ਕਰੋ।",
       "openBitbucket": "Bitbucket ਖੋਲ੍ਹੋ",
       "openGitlab": "GitLab ਖੋਲ੍ਹੋ",
-      "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ"
+      "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ",
+      "cliCannotContinue": "ਇਹ CLI ਸੈਸ਼ਨ ਜਾਰੀ ਨਹੀਂ ਰੱਖ ਸਕਦਾ। ਕਲਾਉਡ ਏਜੰਟ ਜਾਂ ਕੋਈ ਹੋਰ CLI ਚੁਣੋ।",
+      "continueFrom": "{{title}} ਜਾਰੀ ਰੱਖ ਰਿਹਾ ਹੈ",
+      "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "importingSession": "ਸੈਸ਼ਨ ਆਯਾਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ",
@@ -2462,6 +2477,8 @@
       "viewTable": "ਸਾਰਣੀ ਵੇਖੋ",
       "title": "ਸਾਰਣੀ",
       "close": "ਸਾਰਣੀ ਬੰਦ ਕਰੋ",
+      "loading": "ਸਾਰਣੀ ਲੋਡ ਹੋ ਰਹੀ ਹੈ",
+      "empty": "ਇਸ ਸਾਰਣੀ ਵਿੱਚ ਕੋਈ ਕਤਾਰ ਨਹੀਂ ਹੈ।",
       "columnCount_one": "ਕਾਲਮ",
       "columnCount": "ਕਾਲਮ",
       "columnCount_other": "ਕਾਲਮ",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "ਇਹ ਲਿੰਕ {{host}} ਨੂੰ ਤੁਹਾਡੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਖੋਲ੍ਹਦਾ ਹੈ।",
       "open": "ਖੋਲ੍ਹੋ",
       "trustThisHost": "ਇਸ ਹੋਸਟ 'ਤੇ ਭਰੋਸਾ ਕਰੋ"
+    },
+    "folderPicker": {
+      "fieldLabel": "ਫੋਲਡਰ",
+      "accessibility": "ਫੋਲਡਰ: {{label}}",
+      "tapToListHint": "ਕਿਸੇ ਫੋਲਡਰ 'ਤੇ ਟੈਪ ਕਰਕੇ ਉਸ ਦੀ ਸਮੱਗਰੀ ਦੀ ਸੂਚੀ ਵੇਖੋ",
+      "emptyTitle": "ਅੰਦਰ ਕੋਈ ਫੋਲਡਰ ਨਹੀਂ ਹੈ",
+      "emptyDescription": "ਹੋ ਗਿਆ ਇਸ ਫੋਲਡਰ ਦੀ ਵਰਤੋਂ ਕਰਦਾ ਹੈ।",
+      "retryableTitle": "ਫੋਲਡਰਾਂ ਦੀ ਸੂਚੀ ਨਹੀਂ ਦੇਖ ਸਕਿਆ",
+      "retryableDescription": "ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਚੈੱਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ। ਹੋ ਗਿਆ ਅਜੇ ਵੀ ਇਸ ਫੋਲਡਰ ਦੀ ਪੁਸ਼ਟੀ ਕਰਦਾ ਹੈ।",
+      "unsupportedTitle": "ਫੋਲਡਰਾਂ ਦੀ ਸੂਚੀ ਨਹੀਂ ਦੇਖ ਸਕਦਾ",
+      "unsupportedDescription": "ਇਹ CLI ਫੋਲਡਰਾਂ ਦੀ ਸੂਚੀ ਨਹੀਂ ਦੇਖ ਸਕਦਾ। ਹੋ ਗਿਆ ਲਾਂਚ ਫੋਲਡਰ ਨੂੰ ਰੱਖਦਾ ਹੈ ਅਤੇ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ ਉੱਥੇ ਸ਼ੁਰੂ ਹੁੰਦਾ ਹੈ।"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "ਜਦੋਂ ਤੁਸੀਂ ਕਿਸੇ ਲਿੰਕ ਦੇ ਹੋਸਟ 'ਤੇ ਭਰੋਸਾ ਕਰਦੇ ਹੋ, ਇਹ ਦੁਬਾਰਾ ਪੁੱਛੇ ਬਿਨਾਂ ਖੁੱਲ੍ਹਦਾ ਹੈ।",
     "revoke": "{{host}} ਨੂੰ ਹਟਾਓ",
     "backToPreferences": "ਤਰਜੀਹਾਂ 'ਤੇ ਵਾਪਸ ਜਾਓ"
+  },
+  "quickChat": {
+    "title": "ਚੈਟ",
+    "composer": {
+      "placeholder": "ਸੁਨੇਹਾ"
+    },
+    "empty": {
+      "title": "ਚੈਟ ਸ਼ੁਰੂ ਕਰੋ",
+      "description": "ਕਿਸੇ ਮਾਡਲ ਨਾਲ ਗੱਲ ਕਰਨ ਲਈ ਸੁਨੇਹਾ ਭੇਜੋ।"
+    },
+    "working": "ਕੰਮ ਹੋ ਰਿਹਾ ਹੈ",
+    "historyRetry": "ਚੈਟ ਇਤਿਹਾਸ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+    "catalogRetry": "ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ",
+    "sendError": "ਸੁਨੇਹਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   }
 }

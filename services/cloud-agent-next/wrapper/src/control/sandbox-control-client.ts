@@ -24,6 +24,7 @@ export type SandboxControlClientOptions = {
   url: string;
   credential: string;
   providerInstanceId: string;
+  wrapperInstanceId?: string;
   wrapperVersion?: string;
   openWebSocket?: (url: string, credential: string) => WebSocket;
   onRequest?: SandboxControlRequestHandler;
@@ -61,6 +62,7 @@ function defaultReconnectDelayMs(attempt: number): number {
 export function createSandboxControlClient(
   options: SandboxControlClientOptions
 ): SandboxControlClient {
+  const wrapperInstanceId = options.wrapperInstanceId;
   let socket: WebSocket | null = null;
   let keepalive: ReturnType<typeof setInterval> | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -158,6 +160,7 @@ export function createSandboxControlClient(
         payload: {
           protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
           providerInstanceId: options.providerInstanceId,
+          ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
           ...(options.wrapperVersion ? { wrapperVersion: options.wrapperVersion } : {}),
         },
       };
@@ -179,11 +182,10 @@ export function createSandboxControlClient(
       } else {
         settleFirstSuccess();
       }
-    } catch (error) {
+    } catch {
       discardSocket(ws);
       if (shutDown || gen !== generation) return;
-      const message = error instanceof Error ? error.message : 'connect failed';
-      options.log?.(`sandbox control connect failed: ${message}`);
+      options.log?.('sandbox control connect failed');
       armReconnect('connect failed');
     } finally {
       connectInFlight = false;

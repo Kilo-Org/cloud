@@ -145,6 +145,13 @@ export function convertProviderOptions(
       return provider?.only?.map(openRouterToVercelInferenceProviderId);
     }
     if (!vercelInferenceProviders) {
+      if (provider.only) {
+        return getVercelInferenceProvidersExcludingIgnored(
+          provider.ignore,
+          provider.only,
+          provider.only.map(openRouterToVercelInferenceProviderId)
+        );
+      }
       throw new Error('Vercel inference provider data became unavailable during request transform');
     }
     return getVercelInferenceProvidersExcludingIgnored(

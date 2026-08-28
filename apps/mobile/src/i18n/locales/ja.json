@@ -3191,5 +3191,20 @@
     "historyRetry": "チャット履歴を読み込めませんでした。",
     "catalogRetry": "モデルを読み込めませんでした",
     "sendError": "メッセージを送信できませんでした。もう一度お試しください。"
+  },
+  "glanceable": {
+    "waiting": "エージェントを更新中",
+    "empty": "進行中の作業はありません",
+    "stale": "現在更新できません",
+    "expired": "ステータスの有効期限が切れました",
+    "signedOut": "エージェントを表示するにはサインインしてください",
+    "privacy": "エージェントは非表示です",
+    "openAgents": "エージェントを開く",
+    "running": "実行中",
+    "needsInput": "入力が必要",
+    "reconnecting": "再接続中",
+    "channelName": "アクティブなエージェント",
+    "activityKitDisabledTitle": "ライブアクティビティはオフです",
+    "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。"
   }
 }

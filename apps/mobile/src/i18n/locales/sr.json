@@ -3212,5 +3212,20 @@
     "historyRetry": "Nije moguće učitati istoriju ćaskanja.",
     "catalogRetry": "Nije moguće učitati modele",
     "sendError": "Slanje poruke nije uspelo. Pokušajte ponovo."
+  },
+  "glanceable": {
+    "waiting": "Ažuriranje agenata",
+    "empty": "Nema rada u toku",
+    "stale": "Ažuriranje trenutno nije moguće",
+    "expired": "Status je istekao",
+    "signedOut": "Prijavite se da biste videli agente",
+    "privacy": "Agenti su skriveni",
+    "openAgents": "Otvorite agente",
+    "running": "U toku",
+    "needsInput": "zahteva unos",
+    "reconnecting": "Ponovno povezivanje",
+    "channelName": "Aktivni agenti",
+    "activityKitDisabledTitle": "Aktivnosti uživo su isključene",
+    "activityKitDisabledBody": "Uključite Aktivnosti uživo u Podešavanjima da biste videli aktivne agente na zaključanom ekranu."
   }
 }

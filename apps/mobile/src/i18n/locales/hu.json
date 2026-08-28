@@ -3191,5 +3191,20 @@
     "historyRetry": "Nem sikerült betölteni a csevegés előzményeit.",
     "catalogRetry": "Nem sikerült betölteni a modelleket",
     "sendError": "Az üzenet küldése nem sikerült. Próbálja újra."
+  },
+  "glanceable": {
+    "waiting": "Ügynökök frissítése",
+    "empty": "Nincs folyamatban lévő munka",
+    "stale": "Most nem frissíthető",
+    "expired": "Az állapot lejárt",
+    "signedOut": "Jelentkezzen be az ügynökök megtekintéséhez",
+    "privacy": "Ügynökök elrejtve",
+    "openAgents": "Ügynökök megnyitása",
+    "running": "Folyamatban",
+    "needsInput": "bemenetet igényel",
+    "reconnecting": "Újracsatlakozás",
+    "channelName": "Aktív ügynökök",
+    "activityKitDisabledTitle": "Az Élő tevékenységek ki vannak kapcsolva",
+    "activityKitDisabledBody": "Kapcsolja be az Élő tevékenységeket a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
   }
 }

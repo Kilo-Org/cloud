@@ -3191,5 +3191,20 @@
     "historyRetry": "Kunne ikke indlæse chathistorik.",
     "catalogRetry": "Kunne ikke indlæse modeller",
     "sendError": "Kunne ikke sende beskeden. Prøv igen."
+  },
+  "glanceable": {
+    "waiting": "Opdaterer agenter",
+    "empty": "Intet arbejde i gang",
+    "stale": "Kan ikke opdatere nu",
+    "expired": "Status er udløbet",
+    "signedOut": "Log ind for at se agenter",
+    "privacy": "Agenter er skjult",
+    "openAgents": "Åbn agenter",
+    "running": "KØRER",
+    "needsInput": "kræver input",
+    "reconnecting": "Genopretter forbindelsen",
+    "channelName": "Aktive agenter",
+    "activityKitDisabledTitle": "Liveaktiviteter er slået fra",
+    "activityKitDisabledBody": "Slå Liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."
   }
 }

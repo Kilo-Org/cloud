@@ -3191,5 +3191,20 @@
     "historyRetry": "Keskusteluhistoriaa ei voitu ladata.",
     "catalogRetry": "Malleja ei voitu ladata",
     "sendError": "Viestiä ei voitu lähettää. Yritä uudelleen."
+  },
+  "glanceable": {
+    "waiting": "Päivitetään agentteja",
+    "empty": "Ei keskeneräisiä töitä",
+    "stale": "Päivitys ei onnistu nyt",
+    "expired": "Tila vanhentunut",
+    "signedOut": "Kirjaudu sisään nähdäksesi agentit",
+    "privacy": "Agentit piilotettu",
+    "openAgents": "Avaa agentit",
+    "running": "KÄYNNISSÄ",
+    "needsInput": "vaatii syötettä",
+    "reconnecting": "Yhdistetään uudelleen",
+    "channelName": "Aktiiviset agentit",
+    "activityKitDisabledTitle": "Live-aktiviteetit ovat pois päältä",
+    "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön Asetuksissa, niin näet aktiiviset agentit lukitulla näytöllä."
   }
 }

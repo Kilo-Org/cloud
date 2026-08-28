@@ -3191,5 +3191,20 @@
     "historyRetry": "无法加载聊天历史。",
     "catalogRetry": "无法加载模型",
     "sendError": "无法发送消息。请重试。"
+  },
+  "glanceable": {
+    "waiting": "正在更新代理",
+    "empty": "暂无进行中的任务",
+    "stale": "暂时无法更新",
+    "expired": "状态已过期",
+    "signedOut": "请登录以查看代理",
+    "privacy": "代理已隐藏",
+    "openAgents": "打开代理",
+    "running": "运行中",
+    "needsInput": "需要输入",
+    "reconnecting": "正在重新连接",
+    "channelName": "活动代理",
+    "activityKitDisabledTitle": "实时活动已关闭",
+    "activityKitDisabledBody": "请在“设置”中开启“实时活动”，以在锁定屏幕上查看活动代理。"
   }
 }

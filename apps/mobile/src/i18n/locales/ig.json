@@ -3191,5 +3191,20 @@
     "historyRetry": "Enweghị ike ibutu akụkọ nkata.",
     "catalogRetry": "Enweghị ike ibunye ụdị",
     "sendError": "Enweghị ike izipu ozi ahụ. Nwaa ọzọ."
+  },
+  "glanceable": {
+    "waiting": "Na-emelite ndị ọrụ",
+    "empty": "Enweghị ọrụ na-aga n'ihu",
+    "stale": "Enweghị ike imelite ugbu a",
+    "expired": "Oge ọnọdụ agwụla",
+    "signedOut": "Banye iji hụ ndị ọrụ",
+    "privacy": "Ezochiri ndị ọrụ",
+    "openAgents": "Mepee ndị ọrụ",
+    "running": "NA-AGBA",
+    "needsInput": "chọrọ ntinye",
+    "reconnecting": "Na-ejikọ ọzọ",
+    "channelName": "Ndị ọrụ na-arụ ọrụ",
+    "activityKitDisabledTitle": "Agbanyụrụ Ihe Omume Dị Ndụ",
+    "activityKitDisabledBody": "Gbanye Ihe Omume Dị Ndụ na Ntọala iji hụ Ndị ọrụ na-arụ ọrụ na Ihuenyo Mkpọchi."
   }
 }

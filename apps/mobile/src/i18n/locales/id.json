@@ -3191,5 +3191,20 @@
     "historyRetry": "Tidak dapat memuat riwayat obrolan.",
     "catalogRetry": "Tidak dapat memuat model",
     "sendError": "Tidak dapat mengirim pesan. Coba lagi."
+  },
+  "glanceable": {
+    "waiting": "Memperbarui agen",
+    "empty": "Tidak ada pekerjaan yang berlangsung",
+    "stale": "Tidak dapat memperbarui sekarang",
+    "expired": "Status kedaluwarsa",
+    "signedOut": "Masuk untuk melihat agen",
+    "privacy": "Agen disembunyikan",
+    "openAgents": "Buka agen",
+    "running": "BERJALAN",
+    "needsInput": "memerlukan input",
+    "reconnecting": "Menghubungkan kembali",
+    "channelName": "Agen aktif",
+    "activityKitDisabledTitle": "Aktivitas Langsung nonaktif",
+    "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di Pengaturan untuk melihat Agen Aktif di Layar Terkunci."
   }
 }

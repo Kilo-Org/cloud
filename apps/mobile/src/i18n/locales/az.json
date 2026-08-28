@@ -3191,5 +3191,20 @@
     "historyRetry": "Söhbət tarixçəsi yüklənə bilmədi.",
     "catalogRetry": "Modellər yüklənə bilmədi",
     "sendError": "Mesaj göndərilə bilmədi. Yenidən cəhd edin."
+  },
+  "glanceable": {
+    "waiting": "Agentlər yenilənir",
+    "empty": "Davam edən iş yoxdur",
+    "stale": "Hazırda yeniləmək mümkün deyil",
+    "expired": "Statusun müddəti bitib",
+    "signedOut": "Agentləri görmək üçün daxil olun",
+    "privacy": "Agentlər gizlədilib",
+    "openAgents": "Agentləri açın",
+    "running": "İŞLƏYİR",
+    "needsInput": "GİRİŞ TƏLƏB OLUNUR",
+    "reconnecting": "Yenidən qoşulur",
+    "channelName": "Aktiv agentlər",
+    "activityKitDisabledTitle": "Canlı fəaliyyətlər söndürülüb",
+    "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün Parametrlərdə Canlı fəaliyyətləri aktivləşdirin."
   }
 }

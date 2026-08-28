@@ -3212,5 +3212,20 @@
     "historyRetry": "No s'ha pogut carregar l'historial del xat.",
     "catalogRetry": "No s'han pogut carregar els models",
     "sendError": "No s'ha pogut enviar el missatge. Torna-ho a provar."
+  },
+  "glanceable": {
+    "waiting": "Actualitzant els agents",
+    "empty": "No hi ha cap feina en curs",
+    "stale": "Ara no es pot actualitzar",
+    "expired": "Estat caducat",
+    "signedOut": "Inicia la sessió per veure els agents",
+    "privacy": "Agents ocults",
+    "openAgents": "Obre els agents",
+    "running": "EN EXECUCIÓ",
+    "needsInput": "requereix entrada",
+    "reconnecting": "Reconnectant",
+    "channelName": "Agents actius",
+    "activityKitDisabledTitle": "Les activitats en directe estan desactivades",
+    "activityKitDisabledBody": "Activa les activitats en directe a Configuració per veure els agents actius a la pantalla de bloqueig."
   }
 }

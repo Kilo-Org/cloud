@@ -70,7 +70,7 @@ function toolDetail(input: Record<string, unknown> | undefined): string | undefi
   }
   const commandString = asString(command);
   if (commandString !== undefined) {
-    return commandString.length > 100 ? `${commandString.slice(0, 100)}...` : commandString;
+    return commandString;
   }
   const queryString = asString(query);
   if (queryString !== undefined) {
@@ -173,8 +173,7 @@ function toRowFromKilocode(
       const text = asString(part.text);
       const trimmed = text?.trim();
       if (trimmed) {
-        const truncated = trimmed.length > 200 ? `${trimmed.slice(0, 200)}...` : trimmed;
-        return { timestamp, message: truncated, eventType: 'text', key: partKey(part) };
+        return { timestamp, message: trimmed, eventType: 'text', key: partKey(part) };
       }
       return null;
     }

@@ -2137,12 +2137,12 @@
       "discardAttachmentsTitle": "Ekler silinsin mi?",
       "charactersRemaining": "{{count}} karakter kaldı",
       "insertNewline": "Yeni satır ekleyin",
-      "starterChipBuild": "Bir özellik geliştirin",
-      "starterChipEmpty": "Bir fikirle başlayın",
-      "starterChipFix": "Bir hatayı düzeltin",
-      "starterChipPrepare": "Ortamımı kurun",
-      "starterChipWrapUp": "Oturumumu tamamlayın",
-      "starterChipWriteTests": "Testler yazın"
+      "starterChipBuild": "Bir özellik geliştir",
+      "starterChipEmpty": "Bir fikirle başla",
+      "starterChipFix": "Bir hatayı düzelt",
+      "starterChipPrepare": "Ortamımı kur",
+      "starterChipWrapUp": "Oturumumu tamamla",
+      "starterChipWriteTests": "Testler yaz"
     },
     "chatLink": {
       "linkCopied": "Bağlantı kopyalandı",

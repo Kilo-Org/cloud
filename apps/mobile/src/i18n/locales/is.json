@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "Farga viðhengjum?",
       "charactersRemaining": "{{count}} stafir eftir",
       "insertNewline": "Setja inn línuskil",
-      "starterChipBuild": "Búa til eiginleika",
-      "starterChipEmpty": "Byrja með hugmynd",
-      "starterChipFix": "Laga villu",
-      "starterChipPrepare": "Setja upp umhverfið mitt",
-      "starterChipWrapUp": "Ljúka lotunni minni",
-      "starterChipWriteTests": "Skrifa próf"
+      "starterChipBuild": "Búðu til eiginleika",
+      "starterChipEmpty": "Byrjaðu með hugmynd",
+      "starterChipFix": "Lagaðu villu",
+      "starterChipPrepare": "Settu upp umhverfið mitt",
+      "starterChipWrapUp": "Ljúktu lotunni minni",
+      "starterChipWriteTests": "Skrifaðu próf"
     },
     "chatLink": {
       "linkCopied": "Krækja afrituð",

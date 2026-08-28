@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "ਅਟੈਚਮੈਂਟਾਂ ਮਿਟਾਈਏ?",
       "charactersRemaining": "{{count}} ਅੱਖਰ ਬਾਕੀ ਹਨ",
       "insertNewline": "ਨਵੀਂ ਲਾਈਨ ਪਾਓ",
-      "starterChipBuild": "ਇੱਕ ਵਿਸ਼ੇਸ਼ਤਾ ਬਣਾਓ",
-      "starterChipEmpty": "ਇੱਕ ਵਿਚਾਰ ਨਾਲ ਸ਼ੁਰੂ ਕਰੋ",
-      "starterChipFix": "ਇੱਕ ਤਰੁੱਟੀ ਠੀਕ ਕਰੋ",
-      "starterChipPrepare": "ਮੇਰਾ ਵਾਤਾਵਰਨ ਸੈੱਟ ਕਰੋ",
-      "starterChipWrapUp": "ਮੇਰਾ ਸੈਸ਼ਨ ਮੁਕੰਮਲ ਕਰੋ",
-      "starterChipWriteTests": "ਟੈਸਟ ਲਿਖੋ"
+      "starterChipBuild": "ਇੱਕ ਵਿਸ਼ੇਸ਼ਤਾ ਬਣਾ",
+      "starterChipEmpty": "ਇੱਕ ਵਿਚਾਰ ਨਾਲ ਸ਼ੁਰੂ ਕਰ",
+      "starterChipFix": "ਇੱਕ ਤਰੁੱਟੀ ਠੀਕ ਕਰ",
+      "starterChipPrepare": "ਮੇਰਾ ਵਾਤਾਵਰਨ ਸੈੱਟ ਕਰ",
+      "starterChipWrapUp": "ਮੇਰਾ ਸੈਸ਼ਨ ਮੁਕੰਮਲ ਕਰ",
+      "starterChipWriteTests": "ਟੈਸਟ ਲਿਖ"
     },
     "chatLink": {
       "linkCopied": "ਲਿੰਕ ਕਾਪੀ ਹੋ ਗਿਆ",

@@ -2137,12 +2137,12 @@
       "discardAttachmentsTitle": "Bijlagen weggooien?",
       "charactersRemaining": "{{count}} tekens resterend",
       "insertNewline": "Nieuwe regel invoegen",
-      "starterChipBuild": "Een functie bouwen",
-      "starterChipEmpty": "Beginnen met een idee",
-      "starterChipFix": "Een fout oplossen",
-      "starterChipPrepare": "Mijn omgeving instellen",
-      "starterChipWrapUp": "Mijn sessie afronden",
-      "starterChipWriteTests": "Tests schrijven"
+      "starterChipBuild": "Bouw een functie",
+      "starterChipEmpty": "Begin met een idee",
+      "starterChipFix": "Los een fout op",
+      "starterChipPrepare": "Stel mijn omgeving in",
+      "starterChipWrapUp": "Rond mijn sessie af",
+      "starterChipWriteTests": "Schrijf tests"
     },
     "chatLink": {
       "linkCopied": "Link gekopieerd",

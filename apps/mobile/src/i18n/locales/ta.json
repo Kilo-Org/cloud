@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "இணைப்புகளை நிராகரிக்கவா?",
       "charactersRemaining": "{{count}} எழுத்துகள் மீதமுள்ளன",
       "insertNewline": "புதிய வரியைச் செருகவும்",
-      "starterChipBuild": "ஓர் அம்சத்தை உருவாக்கவும்",
-      "starterChipEmpty": "ஓர் யோசனையுடன் தொடங்கவும்",
-      "starterChipFix": "ஒரு பிழையைச் சரிசெய்யவும்",
-      "starterChipPrepare": "எனது சூழலை அமைக்கவும்",
-      "starterChipWrapUp": "எனது அமர்வை முடிக்கவும்",
-      "starterChipWriteTests": "சோதனைகளை எழுதவும்"
+      "starterChipBuild": "ஓர் அம்சத்தை உருவாக்கு",
+      "starterChipEmpty": "ஓர் யோசனையுடன் தொடங்கு",
+      "starterChipFix": "ஒரு பிழையைச் சரிசெய்",
+      "starterChipPrepare": "எனது சூழலை அமை",
+      "starterChipWrapUp": "எனது அமர்வை முடி",
+      "starterChipWriteTests": "சோதனைகளை எழுது"
     },
     "chatLink": {
       "linkCopied": "இணைப்பு நகலெடுக்கப்பட்டது",

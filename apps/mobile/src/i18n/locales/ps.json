@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "ضمیمې لغوه کړئ؟",
       "charactersRemaining": "{{count}} توري پاتې دي",
       "insertNewline": "نوې کرښه دننه کړئ",
-      "starterChipBuild": "یوه ځانګړتیا جوړه کړئ",
-      "starterChipEmpty": "له یوې مفکورې پیل وکړئ",
-      "starterChipFix": "یوه تېروتنه سمه کړئ",
-      "starterChipPrepare": "زما چاپېریال چمتو کړئ",
-      "starterChipWrapUp": "زما ناسته پای ته ورسوئ",
-      "starterChipWriteTests": "ازموینې ولیکئ"
+      "starterChipBuild": "یوه ځانګړتیا جوړه کړه",
+      "starterChipEmpty": "له یوې مفکورې پیل وکړه",
+      "starterChipFix": "یوه تېروتنه سمه کړه",
+      "starterChipPrepare": "زما چاپېریال چمتو کړه",
+      "starterChipWrapUp": "زما ناسته پای ته ورسوه",
+      "starterChipWriteTests": "ازموینې ولیکه"
     },
     "chatLink": {
       "linkCopied": "لینک کاپي شو",

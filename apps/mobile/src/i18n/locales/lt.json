@@ -2629,12 +2629,12 @@
       "discardAttachmentsTitle": "Atmesti priedus?",
       "charactersRemaining": "Liko simbolių: {{count}}",
       "insertNewline": "Įterpti naują eilutę",
-      "starterChipBuild": "Sukurti funkciją",
-      "starterChipEmpty": "Pradėti nuo idėjos",
-      "starterChipFix": "Ištaisyti klaidą",
-      "starterChipPrepare": "Paruošti mano aplinką",
-      "starterChipWrapUp": "Užbaigti mano sesiją",
-      "starterChipWriteTests": "Parašyti testus"
+      "starterChipBuild": "Sukurk funkciją",
+      "starterChipEmpty": "Pradėk nuo idėjos",
+      "starterChipFix": "Ištaisyk klaidą",
+      "starterChipPrepare": "Paruošk mano aplinką",
+      "starterChipWrapUp": "Užbaik mano sesiją",
+      "starterChipWriteTests": "Parašyk testus"
     },
     "chatLink": {
       "linkCopied": "Nuoroda nukopijuota",

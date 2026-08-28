@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "संलग्नकहरू खारेज गर्ने?",
       "charactersRemaining": "{{count}} अक्षर बाँकी छन्",
       "insertNewline": "नयाँ पङ्क्ति घुसाउनुहोस्",
-      "starterChipBuild": "सुविधा बनाउनुहोस्",
-      "starterChipEmpty": "एउटा विचारबाट सुरु गर्नुहोस्",
-      "starterChipFix": "त्रुटि सच्याउनुहोस्",
-      "starterChipPrepare": "मेरो वातावरण तयार गर्नुहोस्",
-      "starterChipWrapUp": "मेरो सत्र समाप्त गर्नुहोस्",
-      "starterChipWriteTests": "परीक्षणहरू लेख्नुहोस्"
+      "starterChipBuild": "सुविधा बनाऊ",
+      "starterChipEmpty": "एउटा विचारबाट सुरु गर",
+      "starterChipFix": "त्रुटि सच्याऊ",
+      "starterChipPrepare": "मेरो वातावरण तयार गर",
+      "starterChipWrapUp": "मेरो सत्र समाप्त गर",
+      "starterChipWriteTests": "परीक्षणहरू लेख"
     },
     "chatLink": {
       "linkCopied": "लिंक प्रतिलिपि गरियो",

@@ -2137,12 +2137,12 @@
       "discardAttachmentsTitle": "첨부 파일을 삭제할까요?",
       "charactersRemaining": "{{count}}자 남음",
       "insertNewline": "줄바꿈 삽입",
-      "starterChipBuild": "기능 구현",
-      "starterChipEmpty": "아이디어로 시작",
-      "starterChipFix": "버그 수정",
-      "starterChipPrepare": "내 환경 설정",
-      "starterChipWrapUp": "내 세션 마무리",
-      "starterChipWriteTests": "테스트 작성"
+      "starterChipBuild": "기능을 구현해",
+      "starterChipEmpty": "아이디어로 시작해",
+      "starterChipFix": "버그를 고쳐",
+      "starterChipPrepare": "내 환경을 설정해",
+      "starterChipWrapUp": "내 세션을 마무리해",
+      "starterChipWriteTests": "테스트를 작성해"
     },
     "chatLink": {
       "linkCopied": "링크 복사됨",

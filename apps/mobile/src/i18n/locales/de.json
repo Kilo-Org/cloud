@@ -2137,12 +2137,12 @@
       "discardAttachmentsTitle": "Anhänge verwerfen?",
       "charactersRemaining": "Noch {{count}} Zeichen",
       "insertNewline": "Zeilenumbruch einfügen",
-      "starterChipBuild": "Eine Funktion entwickeln",
-      "starterChipEmpty": "Mit einer Idee beginnen",
-      "starterChipFix": "Einen Fehler beheben",
-      "starterChipPrepare": "Meine Umgebung einrichten",
-      "starterChipWrapUp": "Meine Sitzung abschließen",
-      "starterChipWriteTests": "Tests schreiben"
+      "starterChipBuild": "Entwickle eine Funktion",
+      "starterChipEmpty": "Beginne mit einer Idee",
+      "starterChipFix": "Behebe einen Fehler",
+      "starterChipPrepare": "Richte meine Umgebung ein",
+      "starterChipWrapUp": "Schließe meine Sitzung ab",
+      "starterChipWriteTests": "Schreibe Tests"
     },
     "chatLink": {
       "linkCopied": "Link kopiert",

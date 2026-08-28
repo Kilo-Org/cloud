@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "Да отхвърлим прикачените файлове?",
       "charactersRemaining": "Остават {{count}} знака",
       "insertNewline": "Вмъкнете нов ред",
-      "starterChipBuild": "Разработете функция",
-      "starterChipEmpty": "Започнете с идея",
-      "starterChipFix": "Отстранете грешка",
-      "starterChipPrepare": "Настройте моята среда",
-      "starterChipWrapUp": "Приключете моята сесия",
-      "starterChipWriteTests": "Напишете тестове"
+      "starterChipBuild": "Разработи функция",
+      "starterChipEmpty": "Започни с идея",
+      "starterChipFix": "Отстрани грешка",
+      "starterChipPrepare": "Настрой моята среда",
+      "starterChipWrapUp": "Приключи моята сесия",
+      "starterChipWriteTests": "Напиши тестове"
     },
     "chatLink": {
       "linkCopied": "Линкът е копиран",

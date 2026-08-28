@@ -2629,12 +2629,12 @@
       "discardAttachmentsTitle": "Выдаліць укладанні?",
       "charactersRemaining": "Засталося сімвалаў: {{count}}",
       "insertNewline": "Уставіць новы радок",
-      "starterChipBuild": "Стварыць функцыю",
-      "starterChipEmpty": "Пачаць з ідэі",
-      "starterChipFix": "Выправіць памылку",
-      "starterChipPrepare": "Наладзіць маё асяроддзе",
-      "starterChipWrapUp": "Завяршыць мой сеанс",
-      "starterChipWriteTests": "Напісаць тэсты"
+      "starterChipBuild": "Ствары функцыю",
+      "starterChipEmpty": "Пачні з ідэі",
+      "starterChipFix": "Выправі памылку",
+      "starterChipPrepare": "Наладзь маё асяроддзе",
+      "starterChipWrapUp": "Завяршы мой сеанс",
+      "starterChipWriteTests": "Напішы тэсты"
     },
     "chatLink": {
       "linkCopied": "Спасылка скапіраваная",

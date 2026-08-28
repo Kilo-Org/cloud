@@ -2610,12 +2610,12 @@
       "discardAttachmentsTitle": "Odbaciti privitke?",
       "charactersRemaining": "Preostalo znakova: {{count}}",
       "insertNewline": "Umetnite novi red",
-      "starterChipBuild": "Izradite funkciju",
-      "starterChipEmpty": "Počnite s idejom",
-      "starterChipFix": "Ispravite grešku",
-      "starterChipPrepare": "Postavite moje okruženje",
-      "starterChipWrapUp": "Završite moju sesiju",
-      "starterChipWriteTests": "Napišite testove"
+      "starterChipBuild": "Izradi funkciju",
+      "starterChipEmpty": "Počni s idejom",
+      "starterChipFix": "Ispravi grešku",
+      "starterChipPrepare": "Postavi moje okruženje",
+      "starterChipWrapUp": "Završi moju sesiju",
+      "starterChipWriteTests": "Napiši testove"
     },
     "chatLink": {
       "linkCopied": "Veza kopirana",

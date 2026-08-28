@@ -2629,12 +2629,12 @@
       "discardAttachmentsTitle": "Zahodit přílohy?",
       "charactersRemaining": "Zbývající počet znaků: {{count}}",
       "insertNewline": "Vložit nový řádek",
-      "starterChipBuild": "Vytvořit funkci",
-      "starterChipEmpty": "Začít nápadem",
-      "starterChipFix": "Opravit chybu",
-      "starterChipPrepare": "Nastavit mé prostředí",
-      "starterChipWrapUp": "Dokončit mou relaci",
-      "starterChipWriteTests": "Napsat testy"
+      "starterChipBuild": "Vytvoř funkci",
+      "starterChipEmpty": "Začni nápadem",
+      "starterChipFix": "Oprav chybu",
+      "starterChipPrepare": "Nastav mé prostředí",
+      "starterChipWrapUp": "Dokonči mou relaci",
+      "starterChipWriteTests": "Napiš testy"
     },
     "chatLink": {
       "linkCopied": "Odkaz zkopírován",

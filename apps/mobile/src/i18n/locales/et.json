@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "Kas loobuda manustest?",
       "charactersRemaining": "{{count}} tähemärki jäänud",
       "insertNewline": "Lisage reavahetus",
-      "starterChipBuild": "Looge funktsioon",
-      "starterChipEmpty": "Alustage ideest",
-      "starterChipFix": "Parandage viga",
-      "starterChipPrepare": "Seadistage minu keskkond",
-      "starterChipWrapUp": "Lõpetage minu seanss",
-      "starterChipWriteTests": "Kirjutage testid"
+      "starterChipBuild": "Loo funktsioon",
+      "starterChipEmpty": "Alusta ideest",
+      "starterChipFix": "Paranda viga",
+      "starterChipPrepare": "Seadista minu keskkond",
+      "starterChipWrapUp": "Lõpeta minu seanss",
+      "starterChipWriteTests": "Kirjuta testid"
     },
     "chatLink": {
       "linkCopied": "Link kopeeritud",

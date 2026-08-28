@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "Əlavələr ləğv edilsin?",
       "charactersRemaining": "{{count}} simvol qalıb",
       "insertNewline": "Yeni sətir daxil edin",
-      "starterChipBuild": "Funksiya yaradın",
-      "starterChipEmpty": "Bir ideya ilə başlayın",
-      "starterChipFix": "Səhvi düzəldin",
-      "starterChipPrepare": "Mühitimi qurun",
-      "starterChipWrapUp": "Sessiyamı tamamlayın",
-      "starterChipWriteTests": "Testlər yazın"
+      "starterChipBuild": "Funksiya yarat",
+      "starterChipEmpty": "Bir ideya ilə başla",
+      "starterChipFix": "Səhvi düzəlt",
+      "starterChipPrepare": "Mühitimi qur",
+      "starterChipWrapUp": "Sessiyamı tamamla",
+      "starterChipWriteTests": "Testlər yaz"
     },
     "chatLink": {
       "linkCopied": "Keçid kopyalandı",

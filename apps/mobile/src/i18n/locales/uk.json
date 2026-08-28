@@ -2161,12 +2161,12 @@
       "discardAttachmentsTitle": "Відкинути вкладення?",
       "charactersRemaining": "Залишилося символів: {{count}}",
       "insertNewline": "Вставити новий рядок",
-      "starterChipBuild": "Створити функцію",
-      "starterChipEmpty": "Почати з ідеї",
-      "starterChipFix": "Виправити помилку",
-      "starterChipPrepare": "Налаштувати моє середовище",
-      "starterChipWrapUp": "Завершити мій сеанс",
-      "starterChipWriteTests": "Написати тести"
+      "starterChipBuild": "Створи функцію",
+      "starterChipEmpty": "Почни з ідеї",
+      "starterChipFix": "Виправ помилку",
+      "starterChipPrepare": "Налаштуй моє середовище",
+      "starterChipWrapUp": "Заверши мій сеанс",
+      "starterChipWriteTests": "Напиши тести"
     },
     "chatLink": {
       "linkCopied": "Посилання скопійовано",

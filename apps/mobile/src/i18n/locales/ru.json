@@ -2161,12 +2161,12 @@
       "discardAttachmentsTitle": "Удалить вложения?",
       "charactersRemaining": "Осталось символов: {{count}}",
       "insertNewline": "Вставить новую строку",
-      "starterChipBuild": "Создать функцию",
-      "starterChipEmpty": "Начать с идеи",
-      "starterChipFix": "Исправить ошибку",
-      "starterChipPrepare": "Настроить мое окружение",
-      "starterChipWrapUp": "Завершить мой сеанс",
-      "starterChipWriteTests": "Написать тесты"
+      "starterChipBuild": "Создай функцию",
+      "starterChipEmpty": "Начни с идеи",
+      "starterChipFix": "Исправь ошибку",
+      "starterChipPrepare": "Настрой мое окружение",
+      "starterChipWrapUp": "Заверши мой сеанс",
+      "starterChipWriteTests": "Напиши тесты"
     },
     "chatLink": {
       "linkCopied": "Ссылка скопирована",

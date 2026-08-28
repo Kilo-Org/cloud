@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "সংযুক্তিগুলি বাতিল করবেন?",
       "charactersRemaining": "{{count}}টি অক্ষর বাকি",
       "insertNewline": "নতুন লাইন যোগ করুন",
-      "starterChipBuild": "একটি ফিচার তৈরি করুন",
-      "starterChipEmpty": "একটি ধারণা দিয়ে শুরু করুন",
-      "starterChipFix": "একটি ত্রুটি ঠিক করুন",
-      "starterChipPrepare": "আমার পরিবেশ প্রস্তুত করুন",
-      "starterChipWrapUp": "আমার সেশন শেষ করুন",
-      "starterChipWriteTests": "পরীক্ষা লিখুন"
+      "starterChipBuild": "একটি ফিচার তৈরি করো",
+      "starterChipEmpty": "একটি ধারণা দিয়ে শুরু করো",
+      "starterChipFix": "একটি ত্রুটি ঠিক করো",
+      "starterChipPrepare": "আমার পরিবেশ প্রস্তুত করো",
+      "starterChipWrapUp": "আমার সেশন শেষ করো",
+      "starterChipWriteTests": "পরীক্ষা লেখো"
     },
     "chatLink": {
       "linkCopied": "লিঙ্ক কপি হয়েছে",

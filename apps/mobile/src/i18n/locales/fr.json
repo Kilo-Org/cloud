@@ -2065,12 +2065,12 @@
       "discardAttachmentsTitle": "Abandonner les pièces jointes ?",
       "charactersRemaining": "{{count}} caractères restants",
       "insertNewline": "Insérer un saut de ligne",
-      "starterChipBuild": "Créer une fonctionnalité",
-      "starterChipEmpty": "Commencer par une idée",
-      "starterChipFix": "Corriger un bogue",
-      "starterChipPrepare": "Configurer mon environnement",
-      "starterChipWrapUp": "Terminer ma session",
-      "starterChipWriteTests": "Écrire des tests"
+      "starterChipBuild": "Crée une fonctionnalité",
+      "starterChipEmpty": "Commence par une idée",
+      "starterChipFix": "Corrige un bogue",
+      "starterChipPrepare": "Configure mon environnement",
+      "starterChipWrapUp": "Termine ma session",
+      "starterChipWriteTests": "Écris des tests"
     },
     "chatLink": {
       "linkCopied": "Lien copié",

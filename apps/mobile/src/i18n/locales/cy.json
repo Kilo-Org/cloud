@@ -2667,12 +2667,12 @@
       "discardAttachmentsTitle": "Taflu atodiadau?",
       "charactersRemaining": "{{count}} nod yn weddill",
       "insertNewline": "Mewnosod llinell newydd",
-      "starterChipBuild": "Adeiladu nodwedd",
+      "starterChipBuild": "Adeilada nodwedd",
       "starterChipEmpty": "Dechrau gyda syniad",
-      "starterChipFix": "Trwsio nam",
+      "starterChipFix": "Trwsia nam",
       "starterChipPrepare": "Gosod fy amgylchedd",
       "starterChipWrapUp": "Gorffen fy sesiwn",
-      "starterChipWriteTests": "Ysgrifennu profion"
+      "starterChipWriteTests": "Ysgrifenna brofion"
     },
     "chatLink": {
       "linkCopied": "Copïwyd y ddolen",

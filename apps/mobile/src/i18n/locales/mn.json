@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "Хавсралтуудыг хаях уу?",
       "charactersRemaining": "{{count}} тэмдэгт үлдсэн",
       "insertNewline": "Шинэ мөр оруулах",
-      "starterChipBuild": "Шинэ функц бүтээх",
-      "starterChipEmpty": "Санаанаас эхлэх",
-      "starterChipFix": "Алдаа засах",
-      "starterChipPrepare": "Орчноо тохируулах",
-      "starterChipWrapUp": "Сессээ дуусгах",
-      "starterChipWriteTests": "Тест бичих"
+      "starterChipBuild": "Шинэ функц бүтээ",
+      "starterChipEmpty": "Санаанаас эхэл",
+      "starterChipFix": "Алдаа зас",
+      "starterChipPrepare": "Миний орчныг тохируул",
+      "starterChipWrapUp": "Миний сессийг дуусга",
+      "starterChipWriteTests": "Тест бич"
     },
     "chatLink": {
       "linkCopied": "Холбоос хуулагдлаа",

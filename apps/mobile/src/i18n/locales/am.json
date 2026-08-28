@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "አባሪዎችን ያስወግዱ?",
       "charactersRemaining": "{{count}} ቁምፊዎች ይቀራሉ",
       "insertNewline": "አዲስ መስመር ያስገቡ",
-      "starterChipBuild": "ባህሪ ይገንቡ",
-      "starterChipEmpty": "በሀሳብ ይጀምሩ",
-      "starterChipFix": "ስህተት ያስተካክሉ",
-      "starterChipPrepare": "የስራ አካባቢዬን ያዋቅሩ",
-      "starterChipWrapUp": "ክፍለ ጊዜዬን ያጠናቅቁ",
-      "starterChipWriteTests": "ሙከራዎችን ይፃፉ"
+      "starterChipBuild": "ባህሪ ገንባ",
+      "starterChipEmpty": "በሀሳብ ጀምር",
+      "starterChipFix": "ስህተት አስተካክል",
+      "starterChipPrepare": "የስራ አካባቢዬን አዋቅር",
+      "starterChipWrapUp": "ክፍለ ጊዜዬን አጠናቅቅ",
+      "starterChipWriteTests": "ሙከራዎችን ጻፍ"
     },
     "chatLink": {
       "linkCopied": "አገናኝ ተቀድቷል",

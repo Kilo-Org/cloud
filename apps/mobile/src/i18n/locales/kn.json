@@ -2591,12 +2591,12 @@
       "discardAttachmentsTitle": "ಲಗತ್ತುಗಳನ್ನು ತೆಗೆದುಹಾಕಬೇಕೆ?",
       "charactersRemaining": "{{count}} ಅಕ್ಷರಗಳು ಉಳಿದಿವೆ",
       "insertNewline": "ಹೊಸ ಸಾಲನ್ನು ಸೇರಿಸಿ",
-      "starterChipBuild": "ವೈಶಿಷ್ಟ್ಯವನ್ನು ನಿರ್ಮಿಸಿ",
-      "starterChipEmpty": "ಒಂದು ಆಲೋಚನೆಯೊಂದಿಗೆ ಪ್ರಾರಂಭಿಸಿ",
-      "starterChipFix": "ದೋಷವನ್ನು ಸರಿಪಡಿಸಿ",
-      "starterChipPrepare": "ನನ್ನ ಪರಿಸರವನ್ನು ಹೊಂದಿಸಿ",
-      "starterChipWrapUp": "ನನ್ನ ಸೆಶನ್ ಮುಕ್ತಾಯಗೊಳಿಸಿ",
-      "starterChipWriteTests": "ಪರೀಕ್ಷೆಗಳನ್ನು ಬರೆಯಿರಿ"
+      "starterChipBuild": "ವೈಶಿಷ್ಟ್ಯವನ್ನು ನಿರ್ಮಿಸು",
+      "starterChipEmpty": "ಒಂದು ಆಲೋಚನೆಯೊಂದಿಗೆ ಪ್ರಾರಂಭಿಸು",
+      "starterChipFix": "ದೋಷವನ್ನು ಸರಿಪಡಿಸು",
+      "starterChipPrepare": "ನನ್ನ ಪರಿಸರವನ್ನು ಹೊಂದಿಸು",
+      "starterChipWrapUp": "ನನ್ನ ಸೆಶನ್ ಮುಕ್ತಾಯಗೊಳಿಸು",
+      "starterChipWriteTests": "ಪರೀಕ್ಷೆಗಳನ್ನು ಬರೆ"
     },
     "chatLink": {
       "linkCopied": "ಲಿಂಕ್ ನಕಲಿಸಲಾಗಿದೆ",

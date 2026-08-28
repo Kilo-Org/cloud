@@ -20,12 +20,6 @@
  */
 
 import {
-  effectiveStatus,
-  type IncomingWsSession,
-  selectRootWsSessions,
-} from './active-sessions-live-roots';
-
-import {
   type CliConnectionData,
   cliConnectionDataSchema,
   type HeartbeatData,
@@ -38,12 +32,6 @@ import {
 
 import { buildActiveSessionsInput } from '@/lib/agent-session-input';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
-
-export {
-  effectiveStatus,
-  isAttentionStatus,
-  selectRootWsSessions,
-} from './active-sessions-live-roots';
 
 /**
  * Sentinel `connectionId` for cloud-agent rows merged into `activeSessions.list`
@@ -62,6 +50,18 @@ export function buildActiveSessionsTrayInput(organizationId: string | null | und
   return { ...buildActiveSessionsInput(organizationId), includeCloudAgentSessions: true as const };
 }
 
+/** Incoming WS row; carries `parentSessionId` for the root filter. */
+type IncomingWsSession = {
+  id: string;
+  status: string;
+  title: string;
+  gitUrl?: string;
+  gitBranch?: string;
+  parentSessionId?: string;
+  connectionId?: string;
+  capabilities?: { attachments?: boolean };
+};
+
 /** Cached active session (tRPC output); enrichment fields preserved across WS. */
 export type CachedActiveSession = ActiveSession;
 
@@ -71,6 +71,33 @@ export type CachedActiveSessionsData = {
 
 /** The three fields that mark a row as having been through a tRPC fetch. */
 const ENRICHMENT_FIELDS = ['createdOnPlatform', 'createdAt', 'updatedAt'] as const;
+
+/** Structured question/permission — the Active Now "NEEDS INPUT" badge. */
+export function isAttentionStatus(status: string | null | undefined): boolean {
+  return status === 'question' || status === 'permission';
+}
+
+/**
+ * Prefer stored attention over live idle/busy so released-CLI heartbeats
+ * do not clear NEEDS INPUT. Non-attention stored values yield to live.
+ */
+export function effectiveStatus(
+  live: string | null | undefined,
+  stored: string | null | undefined
+): string {
+  if (isAttentionStatus(stored) && stored != null) {
+    return stored;
+  }
+  return live ?? '';
+}
+
+function isRootWsSession(session: IncomingWsSession): boolean {
+  return !session.parentSessionId;
+}
+
+export function selectRootWsSessions<T extends IncomingWsSession>(sessions: readonly T[]): T[] {
+  return sessions.filter(session => isRootWsSession(session));
+}
 
 // ── Payload parsing (WS trust boundary) ──────────────────────────────
 
@@ -187,7 +214,7 @@ function withEnrichmentAndConnectionId(
     id: row.id,
     // Sticky attention: a non-attention WS status must not clear a held
     // question/permission. "stored" for WS paths is the cached row status.
-    status: row.childrenSettled ? row.status : effectiveStatus(row.status, current?.status),
+    status: effectiveStatus(row.status, current?.status),
     // The tray title is DB-authoritative (the router enriches it from
     // cli_sessions_v2), so once a row has been through a tRPC fetch a heartbeat's
     // CLI title must not overwrite it — nothing propagates a cloud rename back to

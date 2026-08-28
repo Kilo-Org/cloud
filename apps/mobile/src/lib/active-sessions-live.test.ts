@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  mergeHeartbeatForActiveSessions,
   parseCliConnectionPayload,
   parseHeartbeatPayload,
   parseSessionsListPayload,
@@ -25,43 +24,6 @@ describe('selectRootWsSessions', () => {
       { id: 'root2', status: 'running', title: 'r2', connectionId: 'c1' },
     ];
     expect(selectRootWsSessions(rows).map(r => r.id)).toEqual(['root1', 'root2']);
-  });
-
-  it('hoists a child attention status onto its root', () => {
-    const rows = [
-      { id: 'root1', status: 'busy', title: 'r1', connectionId: 'c1' },
-      {
-        id: 'child1',
-        status: 'permission',
-        title: 'c1',
-        connectionId: 'c1',
-        parentSessionId: 'root1',
-      },
-      { id: 'root2', status: 'busy', title: 'r2', connectionId: 'c1' },
-    ];
-    expect(selectRootWsSessions(rows).map(r => [r.id, r.status])).toEqual([
-      ['root1', 'permission'],
-      ['root2', 'busy'],
-    ]);
-  });
-
-  it('clears a hoisted raise once the children settle, but keeps a root raise sticky', () => {
-    const cached = [
-      { id: 'root1', status: 'permission', title: 'r1', connectionId: 'c1' },
-      { id: 'root2', status: 'question', title: 'r2', connectionId: 'c1' },
-    ];
-    const heartbeat = {
-      connectionId: 'c1',
-      sessions: selectRootWsSessions([
-        { id: 'root1', status: 'busy', title: 'r1' },
-        { id: 'child1', status: 'busy', title: 'c1', parentSessionId: 'root1' },
-        { id: 'root2', status: 'busy', title: 'r2' },
-      ]),
-    };
-    expect(mergeHeartbeatForActiveSessions(cached, heartbeat).map(r => [r.id, r.status])).toEqual([
-      ['root1', 'busy'],
-      ['root2', 'question'],
-    ]);
   });
 });
 

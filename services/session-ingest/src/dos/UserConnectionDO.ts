@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
-import { isNeedsInputStatus } from './session-ingest-attention';
+import { hoistedAttentionChanges, hoistedChildAttention } from './child-attention';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import {
   CLIOutboundMessageSchema,
@@ -10,6 +10,7 @@ import {
   type Instance,
   type SessionEventPayload,
   SessionEventPayloadSchema,
+  SessionStatusSchema,
   type WebInboundMessage,
   WebOutboundMessageSchema,
 } from '../types/user-connection-protocol';
@@ -688,6 +689,27 @@ export class UserConnectionDO extends DurableObject<Env> {
         })),
       },
     });
+
+    // Clients keep a needs-input status sticky until an explicit status event
+    // names the session, so a hoisted child raise must arrive and clear as
+    // `session.status.updated` on the root.
+    const changedAt = new Date(now).toISOString();
+    for (const change of hoistedAttentionChanges(previousSessions, sessions)) {
+      const status = SessionStatusSchema.safeParse(change.status);
+      const previousStatus = SessionStatusSchema.safeParse(change.previousStatus);
+      this.broadcastToWeb({
+        type: 'system',
+        event: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: change.sessionId,
+          previousStatus: previousStatus.success ? previousStatus.data : null,
+          status: status.success ? status.data : null,
+          statusUpdatedAt: changedAt,
+          changedAt,
+        },
+      });
+    }
 
     this.sendToCli(ws, { type: 'heartbeat_ack' });
   }
@@ -2691,10 +2713,8 @@ export class UserConnectionDO extends DurableObject<Env> {
     const hoistedStatus = new Map<string, string>();
     for (const [connectionId, sessions] of this.connectionSessions) {
       if (!liveConnectionIds.has(connectionId)) continue;
-      for (const session of sessions) {
-        if (session.parentSessionId && isNeedsInputStatus(session.status)) {
-          hoistedStatus.set(session.parentSessionId, session.status);
-        }
+      for (const [root, status] of hoistedChildAttention(sessions)) {
+        hoistedStatus.set(root, status);
       }
     }
     for (const [connectionId, sessions] of this.connectionSessions) {

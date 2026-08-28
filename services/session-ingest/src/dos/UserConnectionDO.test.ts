@@ -3943,6 +3943,37 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
+    it('emits session.status.updated on the root when a child raise appears and clears', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      const statusEvents = () =>
+        webWs.send.mock.calls
+          .map(call => JSON.parse(call[0] as string) as { event?: string; data?: unknown })
+          .filter(msg => msg.event === 'session.status.updated')
+          .map(
+            msg => msg.data as { sessionId: string; status: string; previousStatus: string | null }
+          );
+
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('root-1', 'busy', 'Root session'),
+        makeSession('child-1', 'permission', 'Child session', 'root-1'),
+      ]);
+      expect(statusEvents()).toMatchObject([
+        { sessionId: 'root-1', status: 'permission', previousStatus: null },
+      ]);
+
+      webWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [makeSession('root-1', 'busy', 'Root session')]);
+      expect(statusEvents()).toMatchObject([
+        { sessionId: 'root-1', status: 'busy', previousStatus: 'permission' },
+      ]);
+
+      webWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [makeSession('root-1', 'busy', 'Root session')]);
+      expect(statusEvents()).toEqual([]);
+    });
+
     it('cleans up child tracking when session disappears from heartbeat', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');

@@ -48,10 +48,7 @@ import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
-import {
-  isCancelQueuedUpgradeRequired,
-  resolveCancelQueuedRestoreOutcome,
-} from '@/components/agents/mobile-session-manager';
+import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
 import { firstHumanText, isFilePart } from './part-types';
 import {
   buildRemoteAttachmentPartsWithRetryableFeedback,
@@ -895,9 +892,8 @@ export function SessionDetailContent({
         return;
       }
       const composerHasContent = composerControlRef.current?.hasContent() ?? false;
-      const outcome = resolveCancelQueuedRestoreOutcome(composerHasContent);
       const prompt = firstHumanText(message.parts);
-      if (outcome === 'restore') {
+      if (!composerHasContent) {
         if (prompt !== '') {
           composerControlRef.current?.setText(prompt);
         }

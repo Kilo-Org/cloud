@@ -94,14 +94,6 @@ export function isCancelQueuedUpgradeRequired(error: unknown): boolean {
   return readFetchSessionErrorCode(error) === CANCEL_QUEUED_UPGRADE_REQUIRED_CODE;
 }
 
-export type CancelQueuedRestoreOutcome = 'restore' | 'keep-restore';
-
-export function resolveCancelQueuedRestoreOutcome(
-  composerHasContent: boolean
-): CancelQueuedRestoreOutcome {
-  return composerHasContent ? 'keep-restore' : 'restore';
-}
-
 /* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin tRPC passthrough */
 async function defaultFetchSessionQuery(
   sessionId: KiloSessionId

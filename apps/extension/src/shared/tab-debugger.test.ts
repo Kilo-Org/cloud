@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, jest/no-conditional-in-test -- Producer fixtures fail before or after dispatch to verify action certainty. */
 import { describe, expect, it } from 'vitest';
 import {
   WEB_MCP_DISCOVER_MESSAGE,
@@ -160,6 +160,39 @@ describe('tab debugger helpers', () => {
     ]);
   });
 
+  it.each([
+    { effectsUncertain: false, phase: 'attach' },
+    { effectsUncertain: true, phase: 'evaluate' },
+  ])('distinguishes a failure during $phase', async ({ effectsUncertain, phase }) => {
+    const commands: string[] = [];
+    const debuggerApi: ChromeDebuggerApi = {
+      ...createDebuggerApi(),
+      attach: () => {
+        if (phase === 'attach') {
+          throw new Error('Denied.');
+        }
+      },
+      sendCommand: () => {
+        commands.push('evaluate');
+        throw new Error('Response lost.');
+      },
+    };
+    const result = await evalInTab({ code: 'return 1;', debuggerApi, tabId: 7 });
+    expect(result).toMatchObject({ effectsUncertain, ok: false });
+    expect(commands).toStrictEqual(phase === 'attach' ? [] : ['evaluate']);
+  });
+
+  it.each([
+    { effectsUncertain: 'false', error: 'Denied.', ok: false },
+    {
+      ok: true,
+      result: { effectsUncertain: 'true', error: 'Lost result.', ok: false },
+      type: WEB_MCP_EXECUTE_MESSAGE,
+    },
+  ])('rejects malformed uncertainty metadata: %j', response => {
+    expect(isTabDebuggerResponse(response)).toBe(false);
+  });
+
   it('returns eval errors and still detaches', async () => {
     const debuggerApi = createDebuggerApi({
       sendCommand: () => ({
@@ -175,6 +208,7 @@ describe('tab debugger helpers', () => {
         tabId: 7,
       })
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       error: 'Page evaluation failed: ReferenceError: missingValue is not defined',
       ok: false,
     });
@@ -284,7 +318,11 @@ describe('tab debugger helpers', () => {
         tabId: 7,
         timeoutMs: 1,
       })
-    ).resolves.toStrictEqual({ error: 'Page evaluation timed out.', ok: false });
+    ).resolves.toStrictEqual({
+      effectsUncertain: true,
+      error: 'Page evaluation timed out.',
+      ok: false,
+    });
   });
 
   it('reports Firefox scripting eval errors instead of a phantom success', async () => {
@@ -299,6 +337,7 @@ describe('tab debugger helpers', () => {
         tabId: 7,
       })
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       error: 'Page evaluation failed: missingValue is not defined',
       ok: false,
     });
@@ -312,6 +351,7 @@ describe('tab debugger helpers', () => {
     await expect(
       getPageSnapshotInTabWithScripting({ scriptingApi, tabId: 7 })
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       error: 'Failed to read page snapshot: Page snapshot timed out.',
       ok: false,
     });
@@ -334,6 +374,7 @@ describe('tab debugger helpers', () => {
         tabId: 7,
       })
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       error: 'Eval result was not JSON-serializable.',
       ok: false,
     });
@@ -408,7 +449,11 @@ describe('tab debugger helpers', () => {
         tabId: 7,
         timeoutMs: 1,
       })
-    ).resolves.toStrictEqual({ error: 'Page evaluation timed out.', ok: false });
+    ).resolves.toStrictEqual({
+      effectsUncertain: true,
+      error: 'Page evaluation timed out.',
+      ok: false,
+    });
   });
 
   it('captures a viewport screenshot for the selected tab and restores the active tab', async () => {
@@ -466,6 +511,7 @@ describe('tab debugger helpers', () => {
     };
 
     await expect(getViewportScreenshotWithTabsApi({ tabId: 7, tabsApi })).resolves.toStrictEqual({
+      effectsUncertain: false,
       error: 'The selected tab was not active at capture time.',
       ok: false,
     });
@@ -689,7 +735,7 @@ describe('tab debugger helpers', () => {
         tabId: 7,
         toolName: 'double',
       })
-    ).resolves.toStrictEqual({ ok: true, value: '{"doubled":42}' });
+    ).resolves.toStrictEqual({ effectsUncertain: false, ok: true, value: '{"doubled":42}' });
   });
 
   it('executes a tool in the MAIN world targeting the reported document', async () => {
@@ -729,7 +775,7 @@ describe('tab debugger helpers', () => {
         tabId: 7,
         toolName: 'double',
       })
-    ).resolves.toStrictEqual({ ok: true, value: '{"ok":true}' });
+    ).resolves.toStrictEqual({ effectsUncertain: false, ok: true, value: '{"ok":true}' });
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.world).toBe('MAIN');
@@ -766,7 +812,7 @@ describe('tab debugger helpers', () => {
         tabId: 7,
         toolName: 'navigate',
       })
-    ).resolves.toStrictEqual({ ok: true, value: null });
+    ).resolves.toStrictEqual({ effectsUncertain: false, ok: true, value: null });
   });
 
   it('returns a browser rejection as an error result', async () => {
@@ -783,7 +829,11 @@ describe('tab debugger helpers', () => {
         tabId: 7,
         toolName: 'missing',
       })
-    ).resolves.toStrictEqual({ error: 'WebMCP tool execution failed: Tool not found', ok: false });
+    ).resolves.toStrictEqual({
+      effectsUncertain: true,
+      error: 'WebMCP tool execution failed: Tool not found',
+      ok: false,
+    });
   });
 
   it('accepts the WebMCP discover and execute request shapes', () => {
@@ -855,7 +905,7 @@ describe('tab debugger helpers', () => {
         tabId: 7,
         toolName: 'double',
       })
-    ).resolves.toStrictEqual({ ok: true, value: '{"ok":true}' });
+    ).resolves.toStrictEqual({ effectsUncertain: false, ok: true, value: '{"ok":true}' });
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.args).toStrictEqual(['double', '{}', signature]);
@@ -891,7 +941,7 @@ describe('tab debugger helpers', () => {
         tabId: 7,
         toolName: 'double',
       })
-    ).resolves.toStrictEqual({ ok: true, value: '{"doubled":42}' });
+    ).resolves.toStrictEqual({ effectsUncertain: false, ok: true, value: '{"doubled":42}' });
   });
 
   it('returns a stale-tool error when the definition signature changed', async () => {
@@ -928,6 +978,7 @@ describe('tab debugger helpers', () => {
         toolName: 'double',
       })
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       error: 'WebMCP tool execution failed: WebMCP tool "double" changed; refresh the page tools.',
       ok: false,
     });

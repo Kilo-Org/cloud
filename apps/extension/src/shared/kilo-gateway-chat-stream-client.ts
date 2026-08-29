@@ -45,6 +45,14 @@ export class KiloGatewayHttpError extends Error {
   }
 }
 
+/** A call outside the offered tool set is terminal, not a transport failure. */
+export class KiloGatewayUnsupportedToolError extends Error {
+  constructor() {
+    super('Gateway stream tool call did not include a supported tool name.');
+    this.name = 'KiloGatewayUnsupportedToolError';
+  }
+}
+
 const DEFAULT_STALL_TIMEOUT_MS = 45_000;
 const DEFAULT_COMPLETION_TIMEOUT_MS = 90_000;
 
@@ -198,7 +206,7 @@ const parseToolCallBuffer = (
       : [...allowedToolNames].find(allowed => allowed === value.name);
 
   if (name === undefined) {
-    throw new TypeError('Gateway stream tool call did not include a supported tool name.');
+    throw new KiloGatewayUnsupportedToolError();
   }
 
   const parsedArguments = (() => {

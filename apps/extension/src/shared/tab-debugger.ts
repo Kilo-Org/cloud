@@ -158,16 +158,26 @@ export interface WebMcpDiscoveryResult {
   readonly tools: WebMcpToolDescriptor[];
 }
 
-export type EvalTabResult =
+export type EvalTabResult = (
   | {
-      readonly description?: string;
+      readonly description?: string | undefined;
       readonly ok: true;
       readonly value?: unknown;
     }
   | {
       readonly error: string;
       readonly ok: false;
-    };
+    }
+) & { readonly effectsUncertain?: boolean | undefined };
+
+export type NormalizedEvalTabResult = EvalTabResult & { readonly effectsUncertain: boolean };
+
+export const normalizeEvalTabResult = (result: EvalTabResult): NormalizedEvalTabResult => ({
+  ...result,
+  // Old metadata-free producers cannot confirm completion after an issued failure.
+  // Remove this fallback after all metadata-free producers and clients retire.
+  effectsUncertain: result.effectsUncertain ?? !result.ok,
+});
 
 export type TabDebuggerRequest =
   | {
@@ -235,6 +245,7 @@ export type TabDebuggerResponse =
       readonly type: typeof WEB_MCP_EXECUTE_MESSAGE;
     }
   | {
+      readonly effectsUncertain?: boolean | undefined;
       readonly error: string;
       readonly ok: false;
     };
@@ -247,10 +258,12 @@ const inspectableTabSchema = z.object({
 const evalTabResultSchema = z.union([
   z.object({
     description: z.string().optional(),
+    effectsUncertain: z.boolean().optional(),
     ok: z.literal(true),
     value: z.unknown().optional(),
   }),
   z.object({
+    effectsUncertain: z.boolean().optional(),
     error: z.string(),
     ok: z.literal(false),
   }),
@@ -321,6 +334,7 @@ const tabDebuggerResponseSchema = z.union([
     type: z.literal(WEB_MCP_EXECUTE_MESSAGE),
   }),
   z.object({
+    effectsUncertain: z.boolean().optional(),
     error: z.string(),
     ok: z.literal(false),
   }),
@@ -427,7 +441,11 @@ export const getViewportScreenshotWithTabsApi = ({
   const queryTabs = tabsApi.query.bind(tabsApi);
 
   if (captureVisibleTab === undefined || getTab === undefined || updateTab === undefined) {
-    return Promise.resolve({ error: 'Viewport screenshot API is unavailable.', ok: false });
+    return Promise.resolve({
+      effectsUncertain: false,
+      error: 'Viewport screenshot API is unavailable.',
+      ok: false,
+    });
   }
 
   return runScreenshotCaptureExclusively(async () => {
@@ -443,7 +461,11 @@ export const getViewportScreenshotWithTabsApi = ({
 
       // A manual tab switch can land between activation and capture; refuse rather than capture and upload a different tab's contents.
       if (getTabId(activeTab) !== tabId) {
-        return { error: 'The selected tab was not active at capture time.', ok: false };
+        return {
+          effectsUncertain: false,
+          error: 'The selected tab was not active at capture time.',
+          ok: false,
+        };
       }
 
       const dataUrl = await captureVisibleTab(windowId, { format: 'png' });
@@ -506,7 +528,7 @@ const toSerializableEvalResult = (value: unknown): EvalTabResult => {
   try {
     JSON.stringify(value);
   } catch {
-    return { error: 'Eval result was not JSON-serializable.', ok: false };
+    return { effectsUncertain: false, error: 'Eval result was not JSON-serializable.', ok: false };
   }
 
   const stringValue = evalStringValueSchema.safeParse(value);
@@ -901,8 +923,7 @@ const runInjectedWebMcpExecute = async (
   toolNameText: string,
   argumentsText: string,
   definitionSignatureText: string
-  // oxlint-disable-next-line anti-slop/no-unknown-returns -- injected function; the third-party tool result shape is arbitrary and cannot be parsed without importing a schema.
-): Promise<unknown> => {
+): Promise<NormalizedEvalTabResult> => {
   const { modelContext } = document as Document & {
     modelContext?: {
       getTools?: () => Promise<unknown[]>;
@@ -919,7 +940,7 @@ const runInjectedWebMcpExecute = async (
     typeof value === 'string';
   const asString = (value: unknown): string => (isString(value) ? value : '');
   const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- injected function distinguishing a plain-object schema from a primitive/array in arbitrary third-party tool data; cannot import a schema to parse it.
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- injected function distinguishing a plain-object schema from a primitive/array in arbitrary third-party tool data; cannot import a schema to parse them.
     typeof value === 'object' && value !== null && !Array.isArray(value);
 
   if (
@@ -927,12 +948,16 @@ const runInjectedWebMcpExecute = async (
     modelContext.getTools === undefined ||
     modelContext.executeTool === undefined
   ) {
-    throw new Error('WebMCP is not available in this document.');
+    return {
+      effectsUncertain: false,
+      error: 'WebMCP is not available in this document.',
+      ok: false,
+    };
   }
 
   const tools = await modelContext.getTools();
   if (!isArray(tools)) {
-    throw new TypeError('WebMCP returned no tools.');
+    return { effectsUncertain: false, error: 'WebMCP returned no tools.', ok: false };
   }
 
   let tool: unknown = undefined;
@@ -943,12 +968,15 @@ const runInjectedWebMcpExecute = async (
       break;
     }
   }
-
   if (tool === undefined) {
-    throw new Error(`WebMCP tool "${toolNameText}" is not available.`);
+    return {
+      effectsUncertain: false,
+      error: `WebMCP tool "${toolNameText}" is not available.`,
+      ok: false,
+    };
   }
 
-  // Rebuild the ordered definition signature identically to web-mcp-tools.ts and reject a changed registration as a stale tool.
+  // Rebuild the ordered signature before dispatching the page tool.
   const record = isToolRecord(tool) ? tool : {};
   const name = asString(record['name']);
   const title = asString(record['title']);
@@ -964,14 +992,24 @@ const runInjectedWebMcpExecute = async (
   }
   const normalizedSchema = isPlainObject(schema) ? schema : undefined;
   const definitionSignature = JSON.stringify([name, title, description, origin, normalizedSchema]);
-
   if (definitionSignature !== definitionSignatureText) {
-    throw new Error(`WebMCP tool "${toolNameText}" changed; refresh the page tools.`);
+    return {
+      effectsUncertain: false,
+      error: `WebMCP tool "${toolNameText}" changed; refresh the page tools.`,
+      ok: false,
+    };
   }
 
-  const result = await modelContext.executeTool(tool, argumentsText);
-
-  return result;
+  try {
+    const value = await modelContext.executeTool(tool, argumentsText);
+    return { effectsUncertain: false, ok: true, value };
+  } catch (error) {
+    return {
+      effectsUncertain: true,
+      error: error instanceof Error ? error.message : String(error),
+      ok: false,
+    };
+  }
 };
 /* eslint-enable unicorn/consistent-function-scoping */
 
@@ -1011,43 +1049,46 @@ export const evalInTab = async ({
 }): Promise<EvalTabResult> => {
   const target = { tabId };
   let attached = false;
-
+  let dispatched = false;
   try {
     await debuggerApi.attach(target, DEBUGGER_PROTOCOL_VERSION);
     attached = true;
-
+    dispatched = true;
     const response = await debuggerApi.sendCommand(target, 'Runtime.evaluate', {
       awaitPromise: true,
       expression: getEvalExpression(code),
       returnByValue: true,
       timeout: timeoutMs,
     });
-
     const parsed = chromeEvalResponseSchema.safeParse(response);
-
     if (!parsed.success) {
-      return { error: 'Debugger returned an invalid eval response.', ok: false };
+      return {
+        effectsUncertain: true,
+        error: 'Debugger returned an invalid eval response.',
+        ok: false,
+      };
     }
-
     const { exceptionDetails, result } = parsed.data;
-
     if (exceptionDetails !== undefined) {
-      return { error: getExceptionMessage(exceptionDetails), ok: false };
+      return { effectsUncertain: false, error: getExceptionMessage(exceptionDetails), ok: false };
     }
-
     if (result === undefined) {
-      return { error: 'Debugger returned an invalid eval result.', ok: false };
+      return {
+        effectsUncertain: true,
+        error: 'Debugger returned an invalid eval result.',
+        ok: false,
+      };
     }
-
     const normalizedResult = Object.hasOwn(result, 'value')
       ? toSerializableEvalResult(result.value)
       : ({ ok: true } satisfies EvalTabResult);
-
     return normalizedResult.ok && result.description !== undefined
       ? { ...normalizedResult, description: result.description }
       : normalizedResult;
   } catch (error) {
     return {
+      // Attach denial issued no page code. A timeout or lost eval response cannot prove completion.
+      effectsUncertain: dispatched,
       error: error instanceof Error ? error.message : 'Page evaluation failed.',
       ok: false,
     };
@@ -1074,12 +1115,7 @@ export const evalInTabWithScripting = async ({
   readonly timeoutMs?: number;
 }): Promise<EvalTabResult> => {
   try {
-    /*
-     * Soft timeout only. withTimeout rejects this promise, but a runaway model-authored snippet
-     * keeps running in the page's MAIN world after we report a timeout — scripting has no
-     * cancellation primitive. The Chrome/CDP path passes a real timeout to Runtime.evaluate; this
-     * one can't. Revisit if scripting ever gains enforced cancellation.
-     */
+    // This soft timeout cannot stop MAIN-world code. Every timeout or lost result below is uncertain.
     const [response] = await withTimeout(
       Promise.resolve(
         scriptingApi.executeScript({
@@ -1091,20 +1127,22 @@ export const evalInTabWithScripting = async ({
       ),
       timeoutMs
     );
-
-    if (response?.error !== undefined) {
+    if (response === undefined) {
+      return { effectsUncertain: true, error: 'Page evaluation returned no result.', ok: false };
+    }
+    if (response.error !== undefined) {
       const detail = extractInjectionErrorText(response.error);
-
       return {
+        effectsUncertain: false,
         error:
           detail === undefined ? 'Page evaluation failed.' : `Page evaluation failed: ${detail}`,
         ok: false,
       };
     }
-
-    return toSerializableEvalResult(response?.result);
+    return toSerializableEvalResult(response.result);
   } catch (error) {
     return {
+      effectsUncertain: true,
       error: error instanceof Error ? error.message : 'Page evaluation failed.',
       ok: false,
     };
@@ -1136,11 +1174,13 @@ export const getPageSnapshotInTabWithScripting = async ({
       ),
       timeoutMs
     );
-
-    if (response?.error !== undefined) {
+    if (response === undefined) {
+      return { effectsUncertain: true, error: 'Page snapshot returned no result.', ok: false };
+    }
+    if (response.error !== undefined) {
       const detail = extractInjectionErrorText(response.error);
-
       return {
+        effectsUncertain: false,
         error:
           detail === undefined
             ? 'Failed to read page snapshot.'
@@ -1148,10 +1188,10 @@ export const getPageSnapshotInTabWithScripting = async ({
         ok: false,
       };
     }
-
-    return { ok: true, value: response?.result };
+    return { ok: true, value: response.result };
   } catch (error) {
     return {
+      effectsUncertain: true,
       error: error instanceof Error ? error.message : 'Failed to read page snapshot.',
       ok: false,
     };
@@ -1180,11 +1220,13 @@ export const discoverWebMcpToolsInTab = async ({
       ),
       DEFAULT_EVAL_TIMEOUT_MS
     );
-
-    if (response?.error !== undefined) {
+    if (response === undefined) {
+      return { effectsUncertain: true, error: 'WebMCP discovery returned no result.', ok: false };
+    }
+    if (response.error !== undefined) {
       const detail = extractInjectionErrorText(response.error);
-
       return {
+        effectsUncertain: false,
         error:
           detail === undefined
             ? 'Failed to discover WebMCP tools.'
@@ -1192,18 +1234,16 @@ export const discoverWebMcpToolsInTab = async ({
         ok: false,
       };
     }
-
-    const documentId = response?.documentId ?? '';
-    const tools = isWebMcpToolDescriptorArray(response?.result) ? response.result : [];
-
-    // The browser must report the target document; without it the tools cannot be bound to a page.
-    if (documentId === '') {
-      return { ok: true, value: { documentId: '', tools: [] } satisfies WebMcpDiscoveryResult };
-    }
-
-    return { ok: true, value: { documentId, tools } satisfies WebMcpDiscoveryResult };
+    const documentId = response.documentId ?? '';
+    const tools = isWebMcpToolDescriptorArray(response.result) ? response.result : [];
+    // Without a document ID, the tools cannot be bound to a page.
+    return {
+      ok: true,
+      value: { documentId, tools: documentId === '' ? [] : tools } satisfies WebMcpDiscoveryResult,
+    };
   } catch (error) {
     return {
+      effectsUncertain: true,
       error: error instanceof Error ? error.message : 'Failed to discover WebMCP tools.',
       ok: false,
     };
@@ -1237,11 +1277,10 @@ export const executeWebMcpToolInTab = async ({
       ),
       DEFAULT_EVAL_TIMEOUT_MS
     );
-
     if (response?.error !== undefined) {
       const detail = extractInjectionErrorText(response.error);
-
       return {
+        effectsUncertain: true,
         error:
           detail === undefined
             ? 'WebMCP tool execution failed.'
@@ -1249,10 +1288,21 @@ export const executeWebMcpToolInTab = async ({
         ok: false,
       };
     }
-
-    return { ok: true, value: response?.result };
+    const parsed = evalTabResultSchema.safeParse(response?.result);
+    if (!parsed.success) {
+      return {
+        effectsUncertain: true,
+        error: 'WebMCP execution returned an invalid result.',
+        ok: false,
+      };
+    }
+    const result = normalizeEvalTabResult(parsed.data);
+    return result.ok
+      ? result
+      : { ...result, error: `WebMCP tool execution failed: ${result.error}` };
   } catch (error) {
     return {
+      effectsUncertain: true,
       error: error instanceof Error ? error.message : 'WebMCP tool execution failed.',
       ok: false,
     };

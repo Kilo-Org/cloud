@@ -60,7 +60,11 @@ describe('workflow eval', () => {
       type: EVAL_TAB_MESSAGE,
     });
 
-    await expect(evalInTab(7, 'return 42;')).resolves.toStrictEqual({ ok: true, value: 42 });
+    await expect(evalInTab(7, 'return 42;')).resolves.toStrictEqual({
+      effectsUncertain: false,
+      ok: true,
+      value: 42,
+    });
     expect(mocks.sendMessage).toHaveBeenCalledWith({
       code: 'return 42;',
       tabId: 7,
@@ -74,6 +78,7 @@ describe('workflow eval', () => {
     mocks.sendMessage.mockRejectedValueOnce(new Error('disconnected'));
 
     await expect(evalInTab(7, 'return 1;')).resolves.toStrictEqual({
+      effectsUncertain: true,
       error: 'disconnected',
       ok: false,
     });
@@ -84,6 +89,7 @@ describe('workflow eval', () => {
     mocks.sendMessage.mockResolvedValueOnce({ unexpected: true });
 
     await expect(evalInTab(7, 'return 1;')).resolves.toStrictEqual({
+      effectsUncertain: true,
       error: 'Extension background returned an invalid response.',
       ok: false,
     });
@@ -97,6 +103,7 @@ describe('workflow eval', () => {
     });
 
     await expect(evalInTab(7, 'return 1;')).resolves.toStrictEqual({
+      effectsUncertain: true,
       error: 'tab closed',
       ok: false,
     });
@@ -111,9 +118,48 @@ describe('workflow eval', () => {
     });
 
     await expect(evalInTab(7, 'return 42;')).resolves.toStrictEqual({
+      effectsUncertain: true,
       error: 'Extension background returned the wrong response.',
       ok: false,
     });
+  });
+});
+
+describe('workflow action boundaries', () => {
+  it.each([
+    { reason: 'cancelled', status: 'cancelled' },
+    { reason: 'lease_lost', status: 'interrupted' },
+  ])('blocks navigation when $reason arrives during the tab read', async ({ reason, status }) => {
+    const controller = new AbortController();
+    mocks.tabsUpdate.mockReset();
+    mocks.tabsGet.mockReset().mockImplementationOnce(() => {
+      controller.abort(reason === 'cancelled' ? undefined : new Error(reason));
+      return Promise.resolve({ id: 7, status: 'loading', url: 'https://example.com/old' });
+    });
+    await expect(
+      navigateTab(7, 'https://example.com/new', () => {
+        controller.signal.throwIfAborted();
+      })
+    ).rejects.toMatchObject({ effectsUncertain: false, reason, status });
+    expect(mocks.tabsUpdate).not.toHaveBeenCalled();
+    expect(mocks._onUpdatedListeners).toHaveLength(0);
+  });
+
+  it('propagates an issued eval AbortError without a fabricated failure result', async () => {
+    const stopped = new DOMException('Stopped.', 'AbortError');
+    mocks.sendMessage.mockReset().mockRejectedValueOnce(stopped);
+    await expect(evalInTab(7, 'return 1;')).rejects.toBe(stopped);
+  });
+
+  it.each([
+    { effectsUncertain: false, error: 'Permission denied.', ok: false },
+    { effectsUncertain: true, error: 'Unknown completion.', ok: false },
+    { effectsUncertain: true, ok: true, value: 'unconfirmed' },
+  ])('preserves explicit completion metadata through eval: %j', async raw => {
+    mocks.sendMessage
+      .mockReset()
+      .mockResolvedValueOnce({ ok: true, result: raw, type: EVAL_TAB_MESSAGE });
+    await expect(evalInTab(7, 'return 1;')).resolves.toStrictEqual(raw);
   });
 });
 

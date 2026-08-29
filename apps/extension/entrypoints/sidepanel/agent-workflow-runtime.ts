@@ -4,8 +4,18 @@ import {
   WORKFLOW_NAVIGATION_TIMEOUT_MS,
   WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
 } from '@/src/shared/agent-workflows';
-import { EVAL_TAB_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
-import type { EvalTabResult } from '@/src/shared/tab-debugger';
+import {
+  EVAL_TAB_MESSAGE,
+  isTabDebuggerResponse,
+  normalizeEvalTabResult,
+} from '@/src/shared/tab-debugger';
+import type { NormalizedEvalTabResult } from '@/src/shared/tab-debugger';
+import {
+  ExecutionStoppedError,
+  isExecutionStopped,
+  normalizeExecutionGuard,
+} from '@/src/shared/agent-tool-results';
+import type { ExecutionGuard } from '@/src/shared/agent-tool-results';
 
 /**
  * Compare two URLs by origin, pathname, and search, ignoring hash.
@@ -26,35 +36,50 @@ const urlMatches = (left: string, right: string): boolean => {
   }
 };
 
-/**
- * Evaluate workflow page code in a tab through the background transport.
- * Always sends WORKFLOW_PAGE_EVAL_TIMEOUT_MS (30 s); the default 5 s
- * timeout is too short for multi-action page scripts.
- */
-export const evalInTab = async (tabId: number, code: string): Promise<EvalTabResult> => {
+/** Workflows need 30 seconds; ordinary eval retains the background's default timeout. */
+// eslint-disable-next-line max-params -- Both eval callers share response normalization while retaining their existing timeouts.
+export const evalInTab = async (
+  tabId: number,
+  code: string,
+  executionGuard?: ExecutionGuard,
+  timeoutMs = WORKFLOW_PAGE_EVAL_TIMEOUT_MS
+): Promise<NormalizedEvalTabResult> => {
+  normalizeExecutionGuard(executionGuard)();
   try {
     const response: unknown = await browser.runtime.sendMessage({
       code,
       tabId,
-      timeoutMs: WORKFLOW_PAGE_EVAL_TIMEOUT_MS,
+      timeoutMs,
       type: EVAL_TAB_MESSAGE,
     });
 
     if (!isTabDebuggerResponse(response)) {
-      return { error: 'Extension background returned an invalid response.', ok: false };
+      return {
+        effectsUncertain: true,
+        error: 'Extension background returned an invalid response.',
+        ok: false,
+      };
     }
 
     if (!response.ok) {
-      return { error: response.error, ok: false };
+      return normalizeEvalTabResult(response);
     }
 
     if (response.type !== EVAL_TAB_MESSAGE) {
-      return { error: 'Extension background returned the wrong response.', ok: false };
+      return {
+        effectsUncertain: true,
+        error: 'Extension background returned the wrong response.',
+        ok: false,
+      };
     }
 
-    return response.result;
+    return normalizeEvalTabResult(response.result);
   } catch (error) {
+    if (isExecutionStopped(error)) {
+      throw error;
+    }
     return {
+      effectsUncertain: true,
       error: error instanceof Error ? error.message : 'Failed to run eval.',
       ok: false,
     };
@@ -86,9 +111,16 @@ export const evalInTab = async (tabId: number, code: string): Promise<EvalTabRes
  *
  * The listener and timer are always removed in a finally block.
  */
-export const navigateTab = async (tabId: number, url: string): Promise<void> => {
+export const navigateTab = async (
+  tabId: number,
+  url: string,
+  executionGuard?: ExecutionGuard
+): Promise<void> => {
+  const guard = normalizeExecutionGuard(executionGuard);
+  guard();
   // Same-URL fast path.
   const tab = await browser.tabs.get(tabId);
+  guard();
   if (tab.status === 'complete' && tab.url !== undefined && urlMatches(tab.url, url)) {
     return;
   }
@@ -150,7 +182,13 @@ export const navigateTab = async (tabId: number, url: string): Promise<void> => 
 
       timeoutHandle = setTimeout(() => {
         onDone(() => {
-          reject(new Error(`Navigation to ${url} timed out: the page never finished loading.`));
+          reject(
+            new ExecutionStoppedError(
+              `Navigation to ${url} timed out: the page never finished loading.`,
+              'interrupted',
+              true
+            )
+          );
         });
       }, WORKFLOW_NAVIGATION_TIMEOUT_MS);
 
@@ -190,6 +228,7 @@ export const navigateTab = async (tabId: number, url: string): Promise<void> => 
       // Initiate navigation. After the update resolves, do a fresh tabs.get
       // Re-read so that a tab already complete at the matching URL resolves
       // Without waiting for a later onUpdated event.
+      guard();
       void browser.tabs.update(tabId, { url }).then(
         async () => {
           updateApplied = true;
@@ -214,6 +253,15 @@ export const navigateTab = async (tabId: number, url: string): Promise<void> => 
         }
       );
     });
+  } catch (error) {
+    if (isExecutionStopped(error)) {
+      throw error;
+    }
+    throw new ExecutionStoppedError(
+      error instanceof Error ? error.message : 'Navigation failed.',
+      'interrupted',
+      true
+    );
   } finally {
     cleanup();
   }

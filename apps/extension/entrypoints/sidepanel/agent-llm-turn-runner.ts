@@ -9,7 +9,9 @@ import {
   createSafeToolDefinitions,
 } from '@/src/shared/agent-llm-harness';
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
-import type { OnTurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
+import type { LlmTurnOutcome, OnTurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
+import { normalizeExecutionGuard } from '@/src/shared/agent-tool-results';
+import type { ExecutionGuard } from '@/src/shared/agent-tool-results';
 import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
 import type { FetchLike } from '@/src/shared/auth';
 import type {
@@ -19,7 +21,8 @@ import type {
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 import { buildWebMcpToolDefinitions } from '@/src/shared/web-mcp-tools';
 import type { WebMcpToolRoute } from '@/src/shared/web-mcp-tools';
-import { executeEvalToolCall } from './agent-eval-runtime';
+import { DEFAULT_EVAL_TIMEOUT_MS } from '@/src/shared/tab-debugger';
+import { evalInTab } from './agent-workflow-runtime';
 import { createSafeToolExecutor } from './agent-safe-tool-runtime';
 import {
   isRemoteMcpToolCallEvent,
@@ -39,12 +42,16 @@ interface RunDangerousLlmTurnOptions {
   readonly apiBaseUrl: string;
   readonly appendEvents: (events: AgentConversationEvent[]) => void;
   readonly conversationEvents: AgentConversationEvent[];
+  readonly executionGuard?: ExecutionGuard | undefined;
   readonly fetch: FetchLike;
   readonly model: string;
   readonly organizationId?: string | undefined;
   readonly remoteMcpTools?: KiloGatewayToolDefinition[] | undefined;
   readonly executeRemoteMcpToolCall?:
-    | ((toolCall: RemoteMcpToolCallEvent) => Promise<EvalTabResult>)
+    | ((
+        toolCall: RemoteMcpToolCallEvent,
+        executionGuard?: ExecutionGuard
+      ) => Promise<EvalTabResult>)
     | undefined;
   readonly toRemoteMcpToolCallEvents?:
     | ((toolCalls: KiloGatewayToolCallRequest[]) => RemoteMcpToolCallEvent[])
@@ -79,12 +86,17 @@ export const runDangerousLlmTurn = ({
   workflowToolContext,
   workflowTools = [],
   ...options
-}: RunDangerousLlmTurnOptions): Promise<void> => {
+}: RunDangerousLlmTurnOptions): Promise<LlmTurnOutcome> => {
+  const guard = normalizeExecutionGuard(
+    options.executionGuard ?? workflowToolContext?.executionGuard,
+    options.signal
+  );
   // One executor per turn: a fresh unchanged-snapshot memory, so a new conversation's first snapshot is served in full.
-  const executeSafeToolCall = createSafeToolExecutor();
+  const executeSafeToolCall = createSafeToolExecutor(guard);
   // One executor per turn: it carries the abort signal and caps the searches this turn may bill.
   const runWebSearch = createWebSearchExecutor({
     apiBaseUrl: options.apiBaseUrl,
+    executionGuard: guard,
     fetch: options.fetch,
     organizationId: options.organizationId,
     signal: options.signal,
@@ -105,28 +117,34 @@ export const runDangerousLlmTurn = ({
     ...options,
     // eslint-disable-next-line require-await -- async normalizes the sync no-executor error branch into the Promise<EvalTabResult> the runner expects.
     executeToolCall: async (toolCall): Promise<EvalTabResult> => {
+      guard();
       if (isWebMcpToolCallEvent(toolCall)) {
-        return executeWebMcpToolCall(toolCall);
+        return executeWebMcpToolCall(toolCall, guard);
       }
 
       if (isWorkflowToolCallEvent(toolCall)) {
         if (workflowToolContext === undefined) {
           return {
+            effectsUncertain: false,
             error: `Workflow tool ${toolCall.name} is no longer available.`,
             ok: false,
           };
         }
-        return executeWorkflowToolCall(toolCall, workflowToolContext);
+        return executeWorkflowToolCall(toolCall, { ...workflowToolContext, executionGuard: guard });
       }
 
       if (isRemoteMcpToolCallEvent(toolCall)) {
         return executeRemoteMcpToolCall === undefined
-          ? { error: `Remote MCP tool ${toolCall.name} is no longer available.`, ok: false }
-          : executeRemoteMcpToolCall(toolCall);
+          ? {
+              effectsUncertain: false,
+              error: `Remote MCP tool ${toolCall.name} is no longer available.`,
+              ok: false,
+            }
+          : executeRemoteMcpToolCall(toolCall, guard);
       }
 
       if (toolCall.name === 'eval') {
-        return executeEvalToolCall(toolCall);
+        return evalInTab(toolCall.tabId, toolCall.code, guard, DEFAULT_EVAL_TIMEOUT_MS);
       }
 
       if (toolCall.name === 'web_search') {
@@ -135,6 +153,7 @@ export const runDangerousLlmTurn = ({
 
       return executeSafeToolCall(toolCall);
     },
+    executionGuard: guard,
     failureMessage: error =>
       `LLM request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
     maxToolRounds,
@@ -142,7 +161,7 @@ export const runDangerousLlmTurn = ({
     prepareTools: async () => {
       webMcpRoutes = new Map();
 
-      const discovery = await discoverWebMcpTools(selectedTabId);
+      const discovery = await discoverWebMcpTools(selectedTabId, guard);
 
       if (discovery === undefined || discovery.documentId === '') {
         return fixedTools;

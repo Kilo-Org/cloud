@@ -5,6 +5,7 @@ import {
   fetchKiloGatewayChatCompletionStream,
   KiloGatewayHttpError,
   KiloGatewayStreamStalledError,
+  KiloGatewayUnsupportedToolError,
   parseKiloGatewayChatCompletionStream,
 } from './kilo-api-client';
 import type { KiloGatewayToolDefinition, KiloGatewayToolName } from './kilo-api-client';
@@ -222,7 +223,7 @@ describe('kilo gateway chat stream client', () => {
         token: 'token-1',
         tools: searchPageTools,
       })
-    ).rejects.toThrow('Gateway stream tool call did not include a supported tool name.');
+    ).rejects.toBeInstanceOf(KiloGatewayUnsupportedToolError);
   });
 
   it('concatenates a fragmented offered page name across tool call deltas', async () => {

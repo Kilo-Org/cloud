@@ -72,6 +72,7 @@ describe('safe tool runtime', () => {
         })
       )
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         limits: {
@@ -108,6 +109,7 @@ describe('safe tool runtime', () => {
         })
       )
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         id: 'node-1',
@@ -148,6 +150,7 @@ describe('safe tool runtime', () => {
         })
       )
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         limits: {
@@ -218,6 +221,7 @@ describe('safe tool runtime', () => {
         })
       )
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         matches: [
@@ -323,6 +327,7 @@ describe('safe tool runtime', () => {
         })
       )
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         limits: {
@@ -376,6 +381,7 @@ describe('safe tool runtime', () => {
         })
       )
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         results: [
@@ -408,6 +414,7 @@ describe('safe tool runtime', () => {
         })
       )
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         message: 'No memories matched.',
@@ -430,6 +437,7 @@ describe('safe tool runtime', () => {
         })
       )
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       error: 'Search query is required.',
       ok: false,
     });
@@ -452,6 +460,7 @@ describe('safe tool runtime', () => {
         })
       )
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: memory,
     });
@@ -472,6 +481,7 @@ describe('safe tool runtime', () => {
         })
       )
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       error: 'Memory not found.',
       ok: false,
     });
@@ -490,6 +500,7 @@ describe('safe tool runtime', () => {
         })
       )
     ).resolves.toStrictEqual({
+      effectsUncertain: false,
       error: 'Memory id is required.',
       ok: false,
     });

@@ -89,6 +89,7 @@ describe('search_workflows', () => {
 
     const result = await executeWorkflowToolCall(createToolCall('search_workflows'), ctx);
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: { message: 'No workflows saved yet. Use save_workflow to create one.', results: [] },
     });
@@ -181,6 +182,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         autoApproved: false,
@@ -207,28 +209,32 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: { reason: 'The user rejected the save.', saved: false },
     });
   });
 
-  it('aborted outcome returns error', async () => {
+  it('propagates an aborted approval instead of a recoverable tool error', async () => {
     const ctx = createBaseCtx({
       requestApproval: vi.fn().mockResolvedValue({ status: 'aborted' }),
     });
 
-    const result = await executeWorkflowToolCall(
-      createToolCall('save_workflow', {
-        description: 'desc',
-        name: 'My WF',
-        scopeOrigin: 'https://example.com',
-        script: 'return 1;',
-      }),
-      ctx
-    );
-    expect(result).toStrictEqual({
-      error: 'Run stopped before approval.',
-      ok: false,
+    await expect(
+      executeWorkflowToolCall(
+        createToolCall('save_workflow', {
+          description: 'desc',
+          name: 'My WF',
+          scopeOrigin: 'https://example.com',
+          script: 'return 1;',
+        }),
+        ctx
+      )
+    ).rejects.toMatchObject({
+      effectsUncertain: false,
+      name: 'AbortError',
+      reason: 'Run stopped before approval.',
+      status: 'cancelled',
     });
   });
 
@@ -249,6 +255,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: { reason: 'Some persist error', saved: false },
     });
@@ -279,6 +286,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         reason: 'Workflow store is full. Delete a workflow first.',
@@ -332,6 +340,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       error:
         'Workflow not found — the workflowId does not match any saved workflow. Use search_workflows to find it, or omit workflowId to create a new workflow.',
       ok: false,
@@ -397,6 +406,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       error: 'startUrl must match the workflow scope (origin and pathPrefix, if set).',
       ok: false,
     });
@@ -415,6 +425,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       error: 'startUrl must match the workflow scope (origin and pathPrefix, if set).',
       ok: false,
     });
@@ -433,6 +444,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       error: `startUrl must be an absolute URL inside the scope, e.g. "https://example.com/path", or a path starting with "/". Received: not-a-valid-url`,
       ok: false,
     });
@@ -525,6 +537,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         autoApproved: false,
@@ -560,6 +573,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         autoApproved: false,
@@ -607,6 +621,7 @@ describe('save_workflow', () => {
 
     const result = await resultPromise;
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         autoApproved: false,
@@ -653,6 +668,7 @@ describe('save_workflow', () => {
 
     const result = await resultPromise;
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         autoApproved: false,
@@ -693,6 +709,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         autoApproved: false,
@@ -768,6 +785,7 @@ describe('save_workflow', () => {
 
     const result = await resultPromise;
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         autoApproved: false,
@@ -809,6 +827,7 @@ describe('save_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         autoApproved: true,
@@ -844,6 +863,7 @@ describe('run_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       error:
         'Workflow runs are disabled in safe mode. Ask the user to enable "Allow workflows in safe mode" in settings, or to switch this conversation to dangerous mode.',
       ok: false,
@@ -928,6 +948,7 @@ describe('run_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       error: 'Workflow not found. Use search_workflows to list saved workflows and their ids.',
       ok: false,
     });
@@ -962,6 +983,7 @@ describe('delete_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: { deleted: true, name: 'My WF', workflowId: 'wf-1' },
     });
@@ -984,6 +1006,7 @@ describe('delete_workflow', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       error: 'Workflow not found. Use search_workflows to list saved workflows and their ids.',
       ok: false,
     });
@@ -1038,6 +1061,7 @@ describe('save_memory', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: { memoryId: 'mem-1', saved: true },
     });
@@ -1053,23 +1077,24 @@ describe('save_memory', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: { reason: 'The user rejected the save.', saved: false },
     });
   });
 
-  it('aborted outcome returns error', async () => {
+  it('propagates an aborted approval instead of a recoverable tool error', async () => {
     const ctx = createBaseCtx({
       requestApproval: vi.fn().mockResolvedValue({ status: 'aborted' }),
     });
 
-    const result = await executeWorkflowToolCall(
-      createToolCall('save_memory', { text: 'Remember this' }),
-      ctx
-    );
-    expect(result).toStrictEqual({
-      error: 'Run stopped before approval.',
-      ok: false,
+    await expect(
+      executeWorkflowToolCall(createToolCall('save_memory', { text: 'Remember this' }), ctx)
+    ).rejects.toMatchObject({
+      effectsUncertain: false,
+      name: 'AbortError',
+      reason: 'Run stopped before approval.',
+      status: 'cancelled',
     });
   });
 
@@ -1085,6 +1110,7 @@ describe('save_memory', () => {
       ctx
     );
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: { reason: 'Memory store is full.', saved: false },
     });
@@ -1134,7 +1160,11 @@ describe('workflow params through tools', () => {
       ctx
     );
 
-    expect(result).toStrictEqual({ error: 'params must not contain duplicate names.', ok: false });
+    expect(result).toStrictEqual({
+      effectsUncertain: false,
+      error: 'params must not contain duplicate names.',
+      ok: false,
+    });
   });
 
   it('carries params into the approval draft on create', async () => {
@@ -1221,6 +1251,7 @@ describe('workflow params through tools', () => {
     const result = await executeWorkflowToolCall(createToolCall('search_workflows', {}), ctx);
 
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         results: [
@@ -1267,6 +1298,7 @@ describe('startUrl resolution', () => {
     );
 
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         autoApproved: false,
@@ -1305,7 +1337,12 @@ describe('run results name the workflow', () => {
     });
 
   it('includes the workflow name in a successful result', async () => {
-    vi.mocked(runWorkflow).mockResolvedValueOnce({ ok: true, pagesVisited: 1, result: 'done' });
+    vi.mocked(runWorkflow).mockResolvedValueOnce({
+      effectsUncertain: false,
+      ok: true,
+      pagesVisited: 1,
+      result: 'done',
+    });
 
     const result = await executeWorkflowToolCall(
       createToolCall('run_workflow', { workflowId: 'wf-1' }),
@@ -1313,13 +1350,18 @@ describe('run results name the workflow', () => {
     );
 
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: { pagesVisited: 1, result: 'done', workflowName: 'Flight price search' },
     });
   });
 
   it('names the workflow in a failure', async () => {
-    vi.mocked(runWorkflow).mockResolvedValueOnce({ error: 'Tab is at X.', ok: false });
+    vi.mocked(runWorkflow).mockResolvedValueOnce({
+      effectsUncertain: false,
+      error: 'Tab is at X.',
+      ok: false,
+    });
 
     const result = await executeWorkflowToolCall(
       createToolCall('run_workflow', { workflowId: 'wf-1' }),
@@ -1327,8 +1369,151 @@ describe('run results name the workflow', () => {
     );
 
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       error: 'Workflow "Flight price search" failed: Tab is at X.',
       ok: false,
+    });
+  });
+});
+
+describe('workflow authority propagation', () => {
+  it('normalizes a legacy metadata-free workflow failure to uncertain completion', async () => {
+    // Old workflow producers omit metadata; the adapter must not treat that omission as confirmation.
+    const legacyRunner = runWorkflow as ReturnType<typeof vi.fn>;
+    legacyRunner.mockResolvedValueOnce({ error: 'Lost completion.', ok: false });
+    const ctx = createBaseCtx({
+      storage: {
+        getItem: () => [
+          {
+            createdAt: 1,
+            description: 'Test',
+            id: 'wf-1',
+            name: 'Test',
+            scopeOrigin: 'https://example.com',
+            script: 'return 1;',
+            updatedAt: 1,
+          },
+        ],
+        removeItem: () => {},
+        setItem: () => {},
+      },
+    });
+    const result = await executeWorkflowToolCall(
+      createToolCall('run_workflow', { workflowId: 'wf-1' }),
+      ctx
+    );
+    expect(result).toStrictEqual({
+      effectsUncertain: true,
+      error: 'Workflow "Test" failed: Lost completion.',
+      ok: false,
+    });
+  });
+
+  it('does not evaluate after lease loss during initial navigation', async () => {
+    const actual = await vi.importActual<typeof import('@/src/shared/agent-workflow-runner')>(
+      '@/src/shared/agent-workflow-runner'
+    );
+    const { hashWorkflowScript } = await import('@/src/shared/agent-workflows');
+    vi.mocked(runWorkflow).mockImplementationOnce(actual.runWorkflow);
+    const script = 'return { done: true, result: 1 };';
+    const workflow = {
+      approvedScriptHash: await hashWorkflowScript(script),
+      createdAt: 1,
+      description: 'Test',
+      id: 'wf-1',
+      name: 'Test',
+      scopeOrigin: 'https://example.com',
+      script,
+      startUrl: 'https://example.com/start',
+      updatedAt: 1,
+    };
+    const actions: string[] = [];
+    let active = true;
+    const ctx = createBaseCtx({
+      evalInTab: () => {
+        actions.push('eval');
+        return Promise.resolve({ ok: true, value: { ok: true, value: { done: true } } });
+      },
+      executionGuard: () => {
+        if (!active) {
+          throw new Error('lease_lost');
+        }
+      },
+      navigateTab: () => {
+        actions.push('navigate');
+        active = false;
+        return Promise.resolve();
+      },
+      storage: { getItem: () => [workflow], removeItem: () => {}, setItem: () => {} },
+    });
+
+    await expect(
+      executeWorkflowToolCall(createToolCall('run_workflow', { workflowId: 'wf-1' }), ctx)
+    ).rejects.toMatchObject({
+      effectsUncertain: false,
+      reason: 'lease_lost',
+      status: 'interrupted',
+    });
+    expect(actions).toStrictEqual(['navigate']);
+  });
+
+  it.each(['save_workflow', 'save_memory'])(
+    'preserves the owner interruption during %s approval',
+    async name => {
+      const controller = new AbortController();
+      const { ExecutionStoppedError } = await import('@/src/shared/agent-tool-results');
+      const ctx = createBaseCtx({
+        requestApproval: () => {
+          controller.abort(new ExecutionStoppedError('lease_lost'));
+          return Promise.resolve({ status: 'aborted' });
+        },
+        signal: controller.signal,
+      });
+      const tool = createToolCall(name, {
+        description: 'Test',
+        name: 'Test',
+        scopeOrigin: 'https://example.com',
+        script: 'return 1;',
+        text: 'Save this.',
+      });
+      await expect(executeWorkflowToolCall(tool, ctx)).rejects.toMatchObject({
+        effectsUncertain: false,
+        reason: 'lease_lost',
+        status: 'interrupted',
+      });
+    }
+  );
+
+  it.each([
+    { effectsUncertain: false, error: 'Confirmed failure.', ok: false as const },
+    { effectsUncertain: true, error: 'Uncertain failure.', ok: false as const },
+    { effectsUncertain: true, ok: true as const, pagesVisited: 1, result: 'unconfirmed' },
+  ])('preserves workflow certainty through result naming: %j', async workflowResult => {
+    vi.mocked(runWorkflow).mockResolvedValueOnce(workflowResult);
+    const ctx = createBaseCtx({
+      storage: {
+        getItem: () => [
+          {
+            createdAt: 1,
+            description: 'Test',
+            id: 'wf-1',
+            name: 'Test',
+            scopeOrigin: 'https://example.com',
+            script: 'return 1;',
+            updatedAt: 1,
+          },
+        ],
+        removeItem: () => {},
+        setItem: () => {},
+      },
+    });
+    const result = await executeWorkflowToolCall(
+      createToolCall('run_workflow', { workflowId: 'wf-1' }),
+      ctx
+    );
+    expect(result).toMatchObject({
+      effectsUncertain: workflowResult.effectsUncertain,
+      ok: workflowResult.ok,
     });
   });
 });

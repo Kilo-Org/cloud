@@ -9,8 +9,16 @@ import {
   PAGE_SNAPSHOT_MESSAGE,
   VIEWPORT_SCREENSHOT_MESSAGE,
   isTabDebuggerResponse,
+  normalizeEvalTabResult,
 } from '@/src/shared/tab-debugger';
-import type { EvalTabResult, PageSnapshot, PageSnapshotNode } from '@/src/shared/tab-debugger';
+import type {
+  EvalTabResult,
+  NormalizedEvalTabResult,
+  PageSnapshot,
+  PageSnapshotNode,
+} from '@/src/shared/tab-debugger';
+import { normalizeExecutionGuard } from '@/src/shared/agent-tool-results';
+import type { ExecutionGuard } from '@/src/shared/agent-tool-results';
 
 type SafeToolCall = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 const pageSnapshotNodeSchema = z.object({
@@ -98,70 +106,78 @@ const toPageSnapshot = (snapshot: z.infer<typeof pageSnapshotSchema>): PageSnaps
 const readPageSnapshot = async (
   tabId: number,
   { query, textStart }: { readonly query?: string; readonly textStart?: number } = {}
-): Promise<EvalTabResult> => {
+): Promise<NormalizedEvalTabResult> => {
   const response: unknown = await browser.runtime.sendMessage({
     tabId,
     ...(query === undefined ? {} : { query }),
     ...(textStart === undefined ? {} : { textStart }),
     type: PAGE_SNAPSHOT_MESSAGE,
   });
-
   if (!isTabDebuggerResponse(response)) {
-    return { error: 'Extension background returned an invalid response.', ok: false };
+    return {
+      effectsUncertain: true,
+      error: 'Extension background returned an invalid response.',
+      ok: false,
+    };
   }
-
   if (!response.ok) {
-    return { error: response.error, ok: false };
+    return normalizeEvalTabResult(response);
   }
-
   if (response.type !== PAGE_SNAPSHOT_MESSAGE) {
-    return { error: 'Extension background returned the wrong response.', ok: false };
+    return {
+      effectsUncertain: true,
+      error: 'Extension background returned the wrong response.',
+      ok: false,
+    };
   }
-
-  return response.result;
+  return normalizeEvalTabResult(response.result);
 };
 
-const readViewportScreenshot = async (tabId: number): Promise<EvalTabResult> => {
+const readViewportScreenshot = async (tabId: number): Promise<NormalizedEvalTabResult> => {
   const response: unknown = await browser.runtime.sendMessage({
     tabId,
     type: VIEWPORT_SCREENSHOT_MESSAGE,
   });
-
   if (!isTabDebuggerResponse(response)) {
-    return { error: 'Extension background returned an invalid response.', ok: false };
+    return {
+      effectsUncertain: true,
+      error: 'Extension background returned an invalid response.',
+      ok: false,
+    };
   }
-
   if (!response.ok) {
-    return { error: response.error, ok: false };
+    return normalizeEvalTabResult(response);
   }
-
   if (response.type !== VIEWPORT_SCREENSHOT_MESSAGE) {
-    return { error: 'Extension background returned the wrong response.', ok: false };
+    return {
+      effectsUncertain: true,
+      error: 'Extension background returned the wrong response.',
+      ok: false,
+    };
   }
-
-  return response.result;
+  return normalizeEvalTabResult(response.result);
 };
 
 const getSnapshot = async (
   tabId: number,
   options: { readonly query?: string; readonly textStart?: number } = {}
-): Promise<{ error: string; ok: false } | { ok: true; value: PageSnapshot }> => {
+): Promise<
+  ({ error: string; ok: false } | { ok: true; value: PageSnapshot }) & { effectsUncertain: boolean }
+> => {
   const result = await readPageSnapshot(tabId, options);
-
   if (!result.ok) {
-    return { error: result.error, ok: false };
+    return result;
   }
-
+  if (result.effectsUncertain) {
+    return { effectsUncertain: true, error: 'Page snapshot completion is uncertain.', ok: false };
+  }
   const snapshot = pageSnapshotSchema.safeParse(result.value);
-
   if (!snapshot.success) {
-    return { error: 'Page snapshot was invalid.', ok: false };
+    return { effectsUncertain: false, error: 'Page snapshot was invalid.', ok: false };
   }
-
   const pageSnapshot = toPageSnapshot(snapshot.data);
   cacheSnapshot(tabId, pageSnapshot);
-
-  return { ok: true, value: pageSnapshot };
+  return { effectsUncertain: false, ok: true, value: pageSnapshot };
 };
 
 const searchableFields = ['text', 'label', 'href', 'role', 'tag'] as const;
@@ -283,7 +299,7 @@ const runSafeToolCall = async (
     );
 
     if (!snapshotResult.ok) {
-      return { error: snapshotResult.error, ok: false };
+      return snapshotResult;
     }
 
     const snapshot = snapshotResult.value;
@@ -331,16 +347,24 @@ const runSafeToolCall = async (
   const snapshotResult = await getSnapshot(toolCall.tabId, { query });
 
   if (!snapshotResult.ok) {
-    return { error: snapshotResult.error, ok: false };
+    return snapshotResult;
   }
 
   return { ok: true, value: getFindResults(snapshotResult.value, query) };
 };
 
 // One executor per turn: its unchanged-snapshot memory must not cross conversations (or a compaction), where the marker would reference a snapshot the model never saw.
-export const createSafeToolExecutor = (): ((toolCall: SafeToolCall) => Promise<EvalTabResult>) => {
+export const createSafeToolExecutor = (
+  executionGuard?: ExecutionGuard
+): ((toolCall: SafeToolCall) => Promise<NormalizedEvalTabResult>) => {
   const lastServedSnapshotByTab: ServedSnapshotsByTab = new Map();
-  return toolCall => runSafeToolCall(lastServedSnapshotByTab, toolCall);
+  const guard = normalizeExecutionGuard(executionGuard);
+  return async toolCall => {
+    guard();
+    const result = await runSafeToolCall(lastServedSnapshotByTab, toolCall);
+    // Local argument/cache denials are confirmed; browser responses carry their own metadata.
+    return { ...result, effectsUncertain: result.effectsUncertain ?? false };
+  };
 };
 
 export const executeSafeToolCall = createSafeToolExecutor();

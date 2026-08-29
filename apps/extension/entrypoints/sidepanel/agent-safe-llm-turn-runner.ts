@@ -7,7 +7,9 @@ import type {
 } from '@/src/shared/agent-conversation';
 import { createSafeToolDefinitions } from '@/src/shared/agent-llm-harness';
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
-import type { OnTurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
+import type { LlmTurnOutcome, OnTurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
+import { normalizeExecutionGuard } from '@/src/shared/agent-tool-results';
+import type { ExecutionGuard } from '@/src/shared/agent-tool-results';
 import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
 import type { FetchLike } from '@/src/shared/auth';
 import type {
@@ -38,12 +40,16 @@ interface RunSafeLlmTurnOptions {
   readonly apiBaseUrl: string;
   readonly appendEvents: (events: AgentConversationEvent[]) => void;
   readonly conversationEvents: AgentConversationEvent[];
+  readonly executionGuard?: ExecutionGuard | undefined;
   readonly fetch: FetchLike;
   readonly model: string;
   readonly organizationId?: string | undefined;
   readonly remoteMcpTools?: KiloGatewayToolDefinition[] | undefined;
   readonly executeRemoteMcpToolCall?:
-    | ((toolCall: RemoteMcpToolCallEvent) => Promise<EvalTabResult>)
+    | ((
+        toolCall: RemoteMcpToolCallEvent,
+        executionGuard?: ExecutionGuard
+      ) => Promise<EvalTabResult>)
     | undefined;
   readonly toRemoteMcpToolCallEvents?:
     | ((toolCalls: KiloGatewayToolCallRequest[]) => RemoteMcpToolCallEvent[])
@@ -77,12 +83,17 @@ export const runSafeLlmTurn = ({
   workflowToolContext,
   workflowTools = [],
   ...options
-}: RunSafeLlmTurnOptions): Promise<void> => {
+}: RunSafeLlmTurnOptions): Promise<LlmTurnOutcome> => {
+  const guard = normalizeExecutionGuard(
+    options.executionGuard ?? workflowToolContext?.executionGuard,
+    options.signal
+  );
   // One executor per turn: a fresh unchanged-snapshot memory, so a new conversation's first snapshot is served in full.
-  const executeSafeToolCall = createSafeToolExecutor();
+  const executeSafeToolCall = createSafeToolExecutor(guard);
   // One executor per turn: it carries the abort signal and caps the searches this turn may bill.
   const runWebSearch = createWebSearchExecutor({
     apiBaseUrl: options.apiBaseUrl,
+    executionGuard: guard,
     fetch: options.fetch,
     organizationId: options.organizationId,
     signal: options.signal,
@@ -102,24 +113,30 @@ export const runSafeLlmTurn = ({
     ...options,
     // eslint-disable-next-line require-await -- async normalizes the sync no-executor error branch into the Promise<EvalTabResult> the runner expects.
     executeToolCall: async (toolCall): Promise<EvalTabResult> => {
+      guard();
       if (isWebMcpToolCallEvent(toolCall)) {
-        return executeWebMcpToolCall(toolCall);
+        return executeWebMcpToolCall(toolCall, guard);
       }
 
       if (isWorkflowToolCallEvent(toolCall)) {
         if (workflowToolContext === undefined) {
           return {
+            effectsUncertain: false,
             error: `Workflow tool ${toolCall.name} is no longer available.`,
             ok: false,
           };
         }
-        return executeWorkflowToolCall(toolCall, workflowToolContext);
+        return executeWorkflowToolCall(toolCall, { ...workflowToolContext, executionGuard: guard });
       }
 
       if (isRemoteMcpToolCallEvent(toolCall)) {
         return executeRemoteMcpToolCall === undefined
-          ? { error: `Remote MCP tool ${toolCall.name} is no longer available.`, ok: false }
-          : executeRemoteMcpToolCall(toolCall);
+          ? {
+              effectsUncertain: false,
+              error: `Remote MCP tool ${toolCall.name} is no longer available.`,
+              ok: false,
+            }
+          : executeRemoteMcpToolCall(toolCall, guard);
       }
 
       if (toolCall.name === 'web_search') {
@@ -128,6 +145,7 @@ export const runSafeLlmTurn = ({
 
       return executeSafeToolCall(toolCall);
     },
+    executionGuard: guard,
     failureMessage: error => (error instanceof Error ? error.message : 'Failed to run safe mode.'),
     maxToolRounds: maxAgentToolRounds,
     noResponseMessage: 'The model did not return a response.',
@@ -138,7 +156,7 @@ export const runSafeLlmTurn = ({
         return fixedTools;
       }
 
-      const discovery = await discoverWebMcpTools(selectedTabId);
+      const discovery = await discoverWebMcpTools(selectedTabId, guard);
 
       if (discovery === undefined || discovery.documentId === '') {
         return fixedTools;

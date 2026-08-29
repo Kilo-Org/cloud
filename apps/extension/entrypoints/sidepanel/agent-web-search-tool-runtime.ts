@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import type { FetchLike } from '@/src/shared/auth';
-import type { EvalTabResult } from '@/src/shared/tab-debugger';
+import type { NormalizedEvalTabResult } from '@/src/shared/tab-debugger';
+import {
+  ExecutionStoppedError,
+  isExecutionStopped,
+  normalizeExecutionGuard,
+} from '@/src/shared/agent-tool-results';
+import type { ExecutionGuard } from '@/src/shared/agent-tool-results';
 
 interface WebSearchToolCall {
   readonly query?: string | undefined;
@@ -8,6 +14,7 @@ interface WebSearchToolCall {
 
 export interface WebSearchContext {
   readonly apiBaseUrl: string;
+  readonly executionGuard?: ExecutionGuard | undefined;
   readonly fetch: FetchLike;
   readonly organizationId?: string | undefined;
   readonly signal?: AbortSignal | undefined;
@@ -38,6 +45,7 @@ type FetchOutcome =
   | { readonly ok: false; readonly reason: string };
 
 const postSearch = async (query: string, context: WebSearchContext): Promise<FetchOutcome> => {
+  normalizeExecutionGuard(context.executionGuard, context.signal)();
   try {
     const response = await context.fetch(`${context.apiBaseUrl}/api/exa/search`, {
       body: JSON.stringify({
@@ -57,6 +65,13 @@ const postSearch = async (query: string, context: WebSearchContext): Promise<Fet
     });
     return { ok: true, response };
   } catch (error) {
+    if (error instanceof ExecutionStoppedError) {
+      // The request was issued; owner cancellation does not confirm its completion.
+      throw new ExecutionStoppedError(error.reason, error.status, true);
+    }
+    if (isExecutionStopped(error)) {
+      throw error;
+    }
     return { ok: false, reason: error instanceof Error ? error.message : 'network error' };
   }
 };
@@ -69,7 +84,14 @@ const readJson = async <Value>(
     const raw: unknown = await response.json();
     const parsed = schema.safeParse(raw);
     return parsed.success ? parsed.data : undefined;
-  } catch {
+  } catch (error) {
+    if (error instanceof ExecutionStoppedError && response.ok) {
+      // Successful headers alone do not confirm the search result; failed HTTP responses do.
+      throw new ExecutionStoppedError(error.reason, error.status, true);
+    }
+    if (isExecutionStopped(error)) {
+      throw error;
+    }
     return undefined;
   }
 };
@@ -83,49 +105,42 @@ const toResultEntry = (result: z.infer<typeof exaResponseSchema>['results'][numb
   url: result.url,
 });
 
-/**
- * Search the web through the Kilo Exa proxy (`/api/exa/search`). The backend
- * owns auth, the monthly free allowance, and per-request billing; the
- * extension only forwards the user's bearer token. Results come back as
- * compact title/url/snippet records — search results are untrusted data.
- */
+/** Search through the existing Kilo proxy. Results are untrusted data, not instructions. */
 export const executeWebSearchToolCall = async (
   toolCall: WebSearchToolCall,
   context: WebSearchContext
-): Promise<EvalTabResult> => {
+): Promise<NormalizedEvalTabResult> => {
+  normalizeExecutionGuard(context.executionGuard, context.signal)();
   const query = toolCall.query?.trim();
-
   if (query === undefined || query === '') {
-    return { error: QUERY_REQUIRED_ERROR, ok: false };
+    return { effectsUncertain: false, error: QUERY_REQUIRED_ERROR, ok: false };
   }
 
   const outcome = await postSearch(query, context);
-
   if (!outcome.ok) {
-    return { error: `Web search failed: ${outcome.reason}`, ok: false };
+    // The billable request was issued; a lost response does not confirm completion.
+    return { effectsUncertain: true, error: `Web search failed: ${outcome.reason}`, ok: false };
   }
 
   const { response } = outcome;
-
   if (!response.ok) {
-    // The proxy explains allowance and balance failures in its error body; pass that through so the model can tell the user why.
     const errorBody = await readJson(response, errorBodySchema);
     const detail = errorBody === undefined ? '' : ` ${errorBody.error}`;
     return {
+      effectsUncertain: false,
       error: `Web search failed with status ${String(response.status)}.${detail}`,
       ok: false,
     };
   }
 
   const parsed = await readJson(response, exaResponseSchema);
-
   if (parsed === undefined) {
-    return { error: 'Web search returned an invalid response.', ok: false };
+    return { effectsUncertain: true, error: 'Web search returned an invalid response.', ok: false };
   }
 
   const results = parsed.results.slice(0, MAX_RESULTS).map(result => toResultEntry(result));
-
   return {
+    effectsUncertain: false,
     ok: true,
     value:
       results.length === 0
@@ -134,25 +149,23 @@ export const executeWebSearchToolCall = async (
   };
 };
 
-/**
- * One executor per turn: it carries the turn's abort signal so a stopped turn
- * does not leave a billable search in flight, and it caps how many searches
- * one turn may spend from the account's allowance.
- */
+/** One executor per turn carries Stop and bounds billable searches; it cannot undo an issued request. */
 export const createWebSearchExecutor = (
   context: WebSearchContext
-): ((toolCall: WebSearchToolCall) => Promise<EvalTabResult>) => {
+): ((toolCall: WebSearchToolCall) => Promise<NormalizedEvalTabResult>) => {
   let searchCount = 0;
-
-  return async (toolCall: WebSearchToolCall): Promise<EvalTabResult> => {
+  const guard = normalizeExecutionGuard(context.executionGuard, context.signal);
+  return async toolCall => {
+    guard();
     if (searchCount >= MAX_SEARCHES_PER_TURN) {
       return {
+        effectsUncertain: false,
         error: `Web search limit reached for this turn (${String(MAX_SEARCHES_PER_TURN)} searches). Answer with what you have, or ask the user to continue.`,
         ok: false,
       };
     }
-    const result = await executeWebSearchToolCall(toolCall, context);
-    // A rejected argument never reaches the network and bills nothing, so it must not spend the budget.
+    const result = await executeWebSearchToolCall(toolCall, { ...context, executionGuard: guard });
+    // A rejected argument never reaches the network and bills nothing.
     if (result.ok || result.error !== QUERY_REQUIRED_ERROR) {
       searchCount += 1;
     }

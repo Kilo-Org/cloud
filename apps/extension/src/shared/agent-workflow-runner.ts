@@ -9,8 +9,14 @@ import {
   matchesWorkflowScope,
 } from './agent-workflows';
 import type { AgentWorkflow } from './agent-workflows';
+import { isExecutionStopped, normalizeExecutionGuard } from './agent-tool-results';
+import type { ExecutionGuard } from './agent-tool-results';
+import { normalizeEvalTabResult } from './tab-debugger';
+import type { EvalTabResult } from './tab-debugger';
 
-export type WorkflowRunResult =
+// Old producers and stored workflow results omit effectsUncertain; runWorkflow returns the normalized contract.
+// Remove this raw compatibility form after those producers and records retire.
+export type WorkflowRunResult = { readonly effectsUncertain?: boolean } & (
   | {
       ok: true;
       pagesVisited: number;
@@ -22,7 +28,12 @@ export type WorkflowRunResult =
       error: string;
       pageUrl?: string | undefined;
       dryRunActions?: { action: string; selector: string }[] | undefined;
-    };
+    }
+);
+
+export type NormalizedWorkflowRunResult = WorkflowRunResult & {
+  readonly effectsUncertain: boolean;
+};
 
 // The value a workflow script carries across navigations via { navigate, state }.
 interface WorkflowScriptState {
@@ -30,20 +41,10 @@ interface WorkflowScriptState {
   readonly [key: string]: unknown;
 }
 
-interface EvalTabOkResult {
-  ok: true;
-  value: unknown;
-}
-interface EvalTabErrResult {
-  ok: false;
-  error: string;
-}
-type EvalTabResult = EvalTabOkResult | EvalTabErrResult;
-
-interface WorkflowRunnerDeps {
-  evalInTab(tabId: number, code: string): Promise<EvalTabResult>;
+export interface WorkflowRunnerDeps {
+  evalInTab(tabId: number, code: string, executionGuard?: ExecutionGuard): Promise<EvalTabResult>;
   getTabUrl(tabId: number): Promise<string>;
-  navigateTab(tabId: number, url: string): Promise<void>;
+  navigateTab(tabId: number, url: string, executionGuard?: ExecutionGuard): Promise<void>;
 }
 
 // CDP surfaces a mid-eval page navigation as one of these context errors.
@@ -105,6 +106,7 @@ const scriptEnvelopeSchema = z.object({
     .optional()
     .default([]),
   dryRunUnverified: z.boolean().optional(),
+  effectsUncertain: z.boolean().optional(),
   error: z.string().optional(),
   ok: z.boolean(),
   value: z.unknown().optional(),
@@ -339,10 +341,11 @@ export const buildWorkflowPageCode = (
   '  try {\n' +
   '    candidate = compiledExpression();\n' +
   '  } catch (error) {\n' +
-  "    return { ok: false, error: 'Workflow script threw while evaluating: ' + String(error && error.message ? error.message : error) + '. Pass an async ({ page, state, input }) => { … } function (or a bare function body); do not invoke it yourself.', dryRunActions };\n" +
+  "    return { effectsUncertain: false, ok: false, error: 'Workflow script threw while evaluating: ' + String(error && error.message ? error.message : error) + '. Pass an async ({ page, state, input }) => { … } function (or a bare function body); do not invoke it yourself.', dryRunActions };\n" +
   '  }\n' +
   "  if (typeof candidate === 'function') { workflow = candidate; }\n" +
-  "  else { return { ok: false, error: 'Workflow script must be a function, but evaluated to a non-function value. Pass an async ({ page, state, input }) => { … } function (or a bare function body); do not invoke it yourself.', dryRunActions }; }\n" +
+  // An invoked async expression can keep acting after this shape rejection.
+  "  else { return { effectsUncertain: true, ok: false, error: 'Workflow script must be a function, but evaluated to a non-function value. Pass an async ({ page, state, input }) => { … } function (or a bare function body); do not invoke it yourself.', dryRunActions }; }\n" +
   '}\n' +
   'if (workflow === undefined) {\n' +
   "  workflow = new AsyncFunctionCtor('{ page, state, input }', scriptText);\n" +
@@ -356,6 +359,7 @@ export const buildWorkflowPageCode = (
   '  return { ok: true, value, dryRunActions };\n' +
   '} catch (error) {\n' +
   '  return {\n' +
+  '    effectsUncertain: false,\n' +
   '    ok: false,\n' +
   '    error: error instanceof Error ? error.message : String(error),\n' +
   '    dryRunActions,\n' +
@@ -366,6 +370,7 @@ export const buildWorkflowPageCode = (
 
 interface RunWorkflowOptions {
   dryRun?: boolean;
+  executionGuard?: ExecutionGuard | undefined;
   input?: unknown;
   signal?: AbortSignal;
   tabId: number;
@@ -380,14 +385,12 @@ const resultWithActions = (
   base: WorkflowRunResult,
   dryRun: boolean,
   actions: { action: string; selector: string }[]
-): WorkflowRunResult => {
-  if (dryRun) {
-    return { ...base, dryRunActions: actions };
-  }
-  return base;
-};
-
-const isRunStopped = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
+): NormalizedWorkflowRunResult => ({
+  ...base,
+  // These local validation results are confirmed; issued-action failures pass their metadata explicitly.
+  effectsUncertain: base.effectsUncertain ?? false,
+  ...(dryRun ? { dryRunActions: actions } : {}),
+});
 
 const formatWorkflowScopeText = (
   workflow: Pick<AgentWorkflow, 'scopeOrigin' | 'pathPrefix'>
@@ -502,8 +505,10 @@ const validateNavigationState = (
 export const runWorkflow = async (
   deps: WorkflowRunnerDeps,
   options: RunWorkflowOptions
-): Promise<WorkflowRunResult> => {
-  const { workflow, tabId, input, dryRun = false, signal } = options;
+): Promise<NormalizedWorkflowRunResult> => {
+  const { workflow, tabId, input, dryRun = false, signal, executionGuard } = options;
+  const guard = normalizeExecutionGuard(executionGuard, signal);
+  guard();
 
   // 1. Approval gate — also applies to dry runs.
   if (!(await isWorkflowApproved(workflow))) {
@@ -573,7 +578,8 @@ export const runWorkflow = async (
     );
   }
 
-  // 2. Optional startUrl navigation.
+  // 2. Optional startUrl navigation. Approval and input reads never grant authority to act.
+  guard();
   if (workflow.startUrl !== undefined && workflow.startUrl !== '') {
     if (!matchesWorkflowScope(workflow, workflow.startUrl)) {
       return resultWithActions(
@@ -586,10 +592,15 @@ export const runWorkflow = async (
       );
     }
     try {
-      await deps.navigateTab(tabId, workflow.startUrl);
+      guard();
+      await deps.navigateTab(tabId, workflow.startUrl, guard);
     } catch (error) {
+      if (isExecutionStopped(error)) {
+        throw error;
+      }
       return resultWithActions(
         {
+          effectsUncertain: true,
           error: `Navigation to the startUrl failed: ${error instanceof Error ? error.message : String(error)}`,
           ok: false,
         },
@@ -597,31 +608,25 @@ export const runWorkflow = async (
         []
       );
     }
-    if (isRunStopped(signal)) {
-      return resultWithActions({ error: 'Run stopped.', ok: false }, dryRun, []);
-    }
+    guard();
   }
 
-  // 3. Initialize before the loop. `state.input` mirrors `input` on the first
-  // Page for scripts written against the old contract.
+  // 3. `state.input` mirrors input on the first page for older scripts.
   let state: WorkflowScriptState = { input: normalizedInput };
   let pagesVisited = 0;
   let navigationRecoveries = 0;
   const dryRunActions: { action: string; selector: string }[] = [];
 
-  // 4. Loop, at most MAX_WORKFLOW_PAGES_PER_RUN iterations.
   for (let pageIndex = 0; pageIndex < MAX_WORKFLOW_PAGES_PER_RUN; pageIndex++) {
-    // A. Abort check.
-    if (isRunStopped(signal)) {
-      return resultWithActions({ error: 'Run stopped.', ok: false }, dryRun, dryRunActions);
-    }
-
-    // B. Scope check on current tab URL.
+    guard();
     let url = '';
     try {
       // eslint-disable-next-line no-await-in-loop -- Sequential workflow execution by design.
       url = await deps.getTabUrl(tabId);
     } catch (error) {
+      if (isExecutionStopped(error)) {
+        throw error;
+      }
       return resultWithActions(
         {
           error: `Could not read the tab URL: ${error instanceof Error ? error.message : String(error)}`,
@@ -631,9 +636,7 @@ export const runWorkflow = async (
         dryRunActions
       );
     }
-    if (isRunStopped(signal)) {
-      return resultWithActions({ error: 'Run stopped.', ok: false }, dryRun, dryRunActions);
-    }
+    guard();
     if (!matchesWorkflowScope(workflow, url)) {
       return resultWithActions(
         {
@@ -646,24 +649,46 @@ export const runWorkflow = async (
       );
     }
 
-    // C. Build the injected code.
     const code = buildWorkflowPageCode(workflow.script, state, dryRun, normalizedInput);
-
-    // D. Eval in the tab.
-    // eslint-disable-next-line no-await-in-loop — Sequential workflow execution by design.
-    const evalResult = await deps.evalInTab(tabId, code);
-    if (isRunStopped(signal)) {
-      return resultWithActions({ error: 'Run stopped.', ok: false }, dryRun, dryRunActions);
+    let rawResult: EvalTabResult | undefined = undefined;
+    try {
+      guard();
+      // eslint-disable-next-line no-await-in-loop -- Sequential workflow execution by design.
+      rawResult = await deps.evalInTab(tabId, code, guard);
+    } catch (error) {
+      if (isExecutionStopped(error)) {
+        throw error;
+      }
+      rawResult = {
+        effectsUncertain: true,
+        error: error instanceof Error ? error.message : String(error),
+        ok: false,
+      };
+    }
+    const evalResult = normalizeEvalTabResult(rawResult);
+    // Check uncertainty before Stop, navigation recovery, or success. An issued action can outlive its result.
+    if (evalResult.effectsUncertain) {
+      return resultWithActions(
+        {
+          effectsUncertain: true,
+          error: evalResult.ok ? 'Workflow action completion is uncertain.' : evalResult.error,
+          ok: false,
+          pageUrl: url,
+        },
+        dryRun,
+        dryRunActions
+      );
     }
     if (!evalResult.ok) {
-      // A real click can navigate the page mid-eval; the destroyed execution context IS the navigation the script wanted. Re-run the script on the landed page with the same state, exactly like the { navigate } path. Fixed 1.5 s settle and a 3-recovery cap; add a load-complete dep if flaky pages surface.
+      guard();
+      // Recover only when the producer confirms completion. A metadata-free destroyed context is not proof of quiescence.
       if (!dryRun && isNavigationDestroyedEval(evalResult.error) && navigationRecoveries < 3) {
         navigationRecoveries += 1;
-        // eslint-disable-next-line no-await-in-loop, promise/avoid-new -- Sequential workflow execution by design; a plain settle delay has no promise-returning primitive to defer to.
+        // eslint-disable-next-line no-await-in-loop, promise/avoid-new -- Sequential workflow recovery needs a settle delay.
         await new Promise<void>(resolve => {
           setTimeout(resolve, 1500);
         });
-        // eslint-disable-next-line no-continue -- Mirrors the { navigate } path: same state, next page iteration.
+        // eslint-disable-next-line no-continue -- The next iteration checks authority before another action.
         continue;
       }
       return resultWithActions(
@@ -673,25 +698,39 @@ export const runWorkflow = async (
       );
     }
 
-    // E. Increment pagesVisited and parse layer-2 envelope.
     pagesVisited++;
-
     const envelope = scriptEnvelopeSchema.safeParse(evalResult.value);
     if (!envelope.success) {
       return resultWithActions(
-        { error: invalidValueError(evalResult.value, dryRun), ok: false, pageUrl: url },
+        {
+          effectsUncertain: true,
+          error: invalidValueError(evalResult.value, dryRun),
+          ok: false,
+          pageUrl: url,
+        },
         dryRun,
         dryRunActions
       );
     }
 
-    // Accumulate dryRunActions.
-    const pageActions = envelope.data.dryRunActions;
-    dryRunActions.push(...pageActions);
+    dryRunActions.push(...envelope.data.dryRunActions);
+    // Old metadata-free script envelopes cannot confirm a failed issued action.
+    // Remove this fallback after those injected scripts and stored results retire.
+    if (envelope.data.effectsUncertain ?? !envelope.data.ok) {
+      return resultWithActions(
+        {
+          effectsUncertain: true,
+          error: envelope.data.error ?? 'Workflow action completion is uncertain.',
+          ok: false,
+          pageUrl: url,
+        },
+        dryRun,
+        dryRunActions
+      );
+    }
 
-    /* A dry run cannot reach content its own skipped clicks would have produced.
-       Selectors up to the first recorded action are verified, so this reports
-       success with the recorded actions instead of failing a correct script. */
+    guard();
+    // A dry run cannot reach content its skipped clicks would have produced.
     if (dryRun && envelope.data.dryRunUnverified === true) {
       return resultWithActions(
         {
@@ -707,7 +746,6 @@ export const runWorkflow = async (
       );
     }
 
-    // Script threw an error.
     if (!envelope.data.ok) {
       return resultWithActions(
         { error: envelope.data.error ?? 'Unknown script error.', ok: false, pageUrl: url },
@@ -717,8 +755,6 @@ export const runWorkflow = async (
     }
 
     if (!jsonRecordSchema.safeParse(envelope.data.value).success) {
-      /* Same reasoning as above: a dry-run script that falls through without a
-         return value usually read post-action content that never rendered. */
       if (dryRun && dryRunActions.length > 0) {
         return resultWithActions(
           {
@@ -733,7 +769,6 @@ export const runWorkflow = async (
           dryRunActions
         );
       }
-
       return resultWithActions(
         { error: invalidValueError(envelope.data.value, dryRun), ok: false, pageUrl: url },
         dryRun,
@@ -741,10 +776,8 @@ export const runWorkflow = async (
       );
     }
 
-    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- Preceding jsonRecordSchema check guarantees a plain object.
+    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- The schema check guarantees a plain object.
     const innerValue = envelope.data.value as Record<string, unknown>;
-
-    // Success: { done: true, result: <unknown> }
     if (innerValue['done'] === true) {
       return resultWithActions(
         { ok: true, pagesVisited, result: innerValue['result'] },
@@ -753,22 +786,24 @@ export const runWorkflow = async (
       );
     }
 
-    // Navigation: { navigate: string, state: object }
     const navigateValue = stringSchema.safeParse(innerValue['navigate']);
     if (navigateValue.success && navigateValue.data.length > 0) {
       const validationResult = validateNavigationState(workflow, innerValue, url);
-
       if (validationResult.kind === 'error') {
         return resultWithActions(validationResult.errorResult, dryRun, dryRunActions);
       }
-
       state = validationResult.nextState;
       try {
+        guard();
         // eslint-disable-next-line no-await-in-loop -- Sequential workflow execution by design.
-        await deps.navigateTab(tabId, validationResult.navigateUrl);
+        await deps.navigateTab(tabId, validationResult.navigateUrl, guard);
       } catch (error) {
+        if (isExecutionStopped(error)) {
+          throw error;
+        }
         return resultWithActions(
           {
+            effectsUncertain: true,
             error: `Navigation to ${validationResult.navigateUrl} failed: ${error instanceof Error ? error.message : String(error)}`,
             ok: false,
             pageUrl: url,
@@ -777,11 +812,11 @@ export const runWorkflow = async (
           dryRunActions
         );
       }
+      guard();
       // eslint-disable-next-line no-continue -- Clearer than deep nesting for this state machine.
       continue;
     }
 
-    // Anything else is invalid.
     return resultWithActions(
       { error: invalidValueError(innerValue, dryRun), ok: false, pageUrl: url },
       dryRun,

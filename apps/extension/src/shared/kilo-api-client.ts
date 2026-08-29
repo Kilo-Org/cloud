@@ -4,6 +4,7 @@ export {
   fetchKiloGatewayChatCompletionStream,
   KiloGatewayHttpError,
   KiloGatewayStreamStalledError,
+  KiloGatewayUnsupportedToolError,
   parseKiloGatewayChatCompletionStream,
 } from './kilo-gateway-chat-stream-client';
 export type {

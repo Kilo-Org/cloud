@@ -1,5 +1,7 @@
 /* eslint-disable max-classes-per-file */
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
+import { ExecutionStoppedError } from '../../src/shared/agent-tool-results';
 import type { RemoteMcpServer } from '../../src/shared/remote-mcp';
 import type { RemoteMcpToolRoute } from '../../src/shared/remote-mcp-tools';
 
@@ -112,20 +114,29 @@ describe('remote MCP tool call', () => {
     expect(lastCall?.[2]?.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it('returns isError result on tool call failure', async () => {
+  it.each([
+    new Error('Connection lost.'),
+    new McpError(ErrorCode.ConnectionClosed, 'Connection closed.'),
+    new McpError(ErrorCode.RequestTimeout, 'Request timed out.'),
+  ])('does not turn an issued transport failure into a server tool error: %s', async failure => {
     mocks.connect.mockResolvedValueOnce();
-    mocks.callTool.mockRejectedValueOnce(new Error('tool exploded'));
+    mocks.callTool.mockRejectedValueOnce(failure);
     mocks.close.mockResolvedValueOnce();
 
-    const result = await callRemoteMcpTool({
-      arguments: {},
-      fetch: noopFetch,
-      route,
-      server,
-    });
+    await expect(
+      callRemoteMcpTool({ arguments: {}, fetch: noopFetch, route, server })
+    ).rejects.toBe(failure);
+  });
 
-    expect(result).toMatchObject({ isError: true });
-    expect(JSON.stringify(result)).toContain('tool exploded');
+  it('returns a confirmed server tool error without throwing', async () => {
+    const result = { content: [{ text: 'tool exploded', type: 'text' }], isError: true };
+    mocks.connect.mockResolvedValueOnce();
+    mocks.callTool.mockResolvedValueOnce(result);
+    mocks.close.mockResolvedValueOnce();
+
+    await expect(
+      callRemoteMcpTool({ arguments: {}, fetch: noopFetch, route, server })
+    ).resolves.toStrictEqual(result);
   });
 
   it('returns isError result when connect fails', async () => {
@@ -139,7 +150,10 @@ describe('remote MCP tool call', () => {
       server,
     });
 
-    expect(result).toMatchObject({ isError: true });
+    expect(result).toStrictEqual({
+      content: [{ text: 'connect failed', type: 'text' }],
+      isError: true,
+    });
   });
 
   it('closes the client in finally even on error', async () => {
@@ -171,39 +185,61 @@ describe('remote MCP tool call', () => {
     expect(mocks.callTool.mock.calls.at(-1)?.[2]?.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it('returns tool-error object (does not throw) when callTool rejects with AbortError', async () => {
-    const abortErr = Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+  it('propagates an issued AbortError instead of reporting a server tool error', async () => {
+    const error = new DOMException('The operation was aborted', 'AbortError');
     mocks.connect.mockResolvedValueOnce();
-    mocks.callTool.mockRejectedValueOnce(abortErr);
+    mocks.callTool.mockRejectedValueOnce(error);
     mocks.close.mockResolvedValueOnce();
 
-    const controller = new AbortController();
-    controller.abort();
-    const result = await callRemoteMcpTool({
-      arguments: {},
-      fetch: noopFetch,
-      route,
-      server,
-      signal: controller.signal,
-    });
-
-    expect(result).toMatchObject({ isError: true });
-    expect(JSON.stringify(result)).toContain('operation was aborted');
+    await expect(
+      callRemoteMcpTool({ arguments: {}, fetch: noopFetch, route, server })
+    ).rejects.toBe(error);
   });
 
-  it('returns tool-error object (does not throw) when connect rejects with AbortError (simulating timeout)', async () => {
-    const timeoutErr = Object.assign(new Error('signal timed out'), { name: 'AbortError' });
-    mocks.connect.mockRejectedValueOnce(timeoutErr);
+  it('marks a typed abort from an issued call uncertain without losing its owner reason', async () => {
+    mocks.connect.mockResolvedValueOnce();
+    mocks.callTool.mockRejectedValueOnce(new ExecutionStoppedError('lease_lost'));
     mocks.close.mockResolvedValueOnce();
 
-    const result = await callRemoteMcpTool({
-      arguments: {},
-      fetch: noopFetch,
-      route,
-      server,
+    await expect(
+      callRemoteMcpTool({ arguments: {}, fetch: noopFetch, route, server })
+    ).rejects.toMatchObject({
+      effectsUncertain: true,
+      reason: 'lease_lost',
+      status: 'interrupted',
     });
+  });
 
-    expect(result).toMatchObject({ isError: true });
-    expect(JSON.stringify(result)).toContain('signal timed out');
+  it('keeps a connection AbortError confirmed before tool dispatch', async () => {
+    mocks.callTool.mockClear();
+    mocks.connect.mockRejectedValueOnce(new DOMException('Stopped.', 'AbortError'));
+    mocks.close.mockResolvedValueOnce();
+
+    await expect(
+      callRemoteMcpTool({ arguments: {}, fetch: noopFetch, route, server })
+    ).rejects.toMatchObject({
+      effectsUncertain: false,
+      reason: 'cancelled',
+      status: 'cancelled',
+    });
+    expect(mocks.callTool).not.toHaveBeenCalled();
+  });
+
+  it('checks a direct caller guard before opening a connection', async () => {
+    mocks.connect.mockClear();
+    const error = new ExecutionStoppedError('lease_lost');
+
+    await expect(
+      callRemoteMcpTool({
+        arguments: {},
+        executionGuard: () => {
+          throw error;
+        },
+        fetch: noopFetch,
+        route,
+        server,
+      })
+    ).rejects.toBe(error);
+    expect(mocks.connect).not.toHaveBeenCalled();
   });
 });

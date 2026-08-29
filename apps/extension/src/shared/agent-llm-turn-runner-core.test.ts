@@ -11,6 +11,9 @@ import type {
   KiloGatewayToolDefinition,
 } from './kilo-api-client';
 import { runLlmTurn } from './agent-llm-turn-runner-core';
+import type { LlmTurnOutcome } from './agent-llm-turn-runner-core';
+import { ExecutionStoppedError } from './agent-tool-results';
+import type { EvalTabResult } from './tab-debugger';
 
 const kiloApiClientMocks = vi.hoisted(() => ({
   fetchKiloGatewayChatCompletionStream: vi.fn(),
@@ -44,7 +47,7 @@ const getPageSnapshotTool: KiloGatewayToolDefinition = {
 function* createGatewayResponses(): Generator<Response, Response> {
   yield streamResponse([
     'data: {"choices":[{"delta":{"content":"Reading"}}]}\n\n',
-    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]}}]}\n\n',
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
     'data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":5,"total_tokens":105,"cost":0.0007}}\n\n',
     'data: [DONE]\n\n',
   ]);
@@ -59,7 +62,7 @@ function* createGatewayResponses(): Generator<Response, Response> {
 function* createToolOnlyGatewayResponses(rounds: number): Generator<Response, Response> {
   for (let index = 0; index < rounds; index += 1) {
     yield streamResponse([
-      `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_${index}","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]}}]}\n\n`,
+      `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_${index}","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n`,
       'data: [DONE]\n\n',
     ]);
   }
@@ -814,7 +817,8 @@ describe('identical failing tool call guard', () => {
         appendedEvents.push(...events);
       },
       conversationEvents: [createUserMessage('Run the workflow')],
-      executeToolCall: () => Promise.resolve({ error: 'Workflow run failed', ok: false }),
+      executeToolCall: () =>
+        Promise.resolve({ effectsUncertain: false, error: 'Workflow run failed', ok: false }),
       failureMessage: String,
       fetch,
       maxToolRounds: 8,
@@ -872,7 +876,11 @@ describe('per-tool failure cap', () => {
         if (callIndex % 10 === 0) {
           return Promise.resolve({ ok: true, value: { text: 'ok' } });
         }
-        return Promise.resolve({ error: `failure ${String(callIndex)}`, ok: false });
+        return Promise.resolve({
+          effectsUncertain: false,
+          error: `failure ${String(callIndex)}`,
+          ok: false,
+        });
       },
       failureMessage: String,
       fetch,
@@ -902,6 +910,558 @@ describe('per-tool failure cap', () => {
     expect(JSON.stringify(lastEvent)).toContain(
       'Stopped: get_page_snapshot failed 25 times this turn'
     );
+  });
+});
+
+const completeAnswer: KiloGatewayChatCompletion = {
+  content: 'Final answer.',
+  finishReason: 'stop',
+  toolCalls: [],
+};
+const requestedTool: KiloGatewayChatCompletion = {
+  finishReason: 'tool_calls',
+  toolCalls: [{ arguments: {}, id: 'requested-1', name: 'get_page_snapshot' }],
+};
+const outcomeOptions = () => ({
+  apiBaseUrl: 'https://app.kilo.ai',
+  appendEvents: (_events: AgentConversationEvent[]) => {},
+  conversationEvents: [createUserMessage('Finish the requested work.')],
+  executeToolCall: () => Promise.resolve({ ok: true as const, value: 'Observed text.' }),
+  failureMessage: String,
+  fetch: () => new Response(),
+  maxToolRounds: 5,
+  model: 'test-model',
+  noResponseMessage: 'No response.',
+  token: 'test-token',
+  tools: [getPageSnapshotTool],
+  tooManyToolRoundsMessage: 'Round limit.',
+  toToolCallEvents: (calls: KiloGatewayToolCallRequest[]) =>
+    calls.flatMap(call =>
+      call.name === 'get_page_snapshot'
+        ? [createSafeToolCall({ name: 'get_page_snapshot', providerToolCallId: call.id, tabId: 1 })]
+        : []
+    ),
+  updateAssistantMessage: () => {},
+  updateThinkingBlock: () => {},
+});
+
+interface OutcomeCase {
+  label: string;
+  expected: Pick<LlmTurnOutcome, 'status' | 'reason'>;
+  completions?: KiloGatewayChatCompletion[];
+  error?: Error;
+  result?: EvalTabResult;
+  rounds?: number;
+  requests: number;
+  actions?: number;
+  confirmed?: number;
+  summary?: string;
+  uncertain?: boolean;
+}
+const outcomeCases: OutcomeCase[] = [
+  {
+    label: 'end_turn answer',
+    completions: [{ ...completeAnswer, finishReason: 'end_turn' }],
+    expected: { reason: 'completed', status: 'succeeded' },
+    requests: 1,
+    summary: 'Final answer.',
+  },
+  {
+    label: 'empty stream without a finish reason',
+    completions: [{ toolCalls: [] }],
+    expected: { reason: 'empty_response', status: 'failed' },
+    requests: 3,
+  },
+  {
+    label: 'truncated thinking cannot trigger the nudge',
+    completions: [{ reasoning: 'Partial thinking.', toolCalls: [] }],
+    expected: { reason: 'truncated_response', status: 'failed' },
+    requests: 3,
+  },
+  {
+    label: 'context overflow with tool calls',
+    completions: [{ ...requestedTool, finishReason: 'model_context_window_exceeded' }],
+    expected: { reason: 'context_overflow', status: 'failed' },
+    requests: 1,
+  },
+  {
+    label: 'complete answer without evidence',
+    completions: [completeAnswer],
+    expected: { status: 'succeeded', reason: 'completed' },
+    requests: 1,
+    summary: 'Final answer.',
+  },
+  {
+    label: 'empty completion',
+    completions: [{ finishReason: 'stop', toolCalls: [] }],
+    expected: { status: 'failed', reason: 'empty_response' },
+    requests: 1,
+  },
+  {
+    label: 'whitespace answer',
+    completions: [{ content: '   ', finishReason: 'stop', toolCalls: [] }],
+    expected: { status: 'failed', reason: 'empty_response' },
+    requests: 1,
+  },
+  {
+    label: 'thinking without a remaining round',
+    completions: [{ reasoning: 'Planning.', finishReason: 'stop', toolCalls: [] }],
+    rounds: 1,
+    expected: { status: 'failed', reason: 'empty_response' },
+    requests: 1,
+  },
+  {
+    label: 'thinking after the nudge',
+    completions: [{ reasoning: 'Planning.', finishReason: 'stop', toolCalls: [] }],
+    expected: { status: 'failed', reason: 'empty_response' },
+    requests: 2,
+  },
+  {
+    label: 'empty context overflow',
+    completions: [{ finishReason: 'model_context_window_exceeded', toolCalls: [] }],
+    expected: { status: 'failed', reason: 'context_overflow' },
+    requests: 1,
+    summary: 'No response.',
+  },
+  {
+    label: 'exhausted empty truncation',
+    completions: [{ finishReason: 'length', toolCalls: [] }],
+    expected: { status: 'failed', reason: 'truncated_response' },
+    requests: 3,
+    summary: 'No response.',
+  },
+  {
+    label: 'partial final output',
+    completions: [{ content: 'Partial answer.', finishReason: 'length', toolCalls: [] }],
+    expected: { status: 'failed', reason: 'truncated_response' },
+    requests: 3,
+    summary: 'Partial answer.',
+  },
+  {
+    label: 'missing finish reason',
+    completions: [{ content: 'Partial answer.', toolCalls: [] }],
+    expected: { status: 'failed', reason: 'truncated_response' },
+    requests: 3,
+    summary: 'Partial answer.',
+  },
+  {
+    label: 'non-final finish reason',
+    completions: [{ content: 'Partial answer.', finishReason: 'tool_calls', toolCalls: [] }],
+    expected: { status: 'failed', reason: 'truncated_response' },
+    requests: 1,
+  },
+  {
+    label: 'context overflow',
+    completions: [
+      { content: 'Partial answer.', finishReason: 'model_context_window_exceeded', toolCalls: [] },
+    ],
+    expected: { status: 'failed', reason: 'context_overflow' },
+    requests: 1,
+    summary: 'Partial answer.',
+  },
+  {
+    label: 'no available rounds',
+    rounds: 0,
+    expected: { status: 'failed', reason: 'rounds_exhausted' },
+    requests: 0,
+  },
+  {
+    label: 'round limit after confirmed work',
+    completions: [requestedTool],
+    rounds: 1,
+    expected: { status: 'failed', reason: 'rounds_exhausted' },
+    requests: 1,
+    actions: 1,
+    confirmed: 1,
+  },
+  {
+    label: 'discarded unsafe call in a mixed batch',
+    completions: [
+      {
+        finishReason: 'tool_calls',
+        toolCalls: [...requestedTool.toolCalls, { arguments: {}, id: 'unsafe', name: 'eval' }],
+      },
+    ],
+    expected: { status: 'failed', reason: 'unsafe_tool_call' },
+    requests: 1,
+  },
+  {
+    label: 'truncated tool batch',
+    completions: [{ ...requestedTool, finishReason: 'length' }],
+    expected: { status: 'failed', reason: 'truncated_response' },
+    requests: 1,
+  },
+  {
+    label: 'recoverable tool failure',
+    completions: [requestedTool, completeAnswer],
+    result: { effectsUncertain: false, error: 'Missing input.', ok: false },
+    expected: { status: 'succeeded', reason: 'completed' },
+    requests: 2,
+    actions: 1,
+    confirmed: 1,
+  },
+  {
+    label: 'uncertain failure',
+    completions: [requestedTool],
+    result: { effectsUncertain: true, error: 'Timeout.', ok: false },
+    expected: { status: 'interrupted', reason: 'effects_uncertain' },
+    requests: 1,
+    actions: 1,
+    uncertain: true,
+  },
+  {
+    label: 'legacy failure after dispatch',
+    completions: [requestedTool],
+    result: { error: 'Lost result.', ok: false },
+    expected: { status: 'interrupted', reason: 'effects_uncertain' },
+    requests: 1,
+    actions: 1,
+    uncertain: true,
+  },
+  {
+    label: 'uncertain success payload',
+    completions: [requestedTool],
+    result: { effectsUncertain: true, ok: true, value: 'Unconfirmed.' },
+    expected: { status: 'interrupted', reason: 'effects_uncertain' },
+    requests: 1,
+    actions: 1,
+    uncertain: true,
+  },
+  {
+    label: 'exhausted model retries',
+    error: new TypeError('Network failed.'),
+    expected: { status: 'failed', reason: 'retry_exhausted' },
+    requests: 3,
+  },
+  {
+    label: 'terminal model failure',
+    error: new Error('Model failed.'),
+    expected: { status: 'failed', reason: 'model_failure' },
+    requests: 1,
+  },
+  {
+    label: 'model AbortError',
+    error: new DOMException('Stopped.', 'AbortError'),
+    expected: { status: 'cancelled', reason: 'cancelled' },
+    requests: 1,
+  },
+  {
+    label: 'owner interruption',
+    error: new ExecutionStoppedError('lease_lost'),
+    expected: { status: 'interrupted', reason: 'lease_lost' },
+    requests: 1,
+  },
+  {
+    label: 'execution timeout',
+    error: new ExecutionStoppedError('execution_timeout', 'interrupted', true),
+    expected: { status: 'interrupted', reason: 'execution_timeout' },
+    requests: 1,
+    uncertain: true,
+  },
+  {
+    label: 'unconfirmed announcement after the nudge',
+    completions: [
+      requestedTool,
+      { content: 'Creating the workflow now.', finishReason: 'stop', toolCalls: [] },
+    ],
+    expected: { status: 'failed', reason: 'incomplete_response' },
+    requests: 3,
+    actions: 1,
+    confirmed: 1,
+  },
+  {
+    label: 'tool failure cap',
+    completions: [requestedTool],
+    rounds: 30,
+    result: { effectsUncertain: false, error: 'Still blocked.', ok: false },
+    expected: { status: 'failed', reason: 'tool_failure_limit' },
+    requests: 25,
+    actions: 25,
+    confirmed: 25,
+  },
+];
+
+describe('typed terminal outcomes', () => {
+  it.each([
+    { ending: '', label: 'end of stream' },
+    { ending: 'data: [DONE]\n\n', label: 'DONE without finish metadata' },
+  ])('rejects a complete tool call before dispatch at $label', async ({ ending }) => {
+    const appended: AgentConversationEvent[] = [];
+    const actions: string[] = [];
+    let requests = 0;
+    const result = await runLlmTurn({
+      ...outcomeOptions(),
+      appendEvents: events => appended.push(...events),
+      executeToolCall: call => {
+        actions.push(call.name);
+        return Promise.resolve({ ok: true, value: 'Unexpected action.' });
+      },
+      fetch: () => {
+        requests += 1;
+        return streamResponse(
+          requests === 1
+            ? [
+                'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"unfinished-1","function":{"name":"get_page_snapshot","arguments":"{}"}}]}}]}\n\n',
+                ending,
+              ]
+            : [
+                'data: {"choices":[{"delta":{"content":"False success."},"finish_reason":"stop"}]}\n\n',
+              ]
+        );
+      },
+    });
+
+    expect(result).toMatchObject({
+      effectsUncertain: false,
+      reason: 'truncated_response',
+      status: 'failed',
+      toolResults: [],
+    });
+    expect({ actions, requests }).toStrictEqual({ actions: [], requests: 1 });
+    expect(
+      appended.filter(event => event.type === 'tool-call' || event.type === 'tool-result')
+    ).toStrictEqual([]);
+  });
+
+  it('keeps a typed pre-dispatch rejection confirmed after executor setup', async () => {
+    kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockResolvedValueOnce(requestedTool);
+    const actions: string[] = [];
+    let active = true;
+    const guard = () => {
+      if (!active) {
+        throw new ExecutionStoppedError('lease_lost');
+      }
+    };
+    const result = await runLlmTurn({
+      ...outcomeOptions(),
+      executeToolCall: async () => {
+        await Promise.resolve();
+        active = false;
+        guard();
+        actions.push('Unexpected action.');
+        return { ok: true, value: 'Unexpected result.' };
+      },
+      executionGuard: guard,
+    });
+
+    expect(result).toMatchObject({
+      effectsUncertain: false,
+      reason: 'lease_lost',
+      status: 'interrupted',
+      toolResults: [],
+    });
+    expect(actions).toStrictEqual([]);
+  });
+
+  it.each(outcomeCases)('returns a non-ambiguous result for $label', async entry => {
+    const actual = await vi.importActual<typeof import('./kilo-api-client')>('./kilo-api-client');
+    let requests = 0;
+    const actions: string[] = [];
+    const appended: AgentConversationEvent[] = [];
+    kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementation(() => {
+      requests += 1;
+      if (entry.error !== undefined) {
+        throw entry.error;
+      }
+      return entry.completions?.[requests - 1] ?? entry.completions?.at(-1) ?? completeAnswer;
+    });
+    vi.useFakeTimers();
+    try {
+      const pending = runLlmTurn({
+        ...outcomeOptions(),
+        appendEvents: events => appended.push(...events),
+        executeToolCall: call => {
+          actions.push(call.providerToolCallId ?? '');
+          return Promise.resolve(entry.result ?? { ok: true, value: 'Observed text.' });
+        },
+        maxToolRounds: entry.rounds ?? 5,
+      });
+      await vi.runAllTimersAsync();
+      const result = await pending;
+      expect(result).toMatchObject({
+        ...entry.expected,
+        effectsUncertain: entry.uncertain ?? false,
+        ...(entry.summary === undefined ? {} : { summary: entry.summary }),
+      });
+      const assistantMessages = appended.filter(event => event.type === 'message');
+      expect(assistantMessages.at(-1)).toMatchObject({ role: 'assistant', text: result.summary });
+      expect(result.toolResults).toHaveLength(entry.confirmed ?? 0);
+      expect(actions).toHaveLength(entry.actions ?? 0);
+      expect(requests).toBe(entry.requests);
+    } finally {
+      vi.useRealTimers();
+      kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementation(
+        actual.fetchKiloGatewayChatCompletionStream
+      );
+    }
+  });
+
+  it.each([
+    { label: 'Stop', reason: 'cancelled', status: 'cancelled' },
+    { label: 'lease loss', reason: 'lease_lost', status: 'interrupted' },
+  ])('prevents another tool or model round after $label', async ({ reason, status }) => {
+    const actual = await vi.importActual<typeof import('./kilo-api-client')>('./kilo-api-client');
+    const controller = new AbortController();
+    const actions: string[] = [];
+    let active = true;
+    let requests = 0;
+    kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementation(() => {
+      requests += 1;
+      return {
+        ...requestedTool,
+        toolCalls: [
+          ...requestedTool.toolCalls,
+          { arguments: {}, id: 'requested-2', name: 'get_page_snapshot' },
+        ],
+      };
+    });
+    try {
+      const result = await runLlmTurn({
+        ...outcomeOptions(),
+        executionGuard: () => {
+          if (!active) {
+            throw new Error('lease_lost');
+          }
+        },
+        executeToolCall: call => {
+          actions.push(call.providerToolCallId ?? '');
+          if (reason === 'cancelled') {
+            controller.abort();
+          } else {
+            active = false;
+          }
+          return Promise.resolve({ ok: true, value: 'Issued and confirmed.' });
+        },
+        signal: controller.signal,
+      });
+      expect(result).toMatchObject({ effectsUncertain: false, reason, status });
+      expect(result.toolResults).toMatchObject([{ ok: true, value: 'Issued and confirmed.' }]);
+      expect(actions).toStrictEqual(['requested-1']);
+      expect(requests).toBe(1);
+    } finally {
+      kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementation(
+        actual.fetchKiloGatewayChatCompletionStream
+      );
+    }
+  });
+
+  it('retains uncertainty when an issued executor aborts without a result', async () => {
+    const actual = await vi.importActual<typeof import('./kilo-api-client')>('./kilo-api-client');
+    kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockResolvedValueOnce(requestedTool);
+    try {
+      const result = await runLlmTurn({
+        ...outcomeOptions(),
+        executeToolCall: () => Promise.reject(new DOMException('Transport aborted.', 'AbortError')),
+      });
+      expect(result).toMatchObject({
+        effectsUncertain: true,
+        status: 'cancelled',
+        toolResults: [],
+      });
+    } finally {
+      kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementation(
+        actual.fetchKiloGatewayChatCompletionStream
+      );
+    }
+  });
+});
+
+describe('authority across model awaits', () => {
+  it.each([
+    { reason: 'cancelled', status: 'cancelled' as const },
+    { reason: 'lease_lost', status: 'interrupted' as const },
+  ])('retains $reason while waiting to retry', async ({ reason, status }) => {
+    const actual = await vi.importActual<typeof import('./kilo-api-client')>('./kilo-api-client');
+    const controller = new AbortController();
+    let requests = 0;
+    kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementation(() => {
+      requests += 1;
+      setTimeout(() => {
+        controller.abort(new ExecutionStoppedError(reason, status));
+      }, 1);
+      throw new TypeError('Network failed.');
+    });
+    vi.useFakeTimers();
+    try {
+      const pending = runLlmTurn({ ...outcomeOptions(), signal: controller.signal });
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toMatchObject({
+        effectsUncertain: false,
+        reason,
+        status,
+        toolResults: [],
+      });
+      expect(requests).toBe(1);
+    } finally {
+      vi.useRealTimers();
+      kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementation(
+        actual.fetchKiloGatewayChatCompletionStream
+      );
+    }
+  });
+
+  it('preserves the lease guard through the invisible continuation', async () => {
+    const actual = await vi.importActual<typeof import('./kilo-api-client')>('./kilo-api-client');
+    let active = true;
+    let requests = 0;
+    const actions: string[] = [];
+    const completions = [
+      requestedTool,
+      { content: 'Creating the workflow now.', finishReason: 'stop', toolCalls: [] },
+      requestedTool,
+    ];
+    kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementation(() => {
+      const completion = completions[requests];
+      requests += 1;
+      if (requests === 3) {
+        active = false;
+      }
+      return completion;
+    });
+    try {
+      const result = await runLlmTurn({
+        ...outcomeOptions(),
+        executeToolCall: () => {
+          actions.push('read');
+          return Promise.resolve({ ok: true, value: 'observed' });
+        },
+        executionGuard: () => {
+          if (!active) {
+            throw new ExecutionStoppedError('lease_lost');
+          }
+        },
+      });
+      expect(result).toMatchObject({
+        effectsUncertain: false,
+        reason: 'lease_lost',
+        status: 'interrupted',
+      });
+      expect(result.toolResults).toMatchObject([{ ok: true, value: 'observed' }]);
+      expect(actions).toStrictEqual(['read']);
+      expect(requests).toBe(3);
+    } finally {
+      kiloApiClientMocks.fetchKiloGatewayChatCompletionStream.mockImplementation(
+        actual.fetchKiloGatewayChatCompletionStream
+      );
+    }
+  });
+
+  it('retains discovery uncertainty even when Stop arrives at the same time', async () => {
+    const controller = new AbortController();
+    const result = await runLlmTurn({
+      ...outcomeOptions(),
+      prepareTools: () => {
+        controller.abort();
+        throw new ExecutionStoppedError('effects_uncertain', 'interrupted', true);
+      },
+      signal: controller.signal,
+    });
+    expect(result).toMatchObject({
+      effectsUncertain: true,
+      reason: 'effects_uncertain',
+      status: 'interrupted',
+      toolResults: [],
+    });
   });
 });
 

@@ -1,11 +1,19 @@
-/* eslint-disable max-lines, promise/avoid-new, promise/no-multiple-resolved -- Turn loop with a transparent stream-retry tier; the cancellable delay needs a raw, guard-settled promise. */
+/* eslint-disable max-lines, max-classes-per-file, promise/avoid-new, promise/no-multiple-resolved -- The turn loop uses distinct typed failures and a cancellable retry delay. */
 import {
   createAssistantMessage,
   createThinkingBlock,
   createUserMessage,
 } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
-import { runToolCalls } from './agent-tool-results';
+import {
+  ExecutionStoppedError,
+  isExecutionStopped,
+  normalizeExecutionGuard,
+  runToolCalls,
+} from './agent-tool-results';
+import type { ExecutionGuard, ToolResultEvent } from './agent-tool-results';
+import { normalizeEvalTabResult } from './tab-debugger';
+import type { EvalTabResult, NormalizedEvalTabResult } from './tab-debugger';
 import type { FetchLike } from './auth';
 import { buildGatewayMessagesFromEvents } from './agent-llm-harness';
 import type { KiloGatewayToolCallRequest, KiloGatewayToolDefinition } from './kilo-api-client';
@@ -13,8 +21,33 @@ import {
   fetchKiloGatewayChatCompletionStream,
   KiloGatewayHttpError,
   KiloGatewayStreamStalledError,
+  KiloGatewayUnsupportedToolError,
 } from './kilo-api-client';
-import type { EvalTabResult } from './tab-debugger';
+
+export type LlmTurnFailureReason =
+  | 'model_failure'
+  | 'retry_exhausted'
+  | 'context_overflow'
+  | 'rounds_exhausted'
+  | 'truncated_response'
+  | 'empty_response'
+  | 'incomplete_response'
+  | 'tool_failure_limit'
+  | 'unsafe_tool_call';
+
+type TurnTermination =
+  | { readonly status: 'succeeded'; readonly reason: 'completed' }
+  | { readonly status: 'failed'; readonly reason: LlmTurnFailureReason }
+  | { readonly status: 'cancelled' | 'interrupted'; readonly reason: string };
+
+export type LlmTurnOutcome = TurnTermination & {
+  readonly summary: string;
+  /** Only settled, confirmed results from this turn; never inferred evidence. */
+  readonly toolResults: ToolResultEvent[];
+  readonly effectsUncertain: boolean;
+};
+
+class ToolFailureLimitError extends Error {}
 
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
 
@@ -30,6 +63,7 @@ interface RunLlmTurnOptions<ToolCall extends ToolCallEvent> {
   readonly appendEvents: (events: AgentConversationEvent[]) => void;
   readonly conversationEvents: AgentConversationEvent[];
   readonly executeToolCall: (toolCall: ToolCall) => Promise<EvalTabResult>;
+  readonly executionGuard?: ExecutionGuard | undefined;
   readonly failureMessage: (error: unknown) => string;
   readonly fetch: FetchLike;
   readonly maxToolRounds: number;
@@ -65,13 +99,8 @@ const withReasoningDetails = <ToolCall extends ToolCallEvent>(
   return [{ ...first, reasoningDetails }, ...rest];
 };
 
-const isAbortError = (error: unknown): boolean =>
-  error instanceof Error && error.name === 'AbortError';
-
 const isHighEffort = (thinkingEffort: string | undefined): boolean =>
   thinkingEffort === 'high' || thinkingEffort === 'xhigh' || thinkingEffort === 'max';
-
-const isSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
 
 // One transparent retry tier for failures the user cannot act on: a stalled stream, a transient network failure, or a retriable gateway status.
 const MAX_STREAM_ATTEMPTS = 3;
@@ -154,6 +183,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   appendEvents,
   conversationEvents,
   executeToolCall,
+  executionGuard,
   failureMessage,
   fetch,
   maxToolRounds,
@@ -172,15 +202,30 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   updateAssistantMessage,
   updateThinkingBlock,
   onAssistantStreaming,
-}: RunLlmTurnOptions<ToolCall>): Promise<void> => {
+}: RunLlmTurnOptions<ToolCall>): Promise<LlmTurnOutcome> => {
+  const guard = normalizeExecutionGuard(executionGuard, signal);
+  const confirmedToolResults: ToolResultEvent[] = [];
+  let lastAssistantSummary = '';
+  let effectsUncertain = false;
+  let issuedActionPending = false;
+  let streamRetriesExhausted = false;
+  const outcome = (
+    termination: TurnTermination,
+    summary = lastAssistantSummary
+  ): LlmTurnOutcome => ({
+    ...termination,
+    effectsUncertain,
+    summary,
+    toolResults: [...confirmedToolResults],
+  });
   // A weak model can loop one byte-identical failing tool call for the whole turn (measured: 118 identical run_workflow calls). After the third identical failure the error tells it to stop; a success resets the count.
   const identicalFailureCounts = new Map<string, number>();
-  // Some models mutate the arguments slightly each round, so byte-identity never collides and the text escalation never lands; interleaved successes of other tools also defeat a consecutive counter (measured: 50 failing run_workflow calls between healthy snapshots). Count TOTAL failures per tool for the turn: across 812 benchmark attempts no passing attempt exceeded 19; runaway loops hit 118-119. At 25 the turn ends instead of burning billed rounds.
+  // Count total failures per tool, even across changed arguments and interleaved successes.
   const MAX_TOOL_FAILURES_PER_TURN = 25;
   const failureTotals = new Map<string, number>();
-  // Snapshot the message when the cap trips so later results cannot change it.
   let streakStopMessage: string | undefined = undefined;
-  const guardedExecuteToolCall = async (toolCall: ToolCall): Promise<EvalTabResult> => {
+  const guardedExecuteToolCall = async (toolCall: ToolCall): Promise<NormalizedEvalTabResult> => {
+    guard();
     // Key on the call content, not its per-call ids or attached reasoning: repeats must collide.
     const {
       id: _id,
@@ -192,7 +237,12 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       readonly reasoningDetails?: readonly unknown[];
     };
     const key = JSON.stringify(callContent);
-    const result = await executeToolCall(toolCall);
+    issuedActionPending = true;
+    const result = normalizeEvalTabResult(await executeToolCall(toolCall));
+    issuedActionPending = false;
+    if (result.effectsUncertain) {
+      return result;
+    }
     if (result.ok) {
       identicalFailureCounts.delete(key);
       return result;
@@ -208,8 +258,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       return result;
     }
     return {
+      ...result,
       error: `${result.error} — You have sent this exact ${toolCall.name} call ${count} times and it keeps failing. Do not send it again. Change the arguments or take a different approach.`,
-      ok: false,
     };
   };
   const getGatewayChatCompletion = async (
@@ -217,7 +267,9 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     onContentDelta: (delta: string) => void,
     onReasoningDelta: (delta: string) => void
   ) => {
+    guard();
     const requestTools = prepareTools === undefined ? tools : await prepareTools();
+    guard();
 
     return fetchKiloGatewayChatCompletionStream({
       apiBaseUrl,
@@ -240,6 +292,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     nextEvents: AgentConversationEvent[]
   ): Promise<{
     completionEvents: AgentConversationEvent[];
+    discardedToolCalls: boolean;
     finishReason: string | undefined;
     toolCallEvents: ToolCall[];
   }> => {
@@ -317,11 +370,16 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
           }
           return completion;
         } catch (error) {
-          if (
-            streamAttempt >= MAX_STREAM_ATTEMPTS ||
-            !isRetriableStreamError(error) ||
-            isSignalAborted(signal)
-          ) {
+          // Preserve producer uncertainty even when the owner revokes authority at the same time.
+          if (error instanceof ExecutionStoppedError) {
+            throw error;
+          }
+          guard();
+          if (isExecutionStopped(error)) {
+            throw error;
+          }
+          if (streamAttempt >= MAX_STREAM_ATTEMPTS || !isRetriableStreamError(error)) {
+            streamRetriesExhausted = isRetriableStreamError(error);
             // When every attempt came back truncated, degrade to the last partial text rather than replacing it with a failure message.
             if (
               error instanceof TruncatedCompletionError &&
@@ -334,11 +392,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
           resetStreamedTextOnNextDelta = true;
           resetThinkingTextOnNextDelta = true;
           await abortableDelay(STREAM_RETRY_DELAYS_MS[streamAttempt - 1] ?? 4000, signal);
-          if (isSignalAborted(signal)) {
-            const abortError = new Error('The user aborted a request.');
-            abortError.name = 'AbortError';
-            throw abortError;
-          }
+          guard();
           return streamWithRetries(streamAttempt + 1);
         }
       };
@@ -346,6 +400,11 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 
       if (completion.usage !== undefined) {
         onUsage?.(completion.usage);
+      }
+
+      // An unfinished tool batch is terminal; do not retry it or expose unmatched calls in history.
+      if (completion.toolCalls.length > 0 && completion.finishReason === undefined) {
+        throw new TruncatedCompletionError('missing');
       }
 
       if (streamedThinkingEventId !== undefined) {
@@ -364,7 +423,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       }
 
       if (streamedAssistantEventId !== undefined) {
-        const finalStreamedText = completion.content ?? streamedText;
+        const finalStreamedText =
+          completion.content ?? (resetStreamedTextOnNextDelta ? '' : streamedText);
         const streamedAssistantEventIndex = completionEvents.findIndex(
           event => event.id === streamedAssistantEventId
         );
@@ -388,10 +448,15 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         completionEvents.push(createThinkingBlock(completion.reasoning));
       }
 
-      const toolCallEvents = withReasoningDetails(
-        toToolCallEvents(completion.toolCalls),
-        completion.reasoningDetails
-      );
+      const convertedToolCalls = toToolCallEvents(completion.toolCalls);
+      const discardedToolCalls = convertedToolCalls.length !== completion.toolCalls.length;
+      // A partially accepted response must not execute its remaining calls or leave unmatched calls in history.
+      const toolCallEvents =
+        discardedToolCalls ||
+        TRUNCATED_FINISH_REASONS.has(completion.finishReason ?? '') ||
+        completion.finishReason === 'model_context_window_exceeded'
+          ? []
+          : withReasoningDetails(convertedToolCalls, completion.reasoningDetails);
       completionEvents.push(...toolCallEvents);
 
       appendEvents(
@@ -400,7 +465,12 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         )
       );
 
-      return { completionEvents, finishReason: completion.finishReason, toolCallEvents };
+      return {
+        completionEvents,
+        discardedToolCalls,
+        finishReason: completion.finishReason,
+        toolCallEvents,
+      };
     } finally {
       if (didStartAssistantStreaming) {
         // Explicit clear: callers key collapse chrome off this id being undefined.
@@ -416,79 +486,135 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     const continueConversation = async (
       nextConversationEvents: AgentConversationEvent[],
       remainingRounds: number
-    ): Promise<void> => {
-      if (remainingRounds === 0) {
+    ): Promise<LlmTurnOutcome> => {
+      guard();
+      if (remainingRounds <= 0) {
         appendEvents([createAssistantMessage(tooManyToolRoundsMessage)]);
-        return;
+        return outcome({ reason: 'rounds_exhausted', status: 'failed' }, tooManyToolRoundsMessage);
       }
 
-      const { completionEvents, finishReason, toolCallEvents } =
+      const { completionEvents, discardedToolCalls, finishReason, toolCallEvents } =
         await appendCompletion(nextConversationEvents);
-
-      if (completionEvents.length === 0) {
-        appendEvents([createAssistantMessage(noResponseMessage)]);
-        return;
-      }
-
+      guard();
+      const lastAssistantText =
+        completionEvents
+          .toReversed()
+          .find(
+            (event): event is Extract<AgentConversationEvent, { type: 'message' }> =>
+              event.type === 'message' && event.role === 'assistant'
+          )?.text ?? '';
+      lastAssistantSummary = lastAssistantText;
       nextConversationEvents.push(...completionEvents);
 
+      if (discardedToolCalls) {
+        throw new KiloGatewayUnsupportedToolError();
+      }
+      if (
+        finishReason === 'model_context_window_exceeded' ||
+        TRUNCATED_FINISH_REASONS.has(finishReason ?? '') ||
+        (toolCallEvents.length === 0 &&
+          completionEvents.length > 0 &&
+          finishReason !== 'stop' &&
+          finishReason !== 'end_turn')
+      ) {
+        if (lastAssistantText.trim() === '') {
+          lastAssistantSummary = noResponseMessage;
+          appendEvents([createAssistantMessage(noResponseMessage)]);
+        }
+        return outcome({
+          reason:
+            finishReason === 'model_context_window_exceeded'
+              ? 'context_overflow'
+              : 'truncated_response',
+          status: 'failed',
+        });
+      }
+      if (completionEvents.length === 0) {
+        appendEvents([createAssistantMessage(noResponseMessage)]);
+        return outcome({ reason: 'empty_response', status: 'failed' }, noResponseMessage);
+      }
+
       if (toolCallEvents.length === 0) {
-        const lastAssistantText =
-          completionEvents
-            .toReversed()
-            .find(
-              (event): event is Extract<AgentConversationEvent, { type: 'message' }> =>
-                event.type === 'message' && event.role === 'assistant'
-            )?.text ?? '';
-        if (
-          !continueNudgeSent &&
-          // An overflowed prompt cannot fit again with a nudge appended; re-sending it would burn a second billed request on a guaranteed overflow.
-          finishReason !== 'model_context_window_exceeded' &&
-          remainingRounds > 1 &&
-          !isSignalAborted(signal) &&
-          (endedThinkingOnly(completionEvents, lastAssistantText) ||
-            (turnUsedTools && deservesContinueNudge(lastAssistantText)))
-        ) {
+        const needsContinuation =
+          endedThinkingOnly(completionEvents, lastAssistantText) ||
+          (turnUsedTools && deservesContinueNudge(lastAssistantText));
+        if (!continueNudgeSent && remainingRounds > 1 && needsContinuation) {
           continueNudgeSent = true;
           // Ephemeral: sent to the model, never appended to the stored conversation.
           nextConversationEvents.push(createUserMessage(CONTINUE_NUDGE_TEXT));
-          await continueConversation(nextConversationEvents, remainingRounds - 1);
+          return continueConversation(nextConversationEvents, remainingRounds - 1);
         }
-        return;
+        if (lastAssistantText.trim() === '') {
+          appendEvents([createAssistantMessage(noResponseMessage)]);
+          return outcome({ reason: 'empty_response', status: 'failed' }, noResponseMessage);
+        }
+        if (needsContinuation) {
+          return outcome({ reason: 'incomplete_response', status: 'failed' });
+        }
+        return outcome({ reason: 'completed', status: 'succeeded' });
       }
       turnUsedTools = true;
 
-      if (isSignalAborted(signal)) {
-        appendEvents([createAssistantMessage('Stopped.')]);
-        return;
+      await runToolCalls(toolCallEvents, guardedExecuteToolCall, signal, {
+        executionGuard: guard,
+        onResult: result => {
+          issuedActionPending = false;
+          effectsUncertain ||= result.effectsUncertain;
+          if (!result.effectsUncertain) {
+            confirmedToolResults.push(result);
+          }
+          // Keep confirmed events even if Stop or lease loss prevents the next call.
+          appendEvents([result]);
+          nextConversationEvents.push(result);
+          if (streakStopMessage !== undefined) {
+            throw new ToolFailureLimitError(streakStopMessage);
+          }
+        },
+      });
+      if (effectsUncertain) {
+        throw new ExecutionStoppedError('effects_uncertain', 'interrupted', true);
       }
-
-      const toolResultEvents: AgentConversationEvent[] = await runToolCalls(
-        toolCallEvents,
-        guardedExecuteToolCall,
-        signal
-      );
-
-      if (isSignalAborted(signal)) {
-        appendEvents([createAssistantMessage('Stopped.')]);
-        return;
-      }
-
-      appendEvents(toolResultEvents);
-      nextConversationEvents.push(...toolResultEvents);
-
-      if (streakStopMessage !== undefined) {
-        appendEvents([createAssistantMessage(streakStopMessage)]);
-        return;
-      }
-
-      await continueConversation(nextConversationEvents, remainingRounds - 1);
+      guard();
+      return continueConversation(nextConversationEvents, remainingRounds - 1);
     };
 
-    await continueConversation([...conversationEvents], maxToolRounds);
+    return await continueConversation([...conversationEvents], maxToolRounds);
   } catch (error) {
-    appendEvents([
-      createAssistantMessage(isAbortError(error) ? 'Stopped.' : failureMessage(error)),
-    ]);
+    if (error instanceof ExecutionStoppedError) {
+      effectsUncertain ||= error.effectsUncertain;
+      const summary = error.status === 'cancelled' ? 'Stopped.' : `Interrupted: ${error.reason}.`;
+      appendEvents([createAssistantMessage(summary)]);
+      return outcome({ reason: error.reason, status: error.status }, summary);
+    }
+    if (isExecutionStopped(error)) {
+      effectsUncertain ||= issuedActionPending;
+      appendEvents([createAssistantMessage('Stopped.')]);
+      return outcome({ reason: 'cancelled', status: 'cancelled' }, 'Stopped.');
+    }
+    if (error instanceof KiloGatewayUnsupportedToolError) {
+      const summary =
+        'The model requested an unavailable or unsafe tool. No calls from that response were executed.';
+      appendEvents([createAssistantMessage(summary)]);
+      return outcome({ reason: 'unsafe_tool_call', status: 'failed' }, summary);
+    }
+    const summary = error instanceof ToolFailureLimitError ? error.message : failureMessage(error);
+    appendEvents([createAssistantMessage(summary)]);
+    if (issuedActionPending) {
+      effectsUncertain = true;
+      return outcome({ reason: 'effects_uncertain', status: 'interrupted' }, summary);
+    }
+    if (error instanceof TruncatedCompletionError) {
+      return outcome({ reason: 'truncated_response', status: 'failed' }, summary);
+    }
+    if (error instanceof ToolFailureLimitError) {
+      return outcome({ reason: 'tool_failure_limit', status: 'failed' }, summary);
+    }
+    return outcome(
+      {
+        reason: streamRetriesExhausted ? 'retry_exhausted' : 'model_failure',
+        status: 'failed',
+      },
+      summary
+    );
   }
 };

@@ -1,7 +1,10 @@
 /* eslint-disable max-lines */
 import { z } from 'zod';
 import type { WorkflowToolCallEvent } from '@/src/shared/agent-conversation';
-import type { EvalTabResult } from '@/src/shared/tab-debugger';
+import { normalizeEvalTabResult } from '@/src/shared/tab-debugger';
+import type { EvalTabResult, NormalizedEvalTabResult } from '@/src/shared/tab-debugger';
+import { ExecutionStoppedError, normalizeExecutionGuard } from '@/src/shared/agent-tool-results';
+import type { ExecutionGuard } from '@/src/shared/agent-tool-results';
 import {
   MAX_WORKFLOW_COUNT,
   MAX_WORKFLOW_NAME_LENGTH,
@@ -17,7 +20,7 @@ import {
   loadWorkflowSettings,
 } from '@/src/shared/agent-workflows-storage';
 import { runWorkflow } from '@/src/shared/agent-workflow-runner';
-import type { WorkflowRunResult } from '@/src/shared/agent-workflow-runner';
+import type { WorkflowRunResult, WorkflowRunnerDeps } from '@/src/shared/agent-workflow-runner';
 import type { ApprovalKind, ApprovalOutcome } from './pending-approval';
 
 // ---------- tool context ----------
@@ -40,9 +43,10 @@ export interface WorkflowToolContext {
     kind: ApprovalKind,
     draft: Record<string, unknown>
   ) => Promise<ApprovalOutcome>;
-  readonly evalInTab: (tabId: number, code: string) => Promise<EvalTabResult>;
-  readonly navigateTab: (tabId: number, url: string) => Promise<void>;
-  readonly getTabUrl: (tabId: number) => Promise<string>;
+  readonly executionGuard?: ExecutionGuard | undefined;
+  readonly evalInTab: WorkflowRunnerDeps['evalInTab'];
+  readonly navigateTab: WorkflowRunnerDeps['navigateTab'];
+  readonly getTabUrl: WorkflowRunnerDeps['getTabUrl'];
 }
 
 // ---------- zod schemas ----------
@@ -227,22 +231,21 @@ const approvalOutcomeToToolResult = (
     return { ok: true, value: { reason: 'The user rejected the save.', saved: false } };
   }
   if (outcome.status === 'aborted') {
-    return { error: 'Run stopped before approval.', ok: false };
+    throw new ExecutionStoppedError('Run stopped before approval.', 'cancelled');
   }
   // Failed to save — the draft stays in storage but the caller must know.
   return { ok: true, value: { reason: outcome.reason, saved: false } };
 };
 
-/**
- * Map a WorkflowRunResult to an EvalTabResult.
- * The workflow name rides along so the transcript and the model can say
- * which workflow produced the result or the failure.
- */
+/** Preserve action certainty while naming the workflow in its tool result. */
 const runResultToToolResult = (
   result: WorkflowRunResult,
   dryRun: boolean,
   workflowName: string
-): EvalTabResult => {
+): NormalizedEvalTabResult => {
+  // Old metadata-free workflow results use the same issued-failure fallback as eval results.
+  // Remove this normalization after all metadata-free workflow producers and stored results retire.
+  const { effectsUncertain } = normalizeEvalTabResult(result);
   if (result.ok) {
     const extra: Record<string, unknown> = {};
     if (dryRun) {
@@ -251,8 +254,8 @@ const runResultToToolResult = (
     } else if (result.dryRunActions !== undefined) {
       extra['dryRunActions'] = result.dryRunActions;
     }
-
     return {
+      effectsUncertain,
       ok: true,
       value: {
         pagesVisited: result.pagesVisited,
@@ -262,11 +265,10 @@ const runResultToToolResult = (
       },
     };
   }
-
   const withPage =
     result.pageUrl === undefined ? result.error : `${result.error} (page: ${result.pageUrl})`;
-
   return {
+    effectsUncertain,
     error: `Workflow "${workflowName}" failed: ${withPage}`,
     ok: false,
   };
@@ -284,6 +286,7 @@ const executeSearchWorkflows = async (
   }
 
   const workflows = await loadAgentWorkflows(ctx.storage);
+  ctx.executionGuard?.();
   const results = searchAgentWorkflows(workflows, ctx.selectedTabUrl, parsed.data.query);
 
   if (results.length === 0) {
@@ -323,6 +326,7 @@ const executeGetWorkflow = async (
   }
 
   const workflows = await loadAgentWorkflows(ctx.storage);
+  ctx.executionGuard?.();
   const workflow = workflows.find(item => item.id === parsed.data.workflowId);
 
   if (workflow === undefined) {
@@ -350,6 +354,7 @@ const executeSaveWorkflow = async (
   );
 
   const workflows = await loadAgentWorkflows(ctx.storage);
+  ctx.executionGuard?.();
   const existing =
     rawParsed.data.workflowId === undefined
       ? undefined
@@ -426,7 +431,11 @@ const executeSaveWorkflow = async (
   // The runs toggle is a permission the model reads through the save result's nextStep.
   // Request approval first, then read the setting when the save completes.
   // A change made while the card was pending is reflected in the guidance.
+  ctx.executionGuard?.();
   const outcome = await ctx.requestApproval('workflow', draft);
+  if (outcome.status === 'aborted') {
+    ctx.executionGuard?.();
+  }
 
   // A failed settings read still permits the save and falls back to the cautious ask-the-user guidance.
   let runsAutoApproved = false;
@@ -470,6 +479,7 @@ const executeRunWorkflow = async (
   const { workflowId, dryRun = false, input } = parsed.data;
 
   const workflows = await loadAgentWorkflows(ctx.storage);
+  ctx.executionGuard?.();
   const workflow = workflows.find(item => item.id === workflowId);
 
   if (workflow === undefined) {
@@ -480,16 +490,14 @@ const executeRunWorkflow = async (
   }
 
   const result = await runWorkflow(
-    // EvalInTab resolves to the same type structurally but a tsc project-reference edge case
-    // Sees two different EvalTabResult declarations. Cast through Parameters to reconcile.
-    // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- required for tsc project-reference type identity
     {
       evalInTab: ctx.evalInTab,
       getTabUrl: ctx.getTabUrl,
       navigateTab: ctx.navigateTab,
-    } as Parameters<typeof runWorkflow>[0],
+    },
     {
       dryRun,
+      executionGuard: ctx.executionGuard,
       input,
       signal: ctx.signal,
       tabId: ctx.selectedTabId,
@@ -518,6 +526,7 @@ const executeDeleteWorkflow = async (
   }
 
   const workflows = await loadAgentWorkflows(ctx.storage);
+  ctx.executionGuard?.();
   const workflow = workflows.find(item => item.id === parsed.data.workflowId);
 
   if (workflow === undefined) {
@@ -556,13 +565,28 @@ const executeSaveMemory = async (
     ...(note !== undefined && note.trim().length > 0 ? { note: note.trim() } : {}),
   };
 
+  ctx.executionGuard?.();
   const outcome = await ctx.requestApproval('memory', draft);
+  if (outcome.status === 'aborted') {
+    ctx.executionGuard?.();
+  }
   return approvalOutcomeToToolResult(outcome, 'memoryId');
 };
 
 // ---------- main executor ----------
 
-export const executeWorkflowToolCall = (
+export const executeWorkflowToolCall = async (
+  toolCall: WorkflowToolCallEvent,
+  ctx: WorkflowToolContext
+): Promise<NormalizedEvalTabResult> => {
+  const guard = normalizeExecutionGuard(ctx.executionGuard, ctx.signal);
+  guard();
+  const result = await dispatchWorkflowToolCall(toolCall, { ...ctx, executionGuard: guard });
+  // Local validation/approval results are confirmed. run_workflow normalizes its own raw result.
+  return { ...result, effectsUncertain: result.effectsUncertain ?? false };
+};
+
+const dispatchWorkflowToolCall = (
   toolCall: WorkflowToolCallEvent,
   ctx: WorkflowToolContext
 ): Promise<EvalTabResult> => {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FetchLike } from '@/src/shared/auth';
+import { ExecutionStoppedError } from '@/src/shared/agent-tool-results';
 import {
   createWebSearchExecutor,
   executeWebSearchToolCall,
@@ -18,6 +19,100 @@ const context = (fetchMock: FetchLike) => ({
 });
 
 describe('web search tool runtime', () => {
+  it('propagates AbortError from an issued search', async () => {
+    const error = new DOMException('Stopped.', 'AbortError');
+    const fetchMock = vi.fn<FetchLike>().mockRejectedValue(error);
+    await expect(
+      executeWebSearchToolCall(webSearchCall('anything'), context(fetchMock))
+    ).rejects.toBe(error);
+  });
+
+  it.each([
+    { reason: 'lease_lost', status: 'interrupted' as const },
+    { reason: 'owner_cancelled', status: 'cancelled' as const },
+  ])('retains $reason and uncertainty when an issued search aborts', async ({ reason, status }) => {
+    const controller = new AbortController();
+    const request = Promise.withResolvers<Response>();
+    const fetchMock = vi.fn<FetchLike>((_input, init) => {
+      init?.signal?.addEventListener(
+        'abort',
+        () => {
+          request.reject(init.signal?.reason);
+        },
+        {
+          once: true,
+        }
+      );
+      return request.promise;
+    });
+    const pending = executeWebSearchToolCall(webSearchCall('anything'), {
+      ...context(fetchMock),
+      signal: controller.signal,
+    });
+    controller.abort(new ExecutionStoppedError(reason, status));
+
+    await expect(pending).rejects.toMatchObject({ effectsUncertain: true, reason, status });
+  });
+
+  it.each([
+    { effectsUncertain: true, status: 200 },
+    { effectsUncertain: false, status: 402 },
+  ])(
+    'retains typed cancellation while reading a $status response',
+    async ({ effectsUncertain, status }) => {
+      const controller = new AbortController();
+      const fetchMock = vi.fn<FetchLike>(
+        () =>
+          new Response(
+            new ReadableStream<Uint8Array>({
+              start(body) {
+                controller.signal.addEventListener(
+                  'abort',
+                  () => {
+                    body.error(controller.signal.reason);
+                  },
+                  {
+                    once: true,
+                  }
+                );
+              },
+            }),
+            { headers: { 'Content-Type': 'application/json' }, status }
+          )
+      );
+      const pending = executeWebSearchToolCall(webSearchCall('anything'), {
+        ...context(fetchMock),
+        signal: controller.signal,
+      });
+      controller.abort(new ExecutionStoppedError('lease_lost'));
+
+      await expect(pending).rejects.toMatchObject({
+        effectsUncertain,
+        reason: 'lease_lost',
+        status: 'interrupted',
+      });
+    }
+  );
+
+  it.each([
+    { error: new Error('lease_lost'), label: 'legacy guard error' },
+    { error: new ExecutionStoppedError('lease_lost'), label: 'typed guard error' },
+  ])('keeps pre-dispatch rejection confirmed for a $label', async ({ error }) => {
+    const fetchMock = vi.fn<FetchLike>();
+    const runSearch = createWebSearchExecutor({
+      ...context(fetchMock),
+      executionGuard: () => {
+        throw error;
+      },
+    });
+    await expect(runSearch({ query: 'anything' })).rejects.toMatchObject({
+      effectsUncertain: false,
+      reason: 'lease_lost',
+      status: 'interrupted',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('posts the query to the Exa proxy and returns compact results', async () => {
     const fetchMock = vi.fn<FetchLike>().mockResolvedValue(
       jsonResponse(200, {
@@ -38,6 +133,7 @@ describe('web search tool runtime', () => {
     });
 
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         results: [
@@ -70,7 +166,11 @@ describe('web search tool runtime', () => {
     const result = await executeWebSearchToolCall(webSearchCall('  '), {
       ...context(fetchMock),
     });
-    expect(result).toStrictEqual({ error: 'Search query is required.', ok: false });
+    expect(result).toStrictEqual({
+      effectsUncertain: false,
+      error: 'Search query is required.',
+      ok: false,
+    });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -84,6 +184,7 @@ describe('web search tool runtime', () => {
       ...context(fetchMock),
     });
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       error:
         'Web search failed with status 402. Exa free allowance exhausted and no credit balance available',
       ok: false,
@@ -96,6 +197,7 @@ describe('web search tool runtime', () => {
       ...context(fetchMock),
     });
     expect(result).toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: { message: 'No results found. Try a different query.', results: [] },
     });
@@ -106,7 +208,11 @@ describe('web search tool runtime', () => {
     const result = await executeWebSearchToolCall(webSearchCall('anything'), {
       ...context(fetchMock),
     });
-    expect(result).toStrictEqual({ error: 'Web search returned an invalid response.', ok: false });
+    expect(result).toStrictEqual({
+      effectsUncertain: true,
+      error: 'Web search returned an invalid response.',
+      ok: false,
+    });
   });
 
   it('returns a tool error on network failure', async () => {
@@ -114,7 +220,11 @@ describe('web search tool runtime', () => {
     const result = await executeWebSearchToolCall(webSearchCall('anything'), {
       ...context(fetchMock),
     });
-    expect(result).toStrictEqual({ error: 'Web search failed: offline', ok: false });
+    expect(result).toStrictEqual({
+      effectsUncertain: true,
+      error: 'Web search failed: offline',
+      ok: false,
+    });
   });
 });
 

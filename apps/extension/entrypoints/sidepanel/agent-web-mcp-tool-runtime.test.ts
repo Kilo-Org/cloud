@@ -38,6 +38,7 @@ describe('webmcp tool executor', () => {
     });
 
     await expect(executeWebMcpToolCall(createEvent())).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: { doubled: 42 },
     });
@@ -52,6 +53,7 @@ describe('webmcp tool executor', () => {
     });
 
     await expect(executeWebMcpToolCall(createEvent())).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: 'plain text result',
     });
@@ -66,6 +68,7 @@ describe('webmcp tool executor', () => {
     });
 
     await expect(executeWebMcpToolCall(createEvent())).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: null,
     });
@@ -79,6 +82,7 @@ describe('webmcp tool executor', () => {
     });
 
     await expect(executeWebMcpToolCall(createEvent())).resolves.toStrictEqual({
+      effectsUncertain: true,
       error: 'tab closed',
       ok: false,
     });
@@ -89,6 +93,7 @@ describe('webmcp tool executor', () => {
     mocks.sendMessage.mockResolvedValueOnce({ unexpected: true });
 
     await expect(executeWebMcpToolCall(createEvent())).resolves.toStrictEqual({
+      effectsUncertain: true,
       error: 'Extension background returned an invalid response.',
       ok: false,
     });
@@ -99,6 +104,7 @@ describe('webmcp tool executor', () => {
     mocks.sendMessage.mockRejectedValueOnce(new Error('background disconnected'));
 
     await expect(executeWebMcpToolCall(createEvent())).resolves.toStrictEqual({
+      effectsUncertain: true,
       error: 'background disconnected',
       ok: false,
     });
@@ -114,6 +120,7 @@ describe('webmcp tool executor', () => {
     });
 
     await expect(executeWebMcpToolCall(createEvent())).resolves.toStrictEqual({
+      effectsUncertain: false,
       ok: true,
       value: {
         truncated: true,
@@ -169,14 +176,47 @@ describe('webmcp tool discovery', () => {
     expect(mocks.sendMessage).toHaveBeenCalledWith({ tabId: 7, type: WEB_MCP_DISCOVER_MESSAGE });
   });
 
-  it('returns undefined on a non-ok response', async () => {
+  it.each([
+    {
+      expected: undefined,
+      label: 'confirmed denial',
+      response: { effectsUncertain: false, error: 'Discovery denied.', ok: false },
+    },
+    {
+      expected: undefined,
+      label: 'confirmed inner failure',
+      response: {
+        ok: true,
+        result: { effectsUncertain: false, error: 'No tools.', ok: false },
+        type: WEB_MCP_DISCOVER_MESSAGE,
+      },
+    },
+    {
+      expected: { documentId: 'doc-1', tools: [] },
+      label: 'empty tool list',
+      response: {
+        ok: true,
+        result: { ok: true, value: { documentId: 'doc-1', tools: [] } },
+        type: WEB_MCP_DISCOVER_MESSAGE,
+      },
+    },
+  ])('keeps $label nonterminal', async ({ expected, response }) => {
+    mocks.sendMessage.mockReset().mockResolvedValueOnce(response);
+    await expect(discoverWebMcpTools(7)).resolves.toStrictEqual(expected);
+  });
+
+  it('interrupts on a legacy non-ok response', async () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValueOnce({ error: 'tab closed', ok: false });
 
-    await expect(discoverWebMcpTools(7)).resolves.toBeUndefined();
+    await expect(discoverWebMcpTools(7)).rejects.toMatchObject({
+      effectsUncertain: true,
+      reason: 'effects_uncertain',
+      status: 'interrupted',
+    });
   });
 
-  it('returns undefined on a wrong-typed response', async () => {
+  it('interrupts on a wrong-typed response', async () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValueOnce({
       ok: true,
@@ -184,10 +224,14 @@ describe('webmcp tool discovery', () => {
       type: WEB_MCP_EXECUTE_MESSAGE,
     });
 
-    await expect(discoverWebMcpTools(7)).resolves.toBeUndefined();
+    await expect(discoverWebMcpTools(7)).rejects.toMatchObject({
+      effectsUncertain: true,
+      reason: 'effects_uncertain',
+      status: 'interrupted',
+    });
   });
 
-  it('returns undefined on a non-ok inner result', async () => {
+  it('interrupts on a non-ok inner result', async () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValueOnce({
       ok: true,
@@ -195,20 +239,32 @@ describe('webmcp tool discovery', () => {
       type: WEB_MCP_DISCOVER_MESSAGE,
     });
 
-    await expect(discoverWebMcpTools(7)).resolves.toBeUndefined();
+    await expect(discoverWebMcpTools(7)).rejects.toMatchObject({
+      effectsUncertain: true,
+      reason: 'effects_uncertain',
+      status: 'interrupted',
+    });
   });
 
-  it('returns undefined on an invalid response', async () => {
+  it('interrupts on an invalid response', async () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValueOnce({ unexpected: true });
 
-    await expect(discoverWebMcpTools(7)).resolves.toBeUndefined();
+    await expect(discoverWebMcpTools(7)).rejects.toMatchObject({
+      effectsUncertain: true,
+      reason: 'effects_uncertain',
+      status: 'interrupted',
+    });
   });
 
-  it('returns undefined when sendMessage throws', async () => {
+  it('interrupts when sendMessage throws', async () => {
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockRejectedValueOnce(new Error('background disconnected'));
 
-    await expect(discoverWebMcpTools(7)).resolves.toBeUndefined();
+    await expect(discoverWebMcpTools(7)).rejects.toMatchObject({
+      effectsUncertain: true,
+      reason: 'effects_uncertain',
+      status: 'interrupted',
+    });
   });
 });

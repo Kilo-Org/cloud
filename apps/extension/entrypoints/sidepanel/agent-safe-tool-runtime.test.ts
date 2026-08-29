@@ -27,6 +27,38 @@ const snapshotResponse = (value: object) => ({
 const snapshotCall = (tabId: number) =>
   createSafeToolCall({ name: 'get_page_snapshot', providerToolCallId: 'call-1', tabId });
 
+describe('safe result certainty', () => {
+  it.each([
+    { label: 'legacy failure', result: { error: 'Lost result.', ok: false }, uncertain: true },
+    {
+      label: 'confirmed denial',
+      result: { effectsUncertain: false, error: 'Permission denied.', ok: false },
+      uncertain: false,
+    },
+    {
+      label: 'uncertain success',
+      result: { effectsUncertain: true, ok: true, value: snapshotValue },
+      uncertain: true,
+    },
+  ])('preserves $label through snapshot parsing', async ({ result, uncertain }) => {
+    sendMessage.mockResolvedValue({ ok: true, result, type: PAGE_SNAPSHOT_MESSAGE });
+    const value = await createSafeToolExecutor()(snapshotCall(994));
+    expect(value).toMatchObject({ effectsUncertain: uncertain, ok: false });
+  });
+
+  it('rejects a revoked guard before a snapshot dispatch', async () => {
+    sendMessage.mockClear();
+    const execute = createSafeToolExecutor(() => {
+      throw new Error('lease_lost');
+    });
+    await expect(execute(snapshotCall(995))).rejects.toMatchObject({
+      reason: 'lease_lost',
+      status: 'interrupted',
+    });
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+});
+
 describe('get_page_snapshot unchanged-page dedupe', () => {
   it('returns a compact unchanged marker for an identical consecutive snapshot', async () => {
     sendMessage.mockResolvedValue(snapshotResponse({ ...snapshotValue }));

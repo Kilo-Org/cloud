@@ -1,3 +1,4 @@
+/* eslint-disable import/max-dependencies -- Reuse the runner guard alongside the SDK transport, auth, and validation contracts. */
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
@@ -5,9 +6,15 @@ import {
   StreamableHTTPError,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { jsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/types.js';
+import {
+  ExecutionStoppedError,
+  isExecutionStopped,
+  normalizeExecutionGuard,
+} from '../../src/shared/agent-tool-results';
+import type { ExecutionGuard } from '../../src/shared/agent-tool-results';
 import type {
   RemoteMcpAuth,
   RemoteMcpCachedTool,
@@ -209,6 +216,7 @@ export const connectAndPersistRemoteMcpServer = async ({
 
 export const callRemoteMcpTool = async ({
   arguments: args,
+  executionGuard,
   fetch: fetchFn,
   route,
   server,
@@ -216,18 +224,25 @@ export const callRemoteMcpTool = async ({
   storageArea,
 }: {
   readonly arguments: Record<string, unknown>;
+  readonly executionGuard?: ExecutionGuard;
   readonly fetch: FetchLike;
   readonly route: RemoteMcpToolRoute;
   readonly server: RemoteMcpServer;
   readonly signal?: AbortSignal;
   readonly storageArea?: RemoteMcpStorageArea;
 }): Promise<CallToolResult> => {
+  const guard = normalizeExecutionGuard(executionGuard, signal);
+  guard();
   const combined = combineSignal(signal, CONNECT_TIMEOUT_MS);
   const client = makeClient();
   const transport = makeTransport(server, fetchFn, makeAuthProvider(server, storageArea));
+  let toolCallIssued = false;
 
   try {
     await client.connect(asTransport(transport), { signal: combined });
+    guard();
+    combined.throwIfAborted();
+    toolCallIssued = true;
     const result = await client.callTool(
       { arguments: args, name: route.remoteToolName },
       CallToolResultSchema,
@@ -240,7 +255,23 @@ export const callRemoteMcpTool = async ({
      */
     return CallToolResultSchema.parse(result);
   } catch (error) {
-    const text = error instanceof Error ? error.message : String(error);
+    // The SDK wraps in-flight aborts as request timeouts. Retain the owner's original reason.
+    const cause: unknown = signal?.aborted === true ? signal.reason : error;
+    if (cause instanceof ExecutionStoppedError) {
+      throw toolCallIssued ? new ExecutionStoppedError(cause.reason, cause.status, true) : cause;
+    }
+    // These protocol codes confirm rejection before execution; SDK timeouts still leave effects uncertain.
+    const confirmedRejection =
+      !combined.aborted &&
+      cause instanceof McpError &&
+      [ErrorCode.InvalidParams, ErrorCode.MethodNotFound].includes(cause.code);
+    if (toolCallIssued && !confirmedRejection) {
+      throw cause;
+    }
+    if (isExecutionStopped(cause)) {
+      throw new ExecutionStoppedError('cancelled', 'cancelled');
+    }
+    const text = cause instanceof Error ? cause.message : String(cause);
     return { content: [{ text, type: 'text' }], isError: true };
   } finally {
     await client.close();

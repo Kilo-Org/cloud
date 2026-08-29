@@ -5,24 +5,25 @@ import {
   WEB_MCP_DISCOVER_MESSAGE,
   WEB_MCP_EXECUTE_MESSAGE,
   isTabDebuggerResponse,
+  normalizeEvalTabResult,
 } from '@/src/shared/tab-debugger';
-import type { EvalTabResult, WebMcpDiscoveryResult } from '@/src/shared/tab-debugger';
+import type { NormalizedEvalTabResult, WebMcpDiscoveryResult } from '@/src/shared/tab-debugger';
 import { capRemoteMcpToolResult } from '@/src/shared/remote-mcp-tools';
+import {
+  ExecutionStoppedError,
+  isExecutionStopped,
+  normalizeExecutionGuard,
+} from '@/src/shared/agent-tool-results';
+import type { ExecutionGuard } from '@/src/shared/agent-tool-results';
 
-/*
- * Chrome's eval returns a JSON string. Parse it into a structured value so the
- * result enters conversation state as an object, not a quoted string. A
- * non-JSON string and null pass through verbatim.
- */
+// Chrome returns JSON strings. Keep non-JSON strings and null unchanged.
 const stringSchema = z.string();
 const jsonRecordSchema = z.record(z.string(), z.unknown());
-
 const parseWebMcpResult = (value: unknown) => {
   const asString = stringSchema.safeParse(value);
   if (!asString.success) {
     return value;
   }
-
   try {
     const parsed: unknown = JSON.parse(asString.data);
     return parsed;
@@ -33,88 +34,89 @@ const parseWebMcpResult = (value: unknown) => {
 
 const isRecordObject = (value: unknown): value is Record<string, unknown> =>
   jsonRecordSchema.safeParse(value).success;
-
 const isWebMcpDiscoveryResult = (value: unknown): value is WebMcpDiscoveryResult =>
   isRecordObject(value) &&
   stringSchema.safeParse(value['documentId']).success &&
   Array.isArray(value['tools']);
 
-/*
- * Discover the WebMCP tools registered by the selected tab's page through the
- * background transport. Never throws: an invalid, non-ok, or wrong-typed
- * response, a non-ok inner result, or a thrown sendMessage rejection all
- * resolve to undefined so a discovery failure silently disables page tools for
- * the turn.
- */
+/** Confirmed discovery failures disable page tools; uncertain completion interrupts the turn. */
 export const discoverWebMcpTools = async (
-  tabId: number
+  tabId: number,
+  executionGuard?: ExecutionGuard
 ): Promise<WebMcpDiscoveryResult | undefined> => {
+  normalizeExecutionGuard(executionGuard)();
   try {
     const response: unknown = await browser.runtime.sendMessage({
       tabId,
       type: WEB_MCP_DISCOVER_MESSAGE,
     });
-
     if (!isTabDebuggerResponse(response)) {
+      throw new ExecutionStoppedError('effects_uncertain', 'interrupted', true);
+    }
+    if (response.ok && response.type !== WEB_MCP_DISCOVER_MESSAGE) {
+      throw new ExecutionStoppedError('effects_uncertain', 'interrupted', true);
+    }
+    const result = normalizeEvalTabResult(response.ok ? response.result : response);
+    if (result.effectsUncertain) {
+      throw new ExecutionStoppedError('effects_uncertain', 'interrupted', true);
+    }
+    if (!result.ok) {
       return undefined;
     }
-
-    if (!response.ok) {
-      return undefined;
+    return isWebMcpDiscoveryResult(result.value) ? result.value : undefined;
+  } catch (error) {
+    if (isExecutionStopped(error)) {
+      throw error;
     }
-
-    if (response.type !== WEB_MCP_DISCOVER_MESSAGE) {
-      return undefined;
-    }
-
-    if (!response.result.ok) {
-      return undefined;
-    }
-
-    const { value } = response.result;
-
-    return isWebMcpDiscoveryResult(value) ? value : undefined;
-  } catch {
-    return undefined;
+    throw new ExecutionStoppedError('effects_uncertain', 'interrupted', true);
   }
 };
 
-/*
- * Run a WebMCP tool call through the background transport. The background
- * re-checks the definition signature against the page's live registration, so
- * a stale call (the page re-registered the tool after the turn started) fails
- * with a stale-tool error instead of running against the wrong definition.
- */
-export const executeWebMcpToolCall = async (event: WebMcpToolCallEvent): Promise<EvalTabResult> => {
+/** The background checks the live document and definition before running a page tool. */
+export const executeWebMcpToolCall = async (
+  event: WebMcpToolCallEvent,
+  executionGuard?: ExecutionGuard
+): Promise<NormalizedEvalTabResult> => {
+  normalizeExecutionGuard(executionGuard)();
+  let dispatched = false;
   try {
-    const response: unknown = await browser.runtime.sendMessage({
+    const message = {
       arguments: JSON.stringify(event.arguments),
       definitionSignature: event.definitionSignature,
       documentId: event.documentId,
       tabId: event.tabId,
       toolName: event.name,
       type: WEB_MCP_EXECUTE_MESSAGE,
-    });
-
+    };
+    dispatched = true;
+    const response: unknown = await browser.runtime.sendMessage(message);
     if (!isTabDebuggerResponse(response)) {
-      return { error: 'Extension background returned an invalid response.', ok: false };
+      return {
+        effectsUncertain: true,
+        error: 'Extension background returned an invalid response.',
+        ok: false,
+      };
     }
-
     if (!response.ok) {
-      return { error: response.error, ok: false };
+      return normalizeEvalTabResult(response);
     }
-
     if (response.type !== WEB_MCP_EXECUTE_MESSAGE) {
-      return { error: 'Extension background returned the wrong response.', ok: false };
+      return {
+        effectsUncertain: true,
+        error: 'Extension background returned the wrong response.',
+        ok: false,
+      };
     }
-
-    if (!response.result.ok) {
-      return response.result;
-    }
-
-    return { ok: true, value: capRemoteMcpToolResult(parseWebMcpResult(response.result.value)) };
+    const result = normalizeEvalTabResult(response.result);
+    return result.ok
+      ? { ...result, value: capRemoteMcpToolResult(parseWebMcpResult(result.value)) }
+      : result;
   } catch (error) {
+    if (isExecutionStopped(error)) {
+      throw error;
+    }
     return {
+      effectsUncertain: dispatched,
       error: error instanceof Error ? error.message : 'Failed to run WebMCP tool.',
       ok: false,
     };

@@ -216,6 +216,109 @@ describe('grouped unified session input contracts', () => {
   });
 });
 
+describe('provider launch pins', () => {
+  const pin = '123e4567-e89b-12d3-a456-426614174022';
+  const bitbucket = {
+    type: 'bitbucket' as const,
+    url: 'https://bitbucket.org/acme/repo.git',
+    workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+    repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    bitbucketIntegrationId: pin,
+  };
+  const ordinaryBitbucket = {
+    ...basePromptInput,
+    gitUrl: bitbucket.url,
+    platform: 'bitbucket' as const,
+    bitbucketWorkspaceUuid: bitbucket.workspaceUuid,
+    bitbucketRepositoryUuid: bitbucket.repositoryUuid,
+    bitbucketIntegrationId: pin,
+  };
+
+  it.each([
+    { type: 'github', repo: 'acme/repo', githubIntegrationId: pin },
+    {
+      type: 'gitlab',
+      url: 'https://gitlab.example.com/gitlab/group/sub/repo.git',
+      gitlabIntegrationId: pin,
+    },
+    bitbucket,
+  ])('retains the $type pin and exact branch in grouped input', repository => {
+    expect(
+      StartSessionInput.parse({
+        ...baseStartInput,
+        repository: { ...repository, branch: 'release/selected' },
+      }).repository
+    ).toEqual({ ...repository, branch: 'release/selected' });
+  });
+
+  it('accepts an ordinary Bitbucket pin without granting review context', () => {
+    expect(PrepareSessionInput.parse(ordinaryBitbucket)).toMatchObject(ordinaryBitbucket);
+  });
+
+  it.each([
+    { bitbucketWorkspaceSlug: 'acme' },
+    { bitbucketRepositorySlug: 'repo' },
+    { bitbucketPullRequestId: 42 },
+    { bitbucketExpectedHeadSha: '0123456789abcdef0123456789abcdef01234567' },
+  ])('rejects automation-only review context %j', reviewField => {
+    expect(PrepareSessionInput.safeParse({ ...ordinaryBitbucket, ...reviewField }).success).toBe(
+      false
+    );
+  });
+
+  it('rejects managed pins on a GitHub source with a conflicting platform', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        platform: 'gitlab',
+        gitlabIntegrationId: pin,
+      }).success
+    ).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...ordinaryBitbucket,
+        gitUrl: undefined,
+        githubRepo: 'acme/repo',
+      }).success
+    ).toBe(false);
+  });
+
+  it('retains the legacy wrong-provider Bitbucket pin error', () => {
+    const result = PrepareSessionInput.safeParse({
+      ...basePromptInput,
+      gitUrl: 'https://gitlab.com/acme/repo.git',
+      platform: 'gitlab',
+      bitbucketIntegrationId: pin,
+    });
+    if (result.success) throw new Error('Expected an invalid provider pin');
+    expect(result.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ['bitbucketIntegrationId'],
+        message: 'Bitbucket review context is only valid for Bitbucket code review',
+      })
+    );
+  });
+
+  it('retains the flat GitLab pin and rejects pins on another provider', () => {
+    const input = {
+      ...basePromptInput,
+      gitUrl: 'https://gitlab.example.com/gitlab/group/sub/repo.git',
+      platform: 'gitlab',
+      gitlabIntegrationId: pin,
+      upstreamBranch: 'release/selected',
+    };
+    expect(PrepareSessionInput.parse(input)).toMatchObject(input);
+    expect(PrepareSessionInput.safeParse({ ...input, platform: 'github' }).success).toBe(false);
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        repository: { ...baseStartInput.repository, gitlabIntegrationId: pin },
+      }).success
+    ).toBe(false);
+  });
+});
+
 describe('legacy live attachment input compatibility', () => {
   it('accepts only the supported isolated Standard allocation', () => {
     const input = {

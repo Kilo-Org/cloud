@@ -213,6 +213,20 @@ function makeEnv(doStub: ReturnType<typeof makeDoStub>): Env {
     HYPERDRIVE: {
       connectionString: 'postgres://session-create-test',
     } as Env['HYPERDRIVE'],
+    GIT_TOKEN_SERVICE: {
+      getGitLabToken: vi.fn().mockResolvedValue({
+        success: true,
+        token: 'managed-token',
+        integrationId: '123e4567-e89b-12d3-a456-426614174022',
+        instanceUrl: 'https://gitlab.com',
+        glabIsOAuth2: true,
+      }),
+      getBitbucketToken: vi.fn().mockResolvedValue({
+        success: true,
+        token: 'managed-token',
+        integrationId: '123e4567-e89b-12d3-a456-426614174022',
+      }),
+    },
   } as unknown as Env;
 }
 
@@ -415,16 +429,17 @@ describe('createSessionWithLedger admission ladder', () => {
 
   it('passes a normalized Bitbucket repository URL to the session-ingest create call', async () => {
     const ctx = makeContext(makeDoStub());
+    const orgId = '123e4567-e89b-12d3-a456-426614174030';
 
     await runCreate(
       ctx,
       makeRequest({
-        options: { operationKey: OPERATION_KEY },
+        options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: orgId },
         repository: {
           type: 'bitbucket',
           url: 'https://bitbucket.org/acme/widgets.git',
-          workspaceUuid: 'workspace-1',
-          repositoryUuid: 'repo-1',
+          workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+          repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
         },
       })
     );
@@ -434,7 +449,7 @@ describe('createSessionWithLedger admission ladder', () => {
       CLOUD_AGENT_SESSION_ID,
       USER_ID,
       expect.any(Object),
-      undefined,
+      orgId,
       'cloud-agent',
       expect.any(String),
       'https://bitbucket.org/acme/widgets',
@@ -1524,6 +1539,184 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     expect(recordOperationProgressMock).not.toHaveBeenCalled();
   }
 
+  it('fences the selected pin and branch before a retryable authorization failure', async () => {
+    const row = makeLedgerRow();
+    recordOperationProgressMock.mockImplementation(
+      async (_db: unknown, _id: string, progress: Record<string, unknown>) => {
+        row.canonical_result = { ...row.canonical_result, ...progress };
+      }
+    );
+    const ctx = makeContext(makeDoStub());
+    ctx.env.GIT_TOKEN_SERVICE = {
+      getGitLabToken: vi.fn().mockRejectedValue(new Error('binding unavailable')),
+    } as never;
+    const request = makeRequest({
+      repository: {
+        type: 'gitlab',
+        url: 'https://gitlab.com/group/repo.git',
+        gitlabIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+        branch: 'release/selected',
+      },
+    });
+    admitOperationMock.mockResolvedValueOnce({ admission: 'admitted', row });
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    admitOperationMock.mockResolvedValueOnce({ admission: 'takeover', row });
+    await expect(
+      runCreate(ctx, {
+        ...request,
+        repository: { ...request.repository, branch: 'release/different' },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+    recordOperationProgressMock.mockReset().mockResolvedValue(undefined);
+  });
+
+  it.each(['token_refresh_failed', 'project_lookup_failed'])(
+    'recovers from %s with the same launch key and repository selection',
+    async reason => {
+      const request = makeRequest({
+        repository: {
+          type: 'gitlab',
+          url: 'https://gitlab.example.com/gitlab/group/sub/repo.git',
+          gitlabIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+          branch: 'release/selected',
+        },
+        options: { operationKey: OPERATION_KEY },
+      });
+      const original = structuredClone(request);
+      const row = makeLedgerRow({ canonical_result: {} });
+      recordOperationProgressMock.mockImplementation(
+        async (_db: unknown, _id: string, progress: Record<string, unknown>) => {
+          row.canonical_result = { ...row.canonical_result, ...progress };
+        }
+      );
+      let admissions = 0;
+      admitOperationMock.mockImplementation(
+        async (_db: unknown, input: { operationKey: string }) => {
+          if (input.operationKey !== OPERATION_KEY) throw new Error('Launch key changed');
+          return { admission: admissions++ === 0 ? 'admitted' : 'takeover', row };
+        }
+      );
+      const storedRepositories: unknown[] = [];
+      const doStub = makeDoStub({
+        createSessionWithInitialAdmission: vi.fn(async command => {
+          storedRepositories.push(command.repository);
+          return {
+            success: true,
+            outcome: 'queued',
+            messageId: INITIAL_MESSAGE_ID,
+            compatibilityDelivery: 'queued',
+          };
+        }),
+      });
+      const ctx = makeContext(doStub);
+      const getGitLabToken = vi
+        .fn()
+        .mockResolvedValueOnce({ success: false, reason })
+        .mockResolvedValue({
+          success: true,
+          token: 'private-token',
+          integrationId: '123e4567-e89b-12d3-a456-426614174022',
+          instanceUrl: 'https://gitlab.example.com/gitlab',
+          glabIsOAuth2: true,
+        });
+      ctx.env.GIT_TOKEN_SERVICE = { getGitLabToken } as never;
+      try {
+        await expect(runCreate(ctx, request)).rejects.toMatchObject({
+          code: 'SERVICE_UNAVAILABLE',
+        });
+        expect(storedRepositories).toEqual([]);
+        await expect(runCreate(ctx, request)).resolves.toEqual({
+          cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+        });
+        expect(storedRepositories).toEqual([
+          {
+            ...original.repository,
+            resolvedIdentity: {
+              kind: 'resolved',
+              integrationId: '123e4567-e89b-12d3-a456-426614174022',
+              integrationOwner: { type: 'user', id: USER_ID },
+              instanceUrl: 'https://gitlab.example.com/gitlab',
+            },
+          },
+        ]);
+        expect(request).toEqual(original);
+        expect(JSON.stringify(row.canonical_result)).not.toContain('private-token');
+      } finally {
+        recordOperationProgressMock.mockReset().mockResolvedValue(undefined);
+      }
+    }
+  );
+
+  it('reuses a durable GitLab resolution after an uncertain creation response', async () => {
+    const request = makeRequest({
+      repository: {
+        type: 'gitlab',
+        url: 'https://gitlab.example.com/gitlab/group/sub/repo.git',
+        branch: 'release/selected',
+      },
+      options: { operationKey: OPERATION_KEY },
+    });
+    const identity = {
+      kind: 'resolved',
+      integrationId: '123e4567-e89b-12d3-a456-426614174022',
+      integrationOwner: { type: 'user', id: USER_ID },
+      instanceUrl: 'https://gitlab.example.com/gitlab',
+    };
+    const row = makeLedgerRow({ canonical_result: {} });
+    recordOperationProgressMock.mockImplementation(
+      async (_db: unknown, _id: string, progress: Record<string, unknown>) => {
+        row.canonical_result = { ...row.canonical_result, ...progress };
+      }
+    );
+    const persisted: unknown[] = [];
+    const doStub = makeDoStub({
+      createSessionWithInitialAdmission: vi.fn(async command => {
+        persisted.push(command.repository);
+        throw new Error('response lost');
+      }),
+    });
+    const ctx = makeContext(doStub);
+    ctx.env.GIT_TOKEN_SERVICE = {
+      getGitLabToken: vi.fn().mockResolvedValue({
+        success: true,
+        token: 'private-token',
+        integrationId: identity.integrationId,
+        instanceUrl: identity.instanceUrl,
+        glabIsOAuth2: true,
+      }),
+    } as never;
+    admitOperationMock.mockResolvedValueOnce({ admission: 'admitted', row });
+    await expect(runCreate(ctx, request)).rejects.toThrow('response lost');
+    expect(row.canonical_result?.repositoryIdentity).toEqual(identity);
+    expect(persisted).toEqual([{ ...request.repository, resolvedIdentity: identity }]);
+    expect(JSON.stringify(row.canonical_result)).not.toContain('private-token');
+
+    // Recreate only after the existing ladder confirms no ownership row.
+    admitOperationMock.mockResolvedValueOnce({ admission: 'takeover', row });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    ctx.env.GIT_TOKEN_SERVICE = {
+      getGitLabToken: vi.fn(async (params: { expectedIntegrationId?: string }) =>
+        params.expectedIntegrationId === identity.integrationId
+          ? { success: false, reason: 'integration_mismatch' }
+          : {
+              success: true,
+              token: 'replacement-token',
+              integrationId: 'another-integration',
+              instanceUrl: identity.instanceUrl,
+              glabIsOAuth2: true,
+            }
+      ),
+    } as never;
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'GitLab repository authorization failed (integration_mismatch)',
+    });
+    expect(persisted).toHaveLength(1);
+    expect(row.canonical_result?.repositoryIdentity).toEqual(identity);
+    recordOperationProgressMock.mockReset().mockResolvedValue(undefined);
+  });
+
   it('records the create intent fingerprint with the first admitted create progress', async () => {
     const request = originalRequest();
     const doStub = makeDoStub();
@@ -1607,6 +1800,46 @@ describe('createSessionWithLedger changed-intent rejection', () => {
         options: ORIGINAL_OPTIONS,
       }),
     },
+    ...(['gitlab', 'bitbucket'] as const).flatMap(type => {
+      const repository =
+        type === 'gitlab'
+          ? {
+              type,
+              url: 'https://gitlab.example.com/gitlab/group/sub/repo.git',
+              gitlabIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+              branch: 'release/selected',
+            }
+          : {
+              type,
+              url: 'https://bitbucket.org/group/repo.git',
+              workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+              repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+              bitbucketIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+              branch: 'release/selected',
+            };
+      return [
+        {
+          name: `the ${type} integration`,
+          original: makeRequest({ repository, options: ORIGINAL_OPTIONS }),
+          retry: makeRequest({
+            repository: {
+              ...repository,
+              [type === 'gitlab' ? 'gitlabIntegrationId' : 'bitbucketIntegrationId']:
+                '123e4567-e89b-12d3-a456-426614174099',
+            },
+            options: ORIGINAL_OPTIONS,
+          }),
+        },
+        {
+          name: `the ${type} branch`,
+          original: makeRequest({ repository, options: ORIGINAL_OPTIONS }),
+          retry: makeRequest({
+            repository: { ...repository, branch: 'release/different' },
+            options: ORIGINAL_OPTIONS,
+          }),
+        },
+      ];
+    }),
     {
       name: 'the model',
       retry: makeRequest({ agent: { mode: 'code', model: 'gpt-4' }, options: ORIGINAL_OPTIONS }),

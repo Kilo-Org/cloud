@@ -54,7 +54,13 @@ import {
   getEffectiveCredentialContainment,
   parseSessionMetadata,
   requiresContainmentSandbox,
+  preserveResolvedRepositoryIdentity,
+  withResolvedRepositoryIdentity,
 } from './persistence/session-metadata.js';
+import {
+  normalizeRepositoryIdentity,
+  type ResolvedRepositoryIdentity,
+} from './session/session-requests.js';
 import { withDORetry } from './utils/do-retry.js';
 import { resolveSessionStub } from './sandbox-session/session-stub.js';
 import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
@@ -1705,11 +1711,57 @@ export class SessionService {
     return session;
   }
 
+  private async persistRepositoryIdentity(
+    env: PersistenceEnv,
+    metadata: CloudAgentSessionState,
+    identity: ResolvedRepositoryIdentity
+  ): Promise<void> {
+    let next: CloudAgentSessionState;
+    try {
+      next = withResolvedRepositoryIdentity(metadata, identity);
+    } catch {
+      throw ExecutionError.invalidRequest('Repository identity cannot change');
+    }
+    try {
+      const current = await withDORetry(
+        () => resolveSessionStub(env, metadata.identity.userId, metadata.identity.sessionId),
+        stub =>
+          stub.updateResolvedRepositoryIdentity(
+            { identity: metadata.identity, repository: metadata.repository },
+            identity
+          ),
+        'updateResolvedRepositoryIdentity'
+      );
+      Object.assign(metadata, { repository: next.repository }, current);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Repository identity cannot change')) {
+        throw ExecutionError.invalidRequest('Repository identity cannot change');
+      }
+      throw ExecutionError.workspaceSetupFailed('Unable to persist repository identity');
+    }
+  }
+
   async resolveWorkspaceTokens(
     env: PersistenceEnv,
     metadata: CloudAgentSessionState,
     sandboxId: SandboxId
   ): Promise<ResolvedWorkspaceTokens> {
+    if (metadata.repository) {
+      const persisted = await fetchSessionMetadata(
+        env,
+        metadata.identity.userId,
+        metadata.identity.sessionId
+      );
+      if (persisted?.repository?.resolvedIdentity) {
+        try {
+          metadata.repository = preserveResolvedRepositoryIdentity(persisted, metadata).repository;
+        } catch {
+          throw ExecutionError.invalidRequest('Repository identity cannot change');
+        }
+      }
+    }
+    const identity = normalizeRepositoryIdentity(metadata.repository ?? {});
+    const resolvedIdentity = identity.kind === 'resolved' ? identity : undefined;
     const github = githubRepository(metadata);
     const git = gitRepository(metadata);
     const credentialContainment = getEffectiveCredentialContainment(metadata);
@@ -1732,9 +1784,14 @@ export class SessionService {
         githubRepo: github.repo,
         userId: metadata.identity.userId,
         orgId: metadata.identity.orgId,
-        ...(github.githubIntegrationId
-          ? { expectedIntegrationId: github.githubIntegrationId }
-          : {}),
+        ...(resolvedIdentity
+          ? {
+              expectedIntegrationId: resolvedIdentity.integrationId,
+              expectedIntegrationOwner: resolvedIdentity.integrationOwner,
+            }
+          : github.githubIntegrationId
+            ? { expectedIntegrationId: github.githubIntegrationId }
+            : {}),
         allowUserAuthorization:
           metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
           metadata.identity.createdOnPlatform === 'slack',
@@ -1748,10 +1805,23 @@ export class SessionService {
           })
         : await resolveCloudAgentGitHubAuthForRepo(env, authParams);
       if (!result.success) {
+        if (result.error.reason === 'service_compatibility_error') {
+          throw ExecutionError.workspaceSetupFailed(result.error.message);
+        }
         throw ExecutionError.invalidRequest(
           `GitHub token or active app installation required for this repository (${result.error.reason})`
         );
       }
+      if (result.value.identity.kind === 'resolved') {
+        await this.persistRepositoryIdentity(env, metadata, result.value.identity);
+      } else if (resolvedIdentity || github.githubIntegrationId) {
+        throw ExecutionError.workspaceSetupFailed(
+          'GitHub token service cannot prove the repository identity (service_compatibility_error)'
+        );
+      }
+      // Old unpinned GitHub responses omit both identity fields. This retains legacy
+      // checkout, not exact identity. Remove after old deployments/records disappear
+      // and the 30-day ledger window expires; never apply this to other providers.
       githubToken =
         'capability' in result.value ? result.value.capability : result.value.githubToken;
       githubInstallationId = result.value.installationId;
@@ -1788,10 +1858,23 @@ export class SessionService {
           }),
           orgId: metadata.identity.orgId,
           createdOnPlatform: metadata.identity.createdOnPlatform,
+          ...(resolvedIdentity
+            ? { expectedIntegrationId: resolvedIdentity.integrationId }
+            : git.type === 'gitlab' && git.gitlabIntegrationId
+              ? { expectedIntegrationId: git.gitlabIntegrationId }
+              : {}),
         });
         if (!result.success) {
           throw ExecutionError.invalidRequest(gitLabTokenLookupFailureMessage(result.reason));
         }
+        await this.persistRepositoryIdentity(env, metadata, {
+          kind: 'resolved',
+          integrationId: result.value.integrationId,
+          integrationOwner: metadata.identity.orgId
+            ? { type: 'org', id: metadata.identity.orgId }
+            : { type: 'user', id: metadata.identity.userId },
+          instanceUrl: result.value.instanceOrigin,
+        });
         gitToken = result.value.capability;
         gitlabCapabilityGitUrl = result.value.gitUrl;
         gitlabTokenManaged = true;
@@ -1803,10 +1886,23 @@ export class SessionService {
           orgId: metadata.identity.orgId,
           repositoryUrl: git.url,
           createdOnPlatform: metadata.identity.createdOnPlatform,
+          ...(resolvedIdentity
+            ? { expectedIntegrationId: resolvedIdentity.integrationId }
+            : git.type === 'gitlab' && git.gitlabIntegrationId
+              ? { expectedIntegrationId: git.gitlabIntegrationId }
+              : {}),
         });
         if (!result.success) {
           throw ExecutionError.invalidRequest(gitLabTokenLookupFailureMessage(result.reason));
         }
+        await this.persistRepositoryIdentity(env, metadata, {
+          kind: 'resolved',
+          integrationId: result.integrationId,
+          integrationOwner: metadata.identity.orgId
+            ? { type: 'org', id: metadata.identity.orgId }
+            : { type: 'user', id: metadata.identity.userId },
+          instanceUrl: result.instanceUrl,
+        });
         gitToken = result.token;
         gitlabTokenManaged = true;
         gitlabInstanceUrl = result.instanceUrl;
@@ -1838,9 +1934,11 @@ export class SessionService {
           outboundContainerId: getOutboundContainerId(env, sandboxId, {
             managedScmContainment: containmentSandboxRequired,
           }),
-          ...(git.bitbucketIntegrationId
-            ? { expectedIntegrationId: git.bitbucketIntegrationId }
-            : {}),
+          ...(resolvedIdentity
+            ? { expectedIntegrationId: resolvedIdentity.integrationId }
+            : git.bitbucketIntegrationId
+              ? { expectedIntegrationId: git.bitbucketIntegrationId }
+              : {}),
           workspaceUuid: git.workspaceUuid,
           repositoryUuid: git.repositoryUuid,
           repositoryUrl: git.url,
@@ -1860,6 +1958,12 @@ export class SessionService {
           }
           throw ExecutionError.invalidRequest(message);
         }
+        await this.persistRepositoryIdentity(env, metadata, {
+          kind: 'resolved',
+          integrationId: result.value.integrationId,
+          integrationOwner: { type: 'org', id: metadata.identity.orgId },
+          instanceUrl: 'https://bitbucket.org',
+        });
         gitToken = result.value.capability;
         // The canonical clone URL is resolved from the workspace/repo UUIDs at
         // issue time; git.url may carry a stale/renamed slug. Redeem validates
@@ -1871,9 +1975,11 @@ export class SessionService {
         const result = await resolveManagedBitbucketToken(env, {
           userId: metadata.identity.userId,
           orgId: metadata.identity.orgId,
-          ...(git.bitbucketIntegrationId
-            ? { expectedIntegrationId: git.bitbucketIntegrationId }
-            : {}),
+          ...(resolvedIdentity
+            ? { expectedIntegrationId: resolvedIdentity.integrationId }
+            : git.bitbucketIntegrationId
+              ? { expectedIntegrationId: git.bitbucketIntegrationId }
+              : {}),
           workspaceUuid: git.workspaceUuid,
           repositoryUuid: git.repositoryUuid,
           repositoryUrl: git.url,
@@ -1886,6 +1992,12 @@ export class SessionService {
           }
           throw ExecutionError.invalidRequest(message);
         }
+        await this.persistRepositoryIdentity(env, metadata, {
+          kind: 'resolved',
+          integrationId: result.integrationId,
+          integrationOwner: { type: 'org', id: metadata.identity.orgId },
+          instanceUrl: 'https://bitbucket.org',
+        });
         gitToken = result.token;
         bitbucketTokenManaged = true;
       }

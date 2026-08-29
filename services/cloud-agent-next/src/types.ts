@@ -1,4 +1,6 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
+import type { Owner } from '../../../packages/app-shared/src/code-review/repository-identity.js';
+export type { Owner };
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
@@ -177,11 +179,16 @@ export type InterruptResult = {
   processesFound: boolean;
 };
 
+// Old GitHub RPC responses omit integrationId/integrationOwner. The client normalizes
+// that form explicitly. Require these fields after old deployments/clients/records
+// disappear and the 30-day ledger window expires.
 type GetTokenForRepoResult =
   | {
       success: true;
       token: string;
       installationId: string;
+      integrationId?: string;
+      integrationOwner?: Owner;
       accountLogin: string;
       appType: 'standard' | 'lite';
     }
@@ -215,6 +222,7 @@ type ManagedGitHubAuthParams = {
   userId: string;
   orgId?: string;
   expectedIntegrationId?: string;
+  expectedIntegrationOwner?: Owner;
   allowUserAuthorization: boolean;
 };
 
@@ -223,6 +231,8 @@ type GetCloudAgentAuthForRepoResult =
       success: true;
       githubToken: string;
       installationId: string;
+      integrationId?: string;
+      integrationOwner?: Owner;
       accountLogin: string;
       appType: 'standard' | 'lite';
       source: 'user' | 'installation';
@@ -246,6 +256,8 @@ type IssueGitHubSessionCapabilityResult =
       success: true;
       capability: string;
       installationId: string;
+      integrationId?: string;
+      integrationOwner?: Owner;
       accountLogin: string;
       appType: 'standard' | 'lite';
       source: 'user' | 'installation';
@@ -296,10 +308,17 @@ type GetGitLabTokenFailureReason =
   | 'ambiguous_integration'
   | 'project_lookup_failed'
   | 'no_project_token'
-  | 'invalid_instance_url';
+  | 'invalid_instance_url'
+  | 'integration_mismatch';
 
 type GetGitLabTokenResult =
-  | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
+  | {
+      success: true;
+      token: string;
+      instanceUrl: string;
+      integrationId: string;
+      glabIsOAuth2: boolean;
+    }
   | { success: false; reason: GetGitLabTokenFailureReason };
 
 type GitLabSessionIdentity = {
@@ -364,11 +383,11 @@ export type BitbucketTokenFailureReason =
   | 'repository_mismatch';
 
 type GetBitbucketTokenResult =
-  | { success: true; token: string }
+  | { success: true; token: string; integrationId: string }
   | { success: false; reason: BitbucketTokenFailureReason };
 
 type IssueBitbucketSessionCapabilityResult =
-  | { success: true; capability: string; gitUrl: string }
+  | { success: true; capability: string; gitUrl: string; integrationId: string }
   | { success: false; reason: BitbucketTokenFailureReason | 'capability_configuration_error' };
 
 type RedeemBitbucketSessionCapabilityResult =
@@ -436,6 +455,7 @@ export type GitTokenService = {
     userId: string;
     orgId?: string;
     expectedIntegrationId?: string;
+    expectedIntegrationOwner?: Owner;
   }): Promise<GetTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
   getCloudAgentAuthForRepo?(
@@ -453,6 +473,7 @@ export type GitTokenService = {
   getGitLabToken(params: {
     userId: string;
     orgId?: string;
+    expectedIntegrationId?: string;
     repositoryUrl?: string;
     createdOnPlatform?: string;
   }): Promise<GetGitLabTokenResult>;
@@ -469,6 +490,7 @@ export type GitTokenService = {
     userId: string;
     outboundContainerId: string;
     orgId?: string;
+    expectedIntegrationId?: string;
     createdOnPlatform?: string;
   }): Promise<IssueGitLabSessionCapabilityResult>;
   redeemGitLabSessionCapability(params: {

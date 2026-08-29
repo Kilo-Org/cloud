@@ -61,6 +61,8 @@ import type {
 } from '../execution/types.js';
 import { throwAdmissionError } from './queue-message.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
+import { ResolvedRepositoryIdentitySchema } from '../persistence/session-metadata.js';
+import { assertRepositoryAccessBeforeSessionCreation } from './validate-repository-access.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
 
@@ -1130,7 +1132,12 @@ function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<st
         branch: repository.branch,
       };
     case 'gitlab':
-      return { type: 'gitlab', url: repository.url, branch: repository.branch };
+      return {
+        type: 'gitlab',
+        url: repository.url,
+        gitlabIntegrationId: repository.gitlabIntegrationId,
+        branch: repository.branch,
+      };
     case 'bitbucket':
       return {
         type: 'bitbucket',
@@ -1255,7 +1262,8 @@ export async function sessionCreateIntentFingerprint(
 /**
  * Rejects a same-key retry whose create intent changed after the row recorded
  * its intent fingerprint. Rows admitted before the fingerprint contract carry
- * no comparison data and keep the legacy replay/reconcile behavior.
+ * no comparison data and keep the legacy replay/reconcile behavior. Remove this
+ * fallback only after old clients/records disappear and the 30-day ledger window expires.
  */
 async function assertCreateIntentUnchanged(
   input: SessionRegistrationInput,
@@ -1404,13 +1412,56 @@ async function buildLedgerHooks(
   };
 }
 
-/**
- * Runs the create effect under an already-admitted row and settles it:
- * completed after registration + initial admission, failed on explicit
- * rejection or pre-DO allocation failure, reconcile-pending on an unknown
- * transport outcome. On `takeover`/reconcile rows the settle uses the
- * `takeover` admission kind.
- */
+/** Resolve and persist authorization before executing a ledger-owned create. */
+async function resolveLedgerRepository(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  db: WorkerDb,
+  row: OperationLedgerRow
+): Promise<SessionRegistrationInput> {
+  const stored = row.canonical_result?.repositoryIdentity;
+  const repository =
+    stored === undefined
+      ? input.repository
+      : {
+          ...input.repository,
+          resolvedIdentity: ResolvedRepositoryIdentitySchema.parse(stored),
+        };
+  if (
+    repository.type === 'git' ||
+    (repository.type === 'github' &&
+      !repository.githubIntegrationId &&
+      !repository.resolvedIdentity)
+  ) {
+    return input;
+  }
+  // Fence the submitted intent even when authorization fails or its response is lost.
+  await recordOperationProgress(db, row.id, {
+    [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
+  });
+  const resolvedIdentity = await assertRepositoryAccessBeforeSessionCreation({
+    env: ctx.env,
+    userId: ctx.userId,
+    orgId: input.options?.kilocodeOrganizationId,
+    createdOnPlatform: input.options?.createdOnPlatform,
+    repository,
+  });
+  if (!resolvedIdentity) return input;
+  if (
+    repository.resolvedIdentity &&
+    JSON.stringify(ResolvedRepositoryIdentitySchema.parse(repository.resolvedIdentity)) !==
+      JSON.stringify(resolvedIdentity)
+  ) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+  }
+  // Record authorization separately so old request fingerprint bytes do not change.
+  // A lost response must not repeat an unpinned owner lookup.
+  await recordOperationProgress(db, row.id, {
+    repositoryIdentity: resolvedIdentity,
+  });
+  return { ...input, repository: { ...repository, resolvedIdentity } };
+}
+
 async function executeLedgerCreate(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
@@ -1419,6 +1470,7 @@ async function executeLedgerCreate(
   row: OperationLedgerRow,
   admissionKind: 'new' | 'takeover'
 ): Promise<LedgerSessionCreateResult> {
+  input = await resolveLedgerRepository(input, ctx, db, row);
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, admissionKind);
   const billingOrigin = { billingOrigin: options.billingOrigin };
   let result: { cloudAgentSessionId: string; kiloSessionId: string };
@@ -1498,6 +1550,7 @@ async function resumeCloneCreate(
     throw creationInProgressError();
   }
 
+  input = await resolveLedgerRepository(input, ctx, db, row);
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, 'takeover');
   const sessionService = new SessionService();
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';

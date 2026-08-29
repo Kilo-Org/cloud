@@ -1,4 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { CloudAgentSession } from './CloudAgentSession.js';
+import { prepareInputToSessionCreateRequest } from '../router/handlers/session-prepare.js';
+import { startInputToSessionCreateRequest } from '../router/handlers/session-start.js';
+import { PrepareSessionInput, StartSessionInput } from '../router/schemas.js';
+import { normalizeRepositoryIdentity } from '../session/session-requests.js';
+
+vi.mock('cloudflare:workers', () => ({ DurableObject: class DurableObject {} }));
+vi.mock('@cloudflare/sandbox', () => ({
+  Sandbox: class Sandbox {},
+  getSandbox: vi.fn(),
+  ContainerProxy: class ContainerProxy {},
+}));
+vi.mock('@cloudflare/containers', () => ({}));
+vi.mock('../../drizzle/migrations', () => ({ default: { journal: {}, migrations: {} } }));
 
 import {
   CurrentSessionMetadataSchema,
@@ -8,7 +22,202 @@ import {
   requiresContainmentSandbox,
   serializeSessionMetadata,
   updateProviderRuntime,
+  preserveResolvedRepositoryIdentity,
+  withResolvedRepositoryIdentity,
 } from './session-metadata.js';
+
+function createMetadataSession(beforeTransaction?: () => Promise<void>) {
+  const storage = new Map<string, unknown>();
+  const session = Object.create(CloudAgentSession.prototype) as CloudAgentSession;
+  Object.assign(session, {
+    ctx: {
+      storage: {
+        get: async (key: string) => structuredClone(storage.get(key)),
+        put: async (key: string, value: unknown) => {
+          storage.set(key, structuredClone(value));
+        },
+        transaction: async <T>(
+          run: (transaction: {
+            get: (key: string) => Promise<unknown>;
+            put: (key: string, value: unknown) => Promise<void>;
+          }) => Promise<T>
+        ) => {
+          await beforeTransaction?.();
+          const pending = structuredClone(storage);
+          const result = await run({
+            get: async key => structuredClone(pending.get(key)),
+            put: async (key, value) => {
+              pending.set(key, structuredClone(value));
+            },
+          });
+          for (const [key, value] of pending) storage.set(key, value);
+          return result;
+        },
+      },
+    },
+    requireSessionId: async () => 'agent_identity',
+    hasDeletionIntent: async () => false,
+    updateLastActivity: async () => {},
+    ensureAlarmScheduled: async () => {},
+    getMetadata: async () => {
+      const value = storage.get('metadata');
+      return value ? parseSessionMetadata(value) : null;
+    },
+    getSessionMessageQueue: () => ({
+      admitAcceptedMessage: async ({ turn }: { turn: { messageId: string } }) => ({
+        success: true,
+        outcome: 'queued',
+        compatibilityDelivery: 'queued',
+        messageId: turn.messageId,
+      }),
+    }),
+  });
+  return session;
+}
+
+describe('adapters to Durable Object persistence', () => {
+  const pin = '123e4567-e89b-12d3-a456-426614174022';
+  const providers = [
+    { type: 'github' as const, repo: 'group/repo', githubIntegrationId: pin },
+    {
+      type: 'gitlab' as const,
+      url: 'https://gitlab.example.com/gitlab/group/sub/repo.git',
+      gitlabIntegrationId: pin,
+    },
+    {
+      type: 'bitbucket' as const,
+      url: 'https://bitbucket.org/group/repo.git',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      bitbucketIntegrationId: pin,
+    },
+  ];
+  it.each(
+    providers.flatMap(repository => ['prepare', 'start'].map(adapter => ({ adapter, repository })))
+  )(
+    'persists $adapter $repository.type pins and rejects changed admission',
+    async ({ adapter, repository }) => {
+      const branch = 'release/selected';
+      const request =
+        adapter === 'start'
+          ? startInputToSessionCreateRequest(
+              StartSessionInput.parse({
+                message: { prompt: 'Test' },
+                agent: { mode: 'code', model: 'claude-3' },
+                repository: { ...repository, branch },
+              })
+            )
+          : prepareInputToSessionCreateRequest(
+              PrepareSessionInput.parse({
+                prompt: 'Test',
+                mode: 'code',
+                model: 'claude-3',
+                upstreamBranch: branch,
+                githubToken: 'must-not-persist',
+                gitToken: 'must-not-persist',
+                ...(repository.type === 'github'
+                  ? {
+                      githubRepo: repository.repo,
+                      githubIntegrationId: repository.githubIntegrationId,
+                    }
+                  : repository.type === 'gitlab'
+                    ? {
+                        platform: 'gitlab',
+                        gitUrl: repository.url,
+                        gitlabIntegrationId: repository.gitlabIntegrationId,
+                      }
+                    : {
+                        platform: 'bitbucket',
+                        gitUrl: repository.url,
+                        bitbucketIntegrationId: repository.bitbucketIntegrationId,
+                        bitbucketWorkspaceUuid: repository.workspaceUuid,
+                        bitbucketRepositoryUuid: repository.repositoryUuid,
+                      }),
+              })
+            );
+      const resolvedIdentity = {
+        kind: 'resolved' as const,
+        integrationId: pin,
+        integrationOwner: { type: 'org' as const, id: 'org-1' },
+        instanceUrl:
+          repository.type === 'github'
+            ? 'https://github.com'
+            : repository.type === 'gitlab'
+              ? 'https://gitlab.example.com/gitlab'
+              : 'https://bitbucket.org',
+      };
+      const session = createMetadataSession();
+      const command = {
+        identity: { sessionId: 'agent_identity', userId: 'oauth/user', orgId: 'org-1' },
+        auth: {},
+        agent: request.agent,
+        repository: { ...request.repository, resolvedIdentity },
+        message: {
+          initialTurn: {
+            type: 'prompt' as const,
+            messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+            prompt: 'Test',
+          },
+        },
+      };
+      expect(await session.createSessionWithInitialAdmission(command)).toMatchObject({
+        success: true,
+      });
+      const metadata = await session.getMetadata();
+      expect(metadata?.repository).toMatchObject({
+        ...repository,
+        upstreamBranch: branch,
+        resolvedIdentity,
+      });
+      expect(JSON.stringify(metadata)).not.toContain('must-not-persist');
+      expect(await session.createSessionWithInitialAdmission(command)).toMatchObject({
+        success: true,
+      });
+      expect(
+        await session.createSessionWithInitialAdmission({
+          ...command,
+          repository: { ...command.repository, branch: 'release/different' },
+        })
+      ).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+      const changedPin =
+        repository.type === 'github'
+          ? { githubIntegrationId: '123e4567-e89b-12d3-a456-426614174099' }
+          : repository.type === 'gitlab'
+            ? { gitlabIntegrationId: '123e4567-e89b-12d3-a456-426614174099' }
+            : { bitbucketIntegrationId: '123e4567-e89b-12d3-a456-426614174099' };
+      expect(
+        await session.createSessionWithInitialAdmission({
+          ...command,
+          repository: { ...command.repository, ...changedPin },
+        })
+      ).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+      expect(
+        await session.createSessionWithInitialAdmission({
+          ...command,
+          repository: {
+            ...command.repository,
+            resolvedIdentity: { ...resolvedIdentity, integrationId: 'another-integration' },
+          },
+        })
+      ).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+      if (!metadata?.repository) throw new Error('Expected persisted repository');
+      const { resolvedIdentity: _resolved, ...legacyRepository } = metadata.repository;
+      await session.updateMetadata({ ...metadata, repository: legacyRepository });
+      expect(normalizeRepositoryIdentity((await session.getMetadata())?.repository ?? {})).toEqual(
+        resolvedIdentity
+      );
+      const cloneSession = createMetadataSession();
+      const clone = { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' };
+      const { message: _initialMessage, ...registration } = command;
+      expect(await cloneSession.registerSession({ ...registration, clone })).toEqual({
+        success: true,
+      });
+      const clonedMetadata = await cloneSession.getMetadata();
+      expect(clonedMetadata).toMatchObject({ clone, repository: metadata.repository });
+      expect(clonedMetadata).not.toHaveProperty('initialMessage');
+    }
+  );
+});
 
 const callbackTarget = {
   url: 'https://example.com/callback',
@@ -26,6 +235,291 @@ const profile = {
     },
   ],
 };
+
+describe('late resolution on legacy admission', () => {
+  it('replays the original request after resolution without changing its caller pin', async () => {
+    const session = createMetadataSession();
+    const command = {
+      identity: { sessionId: 'agent_identity', userId: 'oauth/user' },
+      auth: {},
+      agent: { mode: 'code', model: 'claude-3' },
+      repository: { type: 'github' as const, repo: 'group/repo', branch: 'release/selected' },
+      message: {
+        initialTurn: {
+          type: 'prompt' as const,
+          messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          prompt: 'Test',
+        },
+      },
+    };
+    await session.createSessionWithInitialAdmission(command);
+    const metadata = await session.getMetadata();
+    if (!metadata) throw new Error('Expected registration');
+    const resolvedIdentity = {
+      kind: 'resolved' as const,
+      integrationId: '123e4567-e89b-12d3-a456-426614174022',
+      integrationOwner: { type: 'user' as const, id: 'oauth/user' },
+      instanceUrl: 'https://github.com',
+    };
+    await session.updateMetadata(withResolvedRepositoryIdentity(metadata, resolvedIdentity));
+    expect(await session.createSessionWithInitialAdmission(command)).toMatchObject({
+      success: true,
+    });
+    expect((await session.getMetadata())?.repository).toMatchObject({
+      repo: 'group/repo',
+      upstreamBranch: 'release/selected',
+      resolvedIdentity,
+    });
+    expect((await session.getMetadata())?.repository).not.toHaveProperty('githubIntegrationId');
+  });
+});
+
+describe('durable repository resolution', () => {
+  const resolvedIdentity = {
+    kind: 'resolved' as const,
+    integrationId: '123e4567-e89b-12d3-a456-426614174022',
+    integrationOwner: { type: 'user' as const, id: 'oauth/user' },
+    instanceUrl: 'https://gitlab.example.com/gitlab',
+  };
+  const base = {
+    metadataSchemaVersion: 2 as const,
+    identity: { sessionId: 'agent_identity', userId: 'oauth/user', orgId: 'billing-org' },
+    auth: {},
+    lifecycle: { version: 1, timestamp: 1 },
+  };
+
+  it.each([
+    {
+      type: 'github' as const,
+      repo: 'group/repo',
+      githubIntegrationId: resolvedIdentity.integrationId,
+    },
+    {
+      type: 'gitlab' as const,
+      url: 'https://gitlab.example.com/gitlab/group/sub/repo.git',
+      gitlabIntegrationId: resolvedIdentity.integrationId,
+    },
+    {
+      type: 'bitbucket' as const,
+      url: 'https://bitbucket.org/group/repo.git',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      bitbucketIntegrationId: resolvedIdentity.integrationId,
+    },
+  ])('round-trips the $type resolution independently of session ownership', repository => {
+    const metadata = parseSessionMetadata({
+      ...base,
+      repository: { ...repository, upstreamBranch: 'release/selected' },
+    });
+    const pinned = withResolvedRepositoryIdentity(metadata, resolvedIdentity);
+    expect(parseSessionMetadata(serializeSessionMetadata(pinned)).repository).toEqual({
+      ...repository,
+      upstreamBranch: 'release/selected',
+      resolvedIdentity,
+    });
+    expect(pinned.identity.orgId).toBe('billing-org');
+    expect(
+      preserveResolvedRepositoryIdentity(pinned, metadata).repository?.resolvedIdentity
+    ).toEqual(resolvedIdentity);
+  });
+
+  it.each([
+    { integrationId: '123e4567-e89b-12d3-a456-426614174099' },
+    { integrationOwner: { type: 'org' as const, id: 'another-owner' } },
+    { instanceUrl: 'https://other.example.com/gitlab' },
+  ])('rejects resolved identity replacement %j', change => {
+    const metadata = withResolvedRepositoryIdentity(
+      parseSessionMetadata({
+        ...base,
+        repository: { type: 'gitlab', url: 'https://gitlab.example.com/gitlab/group/sub/repo.git' },
+      }),
+      resolvedIdentity
+    );
+    expect(() =>
+      withResolvedRepositoryIdentity(metadata, { ...resolvedIdentity, ...change })
+    ).toThrow('Repository identity cannot change');
+  });
+
+  it('rejects a resolved integration that differs from the caller pin', () => {
+    const metadata = parseSessionMetadata({
+      ...base,
+      repository: {
+        type: 'gitlab',
+        url: 'https://gitlab.example.com/gitlab/group/sub/repo.git',
+        gitlabIntegrationId: '123e4567-e89b-12d3-a456-426614174099',
+      },
+    });
+    expect(() => withResolvedRepositoryIdentity(metadata, resolvedIdentity)).toThrow(
+      'Repository identity cannot change'
+    );
+  });
+});
+
+describe('Durable Object repository identity merge', () => {
+  const resolvedIdentity = {
+    kind: 'resolved' as const,
+    integrationId: '123e4567-e89b-12d3-a456-426614174022',
+    integrationOwner: { type: 'user' as const, id: 'oauth/user' },
+    instanceUrl: 'https://github.com',
+  };
+  const snapshot = parseSessionMetadata({
+    metadataSchemaVersion: 2,
+    identity: { sessionId: 'agent_identity', userId: 'oauth/user', orgId: 'billing-org' },
+    auth: { kilocodeToken: 'old-auth' },
+    repository: { type: 'github', repo: 'group/repo', upstreamBranch: 'release/selected' },
+    callback: { target: { url: 'https://example.com/old' } },
+    lifecycle: { version: 1, timestamp: 1 },
+  });
+
+  it('merges into concurrent metadata and preserves it on a stale same-identity retry', async () => {
+    const newer = parseSessionMetadata({
+      ...snapshot,
+      auth: { kilocodeToken: 'current-auth', kiloSessionId: 'current-session' },
+      repository: { ...snapshot.repository, upstreamBranch: 'release/current' },
+      callback: { target: { url: 'https://example.com/current' } },
+      workspace: { branchName: 'workspace/current', workspacePath: '/workspace/current' },
+      lifecycle: { version: 2, timestamp: 1, preparedAt: 2, initiatedAt: 3 },
+    });
+    let concurrent = true;
+    const session = createMetadataSession(async () => {
+      if (concurrent) {
+        concurrent = false;
+        await session.updateMetadata(newer);
+      }
+    });
+    await session.updateMetadata(snapshot);
+    await session.updateResolvedRepositoryIdentity(snapshot, resolvedIdentity);
+    expect(await session.getMetadata()).toEqual({
+      ...newer,
+      repository: { ...newer.repository, resolvedIdentity },
+    });
+
+    await session.updateUpstreamBranch('release/after-prepare');
+    await session.recordKiloServerActivity();
+    const current = await session.getMetadata();
+    await session.updateResolvedRepositoryIdentity(snapshot, resolvedIdentity);
+    expect(await session.getMetadata()).toEqual(current);
+    expect(current?.repository?.upstreamBranch).toBe('release/after-prepare');
+    expect(current?.lifecycle.preparedAt).toBe(2);
+    expect(current?.workspace?.branchName).toBe('workspace/current');
+  });
+
+  it.each([
+    { label: 'repository', change: { repository: { type: 'github', repo: 'group/other' } } },
+    {
+      label: 'provider',
+      change: { repository: { type: 'gitlab', url: 'https://gitlab.com/group/repo.git' } },
+    },
+    { label: 'missing repository', change: { repository: undefined } },
+    { label: 'user', change: { identity: { ...snapshot.identity, userId: 'other-user' } } },
+    { label: 'organization', change: { identity: { ...snapshot.identity, orgId: 'other-org' } } },
+    {
+      label: 'pin',
+      change: {
+        repository: { ...snapshot.repository, githubIntegrationId: resolvedIdentity.integrationId },
+      },
+    },
+    {
+      label: 'integration',
+      change: {
+        repository: {
+          ...snapshot.repository,
+          resolvedIdentity: { ...resolvedIdentity, integrationId: 'another-integration' },
+        },
+      },
+    },
+    {
+      label: 'resolved owner',
+      change: {
+        repository: {
+          ...snapshot.repository,
+          resolvedIdentity: {
+            ...resolvedIdentity,
+            integrationOwner: { type: 'org', id: 'billing-org' },
+          },
+        },
+      },
+    },
+    {
+      label: 'instance',
+      change: {
+        repository: {
+          ...snapshot.repository,
+          resolvedIdentity: { ...resolvedIdentity, instanceUrl: 'https://other.example.com' },
+        },
+      },
+    },
+  ])(
+    'rejects a changed $label between lookup and merge without altering current metadata',
+    async ({ change }) => {
+      const session = createMetadataSession();
+      const current = parseSessionMetadata({ ...snapshot, ...change });
+      await session.updateMetadata(current);
+      await expect(
+        session.updateResolvedRepositoryIdentity(snapshot, resolvedIdentity)
+      ).rejects.toThrow('Repository identity cannot change');
+      expect(await session.getMetadata()).toEqual(current);
+    }
+  );
+
+  it.each([
+    {
+      repository: { type: 'gitlab', url: 'https://gitlab.example.com/gitlab/group/repo.git' },
+      change: { url: 'https://gitlab.example.com/gitlab/group/other.git' },
+    },
+    {
+      repository: { type: 'gitlab', url: 'https://gitlab.example.com/gitlab/group/repo.git' },
+      change: { gitlabIntegrationId: resolvedIdentity.integrationId },
+    },
+    ...[
+      { url: 'https://bitbucket.org/group/other.git' },
+      { workspaceUuid: '123e4567-e89b-12d3-a456-426614174099' },
+      { repositoryUuid: '123e4567-e89b-12d3-a456-426614174099' },
+      { bitbucketIntegrationId: resolvedIdentity.integrationId },
+    ].map(change => ({
+      repository: {
+        type: 'bitbucket',
+        url: 'https://bitbucket.org/group/repo.git',
+        workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+        repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      },
+      change,
+    })),
+  ])(
+    'rejects changed provider resource fields before the first resolution: $change',
+    async ({ repository, change }) => {
+      const session = createMetadataSession();
+      const expected = parseSessionMetadata({ ...snapshot, repository });
+      const current = parseSessionMetadata({
+        ...expected,
+        repository: { ...repository, ...change },
+      });
+      await session.updateMetadata(current);
+      await expect(
+        session.updateResolvedRepositoryIdentity(expected, resolvedIdentity)
+      ).rejects.toThrow('Repository identity cannot change');
+      expect(await session.getMetadata()).toEqual(current);
+    }
+  );
+
+  it('keeps a caller pin and rejects a different resolved integration on replay', async () => {
+    const session = createMetadataSession();
+    const pinned = parseSessionMetadata({
+      ...snapshot,
+      repository: { ...snapshot.repository, githubIntegrationId: resolvedIdentity.integrationId },
+    });
+    await session.updateMetadata(pinned);
+    await session.updateResolvedRepositoryIdentity(pinned, resolvedIdentity);
+    const stored = await session.getMetadata();
+    await expect(
+      session.updateResolvedRepositoryIdentity(pinned, {
+        ...resolvedIdentity,
+        integrationId: 'another-integration',
+      })
+    ).rejects.toThrow('Repository identity cannot change');
+    expect(await session.getMetadata()).toEqual(stored);
+  });
+});
 
 describe('session metadata boundary', () => {
   it('maps legacy managed SCM containment to GitHub and Kilo only', () => {

@@ -35,7 +35,7 @@ export function createSessionStartHandlers(): SessionStartHandlers {
   return { start: startSessionHandler };
 }
 
-function startInputToSessionCreateRequest(
+export function startInputToSessionCreateRequest(
   input: z.infer<typeof StartSessionInput>
 ): SessionCreateRequest {
   const repo = input.repository;
@@ -52,7 +52,12 @@ function startInputToSessionCreateRequest(
       };
       break;
     case 'gitlab':
-      repository = { type: 'gitlab', url: repo.url, branch: repo.branch };
+      repository = {
+        type: 'gitlab',
+        url: repo.url,
+        ...(repo.gitlabIntegrationId ? { gitlabIntegrationId: repo.gitlabIntegrationId } : {}),
+        branch: repo.branch,
+      };
       break;
     case 'bitbucket':
       repository = {
@@ -106,12 +111,14 @@ const startSessionHandler = protectedProcedure
         db = getPgDb(ctx.env);
         await assertOrganizationMembership(db, ctx.userId, organizationId);
       }
-      await assertRepositoryAccessBeforeSessionCreation({
+      const resolvedIdentity = await assertRepositoryAccessBeforeSessionCreation({
         env: ctx.env,
         userId: ctx.userId,
         orgId: organizationId,
+        createdOnPlatform: request.options?.createdOnPlatform,
         repository: request.repository,
       });
+      if (resolvedIdentity) request.repository = { ...request.repository, resolvedIdentity };
 
       const policy = profileResolutionPolicyForSessionCreateOrigin(
         input.options?.createdOnPlatform

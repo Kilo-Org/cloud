@@ -234,12 +234,25 @@ function createInternalApiContext(options: {
             success: true,
             token: 'managed-github-token',
             installationId: '123',
+            integrationId: '123e4567-e89b-12d3-a456-426614174022',
+            integrationOwner: { type: 'user', id: 'test-user-123' },
             accountLogin: 'acme',
             appType: 'standard',
           }),
+        getGitLabToken: vi.fn().mockResolvedValue({
+          success: true,
+          token: 'managed-gitlab-token',
+          instanceUrl: 'https://gitlab.com',
+          integrationId: '123e4567-e89b-12d3-a456-426614174022',
+          glabIsOAuth2: true,
+        }),
         getBitbucketToken:
           options.getBitbucketToken ??
-          vi.fn().mockResolvedValue({ success: true, token: 'managed-bitbucket-token' }),
+          vi.fn().mockResolvedValue({
+            success: true,
+            token: 'managed-bitbucket-token',
+            integrationId: '123e4567-e89b-12d3-a456-426614174022',
+          }),
       } as unknown as TRPCContext['env']['GIT_TOKEN_SERVICE'],
       HYPERDRIVE: {
         connectionString: 'postgres://profile-test',
@@ -624,11 +637,17 @@ describe('prepareSession endpoint', () => {
 
     expect(doStub.registerSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        repository: {
+        repository: expect.objectContaining({
           type: 'gitlab',
           url: 'https://gitlab.com/acme/repo.git',
           branch: 'feature/gitlab',
-        },
+          resolvedIdentity: {
+            kind: 'resolved',
+            integrationId: '123e4567-e89b-12d3-a456-426614174022',
+            integrationOwner: { type: 'user', id: 'test-user-123' },
+            instanceUrl: 'https://gitlab.com',
+          },
+        }),
       })
     );
   });
@@ -651,11 +670,17 @@ describe('prepareSession endpoint', () => {
     expect(doStub.registerSession).toHaveBeenCalledWith(
       expect.objectContaining({
         identity: expect.objectContaining({ createdOnPlatform: 'code-review' }),
-        repository: {
+        repository: expect.objectContaining({
           type: 'gitlab',
           url: 'https://gitlab.com/acme/repo.git',
           branch: 'feature/gitlab',
-        },
+          resolvedIdentity: {
+            kind: 'resolved',
+            integrationId: '123e4567-e89b-12d3-a456-426614174022',
+            integrationOwner: { type: 'user', id: 'test-user-123' },
+            instanceUrl: 'https://gitlab.com',
+          },
+        }),
       })
     );
     expect(doStub.registerSession.mock.calls[0]?.[0].repository).not.toHaveProperty('token');
@@ -663,9 +688,11 @@ describe('prepareSession endpoint', () => {
 
   it('persists only generic Bitbucket repository identity after access preflight', async () => {
     const doStub = createMockDOStub();
-    const getBitbucketToken = vi
-      .fn()
-      .mockResolvedValue({ success: true, token: 'managed-bitbucket-token' });
+    const getBitbucketToken = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'managed-bitbucket-token',
+      integrationId: '123e4567-e89b-12d3-a456-426614174022',
+    });
     const caller = appRouter.createCaller(createInternalApiContext({ doStub, getBitbucketToken }));
     const reviewId = '123e4567-e89b-12d3-a456-426614174023';
     const integrationId = '123e4567-e89b-12d3-a456-426614174022';
@@ -713,6 +740,12 @@ describe('prepareSession endpoint', () => {
           repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
           bitbucketIntegrationId: integrationId,
           branch: 'feature/bitbucket',
+          resolvedIdentity: {
+            kind: 'resolved',
+            integrationId,
+            integrationOwner: { type: 'org', id: organizationId },
+            instanceUrl: 'https://bitbucket.org',
+          },
         },
       })
     );
@@ -1416,6 +1449,8 @@ describe('start endpoint', () => {
       success: true,
       token: 'managed-github-token',
       installationId: '123',
+      integrationId: '123e4567-e89b-12d3-a456-426614174022',
+      integrationOwner: { type: 'user', id: 'test-user-123' },
       accountLogin: 'acme',
       appType: 'standard',
     });
@@ -1435,7 +1470,17 @@ describe('start endpoint', () => {
     });
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId,
+          resolvedIdentity: {
+            kind: 'resolved',
+            integrationId: githubIntegrationId,
+            integrationOwner: { type: 'user', id: 'test-user-123' },
+            instanceUrl: 'https://github.com',
+          },
+        },
       })
     );
   });

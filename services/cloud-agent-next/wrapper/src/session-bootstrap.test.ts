@@ -1519,12 +1519,27 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     });
   });
 
-  it('classifies strict missing branches', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.strictBranch = true;
-    request.materialized.setupCommands = [];
-    expect(
-      prepareWrapperBootstrapWorkspace(request, undefined, {
+  it.each(['github', 'gitlab', 'bitbucket'] as const)(
+    'classifies strict missing %s branches without a fallback',
+    async provider => {
+      const request = makeRequest(tmpDir);
+      if (provider !== 'github') {
+        request.repo = {
+          kind: 'git',
+          url:
+            provider === 'gitlab'
+              ? 'https://gitlab.example.com/gitlab/acme/repo.git'
+              : 'https://bitbucket.org/acme/repo.git',
+          platform: provider,
+          token: 'managed-token',
+          refreshRemote: true,
+        };
+      }
+      request.workspace.branchName = 'release/selected';
+      request.workspace.upstreamBranch = 'release/selected';
+      request.workspace.strictBranch = true;
+      request.materialized.setupCommands = [];
+      const outcome = await prepareWrapperBootstrapWorkspace(request, undefined, {
         git: async args => {
           if (args[0] === 'clone') {
             await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
@@ -1539,12 +1554,13 @@ describe('prepareWrapperBootstrapWorkspace', () => {
           imported: true,
           diffs: { applied: 0, skipped: 0, total: 0 },
         }),
-      })
-    ).rejects.toMatchObject({
-      subtype: 'git_branch_missing',
-      retryable: false,
-    });
-  });
+      }).catch((error: unknown) => error);
+      expect(outcome).toMatchObject({
+        subtype: 'git_branch_missing',
+        retryable: false,
+      });
+    }
+  );
 
   it('exposes redacted setup command and stderr on failure but redacts secrets', async () => {
     const request = makeRequest(tmpDir);

@@ -6,6 +6,7 @@ import { isGeneratedSharedSandboxId, isValidSandboxId } from '../sandbox-id.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { type AgentSandboxProvider, type SandboxId } from '../types.js';
+import type { ResolvedRepositoryIdentity } from '../session/session-requests.js';
 import {
   AttachmentsSchema,
   branchNameSchema,
@@ -68,9 +69,20 @@ const MetadataAuthSchema = z
   })
   .strip();
 
+export const ResolvedRepositoryIdentitySchema = z.object({
+  kind: z.literal('resolved'),
+  integrationId: z.string().min(1),
+  integrationOwner: z.discriminatedUnion('type', [
+    z.object({ type: z.literal('user'), id: z.string().min(1) }),
+    z.object({ type: z.literal('org'), id: z.string().min(1) }),
+  ]),
+  instanceUrl: z.string().url(),
+});
+
 const RepositoryCommonSchema = {
   token: z.string().optional(),
   upstreamBranch: branchNameSchema.optional(),
+  resolvedIdentity: ResolvedRepositoryIdentitySchema.optional(),
 };
 
 const repositoryTypes = new Set(['github', 'gitlab', 'bitbucket', 'git']);
@@ -131,6 +143,7 @@ const MetadataRepositorySchema = z.preprocess(
           type: z.literal('gitlab'),
           url: z.string(),
           platform: z.literal('gitlab').optional(),
+          gitlabIntegrationId: z.string().uuid().optional(),
           gitlabTokenManaged: z.boolean().optional(),
           ...RepositoryCommonSchema,
         })
@@ -145,6 +158,7 @@ const MetadataRepositorySchema = z.preprocess(
           bitbucketIntegrationId: z.string().uuid().optional(),
           bitbucketTokenManaged: z.boolean().optional(),
           upstreamBranch: branchNameSchema.optional(),
+          resolvedIdentity: ResolvedRepositoryIdentitySchema.optional(),
         })
         .strip(),
       z
@@ -526,6 +540,71 @@ export function parseSessionMetadata(raw: unknown): SessionMetadata {
 
 export function serializeSessionMetadata(metadata: SessionMetadata): SessionMetadata {
   return CurrentSessionMetadataSchema.parse(metadata);
+}
+
+export function preserveResolvedRepositoryIdentity(
+  existing: SessionMetadata,
+  next: SessionMetadata
+): SessionMetadata {
+  const stored = existing.repository;
+  const incoming = next.repository;
+  const identity = stored?.resolvedIdentity;
+  if (!identity) return next;
+  const candidate = incoming?.resolvedIdentity;
+  if (
+    !incoming ||
+    existing.identity.userId !== next.identity.userId ||
+    existing.identity.orgId !== next.identity.orgId ||
+    stored.type !== incoming.type ||
+    (stored.type === 'github' &&
+      incoming.type === 'github' &&
+      stored.githubIntegrationId !== incoming.githubIntegrationId) ||
+    (stored.type === 'gitlab' &&
+      incoming.type === 'gitlab' &&
+      stored.gitlabIntegrationId !== incoming.gitlabIntegrationId) ||
+    (stored.type === 'bitbucket' &&
+      incoming.type === 'bitbucket' &&
+      stored.bitbucketIntegrationId !== incoming.bitbucketIntegrationId) ||
+    ('repo' in stored
+      ? stored.repo !== ('repo' in incoming ? incoming.repo : undefined)
+      : stored.url !== ('url' in incoming ? incoming.url : undefined)) ||
+    (stored.type === 'bitbucket' &&
+      (incoming.type !== 'bitbucket' ||
+        stored.workspaceUuid !== incoming.workspaceUuid ||
+        stored.repositoryUuid !== incoming.repositoryUuid)) ||
+    (candidate &&
+      (candidate.integrationId !== identity.integrationId ||
+        candidate.integrationOwner.type !== identity.integrationOwner.type ||
+        candidate.integrationOwner.id !== identity.integrationOwner.id ||
+        candidate.instanceUrl !== identity.instanceUrl))
+  ) {
+    throw new Error('Repository identity cannot change');
+  }
+  return { ...next, repository: { ...incoming, resolvedIdentity: identity } };
+}
+
+export function withResolvedRepositoryIdentity(
+  metadata: SessionMetadata,
+  resolved: ResolvedRepositoryIdentity
+): SessionMetadata {
+  const repository = metadata.repository;
+  if (!repository) throw new Error('Repository identity cannot change');
+  const identity = ResolvedRepositoryIdentitySchema.parse(resolved);
+  const pin =
+    repository.type === 'github'
+      ? repository.githubIntegrationId
+      : repository.type === 'gitlab'
+        ? repository.gitlabIntegrationId
+        : repository.type === 'bitbucket'
+          ? repository.bitbucketIntegrationId
+          : undefined;
+  if (pin !== undefined && pin !== identity.integrationId) {
+    throw new Error('Repository identity cannot change');
+  }
+  return preserveResolvedRepositoryIdentity(metadata, {
+    ...metadata,
+    repository: { ...repository, resolvedIdentity: identity },
+  });
 }
 
 export function updateProviderRuntime(

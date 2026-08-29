@@ -222,6 +222,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       repository = {
         type: 'gitlab',
         url: gitUrl,
+        ...(input.gitlabIntegrationId ? { gitlabIntegrationId: input.gitlabIntegrationId } : {}),
         branch: input.upstreamBranch,
       };
     } else if (
@@ -339,12 +340,17 @@ const prepareSessionHandler = internalApiProtectedProcedure
           input.kilocodeOrganizationId
         );
       }
-      await assertRepositoryAccessBeforeSessionCreation({
-        env: ctx.env,
-        userId: ctx.userId,
-        orgId: input.kilocodeOrganizationId,
-        repository: request.repository,
-      });
+      // Ledger retries authorize the stored resolution, not a new owner lookup.
+      if (!(input.autoInitiate === true && input.operationKey)) {
+        const resolvedIdentity = await assertRepositoryAccessBeforeSessionCreation({
+          env: ctx.env,
+          userId: ctx.userId,
+          orgId: input.kilocodeOrganizationId,
+          createdOnPlatform: input.createdOnPlatform,
+          repository: request.repository,
+        });
+        if (resolvedIdentity) request.repository = { ...request.repository, resolvedIdentity };
+      }
       const policy = profileResolutionPolicyForSessionCreateOrigin(input.createdOnPlatform);
       const requestWithProfile = await resolveEffectiveSessionConfiguration(ctx, request, policy);
       assertModeAvailableForProfile(

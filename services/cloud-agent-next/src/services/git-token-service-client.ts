@@ -1,4 +1,6 @@
 import { logger } from '../logger.js';
+import { ResolvedRepositoryIdentitySchema } from '../persistence/session-metadata.js';
+import type { RepositoryIdentityResolution } from '../session/session-requests.js';
 import type {
   BitbucketTokenFailureReason,
   GitAuthorConfig,
@@ -14,6 +16,7 @@ type GitTokenServiceEnv = {
 export type ResolvedGitHubToken = {
   token: string;
   installationId: string;
+  identity: RepositoryIdentityResolution;
   appType: 'standard' | 'lite';
   accountLogin: string;
 };
@@ -27,9 +30,61 @@ export type ResolveGitHubTokenResult =
   | { success: true; value: ResolvedGitHubToken }
   | { success: false; error: ResolveGitHubTokenError };
 
+function githubIdentityFromResponse(
+  response: { integrationId?: unknown; integrationOwner?: unknown },
+  params: Parameters<GitTokenService['getTokenForRepo']>[0]
+):
+  | { success: true; identity: RepositoryIdentityResolution }
+  | { success: false; error: ResolveGitHubTokenError } {
+  // Old GitHub deployments omit both fields and can ignore newly added selectors.
+  // Permit only their unpinned legacy path, without claiming exact identity.
+  // Remove after old deployments/clients/records disappear and the 30-day ledger window expires.
+  if (
+    !Object.hasOwn(response, 'integrationId') &&
+    !Object.hasOwn(response, 'integrationOwner') &&
+    params.expectedIntegrationId === undefined &&
+    params.expectedIntegrationOwner === undefined
+  ) {
+    return { success: true, identity: { kind: 'legacy-unresolved' } };
+  }
+  const parsed = ResolvedRepositoryIdentitySchema.safeParse({
+    kind: 'resolved',
+    integrationId: response.integrationId,
+    integrationOwner: response.integrationOwner,
+    instanceUrl: 'https://github.com',
+  });
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: {
+        reason: 'service_compatibility_error',
+        message:
+          'GitHub token service cannot prove the repository identity (service_compatibility_error)',
+      },
+    };
+  }
+  const identity = parsed.data;
+  if (
+    (params.expectedIntegrationId !== undefined &&
+      params.expectedIntegrationId !== identity.integrationId) ||
+    (params.expectedIntegrationOwner !== undefined &&
+      (params.expectedIntegrationOwner.type !== identity.integrationOwner.type ||
+        params.expectedIntegrationOwner.id !== identity.integrationOwner.id))
+  ) {
+    return {
+      success: false,
+      error: {
+        reason: 'integration_mismatch',
+        message: 'GitHub repository identity does not match the requested integration',
+      },
+    };
+  }
+  return { success: true, identity };
+}
+
 export async function resolveGitHubTokenForRepo(
   env: GitTokenServiceEnv,
-  params: { githubRepo: string; userId: string; orgId?: string; expectedIntegrationId?: string }
+  params: Parameters<GitTokenService['getTokenForRepo']>[0]
 ): Promise<ResolveGitHubTokenResult> {
   try {
     if (!env.GIT_TOKEN_SERVICE) {
@@ -43,6 +98,8 @@ export async function resolveGitHubTokenForRepo(
     }
     const result = await env.GIT_TOKEN_SERVICE.getTokenForRepo(params);
     if (result.success) {
+      const resolution = githubIdentityFromResponse(result, params);
+      if (!resolution.success) return resolution;
       logger
         .withFields({
           installationId: result.installationId,
@@ -55,6 +112,7 @@ export async function resolveGitHubTokenForRepo(
         value: {
           token: result.token,
           installationId: result.installationId,
+          identity: resolution.identity,
           appType: result.appType,
           accountLogin: result.accountLogin,
         },
@@ -83,6 +141,7 @@ export async function resolveGitHubTokenForRepo(
 export type ResolvedCloudAgentGitHubAuth = {
   githubToken: string;
   installationId: string;
+  identity: RepositoryIdentityResolution;
   appType: 'standard' | 'lite';
   accountLogin: string;
   source: 'user' | 'installation';
@@ -94,6 +153,7 @@ export type ResolvedCloudAgentGitHubAuth = {
 export type ResolvedCloudAgentGitHubCapability = {
   capability: string;
   installationId: string;
+  identity: RepositoryIdentityResolution;
   appType: 'standard' | 'lite';
   accountLogin: string;
   source: 'user' | 'installation';
@@ -102,12 +162,10 @@ export type ResolvedCloudAgentGitHubCapability = {
   fallbackReason?: ManagedGitHubFallbackReason;
 };
 
-type IssueCloudAgentGitHubSessionCapabilityParams = {
-  githubRepo: string;
-  userId: string;
+type IssueCloudAgentGitHubSessionCapabilityParams = Parameters<
+  GitTokenService['getTokenForRepo']
+>[0] & {
   outboundContainerId: string;
-  orgId?: string;
-  expectedIntegrationId?: string;
   allowUserAuthorization: boolean;
 };
 
@@ -119,14 +177,19 @@ type CloudAgentGitHubAuthResult =
   | { success: true; value: ResolvedCloudAgentGitHubAuth }
   | { success: false; error: ResolveGitHubTokenError };
 
+// Old service deployments lack managed-auth/capability RPCs. Remove these
+// fallbacks only after old clients/records disappear and the 30-day ledger window expires.
 async function resolveLegacyInstallationAuthForRepo(
   env: GitTokenServiceEnv,
-  params: { githubRepo: string; userId: string; orgId?: string; expectedIntegrationId?: string }
+  params: Parameters<GitTokenService['getTokenForRepo']>[0]
 ): Promise<CloudAgentGitHubAuthResult> {
   const legacyParams = {
     githubRepo: params.githubRepo,
     userId: params.userId,
     ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
+    ...(params.expectedIntegrationOwner !== undefined
+      ? { expectedIntegrationOwner: params.expectedIntegrationOwner }
+      : {}),
     ...(params.expectedIntegrationId !== undefined
       ? { expectedIntegrationId: params.expectedIntegrationId }
       : {}),
@@ -138,6 +201,7 @@ async function resolveLegacyInstallationAuthForRepo(
     value: {
       githubToken: result.value.token,
       installationId: result.value.installationId,
+      identity: result.value.identity,
       appType: result.value.appType,
       accountLogin: result.value.accountLogin,
       source: 'installation',
@@ -147,13 +211,7 @@ async function resolveLegacyInstallationAuthForRepo(
 
 export async function resolveCloudAgentGitHubAuthForRepo(
   env: GitTokenServiceEnv,
-  params: {
-    githubRepo: string;
-    userId: string;
-    orgId?: string;
-    expectedIntegrationId?: string;
-    allowUserAuthorization: boolean;
-  }
+  params: Parameters<GitTokenService['getTokenForRepo']>[0] & { allowUserAuthorization: boolean }
 ): Promise<CloudAgentGitHubAuthResult> {
   if (!env.GIT_TOKEN_SERVICE) {
     return {
@@ -179,6 +237,8 @@ export async function resolveCloudAgentGitHubAuthForRepo(
         },
       };
     }
+    const resolution = githubIdentityFromResponse(result, params);
+    if (!resolution.success) return resolution;
     logger
       .withFields({
         installationId: result.installationId,
@@ -193,6 +253,7 @@ export async function resolveCloudAgentGitHubAuthForRepo(
       value: {
         githubToken: result.githubToken,
         installationId: result.installationId,
+        identity: resolution.identity,
         appType: result.appType,
         accountLogin: result.accountLogin,
         source: result.source,
@@ -218,6 +279,9 @@ function resolveGitHubAuthFallbackForCapability(
     githubRepo: params.githubRepo,
     userId: params.userId,
     ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
+    ...(params.expectedIntegrationOwner !== undefined
+      ? { expectedIntegrationOwner: params.expectedIntegrationOwner }
+      : {}),
     ...(params.expectedIntegrationId !== undefined
       ? { expectedIntegrationId: params.expectedIntegrationId }
       : {}),
@@ -254,6 +318,8 @@ export async function issueCloudAgentGitHubSessionCapability(
         },
       };
     }
+    const resolution = githubIdentityFromResponse(result, params);
+    if (!resolution.success) return resolution;
     logger
       .withFields({
         installationId: result.installationId,
@@ -268,6 +334,7 @@ export async function issueCloudAgentGitHubSessionCapability(
       value: {
         capability: result.capability,
         installationId: result.installationId,
+        identity: resolution.identity,
         appType: result.appType,
         accountLogin: result.accountLogin,
         source: result.source,
@@ -298,7 +365,13 @@ export type ResolvedCloudAgentGitLabCapability = {
 };
 
 export type ResolveManagedGitLabTokenResult =
-  | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
+  | {
+      success: true;
+      token: string;
+      instanceUrl: string;
+      integrationId: string;
+      glabIsOAuth2: boolean;
+    }
   | { success: false; reason: string };
 
 export type ManagedBitbucketTokenFailureReason =
@@ -307,8 +380,18 @@ export type ManagedBitbucketTokenFailureReason =
   | 'rpc_error';
 
 export type ResolveManagedBitbucketTokenResult =
-  | { success: true; token: string }
+  | { success: true; token: string; integrationId: string }
   | { success: false; reason: ManagedBitbucketTokenFailureReason };
+
+export function isTemporaryManagedGitLabTokenFailure(reason: string): boolean {
+  return (
+    reason === 'token_refresh_failed' ||
+    reason === 'project_lookup_failed' ||
+    reason === 'service_not_configured' ||
+    reason === 'database_not_configured' ||
+    reason === 'rpc_error'
+  );
+}
 
 export function isTemporaryManagedBitbucketTokenFailure(
   reason: ManagedBitbucketTokenFailureReason
@@ -343,7 +426,7 @@ export async function resolveManagedBitbucketToken(
     const result = await env.GIT_TOKEN_SERVICE.getBitbucketToken(params);
     if (result.success) {
       logger.info('Resolved Bitbucket token via git-token-service');
-      return { success: true, token: result.token };
+      return { success: true, token: result.token, integrationId: result.integrationId };
     }
     logger.withFields({ reason: result.reason }).info('Bitbucket token lookup failed');
     return { success: false, reason: result.reason };
@@ -356,6 +439,7 @@ export async function resolveManagedBitbucketToken(
 export type ResolvedCloudAgentBitbucketCapability = {
   capability: string;
   gitUrl: string;
+  integrationId: string;
 };
 
 export async function issueCloudAgentBitbucketSessionCapability(
@@ -383,7 +467,14 @@ export async function issueCloudAgentBitbucketSessionCapability(
     const result = await env.GIT_TOKEN_SERVICE.issueBitbucketSessionCapability(params);
     if (!result.success) return { success: false, reason: result.reason };
     logger.info('Issued Bitbucket session capability via git-token-service');
-    return { success: true, value: { capability: result.capability, gitUrl: result.gitUrl } };
+    return {
+      success: true,
+      value: {
+        capability: result.capability,
+        gitUrl: result.gitUrl,
+        integrationId: result.integrationId,
+      },
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.withFields({ error: message }).error('Failed to issue Bitbucket session capability');
@@ -393,13 +484,7 @@ export async function issueCloudAgentBitbucketSessionCapability(
 
 export async function issueCloudAgentGitLabSessionCapability(
   env: GitTokenServiceEnv,
-  params: {
-    gitUrl: string;
-    userId: string;
-    outboundContainerId: string;
-    orgId?: string;
-    createdOnPlatform?: string;
-  }
+  params: Parameters<GitTokenService['issueGitLabSessionCapability']>[0]
 ): Promise<
   { success: true; value: ResolvedCloudAgentGitLabCapability } | { success: false; reason: string }
 > {
@@ -442,12 +527,7 @@ export async function issueCloudAgentGitLabSessionCapability(
 
 export async function resolveManagedGitLabToken(
   env: GitTokenServiceEnv,
-  params: {
-    userId: string;
-    orgId?: string;
-    repositoryUrl?: string;
-    createdOnPlatform?: string;
-  }
+  params: Parameters<GitTokenService['getGitLabToken']>[0]
 ): Promise<ResolveManagedGitLabTokenResult> {
   try {
     if (!env.GIT_TOKEN_SERVICE) {
@@ -460,6 +540,7 @@ export async function resolveManagedGitLabToken(
         success: true,
         token: result.token,
         instanceUrl: result.instanceUrl,
+        integrationId: result.integrationId,
         glabIsOAuth2: result.glabIsOAuth2,
       };
     }

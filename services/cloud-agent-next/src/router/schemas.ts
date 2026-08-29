@@ -466,6 +466,7 @@ const PrepareSessionSharedFields = {
     .enum(['github', 'gitlab', 'bitbucket'])
     .optional()
     .describe('Git platform type for correct token/env var handling'),
+  gitlabIntegrationId: z.string().uuid().optional(),
   bitbucketWorkspaceUuid: z.string().uuid().optional(),
   bitbucketWorkspaceSlug: z
     .string()
@@ -672,6 +673,16 @@ export const PrepareSessionInput = z
       });
     }
 
+    if (
+      data.gitlabIntegrationId !== undefined &&
+      (data.platform !== 'gitlab' || data.gitUrl === undefined)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['gitlabIntegrationId'],
+        message: 'GitLab integration identity is only valid for GitLab repositories',
+      });
+    }
     const hasBitbucketIds =
       data.bitbucketWorkspaceUuid !== undefined && data.bitbucketRepositoryUuid !== undefined;
     if (
@@ -695,11 +706,13 @@ export const PrepareSessionInput = z
     const bitbucketReviewFields = [
       data.bitbucketWorkspaceSlug,
       data.bitbucketRepositorySlug,
-      data.bitbucketIntegrationId,
       data.bitbucketPullRequestId,
       data.bitbucketExpectedHeadSha,
     ];
-    const hasAnyBitbucketReviewField = bitbucketReviewFields.some(value => value !== undefined);
+    const hasAnyBitbucketReviewField =
+      bitbucketReviewFields.some(value => value !== undefined) ||
+      (data.bitbucketIntegrationId !== undefined &&
+        (data.platform !== 'bitbucket' || data.gitUrl === undefined));
     const hasCompleteBitbucketReviewContext = bitbucketReviewFields.every(
       value => value !== undefined
     );
@@ -707,7 +720,7 @@ export const PrepareSessionInput = z
       data.createdOnPlatform === 'code-review' && data.platform === 'bitbucket';
 
     if (isBitbucketCodeReview) {
-      if (!hasCompleteBitbucketReviewContext) {
+      if (!hasCompleteBitbucketReviewContext || data.bitbucketIntegrationId === undefined) {
         ctx.addIssue({
           code: 'custom',
           path: ['bitbucketIntegrationId'],
@@ -807,12 +820,16 @@ export const RepositoryInputSchema = z.discriminatedUnion('type', [
       .uuid()
       .optional()
       .describe('GitHub platform integration ID that must authorize the selected repository'),
+    gitlabIntegrationId: z.never().optional(),
+    bitbucketIntegrationId: z.never().optional(),
     branch: branchNameSchema.optional().describe('Branch to checkout'),
   }),
   z.object({
     type: z.literal('gitlab'),
     url: gitUrlSchema.describe('GitLab repository HTTPS URL'),
+    gitlabIntegrationId: z.string().uuid().optional(),
     githubIntegrationId: z.never().optional(),
+    bitbucketIntegrationId: z.never().optional(),
     branch: branchNameSchema.optional().describe('Branch to checkout'),
   }),
   z.object({
@@ -822,6 +839,7 @@ export const RepositoryInputSchema = z.discriminatedUnion('type', [
     repositoryUuid: z.string().uuid(),
     bitbucketIntegrationId: z.string().uuid().optional(),
     githubIntegrationId: z.never().optional(),
+    gitlabIntegrationId: z.never().optional(),
     branch: branchNameSchema.optional().describe('Branch to checkout'),
   }),
   z.object({
@@ -829,6 +847,8 @@ export const RepositoryInputSchema = z.discriminatedUnion('type', [
     url: gitUrlSchema.describe('Git repository HTTPS URL'),
     token: z.string().optional().describe('Git authentication token'),
     githubIntegrationId: z.never().optional(),
+    gitlabIntegrationId: z.never().optional(),
+    bitbucketIntegrationId: z.never().optional(),
     branch: branchNameSchema.optional().describe('Branch to checkout'),
   }),
 ]);

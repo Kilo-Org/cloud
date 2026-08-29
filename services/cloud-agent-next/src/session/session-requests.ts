@@ -5,6 +5,7 @@ import type {
   SessionFinalization,
 } from '../execution/types.js';
 import type { SessionProfileBundle } from '../session-profile.js';
+import type { Owner } from '../types.js';
 
 export type ProfileOverrides = {
   envVars?: Record<string, string>;
@@ -16,7 +17,26 @@ export type ProfileOverrides = {
   appendSystemPrompt?: string;
 };
 
-export type SessionRepositoryRequest =
+export type ResolvedRepositoryIdentity = {
+  kind: 'resolved';
+  integrationId: string;
+  integrationOwner: Owner;
+  instanceUrl: string;
+};
+
+export type RepositoryIdentityResolution =
+  | ResolvedRepositoryIdentity
+  | { kind: 'legacy-unresolved' };
+
+export function normalizeRepositoryIdentity(repository: {
+  resolvedIdentity?: ResolvedRepositoryIdentity;
+}): RepositoryIdentityResolution {
+  // Old requests and records lack authorized identity. Remove this fallback only
+  // after old clients/records disappear and the 30-day ledger window expires.
+  return repository.resolvedIdentity ?? { kind: 'legacy-unresolved' };
+}
+
+export type SessionRepositoryRequest = (
   | {
       type: 'github';
       repo: string;
@@ -26,6 +46,7 @@ export type SessionRepositoryRequest =
   | {
       type: 'gitlab';
       url: string;
+      gitlabIntegrationId?: string;
       branch?: string;
     }
   | {
@@ -41,7 +62,8 @@ export type SessionRepositoryRequest =
       url: string;
       token?: string;
       branch?: string;
-    };
+    }
+) & { resolvedIdentity?: ResolvedRepositoryIdentity };
 
 export type SessionRuntimeIntent = {
   devcontainer?: boolean;

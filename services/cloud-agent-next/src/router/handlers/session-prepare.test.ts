@@ -14,7 +14,13 @@ import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
 
 import { t } from '../auth.js';
 import type { TRPCContext } from '../../types.js';
-import { createSessionPrepareHandlers } from './session-prepare.js';
+import {
+  createSessionPrepareHandlers,
+  prepareInputToSessionCreateRequest,
+} from './session-prepare.js';
+import { startInputToSessionCreateRequest } from './session-start.js';
+import { PrepareSessionInput, StartSessionInput } from '../schemas.js';
+import { normalizeRepositoryIdentity } from '../../session/session-requests.js';
 
 const {
   mergeProfileConfigurationMock,
@@ -117,6 +123,60 @@ function createContext(overrides?: {
     } as unknown as TRPCContext['env'],
   } as TRPCContext;
 }
+
+describe('launch adapter identity round trips', () => {
+  const pin = '123e4567-e89b-12d3-a456-426614174022';
+  const branch = 'release/selected';
+  it.each([
+    { type: 'github' as const, repo: 'group/repo', githubIntegrationId: pin },
+    {
+      type: 'gitlab' as const,
+      url: 'https://gitlab.example.com/gitlab/group/sub/repo.git',
+      gitlabIntegrationId: pin,
+    },
+    {
+      type: 'bitbucket' as const,
+      url: 'https://bitbucket.org/group/repo.git',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      bitbucketIntegrationId: pin,
+    },
+  ])('preserves $type identity and branch through both request adapters', repository => {
+    const grouped = startInputToSessionCreateRequest(
+      StartSessionInput.parse({
+        message: { prompt: 'Test' },
+        agent: { mode: 'code', model: 'claude-3' },
+        repository: { ...repository, branch },
+      })
+    );
+    const flat = prepareInputToSessionCreateRequest(
+      PrepareSessionInput.parse({
+        prompt: 'Test',
+        mode: 'code',
+        model: 'claude-3',
+        upstreamBranch: branch,
+        ...(repository.type === 'github'
+          ? { githubRepo: repository.repo, githubIntegrationId: repository.githubIntegrationId }
+          : repository.type === 'gitlab'
+            ? {
+                platform: 'gitlab',
+                gitUrl: repository.url,
+                gitlabIntegrationId: repository.gitlabIntegrationId,
+              }
+            : {
+                platform: 'bitbucket',
+                gitUrl: repository.url,
+                bitbucketIntegrationId: repository.bitbucketIntegrationId,
+                bitbucketWorkspaceUuid: repository.workspaceUuid,
+                bitbucketRepositoryUuid: repository.repositoryUuid,
+              }),
+      })
+    );
+    expect(grouped.repository).toEqual({ ...repository, branch });
+    expect(flat.repository).toEqual(grouped.repository);
+    expect(normalizeRepositoryIdentity(flat.repository)).toEqual({ kind: 'legacy-unresolved' });
+  });
+});
 
 const OPERATION_KEY = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 

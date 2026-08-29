@@ -11,9 +11,15 @@ import {
   getSandboxProvider,
   parseSessionMetadata,
   serializeSessionMetadata,
+  preserveResolvedRepositoryIdentity,
+  withResolvedRepositoryIdentity,
   type SessionMetadata,
 } from './session-metadata.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
+import type {
+  ResolvedRepositoryIdentity,
+  SessionRepositoryRequest,
+} from '../session/session-requests.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
 import { projectTerminalClientError } from '../session/terminal-error-projector.js';
@@ -253,32 +259,7 @@ type GroupedRegisterSessionInput = {
   agent: AgentSelection & {
     appendSystemPrompt?: string;
   };
-  repository?:
-    | {
-        type: 'github';
-        repo: string;
-        githubIntegrationId?: string;
-        branch?: string;
-      }
-    | {
-        type: 'gitlab';
-        url: string;
-        branch?: string;
-      }
-    | {
-        type: 'bitbucket';
-        url: string;
-        workspaceUuid: string;
-        repositoryUuid: string;
-        bitbucketIntegrationId?: string;
-        branch?: string;
-      }
-    | {
-        type: 'git';
-        url: string;
-        token?: string;
-        branch?: string;
-      };
+  repository?: SessionRepositoryRequest;
   profile?: SessionProfileBundle;
   finalization?: SessionFinalization;
   callback?: SessionMetadata['callback'];
@@ -314,13 +295,18 @@ function repositoryMetadataFromRegistrationInput(
           ? { githubIntegrationId: repository.githubIntegrationId }
           : {}),
         upstreamBranch: repository.branch,
+        ...(repository.resolvedIdentity ? { resolvedIdentity: repository.resolvedIdentity } : {}),
       };
     case 'gitlab':
       return {
         type: 'gitlab',
         url: repository.url,
+        ...(repository.gitlabIntegrationId
+          ? { gitlabIntegrationId: repository.gitlabIntegrationId }
+          : {}),
         platform: 'gitlab',
         upstreamBranch: repository.branch,
+        ...(repository.resolvedIdentity ? { resolvedIdentity: repository.resolvedIdentity } : {}),
       };
     case 'bitbucket':
       return {
@@ -331,6 +317,7 @@ function repositoryMetadataFromRegistrationInput(
         repositoryUuid: repository.repositoryUuid,
         bitbucketIntegrationId: repository.bitbucketIntegrationId,
         upstreamBranch: repository.branch,
+        ...(repository.resolvedIdentity ? { resolvedIdentity: repository.resolvedIdentity } : {}),
       };
     case 'git':
       return {
@@ -338,6 +325,7 @@ function repositoryMetadataFromRegistrationInput(
         url: repository.url,
         token: repository.token,
         upstreamBranch: repository.branch,
+        ...(repository.resolvedIdentity ? { resolvedIdentity: repository.resolvedIdentity } : {}),
       };
   }
 
@@ -390,6 +378,13 @@ function isSameRegistrationRepository(
   const submitted = input.repository;
   if (!stored || !submitted) return stored === undefined && submitted === undefined;
   if (stored.type !== submitted.type) return false;
+  if (submitted.resolvedIdentity) {
+    try {
+      withResolvedRepositoryIdentity(metadata, submitted.resolvedIdentity);
+    } catch {
+      return false;
+    }
+  }
 
   switch (submitted.type) {
     case 'github':
@@ -403,6 +398,7 @@ function isSameRegistrationRepository(
       return (
         stored.type === 'gitlab' &&
         stored.url === submitted.url &&
+        stored.gitlabIntegrationId === submitted.gitlabIntegrationId &&
         stored.upstreamBranch === submitted.branch
       );
     case 'git':
@@ -1723,9 +1719,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (await this.hasDeletionIntent()) {
       throw new Error('Cannot update deleted session metadata');
     }
-    const newMetadata = serializeSessionMetadata(parseSessionMetadata(data));
+    let newMetadata = serializeSessionMetadata(parseSessionMetadata(data));
     const existingMetadata = await this.getMetadata();
     if (existingMetadata) {
+      newMetadata = preserveResolvedRepositoryIdentity(existingMetadata, newMetadata);
       if (getSandboxProvider(existingMetadata) !== getSandboxProvider(newMetadata)) {
         throw new Error('Registered sandbox provider cannot be changed');
       }
@@ -1747,6 +1744,39 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     // Track activity for session TTL
     await this.updateLastActivity();
+  }
+
+  async updateResolvedRepositoryIdentity(
+    expected: Pick<SessionMetadata, 'identity' | 'repository'>,
+    identity: ResolvedRepositoryIdentity
+  ): Promise<Pick<SessionMetadata, 'repository' | 'workspace' | 'lifecycle'>> {
+    // Keep the lookup snapshot as a guard, never as the metadata to write.
+    // Only storage I/O belongs in this transaction; credentials are resolved by the caller.
+    return this.ctx.storage.transaction(async transaction => {
+      if (
+        (await transaction.get(DELETION_INTENT_KEY)) !== undefined ||
+        (await transaction.get(VERCEL_DELETION_TOMBSTONE_KEY)) !== undefined
+      ) {
+        throw new Error('Cannot update deleted session metadata');
+      }
+      const raw = await transaction.get('metadata');
+      if (!raw) throw new Error('Cannot update repository identity: session metadata not found');
+      const current = parseSessionMetadata(raw);
+      if (current.identity.sessionId !== expected.identity.sessionId) {
+        throw new Error('Repository identity cannot change');
+      }
+      const authorized = withResolvedRepositoryIdentity(
+        { ...current, identity: expected.identity, repository: expected.repository },
+        identity
+      );
+      const updated = preserveResolvedRepositoryIdentity(authorized, current);
+      await transaction.put('metadata', serializeSessionMetadata(updated));
+      return {
+        repository: updated.repository,
+        workspace: updated.workspace,
+        lifecycle: updated.lifecycle,
+      };
+    });
   }
 
   /**

@@ -3,6 +3,8 @@ import { logger } from '../logger.js';
 import type { GitTokenService } from '../types.js';
 import {
   issueCloudAgentGitHubSessionCapability,
+  issueCloudAgentBitbucketSessionCapability,
+  resolveGitHubTokenForRepo,
   issueCloudAgentGitLabSessionCapability,
   resolveCloudAgentGitHubAuthForRepo,
   resolveManagedBitbucketToken,
@@ -35,6 +37,282 @@ function createGitTokenService() {
 function createEnv(service: Partial<GitTokenService>) {
   return { GIT_TOKEN_SERVICE: service as GitTokenService };
 }
+
+describe('authorized identity producer/consumer contract', () => {
+  const integrationId = '123e4567-e89b-12d3-a456-426614174022';
+  const integrationOwner = { type: 'user' as const, id: 'oauth/user' };
+  const githubParams = {
+    githubRepo: 'acme/repo',
+    userId: 'oauth/user',
+    orgId: 'billing-org',
+    expectedIntegrationId: integrationId,
+    expectedIntegrationOwner: integrationOwner,
+    allowUserAuthorization: true,
+    outboundContainerId: 'container-1',
+  };
+
+  it.each(['raw', 'managed', 'capability', 'legacy-capability'] as const)(
+    'retains the resolved Personal owner and organization context through %s',
+    async mode => {
+      const response = {
+        success: true as const,
+        token: 'raw-token',
+        githubToken: 'managed-token',
+        capability: 'opaque-capability',
+        installationId: '123',
+        appType: 'standard' as const,
+        accountLogin: 'acme',
+        integrationId,
+        integrationOwner,
+        source: 'installation' as const,
+        gitAuthor: { name: 'bot', email: 'bot@example.com' },
+      };
+      const authorized = async (params: Parameters<GitTokenService['getTokenForRepo']>[0]) =>
+        params.orgId === githubParams.orgId &&
+        params.expectedIntegrationId === integrationId &&
+        params.expectedIntegrationOwner?.type === 'user' &&
+        params.expectedIntegrationOwner.id === integrationOwner.id
+          ? response
+          : { success: false as const, reason: 'integration_mismatch' as const };
+      const env = createEnv({
+        getTokenForRepo: authorized,
+        ...(mode === 'legacy-capability'
+          ? {}
+          : {
+              getCloudAgentAuthForRepo: authorized,
+              issueGitHubSessionCapability: authorized,
+            }),
+      });
+      const result =
+        mode === 'raw'
+          ? await resolveGitHubTokenForRepo(env, githubParams)
+          : mode === 'managed'
+            ? await resolveCloudAgentGitHubAuthForRepo(env, githubParams)
+            : await issueCloudAgentGitHubSessionCapability(env, githubParams);
+      expect(result).toMatchObject({
+        success: true,
+        value: {
+          identity: {
+            kind: 'resolved',
+            integrationId,
+            integrationOwner,
+            instanceUrl: 'https://github.com',
+          },
+        },
+      });
+    }
+  );
+
+  it.each(['gitlab', 'bitbucket'] as const)(
+    'retains %s pins through raw and capability responses',
+    async provider => {
+      const authorized = async (params: { expectedIntegrationId?: string }) =>
+        params.expectedIntegrationId === integrationId
+          ? {
+              success: true,
+              token: 'raw-token',
+              capability: 'opaque-capability',
+              integrationId,
+              instanceUrl: 'https://gitlab.example.com/gitlab',
+              instanceOrigin: 'https://gitlab.example.com/gitlab',
+              instanceHost: 'gitlab.example.com',
+              projectPath: 'group/sub/repo',
+              gitUrl: 'https://bitbucket.org/group/repo.git',
+              authType: 'oauth',
+              identity: { accountId: '42', accountLogin: 'actor' },
+              glabIsOAuth2: true,
+            }
+          : { success: false, reason: 'integration_mismatch' };
+      const env = createEnv({
+        getGitLabToken: vi.fn(authorized),
+        issueGitLabSessionCapability: vi.fn(authorized),
+        getBitbucketToken: vi.fn(authorized),
+        issueBitbucketSessionCapability: vi.fn(authorized),
+      } as Partial<GitTokenService>);
+      const params = {
+        userId: 'oauth/user',
+        orgId: 'org-1',
+        expectedIntegrationId: integrationId,
+        outboundContainerId: 'container-1',
+        gitUrl: 'https://gitlab.example.com/gitlab/group/sub/repo.git',
+        repositoryUrl: 'https://bitbucket.org/group/repo.git',
+        workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+        repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      };
+      const raw =
+        provider === 'gitlab'
+          ? await resolveManagedGitLabToken(env, params)
+          : await resolveManagedBitbucketToken(env, params);
+      const capability =
+        provider === 'gitlab'
+          ? await issueCloudAgentGitLabSessionCapability(env, params)
+          : await issueCloudAgentBitbucketSessionCapability(env, params);
+      expect(raw).toMatchObject({ success: true, token: 'raw-token', integrationId });
+      expect(capability).toMatchObject({
+        success: true,
+        value: { capability: 'opaque-capability', integrationId },
+      });
+      if (provider === 'gitlab')
+        expect(capability).toMatchObject({
+          value: { gitUrl: 'https://gitlab.example.com/gitlab/group/sub/repo.git' },
+        });
+    }
+  );
+});
+
+describe('GitHub response identity compatibility', () => {
+  const integrationId = '123e4567-e89b-12d3-a456-426614174022';
+  const integrationOwner = { type: 'user' as const, id: 'oauth/user' };
+  const params = {
+    githubRepo: 'acme/repo',
+    userId: 'oauth/user',
+    orgId: 'billing-org',
+    allowUserAuthorization: true,
+    outboundContainerId: 'container-1',
+  };
+  const oldResponse = {
+    success: true,
+    token: 'old-token',
+    githubToken: 'old-token',
+    capability: 'old-capability',
+    installationId: '123',
+    appType: 'standard',
+    accountLogin: 'acme',
+    source: 'installation',
+    gitAuthor: { name: 'bot', email: 'bot@example.com' },
+  };
+  const resolvers = [
+    { mode: 'raw', resolve: resolveGitHubTokenForRepo },
+    { mode: 'managed', resolve: resolveCloudAgentGitHubAuthForRepo },
+    { mode: 'capability', resolve: issueCloudAgentGitHubSessionCapability },
+  ];
+
+  it.each(resolvers)(
+    'marks old $mode responses as unresolved without inventing identity',
+    async ({ resolve }) => {
+      const service = vi.fn().mockResolvedValue(oldResponse);
+      const result = await resolve(
+        createEnv({
+          getTokenForRepo: service,
+          getCloudAgentAuthForRepo: service,
+          issueGitHubSessionCapability: service,
+        }),
+        params
+      );
+      expect(result).toMatchObject({
+        success: true,
+        value: { identity: { kind: 'legacy-unresolved' } },
+      });
+      expect(result).not.toHaveProperty('value.integrationId');
+    }
+  );
+
+  it.each(
+    resolvers.flatMap(resolver =>
+      [
+        { label: 'pin', expected: { expectedIntegrationId: integrationId } },
+        { label: 'owner', expected: { expectedIntegrationOwner: integrationOwner } },
+      ].map(selection => ({ ...resolver, ...selection }))
+    )
+  )('rejects an unproven $label from an old $mode response', async ({ resolve, expected }) => {
+    const service = vi.fn().mockResolvedValue(oldResponse);
+    const result = await resolve(
+      createEnv({
+        getTokenForRepo: service,
+        getCloudAgentAuthForRepo: service,
+        issueGitHubSessionCapability: service,
+      }),
+      { ...params, ...expected }
+    );
+    expect(result).toMatchObject({
+      success: false,
+      error: { reason: 'service_compatibility_error' },
+    });
+    expect(result).not.toHaveProperty('value');
+  });
+
+  it.each(
+    resolvers.flatMap(resolver =>
+      [
+        { integrationId },
+        { integrationOwner },
+        { integrationId: undefined, integrationOwner: undefined },
+        { integrationId: '', integrationOwner },
+        { integrationId: 123, integrationOwner },
+        { integrationId, integrationOwner: null },
+        { integrationId, integrationOwner: { type: 'user', id: '' } },
+        { integrationId, integrationOwner: { type: 'team', id: 'owner' } },
+      ].map(fields => ({ ...resolver, fields }))
+    )
+  )(
+    'rejects malformed $mode identity $fields without a legacy fallback',
+    async ({ resolve, fields }) => {
+      const service = vi.fn().mockResolvedValue({ ...oldResponse, ...fields });
+      const result = await resolve(
+        createEnv({
+          getTokenForRepo: service,
+          getCloudAgentAuthForRepo: service,
+          issueGitHubSessionCapability: service,
+        }),
+        params
+      );
+      expect(result).toMatchObject({
+        success: false,
+        error: { reason: 'service_compatibility_error' },
+      });
+      expect(result).not.toHaveProperty('value');
+    }
+  );
+
+  it.each(['managed', 'capability'] as const)(
+    'does not hide malformed %s identity with a successful fallback',
+    async mode => {
+      const malformed = { ...oldResponse, integrationId };
+      const resolved = { ...oldResponse, integrationId, integrationOwner };
+      const env = createEnv({
+        getTokenForRepo: vi.fn().mockResolvedValue(resolved),
+        getCloudAgentAuthForRepo: vi
+          .fn()
+          .mockResolvedValue(mode === 'managed' ? malformed : resolved),
+        issueGitHubSessionCapability: vi.fn().mockResolvedValue(malformed),
+      });
+      const result =
+        mode === 'managed'
+          ? await resolveCloudAgentGitHubAuthForRepo(env, params)
+          : await issueCloudAgentGitHubSessionCapability(env, params);
+      expect(result).toMatchObject({
+        success: false,
+        error: { reason: 'service_compatibility_error' },
+      });
+      expect(result).not.toHaveProperty('value');
+    }
+  );
+
+  it.each(
+    resolvers.flatMap(resolver =>
+      [
+        { expectedIntegrationId: 'another-integration' },
+        { expectedIntegrationOwner: { type: 'org' as const, id: 'billing-org' } },
+        { expectedIntegrationOwner: { type: 'user' as const, id: 'another-user' } },
+      ].map(expected => ({ ...resolver, expected }))
+    )
+  )('rejects a changed resolved identity from $mode', async ({ resolve, expected }) => {
+    const service = vi.fn().mockResolvedValue({ ...oldResponse, integrationId, integrationOwner });
+    expect(
+      await resolve(
+        createEnv({
+          getTokenForRepo: service,
+          getCloudAgentAuthForRepo: service,
+          issueGitHubSessionCapability: service,
+        }),
+        { ...params, ...expected }
+      )
+    ).toMatchObject({
+      success: false,
+      error: { reason: 'integration_mismatch' },
+    });
+  });
+});
 
 describe('resolveManagedBitbucketToken', () => {
   const repositoryParams = {
@@ -214,6 +492,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
       value: {
         githubToken: 'installation-token',
         installationId: '123',
+        identity: { kind: 'legacy-unresolved' },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'installation',
@@ -351,6 +630,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
       value: {
         githubToken: 'user-token',
         installationId: '123',
+        identity: { kind: 'legacy-unresolved' },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'user',
@@ -518,6 +798,7 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
       value: {
         githubToken: 'installation-token',
         installationId: '123',
+        identity: { kind: 'legacy-unresolved' },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'installation',
@@ -559,6 +840,7 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
       value: {
         githubToken: 'installation-token',
         installationId: '123',
+        identity: { kind: 'legacy-unresolved' },
         appType: 'standard',
         source: 'installation',
       },

@@ -87,8 +87,11 @@ import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types
 import type { CreateSessionForCloudAgentResult } from '@kilocode/session-ingest-contracts';
 import {
   parseSessionMetadata,
+  preserveResolvedRepositoryIdentity,
+  withResolvedRepositoryIdentity,
   type CredentialContainment,
 } from './persistence/session-metadata.js';
+import type { ResolvedRepositoryIdentity } from './session/session-requests.js';
 import type { ExecutionSession, SandboxId, SandboxInstance, SessionId } from './types.js';
 import type { FencedWrapperDispatchRequest } from './execution/types.js';
 import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
@@ -388,6 +391,7 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
       get: vi.fn(() => ({
         getMetadata: vi.fn().mockResolvedValue(metadata ?? null),
         updateMetadata: vi.fn().mockResolvedValue(undefined),
+        updateResolvedRepositoryIdentity: vi.fn().mockResolvedValue(undefined),
       })),
     } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
     SANDBOX_SESSION: {
@@ -411,6 +415,8 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
         success: true,
         token: 'resolved-gh-token',
         installationId: '123',
+        integrationId: '123e4567-e89b-12d3-a456-426614174022',
+        integrationOwner: { type: 'user', id: 'user_test' },
         accountLogin: 'acme',
         appType: 'standard',
       }),
@@ -418,6 +424,8 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
         success: true,
         githubToken: 'resolved-gh-token',
         installationId: '123',
+        integrationId: '123e4567-e89b-12d3-a456-426614174022',
+        integrationOwner: { type: 'user', id: 'user_test' },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'installation',
@@ -427,6 +435,8 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
         success: true,
         capability: 'kgh2.default',
         installationId: '123',
+        integrationId: '123e4567-e89b-12d3-a456-426614174022',
+        integrationOwner: { type: 'user', id: 'user_test' },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'installation',
@@ -436,6 +446,7 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
       getGitLabToken: vi.fn().mockResolvedValue({
         success: true,
         token: 'resolved-gitlab-token',
+        integrationId: 'integration_1',
         instanceUrl: 'https://gitlab.com',
         glabIsOAuth2: true,
       }),
@@ -588,6 +599,7 @@ describe('SessionService.resolveWorkspaceTokens', () => {
     tokenMocks.resolveManagedBitbucketToken.mockResolvedValue({
       success: true,
       token: 'opaque-workspace-token',
+      integrationId: '123e4567-e89b-12d3-a456-426614174022',
     });
   });
 
@@ -700,6 +712,12 @@ describe('SessionService.prepareWorkspace', () => {
       value: {
         githubToken: 'resolved-gh-token',
         installationId: '123',
+        identity: {
+          kind: 'resolved',
+          integrationId: '123e4567-e89b-12d3-a456-426614174022',
+          integrationOwner: { type: 'user', id: 'user_test' },
+          instanceUrl: 'https://github.com',
+        },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'installation',
@@ -711,6 +729,12 @@ describe('SessionService.prepareWorkspace', () => {
       value: {
         capability: 'kgh2.default',
         installationId: '123',
+        identity: {
+          kind: 'resolved',
+          integrationId: '123e4567-e89b-12d3-a456-426614174022',
+          integrationOwner: { type: 'user', id: 'user_test' },
+          instanceUrl: 'https://github.com',
+        },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'installation',
@@ -733,17 +757,126 @@ describe('SessionService.prepareWorkspace', () => {
     tokenMocks.resolveManagedGitLabToken.mockResolvedValue({
       success: true,
       token: 'resolved-gitlab-token',
+      integrationId: 'integration_1',
       instanceUrl: 'https://gitlab.com',
       glabIsOAuth2: true,
     });
     tokenMocks.resolveManagedBitbucketToken.mockResolvedValue({
       success: true,
       token: 'fresh-bitbucket-token',
+      integrationId: '123e4567-e89b-12d3-a456-426614174022',
     });
     devcontainerMocks.detectDevContainer.mockResolvedValue(null);
     devcontainerMocks.bringUpDevContainer.mockReset();
     portMocks.randomPort.mockReturnValue(4173);
   });
+
+  it.each(
+    [
+      { mode: 'raw', token: 'old-raw-token' },
+      { mode: 'managed', token: 'old-managed-token' },
+      { mode: 'capability', token: 'old-capability' },
+      { mode: 'capability-raw-fallback', token: 'old-raw-token' },
+      { mode: 'capability-managed-fallback', token: 'old-managed-token' },
+    ].flatMap(response =>
+      ['unpinned', 'pin', 'resolved', 'persisted-resolved'].map(selection => ({
+        ...response,
+        selection,
+      }))
+    )
+  )(
+    'prepares only unpinned old GitHub credentials ($mode, $selection)',
+    async ({ mode, token, selection }) => {
+      const actual = await vi.importActual<typeof GitTokenServiceClientModule>(
+        './services/git-token-service-client.js'
+      );
+      tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockImplementation(
+        actual.resolveCloudAgentGitHubAuthForRepo
+      );
+      tokenMocks.issueCloudAgentGitHubSessionCapability.mockImplementation(
+        actual.issueCloudAgentGitHubSessionCapability
+      );
+      const response = {
+        success: true,
+        installationId: '123',
+        appType: 'standard',
+        accountLogin: 'acme',
+      };
+      const managed = {
+        ...response,
+        source: 'installation',
+        gitAuthor: { name: 'bot', email: 'bot@example.com' },
+      };
+      const metadata = createMetadata({
+        githubRepo: 'acme/repo',
+        gitUrl: undefined,
+        gitToken: undefined,
+        platform: 'github',
+        orgId: 'billing-org',
+        upstreamBranch: 'release/selected',
+        credentialContainment: {
+          github: mode.startsWith('capability'),
+          gitlab: false,
+          kilocode: false,
+        },
+      });
+      const identity = {
+        kind: 'resolved' as const,
+        integrationId: '123e4567-e89b-12d3-a456-426614174022',
+        integrationOwner: { type: 'user' as const, id: 'user_test' },
+        instanceUrl: 'https://github.com',
+      };
+      if (metadata.repository?.type !== 'github') throw new Error('Expected GitHub repository');
+      if (selection === 'pin') metadata.repository.githubIntegrationId = identity.integrationId;
+      if (selection === 'resolved') metadata.repository.resolvedIdentity = identity;
+      const before = structuredClone(metadata);
+      if (selection === 'persisted-resolved' && before.repository)
+        before.repository.resolvedIdentity = identity;
+      const env = createEnv(before);
+      env.GIT_TOKEN_SERVICE = {
+        getTokenForRepo: vi.fn().mockResolvedValue({ ...response, token: 'old-raw-token' }),
+        ...(mode === 'managed' || mode === 'capability-managed-fallback'
+          ? {
+              getCloudAgentAuthForRepo: vi
+                .fn()
+                .mockResolvedValue({ ...managed, githubToken: 'old-managed-token' }),
+            }
+          : {}),
+        ...(mode === 'capability'
+          ? {
+              issueGitHubSessionCapability: vi
+                .fn()
+                .mockResolvedValue({ ...managed, capability: 'old-capability' }),
+            }
+          : {}),
+      } as never;
+      const preparation = new SessionService().prepareWorkspace({
+        sandbox: createSandbox(createSession(false)),
+        sandboxId: 'ses-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env,
+        metadata,
+        kilocodeModel: 'test-model',
+      });
+      if (selection === 'unpinned') {
+        const result = await preparation;
+        expect(result.ready).toMatchObject({
+          githubInstallationId: '123',
+          branchName: 'release/selected',
+        });
+        expect(result.context.githubToken).toBe(token);
+        expect(result.runtimeEnv.GH_TOKEN).toBe(token);
+        expect(metadata.repository.resolvedIdentity).toBeUndefined();
+      } else {
+        await expect(preparation).rejects.toMatchObject({
+          code: 'WORKSPACE_SETUP_FAILED',
+          retryable: true,
+        });
+      }
+      expect(await fetchSessionMetadata(env, 'user_test', 'agent_test')).toEqual(before);
+    }
+  );
 
   it('prepares a cold workspace and returns ready metadata', async () => {
     const session = createSession(false);
@@ -1026,6 +1159,7 @@ describe('SessionService.prepareWorkspace', () => {
       success: true,
       value: {
         capability: 'kbb1.opaque-capability',
+        integrationId: '123e4567-e89b-12d3-a456-426614174022',
         gitUrl: 'https://bitbucket.org/acme-team/widgets.git',
       },
     });
@@ -1449,6 +1583,7 @@ describe('SessionService.prepareWorkspace', () => {
       success: true,
       value: {
         capability: 'kbb1.opaque-capability',
+        integrationId: '123e4567-e89b-12d3-a456-426614174022',
         gitUrl: 'https://bitbucket.org/acme-team/widgets.git',
       },
     });
@@ -1993,6 +2128,12 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       value: {
         githubToken: 'resolved-gh-token',
         installationId: '123',
+        identity: {
+          kind: 'resolved',
+          integrationId: '123e4567-e89b-12d3-a456-426614174022',
+          integrationOwner: { type: 'user', id: 'user_test' },
+          instanceUrl: 'https://github.com',
+        },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'installation',
@@ -2004,6 +2145,12 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       value: {
         capability: 'kgh2.default',
         installationId: '123',
+        identity: {
+          kind: 'resolved',
+          integrationId: '123e4567-e89b-12d3-a456-426614174022',
+          integrationOwner: { type: 'user', id: 'user_test' },
+          instanceUrl: 'https://github.com',
+        },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'installation',
@@ -2026,12 +2173,14 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     tokenMocks.resolveManagedGitLabToken.mockResolvedValue({
       success: true,
       token: 'resolved-gitlab-token',
+      integrationId: 'integration_1',
       instanceUrl: 'https://gitlab.com',
       glabIsOAuth2: true,
     });
     tokenMocks.resolveManagedBitbucketToken.mockResolvedValue({
       success: true,
       token: 'fresh-bitbucket-token',
+      integrationId: '123e4567-e89b-12d3-a456-426614174022',
     });
     devcontainerMocks.detectDevContainer.mockResolvedValue(null);
     devcontainerMocks.bringUpDevContainer.mockReset();
@@ -2080,6 +2229,223 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       } satisfies FencedWrapperDispatchRequest,
     });
   }
+
+  it.each(
+    ['github', 'gitlab', 'bitbucket'].flatMap(provider =>
+      [false, true].flatMap(contained =>
+        [false, true].map(pinned => ({ provider, contained, pinned }))
+      )
+    )
+  )(
+    'persists $provider identity before checkout and pins retries (contained=$contained, pinned=$pinned)',
+    async ({ provider, contained, pinned }) => {
+      const integrationId = '123e4567-e89b-12d3-a456-426614174022';
+      const orgId = 'billing-org';
+      const integrationOwner =
+        provider === 'github'
+          ? { type: 'user' as const, id: 'user_test' }
+          : { type: 'org' as const, id: orgId };
+      const instanceUrl =
+        provider === 'github'
+          ? 'https://github.com'
+          : provider === 'gitlab'
+            ? 'https://gitlab.example.com/gitlab'
+            : 'https://bitbucket.org';
+      const url = `${instanceUrl}/acme/repo.git`;
+      const repository =
+        provider === 'github'
+          ? {
+              type: 'github',
+              repo: 'acme/repo',
+              ...(pinned ? { githubIntegrationId: integrationId } : {}),
+            }
+          : provider === 'gitlab'
+            ? { type: 'gitlab', url, ...(pinned ? { gitlabIntegrationId: integrationId } : {}) }
+            : {
+                type: 'bitbucket',
+                url,
+                workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+                repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+                ...(pinned ? { bitbucketIntegrationId: integrationId } : {}),
+              };
+      const metadata = parseSessionMetadata({
+        ...createMetadata(),
+        identity: { sessionId: 'agent_test', userId: 'user_test', orgId },
+        repository: { ...repository, upstreamBranch: 'release/selected' },
+        workspace: {
+          credentialContainment: {
+            github: contained && provider === 'github',
+            gitlab: contained && provider === 'gitlab',
+            bitbucket: contained && provider === 'bitbucket',
+            kilocode: false,
+          },
+        },
+      });
+      const staleSnapshot = structuredClone(metadata);
+      let stored = structuredClone(metadata);
+      let attempts = 0;
+      const lookup = async (
+        _env: unknown,
+        params: {
+          expectedIntegrationId?: string;
+          expectedIntegrationOwner?: { type: string; id: string };
+          orgId?: string;
+        }
+      ) => {
+        const retry = attempts++ > 0;
+        if (
+          params.orgId !== orgId ||
+          params.expectedIntegrationId !== (retry || pinned ? integrationId : undefined) ||
+          (retry &&
+            provider === 'github' &&
+            JSON.stringify(params.expectedIntegrationOwner) !== JSON.stringify(integrationOwner))
+        ) {
+          return {
+            success: false,
+            reason: 'integration_mismatch',
+            error: { reason: 'integration_mismatch' },
+          };
+        }
+        return {
+          success: true,
+          token: 'fresh-token',
+          integrationId,
+          instanceUrl,
+          glabIsOAuth2: true,
+          value: {
+            ...(contained ? { capability: 'opaque-capability' } : { githubToken: 'fresh-token' }),
+            integrationId,
+            identity: { kind: 'resolved', integrationId, integrationOwner, instanceUrl },
+            installationId: '123',
+            appType: 'standard',
+            source: 'installation',
+            gitUrl: url,
+            instanceOrigin: instanceUrl,
+            instanceHost: new URL(instanceUrl).host,
+            projectPath: 'acme/repo',
+            glabIsOAuth2: true,
+          },
+        };
+      };
+      tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockImplementation(lookup);
+      tokenMocks.issueCloudAgentGitHubSessionCapability.mockImplementation(lookup);
+      tokenMocks.resolveManagedGitLabToken.mockImplementation(lookup);
+      tokenMocks.issueCloudAgentGitLabSessionCapability.mockImplementation(lookup);
+      tokenMocks.resolveManagedBitbucketToken.mockImplementation(lookup);
+      tokenMocks.issueCloudAgentBitbucketSessionCapability.mockImplementation(lookup);
+      const configure = (env: PersistenceEnv) => {
+        env.CLOUD_AGENT_SESSION.get = vi.fn(() => ({
+          getMetadata: async () => structuredClone(stored),
+          updateResolvedRepositoryIdentity: async (
+            expected: Pick<CloudAgentSessionState, 'identity' | 'repository'>,
+            identity: ResolvedRepositoryIdentity
+          ) => {
+            const authorized = withResolvedRepositoryIdentity({ ...stored, ...expected }, identity);
+            stored = preserveResolvedRepositoryIdentity(authorized, stored);
+            return {
+              repository: stored.repository,
+              workspace: stored.workspace,
+              lifecycle: stored.lifecycle,
+            };
+          },
+        })) as never;
+      };
+      const first = await buildPromptWrapperRequests(metadata, configure);
+      expect(stored.repository?.resolvedIdentity).toEqual({
+        kind: 'resolved',
+        integrationId,
+        integrationOwner,
+        instanceUrl,
+      });
+      expect(stored.identity.orgId).toBe(orgId);
+      expect(JSON.stringify(stored)).not.toContain('fresh-token');
+      expect(first.readyRequest.workspace).toMatchObject({
+        branchName: 'release/selected',
+        upstreamBranch: 'release/selected',
+        strictBranch: true,
+      });
+      stored = parseSessionMetadata({
+        ...stored,
+        repository: { ...stored.repository, upstreamBranch: 'release/current' },
+        workspace: { ...stored.workspace, branchName: 'workspace/current' },
+        lifecycle: { ...stored.lifecycle, preparedAt: 1 },
+      });
+      const retry = await buildPromptWrapperRequests(staleSnapshot, configure);
+      expect(retry.readyRequest.repo).toEqual(first.readyRequest.repo);
+      expect(retry.readyRequest.workspace).toMatchObject({
+        branchName: 'workspace/current',
+        upstreamBranch: 'release/current',
+        strictBranch: false,
+        preferSnapshot: true,
+      });
+      const resumed = await buildPromptWrapperRequests(structuredClone(stored), configure);
+      expect(resumed.readyRequest.workspace).toEqual(retry.readyRequest.workspace);
+      expect(stored.lifecycle.preparedAt).toBe(1);
+      expect(stored.repository?.upstreamBranch).toBe('release/current');
+    }
+  );
+
+  it('keeps an empty repository and the legacy generated branch without inventing a selection', async () => {
+    const metadata = parseSessionMetadata({ ...createMetadata(), repository: undefined });
+    const result = await buildPromptWrapperRequests(metadata);
+    expect(result.readyRequest.repo).toBeUndefined();
+    expect(result.readyRequest.workspace).toMatchObject({
+      branchName: 'session/agent_test',
+      strictBranch: false,
+    });
+  });
+
+  it.each(['github', 'gitlab', 'bitbucket'] as const)(
+    'rejects replacement %s credentials before wrapper readiness',
+    async provider => {
+      const base = provider === 'bitbucket' ? createBitbucketMetadata(false) : createMetadata();
+      const repository =
+        provider === 'github' ? { type: 'github', repo: 'acme/repo' } : base.repository;
+      const identity = {
+        kind: 'resolved',
+        integrationId: '123e4567-e89b-12d3-a456-426614174099',
+        integrationOwner:
+          provider === 'bitbucket'
+            ? { type: 'org', id: base.identity.orgId }
+            : { type: 'user', id: 'user_test' },
+        instanceUrl:
+          provider === 'github'
+            ? 'https://github.com'
+            : provider === 'gitlab'
+              ? 'https://gitlab.com'
+              : 'https://bitbucket.org',
+      };
+      const metadata = parseSessionMetadata({
+        ...base,
+        repository: { ...repository, resolvedIdentity: identity },
+      });
+      await expect(buildPromptWrapperRequests(metadata)).rejects.toMatchObject({
+        code: 'INVALID_REQUEST',
+        retryable: false,
+        message: 'Repository identity cannot change',
+      });
+      expect(metadata.repository?.resolvedIdentity).toEqual(identity);
+    }
+  );
+
+  it('returns a retryable failure instead of credentials when identity persistence fails', async () => {
+    const metadata = createMetadata();
+    await expect(
+      buildPromptWrapperRequests(metadata, env => {
+        env.CLOUD_AGENT_SESSION.get = vi.fn(() => ({
+          getMetadata: async () => metadata,
+          updateResolvedRepositoryIdentity: async () => {
+            throw new Error('storage unavailable');
+          },
+        })) as never;
+      })
+    ).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      retryable: true,
+      message: 'Unable to persist repository identity',
+    });
+    expect(metadata.repository?.resolvedIdentity).toBeUndefined();
+  });
 
   it('prefers and requires snapshot restore in wrapper readiness for clone metadata', async () => {
     const result = await buildPromptWrapperRequests(createCloneMetadata());
@@ -2164,6 +2530,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     tokenMocks.resolveManagedGitLabToken.mockResolvedValueOnce({
       success: true,
       token: 'resolved-gitlab-token',
+      integrationId: 'integration_1',
       instanceUrl: 'https://gitlab.example.com:8443/gitlab',
       glabIsOAuth2: true,
     });
@@ -2988,6 +3355,12 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       value: {
         capability: 'kgh2.selected-user',
         installationId: '123',
+        identity: {
+          kind: 'resolved',
+          integrationId: '123e4567-e89b-12d3-a456-426614174022',
+          integrationOwner: { type: 'user', id: 'user_test' },
+          instanceUrl: 'https://github.com',
+        },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'user',
@@ -3108,6 +3481,12 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       value: {
         capability: 'kgh2.installation',
         installationId: '123',
+        identity: {
+          kind: 'resolved',
+          integrationId: '123e4567-e89b-12d3-a456-426614174022',
+          integrationOwner: { type: 'user', id: 'user_test' },
+          instanceUrl: 'https://github.com',
+        },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'installation',
@@ -3142,6 +3521,12 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       value: {
         capability: 'kgh2.selected-user',
         installationId: '123',
+        identity: {
+          kind: 'resolved',
+          integrationId: '123e4567-e89b-12d3-a456-426614174022',
+          integrationOwner: { type: 'user', id: 'user_test' },
+          instanceUrl: 'https://github.com',
+        },
         accountLogin: 'acme',
         appType: 'standard',
         source: 'user',

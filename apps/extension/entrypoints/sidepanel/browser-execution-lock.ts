@@ -56,6 +56,10 @@ export interface BrowserRecovery {
   readonly recovered: boolean;
   readonly reason: string;
 }
+export interface BrowserRecoveryReadiness {
+  readonly ready: boolean;
+  readonly reason: string;
+}
 
 /** Native locks grant authority; the observable record supplies display information only. */
 export const createBrowserExecutionCoordinator = ({
@@ -320,7 +324,7 @@ export const createBrowserExecutionCoordinator = ({
             }
           },
         };
-        // Recovery owns this retry even when the caller discards a failed lease.
+        // The coordinator owns this retry even when the caller discards a failed lease.
         const retryRelease = async (): Promise<void> => {
           if (!closing || users !== 0 || fencePending) {
             return;
@@ -369,6 +373,49 @@ export const createBrowserExecutionCoordinator = ({
         }
       })();
     });
+  };
+  const withRecoveryLock = async (
+    getOpenTabIds: () => Promise<readonly number[]>,
+    onReady: () => string | Promise<string>
+  ): Promise<BrowserRecoveryReadiness> => {
+    try {
+      await Promise.all([...failedReleases].map(retry => retry()));
+    } catch {
+      await refresh();
+      return { ready: false, reason: safetyReason() ?? QUARANTINE_MESSAGE };
+    }
+    if (locks === undefined) {
+      // A panel-local counter cannot prove that another panel's issued actions have drained.
+      return {
+        ready: false,
+        reason: `Recovery requires Web Locks. Restore browser Web Locks support before recovering. ${ALL_TABS_RECOVERY_MESSAGE} Browser control remains blocked.`,
+      };
+    }
+    // Recovery never waits behind, steals, or cancels an execution lock.
+    const result = await locks.request(
+      BROWSER_EXECUTION_LOCK,
+      { ifAvailable: true, mode: 'exclusive' },
+      async lock => {
+        if (lock === null) {
+          return {
+            ready: false,
+            reason: 'Browser actions are still unwinding. Wait before recovery.',
+          };
+        }
+        const record = await readSafety();
+        const affected = new Set([...safety.tabIds, ...record.tabIds]);
+        const open = await getOpenTabIds();
+        if ((record.allTabs === true || safety.allTabs === true) && open.length > 0) {
+          return { ready: false, reason: ALL_TABS_RECOVERY_MESSAGE };
+        }
+        if (open.some(tabId => affected.has(tabId))) {
+          return { ready: false, reason: 'Close all affected tabs before recovery.' };
+        }
+        return { ready: true, reason: await onReady() };
+      }
+    );
+    await refresh();
+    return result;
   };
   return {
     /** SessionId must come from the authenticated provider job, never the model's tool arguments. */
@@ -424,53 +471,35 @@ export const createBrowserExecutionCoordinator = ({
       return admission;
     },
     getSnapshot: (): BrowserExecutionSnapshot => snapshot,
-    recover: async (getOpenTabIds: () => Promise<readonly number[]>): Promise<BrowserRecovery> => {
+    /** Readiness grants no authority; explicit recovery must repeat these checks. */
+    prepareRecovery: async (
+      getOpenTabIds: () => Promise<readonly number[]>
+    ): Promise<BrowserRecoveryReadiness> => {
       try {
-        await Promise.all([...failedReleases].map(retry => retry()));
+        return await withRecoveryLock(
+          getOpenTabIds,
+          () =>
+            'Browser control is ready for recovery. Recover explicitly before submitting new work.'
+        );
       } catch {
         await refresh();
-        return { reason: safetyReason() ?? QUARANTINE_MESSAGE, recovered: false };
-      }
-      if (locks === undefined) {
-        // A panel-local counter cannot prove that another panel's issued actions have drained.
         return {
-          reason: `Recovery requires Web Locks. Restore browser Web Locks support before recovering. ${ALL_TABS_RECOVERY_MESSAGE} Browser control remains blocked.`,
-          recovered: false,
+          ready: false,
+          reason:
+            'Recovery readiness could not be checked. Restore storage and browser access before trying again.',
         };
       }
-      // Recovery never waits behind, steals, or cancels an execution lock.
-      const result = await locks.request(
-        BROWSER_EXECUTION_LOCK,
-        { ifAvailable: true, mode: 'exclusive' },
-        async lock => {
-          if (lock === null) {
-            return {
-              reason: 'Browser actions are still unwinding. Wait before recovery.',
-              recovered: false,
-            };
-          }
-          const record = await readSafety();
-          const affected = new Set([...safety.tabIds, ...record.tabIds]);
-          const open = await getOpenTabIds();
-          if ((record.allTabs === true || safety.allTabs === true) && open.length > 0) {
-            return { reason: ALL_TABS_RECOVERY_MESSAGE, recovered: false };
-          }
-          if (open.some(tabId => affected.has(tabId))) {
-            return { reason: 'Close all affected tabs before recovery.', recovered: false };
-          }
-          await storageArea.setItem(BROWSER_EXECUTION_SAFETY_KEY, { tabIds: [], version: 1 });
-          safetyRevision += 1;
-          safety = { tabIds: [], version: 1 };
-          safetyError = false;
-          // A11 must register a fresh generation before delegated execution.
-          return {
-            reason: 'Browser control recovered. Submit new work explicitly.',
-            recovered: true,
-          };
-        }
-      );
-      await refresh();
-      return result;
+    },
+    recover: async (getOpenTabIds: () => Promise<readonly number[]>): Promise<BrowserRecovery> => {
+      const { ready, reason } = await withRecoveryLock(getOpenTabIds, async () => {
+        await storageArea.setItem(BROWSER_EXECUTION_SAFETY_KEY, { tabIds: [], version: 1 });
+        safetyRevision += 1;
+        safety = { tabIds: [], version: 1 };
+        safetyError = false;
+        // A11 must register a fresh generation before delegated execution.
+        return 'Browser control recovered. Submit new work explicitly.';
+      });
+      return { reason, recovered: ready };
     },
     refresh,
     subscribe: (listener: () => void): (() => void) => {

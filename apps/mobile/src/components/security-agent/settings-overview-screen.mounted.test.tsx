@@ -1,11 +1,12 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts RN trees without a DOM. */
 import { type MobileRouter } from '@kilocode/trpc/mobile';
-import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import TestRenderer, { act } from 'react-test-renderer';
+import { onlineManager, QueryClient } from '@tanstack/react-query';
+import { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
+import { renderWithProviders } from '@/test/render-with-providers';
 import { ScopeEntryScreen } from './scope-entry-screen';
 import { SettingsOverviewScreen } from './settings-overview-screen';
 
@@ -19,7 +20,7 @@ let configData: Record<string, unknown> = {};
 let repositoriesData: { id: number }[] = [];
 let roles: { organizationId: string; role: string }[] = [];
 let queryClient = new QueryClient();
-let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+let renderer: ReactTestRenderer | undefined = undefined;
 let previousOnline = true;
 
 vi.mock('@/lib/trpc', async () => {
@@ -43,7 +44,17 @@ vi.mock('@/components/security-agent/dashboard-screen', () => ({
 vi.mock('@/components/security-agent/security-agent-setup', () => ({
   SecurityAgentSetup: 'SecurityAgentSetup',
 }));
-vi.mock('react-native', () => ({ View: 'View', Switch: 'Switch' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Switch: 'Switch',
+  Text: 'Text',
+  Pressable: 'Pressable',
+  ActivityIndicator: 'ActivityIndicator',
+  Platform: { OS: 'android' },
+  I18nManager: { isRTL: false },
+  useColorScheme: () => 'light',
+}));
+vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/components/ui/icons', () => ({
@@ -69,13 +80,12 @@ vi.mock('@/components/platform-error-screen', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 
-function host(root: TestRenderer.ReactTestInstance, type: string) {
+function host(root: ReactTestInstance, type: string) {
   return root.findAll(node => node.type === type);
 }
-function texts(root: TestRenderer.ReactTestInstance) {
+function texts(root: ReactTestInstance) {
   return host(root, 'Text').map(node => node.props.children);
 }
 async function advanceBy(ms = 10) {
@@ -83,11 +93,10 @@ async function advanceBy(ms = 10) {
     await vi.advanceTimersByTimeAsync(ms);
   });
 }
-async function retry(root: TestRenderer.ReactTestInstance) {
+async function retry(root: ReactTestInstance) {
   const onRetry = (host(root, 'PlatformErrorScreen')[0]?.props.onRetry ??
-    host(root, 'Text').find(node => node.props.children === 'Retry')?.props.onPress) as
-    | (() => void)
-    | undefined;
+    host(root, 'Pressable').find(node => node.props.accessibilityLabel === 'Retry')?.props
+      .onPress) as (() => void) | undefined;
   if (!onRetry) {
     throw new Error('Retry was not rendered');
   }
@@ -156,19 +165,13 @@ describe.each([
   ['inline', ScopeEntryScreen],
 ] as const)('%s settings real queries', (presentation, Screen) => {
   async function mount(scope = 'personal') {
-    await act(() => {
-      renderer = TestRenderer.create(
-        <QueryClientProvider client={queryClient}>
-          <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
-            <Screen scope={scope} />
-          </TRPCProvider>
-        </QueryClientProvider>
-      );
-    });
+    ({ renderer } = await renderWithProviders(
+      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+        <Screen scope={scope} />
+      </TRPCProvider>,
+      { queryClient }
+    ));
     await advanceBy();
-    if (!renderer) {
-      throw new Error('renderer was not created');
-    }
     return renderer.root;
   }
 
@@ -191,18 +194,10 @@ describe.each([
   const cases = failureCases.filter(
     ([, procedure]) => presentation === 'inline' || procedure !== 'getPermissionStatus'
   );
-  it.each(
-    cases.flatMap(([scope, procedure, message]) =>
-      (presentation === 'inline' ? [false] : [false, true]).map(isEnabled => ({
-        scope,
-        procedure,
-        message,
-        isEnabled,
-      }))
-    )
-  )(
-    'settles a failed $scope $procedure attempt with enabled=$isEnabled and permits Retry',
-    async ({ scope, procedure, message, isEnabled }) => {
+  const enabledStates = presentation === 'inline' ? [false] : [false, true];
+  it.each(cases.flatMap(testCase => enabledStates.map(enabled => [testCase, enabled] as const)))(
+    'settles a failed %j attempt with enabled=%s and permits Retry',
+    async ([scope, procedure, message], isEnabled) => {
       configData.repositorySelectionMode = 'selected';
       configData.isEnabled = isEnabled;
       configData.selectedRepositoryIds = [1];
@@ -213,7 +208,8 @@ describe.each([
       const root = await mount(scope);
       await retry(root);
       if (procedure === 'getRepositories') {
-        expect(host(root, 'Skeleton')).toHaveLength(1);
+        const progress = presentation === 'inline' ? 'Skeleton' : 'ActivityIndicator';
+        expect(host(root, progress)).toHaveLength(1);
       } else {
         expect(host(root, 'PlatformErrorScreen')[0]?.props.isRetrying).toBe(true);
       }
@@ -251,7 +247,7 @@ describe.each([
       connectivityStates.map(connectivity => ({ scope, procedure, message, connectivity }))
     )
   )(
-    'preserves cached $scope controls after failed $procedure recovery while confirmed $connectivity',
+    'preserves cached $scope controls and Retry after failed $procedure recovery while confirmed $connectivity',
     async ({ scope, procedure, message, connectivity }) => {
       committedConnectivity.status = connectivity;
       const root = await mount(scope);
@@ -261,6 +257,10 @@ describe.each([
       });
       await advanceBy(10_000);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
+      const retryButton = host(root, 'Pressable')[0];
+      expect(retryButton?.props).toMatchObject({ role: 'button', accessibilityLabel: 'Retry' });
+      expect(retryButton.props.className).toContain('min-h-11');
+      expect(retryButton.props.className).toContain('min-w-11');
       onlineManager.setOnline(false);
       failures.clear();
       const response = Promise.withResolvers<undefined>();
@@ -274,18 +274,26 @@ describe.each([
       }
       await retry(root);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
-      expect(host(root, 'Skeleton')).toHaveLength(1);
+      expect(host(root, 'Pressable')[0]).toBe(retryButton);
+      expect(retryButton.props.disabled).toBe(true);
+      expect(retryButton.props.accessibilityState).toEqual({ disabled: true, busy: true });
+      expect(host(root, 'ActivityIndicator')).toHaveLength(1);
       response.resolve(undefined);
       await advanceBy();
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
       expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
-      expect(texts(root)).toContain(message);
+      expect(host(root, 'Pressable')[0]).toBe(retryButton);
+      expect(retryButton.props.disabled).toBe(false);
+      expect(retryButton.props.accessibilityState).toEqual({ disabled: false, busy: false });
+      const status = host(root, 'Text').find(node => node.props.children === message);
+      expect(status?.props.accessibilityLiveRegion).toBe('polite');
       const active = queryClient.getQueryCache().findAll({ type: 'active' });
       expect(active.every(query => query.state.fetchStatus === 'idle')).toBe(true);
       failures.clear();
       await retry(root);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
       expect(texts(root)).not.toContain(message);
+      expect(host(root, 'Pressable')).toHaveLength(0);
       expect(active.every(query => query.state.status === 'success')).toBe(true);
       expect(onlineManager.isOnline()).toBe(false);
     }

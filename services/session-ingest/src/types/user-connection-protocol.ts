@@ -625,7 +625,7 @@ export const browserProviderOutboundMessageSchema = browserBoundary(
         recovery: z
           .strictObject({
             invocationId: browserInvocationIdSchema,
-            tabId: browserTabIdSchema,
+            tabId: browserTabIdSchema.optional(),
             tabClosed: z.literal(true),
             locksDrained: z.literal(true),
           })

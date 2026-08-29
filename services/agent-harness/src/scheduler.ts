@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto';
 import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { z } from 'zod';
-import type { LanguageModel } from 'ai';
+import { toolModelMessageSchema, type LanguageModel } from 'ai';
+import { validQuestionResponse } from '@kilocode/agent-harness/tools';
 import { canonicalizeValidatedInput } from '@kilocode/agent-harness/commands';
 import {
+  type InteractionSchema,
   MessageSchema,
   RunSchema,
   type Conversation,
@@ -13,14 +15,15 @@ import {
   type ToolCall,
   type ToolOutcome,
 } from '@kilocode/agent-harness/contracts';
-import { evaluateDispatch, type DispatchPolicy } from '@kilocode/agent-harness/policy';
+import type { DispatchPolicy } from '@kilocode/agent-harness/policy';
+import { commitDispatch, toolResultMessage } from './dispatch';
 import {
-  compareAndSetCall,
-  insertAttempt,
-  insertCall,
-  insertCheckpoint,
-  type StoreDatabase,
-} from './db/records';
+  closeInteraction,
+  waitForInteraction,
+  resolveInteractionCommand,
+  type InteractionAuthorizer,
+} from './interactions';
+import { compareAndSetCall, insertCall, insertCheckpoint, type StoreDatabase } from './db/records';
 import type { ConversationStore } from './db/store';
 import { StoreError, type AlarmStorage } from './db/wake';
 import * as s from './db/sqlite-schema';
@@ -58,6 +61,8 @@ export const SchedulerStateSchema = z.strictObject({
   currentReservationId: z.uuid().nullable(),
   stopped: z.boolean(),
   reservations: z.array(ReservationSchema),
+  // A12 records reconstruct SDK results from calls. Keep this fallback until those records retire.
+  resultMessages: z.record(z.uuid(), toolModelMessageSchema).default({}),
 });
 type SchedulerState = z.infer<typeof SchedulerStateSchema>;
 type SchedulerRecord = { id: string; data: SchedulerState };
@@ -74,8 +79,21 @@ type Job = {
       display: z.infer<typeof PartialStepSchema>;
       history: ReturnType<typeof buildHistory>;
     }
-  | { kind: 'tool'; call: ToolCall }
+  | {
+      kind: 'tool';
+      call: ToolCall;
+      reconciliation?: { attemptId: string; providerReference: string | null };
+    }
 );
+
+type ToolExecution = {
+  conversation: Conversation;
+  run: Run;
+  call: ToolCall;
+  attemptId: string;
+  signal: AbortSignal;
+  limits: RunLimits;
+};
 
 export type SchedulerAdapter = {
   definitions: readonly ModelTool[];
@@ -90,14 +108,12 @@ export type SchedulerAdapter = {
     call: ToolCall,
     signal: AbortSignal
   ) => Promise<DispatchPolicy>;
-  dispatch: (input: {
-    conversation: Conversation;
-    run: Run;
-    call: ToolCall;
-    attemptId: string;
-    signal: AbortSignal;
-    limits: RunLimits;
-  }) => Promise<unknown>;
+  dispatch: (input: ToolExecution) => Promise<unknown>;
+  // List only pinned definitions whose adapter proves safe outcome lookup, never mutation replay.
+  reconciliation?: {
+    definitions: readonly Pick<ModelTool, 'name' | 'version'>[];
+    read: (input: ToolExecution & { providerReference: string | null }) => Promise<unknown>;
+  };
   system: string;
   now?: () => number;
 };
@@ -117,14 +133,30 @@ function schedulerRecord(db: StoreDatabase, runId: string): SchedulerRecord {
           currentReservationId: null,
           stopped: false,
           reservations: [],
+          resultMessages: {},
         },
       };
 }
 function writeScheduler(db: StoreDatabase, runId: string, record: SchedulerRecord) {
-  const data = SchedulerStateSchema.parse(record.data);
+  const prior = db.select().from(s.checkpoints).where(eq(s.checkpoints.id, record.id)).get();
+  const data = SchedulerStateSchema.parse({
+    ...record.data,
+    // Settlements inside this transition can add results after the caller reads its reservation.
+    resultMessages: {
+      ...(prior ? SchedulerStateSchema.parse(prior.data).resultMessages : {}),
+      ...record.data.resultMessages,
+    },
+  });
   db.insert(s.checkpoints)
-    .values({ id: record.id, runId, step: 0, status: 'partial', data, definitionVersions: {} })
-    .onConflictDoUpdate({ target: s.checkpoints.id, set: { data } })
+    .values({
+      id: record.id,
+      runId,
+      step: 0,
+      status: 'partial',
+      data: jsonValue(data),
+      definitionVersions: {},
+    })
+    .onConflictDoUpdate({ target: s.checkpoints.id, set: { data: jsonValue(data) } })
     .run();
 }
 function storedRun(db: StoreDatabase, runId: string) {
@@ -282,8 +314,9 @@ export function createScheduler(
         )
       )
       .all();
-    const stopping = run.state.status === 'stopping' || schedulerRecord(db, run.id).data.stopped;
-    const limits = stopping ? null : admissionForRun(store, run).limits;
+    const terminal =
+      ['stopping', 'failed'].includes(run.state.status) || schedulerRecord(db, run.id).data.stopped;
+    const limits = terminal ? null : admissionForRun(store, run).limits;
     return rows.flatMap(row => {
       const step = limits
         ? readCompleteStep(row.data, adapter.definitions, limits)
@@ -313,6 +346,7 @@ export function createScheduler(
     call: ReturnType<ConversationStore['callsForRun']>[number],
     result: ToolOutcome
   ) {
+    const message = toolResultMessage(db, call.data, result);
     if (
       !compareAndSetCall(db, call.id, call.revision, {
         state: 'settled',
@@ -321,6 +355,29 @@ export function createScheduler(
       })
     )
       throw new StoreError('command_conflict');
+    const record = schedulerRecord(db, call.runId);
+    record.data.resultMessages[call.id] = message;
+    writeScheduler(db, call.runId, record);
+  }
+  function failPendingInteraction(
+    run: Run,
+    error: RuntimeError['detail']
+  ): EventEnvelope['event'][] {
+    if (error.retryable) return [];
+    const interaction = store
+      .snapshot()
+      ?.unresolvedInteractions.find(
+        item => item.kind === 'approval' && item.toolCall.runId === run.id
+      );
+    const call =
+      interaction && store.callsForRun(run.id).find(item => item.id === interaction.toolCall.id);
+    if (!call || call.data.state === 'executing') return [];
+    const result: ToolOutcome = call.data.result ?? { status: 'failed', error };
+    if (call.data.state !== 'settled') settleCall(call, result);
+    return [
+      ...closeInteraction(db, store, { ...call.data, state: 'settled', result }, 'approve'),
+      ...callEvents({ ...run, state: { status: 'failed', error } }),
+    ];
   }
   function unknownOutcome(
     run: Run,
@@ -328,7 +385,7 @@ export function createScheduler(
     reason: string,
     providerReference?: string
   ): EventEnvelope['event'][] {
-    // Keep the call executing so a13 can reconcile it with compareAndSetCall. Never invent a failed effect.
+    // Keep the call executing until an adapter can confirm its outcome. Never retry an uncertain effect.
     const attempt = db
       .select()
       .from(s.attempts)
@@ -375,7 +432,14 @@ export function createScheduler(
       if (call.data.state !== 'settled' && call.id !== mutation?.id)
         settleCall(call, { status: 'cancelled' });
     }
-    const events = callEvents(run);
+    const events = [
+      ...store
+        .callsForRun(run.id)
+        .flatMap(call =>
+          call.data.state === 'settled' ? closeInteraction(db, store, call.data, 'deny') : []
+        ),
+      ...callEvents(run),
+    ];
     if (mutation && reservation && reservation.deadline > now()) {
       // A supported read can abort. A mutation retains its lease and can report actual late completion.
       writeScheduler(db, run.id, record);
@@ -393,7 +457,7 @@ export function createScheduler(
     ];
   }
 
-  async function claim(): Promise<Job | null> {
+  async function claim(reconcile = false): Promise<Job | null> {
     const snapshot = store.snapshot();
     if (!snapshot || (!snapshot.activeRun && !snapshot.queuedRuns.length)) return null;
     let job: Job | null = null;
@@ -405,8 +469,13 @@ export function createScheduler(
       if (!run || !currentSnapshot) return { events: [] };
       const record = schedulerRecord(db, run.id),
         active = activeReservation(record);
+      const reconciling =
+        reconcile &&
+        run.state.status === 'waiting' &&
+        run.state.waiting.reason === 'reconciliation';
+      if (reconcile && !reconciling) return { events: [] };
       if (run.state.status === 'stopping') return { events: stopRun(run, record) };
-      if (run.state.status === 'waiting' || (active && active.deadline > now()))
+      if ((run.state.status === 'waiting' && !reconciling) || (active && active.deadline > now()))
         return { events: [] };
       try {
         const admission = admissionForRun(store, run);
@@ -418,7 +487,29 @@ export function createScheduler(
         }
         const calls = store.callsForRun(run.id);
         const executing = calls.find(call => call.data.state === 'executing');
-        if (executing) {
+        const attempt =
+          reconciling && executing
+            ? db
+                .select()
+                .from(s.attempts)
+                .where(eq(s.attempts.toolCallId, executing.id))
+                .orderBy(desc(s.attempts.generation))
+                .limit(1)
+                .get()
+            : undefined;
+        if (
+          reconciling &&
+          (!executing ||
+            executing.data.executionTarget.kind !== 'backend' ||
+            !attempt ||
+            !adapter.reconciliation?.definitions.some(
+              item =>
+                item.name === executing.data.name &&
+                item.version === executing.data.definitionVersion
+            ))
+        )
+          return { events: [] };
+        if (executing && !reconciling) {
           if (executing.data.effect !== 'read')
             return {
               events: unknownOutcome(run, executing.data, 'The dispatch response was lost.'),
@@ -441,7 +532,7 @@ export function createScheduler(
           .orderBy(asc(s.checkpoints.step))
           .all();
         const last = checkpointRows.at(-1);
-        if (record.data.stopped) return { events: stopRun(run, record) };
+        if (record.data.stopped && !reconciling) return { events: stopRun(run, record) };
         executorFreeTools(adapter.definitions);
         const step = pending
           ? checkpointRows.find(row => row.id === pending.checkpointId)?.step
@@ -469,8 +560,9 @@ export function createScheduler(
                 step,
                 toolCallId: pending.id,
                 webRequest:
+                  !reconciling &&
                   adapter.definitions.find(item => item.name === pending.data.name)?.group ===
-                  'web',
+                    'web',
               }
             : { kind: 'model', step, inputTokens: history?.inputTokens ?? 0 },
           now()
@@ -510,7 +602,19 @@ export function createScheduler(
             ) !== canonicalizeValidatedInput(complete.calls.map(item => item.call.id))
           )
             fail('invalid_output', 'The stored call digest or order has changed.');
-          job = { ...common, kind: 'tool', call: pending.data };
+          job = {
+            ...common,
+            kind: 'tool',
+            call: pending.data,
+            ...(attempt
+              ? {
+                  reconciliation: {
+                    attemptId: attempt.id,
+                    providerReference: attempt.providerReference,
+                  },
+                }
+              : {}),
+          };
         } else {
           if (!history) fail('invalid_input', 'Canonical history is unavailable.');
           const display = PartialStepSchema.parse({
@@ -546,7 +650,21 @@ export function createScheduler(
         record.data.epoch++;
         record.data.currentReservationId = null;
         writeScheduler(db, run.id, record);
-        return { events: [runEvent(run, { status: 'failed', error: errorDetail(error) })] };
+        const uncertain =
+          reconciling && store.callsForRun(run.id).find(call => call.data.state === 'executing');
+        const detail = errorDetail(error);
+        return {
+          events: uncertain
+            ? unknownOutcome(
+                run,
+                uncertain.data,
+                'The safe outcome check could not complete within the stored limits.'
+              )
+            : [
+                ...failPendingInteraction(run, detail),
+                runEvent(run, { status: 'failed', error: detail }),
+              ],
+        };
       }
     });
     await maintainAlarm();
@@ -637,8 +755,11 @@ export function createScheduler(
         job.kind === 'tool'
           ? store.callsForRun(run.id).find(item => item.id === job.call.id)
           : undefined;
-      if (call?.data.state === 'executing') {
-        if (call.data.effect !== 'read')
+      const failedCall =
+        call &&
+        (call.data.state === 'executing' || (call.data.approval !== null && !detail.retryable));
+      if (failedCall) {
+        if (call.data.state === 'executing' && call.data.effect !== 'read')
           return {
             events: unknownOutcome(
               run,
@@ -653,9 +774,11 @@ export function createScheduler(
           .where(eq(s.attempts.id, job.reservation.id))
           .run();
       }
+      const pendingEvents = failPendingInteraction(run, detail);
       return {
         events: [
-          ...(call?.data.state === 'executing' ? callEvents(run) : []),
+          ...pendingEvents,
+          ...(failedCall && !pendingEvents.length ? callEvents(run) : []),
           runEvent(
             run,
             detail.retryable ? { status: 'running' } : { status: 'failed', error: detail }
@@ -665,34 +788,67 @@ export function createScheduler(
     });
   }
   async function executeTool(job: Job & { kind: 'tool' }, controller: AbortController) {
+    const reconciliation = job.reconciliation;
+    if (reconciliation) {
+      const boundary = adapter.reconciliation;
+      if (!boundary) fail('unavailable_tool', 'This adapter cannot confirm the stored outcome.');
+      // Return the original operation outcome. Lookup failures must throw, not become mutation failures.
+      const result = await abortable(controller.signal, () =>
+        boundary.read({
+          conversation: job.conversation,
+          run: job.run,
+          call: job.call,
+          attemptId: reconciliation.attemptId,
+          providerReference: reconciliation.providerReference,
+          signal: controller.signal,
+          limits: job.admission.limits,
+        })
+      );
+      return commitToolOutcome(
+        job,
+        validateOutcome(result, job.call, adapter.definitions, job.admission.limits)
+      );
+    }
     const policy = await abortable(controller.signal, () =>
-      adapter.policy(job.conversation, job.run, job.call, controller.signal)
+      adapter.policy(
+        store.snapshot()?.conversation ?? job.conversation,
+        job.run,
+        job.call,
+        controller.signal
+      )
     );
     controller.signal.throwIfAborted();
-    let dispatched = false;
-    await store.transition({ wakeAt: job.reservation.deadline }, () => {
+    let dispatched = false,
+      retryPolicy = false;
+    await store.transition({ wakeAt: now() + 1 }, () => {
       fence(job);
       const call = store.callsForRun(job.run.id).find(item => item.id === job.call.id);
       const conversation = store.snapshot()?.conversation;
       if (!call || !conversation) fail('invalid_output', 'The stored dispatch call is missing.');
       validateStoredCall(call.data, job.call, adapter.definitions, job.admission.limits);
-      const decision = evaluateDispatch(call.data, job.call, {
-        ...policy,
-        permissionMode: conversation.permissionMode,
-        permissionRevision: conversation.permissionRevision,
-      });
+      const decision = commitDispatch(
+        db,
+        call,
+        job.call,
+        {
+          ...policy,
+          permissionMode: conversation.permissionMode,
+          permissionRevision: conversation.permissionRevision,
+          // Only durable answers and a14 client grants can release these gates, not adapter hints.
+          questionAnswered: false,
+          clientReady: false,
+        },
+        job.reservation.id,
+        job.epoch
+      );
       if (decision === 'dispatch') {
-        insertAttempt(db, { id: job.reservation.id, toolCallId: call.id, generation: job.epoch });
-        if (
-          !compareAndSetCall(db, call.id, call.revision, {
-            state: 'executing',
-            approval: call.data.approval,
-            result: null,
-          })
-        )
-          throw new StoreError('command_conflict');
         dispatched = true;
-        return { events: callEvents(job.run) };
+        return {
+          events: [
+            ...closeInteraction(db, store, { ...call.data, state: 'executing' }, 'approve'),
+            ...callEvents(job.run),
+          ],
+        };
       }
       const record = schedulerRecord(db, job.run.id);
       // No external request occurred. Release this request slot, but retain time spent checking authority.
@@ -702,44 +858,61 @@ export function createScheduler(
       });
       record.data.currentReservationId = null;
       writeScheduler(db, job.run.id, record);
-      if (decision === 'approval' || decision === 'question' || decision === 'client')
+      if (decision === 'approval' || decision === 'question' || decision === 'client') {
+        const waiting = { ...call.data, state: 'waiting' as const };
+        if (!compareAndSetCall(db, call.id, call.revision, waiting))
+          throw new StoreError('command_conflict');
         return {
           events: [
+            ...(conversation.permissionMode === 'yolo'
+              ? closeInteraction(db, store, waiting, 'approve')
+              : []),
+            ...(decision === 'client' ? [] : [waitForInteraction(store, waiting, decision)]),
+            ...callEvents(job.run),
             runEvent(job.run, {
               status: 'waiting',
               waiting: { reason: decision, toolCallId: call.id },
             }),
           ],
         };
+      }
+      if (decision === 'stale_revision') {
+        retryPolicy = true;
+        return { events: [runEvent(job.run, { status: 'running' })] };
+      }
+      if (decision === 'already_dispatched') return { events: [] };
       if (decision === 'denied') {
         settleCall(call, { status: 'denied' });
         return { events: callEvents(job.run) };
       }
+      const error = {
+        code:
+          decision === 'access_revoked'
+            ? ('access_revoked' as const)
+            : decision === 'unavailable_tool'
+              ? ('unavailable_tool' as const)
+              : ('invalid_input' as const),
+        message: 'The current dispatch authority does not permit this call.',
+        retryable: false,
+      };
+      settleCall(call, { status: 'failed', error });
+      const pendingEvents = failPendingInteraction(job.run, error);
       return {
         events: [
-          runEvent(job.run, {
-            status: 'failed',
-            error: {
-              code:
-                decision === 'access_revoked'
-                  ? 'access_revoked'
-                  : decision === 'unavailable_tool'
-                    ? 'unavailable_tool'
-                    : 'stale_revision',
-              message: 'The current dispatch authority does not permit this call.',
-              retryable: decision === 'stale_revision',
-            },
-          }),
+          ...(pendingEvents.length ? pendingEvents : callEvents(job.run)),
+          runEvent(job.run, { status: 'failed', error }),
         ],
       };
     });
-    if (!dispatched) return true;
+    if (!dispatched) return !retryPolicy;
     fence(job);
     let outcome: ToolOutcome;
     try {
+      // This named backend boundary must recheck current account/context/resource authority before effects.
+      // The execution identity is durable; adapters can use it only with proven provider guarantees.
       const result = await abortable(controller.signal, () =>
         adapter.dispatch({
-          conversation: job.conversation,
+          conversation: store.snapshot()?.conversation ?? job.conversation,
           run: job.run,
           call: job.call,
           attemptId: job.reservation.id,
@@ -753,15 +926,17 @@ export function createScheduler(
       if (error instanceof StoreError || controller.signal.aborted) throw error;
       outcome =
         job.call.effect === 'read'
-          ? controller.signal.aborted
-            ? { status: 'cancelled' }
-            : { status: 'failed', error: errorDetail(error) }
+          ? { status: 'failed', error: errorDetail(error) }
           : {
               status: 'outcome_unknown',
               reason: 'The mutation has no validated completion response.',
             };
     }
+    return commitToolOutcome(job, outcome);
+  }
+  async function commitToolOutcome(job: Job & { kind: 'tool' }, outcome: ToolOutcome) {
     let committed = false;
+    const attemptId = job.reconciliation?.attemptId ?? job.reservation.id;
     await store.transition({ wakeAt: now() + 1 }, () => {
       if (!current(job, true)) return { events: [] };
       committed = true;
@@ -769,6 +944,7 @@ export function createScheduler(
         run = storedRun(db, job.run.id);
       const call = store.callsForRun(run.id).find(item => item.id === job.call.id);
       if (!call) fail('invalid_output', 'The dispatched call is missing.');
+      const stopping = run.state.status === 'stopping' || record.data.stopped;
       updateReservation(record, finishReservation(job.reservation, now()));
       record.data.currentReservationId = null;
       writeScheduler(db, run.id, record);
@@ -776,21 +952,20 @@ export function createScheduler(
         if (outcome.providerReference)
           db.update(s.attempts)
             .set({ providerReference: outcome.providerReference })
-            .where(eq(s.attempts.id, job.reservation.id))
+            .where(eq(s.attempts.id, attemptId))
             .run();
         return {
-          events:
-            run.state.status === 'stopping'
-              ? stopRun(run, record)
-              : unknownOutcome(run, call.data, outcome.reason, outcome.providerReference),
+          events: stopping
+            ? stopRun(run, record)
+            : unknownOutcome(run, call.data, outcome.reason, outcome.providerReference),
         };
       }
       db.update(s.attempts)
         .set({ outcome: jsonValue(outcome) })
-        .where(eq(s.attempts.id, job.reservation.id))
+        .where(eq(s.attempts.id, attemptId))
         .run();
       settleCall(call, outcome);
-      return { events: run.state.status === 'stopping' ? stopRun(run, record) : callEvents(run) };
+      return { events: stopping ? stopRun(run, record) : callEvents(run) };
     });
     return committed;
   }
@@ -799,7 +974,8 @@ export function createScheduler(
     const live = {
       runId: job.run.id,
       controller,
-      abortable: job.kind === 'model' || job.call.effect === 'read',
+      abortable:
+        job.kind === 'model' || job.call.effect === 'read' || job.reconciliation !== undefined,
     };
     inFlight = live;
     const timer = setTimeout(
@@ -858,5 +1034,108 @@ export function createScheduler(
     }
     await maintainAlarm();
   }
-  return { alarm, interrupt };
+  function resolveInteraction(input: unknown, authorize: InteractionAuthorizer) {
+    return resolveInteractionCommand(
+      store,
+      input,
+      authorize,
+      (_db, interaction, command) => {
+        const run = storedRun(db, interaction.toolCall.runId);
+        const record = schedulerRecord(db, run.id);
+        if (record.data.stopped || !['running', 'waiting'].includes(run.state.status))
+          fail('cancelled', 'This run no longer accepts interaction decisions.');
+        const call = store.callsForRun(run.id).find(item => item.data.state !== 'settled');
+        if (!call || call.id !== interaction.toolCall.id || call.data.state === 'executing')
+          fail('invalid_input', 'This interaction no longer owns an undispatched call.');
+        const limits = admissionForRun(store, run).limits;
+        validateStoredCall(call.data, interaction.toolCall, adapter.definitions, limits);
+        const checkpoint = db
+          .select()
+          .from(s.checkpoints)
+          .where(eq(s.checkpoints.id, call.checkpointId))
+          .get();
+        if (checkpoint?.status !== 'complete')
+          fail('invalid_input', 'The interaction has no executable checkpoint.');
+        const expected = readCompleteStep(checkpoint.data, adapter.definitions, limits).calls.find(
+          item => item.call.id === call.id
+        );
+        if (!expected) fail('invalid_input', 'The interaction call is absent from its checkpoint.');
+        validateStoredCall(call.data, expected.call, adapter.definitions, limits);
+        let next: ToolCall;
+        let resolved: z.infer<typeof InteractionSchema>;
+        const resolution = command.resolution;
+        if (interaction.kind === 'approval') {
+          if (resolution.kind !== 'approve' && resolution.kind !== 'deny')
+            fail('invalid_input', 'An approval requires approve or deny.');
+          const approval = {
+            interactionId: interaction.id,
+            commandId: command.commandId,
+            decision: resolution.kind,
+          };
+          next = {
+            ...call.data,
+            approval,
+            state: resolution.kind === 'approve' ? 'pending' : 'settled',
+            result: resolution.kind === 'approve' ? null : { status: 'denied' },
+          };
+          resolved = { ...interaction, toolCall: next, resolution: approval };
+        } else {
+          if (
+            (resolution.kind !== 'answer' && resolution.kind !== 'dismiss') ||
+            !validQuestionResponse(call.data.arguments, resolution)
+          )
+            fail('invalid_input', 'The answer does not match the question IDs or selection rules.');
+          next = {
+            ...call.data,
+            state: 'settled',
+            result:
+              resolution.kind === 'dismiss'
+                ? { status: 'cancelled' }
+                : { status: 'succeeded', output: jsonValue(resolution) },
+          };
+          resolved = {
+            ...interaction,
+            toolCall: next,
+            resolution:
+              resolution.kind === 'dismiss'
+                ? { kind: 'dismiss' }
+                : {
+                    kind: 'answer',
+                    choiceIds: resolution.choiceIds,
+                    ...(resolution.text === undefined ? {} : { text: resolution.text }),
+                  },
+          };
+        }
+        if (next.result) {
+          validateOutcome(next.result, next, adapter.definitions, limits);
+          settleCall({ ...call, data: next }, next.result);
+        } else if (!compareAndSetCall(db, call.id, call.revision, next))
+          throw new StoreError('command_conflict');
+        const reservation = activeReservation(record);
+        if (reservation)
+          updateReservation(record, {
+            ...finishReservation(reservation, now()),
+            status: 'released',
+          });
+        record.data.epoch++;
+        record.data.currentReservationId = null;
+        writeScheduler(db, run.id, record);
+        return {
+          interaction: resolved,
+          events: [
+            { type: 'interaction', interaction: resolved },
+            ...callEvents(run),
+            runEvent(run, { status: 'running' }),
+          ],
+        };
+      },
+      now
+    );
+  }
+  async function reconcile() {
+    const job = await claim(true);
+    if (job) await execute(job);
+    await maintainAlarm();
+  }
+  return { alarm, interrupt, resolveInteraction, reconcile };
 }

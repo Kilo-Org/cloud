@@ -32,30 +32,48 @@ const createStorage = (initialValue?: unknown): AuthStorageArea & { value: unkno
       expect(key).toBe(AUTH_STORAGE_KEY);
       storedValue = undefined;
     },
+    removeItems: keys => {
+      if (keys.includes(AUTH_STORAGE_KEY)) {
+        storedValue = undefined;
+      }
+    },
     setItem: (key, value) => {
       expect(key).toBe(AUTH_STORAGE_KEY);
       storedValue = value;
     },
+    snapshot: () => (storedValue === undefined ? {} : { kiloAuth: storedValue }),
     get value() {
       return storedValue;
     },
   };
 };
 
-const createSessionStorage = (): {
-  readonly clearCalls: string[];
-  readonly storage: Parameters<typeof clearStoredSession>[0];
-} => {
-  const clearCalls: string[] = [];
-
-  return {
-    clearCalls,
-    storage: {
-      clear: base => {
-        clearCalls.push(base);
-      },
+const createSessionStorage = () => {
+  const safety = { allTabs: true, tabIds: [7], version: 1 };
+  const identity = { providerId: 'stable-profile', providerProof: 'private-proof', version: 1 };
+  const values = new Map<string, unknown>([
+    ['local:kiloBrowserExecutionSafety', safety],
+    ['local:kiloBrowserProviderIdentity', identity],
+    ['local:kiloAuth', { token: 'token-1' }],
+    ['local:kiloAgentConversations', ['old local history']],
+    ['local:kiloBrowserTasks', ['delegated history']],
+    ['local:kiloBrowserProviderSettings', { enabled: true }],
+    ['local:unknownAccountKey', 'future account data'],
+    ['local:unknownAccountKey$', { version: 2 }],
+  ]);
+  const storage = {
+    clear: () => {
+      throw new Error('Unprotected storage clear is forbidden.');
     },
+    removeItems: (keys: `local:${string}`[]) => {
+      for (const key of keys) {
+        values.delete(key);
+      }
+    },
+    snapshot: (_base: 'local') =>
+      Object.fromEntries([...values].map(([key, value]) => [key.slice(6), value])),
   };
+  return { identity, safety, storage, values };
 };
 
 const withStubbedEnv = (env: Record<string, string>, assertion: () => void): void => {
@@ -121,12 +139,23 @@ describe('extension auth storage', () => {
     expect(storage.value).toBeUndefined();
   });
 
-  it('clears all local extension storage for explicit logout', async () => {
-    const { clearCalls, storage } = createSessionStorage();
-
+  it('removes every nonprotected account key without clearing the profile safety records', async () => {
+    const { identity, safety, storage, values } = createSessionStorage();
     await clearStoredSession(storage);
+    expect([...values]).toStrictEqual([
+      ['local:kiloBrowserExecutionSafety', safety],
+      ['local:kiloBrowserProviderIdentity', identity],
+    ]);
+  });
 
-    expect(clearCalls).toStrictEqual(['local']);
+  it('keeps the safety records when key enumeration fails instead of falling back to clear', async () => {
+    const { safety, storage, values } = createSessionStorage();
+    storage.snapshot = () => {
+      throw new Error('Enumeration failed.');
+    };
+    await expect(clearStoredSession(storage)).rejects.toThrow('Enumeration failed.');
+    expect(values.get('local:kiloBrowserExecutionSafety')).toBe(safety);
+    expect(values.get('local:unknownAccountKey')).toBe('future account data');
   });
 });
 

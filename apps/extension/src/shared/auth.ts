@@ -1,6 +1,9 @@
 import { z } from 'zod';
+import { BROWSER_EXECUTION_SAFETY_KEY } from '../../entrypoints/sidepanel/browser-execution-lock';
 
 export const AUTH_STORAGE_KEY = 'local:kiloAuth';
+// Keep credentials separate from a8's execution record, whose writer owns its complete format.
+export const BROWSER_PROVIDER_IDENTITY_KEY = 'local:kiloBrowserProviderIdentity';
 export const DEFAULT_KILO_API_BASE_URL = 'https://app.kilo.ai';
 export const DEFAULT_LOCAL_KILO_API_BASE_URL = 'http://localhost:3000';
 
@@ -11,14 +14,52 @@ export interface StoredAuth {
 
 type MaybePromise<Value> = Promise<Value> | Value;
 
-export interface AuthStorageArea {
+export interface AuthStorageArea extends Partial<SessionStorageArea> {
   getItem(key: typeof AUTH_STORAGE_KEY): MaybePromise<unknown>;
   removeItem(key: typeof AUTH_STORAGE_KEY): MaybePromise<void>;
   setItem(key: typeof AUTH_STORAGE_KEY, value: StoredAuth): MaybePromise<void>;
 }
 export interface SessionStorageArea {
-  clear(base: 'local'): MaybePromise<void>;
+  snapshot(base: 'local'): MaybePromise<Record<string, unknown>>;
+  removeItems(keys: `local:${string}`[]): MaybePromise<void>;
 }
+
+// eslint-disable-next-line promise/prefer-await-to-then -- The resolved promise seeds the serialized write queue.
+let profileWrites = Promise.resolve();
+/** Serialize account writes with auth cleanup, including across panels when native locks exist. */
+export const withBrowserProfileStorageLock = <Result>(
+  work: () => Promise<Result>
+): Promise<Result> => {
+  const previous = profileWrites;
+  const result = (async () => {
+    await previous;
+    const locks = globalThis.navigator?.locks;
+    return locks === undefined ? work() : locks.request('kilo:browser-profile-storage', work);
+  })();
+  // A failed write must reject its caller without poisoning later cleanup or recovery.
+  profileWrites = (async () => {
+    try {
+      await result;
+    } catch {
+      // The returned result still rejects; only the queue barrier absorbs the failure.
+    }
+  })();
+  return result;
+};
+
+const protectedProfileKeys = new Set(
+  [BROWSER_EXECUTION_SAFETY_KEY, BROWSER_PROVIDER_IDENTITY_KEY].flatMap(key => [
+    key.slice(6),
+    `${key.slice(6)}$`,
+  ])
+);
+const removeAccountStorage = async (storageArea: SessionStorageArea): Promise<void> => {
+  const keys = Object.keys(await storageArea.snapshot('local'))
+    .filter(key => !protectedProfileKeys.has(key))
+    .map<`local:${string}`>(key => `local:${key}`);
+  // Never clear and restore: a concurrent quarantine write must remain intact throughout logout.
+  await storageArea.removeItems(keys);
+};
 
 export type FetchLike = (input: string, init?: RequestInit) => MaybePromise<Response>;
 
@@ -101,20 +142,36 @@ export const loadStoredAuth = async (
 ): Promise<StoredAuth | undefined> =>
   normalizeStoredAuth(await storageArea.getItem(AUTH_STORAGE_KEY));
 
-export const saveStoredAuth = async (
-  storageArea: AuthStorageArea,
-  auth: StoredAuth
-): Promise<void> => {
-  await storageArea.setItem(AUTH_STORAGE_KEY, auth);
-};
+export const saveStoredAuth = (storageArea: AuthStorageArea, auth: StoredAuth): Promise<void> =>
+  withBrowserProfileStorageLock(async () => {
+    const previous = await loadStoredAuth(storageArea);
+    const changedAccount =
+      previous !== undefined &&
+      (previous.userEmail !== undefined && auth.userEmail !== undefined
+        ? previous.userEmail !== auth.userEmail
+        : previous.token !== auth.token);
+    if (changedAccount) {
+      const { snapshot, removeItems } = storageArea;
+      // Legacy auth-only adapters can save initial auth, but cannot safely switch accounts.
+      // Remove this compatibility branch when all auth-only adapters retire.
+      if (snapshot === undefined || removeItems === undefined) {
+        throw new Error('Account cleanup is unavailable. Sign out before changing accounts.');
+      }
+      await removeAccountStorage({
+        removeItems: keys => removeItems.call(storageArea, keys),
+        snapshot: base => snapshot.call(storageArea, base),
+      });
+    }
+    await storageArea.setItem(AUTH_STORAGE_KEY, auth);
+  });
 
-export const clearStoredAuth = async (storageArea: AuthStorageArea): Promise<void> => {
-  await storageArea.removeItem(AUTH_STORAGE_KEY);
-};
+export const clearStoredAuth = (storageArea: AuthStorageArea): Promise<void> =>
+  withBrowserProfileStorageLock(async () => {
+    await storageArea.removeItem(AUTH_STORAGE_KEY);
+  });
 
-export const clearStoredSession = async (storageArea: SessionStorageArea): Promise<void> => {
-  await storageArea.clear('local');
-};
+export const clearStoredSession = (storageArea: SessionStorageArea): Promise<void> =>
+  withBrowserProfileStorageLock(() => removeAccountStorage(storageArea));
 
 const parseDeviceAuthRequest = (value: unknown): DeviceAuthRequest => {
   const parsed = deviceAuthRequestSchema.safeParse(value);

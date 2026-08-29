@@ -4,6 +4,7 @@ import { type ComponentProps, createElement, Fragment } from 'react';
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
+import { type Pressable } from 'react-native';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   createSessionManager,
@@ -468,73 +469,130 @@ describe('shouldRefuseSilentAttachmentDrop', () => {
 // These tests run in the existing detail suite with the DOM-free renderer.
 // Request order and rendered state are deterministic; native paint timing is not.
 describe('child transcript requests', () => {
-  it('does not fetch any child transcript for card labels', async () => {
-    const view = await mountDetails();
-
-    expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(24);
-    expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toBe(
-      'Researcher\nTask ses-selected\nWaiting for activity\ncompleted'
-    );
-    expect(renderedText(cardFor(view.renderer, kiloId('ses-sibling-0')))).toBe(
-      'Researcher\nTask ses-sibling-0\nWaiting for activity\nrunning'
-    );
-    expect(renderedText(cardFor(view.renderer, kiloId('ses-sibling-1')))).toBe(
-      'Researcher\nTask ses-sibling-1\nWaiting for activity\nerror'
-    );
-    expect(view.renderer.root.findAllByType(ChildSessionModelLabel)).toHaveLength(0);
-    expect(view.requestedIds()).toEqual([ROOT_ID]);
-  });
-
-  it('opens selected and nested sheets immediately without requesting siblings', async () => {
-    const view = await mountDetails();
-    pressCard(view.renderer, SELECTED_ID);
-    pressCard(view.renderer, SELECTED_ID);
-
-    expect(sheetProps(view.renderer)).toMatchObject({
-      visible: true,
+  it.each([
+    {
       sessionId: SELECTED_ID,
-      title: 'Task ses-selected',
-      hydrationState: { status: 'loading' },
-    });
-    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
+      status: 'completed',
+      text: 'Researcher\nTask ses-selected\ncompleted',
+      textRows: 3,
+      waiting: false,
+    },
+    {
+      sessionId: kiloId('ses-sibling-0'),
+      status: 'running',
+      text: 'Researcher\nTask ses-sibling-0\nWaiting for activity\nrunning',
+      textRows: 4,
+      waiting: true,
+    },
+    {
+      sessionId: kiloId('ses-sibling-1'),
+      status: 'error',
+      text: 'Researcher\nTask ses-sibling-1\nerror',
+      textRows: 3,
+      waiting: false,
+    },
+  ] as const)(
+    'renders the $status card without fetching a child transcript for labels',
+    async ({ sessionId, status, text, textRows, waiting }) => {
+      const view = await mountDetails();
+      const card = cardFor(view.renderer, sessionId);
+      const button = card.findByProps({ accessibilityRole: 'button' }).props as ComponentProps<
+        typeof Pressable
+      >;
 
-    const selected = taskMessage(SELECTED_ID, [NESTED_ID, kiloId('ses-nested-sibling')]);
-    selected.parts.push(...childMessage(SELECTED_ID, 'Selected child row').parts);
-    await view.respond(SELECTED_ID, [selected]);
-    expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
-      'Selected child row'
-    );
-    expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toContain('Writing response');
-    expect(cardFor(view.renderer, SELECTED_ID).findAllByType(ChildSessionModelLabel)).toHaveLength(
-      1
-    );
-    expect(renderedText(cardFor(view.renderer, NESTED_ID))).toBe(
-      'Researcher\nTask ses-nested\nWaiting for activity\ncompleted'
-    );
-    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
+      expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(24);
+      expect(renderedText(card)).toBe(text);
+      expect(card.findAll(node => node.type === 'Text')).toHaveLength(textRows);
+      expect(button).toMatchObject({
+        disabled: false,
+        accessibilityState: { disabled: false },
+        accessibilityHint: i18n.t('agentChat.childSession.openHint'),
+      });
+      expect(button.accessibilityLabel).toContain('Researcher');
+      expect(button.accessibilityLabel).toContain(`Task ${sessionId}`);
+      expect(button.accessibilityLabel).toContain(status);
+      expect(button.accessibilityLabel?.includes('Waiting for activity')).toBe(waiting);
+      expect(view.renderer.root.findAllByType(ChildSessionModelLabel)).toHaveLength(0);
+      expect(view.requestedIds()).toEqual([ROOT_ID]);
+    }
+  );
 
-    pressCard(view.renderer, NESTED_ID);
-    expect(sheetProps(view.renderer)).toMatchObject({
-      visible: true,
-      sessionId: NESTED_ID,
-      title: 'Task ses-nested',
-      hydrationState: { status: 'loading' },
-    });
-    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID, NESTED_ID]);
-    await view.respond(NESTED_ID, [childMessage(NESTED_ID, 'Nested child row')]);
-    expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
-      'Nested child row'
-    );
-    expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).not.toContain(
-      'Selected child row'
-    );
+  it.each([
+    [SELECTED_ID, NESTED_ID, 'completed'],
+    [kiloId('ses-sibling-1'), kiloId('ses-nested-failed'), 'error'],
+  ] as const)(
+    'opens %s and its nested sheet immediately without requesting siblings',
+    async (selectedId, nestedId, status) => {
+      const view = await mountDetails();
+      pressCard(view.renderer, selectedId);
+      pressCard(view.renderer, selectedId);
 
-    pressCard(view.renderer, SELECTED_ID);
-    expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
-      'Selected child row'
-    );
-    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID, NESTED_ID]);
-  });
+      expect(sheetProps(view.renderer)).toMatchObject({
+        visible: true,
+        sessionId: selectedId,
+        title: `Task ${selectedId}`,
+        hydrationState: { status: 'loading' },
+      });
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId]);
+
+      const selected = taskMessage(selectedId, [
+        NESTED_ID,
+        kiloId('ses-nested-sibling'),
+        kiloId('ses-nested-failed'),
+      ]);
+      selected.parts.push(...childMessage(selectedId, 'Selected child row').parts);
+      await view.respond(selectedId, [selected]);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Selected child row'
+      );
+      const selectedCard = cardFor(view.renderer, selectedId);
+      expect(renderedText(selectedCard)).toContain('Writing response');
+      expect(selectedCard.findByProps({ accessibilityRole: 'button' }).props).toMatchObject({
+        accessibilityLabel: expect.stringContaining('Writing response'),
+      });
+      expect(selectedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
+      const nestedCard = cardFor(view.renderer, nestedId);
+      expect(renderedText(nestedCard)).toBe(`Researcher\nTask ${nestedId}\n${status}`);
+      expect(nestedCard.findAll(node => node.type === 'Text')).toHaveLength(3);
+      const nestedButton = nestedCard.findByProps({ accessibilityRole: 'button' })
+        .props as ComponentProps<typeof Pressable>;
+      expect(nestedButton).toMatchObject({
+        disabled: false,
+        accessibilityState: { disabled: false },
+        accessibilityHint: i18n.t('agentChat.childSession.openHint'),
+      });
+      expect(nestedButton.accessibilityLabel).toContain(`Task ${nestedId}`);
+      expect(nestedButton.accessibilityLabel).toContain(status);
+      expect(nestedButton.accessibilityLabel).not.toContain('Waiting for activity');
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId]);
+
+      pressCard(view.renderer, nestedId);
+      expect(sheetProps(view.renderer)).toMatchObject({
+        visible: true,
+        sessionId: nestedId,
+        title: `Task ${nestedId}`,
+        hydrationState: { status: 'loading' },
+      });
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId, nestedId]);
+      await view.respond(nestedId, [childMessage(nestedId, 'Nested child row')]);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Nested child row'
+      );
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).not.toContain(
+        'Selected child row'
+      );
+
+      pressCard(view.renderer, selectedId);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Selected child row'
+      );
+      expect(renderedText(cardFor(view.renderer, nestedId))).toContain('Writing response');
+      expect(
+        cardFor(view.renderer, nestedId).findByProps({ accessibilityRole: 'button' }).props
+      ).toMatchObject({ accessibilityLabel: expect.stringContaining('Writing response') });
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId, nestedId]);
+    }
+  );
 
   it('keeps metadata after a retryable failure and retries only on explicit Retry', async () => {
     const view = await mountDetails();

@@ -94,7 +94,9 @@ export function getChildSessionCardState(
   const latestPart = findLatestAssistantPart(childMessages);
   const latestActivity: ChildSessionActivity | string = (() => {
     if (!latestPart) {
-      return i18n.t('agentChat.childSession.waitingForActivity');
+      return part.state.status === 'completed' || part.state.status === 'error'
+        ? ''
+        : i18n.t('agentChat.childSession.waitingForActivity');
     }
     if (isToolPart(latestPart)) {
       return { tool: latestPart.tool, context: getToolContext(latestPart) };

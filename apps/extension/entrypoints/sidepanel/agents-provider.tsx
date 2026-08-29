@@ -3,19 +3,20 @@ import { createContext, useContext, useEffect, useRef } from 'react';
 import type { JSX, ReactNode } from 'react';
 import type { createTRPCClient } from '@trpc/client';
 import { createBrowserLifecycleHooks, createUserWebConnection } from '@kilocode/cloud-agent-sdk';
-import type { SessionManager, UserWebConnection } from '@kilocode/cloud-agent-sdk';
+import type { SessionManager } from '@kilocode/cloud-agent-sdk';
 import type { MobileRouter } from '@kilocode/trpc/mobile';
 import type { StoredAuth } from '@/src/shared/auth';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import { getSessionIngestWsUrl } from '@/src/shared/cloud-agent-config';
 import { createExtensionTrpcClient } from '@/src/shared/extension-trpc-client';
 import { createExtensionAgentSessionManager } from '@/src/shared/extension-agent-session-manager';
+import { BrowserTaskProvider } from './browser-task-provider';
 
 type TrpcClient = ReturnType<typeof createTRPCClient<MobileRouter>>;
 
 export interface ExtensionAgentsContextValue {
   readonly manager: SessionManager;
-  readonly userWebConnection: UserWebConnection;
+  readonly userWebConnection: ReturnType<typeof createUserWebConnection>;
   readonly store: ReturnType<typeof createStore>;
   readonly trpcClient: TrpcClient;
   readonly organizationId: string | null;
@@ -43,15 +44,24 @@ export const ExtensionAgentsProvider = ({
   const apiBaseUrl = getKiloApiBaseUrl();
   const sessionIngestWsUrl = getSessionIngestWsUrl();
 
-  // Create-once via lazy useRef — matching web's CloudAgentProvider pattern.
-  const ref = useRef<ExtensionAgentsContextValue | null>(null);
-  if (ref.current === null) {
+  // Refresh scope-bound resources without remounting BrowserTaskProvider or losing its disposal barrier.
+  const ref = useRef<{
+    auth: StoredAuth;
+    context: ExtensionAgentsContextValue;
+  } | null>(null);
+  if (
+    ref.current === null ||
+    ref.current.auth.token !== auth.token ||
+    ref.current.auth.userEmail !== auth.userEmail ||
+    ref.current.context.organizationId !== organizationId
+  ) {
     const store = createStore();
     const getToken = (): string | undefined => auth.token;
 
     const trpcClient = createExtensionTrpcClient({ apiBaseUrl, getToken });
 
     const userWebConnection = createUserWebConnection({
+      browserProvider: true,
       getAuthToken: async () => {
         const tokenResult = await trpcClient.activeSessions.createWebTicket.mutate();
         return tokenResult.token;
@@ -69,20 +79,30 @@ export const ExtensionAgentsProvider = ({
       userWebConnection,
     });
 
-    ref.current = { manager, organizationId, store, trpcClient, userWebConnection };
+    ref.current = {
+      auth,
+      context: { manager, organizationId, store, trpcClient, userWebConnection },
+    };
   }
 
-  useEffect(() => {
-    const { userWebConnection: uwc } = ref.current!;
-    const release = uwc.retain();
-    return release;
-  }, []);
+  const { context } = ref.current;
+  useEffect(() => context.userWebConnection.retain(), [context]);
 
   return (
-    <JotaiProvider store={ref.current.store}>
-      <ExtensionAgentsContext.Provider value={ref.current}>
+    <ExtensionAgentsContext.Provider value={context}>
+      <BrowserTaskProvider
+        auth={auth}
+        connection={context.userWebConnection}
+        organizationId={organizationId ?? undefined}
+      >
         {children}
-      </ExtensionAgentsContext.Provider>
-    </JotaiProvider>
+      </BrowserTaskProvider>
+    </ExtensionAgentsContext.Provider>
   );
+};
+
+/** Only Agents descendants use the manager's store. Browser producers use getDefaultStore(). */
+export const ExtensionAgentsStore = ({ children }: { children: ReactNode }): JSX.Element => {
+  const { store } = useExtensionAgents();
+  return <JotaiProvider store={store}>{children}</JotaiProvider>;
 };

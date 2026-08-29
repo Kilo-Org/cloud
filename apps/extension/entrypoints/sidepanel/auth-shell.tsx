@@ -1,4 +1,4 @@
-/* eslint-disable import/max-dependencies */
+/* eslint-disable import/max-dependencies, max-lines -- Settings keeps delegated supervision inside its existing overlay. */
 import { storage } from '#imports';
 import { useAtom } from 'jotai';
 import { useEffect, useState } from 'react';
@@ -24,6 +24,8 @@ import {
   resolveAnalyticsOptOutIdentity,
   shouldShowFirefoxUsageDataHint,
 } from './analytics-settings-logic';
+import { BrowserTaskSettings } from './browser-task-controls';
+import { BrowserTaskSupervisionSlot } from './browser-task-supervision-slot';
 import { MemorySettings } from './memory-settings';
 import { OrganizationCreditAccountSelect } from './organization-credit-account';
 import { RemoteMcpSettings } from './remote-mcp-settings';
@@ -194,7 +196,12 @@ const HeaderActions = ({
               <X aria-hidden="true" className="size-4" />
             </button>
           </div>
+          <BrowserTaskSupervisionSlot />
           <div className="agent-conversation-scrollbar grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4 py-4">
+            <BrowserTaskSettings
+              auth={auth}
+              organizationId={selectedOrganizationId === '' ? undefined : selectedOrganizationId}
+            />
             <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
               <p className="type-label text-foreground-muted">Signed in</p>
               <p className="type-body mt-1 truncate text-foreground">

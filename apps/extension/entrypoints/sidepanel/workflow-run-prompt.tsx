@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import type { AgentWorkflowParam } from '@/src/shared/agent-workflows';
+import { BrowserTaskSupervisionSlot } from './browser-task-supervision-slot';
 
 const secondaryButtonClass =
   'type-label h-8 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background';
@@ -48,7 +49,12 @@ export const WorkflowRunPrompt = ({
       role="dialog"
     >
       <div className="flex max-h-full w-full max-w-sm flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-surface-raised p-3 shadow-lg shadow-black/50">
-        <p className="type-body font-semibold text-foreground">Run “{name}”</p>
+        <div className="sticky top-0 z-10 shrink-0 bg-surface-raised">
+          <BrowserTaskSupervisionSlot />
+        </div>
+        <p className="type-body break-words font-semibold text-foreground [overflow-wrap:anywhere]">
+          Run “{name}”
+        </p>
         {params.map(param => (
           <label className="flex flex-col gap-1" key={param.name}>
             <span className="type-label text-foreground-muted">

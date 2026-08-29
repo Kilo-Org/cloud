@@ -9,8 +9,9 @@ import type { SidePanelMode } from '@/src/shared/side-panel-mode';
 import { AgentChatPanel } from './agent-chat-panel';
 import { AgentsMode } from './agents-mode';
 import { AgentsModeSwitch } from './agents-mode-switch';
-import { ExtensionAgentsProvider } from './agents-provider';
+import { ExtensionAgentsProvider, ExtensionAgentsStore } from './agents-provider';
 import { Shell } from './auth-shell';
+import { BrowserTaskControls, BrowserTaskSurface } from './browser-task-controls';
 import { useOrganizationCreditAccount } from './organization-credit-account';
 import { PendingMemorySaveCard } from './pending-memory-save-card';
 import { PendingWorkflowSaveCard } from './pending-workflow-save-card';
@@ -169,36 +170,33 @@ export const SignedInView = ({
   const agentsOrgId = normalizeOrganizationId(selectedOrganizationId);
 
   return (
-    <Shell
-      auth={auth}
-      headerBeforeSettings={mode === 'browser' ? headerBeforeSettings : undefined}
-      onOrganizationChange={selectOrganization}
-      onSignOut={onSignOut}
-      organizationOptions={organizationOptions}
-      selectedOrganizationId={selectedOrganizationId}
-    >
-      <AgentsModeSwitch mode={mode} onModeChange={handleModeChange} />
-      {mode === 'browser' ? (
-        <>
+    <ExtensionAgentsProvider auth={auth} organizationId={agentsOrgId}>
+      <BrowserTaskSurface>
+        <Shell
+          auth={auth}
+          headerBeforeSettings={mode === 'browser' ? headerBeforeSettings : undefined}
+          onOrganizationChange={selectOrganization}
+          onSignOut={onSignOut}
+          organizationOptions={organizationOptions}
+          selectedOrganizationId={selectedOrganizationId}
+        >
+          <AgentsModeSwitch mode={mode} onModeChange={handleModeChange} />
+          <BrowserTaskControls />
           <PendingMemorySaveCard />
           <PendingWorkflowSaveCard />
-        </>
-      ) : null}
-      <AgentChatPanel
-        auth={auth}
-        isVisible={mode === 'browser'}
-        onHeaderBeforeSettingsChange={setHeaderBeforeSettings}
-        organizationId={selectedOrganizationId === '' ? undefined : selectedOrganizationId}
-      />
-      {mode === 'browser' ? null : (
-        <ExtensionAgentsProvider
-          auth={auth}
-          key={`${auth.token}:${selectedOrganizationId}`}
-          organizationId={agentsOrgId}
-        >
-          <AgentsMode />
-        </ExtensionAgentsProvider>
-      )}
-    </Shell>
+          <AgentChatPanel
+            auth={auth}
+            isVisible={mode === 'browser'}
+            onHeaderBeforeSettingsChange={setHeaderBeforeSettings}
+            organizationId={selectedOrganizationId === '' ? undefined : selectedOrganizationId}
+          />
+          {mode === 'browser' ? null : (
+            <ExtensionAgentsStore key={`${auth.token}:${auth.userEmail ?? ''}:${agentsOrgId}`}>
+              <AgentsMode />
+            </ExtensionAgentsStore>
+          )}
+        </Shell>
+      </BrowserTaskSurface>
+    </ExtensionAgentsProvider>
   );
 };

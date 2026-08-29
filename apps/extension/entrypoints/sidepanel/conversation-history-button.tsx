@@ -5,6 +5,7 @@ import type { CSSProperties, JSX } from 'react';
 import { getStoredConversationTitle, isStoredConversationOpen } from './agent-conversation-storage';
 import type { StoredAgentConversation } from './agent-conversation-storage';
 import type { StoredAgentConversationStore } from '@/src/shared/agent-conversation-tabs';
+import { BrowserTaskSupervisionSlot } from './browser-task-supervision-slot';
 
 const historyPageSize = 100;
 
@@ -110,6 +111,9 @@ export const ConversationHistoryButton = ({
             >
               <X aria-hidden="true" className="size-4" />
             </button>
+          </div>
+          <div className="sticky top-14 z-10 shrink-0 bg-surface-raised">
+            <BrowserTaskSupervisionSlot />
           </div>
           <div className="px-3 py-3">
             {conversations.length === 0 ? (

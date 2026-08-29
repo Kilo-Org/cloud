@@ -8,6 +8,7 @@ import {
   isGatewayModelId,
   modelRowDisplayId,
 } from '@/src/shared/model-picker-rows';
+import { BrowserTaskSupervisionSlot } from './browser-task-supervision-slot';
 import { ModelPickerModelRow } from './model-picker-row';
 import { useModelPreferences } from './use-model-preferences';
 
@@ -44,8 +45,9 @@ export const ModelPicker = ({
   const selectedOption = modelOptions.find(option => option.id === model);
   // Always show the conversation's own model: its name when the catalog has it, its raw id
   // While the catalog is missing or stale. 'Loading models...' means no model is stored yet.
+  const emptyLabel = modelOptions.length === 0 ? 'Loading models...' : 'Select model';
   const triggerLabel =
-    selectedOption?.name ?? (model === '' ? 'Loading models...' : modelRowDisplayId(model));
+    selectedOption?.name ?? (model === '' ? emptyLabel : modelRowDisplayId(model));
 
   const rows = useMemo(
     () =>
@@ -119,6 +121,9 @@ export const ModelPicker = ({
             </button>
           </div>
 
+          <div className="sticky top-14 z-10 shrink-0 bg-surface-raised">
+            <BrowserTaskSupervisionSlot />
+          </div>
           <div className="border-b border-border px-3 py-3">
             <input
               aria-label="Search models"

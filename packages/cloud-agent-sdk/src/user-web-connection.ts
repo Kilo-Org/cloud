@@ -151,8 +151,11 @@ type BrowserProviderConnection = {
   registerBrowserProvider: (input: BrowserProviderRegistration) => Promise<BrowserProviderLease>;
   /** Renews the current lease and reconciles only its generation. */
   heartbeatBrowserProvider: (cursor?: string) => Promise<BrowserProviderSnapshot>;
-  /** Reads history with the stable proof, even without registration. Never authorizes execution. */
-  requestBrowserProviderStatus: (cursor?: string) => Promise<BrowserProviderStatusResult>;
+  /** Reads history without execution authority. Explicit proof is used only for this request. */
+  requestBrowserProviderStatus: (
+    cursor?: string,
+    identity?: Pick<BrowserProviderRegistration, 'providerId' | 'providerProof'>
+  ) => Promise<BrowserProviderStatusResult>;
   /** Sends consent only. Wait for a running snapshot before starting browser actions. */
   approveBrowserProviderJob: (input: BrowserProviderApprovalInput) => void;
   cancelBrowserProviderJob: (input: BrowserProviderCancelInput) => void;
@@ -535,15 +538,17 @@ function createUserWebConnection(
   }
 
   async function requestBrowserProviderStatus(
-    cursor?: string
+    cursor?: string,
+    identity?: Pick<BrowserProviderRegistration, 'providerId' | 'providerProof'>
   ): Promise<BrowserProviderStatusResult> {
     requireProviderSocket();
-    if (!providerRegistration) throw new BrowserProviderError('provider_unavailable', true);
+    const provider = identity ?? providerRegistration;
+    if (!provider) throw new BrowserProviderError('provider_unavailable', true);
     const wire = validateProviderMessage({
       type: 'provider_status',
       requestId: cloudAgentSdkRuntime.randomUUID(),
-      providerId: providerRegistration.providerId,
-      providerProof: providerRegistration.providerProof,
+      providerId: provider.providerId,
+      providerProof: provider.providerProof,
       ...(cursor === undefined ? {} : { cursor }),
     });
     if (wire.type !== 'provider_status') throw new BrowserProviderError('invalid_request', false);

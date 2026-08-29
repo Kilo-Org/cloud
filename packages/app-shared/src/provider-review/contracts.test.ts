@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { CODE_REVIEW_PLATFORMS } from '../code-review/enums';
 import { normalizeLegacyGitHubReviewRepository } from '../code-review/repository-identity';
 import {
@@ -17,6 +17,8 @@ import {
   reviewPageKey,
   reviewResourceKey,
   serializeReviewWriteRequest,
+  type ReviewFile,
+  type ReviewOverview,
   type ReviewPageScope,
 } from './contracts';
 import {
@@ -48,6 +50,28 @@ const unresolved = {
 };
 
 describe('normalized provider review contracts', () => {
+  // The package typecheck in CI validates these fixtures and type assertions.
+  const lineCountFixtures: { additions: number | null; deletions: number | null }[] = [
+    { additions: null, deletions: null },
+    { additions: 0, deletions: 0 },
+    { additions: 8, deletions: 3 },
+    { additions: null, deletions: 3 },
+    { additions: 8, deletions: null },
+  ];
+
+  it('accepts unavailable and confirmed file line counts without widening the contract', () => {
+    expectTypeOf(lineCountFixtures).toEqualTypeOf<Pick<ReviewFile, 'additions' | 'deletions'>[]>();
+  });
+
+  it('accepts unavailable overview line counts while keeping commits and files numeric', () => {
+    const overviewCountFixtures = lineCountFixtures.map(counts => ({
+      commits: 1,
+      files: 2,
+      ...counts,
+    }));
+    expectTypeOf(overviewCountFixtures).toEqualTypeOf<ReviewOverview['counts'][]>();
+  });
+
   it.each(CODE_REVIEW_PLATFORMS)('isolates %s pages from other providers and owners', provider => {
     for (const review of Object.values(providerReviewFixtures[provider])) {
       if (review === null) continue;

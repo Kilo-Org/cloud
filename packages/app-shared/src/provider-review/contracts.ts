@@ -259,8 +259,9 @@ export type ReviewFile = {
   status: 'added' | 'deleted' | 'modified' | 'renamed' | 'copied' | 'changed';
   patch: string | null;
   content: 'available' | 'binary' | 'truncated' | 'unavailable';
-  additions: number;
-  deletions: number;
+  // Line additions/deletions: null means unavailable; numeric zero means confirmed zero.
+  additions: number | null;
+  deletions: number | null;
   canonicalUrl: string | null;
 };
 export type ReviewFileContext = {
@@ -306,7 +307,8 @@ export type ReviewOverview = {
   authorization: ReviewAuthorizationContext;
   providerState: z.infer<typeof ProviderReviewStateSchema>;
   checks: z.infer<typeof ReviewChecksSchema>;
-  counts: { commits: number; files: number; additions: number; deletions: number };
+  // Line additions/deletions: null means unavailable; numeric zero means confirmed zero.
+  counts: { commits: number; files: number; additions: number | null; deletions: number | null };
   merge: {
     methods: { id: string; label: string }[];
     squash: 'required' | 'optional' | 'forbidden' | null;

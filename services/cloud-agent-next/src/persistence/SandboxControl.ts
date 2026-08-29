@@ -1529,6 +1529,17 @@ export class SandboxControl extends DurableObject<Env> {
       if (physical.state === 'failed') {
         physical = await this.releaseIfAuthoritativelyDead(physical);
       }
+      if (
+        this.providerKind === 'vercel' &&
+        physical.state === 'unknown' &&
+        physical.stopTombstone &&
+        physical.stopTombstone.attempts >= DEADLINE_MS.stopAttemptLadder.length &&
+        Date.now() >= physical.stopTombstone.createdAt + DEADLINE_MS.reconciliationWindow
+      ) {
+        const observed = await this.observeCurrentProvider(physical);
+        if (!sameAllocation(physical, observed)) return;
+        physical = observed;
+      }
       if (physical.state !== 'stopped') {
         throw new Error('Sandbox credential revocation is pending');
       }

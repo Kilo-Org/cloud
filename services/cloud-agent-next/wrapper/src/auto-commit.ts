@@ -10,6 +10,7 @@ const GIT_LOCAL_TIMEOUT_MS = 30_000;
 const GIT_PUSH_TIMEOUT_MS = 60_000;
 /** Timeout for commit message generation API call */
 const COMMIT_MESSAGE_TIMEOUT_MS = 30_000;
+const worktreeAutoCommits = new Map<string, Promise<void>>();
 
 function appendCommitCoAuthor(
   commitMessage: string,
@@ -84,10 +85,29 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
   const { workspacePath, onEvent, kiloClient, messageId, signal, env } = opts;
   const redact = createSecretRedactor(process.env, env ?? {});
   const logToFile = (message: string): void => writeLog(redact(message));
+  const released = Promise.withResolvers<void>();
+  const previous = worktreeAutoCommits.get(workspacePath) ?? Promise.resolve();
+  const current = previous
+    .then(() => released.promise)
+    .finally(() => {
+      if (worktreeAutoCommits.get(workspacePath) === current)
+        worktreeAutoCommits.delete(workspacePath);
+    });
+  worktreeAutoCommits.set(workspacePath, current);
 
   logToFile(`auto-commit: starting workspacePath=${workspacePath}`);
 
   try {
+    signal?.throwIfAborted();
+    const cancelled = Promise.withResolvers<never>();
+    const onAbort = () => cancelled.reject(signal?.reason);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    try {
+      await Promise.race([previous, cancelled.promise]);
+    } finally {
+      signal?.removeEventListener('abort', onAbort);
+    }
+    signal?.throwIfAborted();
     // Check current branch (agent may have switched branches during execution)
     const branch = await getCurrentBranch(workspacePath, GIT_LOCAL_TIMEOUT_MS, signal, env);
     logToFile(`auto-commit: branch=${branch || '(detached HEAD)'}`);
@@ -299,5 +319,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
       messageId
     );
     return { success: false, error: errorMsg };
+  } finally {
+    released.resolve();
   }
 }

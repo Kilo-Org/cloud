@@ -4115,6 +4115,179 @@ describe('SandboxControl native worktree containment', () => {
     }
   });
 
+  it('observes terminal Vercel cleanup at credential expiry after the reconciliation cutoff', async () => {
+    const { control, registration, vercel } = await credentialFixture('vercel');
+    const start = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(start);
+    try {
+      await readyAttachment(control, credentialInput(registration));
+      vercel.runtime.failStop = true;
+      await control.beginStop('environment_failed');
+      for (let attempt = 0; attempt < DEADLINE_MS.stopAttemptLadder.length; attempt++) {
+        await fireControlDeadline(control, 'stopAttempt');
+      }
+      const retired = await control.getPhysicalRecord();
+      expect(retired).toMatchObject({ state: 'unknown', stopTombstone: { attempts: 5 } });
+      clock.mockReturnValue(start + DEADLINE_MS.reconciliationWindow);
+      await fireControlDeadline(control, 'reconciliation');
+      const expiry = await credentialExpiryDeadline(control);
+      if (expiry === undefined) throw new Error('Missing credential expiry');
+      await runInDurableObject(control, async (instance, state) => {
+        expect(await loadDeadlines(state.storage)).toEqual({ credentialExpiry: expiry });
+        const provider = {
+          ...vercel.provider,
+          observe: vi.fn<ProviderAdapter['observe']>(async () => ({ status: 'terminal' })),
+          stop: vi.fn<ProviderAdapter['stop']>(async () => 'retryable'),
+        };
+        Object.assign(instance, { provider });
+        clock.mockReturnValue(expiry);
+        await instance.alarm();
+        expect(await instance.getPhysicalRecord()).toMatchObject({
+          state: 'stopped',
+          providerRef: null,
+          createIntent: null,
+          stopTombstone: null,
+        });
+        expect(provider.observe).toHaveBeenCalledExactlyOnceWith(
+          retired.providerRef,
+          retired.createIntent
+        );
+        expect(provider.stop).not.toHaveBeenCalled();
+        expect(await loadSessionCredentialGrants(state.storage)).toEqual([]);
+        expect(await state.storage.get('credential_policy_dirty')).toBeUndefined();
+        expect(await loadDeadlines(state.storage)).toEqual({});
+        expect(await state.storage.getAlarm()).toBeNull();
+      });
+      expect(vercel.runtime.creates).toBe(1);
+      expect(vercel.runtime.launches).toHaveLength(1);
+      expect(vercel.runtime.stoppedSessions).toEqual([]);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it.each(['active', 'unknown', 'error'] as const)(
+    'keeps Vercel credential expiry fail-closed after the cutoff when observation is %s',
+    async observation => {
+      const { control, registration, vercel } = await credentialFixture('vercel');
+      const start = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(start);
+      try {
+        await readyAttachment(control, credentialInput(registration));
+        const grants = await storedGrants(control);
+        vercel.runtime.failStop = true;
+        await control.beginStop('environment_failed');
+        for (let attempt = 0; attempt < DEADLINE_MS.stopAttemptLadder.length; attempt++) {
+          await fireControlDeadline(control, 'stopAttempt');
+        }
+        const retired = await control.getPhysicalRecord();
+        expect(retired).toMatchObject({ state: 'unknown', stopTombstone: { attempts: 5 } });
+        clock.mockReturnValue(start + DEADLINE_MS.reconciliationWindow);
+        await fireControlDeadline(control, 'reconciliation');
+        const expiry = await credentialExpiryDeadline(control);
+        if (expiry === undefined) throw new Error('Missing credential expiry');
+        await runInDurableObject(control, async (instance, state) => {
+          const provider = {
+            ...vercel.provider,
+            observe: vi.fn<ProviderAdapter['observe']>(async () => {
+              if (observation === 'error') throw new Error('Provider observation unavailable');
+              return { status: observation };
+            }),
+            stop: vi.fn<ProviderAdapter['stop']>(async () => 'terminal'),
+            updateNetworkPolicy: vi.fn(async () => undefined),
+          };
+          Object.assign(instance, { provider });
+          clock.mockReturnValue(expiry);
+          await instance.alarm();
+          expect(await instance.getPhysicalRecord()).toEqual(retired);
+          expect(await loadSessionCredentialGrants(state.storage)).toEqual(grants);
+          expect(await state.storage.get('credential_policy_dirty')).toBe(true);
+          expect(await loadDeadlines(state.storage)).toEqual({
+            credentialExpiry: expiry + DEADLINE_MS.reconciliation,
+          });
+          expect(await state.storage.getAlarm()).toBe(expiry + DEADLINE_MS.reconciliation);
+          expect(provider.observe).toHaveBeenCalledExactlyOnceWith(
+            retired.providerRef,
+            retired.createIntent
+          );
+          expect(provider.stop).not.toHaveBeenCalled();
+          expect(provider.updateNetworkPolicy).not.toHaveBeenCalled();
+        });
+        expect(vercel.runtime.creates).toBe(1);
+        expect(vercel.runtime.launches).toHaveLength(1);
+        expect(vercel.runtime.stoppedSessions).toEqual([]);
+      } finally {
+        clock.mockRestore();
+      }
+    }
+  );
+
+  it.each(['terminal', 'error'] as const)(
+    'fences a late Vercel credential-expiry observation %s from a replacement allocation',
+    async observation => {
+      const { control, registration, vercel } = await credentialFixture('vercel');
+      const start = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(start);
+      try {
+        await readyAttachment(control, credentialInput(registration));
+        vercel.runtime.failStop = true;
+        await control.beginStop('environment_failed');
+        for (let attempt = 0; attempt < DEADLINE_MS.stopAttemptLadder.length; attempt++) {
+          await fireControlDeadline(control, 'stopAttempt');
+        }
+        const retired = await control.getPhysicalRecord();
+        clock.mockReturnValue(start + DEADLINE_MS.reconciliationWindow);
+        await fireControlDeadline(control, 'reconciliation');
+        const expiry = await credentialExpiryDeadline(control);
+        if (expiry === undefined) throw new Error('Missing credential expiry');
+        await runInDurableObject(control, async (instance, state) => {
+          let replacement: PhysicalRecord | undefined;
+          let replacementGrants: SessionCredentialGrant[] | undefined;
+          let replacementDeadlines: DeadlineTable | undefined;
+          let replacementAlarm: number | null | undefined;
+          const provider = {
+            ...vercel.provider,
+            observe: vi.fn<ProviderAdapter['observe']>(async () => {
+              await instance.confirmStopped();
+              replacement = await instance.claimCreate(
+                crypto.randomUUID(),
+                false,
+                `ses-${crypto.randomUUID().replaceAll('-', '')}`,
+                WORKTREE_CREDENTIAL_CONTAINMENT
+              );
+              await instance.prepareSessionCredentials(credentialInput(registration));
+              replacementGrants = await loadSessionCredentialGrants(state.storage);
+              replacementDeadlines = await loadDeadlines(state.storage);
+              replacementAlarm = await state.storage.getAlarm();
+              if (observation === 'error') throw new Error('Old provider observation unavailable');
+              return { status: observation };
+            }),
+            stop: vi.fn<ProviderAdapter['stop']>(async () => 'terminal'),
+          };
+          Object.assign(instance, { provider });
+          clock.mockReturnValue(expiry);
+          await instance.alarm();
+          expect(replacement).toMatchObject({ state: 'creating', stopTombstone: null });
+          expect(await instance.getPhysicalRecord()).toEqual(replacement);
+          expect(await loadSessionCredentialGrants(state.storage)).toEqual(replacementGrants);
+          expect(await state.storage.get('credential_policy_dirty')).toBe(true);
+          expect(await loadDeadlines(state.storage)).toEqual(replacementDeadlines);
+          expect(await state.storage.getAlarm()).toBe(replacementAlarm);
+          expect(provider.observe).toHaveBeenCalledExactlyOnceWith(
+            retired.providerRef,
+            retired.createIntent
+          );
+          expect(provider.stop).not.toHaveBeenCalled();
+        });
+        expect(vercel.runtime.creates).toBe(1);
+        expect(vercel.runtime.launches).toHaveLength(1);
+        expect(vercel.runtime.stoppedSessions).toEqual([]);
+      } finally {
+        clock.mockRestore();
+      }
+    }
+  );
+
   it.each(['resolve', 'reject'] as const)(
     'does not retire a replacement allocation after a late Vercel policy %s',
     async completion => {

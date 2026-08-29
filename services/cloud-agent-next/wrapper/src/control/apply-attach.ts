@@ -144,15 +144,27 @@ async function defaultRunSetup(
 
 async function serializeWorkspacePreparation(
   directory: string,
+  signal: AbortSignal,
   prepare: () => Promise<ControlHandlerResult | undefined>
 ): Promise<ControlHandlerResult | undefined> {
+  const cancelled = Promise.withResolvers<never>();
+  const onAbort = () => cancelled.reject(signal.reason);
+  const run = () => {
+    signal.removeEventListener('abort', onAbort);
+    signal.throwIfAborted();
+    return prepare();
+  };
   const previous = workspacePreparations.get(directory) ?? Promise.resolve();
-  const current = previous.then(prepare, prepare);
-  workspacePreparations.set(directory, current);
-  try {
-    return await current;
-  } finally {
+  const current = previous.then(run, run).finally(() => {
     if (workspacePreparations.get(directory) === current) workspacePreparations.delete(directory);
+  });
+  workspacePreparations.set(directory, current);
+  signal.addEventListener('abort', onAbort, { once: true });
+  if (signal.aborted) onAbort();
+  try {
+    return await Promise.race([current, cancelled.promise]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
   }
 }
 
@@ -275,7 +287,7 @@ export async function applySessionAttach(
       ...(attach.git?.token ? { GIT_TOKEN: attach.git.token } : {}),
     });
 
-    const workspaceFailure = await serializeWorkspacePreparation(directory, async () => {
+    const workspaceFailure = await serializeWorkspacePreparation(directory, signal, async () => {
       try {
         signal.throwIfAborted();
         const alreadyBootstrapped = await hasBootstrapMarker(directory);

@@ -27,7 +27,13 @@ vi.mock('../../../wrapper/src/utils.js', async () => {
 });
 
 // Import mocked functions so we can configure per-test return values
-import { git, getCurrentBranch, hasGitUpstream, logToFile } from '../../../wrapper/src/utils.js';
+import {
+  git,
+  getCurrentBranch,
+  hasGitUpstream,
+  logToFile,
+  withTimeoutAndAbort,
+} from '../../../wrapper/src/utils.js';
 
 const mockGetCurrentBranch = vi.mocked(getCurrentBranch);
 const mockHasGitUpstream = vi.mocked(hasGitUpstream);
@@ -503,6 +509,196 @@ describe('runAutoCommit', () => {
     const completed = events.find(e => e.streamEventType === 'autocommit_completed');
     expect(completed?.data.message).toContain('https://[REDACTED]@github.com/acme/repo.git');
     expect(completed?.data.message).not.toContain('user-secret');
+  });
+
+  it('cancels queued auto-commit without releasing its predecessor or blocking other worktrees', async () => {
+    const workspacePath = '/workspace/shared';
+    const otherDirectory = '/workspace/other';
+    const dirty = new Set([workspacePath, otherDirectory]);
+    const pushing = Promise.withResolvers<void>();
+    const stopped = Promise.withResolvers<Utils.ExecResult>();
+    const controllers = [new AbortController(), new AbortController(), new AbortController()];
+    const first = createOpts({ workspacePath, signal: controllers[0].signal });
+    const cancelled = createOpts({ workspacePath, signal: controllers[1].signal });
+    const next = createOpts({ workspacePath, signal: controllers[2].signal });
+    const other = createOpts({ workspacePath: otherDirectory });
+    const pending: ReturnType<typeof runAutoCommit>[] = [];
+    let firstSettled = false;
+    let nextSettled = false;
+    mockGetCurrentBranch.mockResolvedValue('work');
+    mockGit.mockImplementation(async (args, options) => {
+      const directory = options?.cwd ?? '';
+      if (args[0] === 'status') return ok(dirty.has(directory) ? ' M result.txt\n' : '');
+      if (args[0] === 'commit') dirty.delete(directory);
+      if (args[0] === 'rev-parse') return ok('abc1234');
+      if (args[0] === 'push' && directory === workspacePath) {
+        pushing.resolve();
+        return stopped.promise;
+      }
+      return ok();
+    });
+    try {
+      const firstCommit = runAutoCommit(first.opts).then(result => {
+        firstSettled = true;
+        return result;
+      });
+      pending.push(firstCommit);
+      await pushing.promise;
+      const cancelledCommit = runAutoCommit(cancelled.opts);
+      pending.push(cancelledCommit);
+      controllers[1].abort(new Error('Queued finalization cancelled'));
+      expect(
+        await withTimeoutAndAbort(cancelledCommit, {
+          timeoutMs: 1_000,
+          timeoutMessage: 'Queued auto-commit cancellation waited for its predecessor',
+          abortMessage: 'Test cancelled',
+        })
+      ).toEqual({ success: false, error: 'Queued finalization cancelled' });
+      expect(cancelled.events).toEqual([
+        expect.objectContaining({
+          streamEventType: 'autocommit_completed',
+          data: expect.objectContaining({ success: false }),
+        }),
+      ]);
+      const nextCommit = runAutoCommit(next.opts).then(result => {
+        nextSettled = true;
+        return result;
+      });
+      const otherCommit = runAutoCommit(other.opts);
+      pending.push(nextCommit, otherCommit);
+      expect(
+        await withTimeoutAndAbort(otherCommit, {
+          timeoutMs: 1_000,
+          timeoutMessage: 'Unrelated worktree auto-commit was blocked',
+          abortMessage: 'Test cancelled',
+        })
+      ).toEqual({ success: true });
+      expect(firstSettled).toBe(false);
+      expect(nextSettled).toBe(false);
+      expect(next.events).toEqual([]);
+
+      controllers[0].abort(new Error('Running finalization cancelled'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(firstSettled).toBe(false);
+      expect(nextSettled).toBe(false);
+      stopped.resolve({ ...ok(), exitCode: 124, terminationReason: 'abort' });
+      await firstCommit;
+      expect(await nextCommit).toEqual({ success: true, skipped: true });
+      expect(cancelled.opts.kiloClient.generateCommitMessage).not.toHaveBeenCalled();
+      expect(next.opts.kiloClient.generateCommitMessage).not.toHaveBeenCalled();
+      expect(mockGetCurrentBranch.mock.calls.map(([directory]) => directory)).toEqual([
+        workspacePath,
+        otherDirectory,
+        workspacePath,
+      ]);
+    } finally {
+      for (const controller of controllers) controller.abort();
+      stopped.resolve({ ...ok(), exitCode: 124, terminationReason: 'abort' });
+      await Promise.allSettled(pending);
+      mockGit.mockReset();
+      mockGetCurrentBranch.mockReset();
+      mockHasGitUpstream.mockReset();
+    }
+  });
+
+  it('serializes same-worktree auto-commit through push and skips a clean sibling', async () => {
+    const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'shared-worktree-autocommit-'));
+    const workspacePath = path.join(root, 'workspace');
+    const remote = path.join(root, 'remote.git');
+    const home = path.join(root, 'home');
+    const env = { PATH: process.env.PATH, HOME: home };
+    const generating = Promise.withResolvers<void>();
+    const generated = Promise.withResolvers<{ message: string }>();
+    const pushing = Promise.withResolvers<void>();
+    const pushed = Promise.withResolvers<void>();
+    const controllers = [new AbortController(), new AbortController()];
+    const pending: ReturnType<typeof runAutoCommit>[] = [];
+    const first = createOpts({
+      workspacePath,
+      env,
+      messageId: 'first',
+      signal: controllers[0].signal,
+    });
+    const second = createOpts({
+      workspacePath,
+      env,
+      messageId: 'second',
+      signal: controllers[1].signal,
+    });
+    let secondSettled = false;
+    vi.mocked(first.opts.kiloClient.generateCommitMessage).mockImplementation(() => {
+      generating.resolve();
+      return generated.promise;
+    });
+    mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+    mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+    mockGit.mockImplementation(async (args, options) => {
+      if (args[0] === 'push') {
+        pushing.resolve();
+        await pushed.promise;
+      }
+      return actual.git(args, options);
+    });
+    const git = async (args: string[]) => {
+      const result = await actual.git(args, { cwd: workspacePath, env, inheritEnv: false });
+      expect(result.exitCode).toBe(0);
+      return result.stdout;
+    };
+    try {
+      await fs.mkdir(workspacePath);
+      await fs.mkdir(home);
+      await git(['init', '--bare', remote]);
+      await git(['init', '--initial-branch=work']);
+      await git(['config', 'user.name', 'Test Agent']);
+      await git(['config', 'user.email', 'test@example.com']);
+      await git(['config', 'commit.gpgsign', 'false']);
+      await git(['remote', 'add', 'origin', remote]);
+      await fs.writeFile(path.join(workspacePath, 'result.txt'), 'shared changes\n');
+
+      const firstCommit = runAutoCommit(first.opts);
+      pending.push(firstCommit);
+      await generating.promise;
+      const secondCommit = runAutoCommit(second.opts).then(result => {
+        secondSettled = true;
+        return result;
+      });
+      pending.push(secondCommit);
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(mockGetCurrentBranch).toHaveBeenCalledTimes(1);
+      expect(second.events).toEqual([]);
+      expect(secondSettled).toBe(false);
+
+      generated.resolve({ message: 'Commit shared changes' });
+      await pushing.promise;
+      expect(await git(['status', '--porcelain'])).toBe('');
+      expect(mockGetCurrentBranch).toHaveBeenCalledTimes(1);
+      expect(secondSettled).toBe(false);
+      pushed.resolve();
+      expect(await firstCommit).toEqual({ success: true });
+      expect(await secondCommit).toEqual({ success: true, skipped: true });
+      expect(second.events).toEqual([
+        expect.objectContaining({
+          streamEventType: 'autocommit_completed',
+          data: expect.objectContaining({ success: true, skipped: true, messageId: 'second' }),
+        }),
+      ]);
+      expect(await git(['--git-dir', remote, 'show', 'refs/heads/work:result.txt'])).toBe(
+        'shared changes\n'
+      );
+      expect(
+        (await git(['--git-dir', remote, 'rev-list', '--count', 'refs/heads/work'])).trim()
+      ).toBe('1');
+    } finally {
+      for (const controller of controllers) controller.abort();
+      generated.resolve({ message: 'Commit shared changes' });
+      pushed.resolve();
+      await Promise.allSettled(pending);
+      mockGit.mockReset();
+      mockGetCurrentBranch.mockReset();
+      mockHasGitUpstream.mockReset();
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it('commits and pushes with the isolated worktree environment instead of wrapper credentials', async () => {

@@ -11,7 +11,7 @@ import {
 } from '../../../src/shared/sandbox-control-protocol';
 import { createWrapperKiloClient, type WrapperKiloClient, type WrapperPty } from '../kilo-api';
 import { materializeMessageAttachments } from '../session-bootstrap';
-import { runProcess } from '../utils';
+import { runProcess, withTimeoutAndAbort } from '../utils';
 import { applySessionAttach } from './apply-attach';
 import { updateSessionSnapshots, unfilteredKiloEvents } from './feed';
 import {
@@ -2117,6 +2117,117 @@ describe('control finalization and compact', () => {
 });
 
 describe('control cancellation and attachments', () => {
+  it.each(['session.abort', 'session.detach'] as const)(
+    'cancels a queued sibling with %s without overtaking active preparation',
+    async operation => {
+      const sibling = { ...session, sessionId: 'ses_sibling', kiloSessionId: 'kilo_sibling' };
+      const next = { ...session, sessionId: 'ses_next', kiloSessionId: 'kilo_next' };
+      const started = Promise.withResolvers<AbortSignal>();
+      const siblingQueued = Promise.withResolvers<void>();
+      const nextQueued = Promise.withResolvers<void>();
+      const stopped = Promise.withResolvers<{ exitCode: number; stdout: string; stderr: string }>();
+      const setupCommands: string[] = [];
+      let markerWrites = 0;
+      let cancellationSettled = false;
+      const handlerDeps = deps({
+        emitPreparing: event => {
+          if (event.action !== 'attempt_started') return;
+          if (event.attemptId === 'sibling') siblingQueued.resolve();
+          if (event.attemptId === 'next') nextQueued.resolve();
+        },
+        applyAttach: (identity, payload, dependencies) =>
+          applySessionAttach(identity, payload, {
+            ...dependencies,
+            mkdir: async () => {},
+            hasBootstrapMarker: async () => false,
+            writeBootstrapMarker: async () => {
+              markerWrites += 1;
+            },
+            sessionExists: async () => true,
+            runSetup: async (command, _directory, _env, _output, signal) => {
+              setupCommands.push(command);
+              if (command === 'first') {
+                if (!signal) throw new Error('Expected preparation signal');
+                started.resolve(signal);
+                return stopped.promise;
+              }
+              return { exitCode: 0, stdout: '', stderr: '' };
+            },
+          }),
+      });
+      const attaching: ReturnType<typeof handleControlRequest>[] = [];
+      const attach = (identity: typeof session, command: string) => {
+        const request = handleControlRequest(
+          'session.attach',
+          identity,
+          {
+            kilo,
+            setupCommands: [command],
+            preparation: { attemptId: command, triggerMessageId: command },
+          },
+          handlerDeps
+        );
+        attaching.push(request);
+        return request;
+      };
+      const firstAttach = attach(session, 'first');
+      let cancellingFirst: ReturnType<typeof handleControlRequest> | undefined;
+      try {
+        const signal = await started.promise;
+        const siblingAttach = attach(sibling, 'sibling');
+        await siblingQueued.promise;
+        const cancelled = await withTimeoutAndAbort(
+          handleControlRequest(
+            operation,
+            sibling,
+            operation === 'session.abort' ? { messageId: 'sibling' } : {},
+            handlerDeps
+          ),
+          {
+            timeoutMs: 1_000,
+            timeoutMessage: 'Queued sibling cancellation waited for active preparation',
+            abortMessage: 'Test cancelled',
+          }
+        );
+        expect(cancelled).toMatchObject({ ok: true });
+        expect(await siblingAttach).toMatchObject({ ok: false });
+        expect(handlerDeps.tasks.has(sibling.kiloSessionId)).toBe(false);
+        expect(signal.aborted).toBe(false);
+        expect(buildHeartbeatPayload(handlerDeps).activeKiloSessions).toBe(1);
+
+        const nextAttach = attach(next, 'next');
+        await nextQueued.promise;
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(setupCommands).toEqual(['first']);
+        cancellingFirst = handleControlRequest(
+          'session.abort',
+          session,
+          { messageId: 'first' },
+          handlerDeps
+        ).then(result => {
+          cancellationSettled = true;
+          return result;
+        });
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(signal.aborted).toBe(true);
+        expect(cancellationSettled).toBe(false);
+        expect(handlerDeps.tasks.has(session.kiloSessionId)).toBe(true);
+        expect(setupCommands).toEqual(['first']);
+
+        stopped.resolve({ exitCode: 0, stdout: '', stderr: '' });
+        expect(await cancellingFirst).toMatchObject({ ok: true });
+        expect(await firstAttach).toMatchObject({ ok: false });
+        expect(await nextAttach).toEqual({ ok: true, result: { attached: true } });
+        expect(setupCommands).toEqual(['first', 'next']);
+        expect(markerWrites).toBe(1);
+      } finally {
+        const cancelled = cancelControlTasks(handlerDeps, 'Test cleanup');
+        stopped.resolve({ exitCode: 0, stdout: '', stderr: '' });
+        await Promise.allSettled([...attaching, cancellingFirst, cancelled]);
+      }
+    }
+  );
+
   it.each(['preparation', 'execution'])(
     'cancels owned %s before detaching its terminal',
     async phase => {

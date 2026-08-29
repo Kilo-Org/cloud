@@ -144,6 +144,11 @@ async function harness(
     async get<T>(key: string): Promise<T | undefined> {
       return structuredClone(records.get(key)) as T | undefined;
     },
+    async list(options?: { prefix?: string }) {
+      return new Map(
+        structuredClone([...records].filter(([key]) => key.startsWith(options?.prefix ?? '')))
+      );
+    },
     async put(key: string | Record<string, unknown>, value?: unknown) {
       if (typeof key === 'string') records.set(key, structuredClone(value));
       else
@@ -262,6 +267,7 @@ async function harness(
     .mockResolvedValue({ type: 'response', requestId: 'request_1', ok: true });
   const socket = {
     getConnectionIdentity: () => connection,
+    hasHandshakenSocket: () => connection !== null,
     closeAll: vi.fn(() => {
       connection = null;
     }),
@@ -563,6 +569,9 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(h.alarmAt).toBe(alarmAt);
     await expect(h.acquire(acquisition)).rejects.toThrow('acquisition expired');
     expect(h.allocations.size).toBe(1);
+    const receipts = structuredClone(h.records.get('acquisition_receipts'));
+    await h.control.eraseRecord({ preserveAcquisitionReceipts: true });
+    expect(h.records.get('acquisition_receipts')).toEqual(receipts);
     await h.control.eraseRecord();
     expect(h.records.has('acquisition_receipts')).toBe(false);
   });

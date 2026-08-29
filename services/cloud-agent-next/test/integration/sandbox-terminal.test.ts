@@ -469,6 +469,7 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
     });
   });
 
+  const messageId = createMessageId();
   const admission = await runInDurableObject(sessionStub, instance =>
     instance.createSessionWithInitialAdmission({
       identity: sessionIdentity,
@@ -476,14 +477,14 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
       agent: { mode: 'code', model: 'test-model' },
       workspace: { sandboxId, sandboxProvider: 'cloudflare' },
       message: {
-        initialTurn: { messageId: createMessageId(), type: 'prompt', prompt: 'Prepare workspace' },
+        initialTurn: { messageId, type: 'prompt', prompt: 'Prepare workspace' },
       },
     })
   );
   if (!admission.success) throw new Error(`Session admission failed: ${admission.error}`);
   await prepared.promise;
   await vi.waitFor(async () => {
-    await expect(sessionStub.getMessageResult(`msg_${identity}`)).resolves.toMatchObject({
+    await expect(sessionStub.getMessageResult(messageId)).resolves.toMatchObject({
       type: 'found',
       result: { status: 'running' },
     });

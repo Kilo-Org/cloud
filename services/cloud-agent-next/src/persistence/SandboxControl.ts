@@ -1327,7 +1327,7 @@ export class SandboxControl extends DurableObject<Env> {
       await this.ctx.storage.put(RUNTIME_DELETED_KEY, true);
       this.socketHandler.closeAll('Worktree deleted');
       await Promise.allSettled([...this.lifecycleOperations]);
-      await this.eraseRecord();
+      await this.eraseRecord({ preserveAcquisitionReceipts: true });
       await this.ctx.storage.deleteAlarm();
       for (const [worktreeId, receipt] of await loadWorktreeDeletionJournals(this.ctx.storage)) {
         if (receipt.resourcesCleaned) {
@@ -1818,7 +1818,7 @@ export class SandboxControl extends DurableObject<Env> {
     return next;
   }
 
-  async eraseRecord(): Promise<void> {
+  async eraseRecord(options?: { preserveAcquisitionReceipts: true }): Promise<void> {
     await eraseSandboxRecord(this.ctx.storage);
     await this.ctx.storage.delete([
       OWNER_ID_KEY,
@@ -1830,6 +1830,7 @@ export class SandboxControl extends DurableObject<Env> {
       BILLING_INPUT_KEY,
       CREDENTIAL_POLICY_DIRTY_KEY,
       PROVIDER_LOCATOR_KEY,
+      ...(options?.preserveAcquisitionReceipts ? [] : [ACQUISITION_RECEIPTS_KEY]),
     ]);
     this.vercelLocator = undefined;
     this.activeConnection = null;

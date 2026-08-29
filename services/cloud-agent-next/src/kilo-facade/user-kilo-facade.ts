@@ -25,7 +25,6 @@ import type {
 } from '../execution/types.js';
 import { getPgDb } from '../db/pg.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
-import type { UserId } from '../types/ids.js';
 import type { Env } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
@@ -837,7 +836,7 @@ async function admitBasicPrompt(params: {
     ...(parsed.prompt.agent ? { agent: parsed.prompt.agent } : {}),
   } satisfies QueueExecutionTurnCommand;
   const request: SubmittedSessionMessageRequest = {
-    userId: params.userId as UserId,
+    userId: params.userId,
     ...command,
   };
   const admitPrompt = params.deps?.admitPrompt ?? defaultAdmitPrompt;

@@ -42,7 +42,6 @@ import {
   type EventSourceId,
   type EventId,
   type SessionId,
-  type UserId,
 } from '../types/ids.js';
 import type {
   ExecutionMetadata,
@@ -1119,7 +1118,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     return {
       sessionId: metadata.identity.sessionId as SessionId,
-      userId: metadata.identity.userId as UserId,
+      userId: metadata.identity.userId,
       orgId: metadata.identity.orgId,
       sandboxId,
       kiloSessionId: metadata.auth.kiloSessionId,
@@ -2608,7 +2607,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const initialTurn = input.message.initialTurn;
     const admitInitialTurn = () =>
       this.getSessionMessageQueue().admitAcceptedMessage({
-        userId: input.identity.userId as UserId,
+        userId: input.identity.userId,
         botId: input.identity.botId,
         turn: initialTurn,
         agent: input.agent,

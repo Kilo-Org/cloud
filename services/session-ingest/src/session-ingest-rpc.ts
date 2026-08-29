@@ -521,10 +521,11 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     const sessions: CloudAgentRootSessionSummary[] = [];
     for (const row of rows) {
       if (!row.cloudAgentSessionId) continue;
+      const title: string | null = row.title;
       sessions.push({
         kiloSessionId: row.kiloSessionId,
         cloudAgentSessionId: row.cloudAgentSessionId,
-        title: row.title?.slice(0, MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS) ?? null,
+        title: title?.slice(0, MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS) ?? null,
         created: databaseTimestampToMilliseconds(row.createdAt),
         updated: databaseTimestampToMilliseconds(row.updatedAt),
       });

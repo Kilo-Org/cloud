@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import { TRPCError } from '@trpc/server';
+import { Octokit } from '@octokit/rest';
 import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -77,6 +78,8 @@ type OctokitMock = {
   git: { deleteRef: jest.Mock };
   repos: {
     get: jest.Mock;
+    getBranchProtection: jest.Mock;
+    getBranchRules: jest.Mock;
     listCommitStatusesForRef: jest.Mock;
   };
   checks: {
@@ -112,6 +115,7 @@ function buildOctokit(token: string): OctokitMock {
   const existing = tokenOctokits.get(token);
   if (existing) return existing;
   const checks = { listForRef: jest.fn() };
+  const policyClient = new Octokit();
   const octokit: OctokitMock = {
     __token: token,
     pulls: {
@@ -128,13 +132,23 @@ function buildOctokit(token: string): OctokitMock {
     git: { deleteRef: jest.fn() },
     repos: {
       get: jest.fn(),
+      getBranchProtection: jest.fn().mockResolvedValue({
+        status: 200,
+        data: { required_linear_history: { enabled: true } },
+      }),
+      getBranchRules: Object.assign(
+        jest.fn().mockResolvedValue({ status: 200, headers: {}, data: [] }),
+        policyClient.repos.getBranchRules
+      ),
       listCommitStatusesForRef: jest.fn(),
     },
     checks,
-    // listChecks calls paginate(checks.listForRef, …) then
-    // paginate(repos.listCommitStatusesForRef, …); dispatch on the method.
-    paginate: jest.fn(async (method: unknown) =>
-      method === checks.listForRef ? checkRunsFixture : commitStatusesFixture
+    // Keep legacy listChecks fixtures separate from installed policy pagination.
+    paginate: Object.assign(
+      jest.fn(async (method: unknown) =>
+        method === checks.listForRef ? checkRunsFixture : commitStatusesFixture
+      ),
+      { iterator: policyClient.paginate.iterator }
     ),
     request: jest.fn(),
   };
@@ -1339,7 +1353,7 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
       jest.restoreAllMocks();
     });
 
-    it('enriches people, labels, reviews, and issues without claiming unattached readers are empty', async () => {
+    it('enriches people, reviews, issues, and policies without claiming unattached readers are empty', async () => {
       const result = await caller.getPullRequestContext(contextInput);
       expect(result.revision).toEqual(revision);
       expect(result.labels).toMatchObject({
@@ -1361,15 +1375,18 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
           source: { availability: 'available' },
         });
       }
-      for (const collection of [result.requirements, result.checks]) {
-        expect(collection).toMatchObject({
-          items: [],
-          completeness: 'unknown',
-          totalCount: null,
-          hasNextPage: null,
-          source: { availability: 'unavailable', reason: 'not-requested' },
-        });
-      }
+      expect(result.requirements).toMatchObject({
+        items: [{ kind: 'branch_protection', state: 'unavailable' }],
+        completeness: 'complete',
+        source: { availability: 'available' },
+      });
+      expect(result.checks).toMatchObject({
+        items: [],
+        completeness: 'unknown',
+        totalCount: null,
+        hasNextPage: null,
+        source: { availability: 'unavailable', reason: 'not-requested' },
+      });
       expect(result.queue).toMatchObject({
         membership: { state: 'unknown', source: { availability: 'unavailable' } },
         position: { value: null, source: { availability: 'unavailable' } },
@@ -1541,7 +1558,10 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
         second.request.mockResolvedValue(contextEnvelope(revision, 'rotated'));
         const result = await caller.getPullRequestContext(contextInput);
         expect(result.labels.items[0]?.name).toBe('rotated');
-        expect(result.requirements.source.reason).toBe('not-requested');
+        expect(result.requirements).toMatchObject({
+          items: [{ kind: 'branch_protection', state: 'unavailable' }],
+          source: { availability: 'available', reason: null },
+        });
         expect(getGitHubUserAccessToken).toHaveBeenNthCalledWith(2, 'user-1', {
           op: 'rotate',
           staleAuthorizationId: 'auth_1',

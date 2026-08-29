@@ -1,4 +1,4 @@
-import type { Octokit } from '@octokit/rest';
+import { Octokit } from '@octokit/rest';
 import {
   createContextReadBudget,
   readPullRequestContext,
@@ -111,8 +111,17 @@ async function run(
   fallback: Partial<PullRequestRestData> = rest,
   requests: string[] = []
 ) {
+  const policyClient = new Octokit();
+  const deniedPolicy = async () => {
+    throw { status: 403 };
+  };
   const octokit = {
     pulls: { get: async () => ({ data: { ...pr, ...fallback } }) },
+    repos: {
+      getBranchProtection: deniedPolicy,
+      getBranchRules: Object.assign(deniedPolicy, policyClient.repos.getBranchRules),
+    },
+    paginate: policyClient.paginate,
     request: async (
       _route: string,
       body: { query: string; variables: { after: string | null }; request: { signal: AbortSignal } }
@@ -180,6 +189,7 @@ it('traverses more than 100 entries independently without per-person requests', 
     });
     expect(result[field].items).toHaveLength(counts[field]);
   }
+  expect(result.requirements.source).toMatchObject({ availability: 'denied', retryable: false });
   // Two pages per people collection; registered sibling sources do not weaken this bound.
   expect(
     requests.filter(query => Object.values(PR_CONTEXT_PEOPLE_QUERIES).includes(query))

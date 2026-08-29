@@ -32,6 +32,7 @@ import {
   contextIssueEventSchema,
   resolveContextIssues,
 } from './context-issues';
+import { normalizeContextPolicies } from './context-rules';
 
 const collectionQueries = {
   ...PR_CONTEXT_PEOPLE_QUERIES,
@@ -462,6 +463,94 @@ export async function readPullRequestContext(
     ]);
     return resolveContextIssues(context.revision.prNodeId, closing, history);
   }
+  async function collectPolicies() {
+    const { baseRepoFullName, baseRef, baseSha } = context.revision;
+    const [owner, repo, extra] = baseRepoFullName?.split('/') ?? [];
+    if (!owner || !repo || extra || !baseRef || !baseSha) return context.requirements;
+    const parameters = { owner, repo, branch: baseRef };
+    const classic: Collection<unknown> = { ...context.requirements, items: [] };
+    const rules: Collection<unknown> = { ...context.requirements, items: [] };
+    await Promise.all([
+      (async () => {
+        const result = await read('rest.branchProtection', async signal => {
+          const response = await octokit.repos.getBranchProtection({
+            ...parameters,
+            request: { signal },
+          });
+          if (response.status !== 200) throw new Error('Incomplete branch protection response');
+          return response;
+        });
+        classic.source = result.source;
+        if (result.data) {
+          classic.items = [result.data.data];
+          classic.completeness = 'complete';
+          classic.hasNextPage = false;
+        } else if (result.source.reason === 'not_found') {
+          // A 404 or nullable rule cannot prove absence; require an explicitly unprotected matching branch.
+          const absence = await read('rest.branch', async signal => {
+            const response = await octokit.repos.getBranch({ ...parameters, request: { signal } });
+            if (response.status !== 200) throw new Error('Incomplete branch response');
+            return z
+              .object({
+                name: z.literal(baseRef),
+                commit: z.object({ sha: z.literal(baseSha) }),
+                protected: z.boolean(),
+              })
+              .parse(response.data);
+          });
+          if (absence.source.availability !== 'available') classic.source = absence.source;
+          else if (absence.data?.protected === false) {
+            classic.source = absence.source;
+            classic.completeness = 'complete';
+            classic.hasNextPage = false;
+          }
+          classic.source.provenance = [...result.source.provenance, ...absence.source.provenance];
+        }
+        classic.knownCount = classic.items.length;
+      })(),
+      (async () => {
+        const stopped = new Error('Policy pagination stopped');
+        const urls = new Set<string>();
+        // The paginator drops request.signal and converts raw 409/null responses to empty arrays.
+        // Read and validate each page before it reaches that normalization.
+        try {
+          const requestPage = Object.assign(
+            async (params: Parameters<typeof octokit.repos.getBranchRules>[0]) => {
+              const result = await read('rest.branchRules', async signal => {
+                if (!params?.url || urls.has(params.url)) throw new Error('Repeated policy page');
+                urls.add(params.url);
+                const response = await octokit.repos.getBranchRules({
+                  ...params,
+                  request: { signal },
+                });
+                if (response.status !== 200 || !Array.isArray(response.data))
+                  throw new Error('Incomplete branch rules response');
+                return response;
+              });
+              rules.source = result.source;
+              if (!result.data) throw stopped;
+              return result.data;
+            },
+            octokit.repos.getBranchRules
+          );
+          for await (const page of octokit.paginate.iterator(requestPage, {
+            ...parameters,
+            per_page: 100,
+          })) {
+            rules.items.push(...page.data);
+            rules.hasNextPage = true;
+          }
+          rules.completeness = 'complete';
+          rules.hasNextPage = false;
+        } catch (error) {
+          if (isHttp401(error)) throw error;
+          if (error !== stopped) rules.source = failedSource(error, 'rest.branchRules');
+        }
+        rules.knownCount = rules.items.length;
+      })(),
+    ]);
+    return normalizeContextPolicies(context.revision, classic, rules);
+  }
   [
     context.labels,
     context.assignees,
@@ -469,6 +558,7 @@ export async function readPullRequestContext(
     context.reviewDecisions,
     context.reviewActivity,
     context.issues,
+    context.requirements,
   ] = await Promise.all([
     collect('labels', contextLabelSchema, context.labels, (known, current) => ({
       ...current,
@@ -496,6 +586,7 @@ export async function readPullRequestContext(
     collectReviews('latestOpinionatedReviews', context.reviewDecisions),
     collectReviews('latestReviews', context.reviewActivity),
     collectIssues(),
+    collectPolicies(),
   ]);
   // Final null fields can hide contradictions between the two connections.
   for (const review of context.reviewDecisions.items) {

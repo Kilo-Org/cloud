@@ -1,29 +1,43 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts React/RN trees without a DOM */
 import { createElement, type ReactElement, type ReactNode, useSyncExternalStore } from 'react';
+import { type MobileRouter } from '@kilocode/trpc/mobile';
+import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createTRPCClient, httpLink } from '@trpc/client';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { type ConnectivityState } from '@/lib/connectivity-online';
+import { type ConnectivityState, isOnline } from '@/lib/connectivity-online';
 import { createOfflineBannerStore, type OfflineBannerStore } from '@/lib/offline-banner-state';
+import { TRPCProvider } from '@/lib/trpc';
 import { OfflineBanner } from './offline-banner';
 import { SettingsOverviewScreen } from './security-agent/settings-overview-screen';
 
 const state = vi.hoisted(() => ({ store: undefined as OfflineBannerStore | undefined }));
 const announceForA11y = vi.hoisted(() => vi.fn());
-const settingsConfig = vi.hoisted(() => ({
-  data: undefined as unknown,
-  isLoading: false,
-  isError: false,
-  fetchStatus: 'paused',
-  refetch: vi.fn(),
-}));
+const transport = vi.fn<typeof fetch>();
+const settingsData = {
+  isEnabled: false,
+  repositorySelectionMode: 'all',
+  selectedRepositoryIds: [],
+  analysisMode: 'auto',
+};
+const trpcClient = createTRPCClient<MobileRouter>({
+  links: [httpLink({ url: 'https://settings.test/api/trpc', fetch: transport })],
+});
 const offlineState: ConnectivityState = { isConnected: true, isInternetReachable: false };
 const onlineState: ConnectivityState = { isConnected: true, isInternetReachable: true };
 const probe = vi.fn<() => Promise<boolean>>();
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 let sourceListener: ((value: ConnectivityState) => void) | undefined = undefined;
+let queryClient = new QueryClient();
+let previousOnline = true;
+let responseGate: Promise<undefined> | undefined = undefined;
 
+vi.mock('@/lib/trpc', async () => {
+  const { createTRPCContext } = await import('@trpc/tanstack-react-query');
+  return createTRPCContext<MobileRouter>();
+});
 vi.mock('react-native', () => ({ View: 'View', Switch: 'Switch' }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -66,14 +80,10 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('@/lib/hooks/use-security-agent', () => ({
-  useSecurityAgentConfig: () => settingsConfig,
-  useSecurityAgentCapability: () => ({ status: 'allowed', canManage: true }),
-  useSecurityAgentRepositories: () => ({ data: [], isLoading: false, isError: false }),
+vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   useSetSecurityAgentEnabled: () => ({ mutate: vi.fn(), isPending: false }),
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
-vi.mock('@/lib/security-agent', () => ({ getSecurityAgentPath: vi.fn() }));
 vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: 'AuditReportButton',
 }));
@@ -91,21 +101,22 @@ vi.mock('@/components/tab-screen', () => ({
   useTabBarBottomPadding: () => 0,
 }));
 
-async function mountTree(
-  element: ReactElement = createElement(OfflineBanner)
-): Promise<TestRenderer.ReactTestRenderer> {
-  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
-    current: undefined,
-  };
-  await act(async () => {
-    await Promise.resolve();
-    rendererRef.current = TestRenderer.create(element);
+async function mountTree(element: ReactElement = <OfflineBanner />) {
+  await act(() => {
+    renderers.push(
+      TestRenderer.create(
+        <QueryClientProvider client={queryClient}>
+          <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+            {element}
+          </TRPCProvider>
+        </QueryClientProvider>
+      )
+    );
   });
-  const renderer = rendererRef.current;
+  const renderer = renderers.at(-1);
   if (!renderer) {
     throw new Error('renderer was not created');
   }
-  renderers.push(renderer);
   return renderer;
 }
 
@@ -114,7 +125,10 @@ function findHost(root: TestRenderer.ReactTestInstance, type: string) {
 }
 
 function emit(value: ConnectivityState) {
-  act(() => sourceListener?.(value));
+  act(() => {
+    onlineManager.setOnline(isOnline(value));
+    sourceListener?.(value);
+  });
 }
 
 async function advanceBy(ms: number) {
@@ -127,10 +141,23 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     vi.useFakeTimers();
+    previousOnline = onlineManager.isOnline();
+    onlineManager.setOnline(false);
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: 3, gcTime: Infinity } } });
+    responseGate = undefined;
+    transport.mockReset().mockImplementation(async input => {
+      await responseGate;
+      const procedure =
+        new URL(input instanceof Request ? input.url : input).pathname.split('.').at(-1) ?? '';
+      const data: Record<string, unknown> = {
+        getConfig: settingsData,
+        getRepositories: [{ id: 1, full_name: 'kilo/repo' }],
+        list: [{ organizationId: 'org_123', role: 'owner' }],
+      };
+      return Response.json({ result: { data: data[procedure] } });
+    });
     probe.mockReset().mockResolvedValue(false);
     announceForA11y.mockClear();
-    settingsConfig.data = undefined;
-    settingsConfig.refetch.mockReset();
     state.store = createOfflineBannerStore({
       source: {
         subscribe: listener => {
@@ -159,6 +186,8 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
         renderer.unmount();
       }
     });
+    queryClient.clear();
+    onlineManager.setOnline(previousOnline);
     state.store?.destroy();
     state.store = undefined;
     vi.clearAllTimers();
@@ -248,65 +277,40 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
     expect(announceForA11y).not.toHaveBeenCalled();
   });
 
-  it.each([true, false])(
-    'keeps cached settings usable before and after probe reachability is %s',
-    async reachable => {
-      settingsConfig.data = {
-        isEnabled: true,
-        repositorySelectionMode: 'selected',
-        selectedRepositoryIds: [1],
-        analysisMode: 'auto',
-      };
-      probe.mockResolvedValue(reachable);
-      const screen = await mountTree(createElement(SettingsOverviewScreen, { scope: 'personal' }));
-      expect(findHost(screen.root, 'Switch')[0]?.props.value).toBe(true);
-
+  it.each(['personal', 'org_123'])(
+    'retrieves complete %s settings after a successful probe without another NetInfo event',
+    async scope => {
+      const response = Promise.withResolvers<undefined>();
+      responseGate = response.promise;
+      probe.mockResolvedValue(true);
+      const banner = await mountTree();
+      const screen = await mountTree(<SettingsOverviewScreen scope={scope} />);
+      const activeQueries = queryClient.getQueryCache().findAll({ type: 'active' });
+      expect(activeQueries).toHaveLength(scope === 'personal' ? 2 : 3);
+      expect(activeQueries.every(query => query.state.fetchStatus === 'paused')).toBe(true);
+      expect(activeQueries.every(query => query.state.data === undefined)).toBe(true);
+      expect(findHost(screen.root, 'Skeleton')).toHaveLength(3);
+      expect(findHost(screen.root, 'Button')).toHaveLength(0);
       emit(offlineState);
       await advanceBy(5000);
-      expect(findHost(screen.root, 'Switch')[0]?.props.value).toBe(true);
+      expect(findHost(screen.root, 'AccessibleStatus')[0]?.props.message).toBe(
+        'Could not load Security Agent settings'
+      );
+      const onRetry = findHost(screen.root, 'Button')[0]?.props.onPress as () => void;
+      act(onRetry);
+      await advanceBy(10);
+      expect(queryClient.isFetching()).toBe(activeQueries.length);
+      expect(findHost(screen.root, 'Button')[0]?.props.loading).toBe(true);
+      await act(() => {
+        response.resolve(undefined);
+      });
+      await advanceBy(10);
+      expect(findHost(screen.root, 'Switch')[0]?.props.disabled).toBe(false);
+      expect(activeQueries.every(query => query.state.status === 'success')).toBe(true);
       expect(findHost(screen.root, 'AccessibleStatus')).toHaveLength(0);
-      expect(findHost(screen.root, 'Skeleton')).toHaveLength(0);
+      expect(onlineManager.isOnline()).toBe(false);
+      expect(banner.toJSON()).toBeNull();
+      expect(announceForA11y).not.toHaveBeenCalled();
     }
   );
-
-  it('exposes settings Retry after a successful probe leaves an uncached query paused', async () => {
-    const confirmation = Promise.withResolvers<boolean>();
-    probe.mockReturnValue(confirmation.promise);
-    const banner = await mountTree();
-    const screen = await mountTree(createElement(SettingsOverviewScreen, { scope: 'personal' }));
-    expect(findHost(screen.root, 'Skeleton')).toHaveLength(3);
-    expect(findHost(screen.root, 'Button')).toHaveLength(0);
-    expect(banner.toJSON()).toBeNull();
-
-    emit(offlineState);
-    await advanceBy(5000);
-    expect(findHost(screen.root, 'Skeleton')).toHaveLength(3);
-    expect(findHost(screen.root, 'Button')).toHaveLength(0);
-    await act(async () => {
-      confirmation.resolve(true);
-      await Promise.resolve();
-    });
-
-    expect(findHost(screen.root, 'Skeleton')).toHaveLength(0);
-    expect(findHost(screen.root, 'AccessibleStatus')[0]?.props.message).toBe(
-      'Could not load Security Agent settings'
-    );
-    const retry = findHost(screen.root, 'Button')[0];
-    expect(retry?.props.accessibilityLabel).toBe('Retry');
-    expect(banner.toJSON()).toBeNull();
-    settingsConfig.refetch.mockImplementationOnce(() => {
-      settingsConfig.data = {
-        isEnabled: true,
-        repositorySelectionMode: 'selected',
-        selectedRepositoryIds: [1],
-        analysisMode: 'auto',
-      };
-      screen.update(createElement(SettingsOverviewScreen, { scope: 'personal' }));
-    });
-    const onRetry = retry?.props.onPress as (() => void) | undefined;
-    act(() => onRetry?.());
-    expect(findHost(screen.root, 'Switch')[0]?.props.value).toBe(true);
-    expect(findHost(screen.root, 'AccessibleStatus')).toHaveLength(0);
-    expect(banner.toJSON()).toBeNull();
-  });
 });

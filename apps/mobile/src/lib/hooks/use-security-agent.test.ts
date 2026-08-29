@@ -20,6 +20,7 @@ const queryState = vi.hoisted(() => ({
   isError: false,
   isFetching: false,
   isPending: false,
+  fetchStatus: 'idle' as 'idle' | 'fetching' | 'paused',
   refetch: vi.fn(),
 }));
 
@@ -46,6 +47,7 @@ beforeEach(() => {
   queryState.isError = false;
   queryState.isFetching = false;
   queryState.isPending = false;
+  queryState.fetchStatus = 'idle';
   queryState.refetch.mockReset();
 });
 
@@ -61,13 +63,16 @@ describe('useSecurityAgentCapability status derivation', () => {
     expect(capability.canManage).toBe(true);
   });
 
-  it('returns allowed for an org with a settled owner role', () => {
-    queryState.data = [{ organizationId: 'org_123', role: 'owner' }];
-    const capability = capabilityFor('org_123');
+  it.each(['owner', 'admin', 'billing_manager'])(
+    'returns allowed for an org with a settled %s role',
+    role => {
+      queryState.data = [{ organizationId: 'org_123', role }];
+      const capability = capabilityFor('org_123');
 
-    expect(capability.status).toBe('allowed');
-    expect(capability.canManage).toBe(true);
-  });
+      expect(capability.status).toBe('allowed');
+      expect(capability.canManage).toBe(true);
+    }
+  );
 
   it('returns denied for an org with a settled member role', () => {
     queryState.data = [{ organizationId: 'org_123', role: 'member' }];
@@ -86,13 +91,28 @@ describe('useSecurityAgentCapability status derivation', () => {
     expect(capability.status).toBe('error');
   });
 
-  it('returns loading when the org role query is pending with no data', () => {
+  it('keeps a paused uncached org role unresolved and exposes its recovery state', () => {
     queryState.data = undefined;
     queryState.isError = false;
     queryState.isPending = true;
+    queryState.fetchStatus = 'paused';
     const capability = capabilityFor('org_123');
 
     expect(capability.status).toBe('loading');
+    expect(capability.fetchStatus).toBe('paused');
+    expect(capability.canManage).toBe(false);
+  });
+
+  it.each([
+    { fetchStatus: 'paused', isPending: true, isError: false },
+    { fetchStatus: 'idle', isPending: false, isError: true },
+  ] as const)('ignores an unavailable shared org query in personal scope: %j', state => {
+    Object.assign(queryState, state);
+    const capability = capabilityFor('personal');
+
+    expect(capability.status).toBe('allowed');
+    expect(capability.canManage).toBe(true);
+    expect(capability.fetchStatus).toBe('idle');
   });
 
   it('falls back to loading for any other unresolved combination', () => {

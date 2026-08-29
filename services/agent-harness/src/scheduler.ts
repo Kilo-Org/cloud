@@ -36,6 +36,7 @@ import {
 import { compareAndSetCall, insertCall, insertCheckpoint, type StoreDatabase } from './db/records';
 import type { ConversationStore } from './db/store';
 import { StoreError, type AlarmStorage } from './db/wake';
+import { HistoryProgressSchema, type HistoryProgress } from './legacy';
 import * as s from './db/sqlite-schema';
 import {
   PartialStepSchema,
@@ -73,6 +74,15 @@ export const SchedulerStateSchema = z.strictObject({
   reservations: z.array(ReservationSchema),
   // A12 records reconstruct SDK results from calls. Keep this fallback until those records retire.
   resultMessages: z.record(z.uuid(), toolModelMessageSchema).default({}),
+  // Pre-sync checkpoints lack this record. Preserve their admission boundary once inference started.
+  // Remove the fallback only after those checkpoints retire.
+  initialHistory: z
+    .discriminatedUnion('status', [
+      z.strictObject({ status: z.literal('pending'), retryAt: z.int().nonnegative() }),
+      z.strictObject({ status: z.literal('ready'), legacyThrough: z.int().nonnegative() }),
+    ])
+    .nullable()
+    .default(null),
 });
 type SchedulerState = z.infer<typeof SchedulerStateSchema>;
 type SchedulerRecord = { id: string; data: SchedulerState };
@@ -125,6 +135,9 @@ export type SchedulerAdapter = {
     read: (input: ToolExecution & { providerReference: string | null }) => Promise<unknown>;
   };
   system: string;
+  // Existing SQLite-only callers have no ingress source. Once a drain starts, a missing adapter
+  // must never bypass its persisted pending state. Production composition supplies this hook.
+  drainLegacy?: (conversation: Conversation, signal: AbortSignal) => Promise<HistoryProgress>;
   now?: () => number;
 };
 function schedulerRecord(db: StoreDatabase, runId: string): SchedulerRecord {
@@ -144,6 +157,7 @@ function schedulerRecord(db: StoreDatabase, runId: string): SchedulerRecord {
           stopped: false,
           reservations: [],
           resultMessages: {},
+          initialHistory: null,
         },
       };
 }
@@ -290,7 +304,9 @@ export function createScheduler(
       try {
         const snapshot = store.snapshot(),
           run = snapshot?.activeRun ?? snapshot?.queuedRuns[0];
-        const reservation = run ? activeReservation(schedulerRecord(db, run.id)) : undefined;
+        const record = run ? schedulerRecord(db, run.id) : undefined;
+        const reservation = record && activeReservation(record);
+        const ingress = record?.data.initialHistory;
         const projection = db
           .select({ dueAt: s.projectionWork.dueAt })
           .from(s.projectionWork)
@@ -299,7 +315,13 @@ export function createScheduler(
           .limit(1)
           .get();
         const runnable = run && ['queued', 'running', 'stopping'].includes(run.state.status);
-        const due = reservation ? reservation.deadline : runnable ? now() + 1 : null;
+        const due = reservation
+          ? reservation.deadline
+          : runnable
+            ? ingress?.status === 'pending' && run.state.status !== 'stopping'
+              ? ingress.retryAt
+              : now() + 1
+            : null;
         const deadline = projection ? Math.min(due ?? Infinity, projection.dueAt) : due;
         // No other admission can pass the gate between the no-work/no-lease check and deletion.
         if (deadline === null) await alarms.deleteAlarm();
@@ -475,9 +497,132 @@ export function createScheduler(
     ];
   }
 
+  async function prepareInitialHistory() {
+    const snapshot = store.snapshot();
+    const selected = snapshot?.activeRun ?? snapshot?.queuedRuns[0];
+    if (!selected || !snapshot || !['queued', 'running'].includes(selected.state.status))
+      return true;
+    const initial = schedulerRecord(db, selected.id).data.initialHistory;
+    if (initial?.status === 'ready') return true;
+    const drainLegacy = adapter.drainLegacy;
+    if (!drainLegacy) return initial === null;
+    if (initial?.status === 'pending' && initial.retryAt > now()) return false;
+    const preparation: {
+      ready: boolean;
+      lease?: { run: Run; conversation: Conversation; epoch: number; deadline: number };
+    } = { ready: false };
+    await store.transition({ wakeAt: now() + 1 }, () => {
+      const currentSnapshot = store.snapshot();
+      const run = currentSnapshot?.activeRun ?? currentSnapshot?.queuedRuns[0];
+      if (
+        !run ||
+        !currentSnapshot ||
+        run.id !== selected.id ||
+        !['queued', 'running'].includes(run.state.status)
+      )
+        return { events: [] };
+      const record = schedulerRecord(db, run.id);
+      if (record.data.initialHistory?.status === 'ready') {
+        preparation.ready = true;
+        return { events: [] };
+      }
+      if (
+        record.data.initialHistory?.status === 'pending' &&
+        record.data.initialHistory.retryAt > now()
+      )
+        return { events: [] };
+      const started = db
+        .select({ id: s.checkpoints.id })
+        .from(s.checkpoints)
+        .where(and(eq(s.checkpoints.runId, run.id), gt(s.checkpoints.step, 0)))
+        .limit(1)
+        .get();
+      if (started && record.data.initialHistory === null) {
+        // Earlier scheduler checkpoints already fixed their history at admission. Do not widen it.
+        const input = db
+          .select()
+          .from(s.messages)
+          .where(eq(s.messages.id, run.inputMessageId))
+          .get();
+        if (!input) fail('invalid_input', 'The accepted input message is missing.');
+        record.data.initialHistory = { status: 'ready', legacyThrough: input.sequence - 1 };
+        writeScheduler(db, run.id, record);
+        preparation.ready = true;
+        return { events: [] };
+      }
+      const deadline = now() + 30_000;
+      record.data.epoch++;
+      record.data.initialHistory = { status: 'pending', retryAt: deadline };
+      writeScheduler(db, run.id, record);
+      preparation.lease = {
+        run,
+        conversation: currentSnapshot.conversation,
+        epoch: record.data.epoch,
+        deadline,
+      };
+      return { events: [] };
+    });
+    const lease = preparation.lease;
+    if (!lease) return preparation.ready;
+    // Persist the continuation and arm recovery before external ingress. No model reservation starts here.
+    await maintainAlarm();
+    let progress: HistoryProgress | undefined;
+    let failure: RuntimeError['detail'] | undefined;
+    const signal = AbortSignal.timeout(Math.max(1, lease.deadline - now()));
+    try {
+      await abortable(signal, () => adapter.authorize(lease.conversation, lease.run, signal));
+      const parsed = HistoryProgressSchema.safeParse(
+        await abortable(signal, () => drainLegacy(lease.conversation, signal))
+      );
+      if (!parsed.success) fail('invalid_output', 'The legacy source returned invalid progress.');
+      signal.throwIfAborted();
+      if (now() >= lease.deadline)
+        fail('storage_unavailable', 'Legacy ingress exceeded its deadline.', true);
+      progress = parsed.data;
+    } catch (error) {
+      failure =
+        error instanceof RuntimeError
+          ? error.detail
+          : {
+              code: 'storage_unavailable',
+              message: 'Legacy ingress is unavailable. Synchronization will retry.',
+              retryable: true,
+            };
+    }
+    await store.transition({ wakeAt: now() + 1 }, () => {
+      const record = schedulerRecord(db, lease.run.id);
+      const run = storedRun(db, lease.run.id);
+      if (
+        record.data.epoch !== lease.epoch ||
+        record.data.initialHistory?.status !== 'pending' ||
+        !['queued', 'running'].includes(run.state.status)
+      )
+        return { events: [] };
+      record.data.epoch++;
+      if (progress?.backlog === 'drained') {
+        const cursor = store.snapshot()?.eventCursor;
+        if (cursor === undefined) fail('invalid_input', 'The conversation is missing.');
+        record.data.initialHistory = { status: 'ready', legacyThrough: cursor };
+        preparation.ready = true;
+      } else record.data.initialHistory = { status: 'pending', retryAt: now() + 1_000 };
+      writeScheduler(db, run.id, record);
+      return {
+        events:
+          failure && !failure.retryable
+            ? [runEvent(run, { status: 'failed', error: failure })]
+            : [],
+      };
+    });
+    return preparation.ready;
+  }
+
   async function claim(reconcile = false): Promise<Job | null> {
     const snapshot = store.snapshot();
     if (!snapshot || (!snapshot.activeRun && !snapshot.queuedRuns.length)) return null;
+    if (!(await prepareInitialHistory())) {
+      await maintainAlarm();
+      return null;
+    }
     let job: Job | null = null;
     // The existing wake gate prearms before any runnable write. maintainAlarm replaces this harmless
     // immediate recovery wake with the persisted lease deadline before awaited external work.
@@ -495,6 +640,7 @@ export function createScheduler(
       if (run.state.status === 'stopping') return { events: stopRun(run, record) };
       if ((run.state.status === 'waiting' && !reconciling) || (active && active.deadline > now()))
         return { events: [] };
+      if (record.data.initialHistory?.status === 'pending') return { events: [] };
       try {
         const admission = admissionForRun(store, run);
         if (active) {
@@ -550,6 +696,10 @@ export function createScheduler(
           .orderBy(asc(s.checkpoints.step))
           .all();
         const last = checkpointRows.at(-1);
+        // A run selected after the asynchronous drain must prepare its own initial boundary.
+        // Older executable checkpoints still reconcile through their original admission history.
+        if (adapter.drainLegacy && record.data.initialHistory === null && !last)
+          return { events: [] };
         if (record.data.stopped && !reconciling) return { events: stopRun(run, record) };
         executorFreeTools(adapter.definitions);
         const step = pending
@@ -567,7 +717,10 @@ export function createScheduler(
               adapter.definitions,
               admission.limits,
               adapter.countTokens,
-              adapter.system
+              adapter.system,
+              record.data.initialHistory?.status === 'ready'
+                ? record.data.initialHistory.legacyThrough
+                : undefined
             );
         const reservation = reserve(
           admission,

@@ -1,4 +1,4 @@
-import { and, asc, eq, gt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lte } from 'drizzle-orm';
 import {
   assistantModelMessageSchema,
   isStepCount,
@@ -262,7 +262,8 @@ export function buildHistory(
   definitions: readonly ModelTool[],
   limits: RunLimits,
   countTokens: TokenCounter,
-  system: string
+  system: string,
+  legacyThrough?: number
 ) {
   const inputRow = db.select().from(s.messages).where(eq(s.messages.id, run.inputMessageId)).get();
   if (!inputRow) fail('invalid_input', 'The accepted input message is missing.');
@@ -282,24 +283,25 @@ export function buildHistory(
       .parse(countTokens(candidate, tools, run));
   if (tokens([instructions, ...messages]) > limits.modelInputTokens)
     fail('limit_exceeded', 'The system and pending call/result history exceed the context limit.');
-  let cursor: string | null = null;
-  const candidates: { sequence: number; message: z.output<typeof MessageSchema> }[] = [];
-  // Bound history reads as well as model input. Drop only whole prior turns, never pending pairs.
-  for (let page = 0; page < 4; page++) {
-    const history = store.history(cursor, 50);
-    for (const message of history.messages) {
-      if (message.provenance === 'harness' && message.role !== 'user') continue;
-      const row = db
-        .select({ sequence: s.messages.sequence })
-        .from(s.messages)
-        .where(eq(s.messages.id, message.id))
-        .get();
-      if (row && row.sequence < inputRow.sequence)
-        candidates.push({ sequence: row.sequence, message });
-    }
-    cursor = history.historyCursor;
-    if (!cursor) break;
-  }
+  // Apply the durable boundary before limiting history. Later imports must not push frozen rows
+  // out of this window on restart. Retain the existing 200-row bound and display ordering.
+  const rows = db
+    .select()
+    .from(s.messages)
+    .where(lte(s.messages.sequence, legacyThrough ?? inputRow.sequence))
+    .orderBy(desc(s.messages.createdAt), desc(s.messages.id))
+    .limit(200)
+    .all();
+  const candidates = rows.flatMap(row => {
+    const message = MessageSchema.parse(row.data);
+    // Post-admission legacy rows are untrusted history, not permission to include queued harness input.
+    if (
+      message.provenance === 'harness' &&
+      (message.role !== 'user' || row.sequence >= inputRow.sequence)
+    )
+      return [];
+    return [{ sequence: row.sequence, message }];
+  });
   for (const { message } of candidates.sort((a, b) => b.sequence - a.sequence)) {
     let group: ModelMessage[];
     if (message.provenance === 'legacy') {

@@ -2,10 +2,11 @@ import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { ChevronDown } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
+import { announceForA11y } from '@/lib/a11y/announce';
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
@@ -162,7 +163,7 @@ export function SessionMessageList<T>({
         nextNewestKey,
       })
     ) {
-      AccessibilityInfo.announceForAccessibility(getOlderMessagesArrivedAnnouncement());
+      announceForA11y(getOlderMessagesArrivedAnnouncement());
     }
     olderArrivalInitializedRef.current = true;
     olderArrivalCountRef.current = nextCount;

@@ -3,7 +3,6 @@ import { type ExecApprovalDecision, type KiloChatClient, type Message } from '@k
 import { type PendingAction, pendingActionGroupIdForMessage } from '@kilocode/kilo-chat-hooks';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  AccessibilityInfo,
   Keyboard,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -11,6 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { announceForA11y } from '@/lib/a11y/announce';
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
 import {
   getOlderMessagesArrivedAnnouncement,
@@ -188,7 +188,7 @@ export function MessageList({
         nextNewestKey,
       })
     ) {
-      AccessibilityInfo.announceForAccessibility(getOlderMessagesArrivedAnnouncement());
+      announceForA11y(getOlderMessagesArrivedAnnouncement());
     }
     olderArrivalInitializedRef.current = true;
     olderArrivalCountRef.current = nextCount;

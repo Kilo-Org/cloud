@@ -1,8 +1,9 @@
-import { AccessibilityInfo, Alert, Linking, Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { announceForA11y } from '@/lib/a11y/announce';
 
 import {
   type VoiceInputControllerSnapshot,
@@ -57,7 +58,7 @@ async function fireHaptic(style: Haptics.ImpactFeedbackStyle): Promise<void> {
 
 function announceVoiceInputListening(): void {
   void fireHaptic(Haptics.ImpactFeedbackStyle.Light);
-  AccessibilityInfo.announceForAccessibility(i18n.t('voiceInput.listening'));
+  announceForA11y(i18n.t('voiceInput.listening'));
 }
 
 export function runVoiceInputListeningFeedback(

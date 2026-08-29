@@ -11,13 +11,36 @@ import {
   showFeedback,
 } from './use-voice-input-actions';
 import { __resetVoiceInputLanguageTagCacheForTests } from './voice-input-language';
+import { createPrivacyNativeTestModule } from '../../../modules/local-access-privacy/tests/native-test-helpers';
+
+const adapter = vi.hoisted((): Parameters<typeof createPrivacyNativeTestModule>[0] => ({
+  available: true,
+  nativeFailure: false,
+  secure: false,
+  captureFailure: false,
+  captureWait: undefined,
+  captureEvents: [],
+  snapshot: { generation: 0, armed: false, foreground: true, covered: false, failed: false },
+  delivered: [],
+  queue: [],
+  listeners: new Map(),
+}));
+vi.mock('expo', () => ({
+  requireNativeModule: () => createPrivacyNativeTestModule(adapter),
+}));
+vi.mock('expo-screen-capture', () => ({
+  allowScreenCaptureAsync: vi.fn(),
+  preventScreenCaptureAsync: vi.fn(),
+}));
 
 const hapticsMock = vi.hoisted(() => ({
   impactAsync: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 const accessibilityMock = vi.hoisted(() => ({
-  announceForAccessibility: vi.fn(),
+  announceForAccessibility: (message: string) => {
+    adapter.delivered.push(message);
+  },
 }));
 
 const alertMock = vi.hoisted(() => ({
@@ -159,6 +182,8 @@ function activeSnapshot(
 describe('useVoiceInput integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    adapter.delivered = [];
+    adapter.queue = [];
     mockController.setSnapshot(idleSnapshot());
     mockController.supportsOnDevice.mockReturnValue(true);
     voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
@@ -217,6 +242,11 @@ describe('useVoiceInput integration', () => {
         expect(startOptions.owner).toBe(owner);
         expect(startOptions.onDraftChange).toBe(onDraftChange);
         expect(startOptions.onFeedback).toBe(showFeedback);
+        for (const task of adapter.queue.splice(0)) {
+          task();
+        }
+        // Starting alone cannot announce before this owner's listening transition.
+        expect(adapter.delivered).toEqual([]);
       });
 
       it('resolves an en-DE device locale to en-US when the supported list contains en-AU and en-US', async () => {

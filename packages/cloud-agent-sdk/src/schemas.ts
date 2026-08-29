@@ -1489,6 +1489,9 @@ export const browserProviderInboundMessageSchema = browserBoundary(
         }),
         goal: browserGoalSchema,
         ownerLabel: browserText(128).min(1),
+        // Old dispatches omit intent. Consumers must treat absence as unknown
+        // and reject execution, never infer permission to start a new conversation.
+        conversationMode: z.enum(['new', 'continue']).optional(),
       }),
       z.strictObject({
         type: z.literal('provider_job_cancel'),

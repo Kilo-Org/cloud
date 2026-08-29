@@ -257,7 +257,7 @@ export type IssueBitbucketSessionCapabilityParams = {
 };
 type BitbucketTokenFailureReason = Extract<GetBitbucketTokenResult, { success: false }>['reason'];
 export type IssueBitbucketSessionCapabilityResult =
-  | { success: true; capability: string; gitUrl: string }
+  | { success: true; capability: string; gitUrl: string; integrationId: string }
   | { success: false; reason: BitbucketTokenFailureReason | 'capability_configuration_error' };
 
 export type RedeemBitbucketSessionCapabilityParams = {
@@ -1107,7 +1107,9 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   async getBitbucketToken(params: GetBitbucketTokenParams): Promise<GetBitbucketTokenResult> {
     if (!params.orgId) return { success: false, reason: 'invalid_request' };
     const result = await resolveBitbucketToken(this.env, params);
-    return result.success ? { success: true, token: result.token } : result;
+    return result.success
+      ? { success: true, token: result.token, integrationId: result.integrationId }
+      : result;
   }
 
   async issueBitbucketSessionCapability(
@@ -1142,6 +1144,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         success: true,
         capability,
         gitUrl: `https://bitbucket.org/${subject.repositoryFullName}.git`,
+        integrationId: subject.integrationId,
       };
     } catch {
       return { success: false, reason: 'capability_configuration_error' };

@@ -1,0 +1,1731 @@
+/* eslint-disable max-lines, init-declarations, import/max-dependencies, import/first, import/no-nodejs-modules, jest/no-hooks, jest/no-untyped-mock-factory, jest/no-conditional-in-test, jest/no-conditional-expect, jest/max-expects, vitest/prefer-import-in-mock, require-await, typescript/require-await, typescript/consistent-type-definitions, typescript/no-unsafe-assignment, typescript/no-unsafe-type-assertion, unicorn/no-await-expression-member -- Table-driven lifetime scenarios check each transition and its durable effects; fixtures retain the browser API types. */
+// @vitest-environment jsdom
+import { locks as nativeLocks } from 'node:worker_threads';
+import { webcrypto } from 'node:crypto';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { getDefaultStore } from 'jotai';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  BrowserJobSnapshot,
+  BrowserProviderInboundMessage,
+  BrowserProviderOutboundMessage,
+  BrowserResult,
+} from '@kilocode/cloud-agent-sdk/schemas';
+import { browserProviderOutboundMessageSchema } from '@kilocode/cloud-agent-sdk/schemas';
+import { BrowserProviderError } from '@kilocode/cloud-agent-sdk/user-web-connection';
+import type {
+  BrowserProviderState,
+  BrowserProviderRegistration,
+  BrowserProviderApprovalInput,
+  BrowserProviderCancelInput,
+  BrowserProviderUnavailableInput,
+  BrowserProviderQuiescenceInput,
+  BrowserProviderResultInput,
+} from '@kilocode/cloud-agent-sdk/user-web-connection';
+import type { BrowserRunContext } from './browser-run-context';
+import type { LlmTurnOutcome } from '@/src/shared/agent-llm-turn-runner-core';
+import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
+
+const fixture = vi.hoisted(() => ({
+  actions: [] as string[],
+  failWrite: '',
+  permissions: new Set<() => void>(),
+  removed: new Set<(id: number) => void>(),
+  tabs: [
+    { id: 7, title: 'Approved tab', url: 'https://example.test/task' },
+    { id: 8, title: 'Other tab', url: 'https://other.test/' },
+  ],
+  turn: async (
+    _context: BrowserRunContext,
+    _events: AgentConversationEvent[]
+  ): Promise<LlmTurnOutcome> => {
+    throw new Error('Set the test turn.');
+  },
+  updated: new Set<(id: number, info: { url?: string }) => void>(),
+  values: new Map<string, unknown>(),
+  watchers: new Map<string, Set<() => void>>(),
+  writes: [] as string[],
+}));
+vi.mock('#imports', () => ({
+  browser: {
+    permissions: {
+      onRemoved: {
+        addListener: (fn: () => void) => fixture.permissions.add(fn),
+        removeListener: (fn: () => void) => fixture.permissions.delete(fn),
+      },
+    },
+    tabs: {
+      get: async (id: number) => {
+        const tab = fixture.tabs.find(item => item.id === id);
+        if (tab === undefined) {
+          throw new Error('Tab closed');
+        }
+        return tab;
+      },
+      onRemoved: {
+        addListener: (fn: (id: number) => void) => fixture.removed.add(fn),
+        removeListener: (fn: (id: number) => void) => fixture.removed.delete(fn),
+      },
+      onUpdated: {
+        addListener: (fn: (id: number, info: { url?: string }) => void) => fixture.updated.add(fn),
+        removeListener: (fn: (id: number, info: { url?: string }) => void) =>
+          fixture.updated.delete(fn),
+      },
+      query: async () => structuredClone(fixture.tabs),
+    },
+  },
+  storage: {
+    getItem: (key: string) => structuredClone(fixture.values.get(key)),
+    removeItem: (key: string) => {
+      fixture.values.delete(key);
+    },
+    setItem: async (key: string, value: unknown) => {
+      if (fixture.failWrite === key) {
+        throw new Error('Private storage failure');
+      }
+      fixture.values.set(key, structuredClone(value));
+      fixture.writes.push(key);
+      for (const notify of fixture.watchers.get(key) ?? []) {
+        notify();
+      }
+    },
+    watch: (key: string, fn: () => void) => {
+      const listeners = fixture.watchers.get(key) ?? new Set<() => void>();
+      fixture.watchers.set(key, listeners);
+      listeners.add(fn);
+      return () => {
+        listeners.delete(fn);
+      };
+    },
+  },
+}));
+vi.mock('./use-gateway-models', () => ({
+  useGatewayModels: () => ({ modelOptions: [{ id: 'selected-model', supportsImages: true }] }),
+}));
+vi.mock(import('./browser-run-context'), async importOriginal => {
+  const original = await importOriginal();
+  return {
+    ...original,
+    runBrowserTurn: (context: BrowserRunContext, events: AgentConversationEvent[]) =>
+      context.lease.run(async guard => {
+        guard();
+        return fixture.turn(context, events);
+      }),
+  };
+});
+
+import { browser, storage } from '#imports';
+import {
+  AUTH_STORAGE_KEY,
+  BROWSER_PROVIDER_IDENTITY_KEY,
+  clearStoredSession,
+} from '@/src/shared/auth';
+import { createAssistantMessage } from '@/src/shared/agent-conversation';
+import { BROWSER_TASK_STORAGE_KEY } from '@/src/shared/browser-task-store';
+import type { StoredBrowserJob } from '@/src/shared/browser-task-store';
+import {
+  createBrowserExecutionCoordinator,
+  BROWSER_EXECUTION_SAFETY_KEY,
+  PROVIDER_OWNER_LOCK,
+} from './browser-execution-lock';
+import type { BrowserExecutionLease } from './browser-execution-lock';
+import {
+  BrowserTaskProvider,
+  createBrowserTaskProviderRuntime,
+  useBrowserTask,
+} from './browser-task-provider';
+import type { BrowserTaskProviderRuntime } from './browser-task-provider';
+import { applyApprovalDecision, pendingApprovalAtom, pendingLockAtom } from './pending-approval';
+
+type Delivery = Extract<BrowserProviderInboundMessage, { type: 'provider_job' }>;
+type Fence = { invocationId: string; tabId?: number };
+const runtimes: BrowserTaskProviderRuntime[] = [];
+const localLeases: BrowserExecutionLease[] = [];
+const auth = { token: 'test-account-token', userEmail: 'owner@example.test' };
+const defaults = {
+  enabled: true,
+  mode: 'safe' as const,
+  model: 'selected-model',
+  thinkingEffort: 'high',
+};
+const outcome = (): LlmTurnOutcome => ({
+  effectsUncertain: false,
+  reason: 'completed',
+  status: 'succeeded',
+  summary: 'Observed the requested page.',
+  toolResults: [],
+});
+const terminalResult = (
+  job: BrowserJobSnapshot,
+  reason: Exclude<BrowserResult['reason'], 'completed'>,
+  status: Exclude<BrowserResult['status'], 'succeeded'> = 'interrupted'
+): BrowserResult => ({
+  browserTaskId: job.browserTaskId,
+  effectsUncertain: job.status === 'running',
+  evidence: [],
+  invocationId: job.invocationId,
+  jobId: job.jobId,
+  providerId: job.providerId,
+  reason,
+  status,
+  summary: `Relay settled ${reason}.`,
+});
+const relay = () => {
+  let state: BrowserProviderState = { status: 'ready' };
+  let registration: BrowserProviderRegistration | undefined;
+  let generation = 0;
+  let fence: Fence | undefined;
+  let acknowledgeApproval = true;
+  let acknowledgeHeartbeat = true;
+  let acknowledgeTerminal = true;
+  const queued = new Map<string, Delivery>();
+  const rows = new Map<string, BrowserJobSnapshot>();
+  const messages = new Set<(message: BrowserProviderInboundMessage) => void>();
+  const states = new Set<(value: BrowserProviderState) => void>();
+  const outbound: BrowserProviderOutboundMessage[] = [];
+  const events: string[] = [];
+  const heartbeatTimes: number[] = [];
+  const setState = (next: BrowserProviderState): void => {
+    state = next;
+    for (const listener of states) {
+      listener(next);
+    }
+  };
+  const send = (message: BrowserProviderInboundMessage): void => {
+    for (const listener of messages) {
+      listener(structuredClone(message));
+    }
+  };
+  const snapshot = (): void => {
+    if (registration !== undefined) {
+      send({
+        generation,
+        jobs: [...rows.values()].filter(job => job.generation === generation),
+        providerId: registration.providerId,
+        type: 'provider_snapshot',
+      });
+    }
+  };
+  const record = (message: BrowserProviderOutboundMessage): void => {
+    outbound.push(browserProviderOutboundMessageSchema.parse(message));
+  };
+  const renew = () => {
+    if (registration === undefined) {
+      throw new Error('No provider');
+    }
+    const lease = {
+      generation,
+      leaseExpiresAt: new Date(Date.now() + 15_000).toISOString(),
+      providerId: registration.providerId,
+      requestId: crypto.randomUUID(),
+      type: 'provider_lease_ack' as const,
+    };
+    setState({ lease, status: 'registered' });
+    return lease;
+  };
+  const settle = (job: BrowserJobSnapshot, result: BrowserResult): void => {
+    if (rows.get(job.jobId)?.result !== undefined) {
+      return;
+    }
+    rows.set(job.jobId, { ...job, result, status: result.status });
+    queued.delete(job.jobId);
+    if (acknowledgeTerminal) {
+      snapshot();
+    }
+  };
+  const dispatch = (message: Delivery): void => {
+    rows.set(message.job.jobId, message.job);
+    fence = { invocationId: message.job.invocationId };
+    send(message);
+  };
+  const connection = {
+    approveBrowserProviderJob: (input: BrowserProviderApprovalInput) => {
+      record({ ...input, type: 'provider_approval' });
+      const job = rows.get(input.jobId);
+      if (job === undefined) {
+        throw new Error('Unknown job');
+      }
+      if (input.approval.decision === 'denied') {
+        settle(job, terminalResult(job, 'approval_denied', 'failed'));
+        return;
+      }
+      fence = { invocationId: job.invocationId, tabId: input.approval.tab.tabId };
+      rows.set(job.jobId, {
+        ...job,
+        approvedTab: input.approval.tab,
+        deadlines: { ...job.deadlines, execution: new Date(Date.now() + 600_000).toISOString() },
+        status: 'running',
+      });
+      if (acknowledgeApproval) {
+        snapshot();
+      }
+    },
+    cancelBrowserProviderJob: (input: BrowserProviderCancelInput) => {
+      record({ ...input, type: 'provider_cancel' });
+      const job = rows.get(input.jobId);
+      if (job === undefined) {
+        throw new Error('Unknown job');
+      }
+      if (job.status === 'running') {
+        setState({ reason: 'cancelled', retryable: true, status: 'unavailable' });
+      }
+      send({ ...input, reason: 'cancelled', type: 'provider_job_cancel' });
+      settle(job, terminalResult(job, 'cancelled', 'cancelled'));
+    },
+    getBrowserProviderState: () => state,
+    heartbeatBrowserProvider: async () => {
+      heartbeatTimes.push(Date.now());
+      if (registration === undefined) {
+        throw new BrowserProviderError('provider_unavailable', true);
+      }
+      if (acknowledgeHeartbeat) {
+        renew();
+      }
+      return {
+        generation,
+        jobs: [...rows.values()].filter(job => job.generation === generation),
+        providerId: registration.providerId,
+        type: 'provider_snapshot' as const,
+      };
+    },
+    markBrowserProviderUnavailable: (input: BrowserProviderUnavailableInput) => {
+      record({ ...input, type: 'provider_unavailable' });
+      setState({ reason: input.reason, retryable: true, status: 'unavailable' });
+      for (const job of rows.values()) {
+        if (job.result === undefined) {
+          settle(job, terminalResult(job, input.reason));
+        }
+      }
+    },
+    onBrowserProviderMessage: (listener: (message: BrowserProviderInboundMessage) => void) => {
+      messages.add(listener);
+      return () => {
+        messages.delete(listener);
+      };
+    },
+    onBrowserProviderStateChange: (listener: (value: BrowserProviderState) => void) => {
+      states.add(listener);
+      return () => {
+        states.delete(listener);
+      };
+    },
+    quiesceBrowserProviderJob: (input: BrowserProviderQuiescenceInput) => {
+      record({ ...input, type: 'provider_quiesced' });
+      if (rows.get(input.jobId)?.result === undefined) {
+        throw new Error('Premature quiescence');
+      }
+      if (fence?.invocationId !== input.invocationId || fence.tabId !== input.tabId) {
+        throw new Error('Quiescence must match the dispatched fence');
+      }
+      events.push('quiesced');
+      fence = undefined;
+      const next = queued.values().next().value;
+      if (next !== undefined && state.status === 'registered') {
+        queued.delete(next.job.jobId);
+        dispatch(next);
+      }
+    },
+    registerBrowserProvider: async (input: BrowserProviderRegistration) => {
+      record({
+        ...input,
+        enabled: true,
+        requestId: crypto.randomUUID(),
+        type: 'provider_register',
+      });
+      registration = input;
+      if (
+        fence !== undefined &&
+        (input.recovery?.invocationId !== fence.invocationId ||
+          input.recovery?.tabId !== fence.tabId)
+      ) {
+        setState({ reason: 'provider_unavailable', retryable: true, status: 'unavailable' });
+        throw new BrowserProviderError('provider_unavailable', true);
+      }
+      events.push(input.recovery === undefined ? 'registered' : 'recovered');
+      fence = undefined;
+      generation += 1;
+      return renew();
+    },
+    requestBrowserProviderStatus: async () => {
+      events.push('status');
+      if (registration === undefined) {
+        throw new BrowserProviderError('provider_unavailable', true);
+      }
+      return {
+        jobs: [...rows.values()],
+        providerId: registration.providerId,
+        requestId: crypto.randomUUID(),
+        type: 'provider_status_result' as const,
+        ...(fence === undefined ? {} : { unresolvedFence: fence }),
+      };
+    },
+    retain: () => () => {
+      events.push('released');
+    },
+    retryConnection: () => {
+      setState({ status: 'ready' });
+    },
+    sendBrowserProviderResult: (input: BrowserProviderResultInput) => {
+      record({ ...input, type: 'provider_result' });
+      const persisted = fixture.values.get(BROWSER_TASK_STORAGE_KEY) as {
+        jobs: StoredBrowserJob[];
+      };
+      if (
+        !persisted.jobs.some(
+          job =>
+            job.snapshot.invocationId === input.invocationId && job.snapshot.result !== undefined
+        )
+      ) {
+        throw new Error('Result before persistence');
+      }
+      events.push('result');
+      const job = rows.get(input.jobId);
+      if (job === undefined) {
+        throw new Error('Unknown job');
+      }
+      settle(job, input.result);
+    },
+  };
+  const delivery = (overrides: Partial<Delivery> = {}): Delivery => {
+    if (registration === undefined) {
+      throw new Error('No provider');
+    }
+    const now = Date.now();
+    return {
+      conversationMode: 'new',
+      goal: 'Read the requested page.',
+      job: {
+        browserTaskId: `bt_${crypto.randomUUID()}`,
+        createdAt: new Date(now).toISOString(),
+        deadlines: {
+          approval: new Date(now + 120_000).toISOString(),
+          queue: new Date(now + 600_000).toISOString(),
+        },
+        expiresAt: new Date(now + 604_800_000).toISOString(),
+        generation,
+        invocationId: `b1.${now}.${'a'.repeat(32)}${crypto.randomUUID().replaceAll('-', '')}`,
+        jobId: `bj_${crypto.randomUUID()}`,
+        payloadFingerprint: 'a'.repeat(64),
+        providerId: registration.providerId,
+        status: 'awaiting_approval',
+      },
+      ownerLabel: 'ses_parent_a',
+      type: 'provider_job',
+      ...overrides,
+    };
+  };
+  return {
+    connection,
+    delivery,
+    dispatch,
+    enqueue: (message: Delivery) => {
+      queued.set(message.job.jobId, message);
+      rows.set(message.job.jobId, { ...message.job, status: 'queued' });
+      snapshot();
+    },
+    events,
+    heartbeatTimes,
+    outbound,
+    renew,
+    rows,
+    send,
+    setApprovalAck: (value: boolean) => {
+      acknowledgeApproval = value;
+    },
+    setFence: (value: Fence) => {
+      fence = value;
+    },
+    setHeartbeatAck: (value: boolean) => {
+      acknowledgeHeartbeat = value;
+    },
+    setState,
+    setTerminalAck: (value: boolean) => {
+      acknowledgeTerminal = value;
+    },
+    settle,
+    snapshot,
+  };
+};
+const setup = async (enabled = true, supportsLocks = true) => {
+  const transport = relay();
+  const coordinator = createBrowserExecutionCoordinator({
+    locks: supportsLocks ? (nativeLocks as LockManager) : undefined,
+    storageArea: storage,
+  });
+  const runtime = createBrowserTaskProviderRuntime({
+    auth,
+    connection: transport.connection,
+    coordinator,
+    organizationId: 'org-approved',
+    storageArea: storage,
+    supportsImages: () => true,
+  });
+  runtimes.push(runtime);
+  await runtime.start();
+  if (enabled && supportsLocks) {
+    await runtime.setSettings(defaults);
+  }
+  return { coordinator, runtime, transport };
+};
+const waitForConsent = async (runtime: BrowserTaskProviderRuntime) => {
+  await waitFor(() => {
+    expect(runtime.getSnapshot().phase).toBe('awaiting_approval');
+  });
+};
+const waitForDone = async (runtime: BrowserTaskProviderRuntime) => {
+  await waitFor(() => {
+    expect(runtime.getSnapshot().active).toBeUndefined();
+  });
+};
+
+describe('enabled browser provider owner', () => {
+  beforeEach(() => {
+    vi.stubGlobal('crypto', webcrypto);
+    fixture.actions = [];
+    fixture.writes = [];
+    fixture.failWrite = '';
+    fixture.values.clear();
+    fixture.values.set(AUTH_STORAGE_KEY, auth);
+    fixture.tabs = [
+      { id: 7, title: 'Approved tab', url: 'https://example.test/task' },
+      { id: 8, title: 'Other tab', url: 'https://other.test/' },
+    ];
+    fixture.turn = async (context, events) => {
+      context.executionGuard();
+      fixture.actions.push(
+        `run:${context.selectedTab.id}:${events.filter(event => event.type === 'message' && event.role === 'user').length}`
+      );
+      context.appendEvents([createAssistantMessage('Observed the requested page.')]);
+      return outcome();
+    };
+    getDefaultStore().set(pendingApprovalAtom, undefined);
+    getDefaultStore().set(pendingLockAtom, false);
+  });
+  afterEach(async () => {
+    await Promise.all(localLeases.splice(0).map(lease => lease.release()));
+    await Promise.all(runtimes.splice(0).map(runtime => runtime.dispose()));
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    fixture.watchers.clear();
+    fixture.removed.clear();
+    fixture.permissions.clear();
+    fixture.updated.clear();
+  });
+
+  it('stays disabled with an empty queue until a model is explicitly selected', async () => {
+    const { runtime, transport } = await setup(false);
+    expect(runtime.getSnapshot()).toMatchObject({
+      active: undefined,
+      jobs: [],
+      phase: 'disabled',
+      settings: { enabled: false, mode: 'safe', model: '' },
+    });
+    await runtime.setSettings({ ...defaults, model: '' });
+    expect(runtime.getSnapshot()).toMatchObject({
+      message: expect.stringContaining('Select a model'),
+      retryable: false,
+    });
+    expect(transport.outbound).toHaveLength(0);
+    expect(fixture.actions).toStrictEqual([]);
+  });
+
+  it('keeps a competing panel away from profile proof and delegated work', async () => {
+    const first = await setup();
+    const writes = [...fixture.writes];
+    const second = await setup(false);
+    expect(second.runtime.getSnapshot()).toMatchObject({
+      message: expect.stringContaining('Another panel'),
+      phase: 'owned_elsewhere',
+      profile: undefined,
+    });
+    expect(fixture.writes).toStrictEqual(writes);
+    expect(second.transport.outbound).toStrictEqual([]);
+    expect(JSON.stringify(first.runtime.getSnapshot())).not.toContain('providerProof');
+  });
+
+  it.each([
+    { phase: 'unsupported', reason: 'unsupported', retryable: false },
+    { phase: 'unavailable', reason: 'provider_unavailable', retryable: true },
+  ] as const)('exposes $phase without a stale connecting state', async expected => {
+    const { runtime, transport } = await setup();
+    transport.setState({
+      reason: expected.reason,
+      retryable: expected.retryable,
+      status: 'unavailable',
+    });
+    transport.send(transport.delivery());
+    expect(runtime.getSnapshot()).toMatchObject({
+      active: undefined,
+      phase: expected.phase,
+      retryable: expected.retryable,
+    });
+    expect(fixture.actions).toStrictEqual([]);
+  });
+
+  it('fails closed when native Web Locks are unavailable', async () => {
+    const { runtime, transport } = await setup(false, false);
+    expect(runtime.getSnapshot()).toMatchObject({
+      message: expect.stringContaining('Web Locks'),
+      phase: 'unsupported',
+    });
+    expect(fixture.values.has(BROWSER_PROVIDER_IDENTITY_KEY)).toBe(false);
+    expect(transport.outbound).toStrictEqual([]);
+  });
+
+  it('persists consent, waits for relay running, and records history before result and quiescence', async () => {
+    const { runtime, transport } = await setup();
+    transport.setApprovalAck(false);
+    const message = transport.delivery();
+    transport.dispatch(message);
+    await waitForConsent(runtime);
+    expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({
+      jobs: [{ approval: null, intent: { goal: message.goal } }],
+    });
+    await runtime.approve(message.job.jobId, 7);
+    await waitFor(() => {
+      expect(transport.outbound.some(frame => frame.type === 'provider_approval')).toBe(true);
+    });
+    expect(fixture.actions).toStrictEqual([]);
+    expect(runtime.getSnapshot().active).toMatchObject({
+      approval: {
+        settings: {
+          mode: 'safe',
+          model: 'selected-model',
+          organizationId: 'org-approved',
+          thinkingEffort: 'high',
+        },
+        tab: { tabId: 7, title: 'Approved tab', url: 'https://example.test/task' },
+      },
+      goal: message.goal,
+      ownerLabel: 'ses_parent_a',
+    });
+    transport.snapshot();
+    await waitForDone(runtime);
+    expect(fixture.actions).toStrictEqual(['run:7:1']);
+    expect(runtime.getSnapshot()).toMatchObject({
+      phase: 'idle',
+      result: { evidence: [], status: 'succeeded', summary: 'Observed the requested page.' },
+    });
+    expect(transport.events.slice(-2)).toStrictEqual(['result', 'quiesced']);
+    expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({
+      histories: [{ events: [{ text: message.goal }, { text: 'Observed the requested page.' }] }],
+    });
+  });
+
+  it('freezes settings at approval while local runs drain and never retargets an active tab', async () => {
+    const { coordinator, runtime, transport } = await setup();
+    const local = await coordinator.acquireLocal();
+    if (!local.admitted) {
+      throw new Error(local.reason);
+    }
+    localLeases.push(local.lease);
+    const message = transport.delivery();
+    transport.dispatch(message);
+    await waitForConsent(runtime);
+    await runtime.approve(message.job.jobId, 7);
+    await waitFor(() => {
+      expect(runtime.getSnapshot().phase).toBe('waiting');
+    });
+    await runtime.setSettings({
+      ...defaults,
+      mode: 'dangerous',
+      model: 'later-model',
+      thinkingEffort: 'low',
+    });
+    fixture.tabs.reverse();
+    expect(runtime.getSnapshot().active?.approval?.settings).toMatchObject({
+      mode: 'safe',
+      model: 'selected-model',
+      thinkingEffort: 'high',
+    });
+    expect(runtime.getSnapshot().active?.job.deadlines.approval).toBe(
+      message.job.deadlines.approval
+    );
+    expect((await coordinator.acquireLocal()).admitted).toBe(false);
+    await local.lease.release();
+    await waitForDone(runtime);
+    expect(fixture.actions).toStrictEqual(['run:7:1']);
+    expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({
+      jobs: [{ approval: { settings: { mode: 'safe', model: 'selected-model' } } }],
+    });
+  });
+
+  it('looks up duplicates and continues only isolated browser history with fresh consent', async () => {
+    const { runtime, transport } = await setup();
+    fixture.values.set('local:kiloAgentConversations', {
+      transcript: 'parent or local transcript must not enter',
+    });
+    const first = transport.delivery();
+    transport.dispatch(first);
+    await waitForConsent(runtime);
+    transport.send(first);
+    await runtime.approve(first.job.jobId, 7);
+    await waitForDone(runtime);
+    transport.send(first);
+    await runtime.refreshStatus();
+    const next = transport.delivery({ conversationMode: 'continue', goal: 'Read a follow-up.' });
+    next.job.browserTaskId = first.job.browserTaskId;
+    transport.dispatch(next);
+    await waitForConsent(runtime);
+    expect(runtime.getSnapshot().active?.approval).toBeUndefined();
+    expect(fixture.actions).toStrictEqual(['run:7:1']);
+    await runtime.approve(next.job.jobId, 8);
+    await waitForDone(runtime);
+    expect(fixture.actions).toStrictEqual(['run:7:1', 'run:8:2']);
+    expect(JSON.stringify(fixture.values.get(BROWSER_TASK_STORAGE_KEY))).not.toContain(
+      'parent or local transcript'
+    );
+  });
+
+  it.each(['accept', 'approve', 'finish'] as const)(
+    'does not announce unrecorded work when %s storage fails',
+    async phase => {
+      const { runtime, transport } = await setup();
+      const message = transport.delivery();
+      if (phase === 'accept') {
+        fixture.failWrite = BROWSER_TASK_STORAGE_KEY;
+      }
+      transport.dispatch(message);
+      if (phase !== 'accept') {
+        await waitForConsent(runtime);
+        if (phase === 'approve') {
+          fixture.failWrite = BROWSER_TASK_STORAGE_KEY;
+        }
+        if (phase === 'finish') {
+          fixture.turn = async context => {
+            fixture.actions.push('executed');
+            context.appendEvents([createAssistantMessage('Not persisted')]);
+            fixture.failWrite = BROWSER_TASK_STORAGE_KEY;
+            return outcome();
+          };
+        }
+        await runtime.approve(message.job.jobId, 7);
+      }
+      await waitForDone(runtime);
+      expect(transport.outbound.filter(frame => frame.type === 'provider_result')).toStrictEqual(
+        []
+      );
+      expect(fixture.actions).toStrictEqual(phase === 'finish' ? ['executed'] : []);
+      expect(JSON.stringify(runtime.getSnapshot())).not.toContain('Private storage failure');
+      expect(runtime.getSnapshot()).toMatchObject({
+        message: expect.stringContaining('storage is unavailable'),
+        retryable: true,
+      });
+      fixture.failWrite = '';
+    }
+  );
+
+  it('cancels queued work with provider authority, without disturbing the active approval', async () => {
+    const { runtime, transport } = await setup();
+    const active = transport.delivery();
+    transport.dispatch(active);
+    await waitForConsent(runtime);
+    const queued = { ...transport.delivery().job, status: 'queued' as const };
+    transport.rows.set(queued.jobId, queued);
+    transport.snapshot();
+    runtime.cancel(queued.jobId);
+    expect(runtime.getSnapshot().active?.job.jobId).toBe(active.job.jobId);
+    expect(transport.rows.get(queued.jobId)?.status).toBe('cancelled');
+    expect(transport.outbound.filter(frame => frame.type === 'provider_cancel')).toMatchObject([
+      { generation: queued.generation, jobId: queued.jobId, providerId: queued.providerId },
+    ]);
+    expect(
+      JSON.stringify(transport.outbound.filter(frame => frame.type === 'provider_cancel'))
+    ).not.toContain('capability');
+    expect(fixture.actions).toStrictEqual([]);
+  });
+
+  it('cancels a pending memory approval and prevents any later agent action or stale save', async () => {
+    const { runtime, transport } = await setup();
+    fixture.turn = async context => {
+      await context.requestApproval('memory', {
+        createdAt: Date.now(),
+        pageTitle: 'Approved tab',
+        pageUrl: 'https://example.test/task',
+        text: 'A memory',
+      });
+      context.executionGuard();
+      fixture.actions.push('after approval');
+      return outcome();
+    };
+    const message = transport.delivery();
+    transport.dispatch(message);
+    await waitForConsent(runtime);
+    await runtime.approve(message.job.jobId, 7);
+    await waitFor(() => {
+      expect(getDefaultStore().get(pendingApprovalAtom)?.kind).toBe('memory');
+    });
+    const pending = getDefaultStore().get(pendingApprovalAtom);
+    if (pending === undefined) {
+      throw new Error('Missing approval');
+    }
+    runtime.cancel(message.job.jobId);
+    await waitForDone(runtime);
+    expect(
+      (await applyApprovalDecision(storage, 'memory', pending.draft, true, pending)).status
+    ).toBe('aborted');
+    expect(fixture.actions).toStrictEqual([]);
+    expect(getDefaultStore().get(pendingApprovalAtom)).toBeUndefined();
+    expect(fixture.values.has('local:kiloAgentMemories')).toBe(false);
+    expect(runtime.getSnapshot().result?.status).toBe('cancelled');
+  });
+
+  it('waits for an issued action to unwind after Stop and keeps uncertain execution quarantined', async () => {
+    const { coordinator, runtime, transport } = await setup();
+    const gate = Promise.withResolvers<void>();
+    fixture.turn = async context => {
+      context.executionGuard();
+      fixture.actions.push('issued');
+      await gate.promise;
+      context.executionGuard();
+      fixture.actions.push('subsequent');
+      return outcome();
+    };
+    const message = transport.delivery();
+    transport.dispatch(message);
+    await waitForConsent(runtime);
+    await runtime.approve(message.job.jobId, 7);
+    await waitFor(() => {
+      expect(fixture.actions).toStrictEqual(['issued']);
+    });
+    runtime.cancel(message.job.jobId);
+    expect((await coordinator.acquireLocal()).admitted).toBe(false);
+    expect(transport.events).not.toContain('quiesced');
+    gate.resolve();
+    await waitForDone(runtime);
+    expect(fixture.actions).toStrictEqual(['issued']);
+    expect(runtime.getSnapshot().result).toMatchObject({
+      effectsUncertain: true,
+      status: 'cancelled',
+    });
+    expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({ tabIds: [7] });
+    expect((await coordinator.acquireLocal()).admitted).toBe(false);
+    expect(transport.events).not.toContain('quiesced');
+  });
+
+  it.each([undefined, 7])(
+    'recovers an expired fence with tab %s by status, closure, and a fresh generation',
+    async tabId => {
+      const { runtime, transport } = await setup();
+      const fence: Fence = {
+        invocationId: `b1.${Date.now() - 700_000_000}.${'b'.repeat(64)}`,
+        ...(tabId === undefined ? {} : { tabId }),
+      };
+      transport.setFence(fence);
+      transport.setState({
+        reason: 'provider_unavailable',
+        retryable: true,
+        status: 'unavailable',
+      });
+      if (tabId !== undefined) {
+        const bound = fixture.tabs.find(tab => tab.id === tabId);
+        if (bound === undefined) {
+          throw new Error('Missing affected tab');
+        }
+        bound.url = 'chrome://settings';
+        await runtime.recover();
+        expect(transport.events).not.toContain('recovered');
+        fixture.tabs = fixture.tabs.filter(tab => tab.id !== tabId);
+      }
+      await runtime.recover();
+      expect(transport.events.indexOf('status')).toBeLessThan(
+        transport.events.indexOf('recovered')
+      );
+      expect(
+        transport.outbound.findLast(frame => frame.type === 'provider_register')
+      ).toMatchObject({
+        recovery: { invocationId: fence.invocationId, locksDrained: true, tabClosed: true },
+      });
+      if (tabId === undefined) {
+        expect(JSON.stringify(transport.outbound.at(-1))).not.toContain('tabId');
+      }
+      expect(runtime.getSnapshot()).toMatchObject({ active: undefined, phase: 'idle' });
+      expect(fixture.actions).toStrictEqual([]);
+      const fresh = transport.delivery({ goal: 'Explicit work after recovery.' });
+      transport.dispatch(fresh);
+      await waitForConsent(runtime);
+      await runtime.approve(fresh.job.jobId, 8);
+      await waitForDone(runtime);
+      expect(fixture.actions).toStrictEqual(['run:8:1']);
+    }
+  );
+
+  it('passes every open tab to all-tabs recovery, including tabs outside the affected list', async () => {
+    const { runtime, transport } = await setup();
+    fixture.values.set(BROWSER_EXECUTION_SAFETY_KEY, { allTabs: true, tabIds: [7], version: 1 });
+    fixture.tabs = fixture.tabs.filter(tab => tab.id !== 7);
+    const fence = { invocationId: `b1.${Date.now() - 700_000_000}.${'c'.repeat(64)}` };
+    transport.setFence(fence);
+    await runtime.recover();
+    expect(runtime.getSnapshot().message).toContain('Close all target tabs');
+    expect(transport.events).not.toContain('recovered');
+    fixture.tabs = [];
+    await runtime.recover();
+    expect(runtime.getSnapshot().phase).toBe('idle');
+    expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+      tabIds: [],
+      version: 1,
+    });
+  });
+
+  it('keeps the account-independent fence when authentication clears during issued work', async () => {
+    const { runtime, transport } = await setup();
+    const gate = Promise.withResolvers<void>();
+    fixture.turn = async context => {
+      fixture.actions.push('issued');
+      await gate.promise;
+      context.executionGuard();
+      fixture.actions.push('later');
+      return outcome();
+    };
+    const message = transport.delivery();
+    transport.dispatch(message);
+    await waitForConsent(runtime);
+    await runtime.approve(message.job.jobId, 7);
+    await waitFor(() => {
+      expect(fixture.actions).toStrictEqual(['issued']);
+    });
+    const disposing = runtime.dispose();
+    await waitFor(() => {
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({ tabIds: [7] });
+    });
+    await clearStoredSession({
+      removeItems: keys => {
+        for (const key of keys) {
+          fixture.values.delete(key);
+        }
+      },
+      snapshot: () =>
+        Object.fromEntries([...fixture.values].map(([key, value]) => [key.slice(6), value])),
+    });
+    gate.resolve();
+    await disposing;
+    expect(fixture.actions).toStrictEqual(['issued']);
+    expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({ tabIds: [7] });
+    expect(fixture.values.has(BROWSER_TASK_STORAGE_KEY)).toBe(false);
+  });
+
+  it('rejects stale generations and running snapshots that have no live consent', async () => {
+    const { runtime, transport } = await setup();
+    const stale = transport.delivery();
+    stale.job.generation += 1;
+    transport.send(stale);
+    const historical = transport.delivery().job;
+    transport.send({
+      generation: historical.generation,
+      jobs: [
+        {
+          ...historical,
+          approvedTab: {
+            effectiveMode: 'safe',
+            tabId: 7,
+            title: 'Old consent',
+            url: 'https://example.test/',
+          },
+          status: 'running',
+        },
+      ],
+      providerId: historical.providerId,
+      type: 'provider_snapshot',
+    });
+    await runtime.refreshStatus();
+    expect({ actions: fixture.actions, active: runtime.getSnapshot().active }).toStrictEqual({
+      actions: [],
+      active: undefined,
+    });
+    expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({ jobs: [] });
+  });
+
+  it('keeps relay cancellation immutable when a late success snapshot arrives', async () => {
+    const { runtime, transport } = await setup();
+    const message = transport.delivery();
+    transport.dispatch(message);
+    await waitForConsent(runtime);
+    runtime.cancel(message.job.jobId);
+    await waitForDone(runtime);
+    const late: BrowserJobSnapshot = {
+      ...message.job,
+      result: {
+        browserTaskId: message.job.browserTaskId,
+        effectsUncertain: false,
+        evidence: [],
+        invocationId: message.job.invocationId,
+        jobId: message.job.jobId,
+        providerId: message.job.providerId,
+        reason: 'completed',
+        status: 'succeeded',
+        summary: 'Late success',
+      },
+      status: 'succeeded',
+    };
+    transport.send({
+      generation: message.job.generation,
+      jobs: [late],
+      providerId: message.job.providerId,
+      type: 'provider_snapshot',
+    });
+    expect(runtime.getSnapshot()).toMatchObject({
+      jobs: [{ jobId: message.job.jobId, status: 'cancelled' }],
+      result: { reason: 'cancelled', status: 'cancelled' },
+    });
+    expect(fixture.actions).toStrictEqual([]);
+  });
+
+  it.each(['rejection', 'cancellation', 'cancellation while waiting'] as const)(
+    'offers fresh FIFO consent after %s without recovery',
+    async termination => {
+      const { coordinator, runtime, transport } = await setup();
+      let local: BrowserExecutionLease | undefined;
+      if (termination === 'cancellation while waiting') {
+        const admission = await coordinator.acquireLocal();
+        if (!admission.admitted) {
+          throw new Error(admission.reason);
+        }
+        local = admission.lease;
+        localLeases.push(local);
+      }
+      const first = transport.delivery();
+      const next = transport.delivery({ goal: 'Read the next page.', ownerLabel: 'ses_parent_b' });
+      transport.dispatch(first);
+      await waitForConsent(runtime);
+      transport.enqueue(next);
+      if (local !== undefined) {
+        await runtime.approve(first.job.jobId, 7);
+        await waitFor(() => {
+          expect(runtime.getSnapshot().phase).toBe('waiting');
+        });
+      }
+      transport.setTerminalAck(false);
+      if (termination === 'rejection') {
+        runtime.reject(first.job.jobId);
+      } else {
+        runtime.cancel(first.job.jobId);
+      }
+      const reason = termination === 'rejection' ? 'approval_denied' : 'cancelled';
+      await waitFor(() => {
+        expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({
+          jobs: [{ approval: null, snapshot: { result: { effectsUncertain: false, reason } } }],
+        });
+      });
+      expect(runtime.getSnapshot().active?.job.jobId).toBe(first.job.jobId);
+      expect(transport.connection.getBrowserProviderState().status).toBe('registered');
+      expect(transport.rows.get(next.job.jobId)?.status).toBe('queued');
+      expect(transport.events).not.toContain('quiesced');
+      expect(fixture.actions).toStrictEqual([]);
+
+      transport.setTerminalAck(true);
+      transport.snapshot();
+      await waitFor(() => {
+        expect(runtime.getSnapshot()).toMatchObject({
+          active: { approval: undefined, goal: next.goal, job: { jobId: next.job.jobId } },
+          phase: 'awaiting_approval',
+          result: { reason },
+        });
+      });
+      expect(
+        transport.outbound.find(frame => frame.type === 'provider_quiesced')
+      ).not.toHaveProperty('tabId');
+      expect(fixture.actions).toStrictEqual([]);
+      await local?.release();
+      await waitFor(() => {
+        expect(coordinator.getSnapshot().delegated).toBe('idle');
+      });
+      await runtime.approve(next.job.jobId, 8);
+      await waitForDone(runtime);
+      expect(fixture.actions).toStrictEqual(['run:8:1']);
+      expect(runtime.getSnapshot().phase).toBe('idle');
+      expect(transport.rows.get(first.job.jobId)?.result).toMatchObject({ reason });
+      expect(transport.events).not.toContain('recovered');
+    }
+  );
+
+  it.each(['rejection', 'cancellation'] as const)(
+    'preserves the next consent when a stale tab approval resumes after %s',
+    async termination => {
+      const { runtime, transport } = await setup();
+      const idleMessage = runtime.getSnapshot().message;
+      const first = transport.delivery();
+      const next = transport.delivery({ goal: 'Read the next page.', ownerLabel: 'ses_parent_b' });
+      transport.dispatch(first);
+      await waitForConsent(runtime);
+      transport.enqueue(next);
+      const tabs = await browser.tabs.query({});
+      const tabsApi: {
+        query: (queryInfo: Parameters<typeof browser.tabs.query>[0]) => Promise<typeof tabs>;
+      } = browser.tabs;
+      const enumerating = Promise.withResolvers<void>();
+      const resume = Promise.withResolvers<void>();
+      const query = vi.spyOn(tabsApi, 'query').mockImplementationOnce(async () => {
+        enumerating.resolve();
+        await resume.promise;
+        return tabs;
+      });
+      const approving = runtime.approve(first.job.jobId, 7);
+      try {
+        await enumerating.promise;
+        if (termination === 'rejection') {
+          runtime.reject(first.job.jobId);
+        } else {
+          runtime.cancel(first.job.jobId);
+        }
+        await waitFor(() => {
+          expect(runtime.getSnapshot()).toMatchObject({
+            active: {
+              approval: undefined,
+              goal: next.goal,
+              job: { jobId: next.job.jobId },
+              ownerLabel: next.ownerLabel,
+            },
+            phase: 'awaiting_approval',
+          });
+        });
+        const awaitingConsent = runtime.getSnapshot();
+        resume.resolve();
+        await approving;
+        expect(runtime.getSnapshot()).toStrictEqual(awaitingConsent);
+        expect(fixture.actions).toStrictEqual([]);
+        await runtime.approve(next.job.jobId, 8);
+        await waitForDone(runtime);
+        expect(fixture.actions).toStrictEqual(['run:8:1']);
+        expect(runtime.getSnapshot()).toMatchObject({
+          message: idleMessage,
+          phase: 'idle',
+          result: { jobId: next.job.jobId, reason: 'completed', status: 'succeeded' },
+        });
+      } finally {
+        resume.resolve();
+        await approving;
+        query.mockRestore();
+      }
+    }
+  );
+
+  it.each([
+    { reason: 'provider_unavailable', retryable: true },
+    { reason: 'permission_denied', retryable: false },
+  ] as const)(
+    'reports current tab approval failure $reason without starting work',
+    async failure => {
+      const { runtime, transport } = await setup();
+      const message = transport.delivery();
+      transport.dispatch(message);
+      await waitForConsent(runtime);
+      const tabs = await browser.tabs.query({});
+      const tabsApi: {
+        query: (queryInfo: Parameters<typeof browser.tabs.query>[0]) => Promise<typeof tabs>;
+      } = browser.tabs;
+      const query = vi
+        .spyOn(tabsApi, 'query')
+        .mockRejectedValueOnce(new BrowserProviderError(failure.reason, failure.retryable));
+      try {
+        await runtime.approve(message.job.jobId, 7);
+        expect(runtime.getSnapshot()).toMatchObject({
+          active: { approval: undefined, job: { jobId: message.job.jobId } },
+          message: expect.stringContaining(failure.reason),
+          phase: 'unavailable',
+          retryable: failure.retryable,
+        });
+        expect(fixture.actions).toStrictEqual([]);
+      } finally {
+        query.mockRestore();
+      }
+      if (failure.retryable) {
+        await runtime.approve(message.job.jobId, 7);
+        await waitForDone(runtime);
+        expect(fixture.actions).toStrictEqual(['run:7:1']);
+        expect(runtime.getSnapshot().result).toMatchObject({ status: 'succeeded' });
+      } else {
+        runtime.reject(message.job.jobId);
+        await waitForDone(runtime);
+        expect(fixture.actions).toStrictEqual([]);
+        expect(runtime.getSnapshot().result).toMatchObject({ reason: 'approval_denied' });
+      }
+    }
+  );
+
+  it.each(['drained', 'failed'] as const)(
+    'waits for a %s lease release before acknowledging quiescence',
+    async releaseOutcome => {
+      const { coordinator, runtime, transport } = await setup();
+      const releasing = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const acquire = coordinator.acquireDelegated;
+      const admissionSpy = vi
+        .spyOn(coordinator, 'acquireDelegated')
+        .mockImplementationOnce(async (...args) => {
+          const admission = await acquire(...args);
+          if (!admission.admitted) {
+            return admission;
+          }
+          localLeases.push(admission.lease);
+          return {
+            admitted: true,
+            lease: {
+              ...admission.lease,
+              release: async () => {
+                releasing.resolve();
+                await release.promise;
+                if (releaseOutcome === 'failed') {
+                  throw new Error('Execution lease did not drain');
+                }
+                await admission.lease.release();
+              },
+            },
+          };
+        });
+      const first = transport.delivery();
+      const next = transport.delivery({ goal: 'Read after drainage.' });
+      transport.dispatch(first);
+      await waitForConsent(runtime);
+      transport.enqueue(next);
+      await runtime.approve(first.job.jobId, 7);
+      await releasing.promise;
+      admissionSpy.mockRestore();
+      try {
+        expect(runtime.getSnapshot().active?.job.status).toBe('succeeded');
+        expect(transport.rows.get(next.job.jobId)?.status).toBe('queued');
+        expect(transport.events).not.toContain('quiesced');
+      } finally {
+        release.resolve();
+      }
+      if (releaseOutcome === 'failed') {
+        await waitForDone(runtime);
+        expect(runtime.getSnapshot().phase).toBe('recovery');
+        expect(transport.rows.get(next.job.jobId)?.status).toBe('queued');
+        expect(transport.events).not.toContain('quiesced');
+      } else {
+        await waitFor(() => {
+          expect(runtime.getSnapshot()).toMatchObject({
+            active: { approval: undefined, job: { jobId: next.job.jobId } },
+            phase: 'awaiting_approval',
+          });
+        });
+      }
+      expect(fixture.actions).toStrictEqual(['run:7:1']);
+    }
+  );
+
+  it.each(['workflow', 'memory', 'browser'] as const)(
+    'invalidates %s authority revoked during pending tab enumeration',
+    async permission => {
+      const { runtime, transport } = await setup();
+      const key =
+        permission === 'workflow' ? 'local:kiloWorkflowSettings' : 'local:kiloMemorySettings';
+      const flag =
+        permission === 'workflow' ? 'allowWorkflowsInSafeMode' : 'autoApproveMemorySaves';
+      await storage.setItem(key, { [flag]: true });
+      const message = transport.delivery();
+      transport.dispatch(message);
+      await waitForConsent(runtime);
+      const tabs = await browser.tabs.query({});
+      const tabsApi: {
+        query: (queryInfo: Parameters<typeof browser.tabs.query>[0]) => Promise<typeof tabs>;
+      } = browser.tabs;
+      const enumerating = Promise.withResolvers<void>();
+      const resume = Promise.withResolvers<void>();
+      const query = vi.spyOn(tabsApi, 'query').mockImplementationOnce(async () => {
+        enumerating.resolve();
+        await resume.promise;
+        return tabs;
+      });
+      const approving = runtime.approve(message.job.jobId, 7);
+      await enumerating.promise;
+      if (permission === 'browser') {
+        for (const listener of fixture.permissions) {
+          listener();
+        }
+      } else {
+        await storage.setItem(key, { [flag]: false });
+      }
+      resume.resolve();
+      await approving;
+      query.mockRestore();
+      await waitForDone(runtime);
+      expect(fixture.actions).toStrictEqual([]);
+      expect(runtime.getSnapshot().result).toMatchObject({ reason: 'permission_denied' });
+      expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({
+        jobs: [{ approval: null, snapshot: { result: { reason: 'permission_denied' } } }],
+      });
+      expect(transport.outbound.filter(frame => frame.type === 'provider_approval')).toStrictEqual(
+        []
+      );
+    }
+  );
+
+  it('ignores an old permission-read failure after FIFO advances to an approved job', async () => {
+    const { coordinator, runtime, transport } = await setup();
+    const local = await coordinator.acquireLocal();
+    if (!local.admitted) {
+      throw new Error(local.reason);
+    }
+    localLeases.push(local.lease);
+    const first = transport.delivery();
+    const next = transport.delivery({
+      goal: 'Read after cancellation.',
+      ownerLabel: 'ses_parent_b',
+    });
+    transport.dispatch(first);
+    await waitForConsent(runtime);
+    transport.enqueue(next);
+    await runtime.approve(first.job.jobId, 7);
+    await waitFor(() => {
+      expect(runtime.getSnapshot().phase).toBe('waiting');
+    });
+    const read = Promise.withResolvers<unknown>();
+    const reading = Promise.withResolvers<void>();
+    const storageApi = storage as { getItem: (key: string) => unknown };
+    const { getItem } = storageApi;
+    const spy = vi.spyOn(storageApi, 'getItem').mockImplementation(key => {
+      if (key === 'local:kiloRemoteMcpServers') {
+        reading.resolve();
+        return read.promise;
+      }
+      return getItem(key);
+    });
+    const running = Promise.withResolvers<void>();
+    const finish = Promise.withResolvers<void>();
+    fixture.turn = async context => {
+      running.resolve();
+      await finish.promise;
+      context.executionGuard();
+      fixture.actions.push('next job');
+      return outcome();
+    };
+    try {
+      await storage.setItem('local:kiloMemorySettings', { autoApproveMemorySaves: false });
+      await reading.promise;
+      spy.mockRestore();
+      runtime.cancel(first.job.jobId);
+      await waitFor(() => {
+        expect(runtime.getSnapshot()).toMatchObject({
+          active: { job: { jobId: next.job.jobId } },
+          phase: 'awaiting_approval',
+        });
+      });
+      await local.lease.release();
+      await runtime.approve(next.job.jobId, 8);
+      await running.promise;
+      await act(async () => {
+        read.reject(new Error('Old permission read failed'));
+        await expect(read.promise).rejects.toThrow('Old permission read failed');
+      });
+      expect(runtime.getSnapshot()).toMatchObject({
+        active: { job: { jobId: next.job.jobId } },
+        phase: 'running',
+      });
+      finish.resolve();
+      await waitForDone(runtime);
+      expect(fixture.actions).toStrictEqual(['next job']);
+      expect(runtime.getSnapshot().result).toMatchObject({
+        jobId: next.job.jobId,
+        reason: 'completed',
+      });
+      expect(transport.outbound.some(frame => frame.type === 'provider_unavailable')).toBe(false);
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).not.toMatchObject({ tabIds: [8] });
+    } finally {
+      spy.mockRestore();
+      read.resolve({ servers: [] });
+      finish.resolve();
+    }
+  });
+
+  it.each(['workflow', 'memory'] as const)(
+    'blocks an approved %s action while permission validation waits for storage',
+    async permission => {
+      const { runtime, transport } = await setup();
+      const key =
+        permission === 'workflow' ? 'local:kiloWorkflowSettings' : 'local:kiloMemorySettings';
+      const flag =
+        permission === 'workflow' ? 'allowWorkflowsInSafeMode' : 'autoApproveMemorySaves';
+      await storage.setItem(key, { [flag]: true });
+      const running = Promise.withResolvers<void>();
+      const actNow = Promise.withResolvers<void>();
+      fixture.turn = async context => {
+        running.resolve();
+        await actNow.promise;
+        context.executionGuard();
+        fixture.actions.push(`revoked ${permission} action`);
+        return outcome();
+      };
+      const message = transport.delivery();
+      transport.dispatch(message);
+      await waitForConsent(runtime);
+      await runtime.approve(message.job.jobId, 7);
+      await running.promise;
+      const read = Promise.withResolvers<unknown>();
+      const reading = Promise.withResolvers<void>();
+      const storageApi = storage as { getItem: (key: string) => unknown };
+      const { getItem } = storageApi;
+      const spy = vi.spyOn(storageApi, 'getItem').mockImplementation(storageKey => {
+        if (storageKey === 'local:kiloRemoteMcpServers') {
+          reading.resolve();
+          return read.promise;
+        }
+        return getItem(storageKey);
+      });
+      try {
+        await storage.setItem(key, { [flag]: false });
+        await reading.promise;
+        actNow.resolve();
+        await waitForDone(runtime);
+        expect(fixture.actions).toStrictEqual([]);
+        expect(runtime.getSnapshot().result).toMatchObject({ reason: 'permission_denied' });
+      } finally {
+        spy.mockRestore();
+        read.resolve({ servers: [] });
+        actNow.resolve();
+      }
+    }
+  );
+
+  it('requires every overlapping permission check before unchanged authority can run', async () => {
+    const { runtime, transport } = await setup();
+    const running = Promise.withResolvers<() => void>();
+    const finish = Promise.withResolvers<void>();
+    fixture.turn = async context => {
+      running.resolve(context.executionGuard);
+      await finish.promise;
+      context.executionGuard();
+      fixture.actions.push('validated action');
+      return outcome();
+    };
+    const message = transport.delivery();
+    transport.dispatch(message);
+    await waitForConsent(runtime);
+    await runtime.approve(message.job.jobId, 7);
+    const guard = await running.promise;
+    const first = Promise.withResolvers<unknown>();
+    const second = Promise.withResolvers<unknown>();
+    const reads = [first, second];
+    const storageApi = storage as { getItem: (key: string) => unknown };
+    const { getItem } = storageApi;
+    const spy = vi.spyOn(storageApi, 'getItem').mockImplementation(key => {
+      if (key === 'local:kiloRemoteMcpServers') {
+        return reads.shift()?.promise;
+      }
+      return getItem(key);
+    });
+    try {
+      await storage.setItem('local:kiloMemorySettings', { autoApproveMemorySaves: false });
+      await storage.setItem('local:kiloWorkflowSettings', { allowWorkflowsInSafeMode: false });
+      expect(reads).toHaveLength(0);
+      expect(guard).toThrow('permission_denied');
+      await act(async () => {
+        first.resolve({ servers: [] });
+        await first.promise;
+      });
+      expect(guard).toThrow('permission_denied');
+      await act(async () => {
+        second.resolve({ servers: [] });
+        await second.promise;
+      });
+      expect(guard).not.toThrow();
+      finish.resolve();
+      await waitForDone(runtime);
+      expect(fixture.actions).toStrictEqual(['validated action']);
+      expect(runtime.getSnapshot().result?.reason).toBe('completed');
+    } finally {
+      spy.mockRestore();
+      first.resolve({ servers: [] });
+      second.resolve({ servers: [] });
+      finish.resolve();
+    }
+  });
+
+  it.each(['binding', 'closed', 'uninspectable'] as const)(
+    'interrupts %s tab loss before the next action',
+    async kind => {
+      const { runtime, transport } = await setup();
+      const gate = Promise.withResolvers<void>();
+      fixture.turn = async context => {
+        fixture.actions.push('issued');
+        await gate.promise;
+        context.executionGuard();
+        fixture.actions.push('later');
+        return outcome();
+      };
+      const message = transport.delivery();
+      transport.dispatch(message);
+      await waitForConsent(runtime);
+      await runtime.approve(message.job.jobId, 7);
+      await waitFor(() => {
+        expect(fixture.actions).toStrictEqual(['issued']);
+      });
+      const running = transport.rows.get(message.job.jobId);
+      if (running?.approvedTab === undefined) {
+        throw new Error('Missing running fixture');
+      }
+      if (kind === 'binding') {
+        transport.rows.set(running.jobId, {
+          ...running,
+          approvedTab: { ...running.approvedTab, tabId: 8 },
+        });
+        transport.snapshot();
+      }
+      if (kind === 'closed') {
+        fixture.tabs = fixture.tabs.filter(tab => tab.id !== 7);
+        for (const listener of fixture.removed) {
+          listener(7);
+        }
+      }
+      if (kind === 'uninspectable') {
+        for (const listener of fixture.updated) {
+          listener(7, { url: 'chrome://settings' });
+        }
+      }
+      gate.resolve();
+      await waitForDone(runtime);
+      expect(fixture.actions).toStrictEqual(['issued']);
+      expect(runtime.getSnapshot().result).toMatchObject({
+        reason: 'tab_lost',
+        status: 'interrupted',
+      });
+    }
+  );
+
+  it('heartbeats every five seconds and cannot renew an expired local lease with a late acknowledgement', async () => {
+    vi.useFakeTimers();
+    const { runtime, transport } = await setup();
+    const start = Date.now();
+    const message = transport.delivery();
+    transport.dispatch(message);
+    await vi.waitFor(() => {
+      expect(runtime.getSnapshot().phase).toBe('awaiting_approval');
+    });
+    transport.setHeartbeatAck(false);
+    await vi.advanceTimersByTimeAsync(15_001);
+    await vi.waitFor(() => {
+      expect(runtime.getSnapshot().active).toBeUndefined();
+    });
+    expect(transport.heartbeatTimes.slice(0, 2)).toStrictEqual([start + 5000, start + 10_000]);
+    expect(runtime.getSnapshot().result?.reason).toBe('lease_expired');
+    transport.renew();
+    transport.dispatch(transport.delivery());
+    await vi.advanceTimersByTimeAsync(1);
+    expect({ actions: fixture.actions, active: runtime.getSnapshot().active }).toStrictEqual({
+      actions: [],
+      active: undefined,
+    });
+  });
+
+  it.each(['approval_timeout', 'execution_timeout'] as const)(
+    'enforces the relay %s deadline locally',
+    async reason => {
+      vi.useFakeTimers();
+      const { runtime, transport } = await setup();
+      const gate = Promise.withResolvers<void>();
+      fixture.turn = async context => {
+        fixture.actions.push('issued');
+        await gate.promise;
+        context.executionGuard();
+        fixture.actions.push('later');
+        return outcome();
+      };
+      const message = transport.delivery();
+      message.job.deadlines.approval = new Date(Date.now() + 1000).toISOString();
+      transport.dispatch(message);
+      await vi.waitFor(() => {
+        expect(runtime.getSnapshot().phase).toBe('awaiting_approval');
+      });
+      if (reason === 'execution_timeout') {
+        transport.setApprovalAck(false);
+        await runtime.approve(message.job.jobId, 7);
+        await vi.waitFor(() => {
+          expect(transport.rows.get(message.job.jobId)?.status).toBe('running');
+        });
+        const running = transport.rows.get(message.job.jobId);
+        if (running === undefined) {
+          throw new Error('Missing running fixture');
+        }
+        transport.rows.set(running.jobId, {
+          ...running,
+          deadlines: { ...running.deadlines, execution: new Date(Date.now() + 500).toISOString() },
+        });
+        transport.snapshot();
+        await vi.waitFor(() => {
+          expect(fixture.actions).toStrictEqual(['issued']);
+        });
+      }
+      await vi.advanceTimersByTimeAsync(1100);
+      gate.resolve();
+      await vi.waitFor(() => {
+        expect(runtime.getSnapshot().active).toBeUndefined();
+      });
+      expect(runtime.getSnapshot().result?.reason).toBe(reason);
+      expect(fixture.actions).not.toContain('later');
+    }
+  );
+
+  it.each(['disconnect', 'disable', 'permission', 'organization', 'auth'] as const)(
+    'aborts on %s while an issued action unwinds',
+    async cause => {
+      const { runtime, transport } = await setup();
+      const gate = Promise.withResolvers<void>();
+      let signal: AbortSignal | undefined;
+      fixture.turn = async context => {
+        ({ signal } = context.abort);
+        fixture.actions.push('issued');
+        await gate.promise;
+        context.executionGuard();
+        fixture.actions.push('later');
+        return outcome();
+      };
+      const message = transport.delivery();
+      transport.dispatch(message);
+      await waitForConsent(runtime);
+      await runtime.approve(message.job.jobId, 7);
+      await waitFor(() => {
+        expect(fixture.actions).toStrictEqual(['issued']);
+      });
+      if (cause === 'disconnect') {
+        transport.setState({ status: 'disconnected' });
+      }
+      if (cause === 'disable') {
+        await runtime.setSettings({ ...defaults, enabled: false });
+      }
+      if (cause === 'permission') {
+        for (const listener of fixture.permissions) {
+          listener();
+        }
+      }
+      if (cause === 'organization') {
+        await storage.setItem('local:kiloSelectedOrganizationId', 'new-org');
+      }
+      if (cause === 'auth') {
+        await storage.setItem(AUTH_STORAGE_KEY, {
+          token: 'other-token',
+          userEmail: 'other@example.test',
+        });
+      }
+      try {
+        expect(signal?.aborted).toBe(true);
+      } finally {
+        gate.resolve();
+        await runtime.dispose();
+      }
+      expect(fixture.actions).toStrictEqual(['issued']);
+      expect(transport.events).not.toContain('quiesced');
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({ tabIds: [7] });
+    }
+  );
+
+  it('withdraws a locally quarantined provider and recovers after the SDK clears its proof cache', async () => {
+    const { coordinator, runtime, transport } = await setup();
+    let proofAvailable = true;
+    const register = transport.connection.registerBrowserProvider;
+    const unavailable = transport.connection.markBrowserProviderUnavailable;
+    const status = transport.connection.requestBrowserProviderStatus;
+    transport.connection.registerBrowserProvider = input => {
+      proofAvailable = true;
+      return register(input);
+    };
+    transport.connection.markBrowserProviderUnavailable = input => {
+      proofAvailable = false;
+      unavailable(input);
+    };
+    transport.connection.requestBrowserProviderStatus = async () => {
+      if (!proofAvailable) {
+        throw new BrowserProviderError('provider_unavailable', true);
+      }
+      return status();
+    };
+    const admission = await coordinator.acquireLocal();
+    if (!admission.admitted) {
+      throw new Error(admission.reason);
+    }
+    localLeases.push(admission.lease);
+    await admission.lease.quarantine(8);
+    await admission.lease.release();
+    await waitFor(() => {
+      expect(runtime.getSnapshot().phase).toBe('recovery');
+    });
+    expect(transport.connection.getBrowserProviderState().status).toBe('unavailable');
+    fixture.tabs = fixture.tabs.filter(tab => tab.id !== 8);
+    await runtime.recover();
+    expect(runtime.getSnapshot().phase).toBe('idle');
+    expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+      tabIds: [],
+      version: 1,
+    });
+    expect(fixture.actions).toStrictEqual([]);
+  });
+
+  it('requires drained native locks before fresh recovery registration', async () => {
+    const { coordinator, runtime, transport } = await setup();
+    transport.setFence({ invocationId: `b1.${Date.now() - 700_000_000}.${'d'.repeat(64)}` });
+    const admission = await coordinator.acquireLocal();
+    if (!admission.admitted) {
+      throw new Error(admission.reason);
+    }
+    localLeases.push(admission.lease);
+    await runtime.recover();
+    expect(runtime.getSnapshot().message).toContain('unwinding');
+    expect(transport.events).not.toContain('recovered');
+    await admission.lease.release();
+    await runtime.recover();
+    expect(transport.events).toContain('recovered');
+    expect(fixture.actions).toStrictEqual([]);
+  });
+
+  it('reloads recorded work as status rather than replaying old consent or actions', async () => {
+    const { runtime, transport } = await setup();
+    const message = transport.delivery();
+    transport.dispatch(message);
+    await waitForConsent(runtime);
+    await runtime.dispose();
+    const coordinator = createBrowserExecutionCoordinator({
+      locks: nativeLocks as LockManager,
+      storageArea: storage,
+    });
+    const reopened = createBrowserTaskProviderRuntime({
+      auth,
+      connection: transport.connection,
+      coordinator,
+      organizationId: 'org-approved',
+      storageArea: storage,
+    });
+    runtimes.push(reopened);
+    await reopened.start();
+    transport.setState({ status: 'ready' });
+    await reopened.refreshStatus();
+    transport.send(message);
+    expect({ actions: fixture.actions, active: reopened.getSnapshot().active }).toStrictEqual({
+      actions: [],
+      active: undefined,
+    });
+    expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({
+      jobs: [{ snapshot: { status: 'interrupted' } }],
+    });
+    expect(transport.outbound.filter(frame => frame.type === 'provider_approval')).toStrictEqual(
+      []
+    );
+  });
+
+  it('owns and releases the provider through the injectable component lifetime', async () => {
+    vi.stubGlobal('navigator', { locks: nativeLocks });
+    const transport = relay();
+    const View = () => {
+      const { state } = useBrowserTask();
+      return <output>{state.phase}</output>;
+    };
+    const mounted = render(
+      <BrowserTaskProvider auth={auth} connection={transport.connection} organizationId={undefined}>
+        <View />
+      </BrowserTaskProvider>,
+      { reactStrictMode: true }
+    );
+    await screen.findByText('disabled');
+    expect((await nativeLocks.query()).held?.some(lock => lock.name === PROVIDER_OWNER_LOCK)).toBe(
+      true
+    );
+    act(() => {
+      mounted.unmount();
+    });
+    await waitFor(async () => {
+      expect(
+        (await nativeLocks.query()).held?.some(lock => lock.name === PROVIDER_OWNER_LOCK)
+      ).toBe(false);
+    });
+    expect(transport.outbound).toStrictEqual([]);
+  });
+});

@@ -245,6 +245,10 @@ export type RequirementObservations = {
   deployments: RequirementCollection<z.output<typeof contextDeploymentSchema>>;
 };
 
+const objectSchema = z.record(z.string(), z.json());
+const object = (value: unknown): z.output<typeof objectSchema> =>
+  objectSchema.safeParse(value).data ?? {};
+
 export function contextRequirementEvidence(
   revision: GitHubPrReviewRevision,
   source: GitHubPrReviewSource,
@@ -261,4 +265,159 @@ export function contextRequirementEvidence(
     evaluatedSha,
     observedAt: source.observedAt,
   }));
+}
+
+const reviewFlags = [
+  [
+    'require_code_owner_reviews',
+    'require_code_owner_review',
+    'code-owner-reviews',
+    'Code owner reviews',
+  ],
+  [
+    'require_last_push_approval',
+    'require_last_push_approval',
+    'last-push-approval',
+    'Approval of the last push',
+  ],
+  [
+    'dismiss_stale_reviews',
+    'dismiss_stale_reviews_on_push',
+    'stale-review-dismissal',
+    'Stale review dismissal',
+  ],
+] as const;
+
+export function expandPolicy(item: Requirement): Requirement[] {
+  if (item.check || !item.policy) return [item];
+  const { policy } = item;
+  const parameters: z.output<typeof objectSchema> = policy.parameters ?? {};
+  const classic = policy.source === 'classic';
+  const rows: Requirement[] = [];
+  const add = (kind: string, title: string) =>
+    rows.push({ ...item, id: `${item.id}:${kind}:${title}`, kind, title });
+  const status: z.output<typeof objectSchema> = classic
+    ? object(parameters.required_status_checks)
+    : policy.ruleType === 'required_status_checks'
+      ? parameters
+      : {};
+  const checkListSchema = z.array(z.object({ context: z.string().min(1) }));
+  const supportedStatus = (
+    classic
+      ? z
+          .object({
+            strict: z.boolean(),
+            checks: checkListSchema,
+            contexts: z.array(z.string().min(1)),
+            url: z.string().optional(),
+            contexts_url: z.string().optional(),
+            enforcement_level: z.string().optional(),
+          })
+          .strict()
+      : z
+          .object({
+            strict_required_status_checks_policy: z.boolean(),
+            required_status_checks: checkListSchema,
+            do_not_enforce_on_create: z.boolean().optional(),
+          })
+          .strict()
+  ).safeParse(status).success;
+  const checks = classic ? status.checks : status.required_status_checks;
+  const emptyChecks =
+    Array.isArray(checks) &&
+    checks.length === 0 &&
+    (!classic || (Array.isArray(status.contexts) && status.contexts.length === 0));
+  const strict = classic ? status.strict : status.strict_required_status_checks_policy;
+  if (strict === true && !emptyChecks) add('branch-freshness', 'Branch must be up to date');
+  if (
+    (classic
+      ? parameters.required_status_checks != null
+      : policy.ruleType === 'required_status_checks') &&
+    !supportedStatus
+  )
+    add('status-policy', 'Required status check policy');
+  const reviews: z.output<typeof objectSchema> = classic
+    ? object(parameters.required_pull_request_reviews)
+    : policy.ruleType === 'pull_request'
+      ? parameters
+      : {};
+  const reviewCount = z
+    .number()
+    .int()
+    .nonnegative()
+    .safeParse(reviews.required_approving_review_count);
+  if (
+    (classic
+      ? parameters.required_pull_request_reviews != null
+      : policy.ruleType === 'pull_request') &&
+    (!reviewCount.success || reviewCount.data > 0)
+  )
+    add('approving-reviews', 'Required approving reviews');
+  for (const [classicField, rulesetField, kind, title] of reviewFlags)
+    if (reviews[classic ? classicField : rulesetField] === true) add(kind, title);
+  if (
+    Object.keys(reviews).length &&
+    reviewFlags.some(
+      ([classicField, rulesetField]) =>
+        typeof reviews[classic ? classicField : rulesetField] !== 'boolean'
+    )
+  )
+    add('review-policy', 'Review requirements');
+  if (
+    (classic &&
+      Object.hasOwn(parameters, 'required_conversation_resolution') &&
+      parameters.required_conversation_resolution !== false &&
+      object(parameters.required_conversation_resolution).enabled !== false) ||
+    reviews.required_review_thread_resolution === true
+  )
+    add('conversation-resolution', 'Resolved review conversations');
+  if (!classic && policy.ruleType === 'pull_request' && parameters.allowed_merge_methods != null)
+    add('allowed-merge-methods', 'Allowed merge methods');
+  const environments = classic
+    ? object(parameters.required_deployments).required_deployment_environments
+    : policy.ruleType === 'required_deployments'
+      ? parameters.required_deployment_environments
+      : undefined;
+  const parsedEnvironments = z.array(z.string().min(1)).safeParse(environments);
+  if (parsedEnvironments.success) {
+    for (const environment of new Set(parsedEnvironments.data)) add('deployment', environment);
+  } else if (classic && parameters.required_deployments != null) {
+    add('deployment-policy', 'Required deployment policy');
+  }
+  if (classic) {
+    for (const [field, kind, title] of [
+      ['required_signatures', 'commit-signatures', 'Signed commits'],
+      ['required_linear_history', 'linear-history', 'Linear history'],
+      ['lock_branch', 'locked-branch', 'Unlocked branch'],
+      ['block_creations', 'branch-creation', 'Branch creation restrictions'],
+    ] as const)
+      if (
+        Object.hasOwn(parameters, field) &&
+        parameters[field] !== false &&
+        object(parameters[field]).enabled !== false
+      )
+        add(kind, title);
+    if (parameters.restrictions != null) add('push-restrictions', 'Push restrictions');
+    const known = new Set([
+      'url',
+      'name',
+      'protection_url',
+      'required_status_checks',
+      'required_pull_request_reviews',
+      'required_conversation_resolution',
+      'required_deployments',
+      'required_signatures',
+      'required_linear_history',
+      'lock_branch',
+      'block_creations',
+      'restrictions',
+      'enforce_admins',
+      'allow_force_pushes',
+      'allow_deletions',
+      'allow_fork_syncing',
+    ]);
+    for (const key of Object.keys(parameters)) if (!known.has(key)) add(key, key);
+  }
+  // Check descriptions are separate rows; do not keep an unevaluated umbrella for them.
+  return rows.length || supportedStatus ? rows : [item];
 }

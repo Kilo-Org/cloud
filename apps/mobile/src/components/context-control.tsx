@@ -1,6 +1,6 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
-import { Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -102,8 +102,10 @@ export function ContextControl({ scope }: { readonly scope?: ContextDisplayScope
   } else if (unavailable) {
     errorMessage = t('organization.boundary.organizationUnavailable');
   }
-  const retryBusy = !providerError && organizations.isFetching;
+  const retryBusy =
+    providerError === 'save' ? context.isSaving : !providerError && organizations.isFetching;
   const disabled = !isResolved || orgs === undefined;
+  const pickerBusy = pending || (orgs === undefined && token != null && organizations.isPending);
   const content = pending ? (
     <Skeleton className="h-5 w-36 rounded" />
   ) : (
@@ -127,13 +129,19 @@ export function ContextControl({ scope }: { readonly scope?: ContextDisplayScope
           accessibilityRole="button"
           accessibilityLabel={label}
           accessibilityHint={t('profile.selectAccount')}
-          accessibilityState={{ busy: pending, disabled }}
+          accessibilityState={{ busy: pickerBusy, disabled }}
           disabled={disabled}
           onPress={openPicker}
           className="min-h-11 flex-row items-center gap-1 active:opacity-70"
         >
           {content}
-          <ChevronDown size={14} color={colors.mutedForeground} />
+          <View className="size-5 items-center justify-center">
+            {pickerBusy ? (
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+            ) : (
+              <ChevronDown size={14} color={colors.mutedForeground} />
+            )}
+          </View>
         </Pressable>
       )}
       <AccessibleStatus message={errorMessage} className="text-sm" />
@@ -145,9 +153,10 @@ export function ContextControl({ scope }: { readonly scope?: ContextDisplayScope
           accessibilityState={{ busy: retryBusy, disabled: retryBusy }}
           disabled={retryBusy}
           onPress={retry}
-          className="min-h-11 justify-center active:opacity-70"
+          className="min-h-11 flex-row items-center gap-2 active:opacity-70"
         >
           <Text className="text-sm text-primary">{t('common.retry')}</Text>
+          {retryBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </Pressable>
       ) : null}
     </View>

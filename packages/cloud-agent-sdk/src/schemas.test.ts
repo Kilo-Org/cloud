@@ -188,6 +188,7 @@ const providerOutbound = [
     approval: { decision: 'denied', reason: 'approval_denied' },
   },
   { type: 'provider_result', ...jobBinding, tab, result: completed },
+  { type: 'provider_quiesced', ...jobBinding },
   { type: 'provider_quiesced', ...jobBinding, tabId: tab.tabId },
   { type: 'provider_unavailable', ...binding, reason: 'provider_lost', effectsUncertain: true },
   { type: 'provider_cancel', ...jobBinding },
@@ -254,6 +255,91 @@ describe.each([
   ])('rejects invalid conversation modes: %j', fields => {
     expect(schema.safeParse({ ...providerInbound[0], ...fields }).success).toBe(false);
   });
+});
+
+describe.each([
+  { name: 'SDK', contract: browser },
+  { name: 'relay', contract: relay },
+])('provider quiescence: $name', ({ contract }) => {
+  const quiesced = { type: 'provider_quiesced', ...jobBinding };
+
+  it.each([{}, { tabId: tab.tabId }, { tabId: 0 }, { tabId: Number.MAX_SAFE_INTEGER }])(
+    'preserves the exact binding and supplied or omitted tab: %j',
+    tabFields => {
+      const frame = { ...quiesced, ...tabFields };
+      expect(contract.browserProviderOutboundMessageSchema.parse(frame)).toStrictEqual(frame);
+      expect(contract.webOutboundWithBrowserMessageSchema.parse(frame)).toStrictEqual(frame);
+    }
+  );
+
+  it.each([
+    { tabId: null },
+    { tabId: -1 },
+    { tabId: 1.5 },
+    { tabId: Number.MAX_SAFE_INTEGER + 1 },
+    { tabId: '7' },
+    { tabId: true },
+    { tabId: [] },
+    { tabId: {} },
+  ])('rejects invalid supplied quiescence tabs: %j', fields => {
+    const frame = { ...quiesced, ...fields };
+    expect(contract.browserProviderOutboundMessageSchema.safeParse(frame).success).toBe(false);
+    expect(contract.webOutboundWithBrowserMessageSchema.safeParse(frame).success).toBe(false);
+  });
+
+  it.each([
+    { providerId: undefined },
+    { providerId: handle.jobId },
+    { browserTaskId: undefined },
+    { browserTaskId: handle.jobId },
+    { jobId: undefined },
+    { jobId: handle.providerId },
+    { invocationId: undefined },
+    { invocationId: handle.jobId },
+    { generation: undefined },
+    { generation: null },
+    { generation: 0 },
+    { generation: -1 },
+    { generation: 1.5 },
+    { generation: Number.MAX_SAFE_INTEGER + 1 },
+    { generation: '1' },
+  ])('rejects invalid or missing quiescence bindings: %j', fields => {
+    for (const tabFields of [{}, { tabId: tab.tabId }]) {
+      const frame = JSON.parse(JSON.stringify({ ...quiesced, ...tabFields, ...fields }));
+      expect(contract.browserProviderOutboundMessageSchema.safeParse(frame).success).toBe(false);
+      expect(contract.webOutboundWithBrowserMessageSchema.safeParse(frame).success).toBe(false);
+    }
+  });
+
+  it.each([
+    { connectionId: 'foreign-socket' },
+    { recovery },
+    { tabClosed: true },
+    { locksDrained: true },
+  ])('rejects socket or recovery authority on quiescence: %j', fields => {
+    for (const tabFields of [{}, { tabId: tab.tabId }]) {
+      const frame = { ...quiesced, ...tabFields, ...fields };
+      expect(contract.browserProviderOutboundMessageSchema.safeParse(frame).success).toBe(false);
+      expect(contract.webOutboundWithBrowserMessageSchema.safeParse(frame).success).toBe(false);
+    }
+  });
+
+  it.each([{ tab: undefined }, { tab: { ...tab, tabId: undefined } }])(
+    'keeps approved tabs required outside quiescence: %j',
+    ({ tab }) => {
+      for (const frame of [
+        {
+          type: 'provider_approval',
+          ...jobBinding,
+          approval: { decision: 'approved', tab },
+        },
+        { type: 'provider_result', ...jobBinding, tab, result: completed },
+      ]) {
+        expect(contract.browserProviderOutboundMessageSchema.safeParse(frame).success).toBe(false);
+        expect(contract.webOutboundWithBrowserMessageSchema.safeParse(frame).success).toBe(false);
+      }
+    }
+  );
 });
 
 describe.each([

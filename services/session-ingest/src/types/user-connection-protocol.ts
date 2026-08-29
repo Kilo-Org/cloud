@@ -444,10 +444,16 @@ export const browserJobSnapshotSchema = z
   .strictObject({
     ...browserJobMetadataShape,
     status: browserJobStatusSchema,
+    // Optional display metadata; legacy snapshots omit it.
+    ownerLabel: browserText(128).min(1).optional(),
+    queuePosition: z.number().int().min(1).max(100).optional(),
     approvedTab: browserApprovedTabSchema.optional(),
     result: browserResultSchema.optional(),
   })
   .superRefine((job, context) => {
+    if (job.queuePosition !== undefined && job.status !== 'queued') {
+      context.addIssue({ code: 'custom', message: 'Queue position requires a queued job' });
+    }
     const terminal = browserTerminalStatusSchema.safeParse(job.status).success;
     if (
       terminal !== (job.result !== undefined) ||

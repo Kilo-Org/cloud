@@ -1618,7 +1618,8 @@
       "couldNotSearch": "無法搜尋工作階段",
       "completedWillAppear": "已完成的工作階段將顯示在這裡。",
       "noPastSessions": "沒有過去的工作階段",
-      "live": "即時"
+      "live": "即時",
+      "updating": "更新中"
     },
     "sessionRow": {
       "deleteTitle": "刪除工作階段？",

@@ -1618,7 +1618,8 @@
       "couldNotSearch": "セッションを検索できませんでした",
       "completedWillAppear": "完了したセッションがここに表示されます。",
       "noPastSessions": "過去のセッションはありません",
-      "live": "ライブ"
+      "live": "ライブ",
+      "updating": "更新中"
     },
     "sessionRow": {
       "deleteTitle": "セッションを削除しますか？",

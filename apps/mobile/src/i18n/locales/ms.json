@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Tidak dapat mencari sesi",
       "completedWillAppear": "Sesi yang selesai akan muncul di sini.",
       "noPastSessions": "Tiada sesi lalu",
-      "live": "LANGSUNG"
+      "live": "LANGSUNG",
+      "updating": "Mengemas kini"
     },
     "sessionRow": {
       "deleteTitle": "Padam sesi?",

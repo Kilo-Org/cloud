@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Nuk u kërkuan seancat",
       "completedWillAppear": "Seancat e përfunduara do të shfaqen këtu.",
       "noPastSessions": "Asnjë seancë e kaluar",
-      "live": "DREJTPËRDREJT"
+      "live": "DREJTPËRDREJT",
+      "updating": "Duke u përditësuar"
     },
     "sessionRow": {
       "deleteTitle": "Ta fshijmë seancën?",

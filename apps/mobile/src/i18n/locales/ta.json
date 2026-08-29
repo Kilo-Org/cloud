@@ -2072,7 +2072,8 @@
       "couldNotSearch": "அமர்வுகளைத் தேட முடியவில்லை",
       "completedWillAppear": "நிறைவடைந்த அமர்வுகள் இங்கே தோன்றும்.",
       "noPastSessions": "கடந்த அமர்வுகள் இல்லை",
-      "live": "நேரலை"
+      "live": "நேரலை",
+      "updating": "புதுப்பிக்கிறது"
     },
     "sessionRow": {
       "deleteTitle": "அமர்வை நீக்கவா?",

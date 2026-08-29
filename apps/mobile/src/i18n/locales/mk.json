@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Не можеше да се пребаруваат сесиите",
       "completedWillAppear": "Завршените сесии ќе се појават тука.",
       "noPastSessions": "Нема минати сесии",
-      "live": "ВОЖИВО"
+      "live": "ВОЖИВО",
+      "updating": "Се ажурира"
     },
     "sessionRow": {
       "deleteTitle": "Да се избрише сесијата?",

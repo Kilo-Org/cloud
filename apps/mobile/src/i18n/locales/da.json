@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Kunne ikke søge i sessioner",
       "completedWillAppear": "Fuldførte sessioner vises her.",
       "noPastSessions": "Ingen tidligere sessioner",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Opdaterer"
     },
     "sessionRow": {
       "deleteTitle": "Slet session?",

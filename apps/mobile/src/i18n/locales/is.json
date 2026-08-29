@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Ekki tókst að leita í lotum",
       "completedWillAppear": "Lokið lotur birtast hér.",
       "noPastSessions": "Engar fyrri lotur",
-      "live": "BEIN"
+      "live": "BEIN",
+      "updating": "Uppfærir"
     },
     "sessionRow": {
       "deleteTitle": "Eyða lotu?",

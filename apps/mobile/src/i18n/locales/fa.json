@@ -2072,7 +2072,8 @@
       "couldNotSearch": "جستجوی نشستها ممکن نشد",
       "completedWillAppear": "نشستهای تکمیلشده اینجا ظاهر میشوند.",
       "noPastSessions": "هیچ نشست گذشته وجود ندارد",
-      "live": "زنده"
+      "live": "زنده",
+      "updating": "در حال به‌روزرسانی"
     },
     "sessionRow": {
       "deleteTitle": "نشست حذف شود؟",

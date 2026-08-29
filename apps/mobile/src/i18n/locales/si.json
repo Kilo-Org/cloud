@@ -2072,7 +2072,8 @@
       "couldNotSearch": "සැසි සෙවීමට නොහැකි විය",
       "completedWillAppear": "සම්පූර්ණ කළ සැසි මෙහි දිස්වනු ඇත.",
       "noPastSessions": "පසුගිය සැසි නැත",
-      "live": "සජීවී"
+      "live": "සජීවී",
+      "updating": "යාවත්කාලීන වෙමින්"
     },
     "sessionRow": {
       "deleteTitle": "සැසිය මකන්නද?",

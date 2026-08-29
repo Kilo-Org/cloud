@@ -2085,7 +2085,8 @@
       "couldNotSearch": "No s'han pogut cercar les sessions",
       "completedWillAppear": "Les sessions completades apareixeran aquí.",
       "noPastSessions": "Cap sessió anterior",
-      "live": "EN DIRECTE"
+      "live": "EN DIRECTE",
+      "updating": "Actualitzant"
     },
     "sessionRow": {
       "deleteTitle": "Eliminar la sessió?",

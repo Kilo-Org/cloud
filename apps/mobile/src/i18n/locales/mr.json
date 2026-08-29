@@ -2072,7 +2072,8 @@
       "couldNotSearch": "सत्रे शोधता आली नाहीत",
       "completedWillAppear": "पूर्ण झालेली सत्रे येथे दिसतील.",
       "noPastSessions": "भूतकाळातील सत्रे नाहीत",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "अपडेट होत आहे"
     },
     "sessionRow": {
       "deleteTitle": "सत्र हटवायचे?",

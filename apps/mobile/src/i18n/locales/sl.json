@@ -2098,7 +2098,8 @@
       "couldNotSearch": "Sej ni bilo mogoče iskati",
       "completedWillAppear": "Dokončane seje bodo prikazane tukaj.",
       "noPastSessions": "Ni preteklih sej",
-      "live": "V ŽIVO"
+      "live": "V ŽIVO",
+      "updating": "Posodabljanje"
     },
     "sessionRow": {
       "deleteTitle": "Izbrisati sejo?",

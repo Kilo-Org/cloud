@@ -2085,7 +2085,8 @@
       "couldNotSearch": "Nu s-au putut căuta sesiunile",
       "completedWillAppear": "Sesiunile finalizate vor apărea aici.",
       "noPastSessions": "Nicio sesiune trecută",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Se actualizează"
     },
     "sessionRow": {
       "deleteTitle": "Ștergi sesiunea?",

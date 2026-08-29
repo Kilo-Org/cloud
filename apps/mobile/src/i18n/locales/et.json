@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Seansside otsimine ebaõnnestus",
       "completedWillAppear": "Lõpetatud seansid ilmuvad siia.",
       "noPastSessions": "Minevikuseansse pole",
-      "live": "OTSE"
+      "live": "OTSE",
+      "updating": "Uuendamine"
     },
     "sessionRow": {
       "deleteTitle": "Kustutan seansi?",

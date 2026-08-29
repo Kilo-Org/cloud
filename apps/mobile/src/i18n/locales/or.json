@@ -2072,7 +2072,8 @@
       "couldNotSearch": "ସେସନ୍ ଖୋଜାଯାଇପାରିଲା ନାହିଁ",
       "completedWillAppear": "ସମାପ୍ତ ସେସନ୍ ଏଠାରେ ଦେଖାଯିବ।",
       "noPastSessions": "କୌଣସି ପୁରୁଣା ସେସନ୍ ନାହିଁ",
-      "live": "ଲାଇଭ୍"
+      "live": "ଲାଇଭ୍",
+      "updating": "ଅପଡେଟ୍ ହେଉଛି"
     },
     "sessionRow": {
       "deleteTitle": "ସେସନ୍ ବିଲୋପ କରିବେ?",

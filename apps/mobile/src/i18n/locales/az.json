@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Sessiyalar axtarıla bilmədi",
       "completedWillAppear": "Tamamlanmış sessiyalar burada görünəcək.",
       "noPastSessions": "Keçmiş sessiya yoxdur",
-      "live": "CANLI"
+      "live": "CANLI",
+      "updating": "Yenilənir"
     },
     "sessionRow": {
       "deleteTitle": "Sessiyanı silsin?",

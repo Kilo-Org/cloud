@@ -2098,7 +2098,8 @@
       "couldNotSearch": "Relace se nepodařilo vyhledat",
       "completedWillAppear": "Dokončené relace se zde zobrazí.",
       "noPastSessions": "Žádné minulé relace",
-      "live": "ŽIVĚ"
+      "live": "ŽIVĚ",
+      "updating": "Aktualizuje se"
     },
     "sessionRow": {
       "deleteTitle": "Smazat relaci?",

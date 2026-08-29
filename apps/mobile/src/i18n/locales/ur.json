@@ -2072,7 +2072,8 @@
       "couldNotSearch": "سیشنز تلاش نہیں ہو سکے",
       "completedWillAppear": "مکمل شدہ سیشنز یہاں ظاہر ہوں گے۔",
       "noPastSessions": "کوئی ماضی کے سیشن نہیں",
-      "live": "لائیو"
+      "live": "لائیو",
+      "updating": "اپڈیٹ ہو رہا ہے"
     },
     "sessionRow": {
       "deleteTitle": "سیشن حذف کریں؟",

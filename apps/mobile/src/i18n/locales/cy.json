@@ -2124,7 +2124,8 @@
       "couldNotSearch": "Methwyd chwilio sesiynau",
       "completedWillAppear": "Bydd sesiynau wedi'u cwblhau'n ymddangos yma.",
       "noPastSessions": "Dim sesiynau yn y gorffennol",
-      "live": "BYW"
+      "live": "BYW",
+      "updating": "Yn diweddaru"
     },
     "sessionRow": {
       "deleteTitle": "Dileu sesiwn?",

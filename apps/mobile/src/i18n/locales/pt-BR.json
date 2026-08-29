@@ -1604,7 +1604,8 @@
       "couldNotSearch": "Não foi possível pesquisar as sessões",
       "completedWillAppear": "As sessões concluídas aparecerão aqui.",
       "noPastSessions": "Nenhuma sessão anterior",
-      "live": "AO VIVO"
+      "live": "AO VIVO",
+      "updating": "Atualizando"
     },
     "sessionRow": {
       "deleteTitle": "Excluir sessão?",

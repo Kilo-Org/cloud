@@ -2072,7 +2072,8 @@
       "couldNotSearch": "نەتوانرا گەڕان لە سێشنەکان بکرێت",
       "completedWillAppear": "سێشنە تەواوکراوەکان لێرە دەردەکەون.",
       "noPastSessions": "هیچ سێشنێکی ڕابردوو نییە",
-      "live": "ڕاستەوخۆ"
+      "live": "ڕاستەوخۆ",
+      "updating": "لە نوێکردنەوەدایە"
     },
     "sessionRow": {
       "deleteTitle": "سڕینەوەی سێشن؟",

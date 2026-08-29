@@ -2072,7 +2072,8 @@
       "couldNotSearch": "સત્રો શોધી શકાયા નથી",
       "completedWillAppear": "પૂર્ણ થયેલ સત્રો અહીં દેખાશે.",
       "noPastSessions": "કોઈ ભૂતકાળના સત્ર નથી",
-      "live": "લાઇવ"
+      "live": "લાઇવ",
+      "updating": "અપડેટ થઈ રહ્યું છે"
     },
     "sessionRow": {
       "deleteTitle": "સત્ર કાઢી નાખવું?",

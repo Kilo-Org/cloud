@@ -2085,7 +2085,8 @@
       "couldNotSearch": "Nije moguće pretražiti sesije",
       "completedWillAppear": "Dovršene sesije pojavit će se ovdje.",
       "noPastSessions": "Nema prošlih sesija",
-      "live": "UŽIVO"
+      "live": "UŽIVO",
+      "updating": "Ažuriranje"
     },
     "sessionRow": {
       "deleteTitle": "Izbrisati sesiju?",

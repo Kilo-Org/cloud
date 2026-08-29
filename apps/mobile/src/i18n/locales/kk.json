@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Сессияларды іздеу мүмкін болмады",
       "completedWillAppear": "Аяқталған сессиялар осында пайда болады.",
       "noPastSessions": "Өткен сессиялар жоқ",
-      "live": "ТІКІ"
+      "live": "ТІКІ",
+      "updating": "Жаңартылуда"
     },
     "sessionRow": {
       "deleteTitle": "Сессияны жою керек пе?",

@@ -2098,7 +2098,8 @@
       "couldNotSearch": "Nepavyko ieškoti sesijų",
       "completedWillAppear": "Baigtos sesijos bus rodomos čia.",
       "noPastSessions": "Nėra ankstesnių sesijų",
-      "live": "TIESIOGIAI"
+      "live": "TIESIOGIAI",
+      "updating": "Atnaujinama"
     },
     "sessionRow": {
       "deleteTitle": "Ištrinti sesiją?",

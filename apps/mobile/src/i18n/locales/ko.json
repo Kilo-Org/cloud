@@ -1618,7 +1618,8 @@
       "couldNotSearch": "세션을 검색할 수 없습니다",
       "completedWillAppear": "완료된 세션이 여기에 표시됩니다.",
       "noPastSessions": "지난 세션 없음",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "업데이트 중"
     },
     "sessionRow": {
       "deleteTitle": "세션을 삭제하시겠습니까?",

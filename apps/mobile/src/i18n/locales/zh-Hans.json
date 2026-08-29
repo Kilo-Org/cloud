@@ -1618,7 +1618,8 @@
       "couldNotSearch": "无法搜索会话",
       "completedWillAppear": "已完成的会话将显示在这里。",
       "noPastSessions": "没有过去的会话",
-      "live": "实时"
+      "live": "实时",
+      "updating": "正在更新"
     },
     "sessionRow": {
       "deleteTitle": "删除会话？",

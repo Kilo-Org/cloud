@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Pa t 'kapab chèche sesyon yo",
       "completedWillAppear": "Sesyon ki fini yo pral parèt isit la.",
       "noPastSessions": "Pa gen sesyon pase",
-      "live": "AN DIRÈK"
+      "live": "AN DIRÈK",
+      "updating": "Ap aktyalize"
     },
     "sessionRow": {
       "deleteTitle": "Efase sesyon an?",

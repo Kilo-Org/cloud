@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Ko le wa awọn akoko",
       "completedWillAppear": "Awọn akoko ti o pari yoo han nibi.",
       "noPastSessions": "Ko si awọn akoko ti o kọja",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Ti n ṣe imudojuiwọn"
     },
     "sessionRow": {
       "deleteTitle": "Pa akoko rẹ?",

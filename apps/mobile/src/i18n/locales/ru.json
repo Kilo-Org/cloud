@@ -1630,7 +1630,8 @@
       "couldNotSearch": "Не удалось выполнить поиск сеансов",
       "completedWillAppear": "Завершенные сеансы появятся здесь.",
       "noPastSessions": "Нет прошлых сеансов",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Обновление"
     },
     "sessionRow": {
       "deleteTitle": "Удалить сеанс?",

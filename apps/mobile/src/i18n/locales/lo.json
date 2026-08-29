@@ -2072,7 +2072,8 @@
       "couldNotSearch": "ບໍ່ສາມາດຄົ້ນຫາເຊດຊັນ",
       "completedWillAppear": "ເຊດຊັນທີ່ສຳເລັດຈະປາກົດຢູ່ນີ້.",
       "noPastSessions": "ບໍ່ມີເຊດຊັນທີ່ຜ່ານມາ",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "ກຳລັງອັບເດດ"
     },
     "sessionRow": {
       "deleteTitle": "ລຶບເຊດຊັນ?",

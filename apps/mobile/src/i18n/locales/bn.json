@@ -2072,7 +2072,8 @@
       "couldNotSearch": "সেশন খোঁজা যায়নি",
       "completedWillAppear": "সম্পন্ন সেশন এখানে দেখাবে।",
       "noPastSessions": "কোনো অতীত সেশন নেই",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "আপডেট হচ্ছে"
     },
     "sessionRow": {
       "deleteTitle": "সেশন মুছবেন?",

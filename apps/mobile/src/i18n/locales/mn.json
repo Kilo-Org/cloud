@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Сессийг хайх боломжгүй",
       "completedWillAppear": "Дууссан сессүүд энд гарч ирнэ.",
       "noPastSessions": "Өмнөх сесс байхгүй",
-      "live": "ШУУД"
+      "live": "ШУУД",
+      "updating": "Шинэчилж байна"
     },
     "sessionRow": {
       "deleteTitle": "Сессийг устгах уу?",

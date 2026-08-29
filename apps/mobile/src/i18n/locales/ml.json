@@ -2072,7 +2072,8 @@
       "couldNotSearch": "സെഷനുകൾ തിരയാൻ കഴിഞ്ഞില്ല",
       "completedWillAppear": "പൂർത്തിയായ സെഷനുകൾ ഇവിടെ ദൃശ്യമാകും.",
       "noPastSessions": "മുൻകാല സെഷനുകളൊന്നുമില്ല",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "അപ്ഡേറ്റ് ചെയ്യുന്നു"
     },
     "sessionRow": {
       "deleteTitle": "സെഷൻ ഇല്ലാതാക്കണോ?",

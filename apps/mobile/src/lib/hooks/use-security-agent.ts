@@ -2,7 +2,8 @@ import {
   canManageSecurityAgent,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import { type SecurityAgentConfig } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
@@ -66,6 +67,57 @@ export function useSecurityAgentRepositories(scope: string) {
   return isPersonalSecurityScope(scope) ? personal : organization;
 }
 
+export function useRetrySecurityAgentSettings(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [isRetrying, setIsRetrying] = useState(false);
+  const retry = async () => {
+    if (isRetrying) {
+      return;
+    }
+    setIsRetrying(true);
+    const keys = isPersonalSecurityScope(scope)
+      ? [
+          trpc.securityAgent.getPermissionStatus.queryKey(),
+          trpc.securityAgent.getConfig.queryKey(),
+          trpc.securityAgent.getRepositories.queryKey(),
+        ]
+      : [
+          trpc.organizations.securityAgent.getPermissionStatus.queryKey({ organizationId: scope }),
+          trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: scope }),
+          trpc.organizations.securityAgent.getRepositories.queryKey({ organizationId: scope }),
+          trpc.organizations.list.queryKey(),
+        ];
+    await Promise.allSettled(
+      keys.map(async queryKey => {
+        const query = queryClient.getQueryCache().find({ queryKey, exact: true });
+        if (!query) {
+          return;
+        }
+        const options = query.options;
+        // An uncached refetch reuses its paused promise, even with cancelRefetch.
+        // Cancel first, then bypass NetInfo for this deliberate attempt only.
+        await queryClient.cancelQueries({ queryKey, exact: true });
+        try {
+          await queryClient.fetchQuery({
+            ...options,
+            queryKey,
+            networkMode: 'always',
+            retry: false,
+            staleTime: 0,
+          });
+        } finally {
+          query.setOptions(options);
+        }
+      })
+    );
+    // Each query retains its own error; wait for every request to settle before
+    // allowing another attempt. The existing tRPC transport bounds request time.
+    setIsRetrying(false);
+  };
+  return { retry, isRetrying };
+}
+
 export function useSecurityAgentDashboardStats(scope: string, repoFullName?: string) {
   const trpc = useTRPC();
   const personal = useQuery({
@@ -127,6 +179,7 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
       refetch: query.refetch,
       hasData: true,
       isPending: false,
+      fetchStatus: 'idle' as const,
     };
   }
   return {
@@ -137,6 +190,7 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
     refetch: query.refetch,
     hasData: query.data !== undefined,
     isPending: query.isPending,
+    fetchStatus: query.fetchStatus,
   };
 }
 
@@ -146,7 +200,7 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
 type SecurityAgentCapabilityStatus = 'loading' | 'error' | 'denied' | 'allowed';
 
 export function useSecurityAgentCapability(scope: string) {
-  const { role, isLoading, isError, isFetching, refetch, hasData, isPending } =
+  const { role, isLoading, isError, isFetching, refetch, hasData, isPending, fetchStatus } =
     useSecurityAgentOrgRoleQuery(scope);
   const canManage = canManageSecurityAgent(scope, role);
 
@@ -172,6 +226,7 @@ export function useSecurityAgentCapability(scope: string) {
     isError,
     isFetching,
     refetch,
+    fetchStatus,
   };
 }
 

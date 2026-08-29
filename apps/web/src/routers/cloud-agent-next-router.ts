@@ -10,6 +10,7 @@ import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { generateCloudAgentToken } from '@/lib/tokens';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
+import { withRepositoryReadDeadline } from '@/lib/integrations/core/repository-read-limits';
 import {
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
@@ -57,6 +58,11 @@ import { TRPCError } from '@trpc/server';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
+
+const ListRepositoriesInput = z.union([
+  z.object({ forceRefresh: z.boolean().default(false), bounded: z.literal(true) }).strict(),
+  z.object({ forceRefresh: z.boolean().default(false), bounded: z.literal(false).optional() }),
+]);
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -523,11 +529,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
    * List GitHub repositories available for cloud agent sessions.
    */
   listGitHubRepositories: baseProcedure
-    .input(
-      z.object({
-        forceRefresh: z.boolean().optional().default(false),
-      })
-    )
+    .input(ListRepositoriesInput)
     .output(
       z.object({
         repositories: z.array(
@@ -542,32 +544,61 @@ export const cloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: z.boolean(),
         syncedAt: z.string().nullish(),
         errorMessage: z.string().optional(),
+        status: z
+          .enum([
+            'not_connected',
+            'available',
+            'suspended',
+            'reconnect_required',
+            'misconfigured',
+            'temporarily_unavailable',
+            'integration_limit_exceeded',
+          ])
+          .optional(),
       })
     )
     .query(async ({ ctx, input }) => {
-      const result = await fetchGitHubRepositoriesForUser(ctx.user.id, input.forceRefresh);
-      return {
-        repositories: await orderRepositoriesByUsage({
-          userId: ctx.user.id,
-          organizationId: null,
-          platform: 'github',
-          repositories: result.repositories,
-        }),
-        integrationInstalled: result.integrationInstalled,
-        syncedAt: result.syncedAt,
-        errorMessage: result.errorMessage,
-      };
+      try {
+        return await withRepositoryReadDeadline(
+          input.bounded ? { bounded: true } : undefined,
+          async signal => {
+            const result = input.bounded
+              ? await fetchGitHubRepositoriesForUser(ctx.user.id, input.forceRefresh, {
+                  bounded: true,
+                  signal,
+                })
+              : await fetchGitHubRepositoriesForUser(ctx.user.id, input.forceRefresh);
+            signal?.throwIfAborted();
+            return {
+              repositories: await orderRepositoriesByUsage({
+                userId: ctx.user.id,
+                organizationId: null,
+                platform: 'github',
+                repositories: result.repositories,
+              }),
+              integrationInstalled: result.integrationInstalled,
+              syncedAt: result.syncedAt,
+              errorMessage: result.errorMessage,
+              ...(input.bounded ? { status: result.status } : {}),
+            };
+          }
+        );
+      } catch (error) {
+        if (!input.bounded) throw error;
+        return {
+          status: 'temporarily_unavailable' as const,
+          integrationInstalled: true,
+          repositories: [],
+          syncedAt: null,
+        };
+      }
     }),
 
   /**
    * List GitLab repositories available for cloud agent sessions.
    */
   listGitLabRepositories: baseProcedure
-    .input(
-      z.object({
-        forceRefresh: z.boolean().optional().default(false),
-      })
-    )
+    .input(ListRepositoriesInput)
     .output(
       z.object({
         repositories: z.array(
@@ -581,21 +612,54 @@ export const cloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: z.boolean(),
         syncedAt: z.string().nullish(),
         errorMessage: z.string().optional(),
+        status: z
+          .enum([
+            'not_connected',
+            'available',
+            'suspended',
+            'reconnect_required',
+            'misconfigured',
+            'temporarily_unavailable',
+            'integration_limit_exceeded',
+          ])
+          .optional(),
       })
     )
     .query(async ({ ctx, input }) => {
-      const result = await fetchGitLabRepositoriesForUser(ctx.user.id, input.forceRefresh);
-      return {
-        repositories: await orderRepositoriesByUsage({
-          userId: ctx.user.id,
-          organizationId: null,
-          platform: 'gitlab',
-          repositories: result.repositories,
-          gitlabInstanceUrl: result.instanceUrl,
-        }),
-        integrationInstalled: result.integrationInstalled,
-        syncedAt: result.syncedAt,
-        errorMessage: result.errorMessage,
-      };
+      try {
+        return await withRepositoryReadDeadline(
+          input.bounded ? { bounded: true } : undefined,
+          async signal => {
+            const result = input.bounded
+              ? await fetchGitLabRepositoriesForUser(ctx.user.id, input.forceRefresh, {
+                  bounded: true,
+                  signal,
+                })
+              : await fetchGitLabRepositoriesForUser(ctx.user.id, input.forceRefresh);
+            signal?.throwIfAborted();
+            return {
+              repositories: await orderRepositoriesByUsage({
+                userId: ctx.user.id,
+                organizationId: null,
+                platform: 'gitlab',
+                repositories: result.repositories,
+                gitlabInstanceUrl: result.instanceUrl,
+              }),
+              integrationInstalled: result.integrationInstalled,
+              syncedAt: result.syncedAt,
+              errorMessage: result.errorMessage,
+              ...(input.bounded ? { status: result.status } : {}),
+            };
+          }
+        );
+      } catch (error) {
+        if (!input.bounded) throw error;
+        return {
+          status: 'temporarily_unavailable' as const,
+          integrationInstalled: true,
+          repositories: [],
+          syncedAt: null,
+        };
+      }
     }),
 });

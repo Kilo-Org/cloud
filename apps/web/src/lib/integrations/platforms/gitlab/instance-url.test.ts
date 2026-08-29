@@ -7,8 +7,10 @@ import {
   assertGitLabUrlResolvesSafely,
   buildGitLabPlatformRepositoryId,
   buildGitLabUrl,
+  GitLabInstanceUrlError,
   isDefaultGitLabInstanceUrl,
   normalizeGitLabInstanceUrl,
+  resolveGitLabUrlSafely,
 } from './instance-url';
 
 const mockLookup = lookup as jest.Mock;
@@ -51,6 +53,7 @@ describe('GitLab instance URL safety', () => {
   urlWithCredentials.password = 'pass';
 
   it.each([
+    ['not a URL', 'Invalid URL format'],
     ['ftp://gitlab.example.com', 'Invalid URL protocol'],
     ['http://gitlab.example.com', 'must use https'],
     [urlWithCredentials.toString(), 'must not include credentials'],
@@ -66,7 +69,13 @@ describe('GitLab instance URL safety', () => {
     ['http://192.168.0.1', 'host is not allowed'],
     ['https://gitlab.local', 'host is not allowed'],
   ])('rejects unsafe instance URL %p', (url, message) => {
-    expect(() => normalizeGitLabInstanceUrl(url)).toThrow(message);
+    expect(() => normalizeGitLabInstanceUrl(url)).toThrow(
+      expect.objectContaining({
+        name: 'GitLabInstanceUrlError',
+        message: expect.stringContaining(message),
+        reason: 'invalid_url',
+      })
+    );
   });
 
   it('accepts hostnames that resolve to public addresses', async () => {
@@ -80,12 +89,41 @@ describe('GitLab instance URL safety', () => {
     });
   });
 
+  it('distinguishes transient lookup failures while preserving the legacy error', async () => {
+    mockLookup.mockRejectedValueOnce(
+      Object.assign(new Error('getaddrinfo EAI_AGAIN gitlab.example.com'), { code: 'EAI_AGAIN' })
+    );
+
+    const result = resolveGitLabUrlSafely('https://gitlab.example.com/api/v4/user');
+    await expect(result).rejects.toBeInstanceOf(GitLabInstanceUrlError);
+    await expect(result).rejects.toMatchObject({
+      name: 'GitLabInstanceUrlError',
+      message: 'GitLab instance URL host could not be resolved.',
+      reason: 'resolution_failed',
+    });
+  });
+
+  it('distinguishes empty DNS answers from unsafe addresses', async () => {
+    mockLookup.mockResolvedValueOnce([]);
+
+    await expect(
+      resolveGitLabUrlSafely('https://gitlab.example.com/api/v4/user')
+    ).rejects.toMatchObject({
+      name: 'GitLabInstanceUrlError',
+      message: 'GitLab instance URL host could not be resolved.',
+      reason: 'resolution_failed',
+    });
+  });
+
   it('rejects hostnames that resolve to unsafe addresses', async () => {
     mockLookup.mockResolvedValueOnce([{ address: '192.168.1.10', family: 4 }]);
 
     await expect(
       assertGitLabUrlResolvesSafely('https://gitlab.example.com/api/v4/user')
-    ).rejects.toThrow('resolves to an address that is not allowed');
+    ).rejects.toMatchObject({
+      message: 'GitLab instance URL host resolves to an address that is not allowed.',
+      reason: 'invalid_url',
+    });
   });
 
   it('rejects hostnames that resolve to deprecated IPv6 site-local addresses', async () => {
@@ -93,13 +131,19 @@ describe('GitLab instance URL safety', () => {
 
     await expect(
       assertGitLabUrlResolvesSafely('https://gitlab.example.com/api/v4/user')
-    ).rejects.toThrow('resolves to an address that is not allowed');
+    ).rejects.toMatchObject({
+      message: 'GitLab instance URL host resolves to an address that is not allowed.',
+      reason: 'invalid_url',
+    });
   });
 
   it('rejects unsafe literal IP URLs during fetch-time validation', async () => {
-    await expect(assertGitLabUrlResolvesSafely('http://127.0.0.1/api/v4/user')).rejects.toThrow(
-      'host is not allowed'
-    );
+    await expect(
+      assertGitLabUrlResolvesSafely('http://127.0.0.1/api/v4/user')
+    ).rejects.toMatchObject({
+      message: 'GitLab instance URL host is not allowed.',
+      reason: 'invalid_url',
+    });
 
     expect(mockLookup).not.toHaveBeenCalled();
   });

@@ -10,6 +10,8 @@ import {
   jest,
 } from '@jest/globals';
 import type { Organization, User } from '@kilocode/db/schema';
+import { randomUUID } from 'node:crypto';
+import type { RepositoryReadOptions } from '@/lib/integrations/core/repository-read-limits';
 import {
   kilocode_users,
   organizations,
@@ -28,7 +30,11 @@ import type {
 
 const mockFetchBitbucketRepositoriesFromTokenService =
   jest.fn<
-    (kiloUserId: string, organizationId?: string) => Promise<BitbucketRepositoryListResult>
+    (
+      kiloUserId: string,
+      organizationId?: string,
+      options?: RepositoryReadOptions
+    ) => Promise<BitbucketRepositoryListResult>
   >();
 
 jest.mock('./token-service-client', () => ({
@@ -403,4 +409,171 @@ describe('Bitbucket repository cache', () => {
     expect(unchanged?.repositories).toEqual([CACHED_REPOSITORY]);
     expect(new Date(unchanged?.syncedAt ?? '').toISOString()).toBe(CACHED_AT);
   });
+
+  it('distinguishes bounded OAuth absence from an available empty cache', async () => {
+    const input = {
+      owner: { type: 'user' as const, id: user.id },
+      kiloUserId: user.id,
+      readOptions: { bounded: true },
+    };
+    await expect(listBitbucketRepositories(input)).resolves.toEqual({ status: 'not_connected' });
+    await insertActiveIntegration(user.id, { repositories: [] });
+    await expect(listBitbucketRepositories(input)).resolves.toEqual({
+      status: 'available',
+      repositories: [],
+      syncedAt: CACHED_AT,
+    });
+  });
+
+  it.each(['reconnect_required', 'insufficient_permissions', 'temporarily_unavailable'] as const)(
+    'retains bounded OAuth %s without changing the complete cache',
+    async status => {
+      const integration = await insertActiveIntegration(user.id);
+      mockFetchBitbucketRepositoriesFromTokenService.mockResolvedValue({ status });
+      await expect(
+        listBitbucketRepositories({
+          owner: { type: 'user', id: user.id },
+          kiloUserId: user.id,
+          forceRefresh: true,
+          readOptions: { bounded: true },
+        })
+      ).resolves.toEqual({ status });
+      const [saved] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      expect(saved?.repositories).toEqual([CACHED_REPOSITORY]);
+    }
+  );
+
+  it('does not report a configured OAuth provider as absent after a remote disconnect', async () => {
+    const integration = await insertActiveIntegration(user.id, {}, organization.id);
+    mockFetchBitbucketRepositoriesFromTokenService.mockResolvedValue({ status: 'not_connected' });
+    const { fetchBitbucketRepositoriesForOrganization } =
+      await import('@/lib/cloud-agent/bitbucket-integration-helpers');
+    await expect(
+      fetchBitbucketRepositoriesForOrganization(organization.id, user.id, true, { bounded: true })
+    ).resolves.toEqual({ status: 'temporarily_unavailable' });
+    const [saved] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    expect(saved?.repositories).toEqual([CACHED_REPOSITORY]);
+  });
+
+  it.each(['suspended', 'auth-invalid'] as const)(
+    'rejects a bounded OAuth cache hit when the integration is %s',
+    async state => {
+      const integration = await insertActiveIntegration(user.id);
+      const invalidation =
+        state === 'suspended'
+          ? { suspended_at: CACHED_AT }
+          : { auth_invalid_at: CACHED_AT, auth_invalid_reason: 'provider_rejected' };
+      await db
+        .update(platform_integrations)
+        .set(invalidation)
+        .where(eq(platform_integrations.id, integration.id));
+      await expect(
+        listBitbucketRepositories({
+          owner: { type: 'user', id: user.id },
+          kiloUserId: user.id,
+          readOptions: { bounded: true },
+        })
+      ).resolves.toEqual({ status: 'reconnect_required' });
+      expect(mockFetchBitbucketRepositoriesFromTokenService).not.toHaveBeenCalled();
+    }
+  );
+
+  it('bounds a complete OAuth cache without changing legacy reads', async () => {
+    const repositories = Array.from({ length: 60 }, (_, index) => ({
+      ...CACHED_REPOSITORY,
+      id: randomUUID(),
+      full_name: `acme/repo-${index}`,
+    }));
+    await insertActiveIntegration(user.id, { repositories });
+    const input = { owner: { type: 'user' as const, id: user.id }, kiloUserId: user.id };
+    const bounded = await listBitbucketRepositories({ ...input, readOptions: { bounded: true } });
+    expect(bounded.status).toBe('available');
+    if (bounded.status !== 'available') throw new Error('Expected bounded repositories');
+    expect(bounded.repositories).toHaveLength(50);
+    expect(bounded.repositories.at(-1)?.fullName).toBe('acme/repo-49');
+    const legacy = await listBitbucketRepositories(input);
+    expect(legacy.status).toBe('available');
+    if (legacy.status !== 'available') throw new Error('Expected complete repositories');
+    expect(legacy.repositories).toHaveLength(60);
+  });
+
+  it.each([false, true])(
+    'does not persist a partial OAuth result on refresh=%s',
+    async forceRefresh => {
+      const integration = await insertActiveIntegration(
+        user.id,
+        forceRefresh ? {} : { repositories: null, syncedAt: null }
+      );
+      mockFetchBitbucketRepositoriesFromTokenService.mockImplementation(
+        async (_userId, _organizationId, options) => {
+          if (!options?.bounded) throw new Error('Unbounded transport');
+          return { status: 'available', repositories: [REFRESHED_REPOSITORY] };
+        }
+      );
+      await expect(
+        listBitbucketRepositories({
+          owner: { type: 'user', id: user.id },
+          kiloUserId: user.id,
+          forceRefresh,
+          readOptions: { bounded: true },
+        })
+      ).resolves.toMatchObject({ status: 'available', repositories: [REFRESHED_REPOSITORY] });
+      const [unchanged] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      expect(unchanged?.repositories).toEqual(forceRefresh ? [CACHED_REPOSITORY] : null);
+      expect(
+        unchanged?.repositories_synced_at
+          ? new Date(unchanged.repositories_synced_at).toISOString()
+          : null
+      ).toBe(forceRefresh ? CACHED_AT : null);
+    }
+  );
+
+  it.each(['available', 'reconnect_required', 'temporarily_unavailable'] as const)(
+    'ignores stale OAuth %s after credential rotation and returns the bounded winner',
+    async status => {
+      const integration = await insertActiveIntegration(user.id);
+      const winner = Array.from({ length: 60 }, (_, index) => ({
+        ...CACHED_REPOSITORY,
+        id: randomUUID(),
+        full_name: `acme/winner-${index}`,
+      }));
+      mockFetchBitbucketRepositoriesFromTokenService.mockImplementation(async () => {
+        await db
+          .update(platform_oauth_credentials)
+          .set({ credential_version: 2 })
+          .where(eq(platform_oauth_credentials.platform_integration_id, integration.id));
+        await db
+          .update(platform_integrations)
+          .set({ repositories: winner, repositories_synced_at: '2026-06-24T08:00:00.000Z' })
+          .where(eq(platform_integrations.id, integration.id));
+        return status === 'available'
+          ? { status, repositories: [REFRESHED_REPOSITORY] }
+          : { status };
+      });
+      const result = await listBitbucketRepositories({
+        owner: { type: 'user', id: user.id },
+        kiloUserId: user.id,
+        forceRefresh: true,
+        readOptions: { bounded: true },
+      });
+      expect(result.status).toBe('available');
+      if (result.status !== 'available') throw new Error('Expected the winner cache');
+      expect(result.repositories).toHaveLength(50);
+      expect(result.repositories[0].fullName).toBe('acme/winner-0');
+      const [saved] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      expect(saved?.repositories).toEqual(winner);
+    }
+  );
 });

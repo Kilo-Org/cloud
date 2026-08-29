@@ -12,7 +12,9 @@ import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
+  ensureOrganizationAccess,
 } from '@/routers/organizations/utils';
+import { withRepositoryReadDeadline } from '@/lib/integrations/core/repository-read-limits';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   BitbucketOrganizationRepositoryListResultSchema,
@@ -189,20 +191,20 @@ const AnswerPermissionInput = baseAnswerPermissionNextSchema.extend({
   organizationId: z.uuid(),
 });
 
-const ListGitHubRepositoriesInput = z.object({
-  organizationId: z.uuid(),
-  forceRefresh: z.boolean().optional().default(false),
-});
-
-const ListGitLabRepositoriesInput = z.object({
-  organizationId: z.uuid(),
-  forceRefresh: z.boolean().optional().default(false),
-});
-
-const ListBitbucketRepositoriesInput = z.object({
-  organizationId: z.uuid(),
-  forceRefresh: z.boolean().optional().default(false),
-});
+const ListRepositoriesInput = z.union([
+  z
+    .object({
+      organizationId: z.uuid(),
+      forceRefresh: z.boolean().default(false),
+      bounded: z.literal(true),
+    })
+    .strict(),
+  z.object({
+    organizationId: z.uuid(),
+    forceRefresh: z.boolean().default(false),
+    bounded: z.literal(false).optional(),
+  }),
+]);
 
 /**
  * Cloud Agent Next Router (Organization Context)
@@ -702,7 +704,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
    * List GitHub repositories available for cloud agent sessions (organization context).
    */
   listGitHubRepositories: organizationMemberProcedure
-    .input(ListGitHubRepositoriesInput)
+    .input(ListRepositoriesInput)
     .output(
       z.object({
         repositories: z.array(
@@ -719,31 +721,75 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: z.boolean(),
         syncedAt: z.string().nullish(),
         errorMessage: z.string().optional(),
+        status: z
+          .enum([
+            'not_connected',
+            'available',
+            'suspended',
+            'reconnect_required',
+            'misconfigured',
+            'temporarily_unavailable',
+            'integration_limit_exceeded',
+          ])
+          .optional(),
       })
     )
     .query(async ({ ctx, input }) => {
-      const result = await fetchAllGitHubRepositoriesForOrganization(
-        input.organizationId,
-        input.forceRefresh
-      );
-      return {
-        repositories: await orderRepositoriesByUsage({
-          userId: ctx.user.id,
-          organizationId: input.organizationId,
-          platform: 'github',
-          repositories: result.repositories,
-        }),
-        integrationInstalled: result.integrationInstalled,
-        syncedAt: result.syncedAt,
-        errorMessage: result.errorMessage,
-      };
+      try {
+        return await withRepositoryReadDeadline(
+          input.bounded ? { bounded: true } : undefined,
+          async signal => {
+            const result = input.bounded
+              ? await fetchAllGitHubRepositoriesForOrganization(
+                  input.organizationId,
+                  input.forceRefresh,
+                  { bounded: true, signal }
+                )
+              : await fetchAllGitHubRepositoriesForOrganization(
+                  input.organizationId,
+                  input.forceRefresh
+                );
+            signal?.throwIfAborted();
+            const repositories = await orderRepositoriesByUsage({
+              userId: ctx.user.id,
+              organizationId: input.organizationId,
+              platform: 'github',
+              repositories: result.repositories,
+            });
+            if (input.bounded) {
+              signal?.throwIfAborted();
+              await ensureOrganizationAccess(ctx, input.organizationId);
+            }
+            return {
+              repositories,
+              integrationInstalled: result.integrationInstalled,
+              syncedAt: result.syncedAt,
+              errorMessage: result.errorMessage,
+              ...(input.bounded ? { status: result.status } : {}),
+            };
+          }
+        );
+      } catch (error) {
+        if (
+          !input.bounded ||
+          (error instanceof TRPCError &&
+            (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN'))
+        )
+          throw error;
+        return {
+          status: 'temporarily_unavailable' as const,
+          integrationInstalled: true,
+          repositories: [],
+          syncedAt: null,
+        };
+      }
     }),
 
   /**
    * List GitLab repositories available for cloud agent sessions (organization context).
    */
   listGitLabRepositories: organizationMemberProcedure
-    .input(ListGitLabRepositoriesInput)
+    .input(ListRepositoriesInput)
     .output(
       z.object({
         repositories: z.array(
@@ -757,48 +803,120 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: z.boolean(),
         syncedAt: z.string().nullish(),
         errorMessage: z.string().optional(),
+        status: z
+          .enum([
+            'not_connected',
+            'available',
+            'suspended',
+            'reconnect_required',
+            'misconfigured',
+            'temporarily_unavailable',
+          ])
+          .optional(),
       })
     )
     .query(async ({ ctx, input }) => {
-      const result = await fetchGitLabRepositoriesForOrganization(
-        input.organizationId,
-        ctx.user.id,
-        input.forceRefresh
-      );
-      return {
-        repositories: await orderRepositoriesByUsage({
-          userId: ctx.user.id,
-          organizationId: input.organizationId,
-          platform: 'gitlab',
-          repositories: result.repositories,
-          gitlabInstanceUrl: result.instanceUrl,
-        }),
-        integrationInstalled: result.integrationInstalled,
-        syncedAt: result.syncedAt,
-        errorMessage: result.errorMessage,
-      };
+      try {
+        return await withRepositoryReadDeadline(
+          input.bounded ? { bounded: true } : undefined,
+          async signal => {
+            const result = input.bounded
+              ? await fetchGitLabRepositoriesForOrganization(
+                  input.organizationId,
+                  ctx.user.id,
+                  input.forceRefresh,
+                  { bounded: true, signal }
+                )
+              : await fetchGitLabRepositoriesForOrganization(
+                  input.organizationId,
+                  ctx.user.id,
+                  input.forceRefresh
+                );
+            signal?.throwIfAborted();
+            const repositories = await orderRepositoriesByUsage({
+              userId: ctx.user.id,
+              organizationId: input.organizationId,
+              platform: 'gitlab',
+              repositories: result.repositories,
+              gitlabInstanceUrl: result.instanceUrl,
+            });
+            if (input.bounded) {
+              signal?.throwIfAborted();
+              await ensureOrganizationAccess(ctx, input.organizationId);
+            }
+            return {
+              repositories,
+              integrationInstalled: result.integrationInstalled,
+              syncedAt: result.syncedAt,
+              errorMessage: result.errorMessage,
+              ...(input.bounded ? { status: result.status } : {}),
+            };
+          }
+        );
+      } catch (error) {
+        if (
+          !input.bounded ||
+          (error instanceof TRPCError &&
+            (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN'))
+        )
+          throw error;
+        return {
+          status: 'temporarily_unavailable' as const,
+          integrationInstalled: true,
+          repositories: [],
+          syncedAt: null,
+        };
+      }
     }),
 
   listBitbucketRepositories: organizationMemberProcedure
-    .input(ListBitbucketRepositoriesInput)
+    .input(ListRepositoriesInput)
     .output(BitbucketOrganizationRepositoryListResultSchema)
     .query(async ({ ctx, input }) => {
-      const result = await fetchBitbucketRepositoriesForOrganization(
-        input.organizationId,
-        ctx.user.id,
-        input.forceRefresh
-      );
-      if (result.status !== 'available') {
-        return result;
+      try {
+        return await withRepositoryReadDeadline(
+          input.bounded ? { bounded: true } : undefined,
+          async signal => {
+            const result = input.bounded
+              ? await fetchBitbucketRepositoriesForOrganization(
+                  input.organizationId,
+                  ctx.user.id,
+                  input.forceRefresh,
+                  { bounded: true, signal }
+                )
+              : await fetchBitbucketRepositoriesForOrganization(
+                  input.organizationId,
+                  ctx.user.id,
+                  input.forceRefresh
+                );
+            signal?.throwIfAborted();
+            const output =
+              result.status === 'available'
+                ? {
+                    ...result,
+                    repositories: await orderRepositoriesByUsage({
+                      userId: ctx.user.id,
+                      organizationId: input.organizationId,
+                      platform: 'bitbucket',
+                      repositories: result.repositories,
+                    }),
+                  }
+                : result;
+            if (input.bounded) {
+              signal?.throwIfAborted();
+              await ensureOrganizationAccess(ctx, input.organizationId);
+            }
+            return output;
+          }
+        );
+      } catch (error) {
+        if (
+          !input.bounded ||
+          (error instanceof TRPCError &&
+            (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN'))
+        )
+          throw error;
+        return { status: 'temporarily_unavailable' as const };
       }
-      return {
-        ...result,
-        repositories: await orderRepositoriesByUsage({
-          userId: ctx.user.id,
-          organizationId: input.organizationId,
-          platform: 'bitbucket',
-          repositories: result.repositories,
-        }),
-      };
     }),
 });

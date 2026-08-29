@@ -1,4 +1,15 @@
 import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
+import type { Owner } from '@/lib/integrations/core/types';
+import {
+  REPOSITORY_READ_LIMITS,
+  withRepositoryReadDeadline,
+  type RepositoryReadOptions,
+} from '@/lib/integrations/core/repository-read-limits';
+import {
+  GitLabInstanceUrlError,
+  normalizeGitLabInstanceUrl,
+} from '@/lib/integrations/platforms/gitlab/instance-url';
 import {
   getIntegrationForOrganization,
   getIntegrationForOwner,
@@ -16,6 +27,13 @@ import {
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
 
 type GitLabRepositoriesResult = {
+  status?:
+    | 'not_connected'
+    | 'available'
+    | 'suspended'
+    | 'reconnect_required'
+    | 'misconfigured'
+    | 'temporarily_unavailable';
   integrationInstalled: boolean;
   repositories: {
     id: number;
@@ -105,6 +123,70 @@ export async function getGitLabTokenForUser(userId: string): Promise<string | un
   }
 }
 
+async function fetchBoundedGitLabRepositories(
+  owner: Owner,
+  actorUserId: string,
+  forceRefresh: boolean,
+  options: RepositoryReadOptions
+): Promise<GitLabRepositoriesResult> {
+  const unavailable = { integrationInstalled: true, repositories: [], syncedAt: null };
+  try {
+    return await withRepositoryReadDeadline<GitLabRepositoriesResult>(options, async signal => {
+      const integration =
+        owner.type === 'org'
+          ? await getIntegrationForOrganization(owner.id, PLATFORM.GITLAB)
+          : await getIntegrationForOwner(owner, PLATFORM.GITLAB);
+      if (!integration) {
+        return { ...unavailable, integrationInstalled: false, status: 'not_connected' };
+      }
+      if (isPlatformIntegrationSuspended(integration))
+        return { ...unavailable, status: 'suspended' };
+      if (integration.auth_invalid_at) return { ...unavailable, status: 'reconnect_required' };
+      const metadata = z
+        .object({ gitlab_instance_url: z.string().optional() })
+        .safeParse(integration.metadata ?? {});
+      if (integration.integration_status !== 'active' || !metadata.success) {
+        return { ...unavailable, status: 'misconfigured' };
+      }
+      const instanceUrl = normalizeGitLabInstanceUrl(metadata.data.gitlab_instance_url);
+      const cached = requireNumericPlatformRepositories(
+        integration.repositories?.slice(0, REPOSITORY_READ_LIMITS.repositories) ?? null
+      );
+      let repositories = cached;
+      let syncedAt = integration.repositories_synced_at;
+      if (forceRefresh || !cached || !syncedAt) {
+        signal?.throwIfAborted();
+        const token = await getValidGitLabToken(integration, {
+          userId: actorUserId,
+          ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
+        });
+        signal?.throwIfAborted();
+        repositories = await fetchGitLabProjects(token, instanceUrl, { bounded: true, signal });
+        syncedAt = new Date().toISOString();
+      }
+      signal?.throwIfAborted();
+      return {
+        status: 'available',
+        integrationInstalled: true,
+        repositories: mapRepositories(
+          (repositories ?? []).slice(0, REPOSITORY_READ_LIMITS.repositories)
+        ),
+        syncedAt,
+        instanceUrl,
+      };
+    });
+  } catch (error) {
+    const status =
+      error instanceof GitLabInstanceUrlError && error.reason !== 'resolution_failed'
+        ? 'misconfigured'
+        : error instanceof TRPCError &&
+            (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN')
+          ? 'reconnect_required'
+          : 'temporarily_unavailable';
+    return { ...unavailable, status };
+  }
+}
+
 /**
  * Fetch GitLab repositories for an organization
  * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true
@@ -112,8 +194,17 @@ export async function getGitLabTokenForUser(userId: string): Promise<string | un
 export async function fetchGitLabRepositoriesForOrganization(
   organizationId: string,
   actorUserId: string,
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  options?: RepositoryReadOptions
 ): Promise<GitLabRepositoriesResult> {
+  if (options?.bounded) {
+    return fetchBoundedGitLabRepositories(
+      { type: 'org', id: organizationId },
+      actorUserId,
+      forceRefresh,
+      options
+    );
+  }
   const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
 
   if (!integration) {
@@ -166,8 +257,17 @@ export async function fetchGitLabRepositoriesForOrganization(
  */
 export async function fetchGitLabRepositoriesForUser(
   userId: string,
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  options?: RepositoryReadOptions
 ): Promise<GitLabRepositoriesResult> {
+  if (options?.bounded) {
+    return fetchBoundedGitLabRepositories(
+      { type: 'user', id: userId },
+      userId,
+      forceRefresh,
+      options
+    );
+  }
   const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITLAB);
 
   if (!integration) {

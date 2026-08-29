@@ -1,5 +1,6 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
-import { createCallerFactory } from '@/lib/trpc/init';
+import type * as GitHubIntegrationHelpers from '@/lib/cloud-agent/github-integration-helpers';
+import type * as GitLabIntegrationHelpers from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type * as TrpcInitModule from '@/lib/trpc/init';
 import type * as ZodModule from 'zod';
 import type { z } from 'zod';
@@ -83,37 +84,13 @@ const mockIsFeatureFlagEnabledOrDevelopment =
 const mockVerifyOrgOwnsSessionV2ByCloudAgentId =
   jest.fn<() => Promise<{ kiloSessionId: string } | null>>();
 const mockFetchBitbucketRepositoriesForOrganization =
-  jest.fn<
-    (
-      organizationId: string,
-      kiloUserId: string,
-      forceRefresh?: boolean
-    ) => Promise<BitbucketOrganizationRepositoryListResult>
-  >();
+  jest.fn<typeof BitbucketIntegrationHelpers.fetchBitbucketRepositoriesForOrganization>();
 const mockGetBalanceForOrganizationUser =
   jest.fn<(organizationId: string, userId: string) => Promise<{ balance: number }>>();
-const mockFetchGitHubRepositoriesForOrganization = jest.fn<
-  (
-    organizationId: string,
-    forceRefresh: boolean
-  ) => Promise<{
-    repositories: unknown[];
-    integrationInstalled: boolean;
-    syncedAt: null;
-  }>
->();
-const mockFetchGitLabRepositoriesForOrganization = jest.fn<
-  (
-    organizationId: string,
-    actorUserId: string,
-    forceRefresh: boolean
-  ) => Promise<{
-    repositories: unknown[];
-    integrationInstalled: boolean;
-    syncedAt: null;
-    instanceUrl?: string;
-  }>
->();
+const mockFetchGitHubRepositoriesForOrganization =
+  jest.fn<typeof GitHubIntegrationHelpers.fetchAllGitHubRepositoriesForOrganization>();
+const mockFetchGitLabRepositoriesForOrganization =
+  jest.fn<typeof GitLabIntegrationHelpers.fetchGitLabRepositoriesForOrganization>();
 const mockOrderRepositoriesByUsage =
   jest.fn<
     <T extends { fullName: string }>(params: {
@@ -125,6 +102,23 @@ const mockOrderRepositoriesByUsage =
     }) => Promise<T[]>
   >();
 const mockEnsureOrganizationAccess = jest.fn<(userId: string, organizationId: string) => void>();
+
+// Caller contexts supply authentication; these unit tests do not open external services.
+jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@/lib/admin/admin-access-log', () => ({
+  authViaTokenFromHeaders: jest.fn(),
+  clientIpFromHeaders: jest.fn(),
+  emitAdminAccessEvent: jest.fn(),
+}));
+jest.mock('@/lib/drizzle', () => ({ db: {}, readDb: {} }));
+jest.mock('@/lib/config.server', () => ({}));
+jest.mock('@/lib/r2/cloud-agent-pending-uploads', () => ({
+  linkPendingUploads: jest.fn(async () => undefined),
+  releasePendingUploads: jest.fn(async () => undefined),
+}));
+jest.mock('@/lib/cloud-agent/stream-ticket', () => ({
+  signStreamTicket: jest.fn(() => ({ ticket: 'test-stream-ticket', expiresAt: 1_900_000_000 })),
+}));
 
 jest.mock('@/lib/tokens', () => ({
   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
@@ -192,6 +186,8 @@ jest.mock('@/routers/organizations/utils', () => {
   return {
     organizationMemberProcedure: organizationProcedure,
     organizationMemberMutationProcedure: organizationProcedure,
+    ensureOrganizationAccess: (ctx: { user: User }, organizationId: string) =>
+      mockEnsureOrganizationAccess(ctx.user.id, organizationId),
   };
 });
 
@@ -221,6 +217,7 @@ let createCaller: (ctx: { user: User }) => {
   listBitbucketRepositories: (input: {
     organizationId: string;
     forceRefresh?: boolean;
+    bounded?: boolean;
   }) => Promise<BitbucketOrganizationRepositoryListResult>;
   checkEligibility: (input: { organizationId: string }) => Promise<{
     balance: number;
@@ -230,11 +227,13 @@ let createCaller: (ctx: { user: User }) => {
   }>;
   listGitHubRepositories: (input: {
     organizationId: string;
-    forceRefresh: boolean;
+    forceRefresh?: boolean;
+    bounded?: boolean;
   }) => Promise<unknown>;
   listGitLabRepositories: (input: {
     organizationId: string;
-    forceRefresh: boolean;
+    forceRefresh?: boolean;
+    bounded?: boolean;
   }) => Promise<unknown>;
   refreshTerminalTicket: (input: {
     organizationId: string;
@@ -260,6 +259,7 @@ let createCaller: (ctx: { user: User }) => {
 };
 
 beforeAll(async () => {
+  const { createCallerFactory } = await import('@/lib/trpc/init');
   const mod = await import('./organization-cloud-agent-next-router');
   createCaller = createCallerFactory(mod.organizationCloudAgentNextRouter);
 });
@@ -621,6 +621,200 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
       caller.listGitHubRepositories({ organizationId: ORGANIZATION_ID, forceRefresh: false })
     ).rejects.toThrow('provider down');
     expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
+  });
+});
+
+describe.each([
+  'listGitHubRepositories',
+  'listGitLabRepositories',
+  'listBitbucketRepositories',
+] as const)('bounded organization %s', method => {
+  const user = { id: 'oauth/member', is_admin: false } as User;
+  const numeric = {
+    status: 'available' as const,
+    repositories: [],
+    integrationInstalled: true,
+    syncedAt: null,
+  };
+  const bitbucket = {
+    status: 'available' as const,
+    repositories: [],
+    syncedAt: '2026-06-25T18:00:00.000Z',
+  };
+  const expected = method === 'listBitbucketRepositories' ? bitbucket : numeric;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureOrganizationAccess.mockReset().mockImplementation(() => undefined);
+    mockOrderRepositoriesByUsage.mockImplementation(async ({ repositories }) => repositories);
+    mockFetchGitHubRepositoriesForOrganization
+      .mockReset()
+      .mockImplementation(async (organizationId, refresh, options) => {
+        if (
+          organizationId !== ORGANIZATION_ID ||
+          refresh !== false ||
+          !options?.bounded ||
+          !options.signal
+        )
+          throw new Error('Incorrect bounded request');
+        return numeric;
+      });
+    mockFetchGitLabRepositoriesForOrganization
+      .mockReset()
+      .mockImplementation(async (organizationId, actor, refresh, options) => {
+        if (
+          organizationId !== ORGANIZATION_ID ||
+          actor !== user.id ||
+          refresh !== false ||
+          !options?.bounded ||
+          !options.signal
+        )
+          throw new Error('Incorrect bounded request');
+        return numeric;
+      });
+    mockFetchBitbucketRepositoriesForOrganization
+      .mockReset()
+      .mockImplementation(async (organizationId, actor, refresh, options) => {
+        if (
+          organizationId !== ORGANIZATION_ID ||
+          actor !== user.id ||
+          refresh !== false ||
+          !options?.bounded ||
+          !options.signal
+        )
+          throw new Error('Incorrect bounded request');
+        return bitbucket;
+      });
+  });
+
+  it('uses fixed bounds, authenticated ownership, and the existing refresh default', async () => {
+    await expect(
+      createCaller({ user })[method]({ organizationId: ORGANIZATION_ID, bounded: true })
+    ).resolves.toEqual(expected);
+  });
+
+  it.each([false, true])(
+    'denies membership removed during bounded refresh=%s',
+    async forceRefresh => {
+      const revoke = () =>
+        mockEnsureOrganizationAccess.mockImplementation(() => {
+          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Membership removed' });
+        });
+      mockFetchGitHubRepositoriesForOrganization.mockImplementation(async () => {
+        revoke();
+        return numeric;
+      });
+      mockFetchGitLabRepositoriesForOrganization.mockImplementation(async () => {
+        revoke();
+        return numeric;
+      });
+      mockFetchBitbucketRepositoriesForOrganization.mockImplementation(async () => {
+        revoke();
+        return bitbucket;
+      });
+      await expect(
+        createCaller({ user })[method]({
+          organizationId: ORGANIZATION_ID,
+          forceRefresh,
+          bounded: true,
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED', message: 'Membership removed' });
+    }
+  );
+
+  it('denies removed membership before reading provider data', async () => {
+    mockEnsureOrganizationAccess.mockImplementation(() => {
+      throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Membership removed' });
+    });
+    await expect(
+      createCaller({ user })[method]({ organizationId: ORGANIZATION_ID, bounded: true })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(mockFetchGitHubRepositoriesForOrganization).not.toHaveBeenCalled();
+    expect(mockFetchGitLabRepositoriesForOrganization).not.toHaveBeenCalled();
+    expect(mockFetchBitbucketRepositoriesForOrganization).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['limit', 51],
+    ['pages', 3],
+    ['responseBytes', 1_048_577],
+    ['timeoutMs', 30_001],
+    ['endpoint', 'https://example.com/repositories'],
+    ['actorUserId', 'oauth/other-user'],
+    ['credentials', 'client-supplied-token'],
+    ['signal', { aborted: false }],
+  ] as const)('rejects client-supplied %s', async (key, value) => {
+    const input = { organizationId: ORGANIZATION_ID, bounded: true, [key]: value };
+    await expect(createCaller({ user })[method](input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+  });
+
+  it.each(['not_connected', 'reconnect_required', 'temporarily_unavailable'] as const)(
+    'preserves the %s state',
+    async status => {
+      const result = { ...numeric, status, integrationInstalled: status !== 'not_connected' };
+      mockFetchGitHubRepositoriesForOrganization.mockResolvedValue(result);
+      mockFetchGitLabRepositoriesForOrganization.mockResolvedValue(result);
+      mockFetchBitbucketRepositoriesForOrganization.mockResolvedValue({ status });
+      await expect(
+        createCaller({ user })[method]({ organizationId: ORGANIZATION_ID, bounded: true })
+      ).resolves.toEqual(method === 'listBitbucketRepositories' ? { status } : result);
+    }
+  );
+
+  it('preserves old output and default refresh when bounded options are omitted', async () => {
+    mockFetchGitHubRepositoriesForOrganization.mockImplementation(
+      async (_org, refresh, options) => {
+        if (refresh !== false || options !== undefined) throw new Error('Legacy call changed');
+        return numeric;
+      }
+    );
+    mockFetchGitLabRepositoriesForOrganization.mockImplementation(
+      async (_org, _actor, refresh, options) => {
+        if (refresh !== false || options !== undefined) throw new Error('Legacy call changed');
+        return numeric;
+      }
+    );
+    mockFetchBitbucketRepositoriesForOrganization.mockImplementation(
+      async (_org, _actor, refresh, options) => {
+        if (refresh !== false || options !== undefined) throw new Error('Legacy call changed');
+        return bitbucket;
+      }
+    );
+    await expect(
+      createCaller({ user })[method]({ organizationId: ORGANIZATION_ID })
+    ).resolves.toEqual(
+      method === 'listBitbucketRepositories'
+        ? bitbucket
+        : { repositories: [], integrationInstalled: true, syncedAt: null }
+    );
+  });
+
+  it('returns an explicit temporary state at the operation deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      mockFetchGitHubRepositoriesForOrganization.mockImplementation(() => new Promise(() => {}));
+      mockFetchGitLabRepositoriesForOrganization.mockImplementation(() => new Promise(() => {}));
+      mockFetchBitbucketRepositoriesForOrganization.mockImplementation(() => new Promise(() => {}));
+      const result = createCaller({ user })[method]({
+        organizationId: ORGANIZATION_ID,
+        bounded: true,
+      });
+      await jest.advanceTimersByTimeAsync(30_000);
+      await expect(result).resolves.toEqual(
+        method === 'listBitbucketRepositories'
+          ? { status: 'temporarily_unavailable' }
+          : {
+              status: 'temporarily_unavailable',
+              integrationInstalled: true,
+              repositories: [],
+              syncedAt: null,
+            }
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

@@ -10,6 +10,8 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
+import { randomUUID } from 'node:crypto';
+import type { RepositoryReadOptions } from '@/lib/integrations/core/repository-read-limits';
 import { eq } from 'drizzle-orm';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -23,7 +25,13 @@ import type {
 } from './workspace-access-token-repository-cache';
 
 const mockFetchBitbucketRepositoriesFromTokenService =
-  jest.fn<(kiloUserId: string, organizationId: string) => Promise<BitbucketRepositoryListResult>>();
+  jest.fn<
+    (
+      kiloUserId: string,
+      organizationId: string,
+      options?: RepositoryReadOptions
+    ) => Promise<BitbucketRepositoryListResult>
+  >();
 
 jest.mock('./token-service-client', () => ({
   BitbucketRepositorySchema:
@@ -864,4 +872,174 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
     expect(new Date(invalidated?.invalidAt ?? '').toISOString()).toBe('2026-06-24T09:00:00.000Z');
     expect(invalidated?.invalidReason).toBe('provider_rejected');
   });
+
+  it('distinguishes bounded absence from an available empty workspace-token cache', async () => {
+    await expect(
+      fetchBitbucketRepositoriesForOrganization(organization.id, user.id, false, { bounded: true })
+    ).resolves.toEqual({ status: 'not_connected' });
+    await insertStaticIntegration(organization.id, user.id, { repositories: [] });
+    await expect(
+      fetchBitbucketRepositoriesForOrganization(organization.id, user.id, false, { bounded: true })
+    ).resolves.toEqual({ status: 'available', repositories: [], syncedAt: CACHED_AT });
+  });
+
+  it.each(['suspended', 'auth-invalid'] as const)(
+    'rejects a bounded workspace-token cache hit when the integration is %s',
+    async state => {
+      const integration = await insertStaticIntegration(organization.id, user.id);
+      const invalidation =
+        state === 'suspended'
+          ? { suspended_at: CACHED_AT }
+          : { auth_invalid_at: CACHED_AT, auth_invalid_reason: 'provider_rejected' };
+      await db
+        .update(platform_integrations)
+        .set(invalidation)
+        .where(eq(platform_integrations.id, integration.id));
+      await expect(
+        fetchBitbucketRepositoriesForOrganization(organization.id, user.id, false, {
+          bounded: true,
+        })
+      ).resolves.toEqual({ status: 'reconnect_required' });
+      expect(mockFetchBitbucketRepositoriesFromTokenService).not.toHaveBeenCalled();
+    }
+  );
+
+  it('bounds workspace-token cache projection while preserving complete legacy reads', async () => {
+    const repositories = Array.from({ length: 60 }, (_, index) => ({
+      ...CACHED_REPOSITORY,
+      id: randomUUID(),
+      full_name: `acme/repo-${index}`,
+    }));
+    await insertStaticIntegration(organization.id, user.id, { repositories });
+    const bounded = await fetchBitbucketRepositoriesForOrganization(
+      organization.id,
+      user.id,
+      false,
+      { bounded: true }
+    );
+    expect(bounded.status).toBe('available');
+    if (bounded.status !== 'available') throw new Error('Expected bounded repositories');
+    expect(bounded.repositories).toHaveLength(50);
+    expect(bounded.repositories.at(-1)?.fullName).toBe('acme/repo-49');
+    const legacy = await fetchBitbucketRepositoriesForOrganization(organization.id, user.id);
+    expect(legacy.status).toBe('available');
+    if (legacy.status !== 'available') throw new Error('Expected complete repositories');
+    expect(legacy.repositories).toHaveLength(60);
+  });
+
+  it.each([false, true])(
+    'uses bounded transport without persisting partial results on refresh=%s',
+    async forceRefresh => {
+      const integration = await insertStaticIntegration(
+        organization.id,
+        user.id,
+        forceRefresh ? {} : { repositories: null, syncedAt: null }
+      );
+      mockFetchBitbucketRepositoriesFromTokenService.mockImplementation(
+        async (_user, _org, options) => {
+          if (!options?.bounded || !options.signal) throw new Error('Unbounded transport');
+          return { status: 'available', repositories: [REFRESHED_REPOSITORY] };
+        }
+      );
+      await expect(
+        fetchBitbucketRepositoriesForOrganization(organization.id, user.id, forceRefresh, {
+          bounded: true,
+        })
+      ).resolves.toMatchObject({ status: 'available', repositories: [REFRESHED_REPOSITORY] });
+      const [unchanged] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      expect(unchanged?.repositories).toEqual(forceRefresh ? [CACHED_REPOSITORY] : null);
+      expect(
+        unchanged?.repositories_synced_at
+          ? new Date(unchanged.repositories_synced_at).toISOString()
+          : null
+      ).toBe(forceRefresh ? CACHED_AT : null);
+    }
+  );
+
+  it.each(['rotation', 'reconnection', 'cache refresh'] as const)(
+    'returns a bounded winner after %s during provider work',
+    async race => {
+      const integration = await insertStaticIntegration(organization.id, user.id);
+      let winnerId = integration.id;
+      const winner = Array.from({ length: 60 }, (_, index) => ({
+        ...CACHED_REPOSITORY,
+        id: randomUUID(),
+        full_name: `acme/winner-${index}`,
+      }));
+      mockFetchBitbucketRepositoriesFromTokenService.mockImplementation(async () => {
+        if (race === 'reconnection') {
+          winnerId = await replaceWithWinnerIntegration(organization.id, user.id, integration.id);
+        } else if (race === 'rotation') {
+          await db
+            .update(platform_access_token_credentials)
+            .set({ credential_version: 2 })
+            .where(eq(platform_access_token_credentials.platform_integration_id, integration.id));
+        }
+        await db
+          .update(platform_integrations)
+          .set({ repositories: winner, repositories_synced_at: WINNER_CACHED_AT })
+          .where(eq(platform_integrations.id, winnerId));
+        return { status: 'reconnect_required' };
+      });
+      const result = await fetchBitbucketRepositoriesForOrganization(
+        organization.id,
+        user.id,
+        true,
+        { bounded: true }
+      );
+      expect(result.status).toBe('available');
+      if (result.status !== 'available') throw new Error('Expected the winner cache');
+      expect(result.repositories).toHaveLength(50);
+      expect(result.repositories[0].fullName).toBe('acme/winner-0');
+      const [saved] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, winnerId));
+      expect(saved?.repositories).toEqual(winner);
+    }
+  );
+
+  it('does not return bounded provider data after parent invalidation', async () => {
+    const integration = await insertStaticIntegration(organization.id, user.id);
+    mockFetchBitbucketRepositoriesFromTokenService.mockImplementation(async () => {
+      await db
+        .update(platform_integrations)
+        .set({ auth_invalid_at: WINNER_CACHED_AT, auth_invalid_reason: 'provider_rejected' })
+        .where(eq(platform_integrations.id, integration.id));
+      return { status: 'available', repositories: [REFRESHED_REPOSITORY] };
+    });
+    await expect(
+      fetchBitbucketRepositoriesForOrganization(organization.id, user.id, true, { bounded: true })
+    ).resolves.toEqual({ status: 'reconnect_required' });
+    const [saved] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    expect(saved?.repositories).toEqual([CACHED_REPOSITORY]);
+    expect(saved?.auth_invalid_reason).toBe('provider_rejected');
+  });
+
+  it.each([
+    ['reconnect_required', 'reconnect_required'],
+    ['insufficient_permissions', 'insufficient_permissions'],
+    ['temporarily_unavailable', 'temporarily_unavailable'],
+    ['not_connected', 'temporarily_unavailable'],
+  ] as const)(
+    'reports configured provider %s without cache writes',
+    async (status, expectedStatus) => {
+      const integration = await insertStaticIntegration(organization.id, user.id);
+      mockFetchBitbucketRepositoriesFromTokenService.mockResolvedValue({ status });
+      await expect(
+        fetchBitbucketRepositoriesForOrganization(organization.id, user.id, true, { bounded: true })
+      ).resolves.toEqual({ status: expectedStatus });
+      const [saved] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      expect(saved?.repositories).toEqual([CACHED_REPOSITORY]);
+    }
+  );
 });

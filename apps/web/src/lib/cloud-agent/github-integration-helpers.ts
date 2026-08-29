@@ -1,4 +1,10 @@
 import { TRPCError } from '@trpc/server';
+import type { Owner } from '@/lib/integrations/core/types';
+import {
+  REPOSITORY_READ_LIMITS,
+  withRepositoryReadDeadline,
+  type RepositoryReadOptions,
+} from '@/lib/integrations/core/repository-read-limits';
 import {
   getIntegrationsByOrganization,
   getIntegrationForOrganization,
@@ -23,6 +29,14 @@ import {
 } from '@/lib/integrations/core/types';
 
 type GitHubRepositoriesResult = {
+  status?:
+    | 'not_connected'
+    | 'available'
+    | 'suspended'
+    | 'reconnect_required'
+    | 'misconfigured'
+    | 'temporarily_unavailable'
+    | 'integration_limit_exceeded';
   integrationInstalled: boolean;
   repositories: {
     id: number;
@@ -187,10 +201,89 @@ export async function fetchGitHubRepositoriesForOrganization(
   }
 }
 
+async function fetchBoundedGitHubRepositories(
+  owner: Owner,
+  forceRefresh: boolean,
+  options: RepositoryReadOptions
+): Promise<GitHubRepositoriesResult> {
+  const unavailable = { integrationInstalled: true, repositories: [], syncedAt: null };
+  try {
+    return await withRepositoryReadDeadline<GitHubRepositoriesResult>(options, async signal => {
+      const candidates =
+        owner.type === 'org'
+          ? await getIntegrationsByOrganization(owner.id, PLATFORM.GITHUB)
+          : [await getIntegrationForOwner(owner, PLATFORM.GITHUB)];
+      const integrations = candidates.filter(integration => integration !== null);
+      if (!integrations.length) {
+        return { ...unavailable, integrationInstalled: false, status: 'not_connected' };
+      }
+      if (integrations.length > 10) {
+        return { ...unavailable, status: 'integration_limit_exceeded' };
+      }
+      // Check every configured installation before fetching or applying the result cap.
+      for (const integration of integrations) {
+        if (isPlatformIntegrationSuspended(integration)) {
+          return { ...unavailable, status: 'suspended' };
+        }
+        if (integration.auth_invalid_at) {
+          return { ...unavailable, status: 'reconnect_required' };
+        }
+        if (!isPlatformIntegrationHealthy(integration) || !integration.platform_installation_id) {
+          return { ...unavailable, status: 'misconfigured' };
+        }
+      }
+      const repositories: GitHubRepositoriesResult['repositories'] = [];
+      let syncedAt: string | null = null;
+      for (const integration of integrations) {
+        signal?.throwIfAborted();
+        const installationId = integration.platform_installation_id;
+        if (!installationId) return { ...unavailable, status: 'misconfigured' };
+        const cached = requireNumericPlatformRepositories(
+          integration.repositories?.slice(0, REPOSITORY_READ_LIMITS.repositories) ?? null
+        );
+        const refresh = forceRefresh || !cached || !integration.repositories_synced_at;
+        const selected = refresh
+          ? await fetchGitHubRepositories(
+              installationId,
+              integration.github_app_type || 'standard',
+              {
+                bounded: true,
+                signal,
+              }
+            )
+          : cached;
+        signal?.throwIfAborted();
+        repositories.push(
+          ...mapRepositories(
+            selected.slice(0, REPOSITORY_READ_LIMITS.repositories - repositories.length),
+            owner.type === 'org' ? integration : undefined
+          )
+        );
+        const nextSyncedAt = refresh
+          ? new Date().toISOString()
+          : integration.repositories_synced_at;
+        if (nextSyncedAt && (!syncedAt || nextSyncedAt < syncedAt)) syncedAt = nextSyncedAt;
+      }
+      // Bounded transport results are not a complete shared cache.
+      return { status: 'available', integrationInstalled: true, repositories, syncedAt };
+    });
+  } catch {
+    return { ...unavailable, status: 'temporarily_unavailable' };
+  }
+}
+
 export async function fetchAllGitHubRepositoriesForOrganization(
   organizationId: string,
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  options?: RepositoryReadOptions
 ): Promise<GitHubRepositoriesResult> {
+  if (options?.bounded) {
+    return fetchBoundedGitHubRepositories(
+      { type: 'org', id: organizationId },
+      forceRefresh,
+      options
+    );
+  }
   const integrations = (
     await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB)
   ).filter(isPlatformIntegrationHealthy);
@@ -252,8 +345,12 @@ async function fetchRepositoriesForIntegrations(
 
 export async function fetchGitHubRepositoriesForUser(
   userId: string,
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  options?: RepositoryReadOptions
 ): Promise<GitHubRepositoriesResult> {
+  if (options?.bounded) {
+    return fetchBoundedGitHubRepositories({ type: 'user', id: userId }, forceRefresh, options);
+  }
   const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITHUB);
 
   if (!integration) {

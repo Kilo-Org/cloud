@@ -9,6 +9,10 @@ import { after } from 'next/server';
 import { db } from '@/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
+import {
+  REPOSITORY_READ_LIMITS,
+  type RepositoryReadOptions,
+} from '@/lib/integrations/core/repository-read-limits';
 import { BitbucketIntegrationMetadataSchema, type BitbucketWorkspace } from './metadata';
 import {
   BitbucketRepositorySchema,
@@ -50,6 +54,7 @@ type ListBitbucketRepositoriesInput = {
   kiloUserId: string;
   forceRefresh?: boolean;
   expectedIntegrationId?: string;
+  readOptions?: RepositoryReadOptions;
 };
 
 type PrimeBitbucketRepositoryCacheInput = {
@@ -70,10 +75,15 @@ function ownerCondition(owner: Owner) {
 function readCachedRepositories(
   value: unknown,
   syncedAt: string | null,
-  workspace: BitbucketWorkspace
+  workspace: BitbucketWorkspace,
+  readOptions?: RepositoryReadOptions
 ): Extract<CachedBitbucketRepositoryListResult, { status: 'available' }> | null {
   if (value === null || !syncedAt) return null;
-  const repositories = z.array(CachedBitbucketRepositorySchema).safeParse(value);
+  const selected =
+    readOptions?.bounded && Array.isArray(value)
+      ? value.slice(0, REPOSITORY_READ_LIMITS.repositories)
+      : value;
+  const repositories = z.array(CachedBitbucketRepositorySchema).safeParse(selected);
   if (!repositories.success) return null;
   return {
     status: 'available',
@@ -94,26 +104,32 @@ export async function listBitbucketRepositories({
   kiloUserId,
   forceRefresh = false,
   expectedIntegrationId,
+  readOptions,
 }: ListBitbucketRepositoriesInput): Promise<CachedBitbucketRepositoryListResult> {
-  const [row] = await db
-    .select({
-      integrationId: platform_integrations.id,
-      integrationStatus: platform_integrations.integration_status,
-      installationId: platform_integrations.platform_installation_id,
-      accountId: platform_integrations.platform_account_id,
-      accountLogin: platform_integrations.platform_account_login,
-      metadata: platform_integrations.metadata,
-      repositories: platform_integrations.repositories,
-      repositoriesSyncedAt: platform_integrations.repositories_synced_at,
-      credential: platform_oauth_credentials,
-    })
-    .from(platform_integrations)
-    .leftJoin(
-      platform_oauth_credentials,
-      eq(platform_oauth_credentials.platform_integration_id, platform_integrations.id)
-    )
-    .where(and(ownerCondition(owner), eq(platform_integrations.platform, PLATFORM.BITBUCKET)))
-    .limit(1);
+  readOptions?.signal?.throwIfAborted();
+  const load = () =>
+    db
+      .select({
+        integrationId: platform_integrations.id,
+        integrationStatus: platform_integrations.integration_status,
+        suspendedAt: platform_integrations.suspended_at,
+        authInvalidAt: platform_integrations.auth_invalid_at,
+        installationId: platform_integrations.platform_installation_id,
+        accountId: platform_integrations.platform_account_id,
+        accountLogin: platform_integrations.platform_account_login,
+        metadata: platform_integrations.metadata,
+        repositories: platform_integrations.repositories,
+        repositoriesSyncedAt: platform_integrations.repositories_synced_at,
+        credential: platform_oauth_credentials,
+      })
+      .from(platform_integrations)
+      .leftJoin(
+        platform_oauth_credentials,
+        eq(platform_oauth_credentials.platform_integration_id, platform_integrations.id)
+      )
+      .where(and(ownerCondition(owner), eq(platform_integrations.platform, PLATFORM.BITBUCKET)))
+      .limit(1);
+  const [row] = await load();
 
   if (!row) return { status: 'not_connected' };
   if (expectedIntegrationId && row.integrationId !== expectedIntegrationId) {
@@ -121,6 +137,9 @@ export async function listBitbucketRepositories({
   }
   const credential = BitbucketOAuthCredentialRowSchema.safeParse(row.credential);
   if (!credential.success || credential.data.revoked_at) {
+    return { status: 'reconnect_required' };
+  }
+  if (readOptions?.bounded && (row.suspendedAt || row.authInvalidAt)) {
     return { status: 'reconnect_required' };
   }
 
@@ -145,14 +164,51 @@ export async function listBitbucketRepositories({
   const cachedResult = readCachedRepositories(
     row.repositories,
     row.repositoriesSyncedAt,
-    metadata.data.workspace
+    metadata.data.workspace,
+    readOptions
   );
   if (!forceRefresh && cachedResult) return cachedResult;
 
-  const result = await fetchBitbucketRepositoriesFromTokenService(
-    kiloUserId,
-    owner.type === 'org' ? owner.id : undefined
-  );
+  readOptions?.signal?.throwIfAborted();
+  const result = readOptions?.bounded
+    ? await fetchBitbucketRepositoriesFromTokenService(
+        kiloUserId,
+        owner.type === 'org' ? owner.id : undefined,
+        readOptions
+      ).catch(() => ({ status: 'temporarily_unavailable' as const }))
+    : await fetchBitbucketRepositoriesFromTokenService(
+        kiloUserId,
+        owner.type === 'org' ? owner.id : undefined
+      );
+  if (readOptions?.bounded) {
+    readOptions.signal?.throwIfAborted();
+    const [current] = await load();
+    const currentCredential = BitbucketOAuthCredentialRowSchema.safeParse(current?.credential);
+    if (
+      !current ||
+      !currentCredential.success ||
+      current.integrationId !== row.integrationId ||
+      current.integrationStatus !== row.integrationStatus ||
+      current.suspendedAt !== row.suspendedAt ||
+      current.authInvalidAt !== row.authInvalidAt ||
+      current.installationId !== row.installationId ||
+      current.accountId !== row.accountId ||
+      current.accountLogin !== row.accountLogin ||
+      JSON.stringify(current.metadata) !== JSON.stringify(row.metadata) ||
+      current.repositoriesSyncedAt !== row.repositoriesSyncedAt ||
+      currentCredential.data.id !== credential.data.id ||
+      currentCredential.data.credential_version !== credential.data.credential_version ||
+      currentCredential.data.revoked_at !== credential.data.revoked_at
+    ) {
+      return listBitbucketRepositories({ owner, kiloUserId, expectedIntegrationId, readOptions });
+    }
+    if (result.status !== 'available') return result;
+    return {
+      status: 'available',
+      repositories: result.repositories.slice(0, REPOSITORY_READ_LIMITS.repositories),
+      syncedAt: new Date().toISOString(),
+    };
+  }
   if (result.status !== 'available') return result;
 
   const repositories = result.repositories.map(repository => ({

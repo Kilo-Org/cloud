@@ -1,5 +1,6 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
-import { createCallerFactory } from '@/lib/trpc/init';
+import type * as GitHubIntegrationHelpers from '@/lib/cloud-agent/github-integration-helpers';
+import type * as GitLabIntegrationHelpers from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type { User } from '@kilocode/db/schema';
 import type { z } from 'zod';
 import type { personalPrepareSessionNextSchema } from '@/routers/cloud-agent-next-schemas';
@@ -79,27 +80,10 @@ const mockIsFeatureFlagEnabledOrDevelopment =
 const mockVerifyUserOwnsSessionV2ByCloudAgentId =
   jest.fn<() => Promise<{ kiloSessionId: string } | null>>();
 const mockGetBalanceForUser = jest.fn<(user: User) => Promise<{ balance: number }>>();
-const mockFetchGitHubRepositoriesForUser = jest.fn<
-  (
-    userId: string,
-    forceRefresh: boolean
-  ) => Promise<{
-    repositories: unknown[];
-    integrationInstalled: boolean;
-    syncedAt: null;
-  }>
->();
-const mockFetchGitLabRepositoriesForUser = jest.fn<
-  (
-    userId: string,
-    forceRefresh: boolean
-  ) => Promise<{
-    repositories: unknown[];
-    integrationInstalled: boolean;
-    syncedAt: null;
-    instanceUrl?: string;
-  }>
->();
+const mockFetchGitHubRepositoriesForUser =
+  jest.fn<typeof GitHubIntegrationHelpers.fetchGitHubRepositoriesForUser>();
+const mockFetchGitLabRepositoriesForUser =
+  jest.fn<typeof GitLabIntegrationHelpers.fetchGitLabRepositoriesForUser>();
 const mockOrderRepositoriesByUsage =
   jest.fn<
     <T extends { fullName: string }>(params: {
@@ -110,6 +94,22 @@ const mockOrderRepositoriesByUsage =
       gitlabInstanceUrl?: string;
     }) => Promise<T[]>
   >();
+
+// Caller contexts supply authentication; these unit tests do not open external services.
+jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@/lib/admin/admin-access-log', () => ({
+  authViaTokenFromHeaders: jest.fn(),
+  clientIpFromHeaders: jest.fn(),
+  emitAdminAccessEvent: jest.fn(),
+}));
+jest.mock('@/lib/drizzle', () => ({ db: {}, readDb: {} }));
+jest.mock('@/lib/r2/cloud-agent-pending-uploads', () => ({
+  linkPendingUploads: jest.fn(async () => undefined),
+  releasePendingUploads: jest.fn(async () => undefined),
+}));
+jest.mock('@/lib/cloud-agent/stream-ticket', () => ({
+  signStreamTicket: jest.fn(() => ({ ticket: 'test-stream-ticket', expiresAt: 1_900_000_000 })),
+}));
 
 jest.mock('@/lib/tokens', () => ({
   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
@@ -183,11 +183,18 @@ let createCaller: (ctx: { user: User }) => {
     isEligible: boolean;
     accessLevel: 'full' | 'limited' | 'blocked';
   }>;
-  listGitHubRepositories: (input: { forceRefresh: boolean }) => Promise<unknown>;
-  listGitLabRepositories: (input: { forceRefresh: boolean }) => Promise<unknown>;
+  listGitHubRepositories: (input: {
+    forceRefresh?: boolean;
+    bounded?: boolean;
+  }) => Promise<unknown>;
+  listGitLabRepositories: (input: {
+    forceRefresh?: boolean;
+    bounded?: boolean;
+  }) => Promise<unknown>;
 };
 
 beforeAll(async () => {
+  const { createCallerFactory } = await import('@/lib/trpc/init');
   const mod = await import('./cloud-agent-next-router');
   createCaller = createCallerFactory(mod.cloudAgentNextRouter);
 });
@@ -507,6 +514,109 @@ describe('cloudAgentNextRouter helper procedures', () => {
       'provider down'
     );
     expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
+  });
+});
+
+describe.each([
+  ['listGitHubRepositories', mockFetchGitHubRepositoriesForUser],
+  ['listGitLabRepositories', mockFetchGitLabRepositoriesForUser],
+] as const)('bounded personal %s', (method, fetchRepositories) => {
+  const user = { id: 'oauth/member', is_admin: false } as User;
+  beforeEach(() => {
+    jest.clearAllMocks();
+    fetchRepositories.mockReset();
+    mockOrderRepositoriesByUsage.mockImplementation(async ({ repositories }) =>
+      [...repositories].reverse()
+    );
+  });
+
+  it.each([
+    'not_connected',
+    'available',
+    'suspended',
+    'reconnect_required',
+    'misconfigured',
+    'temporarily_unavailable',
+  ] as const)('preserves the %s state and derives the actor from authentication', async status => {
+    const expected = {
+      status,
+      repositories: [],
+      integrationInstalled: status !== 'not_connected',
+      syncedAt: null,
+    };
+    fetchRepositories.mockImplementation(async (actor, forceRefresh, options) => {
+      if (actor !== user.id || forceRefresh !== false || !options?.bounded || !options.signal) {
+        throw new Error('Incorrect bounded authority or options');
+      }
+      return expected;
+    });
+    await expect(createCaller({ user })[method]({ bounded: true })).resolves.toEqual(expected);
+  });
+
+  it('preserves omitted options, refresh defaults, output fields, and usage ordering', async () => {
+    const repositories = [
+      { id: 1, name: 'one', fullName: 'org/one', private: false },
+      { id: 2, name: 'two', fullName: 'org/two', private: true },
+    ];
+    fetchRepositories.mockImplementation(async (actor, refresh, options) => {
+      if (actor !== user.id || refresh !== false || options !== undefined)
+        throw new Error('Legacy call changed');
+      return { status: 'available', repositories, integrationInstalled: true, syncedAt: null };
+    });
+    await expect(createCaller({ user })[method]({})).resolves.toEqual({
+      repositories: [repositories[1], repositories[0]],
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+  });
+
+  it.each([
+    ['limit', 51],
+    ['pages', 3],
+    ['responseBytes', 1_048_577],
+    ['timeoutMs', 30_001],
+    ['endpoint', 'https://example.com/repositories'],
+    ['userId', 'oauth/other-user'],
+    ['credentials', 'client-supplied-token'],
+    ['signal', { aborted: false }],
+    ['organizationId', '9a283301-b75d-4375-a1ba-e319a02e18b7'],
+  ] as const)('rejects client-supplied %s on bounded reads', async (key, value) => {
+    const input = { bounded: true, [key]: value };
+    await expect(createCaller({ user })[method](input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(fetchRepositories).not.toHaveBeenCalled();
+  });
+
+  it('returns temporary unavailability without a raw provider error', async () => {
+    fetchRepositories.mockRejectedValue(new Error('raw credential response'));
+    await expect(createCaller({ user })[method]({ bounded: true })).resolves.toEqual({
+      status: 'temporarily_unavailable',
+      integrationInstalled: true,
+      repositories: [],
+      syncedAt: null,
+    });
+  });
+
+  it('bounds the complete procedure, including usage ordering', async () => {
+    jest.useFakeTimers();
+    try {
+      fetchRepositories.mockResolvedValue({
+        status: 'available',
+        repositories: [],
+        integrationInstalled: true,
+        syncedAt: null,
+      });
+      mockOrderRepositoriesByUsage.mockImplementation(() => new Promise(() => {}));
+      const result = createCaller({ user })[method]({ bounded: true });
+      await jest.advanceTimersByTimeAsync(30_000);
+      await expect(result).resolves.toMatchObject({
+        status: 'temporarily_unavailable',
+        repositories: [],
+      });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

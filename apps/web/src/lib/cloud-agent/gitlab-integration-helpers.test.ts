@@ -1,7 +1,10 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
-import { buildGitLabCloneUrl } from './gitlab-integration-helpers';
+import type { RepositoryReadOptions } from '@/lib/integrations/core/repository-read-limits';
+import type { buildGitLabCloneUrl as BuildGitLabCloneUrl } from './gitlab-integration-helpers';
+
+let buildGitLabCloneUrl: typeof BuildGitLabCloneUrl;
 
 // Define mock functions at module level with proper typing
 const mockGetGitLabIntegration = jest.fn<(owner: Owner) => Promise<PlatformIntegration | null>>();
@@ -19,7 +22,13 @@ const mockGetIntegrationForOwner =
 const mockUpdateRepositoriesForIntegration =
   jest.fn<(integrationId: string, repositories: unknown[]) => Promise<void>>();
 const mockFetchGitLabProjects =
-  jest.fn<(accessToken: string, instanceUrl: string) => Promise<unknown[]>>();
+  jest.fn<
+    (
+      accessToken: string,
+      instanceUrl: string,
+      options?: RepositoryReadOptions
+    ) => Promise<unknown[]>
+  >();
 
 // Wire up the mocks
 jest.mock('@/lib/integrations/gitlab-service', () => ({
@@ -36,6 +45,14 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   fetchGitLabProjects: mockFetchGitLabProjects,
 }));
+
+jest.mock('dns/promises', () => ({
+  lookup: jest.fn(),
+}));
+
+beforeAll(async () => {
+  ({ buildGitLabCloneUrl } = await import('./gitlab-integration-helpers'));
+});
 
 describe('gitlab-integration-helpers', () => {
   beforeEach(() => {
@@ -581,5 +598,243 @@ describe('gitlab-integration-helpers', () => {
       expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
       expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe.each(['personal', 'organization'] as const)('bounded GitLab %s reads', scope => {
+  const repositories = Array.from({ length: 60 }, (_, id) => ({
+    id,
+    name: `repo-${id}`,
+    full_name: `group/repo-${id}`,
+    private: false,
+  }));
+  const integration = (overrides: Partial<PlatformIntegration> = {}) =>
+    ({
+      id: 'integration-1',
+      platform: 'gitlab',
+      integration_status: 'active',
+      suspended_at: null,
+      auth_invalid_at: null,
+      metadata: {},
+      repositories,
+      repositories_synced_at: '2026-06-25 18:00:00+00',
+      ...overrides,
+    }) as PlatformIntegration;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetValidGitLabToken.mockReset().mockResolvedValue('valid-token');
+    mockFetchGitLabProjects.mockReset();
+    mockUpdateRepositoriesForIntegration.mockReset();
+  });
+
+  function configure(value: PlatformIntegration | null) {
+    mockGetIntegrationForOwner.mockResolvedValue(value);
+    mockGetIntegrationForOrganization.mockResolvedValue(value);
+  }
+
+  async function read(
+    forceRefresh = false,
+    options: RepositoryReadOptions | undefined = { bounded: true }
+  ) {
+    const helpers = await import('./gitlab-integration-helpers');
+    return scope === 'personal'
+      ? helpers.fetchGitLabRepositoriesForUser('oauth/member', forceRefresh, options)
+      : helpers.fetchGitLabRepositoriesForOrganization(
+          'org-123',
+          'oauth/member',
+          forceRefresh,
+          options
+        );
+  }
+
+  it.each([
+    ['absent', null, 'not_connected'],
+    ['empty', integration({ repositories: [] }), 'available'],
+    ['suspended', integration({ suspended_at: '2026-06-25 18:00:00+00' }), 'suspended'],
+    [
+      'auth-invalid',
+      integration({ auth_invalid_at: '2026-06-25 18:00:00+00' }),
+      'reconnect_required',
+    ],
+    ['inactive', integration({ integration_status: 'pending' }), 'misconfigured'],
+    [
+      'malformed URL',
+      integration({ metadata: { gitlab_instance_url: 'not a URL' } }),
+      'misconfigured',
+    ],
+    [
+      'private URL',
+      integration({ metadata: { gitlab_instance_url: 'https://127.0.0.1' } }),
+      'misconfigured',
+    ],
+    [
+      'unsafe hostname',
+      integration({ metadata: { gitlab_instance_url: 'https://gitlab.local' } }),
+      'misconfigured',
+    ],
+    [
+      'invalid URL',
+      integration({ metadata: { gitlab_instance_url: 'https://user:password@gitlab.com' } }),
+      'misconfigured',
+    ],
+  ] as const)('keeps %s distinct without fetching', async (_label, value, status) => {
+    configure(value);
+    await expect(read()).resolves.toMatchObject({
+      status,
+      integrationInstalled: value !== null,
+      repositories: [],
+    });
+    expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
+    expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+  });
+
+  it('caps a cached list before checking repository IDs', async () => {
+    const cached = [...repositories];
+    cached[50] = {
+      ...cached[50],
+      get id(): number {
+        throw new Error('Past the bound');
+      },
+    };
+    configure(integration({ repositories: cached }));
+    const result = await read();
+    expect(result.status).toBe('available');
+    expect(result.repositories).toHaveLength(50);
+    expect(result.repositories.at(-1)?.fullName).toBe('group/repo-49');
+  });
+
+  it.each([false, true])(
+    'preserves the complete cache and legacy behavior on refresh=%s',
+    async forceRefresh => {
+      const value = integration({
+        repositories: forceRefresh ? repositories : null,
+        repositories_synced_at: forceRefresh ? '2026-06-25 18:00:00+00' : null,
+      });
+      configure(value);
+      mockUpdateRepositoriesForIntegration.mockImplementation(async (_id, saved) => {
+        value.repositories = saved as PlatformIntegration['repositories'];
+      });
+      mockFetchGitLabProjects.mockImplementation(async (_token, _url, options) => {
+        if (!options?.bounded || !options.signal) throw new Error('Unbounded transport');
+        return repositories.slice(0, 50);
+      });
+      const result = await read(forceRefresh);
+      expect(result.status).toBe('available');
+      expect(result.repositories).toHaveLength(50);
+      mockFetchGitLabProjects.mockResolvedValue(repositories);
+      const legacy = await read(false, { bounded: false });
+      expect(legacy.repositories).toHaveLength(60);
+      expect(legacy).not.toHaveProperty('status');
+    }
+  );
+
+  it.each([
+    ['UNAUTHORIZED', 'reconnect_required'],
+    ['INTERNAL_SERVER_ERROR', 'temporarily_unavailable'],
+  ] as const)(
+    'keeps credential rejection separate from temporary failure',
+    async (code, status) => {
+      const { TRPCError } = await import('@trpc/server');
+      configure(integration({ repositories: null }));
+      mockGetValidGitLabToken.mockRejectedValue(
+        new TRPCError({ code, message: 'provider details' })
+      );
+      await expect(read()).resolves.toEqual({
+        status,
+        integrationInstalled: true,
+        repositories: [],
+        syncedAt: null,
+      });
+    }
+  );
+
+  it('does not expose a raw project-fetch failure', async () => {
+    configure(integration({ repositories: null }));
+    mockFetchGitLabProjects.mockRejectedValue(new Error('secret provider response'));
+    await expect(read()).resolves.toEqual({
+      status: 'temporarily_unavailable',
+      integrationInstalled: true,
+      repositories: [],
+      syncedAt: null,
+    });
+  });
+
+  describe('self-hosted DNS failures', () => {
+    beforeEach(async () => {
+      const { lookup } = await import('dns/promises');
+      const { buildGitLabUrl, resolveGitLabUrlSafely } =
+        await import('@/lib/integrations/platforms/gitlab/instance-url');
+      jest
+        .mocked(lookup)
+        .mockReset()
+        .mockRejectedValue(
+          Object.assign(new Error('getaddrinfo EAI_AGAIN gitlab.example.com'), {
+            code: 'EAI_AGAIN',
+          })
+        );
+      configure(
+        integration({
+          metadata: { gitlab_instance_url: 'https://gitlab.example.com' },
+          repositories: null,
+        })
+      );
+      mockFetchGitLabProjects.mockImplementation(async (_token, instanceUrl) => {
+        await resolveGitLabUrlSafely(buildGitLabUrl(instanceUrl, '/api/v4/projects'));
+        return [];
+      });
+    });
+
+    it('reports transient lookup failure without exposing resolver details', async () => {
+      await expect(read()).resolves.toEqual({
+        status: 'temporarily_unavailable',
+        integrationInstalled: true,
+        repositories: [],
+        syncedAt: null,
+      });
+    });
+
+    it('keeps private DNS answers misconfigured', async () => {
+      const { lookup } = await import('dns/promises');
+      jest.mocked(lookup).mockResolvedValueOnce([{ address: '192.168.1.10', family: 4 }]);
+      await expect(read()).resolves.toEqual({
+        status: 'misconfigured',
+        integrationInstalled: true,
+        repositories: [],
+        syncedAt: null,
+      });
+    });
+
+    it('preserves the legacy failure when bounded options are omitted', async () => {
+      const helpers = await import('./gitlab-integration-helpers');
+      const result =
+        scope === 'personal'
+          ? helpers.fetchGitLabRepositoriesForUser('oauth/member')
+          : helpers.fetchGitLabRepositoriesForOrganization('org-123', 'oauth/member');
+      await expect(result).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch GitLab repositories',
+      });
+    });
+  });
+
+  it('stops before project fetching when credential retrieval exceeds the deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      configure(integration({ repositories: null }));
+      const token = Promise.withResolvers<string>();
+      mockGetValidGitLabToken.mockReturnValue(token.promise);
+      const result = read();
+      await jest.advanceTimersByTimeAsync(30_000);
+      await expect(result).resolves.toMatchObject({
+        status: 'temporarily_unavailable',
+        repositories: [],
+      });
+      token.resolve('late-token');
+      await Promise.resolve();
+      expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

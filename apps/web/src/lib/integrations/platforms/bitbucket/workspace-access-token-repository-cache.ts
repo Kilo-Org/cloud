@@ -15,6 +15,10 @@ import { and, eq, exists, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
+import {
+  REPOSITORY_READ_LIMITS,
+  type RepositoryReadOptions,
+} from '@/lib/integrations/core/repository-read-limits';
 import { BitbucketWorkspaceAccessTokenMetadataSchema } from './metadata';
 import {
   BitbucketRepositorySchema,
@@ -69,6 +73,7 @@ type AvailableRepositoryCache = Extract<
 type ReadCachedRepositoriesInput = {
   organizationId: string;
   expectedIntegrationId?: string;
+  readOptions?: RepositoryReadOptions;
 };
 
 type RefreshRepositoriesInput = {
@@ -80,6 +85,7 @@ type RefreshRepositoriesInput = {
 type RefreshRepositoriesForMemberInput = {
   organizationId: string;
   kiloUserId: string;
+  readOptions?: RepositoryReadOptions;
 };
 
 type ListRepositoriesInput = {
@@ -118,6 +124,7 @@ async function loadIntegration(organizationId: string) {
     .select({
       integrationId: platform_integrations.id,
       integrationStatus: platform_integrations.integration_status,
+      suspendedAt: platform_integrations.suspended_at,
       installationId: platform_integrations.platform_installation_id,
       workspaceUuid: platform_integrations.platform_account_id,
       workspaceSlug: platform_integrations.platform_account_login,
@@ -167,10 +174,15 @@ function repositoriesHaveUniqueIdentity(
 function parseCachedRepositories(
   repositoriesValue: unknown,
   repositoriesSyncedAt: string | null,
-  workspace: WorkspaceIdentity
+  workspace: WorkspaceIdentity,
+  readOptions?: RepositoryReadOptions
 ): AvailableRepositoryCache | null {
   if (repositoriesValue === null || repositoriesSyncedAt === null) return null;
-  const repositories = z.array(CachedRepositorySchema).safeParse(repositoriesValue);
+  const selected =
+    readOptions?.bounded && Array.isArray(repositoriesValue)
+      ? repositoriesValue.slice(0, REPOSITORY_READ_LIMITS.repositories)
+      : repositoriesValue;
+  const repositories = z.array(CachedRepositorySchema).safeParse(selected);
   if (!repositories.success) return null;
 
   const projected = repositories.data.map(repository => ({
@@ -201,7 +213,7 @@ function toIsoTimestamp(value: string | null): string | null {
   return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
 }
 
-function parseIntegration(row: LoadedIntegration) {
+function parseIntegration(row: LoadedIntegration, readOptions?: RepositoryReadOptions) {
   const metadata = BitbucketWorkspaceAccessTokenMetadataSchema.safeParse(row.metadata);
   const workspaceUuid = z.uuid().safeParse(row.workspaceUuid);
   const workspaceSlug = WorkspaceSlugSchema.safeParse(row.workspaceSlug);
@@ -214,7 +226,7 @@ function parseIntegration(row: LoadedIntegration) {
       ? { ...workspaceIdentity, displayName: metadata.data.displayName }
       : null;
   const cache = workspace
-    ? parseCachedRepositories(row.repositories, row.repositoriesSyncedAt, workspace)
+    ? parseCachedRepositories(row.repositories, row.repositoriesSyncedAt, workspace, readOptions)
     : null;
   const parsedCredential = BitbucketWorkspaceAccessTokenCredentialRowSchema.safeParse(
     row.credential
@@ -235,6 +247,7 @@ function parseIntegration(row: LoadedIntegration) {
     row.installationId === null &&
     hasValidCredentialEvidence &&
     row.integrationStatus === INTEGRATION_STATUS.ACTIVE &&
+    (!readOptions?.bounded || row.suspendedAt === null) &&
     row.authInvalidAt === null;
   const rotatable =
     row.integrationStatus === INTEGRATION_STATUS.ACTIVE &&
@@ -259,9 +272,10 @@ function parseIntegration(row: LoadedIntegration) {
   };
 }
 
-async function loadParsedIntegration(organizationId: string) {
+async function loadParsedIntegration(organizationId: string, readOptions?: RepositoryReadOptions) {
+  readOptions?.signal?.throwIfAborted();
   const row = await loadIntegration(organizationId);
-  return row ? parseIntegration(row) : null;
+  return row ? parseIntegration(row, readOptions) : null;
 }
 
 function isRefreshableIntegration(
@@ -331,6 +345,7 @@ export async function getBitbucketWorkspaceAccessTokenStatus(organizationId: str
 export async function readCachedBitbucketWorkspaceAccessTokenRepositories({
   organizationId,
   expectedIntegrationId,
+  readOptions,
 }: ReadCachedRepositoriesInput): Promise<BitbucketWorkspaceAccessTokenRepositoryListResult> {
   const canonicalOrganizationId = canonicalizeUuid(organizationId);
   const canonicalExpectedIntegrationId = expectedIntegrationId
@@ -340,7 +355,7 @@ export async function readCachedBitbucketWorkspaceAccessTokenRepositories({
     return { status: 'invalid_request' };
   }
 
-  const integration = await loadParsedIntegration(canonicalOrganizationId);
+  const integration = await loadParsedIntegration(canonicalOrganizationId, readOptions);
   if (!integration) return { status: 'not_connected' };
   if (
     canonicalExpectedIntegrationId &&
@@ -492,13 +507,14 @@ export async function refreshBitbucketWorkspaceAccessTokenRepositories({
 export async function refreshBitbucketWorkspaceAccessTokenRepositoriesForMember({
   organizationId,
   kiloUserId,
+  readOptions,
 }: RefreshRepositoriesForMemberInput): Promise<BitbucketWorkspaceAccessTokenRepositoryListResult> {
   const canonicalOrganizationId = canonicalizeUuid(organizationId);
   if (!canonicalOrganizationId) {
     return { status: 'invalid_request' };
   }
 
-  const integration = await loadParsedIntegration(canonicalOrganizationId);
+  const integration = await loadParsedIntegration(canonicalOrganizationId, readOptions);
   if (!integration) return { status: 'not_connected' };
   if (!isRefreshableIntegration(integration)) {
     return { status: 'reconnect_required' };
@@ -509,6 +525,7 @@ export async function refreshBitbucketWorkspaceAccessTokenRepositoriesForMember(
     kiloUserId,
     integration,
     requireOrganizationManager: false,
+    readOptions,
   });
 }
 
@@ -517,18 +534,28 @@ async function refreshLoadedBitbucketWorkspaceAccessTokenRepositories({
   kiloUserId,
   integration,
   requireOrganizationManager,
+  readOptions,
 }: {
   organizationId: string;
   kiloUserId: string;
   integration: RefreshableParsedIntegration;
   requireOrganizationManager: boolean;
+  readOptions?: RepositoryReadOptions;
 }): Promise<BitbucketWorkspaceAccessTokenRepositoryListResult> {
   const workspaceIdentity = integration.workspaceIdentity;
   const credential = integration.credential;
-  const providerResult = await fetchBitbucketWorkspaceAccessTokenRepositoriesFromTokenService(
-    kiloUserId,
-    organizationId
-  );
+  readOptions?.signal?.throwIfAborted();
+  const providerResult = readOptions?.bounded
+    ? await fetchBitbucketWorkspaceAccessTokenRepositoriesFromTokenService(
+        kiloUserId,
+        organizationId,
+        readOptions
+      ).catch(() => ({ status: 'temporarily_unavailable' as const }))
+    : await fetchBitbucketWorkspaceAccessTokenRepositoriesFromTokenService(
+        kiloUserId,
+        organizationId
+      );
+  readOptions?.signal?.throwIfAborted();
   const stillCurrent = await db.transaction(async tx => {
     await lockBitbucketWorkspaceAccessTokenOrganization(tx, organizationId);
     return isObservedCredentialGenerationCurrent(tx, organizationId, {
@@ -540,7 +567,23 @@ async function refreshLoadedBitbucketWorkspaceAccessTokenRepositories({
   if (!stillCurrent) {
     return readCachedBitbucketWorkspaceAccessTokenRepositories({
       organizationId,
+      readOptions,
     });
+  }
+  if (readOptions?.bounded) {
+    const current = await loadParsedIntegration(organizationId, readOptions);
+    if (!current) return { status: 'not_connected' };
+    if (!isRefreshableIntegration(current)) return { status: 'reconnect_required' };
+    if (
+      current.row.integrationId !== integration.row.integrationId ||
+      current.credential.id !== credential.id ||
+      current.credential.version !== credential.version ||
+      current.workspaceIdentity.uuid !== workspaceIdentity.uuid ||
+      current.workspaceIdentity.slug !== workspaceIdentity.slug ||
+      current.row.repositoriesSyncedAt !== integration.row.repositoriesSyncedAt
+    ) {
+      return current.cache ?? { status: 'temporarily_unavailable' };
+    }
   }
   if (providerResult.status !== 'available') return providerResult;
   if (
@@ -552,6 +595,14 @@ async function refreshLoadedBitbucketWorkspaceAccessTokenRepositories({
     !repositoriesHaveUniqueIdentity(providerResult.repositories)
   ) {
     return { status: 'invalid_request' };
+  }
+
+  if (readOptions?.bounded) {
+    return {
+      status: 'available',
+      repositories: providerResult.repositories.slice(0, REPOSITORY_READ_LIMITS.repositories),
+      syncedAt: new Date().toISOString(),
+    };
   }
 
   const repositories = providerResult.repositories.map(repository => ({

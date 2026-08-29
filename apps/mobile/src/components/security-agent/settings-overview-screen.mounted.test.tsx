@@ -1,66 +1,51 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
-
-// Settings-overview disabled-state contract: the enable switch is disabled
-// while the agent is off with no effective repo selection (the server would
-// refuse an empty effective set), and re-enables once a selection exists.
-// The disabled copy explains the block, and a "Select repositories" CTA is
-// offered only when there are integration repos to pick from — zero repos
-// stays explanatory copy only.
-
-import { createElement } from 'react';
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts RN trees without a DOM. */
+import { type MobileRouter } from '@kilocode/trpc/mobile';
+import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
+import { trpcClient, TRPCProvider } from '@/lib/trpc';
+import { ScopeEntryScreen } from './scope-entry-screen';
 import { SettingsOverviewScreen } from './settings-overview-screen';
 
-const config = vi.hoisted(() => ({
-  data: null as unknown,
-  isLoading: false,
-  isError: false,
-  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
-  refetch: vi.fn(),
-}));
-const capability = vi.hoisted(() => ({
-  canManage: true,
-  status: 'allowed' as 'loading' | 'error' | 'denied' | 'allowed',
-  isError: false,
-  refetch: vi.fn(),
-}));
 const committedConnectivity = vi.hoisted(() => ({
   status: 'online' as 'online' | 'offline' | 'unknown',
 }));
-const repositories = vi.hoisted(() => ({
-  data: null as unknown[] | null,
-  isLoading: false,
-  isError: false,
-  refetch: vi.fn(),
-}));
-const setEnabled = vi.hoisted(() => ({
-  mutate: vi.fn(),
-  isPending: false,
-}));
-const trackInteraction = vi.hoisted(() => ({
-  mutate: vi.fn(),
-}));
+const transport = vi.hoisted(() => vi.fn<typeof fetch>());
+const failures = new Set<string>();
+const gates = new Map<string, Promise<undefined>>();
+let configData: Record<string, unknown> = {};
+let repositoriesData: { id: number }[] = [];
+let roles: { organizationId: string; role: string }[] = [];
+let queryClient = new QueryClient();
+let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+let previousOnline = true;
 
-const configureRows = vi.hoisted(() => ({
-  rows: [] as { title: string; subtitle?: string; onPress?: () => void }[],
+vi.mock('@/lib/trpc', async () => {
+  const { createTRPCContext } = await import('@trpc/tanstack-react-query');
+  const { createTRPCClient, httpLink } = await import('@trpc/client');
+  return {
+    ...createTRPCContext<MobileRouter>(),
+    trpcClient: createTRPCClient<MobileRouter>({
+      links: [httpLink({ url: 'https://settings.test/api/trpc', fetch: transport })],
+    }),
+  };
+});
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  FadeIn: { duration: () => ({}) },
 }));
-
-const platformErrorScreens = vi.hoisted(() => ({
-  screens: [] as { variant?: string; message?: string; onRetry?: () => void }[],
+vi.mock('@/components/security-agent/dashboard-screen', () => ({
+  DashboardScreen: 'DashboardScreen',
 }));
-
-vi.mock('react-native', () => ({
-  View: 'View',
-  Switch: 'Switch',
+vi.mock('@/components/security-agent/security-agent-setup', () => ({
+  SecurityAgentSetup: 'SecurityAgentSetup',
 }));
-vi.mock('expo-haptics', () => ({
-  selectionAsync: vi.fn(),
-}));
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn(), back: vi.fn(), dismiss: vi.fn(), canGoBack: vi.fn() }),
-}));
+vi.mock('react-native', () => ({ View: 'View', Switch: 'Switch' }));
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Clock: 'Clock',
@@ -68,291 +53,252 @@ vi.mock('@/components/ui/icons', () => ({
   FolderGit2: 'FolderGit2',
   Zap: 'Zap',
 }));
-vi.mock('@/lib/hooks/use-security-agent', () => ({
-  useSecurityAgentCapability: () => capability,
-  useSecurityAgentConfig: () => config,
-  useSecurityAgentRepositories: () => repositories,
-  useSetSecurityAgentEnabled: () => setEnabled,
-  useTrackSecurityAgentInteraction: () => trackInteraction,
+vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
+  useSetSecurityAgentEnabled: () => ({ mutate: vi.fn(), isPending: false }),
+  useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => committedConnectivity.status,
 }));
-vi.mock('@/lib/security-agent', () => ({
-  getSecurityAgentPath: (scope: string, section: string) => `/security/${scope}/${section}`,
-}));
 vi.mock('@/components/security-agent/audit-report-button', () => ({
-  AuditReportButton: () => null,
+  AuditReportButton: 'AuditReportButton',
 }));
 vi.mock('@/components/platform-error-screen', () => ({
-  PlatformErrorScreen: (props: { variant?: string; message?: string; onRetry?: () => void }) => {
-    platformErrorScreens.screens.push(props);
-    return null;
-  },
+  PlatformErrorScreen: 'PlatformErrorScreen',
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
-vi.mock('@/components/ui/configure-row', () => ({
-  ConfigureRow: (props: { title: string; subtitle?: string; onPress?: () => void }) => {
-    configureRows.rows.push(props);
-    return null;
-  },
-}));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: (props: { children?: unknown }) => props.children,
-}));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 
-type R = TestRenderer.ReactTestRenderer;
-type I = TestRenderer.ReactTestInstance;
-
-function disabledConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    isEnabled: false,
-    repositorySelectionMode: 'selected',
-    selectedRepositoryIds: [],
-    analysisMode: 'auto',
-    autoAnalysisEnabled: false,
-    autoRemediationEnabled: false,
-    autoDismissEnabled: false,
-    newFindingNotificationsEnabled: false,
-    slaNotificationsEnabled: false,
-    slaEnabled: false,
-    ...overrides,
-  };
+function host(root: TestRenderer.ReactTestInstance, type: string) {
+  return root.findAll(node => node.type === type);
 }
-
-function renderScreen(): R {
-  const ref: { current: R | undefined } = { current: undefined };
-  act(() => {
-    ref.current = TestRenderer.create(
-      createElement(SettingsOverviewScreen, { scope: 'personal', presentation: 'inline' })
-    );
+function texts(root: TestRenderer.ReactTestInstance) {
+  return host(root, 'Text').map(node => node.props.children);
+}
+async function advanceBy(ms = 10) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
   });
-  const r = ref.current;
-  if (!r) {
-    throw new Error('renderer was not created');
+}
+async function retry(root: TestRenderer.ReactTestInstance) {
+  const onRetry = (host(root, 'PlatformErrorScreen')[0]?.props.onRetry ??
+    host(root, 'Text').find(node => node.props.children === 'Retry')?.props.onPress) as
+    | (() => void)
+    | undefined;
+  if (!onRetry) {
+    throw new Error('Retry was not rendered');
   }
-  return r;
+  act(onRetry);
+  await advanceBy();
 }
-
-function findSwitch(root: I): I {
-  const nodes = root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Switch');
-  const n = nodes[0];
-  if (!n) {
-    throw new Error('Switch not found');
-  }
-  return n;
-}
-
-function hasSwitch(root: I): boolean {
-  return (
-    root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Switch').length > 0
-  );
-}
-
 const denialCopy =
   'Security Agent is disabled. Only organization owners and billing managers can turn it on.';
+const emptyCopy = 'Select at least one repository before enabling Security Agent.';
+const failureCases = [
+  ['personal', 'getConfig', 'Could not load Security Agent settings'],
+  ['org_123', 'getConfig', 'Could not load Security Agent settings'],
+  ['org_123', 'list', 'Could not load permissions'],
+  ['personal', 'getRepositories', 'Could not load repositories'],
+  ['org_123', 'getRepositories', 'Could not load repositories'],
+  ['personal', 'getPermissionStatus', 'Could not load permissions'],
+  ['org_123', 'getPermissionStatus', 'Could not load permissions'],
+] as const;
+const connectivityStates = ['online', 'offline'] as const;
 
-function renderedTexts(root: I): string[] {
-  return root
-    .findAll(
-      n =>
-        typeof n.type === 'string' &&
-        (n.type as string) === 'Text' &&
-        typeof n.props.children === 'string'
-    )
-    .map(n => n.props.children as string);
-}
-
-function resetMocks() {
-  config.data = null;
-  config.isLoading = false;
-  config.isError = false;
-  config.fetchStatus = 'idle';
-  capability.canManage = true;
-  capability.status = 'allowed';
-  capability.isError = false;
+beforeEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  vi.useFakeTimers();
+  previousOnline = onlineManager.isOnline();
+  onlineManager.setOnline(true);
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: 3, gcTime: Infinity } } });
   committedConnectivity.status = 'online';
-  repositories.data = [];
-  repositories.isLoading = false;
-  repositories.isError = false;
-  configureRows.rows = [];
-  platformErrorScreens.screens = [];
-}
-
-describe('SettingsOverviewScreen disabled switch', () => {
-  beforeEach(resetMocks);
-
-  it('disables the switch while disabled with no effective repo selection', () => {
-    config.data = disabledConfig();
-    repositories.data = [];
-    const root = renderScreen();
-
-    expect(findSwitch(root.root).props.value).toBe(false);
-    expect(findSwitch(root.root).props.disabled).toBe(true);
-  });
-
-  it('enables the switch once a repo is selected', () => {
-    config.data = disabledConfig({ selectedRepositoryIds: [1] });
-    const root = renderScreen();
-
-    expect(findSwitch(root.root).props.disabled).toBe(false);
-  });
-
-  it('enables the switch in all mode with integration repos', () => {
-    config.data = disabledConfig({ repositorySelectionMode: 'all' });
-    repositories.data = [{ id: 1 }];
-    const root = renderScreen();
-
-    expect(findSwitch(root.root).props.disabled).toBe(false);
+  configData = {
+    isEnabled: false,
+    repositorySelectionMode: 'all',
+    selectedRepositoryIds: [],
+    analysisMode: 'auto',
+  };
+  repositoriesData = [{ id: 1 }];
+  roles = [{ organizationId: 'org_123', role: 'owner' }];
+  failures.clear();
+  gates.clear();
+  transport.mockReset().mockImplementation(async input => {
+    const procedure =
+      new URL(input instanceof Request ? input.url : input).pathname.split('.').at(-1) ?? '';
+    await gates.get(procedure);
+    if (failures.has(procedure)) {
+      throw new Error('Network request failed');
+    }
+    const data: Record<string, unknown> = {
+      getPermissionStatus: { hasIntegration: true, hasPermissions: true },
+      getConfig: configData,
+      getRepositories: repositoriesData,
+      list: roles,
+      mintInstallState: { token: 'install-state' },
+    };
+    return Response.json({ result: { data: data[procedure] } });
   });
 });
-
-describe('SettingsOverviewScreen disabled copy and CTA', () => {
-  beforeEach(resetMocks);
-
-  it('shows the empty-selection copy while disabled with no effective repo', () => {
-    config.data = disabledConfig();
-    repositories.data = [];
-    const root = renderScreen();
-
-    expect(renderedTexts(root.root)).toContain(
-      'Select at least one repository before enabling Security Agent.'
-    );
-  });
-
-  it('offers the Select repositories CTA when integration repos exist', () => {
-    config.data = disabledConfig();
-    repositories.data = [{ id: 1 }, { id: 2 }];
-    renderScreen();
-
-    expect(configureRows.rows.map(r => r.title)).toContain('Select repositories');
-  });
-
-  it('shows explanatory copy only when there are zero integration repos', () => {
-    config.data = disabledConfig();
-    repositories.data = [];
-    const root = renderScreen();
-
-    expect(configureRows.rows.map(r => r.title)).not.toContain('Select repositories');
-    expect(renderedTexts(root.root)).toContain(
-      'Select at least one repository before enabling Security Agent.'
-    );
-  });
-
-  it('does not offer the CTA to a non-manager', () => {
-    capability.canManage = false;
-    capability.status = 'denied';
-    config.data = disabledConfig();
-    repositories.data = [{ id: 1 }];
-    renderScreen();
-
-    expect(configureRows.rows.map(r => r.title)).not.toContain('Select repositories');
-  });
+afterEach(() => {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+  queryClient.clear();
+  onlineManager.setOnline(previousOnline);
+  vi.clearAllTimers();
+  vi.useRealTimers();
 });
 
-describe('SettingsOverviewScreen repository query loading and error', () => {
-  beforeEach(resetMocks);
+describe.each([
+  ['standalone', SettingsOverviewScreen],
+  ['inline', ScopeEntryScreen],
+] as const)('%s settings real queries', (presentation, Screen) => {
+  async function mount(scope = 'personal') {
+    await act(() => {
+      renderer = TestRenderer.create(
+        <QueryClientProvider client={queryClient}>
+          <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+            <Screen scope={scope} />
+          </TRPCProvider>
+        </QueryClientProvider>
+      );
+    });
+    await advanceBy();
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    return renderer.root;
+  }
 
-  it('does not read a loading repo query as empty in all mode', () => {
-    config.data = disabledConfig({ repositorySelectionMode: 'all' });
-    repositories.data = null;
-    repositories.isLoading = true;
-    const root = renderScreen();
+  it.each([
+    ['personal', 'getRepositories', 'Select repositories'],
+    ['org_123', 'list', undefined],
+  ] as const)(
+    'keeps unresolved %s %s distinct from empty or denied',
+    async (scope, procedure, cta) => {
+      gates.set(procedure, Promise.withResolvers<undefined>().promise);
+      const root = await mount(scope);
+      expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+      expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+      expect(texts(root)).not.toContain(emptyCopy);
+      expect(texts(root)).not.toContain(denialCopy);
+      expect(host(root, 'ConfigureRow')[0]?.props.title).toBe(cta);
+    }
+  );
 
-    expect(renderedTexts(root.root)).not.toContain(
-      'Select at least one repository before enabling Security Agent.'
-    );
-  });
+  const cases = failureCases.filter(
+    ([, procedure]) => presentation === 'inline' || procedure !== 'getPermissionStatus'
+  );
+  it.each(
+    cases.flatMap(([scope, procedure, message]) =>
+      (presentation === 'inline' ? [false] : [false, true]).map(isEnabled => ({
+        scope,
+        procedure,
+        message,
+        isEnabled,
+      }))
+    )
+  )(
+    'settles a failed $scope $procedure attempt with enabled=$isEnabled and permits Retry',
+    async ({ scope, procedure, message, isEnabled }) => {
+      configData.repositorySelectionMode = 'selected';
+      configData.isEnabled = isEnabled;
+      configData.selectedRepositoryIds = [1];
+      onlineManager.setOnline(false);
+      failures.add(procedure);
+      const response = Promise.withResolvers<undefined>();
+      gates.set(procedure, response.promise);
+      const root = await mount(scope);
+      await retry(root);
+      if (procedure === 'getRepositories') {
+        expect(host(root, 'Skeleton')).toHaveLength(1);
+      } else {
+        expect(host(root, 'PlatformErrorScreen')[0]?.props.isRetrying).toBe(true);
+      }
+      response.resolve(undefined);
+      await advanceBy();
+      const error = host(root, 'PlatformErrorScreen')[0];
+      expect([error?.props.message, error?.props.errorTitle, ...texts(root)]).toContain(
+        presentation === 'inline' && procedure !== 'getRepositories'
+          ? 'Could not load Security Agent'
+          : message
+      );
+      const active = queryClient.getQueryCache().findAll({ type: 'active' });
+      const requests = transport.mock.calls.length;
+      await advanceBy(60_000);
+      expect(transport.mock.calls).toHaveLength(requests);
+      // A new child can pause background refetches of already cached data.
+      expect(active.filter(query => query.state.status === 'error')).toMatchObject([
+        { state: { fetchStatus: 'idle' } },
+      ]);
+      failures.clear();
+      await retry(root);
+      expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
+      expect(active.every(query => query.state.status === 'success')).toBe(true);
+      expect(onlineManager.isOnline()).toBe(false);
+    }
+  );
 
-  it('shows a retry action when the repo query fails in all mode', () => {
-    config.data = disabledConfig({ repositorySelectionMode: 'all' });
-    repositories.data = null;
-    repositories.isError = true;
-    const root = renderScreen();
+  const cachedCases = [
+    ...cases,
+    ['personal', 'all', 'Could not load Security Agent settings'],
+    ['org_123', 'all', 'Could not load Security Agent settings'],
+  ] as const;
+  it.each(
+    cachedCases.flatMap(([scope, procedure, message]) =>
+      connectivityStates.map(connectivity => ({ scope, procedure, message, connectivity }))
+    )
+  )(
+    'preserves cached $scope controls after failed $procedure recovery while confirmed $connectivity',
+    async ({ scope, procedure, message, connectivity }) => {
+      committedConnectivity.status = connectivity;
+      const root = await mount(scope);
+      failures.add('getRepositories');
+      act(() => {
+        void queryClient.refetchQueries({ type: 'active' });
+      });
+      await advanceBy(10_000);
+      expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
+      onlineManager.setOnline(false);
+      failures.clear();
+      const response = Promise.withResolvers<undefined>();
+      const failedProcedures =
+        procedure === 'all'
+          ? ['getConfig', 'getPermissionStatus', 'getRepositories', 'list']
+          : [procedure];
+      for (const failed of failedProcedures) {
+        failures.add(failed);
+        gates.set(failed, response.promise);
+      }
+      await retry(root);
+      expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
+      expect(host(root, 'Skeleton')).toHaveLength(1);
+      response.resolve(undefined);
+      await advanceBy();
+      expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
+      expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+      expect(texts(root)).toContain(message);
+      const active = queryClient.getQueryCache().findAll({ type: 'active' });
+      expect(active.every(query => query.state.fetchStatus === 'idle')).toBe(true);
+      failures.clear();
+      await retry(root);
+      expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
+      expect(texts(root)).not.toContain(message);
+      expect(active.every(query => query.state.status === 'success')).toBe(true);
+      expect(onlineManager.isOnline()).toBe(false);
+    }
+  );
 
-    expect(renderedTexts(root.root)).toContain('Could not load repositories');
-    expect(renderedTexts(root.root)).toContain('Retry');
-  });
-
-  it('keeps the Select repositories CTA reachable when the repo query fails', () => {
-    config.data = disabledConfig();
-    repositories.data = null;
-    repositories.isError = true;
-    renderScreen();
-
-    expect(configureRows.rows.map(r => r.title)).toContain('Select repositories');
-  });
-});
-
-describe('SettingsOverviewScreen capability and connectivity states', () => {
-  beforeEach(resetMocks);
-
-  it('renders the skeleton while the capability is loading', () => {
-    config.data = disabledConfig();
-    capability.status = 'loading';
-    const root = renderScreen();
-
-    expect(platformErrorScreens.screens).toEqual([]);
-    expect(hasSwitch(root.root)).toBe(false);
-    expect(renderedTexts(root.root)).not.toContain(denialCopy);
-  });
-
-  it('shows the permissions error with retry and no denial copy when capability errors', () => {
-    config.data = disabledConfig();
-    capability.status = 'error';
-    const root = renderScreen();
-
-    expect(platformErrorScreens.screens[0]?.message).toBe('Could not load permissions');
-    expect(platformErrorScreens.screens[0]?.onRetry).toBeTypeOf('function');
-    expect(renderedTexts(root.root)).not.toContain(denialCopy);
-  });
-
-  it('keeps the resolved branch when a background refetch fails with a settled role', () => {
-    config.data = disabledConfig();
-    capability.isError = true;
-    const root = renderScreen();
-
-    expect(platformErrorScreens.screens).toEqual([]);
-    expect(hasSwitch(root.root)).toBe(true);
-  });
-
-  it('shows denial copy and hides the switch when denied', () => {
-    config.data = disabledConfig();
-    capability.status = 'denied';
-    capability.canManage = false;
-    const root = renderScreen();
-
-    expect(hasSwitch(root.root)).toBe(false);
-    expect(renderedTexts(root.root)).toContain(denialCopy);
-  });
-
-  it('shows the switch when allowed', () => {
-    config.data = disabledConfig();
-    const root = renderScreen();
-
-    expect(hasSwitch(root.root)).toBe(true);
-  });
-
-  it('shows the offline variant when paused with committed offline', () => {
-    config.data = null;
-    config.fetchStatus = 'paused';
-    committedConnectivity.status = 'offline';
-    const root = renderScreen();
-
-    expect(platformErrorScreens.screens[0]?.variant).toBe('offline');
-    expect(platformErrorScreens.screens[0]?.message).toBe('Could not load Security Agent settings');
-    expect(hasSwitch(root.root)).toBe(false);
-  });
-
-  it('renders the skeleton when paused but connectivity is unknown', () => {
-    config.data = null;
-    config.fetchStatus = 'paused';
+  it.each(['personal', 'org_123'])('keeps an uncached %s unknown boot silent', async scope => {
+    onlineManager.setOnline(false);
     committedConnectivity.status = 'unknown';
-    const root = renderScreen();
-
-    expect(platformErrorScreens.screens).toEqual([]);
-    expect(hasSwitch(root.root)).toBe(false);
+    const root = await mount(scope);
+    expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+    expect(host(root, 'SecurityAgentSetup')).toHaveLength(0);
+    expect(host(root, 'Switch')).toHaveLength(0);
+    expect(texts(root)).not.toContain(denialCopy);
   });
 });

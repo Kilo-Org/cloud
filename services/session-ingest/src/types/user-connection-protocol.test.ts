@@ -168,6 +168,14 @@ const providerStatusResult = {
   ],
   nextCursor: interruptedHandle.jobId,
 } as const;
+const unresolvedFence = { invocationId: interruptedHandle.invocationId, tabId: tab.tabId };
+const expiredInvocationId = `b1.1.${'f'.repeat(64)}`;
+const emptyProviderStatusResult = {
+  type: 'provider_status_result',
+  requestId,
+  providerId: handle.providerId,
+  jobs: [],
+} as const;
 const providerOutbound = [
   providerStatusRequest,
   { ...providerStatusRequest, cursor: handle.jobId },
@@ -217,7 +225,9 @@ const providerInbound = [
   { type: 'provider_snapshot', ...binding, jobs: [] },
   { type: 'provider_lease_ack', requestId, ...binding, leaseExpiresAt: '2026-08-28T00:00:15.000Z' },
   providerStatusResult,
-  { type: 'provider_status_result', requestId, providerId: handle.providerId, jobs: [] },
+  emptyProviderStatusResult,
+  { ...providerStatusResult, unresolvedFence },
+  { ...emptyProviderStatusResult, unresolvedFence: { invocationId: expiredInvocationId } },
 ];
 
 describe.each([
@@ -260,6 +270,94 @@ describe.each([
   { name: 'relay', contract: browser },
   { name: 'SDK', contract: sdk },
 ])('read-only provider status: $name', ({ contract }) => {
+  it('keeps absent fences omitted from old status frames', () => {
+    for (const frame of [providerStatusResult, emptyProviderStatusResult]) {
+      expect(contract.browserProviderInboundMessageSchema.parse(frame)).toStrictEqual(frame);
+      expect(contract.webInboundWithBrowserMessageSchema.parse(frame)).toStrictEqual(frame);
+    }
+  });
+
+  it.each([
+    { invocationId: handle.invocationId },
+    unresolvedFence,
+    { ...unresolvedFence, tabId: 0 },
+    { ...unresolvedFence, tabId: Number.MAX_SAFE_INTEGER },
+    { invocationId: expiredInvocationId },
+    { ...unresolvedFence, invocationId: expiredInvocationId },
+  ])('preserves a compact fence without retained jobs: %j', unresolvedFence => {
+    const frame = { ...emptyProviderStatusResult, unresolvedFence };
+    expect(contract.browserProviderInboundMessageSchema.parse(frame)).toStrictEqual(frame);
+    expect(contract.webInboundWithBrowserMessageSchema.parse(frame)).toStrictEqual(frame);
+  });
+
+  it.each([
+    { unresolvedFence: null },
+    { unresolvedFence: false },
+    { unresolvedFence: 0 },
+    { unresolvedFence: 'fence' },
+    { unresolvedFence: [] },
+    { unresolvedFence: {} },
+    { unresolvedFence: { tabId: tab.tabId } },
+  ])('rejects malformed fence objects: %j', fields => {
+    const frame = { ...providerStatusResult, ...fields };
+    expect(contract.browserProviderInboundMessageSchema.safeParse(frame).success).toBe(false);
+    expect(contract.webInboundWithBrowserMessageSchema.safeParse(frame).success).toBe(false);
+  });
+
+  it.each([
+    { invocationId: undefined },
+    { invocationId: null },
+    { invocationId: 7 },
+    { invocationId: '' },
+    { invocationId: handle.jobId },
+    { invocationId: `b1.0.${'a'.repeat(64)}` },
+    { invocationId: `b1.01.${'a'.repeat(64)}` },
+    { invocationId: `b1.8640000000000001.${'a'.repeat(64)}` },
+    { invocationId: `b1.9007199254740992.${'a'.repeat(64)}` },
+    { invocationId: `b1.1787875200000.${'A'.repeat(64)}` },
+    { invocationId: `b1.1787875200000.${'a'.repeat(63)}` },
+    { tabId: null },
+    { tabId: -1 },
+    { tabId: 1.5 },
+    { tabId: Number.MAX_SAFE_INTEGER + 1 },
+    { tabId: '7' },
+    { tabId: true },
+  ])('rejects invalid fence fields: %j', fields => {
+    const frame = { ...providerStatusResult, unresolvedFence: { ...unresolvedFence, ...fields } };
+    expect(contract.browserProviderInboundMessageSchema.safeParse(frame).success).toBe(false);
+    expect(contract.webInboundWithBrowserMessageSchema.safeParse(frame).success).toBe(false);
+  });
+
+  it.each([
+    { parentSessionId: owner.parentSessionId },
+    { parentProof: owner.parentProof },
+    { providerProof: registration.providerProof },
+    { connectionId: 'private-route' },
+    { generation: 1 },
+    { goal: invoke.goal },
+    { result: completed },
+    { tabClosed: true },
+    { locksDrained: true },
+    { extra: true },
+  ])('rejects private or unknown fence fields: %j', fields => {
+    const frame = { ...providerStatusResult, unresolvedFence: { ...unresolvedFence, ...fields } };
+    expect(contract.browserProviderInboundMessageSchema.safeParse(frame).success).toBe(false);
+    expect(contract.webInboundWithBrowserMessageSchema.safeParse(frame).success).toBe(false);
+  });
+
+  it('keeps fence discovery out of execution frames and job snapshots', () => {
+    for (const frame of providerInbound) {
+      if (frame.type === 'provider_status_result') continue;
+      expect(
+        contract.browserProviderInboundMessageSchema.safeParse({ ...frame, unresolvedFence })
+          .success
+      ).toBe(false);
+    }
+    expect(contract.browserJobSnapshotSchema.safeParse({ ...job, unresolvedFence }).success).toBe(
+      false
+    );
+  });
+
   it('keeps historical generations separate from execution snapshots', () => {
     expect(contract.browserProviderInboundMessageSchema.parse(providerStatusResult)).toEqual(
       providerStatusResult
@@ -381,8 +479,12 @@ describe.each([
     }
   });
 
-  it('accepts 25 historical jobs but rejects a 26th job', () => {
-    const page = { ...providerStatusResult, jobs: Array.from({ length: 25 }, () => job) };
+  it('accepts 25 historical jobs with a fence but rejects a 26th job', () => {
+    const page = {
+      ...providerStatusResult,
+      unresolvedFence,
+      jobs: Array.from({ length: 25 }, () => job),
+    };
     expect(contract.browserProviderInboundMessageSchema.parse(page)).toEqual(page);
     expect(
       contract.browserProviderInboundMessageSchema.safeParse({ ...page, jobs: [...page.jobs, job] })
@@ -403,6 +505,27 @@ describe.each([
         jobs: [...page.jobs, largeJob],
       }).success
     ).toBe(false);
+  });
+
+  it('counts compact fences in the existing frame byte limit', () => {
+    const largeJob = {
+      ...finishedJob,
+      result: { ...completed, summary: '\u00e9'.repeat(16384) },
+    };
+    const lastJob = { ...finishedJob, result: { ...completed, summary: '' } };
+    const page = {
+      ...providerStatusResult,
+      unresolvedFence,
+      jobs: [largeJob, largeJob, largeJob, lastJob],
+    };
+    lastJob.result.summary = 'x'.repeat(
+      128 * 1024 - 1 - Buffer.byteLength(JSON.stringify(page), 'utf8')
+    );
+    expect(contract.browserProviderInboundMessageSchema.parse(page)).toEqual(page);
+    lastJob.result.summary += 'x';
+    expect(contract.browserProviderInboundMessageSchema.safeParse(page).success).toBe(false);
+    const unfencedPage = { ...providerStatusResult, jobs: page.jobs };
+    expect(contract.browserProviderInboundMessageSchema.parse(unfencedPage)).toEqual(unfencedPage);
   });
 });
 

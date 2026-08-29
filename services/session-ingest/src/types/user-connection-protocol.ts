@@ -717,6 +717,13 @@ export const browserProviderInboundMessageSchema = browserBoundary(
           type: z.literal('provider_status_result'),
           requestId: browserRequestIdSchema,
           providerId: browserProviderIdSchema,
+          // Old responses omit this field; retained identities can outlive job history.
+          unresolvedFence: z
+            .strictObject({
+              invocationId: browserInvocationIdSchema,
+              tabId: browserTabIdSchema.optional(),
+            })
+            .optional(),
           jobs: z.array(browserJobSnapshotSchema).max(BROWSER_PAGE_SIZE),
           nextCursor: browserJobIdSchema.optional(),
         })

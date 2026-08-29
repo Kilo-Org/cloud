@@ -176,20 +176,17 @@ const emptyProviderStatusResult = {
   providerId: handle.providerId,
   jobs: [],
 } as const;
+const recovery = {
+  invocationId: handle.invocationId,
+  tabClosed: true,
+  locksDrained: true,
+} as const;
 const providerOutbound = [
   providerStatusRequest,
   { ...providerStatusRequest, cursor: handle.jobId },
   registration,
-  {
-    ...registration,
-    generation: 1,
-    recovery: {
-      invocationId: handle.invocationId,
-      tabId: tab.tabId,
-      tabClosed: true,
-      locksDrained: true,
-    },
-  },
+  { ...registration, generation: 1, recovery },
+  { ...registration, generation: 1, recovery: { ...recovery, tabId: tab.tabId } },
   { type: 'provider_heartbeat', requestId, ...binding, cursor: handle.jobId },
   { type: 'provider_approval', ...jobBinding, approval: { decision: 'approved', tab } },
   {
@@ -263,6 +260,73 @@ describe.each([
     { conversationMode: {} },
   ])('rejects invalid conversation modes: %j', fields => {
     expect(schema.safeParse({ ...providerInbound[0], ...fields }).success).toBe(false);
+  });
+});
+
+describe.each([
+  { name: 'relay', contract: browser },
+  { name: 'SDK', contract: sdk },
+])('provider recovery registration: $name', ({ contract }) => {
+  it.each([
+    recovery,
+    { ...recovery, tabId: tab.tabId },
+    { ...recovery, tabId: 0 },
+    { ...recovery, tabId: Number.MAX_SAFE_INTEGER },
+    { ...recovery, invocationId: expiredInvocationId },
+    { ...recovery, invocationId: expiredInvocationId, tabId: tab.tabId },
+  ])('preserves recovery identity and tab omission: %j', recovery => {
+    const frame = { ...registration, generation: 1, recovery };
+    expect(contract.browserProviderOutboundMessageSchema.parse(frame)).toStrictEqual(frame);
+    expect(contract.webOutboundWithBrowserMessageSchema.parse(frame)).toStrictEqual(frame);
+  });
+
+  it.each([
+    { tabClosed: undefined },
+    { tabClosed: false },
+    { tabClosed: 'true' },
+    { tabClosed: 1 },
+    { locksDrained: undefined },
+    { locksDrained: false },
+    { locksDrained: 'true' },
+    { locksDrained: 1 },
+    { invocationId: undefined },
+    { invocationId: null },
+    { invocationId: 7 },
+    { invocationId: '' },
+    { invocationId: handle.jobId },
+    { invocationId: `b1.0.${'a'.repeat(64)}` },
+    { invocationId: `b1.01.${'a'.repeat(64)}` },
+    { invocationId: `b1.8640000000000001.${'a'.repeat(64)}` },
+    { invocationId: `b1.9007199254740992.${'a'.repeat(64)}` },
+    { invocationId: `b1.1787875200000.${'A'.repeat(64)}` },
+    { invocationId: `b1.1787875200000.${'a'.repeat(63)}` },
+    { owner },
+    { extra: true },
+  ])('rejects unsafe or malformed recovery with and without a tab: %j', fields => {
+    for (const tabFields of [{}, { tabId: tab.tabId }]) {
+      const frame = {
+        ...registration,
+        generation: 1,
+        recovery: { ...recovery, ...tabFields, ...fields },
+      };
+      expect(contract.browserProviderOutboundMessageSchema.safeParse(frame).success).toBe(false);
+      expect(contract.webOutboundWithBrowserMessageSchema.safeParse(frame).success).toBe(false);
+    }
+  });
+
+  it.each([
+    { tabId: null },
+    { tabId: -1 },
+    { tabId: 1.5 },
+    { tabId: Number.MAX_SAFE_INTEGER + 1 },
+    { tabId: '7' },
+    { tabId: true },
+    { tabId: [] },
+    { tabId: {} },
+  ])('rejects invalid supplied recovery tabs: %j', fields => {
+    const frame = { ...registration, generation: 1, recovery: { ...recovery, ...fields } };
+    expect(contract.browserProviderOutboundMessageSchema.safeParse(frame).success).toBe(false);
+    expect(contract.webOutboundWithBrowserMessageSchema.safeParse(frame).success).toBe(false);
   });
 });
 
@@ -1058,28 +1122,7 @@ describe.each([
     }
   });
 
-  it('requires closed tabs and drained locks on provider recovery registration', () => {
-    const recovery = {
-      invocationId: handle.invocationId,
-      tabId: tab.tabId,
-      tabClosed: true,
-      locksDrained: true,
-    };
-    for (const fields of [
-      { tabClosed: false },
-      { locksDrained: false },
-      { tabId: undefined },
-      { invocationId: undefined },
-      { owner },
-    ]) {
-      expect(
-        contract.browserProviderOutboundMessageSchema.safeParse({
-          ...registration,
-          generation: 1,
-          recovery: { ...recovery, ...fields },
-        }).success
-      ).toBe(false);
-    }
+  it('rejects invalid provider registration generations', () => {
     for (const generation of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
       expect(
         contract.browserProviderOutboundMessageSchema.safeParse({ ...registration, generation })

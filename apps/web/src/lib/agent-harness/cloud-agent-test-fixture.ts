@@ -1,6 +1,7 @@
 import { beforeEach, jest } from '@jest/globals';
 import { createHash } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
+import { canonicalizeValidatedInput } from '@kilocode/agent-harness/commands';
 import type { HarnessCapabilityScope } from './authorization';
 
 const conversationId = '11111111-1111-4111-8111-111111111111';
@@ -10,7 +11,9 @@ export const userId = 'oauth/github:owner';
 export const sessionId = 'ses_12345678901234567890123456';
 export const cloudId = 'agent_real_reference';
 export const reference = { sessionId };
-const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+export const dispatchStartedAt = 1717986919400;
+const digest = (value: unknown) =>
+  createHash('sha256').update(canonicalizeValidatedInput(value)).digest('hex');
 export const message = (id: string, content: string, role = 'user') => ({
   info: { id, sessionID: sessionId, role },
   parts: [
@@ -23,6 +26,7 @@ const initialFixture = () => ({
   sessionScope: org as string | null,
   revoked: false,
   grantRevoked: false,
+  inputDigest: '',
   hideEvidence: false,
   unavailable: false,
   historyKind: undefined as string | undefined,
@@ -46,6 +50,8 @@ jest.mock('./authorization', () => ({
     if (
       fixture.grantRevoked ||
       token !== scope.operation ||
+      scope.inputDigest !== fixture.inputDigest ||
+      scope.definitionVersion !== '1' ||
       scope.conversationId !== conversationId ||
       scope.dispatchId !== operationId ||
       scope.target.kind !== 'backend' ||
@@ -113,12 +119,19 @@ export const caller = {
   },
 };
 jest.mock('@/routers/root-router', () => ({ rootRouter: { createCaller: () => caller } }));
-export const invocation = (name: string, args: unknown) => ({
-  conversationId,
-  operationId,
-  name: `kilo.sessions.${name}`,
-  arguments: args,
-});
+export const invocation = (name: string, args: unknown) => {
+  const identity = ['start', 'continue', 'stop'].includes(name) ? { dispatchStartedAt } : {};
+  fixture.inputDigest = digest(
+    'dispatchStartedAt' in identity ? { arguments: args, ...identity } : args
+  );
+  return {
+    conversationId,
+    operationId,
+    name: `kilo.sessions.${name}`,
+    arguments: args,
+    ...identity,
+  };
+};
 beforeEach(() => {
   jest.restoreAllMocks();
   Object.assign(fixture, initialFixture());

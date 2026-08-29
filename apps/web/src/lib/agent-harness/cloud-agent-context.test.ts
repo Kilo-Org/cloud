@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { TRPCError } from '@trpc/server';
+import { TRPCClientError } from '@trpc/client';
+import { getTRPCErrorFromUnknown, TRPCError } from '@trpc/server';
+import { getHTTPStatusCodeFromError } from '@trpc/server/http';
+import { TRPC_ERROR_CODES_BY_KEY } from '@trpc/server/rpc';
+import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
+import { insertSorted } from '@kilocode/cloud-agent-sdk/storage/helpers';
 import { z } from 'zod';
 import {
   caller,
+  dispatchStartedAt,
   fixture,
   invocation,
   message,
@@ -21,7 +27,7 @@ jest.mock('@/lib/tokens', () => ({ generateInternalServiceToken: () => 'mock-jwt
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 // The repository transformer does not hoist mocks.
-const { createHarnessCloudAgentContext } =
+const { createHarnessCloudAgentContext, normalizeCloudAgentAdmissionError } =
   jest.requireActual<typeof Context>('./cloud-agent-context');
 const { fetchSessionMessagesPage } = jest.requireActual<typeof SessionIngest>(
   '@/lib/session-ingest-client'
@@ -179,12 +185,105 @@ it('rejects model-supplied scope and bounds UTF-8 input and output', async () =>
 });
 it('keeps replay identity stable without colliding across dispatches or inputs', () => {
   const input = invocation('continue', { ...reference, message: 'one' });
-  const identity = (value: unknown) => createHarnessCloudAgentContext('token', value).messageId;
-  expect(identity(input)).toBe(identity({ ...input, arguments: { message: 'one', ...reference } }));
+  const identity = (value: unknown) => createHarnessCloudAgentContext('token', value).messageId!;
+  const harness = identity(input);
+  const clock = jest.spyOn(Date, 'now').mockReturnValue(dispatchStartedAt - 1);
+  const legacy = generateMessageId();
+  clock.mockReturnValue(dispatchStartedAt);
+  expect(harness.slice(4, 16)).toBe(generateMessageId().slice(4, 16));
+  clock.mockReturnValue(dispatchStartedAt + 1);
+  const assistant = generateMessageId();
+  clock.mockReturnValue(dispatchStartedAt + 60_000);
+  expect(identity({ ...input, arguments: { message: 'one', ...reference } })).toBe(harness);
+  expect(harness).toMatch(/^msg_[a-f0-9]{12}[A-Za-z0-9]{14}$/);
+  expect([assistant, harness, legacy].reduce(insertSorted, [])).toEqual([
+    legacy,
+    harness,
+    assistant,
+  ]);
   for (const change of [
     { operationId: org },
     { conversationId: org },
+    { dispatchStartedAt: dispatchStartedAt + 1 },
     { arguments: { ...reference, message: 'two' } },
   ])
-    expect(identity({ ...input, ...change })).not.toBe(identity(input));
+    expect(identity({ ...input, ...change })).not.toBe(harness);
+});
+
+const mutations = [
+  ['start', { prompt: 'Fix', modelId: 'model' }, 'prompt'],
+  ['continue', { ...reference, message: 'Continue' }, 'message'],
+  ['stop', reference, 'sessionId'],
+] as const;
+it.each(mutations)('authenticates %s identity in both scopes', async (name, args, field) => {
+  for (const scope of [null, org]) {
+    fixture.organizationId = fixture.sessionScope = scope;
+    const input = invocation(name, args);
+    const fresh = (value: unknown) => createHarnessCloudAgentContext(input.name, value).fresh();
+    expect((await fresh(input)).authority).toEqual({ userId, organizationId: scope });
+    for (const change of [
+      { dispatchStartedAt: dispatchStartedAt + 1 },
+      { arguments: { ...args, [field]: 'changed' } },
+    ])
+      await expect(fresh({ ...input, ...change })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  }
+});
+it.each(mutations)('rejects missing or unusable %s dispatch identity', (name, args) => {
+  const input = invocation(name, args);
+  for (const time of [undefined, null, -1, 1.5, NaN, Infinity, 2 ** 53, '0'])
+    expect(() =>
+      createHarnessCloudAgentContext(input.name, { ...input, dispatchStartedAt: time })
+    ).toThrow(z.ZodError);
+  expect(() =>
+    createHarnessCloudAgentContext(input.name, { ...input, messageId: 'unsigned-override' })
+  ).toThrow(z.ZodError);
+});
+
+const remoteError = (code: TRPCError['code']) =>
+  TRPCClientError.from({
+    error: {
+      message: 'provider-private-text',
+      code: TRPC_ERROR_CODES_BY_KEY[code],
+      data: { code, httpStatus: getHTTPStatusCodeFromError(new TRPCError({ code })) },
+    },
+  });
+it.each([
+  'UNAUTHORIZED',
+  'FORBIDDEN',
+  'BAD_REQUEST',
+  'PRECONDITION_FAILED',
+  'PAYMENT_REQUIRED',
+] as const)('preserves sanitized %s rejection through the server caller wrapper', code => {
+  const remote = remoteError(code);
+  const wrapped = getTRPCErrorFromUnknown(remote);
+  expect(wrapped).toMatchObject({ code: 'INTERNAL_SERVER_ERROR', cause: remote });
+  for (const error of [
+    remote,
+    wrapped,
+    new TRPCError({ code, message: 'provider-private-text' }),
+  ]) {
+    const normalized = normalizeCloudAgentAdmissionError(error);
+    expect(normalized).toMatchObject({ code, message: 'Cloud Agent rejected this operation.' });
+    expect(normalized?.cause).toBeUndefined();
+  }
+});
+it.each([
+  new Error('response lost'),
+  TRPCClientError.from(new Error('response lost')),
+  remoteError('SERVICE_UNAVAILABLE'),
+  remoteError('TIMEOUT'),
+  remoteError('CONFLICT'),
+  { data: { code: 'FORBIDDEN', httpStatus: 403 } },
+  ...[
+    undefined,
+    { code: 'BAD_REQUEST' },
+    { code: 'BAD_REQUEST', httpStatus: 500 },
+    { code: 'FORBIDDEN', httpStatus: 403 },
+    { code: 'BAD_REQUEST', httpStatus: '400' },
+  ].map(data =>
+    TRPCClientError.from({ error: { message: 'provider-private-text', code: -32600, data } })
+  ),
+])('keeps transport, ambiguous, or malformed errors uncertain: %s', error => {
+  expect(normalizeCloudAgentAdmissionError(error)).toBeUndefined();
+  expect(normalizeCloudAgentAdmissionError(getTRPCErrorFromUnknown(error))).toBeUndefined();
 });

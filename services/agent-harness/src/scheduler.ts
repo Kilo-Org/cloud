@@ -111,6 +111,8 @@ type ToolExecution = {
   run: Run;
   call: ToolCall;
   attemptId: string;
+  // Legacy attempts without an original reservation use undefined until those records retire.
+  dispatchStartedAt: number | undefined;
   signal: AbortSignal;
   limits: RunLimits;
 };
@@ -128,7 +130,7 @@ export type SchedulerAdapter = {
     call: ToolCall,
     signal: AbortSignal
   ) => Promise<DispatchPolicy>;
-  dispatch: (input: ToolExecution) => Promise<unknown>;
+  dispatch: (input: ToolExecution & { dispatchStartedAt: number }) => Promise<unknown>;
   // List only pinned definitions whose adapter proves safe outcome lookup, never mutation replay.
   reconciliation?: {
     definitions: readonly Pick<ModelTool, 'name' | 'version'>[];
@@ -1024,6 +1026,23 @@ export function createScheduler(
     if (reconciliation) {
       const boundary = adapter.reconciliation;
       if (!boundary) fail('unavailable_tool', 'This adapter cannot confirm the stored outcome.');
+      const dispatchStartedAt = schedulerRecord(db, job.run.id).data.reservations.find(
+        item =>
+          item.id === reconciliation.attemptId &&
+          item.kind === 'tool' &&
+          item.toolCallId === job.call.id &&
+          item.status !== 'released'
+      )?.startedAt;
+      // Legacy attempts can lack their original reservation. Keep this guard until those records retire.
+      if (
+        job.call.name.startsWith('kilo.sessions.') &&
+        job.call.effect !== 'read' &&
+        dispatchStartedAt === undefined
+      )
+        return commitToolOutcome(job, {
+          status: 'outcome_unknown',
+          reason: 'The original Cloud Agent dispatch identity is unavailable.',
+        });
       // Return the original operation outcome. Lookup failures must throw, not become mutation failures.
       const result = await abortable(controller.signal, () =>
         boundary.read({
@@ -1031,6 +1050,7 @@ export function createScheduler(
           run: job.run,
           call: job.call,
           attemptId: reconciliation.attemptId,
+          dispatchStartedAt,
           providerReference: reconciliation.providerReference,
           signal: controller.signal,
           limits: job.admission.limits,
@@ -1071,6 +1091,7 @@ export function createScheduler(
           run: job.run,
           call: job.call,
           attemptId: job.reservation.id,
+          dispatchStartedAt: job.reservation.startedAt,
           signal: controller.signal,
           limits: job.admission.limits,
         })

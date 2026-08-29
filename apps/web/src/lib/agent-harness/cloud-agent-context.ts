@@ -1,5 +1,8 @@
 import 'server-only';
+import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
+import { getHTTPStatusCodeFromError } from '@trpc/server/http';
+import { TRPC_ERROR_CODES_BY_KEY } from '@trpc/server/rpc';
 import { z } from 'zod';
 import { type ToolOutcome } from '@kilocode/agent-harness/contracts';
 import { ToolRequestSchema, toolDefinitions } from '@kilocode/agent-harness/tools';
@@ -7,13 +10,54 @@ import { rootRouter } from '@/routers/root-router';
 import { authorizeHarnessCapability, harnessInputDigest } from './authorization';
 
 const Id = z.uuid().transform(value => value.toLowerCase());
+const DispatchTime = z.int().nonnegative();
 const definitions = toolDefinitions.filter(tool => tool.name.startsWith('kilo.sessions.'));
 const Invocation = z.strictObject({
   conversationId: Id,
   operationId: Id,
   name: z.enum(definitions.map(tool => tool.name)),
   arguments: z.unknown(),
+  dispatchStartedAt: DispatchTime.optional(),
 });
+const AdmissionCode = z.enum([
+  'UNAUTHORIZED',
+  'FORBIDDEN',
+  'BAD_REQUEST',
+  'PRECONDITION_FAILED',
+  'PAYMENT_REQUIRED',
+]);
+const RemoteAdmission = z.object({
+  message: z.string(),
+  code: z.int(),
+  data: z.object({ code: AdmissionCode, httpStatus: z.int() }),
+});
+
+export function normalizeCloudAgentAdmissionError(error: unknown): TRPCError | undefined {
+  // Only unwrap server caller wrappers, never infer rejection from transport text or arbitrary causes.
+  for (
+    let depth = 0;
+    depth < 4 && error instanceof TRPCError && error.code === 'INTERNAL_SERVER_ERROR';
+    depth++
+  )
+    error = error.cause;
+  const remote = error instanceof TRPCClientError ? RemoteAdmission.safeParse(error.shape) : null;
+  const code = AdmissionCode.safeParse(
+    error instanceof TRPCError ? error.code : remote?.success ? remote.data.data.code : undefined
+  );
+  if (!code.success) return undefined;
+  const normalized = new TRPCError({
+    code: code.data,
+    message: 'Cloud Agent rejected this operation.',
+  });
+  if (
+    remote?.success &&
+    (remote.data.code !== TRPC_ERROR_CODES_BY_KEY[code.data] ||
+      remote.data.data.httpStatus !== getHTTPStatusCodeFromError(normalized))
+  )
+    return undefined;
+  return normalized;
+}
+
 function bounded<T>(value: T): T {
   if (Buffer.byteLength(JSON.stringify(value), 'utf8') > 64 * 1024)
     throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE' });
@@ -29,17 +73,29 @@ export function createHarnessCloudAgentContext(token: string, input: unknown) {
   bounded(request);
   const definition = definitions.find(tool => tool.name === request.name);
   if (!definition) throw new TRPCError({ code: 'BAD_REQUEST' });
+  // Reads retain their deployed argument-only digest. Mutations cannot invent legacy dispatch times.
+  const dispatchStartedAt =
+    definition.effect === 'read' ? undefined : DispatchTime.parse(invocation.dispatchStartedAt);
   const scope = {
     audience: 'agent-harness:operations',
     conversationId: invocation.conversationId,
     operation: request.name,
     definitionVersion: definition.version,
-    inputDigest: harnessInputDigest(request.arguments),
+    inputDigest: harnessInputDigest(
+      dispatchStartedAt === undefined
+        ? request.arguments
+        : { arguments: request.arguments, dispatchStartedAt }
+    ),
     dispatchId: invocation.operationId,
     target: { kind: 'backend' } as const,
   };
-  // Stable, schema-valid message identity; include the immutable input and conversation in its digest.
-  const messageId = `msg_${harnessInputDigest(scope).slice(0, 26)}`;
+  // Match the deployed SDK's six-byte millisecond << 12 prefix; only the suffix is a scoped digest.
+  const messageId =
+    dispatchStartedAt === undefined
+      ? undefined
+      : `msg_${BigInt.asUintN(48, BigInt(dispatchStartedAt) << 12n)
+          .toString(16)
+          .padStart(12, '0')}${harnessInputDigest(scope).slice(0, 14)}`;
   const fresh = async () => {
     const { ctx, authority } = await authorizeHarnessCapability(token, scope);
     return { caller: rootRouter.createCaller(ctx), authority };

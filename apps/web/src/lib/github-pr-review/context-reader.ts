@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { Octokit } from '@octokit/rest';
 import {
   GitHubPrReviewContextSchema,
+  GitHubPrReviewTimestampSchema,
   type GitHubPrReviewContext,
   type GitHubPrReviewRevision,
   type GitHubPrReviewSource,
@@ -18,7 +19,14 @@ import {
   contextReviewRequestSchema,
   mergeKnownContextIdentity,
 } from './context-people';
+import {
+  PR_CONTEXT_REVIEW_QUERIES,
+  contextReviewSchema,
+  contextReviewsAgree,
+  resolveContextReviewDecisions,
+} from './context-reviews';
 
+const collectionQueries = { ...PR_CONTEXT_PEOPLE_QUERIES, ...PR_CONTEXT_REVIEW_QUERIES };
 const deadlineError = new Error('PR context deadline');
 type PrInput = { owner: string; repo: string; number: number };
 export type ContextReadResult<T> = { data: T | null; source: GitHubPrReviewSource };
@@ -222,7 +230,7 @@ const graphQlRevisionSchema = z
   );
 
 function invalidateRevision(context: GitHubPrReviewContext, source: GitHubPrReviewSource) {
-  for (const collection of [context.requirements, context.checks]) {
+  for (const collection of [context.reviewDecisions, context.requirements, context.checks]) {
     collection.source = source;
     collection.completeness = 'unknown';
   }
@@ -255,11 +263,12 @@ export async function readPullRequestContext(
   const read = createContextSourceReader(octokit, input, budget);
   type Collection<T> = Omit<GitHubPrReviewContext['labels'], 'items'> & { items: T[] };
   async function collect<T extends { id: string | null } | null>(
-    field: keyof typeof PR_CONTEXT_PEOPLE_QUERIES,
+    field: keyof typeof collectionQueries,
     node: z.ZodType<T>,
     fallback: Collection<T>,
     merge: (known: T, current: T) => T,
-    matches = (known: T, current: T) => known?.id != null && known.id === current?.id
+    matches = (known: T, current: T) => known?.id != null && known.id === current?.id,
+    normalize: (item: T, result: ContextReadResult<unknown>, index: number) => T = item => item
   ): Promise<Collection<T>> {
     const schema = z.object({
       nodes: z.array(node.nullable().catch(null)).nullish().catch(null),
@@ -289,23 +298,20 @@ export async function readPullRequestContext(
       ),
     });
     for (;;) {
-      const page = decodeContextGraphQlSource(
-        await read(`graphql.${field}`, async (signal): Promise<unknown> => {
-          const response = await octokit.request('POST /graphql', {
-            query: PR_CONTEXT_PEOPLE_QUERIES[field],
-            variables: {
-              owner: input.owner,
-              name: input.repo,
-              number: input.number,
-              after: collection.endCursor,
-            },
-            request: { signal },
-          });
-          return response.data;
-        }),
-        ['repository', 'pullRequest', field],
-        schema
-      );
+      const result = await read(`graphql.${field}`, async (signal): Promise<unknown> => {
+        const response = await octokit.request('POST /graphql', {
+          query: collectionQueries[field],
+          variables: {
+            owner: input.owner,
+            name: input.repo,
+            number: input.number,
+            after: collection.endCursor,
+          },
+          request: { signal },
+        });
+        return response.data;
+      });
+      const page = decodeContextGraphQlSource(result, ['repository', 'pullRequest', field], schema);
       collection.source = page.source;
       if (page.source.availability !== 'available') incomplete = markIncomplete();
       if (!page.data) break;
@@ -321,8 +327,8 @@ export async function readPullRequestContext(
       collection.totalCount = totalCount ?? collection.totalCount;
       collection.hasNextPage = pageInfo?.hasNextPage ?? null;
       collection.endCursor = pageInfo?.endCursor ?? null;
-      for (const item of nodes ?? []) {
-        if (item?.id) entries.set(item.id, item);
+      for (const [index, item] of (nodes ?? []).entries()) {
+        if (item?.id) entries.set(item.id, normalize(item, result, index));
         else incomplete = markIncomplete();
       }
       if (!pageInfo?.hasNextPage) break;
@@ -366,7 +372,81 @@ export async function readPullRequestContext(
       : 'complete';
     return collection;
   }
-  [context.labels, context.assignees, context.reviewRequests] = await Promise.all([
+  const reviewEvidence = {
+    latestOpinionatedReviews: new Map<string, z.output<typeof contextReviewSchema>>(),
+    latestReviews: new Map<string, z.output<typeof contextReviewSchema>>(),
+  };
+  const collectReviews = (
+    field: keyof typeof PR_CONTEXT_REVIEW_QUERIES,
+    fallback: GitHubPrReviewContext['reviewDecisions']
+  ) => {
+    const evidence = reviewEvidence[field];
+    return collect(
+      field,
+      contextReviewSchema,
+      fallback,
+      (_known, current) => current,
+      undefined,
+      (review, result, index) => {
+        const attribution = decodeContextGraphQlSource(
+          result,
+          ['repository', 'pullRequest', field, 'nodes', index, 'onBehalfOf'],
+          z.object({})
+        );
+        const state = decodeContextGraphQlSource(
+          result,
+          ['repository', 'pullRequest', field, 'nodes', index, 'state'],
+          z.string()
+        );
+        const submission = decodeContextGraphQlSource(
+          result,
+          ['repository', 'pullRequest', field, 'nodes', index, 'submittedAt'],
+          GitHubPrReviewTimestampSchema.nullable()
+        );
+        const submittedAt =
+          submission.source.availability === 'available' ? review.submittedAt : null;
+        const available = attribution.source.availability === 'available';
+        const previous = evidence.get(review.id);
+        const current: z.output<typeof contextReviewSchema> = {
+          ...review,
+          submittedAt,
+          // A failed field or conflicting page cannot establish a current decision.
+          state:
+            state.source.availability !== 'available' ||
+            (previous && !contextReviewsAgree(previous, { ...review, submittedAt }))
+              ? 'UNKNOWN'
+              : review.state,
+          onBehalfOf: {
+            ...review.onBehalfOf,
+            completeness: available
+              ? review.onBehalfOf.completeness
+              : review.onBehalfOf.knownCount
+                ? 'partial'
+                : 'unknown',
+            source: {
+              ...(available ? review.onBehalfOf.source : attribution.source),
+              observedAt: attribution.source.observedAt,
+              provenance: [`graphql.${field}.onBehalfOf`],
+            },
+          },
+        };
+        // Null observations cannot erase comparison evidence or supply public field values.
+        evidence.set(review.id, {
+          ...current,
+          submittedAt: current.submittedAt ?? previous?.submittedAt ?? null,
+          commitSha: current.commitSha ?? previous?.commitSha ?? null,
+        });
+        return current;
+      }
+    );
+  };
+  [
+    context.labels,
+    context.assignees,
+    context.reviewRequests,
+    context.reviewDecisions,
+    context.reviewActivity,
+  ] = await Promise.all([
     collect('labels', contextLabelSchema, context.labels, (known, current) => ({
       ...current,
       color: current.color ?? known.color,
@@ -390,7 +470,21 @@ export async function readPullRequestContext(
           ? known.id === current.id
           : known.reviewer?.id != null && known.reviewer.id === current.reviewer?.id
     ),
+    collectReviews('latestOpinionatedReviews', context.reviewDecisions),
+    collectReviews('latestReviews', context.reviewActivity),
   ]);
+  // Final null fields can hide contradictions between the two connections.
+  for (const review of context.reviewDecisions.items) {
+    const opinionated = reviewEvidence.latestOpinionatedReviews.get(review.id);
+    const activity = reviewEvidence.latestReviews.get(review.id);
+    if (opinionated && activity && !contextReviewsAgree(opinionated, activity)) {
+      review.state = 'UNKNOWN';
+    }
+  }
+  context.reviewDecisions = resolveContextReviewDecisions(
+    context.reviewDecisions,
+    context.reviewActivity
+  );
   const final = decodeContextGraphQlSource(
     await read('graphql.revision', async (signal): Promise<unknown> => {
       const response = await octokit.request('POST /graphql', {

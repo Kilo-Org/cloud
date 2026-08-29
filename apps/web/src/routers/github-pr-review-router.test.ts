@@ -1313,6 +1313,8 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
                 },
                 assignees: empty,
                 reviewRequests: empty,
+                latestOpinionatedReviews: empty,
+                latestReviews: empty,
                 privatePayload: 'provider-only',
               },
             },
@@ -1335,7 +1337,7 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
       jest.restoreAllMocks();
     });
 
-    it('enriches people and labels without claiming that unattached readers are empty', async () => {
+    it('enriches people, labels, and reviews without claiming unattached readers are empty', async () => {
       const result = await caller.getPullRequestContext(contextInput);
       expect(result.revision).toEqual(revision);
       expect(result.labels).toMatchObject({
@@ -1350,13 +1352,14 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
         openedAt: '2026-01-01T00:00:00Z',
         closedAt: null,
       });
-      for (const collection of [
-        result.reviewDecisions,
-        result.reviewActivity,
-        result.issues,
-        result.requirements,
-        result.checks,
-      ]) {
+      for (const collection of [result.reviewDecisions, result.reviewActivity]) {
+        expect(collection).toMatchObject({
+          items: [],
+          completeness: 'complete',
+          source: { availability: 'available' },
+        });
+      }
+      for (const collection of [result.issues, result.requirements, result.checks]) {
         expect(collection).toMatchObject({
           items: [],
           completeness: 'unknown',
@@ -1456,6 +1459,7 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
         });
         expect(result.revision).toEqual(initial);
         for (const source of [
+          result.reviewDecisions.source,
           result.requirements.source,
           result.checks.source,
           result.queue.membership.source,

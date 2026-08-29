@@ -5,8 +5,20 @@ import {
   PR_CONTEXT_REVISION_QUERY,
 } from './context-reader';
 import { PR_CONTEXT_PEOPLE_QUERIES } from './context-people';
+import { PR_REVIEW_GRAPHQL_DOCUMENTS } from '@/routers/github-pr-review-router';
 import { GitHubPrReviewContextSchema } from './context-dtos';
 import type { PullRequestRestData } from './mappers';
+import type * as TrpcServer from '@trpc/server';
+
+// The registry identifies allowed sibling sources without starting router services.
+jest.mock('@/lib/trpc/init', () => {
+  const { initTRPC } = jest.requireActual<typeof TrpcServer>('@trpc/server');
+  const t = initTRPC.create();
+  return { baseProcedure: t.procedure, createTRPCRouter: t.router };
+});
+jest.mock('@/lib/drizzle', () => ({}));
+jest.mock('@kilocode/db/operation-ledger', () => ({}));
+jest.mock('@/lib/integrations/platforms/github/user-token-client', () => ({}));
 
 const fields = ['labels', 'assignees', 'reviewRequests'] as const;
 type Field = (typeof fields)[number];
@@ -124,8 +136,11 @@ async function run(
           },
         };
       const field = fields.find(field => PR_CONTEXT_PEOPLE_QUERIES[field] === body.query);
-      if (!field) throw new Error('Unexpected per-person request');
-      return serve(field, body.variables.after, body.request.signal);
+      if (field) return serve(field, body.variables.after, body.request.signal);
+      if (!Object.values(PR_REVIEW_GRAPHQL_DOCUMENTS).includes(body.query))
+        throw new Error('Unexpected per-person request');
+      // Registered sibling sources are outside this fixture's people evidence.
+      return { data: { data: { repository: { pullRequest: {} } } } };
     },
   } as unknown as Octokit;
   return GitHubPrReviewContextSchema.parse(
@@ -165,8 +180,13 @@ it('traverses more than 100 entries independently without per-person requests', 
     });
     expect(result[field].items).toHaveLength(counts[field]);
   }
-  // Two pages per collection and the final revision read, without identity lookups.
-  expect(requests).toHaveLength(7);
+  // Two pages per people collection; registered sibling sources do not weaken this bound.
+  expect(
+    requests.filter(query => Object.values(PR_CONTEXT_PEOPLE_QUERIES).includes(query))
+  ).toHaveLength(6);
+  expect(requests.every(query => Object.values(PR_REVIEW_GRAPHQL_DOCUMENTS).includes(query))).toBe(
+    true
+  );
 });
 
 describe.each(fields)('%s completeness', field => {

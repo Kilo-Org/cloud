@@ -2,10 +2,7 @@ import {
   updateUserRoleInOrganization,
   removeUserFromOrganization,
   addUserToOrganization,
-  getOrganizationById,
   getOrganizationMembers,
-  inviteUserToOrganization,
-  getAcceptInviteUrl,
 } from '@/lib/organizations/organizations';
 import { updateOrganizationUserLimit } from '@/lib/organizations/organization-usage';
 import {
@@ -25,10 +22,8 @@ import {
   organizationMemberProcedure,
 } from '@/routers/organizations/utils';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
-import {
-  enqueueInviteEmail,
-  resetInviteEmailForResend,
-} from '@kilocode/db/external-side-effect-outbox';
+import { resetInviteEmailForResend } from '@kilocode/db/external-side-effect-outbox';
+import { inviteOrganizationMember } from '@/lib/organizations/member-invitation';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import * as z from 'zod';
@@ -489,106 +484,10 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       return successResult({ updated: memberId });
     }),
+  // Old web/native clients omit an operation identity. Keep their contract until those clients retire.
   invite: organizationBillingMutationProcedure
     .input(InviteMemberSchema)
-    .mutation(async ({ input, ctx }) => {
-      const { user } = ctx;
-      const { organizationId, email, role } = input;
-
-      // Members can be invited by any billing-capable role; elevated roles
-      // require organization-management authority, and only an owner may invite
-      // another owner.
-      if (role !== 'member') {
-        const actorRole = await ensureOrganizationAccess(
-          ctx,
-          organizationId,
-          ORGANIZATION_MANAGE_ROLES
-        );
-        assertOwnerAuthority(actorRole, { nextRole: role });
-      }
-
-      // Get organization details
-      const organization = await getOrganizationById(organizationId);
-      if (!organization) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
-        });
-      }
-
-      // Owners and Kilo admins can invite any role. Billing managers can invite members only.
-      try {
-        const result = await db.transaction(async tx => {
-          const invitation = await inviteUserToOrganization(
-            organizationId,
-            user.id,
-            email,
-            role,
-            tx
-          );
-          const acceptInviteUrl = getAcceptInviteUrl(invitation.token);
-
-          await createAuditLog({
-            action: 'organization.user.send_invite',
-            actor_email: user.google_user_email,
-            actor_id: user.id,
-            actor_name: user.google_user_name,
-            message: `Invited ${email} as ${role}`,
-            organization_id: organization.id,
-            tx,
-          });
-
-          await enqueueInviteEmail(tx, {
-            invitationId: invitation.id,
-            payload: {
-              invitationId: invitation.id,
-              to: email,
-              organizationName: organization.name,
-              inviterName: user.google_user_name,
-              acceptInviteUrl,
-            },
-          });
-
-          return { acceptInviteUrl, invitationId: invitation.id };
-        });
-
-        return { ...result, emailStatus: 'pending' as const };
-      } catch (error) {
-        if (error instanceof Error) {
-          if (error.message === 'User already has a pending invitation') {
-            throw new TRPCError({
-              code: 'CONFLICT',
-              message: 'This email already has a pending invitation',
-            });
-          }
-          if (error.message === 'User is already a member of this organization') {
-            throw new TRPCError({
-              code: 'CONFLICT',
-              message: 'This user is already a member of this organization',
-            });
-          }
-          if (error.message === 'Child organizations cannot invite members') {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'Child organizations manage membership through their parent organization.',
-            });
-          }
-          if (error.message === 'User must join this organization through SSO') {
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: 'This user must join through your organization SSO provider',
-            });
-          }
-          if (error.message === 'Organization SSO policy is misconfigured') {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'This organization has an invalid SSO configuration',
-            });
-          }
-        }
-        throw error;
-      }
-    }),
+    .mutation(({ input, ctx }) => inviteOrganizationMember(ctx, input)),
   deleteInvite: organizationAdminMutationProcedure
     .input(DeleteInviteSchema)
     .mutation(async ({ input, ctx }) => {

@@ -8,7 +8,7 @@ import {
   organization_membership_removals,
   organizations,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { eq, desc, and, count, gt, isNull, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import type Stripe from 'stripe';
@@ -72,9 +72,10 @@ export type SubscriptionMetadata = z.infer<typeof SubscriptionMetadataSchema>;
  * created row therefore always reflects the current subscription state.
  */
 export async function getMostRecentSeatPurchase(
-  organizationId: Organization['id']
+  organizationId: Organization['id'],
+  transaction?: DrizzleTransaction
 ): Promise<OrganizationSeatsPurchase | null> {
-  const [purchase] = await db
+  const [purchase] = await (transaction ?? db)
     .select()
     .from(organization_seats_purchases)
     .where(eq(organization_seats_purchases.organization_id, organizationId))

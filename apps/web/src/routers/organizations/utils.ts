@@ -1,6 +1,6 @@
 import type { Organization } from '@kilocode/db/schema';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import {
@@ -47,7 +47,8 @@ function allowedRole(
 export async function ensureOrganizationAccess(
   ctx: TRPCContext,
   organizationId: Organization['id'],
-  roles?: OrganizationRole[]
+  roles?: OrganizationRole[],
+  transaction?: DrizzleTransaction
 ): Promise<OrganizationRole> {
   if (ctx.user.is_admin) {
     return await elevateViaKiloAdmin(ctx, {
@@ -56,7 +57,8 @@ export async function ensureOrganizationAccess(
       grant: 'owner',
     });
   }
-  const directRows = await db
+  const database = transaction ?? db;
+  const directRows = await database
     .select({ role: organization_memberships.role })
     .from(organization_memberships)
     .where(
@@ -66,7 +68,7 @@ export async function ensureOrganizationAccess(
       )
     );
 
-  const inheritedRows = await db
+  const inheritedRows = await database
     .select({ role: organization_memberships.role })
     .from(organizations)
     .innerJoin(

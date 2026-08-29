@@ -11,6 +11,7 @@ import {
   organization_invitations,
   organizations,
   external_side_effect_outbox,
+  agent_harness_invitation_results,
   type User,
   type Organization,
 } from '@kilocode/db/schema';
@@ -910,6 +911,200 @@ describe('organizations members trpc router', () => {
   });
 
   describe('invite procedure', () => {
+    it('keeps the old response, recipient case, and seven-day invitation without an operation key', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `Old.Client.${crypto.randomUUID()}@Example.com`;
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+      const [invitation] = await db
+        .select()
+        .from(organization_invitations)
+        .where(eq(organization_invitations.id, result.invitationId));
+      expect(result).toEqual({
+        acceptInviteUrl: expect.stringContaining(`/users/accept-invite/${invitation.token}`),
+        invitationId: invitation.id,
+        emailStatus: 'pending',
+      });
+      expect(invitation).toMatchObject({
+        email,
+        role: 'member',
+        invited_by: regularUser.id,
+        accepted_at: null,
+      });
+      expect(Date.parse(invitation.expires_at) - Date.parse(invitation.created_at)).toBe(
+        7 * 24 * 60 * 60 * 1000
+      );
+      const operations = await db
+        .select()
+        .from(agent_harness_invitation_results)
+        .where(eq(agent_harness_invitation_results.invitation_id, invitation.id));
+      expect(operations).toEqual([]);
+      const audits = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(
+          and(
+            eq(organization_audit_logs.organization_id, testOrganization.id),
+            eq(organization_audit_logs.message, `Invited ${email} as member`)
+          )
+        );
+      expect(audits).toEqual([
+        expect.objectContaining({
+          action: 'organization.user.send_invite',
+          actor_id: regularUser.id,
+          actor_email: regularUser.google_user_email,
+          actor_name: regularUser.google_user_name,
+        }),
+      ]);
+      const queued = await db
+        .select()
+        .from(external_side_effect_outbox)
+        .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+      expect(queued).toEqual([
+        expect.objectContaining({
+          status: 'pending',
+          payload: {
+            invitationId: invitation.id,
+            to: email,
+            organizationName: testOrganization.name,
+            inviterName: regularUser.google_user_name,
+            acceptInviteUrl: result.acceptInviteUrl,
+          },
+        }),
+      ]);
+    });
+
+    it('retains the legacy conflict on a repeated request without another audit or enqueue', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const input = {
+        organizationId: testOrganization.id,
+        email: `${crypto.randomUUID()}@legacy-repeat.example.com`,
+        role: 'member' as const,
+      };
+      const result = await caller.organizations.members.invite(input);
+      await expect(caller.organizations.members.invite(input)).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'This email already has a pending invitation',
+      });
+      expect(
+        await db
+          .select()
+          .from(organization_invitations)
+          .where(
+            and(
+              eq(organization_invitations.organization_id, testOrganization.id),
+              eq(organization_invitations.email, input.email)
+            )
+          )
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(organization_audit_logs)
+          .where(
+            and(
+              eq(organization_audit_logs.organization_id, testOrganization.id),
+              eq(organization_audit_logs.message, `Invited ${input.email} as member`)
+            )
+          )
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(external_side_effect_outbox)
+          .where(eq(external_side_effect_outbox.invitation_id, result.invitationId))
+      ).toHaveLength(1);
+    });
+
+    it('retains the existing-member conflict', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.organizations.members.invite({
+          organizationId: testOrganization.id,
+          email: regularUser.google_user_email,
+          role: 'member',
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'This user is already a member of this organization',
+      });
+    });
+
+    it('retains authorization before legacy email validation', async () => {
+      const caller = await createCallerForUser(nonMemberUser.id);
+      await expect(
+        caller.organizations.members.invite({
+          organizationId: testOrganization.id,
+          email: 'invalid-email',
+          role: 'member',
+        })
+      ).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have access to this organization',
+      });
+    });
+
+    it.each(['required SSO', 'invalid SSO', 'expired trial'] as const)(
+      'preserves the %s error without recording an invitation',
+      async state => {
+        const isolated = await createOrganization(
+          'Legacy invitation preconditions',
+          regularUser.id
+        );
+        const domain = `${crypto.randomUUID()}.example.com`;
+        try {
+          await db
+            .update(organizations)
+            .set(
+              state === 'expired trial'
+                ? { free_trial_end_at: '2000-01-01 00:00:00+00' }
+                : { sso_domain: state === 'required SSO' ? domain : 'invalid domain' }
+            )
+            .where(eq(organizations.id, isolated.id));
+          const caller = await createCallerForUser(regularUser.id);
+          await expect(
+            caller.organizations.members.invite({
+              organizationId: isolated.id,
+              email: `invited@${domain}`,
+              role: 'member',
+            })
+          ).rejects.toMatchObject(
+            state === 'expired trial'
+              ? { code: 'FORBIDDEN', message: 'Organization trial has expired.' }
+              : state === 'required SSO'
+                ? {
+                    code: 'FORBIDDEN',
+                    message: 'This user must join through your organization SSO provider',
+                  }
+                : {
+                    code: 'PRECONDITION_FAILED',
+                    message: 'This organization has an invalid SSO configuration',
+                  }
+          );
+          expect(
+            await db
+              .select()
+              .from(organization_invitations)
+              .where(eq(organization_invitations.organization_id, isolated.id))
+          ).toEqual([]);
+          expect(
+            await db
+              .select()
+              .from(organization_audit_logs)
+              .where(eq(organization_audit_logs.organization_id, isolated.id))
+          ).toEqual([]);
+        } finally {
+          await db
+            .delete(organization_memberships)
+            .where(eq(organization_memberships.organization_id, isolated.id));
+          await db.delete(organizations).where(eq(organizations.id, isolated.id));
+        }
+      }
+    );
+
     it('should invite member for organization owner', async () => {
       const caller = await createCallerForUser(regularUser.id);
 

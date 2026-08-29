@@ -474,7 +474,7 @@ async function providerPage<
     BrowserProviderInboundMessage,
     { type: 'provider_snapshot' | 'provider_status_result' }
   >,
->(c: Context, frame: T, now: number, cursor?: string): Promise<T> {
+>(c: Context, provider: Provider, frame: T, now: number, cursor?: string): Promise<T> {
   const deadlines = await list(c.tx, 'deadline', deadlineSchema, BROWSER_MAX_JOBS);
   const rows = deadlines.filter(
     row =>
@@ -485,13 +485,21 @@ async function providerPage<
   );
   for (const row of rows) {
     const job = await required(c.tx, key.job(row.jobId), jobSchema);
-    const candidate = { ...frame, jobs: [...frame.jobs, job.snapshot], nextCursor: row.jobId };
+    const queuePosition =
+      job.snapshot.status === 'queued' ? provider.queue.indexOf(job.snapshot.jobId) + 1 : 0;
+    // Provider display metadata never changes stored snapshots or parent updates.
+    const snapshot: BrowserJobSnapshot = {
+      ...job.snapshot,
+      ownerLabel: job.parentSessionId,
+      ...(queuePosition > 0 ? { queuePosition } : {}),
+    };
+    const candidate = { ...frame, jobs: [...frame.jobs, snapshot], nextCursor: row.jobId };
     if (
       frame.jobs.length === BROWSER_PAGE_SIZE ||
       bytes(JSON.stringify(candidate)) + 64 >= BROWSER_FRAME_MAX_BYTES
     )
       break;
-    frame.jobs.push(job.snapshot);
+    frame.jobs.push(snapshot);
   }
   if (frame.jobs.length < rows.length) frame.nextCursor = frame.jobs.at(-1)?.jobId;
   parse(browserProviderInboundMessageSchema, frame);
@@ -743,7 +751,7 @@ export function createBrowserJobStore(storage: Storage) {
           ...(provider.fence.tabId === undefined ? {} : { tabId: provider.fence.tabId }),
         };
       }
-      return providerPage(c, frame, now, message.cursor);
+      return providerPage(c, provider, frame, now, message.cursor);
     });
     return result.value;
   }
@@ -953,7 +961,7 @@ export function createBrowserJobStore(storage: Storage) {
         };
         return {
           leaseExpiresAt: executionLease(provider),
-          snapshot: await providerPage(c, frame, now, message.cursor),
+          snapshot: await providerPage(c, provider, frame, now, message.cursor),
         };
       }
       const job = await required(c.tx, key.job(message.jobId), jobSchema);

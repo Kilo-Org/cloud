@@ -392,13 +392,17 @@ function requireInputRowOnChangeText(render: React.ReactElement): (text: string)
 function findNode(
   node: Node,
   predicate: (type: unknown, props: Record<string, unknown>) => boolean
-): { type: unknown; props: Record<string, unknown> } | null {
+): { type: unknown; props: Record<string, unknown>; key?: React.Key | null } | null {
   if (node === null || typeof node !== 'object') {
     return null;
   }
-  const { type, props } = node as { type?: unknown; props?: Record<string, unknown> };
+  const { type, props, key } = node as {
+    type?: unknown;
+    props?: Record<string, unknown>;
+    key?: React.Key | null;
+  };
   if (props !== undefined && predicate(type, props)) {
-    return { type, props };
+    return { type, props, key };
   }
   if (type === renderText && props !== undefined) {
     return findNode(renderText(props as React.ComponentProps<typeof renderText>), predicate);
@@ -569,6 +573,7 @@ describe('ChatComposer CLI suggestion', () => {
 
     const suggestion = findNode(render, type => type === MockSuggestionCard);
     expect(findNode(render, type => type === MockChatToolbar)).toBeNull();
+    expect(suggestion?.key).toBe('sug-1');
     expect(suggestion?.props).toMatchObject({
       text: 'Review the completed work?',
       actions: [{ label: 'Review', prompt: '/review branch' }],

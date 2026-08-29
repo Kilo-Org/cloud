@@ -1114,6 +1114,7 @@ export function ChatComposer({
         exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
       >
         <SuggestionCard
+          key={suggestion.requestId}
           text={suggestion.text}
           actions={suggestion.actions}
           onAccept={async index => {

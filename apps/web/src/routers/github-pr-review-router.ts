@@ -47,6 +47,7 @@ import {
   readPullRequestContext,
   PR_CONTEXT_REVISION_QUERY,
 } from '@/lib/github-pr-review/context-reader';
+import { PR_CONTEXT_PEOPLE_QUERIES } from '@/lib/github-pr-review/context-people';
 import { getGitHubUserAccessToken } from '@/lib/integrations/platforms/github/user-token-client';
 import {
   AutoMergeMethodSchema,
@@ -541,6 +542,7 @@ export const CONVERSATION_COMMENTS_QUERY_FOR_TEST = CONVERSATION_COMMENTS_QUERY;
 export const PR_REVIEW_GRAPHQL_DOCUMENTS = {
   PULL_REQUEST_FRAGMENT_QUERY,
   PR_CONTEXT_REVISION_QUERY,
+  ...PR_CONTEXT_PEOPLE_QUERIES,
   REVIEW_THREADS_QUERY,
   REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY,
   CONVERSATION_COMMENTS_QUERY,

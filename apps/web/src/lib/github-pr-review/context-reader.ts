@@ -11,6 +11,13 @@ import {
 } from './context-dtos';
 import { classifyGitHubHttpError } from './errors';
 import { buildOverviewDto } from './mappers';
+import {
+  PR_CONTEXT_PEOPLE_QUERIES,
+  contextLabelSchema,
+  contextIdentitySchema,
+  contextReviewRequestSchema,
+  mergeKnownContextIdentity,
+} from './context-people';
 
 const deadlineError = new Error('PR context deadline');
 type PrInput = { owner: string; repo: string; number: number };
@@ -246,7 +253,144 @@ export async function readPullRequestContext(
     return invalidateRevision(context, failedSource(error, 'rest.pullRequest'));
   }
   const read = createContextSourceReader(octokit, input, budget);
-  // Later source readers use this same reader and budget before the final revision fence.
+  type Collection<T> = Omit<GitHubPrReviewContext['labels'], 'items'> & { items: T[] };
+  async function collect<T extends { id: string | null } | null>(
+    field: keyof typeof PR_CONTEXT_PEOPLE_QUERIES,
+    node: z.ZodType<T>,
+    fallback: Collection<T>,
+    merge: (known: T, current: T) => T,
+    matches = (known: T, current: T) => known?.id != null && known.id === current?.id
+  ): Promise<Collection<T>> {
+    const schema = z.object({
+      nodes: z.array(node.nullable().catch(null)).nullish().catch(null),
+      totalCount: z.number().int().nonnegative().nullish().catch(null),
+      pageInfo: z
+        .object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() })
+        .nullish()
+        .catch(null),
+    });
+    const collection: Collection<T> = {
+      ...fallback,
+      items: [],
+      totalCount: null,
+      hasNextPage: null,
+      endCursor: null,
+    };
+    const entries = new Map<string, T>();
+    const cursors = new Set<string>();
+    let incomplete: GitHubPrReviewSource | undefined;
+    const markIncomplete = (): GitHubPrReviewSource => ({
+      ...collection.source,
+      reason: incomplete?.reason ?? collection.source.reason ?? 'pagination-incomplete',
+      retryable: Boolean(
+        incomplete?.retryable ||
+        collection.source.retryable ||
+        collection.source.availability === 'available'
+      ),
+    });
+    for (;;) {
+      const page = decodeContextGraphQlSource(
+        await read(`graphql.${field}`, async (signal): Promise<unknown> => {
+          const response = await octokit.request('POST /graphql', {
+            query: PR_CONTEXT_PEOPLE_QUERIES[field],
+            variables: {
+              owner: input.owner,
+              name: input.repo,
+              number: input.number,
+              after: collection.endCursor,
+            },
+            request: { signal },
+          });
+          return response.data;
+        }),
+        ['repository', 'pullRequest', field],
+        schema
+      );
+      collection.source = page.source;
+      if (page.source.availability !== 'available') incomplete = markIncomplete();
+      if (!page.data) break;
+      const { nodes, totalCount, pageInfo } = page.data;
+      if (
+        !nodes ||
+        totalCount == null ||
+        !pageInfo ||
+        (collection.totalCount != null && totalCount !== collection.totalCount)
+      ) {
+        incomplete = markIncomplete();
+      }
+      collection.totalCount = totalCount ?? collection.totalCount;
+      collection.hasNextPage = pageInfo?.hasNextPage ?? null;
+      collection.endCursor = pageInfo?.endCursor ?? null;
+      for (const item of nodes ?? []) {
+        if (item?.id) entries.set(item.id, item);
+        else incomplete = markIncomplete();
+      }
+      if (!pageInfo?.hasNextPage) break;
+      if (!pageInfo.endCursor || cursors.has(pageInfo.endCursor)) {
+        incomplete = markIncomplete();
+        break;
+      }
+      cursors.add(pageInfo.endCursor);
+    }
+    if (
+      !incomplete &&
+      (collection.hasNextPage !== false || entries.size !== collection.totalCount)
+    ) {
+      incomplete = markIncomplete();
+    }
+    collection.items = [...entries.values()];
+    if (incomplete) {
+      collection.items = collection.items.map(current => {
+        const known = fallback.items.find(item => matches(item, current));
+        return known === undefined ? current : merge(known, current);
+      });
+      collection.items.push(
+        ...fallback.items.filter(
+          known => !collection.items.some(current => matches(known, current))
+        )
+      );
+      collection.source = {
+        ...incomplete,
+        availability:
+          collection.items.length || incomplete.availability === 'available'
+            ? 'partial'
+            : incomplete.availability,
+        provenance: [...new Set([...fallback.source.provenance, ...incomplete.provenance])],
+      };
+    }
+    collection.knownCount = collection.items.length;
+    collection.completeness = incomplete
+      ? collection.knownCount
+        ? 'partial'
+        : 'unknown'
+      : 'complete';
+    return collection;
+  }
+  [context.labels, context.assignees, context.reviewRequests] = await Promise.all([
+    collect('labels', contextLabelSchema, context.labels, (known, current) => ({
+      ...current,
+      color: current.color ?? known.color,
+    })),
+    collect(
+      'assignees',
+      contextIdentitySchema.nullable(),
+      context.assignees,
+      mergeKnownContextIdentity
+    ),
+    collect(
+      'reviewRequests',
+      contextReviewRequestSchema,
+      context.reviewRequests,
+      (known, current) => ({
+        ...current,
+        reviewer: mergeKnownContextIdentity(known.reviewer, current.reviewer),
+      }),
+      (known, current) =>
+        known.id != null
+          ? known.id === current.id
+          : known.reviewer?.id != null && known.reviewer.id === current.reviewer?.id
+    ),
+  ]);
   const final = decodeContextGraphQlSource(
     await read('graphql.revision', async (signal): Promise<unknown> => {
       const response = await octokit.request('POST /graphql', {

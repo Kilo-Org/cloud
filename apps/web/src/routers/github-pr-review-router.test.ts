@@ -1291,7 +1291,8 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
         privatePayload: 'provider-only',
       };
     }
-    function contextEnvelope(identity = revision) {
+    function contextEnvelope(identity = revision, labelName = 'known') {
+      const empty = { nodes: [], totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null } };
       return {
         data: {
           data: {
@@ -1305,6 +1306,13 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
                 baseRepository: identity.baseRepoFullName
                   ? { nameWithOwner: identity.baseRepoFullName }
                   : null,
+                labels: {
+                  ...empty,
+                  nodes: [{ id: 'LABEL_1', name: labelName, color: 'ffffff' }],
+                  totalCount: 1,
+                },
+                assignees: empty,
+                reviewRequests: empty,
                 privatePayload: 'provider-only',
               },
             },
@@ -1327,14 +1335,16 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
       jest.restoreAllMocks();
     });
 
-    it('returns REST context without claiming that unattached readers are empty', async () => {
+    it('enriches people and labels without claiming that unattached readers are empty', async () => {
       const result = await caller.getPullRequestContext(contextInput);
       expect(result.revision).toEqual(revision);
       expect(result.labels).toMatchObject({
         items: [{ name: 'known' }],
-        completeness: 'unknown',
-        source: { availability: 'partial' },
+        completeness: 'complete',
+        source: { availability: 'available', provenance: ['graphql.labels'] },
       });
+      expect(result.assignees).toMatchObject({ items: [], completeness: 'complete' });
+      expect(result.reviewRequests).toMatchObject({ items: [], completeness: 'complete' });
       expect(result.lifecycle).toMatchObject({
         source: { availability: 'available' },
         openedAt: '2026-01-01T00:00:00Z',
@@ -1369,8 +1379,9 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
       });
       expect(result.revision.baseSha).toBeNull();
       expect(result.labels).toMatchObject({
-        completeness: 'unknown',
-        source: { availability: 'unavailable', reason: 'not-requested' },
+        items: [{ name: 'known' }],
+        completeness: 'complete',
+        source: { availability: 'available' },
       });
       expect(result.lifecycle.openedAt).toBeNull();
       expect(result.requirements.source).toMatchObject({
@@ -1521,7 +1532,7 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
         second.pulls.get.mockResolvedValue({
           data: { ...contextPr(), labels: [{ name: 'rotated' }] },
         });
-        second.request.mockResolvedValue(contextEnvelope());
+        second.request.mockResolvedValue(contextEnvelope(revision, 'rotated'));
         const result = await caller.getPullRequestContext(contextInput);
         expect(result.labels.items[0]?.name).toBe('rotated');
         expect(result.requirements.source.reason).toBe('not-requested');

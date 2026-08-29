@@ -42,8 +42,8 @@ const introspection = JSON.parse(readFileSync(introspectionPath, 'utf8'));
 const githubSchema = buildClientSchema(introspection);
 
 describe('github-pr-review-router GraphQL documents', () => {
-  test('exports exactly 12 documents (sanity guard for the export record)', () => {
-    expect(Object.keys(PR_REVIEW_GRAPHQL_DOCUMENTS)).toHaveLength(12);
+  test('exports exactly 15 documents (sanity guard for the export record)', () => {
+    expect(Object.keys(PR_REVIEW_GRAPHQL_DOCUMENTS)).toHaveLength(15);
   });
 
   test.each(Object.entries(PR_REVIEW_GRAPHQL_DOCUMENTS))(

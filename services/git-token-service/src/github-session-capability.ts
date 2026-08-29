@@ -1,6 +1,12 @@
 import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encryption';
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
+import type { Owner } from '../../../packages/app-shared/src/code-review/repository-identity.js';
+
+export const GitHubIntegrationOwnerSchema: z.ZodType<Owner> = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('user'), id: z.string().min(1) }).strict(),
+  z.object({ type: z.literal('org'), id: z.string().uuid() }).strict(),
+]);
 
 const LEGACY_CAPABILITY_PREFIX = 'kgh1.';
 const BOUND_CAPABILITY_PREFIX = 'kgh2.';
@@ -42,6 +48,7 @@ const GitHubSessionCapabilityClaimsBaseSchema = z.object({
   userId: z.string().min(1),
   orgId: z.string().uuid().optional(),
   integrationId: z.string().uuid().optional(),
+  integrationOwner: GitHubIntegrationOwnerSchema.optional(),
   owner: GitHubPathPartSchema,
   repo: GitHubPathPartSchema,
   source: z.enum(['user', 'installation']),
@@ -62,6 +69,7 @@ const GitHubSessionCapabilityClaimsSchema = z
     GitHubBoundSessionCapabilityClaimsSchema,
   ])
   .refine(claims => claims.expiresAt > claims.issuedAt)
+  .refine(claims => claims.integrationOwner === undefined || claims.integrationId !== undefined)
   .refine(
     claims =>
       claims.expiresAt - claims.issuedAt <= getGitHubSessionCapabilityLifetimeMs(claims.version)
@@ -74,6 +82,7 @@ export type GitHubSessionCapabilitySubject = {
   outboundContainerId?: string;
   orgId?: string;
   integrationId?: string;
+  integrationOwner?: Owner;
   owner: string;
   repo: string;
   source: GitHubAuthSource;

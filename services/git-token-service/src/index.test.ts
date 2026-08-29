@@ -1,8 +1,15 @@
 import { signKiloToken } from '@kilocode/worker-utils';
+import * as dbClient from '@kilocode/db/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as GitLabCredentialBrokerHandlerModule from './gitlab-credential-broker-handler.js';
 import type * as GitLabLookupServiceModule from './gitlab-lookup-service.js';
 import type * as InteractiveReviewHandlerModule from './interactive-review-handler.js';
+import type * as InstallationLookupServiceModule from './installation-lookup-service.js';
+import { GitHubSessionCapabilityCodec } from './github-session-capability.js';
+import type {
+  FindInstallationParams,
+  ManagedInstallationLookupSuccess,
+} from './installation-lookup-service.js';
 
 const serviceMocks = vi.hoisted(() => ({
   findInstallationId: vi.fn(),
@@ -781,37 +788,51 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
     vi.clearAllMocks();
   });
 
-  it('mints repository-scoped tokens after resolving an authorized installation', async () => {
-    serviceMocks.findInstallationId.mockResolvedValue({
-      success: true,
-      installationId: '123',
-      accountLogin: 'old-owner',
-      githubAppType: 'lite',
-    });
-    serviceMocks.getTokenForRepo.mockResolvedValue('scoped-token');
-    serviceMocks.getToken.mockResolvedValue('installation-wide-token');
+  it.each([
+    undefined,
+    '00000000-0000-4000-8000-000000000002',
+    '00000000-0000-4000-8000-000000000099',
+  ])(
+    'returns a scoped token and the resolved identity rather than the caller pin %s',
+    async expectedIntegrationId => {
+      serviceMocks.findInstallationId.mockResolvedValue({
+        success: true,
+        integrationId: '00000000-0000-4000-8000-000000000002',
+        integrationOwner: { type: 'user', id: 'user-1' },
+        installationId: '123',
+        accountLogin: 'old-owner',
+        githubAppType: 'lite',
+      });
+      serviceMocks.getTokenForRepo.mockResolvedValue('scoped-token');
+      serviceMocks.getToken.mockResolvedValue('installation-wide-token');
 
-    const result = await createService().getTokenForRepo({
-      githubRepo: 'renamed-owner/repository',
-      userId: 'user-1',
-    });
+      const result = await createService().getTokenForRepo({
+        githubRepo: 'renamed-owner/repository',
+        userId: 'user-1',
+        expectedIntegrationId,
+      });
 
-    expect(result).toEqual({
-      success: true,
-      token: 'scoped-token',
-      installationId: '123',
-      accountLogin: 'old-owner',
-      appType: 'lite',
-    });
-    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledWith('123', 'repository', 'lite');
-    expect(serviceMocks.getToken).not.toHaveBeenCalled();
-  });
+      expect(result).toEqual({
+        success: true,
+        token: 'scoped-token',
+        integrationId: '00000000-0000-4000-8000-000000000002',
+        integrationOwner: { type: 'user', id: 'user-1' },
+        installationId: '123',
+        accountLogin: 'old-owner',
+        appType: 'lite',
+      });
+      expect(serviceMocks.getTokenForRepo).toHaveBeenCalledWith('123', 'repository', 'lite');
+      expect(serviceMocks.getToken).not.toHaveBeenCalled();
+    }
+  );
 
   it('repairs stale login metadata after a lookup miss before minting a token', async () => {
     serviceMocks.findInstallationId
       .mockResolvedValueOnce({ success: false, reason: 'no_installation_found' })
       .mockResolvedValueOnce({
         success: true,
+        integrationId: 'integration-1',
+        integrationOwner: { type: 'user', id: 'user-1' },
         installationId: '123',
         accountLogin: 'renamed-owner',
         githubAppType: 'standard',
@@ -837,7 +858,11 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
       userId: 'user-1',
     });
 
-    expect(result).toMatchObject({ success: true, token: 'scoped-token' });
+    expect(result).toMatchObject({
+      success: true,
+      token: 'scoped-token',
+      integrationId: 'integration-1',
+    });
     expect(serviceMocks.updateAccountLogin).toHaveBeenCalledWith('integration-1', 'renamed-owner');
     expect(consoleLog).toHaveBeenCalledWith(
       JSON.stringify({
@@ -960,6 +985,8 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
   it('does not fall back to an installation-wide token when scoped minting fails', async () => {
     serviceMocks.findInstallationId.mockResolvedValue({
       success: true,
+      integrationId: '00000000-0000-4000-8000-000000000002',
+      integrationOwner: { type: 'user', id: 'user_1' },
       installationId: '123',
       accountLogin: 'old-owner',
       githubAppType: 'standard',
@@ -972,57 +999,681 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
     expect(serviceMocks.getToken).not.toHaveBeenCalled();
   });
 
-  it('repairs stale login metadata within the expected integration fence', async () => {
-    const params = {
-      githubRepo: 'acme/repository',
-      userId: 'user-1',
-      orgId: '00000000-0000-4000-8000-000000000001',
-      expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
-    };
-    serviceMocks.findInstallationId
-      .mockResolvedValueOnce({ success: false, reason: 'integration_mismatch' })
-      .mockResolvedValueOnce({
-        success: true,
-        installationId: '123',
-        accountLogin: 'acme',
-        githubAppType: 'standard',
-      });
-    serviceMocks.findRefreshCandidates.mockResolvedValue({
-      success: true,
-      candidates: [
-        {
+  it.each([undefined, '00000000-0000-4000-8000-000000000001'])(
+    'repairs stale login metadata within the expected integration fence for owner scope %s',
+    async orgId => {
+      const params = {
+        githubRepo: 'acme/repository',
+        userId: 'user-1',
+        orgId,
+        expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+      };
+      serviceMocks.findInstallationId
+        .mockResolvedValueOnce({ success: false, reason: 'integration_mismatch' })
+        .mockResolvedValueOnce({
+          success: true,
           integrationId: params.expectedIntegrationId,
+          integrationOwner:
+            orgId === undefined ? { type: 'user', id: 'user-1' } : { type: 'org', id: orgId },
           installationId: '123',
-          accountLogin: 'old-acme',
+          accountLogin: 'acme',
           githubAppType: 'standard',
-        },
-      ],
-    });
-    serviceMocks.refreshInstallationAccountLoginIfDue.mockResolvedValue('acme');
-    serviceMocks.updateAccountLogin.mockResolvedValue(true);
-    serviceMocks.getTokenForRepo.mockResolvedValue('scoped-token');
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+        });
+      serviceMocks.findRefreshCandidates.mockResolvedValue({
+        success: true,
+        candidates: [
+          {
+            integrationId: params.expectedIntegrationId,
+            installationId: '123',
+            accountLogin: 'old-acme',
+            githubAppType: 'standard',
+          },
+        ],
+      });
+      serviceMocks.refreshInstallationAccountLoginIfDue.mockResolvedValue('acme');
+      serviceMocks.updateAccountLogin.mockResolvedValue(true);
+      serviceMocks.getTokenForRepo.mockResolvedValue('scoped-token');
+      vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await expect(createService().getTokenForRepo(params)).resolves.toMatchObject({
-      success: true,
-      token: 'scoped-token',
-    });
-    expect(serviceMocks.findInstallationId).toHaveBeenCalledTimes(2);
-    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(params);
-    expect(serviceMocks.updateAccountLogin).toHaveBeenCalledWith(
-      params.expectedIntegrationId,
-      'acme'
-    );
-  });
+      await expect(createService().getTokenForRepo(params)).resolves.toMatchObject({
+        success: true,
+        token: 'scoped-token',
+        integrationId: params.expectedIntegrationId,
+      });
+      expect(serviceMocks.findInstallationId).toHaveBeenCalledTimes(2);
+      expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(params);
+      expect(serviceMocks.updateAccountLogin).toHaveBeenCalledWith(
+        params.expectedIntegrationId,
+        'acme'
+      );
+    }
+  );
 });
 
 const outboundContainerId = 'outbound-container-1';
+
+describe('GitTokenRPCEntrypoint GitHub launch integration identity', () => {
+  const integration: ManagedInstallationLookupSuccess = {
+    success: true,
+    integrationId: '00000000-0000-4000-8000-000000000002',
+    integrationOwner: { type: 'user', id: 'user_1' },
+    installationId: '123',
+    accountLogin: 'acme',
+    githubAppType: 'standard',
+    repoName: 'repo',
+    permissions: { contents: 'write', pull_requests: 'write' },
+  };
+  const userAuthor = { name: 'octocat', email: '1+octocat@users.noreply.github.com' };
+  const installationAuthor = {
+    name: 'kiloconnect[bot]',
+    email: '240665456+kiloconnect[bot]@users.noreply.github.com',
+  };
+  const codec = new GitHubSessionCapabilityCodec(Buffer.alloc(32, 7).toString('base64'));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    serviceMocks.findInstallationId.mockResolvedValue(integration);
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValue(integration);
+    serviceMocks.findRefreshCandidates.mockResolvedValue({ success: true, candidates: [] });
+    serviceMocks.getTokenForRepo.mockResolvedValue('installation-token');
+    serviceMocks.selectUserAuthorization.mockResolvedValue({
+      selected: true,
+      token: 'user-token',
+      gitAuthor: userAuthor,
+    });
+  });
+
+  describe.each([undefined, integration.integrationId, '00000000-0000-4000-8000-000000000099'])(
+    'caller pin %s',
+    expectedIntegrationId => {
+      it.each([false, true])(
+        'returns and seals the authorized identity with user authorization %s',
+        async allowUserAuthorization => {
+          const params = {
+            githubRepo: 'acme/repo',
+            userId: 'user_1',
+            expectedIntegrationId,
+            allowUserAuthorization,
+            outboundContainerId,
+          };
+          const expectedMetadata = {
+            success: true,
+            integrationId: integration.integrationId,
+            integrationOwner: { type: 'user', id: 'user_1' },
+            installationId: '123',
+            accountLogin: 'acme',
+            appType: 'standard',
+            ...(allowUserAuthorization
+              ? { source: 'user', gitAuthor: userAuthor, commitCoAuthor: installationAuthor }
+              : { source: 'installation', gitAuthor: installationAuthor }),
+          };
+          const service = createService();
+          await expect(service.getCloudAgentAuthForRepo(params)).resolves.toEqual({
+            ...expectedMetadata,
+            githubToken: allowUserAuthorization ? 'user-token' : 'installation-token',
+          });
+          const issued = await service.issueGitHubSessionCapability(params);
+          expect(issued).toEqual({ ...expectedMetadata, capability: expect.any(String) });
+          if (!issued.success) throw new Error('Expected capability');
+          expect(codec.decode(issued.capability)).toMatchObject({
+            integrationId: integration.integrationId,
+            owner: 'acme',
+            repo: 'repo',
+          });
+          expect(issued).not.toHaveProperty('githubToken');
+        }
+      );
+    }
+  );
+
+  it.each([
+    'no_user_authorization',
+    'revoked',
+    'refresh_failed',
+    'insufficient_user_access',
+    'credential_unreadable',
+    'credential_configuration_error',
+  ])('retains the resolved identity when user selection falls back for %s', async reason => {
+    serviceMocks.selectUserAuthorization.mockResolvedValue({ selected: false, reason });
+    await expect(
+      createService().getCloudAgentAuthForRepo({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toEqual({
+      success: true,
+      integrationId: integration.integrationId,
+      integrationOwner: { type: 'user', id: 'user_1' },
+      githubToken: 'installation-token',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+      source: 'installation',
+      gitAuthor: installationAuthor,
+      fallbackReason: reason,
+    });
+  });
+
+  it.each(['lite_installation', 'insufficient_user_access'])(
+    'retains the resolved identity for the installation fallback %s',
+    async fallbackReason => {
+      const githubAppType = fallbackReason === 'lite_installation' ? 'lite' : 'standard';
+      serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
+        ...integration,
+        githubAppType,
+        permissions: { contents: 'read' },
+      });
+      await expect(
+        createService().getCloudAgentAuthForRepo({
+          githubRepo: 'acme/repo',
+          userId: 'user_1',
+          allowUserAuthorization: true,
+        })
+      ).resolves.toMatchObject({
+        success: true,
+        integrationId: integration.integrationId,
+        githubToken: 'installation-token',
+        source: 'installation',
+        appType: githubAppType,
+        fallbackReason,
+      });
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    }
+  );
+
+  describe.each([undefined, '00000000-0000-4000-8000-000000000001'])('owner scope %s', orgId => {
+    const actor = { userId: 'user_1', ...(orgId === undefined ? {} : { orgId }) };
+
+    it.each([false, true])(
+      'retains the exact integration after managed login repair with user authorization %s',
+      async allowUserAuthorization => {
+        serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
+          success: false,
+          reason: 'integration_mismatch',
+        });
+        serviceMocks.findRefreshCandidates.mockResolvedValue({
+          success: true,
+          candidates: [
+            {
+              integrationId: integration.integrationId,
+              installationId: '123',
+              accountLogin: 'old-acme',
+              githubAppType: 'standard',
+            },
+          ],
+        });
+        serviceMocks.refreshInstallationAccountLoginIfDue.mockResolvedValue('acme');
+        serviceMocks.updateAccountLogin.mockResolvedValue(true);
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        await expect(
+          createService().getCloudAgentAuthForRepo({
+            ...actor,
+            githubRepo: 'acme/repo',
+            expectedIntegrationId: integration.integrationId,
+            allowUserAuthorization,
+          })
+        ).resolves.toMatchObject({
+          success: true,
+          integrationId: integration.integrationId,
+          githubToken: allowUserAuthorization ? 'user-token' : 'installation-token',
+          source: allowUserAuthorization ? 'user' : 'installation',
+        });
+      }
+    );
+
+    describe.each([undefined, outboundContainerId])('capability container %s', containerId => {
+      const container = containerId === undefined ? {} : { outboundContainerId: containerId };
+
+      it.each([false, true])(
+        'pins a legacy request through token refresh with user authorization %s',
+        async allowUserAuthorization => {
+          const service = createService();
+          const issued = await service.issueGitHubSessionCapability({
+            ...actor,
+            ...container,
+            githubRepo: 'acme/repo',
+            allowUserAuthorization,
+          });
+          if (!issued.success) throw new Error('Expected capability');
+          expect(issued.integrationId).toBe(integration.integrationId);
+          serviceMocks.findManagedInstallationForRepo.mockImplementation(
+            async (params: FindInstallationParams) =>
+              params.expectedIntegrationId === integration.integrationId
+                ? integration
+                : { success: false, reason: 'integration_mismatch' }
+          );
+          serviceMocks.getTokenForRepo.mockResolvedValue('refreshed-installation-token');
+          serviceMocks.selectUserAuthorization.mockResolvedValue({
+            selected: true,
+            token: 'refreshed-user-token',
+            gitAuthor: userAuthor,
+          });
+          await expect(
+            service.redeemGitHubSessionCapability({
+              capability: issued.capability,
+              ...container,
+              requestMethod: 'GET',
+              requestUrl: 'https://api.github.com/repos/acme/repo/pulls/42',
+            })
+          ).resolves.toEqual({
+            success: true,
+            authorization: allowUserAuthorization
+              ? 'Bearer refreshed-user-token'
+              : 'Bearer refreshed-installation-token',
+          });
+        }
+      );
+
+      it.each([false, true])(
+        'rejects replacement after an unpinned request with user authorization %s',
+        async allowUserAuthorization => {
+          const service = createService();
+          const issued = await service.issueGitHubSessionCapability({
+            ...actor,
+            ...container,
+            githubRepo: 'acme/repo',
+            allowUserAuthorization,
+          });
+          if (!issued.success) throw new Error('Expected capability');
+          serviceMocks.findManagedInstallationForRepo.mockImplementation(
+            async (params: FindInstallationParams) =>
+              params.expectedIntegrationId === undefined
+                ? { ...integration, integrationId: '00000000-0000-4000-8000-000000000099' }
+                : { success: false, reason: 'integration_mismatch' }
+          );
+          await expect(
+            service.redeemGitHubSessionCapability({
+              capability: issued.capability,
+              ...container,
+              requestMethod: 'GET',
+              requestUrl: 'https://api.github.com/repos/acme/repo/pulls/42',
+            })
+          ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+        }
+      );
+
+      it.each([false, true])(
+        'redeems an old unpinned capability with user authorization %s',
+        async allowUserAuthorization => {
+          const capability = codec.issue({
+            ...actor,
+            ...container,
+            owner: 'acme',
+            repo: 'repo',
+            source: allowUserAuthorization ? 'user' : 'installation',
+            identity: {
+              installationId: '123',
+              accountLogin: 'acme',
+              appType: 'standard',
+              gitAuthor: allowUserAuthorization ? userAuthor : installationAuthor,
+              ...(allowUserAuthorization ? { commitCoAuthor: installationAuthor } : {}),
+            },
+          });
+          serviceMocks.findManagedInstallationForRepo.mockImplementation(
+            async (params: FindInstallationParams) =>
+              params.expectedIntegrationId === undefined
+                ? integration
+                : { success: false, reason: 'integration_mismatch' }
+          );
+          const service = createService();
+          await expect(
+            service.redeemGitHubSessionCapability({
+              capability,
+              ...container,
+              requestMethod: 'GET',
+              requestUrl: 'https://api.github.com/repos/acme/repo/pulls/42',
+            })
+          ).resolves.toEqual({
+            success: true,
+            authorization: allowUserAuthorization
+              ? 'Bearer user-token'
+              : 'Bearer installation-token',
+          });
+          if (containerId === undefined) {
+            await expect(
+              service.redeemGitHubSessionCapability({
+                capability,
+                requestMethod: 'GET',
+                requestUrl: 'https://api.github.com/repos/acme/other/pulls/42',
+              })
+            ).resolves.toEqual({ success: false, reason: 'repository_mismatch' });
+          }
+        }
+      );
+    });
+  });
+
+  async function usePersonalInstallationLookup() {
+    const { InstallationLookupService } = await vi.importActual<
+      typeof InstallationLookupServiceModule
+    >('./installation-lookup-service.js');
+    const row = {
+      id: integration.integrationId,
+      platform_installation_id: '123',
+      platform_account_login: 'acme',
+      github_app_type: 'standard',
+      integration_status: 'active',
+      owned_by_organization_id: null,
+      owned_by_user_id: 'user_1',
+      repository_access: 'all',
+      repositories: null,
+      permissions: { contents: 'write', pull_requests: 'write' },
+    };
+    const query = {
+      from: vi.fn(() => query),
+      leftJoin: vi.fn(() => query),
+      innerJoin: vi.fn(() => query),
+      where: vi.fn(() => query),
+      orderBy: vi.fn(() => query),
+      limit: vi.fn(async () => [row]),
+    };
+    vi.spyOn(dbClient, 'getWorkerDb').mockReturnValue({ select: () => query } as never);
+    const lookup = new InstallationLookupService({
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+    } as CloudflareEnv);
+    serviceMocks.findInstallationId.mockImplementation((params: FindInstallationParams) =>
+      lookup.findInstallationId(params)
+    );
+    serviceMocks.findManagedInstallationForRepo.mockImplementation(
+      (params: FindInstallationParams) => lookup.findManagedInstallationForRepo(params)
+    );
+    return row;
+  }
+
+  it('keeps an authorized legacy Personal fallback redeemable in an organization session', async () => {
+    await usePersonalInstallationLookup();
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      orgId: '00000000-0000-4000-8000-000000000001',
+      outboundContainerId,
+    });
+    expect(issued).toMatchObject({ success: true, integrationId: integration.integrationId });
+    if (!issued.success) throw new Error('Expected capability');
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'GET',
+        requestUrl: 'https://api.github.com/repos/acme/repo/pulls/42',
+      })
+    ).resolves.toEqual({ success: true, authorization: 'Bearer installation-token' });
+  });
+
+  const organizationSession = {
+    githubRepo: 'acme/repo',
+    userId: 'user_1',
+    orgId: '00000000-0000-4000-8000-000000000001',
+  };
+
+  it('retains the resolved Personal owner across raw-token retries in an organization session', async () => {
+    await usePersonalInstallationLookup();
+    const service = createService();
+    const resolved = await service.getTokenForRepo(organizationSession);
+    expect(resolved).toEqual({
+      success: true,
+      token: 'installation-token',
+      integrationId: integration.integrationId,
+      integrationOwner: { type: 'user', id: 'user_1' },
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+    });
+    if (!resolved.success) throw new Error('Expected raw token');
+    serviceMocks.getTokenForRepo.mockResolvedValue('refreshed-installation-token');
+    await expect(
+      service.getTokenForRepo({
+        ...organizationSession,
+        expectedIntegrationId: resolved.integrationId,
+        expectedIntegrationOwner: resolved.integrationOwner,
+      })
+    ).resolves.toEqual({ ...resolved, token: 'refreshed-installation-token' });
+  });
+
+  describe.each([undefined, outboundContainerId])('Personal fallback container %s', containerId => {
+    const container = containerId === undefined ? {} : { outboundContainerId: containerId };
+
+    it.each([false, true])(
+      'retains the owner across capability retries with user authorization %s',
+      async allowUserAuthorization => {
+        await usePersonalInstallationLookup();
+        const service = createService();
+        const params = { ...organizationSession, ...container, allowUserAuthorization };
+        const issued = await service.issueGitHubSessionCapability(params);
+        expect(issued).toMatchObject({
+          success: true,
+          integrationId: integration.integrationId,
+          integrationOwner: { type: 'user', id: 'user_1' },
+        });
+        if (!issued.success) throw new Error('Expected capability');
+        expect(codec.decode(issued.capability)).toMatchObject({
+          orgId: organizationSession.orgId,
+          integrationId: integration.integrationId,
+          integrationOwner: { type: 'user', id: 'user_1' },
+        });
+        const retried = await service.issueGitHubSessionCapability({
+          ...params,
+          expectedIntegrationId: issued.integrationId,
+          expectedIntegrationOwner: issued.integrationOwner,
+        });
+        expect(retried).toMatchObject({
+          success: true,
+          integrationId: integration.integrationId,
+          integrationOwner: { type: 'user', id: 'user_1' },
+        });
+        if (!retried.success) throw new Error('Expected retry capability');
+        serviceMocks.getTokenForRepo.mockResolvedValue('refreshed-installation-token');
+        serviceMocks.selectUserAuthorization.mockResolvedValue({
+          selected: true,
+          token: 'refreshed-user-token',
+          gitAuthor: userAuthor,
+        });
+        for (const { capability } of [issued, retried]) {
+          await expect(
+            service.redeemGitHubSessionCapability({
+              capability,
+              ...container,
+              requestMethod: 'GET',
+              requestUrl: 'https://api.github.com/repos/acme/repo/pulls/42',
+            })
+          ).resolves.toEqual({
+            success: true,
+            authorization: allowUserAuthorization
+              ? 'Bearer refreshed-user-token'
+              : 'Bearer refreshed-installation-token',
+          });
+        }
+      }
+    );
+
+    it.each([false, true])(
+      'preserves old unpinned fallback and organization-only pin semantics with user authorization %s',
+      async allowUserAuthorization => {
+        const row = await usePersonalInstallationLookup();
+        const subject = {
+          userId: organizationSession.userId,
+          orgId: organizationSession.orgId,
+          ...container,
+          owner: 'acme',
+          repo: 'repo',
+          source: allowUserAuthorization ? ('user' as const) : ('installation' as const),
+          identity: {
+            installationId: '123',
+            accountLogin: 'acme',
+            appType: 'standard' as const,
+            gitAuthor: allowUserAuthorization ? userAuthor : installationAuthor,
+            ...(allowUserAuthorization ? { commitCoAuthor: installationAuthor } : {}),
+          },
+        };
+        const service = createService();
+        const request = {
+          ...container,
+          requestMethod: 'GET',
+          requestUrl: 'https://api.github.com/repos/acme/repo/pulls/42',
+        };
+        const expected = {
+          success: true,
+          authorization: allowUserAuthorization ? 'Bearer user-token' : 'Bearer installation-token',
+        };
+        await expect(
+          service.redeemGitHubSessionCapability({
+            ...request,
+            capability: codec.issue(subject),
+          })
+        ).resolves.toEqual(expected);
+        const pinned = codec.issue({ ...subject, integrationId: integration.integrationId });
+        await expect(
+          service.redeemGitHubSessionCapability({ ...request, capability: pinned })
+        ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+        const personalPinned = codec.issue({
+          ...subject,
+          orgId: undefined,
+          integrationId: integration.integrationId,
+        });
+        await expect(
+          service.redeemGitHubSessionCapability({ ...request, capability: personalPinned })
+        ).resolves.toEqual(expected);
+        Object.assign(row, {
+          owned_by_organization_id: organizationSession.orgId,
+          owned_by_user_id: null,
+        });
+        await expect(
+          service.redeemGitHubSessionCapability({ ...request, capability: pinned })
+        ).resolves.toEqual(expected);
+        await expect(
+          service.redeemGitHubSessionCapability({ ...request, capability: personalPinned })
+        ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+      }
+    );
+  });
+
+  it.each([
+    [
+      'transferred to the session organization',
+      {
+        owned_by_organization_id: organizationSession.orgId,
+        owned_by_user_id: null,
+      },
+    ],
+    ['transferred to another user', { owned_by_user_id: 'oauth/another-user' }],
+    ['replaced', { id: '00000000-0000-4000-8000-000000000099' }],
+    ['suspended', { integration_status: 'suspended' }],
+    [
+      'removed from the repository',
+      {
+        repository_access: 'selected',
+        repositories: [{ full_name: 'acme/other-repo' }],
+      },
+    ],
+  ])(
+    'rejects raw retries and redemption after the Personal integration is %s',
+    async (_name, change) => {
+      const row = await usePersonalInstallationLookup();
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        ...organizationSession,
+        outboundContainerId,
+      });
+      if (!issued.success) throw new Error('Expected capability');
+      Object.assign(row, change);
+      await expect(
+        service.getTokenForRepo({
+          ...organizationSession,
+          expectedIntegrationId: issued.integrationId,
+          expectedIntegrationOwner: issued.integrationOwner,
+        })
+      ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'GET',
+          requestUrl: 'https://api.github.com/repos/acme/repo/pulls/42',
+        })
+      ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+    }
+  );
+
+  it.each([false, true])(
+    'rejects a changed integration owner with identical provider identity and user authorization %s',
+    async allowUserAuthorization => {
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+        allowUserAuthorization,
+      });
+      if (!issued.success) throw new Error('Expected capability');
+      serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
+        ...integration,
+        integrationOwner: { type: 'org', id: organizationSession.orgId },
+      });
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'GET',
+          requestUrl: 'https://api.github.com/repos/acme/repo/pulls/42',
+        })
+      ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+    }
+  );
+
+  it.each([false, true])(
+    'rejects a changed integration with identical provider identity and user authorization %s',
+    async allowUserAuthorization => {
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+        allowUserAuthorization,
+      });
+      if (!issued.success) throw new Error('Expected capability');
+      serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
+        ...integration,
+        integrationId: '00000000-0000-4000-8000-000000000099',
+      });
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'GET',
+          requestUrl: 'https://api.github.com/repos/acme/repo/pulls/42',
+        })
+      ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+    }
+  );
+
+  it.each([
+    ['database_not_configured', 'database_not_configured'],
+    ['invalid_repo_format', 'invalid_repo_format'],
+    ['no_installation_found', 'no_installation_found'],
+    ['invalid_org_id', 'invalid_org_id'],
+    ['integration_mismatch', 'integration_mismatch'],
+    ['ambiguous_installation', 'no_installation_found'],
+  ])('preserves the public error for lookup failure %s', async (reason, publicReason) => {
+    serviceMocks.findInstallationId.mockResolvedValue({ success: false, reason });
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValue({ success: false, reason });
+    const service = createService();
+    const params = { githubRepo: 'acme/repo', userId: 'user_1' };
+    const failure = { success: false, reason: publicReason };
+    await expect(service.getTokenForRepo(params)).resolves.toEqual(failure);
+    await expect(service.getCloudAgentAuthForRepo(params)).resolves.toEqual(failure);
+    await expect(service.issueGitHubSessionCapability(params)).resolves.toEqual(failure);
+  });
+});
 
 describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
       success: true,
+      integrationId: '00000000-0000-4000-8000-000000000002',
+      integrationOwner: { type: 'user', id: 'user_1' },
       installationId: '123',
       accountLogin: 'acme',
       githubAppType: 'standard',
@@ -1107,6 +1758,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       userId: 'user_1',
       orgId,
       expectedIntegrationId,
+      expectedIntegrationOwner: { type: 'user', id: 'user_1' },
       githubRepo: 'acme/repo',
     });
   });
@@ -1143,6 +1795,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       userId: 'user_1',
       orgId: '00000000-0000-4000-8000-000000000001',
       expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+      expectedIntegrationOwner: { type: 'user', id: 'user_1' },
       githubRepo: 'acme/repo',
     });
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
@@ -1632,6 +2285,8 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     if (!issued.success) throw new Error('Expected successful issuance');
     serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
       success: true,
+      integrationId: '00000000-0000-4000-8000-000000000002',
+      integrationOwner: { type: 'user', id: 'user_1' },
       installationId: '456',
       accountLogin: 'acme',
       githubAppType: 'standard',

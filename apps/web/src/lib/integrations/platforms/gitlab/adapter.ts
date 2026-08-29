@@ -5,6 +5,14 @@
  * Supports both GitLab.com and self-hosted GitLab instances.
  */
 
+import { z } from 'zod';
+import {
+  boundRepositoryResponse,
+  repositoryPageSchema,
+  REPOSITORY_READ_LIMITS,
+  withRepositoryReadDeadline,
+  type RepositoryReadOptions,
+} from '@/lib/integrations/core/repository-read-limits';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { PlatformRepository } from '@/lib/integrations/core/types';
@@ -32,8 +40,16 @@ const MAX_GITLAB_REDIRECTS = 5;
 const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
 const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
 
-async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): Promise<Response> {
-  const response = await fetchGitLabOnce(url, init);
+async function fetchGitLab(
+  url: string,
+  init?: RequestInit,
+  redirectCount = 0,
+  bounded = false
+): Promise<Response> {
+  const rawResponse = await fetchGitLabOnce(url, init, bounded);
+  const response = bounded
+    ? await boundRepositoryResponse(rawResponse, init?.signal ?? undefined)
+    : rawResponse;
   if (!isGitLabRedirect(response.status)) {
     return response;
   }
@@ -51,17 +67,24 @@ async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): 
   return fetchGitLab(
     redirectUrl,
     buildRedirectRequestInit(init, response.status, url, redirectUrl),
-    redirectCount + 1
+    redirectCount + 1,
+    bounded
   );
 }
 
-async function fetchGitLabOnce(url: string, init?: RequestInit): Promise<Response> {
+async function fetchGitLabOnce(
+  url: string,
+  init?: RequestInit,
+  bounded = false
+): Promise<Response> {
+  if (bounded) init?.signal?.throwIfAborted();
   const resolvedUrl = await resolveGitLabUrlSafely(url);
+  if (bounded) init?.signal?.throwIfAborted();
   if (!resolvedUrl.address) {
     return fetch(url, { ...init, redirect: 'manual' });
   }
 
-  return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
+  return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init, bounded);
 }
 
 function isGitLabRedirect(status: number): boolean {
@@ -109,8 +132,10 @@ function buildRedirectRequestInit(
 
 function fetchGitLabBoundToAddress(
   { url, address, family }: GitLabResolvedUrl & { address: string },
-  init?: RequestInit
+  init?: RequestInit,
+  bounded = false
 ): Promise<Response> {
+  const maxBytes = bounded ? REPOSITORY_READ_LIMITS.responseBytes : MAX_GITLAB_RESPONSE_BYTES;
   const request = url.protocol === 'https:' ? https.request : http.request;
   const headers = headersInitToRecord(init?.headers);
   const body = bodyInitToBuffer(init?.body);
@@ -138,7 +163,7 @@ function fetchGitLabBoundToAddress(
         response.on('data', chunk => {
           const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
           responseBytes += buffer.byteLength;
-          if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+          if (responseBytes > maxBytes) {
             const error = new Error('GitLab response exceeded size limit');
             response.destroy(error);
             req.destroy(error);
@@ -286,7 +311,9 @@ export type GitLabProject = {
   marked_for_deletion_at?: string | null;
 };
 
-function isActiveGitLabProject(project: GitLabProject): boolean {
+function isActiveGitLabProject(
+  project: Pick<GitLabProject, 'archived' | 'marked_for_deletion_on' | 'marked_for_deletion_at'>
+): boolean {
   return !project.archived && !project.marked_for_deletion_on && !project.marked_for_deletion_at;
 }
 
@@ -436,57 +463,80 @@ export async function fetchGitLabUser(
  */
 export async function fetchGitLabProjects(
   accessToken: string,
-  instanceUrl: string = DEFAULT_GITLAB_URL
+  instanceUrl: string = DEFAULT_GITLAB_URL,
+  options?: RepositoryReadOptions
 ): Promise<PlatformRepository[]> {
-  const projects: PlatformRepository[] = [];
-  let page = 1;
-  const perPage = 100;
+  return withRepositoryReadDeadline(options, async signal => {
+    const projects: PlatformRepository[] = [];
+    let page = 1;
+    let fetchedPages = 0;
+    const perPage = signal ? REPOSITORY_READ_LIMITS.repositories : 100;
 
-  while (true) {
-    const response = await fetchGitLab(
-      buildGitLabUrl(instanceUrl, '/api/v4/projects', {
-        membership: true,
-        per_page: perPage,
-        page,
-        archived: false,
-      }),
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+    while (!signal || fetchedPages < REPOSITORY_READ_LIMITS.pages) {
+      fetchedPages++;
+      const response = await fetchGitLab(
+        buildGitLabUrl(instanceUrl, '/api/v4/projects', {
+          membership: true,
+          per_page: perPage,
+          page,
+          archived: false,
+        }),
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            ...(signal ? { Accept: 'application/json' } : {}),
+          },
+          ...(signal ? { signal } : {}),
         },
+        0,
+        !!signal
+      );
+      if (!response.ok) {
+        const error = await response.text();
+        logExceptInTest('GitLab projects fetch failed:', { status: response.status, error });
+        throw new Error(`GitLab projects fetch failed: ${response.status}`);
       }
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      logExceptInTest('GitLab projects fetch failed:', { status: response.status, error });
-      throw new Error(`GitLab projects fetch failed: ${response.status}`);
+      const data = signal
+        ? repositoryPageSchema
+            .pipe(
+              z.array(
+                z.object({
+                  id: z.number(),
+                  name: z.string(),
+                  path_with_namespace: z.string(),
+                  visibility: z.enum(['private', 'internal', 'public']),
+                  archived: z.boolean(),
+                  marked_for_deletion_on: z.string().nullish(),
+                  marked_for_deletion_at: z.string().nullish(),
+                })
+              )
+            )
+            .parse(await response.json())
+        : ((await response.json()) as GitLabProject[]);
+      const active = data.filter(isActiveGitLabProject);
+      const selected = signal
+        ? active.slice(0, REPOSITORY_READ_LIMITS.repositories - projects.length)
+        : active;
+      projects.push(
+        ...selected.map(project => ({
+          id: project.id,
+          name: project.name,
+          full_name: project.path_with_namespace,
+          private: project.visibility === 'private',
+        }))
+      );
+      if (signal && projects.length >= REPOSITORY_READ_LIMITS.repositories) break;
+      const nextPage = Number.parseInt(response.headers.get('x-next-page') || '', 10);
+      if (Number.isInteger(nextPage) && nextPage > page) {
+        page = nextPage;
+        continue;
+      }
+      if (data.length < perPage) break;
+      page++;
     }
-
-    const data = (await response.json()) as GitLabProject[];
-
-    projects.push(
-      ...data.filter(isActiveGitLabProject).map(project => ({
-        id: project.id,
-        name: project.name,
-        full_name: project.path_with_namespace,
-        private: project.visibility === 'private',
-      }))
-    );
-
-    const nextPage = Number.parseInt(response.headers.get('x-next-page') || '', 10);
-    if (Number.isInteger(nextPage) && nextPage > page) {
-      page = nextPage;
-      continue;
-    }
-
-    if (data.length < perPage) break;
-    page++;
-  }
-
-  logExceptInTest('GitLab projects fetched', { count: projects.length });
-
-  return projects;
+    logExceptInTest('GitLab projects fetched', { count: projects.length });
+    return projects;
+  });
 }
 
 /**

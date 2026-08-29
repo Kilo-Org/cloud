@@ -2,6 +2,12 @@ import 'server-only';
 
 import { z } from 'zod';
 import {
+  boundedRepositoryFetch,
+  REPOSITORY_READ_LIMITS,
+  withRepositoryReadDeadline,
+  type RepositoryReadOptions,
+} from '@/lib/integrations/core/repository-read-limits';
+import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
@@ -40,43 +46,64 @@ export type BitbucketRepositoryListResult = z.infer<typeof BitbucketRepositoryLi
 
 export async function fetchBitbucketRepositoriesFromTokenService(
   kiloUserId: string,
-  organizationId?: string
+  organizationId?: string,
+  options?: RepositoryReadOptions
 ): Promise<BitbucketRepositoryListResult> {
-  if (!GIT_TOKEN_SERVICE_API_URL) return { status: 'temporarily_unavailable' };
-  const serviceToken = generateInternalServiceToken(kiloUserId, {
-    expiresIn: TOKEN_EXPIRY.fiveMinutes,
-    audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
-    organizationId,
-  });
-
-  let response: Response;
-  try {
-    response = await fetch(`${GIT_TOKEN_SERVICE_API_URL}/internal/bitbucket/repositories`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${serviceToken}`,
-      },
-      signal: AbortSignal.timeout(30_000),
+  return withRepositoryReadDeadline(options, async signal => {
+    if (!GIT_TOKEN_SERVICE_API_URL) return { status: 'temporarily_unavailable' };
+    const serviceToken = generateInternalServiceToken(kiloUserId, {
+      expiresIn: TOKEN_EXPIRY.fiveMinutes,
+      audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+      organizationId,
     });
-  } catch {
-    return { status: 'temporarily_unavailable' };
-  }
-  if (!response.ok) return { status: 'temporarily_unavailable' };
 
-  try {
-    const parsed = BitbucketRepositoryListResultSchema.safeParse(await response.json());
-    return parsed.success ? parsed.data : { status: 'temporarily_unavailable' };
-  } catch {
-    return { status: 'temporarily_unavailable' };
-  }
+    try {
+      const response = await (signal ? boundedRepositoryFetch(signal) : fetch)(
+        `${GIT_TOKEN_SERVICE_API_URL}/internal/bitbucket/repositories`,
+        {
+          method: 'POST',
+          headers: { Accept: 'application/json', Authorization: `Bearer ${serviceToken}` },
+          signal: signal ?? AbortSignal.timeout(30_000),
+        }
+      );
+      if (!response.ok) return { status: 'temporarily_unavailable' };
+      const data: unknown = await response.json();
+      if (
+        signal &&
+        typeof data === 'object' &&
+        data !== null &&
+        'status' in data &&
+        data.status === 'available'
+      ) {
+        const envelope = z
+          .object({
+            status: z.literal('available'),
+            repositories: z.custom<unknown[]>(Array.isArray),
+          })
+          .strict()
+          .parse(data);
+        const repositories: BitbucketRepository[] = [];
+        for (const raw of envelope.repositories) {
+          const repository = BitbucketRepositorySchema.parse(raw);
+          if (repositories.length < REPOSITORY_READ_LIMITS.repositories)
+            repositories.push(repository);
+        }
+        return { status: 'available', repositories };
+      }
+      return BitbucketRepositoryListResultSchema.parse(data);
+    } catch (error) {
+      if (signal) throw error;
+      return { status: 'temporarily_unavailable' };
+    }
+  });
 }
 
 export function fetchBitbucketWorkspaceAccessTokenRepositoriesFromTokenService(
   kiloUserId: string,
-  organizationId: string
+  organizationId: string,
+  options?: RepositoryReadOptions
 ): Promise<BitbucketRepositoryListResult> {
-  return fetchBitbucketRepositoriesFromTokenService(kiloUserId, organizationId);
+  return fetchBitbucketRepositoriesFromTokenService(kiloUserId, organizationId, options);
 }
 
 const BITBUCKET_CODE_REVIEW_RESPONSE_MAX_BYTES = 256_000;

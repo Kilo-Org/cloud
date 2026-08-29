@@ -1,3 +1,11 @@
+import { z } from 'zod';
+import {
+  boundedRepositoryFetch,
+  repositoryPageSchema,
+  REPOSITORY_READ_LIMITS,
+  withRepositoryReadDeadline,
+  type RepositoryReadOptions,
+} from '@/lib/integrations/core/repository-read-limits';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import { exchangeWebFlowCode } from '@octokit/oauth-methods';
@@ -66,7 +74,8 @@ export function verifyGitHubWebhookSignature(
  */
 export async function generateGitHubInstallationToken(
   installationId: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  request?: Octokit['request']
 ): Promise<InstallationToken> {
   const credentials = getGitHubAppCredentials(appType);
 
@@ -78,6 +87,7 @@ export async function generateGitHubInstallationToken(
     appId: credentials.appId,
     privateKey: credentials.privateKey,
     installationId,
+    ...(request ? { request } : {}),
   });
 
   const authResult = await auth({ type: 'installation' });
@@ -136,40 +146,66 @@ type GitHubBranch = {
  */
 export async function fetchGitHubRepositories(
   installationId: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  options?: RepositoryReadOptions
 ): Promise<GitHubRepository[]> {
-  const tokenData = await generateGitHubInstallationToken(installationId, appType);
-  const octokit = new Octokit({ auth: tokenData.token });
+  return withRepositoryReadDeadline(options, async signal => {
+    const request = signal ? { fetch: boundedRepositoryFetch(signal), signal } : undefined;
+    const tokenData = await generateGitHubInstallationToken(
+      installationId,
+      appType,
+      request ? new Octokit({ request }).request : undefined
+    );
+    const octokit = new Octokit({ auth: tokenData.token, ...(request ? { request } : {}) });
+    const repositories: GitHubRepository[] = [];
+    let page = 1;
+    const perPage = signal ? REPOSITORY_READ_LIMITS.repositories : 100;
 
-  // Fetch all repositories accessible by the installation using pagination
-  const repositories: GitHubRepository[] = [];
-  let page = 1;
-  const perPage = 100;
-
-  while (true) {
-    const { data } = await octokit.apps.listReposAccessibleToInstallation({
-      per_page: 100,
-      page,
-    });
-
-    // Filter out archived repositories
-    repositories.push(
-      ...data.repositories
-        .filter(repo => !repo.archived)
-        .map(repo => ({
+    while (!signal || page <= REPOSITORY_READ_LIMITS.pages) {
+      const result = await octokit.apps.listReposAccessibleToInstallation({
+        per_page: perPage,
+        page,
+      });
+      const data = signal
+        ? z
+            .object({
+              repositories: repositoryPageSchema.pipe(
+                z.array(
+                  z.object({
+                    id: z.number(),
+                    name: z.string(),
+                    full_name: z.string(),
+                    private: z.boolean(),
+                    archived: z.boolean(),
+                    created_at: z.string().nullish(),
+                  })
+                )
+              ),
+            })
+            .parse(result.data)
+        : result.data;
+      const active = data.repositories.filter(repo => !repo.archived);
+      const selected = signal
+        ? active.slice(0, REPOSITORY_READ_LIMITS.repositories - repositories.length)
+        : active;
+      repositories.push(
+        ...selected.map(repo => ({
           id: repo.id,
           name: repo.name,
           full_name: repo.full_name,
           private: repo.private,
           created_at: repo.created_at ?? new Date().toISOString(),
         }))
-    );
-
-    if (data.repositories.length < perPage) break;
-    page++;
-  }
-
-  return repositories;
+      );
+      if (
+        data.repositories.length < perPage ||
+        (signal && repositories.length >= REPOSITORY_READ_LIMITS.repositories)
+      )
+        break;
+      page++;
+    }
+    return repositories;
+  });
 }
 
 /**

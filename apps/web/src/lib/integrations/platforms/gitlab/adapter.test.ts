@@ -1,3 +1,7 @@
+jest.mock('@/lib/utils.server', () => ({ logExceptInTest: jest.fn() }));
+jest.mock('@/lib/integrations/oauth/urls', () => ({
+  getPlatformOAuthCallbackUrl: () => 'https://app.example/callback',
+}));
 jest.mock('dns/promises', () => ({
   lookup: jest.fn(),
 }));
@@ -423,6 +427,117 @@ describe('fetchGitLabProjects', () => {
       'https://gitlab.com/api/v4/projects?membership=true&per_page=100&page=2&archived=false',
       expect.anything()
     );
+  });
+});
+
+describe('bounded GitLab projects', () => {
+  beforeEach(() => mockFetch.mockReset());
+  afterEach(() => jest.useRealTimers());
+  const active = createGitLabProjectDiscoveryResponse()[0];
+
+  it.each([false, true])('bounds archived-only pages, self-hosted=%s', async selfHosted => {
+    const json = Array(50).fill({ ...active, archived: true });
+    if (selfHosted) {
+      mockSelfHostedGitLabResponse({ status: 200, json });
+      mockSelfHostedGitLabResponse({ status: 200, json });
+    } else mockFetch.mockImplementation(async () => Response.json(json));
+    await expect(
+      fetchGitLabProjects('token', selfHosted ? 'https://gitlab.example.com' : undefined, {
+        bounded: true,
+      })
+    ).resolves.toEqual([]);
+    expect(selfHosted ? mockHttpsRequest : mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('caps accumulation across next-page jumps', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        Response.json(Array(40).fill(active), { headers: { 'x-next-page': '8' } })
+      )
+      .mockResolvedValueOnce(
+        Response.json(Array(40).fill(active), { headers: { 'x-next-page': '99' } })
+      );
+    const result = await fetchGitLabProjects('token', undefined, { bounded: true });
+    expect(result).toEqual(
+      Array(50).fill({
+        id: 123,
+        name: 'active-project',
+        full_name: 'group/active-project',
+        private: true,
+      })
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    {},
+    [null],
+    Array(51).fill(active),
+    'invalid json',
+    [{ ...active, name: 'x'.repeat(1048577) }],
+  ])('rejects malformed or oversized pages %#', async json => {
+    mockFetch.mockResolvedValue(
+      typeof json === 'string'
+        ? new Response(json, { headers: { 'content-type': 'application/json' } })
+        : Response.json(json)
+    );
+    await expect(fetchGitLabProjects('token', undefined, { bounded: true })).rejects.toThrow();
+  });
+
+  it('rejects self-hosted bytes before the legacy 10 MiB ceiling', async () => {
+    mockSelfHostedGitLabResponse({ status: 200, body: 'x'.repeat(1048577) });
+    await expect(
+      fetchGitLabProjects('token', 'https://gitlab.example.com', { bounded: true })
+    ).rejects.toThrow('GitLab response exceeded size limit');
+  });
+
+  it('keeps DNS binding and strips credentials across a public-to-self-hosted redirect', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: 'https://gitlab.example.com/api/v4/projects' },
+      })
+    );
+    mockSelfHostedGitLabResponse({ status: 200, json: [] });
+    await expect(fetchGitLabProjects('token', undefined, { bounded: true })).resolves.toEqual([]);
+    const options = mockHttpsRequest.mock.calls[0][0];
+    expect(options.headers.authorization).toBeUndefined();
+    const resolved = jest.fn();
+    options.lookup('gitlab.example.com', {}, resolved);
+    expect(resolved).toHaveBeenCalledWith(null, '93.184.216.34', 4);
+  });
+
+  it('rejects unsafe redirect destinations without returning repositories', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: 'https://127.0.0.1/api/v4/projects' },
+      })
+    );
+    await expect(fetchGitLabProjects('token', undefined, { bounded: true })).rejects.toThrow(
+      'host is not allowed'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses one deadline across pages and cancels the pending transport', async () => {
+    jest.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    mockFetch.mockImplementation((_url, init) => {
+      signal = init.signal;
+      return new Promise(resolve =>
+        setTimeout(
+          () => resolve(Response.json(Array(50).fill({ ...active, archived: true }))),
+          20_000
+        )
+      );
+    });
+    const result = fetchGitLabProjects('token', undefined, { bounded: true });
+    const rejection = expect(result).rejects.toThrow('Repository fetch timed out');
+    await jest.advanceTimersByTimeAsync(30_000);
+    await rejection;
+    expect(signal?.aborted).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
 

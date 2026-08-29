@@ -4,6 +4,8 @@ import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { parseTimestamp } from '@/lib/utils';
 
 export type LabeledInstance = InstancePickerInstance & {
+  /** Native row identifier, independent of displayed facts and input order. */
+  testID: string;
   /** Exact branch/start text rendered without further truncation by the picker. */
   displayFacts: string;
   /** Stable connection hash, only when the displayed identity still has a peer. */
@@ -37,7 +39,12 @@ export function dedupeInstanceLabels(
       instance.projectName,
       displayFacts,
     ]);
-    const row: LabeledInstance = { ...instance, displayFacts, dedupSuffix: null };
+    const row: LabeledInstance = {
+      ...instance,
+      testID: `instance-picker-row-${shortConnectionIdHash(instance.connectionId)}`,
+      displayFacts,
+      dedupSuffix: null,
+    };
     const peer = labels.get(labelKey);
     if (peer) {
       peer.dedupSuffix = shortConnectionIdHash(peer.connectionId);

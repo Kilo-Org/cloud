@@ -29,6 +29,61 @@ describe('dedupeInstanceLabels', () => {
     ]);
     expect(result.map(row => row.dedupSuffix)).toEqual([null, null, null]);
     expect(result.map(row => row.connectionId)).toEqual(['a', 'b', 'c']);
+    expect(result.map(row => row.testID)).toEqual([
+      'instance-picker-row-000061',
+      'instance-picker-row-000062',
+      'instance-picker-row-000063',
+    ]);
+  });
+
+  it('keeps identifiers across refreshes, reordered inputs, and changed displayed facts', () => {
+    const input = [
+      instance({ connectionId: 'a', name: 'laptop', projectName: 'kilo' }),
+      instance({ connectionId: 'b', name: 'desktop', projectName: 'cloud' }),
+    ];
+    const identifiers = dedupeInstanceLabels(input).map(row => row.testID);
+    expect(dedupeInstanceLabels(input.map(row => ({ ...row }))).map(row => row.testID)).toEqual(
+      identifiers
+    );
+    const refreshed = dedupeInstanceLabels(
+      input.toReversed().map(row =>
+        instance({
+          connectionId: row.connectionId,
+          name: 'renamed',
+          projectName: 'shared',
+          kind: 'remote',
+          gitBranch: 'feature/identity',
+          startedAt: new Date(2026, 7, 28, 12, 34).toISOString(),
+        })
+      )
+    );
+    expect(refreshed.map(row => row.testID)).toEqual(identifiers.toReversed());
+    expect(refreshed.map(row => row.dedupSuffix)).toEqual(['000062', '000061']);
+  });
+
+  it('keeps identifiers when shortened branches and displayed minutes collide', () => {
+    const first = instance({
+      connectionId: 'a',
+      gitBranch: 'feature/abcdefghijkl-a',
+      startedAt: new Date(2026, 7, 28, 12, 34, 1).toISOString(),
+    });
+    const second = instance({
+      connectionId: 'b',
+      gitBranch: 'feature/abcdefghijkl-b',
+      startedAt: new Date(2026, 7, 28, 12, 34, 59).toISOString(),
+    });
+    const [alone] = dedupeInstanceLabels([first]);
+    const [peer, duplicate] = dedupeInstanceLabels([second, first]);
+    const [aloneAgain] = dedupeInstanceLabels([first]);
+    expect(duplicate?.displayFacts).toBe(peer?.displayFacts);
+    expect([alone?.dedupSuffix, duplicate?.dedupSuffix, aloneAgain?.dedupSuffix]).toEqual([
+      null,
+      '000061',
+      null,
+    ]);
+    expect(alone?.testID).toBe('instance-picker-row-000061');
+    expect(duplicate?.testID).toBe(alone?.testID);
+    expect(aloneAgain?.testID).toBe(alone?.testID);
   });
 
   it('stamps both rows of a single duplicate pair with stable, distinct suffixes', () => {

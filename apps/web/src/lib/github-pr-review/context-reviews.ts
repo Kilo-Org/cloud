@@ -129,17 +129,30 @@ export function contextReviewsAgree(first: Review, second: Review) {
   );
 }
 
-export function resolveContextReviewDecisions(opinionated: Reviews, activity: Reviews): Reviews {
+export function contextReviewEvidenceConflicts(first: Review, second: Review) {
+  // UNKNOWN supplies no contradictory state evidence; keep comparing all other fields.
+  return !contextReviewsAgree(first, {
+    ...second,
+    state: first.state === 'UNKNOWN' || second.state === 'UNKNOWN' ? first.state : second.state,
+  });
+}
+
+export function resolveContextReviewDecisions(
+  opinionated: Reviews,
+  activity: Reviews,
+  conflictingReviewIds?: ReadonlySet<string>
+): Reviews {
   const groups = new Map<string, { opinionated: Review[]; activity: Review[] }>();
   const reviewsById = new Map<string, Review>();
-  const conflicts = new Set<string>();
+  // Collectors retain genuine conflicts separately from normalized UNKNOWN states.
+  const conflicts = new Set(conflictingReviewIds);
   for (const [field, reviews] of [
     ['opinionated', opinionated],
     ['activity', activity],
   ] as const) {
     for (const review of reviews.items) {
       const previous = reviewsById.get(review.id);
-      if (previous && !contextReviewsAgree(previous, review)) conflicts.add(review.id);
+      if (previous && contextReviewEvidenceConflicts(previous, review)) conflicts.add(review.id);
       reviewsById.set(review.id, review);
       const key = reviewerKey(review);
       const group = groups.get(key) ?? { opinionated: [], activity: [] };

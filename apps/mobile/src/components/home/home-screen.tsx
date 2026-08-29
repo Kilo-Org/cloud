@@ -15,6 +15,7 @@ import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { ProductChoices } from '@/components/home/product-choices';
 import { QueryError } from '@/components/query-error';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -54,7 +55,13 @@ export function HomeScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={headerTitle} size="large" showBackButton={false} className="px-[22px]" />
+      <ScreenHeader
+        title={headerTitle}
+        size="large"
+        showBackButton={false}
+        className="px-[22px]"
+        context={<ContextControl />}
+      />
       <TabScreenScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}

@@ -75,6 +75,7 @@ vi.mock('@/components/agents/file-part-cache', () => ({
   cacheFilePart: vi.fn(),
 }));
 vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
   trpcClient: {
     cloudAgentNext: {
       getAttachmentDownloadUrl: { mutate: vi.fn() },
@@ -97,6 +98,8 @@ vi.mock('@/lib/trpc', () => ({
 
 // ── react-native / native bridges ──────────────────────────────────────────
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
+  Pressable: 'Pressable',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   Platform: { OS: 'ios' },
   View: 'View',
@@ -104,7 +107,7 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), canGoBack: () => true, back: vi.fn() }),
 }));
 vi.mock('expo-keep-awake', () => ({
   useKeepAwake: vi.fn(),
@@ -232,7 +235,7 @@ vi.mock('@/components/agents/use-session-detail-rename', () => ({
   useSessionDetailRename: () => ({
     closeModal: vi.fn(),
     isModalOpen: false,
-    isTitleInteractive: false,
+    isTitleInteractive: true,
     modalInitialValue: '',
     openModal: vi.fn(),
     submit: vi.fn(),
@@ -399,9 +402,25 @@ vi.mock('@/components/query-error', () => ({
 vi.mock('@/components/rename-modal', () => ({
   RenameModal: 'RenameModal',
 }));
-vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: 'ScreenHeader',
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
+const globalContext = vi.hoisted(() => ({
+  organizationId: 'global-org',
+  isLoaded: true,
+  error: null,
+  retry: vi.fn(),
+  setOrganizationId: vi.fn(),
+}));
+vi.mock('@/lib/organization-context', () => ({ useOrganization: () => globalContext }));
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: () => ({
+    data: [{ organizationId: 'org-a', organizationName: 'Session organization' }],
+  }),
+}));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/components/ui/accessible-status', () => ({
   AccessibleStatus: 'AccessibleStatus',
 }));
@@ -415,6 +434,8 @@ vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
 vi.mock('@/components/ui/icons', () => ({
+  ChevronLeft: 'ChevronLeft',
+  ChevronDown: 'ChevronDown',
   MessageSquare: 'MessageSquare',
 }));
 
@@ -508,11 +529,15 @@ function queuedMessage(parts: readonly unknown[] = [TEXT_PART]): StoredMessage {
   } as unknown as StoredMessage;
 }
 
-function mount(): TestRenderer.ReactTestRenderer {
+const PERSONAL_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
+
+function mount(
+  displayScope: Parameters<typeof SessionDetailContent>[0]['displayScope'] = PERSONAL_DISPLAY_SCOPE
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
-      createElement(SessionDetailContent, { sessionId: SESSION_ID })
+      createElement(SessionDetailContent, { sessionId: SESSION_ID, displayScope })
     );
   });
   if (!ref.current) {
@@ -598,6 +623,40 @@ describe('shouldRefuseSilentAttachmentDrop', () => {
       expect(shouldRefuseSilentAttachmentDrop(kind, hasAttachments)).toBe(expected);
     }
   );
+});
+
+describe('SessionDetailContent display scope', () => {
+  it.each([
+    { organizationId: null, isResolved: true, label: 'profile.personal' },
+    { organizationId: 'org-a', isResolved: true, label: 'Session organization' },
+    { organizationId: 'missing-org', isResolved: true, label: 'profile.organization' },
+    { organizationId: null, isResolved: false, label: 'profile.selectAccount' },
+  ])('renders a read-only $label and preserves header actions', state => {
+    const renderer = mount({ organizationId: state.organizationId, isResolved: state.isResolved });
+    const label = renderer.root.find(
+      node => node.type === 'View' && node.props.accessibilityRole === 'text'
+    );
+    expect(label.props.accessibilityLabel).toBe(state.label);
+    expect(label.props.accessibilityState).toEqual({ busy: !state.isResolved });
+    const controls = findByType(renderer, 'Pressable');
+    expect(
+      controls.filter(node => node.props.accessibilityHint === 'profile.selectAccount')
+    ).toHaveLength(0);
+    expect(controls.map(node => node.props.accessibilityLabel)).toContain('screenHeader.goBack');
+    expect(controls.map(node => node.props.accessibilityLabel)).toContain(
+      'agentChat.session.renameAccessibility'
+    );
+    if (state.organizationId === 'missing-org') {
+      expect(findByType(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(
+        'organization.boundary.organizationUnavailable'
+      );
+    }
+    expect(globalContext.organizationId).toBe('global-org');
+    expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });
 
 describe('SessionDetailContent cancel/restore', () => {

@@ -26,6 +26,7 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useOrganization } from '@/lib/organization-context';
@@ -280,6 +281,7 @@ export function AgentSessionListScreen() {
         showBackButton={false}
         className="px-[22px]"
         headerRight={headerRight}
+        context={<ContextControl />}
       />
       {hasLiveRows || isSearching ? (
         <SessionListSearchHeader

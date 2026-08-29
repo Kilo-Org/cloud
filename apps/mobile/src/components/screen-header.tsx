@@ -18,6 +18,9 @@ type ScreenHeaderProps = {
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
   size?: 'default' | 'large';
   headerRight?: React.ReactNode;
+  /** Home, Agents, Quick Chat, and session headers supply context below the title.
+   * Other callers keep their existing title-only layout when this slot is absent. */
+  context?: React.ReactNode;
   modal?: boolean;
   showBackButton?: boolean;
   onBack?: () => void;
@@ -39,6 +42,7 @@ export function ScreenHeader({
   eyebrow,
   size = 'default',
   headerRight,
+  context,
   modal,
   showBackButton,
   onBack,
@@ -122,6 +126,7 @@ export function ScreenHeader({
           <View className="min-w-0 flex-1">
             {eyebrow ? <Eyebrow className="mb-0.5">{eyebrow}</Eyebrow> : null}
             {titleNode}
+            {context}
           </View>
         </View>
         {headerRight ? (

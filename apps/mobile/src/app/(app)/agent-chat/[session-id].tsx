@@ -16,6 +16,7 @@ import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal
 import { performCopy } from '@/components/agents/use-message-copy';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -106,6 +107,11 @@ export default function SessionDetailScreen() {
     enabled: routeOrganizationId === undefined && sessionId !== null,
   });
 
+  const displayScope = {
+    organizationId: routeOrganizationId ?? sessionQuery.data?.organization_id ?? null,
+    isResolved: routeOrganizationId !== undefined || sessionQuery.data != null,
+  };
+
   if (sessionId === null) {
     return <InvalidRouteState backTo={'/(app)' as Href} />;
   }
@@ -117,6 +123,7 @@ export default function SessionDetailScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={cachedTitle ?? t('agentChat.session.title')}
+          context={<ContextControl scope={displayScope} />}
           headerRight={
             <SessionContextMetrics
               info={undefined}
@@ -156,7 +163,10 @@ export default function SessionDetailScreen() {
     const copyText = buildTerminalErrorCopyText({ sessionId, title, message });
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('agentChat.session.title')} />
+        <ScreenHeader
+          title={t('agentChat.session.title')}
+          context={<ContextControl scope={displayScope} />}
+        />
         <SessionConnectionIndicator />
         <View className="flex-1 items-center justify-center gap-3 px-6">
           <QueryError
@@ -201,6 +211,7 @@ export default function SessionDetailScreen() {
     >
       <SessionDetailContent
         sessionId={sessionId as KiloSessionId}
+        displayScope={displayScope}
         cachedTitle={cachedTitle}
         openedVia={via === 'push' ? 'push' : 'app'}
         shareId={shareId}

@@ -70,12 +70,11 @@ export async function resolveGitHubTokenForRepo(
         message: `GitHub token lookup failed (${result.reason})`,
       },
     };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.withFields({ error: message }).error('Failed to call git-token-service getTokenForRepo');
+  } catch {
+    logger.error('Failed to call git-token-service getTokenForRepo');
     return {
       success: false,
-      error: { reason: 'rpc_error', message: `git-token-service RPC failed: ${message}` },
+      error: { reason: 'rpc_error', message: 'GitHub credential service is unavailable' },
     };
   }
 }
@@ -112,7 +111,7 @@ type IssueCloudAgentGitHubSessionCapabilityParams = {
 };
 
 type IssueCloudAgentGitHubSessionCapabilityResult =
-  | { success: true; value: ResolvedCloudAgentGitHubCapability | ResolvedCloudAgentGitHubAuth }
+  | { success: true; value: ResolvedCloudAgentGitHubCapability }
   | { success: false; error: ResolveGitHubTokenError };
 
 type CloudAgentGitHubAuthResult =
@@ -201,35 +200,20 @@ export async function resolveCloudAgentGitHubAuthForRepo(
         ...(result.fallbackReason ? { fallbackReason: result.fallbackReason } : {}),
       },
     };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger
-      .withFields({ error: message })
-      .warn('Managed GitHub auth RPC unavailable; using installation authentication fallback');
-    return resolveLegacyInstallationAuthForRepo(env, params);
+  } catch {
+    logger.error('Failed to call git-token-service getCloudAgentAuthForRepo');
+    return {
+      success: false,
+      error: { reason: 'rpc_error', message: 'GitHub credential service is unavailable' },
+    };
   }
-}
-
-function resolveGitHubAuthFallbackForCapability(
-  env: GitTokenServiceEnv,
-  params: IssueCloudAgentGitHubSessionCapabilityParams
-): Promise<IssueCloudAgentGitHubSessionCapabilityResult> {
-  return resolveCloudAgentGitHubAuthForRepo(env, {
-    githubRepo: params.githubRepo,
-    userId: params.userId,
-    ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
-    ...(params.expectedIntegrationId !== undefined
-      ? { expectedIntegrationId: params.expectedIntegrationId }
-      : {}),
-    allowUserAuthorization: params.allowUserAuthorization,
-  });
 }
 
 export async function issueCloudAgentGitHubSessionCapability(
   env: GitTokenServiceEnv,
   params: IssueCloudAgentGitHubSessionCapabilityParams
 ): Promise<IssueCloudAgentGitHubSessionCapabilityResult> {
-  if (!env.GIT_TOKEN_SERVICE) {
+  if (typeof env.GIT_TOKEN_SERVICE?.issueGitHubSessionCapability !== 'function') {
     return {
       success: false,
       error: {
@@ -237,10 +221,6 @@ export async function issueCloudAgentGitHubSessionCapability(
         message: 'git-token-service capability issuance is not configured',
       },
     };
-  }
-  if (typeof env.GIT_TOKEN_SERVICE.issueGitHubSessionCapability !== 'function') {
-    logger.warn('Managed GitHub capability RPC unavailable; using direct authentication fallback');
-    return resolveGitHubAuthFallbackForCapability(env, params);
   }
 
   try {
@@ -276,12 +256,12 @@ export async function issueCloudAgentGitHubSessionCapability(
         ...(result.fallbackReason ? { fallbackReason: result.fallbackReason } : {}),
       },
     };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger
-      .withFields({ error: message })
-      .warn('Managed GitHub capability RPC unavailable; using direct authentication fallback');
-    return resolveGitHubAuthFallbackForCapability(env, params);
+  } catch {
+    logger.error('Failed to call git-token-service issueGitHubSessionCapability');
+    return {
+      success: false,
+      error: { reason: 'rpc_error', message: 'GitHub credential service is unavailable' },
+    };
   }
 }
 

@@ -1748,9 +1748,39 @@ export class SessionService {
           })
         : await resolveCloudAgentGitHubAuthForRepo(env, authParams);
       if (!result.success) {
-        throw ExecutionError.invalidRequest(
-          `GitHub token or active app installation required for this repository (${result.error.reason})`
-        );
+        switch (result.error.reason) {
+          case 'no_installation_found':
+          case 'repository_not_installed': {
+            const message =
+              'GitHub repository authentication failed. Check that the GitHub App is installed and has access to this repository.';
+            throw ExecutionError.workspaceSetupFailed(message, undefined, {
+              subtype: 'git_authentication_failed',
+              safeFailureMessage: message,
+              retryable: false,
+            });
+          }
+          case 'rpc_error':
+          case 'service_not_configured':
+          case 'database_not_configured': {
+            const message = 'GitHub credential service is unavailable. Please try again.';
+            throw ExecutionError.workspaceSetupFailed(message, undefined, {
+              safeFailureMessage: message,
+            });
+          }
+          case 'invalid_repo_format':
+          case 'invalid_org_id':
+          case 'integration_mismatch':
+          case 'capability_configuration_error':
+            throw ExecutionError.invalidRequest(
+              `GitHub repository authorization failed (${result.error.reason})`
+            );
+          default: {
+            const message = 'GitHub credential resolution failed. Please try again.';
+            throw ExecutionError.workspaceSetupFailed(message, undefined, {
+              safeFailureMessage: message,
+            });
+          }
+        }
       }
       githubToken =
         'capability' in result.value ? result.value.capability : result.value.githubToken;

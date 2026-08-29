@@ -1,38 +1,40 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 import { spawn } from 'node:child_process';
-import { logToFile } from './utils.js';
+import { logToFile, withTimeoutAndAbort } from './utils.js';
+
+type LogUploadContext = {
+  workerBaseUrl: string;
+  kiloSessionId: string;
+  workerAuthToken: string;
+};
 
 type LogUploaderOpts = {
-  workerBaseUrl: string;
+  archiveId: string;
+  context: LogUploadContext;
   sessionId: string;
-  /**
-   * Read at upload time rather than captured once at creation: a later session
-   * bind can carry a different kiloSessionId, and the Worker rejects uploads
-   * whose query param disagrees with the ticket's kiloSessionId claim.
-   */
-  getKiloSessionId: () => string;
-  executionId: string;
   userId: string;
-  /**
-   * Reads the current wrapper dispatch ticket at upload time rather than a
-   * value captured once at creation. The uploader is created once per wrapper
-   * process and outlives the ticket's own (shorter) lifetime, which is
-   * refreshed on every subsequent session bind.
-   */
-  getWorkerAuthToken: () => string;
   /** Directory containing CLI log files (e.g. ~/.local/share/kilo/log/) */
   cliLogDir: string;
   wrapperLogPath: string;
 };
 
 export type LogUploader = {
+  readonly archiveId: string;
   start: (intervalMs?: number) => void;
+  updateContext: (context: LogUploadContext) => void;
   uploadNow: () => Promise<void>;
+  finalize: (timeoutMs?: number) => Promise<void>;
   stop: () => void;
 };
 
 const UPLOAD_TIMEOUT_MS = 15_000;
+const FINAL_UPLOAD_TIMEOUT_MS = 5_000;
+
+export function createLogArchiveId(wrapperRunId: string): string {
+  return `${wrapperRunId}--${randomUUID()}`;
+}
 
 type TarStream = {
   stream: ReadableStream<Uint8Array>;
@@ -53,12 +55,9 @@ function createTarStream(paths: Array<string>): TarStream | undefined {
   const { stdout, stderr: stderrStream } = proc;
   if (!stdout || !stderrStream) return undefined;
 
-  let stderr = '';
-  stderrStream.on('data', (chunk: Buffer) => {
-    stderr += chunk.toString();
-  });
+  stderrStream.resume();
   proc.on('close', code => {
-    if (code !== 0) logToFile(`tar exited with code ${code}: ${stderr}`);
+    if (code !== 0) logToFile(`tar exited with code ${code}`);
   });
 
   const stream = new ReadableStream({
@@ -82,7 +81,7 @@ function createTarStream(paths: Array<string>): TarStream | undefined {
       stdout.on('end', close);
       stdout.on('error', error);
       proc.on('error', err => {
-        logToFile(`tar spawn error: ${err.message}`);
+        logToFile('tar spawn error');
         error(err);
       });
     },
@@ -92,67 +91,120 @@ function createTarStream(paths: Array<string>): TarStream | undefined {
 }
 
 export function createLogUploader(opts: LogUploaderOpts): LogUploader {
+  type Upload = { promise: Promise<void>; abort: AbortController };
+
+  const { archiveId, sessionId, userId, cliLogDir, wrapperLogPath } = opts;
+  let context = { ...opts.context };
   let intervalId: ReturnType<typeof setInterval> | undefined;
-  let isUploading = false;
-  let activeAbort: AbortController | undefined;
+  let activeUpload: Upload | undefined;
+  let queuedUpload: Upload | undefined;
+  let finalUpload: Promise<void> | undefined;
+  let stopped = false;
 
-  async function uploadNow(): Promise<void> {
-    if (isUploading) return;
-    isUploading = true;
-    const tar = createTarStream([opts.cliLogDir, opts.wrapperLogPath]);
-    if (!tar) {
-      isUploading = false;
-      return;
-    }
+  function uploadNow(): Promise<void> {
+    if (finalUpload) return finalUpload;
+    if (stopped) return Promise.resolve();
+    if (queuedUpload) return queuedUpload.promise;
 
+    const uploadContext = { ...context };
+    const previousUpload = activeUpload;
     const abort = new AbortController();
-    activeAbort = abort;
-    const timer = setTimeout(() => abort.abort(), UPLOAD_TIMEOUT_MS);
-    try {
-      const url = new URL(
-        `${opts.workerBaseUrl}/sessions/${encodeURIComponent(opts.userId)}/${encodeURIComponent(opts.sessionId)}/logs/${encodeURIComponent(opts.executionId)}/logs.tar.gz`
-      );
-      url.searchParams.set('kiloSessionId', opts.getKiloSessionId());
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${opts.getWorkerAuthToken()}` },
-        body: tar.stream,
-        // @ts-expect-error -- Node/Bun fetch supports duplex for streaming request bodies
-        duplex: 'half',
-        signal: abort.signal,
-      });
-      if (!response.ok) {
-        logToFile(`Log upload failed: ${response.status} ${response.statusText}`);
+    const upload: Upload = { promise: performUpload(), abort };
+    if (previousUpload) queuedUpload = upload;
+    else activeUpload = upload;
+    return upload.promise;
+
+    async function performUpload(): Promise<void> {
+      let tar: TarStream | undefined;
+      try {
+        await withTimeoutAndAbort(
+          (async () => {
+            await previousUpload?.promise;
+            abort.signal.throwIfAborted();
+            if (queuedUpload === upload) queuedUpload = undefined;
+            activeUpload = upload;
+
+            const url = new URL(
+              `${uploadContext.workerBaseUrl}/sessions/${encodeURIComponent(userId)}/${encodeURIComponent(sessionId)}/logs/${encodeURIComponent(archiveId)}/logs.tar.gz`
+            );
+            url.searchParams.set('kiloSessionId', uploadContext.kiloSessionId);
+            tar = createTarStream([cliLogDir, wrapperLogPath]);
+            if (!tar) return;
+
+            const response = await fetch(url, {
+              method: 'PUT',
+              headers: { Authorization: `Bearer ${uploadContext.workerAuthToken}` },
+              body: tar.stream,
+              // @ts-expect-error -- Node/Bun fetch supports duplex for streaming request bodies
+              duplex: 'half',
+              signal: abort.signal,
+            });
+            if (!abort.signal.aborted && !response.ok) {
+              logToFile(`Log upload failed: ${response.status}`);
+            }
+          })(),
+          {
+            timeoutMs: UPLOAD_TIMEOUT_MS,
+            timeoutMessage: 'Log upload timed out',
+            signal: abort.signal,
+            abortMessage: 'Log upload aborted',
+          }
+        );
+      } catch {
+        logToFile('Log upload did not complete');
+      } finally {
+        abort.abort();
+        tar?.kill();
+        if (activeUpload === upload) activeUpload = undefined;
+        if (queuedUpload === upload) queuedUpload = undefined;
       }
-    } catch (error) {
-      if (abort.signal.aborted) {
-        logToFile(`Log upload timed out after ${UPLOAD_TIMEOUT_MS}ms`);
-      } else {
-        logToFile(`Log upload error: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    } finally {
-      clearTimeout(timer);
-      tar.kill();
-      isUploading = false;
-      if (activeAbort === abort) activeAbort = undefined;
+    }
+  }
+
+  function clearUploadInterval(): void {
+    if (intervalId !== undefined) {
+      clearInterval(intervalId);
+      intervalId = undefined;
     }
   }
 
   function start(intervalMs = 30_000): void {
     stop();
+    stopped = false;
+    finalUpload = undefined;
     intervalId = setInterval(() => {
-      uploadNow().catch(() => {});
+      if (!activeUpload && !queuedUpload) void uploadNow();
     }, intervalMs);
   }
 
-  function stop(): void {
-    if (intervalId !== undefined) {
-      clearInterval(intervalId);
-      intervalId = undefined;
-    }
-    activeAbort?.abort();
-    activeAbort = undefined;
+  function finalize(timeoutMs = FINAL_UPLOAD_TIMEOUT_MS): Promise<void> {
+    if (finalUpload) return finalUpload;
+    clearUploadInterval();
+    finalUpload = withTimeoutAndAbort(uploadNow(), {
+      timeoutMs,
+      timeoutMessage: 'Final log upload timed out',
+      abortMessage: 'Final log upload aborted',
+    })
+      .catch(() => logToFile('Final log upload timed out'))
+      .finally(stop);
+    return finalUpload;
   }
 
-  return { start, uploadNow, stop };
+  function stop(): void {
+    stopped = true;
+    clearUploadInterval();
+    activeUpload?.abort.abort();
+    queuedUpload?.abort.abort();
+  }
+
+  return {
+    archiveId,
+    start,
+    updateContext: nextContext => {
+      context = { ...nextContext };
+    },
+    uploadNow,
+    finalize,
+    stop,
+  };
 }

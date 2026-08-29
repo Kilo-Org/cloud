@@ -166,21 +166,40 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current).repository).not.toHaveProperty('githubIntegrationId');
   });
 
-  it('parses and serializes clone source metadata', () => {
-    const current = {
-      metadataSchemaVersion: 2 as const,
-      identity: { sessionId: 'agent_clone', userId: 'user_clone' },
-      auth: {},
-      clone: {
-        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
-      },
-      lifecycle: { version: 1, timestamp: 1 },
-    };
+  it.each([undefined, '2026-08-29T10:00:00.000Z'])(
+    'round-trips clone metadata without inventing a reporting creation time (%s)',
+    reportingCreatedAt => {
+      const current = {
+        metadataSchemaVersion: 2 as const,
+        identity: { sessionId: 'agent_clone', userId: 'user_clone' },
+        auth: {},
+        clone: {
+          cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+          ...(reportingCreatedAt ? { reportingCreatedAt } : {}),
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      };
 
-    expect(parseSessionMetadata(current)).toEqual(current);
-    expect(serializeSessionMetadata(current)).toEqual(current);
-    expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
-  });
+      expect(parseSessionMetadata(current)).toEqual(current);
+      expect(serializeSessionMetadata(current)).toEqual(current);
+      expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
+    }
+  );
+
+  it.each(['invalid', '2026-08-29', '2026-02-30T10:00:00.000Z', 1_700_000_000_000, null])(
+    'rejects an invalid clone reporting creation time (%s)',
+    reportingCreatedAt => {
+      expect(() =>
+        parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'agent_clone', userId: 'user_clone' },
+          auth: {},
+          clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', reportingCreatedAt },
+          lifecycle: { version: 1, timestamp: 1 },
+        })
+      ).toThrow('Invalid current session metadata');
+    }
+  );
 
   it('keeps metadata without clone as an empty-session bootstrap', () => {
     const current = {

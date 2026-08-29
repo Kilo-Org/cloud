@@ -166,6 +166,7 @@ export type WrapperBootstrapDeps = {
   git?: GitRunner;
   runProcess?: ProcessRunner;
   restoreSession?: typeof restoreSession;
+  beforeFailureCleanup?: () => Promise<void>;
   workspacePreparationTimeoutMs?: number;
 };
 
@@ -427,7 +428,15 @@ async function removePath(filePath: string, signal?: AbortSignal): Promise<void>
   }
 }
 
-async function cleanupWorkspace(request: WrapperSessionReadyRequest): Promise<void> {
+async function cleanupWorkspace(
+  request: WrapperSessionReadyRequest,
+  beforeFailureCleanup: WrapperBootstrapDeps['beforeFailureCleanup']
+): Promise<void> {
+  try {
+    await beforeFailureCleanup?.();
+  } catch {
+    logToFile('Failed to finalize logs before workspace cleanup');
+  }
   await Promise.allSettled([
     removePath(request.workspace.workspacePath),
     removePath(request.workspace.sessionHome),
@@ -1310,7 +1319,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   } catch (error) {
     if (error instanceof RestoredWorkspaceReconciliationError) {
       if (workspaceNeedsBootstrap) {
-        await cleanupWorkspace(request);
+        await cleanupWorkspace(request, deps.beforeFailureCleanup);
       }
       throw error;
     }
@@ -1322,7 +1331,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'}`
     );
     if (workspaceNeedsBootstrap) {
-      await cleanupWorkspace(request);
+      await cleanupWorkspace(request, deps.beforeFailureCleanup);
       logToFile(`bootstrap workspace cleanup finished kiloSessionId=${request.kiloSessionId}`);
     }
     throw bootstrapError;

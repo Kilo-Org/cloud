@@ -1,7 +1,11 @@
 import 'server-only';
 
 import { z } from 'zod';
-import { GitHubPrReviewIssueSchema, GitHubPrReviewTimestampSchema } from './context-dtos';
+import {
+  GitHubPrReviewIssueSchema,
+  GitHubPrReviewTimestampSchema,
+  type GitHubPrReviewContext,
+} from './context-dtos';
 
 const endpointFragment = /* GraphQL */ `
   fragment ContextIssueEndpoint on Node {
@@ -102,3 +106,114 @@ export const contextIssueEventSchema = z
     target:
       'canonical' in event ? event.canonical : 'subject' in event ? event.subject : event.target,
   }));
+
+type Issue = GitHubPrReviewContext['issues']['items'][number];
+type Collection<T> = Omit<GitHubPrReviewContext['issues'], 'items'> & { items: T[] };
+
+export function resolveContextIssues(
+  prId: string,
+  closing: Collection<z.output<typeof contextIssueSchema>>,
+  history: Collection<z.output<typeof contextIssueEventSchema>>
+): GitHubPrReviewContext['issues'] {
+  const ordered = history.items.every(
+    (event, index) =>
+      event.createdAt !== null &&
+      (index === 0 ||
+        Date.parse(event.createdAt) >= Date.parse(history.items[index - 1]?.createdAt ?? ''))
+  );
+  const historyComplete =
+    history.completeness === 'complete' &&
+    ordered &&
+    history.items.every(event => event.source !== null && event.target !== null);
+  const relationships = new Map<
+    string,
+    {
+      issue: z.output<typeof contextIssueSchema>;
+      relationship: Issue['relationships'][number];
+    }
+  >();
+  for (const issue of closing.items) {
+    relationships.set(`closing:${issue.id}`, {
+      issue,
+      relationship: {
+        category: 'closing',
+        membership: 'current',
+        evidenceId: issue.id,
+        sourceId: prId,
+        targetId: issue.id,
+      },
+    });
+  }
+  for (const event of history.items) {
+    const { source, target, category } = event;
+    if (!source || !target) continue;
+    const issue =
+      source.id === prId && source.__typename === 'PullRequest'
+        ? target
+        : target.id === prId && target.__typename === 'PullRequest'
+          ? source
+          : null;
+    if (issue?.__typename !== 'Issue') continue;
+    const current = historyComplete && category !== 'referenced';
+    const key = current ? JSON.stringify([category, source.id, target.id]) : event.id;
+    if (current && event.removed) relationships.delete(key);
+    else
+      relationships.set(key, {
+        issue,
+        relationship: {
+          category,
+          membership: current ? 'current' : 'historical',
+          evidenceId: event.id,
+          sourceId: source.id,
+          targetId: target.id,
+        },
+      });
+  }
+  const issues = new Map<string, Issue>();
+  for (const { issue, relationship } of relationships.values()) {
+    const known: Issue = issues.get(issue.id) ?? {
+      id: issue.id,
+      number: issue.number,
+      title: issue.title,
+      state: issue.state,
+      url: issue.url,
+      repository: issue.repository.nameWithOwner,
+      relationships: [],
+    };
+    known.url ??= issue.url;
+    known.relationships.push(relationship);
+    issues.set(issue.id, known);
+  }
+  const sources = [closing.source, history.source];
+  const failure = sources.find(source => source.availability !== 'available');
+  const complete = closing.completeness === 'complete' && historyComplete;
+  // Counts cover supported PR-side sources, not every outgoing or inaccessible relationship.
+  return {
+    items: [...issues.values()],
+    knownCount: issues.size,
+    totalCount: complete ? issues.size : null,
+    completeness: complete ? 'complete' : issues.size ? 'partial' : 'unknown',
+    hasNextPage: [closing, history].some(source => source.hasNextPage === true)
+      ? true
+      : [closing, history].every(source => source.hasNextPage === false)
+        ? false
+        : null,
+    endCursor: null,
+    source: {
+      ...closing.source,
+      observedAt: history.source.observedAt ?? closing.source.observedAt,
+      provenance: sources.flatMap(source => source.provenance),
+      availability: complete
+        ? 'available'
+        : issues.size
+          ? 'partial'
+          : failure?.availability === 'denied'
+            ? 'denied'
+            : 'unavailable',
+      retryable:
+        sources.some(source => source.retryable) ||
+        (!ordered && history.source.availability === 'available'),
+      reason: complete ? null : (failure?.reason ?? 'issue-history-incomplete'),
+    },
+  };
+}

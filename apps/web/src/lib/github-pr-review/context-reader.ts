@@ -26,7 +26,18 @@ import {
   resolveContextReviewDecisions,
 } from './context-reviews';
 
-const collectionQueries = { ...PR_CONTEXT_PEOPLE_QUERIES, ...PR_CONTEXT_REVIEW_QUERIES };
+import {
+  PR_CONTEXT_ISSUE_QUERIES,
+  contextIssueSchema,
+  contextIssueEventSchema,
+  resolveContextIssues,
+} from './context-issues';
+
+const collectionQueries = {
+  ...PR_CONTEXT_PEOPLE_QUERIES,
+  ...PR_CONTEXT_REVIEW_QUERIES,
+  ...PR_CONTEXT_ISSUE_QUERIES,
+};
 const deadlineError = new Error('PR context deadline');
 type PrInput = { owner: string; repo: string; number: number };
 export type ContextReadResult<T> = { data: T | null; source: GitHubPrReviewSource };
@@ -443,12 +454,21 @@ export async function readPullRequestContext(
       }
     );
   };
+  async function collectIssues() {
+    const empty = { ...context.issues, items: [] };
+    const [closing, history] = await Promise.all([
+      collect('closingIssuesReferences', contextIssueSchema, empty, (_known, current) => current),
+      collect('timelineItems', contextIssueEventSchema, empty, (_known, current) => current),
+    ]);
+    return resolveContextIssues(context.revision.prNodeId, closing, history);
+  }
   [
     context.labels,
     context.assignees,
     context.reviewRequests,
     context.reviewDecisions,
     context.reviewActivity,
+    context.issues,
   ] = await Promise.all([
     collect('labels', contextLabelSchema, context.labels, (known, current) => ({
       ...current,
@@ -475,6 +495,7 @@ export async function readPullRequestContext(
     ),
     collectReviews('latestOpinionatedReviews', context.reviewDecisions),
     collectReviews('latestReviews', context.reviewActivity),
+    collectIssues(),
   ]);
   // Final null fields can hide contradictions between the two connections.
   for (const review of context.reviewDecisions.items) {

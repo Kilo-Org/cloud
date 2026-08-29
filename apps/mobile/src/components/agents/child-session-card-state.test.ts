@@ -105,6 +105,22 @@ function makeAssistantMessage(parts: Part[], id = 'msg-1'): StoredMessage {
 }
 
 describe('getChildSessionCardState', () => {
+  it.each(['completed', 'running', 'error'] as const)(
+    'keeps a %s task useful without child transcript enrichment',
+    status => {
+      const part = makeTaskPart(status, {
+        subagent_type: 'Researcher',
+        description: 'Review access rules',
+        prompt: 'Read the access configuration before proposing changes.',
+      });
+      expect(getChildSessionCardState(part, [])).toEqual({
+        agentName: 'Researcher',
+        taskName: 'Review access rules',
+        latestActivity: 'Waiting for activity',
+      });
+    }
+  );
+
   it('falls back to Subagent / Task / Waiting for activity for a pending task with empty input', () => {
     const part = makeTaskPart('pending');
     expect(getChildSessionCardState(part, [])).toEqual({

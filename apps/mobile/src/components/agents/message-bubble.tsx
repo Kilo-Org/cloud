@@ -182,7 +182,11 @@ function MessageBubbleImpl({
                   <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
                 ) : null}
                 {fileParts.map(part => (
-                  <FilePartRenderer key={part.id} part={part} />
+                  <FilePartRenderer
+                    key={part.id}
+                    part={part}
+                    onLongPress={onLongPressDetails ? handleLongPress : undefined}
+                  />
                 ))}
               </InMessageBubbleContext.Provider>
             </Bubble>

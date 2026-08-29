@@ -35,6 +35,7 @@ type MessageDetailsSheetProps = {
   isCancelingQueued?: boolean;
   onCancelQueued?: (message: StoredMessage) => void | Promise<void>;
   cancelQueuedFeedback?: { message: string; attempt: number } | null;
+  cancelQueuedGuidance?: string | null;
 };
 
 export function MessageDetailsSheet({
@@ -46,6 +47,7 @@ export function MessageDetailsSheet({
   isCancelingQueued = false,
   onCancelQueued,
   cancelQueuedFeedback,
+  cancelQueuedGuidance,
 }: Readonly<MessageDetailsSheetProps>) {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -133,6 +135,13 @@ export function MessageDetailsSheet({
         tone="error"
         className="px-6 pt-4 text-sm"
       />
+      {/* Keep recovery guidance readable without replaying the outcome announcement. */}
+      {visible &&
+      message &&
+      cancelQueuedGuidance &&
+      cancelQueuedFeedback?.message !== cancelQueuedGuidance ? (
+        <Text className="px-6 pt-4 text-sm text-destructive">{cancelQueuedGuidance}</Text>
+      ) : null}
       {selectVisible ? (
         <MessageTextSelectSheet
           text={content?.copyableText ?? ''}

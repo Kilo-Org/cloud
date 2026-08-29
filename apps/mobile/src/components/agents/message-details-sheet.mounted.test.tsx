@@ -290,6 +290,36 @@ describe('MessageDetailsSheet mounted', () => {
     await unmount(renderer);
   });
 
+  it('keeps upgrade guidance readable on reopening without announcing the outcome again', async () => {
+    const message = storedMessage(userInfo(), [textPart('queued')]);
+    const guidance =
+      'Canceling queued messages requires a newer Kilo CLI. Update Kilo CLI and reconnect.';
+    const renderer = await mountSheet(message, {
+      cancelQueuedGuidance: guidance,
+      cancelQueuedFeedback: { message: guidance, attempt: 1 },
+    });
+    const guidanceNodes = () =>
+      renderer.root.findAll(node => node.type === 'Text' && node.props.children === guidance);
+    expect(guidanceNodes()).toHaveLength(1);
+    expect(native.announce.mock.calls).toEqual([[guidance]]);
+    act(() => {
+      renderer.update(sheetElement(message, { visible: false, cancelQueuedGuidance: guidance }));
+    });
+    expect(guidanceNodes()).toHaveLength(0);
+    act(() => {
+      renderer.update(sheetElement(message, { cancelQueuedGuidance: guidance }));
+    });
+    expect(guidanceNodes()).toHaveLength(1);
+    expect(guidanceNodes()[0]?.props.accessibilityLiveRegion).toBeUndefined();
+    expect(native.announce.mock.calls).toEqual([[guidance]]);
+    expect(findByTestID(renderer.root, 'message-details-cancel-queued')).toHaveLength(0);
+    act(() => {
+      renderer.update(sheetElement(null, { cancelQueuedGuidance: guidance }));
+    });
+    expect(guidanceNodes()).toHaveLength(0);
+    await unmount(renderer);
+  });
+
   it('keeps real Copy and confirmed Report outcomes on the details sheet', async () => {
     const message = storedMessage(assistantInfo(), [textPart('copy this response')]);
     const renderer = await mountSheet(message);

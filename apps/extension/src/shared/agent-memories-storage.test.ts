@@ -1,5 +1,11 @@
+/* eslint-disable jest/no-conditional-in-test -- Storage fixtures route delayed reads; the table runs every origin case. */
 import { describe, expect, it } from 'vitest';
-import { MAX_MEMORY_COUNT, MAX_MEMORY_NOTE_LENGTH, agentMemoryInputSchema } from './agent-memories';
+import {
+  MAX_MEMORY_COUNT,
+  MAX_MEMORY_NOTE_LENGTH,
+  agentMemoryInputSchema,
+  buildPendingMemoryDraft,
+} from './agent-memories';
 import type { AgentMemory, PendingAgentMemoryDraft } from './agent-memories';
 import {
   AGENT_MEMORIES_STORAGE_KEY,
@@ -143,7 +149,10 @@ describe('agent memories storage', () => {
       truncated: true,
     };
     await savePendingAgentMemoryDraft(storage, draft);
-    await expect(loadPendingAgentMemoryDraft(storage)).resolves.toStrictEqual(draft);
+    await expect(loadPendingAgentMemoryDraft(storage)).resolves.toStrictEqual({
+      ...draft,
+      origin: { kind: 'local' },
+    });
 
     const replacement: PendingAgentMemoryDraft = {
       createdAt: 100,
@@ -152,7 +161,10 @@ describe('agent memories storage', () => {
       text: 'replacement',
     };
     await savePendingAgentMemoryDraft(storage, replacement);
-    await expect(loadPendingAgentMemoryDraft(storage)).resolves.toStrictEqual(replacement);
+    await expect(loadPendingAgentMemoryDraft(storage)).resolves.toStrictEqual({
+      ...replacement,
+      origin: { kind: 'local' },
+    });
 
     await clearPendingAgentMemoryDraft(storage);
     await expect(loadPendingAgentMemoryDraft(storage)).resolves.toBeUndefined();
@@ -164,5 +176,113 @@ describe('agent memories storage', () => {
 
     await expect(loadPendingAgentMemoryDraft(storage)).resolves.toBeUndefined();
     expect(storage.values.has(PENDING_AGENT_MEMORY_DRAFT_STORAGE_KEY)).toBe(false);
+  });
+});
+
+const delegatedOrigin = {
+  approvalId: 'approval-1',
+  expiresAt: 1_800_000_000_000,
+  invocationId: 'invocation-1',
+  kind: 'delegated' as const,
+};
+
+describe('invocation-scoped memory drafts', () => {
+  it('retains background selections and their old metadata-free producer form', async () => {
+    const storage = createStorage();
+    const selection = buildPendingMemoryDraft({
+      now: 20,
+      pageTitle: 'Background page',
+      pageUrl: 'https://example.com/background?private=value',
+      selectionText: '  From the context menu  ',
+    });
+    if (!selection) {
+      throw new Error('Expected a selection.');
+    }
+    await savePendingAgentMemoryDraft(storage, selection);
+    const loaded = await loadPendingAgentMemoryDraft(storage);
+    await clearPendingAgentMemoryDraft(storage, delegatedOrigin);
+    expect(loaded).toMatchObject({
+      origin: { kind: 'local' },
+      pageUrl: 'https://example.com/background',
+      text: 'From the context menu',
+    });
+    await expect(loadPendingAgentMemoryDraft(storage)).resolves.toStrictEqual(loaded);
+  });
+
+  it('does not replace a local draft when the delegated write guard fails', async () => {
+    const storage = createStorage();
+    await savePendingAgentMemoryDraft(storage, baseInput);
+    await expect(
+      savePendingAgentMemoryDraft(storage, { ...baseInput, origin: delegatedOrigin }, () => {
+        throw new Error('Invocation ended.');
+      })
+    ).rejects.toThrow('Invocation ended.');
+    await expect(loadPendingAgentMemoryDraft(storage)).resolves.toStrictEqual({
+      ...baseInput,
+      origin: { kind: 'local' },
+    });
+  });
+
+  it('preserves delegated identity through storage and clears only its matching approval', async () => {
+    const storage = createStorage();
+    const draft = { ...baseInput, origin: delegatedOrigin };
+    await savePendingAgentMemoryDraft(storage, draft);
+    const loaded = await loadPendingAgentMemoryDraft(storage);
+    await clearPendingAgentMemoryDraft(storage, { ...delegatedOrigin, approvalId: 'older' });
+    expect(loaded).toStrictEqual(draft);
+    await expect(loadPendingAgentMemoryDraft(storage)).resolves.toStrictEqual(draft);
+    await clearPendingAgentMemoryDraft(storage, delegatedOrigin);
+    await expect(loadPendingAgentMemoryDraft(storage)).resolves.toBeUndefined();
+  });
+
+  it('loads old local records without requiring invocation authority', async () => {
+    const storage = createStorage();
+    storage.values.set(PENDING_AGENT_MEMORY_DRAFT_STORAGE_KEY, baseInput);
+    await expect(loadPendingAgentMemoryDraft(storage)).resolves.toStrictEqual({
+      ...baseInput,
+      origin: { kind: 'local' },
+    });
+  });
+
+  it.each([
+    { kind: 'delegated' },
+    { ...delegatedOrigin, invocationId: '' },
+    { ...delegatedOrigin, approvalId: '' },
+    { ...delegatedOrigin, expiresAt: 'tomorrow' },
+    { ...delegatedOrigin, kind: 'unknown' },
+  ])('rejects malformed origin instead of treating it as local: %j', async origin => {
+    const storage = createStorage();
+    storage.values.set(PENDING_AGENT_MEMORY_DRAFT_STORAGE_KEY, { ...baseInput, origin });
+    await expect(loadPendingAgentMemoryDraft(storage)).resolves.toBeUndefined();
+    expect(storage.values.has(PENDING_AGENT_MEMORY_DRAFT_STORAGE_KEY)).toBe(false);
+  });
+
+  it.each([
+    { kind: 'local' as const },
+    { ...delegatedOrigin, approvalId: 'approval-2', invocationId: 'invocation-2' },
+    { ...delegatedOrigin, approvalId: 'approval-2' },
+  ])('preserves a replacement during an asynchronous clear: %j', async origin => {
+    const storage = createStorage();
+    const draft = { ...baseInput, origin: delegatedOrigin };
+    await savePendingAgentMemoryDraft(storage, draft);
+    const readStarted = Promise.withResolvers<void>();
+    const read = Promise.withResolvers<unknown>();
+    const getItem = storage.getItem.bind(storage);
+    let delayRead = true;
+    storage.getItem = key => {
+      if (delayRead && key === PENDING_AGENT_MEMORY_DRAFT_STORAGE_KEY) {
+        delayRead = false;
+        readStarted.resolve();
+        return read.promise;
+      }
+      return getItem(key);
+    };
+    const clearing = clearPendingAgentMemoryDraft(storage, delegatedOrigin);
+    await readStarted.promise;
+    const replacement = { ...baseInput, origin, text: 'new selection' };
+    const replacing = savePendingAgentMemoryDraft(storage, replacement);
+    read.resolve(draft);
+    await Promise.all([clearing, replacing]);
+    await expect(loadPendingAgentMemoryDraft(storage)).resolves.toStrictEqual(replacement);
   });
 });

@@ -22,7 +22,32 @@ export interface AgentMemory {
 
 export type AgentMemoryInput = Omit<AgentMemory, 'id'>;
 
+const localApprovalOriginSchema = z.object({ kind: z.literal('local') });
+export const delegatedApprovalOriginSchema = z.object({
+  approvalId: z.string().min(1),
+  expiresAt: z.number().int().nonnegative(),
+  invocationId: z.string().min(1),
+  kind: z.literal('delegated'),
+});
+export const approvalOriginSchema = z
+  .discriminatedUnion('kind', [localApprovalOriginSchema, delegatedApprovalOriginSchema])
+  // Old local draft records, including background selections, have no origin.
+  // Remove this default only after all origin-free producers and stored drafts retire.
+  .default({ kind: 'local' });
+export type ApprovalOrigin = z.infer<typeof approvalOriginSchema>;
+export type DelegatedApprovalOrigin = z.infer<typeof delegatedApprovalOriginSchema>;
+
+export const matchesDelegatedApproval = (
+  origin: ApprovalOrigin,
+  expected: DelegatedApprovalOrigin
+): boolean =>
+  origin.kind === 'delegated' &&
+  origin.invocationId === expected.invocationId &&
+  origin.approvalId === expected.approvalId &&
+  origin.expiresAt === expected.expiresAt;
+
 export interface PendingAgentMemoryDraft {
+  origin?: ApprovalOrigin | undefined;
   text: string;
   note?: string | undefined;
   pageTitle: string;
@@ -56,10 +81,15 @@ export const agentMemoryInputSchema = z
 
 export const storedAgentMemoriesSchema = z.array(z.unknown());
 
+export type NormalizedPendingAgentMemoryDraft = PendingAgentMemoryDraft & {
+  origin: ApprovalOrigin;
+};
+
 export const pendingAgentMemoryDraftSchema = z
   .object({
     createdAt: z.number(),
     note: z.string().max(MAX_MEMORY_NOTE_LENGTH).optional(),
+    origin: approvalOriginSchema,
     pageTitle: z.string(),
     pageUrl: z.string(),
     text: z.string(),
@@ -109,11 +139,13 @@ export const buildPendingMemoryDraft = ({
   pageTitle,
   pageUrl,
   now,
+  origin,
 }: {
   selectionText: string | undefined;
   pageTitle: string;
   pageUrl: string;
   now: number;
+  origin?: ApprovalOrigin | undefined;
 }): PendingAgentMemoryDraft | undefined => {
   const trimmed = (selectionText ?? '').trim();
   if (trimmed.length === 0) {
@@ -128,6 +160,7 @@ export const buildPendingMemoryDraft = ({
     pageTitle,
     pageUrl: pageUrl === '' ? '' : sanitizeTabContextUrl(pageUrl),
     text,
+    ...(origin === undefined ? {} : { origin }),
     ...(truncated ? { truncated: true } : {}),
   };
 };

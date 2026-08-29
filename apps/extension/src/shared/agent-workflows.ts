@@ -1,5 +1,7 @@
 /* eslint-disable max-lines -- Single domain module for workflow types, validation, search, and formatting; splitting would scatter the contract. */
 import { z } from 'zod';
+import { approvalOriginSchema } from './agent-memories';
+import type { ApprovalOrigin } from './agent-memories';
 import { sanitizeTabContextText } from './tab-context-sanitize';
 
 export const MAX_WORKFLOW_COUNT = 100;
@@ -48,6 +50,7 @@ export type AgentWorkflowInput = Omit<
 };
 
 export interface PendingAgentWorkflowDraft {
+  origin?: ApprovalOrigin | undefined;
   workflowId?: string | undefined;
   name: string;
   description: string;
@@ -107,11 +110,16 @@ export const agentWorkflowInputSchema = z
 
 export const storedAgentWorkflowsSchema = z.array(z.unknown());
 
+export type NormalizedPendingAgentWorkflowDraft = PendingAgentWorkflowDraft & {
+  origin: ApprovalOrigin;
+};
+
 export const pendingAgentWorkflowDraftSchema = z
   .object({
     createdAt: z.number(),
     description: z.string().max(MAX_WORKFLOW_DESCRIPTION_LENGTH),
     name: z.string().max(MAX_WORKFLOW_NAME_LENGTH),
+    origin: approvalOriginSchema,
     params: workflowParamsSchema.optional(),
     pathPrefix: z.string().nullable().optional(),
     scopeOrigin: z.string(),

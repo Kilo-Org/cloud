@@ -1,4 +1,8 @@
 import type { z } from 'zod';
+import type { ExecutionGuard } from './agent-tool-results';
+import { matchesDelegatedApproval } from './agent-memories';
+import type { DelegatedApprovalOrigin } from './agent-memories';
+import { withPendingDraftStorageLock } from './agent-memories-storage';
 import {
   DEFAULT_WORKFLOW_SETTINGS,
   MAX_WORKFLOW_COUNT,
@@ -12,6 +16,7 @@ import type {
   AgentWorkflow,
   AgentWorkflowInput,
   AgentWorkflowSettings,
+  NormalizedPendingAgentWorkflowDraft,
   PendingAgentWorkflowDraft,
 } from './agent-workflows';
 
@@ -55,11 +60,13 @@ const toAgentWorkflow = (value: z.infer<typeof agentWorkflowSchema>): AgentWorkf
 
 const toPendingDraft = (
   value: z.infer<typeof pendingAgentWorkflowDraftSchema>
-): PendingAgentWorkflowDraft => {
-  const draft: PendingAgentWorkflowDraft = {
+): NormalizedPendingAgentWorkflowDraft => {
+  const draft: NormalizedPendingAgentWorkflowDraft = {
     createdAt: value.createdAt,
     description: value.description,
     name: value.name,
+    // Old local draft records lack origin; the schema normalizes them until those records retire.
+    origin: value.origin,
     scopeOrigin: value.scopeOrigin,
     script: value.script,
   };
@@ -108,7 +115,9 @@ export const saveAgentWorkflows = async (
 
 export const addAgentWorkflow = async (
   storageArea: AgentWorkflowsStorageArea,
-  input: AgentWorkflowInput
+  input: AgentWorkflowInput,
+  // Old local storage callers omit the guard. Remove this optional form after those callers retire.
+  executionGuard?: ExecutionGuard
 ): Promise<AgentWorkflow> => {
   const parsedInput = agentWorkflowInputSchema.parse(input);
   const workflows = await loadAgentWorkflows(storageArea);
@@ -135,14 +144,18 @@ export const addAgentWorkflow = async (
   };
 
   const workflow = toAgentWorkflow(agentWorkflowSchema.parse(candidate));
+  executionGuard?.();
   await saveAgentWorkflows(storageArea, [...workflows, workflow]);
   return workflow;
 };
 
+// eslint-disable-next-line max-params -- The optional guard preserves the existing update API.
 export const updateAgentWorkflow = async (
   storageArea: AgentWorkflowsStorageArea,
   id: string,
-  updates: Partial<AgentWorkflowInput>
+  updates: Partial<AgentWorkflowInput>,
+  // Old local storage callers omit the guard. Remove this optional form after those callers retire.
+  executionGuard?: ExecutionGuard
 ): Promise<AgentWorkflow> => {
   const workflows = await loadAgentWorkflows(storageArea);
   const existing = workflows.find(workflow => workflow.id === id);
@@ -181,6 +194,7 @@ export const updateAgentWorkflow = async (
 
   const validated = toAgentWorkflow(agentWorkflowSchema.parse(updated));
   const replaced = workflows.map(workflow => (workflow.id === id ? validated : workflow));
+  executionGuard?.();
   await saveAgentWorkflows(storageArea, replaced);
   return validated;
 };
@@ -196,36 +210,53 @@ export const deleteAgentWorkflow = async (
   );
 };
 
-export const savePendingWorkflowDraft = async (
+export const savePendingWorkflowDraft = (
   storageArea: AgentWorkflowsStorageArea,
-  draft: PendingAgentWorkflowDraft
-): Promise<void> => {
-  const parsed = toPendingDraft(pendingAgentWorkflowDraftSchema.parse(draft));
-  await storageArea.setItem(PENDING_WORKFLOW_SAVE_STORAGE_KEY, parsed);
-};
+  draft: PendingAgentWorkflowDraft,
+  // Old local storage callers omit the guard. Remove this optional form after those callers retire.
+  executionGuard?: ExecutionGuard
+): Promise<void> =>
+  withPendingDraftStorageLock(PENDING_WORKFLOW_SAVE_STORAGE_KEY, async () => {
+    const parsed = toPendingDraft(pendingAgentWorkflowDraftSchema.parse(draft));
+    executionGuard?.();
+    await storageArea.setItem(PENDING_WORKFLOW_SAVE_STORAGE_KEY, parsed);
+  });
 
-export const loadPendingWorkflowDraft = async (
+export const loadPendingWorkflowDraft = (
   storageArea: AgentWorkflowsStorageArea
-): Promise<PendingAgentWorkflowDraft | undefined> => {
-  const value = await storageArea.getItem(PENDING_WORKFLOW_SAVE_STORAGE_KEY);
-  if (value === null || value === undefined) {
-    return undefined;
-  }
+): Promise<NormalizedPendingAgentWorkflowDraft | undefined> =>
+  withPendingDraftStorageLock(PENDING_WORKFLOW_SAVE_STORAGE_KEY, async () => {
+    const value = await storageArea.getItem(PENDING_WORKFLOW_SAVE_STORAGE_KEY);
+    if (value === null || value === undefined) {
+      return;
+    }
 
-  const parsed = pendingAgentWorkflowDraftSchema.safeParse(value);
-  if (!parsed.success) {
+    const parsed = pendingAgentWorkflowDraftSchema.safeParse(value);
+    if (!parsed.success) {
+      await storageArea.removeItem(PENDING_WORKFLOW_SAVE_STORAGE_KEY);
+      return;
+    }
+
+    return toPendingDraft(parsed.data);
+  });
+
+export const clearPendingWorkflowDraft = (
+  storageArea: AgentWorkflowsStorageArea,
+  expected?: DelegatedApprovalOrigin
+): Promise<void> =>
+  withPendingDraftStorageLock(PENDING_WORKFLOW_SAVE_STORAGE_KEY, async () => {
+    if (expected !== undefined) {
+      const current = pendingAgentWorkflowDraftSchema.safeParse(
+        await storageArea.getItem(PENDING_WORKFLOW_SAVE_STORAGE_KEY)
+      );
+      if (!current.success || !matchesDelegatedApproval(current.data.origin, expected)) {
+        return;
+      }
+    }
+    // Old local callers clear the sole draft without an invocation comparison.
+    // Remove that call form only after all old local draft producers retire.
     await storageArea.removeItem(PENDING_WORKFLOW_SAVE_STORAGE_KEY);
-    return undefined;
-  }
-
-  return toPendingDraft(parsed.data);
-};
-
-export const clearPendingWorkflowDraft = async (
-  storageArea: AgentWorkflowsStorageArea
-): Promise<void> => {
-  await storageArea.removeItem(PENDING_WORKFLOW_SAVE_STORAGE_KEY);
-};
+  });
 
 export const loadWorkflowSettings = async (
   storageArea: AgentWorkflowsStorageArea

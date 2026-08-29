@@ -1,4 +1,5 @@
 /* eslint-disable max-lines, no-unsafe-type-assertion, require-await, jest/no-hooks, jest/valid-title, promise/avoid-new, vitest/prefer-expect-type-of -- test fixture constraints */
+/* eslint-disable jest/no-conditional-in-test -- The table exhausts both draft kinds and every authority-loss boundary. */
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { getDefaultStore } from 'jotai';
 import type { PendingAgentMemoryDraft } from '@/src/shared/agent-memories';
@@ -132,6 +133,20 @@ describe(applyApprovalDecision, () => {
     // Must still return rejected, not throw.
     expect(outcome).toStrictEqual({ status: 'rejected' });
   });
+
+  it.each(['memory', 'workflow'] as const)(
+    'preserves the legacy local %s cleanup-failure outcome',
+    async kind => {
+      const storage = createStorage({ failRemoveItem: true });
+      const draft = kind === 'memory' ? memoryDraft() : workflowDraft();
+      const savedKey = kind === 'memory' ? 'local:kiloAgentMemories' : 'local:kiloAgentWorkflows';
+      await expect(applyApprovalDecision(storage, kind, draft, true)).resolves.toStrictEqual({
+        reason: 'Storage remove failed.',
+        status: 'failed',
+      });
+      expect(storage.values.get(savedKey)).toHaveLength(1);
+    }
+  );
 
   it('approve saves memory once and returns approved with savedId', async () => {
     const storage = createStorage();
@@ -1118,5 +1133,359 @@ describe(requestApproval, () => {
       status: 'approved',
     });
     await promise;
+  });
+});
+
+const waitForApproval = async () => {
+  await vi.waitFor(() => {
+    expect(getDefaultStore().get(pendingApprovalAtom)).toBeDefined();
+  });
+  const entry = getDefaultStore().get(pendingApprovalAtom);
+  if (!entry) {
+    throw new Error('Expected an approval card.');
+  }
+  return entry;
+};
+
+const liveInvocation = () => ({
+  executionGuard: () => {},
+  expiresAt: Date.now() + 60_000,
+  invocationId: 'delegated-invocation',
+  isLive: () => true,
+});
+
+describe.each(['memory', 'workflow'] as const)('delegated %s approval', kind => {
+  const makeDraft = kind === 'memory' ? memoryDraft : workflowDraft;
+  const pendingKey =
+    kind === 'memory' ? 'local:kiloPendingAgentMemoryDraft' : 'local:kiloPendingWorkflowSave';
+  const savedKey = kind === 'memory' ? 'local:kiloAgentMemories' : 'local:kiloAgentWorkflows';
+
+  beforeEach(clearAtom);
+  afterEach(() => {
+    clearAtom();
+    vi.restoreAllMocks();
+  });
+
+  it('saves once and rejects a replay even before the card settles', async () => {
+    const storage = createStorage();
+    const controller = new AbortController();
+    const approval = requestApproval(
+      storage,
+      kind,
+      makeDraft(),
+      controller.signal,
+      liveInvocation()
+    );
+    const entry = await waitForApproval();
+    const first = await applyApprovalDecision(
+      storage,
+      kind,
+      structuredClone(entry.draft),
+      true,
+      entry
+    );
+    const replay = await applyApprovalDecision(storage, kind, entry.draft, true, entry);
+    entry.settle(first);
+    await expect(approval).resolves.toMatchObject({ status: 'approved' });
+    expect(replay).toStrictEqual({ status: 'aborted' });
+    expect(storage.values.get(savedKey)).toHaveLength(1);
+  });
+
+  it('rejects a reloaded delegated record without current in-memory authority', async () => {
+    const storage = createStorage();
+    const controller = new AbortController();
+    const approval = requestApproval(
+      storage,
+      kind,
+      makeDraft(),
+      controller.signal,
+      liveInvocation()
+    );
+    const entry = await waitForApproval();
+    getDefaultStore().set(pendingApprovalAtom, undefined);
+    const reloaded = structuredClone(entry.draft);
+    const outcome = await applyApprovalDecision(storage, kind, reloaded, true);
+    controller.abort();
+    await approval;
+    expect(outcome).toStrictEqual({ status: 'aborted' });
+    expect(storage.values.has(savedKey)).toBe(false);
+    expect(storage.values.has(pendingKey)).toBe(false);
+  });
+
+  it('rejects a cancelled card click and clears the persisted draft', async () => {
+    const storage = createStorage();
+    const controller = new AbortController();
+    const approval = requestApproval(
+      storage,
+      kind,
+      makeDraft(),
+      controller.signal,
+      liveInvocation()
+    );
+    const entry = await waitForApproval();
+    controller.abort();
+    const outcome = await applyApprovalDecision(storage, kind, entry.draft, true, entry);
+    entry.settle({ autoApproved: false, savedId: 'late', status: 'approved' });
+    await expect(approval).resolves.toStrictEqual({ status: 'aborted' });
+    expect(outcome).toStrictEqual({ status: 'aborted' });
+    expect(storage.values.has(savedKey)).toBe(false);
+    expect(storage.values.has(pendingKey)).toBe(false);
+  });
+
+  it.each(['abort', 'terminal', 'lease'] as const)(
+    'rechecks %s after the saved-store read, before issuing a write',
+    async stop => {
+      const storage = createStorage();
+      const controller = new AbortController();
+      const authority = { active: true, lease: true };
+      const approval = requestApproval(storage, kind, makeDraft(), controller.signal, {
+        ...liveInvocation(),
+        executionGuard: () => {
+          if (!authority.lease) {
+            throw new Error('Lease ended.');
+          }
+        },
+        isLive: () => authority.active,
+      });
+      const entry = await waitForApproval();
+      const read = Promise.withResolvers<unknown>();
+      const reading = Promise.withResolvers<void>();
+      storage.getItem = key => {
+        if (key === savedKey) {
+          reading.resolve();
+          return read.promise;
+        }
+        return storage.values.get(key);
+      };
+      const applying = applyApprovalDecision(storage, kind, entry.draft, true, entry);
+      await reading.promise;
+      if (stop === 'abort') {
+        controller.abort();
+      } else if (stop === 'terminal') {
+        authority.active = false;
+      } else {
+        authority.lease = false;
+      }
+      read.resolve([]);
+      const outcome = await applying;
+      controller.abort();
+      await approval;
+      expect(outcome).toStrictEqual({ status: 'aborted' });
+      expect(storage.values.has(savedKey)).toBe(false);
+    }
+  );
+
+  it('expires an approval before a retained click can save', async () => {
+    const storage = createStorage();
+    const controller = new AbortController();
+    const invocation = liveInvocation();
+    const approval = requestApproval(storage, kind, makeDraft(), controller.signal, invocation);
+    const entry = await waitForApproval();
+    vi.spyOn(Date, 'now').mockReturnValue(invocation.expiresAt);
+    const outcome = await applyApprovalDecision(storage, kind, entry.draft, true, entry);
+    controller.abort();
+    await approval;
+    expect(outcome).toStrictEqual({ status: 'aborted' });
+    expect(storage.values.has(savedKey)).toBe(false);
+    expect(storage.values.has(pendingKey)).toBe(false);
+  });
+
+  it.each(['local', 'delegated'] as const)(
+    'does not clear a newer %s draft when the old invocation aborts',
+    async replacementKind => {
+      const storage = createStorage();
+      const controller = new AbortController();
+      const approval = requestApproval(
+        storage,
+        kind,
+        makeDraft(),
+        controller.signal,
+        liveInvocation()
+      );
+      const entry = await waitForApproval();
+      const replacement =
+        replacementKind === 'local'
+          ? makeDraft({ createdAt: 42 })
+          : { ...entry.draft, origin: { ...entry.draft.origin, approvalId: 'newer' } };
+      storage.values.set(pendingKey, replacement);
+      controller.abort();
+      await approval;
+      await applyApprovalDecision(storage, kind, entry.draft, true, entry);
+      expect(storage.values.get(pendingKey)).toStrictEqual(replacement);
+      expect(storage.values.has(savedKey)).toBe(false);
+    }
+  );
+
+  it('cleans up a draft whose issued persistence finishes after abort', async () => {
+    const storage = createStorage();
+    const controller = new AbortController();
+    const issued = Promise.withResolvers<void>();
+    const written = Promise.withResolvers<void>();
+    const setItem = storage.setItem.bind(storage);
+    storage.setItem = async (key, value) => {
+      await setItem(key, value);
+      if (key === pendingKey) {
+        issued.resolve();
+        await written.promise;
+      }
+    };
+    const approval = requestApproval(
+      storage,
+      kind,
+      makeDraft(),
+      controller.signal,
+      liveInvocation()
+    );
+    await issued.promise;
+    controller.abort();
+    written.resolve();
+    await expect(approval).resolves.toStrictEqual({ status: 'aborted' });
+    expect(storage.values.has(pendingKey)).toBe(false);
+    expect(getDefaultStore().get(pendingApprovalAtom)).toBeUndefined();
+  });
+
+  it('does not claim that Stop undoes an already-issued save', async () => {
+    const storage = createStorage();
+    const controller = new AbortController();
+    const approval = requestApproval(
+      storage,
+      kind,
+      makeDraft(),
+      controller.signal,
+      liveInvocation()
+    );
+    const entry = await waitForApproval();
+    const issued = Promise.withResolvers<void>();
+    const saved = Promise.withResolvers<void>();
+    const setItem = storage.setItem.bind(storage);
+    storage.setItem = async (key, value) => {
+      await setItem(key, value);
+      if (key === savedKey) {
+        issued.resolve();
+        await saved.promise;
+      }
+    };
+    const applying = applyApprovalDecision(storage, kind, entry.draft, true, entry);
+    await issued.promise;
+    controller.abort();
+    await expect(approval).resolves.toStrictEqual({ status: 'aborted' });
+    saved.resolve();
+    await expect(applying).resolves.toMatchObject({ status: 'approved' });
+    expect(storage.values.get(savedKey)).toHaveLength(1);
+  });
+
+  it('keeps a newer atom entry when a retained settlement callback runs', async () => {
+    const storage = createStorage();
+    const controller = new AbortController();
+    const first = requestApproval(storage, kind, makeDraft(), controller.signal, liveInvocation());
+    const oldEntry = await waitForApproval();
+    controller.abort();
+    await first;
+    const second = requestApproval(storage, kind, makeDraft({ createdAt: 2 }), abortSignal());
+    const entry = await waitForApproval();
+    oldEntry.settle({ status: 'rejected' });
+    expect(getDefaultStore().get(pendingApprovalAtom)?.draft.createdAt).toBe(2);
+    const outcome = await applyApprovalDecision(storage, kind, entry.draft, true, entry);
+    entry.settle(outcome);
+    await expect(second).resolves.toMatchObject({ status: 'approved' });
+    expect(storage.values.get(savedKey)).toHaveLength(1);
+  });
+
+  it('does not persist a draft or auto-approve after terminal settings reads', async () => {
+    const storage = createStorage();
+    const controller = new AbortController();
+    const settings = Promise.withResolvers<unknown>();
+    storage.getItem = () => settings.promise;
+    let active = true;
+    const approval = requestApproval(storage, kind, makeDraft(), controller.signal, {
+      ...liveInvocation(),
+      isLive: () => active,
+    });
+    active = false;
+    settings.resolve({ ...autoApproveSettings(), ...autoApproveMemorySettings() });
+    await expect(approval).resolves.toStrictEqual({ status: 'aborted' });
+    expect(storage.values.size).toBe(0);
+    expect(getDefaultStore().get(pendingLockAtom)).toBe(false);
+  });
+
+  it('expires the card and stored draft without requiring another click', async () => {
+    vi.useFakeTimers();
+    const storage = createStorage();
+    const controller = new AbortController();
+    try {
+      const approval = requestApproval(storage, kind, makeDraft(), controller.signal, {
+        ...liveInvocation(),
+        expiresAt: Date.now() + 1000,
+      });
+      await waitForApproval();
+      await vi.advanceTimersByTimeAsync(1000);
+      await expect(approval).resolves.toStrictEqual({ status: 'aborted' });
+      expect(storage.values.has(pendingKey)).toBe(false);
+      expect(getDefaultStore().get(pendingApprovalAtom)).toBeUndefined();
+    } finally {
+      controller.abort();
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports an issued save honestly when draft cleanup fails', async () => {
+    const storage = createStorage({ failRemoveItem: true });
+    const controller = new AbortController();
+    const approval = requestApproval(
+      storage,
+      kind,
+      makeDraft(),
+      controller.signal,
+      liveInvocation()
+    );
+    const entry = await waitForApproval();
+    const outcome = await applyApprovalDecision(storage, kind, entry.draft, true, entry);
+    entry.settle(outcome);
+    await expect(approval).resolves.toMatchObject({ status: 'approved' });
+    expect(storage.values.get(savedKey)).toHaveLength(1);
+    const replay = await applyApprovalDecision(storage, kind, entry.draft, true, entry);
+    expect(replay).toStrictEqual({ status: 'aborted' });
+    expect(storage.values.get(savedKey)).toHaveLength(1);
+  });
+});
+
+describe('delegated workflow update writes', () => {
+  beforeEach(clearAtom);
+  afterEach(clearAtom);
+
+  it('rechecks invocation authority after reading the workflow being replaced', async () => {
+    const storage = createStorage();
+    const existing = { ...workflowDraft({ createdAt: 1 }), id: 'wf-existing', updatedAt: 1 };
+    storage.values.set('local:kiloAgentWorkflows', [existing]);
+    const controller = new AbortController();
+    let active = true;
+    const approval = requestApproval(
+      storage,
+      'workflow',
+      workflowDraft({ name: 'Replacement', workflowId: existing.id }),
+      controller.signal,
+      {
+        ...liveInvocation(),
+        isLive: () => active,
+      }
+    );
+    const entry = await waitForApproval();
+    const reading = Promise.withResolvers<void>();
+    const read = Promise.withResolvers<unknown>();
+    storage.getItem = key => {
+      if (key === 'local:kiloAgentWorkflows') {
+        reading.resolve();
+        return read.promise;
+      }
+      return storage.values.get(key);
+    };
+    const applying = applyApprovalDecision(storage, 'workflow', entry.draft, true, entry);
+    await reading.promise;
+    active = false;
+    read.resolve([existing]);
+    await expect(applying).resolves.toStrictEqual({ status: 'aborted' });
+    controller.abort();
+    await approval;
+    expect(storage.values.get('local:kiloAgentWorkflows')).toStrictEqual([existing]);
   });
 });

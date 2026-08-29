@@ -1,11 +1,19 @@
 /* eslint-disable max-lines -- card states + draft form push past 300, and splitting would scatter related logic */
 import { storage } from '#imports';
-import { useAtom, useSetAtom } from 'jotai';
-import { useEffect, useRef, useState } from 'react';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
-import { MAX_MEMORY_NOTE_LENGTH } from '@/src/shared/agent-memories';
-import type { PendingAgentMemoryDraft } from '@/src/shared/agent-memories';
-import { applyApprovalDecision, pendingApprovalAtom } from './pending-approval';
+import { MAX_MEMORY_NOTE_LENGTH, pendingAgentMemoryDraftSchema } from '@/src/shared/agent-memories';
+import type { NormalizedPendingAgentMemoryDraft } from '@/src/shared/agent-memories';
+import {
+  applyApprovalDecision,
+  approvalDraftKey,
+  discardInactiveApprovalDraft,
+  isApprovalDraftLive,
+  pendingApprovalAtom,
+  settleMatchingApproval,
+} from './pending-approval';
+import { BrowserTaskSupervisionSlot } from './browser-task-supervision-slot';
 import {
   buildDraftSelectionPreview,
   classifySaveError,
@@ -26,8 +34,27 @@ const primaryButtonClass =
   'type-label h-8 rounded-md bg-brand-primary px-3 text-brand-primary-foreground transition hover:bg-brand-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle';
 
 export const PendingMemorySaveCard = (): JSX.Element | null => {
-  const { isLoaded, loadError, memories, pendingDraft, reload } = useAgentMemories();
-  const [approvalEntry, setApprovalEntry] = useAtom(pendingApprovalAtom);
+  const {
+    isLoaded,
+    loadError,
+    memories,
+    pendingDraft: legacyStoredDraft,
+    reload,
+  } = useAgentMemories();
+  // Old memory hooks expose optional origin; normalize until those hook contracts retire.
+  const storedDraft = useMemo(() => {
+    const parsed = pendingAgentMemoryDraftSchema.safeParse(legacyStoredDraft);
+    return parsed.success ? parsed.data : undefined;
+  }, [legacyStoredDraft]);
+  const approvalEntry = useAtomValue(pendingApprovalAtom);
+  const atomStore = useStore();
+  const entryDraft = approvalEntry?.kind === 'memory' ? approvalEntry.draft : undefined;
+  const hasDelegatedDraft =
+    entryDraft?.origin.kind === 'delegated' || storedDraft?.origin.kind === 'delegated';
+  // Old local cards prefer background selections. Keep this order until those producers retire.
+  const candidate = hasDelegatedDraft ? (entryDraft ?? storedDraft) : (storedDraft ?? entryDraft);
+  const pendingDraft =
+    candidate && isApprovalDraftLive('memory', candidate, approvalEntry) ? candidate : undefined;
   const setSettingsOpen = useSetAtom(settingsDialogOpenAtom);
   const [savedConfirmation, setSavedConfirmation] = useState(false);
   const [saveError, setSaveError] = useState<string | undefined>();
@@ -35,34 +62,33 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
   const [isSaving, setIsSaving] = useState(false);
   const [fullOutcome, setFullOutcome] = useState(false);
   const lastDraftKeyRef = useRef<string | null>(null);
+  const currentDraftKeyRef = useRef<string | null>(null);
+  currentDraftKeyRef.current = pendingDraft ? approvalDraftKey(pendingDraft) : null;
+  const savingDraftKeyRef = useRef<string | null>(null);
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
   const focusedDraftKeyRef = useRef<string | null>(null);
-  const settledRef = useRef(false);
 
   useEffect(() => {
-    if (pendingDraft === undefined) {
-      lastDraftKeyRef.current = null;
+    if (candidate && !pendingDraft) {
+      void discardInactiveApprovalDraft(storage, 'memory', candidate);
+    }
+  }, [candidate, pendingDraft]);
+
+  useEffect(() => {
+    const draftKey = pendingDraft ? approvalDraftKey(pendingDraft) : null;
+    if (lastDraftKeyRef.current !== draftKey) {
+      setSaveError(undefined);
+      setNote(pendingDraft?.note ?? '');
+      setFullOutcome(false);
+      setIsSaving(false);
+      savingDraftKeyRef.current = null;
+      if (pendingDraft) {
+        setSavedConfirmation(false);
+      }
+    }
+    if (!pendingDraft) {
       focusedDraftKeyRef.current = null;
-      settledRef.current = false;
-      return;
     }
-
-    const draftKey = `${pendingDraft.createdAt}:${pendingDraft.text}`;
-    if (lastDraftKeyRef.current !== null && lastDraftKeyRef.current !== draftKey) {
-      setSavedConfirmation(false);
-      setSaveError(undefined);
-      setNote(pendingDraft.note ?? '');
-      setFullOutcome(false);
-      settledRef.current = false;
-    } else if (lastDraftKeyRef.current === null) {
-      // Fresh draft while confirmation may still be showing from a prior save.
-      setSavedConfirmation(false);
-      setSaveError(undefined);
-      setNote(pendingDraft.note ?? '');
-      setFullOutcome(false);
-      settledRef.current = false;
-    }
-
     lastDraftKeyRef.current = draftKey;
   }, [pendingDraft]);
 
@@ -85,7 +111,7 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
       return;
     }
 
-    const draftKey = `${pendingDraft.createdAt}:${pendingDraft.text}`;
+    const draftKey = approvalDraftKey(pendingDraft);
     if (focusedDraftKeyRef.current === draftKey) {
       return;
     }
@@ -98,16 +124,20 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
     return null;
   }
 
-  const handleCancel = (): void => {
-    // Settle the atom first if one exists for memory kind.
-    if (approvalEntry !== undefined && approvalEntry.kind === 'memory' && !settledRef.current) {
-      settledRef.current = true;
-      approvalEntry.settle({ status: 'rejected' });
-      setApprovalEntry(undefined);
-    }
-    // ApplyApprovalDecision for reject clears the draft.
-    if (pendingDraft !== undefined) {
-      void applyApprovalDecision(storage, 'memory', pendingDraft, false);
+  const handleCancel = async (): Promise<void> => {
+    if (pendingDraft) {
+      const key = approvalDraftKey(pendingDraft);
+      const outcome = await applyApprovalDecision(
+        storage,
+        'memory',
+        pendingDraft,
+        false,
+        atomStore.get(pendingApprovalAtom)
+      );
+      settleMatchingApproval(atomStore, 'memory', pendingDraft, outcome);
+      if (currentDraftKeyRef.current !== key && currentDraftKeyRef.current !== null) {
+        return;
+      }
     }
     setSavedConfirmation(false);
     setSaveError(undefined);
@@ -124,60 +154,61 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
   };
 
   const handleSave = async (): Promise<void> => {
-    if (pendingDraft === undefined || isSaving) {
+    if (!pendingDraft || savingDraftKeyRef.current !== null) {
       return;
     }
-
+    const key = approvalDraftKey(pendingDraft);
+    savingDraftKeyRef.current = key;
     setIsSaving(true);
     try {
       const trimmedNote = note.trim();
-      const finalDraft: PendingAgentMemoryDraft = {
+      const finalDraft: NormalizedPendingAgentMemoryDraft = {
         ...pendingDraft,
         note: trimmedNote.length > 0 ? trimmedNote : undefined,
       };
-
-      const outcome = await applyApprovalDecision(storage, 'memory', finalDraft, true);
-
+      const outcome = await applyApprovalDecision(
+        storage,
+        'memory',
+        finalDraft,
+        true,
+        atomStore.get(pendingApprovalAtom)
+      );
+      settleMatchingApproval(atomStore, 'memory', finalDraft, outcome);
+      if (currentDraftKeyRef.current !== key && currentDraftKeyRef.current !== null) {
+        return;
+      }
       if (outcome.status === 'approved') {
-        // Settle the atom if one exists.
-        if (approvalEntry !== undefined && approvalEntry.kind === 'memory' && !settledRef.current) {
-          settledRef.current = true;
-          approvalEntry.settle(outcome);
-          setApprovalEntry(undefined);
-        }
         setSaveError(undefined);
         setSavedConfirmation(true);
         setNote('');
         return;
       }
-
       if (outcome.status === 'failed') {
-        // The draft stays in storage, but the tool caller needs the failure.
-        if (approvalEntry !== undefined && approvalEntry.kind === 'memory' && !settledRef.current) {
-          settledRef.current = true;
-          approvalEntry.settle(outcome);
-          setApprovalEntry(undefined);
-        }
-
-        // Only true store-full outcomes set the full view; generic failures stay retryable.
+        // Store-full and retryable failures retain their existing distinct guidance.
         if (outcome.reason === 'Memory store is full.') {
           setFullOutcome(true);
           reload();
           return;
         }
-
         setSaveError(SAVE_ERROR_MESSAGE);
+      } else {
+        reload();
       }
     } catch (error) {
+      if (currentDraftKeyRef.current !== key) {
+        return;
+      }
       if (classifySaveError(error) === 'full') {
         setFullOutcome(true);
         reload();
         return;
       }
-
       setSaveError(SAVE_ERROR_MESSAGE);
     } finally {
-      setIsSaving(false);
+      if (savingDraftKeyRef.current === key) {
+        savingDraftKeyRef.current = null;
+        setIsSaving(false);
+      }
     }
   };
 
@@ -191,6 +222,7 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
       role="dialog"
     >
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface-raised p-3 shadow-lg shadow-black/50">
+        <BrowserTaskSupervisionSlot />
         {view.kind === 'confirmation' ? (
           <div className="flex flex-col gap-3">
             <p className="type-body text-foreground">{CONFIRMATION_MESSAGE}</p>
@@ -280,7 +312,13 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
                 </div>
 
                 <div className="flex justify-end gap-2">
-                  <button className={secondaryButtonClass} onClick={handleCancel} type="button">
+                  <button
+                    className={secondaryButtonClass}
+                    onClick={() => {
+                      void handleCancel();
+                    }}
+                    type="button"
+                  >
                     Cancel
                   </button>
                   <button

@@ -1,16 +1,32 @@
 /* eslint-disable capitalized-comments, id-length, jest/max-expects, jest/no-hooks, jest/no-untyped-mock-factory, max-dependencies, max-lines, sort-keys, vitest/prefer-import-in-mock -- test fixture constraints */
 /* eslint-disable import/first */
+/* eslint-disable jest/no-conditional-in-test, jest/no-conditional-expect -- The table runs both cards with their distinct existing views and controls. */
 // @vitest-environment jsdom
 
 import { createElement } from 'react';
-import { Provider, createStore } from 'jotai';
+import { Provider, createStore, getDefaultStore } from 'jotai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, waitFor, cleanup } from '@testing-library/react';
-import type { AgentWorkflow, PendingAgentWorkflowDraft } from '@/src/shared/agent-workflows';
+import { act, fireEvent, render, waitFor, cleanup, within } from '@testing-library/react';
+import { BrowserTaskSupervisionContext } from './browser-task-supervision-slot';
+import type { ApprovalOutcome, PendingApprovalEntry } from './pending-approval';
+import {
+  DEFAULT_WORKFLOW_SETTINGS,
+  pendingAgentWorkflowDraftSchema,
+} from '@/src/shared/agent-workflows';
+import type {
+  AgentWorkflow,
+  NormalizedPendingAgentWorkflowDraft,
+  PendingAgentWorkflowDraft,
+} from '@/src/shared/agent-workflows';
+import { pendingAgentMemoryDraftSchema } from '@/src/shared/agent-memories';
 import { deriveWorkflowSaveCardState } from './pending-workflow-save-card-state';
 
 vi.mock('#imports', () => ({
-  storage: {},
+  storage: {
+    getItem: () => null,
+    removeItem: () => {},
+    setItem: () => {},
+  },
 }));
 
 vi.mock('@/src/shared/agent-workflows-storage', () => ({
@@ -39,15 +55,17 @@ vi.mock('./use-agent-memories', () => ({
   useAgentMemories: vi.fn(),
 }));
 
+import { storage } from '#imports';
 import {
   addAgentWorkflow,
   loadAgentWorkflows,
   loadPendingWorkflowDraft,
+  loadWorkflowSettings,
 } from '@/src/shared/agent-workflows-storage';
 import type { AgentMemory, PendingAgentMemoryDraft } from '@/src/shared/agent-memories';
 import { addAgentMemory, clearPendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
 import { useAgentMemories } from './use-agent-memories';
-import { pendingApprovalAtom } from './pending-approval';
+import { pendingApprovalAtom, pendingLockAtom, requestApproval } from './pending-approval';
 import { PendingMemorySaveCard } from './pending-memory-save-card';
 import { PendingWorkflowSaveCard } from './pending-workflow-save-card';
 
@@ -58,22 +76,22 @@ const mockAddAgentMemory = vi.mocked(addAgentMemory);
 const mockClearPendingAgentMemoryDraft = vi.mocked(clearPendingAgentMemoryDraft);
 const mockUseAgentMemories = vi.mocked(useAgentMemories);
 
-const draft = (overrides: Partial<PendingAgentWorkflowDraft> = {}): PendingAgentWorkflowDraft => ({
-  createdAt: 1_700_000_000_000,
-  description: 'A test workflow',
-  name: 'Test Workflow',
-  scopeOrigin: 'https://example.com',
-  script: 'return { done: true, result: 1 };',
-  ...overrides,
-});
+const draft = (overrides: Partial<PendingAgentWorkflowDraft> = {}) =>
+  pendingAgentWorkflowDraftSchema.parse({
+    createdAt: 1_700_000_000_000,
+    description: 'A test workflow',
+    name: 'Test Workflow',
+    scopeOrigin: 'https://example.com',
+    script: 'return { done: true, result: 1 };',
+    ...overrides,
+  });
 
-const draftAlt: PendingAgentWorkflowDraft = {
+const draftAlt = draft({
   createdAt: 1_700_000_000_001,
   description: 'Another workflow',
   name: 'Second',
-  scopeOrigin: 'https://example.com',
   script: 'return { done: true, result: 2 };',
-};
+});
 
 const baseInput = {
   isSaving: false,
@@ -150,7 +168,8 @@ describe('workflow save card state', () => {
   });
 });
 
-const updateDraft: PendingAgentWorkflowDraft = {
+const updateDraft: NormalizedPendingAgentWorkflowDraft = {
+  origin: { kind: 'local' },
   createdAt: 1_700_000_000_000,
   description: 'Updated workflow',
   name: 'My Update',
@@ -339,7 +358,8 @@ describe('workflow save card script diff render', () => {
     ...overrides,
   });
 
-  const changedDraft: PendingAgentWorkflowDraft = {
+  const changedDraft: NormalizedPendingAgentWorkflowDraft = {
+    origin: { kind: 'local' },
     createdAt: 1_700_000_000_000,
     description: 'Updated workflow',
     name: 'My Update',
@@ -348,12 +368,13 @@ describe('workflow save card script diff render', () => {
     workflowId: 'wf-1',
   };
 
-  const identicalDraft: PendingAgentWorkflowDraft = {
+  const identicalDraft: NormalizedPendingAgentWorkflowDraft = {
     ...changedDraft,
     script: storedScript,
   };
 
-  const createDraft: PendingAgentWorkflowDraft = {
+  const createDraft: NormalizedPendingAgentWorkflowDraft = {
+    origin: { kind: 'local' },
     createdAt: 1_700_000_000_000,
     description: 'New workflow',
     name: 'New Workflow',
@@ -551,15 +572,14 @@ describe('workflow save card second approval resets settled guard and stale erro
   });
 });
 
-const memoryDraft = (
-  overrides: Partial<PendingAgentMemoryDraft> = {}
-): PendingAgentMemoryDraft => ({
-  createdAt: 1_700_000_000_000,
-  pageTitle: 'Test Page',
-  pageUrl: 'https://example.com/page',
-  text: 'Selected text for memory',
-  ...overrides,
-});
+const memoryDraft = (overrides: Partial<PendingAgentMemoryDraft> = {}) =>
+  pendingAgentMemoryDraftSchema.parse({
+    createdAt: 1_700_000_000_000,
+    pageTitle: 'Test Page',
+    pageUrl: 'https://example.com/page',
+    text: 'Selected text for memory',
+    ...overrides,
+  });
 
 const emptyMemories: AgentMemory[] = [];
 
@@ -598,14 +618,13 @@ describe('workflow save card reject-A then approve-B settles', () => {
     // Click Reject on A.
     fireEvent.click(getByText('Reject'));
 
-    expect(settleA).toHaveBeenCalledWith({ status: 'rejected' });
-    // eslint-disable-next-line vitest/prefer-called-once, vitest/prefer-called-times -- conflicting rules
-    expect(settleA).toHaveBeenCalledTimes(1);
-
-    // Wait for handleCancel's setPendingDraft(undefined) to complete.
+    // Rejection clears storage before settling the matching approval.
     await waitFor(() => {
       expect(queryByText('Approve and save')).toBeNull();
     });
+    expect(settleA).toHaveBeenCalledWith({ status: 'rejected' });
+    // eslint-disable-next-line vitest/prefer-called-once, vitest/prefer-called-times -- conflicting rules
+    expect(settleA).toHaveBeenCalledTimes(1);
 
     // Set atom B after A is fully settled.
     store.set(pendingApprovalAtom, {
@@ -753,7 +772,9 @@ describe('workflow save card persisted draft recovery', () => {
 
   it('renders a new approval card after a persisted missing-original update loaded on reload', async () => {
     // Reload path loads a persisted update whose original workflow is missing.
-    mockLoadPendingWorkflowDraft.mockResolvedValue(updateDraft);
+    mockLoadPendingWorkflowDraft.mockResolvedValue(
+      pendingAgentWorkflowDraftSchema.parse(updateDraft)
+    );
     mockLoadAgentWorkflows.mockResolvedValue([]);
 
     const { getByText, queryByText, rerender } = render(createElement(PendingWorkflowSaveCard), {
@@ -791,7 +812,8 @@ describe('workflow save card persisted draft recovery', () => {
     const oldScript =
       "const greeting = 'hello';\nconst count = 1;\nreturn { done: true, result: count };";
 
-    const persistedUpdate: PendingAgentWorkflowDraft = {
+    const persistedUpdate: NormalizedPendingAgentWorkflowDraft = {
+      origin: { kind: 'local' },
       createdAt: 1_700_000_000_000,
       description: 'Persisted update',
       name: 'Persisted',
@@ -812,7 +834,9 @@ describe('workflow save card persisted draft recovery', () => {
     };
 
     // Reload path loads a persisted update and its old stored script.
-    mockLoadPendingWorkflowDraft.mockResolvedValue(persistedUpdate);
+    mockLoadPendingWorkflowDraft.mockResolvedValue(
+      pendingAgentWorkflowDraftSchema.parse(persistedUpdate)
+    );
     mockLoadAgentWorkflows.mockResolvedValue([stored]);
 
     const { container, getByText, queryByText, rerender } = render(
@@ -962,5 +986,468 @@ describe('memory save card retryable error for generic failure', () => {
     expect(settle).toHaveBeenCalledWith(
       expect.objectContaining({ reason: 'quota exceeded', status: 'failed' })
     );
+  });
+});
+
+describe('background memory draft compatibility', () => {
+  it('shows a newer local selection without losing the unrelated local approval', () => {
+    const store = createStore();
+    const local = memoryDraft({ text: 'Pending local agent selection' });
+    const background = memoryDraft({ createdAt: 2, text: 'New background selection' });
+    store.set(pendingApprovalAtom, { draft: local, kind: 'memory', settle: vi.fn() });
+    const loaded = {
+      isLoaded: true,
+      loadError: false,
+      memories: emptyMemories,
+      pendingDraft: { ...background, origin: undefined },
+      reload: vi.fn(),
+    };
+    mockUseAgentMemories.mockReturnValue(loaded);
+    const view = render(createElement(PendingMemorySaveCard), { wrapper: createWrapper(store) });
+    expect(view.getByText('New background selection')).toBeDefined();
+    mockUseAgentMemories.mockReturnValue({ ...loaded, pendingDraft: undefined });
+    view.rerender(createElement(PendingMemorySaveCard));
+    expect(view.getByText('Pending local agent selection')).toBeDefined();
+  });
+});
+
+const supervision = createElement(
+  'div',
+  null,
+  createElement('span', null, 'CLI owner — Example tab'),
+  createElement('button', { type: 'button' }, 'Stop CLI task')
+);
+const createSupervisedWrapper = (store: ReturnType<typeof createStore>) =>
+  function Wrapper({ children }: { children: React.ReactNode }) {
+    return createElement(
+      Provider,
+      { store },
+      createElement(BrowserTaskSupervisionContext.Provider, { value: supervision }, children)
+    );
+  };
+
+describe.each([
+  { kind: 'memory' as const, Component: PendingMemorySaveCard, saveName: 'Save memory' },
+  { kind: 'workflow' as const, Component: PendingWorkflowSaveCard, saveName: 'Approve and save' },
+])('$kind approval lifetime and supervision', ({ kind, Component, saveName }) => {
+  let store = createStore();
+  let saved: (AgentMemory | AgentWorkflow)[] = [];
+  let saveGate: Promise<void> | null = null;
+  let saveStarted = Promise.withResolvers<void>();
+  const reload = vi.fn();
+
+  const setStoredDraft = (entry?: PendingApprovalEntry): void => {
+    mockUseAgentMemories.mockReturnValue({
+      isLoaded: true,
+      loadError: false,
+      memories: [],
+      pendingDraft: entry?.kind === 'memory' ? entry.draft : undefined,
+      reload,
+    });
+    mockLoadPendingWorkflowDraft.mockResolvedValue(
+      entry?.kind === 'workflow' ? pendingAgentWorkflowDraftSchema.parse(entry.draft) : undefined
+    );
+  };
+  const makeEntry = (approvalId = 'first'): PendingApprovalEntry => {
+    const origin = {
+      kind: 'delegated' as const,
+      approvalId,
+      invocationId: 'invocation',
+      expiresAt: Date.now() + 60_000,
+    };
+    return kind === 'memory'
+      ? {
+          kind,
+          draft: memoryDraft({ origin, note: approvalId }),
+          isLive: () => true,
+          settle: vi.fn(),
+        }
+      : { kind, draft: draft({ origin, name: approvalId }), isLive: () => true, settle: vi.fn() };
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store = createStore();
+    saved = [];
+    saveGate = null;
+    saveStarted = Promise.withResolvers<void>();
+    mockLoadAgentWorkflows.mockResolvedValue([]);
+    setStoredDraft(
+      kind === 'memory'
+        ? { kind, draft: memoryDraft(), settle: vi.fn() }
+        : { kind, draft: draft(), settle: vi.fn() }
+    );
+    mockAddAgentMemory.mockImplementation(async (_storage, input) => {
+      saveStarted.resolve();
+      await saveGate;
+      const record = { ...input, id: 'saved-memory' };
+      saved.push(record);
+      return record;
+    });
+    mockAddAgentWorkflow.mockImplementation(async (_storage, input) => {
+      saveStarted.resolve();
+      await saveGate;
+      const record = { ...input, id: 'saved-workflow', createdAt: 1, updatedAt: 1 };
+      saved.push(record);
+      return record;
+    });
+  });
+
+  it('makes a retained save click inert when cancellation wins before React renders', async () => {
+    let live = true;
+    const result = Promise.withResolvers<ApprovalOutcome>();
+    const entry = { ...makeEntry(), isLive: () => live, settle: result.resolve };
+    setStoredDraft(entry);
+    store.set(pendingApprovalAtom, entry);
+    const view = render(createElement(Component), { wrapper: createWrapper(store) });
+    const button = await view.findByRole('button', { name: saveName });
+    live = false;
+    fireEvent.click(button);
+    await expect(result.promise).resolves.toStrictEqual({ status: 'aborted' });
+    await waitFor(() => {
+      expect(view.queryByRole('dialog')).toBeNull();
+    });
+    expect(saved).toStrictEqual([]);
+  });
+
+  it('clears a loaded delegated card when its atom ends and an empty reload arrives', async () => {
+    const entry = makeEntry();
+    setStoredDraft(entry);
+    store.set(pendingApprovalAtom, entry);
+    const view = render(createElement(Component), { wrapper: createWrapper(store) });
+    await view.findByRole('button', { name: saveName });
+    await act(async () => {
+      store.set(pendingApprovalAtom, undefined);
+      await Promise.resolve();
+    });
+    setStoredDraft(undefined);
+    view.rerender(createElement(Component));
+    await waitFor(() => {
+      expect(view.queryByRole('dialog')).toBeNull();
+    });
+    expect(view.queryByRole('button', { name: saveName })).toBeNull();
+    expect(saved).toStrictEqual([]);
+  });
+
+  it('does not recover delegated authority from a persisted draft on mount', async () => {
+    const entry = makeEntry();
+    setStoredDraft(entry);
+    const read = Promise.withResolvers<Awaited<ReturnType<typeof loadPendingWorkflowDraft>>>();
+    mockLoadPendingWorkflowDraft.mockReturnValue(read.promise);
+    const view = render(createElement(Component), { wrapper: createWrapper(store) });
+    await act(async () => {
+      read.resolve(
+        entry.kind === 'workflow' ? pendingAgentWorkflowDraftSchema.parse(entry.draft) : undefined
+      );
+      await read.promise;
+    });
+    expect(view.queryByRole('dialog')).toBeNull();
+    expect(saved).toStrictEqual([]);
+  });
+
+  it('keeps the newer card after a stale asynchronous draft load', async () => {
+    const oldEntry = makeEntry();
+    const nextEntry = makeEntry('replacement');
+    const read = Promise.withResolvers<Awaited<ReturnType<typeof loadPendingWorkflowDraft>>>();
+    setStoredDraft(undefined);
+    mockLoadPendingWorkflowDraft.mockReturnValue(read.promise);
+    const view = render(createElement(Component), { wrapper: createWrapper(store) });
+    await act(async () => {
+      store.set(pendingApprovalAtom, nextEntry);
+      await Promise.resolve();
+    });
+    await view.findByRole('button', { name: saveName });
+    await act(async () => {
+      read.resolve(
+        oldEntry.kind === 'workflow'
+          ? pendingAgentWorkflowDraftSchema.parse(oldEntry.draft)
+          : undefined
+      );
+      await read.promise;
+      setStoredDraft(oldEntry);
+      view.rerender(createElement(Component));
+    });
+    if (kind === 'memory') {
+      expect(view.getByDisplayValue('replacement')).toBeDefined();
+    } else {
+      expect(view.getByText('replacement')).toBeDefined();
+    }
+    expect(view.getByRole('button', { name: saveName }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('does not clear a newer draft or its atom when an old save completes', async () => {
+    const gate = Promise.withResolvers<void>();
+    saveGate = gate.promise;
+    const oldEntry = makeEntry();
+    const nextEntry = makeEntry('replacement');
+    setStoredDraft(oldEntry);
+    store.set(pendingApprovalAtom, oldEntry);
+    const view = render(createElement(Component), { wrapper: createWrapper(store) });
+    fireEvent.click(await view.findByRole('button', { name: saveName }));
+    await saveStarted.promise;
+    await act(async () => {
+      setStoredDraft(nextEntry);
+      store.set(pendingApprovalAtom, nextEntry);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      gate.resolve();
+      await gate.promise;
+    });
+    await waitFor(() => {
+      expect(saved).toHaveLength(1);
+    });
+    if (kind === 'memory') {
+      expect(view.getByDisplayValue('replacement')).toBeDefined();
+    } else {
+      expect(view.getByText('replacement')).toBeDefined();
+    }
+    expect(store.get(pendingApprovalAtom)?.draft.origin).toStrictEqual(nextEntry.draft.origin);
+    expect(view.getByRole('button', { name: saveName }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it.each(['full', 'retryable'] as const)(
+    'keeps a real delegated %s failure pending until an explicit retry succeeds',
+    async failure => {
+      store = getDefaultStore();
+      store.set(pendingApprovalAtom, undefined);
+      store.set(pendingLockAtom, false);
+      setStoredDraft(undefined);
+      vi.mocked(loadWorkflowSettings).mockResolvedValue(DEFAULT_WORKFLOW_SETTINGS);
+      const error = new Error('quota exceeded');
+      if (failure === 'full') {
+        error.name =
+          kind === 'memory' ? 'AgentMemoryStoreFullError' : 'AgentWorkflowStoreFullError';
+      }
+      if (kind === 'memory') {
+        mockAddAgentMemory.mockRejectedValueOnce(error);
+      } else {
+        mockAddAgentWorkflow.mockRejectedValueOnce(error);
+      }
+      const controller = new AbortController();
+      const approval = requestApproval(
+        storage,
+        kind,
+        kind === 'memory' ? memoryDraft() : draft(),
+        controller.signal,
+        {
+          invocationId: 'retry-invocation',
+          expiresAt: Date.now() + 60_000,
+          isLive: () => true,
+          executionGuard: () => {},
+        }
+      );
+      const view = render(createElement(Component), { wrapper: createSupervisedWrapper(store) });
+      try {
+        const save = await view.findByRole('button', { name: saveName });
+        if (kind === 'memory') {
+          fireEvent.change(view.getByRole('textbox', { name: 'Memory note (optional)' }), {
+            target: { value: 'Keep this edited note' },
+          });
+        }
+        fireEvent.click(save);
+        const messages = {
+          memory: {
+            full: 'Memory is full. Delete memories to save new ones.',
+            retryable: "Couldn't save memory. Try again.",
+          },
+          workflow: { full: 'Workflow store is full.', retryable: 'quota exceeded' },
+        };
+        await view.findByText(messages[kind][failure]);
+        const dialog = within(view.getByRole('dialog'));
+        expect(dialog.getByRole('button', { name: 'Stop CLI task' }).hasAttribute('disabled')).toBe(
+          false
+        );
+        if (kind === 'memory') {
+          expect(view.getByDisplayValue('Keep this edited note')).toBeDefined();
+          if (failure === 'full') {
+            expect(dialog.getByRole('button', { name: 'Manage memories' })).toBeDefined();
+          }
+        }
+        const retry = dialog.getByRole('button', {
+          name: kind === 'memory' && failure === 'retryable' ? 'Retry' : saveName,
+        });
+        expect(retry.hasAttribute('disabled')).toBe(false);
+        expect(store.get(pendingLockAtom)).toBe(true);
+        expect(saved).toStrictEqual([]);
+
+        fireEvent.click(retry);
+        await expect(approval).resolves.toStrictEqual({
+          status: 'approved',
+          autoApproved: false,
+          savedId: kind === 'memory' ? 'saved-memory' : 'saved-workflow',
+        });
+        expect(saved).toHaveLength(1);
+        expect(store.get(pendingApprovalAtom)).toBeUndefined();
+        expect(store.get(pendingLockAtom)).toBe(false);
+        if (kind === 'memory') {
+          expect(saved[0]).toMatchObject({ note: 'Keep this edited note' });
+          await view.findByText('Saved to memory');
+          expect(
+            within(view.getByRole('dialog')).getByRole('button', { name: 'Stop CLI task' })
+          ).toBeDefined();
+          fireEvent.click(view.getByRole('button', { name: 'Done' }));
+        }
+        await waitFor(() => {
+          expect(view.queryByRole('dialog')).toBeNull();
+        });
+      } finally {
+        controller.abort();
+        await approval;
+      }
+    }
+  );
+
+  it.each(['terminal', 'cancelled', 'expired', 'reloaded'] as const)(
+    'keeps a real delegated retry inert after authority becomes %s',
+    async stop => {
+      store = getDefaultStore();
+      store.set(pendingApprovalAtom, undefined);
+      store.set(pendingLockAtom, false);
+      setStoredDraft(undefined);
+      vi.mocked(loadWorkflowSettings).mockResolvedValue(DEFAULT_WORKFLOW_SETTINGS);
+      if (kind === 'memory') {
+        mockAddAgentMemory.mockRejectedValueOnce(new Error('quota exceeded'));
+      } else {
+        mockAddAgentWorkflow.mockRejectedValueOnce(new Error('quota exceeded'));
+      }
+      const controller = new AbortController();
+      const expiresAt = Date.now() + 60_000;
+      let live = true;
+      const approval = requestApproval(
+        storage,
+        kind,
+        kind === 'memory' ? memoryDraft() : draft(),
+        controller.signal,
+        {
+          invocationId: 'ended-retry-invocation',
+          expiresAt,
+          isLive: () => live,
+          executionGuard: () => {},
+        }
+      );
+      const now = vi.spyOn(Date, 'now');
+      const view = render(createElement(Component), { wrapper: createWrapper(store) });
+      try {
+        fireEvent.click(await view.findByRole('button', { name: saveName }));
+        await view.findByText(
+          kind === 'memory' ? "Couldn't save memory. Try again." : 'quota exceeded'
+        );
+        setStoredDraft(store.get(pendingApprovalAtom));
+        const retry = view.getByRole('button', { name: kind === 'memory' ? 'Retry' : saveName });
+        await act(async () => {
+          if (stop === 'terminal') {
+            live = false;
+          } else if (stop === 'cancelled') {
+            controller.abort();
+          } else if (stop === 'expired') {
+            now.mockReturnValue(expiresAt);
+          } else {
+            store.set(pendingApprovalAtom, undefined);
+          }
+          fireEvent.click(retry);
+          await Promise.resolve();
+        });
+        controller.abort();
+        await expect(approval).resolves.toStrictEqual({ status: 'aborted' });
+        await waitFor(() => {
+          expect(view.queryByRole('dialog')).toBeNull();
+        });
+        expect(saved).toStrictEqual([]);
+        expect(store.get(pendingApprovalAtom)).toBeUndefined();
+        expect(store.get(pendingLockAtom)).toBe(false);
+      } finally {
+        now.mockRestore();
+        controller.abort();
+        await approval;
+      }
+    }
+  );
+
+  it('keeps supervision inside editing and saving, then preserves the existing completion view', async () => {
+    const gate = Promise.withResolvers<void>();
+    saveGate = gate.promise;
+    const view = render(createElement(Component), { wrapper: createSupervisedWrapper(store) });
+    const button = await view.findByRole('button', { name: saveName });
+    const dialog = view.getByRole('dialog');
+    expect(within(dialog).getByText('CLI owner — Example tab')).toBeDefined();
+    fireEvent.click(button);
+    await saveStarted.promise;
+    const stop = within(dialog).getByRole('button', { name: 'Stop CLI task' });
+    stop.focus();
+    expect(document.activeElement).toBe(stop);
+    expect(stop.hasAttribute('disabled')).toBe(false);
+    await act(async () => {
+      gate.resolve();
+      await gate.promise;
+    });
+    await waitFor(() => {
+      expect(saved).toHaveLength(1);
+    });
+    setStoredDraft(undefined);
+    view.rerender(createElement(Component));
+    if (kind === 'memory') {
+      await view.findByText('Saved to memory');
+      expect(
+        within(view.getByRole('dialog')).getByRole('button', { name: 'Stop CLI task' })
+      ).toBeDefined();
+      fireEvent.click(view.getByRole('button', { name: 'Done' }));
+    }
+    await waitFor(() => {
+      expect(view.queryByRole('dialog')).toBeNull();
+    });
+  });
+
+  it.each(['full', 'retryable'] as const)(
+    'keeps supervision inside the %s save state',
+    async failure => {
+      const error = new Error('quota exceeded');
+      if (failure === 'full') {
+        error.name =
+          kind === 'memory' ? 'AgentMemoryStoreFullError' : 'AgentWorkflowStoreFullError';
+      }
+      mockAddAgentMemory.mockRejectedValue(error);
+      mockAddAgentWorkflow.mockRejectedValue(error);
+      const view = render(createElement(Component), { wrapper: createSupervisedWrapper(store) });
+      fireEvent.click(await view.findByRole('button', { name: saveName }));
+      const messages = {
+        memory: {
+          full: 'Memory is full. Delete memories to save new ones.',
+          retryable: "Couldn't save memory. Try again.",
+        },
+        workflow: { full: 'Workflow store is full.', retryable: 'quota exceeded' },
+      };
+      await view.findByText(messages[kind][failure]);
+      const stop = within(view.getByRole('dialog')).getByRole('button', { name: 'Stop CLI task' });
+      expect(stop.hasAttribute('disabled')).toBe(false);
+      expect(saved).toStrictEqual([]);
+    }
+  );
+
+  it('keeps supervision and recovery controls inside load errors', async () => {
+    mockLoadPendingWorkflowDraft.mockRejectedValue(new Error('Read failed.'));
+    mockUseAgentMemories.mockReturnValue({
+      isLoaded: true,
+      loadError: true,
+      memories: [],
+      pendingDraft: memoryDraft(),
+      reload,
+    });
+    const view = render(createElement(Component), { wrapper: createSupervisedWrapper(store) });
+    const recovery = kind === 'memory' ? 'Retry' : 'Dismiss';
+    await view.findByRole('button', { name: recovery });
+    expect(
+      within(view.getByRole('dialog')).getByRole('button', { name: 'Stop CLI task' })
+    ).toBeDefined();
+    expect(view.queryByRole('button', { name: saveName })).toBeNull();
+  });
+
+  it('retains local reload approval without a supervision provider', async () => {
+    const view = render(createElement(Component), { wrapper: createWrapper(store) });
+    fireEvent.click(await view.findByRole('button', { name: saveName }));
+    await waitFor(() => {
+      expect(saved).toHaveLength(1);
+    });
+    expect(view.queryByRole('button', { name: 'Stop CLI task' })).toBeNull();
   });
 });

@@ -11,8 +11,19 @@ import { join } from 'node:path';
 import { buildClientSchema, parse, validate } from 'graphql';
 
 import { describe, test, expect } from '@jest/globals';
+import type * as TrpcServer from '@trpc/server';
 
 import { PR_REVIEW_GRAPHQL_DOCUMENTS } from '@/routers/github-pr-review-router';
+
+// Document validation needs router registration, not authentication or database services.
+jest.mock('@/lib/trpc/init', () => {
+  const { initTRPC } = jest.requireActual<typeof TrpcServer>('@trpc/server');
+  const t = initTRPC.create();
+  return { baseProcedure: t.procedure, createTRPCRouter: t.router };
+});
+jest.mock('@/lib/drizzle', () => ({}));
+jest.mock('@kilocode/db/operation-ledger', () => ({}));
+jest.mock('@/lib/integrations/platforms/github/user-token-client', () => ({}));
 
 // `@octokit/graphql-schema` is published as an ESM-only package (`"type":
 // "module"`), which Jest's CJS test runner cannot `import` directly without
@@ -31,8 +42,8 @@ const introspection = JSON.parse(readFileSync(introspectionPath, 'utf8'));
 const githubSchema = buildClientSchema(introspection);
 
 describe('github-pr-review-router GraphQL documents', () => {
-  test('exports exactly 11 documents (sanity guard for the export record)', () => {
-    expect(Object.keys(PR_REVIEW_GRAPHQL_DOCUMENTS)).toHaveLength(11);
+  test('exports exactly 12 documents (sanity guard for the export record)', () => {
+    expect(Object.keys(PR_REVIEW_GRAPHQL_DOCUMENTS)).toHaveLength(12);
   });
 
   test.each(Object.entries(PR_REVIEW_GRAPHQL_DOCUMENTS))(

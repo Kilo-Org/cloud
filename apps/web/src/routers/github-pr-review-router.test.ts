@@ -4,7 +4,16 @@
 import { TRPCError } from '@trpc/server';
 import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
-import { INBOX_SEARCH_QUERY, prLedgerResourceKey } from './github-pr-review-router';
+import {
+  INBOX_SEARCH_QUERY,
+  type githubPrReviewRouter,
+  prLedgerResourceKey,
+} from './github-pr-review-router';
+import type { GitHubPrReviewRevision } from '@/lib/github-pr-review/context-dtos';
+
+// Callers supply the authenticated context; these unused HTTP-auth imports need no test services.
+jest.mock('@/lib/user/server', () => ({}));
+jest.mock('@/lib/admin/admin-access-log', () => ({}));
 
 const getGitHubUserAccessToken = jest.fn();
 
@@ -1056,6 +1065,7 @@ describe('githubPrReviewRouter.listInbox', () => {
           number: 1,
           title: 'Fix the thing',
           author: { login: 'octocat', avatarUrl: 'https://avatars.example/octocat.png' },
+          authorDisplayName: null,
           isDraft: false,
           updatedAt: '2026-01-01T00:00:00Z',
         },
@@ -1247,6 +1257,367 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
       }
     }
   }
+
+  describe('getPullRequestContext isolation', () => {
+    const revision: GitHubPrReviewRevision = {
+      prNodeId: 'PR_1',
+      number: 1,
+      headSha: 'a'.repeat(40),
+      baseRepoFullName: 'octocat/hello',
+      baseRef: 'main',
+      baseSha: 'b'.repeat(40),
+    };
+    const prInput = { owner: 'octocat', repo: 'hello', number: 1 };
+    const contextInput = { ...prInput, expectedRevision: revision };
+    let caller: ReturnType<typeof githubPrReviewRouter.createCaller>;
+
+    function contextPr(identity = revision) {
+      return {
+        ...overviewPrData,
+        number: identity.number,
+        node_id: identity.prNodeId,
+        head: { ...overviewPrData.head, sha: identity.headSha },
+        base: {
+          ref: identity.baseRef,
+          sha: identity.baseSha ?? undefined,
+          repo: identity.baseRepoFullName ? { full_name: identity.baseRepoFullName } : null,
+        },
+        labels: [{ name: 'known', node_id: 'LABEL_1', color: 'ffffff' }],
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-08-28T12:00:00Z',
+        closed_at: null,
+        merged_at: null,
+        merged_by: null,
+        privatePayload: 'provider-only',
+      };
+    }
+    function contextEnvelope(identity = revision) {
+      return {
+        data: {
+          data: {
+            repository: {
+              pullRequest: {
+                id: identity.prNodeId,
+                number: identity.number,
+                headRefOid: identity.headSha,
+                baseRefName: identity.baseRef,
+                baseRefOid: identity.baseSha,
+                baseRepository: identity.baseRepoFullName
+                  ? { nameWithOwner: identity.baseRepoFullName }
+                  : null,
+                privatePayload: 'provider-only',
+              },
+            },
+          },
+        },
+      };
+    }
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.spyOn(console, 'info').mockImplementation(() => undefined);
+      getGitHubUserAccessToken.mockResolvedValue(connected('t1', 'auth_1', 1));
+      caller = createCaller({ user: { id: 'user-1' } as User });
+      const octokit = buildOctokit('t1');
+      octokit.pulls.get.mockResolvedValue({ data: contextPr() });
+      octokit.repos.get.mockResolvedValue({ data: overviewRepoData });
+      octokit.request.mockResolvedValue(contextEnvelope());
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+      jest.restoreAllMocks();
+    });
+
+    it('returns REST context without claiming that unattached readers are empty', async () => {
+      const result = await caller.getPullRequestContext(contextInput);
+      expect(result.revision).toEqual(revision);
+      expect(result.labels).toMatchObject({
+        items: [{ name: 'known' }],
+        completeness: 'unknown',
+        source: { availability: 'partial' },
+      });
+      expect(result.lifecycle).toMatchObject({
+        source: { availability: 'available' },
+        openedAt: '2026-01-01T00:00:00Z',
+        closedAt: null,
+      });
+      for (const collection of [
+        result.reviewDecisions,
+        result.reviewActivity,
+        result.issues,
+        result.requirements,
+        result.checks,
+      ]) {
+        expect(collection).toMatchObject({
+          items: [],
+          completeness: 'unknown',
+          totalCount: null,
+          hasNextPage: null,
+          source: { availability: 'unavailable', reason: 'not-requested' },
+        });
+      }
+      expect(result.queue).toMatchObject({
+        membership: { state: 'unknown', source: { availability: 'unavailable' } },
+        position: { value: null, source: { availability: 'unavailable' } },
+      });
+    });
+
+    it('accepts old PR payloads without inventing missing context or base identity', async () => {
+      buildOctokit('t1').pulls.get.mockResolvedValue({ data: overviewPrData });
+      const result = await caller.getPullRequestContext({
+        ...contextInput,
+        expectedRevision: { ...revision, baseSha: null },
+      });
+      expect(result.revision.baseSha).toBeNull();
+      expect(result.labels).toMatchObject({
+        completeness: 'unknown',
+        source: { availability: 'unavailable', reason: 'not-requested' },
+      });
+      expect(result.lifecycle.openedAt).toBeNull();
+      expect(result.requirements.source).toMatchObject({
+        availability: 'unavailable',
+        retryable: true,
+        reason: 'revision-unavailable',
+      });
+    });
+
+    it('returns core and Files before the ten-second optional deadline', async () => {
+      const started = Promise.withResolvers<void>();
+      const held = Promise.withResolvers<ReturnType<typeof contextEnvelope>>();
+      const octokit = buildOctokit('t1');
+      octokit.request.mockImplementation((_path: string, body: { query: string }) => {
+        if (body.query.includes('PrReviewContextRevision')) {
+          started.resolve();
+          return held.promise;
+        }
+        return Promise.resolve({ data: { data: overviewGraphQlData } });
+      });
+      octokit.pulls.listFiles.mockResolvedValue({ data: [] });
+      let settled = false;
+      const pending = caller.getPullRequestContext(contextInput).then(result => {
+        settled = true;
+        return result;
+      });
+      await started.promise;
+      const core = await caller.getPullRequest(prInput);
+      expect(core).toMatchObject({
+        title: 'Fix the thing',
+        headSha: revision.headSha,
+        counts: { changedFiles: 2 },
+        reviewDecision: 'APPROVED',
+      });
+      await expect(caller.listFiles(prInput)).resolves.toMatchObject({
+        files: [],
+        nextCursor: null,
+      });
+      expect(settled).toBe(false);
+      await jest.advanceTimersByTimeAsync(9999);
+      expect(settled).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      const context = await pending;
+      expect(context.labels.items).toEqual([{ id: 'LABEL_1', name: 'known', color: 'ffffff' }]);
+      expect(context.requirements.source).toMatchObject({
+        availability: 'unavailable',
+        retryable: true,
+        reason: 'deadline',
+      });
+      held.resolve(contextEnvelope());
+    });
+
+    describe.each(['expected', 'initial', 'final'] as const)('%s revision fence', phase => {
+      it.each([
+        { prNodeId: 'PR_other' },
+        { number: 2 },
+        { headSha: 'c'.repeat(40) },
+        { baseRepoFullName: 'other/hello' },
+        { baseRef: 'release' },
+        { baseSha: 'c'.repeat(40) },
+      ])('marks conflicting identity stale: %p', async patch => {
+        const changed = { ...revision, ...patch };
+        const expected = phase === 'expected' ? changed : revision;
+        const initial = phase === 'initial' ? changed : revision;
+        const final = phase === 'final' ? changed : revision;
+        const octokit = buildOctokit('t1');
+        octokit.pulls.get.mockResolvedValue({ data: contextPr(initial) });
+        octokit.request.mockResolvedValue(contextEnvelope(final));
+        const result = await caller.getPullRequestContext({
+          ...contextInput,
+          expectedRevision: expected,
+        });
+        expect(result.revision).toEqual(initial);
+        for (const source of [
+          result.requirements.source,
+          result.checks.source,
+          result.queue.membership.source,
+          result.queue.position.source,
+        ]) {
+          expect(source).toMatchObject({
+            availability: 'stale',
+            retryable: true,
+            reason: 'revision-mismatch',
+          });
+        }
+        expect(result.labels.items[0]?.name).toBe('known');
+        expect(console.info).toHaveBeenCalledWith('github-pr-review.context-revision-mismatch', {
+          expected,
+          initial,
+          final,
+        });
+      });
+    });
+
+    it('rejects a revision for a different requested PR number as stale', async () => {
+      await expect(
+        caller.getPullRequestContext({ ...contextInput, number: 2 })
+      ).resolves.toMatchObject({
+        requirements: { source: { availability: 'stale', reason: 'revision-mismatch' } },
+        queue: { membership: { source: { availability: 'stale' } } },
+      });
+    });
+
+    it.each([null, { headRefOid: revision.headSha }])(
+      'keeps missing final identity unavailable: %p',
+      pullRequest => {
+        buildOctokit('t1').request.mockResolvedValue({
+          data: { data: { repository: { pullRequest } } },
+        });
+        return expect(caller.getPullRequestContext(contextInput)).resolves.toMatchObject({
+          labels: { items: [{ name: 'known' }] },
+          requirements: { source: { availability: 'unavailable', retryable: true } },
+        });
+      }
+    );
+
+    it.each([200, 403, 404, 503])(
+      'does not reconnect on optional 401 with probe status %s',
+      async status => {
+        const octokit = buildOctokit('t1');
+        octokit.request.mockRejectedValue({ status: 401, message: 'provider-only' });
+        if (status !== 200)
+          octokit.pulls.get
+            .mockResolvedValueOnce({ data: contextPr() })
+            .mockRejectedValueOnce({ status });
+        const result = await caller.getPullRequestContext(contextInput);
+        expect(result.labels.items[0]?.name).toBe('known');
+        expect(result.requirements.source).toMatchObject({
+          availability: status === 200 ? 'denied' : 'unavailable',
+          retryable: status !== 200,
+          reason: status === 200 ? 'optional-permission-denied' : 'credential-probe-inconclusive',
+        });
+        expect(getGitHubUserAccessToken.mock.calls).toEqual([['user-1', { op: 'fetch' }]]);
+      }
+    );
+
+    it.each(['initial', 'optional'])(
+      'rotates after confirmed %s credential rejection',
+      async phase => {
+        getGitHubUserAccessToken
+          .mockResolvedValueOnce(connected('t1', 'auth_1', 1))
+          .mockResolvedValueOnce(connected('t2', 'auth_1', 2));
+        const first = buildOctokit('t1');
+        first.pulls.get.mockRejectedValue({ status: 401 });
+        if (phase === 'optional') first.pulls.get.mockResolvedValueOnce({ data: contextPr() });
+        first.request.mockRejectedValue({ status: 401 });
+        const second = buildOctokit('t2');
+        second.pulls.get.mockResolvedValue({
+          data: { ...contextPr(), labels: [{ name: 'rotated' }] },
+        });
+        second.request.mockResolvedValue(contextEnvelope());
+        const result = await caller.getPullRequestContext(contextInput);
+        expect(result.labels.items[0]?.name).toBe('rotated');
+        expect(result.requirements.source.reason).toBe('not-requested');
+        expect(getGitHubUserAccessToken).toHaveBeenNthCalledWith(2, 'user-1', {
+          op: 'rotate',
+          staleAuthorizationId: 'auth_1',
+          staleCredentialVersion: 1,
+        });
+      }
+    );
+
+    it('shares the original deadline through credential rotation', async () => {
+      getGitHubUserAccessToken
+        .mockResolvedValueOnce(connected('t1', 'auth_1', 1))
+        .mockResolvedValueOnce(connected('t2', 'auth_1', 2));
+      buildOctokit('t1').pulls.get.mockImplementation(async () => {
+        await new Promise(resolve => setTimeout(resolve, 6000));
+        throw { status: 401 };
+      });
+      const second = buildOctokit('t2');
+      second.pulls.get.mockResolvedValue({ data: contextPr() });
+      second.request.mockImplementation(async () => {
+        await new Promise(resolve => setTimeout(resolve, 6000));
+        return contextEnvelope();
+      });
+      let settled = false;
+      const pending = caller.getPullRequestContext(contextInput).then(result => {
+        settled = true;
+        return result;
+      });
+      await jest.advanceTimersByTimeAsync(9999);
+      expect(settled).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(settled).toBe(true);
+      await expect(pending).resolves.toMatchObject({
+        labels: { items: [{ name: 'known' }] },
+        requirements: {
+          source: { availability: 'unavailable', retryable: true, reason: 'deadline' },
+        },
+      });
+    });
+
+    it.each(['core', 'mutation', 'context'])(
+      'keeps terminal credential rejection for %s',
+      async operation => {
+        getGitHubUserAccessToken
+          .mockResolvedValueOnce(connected('t1', 'auth_1', 1))
+          .mockResolvedValueOnce(connected('t2', 'auth_1', 2))
+          .mockResolvedValueOnce({ status: 'disconnected', reason: 'revoked' });
+        for (const token of ['t1', 't2']) {
+          const octokit = buildOctokit(token);
+          octokit.pulls.get
+            .mockResolvedValueOnce({ data: contextPr() })
+            .mockRejectedValue({ status: 401 });
+          octokit.repos.get.mockResolvedValue({ data: overviewRepoData });
+          octokit.request.mockRejectedValue({ status: 401 });
+        }
+        const pending =
+          operation === 'core'
+            ? caller.getPullRequest(prInput)
+            : operation === 'mutation'
+              ? caller.resolveThread({ threadId: 'THREAD_1' })
+              : caller.getPullRequestContext(contextInput);
+        await expect(pending).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+          message: 'GitHub connection is no longer valid — reconnect',
+        });
+        expect(getGitHubUserAccessToken).toHaveBeenNthCalledWith(3, 'user-1', {
+          op: 'reportRejected',
+          authorizationId: 'auth_1',
+          credentialVersion: 2,
+        });
+      }
+    );
+
+    it('requires the authenticated user’s GitHub connection', async () => {
+      getGitHubUserAccessToken.mockResolvedValue({
+        status: 'disconnected',
+        reason: 'not_connected',
+      });
+      await expect(caller.getPullRequestContext(contextInput)).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+      });
+    });
+
+    it.each([
+      prInput,
+      { ...contextInput, owner: 'invalid/owner' },
+      { ...contextInput, number: 0 },
+      { ...contextInput, expectedRevision: { ...revision, extra: true } },
+    ])('rejects invalid context input: %p', async input => {
+      await expect(caller.getPullRequestContext(input as never)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+    });
+  });
 
   it('getPullRequest starts repos.get and the GraphQL leg before pulls.get resolves', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));

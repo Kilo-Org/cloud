@@ -38,6 +38,15 @@ import {
   REVIEW_THREADS_PAGE_SIZE,
 } from '@/lib/github-pr-review/dtos';
 import { throwTrpcFromGraphQlErrors, withGitHubUserTokenRetry } from '@/lib/github-pr-review/retry';
+import {
+  GitHubPrReviewContextSchema,
+  GitHubPrReviewRevisionSchema,
+} from '@/lib/github-pr-review/context-dtos';
+import {
+  createContextReadBudget,
+  readPullRequestContext,
+  PR_CONTEXT_REVISION_QUERY,
+} from '@/lib/github-pr-review/context-reader';
 import { getGitHubUserAccessToken } from '@/lib/integrations/platforms/github/user-token-client';
 import {
   AutoMergeMethodSchema,
@@ -78,6 +87,9 @@ const operationKeySchema = z.string().min(1).max(128).optional();
 const prNumberSchema = z.number().int().positive();
 
 const GetPullRequestInput = ownerRepoSchema.extend({ number: prNumberSchema }).strict();
+const GetPullRequestContextInput = GetPullRequestInput.extend({
+  expectedRevision: GitHubPrReviewRevisionSchema,
+}).strict();
 
 const ListChecksInput = ownerRepoSchema.extend({ ref: z.string().min(1).max(255) }).strict();
 
@@ -522,12 +534,13 @@ function normalizeComment(node: GraphQlCommentNode) {
 export const REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST = REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY;
 export const CONVERSATION_COMMENTS_QUERY_FOR_TEST = CONVERSATION_COMMENTS_QUERY;
 
-// All raw PR-Review GraphQL documents defined in this router, collected as a
+// All raw PR-Review GraphQL documents used by this router, collected as a
 // single exported record so the schema-validity test enumerates docs from
 // module exports (newly added docs are auto-covered). Keys are the
 // operation name / mutation tag; values are the unchanged document strings.
 export const PR_REVIEW_GRAPHQL_DOCUMENTS = {
   PULL_REQUEST_FRAGMENT_QUERY,
+  PR_CONTEXT_REVISION_QUERY,
   REVIEW_THREADS_QUERY,
   REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY,
   CONVERSATION_COMMENTS_QUERY,
@@ -1516,6 +1529,22 @@ export const githubPrReviewRouter = createTRPCRouter({
     });
     return overview;
   }),
+
+  // Keep optional reads separate so they cannot delay core data or Files inputs.
+  getPullRequestContext: baseProcedure
+    .input(GetPullRequestContextInput)
+    .output(GitHubPrReviewContextSchema)
+    .query(async ({ ctx, input }) => {
+      const budget = createContextReadBudget();
+      try {
+        return await withGitHubUserTokenRetry({
+          kiloUserId: ctx.user.id,
+          call: octokit => readPullRequestContext(octokit, input, budget),
+        });
+      } finally {
+        budget.close();
+      }
+    }),
 
   listChecks: baseProcedure.input(ListChecksInput).query(async ({ ctx, input }) => {
     return withGitHubUserTokenRetry({

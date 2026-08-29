@@ -1456,7 +1456,7 @@ export const browserProviderOutboundMessageSchema = browserBoundary(
       z.strictObject({
         type: z.literal('provider_quiesced'),
         ...browserJobBindingShape,
-        tabId: browserTabIdSchema,
+        tabId: browserTabIdSchema.optional(),
       }),
       z.strictObject({
         type: z.literal('provider_unavailable'),

@@ -43,6 +43,7 @@ import {
   BROWSER_RETENTION_MS,
 } from './browser-job-store';
 import {
+  BROWSER_PAGE_SIZE,
   browserCLIInboundMessageSchema,
   browserProviderInboundMessageSchema,
   browserJobSnapshotSchema,
@@ -682,6 +683,163 @@ describe('UserConnectionDO', () => {
         };
       }
 
+      it.each(['provider_snapshot', 'provider_status_result'] as const)(
+        'preserves trusted owners and global queue positions in %s pages',
+        async responseType => {
+          const f = await browserSetup();
+          // Reverse job IDs so page order differs from equal-time FIFO admission.
+          let uuid = 1_000;
+          vi.spyOn(crypto, 'randomUUID').mockImplementation(
+            () => `00000000-0000-4000-8000-${(uuid--).toString(16).padStart(12, '0')}`
+          );
+          const active = await approve(f, await invoke(f));
+          const expected: BrowserJobSnapshot[] = [{ ...active, ownerLabel: owner.parentSessionId }];
+          for (let position = 1; position <= BROWSER_PAGE_SIZE + 1; position++) {
+            const queuedOwner = position % 2 === 0 ? otherOwner : owner;
+            const queued = await invoke(f, position + 1, {
+              owner: queuedOwner,
+              goal: `Owner: untrusted-${position}`,
+            });
+            expected.push({
+              ...queued,
+              ownerLabel: queuedOwner.parentSessionId,
+              queuePosition: position,
+            });
+          }
+          const reader =
+            responseType === 'provider_snapshot'
+              ? f.panel
+              : addWebSocket(f.mockCtx, 'queue-history-reader');
+          if (reader !== f.panel) await negotiate(f.doInstance, reader, 'web');
+          const before = structuredClone([...f.ctx.storage.store]);
+          const attachments = f.mockCtx.sockets.map(ws => ws.deserializeAttachment());
+          const alarmAt = f.ctx.storage.alarmAt;
+          for (const ws of f.mockCtx.sockets) ws.send.mockClear();
+          f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
+          const pageOrder = expected.toReversed();
+          let cursor: BrowserJobSnapshot['jobId'] | undefined;
+
+          for (const pageNumber of [0, 1]) {
+            const requestId = crypto.randomUUID();
+            await frame(
+              f.doInstance,
+              reader,
+              responseType === 'provider_snapshot'
+                ? {
+                    type: 'provider_heartbeat',
+                    providerId: registration.providerId,
+                    generation: active.generation,
+                    requestId,
+                    cursor,
+                  }
+                : { ...historyRequest(), requestId, cursor }
+            );
+            const page = browserProviderInboundMessageSchema.parse(
+              allSent(reader).findLast(message => message.type === responseType)
+            );
+            if (page.type !== 'provider_snapshot' && page.type !== 'provider_status_result') {
+              throw new Error('Missing provider page');
+            }
+            const expectedJobs = pageOrder.slice(
+              pageNumber * BROWSER_PAGE_SIZE,
+              (pageNumber + 1) * BROWSER_PAGE_SIZE
+            );
+            expect(page).toEqual({
+              type: responseType,
+              requestId,
+              providerId: registration.providerId,
+              ...(responseType === 'provider_snapshot'
+                ? { generation: active.generation }
+                : { unresolvedFence: { invocationId: active.invocationId, tabId: tab.tabId } }),
+              jobs: expectedJobs,
+              ...(pageNumber === 0 ? { nextCursor: expectedJobs.at(-1)?.jobId } : {}),
+            });
+            cursor = page.nextCursor;
+          }
+
+          expect(allSent(reader).map(message => message.type)).toEqual(
+            responseType === 'provider_snapshot'
+              ? [
+                  'provider_lease_ack',
+                  'provider_snapshot',
+                  'provider_lease_ack',
+                  'provider_snapshot',
+                ]
+              : ['provider_status_result', 'provider_status_result']
+          );
+          for (const ws of f.mockCtx.sockets) {
+            if (ws !== reader) expect(allSent(ws)).toEqual([]);
+          }
+          expect([...f.ctx.storage.store]).toEqual(before);
+          expect(f.mockCtx.sockets.map(ws => ws.deserializeAttachment())).toEqual(attachments);
+          expect(f.ctx.storage.alarmAt).toBe(alarmAt);
+        }
+      );
+
+      it.each(['foreign socket', 'prior socket', 'stale generation', 'future generation'] as const)(
+        'rejects snapshot metadata for a %s',
+        async caller => {
+          const f = await browserSetup();
+          const prior = f.panel;
+          f.panel = addWebSocket(f.mockCtx, 'current-panel');
+          await negotiate(f.doInstance, f.panel, 'web');
+          await frame(f.doInstance, f.panel, registration);
+          const active = await approve(f, await invoke(f));
+          const queued = await invoke(f, 2, { owner: otherOwner });
+          await invoke(f, 3);
+          const reader =
+            caller === 'foreign socket'
+              ? addWebSocket(f.mockCtx, 'foreign-reader')
+              : caller === 'prior socket'
+                ? prior
+                : f.panel;
+          if (caller === 'foreign socket') {
+            await negotiate(f.doInstance, reader, 'web');
+            await frame(f.doInstance, reader, historyRequest());
+            expect(allSent(reader).at(-1)).toMatchObject({
+              type: 'provider_status_result',
+              jobs: expect.arrayContaining([
+                { ...queued, ownerLabel: otherOwner.parentSessionId, queuePosition: 1 },
+              ]),
+            });
+          }
+          const request = {
+            type: 'provider_heartbeat',
+            requestId: crypto.randomUUID(),
+            providerId: registration.providerId,
+            generation:
+              caller === 'stale generation'
+                ? active.generation - 1
+                : caller === 'future generation'
+                  ? active.generation + 1
+                  : active.generation,
+          } satisfies BrowserProviderOutboundMessage;
+          const before = structuredClone([...f.ctx.storage.store]);
+          const alarmAt = f.ctx.storage.alarmAt;
+          for (const ws of f.mockCtx.sockets) ws.send.mockClear();
+
+          await frame(f.doInstance, reader, request);
+
+          expect(allSent(reader)).toEqual([
+            {
+              type: 'response',
+              id: request.requestId,
+              error: {
+                source: 'relay',
+                code: 'owner_mismatch',
+                message: 'Browser job request rejected: owner_mismatch',
+                retryable: false,
+              },
+            },
+          ]);
+          for (const ws of f.mockCtx.sockets) {
+            if (ws !== reader) expect(allSent(ws)).toEqual([]);
+          }
+          expect([...f.ctx.storage.store]).toEqual(before);
+          expect(f.ctx.storage.alarmAt).toBe(alarmAt);
+        }
+      );
+
       it.each(['registered', 'unregistered'] as const)(
         'returns prior-generation history privately to the %s requester without restoring execution',
         async requester => {
@@ -692,6 +850,8 @@ describe('UserConnectionDO', () => {
           const completed = job(f, first.jobId);
           await frame(f.doInstance, f.panel, { ...registration, generation: first.generation });
           const current = await invoke(f, 2);
+          const queued = await invoke(f, 3, { owner: otherOwner });
+          const nextQueued = await invoke(f, 4);
           expect(current.generation).toBeGreaterThan(completed.generation);
           const reader =
             requester === 'registered' ? f.panel : addWebSocket(f.mockCtx, 'history-reader');
@@ -711,11 +871,16 @@ describe('UserConnectionDO', () => {
               type: 'provider_status_result',
               requestId: request.requestId,
               providerId: registration.providerId,
-              jobs: expect.arrayContaining([completed, current]),
+              jobs: expect.arrayContaining([
+                { ...completed, ownerLabel: owner.parentSessionId },
+                { ...current, ownerLabel: owner.parentSessionId },
+                { ...queued, ownerLabel: otherOwner.parentSessionId, queuePosition: 1 },
+                { ...nextQueued, ownerLabel: owner.parentSessionId, queuePosition: 2 },
+              ]),
               unresolvedFence: { invocationId: current.invocationId },
             },
           ]);
-          expect(allSent(reader)[0]?.jobs).toHaveLength(2);
+          expect(allSent(reader)[0]?.jobs).toHaveLength(4);
           for (const ws of f.mockCtx.sockets) {
             if (ws !== reader) expect(allSent(ws)).toEqual([]);
           }
@@ -783,7 +948,7 @@ describe('UserConnectionDO', () => {
                 type: 'provider_status_result',
                 requestId: request.requestId,
                 providerId: active.providerId,
-                jobs: expired ? [] : [interrupted],
+                jobs: expired ? [] : [{ ...interrupted, ownerLabel: owner.parentSessionId }],
                 unresolvedFence:
                   phase === 'running'
                     ? { invocationId: active.invocationId, tabId: tab.tabId }
@@ -827,7 +992,7 @@ describe('UserConnectionDO', () => {
           providerProof: registration.providerProof,
         },
       ])(
-        'correlates a $name failure without exposing an expired fence or changing authority',
+        'correlates a $name failure without exposing queue metadata or an expired fence',
         async fields => {
           const f = await browserSetup();
           const active = await approve(
@@ -836,13 +1001,11 @@ describe('UserConnectionDO', () => {
               invocationId: `b1.${now - BROWSER_RETENTION_MS + 1_000}.${'1'.padStart(64, '0')}`,
             })
           );
+          await invoke(f, 2, { owner: otherOwner });
+          await invoke(f, 3);
           const otherPanel = addWebSocket(f.mockCtx, 'other-provider');
           await negotiate(f.doInstance, otherPanel, 'web');
           await frame(f.doInstance, otherPanel, otherRegistration);
-          vi.mocked(Date.now).mockReturnValue(now + 1_000);
-          await f.doInstance.alarm();
-          await flushAsync();
-          expect(f.ctx.storage.store.has(`browser/job/${active.jobId}`)).toBe(false);
           const reader = addWebSocket(f.mockCtx, 'denied-reader', [], fields.kiloUserId);
           await negotiate(f.doInstance, reader, 'web');
           const request = {
@@ -850,40 +1013,51 @@ describe('UserConnectionDO', () => {
             providerId: fields.providerId,
             providerProof: fields.providerProof,
           };
-          const before = structuredClone([...f.ctx.storage.store]);
-          const attachments = f.mockCtx.sockets.map(ws => ws.deserializeAttachment());
-          const alarmAt = f.ctx.storage.alarmAt;
-          for (const ws of f.mockCtx.sockets) ws.send.mockClear();
-          f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
 
-          await frame(f.doInstance, reader, request);
+          for (const expired of [false, true]) {
+            if (expired) {
+              vi.mocked(Date.now).mockReturnValue(now + 1_000);
+              await f.doInstance.alarm();
+              await flushAsync();
+              expect(f.ctx.storage.store.has(`browser/job/${active.jobId}`)).toBe(false);
+            }
+            const before = structuredClone([...f.ctx.storage.store]);
+            const attachments = f.mockCtx.sockets.map(ws => ws.deserializeAttachment());
+            const alarmAt = f.ctx.storage.alarmAt;
+            for (const ws of f.mockCtx.sockets) ws.send.mockClear();
+            f.doInstance = new UserConnectionDO(f.ctx as never, {} as never);
 
-          expect(allSent(reader)).toEqual([
-            {
-              type: 'response',
-              id: request.requestId,
-              error: {
-                source: 'relay',
-                code: 'owner_mismatch',
-                message: 'Browser job request rejected: owner_mismatch',
-                retryable: false,
+            await frame(f.doInstance, reader, request);
+
+            expect(allSent(reader)).toEqual([
+              {
+                type: 'response',
+                id: request.requestId,
+                error: {
+                  source: 'relay',
+                  code: 'owner_mismatch',
+                  message: 'Browser job request rejected: owner_mismatch',
+                  retryable: false,
+                },
               },
-            },
-          ]);
-          for (const ws of f.mockCtx.sockets) {
-            if (ws !== reader) expect(allSent(ws)).toEqual([]);
+            ]);
+            for (const ws of f.mockCtx.sockets) {
+              if (ws !== reader) expect(allSent(ws)).toEqual([]);
+            }
+            expect([...f.ctx.storage.store]).toEqual(before);
+            expect(f.mockCtx.sockets.map(ws => ws.deserializeAttachment())).toEqual(attachments);
+            expect(f.ctx.storage.alarmAt).toBe(alarmAt);
           }
-          expect([...f.ctx.storage.store]).toEqual(before);
-          expect(f.mockCtx.sockets.map(ws => ws.deserializeAttachment())).toEqual(attachments);
-          expect(f.ctx.storage.alarmAt).toBe(alarmAt);
         }
       );
 
       it.each(['CLI', 'unnegotiated web', 'unauthenticated web'] as const)(
-        'exposes no history or fence to a %s requester with a valid provider proof',
+        'exposes no queue metadata, history, or fence to a %s requester with a valid provider proof',
         async requester => {
           const f = await browserSetup();
           await invoke(f);
+          await invoke(f, 2, { owner: otherOwner });
+          await invoke(f, 3);
           const reader =
             requester === 'CLI'
               ? f.cli

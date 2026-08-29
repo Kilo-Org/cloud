@@ -1314,6 +1314,23 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
               pullRequest: {
                 id: identity.prNodeId,
                 number: identity.number,
+                mergeable: 'MERGEABLE',
+                viewerCanMergeAsAdmin: false,
+                potentialMergeCommit: null,
+                baseRef: {
+                  refUpdateRule: {
+                    requiredApprovingReviewCount: 0,
+                    requiredStatusCheckContexts: [],
+                    requiresConversationResolution: false,
+                  },
+                  compare: {
+                    behindBy: 0,
+                    baseTarget: { oid: identity.baseSha },
+                    headTarget: { oid: identity.headSha },
+                  },
+                },
+                reviewThreads: empty,
+                eligibleReviews: empty,
                 headRefOid: identity.headSha,
                 baseRefName: identity.baseRef,
                 baseRefOid: identity.baseSha,
@@ -1332,6 +1349,11 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
                 closingIssuesReferences: empty,
                 timelineItems: empty,
                 privatePayload: 'provider-only',
+              },
+              object: {
+                oid: identity.headSha,
+                statusCheckRollup: { contexts: empty },
+                deployments: empty,
               },
             },
           },
@@ -1376,16 +1398,16 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
         });
       }
       expect(result.requirements).toMatchObject({
-        items: [{ kind: 'branch_protection', state: 'unavailable' }],
+        items: [{ kind: 'linear-history', state: 'unavailable' }],
         completeness: 'complete',
         source: { availability: 'available' },
       });
       expect(result.checks).toMatchObject({
         items: [],
-        completeness: 'unknown',
-        totalCount: null,
-        hasNextPage: null,
-        source: { availability: 'unavailable', reason: 'not-requested' },
+        completeness: 'complete',
+        totalCount: 0,
+        hasNextPage: false,
+        source: { availability: 'available', reason: null },
       });
       expect(result.queue).toMatchObject({
         membership: { state: 'unknown', source: { availability: 'unavailable' } },
@@ -1559,7 +1581,7 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
         const result = await caller.getPullRequestContext(contextInput);
         expect(result.labels.items[0]?.name).toBe('rotated');
         expect(result.requirements).toMatchObject({
-          items: [{ kind: 'branch_protection', state: 'unavailable' }],
+          items: [{ kind: 'linear-history', state: 'unavailable' }],
           source: { availability: 'available', reason: null },
         });
         expect(getGitHubUserAccessToken).toHaveBeenNthCalledWith(2, 'user-1', {

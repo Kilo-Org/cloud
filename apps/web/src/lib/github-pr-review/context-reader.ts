@@ -33,11 +33,25 @@ import {
   resolveContextIssues,
 } from './context-issues';
 import { normalizeContextPolicies } from './context-rules';
+import {
+  PR_CONTEXT_EVALUATION_QUERY,
+  PR_CONTEXT_REQUIREMENT_QUERIES,
+  contextCheckSchema,
+  contextCheckOutcome,
+  contextComparisonSchema,
+  contextDeploymentSchema,
+  contextRequirementEvidence,
+  contextTestMergeSchema,
+  contextThreadSchema,
+  evaluateContextRequirements,
+  type RequirementFacts,
+} from './context-requirements';
 
 const collectionQueries = {
   ...PR_CONTEXT_PEOPLE_QUERIES,
   ...PR_CONTEXT_REVIEW_QUERIES,
   ...PR_CONTEXT_ISSUE_QUERIES,
+  ...PR_CONTEXT_REQUIREMENT_QUERIES,
 };
 const deadlineError = new Error('PR context deadline');
 type PrInput = { owner: string; repo: string; number: number };
@@ -246,6 +260,21 @@ function invalidateRevision(context: GitHubPrReviewContext, source: GitHubPrRevi
     collection.source = source;
     collection.completeness = 'unknown';
   }
+  for (const requirement of context.requirements.items) requirement.state = 'unavailable';
+  for (const check of context.checks.items) {
+    check.requiredness = 'unknown';
+    check.observation = 'unknown';
+  }
+  // Keep failed sources' recovery metadata; invalidate only previously successful observations.
+  for (const [key, evaluationSource] of Object.entries(context.evaluationSources)) {
+    if (evaluationSource.availability !== 'available') continue;
+    Object.assign(context.evaluationSources, {
+      [key]: {
+        ...source,
+        provenance: [...new Set([...evaluationSource.provenance, ...source.provenance])],
+      },
+    });
+  }
   context.queue.membership.source = source;
   context.queue.position.source = source;
   return context;
@@ -280,7 +309,12 @@ export async function readPullRequestContext(
     fallback: Collection<T>,
     merge: (known: T, current: T) => T,
     matches = (known: T, current: T) => known?.id != null && known.id === current?.id,
-    normalize: (item: T, result: ContextReadResult<unknown>, index: number) => T = item => item
+    normalize: (item: T, result: ContextReadResult<unknown>, index: number) => T = item => item,
+    options: {
+      path?: ReadonlyArray<string | number>;
+      variables?: Record<string, string>;
+      validPage?: (result: ContextReadResult<unknown>) => boolean;
+    } = {}
   ): Promise<Collection<T>> {
     const schema = z.object({
       nodes: z.array(node.nullable().catch(null)).nullish().catch(null),
@@ -318,14 +352,20 @@ export async function readPullRequestContext(
             name: input.repo,
             number: input.number,
             after: collection.endCursor,
+            ...options.variables,
           },
           request: { signal },
         });
         return response.data;
       });
-      const page = decodeContextGraphQlSource(result, ['repository', 'pullRequest', field], schema);
+      const page = decodeContextGraphQlSource(
+        result,
+        options.path ?? ['repository', 'pullRequest', field],
+        schema
+      );
       collection.source = page.source;
-      if (page.source.availability !== 'available') incomplete = markIncomplete();
+      if (page.source.availability !== 'available' || options.validPage?.(result) === false)
+        incomplete = markIncomplete();
       if (!page.data) break;
       const { nodes, totalCount, pageInfo } = page.data;
       if (
@@ -387,11 +427,13 @@ export async function readPullRequestContext(
   const reviewEvidence = {
     latestOpinionatedReviews: new Map<string, z.output<typeof contextReviewSchema>>(),
     latestReviews: new Map<string, z.output<typeof contextReviewSchema>>(),
+    eligibleReviews: new Map<string, z.output<typeof contextReviewSchema>>(),
   };
   const conflictingReviewIds = new Set<string>();
   const collectReviews = (
-    field: keyof typeof PR_CONTEXT_REVIEW_QUERIES,
-    fallback: GitHubPrReviewContext['reviewDecisions']
+    field: keyof typeof reviewEvidence,
+    fallback: GitHubPrReviewContext['reviewDecisions'],
+    conflicts = conflictingReviewIds
   ) => {
     const evidence = reviewEvidence[field];
     const pageConflicts = new Set<string>();
@@ -441,7 +483,7 @@ export async function readPullRequestContext(
         };
         if (previous && contextReviewEvidenceConflicts(previous, current)) {
           pageConflicts.add(review.id);
-          conflictingReviewIds.add(review.id);
+          conflicts.add(review.id);
         }
         // Missing observations cannot erase comparison evidence or supply public field values.
         evidence.set(review.id, {
@@ -551,6 +593,198 @@ export async function readPullRequestContext(
     ]);
     return normalizeContextPolicies(context.revision, classic, rules);
   }
+  async function collectEvaluation() {
+    const result = await read('graphql.requirements', async (signal): Promise<unknown> => {
+      const response = await octokit.request('POST /graphql', {
+        query: PR_CONTEXT_EVALUATION_QUERY,
+        variables: {
+          owner: input.owner,
+          name: input.repo,
+          number: input.number,
+          head: context.revision.headSha,
+        },
+        request: { signal },
+      });
+      return response.data;
+    });
+    const path = ['repository', 'pullRequest'];
+    const revision = decodeContextGraphQlSource(result, path, graphQlRevisionSchema);
+    const identity = (
+      [
+        ['prNodeId', ['id'], z.string().min(1)],
+        ['number', ['number'], z.number().int().positive()],
+        ['headSha', ['headRefOid'], z.string().min(1)],
+        ['baseRef', ['baseRefName'], z.string().min(1)],
+        ['baseSha', ['baseRefOid'], z.string().min(1)],
+        ['baseRepoFullName', ['baseRepository', 'nameWithOwner'], z.string().min(1)],
+      ] as const
+    ).map(([field, parts, schema]) => ({
+      field,
+      ...decodeContextGraphQlSource(result, [...path, ...parts], schema),
+    }));
+    // Matching outer reads cannot supply missing evaluation identity.
+    const identified = identity.every(field => field.source.availability === 'available');
+    function fact<T extends z.ZodTypeAny>(
+      fields: string[],
+      schema: T
+    ): ContextReadResult<z.output<T>> {
+      const decoded = decodeContextGraphQlSource(result, [...path, ...fields], schema);
+      return identified
+        ? decoded
+        : {
+            data: null,
+            source: {
+              ...revision.source,
+              availability: revision.source.availability === 'denied' ? 'denied' : 'unavailable',
+              reason: revision.source.reason ?? 'evaluation-identity-unavailable',
+            },
+          };
+    }
+    const facts: RequirementFacts = {
+      mergeable: fact(['mergeable'], z.enum(['MERGEABLE', 'CONFLICTING', 'UNKNOWN'])),
+      testMerge: fact(['potentialMergeCommit'], contextTestMergeSchema),
+      canBypassClassic: fact(['viewerCanMergeAsAdmin'], z.boolean()),
+      viewerRule: {
+        requiredApprovingReviewCount: fact(
+          ['baseRef', 'refUpdateRule', 'requiredApprovingReviewCount'],
+          z.number().int().nonnegative().nullable()
+        ),
+        requiredStatusCheckContexts: fact(
+          ['baseRef', 'refUpdateRule', 'requiredStatusCheckContexts'],
+          z.array(z.string().nullable()).nullable()
+        ),
+        requiresConversationResolution: fact(
+          ['baseRef', 'refUpdateRule', 'requiresConversationResolution'],
+          z.boolean()
+        ),
+      },
+      comparison: fact(['baseRef', 'compare'], contextComparisonSchema),
+    };
+    const commitMatches = (page: ContextReadResult<unknown>, oid: string) =>
+      decodeContextGraphQlSource(page, ['repository', 'object', 'oid'], z.literal(oid)).source
+        .availability === 'available';
+    const collectChecks = (oid: string) => {
+      const checkPath = ['repository', 'object', 'statusCheckRollup', 'contexts'];
+      const seen = new Map<string, z.output<typeof contextCheckSchema>>();
+      const conflicts = new Set<string>();
+      return collect(
+        'checks',
+        contextCheckSchema,
+        context.checks,
+        (_known, current) => current,
+        undefined,
+        (item, page, index) => {
+          const nodePath = [...checkPath, 'nodes', index];
+          const run = item.kind === 'check-run';
+          const field = <T extends z.ZodTypeAny>(parts: string[], schema: T) =>
+            decodeContextGraphQlSource(page, [...nodePath, ...parts], schema);
+          const required = field(['isRequired'], z.boolean());
+          const status = field([run ? 'status' : 'state'], z.string());
+          const conclusion = run ? field(['conclusion'], z.string().nullable()) : null;
+          const application = run ? field(['checkSuite', 'app'], z.unknown()) : null;
+          const commit = field(
+            run ? ['checkSuite', 'commit', 'oid'] : ['commit', 'oid'],
+            z.literal(oid)
+          );
+          const identity = field(['id'], z.literal(item.id));
+          const name = field([run ? 'name' : 'context'], z.literal(item.name));
+          const current = {
+            ...item,
+            status: status.source.availability === 'available' ? status.data : null,
+            conclusion: conclusion?.source.availability === 'available' ? conclusion.data : null,
+            application: application?.source.availability === 'available' ? item.application : null,
+            requiredness:
+              required.source.availability !== 'available'
+                ? ('unknown' as const)
+                : required.data
+                  ? ('required' as const)
+                  : ('optional' as const),
+          };
+          current.outcome = contextCheckOutcome(current.kind, current.status, current.conclusion);
+          if (
+            !commitMatches(page, oid) ||
+            [commit, identity, name].some(value => value.source.availability !== 'available')
+          ) {
+            current.observation = 'unknown';
+            current.requiredness = 'unknown';
+          }
+          if (current.id) {
+            const previous = seen.get(current.id);
+            if (previous && JSON.stringify(previous) !== JSON.stringify(current))
+              conflicts.add(current.id);
+            seen.set(current.id, { ...current });
+            if (conflicts.has(current.id)) {
+              current.observation = 'unknown';
+              current.requiredness = 'unknown';
+            }
+          }
+          current.evidence = [
+            ...contextRequirementEvidence(
+              context.revision,
+              { ...required.source, provenance: ['graphql.checks.isRequired'] },
+              `isRequired:${current.requiredness}`,
+              current.evaluatedSha
+            ),
+            ...contextRequirementEvidence(
+              context.revision,
+              { ...page.source, provenance: ['graphql.checks'] },
+              `check:${current.id}:${current.outcome};status:${current.status};conclusion:${current.conclusion}`,
+              current.evaluatedSha
+            ),
+          ];
+          return current;
+        },
+        {
+          path: checkPath,
+          variables: { oid, pr: context.revision.prNodeId },
+          validPage: page => commitMatches(page, oid),
+        }
+      );
+    };
+    const [head, merge, threads, eligibleReviews, deployments] = await Promise.all([
+      collectChecks(context.revision.headSha),
+      facts.testMerge.data ? collectChecks(facts.testMerge.data.oid) : Promise.resolve(null),
+      collect(
+        'reviewThreads',
+        contextThreadSchema,
+        { ...context.checks, items: [] },
+        (_known, current) => current,
+        undefined,
+        (thread, page, index) => ({
+          ...thread,
+          isResolved:
+            decodeContextGraphQlSource(
+              page,
+              [...path, 'reviewThreads', 'nodes', index, 'isResolved'],
+              z.boolean()
+            ).source.availability === 'available'
+              ? thread.isResolved
+              : null,
+        })
+      ),
+      collectReviews('eligibleReviews', { ...context.reviewDecisions, items: [] }, new Set()),
+      collect(
+        'deployments',
+        contextDeploymentSchema,
+        { ...context.checks, items: [] },
+        (_known, current) => current,
+        undefined,
+        undefined,
+        {
+          path: ['repository', 'object', 'deployments'],
+          variables: { oid: context.revision.headSha },
+          validPage: page => commitMatches(page, context.revision.headSha),
+        }
+      ),
+    ]);
+    return {
+      // Incomplete identity cannot prove a verdict, but reliable fields can still prove a mismatch.
+      identity,
+      facts,
+      observations: { head, merge, threads, eligibleReviews, deployments },
+    };
+  }
+  let evaluation: Awaited<ReturnType<typeof collectEvaluation>>;
   [
     context.labels,
     context.assignees,
@@ -559,6 +793,7 @@ export async function readPullRequestContext(
     context.reviewActivity,
     context.issues,
     context.requirements,
+    evaluation,
   ] = await Promise.all([
     collect('labels', contextLabelSchema, context.labels, (known, current) => ({
       ...current,
@@ -587,6 +822,7 @@ export async function readPullRequestContext(
     collectReviews('latestReviews', context.reviewActivity),
     collectIssues(),
     collectPolicies(),
+    collectEvaluation(),
   ]);
   // Final null fields can hide contradictions between the two connections.
   for (const review of context.reviewDecisions.items) {
@@ -601,6 +837,10 @@ export async function readPullRequestContext(
     context.reviewDecisions,
     context.reviewActivity,
     conflictingReviewIds
+  );
+  Object.assign(
+    context,
+    evaluateContextRequirements(context, evaluation.facts, evaluation.observations)
   );
   const final = decodeContextGraphQlSource(
     await read('graphql.revision', async (signal): Promise<unknown> => {
@@ -628,9 +868,12 @@ export async function readPullRequestContext(
     fields.some(
       field =>
         new Set(
-          observations
-            .map(revision => revision?.[field])
-            .filter(value => value != null && value !== '')
+          [
+            ...observations.map(revision => revision?.[field]),
+            evaluation.identity.find(
+              identity => identity.field === field && identity.source.availability === 'available'
+            )?.data,
+          ].filter(value => value != null && value !== '')
         ).size > 1
     );
   if (mismatch) {

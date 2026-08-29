@@ -1,7 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { announceForA11y } from './announce';
+import { createPrivacyNativeTestModule } from '../../../modules/local-access-privacy/tests/native-test-helpers';
 import { announcingToast } from './announcing-toast';
+
+const adapter = vi.hoisted((): Parameters<typeof createPrivacyNativeTestModule>[0] => ({
+  available: true,
+  nativeFailure: false,
+  secure: false,
+  captureFailure: false,
+  captureWait: undefined,
+  captureEvents: [],
+  snapshot: { generation: 0, armed: false, foreground: true, covered: false, failed: false },
+  delivered: [],
+  queue: [],
+  listeners: new Map(),
+}));
 
 const sonnerMock = vi.hoisted(() => {
   // `sonner-native` exports a single `toast` callable that has `.success`,
@@ -26,114 +39,143 @@ const sonnerMock = vi.hoisted(() => {
   return { callable, success, error, warning };
 });
 
-const accessibilityMock = vi.hoisted(() => ({
-  announceForAccessibility: vi.fn(),
-  setAccessibilityFocus: vi.fn(),
+vi.mock('expo', () => ({
+  requireNativeModule: () => createPrivacyNativeTestModule(adapter),
 }));
-
+vi.mock('expo-screen-capture', () => ({
+  allowScreenCaptureAsync: vi.fn(),
+  preventScreenCaptureAsync: vi.fn(),
+}));
 vi.mock('sonner-native', () => ({
   toast: sonnerMock.callable,
 }));
 vi.mock('react-native', () => ({
-  AccessibilityInfo: accessibilityMock,
+  Platform: { OS: 'ios' },
+  AccessibilityInfo: {
+    // A direct React Native bypass must remain observable in denial tests.
+    announceForAccessibility: (message: string) => {
+      adapter.delivered.push(message);
+    },
+    setAccessibilityFocus: vi.fn(),
+  },
   findNodeHandle: vi.fn(),
 }));
 
+function deliver() {
+  for (const task of adapter.queue.splice(0)) {
+    task();
+  }
+}
+
 describe('announcingToast', () => {
   beforeEach(() => {
-    sonnerMock.success.mockClear();
-    sonnerMock.error.mockClear();
-    sonnerMock.warning.mockClear();
-    accessibilityMock.announceForAccessibility.mockClear();
+    adapter.available = true;
+    adapter.snapshot = {
+      generation: 0,
+      armed: false,
+      foreground: true,
+      covered: false,
+      failed: false,
+    };
+    adapter.delivered = [];
+    adapter.queue = [];
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('success shows the toast AND announces the message', () => {
-    // oxlint-disable-next-line no-literal-copy/no-literal-copy
-    const result = announcingToast.success('Session renamed');
+  it.each([
+    ['success', 'Session renamed', 'success-id'],
+    ['error', 'Network request failed', 'error-id'],
+    ['warning', 'Webhook sync partially failed', 'warning-id'],
+  ] as const)('%s shows the toast AND announces the message', (kind, message, id) => {
+    const result = announcingToast[kind](message);
 
-    expect(sonnerMock.success).toHaveBeenCalledTimes(1);
-    expect(sonnerMock.success).toHaveBeenCalledWith('Session renamed', undefined);
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledTimes(1);
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith('Session renamed');
-    expect(result).toBe('success-id');
+    expect(sonnerMock[kind]).toHaveBeenCalledTimes(1);
+    expect(sonnerMock[kind]).toHaveBeenCalledWith(message, undefined);
+    expect(result).toBe(id);
+    expect(adapter.delivered).toEqual([]);
+    expect(adapter.queue).toHaveLength(1);
+    deliver();
+    expect(adapter.delivered).toEqual([message]);
   });
 
-  it('error shows the toast AND announces the message', () => {
-    // oxlint-disable-next-line no-literal-copy/no-literal-copy
-    const result = announcingToast.error('Network request failed');
+  it.each(['success', 'error', 'warning'] as const)(
+    '%s forwards sonner-native options without swallowing them',
+    kind => {
+      const options = { description: 'tap to retry' };
+      const result = announcingToast[kind]('Save outcome', options);
+      deliver();
 
-    expect(sonnerMock.error).toHaveBeenCalledTimes(1);
-    expect(sonnerMock.error).toHaveBeenCalledWith('Network request failed', undefined);
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledTimes(1);
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith(
-      'Network request failed'
-    );
-    expect(result).toBe('error-id');
-  });
+      expect(sonnerMock[kind]).toHaveBeenCalledWith('Save outcome', options);
+      expect(result).toBe(`${kind}-id`);
+      expect(adapter.delivered).toEqual(['Save outcome']);
+    }
+  );
 
-  it('warning shows the toast AND announces the message', () => {
-    // oxlint-disable-next-line no-literal-copy/no-literal-copy
-    const result = announcingToast.warning('Webhook sync partially failed');
-
-    expect(sonnerMock.warning).toHaveBeenCalledTimes(1);
-    expect(sonnerMock.warning).toHaveBeenCalledWith('Webhook sync partially failed', undefined);
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledTimes(1);
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith(
-      'Webhook sync partially failed'
-    );
-    expect(result).toBe('warning-id');
-  });
-
-  it('forwards sonner-native options without swallowing them', () => {
-    const options = { description: 'tap to retry' };
-    // oxlint-disable-next-line no-literal-copy/no-literal-copy
-    announcingToast.error('Save failed', options);
-
-    expect(sonnerMock.error).toHaveBeenCalledWith('Save failed', options);
-  });
   it('trims whitespace from the announced message so the screen reader hears the trimmed form', () => {
-    // oxlint-disable-next-line no-literal-copy/no-literal-copy
     announcingToast.error('  Too many requests  ');
+    deliver();
 
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith('Too many requests');
+    expect(sonnerMock.error).toHaveBeenCalledWith('  Too many requests  ', undefined);
+    expect(adapter.delivered).toEqual(['Too many requests']);
   });
 
   it('drops empty messages instead of announcing blank speech', () => {
-    announcingToast.success('');
+    const result = announcingToast.success('');
 
     expect(sonnerMock.success).toHaveBeenCalledWith('', undefined);
-    expect(accessibilityMock.announceForAccessibility).not.toHaveBeenCalled();
+    expect(result).toBe('success-id');
+    expect(adapter.queue).toEqual([]);
+    deliver();
+    expect(adapter.delivered).toEqual([]);
   });
 
   it('announces the same message the toast shows (sighted and screen-reader users hear the same outcome)', () => {
-    // Spot-check that announcement is derived from the actual toast title,
-    // not a separate label that could drift out of sync.
     const message = 'Existing remediations queued';
     announcingToast.success(message);
+    deliver();
 
-    const announced = accessibilityMock.announceForAccessibility.mock.calls[0]?.[0];
     const toasted = sonnerMock.success.mock.calls[0]?.[0];
-    expect(announced).toBe(toasted);
-    expect(announced).toBe(message);
+    expect(adapter.delivered).toEqual([toasted]);
+    expect(adapter.delivered).toEqual([message]);
   });
 
-  it('reuses announceForA11y from the shared helper (no second announce utility)', () => {
-    // The adapter must delegate to the shared announce helper so screen-reader
-    // behavior stays in one place. The earlier "announces the same message"
-    // test already proves the message reaches AccessibilityInfo via
-    // announceForA11y (which is the only path in the adapter). This test
-    // additionally asserts the imported helper is the same function reference
-    // we import at the top of the test, so a future refactor that reaches
-    // for `AccessibilityInfo.announceForAccessibility` directly would be
-    // caught — the visible result would still pass, but the import
-    // wouldn't be reused.
-    expect(typeof announceForA11y).toBe('function');
-    announcingToast.success('hello');
-    announcingToast.error('oops');
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledTimes(2);
-  });
+  it.each(['success', 'error', 'warning'] as const)(
+    '%s retains the toast outcome while covered without replaying speech after unlock',
+    kind => {
+      adapter.snapshot.armed = true;
+      adapter.snapshot.covered = true;
+      const options = { description: 'Existing outcome details' };
+      const result = announcingToast[kind]('Protected outcome', options);
+
+      expect(result).toBe(`${kind}-id`);
+      expect(sonnerMock[kind]).toHaveBeenCalledWith('Protected outcome', options);
+      expect(adapter.queue).toEqual([]);
+      deliver();
+      expect(adapter.delivered).toEqual([]);
+
+      adapter.snapshot.covered = false;
+      adapter.snapshot.generation += 1;
+      deliver();
+      expect(adapter.delivered).toEqual([]);
+      announcingToast[kind]('Fresh outcome');
+      deliver();
+      expect(adapter.delivered).toEqual(['Fresh outcome']);
+    }
+  );
+
+  it.each(['success', 'error', 'warning'] as const)(
+    '%s retains the toast outcome when native speech is unavailable',
+    kind => {
+      adapter.available = false;
+      const result = announcingToast[kind]('Completed outcome');
+      deliver();
+
+      expect(result).toBe(`${kind}-id`);
+      expect(sonnerMock[kind]).toHaveBeenCalledWith('Completed outcome', undefined);
+      expect(adapter.delivered).toEqual([]);
+    }
+  );
 });

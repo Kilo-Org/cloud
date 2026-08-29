@@ -1,6 +1,28 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { createPrivacyNativeTestModule } from '../../../modules/local-access-privacy/tests/native-test-helpers';
 import { nextAnnouncement } from './status-announcement';
+
+const adapter = vi.hoisted((): Parameters<typeof createPrivacyNativeTestModule>[0] => ({
+  available: true,
+  nativeFailure: false,
+  secure: false,
+  captureFailure: false,
+  captureWait: undefined,
+  captureEvents: [],
+  snapshot: { generation: 0, armed: false, foreground: true, covered: false, failed: false },
+  delivered: [],
+  queue: [],
+  listeners: new Map(),
+}));
+
+vi.mock('expo', () => ({
+  requireNativeModule: () => createPrivacyNativeTestModule(adapter),
+}));
+vi.mock('expo-screen-capture', () => ({
+  allowScreenCaptureAsync: vi.fn(),
+  preventScreenCaptureAsync: vi.fn(),
+}));
 
 const accessibilityMock = vi.hoisted(() => ({
   announceForAccessibility: vi.fn(),

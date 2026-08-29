@@ -1,13 +1,12 @@
 import { AccessibilityInfo, findNodeHandle } from 'react-native';
 import { type Component, type RefObject } from 'react';
 
-// Shared accessibility helpers used across mobile screens. These wrap
-// `react-native` primitives so call sites stay small and so unit tests can
-// target a single import surface (rather than mocking `react-native`
-// per-feature). The functions are intentionally side-effecting and best
-// effort — they never throw on missing handles or native accessibility
-// failures, so a TalkBack/VoiceOver outage never breaks the UI or a caller's
-// completion flow.
+import { announceLocalAccessPrivacy } from '@/lib/local-access-privacy';
+
+// Shared accessibility helpers keep native delivery and focus handling in one
+// place. Native privacy checks protected speech again after queueing; denied
+// announcements are never replayed. Accessibility failures must not break UI
+// completion flows.
 
 /**
  * Announce a message to assistive technologies (TalkBack on Android,
@@ -22,7 +21,7 @@ export function announceForA11y(message: string): void {
     return;
   }
   try {
-    AccessibilityInfo.announceForAccessibility(trimmed);
+    void announceLocalAccessPrivacy(trimmed);
   } catch {
     // Best effort: a native accessibility outage must never break the UI.
   }

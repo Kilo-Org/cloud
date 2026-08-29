@@ -2657,6 +2657,218 @@ describe('createUserWebConnection browser provider', () => {
     expect(frames().filter(frame => frame.type === 'command')).toEqual([]);
   });
 
+  it.each([
+    ['approval denial', 'failed', 'approval_denied'],
+    ['provider cancellation', 'cancelled', 'cancelled'],
+  ] as const)(
+    'releases the next queued consent through no-tab quiescence after %s',
+    async (event, status, reason) => {
+      const f = await relayRegistered();
+      const current = await f.invoke();
+      const queued = await f.invoke(2);
+      const registeredState = f.client.getBrowserProviderState();
+      expect(queued.status).toBe('queued');
+      if (event === 'approval denial') {
+        f.client.approveBrowserProviderJob({
+          ...binding(current),
+          approval: { decision: 'denied', reason: 'approval_denied' },
+        });
+      } else {
+        f.client.cancelBrowserProviderJob(binding(current));
+      }
+      // Sending a denial or Stop does not confirm terminal state at the relay.
+      expect(() => f.client.quiesceBrowserProviderJob(binding(current))).toThrow('invalid_request');
+      await f.flush();
+      const terminal = f.snapshot(current.jobId);
+      expect(terminal).toMatchObject({
+        status,
+        result: { status, reason, effectsUncertain: false },
+      });
+      expect(terminal).not.toHaveProperty('approvedTab');
+      expect(f.snapshot(queued.jobId)).toEqual(queued);
+      expect(
+        f.messages
+          .filter(message => message.type === 'provider_job')
+          .map(message => message.job.jobId)
+      ).toEqual([current.jobId]);
+      expect(frames().filter(frame => frame.type === 'provider_quiesced')).toEqual([]);
+
+      f.client.quiesceBrowserProviderJob(binding(current));
+      await f.flush();
+      expect(lastFrame('provider_quiesced')).toStrictEqual({
+        type: 'provider_quiesced',
+        ...binding(current),
+      });
+      expect(
+        f.messages
+          .filter(message => message.type === 'provider_job')
+          .map(message => message.job.jobId)
+      ).toEqual([current.jobId, queued.jobId]);
+      const next = f.snapshot(queued.jobId);
+      expect(next).toMatchObject({ status: 'awaiting_approval', generation: current.generation });
+      expect(next).not.toHaveProperty('approvedTab');
+      expect(next.deadlines).not.toHaveProperty('execution');
+      expect(f.client.getBrowserProviderState()).toEqual(registeredState);
+      expect(() => f.client.sendBrowserProviderResult(completion(next))).toThrow('invalid_request');
+      expect(() =>
+        f.client.approveBrowserProviderJob({
+          ...binding(current),
+          approval: { decision: 'approved', tab },
+        })
+      ).toThrow('invalid_request');
+      expect(frames().filter(frame => frame.type === 'provider_result')).toEqual([]);
+
+      f.client.approveBrowserProviderJob({
+        ...binding(next),
+        approval: { decision: 'approved', tab },
+      });
+      await f.flush();
+      expect(f.snapshot(next.jobId)).toMatchObject({ status: 'running', approvedTab: tab });
+      expect(f.snapshot(current.jobId)).toEqual(terminal);
+    }
+  );
+
+  it.each([0, tab.tabId])(
+    'requires exact approved tab %s for SDK quiescence before releasing queued consent',
+    async tabId => {
+      const f = await relayRegistered();
+      const current = await f.invoke();
+      const queued = await f.invoke(2);
+      const approvedTab = { ...tab, tabId };
+      f.client.approveBrowserProviderJob({
+        ...binding(current),
+        approval: { decision: 'approved', tab: approvedTab },
+      });
+      await f.flush();
+      f.client.sendBrowserProviderResult({ ...completion(current), tab: approvedTab });
+      await f.flush();
+      const terminal = f.snapshot(current.jobId);
+      expect(terminal).toMatchObject({ status: 'succeeded', approvedTab });
+
+      for (const fields of [{}, { tabId: tabId + 1 }]) {
+        expect(() =>
+          f.client.quiesceBrowserProviderJob({ ...binding(current), ...fields })
+        ).toThrow('invalid_request');
+        await f.flush();
+        expect(f.snapshot(current.jobId)).toEqual(terminal);
+        expect(f.snapshot(queued.jobId)).toEqual(queued);
+      }
+      expect(frames().filter(frame => frame.type === 'provider_quiesced')).toEqual([]);
+      f.client.quiesceBrowserProviderJob({ ...binding(current), tabId });
+      await f.flush();
+      expect(lastFrame('provider_quiesced')).toStrictEqual({
+        type: 'provider_quiesced',
+        ...binding(current),
+        tabId,
+      });
+      expect(f.snapshot(queued.jobId)).toMatchObject({ status: 'awaiting_approval' });
+      expect(f.snapshot(queued.jobId)).not.toHaveProperty('approvedTab');
+      expect(
+        f.messages
+          .filter(message => message.type === 'provider_job')
+          .map(message => message.job.jobId)
+      ).toEqual([current.jobId, queued.jobId]);
+    }
+  );
+
+  it.each([
+    ['wrong provider', { providerId: `bp_${uuid(9)}` }],
+    ['wrong conversation', { browserTaskId: `bt_${uuid(9)}` }],
+    ['wrong job', { jobId: `bj_${uuid(9)}` }],
+    ['wrong invocation', { invocationId: `b1.${now}.${'f'.repeat(64)}` }],
+    ['stale generation', { generation: 1 }],
+  ] as const)('rejects no-tab quiescence with %s at the SDK boundary', async (_variant, fields) => {
+    const f = await relayRegistered();
+    f.client.markBrowserProviderUnavailable({
+      providerId: registration.providerId,
+      generation: 1,
+      reason: 'provider_unavailable',
+      effectsUncertain: false,
+    });
+    await f.flush();
+    const renewed = f.client.registerBrowserProvider({ ...registration, generation: 1 });
+    await f.flush();
+    await expect(renewed).resolves.toMatchObject({ generation: 2 });
+    const current = await f.invoke();
+    const queued = await f.invoke(2);
+    f.client.cancelBrowserProviderJob(binding(current));
+    await f.flush();
+    const terminal = f.snapshot(current.jobId);
+    expect(terminal).toMatchObject({ status: 'cancelled', generation: 2 });
+
+    expect(() => f.client.quiesceBrowserProviderJob({ ...binding(current), ...fields })).toThrow(
+      'owner_mismatch'
+    );
+    await f.flush();
+    expect(frames().filter(frame => frame.type === 'provider_quiesced')).toEqual([]);
+    expect(f.snapshot(current.jobId)).toEqual(terminal);
+    expect(f.snapshot(queued.jobId)).toEqual(queued);
+    f.client.quiesceBrowserProviderJob(binding(current));
+    await f.flush();
+    expect(f.snapshot(queued.jobId)).toMatchObject({ status: 'awaiting_approval' });
+  });
+
+  it.each(['queued', 'awaiting_approval', 'running'] as const)(
+    'rejects SDK quiescence for nonterminal %s work with or without a tab',
+    async phase => {
+      const f = await relayRegistered();
+      const current = await f.invoke();
+      const queued = await f.invoke(2);
+      if (phase === 'running') {
+        f.client.approveBrowserProviderJob({
+          ...binding(current),
+          approval: { decision: 'approved', tab },
+        });
+        await f.flush();
+      }
+      const target = f.snapshot(phase === 'queued' ? queued.jobId : current.jobId);
+      expect(target.status).toBe(phase);
+      for (const fields of [{}, { tabId: tab.tabId }]) {
+        expect(() => f.client.quiesceBrowserProviderJob({ ...binding(target), ...fields })).toThrow(
+          'invalid_request'
+        );
+      }
+      await f.flush();
+      expect(frames().filter(frame => frame.type === 'provider_quiesced')).toEqual([]);
+      expect(f.snapshot(target.jobId)).toEqual(target);
+      expect(f.snapshot(queued.jobId)).toEqual(queued);
+      expect(
+        f.messages
+          .filter(message => message.type === 'provider_job')
+          .map(message => message.job.jobId)
+      ).toEqual([current.jobId]);
+    }
+  );
+
+  it('does not let a replacement SDK socket quiesce prior no-tab terminal work from history', async () => {
+    const f = await relayRegistered();
+    const current = await f.invoke();
+    f.client.cancelBrowserProviderJob(binding(current));
+    await f.flush();
+    const terminal = f.snapshot(current.jobId);
+    expect(terminal).toMatchObject({ status: 'cancelled', result: { effectsUncertain: false } });
+    expect(terminal).not.toHaveProperty('approvedTab');
+    await f.disconnect(4001);
+    await jest.advanceTimersByTimeAsync(0);
+    await f.connect();
+
+    expect(() => f.client.quiesceBrowserProviderJob(binding(current))).toThrow('owner_mismatch');
+    const status = f.client.requestBrowserProviderStatus();
+    await f.flush();
+    await expect(status).resolves.toMatchObject({
+      jobs: [terminal],
+      unresolvedFence: { invocationId: current.invocationId },
+    });
+    expect((await status).unresolvedFence).not.toHaveProperty('tabId');
+    expect(f.client.getBrowserProviderState()).toEqual({
+      status: 'unavailable',
+      reason: 'provider_unavailable',
+      retryable: true,
+    });
+    expect(frames().filter(frame => frame.type === 'provider_quiesced')).toEqual([]);
+    expect(f.snapshot(current.jobId)).toEqual(terminal);
+  });
+
   it('makes unavailable explicit while permitting drained-work acknowledgement and disabling automatic registration', async () => {
     const client = await registered();
     const current = job();

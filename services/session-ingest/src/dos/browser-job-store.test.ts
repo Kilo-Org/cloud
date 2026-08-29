@@ -1966,89 +1966,157 @@ describe('browser provider historical status', () => {
     }
   );
 
-  it('recovers an expired fence only with its discovered identity and explicit safety proof', async () => {
-    const f = await setup();
-    const active = await running(f, {
-      invocationId: invocation(1, NOW - BROWSER_RETENTION_MS + 1_000),
-    });
-    await f.store.updateProvider(f.panel, resultMessage(active), NOW);
-    const queued = await admit(f, 2);
-    await f.store.expire(NOW + 1_000);
-    expect((await f.store.cleanup(NOW + 1_000)).value).toBe(1);
-    expect(f.fake.get(`browser/job/${active.jobId}`)).toBeUndefined();
-    expect(f.fake.get(`browser/invocation/${active.invocationId}`)).toBeUndefined();
-    const restarted = createBrowserJobStore(f.fake.storage);
-    const reader = socket('web', 'reconnected');
-    const attachment = reader.deserializeAttachment();
-    const before = f.fake.snapshot();
-    const cancellations = await restarted.pendingCancellations();
-    const page = await restarted.providerStatus(reader, historyRequest(), NOW + 1_001);
-    expect(page.unresolvedFence).toStrictEqual({
-      invocationId: active.invocationId,
-      tabId: TAB.tabId,
-    });
-    expect(page.jobs).toMatchObject([
-      { jobId: queued.jobId, status: 'interrupted', result: { reason: 'provider_unavailable' } },
-    ]);
-    expect(f.fake.snapshot()).toEqual(before);
-    expect(reader.deserializeAttachment()).toEqual(attachment);
-    expect(await restarted.pendingCancellations()).toEqual(cancellations);
-    expect((await restarted.deadlines()).lease).toBeNull();
-    expect((await restarted.dispatch(active.providerId, NOW + 1_001)).value).toBeNull();
-    await expect(
-      restarted.updateProvider(reader, quiesced(active), NOW + 1_001)
-    ).rejects.toMatchObject({ code: 'owner_mismatch' });
-    await expect(
-      restarted.registerProvider(reader, registration(), NOW + 1_001)
-    ).rejects.toMatchObject({ code: 'provider_unavailable', retryable: true });
-
-    const fence = page.unresolvedFence;
-    if (!fence || fence.tabId === undefined) throw new Error('Missing approved recovery identity');
-    const safetyProof = {
-      ...fence,
-      tabId: fence.tabId,
-      tabClosed: true,
-      locksDrained: true,
-    } as const;
-    for (const [recoveryFields, code] of [
-      [{ ...safetyProof, invocationId: invocation(99) }, 'provider_unavailable'],
-      [{ ...safetyProof, tabId: fence.tabId + 1 }, 'provider_unavailable'],
-      [{ ...safetyProof, tabId: undefined }, 'invalid_request'],
-      [{ ...safetyProof, tabClosed: false }, 'invalid_request'],
-      [{ ...safetyProof, locksDrained: false }, 'invalid_request'],
-    ] as const) {
+  it.each([
+    ['pre-approval', undefined],
+    ['approved tab zero', 0],
+    ['approved tab', TAB.tabId],
+  ] as const)(
+    'recovers an expired %s fence only with its discovered identity and explicit safety proof',
+    async (_state, tabId) => {
+      const f = await setup();
+      await admit(f, 1, {
+        invocationId: invocation(1, NOW - BROWSER_RETENTION_MS + 1_000),
+      });
+      let active = await dispatch(f);
+      if (tabId !== undefined) {
+        active = await approve(f, active, NOW, { ...TAB, tabId });
+        await f.store.updateProvider(f.panel, resultMessage(active), NOW);
+      }
+      const queued = await admit(f, 2);
+      await f.store.expire(NOW + 1_000);
+      expect((await f.store.cleanup(NOW + 1_000)).value).toBe(1);
+      expect(f.fake.get(`browser/job/${active.jobId}`)).toBeUndefined();
+      expect(f.fake.get(`browser/invocation/${active.invocationId}`)).toBeUndefined();
+      const restarted = createBrowserJobStore(f.fake.storage);
+      const reader = socket('web', 'reconnected');
+      const attachment = reader.deserializeAttachment();
+      const before = f.fake.snapshot();
+      const cancellations = await restarted.pendingCancellations();
+      const page = await restarted.providerStatus(reader, historyRequest(), NOW + 1_001);
+      expect(page.unresolvedFence).toStrictEqual(
+        tabId === undefined
+          ? { invocationId: active.invocationId }
+          : { invocationId: active.invocationId, tabId }
+      );
+      expect(page.jobs).toMatchObject([
+        { jobId: queued.jobId, status: 'interrupted', result: { reason: 'provider_unavailable' } },
+      ]);
+      expect(f.fake.snapshot()).toEqual(before);
+      expect(reader.deserializeAttachment()).toEqual(attachment);
+      expect(await restarted.pendingCancellations()).toEqual(cancellations);
+      expect((await restarted.deadlines()).lease).toBeNull();
+      expect((await restarted.dispatch(active.providerId, NOW + 1_001)).value).toBeNull();
       await expect(
-        restarted.registerProvider(
+        restarted.updateProvider(reader, quiesced(active), NOW + 1_001)
+      ).rejects.toMatchObject({ code: 'owner_mismatch' });
+      await expect(
+        restarted.registerProvider(reader, registration(), NOW + 1_001)
+      ).rejects.toMatchObject({ code: 'provider_unavailable', retryable: true });
+
+      const fence = page.unresolvedFence;
+      if (!fence) throw new Error('Missing recovery identity');
+      const safetyProof = { ...fence, tabClosed: true, locksDrained: true } as const;
+      for (const [recoveryFields, code] of [
+        [{ ...safetyProof, invocationId: invocation(99) }, 'provider_unavailable'],
+        [{ ...safetyProof, invocationId: undefined }, 'invalid_request'],
+        [{ ...safetyProof, tabClosed: undefined }, 'invalid_request'],
+        [{ ...safetyProof, locksDrained: undefined }, 'invalid_request'],
+        [{ ...safetyProof, tabClosed: false }, 'invalid_request'],
+        [{ ...safetyProof, locksDrained: false }, 'invalid_request'],
+      ] as const) {
+        await expect(
+          restarted.registerProvider(
+            reader,
+            { ...registration(), recovery: recoveryFields },
+            NOW + 1_001
+          )
+        ).rejects.toMatchObject({ code, retryable: code === 'provider_unavailable' });
+        expect(f.fake.snapshot()).toEqual(before);
+      }
+      if (fence.tabId !== undefined) {
+        for (const suppliedTabId of [undefined, fence.tabId + 1]) {
+          await expect(
+            restarted.registerProvider(
+              reader,
+              registration(1, { recovery: { ...safetyProof, tabId: suppliedTabId } }),
+              NOW + 1_001
+            )
+          ).rejects.toMatchObject({ code: 'provider_unavailable', retryable: true });
+          expect(f.fake.snapshot()).toEqual(before);
+        }
+      }
+      for (const variant of ['wrong proof', 'wrong user'] as const) {
+        await expect(
+          restarted.registerProvider(
+            variant === 'wrong user' ? socket('web', 'reconnected', 'user_2') : reader,
+            registration(1, {
+              recovery: safetyProof,
+              ...(variant === 'wrong proof' ? { providerProof: 'b'.repeat(64) } : {}),
+            }),
+            NOW + 1_001
+          )
+        ).rejects.toMatchObject({ code: 'owner_mismatch', retryable: false });
+        expect(f.fake.snapshot()).toEqual(before);
+      }
+      const recovered = await restarted.registerProvider(
+        reader,
+        registration(1, { recovery: safetyProof }),
+        NOW + 1_001
+      );
+      expect(recovered.value.generation).toBeGreaterThan(active.generation);
+      expect(await restarted.pendingCancellations()).toEqual([]);
+      expect(await restarted.dispatch(active.providerId, NOW + 1_001)).toEqual({
+        value: null,
+        effects: { updates: [], cancellations: [] },
+      });
+      expect(f.fake.get(`browser/job/${queued.jobId}`)).toMatchObject({
+        snapshot: { status: 'interrupted' },
+      });
+      expect(f.fake.get(`browser/job/${queued.jobId}`)).not.toHaveProperty('dispatch');
+      const recoveredPage = await restarted.providerStatus(reader, historyRequest(), NOW + 1_001);
+      expect(recoveredPage.jobs).toEqual(page.jobs);
+      expect(recoveredPage).not.toHaveProperty('unresolvedFence');
+      for (const input of [recovery(active.invocationId), ownedLookup(active)]) {
+        await expect(restarted.lookup(f.cli, input, NOW + 1_001)).rejects.toMatchObject({
+          code: 'invocation_expired',
+          retryable: false,
+        });
+      }
+      await expect(
+        restarted.invoke(f.cli, request(1, { invocationId: active.invocationId }), NOW + 1_001)
+      ).rejects.toMatchObject({ code: 'invocation_expired', retryable: false });
+      await expect(
+        restarted.updateProvider(
           reader,
-          { ...registration(), recovery: recoveryFields },
+          {
+            type: 'provider_approval',
+            ...binding(active),
+            approval: { decision: 'approved', tab: TAB },
+          },
           NOW + 1_001
         )
-      ).rejects.toMatchObject({ code, retryable: code === 'provider_unavailable' });
-      expect(f.fake.snapshot()).toEqual(before);
+      ).rejects.toMatchObject({ code: 'owner_mismatch', retryable: false });
+      expect(f.fake.get(`browser/job/${active.jobId}`)).toBeUndefined();
+      expect(f.fake.get(`browser/invocation/${active.invocationId}`)).toBeUndefined();
+
+      const next = (await restarted.invoke(f.cli, request(3), NOW + 1_002)).value.job;
+      const current = { ...f, store: restarted, panel: reader };
+      const awaitingApproval = await dispatch(current, next.providerId, NOW + 1_002);
+      expect(awaitingApproval).toMatchObject({
+        jobId: next.jobId,
+        generation: recovered.value.generation,
+        status: 'awaiting_approval',
+      });
+      expect(awaitingApproval).not.toHaveProperty('approvedTab');
+      await expect(
+        restarted.updateProvider(reader, resultMessage(awaitingApproval), NOW + 1_002)
+      ).rejects.toMatchObject({ code: 'invalid_request', retryable: false });
+      expect(await approve(current, awaitingApproval, NOW + 1_002)).toMatchObject({
+        status: 'running',
+        approvedTab: TAB,
+      });
     }
-    const recovered = await restarted.registerProvider(
-      reader,
-      registration(1, { recovery: safetyProof }),
-      NOW + 1_001
-    );
-    expect(recovered.value.generation).toBeGreaterThan(active.generation);
-    expect(await restarted.pendingCancellations()).toEqual([]);
-    expect(await restarted.dispatch(active.providerId, NOW + 1_001)).toEqual({
-      value: null,
-      effects: { updates: [], cancellations: [] },
-    });
-    expect(f.fake.get(`browser/job/${queued.jobId}`)).toMatchObject({
-      snapshot: { status: 'interrupted' },
-    });
-    expect(f.fake.get(`browser/job/${queued.jobId}`)).not.toHaveProperty('dispatch');
-    expect(
-      await restarted.providerStatus(reader, historyRequest(), NOW + 1_001)
-    ).not.toHaveProperty('unresolvedFence');
-    const next = (await restarted.invoke(f.cli, request(3), NOW + 1_002)).value.job;
-    expect(
-      (await restarted.dispatch(active.providerId, NOW + 1_002)).value?.message.job.jobId
-    ).toBe(next.jobId);
-  });
+  );
 
   it('fails closed when a retained job belongs to another provider', async () => {
     const f = await setup();

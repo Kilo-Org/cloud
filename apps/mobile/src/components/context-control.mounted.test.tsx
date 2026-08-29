@@ -29,6 +29,7 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'android' },
   Pressable: 'Pressable',
   View: 'View',
@@ -69,15 +70,11 @@ function texts(ui: Mounted) {
 }
 
 function picker(ui: Mounted) {
-  return ui.renderer.root.find(
-    node => node.type === 'Pressable' && node.props.accessibilityHint === 'Select account'
-  );
+  return ui.renderer.root.findByProps({ accessibilityHint: 'Select account' });
 }
 
 function retry(ui: Mounted) {
-  return ui.renderer.root.find(
-    node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Retry'
-  );
+  return ui.renderer.root.findByProps({ accessibilityLabel: 'Retry' });
 }
 
 async function press(node: ReactTestInstance) {
@@ -122,28 +119,27 @@ afterEach(() => {
 });
 
 describe('ContextControl', () => {
-  it('shows confirmed Personal without waiting for organization names', async () => {
-    list.mockReturnValue(new Promise(() => undefined));
-    const ui = await mount();
-    expect(texts(ui)).toContain('Personal');
-    expect(ui.renderer.root.findAll(node => node.type === 'Skeleton')).toHaveLength(0);
-    expect(picker(ui).props.accessibilityState).toEqual({ busy: false, disabled: true });
-  });
-
-  it('shows a busy placeholder until the required name resolves, then exposes its full name', async () => {
-    storage.read.mockResolvedValue('org-a');
+  it.each([
+    { id: null, label: 'Personal', result: [] },
+    { id: 'org-a', label: name, result: orgs },
+  ])('shows progress for $id membership lookup', async ({ id, label, result }) => {
+    storage.read.mockResolvedValue(id);
     const names = Promise.withResolvers<typeof orgs>();
     list.mockReturnValue(names.promise);
     const ui = await mount();
-    expect(texts(ui)).not.toContain('Personal');
+    expect(texts(ui).includes('Personal')).toBe(id === null);
+    expect(ui.renderer.root.findAllByType('Skeleton')).toHaveLength(id === null ? 0 : 1);
     expect(picker(ui).props.accessibilityState).toEqual({ busy: true, disabled: true });
+    expect(picker(ui).findAllByType('ActivityIndicator')).toHaveLength(1);
     await act(() => {
-      names.resolve(orgs);
+      names.resolve(result);
     });
-    await waitFor(() => texts(ui).includes(name));
-    expect(picker(ui).props.accessibilityLabel).toBe(name);
+    await waitFor(() => !picker(ui).props.disabled);
+    expect(texts(ui)).toContain(label);
+    expect(picker(ui).props.accessibilityLabel).toBe(label);
     expect(picker(ui).props.accessibilityRole).toBe('button');
-    expect(picker(ui).props.disabled).toBe(false);
+    expect(picker(ui).props.accessibilityState).toEqual({ busy: false, disabled: false });
+    expect(picker(ui).findAllByType('ActivityIndicator')).toHaveLength(0);
   });
 
   it.each([
@@ -202,7 +198,7 @@ describe('ContextControl', () => {
     expect(ui.renderer.root.findByType('GlobalScope').props.id).toBe('org-a');
   });
 
-  it('keeps a cached name visible during refetch and after a refetch error', async () => {
+  it('keeps a cached name visible through refetch failure and a busy explicit Retry', async () => {
     storage.read.mockResolvedValue('org-a');
     const ui = await mount();
     await waitFor(() => texts(ui).includes(name));
@@ -221,6 +217,17 @@ describe('ContextControl', () => {
       refresh.reject(new Error('offline'));
     });
     await waitFor(() => texts(ui).includes('Retry'));
+    const names = Promise.withResolvers<typeof orgs>();
+    list.mockReturnValue(names.promise);
+    await press(retry(ui));
+    await waitFor(() => retry(ui).props.disabled === true);
+    expect(texts(ui)).toContain(name);
+    expect(retry(ui).props.accessibilityState).toEqual({ busy: true, disabled: true });
+    expect(retry(ui).findAllByType('ActivityIndicator')).toHaveLength(1);
+    await act(() => {
+      names.resolve(orgs);
+    });
+    await waitFor(() => !texts(ui).includes('Retry'));
     expect(texts(ui)).toContain(name);
   });
 
@@ -246,9 +253,24 @@ describe('ContextControl', () => {
     await waitFor(() => texts(ui).includes('Could not save setting'));
     expect(texts(ui)).toContain(name);
     expect(persisted).toBeNull();
+    const save = Promise.withResolvers<undefined>();
+    storage.write.mockImplementationOnce(async (_key: string, value: string) => {
+      await save.promise;
+      persisted = value;
+    });
     await press(retry(ui));
+    expect(texts(ui)).toContain(name);
+    expect(texts(ui)).toContain('Could not save setting');
+    expect(retry(ui).props.accessibilityState).toEqual({ busy: true, disabled: true });
+    expect(retry(ui).props.disabled).toBe(true);
+    expect(retry(ui).findAllByType('ActivityIndicator')).toHaveLength(1);
+    expect(persisted).toBeNull();
+    await act(() => {
+      save.resolve(undefined);
+    });
     await waitFor(() => persisted === 'org-a');
     expect(texts(ui)).not.toContain('Could not save setting');
+    expect(texts(ui)).not.toContain('Retry');
   });
 
   it.each([

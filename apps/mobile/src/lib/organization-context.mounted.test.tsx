@@ -57,11 +57,11 @@ beforeEach(() => {
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockImplementation(async (_key: string, value: string) => {
     writes.push(value);
-    await Promise.resolve();
+    await Promise.resolve(undefined);
   });
   storage.remove.mockReset().mockImplementation(async () => {
     writes.push(null);
-    await Promise.resolve();
+    await Promise.resolve(undefined);
   });
 });
 
@@ -207,21 +207,45 @@ describe('OrganizationProvider restoration', () => {
 });
 
 describe('OrganizationProvider persistence', () => {
-  it('retains an optimistic selection after a write failure and saves it on retry', async () => {
+  it.each([
+    { id: 'org-a', fails: false },
+    { id: 'org-a', fails: true },
+    { id: null, fails: false },
+    { id: null, fails: true },
+  ])('keeps $id save Retry busy until storage settles (fails=$fails)', async ({ id, fails }) => {
+    storage.read.mockResolvedValue('previous-org');
     await mount();
-    storage.write.mockRejectedValueOnce(new Error('save failed'));
+    const write = id === null ? storage.remove : storage.write;
+    write.mockRejectedValueOnce(new Error('save failed'));
     await act(() => {
-      scope().setOrganizationId('org-a');
+      scope().setOrganizationId(id);
     });
     await waitFor(() => scope().error === 'save');
-    expect(scope()).toMatchObject({ organizationId: 'org-a', isLoaded: true });
-    expect(writes).toEqual([]);
+    const save = Promise.withResolvers<undefined>();
+    write.mockImplementationOnce(async (_key: string, value?: string) => {
+      await save.promise;
+      writes.push(value ?? null);
+    });
     await act(() => {
       scope().retry();
     });
-    await waitFor(() => writes.length === 1);
-    expect(writes).toEqual(['org-a']);
-    expect(scope().error).toBeNull();
+    expect(scope()).toMatchObject({
+      organizationId: id,
+      isLoaded: true,
+      error: 'save',
+      isSaving: true,
+    });
+    expect(writes).toEqual([]);
+    await act(() => {
+      if (fails) {
+        save.reject(new Error('retry failed'));
+      } else {
+        save.resolve(undefined);
+      }
+    });
+    await waitFor(() => !scope().isSaving);
+    expect(scope()).toMatchObject({ organizationId: id, error: fails ? 'save' : null });
+    expect(writes).toEqual(fails ? [] : [id]);
   });
 
   it.each(['org-b', null])('retries the latest selection %s, not a failed snapshot', async id => {
@@ -238,57 +262,56 @@ describe('OrganizationProvider persistence', () => {
     });
     await waitFor(() => writes.length === 2);
     expect(writes).toEqual([id, id]);
-    expect(scope()).toMatchObject({ organizationId: id, isLoaded: true, error: null });
+    expect(scope()).toMatchObject({
+      organizationId: id,
+      isLoaded: true,
+      error: null,
+      isSaving: false,
+    });
   });
 
-  it('reports a failed Personal deletion and retries deletion', async () => {
-    storage.read.mockResolvedValue('org-a');
-    await mount();
-    storage.remove.mockRejectedValueOnce(new Error('delete failed'));
-    await act(() => {
-      scope().setOrganizationId(null);
-    });
-    await waitFor(() => scope().error === 'save');
-    expect(scope().organizationId).toBeNull();
-    await act(() => {
-      scope().retry();
-    });
-    await waitFor(() => writes.length === 1);
-    expect(writes).toEqual([null]);
-  });
-
-  it.each([
-    { reason: 'selection', expected: 'org-b' },
-    { reason: 'token', expected: null },
-    { reason: 'epoch', expected: 'org-a' },
-    { reason: 'unmount', expected: null },
-  ])('ignores a rejected save after $reason invalidation', async ({ reason, expected }) => {
-    const renderer = await mount();
-    const save = Promise.withResolvers<undefined>();
-    storage.write.mockReturnValueOnce(save.promise);
-    await act(() => {
-      scope().setOrganizationId('org-a');
-    });
-    if (reason === 'selection') {
+  describe.each(['resolve', 'reject'])('obsolete save %s', outcome => {
+    it.each([
+      { reason: 'selection', expected: 'org-b', isSaving: true },
+      { reason: 'token', expected: null, isSaving: false },
+      { reason: 'epoch', expected: 'org-a', isSaving: true },
+      { reason: 'unmount', expected: null, isSaving: false },
+    ])('ignores completion after $reason invalidation', async ({ reason, expected, isSaving }) => {
+      const renderer = await mount();
+      const save = Promise.withResolvers<undefined>();
+      const newerSave = Promise.withResolvers<undefined>();
+      storage.write.mockReturnValueOnce(save.promise).mockReturnValueOnce(newerSave.promise);
       await act(() => {
-        scope().setOrganizationId('org-b');
+        scope().setOrganizationId('org-a');
       });
-    } else if (reason === 'token') {
-      auth.token = undefined;
+      if (reason === 'selection') {
+        await act(() => {
+          scope().setOrganizationId('org-b');
+        });
+      } else if (reason === 'token') {
+        auth.token = undefined;
+        await act(() => {
+          renderer.update(tree());
+        });
+      } else if (reason === 'epoch') {
+        bumpAuthEpoch();
+      } else {
+        act(() => {
+          renderer.unmount();
+        });
+        await mount();
+      }
       await act(() => {
-        renderer.update(tree());
+        if (outcome === 'resolve') {
+          save.resolve(undefined);
+        } else {
+          save.reject(new Error('obsolete'));
+        }
       });
-    } else if (reason === 'epoch') {
-      bumpAuthEpoch();
-    } else {
-      act(() => {
-        renderer.unmount();
+      expect(scope()).toMatchObject({ organizationId: expected, error: null, isSaving });
+      await act(() => {
+        newerSave.resolve(undefined);
       });
-      await mount();
-    }
-    await act(() => {
-      save.reject(new Error('obsolete'));
     });
-    expect(scope()).toMatchObject({ organizationId: expected, error: null });
   });
 });

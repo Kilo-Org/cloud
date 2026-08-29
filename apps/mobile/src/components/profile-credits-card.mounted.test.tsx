@@ -131,6 +131,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 const BALANCE_KEY = ['user', 'getContextBalance'] as const;
 const savedMetadata = new Map<string, string>();
+let saveCompletion: Promise<undefined> | undefined = undefined;
 
 async function mountCard(
   queryClient: QueryClient = createTestQueryClient(),
@@ -169,17 +170,18 @@ function openNativePicker(renderer: ReactTestRenderer) {
 beforeEach(() => {
   Platform.OS = 'ios';
   savedMetadata.clear();
+  saveCompletion = undefined;
   storage.read.mockReset().mockImplementation(async (key: string) => {
     await Promise.resolve();
     return savedMetadata.get(key) ?? null;
   });
   storage.write.mockReset().mockImplementation(async (key: string, value: string) => {
+    await saveCompletion;
     savedMetadata.set(key, value);
-    await Promise.resolve();
   });
   storage.remove.mockReset().mockImplementation(async (key: string) => {
+    await saveCompletion;
     savedMetadata.delete(key);
-    await Promise.resolve();
   });
   showPicker.mockReset();
   getContextBalanceQueryFn.mockReset();
@@ -240,9 +242,7 @@ describe('CreditsCard balance state', () => {
       expect(texts()).toContain('Could not save setting');
       expect(texts()).toContain('Supplied organization');
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
-      const retryButton = renderer.root.find(
-        node => node.type === Pressable && node.props.accessibilityLabel === 'Retry'
-      );
+      const retryButton = renderer.root.findByProps({ accessibilityLabel: 'Retry' });
       expect(retryButton.props.accessibilityRole).toBe('button');
       expect(retryButton.props.accessibilityHint).toBe('Could not save setting');
       // Keep the rendered handler to catch a retry that captures the earlier failed choice.
@@ -261,8 +261,20 @@ describe('CreditsCard balance state', () => {
         node => node.type === 'Text' && node.props.accessibilityLiveRegion === 'polite'
       );
       expect(status.children).toContain('Could not save setting');
+      const save = Promise.withResolvers<undefined>();
+      saveCompletion = save.promise;
       await act(() => {
         retry();
+      });
+      expect(texts()).toContain(label);
+      expect(texts()).toContain('Could not save setting');
+      const busyRetry = renderer.root.findByProps({ accessibilityLabel: 'Retry' });
+      expect(busyRetry.props.accessibilityState).toEqual({ busy: true, disabled: true });
+      expect(busyRetry.props.disabled).toBe(true);
+      expect(busyRetry.findAllByType('ActivityIndicator')).toHaveLength(1);
+      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
+      await act(() => {
+        save.resolve(undefined);
       });
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(id ?? undefined);
       expect(texts()).toContain(label);
@@ -285,21 +297,7 @@ describe('CreditsCard balance state', () => {
     unmount();
   });
 
-  it('shows the balance when data is cached for the signed-in user', async () => {
-    currentUser.userId = 'user-A';
-    const queryClient = createTestQueryClient();
-    queryClient.setQueryData([...BALANCE_KEY], { balance: 1 });
-
-    const { texts, unmount } = await mountCard(queryClient);
-
-    await waitFor(() => texts().includes('$1.00') && !texts().includes('SKELETON'));
-    expect(texts()).not.toContain('SKELETON');
-    expect(texts()).toContain('$1.00');
-
-    unmount();
-  });
-
-  it('never renders user A balance as current after switching to user B', async () => {
+  it('shows a cached balance without reusing it after an account change', async () => {
     const queryClient = createTestQueryClient();
 
     // Owner A signs in and has a cached balance.
@@ -308,18 +306,15 @@ describe('CreditsCard balance state', () => {
 
     // Hold the next owner's balance fetch until the test resolves it, so the
     // skeleton state between the switch and the resolved fetch is observable.
-    let resolveB: ((value: { balance: number }) => void) | undefined = undefined;
-    getContextBalanceQueryFn.mockReturnValue(
-      new Promise<{ balance: number }>(resolve => {
-        resolveB = resolve;
-      })
-    );
+    const balanceB = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(balanceB.promise);
 
     const a = await mountCard(queryClient);
 
     // User A renders from cache.
     await waitFor(() => a.texts().includes('$10.00'));
     expect(a.texts()).toContain('$10.00');
+    expect(a.texts()).not.toContain('SKELETON');
 
     // Sign-out unmounts the profile and clears the React Query cache.
     a.unmount();
@@ -334,9 +329,8 @@ describe('CreditsCard balance state', () => {
     expect(b.texts()).not.toContain('$10.00');
 
     // Resolve user B's balance.
-    await act(async () => {
-      resolveB?.({ balance: 25 });
-      await Promise.resolve();
+    await act(() => {
+      balanceB.resolve({ balance: 25 });
     });
     await waitFor(() => b.texts().includes('$25.00'));
 

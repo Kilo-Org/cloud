@@ -417,7 +417,7 @@ async function commit(next?: NavigationState): Promise<void> {
 }
 
 function visibleAccount(): string {
-  return renderer?.root.findByType('surface').props.account as string;
+  return renderer?.root.find(node => Object.is(node.type, 'surface')).props.account as string;
 }
 
 function startSignedIn(): void {

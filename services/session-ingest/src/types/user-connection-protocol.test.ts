@@ -1029,6 +1029,128 @@ describe.each([
     browser.BrowserResult | null
   > satisfies Record<sdk.BrowserJobSnapshot['status'], sdk.BrowserResult | null>;
 
+  describe('queue metadata', () => {
+    const queuedJob = { ...job, status: 'queued' } as const;
+
+    it.each([
+      {},
+      { ownerLabel: owner.parentSessionId },
+      { queuePosition: 1 },
+      { queuePosition: 100 },
+      { ownerLabel: owner.parentSessionId, queuePosition: 50 },
+    ])('preserves optional fields without inventing missing metadata: %j', fields => {
+      const snapshot = { ...queuedJob, ...fields };
+      expect(contract.browserJobSnapshotSchema.parse(snapshot)).toStrictEqual(snapshot);
+    });
+
+    it.each([
+      { queuePosition: 0 },
+      { queuePosition: -1 },
+      { queuePosition: 101 },
+      { queuePosition: 1.5 },
+      { queuePosition: '1' },
+      { queuePosition: null },
+      { queuePosition: true },
+      { queuePosition: [] },
+      { queuePosition: {} },
+      { queuePosition: NaN },
+      { queuePosition: Infinity },
+    ])('rejects malformed queue positions: %j', fields => {
+      expect(contract.browserJobSnapshotSchema.safeParse({ ...queuedJob, ...fields }).success).toBe(
+        false
+      );
+    });
+
+    it.each([
+      { ownerLabel: 'x', accepted: true },
+      { ownerLabel: 'x'.repeat(128), accepted: true },
+      { ownerLabel: '\u00e9'.repeat(64), accepted: true },
+      { ownerLabel: '', accepted: false },
+      { ownerLabel: 'x'.repeat(129), accepted: false },
+      { ownerLabel: '\u00e9'.repeat(65), accepted: false },
+      { ownerLabel: null, accepted: false },
+      { ownerLabel: 1, accepted: false },
+      { ownerLabel: false, accepted: false },
+      { ownerLabel: [], accepted: false },
+      { ownerLabel: {}, accepted: false },
+    ])('matches the existing dispatch owner-label bounds: %j', ({ ownerLabel, accepted }) => {
+      expect(
+        contract.browserJobSnapshotSchema.safeParse({ ...queuedJob, ownerLabel }).success
+      ).toBe(accepted);
+      expect(
+        contract.browserProviderInboundMessageSchema.safeParse({
+          type: 'provider_job',
+          job,
+          goal: invoke.goal,
+          ownerLabel,
+        }).success
+      ).toBe(accepted);
+    });
+
+    it.each(Object.entries(statusResults).filter(([status]) => status !== 'queued'))(
+      'preserves legacy %s snapshots and labels but rejects stale queue positions',
+      (status, result) => {
+        const snapshot = {
+          ...job,
+          status,
+          ...(status === 'running' ? { approvedTab: tab } : {}),
+          ...(result ? { result } : {}),
+        };
+        expect(contract.browserJobSnapshotSchema.parse(snapshot)).toStrictEqual(snapshot);
+        const labeled = { ...snapshot, ownerLabel: owner.parentSessionId };
+        expect(contract.browserJobSnapshotSchema.parse(labeled)).toStrictEqual(labeled);
+        expect(
+          contract.browserJobSnapshotSchema.safeParse({ ...labeled, queuePosition: 1 }).success
+        ).toBe(false);
+      }
+    );
+
+    it.each([
+      { owner },
+      { parentSessionId: owner.parentSessionId },
+      { parentProof: owner.parentProof },
+      { providerProof: registration.providerProof },
+      { connectionId: 'private-route' },
+      { capabilities: { browserJobsV1: true } },
+      { goal: invoke.goal },
+      { recovery },
+      { leaseExpiresAt: '2026-08-28T00:00:15.000Z' },
+    ])('keeps private data and authority out of labeled snapshots: %j', fields => {
+      expect(
+        contract.browserJobSnapshotSchema.safeParse({
+          ...queuedJob,
+          ownerLabel: owner.parentSessionId,
+          queuePosition: 1,
+          ...fields,
+        }).success
+      ).toBe(false);
+    });
+
+    it.each([{ ownerLabel: owner.parentSessionId }, { queuePosition: 1 }])(
+      'keeps projection metadata out of requests and immutable results: %j',
+      fields => {
+        for (const args of modelArguments) {
+          expect(
+            contract.browserTaskArgumentsSchema.safeParse({ ...args, ...fields }).success
+          ).toBe(false);
+        }
+        for (const frame of cliRequests) {
+          expect(contract.browserRequestSchema.safeParse({ ...frame, ...fields }).success).toBe(
+            false
+          );
+        }
+        for (const frame of providerOutbound) {
+          expect(
+            contract.browserProviderOutboundMessageSchema.safeParse({ ...frame, ...fields }).success
+          ).toBe(false);
+        }
+        expect(contract.browserResultSchema.safeParse({ ...completed, ...fields }).success).toBe(
+          false
+        );
+      }
+    );
+  });
+
   it.each(Object.entries(statusResults))(
     'enforces the observable result contract for %s',
     (status, result) => {

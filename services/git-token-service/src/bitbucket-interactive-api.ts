@@ -4,6 +4,7 @@ import createClient, {
   type RequestBodyOption,
 } from 'openapi-fetch';
 import { z } from 'zod';
+import { ReviewActorSchema } from '../../../packages/app-shared/src/provider-review/contracts.js';
 import type { components, paths } from './bitbucket-openapi.js';
 import { normalizeBitbucketUuid } from './bitbucket-url.js';
 import {
@@ -95,6 +96,52 @@ export type BitbucketInteractiveResult<T = unknown> =
   | { status: 200 | 201; data: T; next?: string; location?: string }
   | { status: 202; data: unknown; location: string }
   | { status: 204; data: null };
+
+// Kilo IDs come from verified claims; provider identity and grants come from the selected integration.
+export const BitbucketInteractiveMetadataSchema = z.strictObject({
+  actorUserId: z.string().min(1),
+  organizationId: z.string().min(1),
+  integrationId: z.string().min(1),
+  instanceUrl: z.literal('https://bitbucket.org'),
+  providerActor: z.discriminatedUnion('credentialKind', [
+    z.strictObject({
+      credentialKind: z.literal('bitbucketOAuth'),
+      actor: ReviewActorSchema.extend({
+        provider: z.literal('bitbucket'),
+        instanceUrl: z.literal('https://bitbucket.org'),
+      }),
+    }),
+    // A workspace token identifies a workspace principal, not a provider user.
+    z.strictObject({
+      credentialKind: z.literal('bitbucketWorkspaceToken'),
+      workspaceUuid: z.string().refine(value => normalizeBitbucketUuid(value) !== null),
+      workspaceSlug: z.string().min(1),
+    }),
+  ]),
+  grants: z.strictObject({
+    scopes: z.array(
+      z.enum([
+        'account',
+        'email',
+        'repository',
+        'repository:write',
+        'pullrequest',
+        'pullrequest:write',
+        'webhook',
+      ])
+    ),
+  }),
+});
+export type BitbucketInteractiveMetadata = z.infer<typeof BitbucketInteractiveMetadataSchema>;
+export type BitbucketInteractiveServiceSuccess<T = unknown> = {
+  success: true;
+  result: BitbucketInteractiveResult<T>;
+  metadata: BitbucketInteractiveMetadata;
+};
+export type BitbucketInteractiveResponse<T = unknown> = BitbucketInteractiveResult<T> & {
+  metadata: BitbucketInteractiveMetadata;
+};
+
 export type BitbucketInteractiveScope =
   | { kind: 'workspace'; workspace: string }
   | { kind: 'repository'; workspace: string; repository: string };

@@ -57,23 +57,83 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.params).toContain(10);
   });
 
-  it('uses a supplied integration ID as an exact organization authorization fence', () => {
-    const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
-    const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';
-    const query = buildManagedInstallationLookupQuery(db, {
-      ...params,
-      expectedIntegrationId,
-    }).toSQL();
+  describe.each([
+    ['raw token', buildInstallationLookupQuery],
+    ['managed auth', buildManagedInstallationLookupQuery],
+    ['login repair', buildInstallationRefreshCandidatesQuery],
+  ] as const)('%s authorization', (_path, buildLookupQuery) => {
+    it.each([undefined, { type: 'org', id: params.orgId }] as const)(
+      'requires the exact organization owner, membership, and an unblocked user with selector %s',
+      expectedIntegrationOwner => {
+        const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
+        const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';
+        const query = buildLookupQuery(db, {
+          ...params,
+          expectedIntegrationId,
+          expectedIntegrationOwner,
+        }).toSQL();
 
-    expect(query.sql).toContain('"platform_integrations"."id" =');
-    expect(query.sql).toContain('"platform_integrations"."integration_status" =');
-    expect(query.sql).toContain('"platform_integrations"."owned_by_organization_id" =');
-    expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" is null');
-    expect(query.sql).toContain('"organization_memberships"."id" is not null');
-    expect(query.sql).not.toContain('"platform_integrations"."owned_by_user_id" =');
-    expect(query.params).toContain(expectedIntegrationId);
-    expect(query.params).toContain(params.orgId);
-    expect(query.params).toContain('renamed-owner');
-    expect(query.params).toContain(1);
+        expect(query.sql).toContain('"platform_integrations"."id" =');
+        expect(query.sql).toContain('"platform_integrations"."integration_status" =');
+        expect(query.sql).toContain('"platform_integrations"."owned_by_organization_id" =');
+        expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" is null');
+        expect(query.sql).toContain('"organization_memberships"."id" is not null');
+        expect(query.sql).toContain('"organization_memberships"."kilo_user_id" =');
+        expect(query.sql).toContain('exists (select');
+        expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
+        expect(query.sql).not.toContain('"platform_integrations"."owned_by_user_id" =');
+        expect(query.params).toContain(expectedIntegrationId);
+        expect(query.params).toContain(params.orgId);
+        expect(query.params).toContain('active');
+      }
+    );
+
+    it('requires the exact Personal owner and excludes organization and blocked-user access', () => {
+      const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
+      const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';
+      const query = buildLookupQuery(db, {
+        githubRepo: params.githubRepo,
+        userId: 'oauth/personal-owner',
+        expectedIntegrationId,
+      }).toSQL();
+
+      expect(query.sql).toContain('"platform_integrations"."id" =');
+      expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" =');
+      expect(query.sql).toContain('"platform_integrations"."owned_by_organization_id" is null');
+      expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
+      expect(query.sql).toContain('"platform_integrations"."integration_status" =');
+      expect(query.sql).toContain('"platform_integrations"."platform_installation_id" is not null');
+      expect(query.sql).not.toContain('"platform_integrations"."owned_by_user_id" is null');
+      expect(query.sql).not.toContain('"organization_memberships"."id" is not null');
+      expect(query.sql).not.toContain('false');
+      expect(query.params).toContain('oauth/personal-owner');
+      expect(query.params).toContain(expectedIntegrationId);
+      expect(query.params).toContain('active');
+    });
+
+    it('retains session membership and blocked-user guards for an explicit Personal pin', () => {
+      const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
+      const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';
+      const query = buildLookupQuery(db, {
+        ...params,
+        userId: 'oauth/personal-owner',
+        expectedIntegrationId,
+        expectedIntegrationOwner: { type: 'user', id: 'oauth/personal-owner' },
+      }).toSQL();
+
+      expect(query.sql).toContain('exists (select');
+      expect(query.sql).toContain('"organization_memberships"."kilo_user_id" =');
+      expect(query.sql).toContain('"platform_integrations"."id" =');
+      expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" =');
+      expect(query.sql).toContain('"platform_integrations"."owned_by_organization_id" is null');
+      expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
+      expect(query.sql).toContain('"platform_integrations"."integration_status" =');
+      expect(query.sql).not.toContain('"platform_integrations"."owned_by_user_id" is null');
+      expect(query.sql).not.toContain(' or ');
+      expect(query.params).toContain(expectedIntegrationId);
+      expect(query.params.filter(param => param === params.orgId)).toHaveLength(1);
+      expect(query.params.filter(param => param === 'oauth/personal-owner')).toHaveLength(4);
+      expect(query.params).toContain('active');
+    });
   });
 });

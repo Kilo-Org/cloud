@@ -86,6 +86,77 @@ describe('GitHubSessionCapabilityCodec', () => {
     expect(decoded).not.toHaveProperty('integrationId');
   });
 
+  describe.each([undefined, claims.outboundContainerId])('container %s', outboundContainerId => {
+    it.each([
+      { type: 'user', id: 'oauth/personal-owner' },
+      { type: 'org', id: claims.orgId },
+    ] as const)(
+      'seals the $type integration owner separately from the session context',
+      integrationOwner => {
+        const codec = new GitHubSessionCapabilityCodec(encryptionKey);
+        const { outboundContainerId: _outboundContainerId, ...unboundClaims } = claims;
+        const decoded = codec.decode(
+          codec.issue({
+            ...unboundClaims,
+            userId: 'oauth/personal-owner',
+            ...(outboundContainerId === undefined ? {} : { outboundContainerId }),
+            integrationOwner,
+          })
+        );
+
+        expect(decoded).toMatchObject({
+          userId: 'oauth/personal-owner',
+          orgId: claims.orgId,
+          integrationId: claims.integrationId,
+          integrationOwner,
+          owner: 'acme',
+          repo: 'widgets',
+          identity: claims.identity,
+        });
+      }
+    );
+
+    it.each([
+      ['unknown owner type', { type: 'team', id: claims.orgId }],
+      ['empty Personal owner', { type: 'user', id: '' }],
+      ['invalid organization ID', { type: 'org', id: 'not-a-uuid' }],
+      ['unknown owner field', { type: 'user', id: 'user_1', orgId: claims.orgId }],
+    ])('rejects a decrypted claim with %s', (_name, integrationOwner) => {
+      const version = outboundContainerId === undefined ? 1 : 2;
+      const serializedClaims = JSON.stringify({
+        ...claims,
+        purpose: 'github_scm_session',
+        version,
+        outboundContainerId,
+        integrationOwner,
+        issuedAt: Date.now(),
+        expiresAt: Date.now() + 60_000,
+      });
+      const capability = `kgh${version}.${encryptWithSymmetricKey(serializedClaims, encryptionKey)}`;
+      expect(() => new GitHubSessionCapabilityCodec(encryptionKey).decode(capability)).toThrowError(
+        expect.objectContaining({ reason: 'invalid_capability' })
+      );
+    });
+
+    it('rejects an owner claim without its integration pin', () => {
+      const version = outboundContainerId === undefined ? 1 : 2;
+      const serializedClaims = JSON.stringify({
+        ...claims,
+        purpose: 'github_scm_session',
+        version,
+        outboundContainerId,
+        integrationId: undefined,
+        integrationOwner: { type: 'user', id: 'user_1' },
+        issuedAt: Date.now(),
+        expiresAt: Date.now() + 60_000,
+      });
+      const capability = `kgh${version}.${encryptWithSymmetricKey(serializedClaims, encryptionKey)}`;
+      expect(() => new GitHubSessionCapabilityCodec(encryptionKey).decode(capability)).toThrowError(
+        expect.objectContaining({ reason: 'invalid_capability' })
+      );
+    });
+  });
+
   it.each([
     ['legacy unbound v1', 'kgh1.', 1, 2 * 60 * 60 * 1000, false],
     ['container-bound v2', 'kgh2.', 2, 4 * 60 * 60 * 1000, true],

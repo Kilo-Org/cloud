@@ -6,23 +6,24 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import { eq, and, exists, isNull, isNotNull, or, sql } from 'drizzle-orm';
+import type { Owner } from '../../../packages/app-shared/src/code-review/repository-identity.js';
+import { GitHubIntegrationOwnerSchema } from './github-session-capability.js';
 
 export type FindInstallationParams = {
   githubRepo: string;
   userId: string;
   orgId?: string;
   expectedIntegrationId?: string;
+  expectedIntegrationOwner?: Owner;
 };
 
 const InstallationLookupResultSchema = z.object({
+  id: z.string(),
   platform_installation_id: z.string(),
   platform_account_login: z.string().nullable(),
   github_app_type: z.enum(['standard', 'lite']).nullable().optional(),
   owned_by_organization_id: z.string().nullable(),
-});
-
-const InstallationRefreshCandidateSchema = InstallationLookupResultSchema.extend({
-  id: z.string(),
+  owned_by_user_id: z.string().nullable(),
 });
 
 const ManagedInstallationLookupResultSchema = InstallationLookupResultSchema.extend({
@@ -40,13 +41,14 @@ const ManagedInstallationLookupResultSchema = InstallationLookupResultSchema.ext
 const ExactManagedInstallationLookupResultSchema = ManagedInstallationLookupResultSchema.extend({
   id: z.string().uuid(),
   integration_status: z.string(),
-  owned_by_user_id: z.string().nullable(),
 });
 
 const MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES = 10;
 
 export type InstallationLookupSuccess = {
   success: true;
+  integrationId: string;
+  integrationOwner: Owner;
   installationId: string;
   accountLogin: string;
   githubAppType: 'standard' | 'lite';
@@ -86,6 +88,23 @@ export type ManagedInstallationLookupResult =
   | InstallationLookupFailure
   | { success: false; reason: 'repository_not_installed' };
 
+function getExpectedIntegrationOwner(params: FindInstallationParams): Owner {
+  return (
+    params.expectedIntegrationOwner ??
+    (params.orgId === undefined
+      ? { type: 'user', id: params.userId }
+      : { type: 'org', id: params.orgId })
+  );
+}
+
+function getIntegrationOwner(row: z.infer<typeof InstallationLookupResultSchema>): Owner {
+  return GitHubIntegrationOwnerSchema.parse(
+    row.owned_by_organization_id === null
+      ? { type: 'user', id: row.owned_by_user_id }
+      : { type: 'org', id: row.owned_by_organization_id }
+  );
+}
+
 function buildAuthorizedInstallationsQuery(
   db: WorkerDb,
   params: FindInstallationParams,
@@ -109,17 +128,23 @@ function buildAuthorizedInstallationsQuery(
               )
             )
         );
+  const expectedOwner = getExpectedIntegrationOwner(params);
   const exactIntegrationOwner =
     params.expectedIntegrationId === undefined
       ? undefined
-      : params.orgId === undefined
-        ? sql`false`
-        : and(
-            eq(platform_integrations.id, params.expectedIntegrationId),
-            eq(platform_integrations.owned_by_organization_id, params.orgId),
-            isNull(platform_integrations.owned_by_user_id),
-            isNotNull(organization_memberships.id)
-          );
+      : and(
+          eq(platform_integrations.id, params.expectedIntegrationId),
+          expectedOwner.type === 'user'
+            ? and(
+                eq(platform_integrations.owned_by_user_id, expectedOwner.id),
+                isNull(platform_integrations.owned_by_organization_id)
+              )
+            : and(
+                eq(platform_integrations.owned_by_organization_id, expectedOwner.id),
+                isNull(platform_integrations.owned_by_user_id),
+                isNotNull(organization_memberships.id)
+              )
+        );
   const legacyAuthorizedOwner =
     params.expectedIntegrationId === undefined
       ? or(
@@ -228,10 +253,22 @@ export class InstallationLookupService {
 
     if (
       params.expectedIntegrationId !== undefined &&
-      (params.orgId === undefined ||
-        !z.string().uuid().safeParse(params.expectedIntegrationId).success)
+      !z.string().uuid().safeParse(params.expectedIntegrationId).success
     ) {
       return { success: false, reason: 'integration_mismatch' };
+    }
+
+    if (params.expectedIntegrationOwner !== undefined) {
+      const owner = GitHubIntegrationOwnerSchema.safeParse(params.expectedIntegrationOwner);
+      if (
+        !owner.success ||
+        params.expectedIntegrationId === undefined ||
+        (owner.data.type === 'user'
+          ? owner.data.id !== params.userId
+          : owner.data.id !== params.orgId)
+      ) {
+        return { success: false, reason: 'integration_mismatch' };
+      }
     }
 
     const repoParts = params.githubRepo.split('/');
@@ -258,6 +295,8 @@ export class InstallationLookupService {
 
       return {
         success: true,
+        integrationId: selected.data.id,
+        integrationOwner: getIntegrationOwner(selected.data),
         installationId: selected.data.platform_installation_id,
         accountLogin: selected.data.platform_account_login ?? '',
         githubAppType: selected.data.github_app_type ?? 'standard',
@@ -284,6 +323,8 @@ export class InstallationLookupService {
 
     return {
       success: true,
+      integrationId: selected.id,
+      integrationOwner: getIntegrationOwner(selected),
       installationId: selected.platform_installation_id,
       accountLogin: selected.platform_account_login ?? '',
       githubAppType: selected.github_app_type ?? 'standard',
@@ -302,7 +343,7 @@ export class InstallationLookupService {
     return {
       success: true,
       candidates: rows.map(row => {
-        const parsed = InstallationRefreshCandidateSchema.parse(row);
+        const parsed = InstallationLookupResultSchema.parse(row);
         return {
           integrationId: parsed.id,
           installationId: parsed.platform_installation_id,
@@ -348,6 +389,8 @@ export class InstallationLookupService {
 
       return {
         success: true,
+        integrationId: selected.data.id,
+        integrationOwner: getIntegrationOwner(selected.data),
         installationId: selected.data.platform_installation_id,
         accountLogin: selected.data.platform_account_login ?? '',
         githubAppType: selected.data.github_app_type ?? 'standard',
@@ -385,6 +428,8 @@ export class InstallationLookupService {
 
     return {
       success: true,
+      integrationId: selected.id,
+      integrationOwner: getIntegrationOwner(selected),
       installationId: selected.platform_installation_id,
       accountLogin: selected.platform_account_login ?? '',
       githubAppType: selected.github_app_type ?? 'standard',
@@ -397,11 +442,17 @@ export class InstallationLookupService {
     selected: z.infer<typeof ExactManagedInstallationLookupResultSchema>,
     params: FindInstallationParams
   ): boolean {
+    const expectedOwner = getExpectedIntegrationOwner(params);
+    const matchesOwner =
+      expectedOwner.type === 'user'
+        ? selected.owned_by_user_id === expectedOwner.id &&
+          selected.owned_by_organization_id === null
+        : selected.owned_by_organization_id === expectedOwner.id &&
+          selected.owned_by_user_id === null;
     if (
       selected.id !== params.expectedIntegrationId ||
       selected.integration_status !== 'active' ||
-      selected.owned_by_organization_id !== params.orgId ||
-      selected.owned_by_user_id !== null ||
+      !matchesOwner ||
       selected.platform_account_login?.toLowerCase() !==
         params.githubRepo.split('/')[0]?.toLowerCase()
     ) {

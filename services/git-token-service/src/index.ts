@@ -1,4 +1,5 @@
 import { timingSafeEqual } from '@kilocode/encryption';
+import type { Owner } from '../../../packages/app-shared/src/code-review/repository-identity.js';
 import {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   extractBearerToken,
@@ -102,11 +103,15 @@ export type GetTokenForRepoParams = {
   userId: string;
   orgId?: string;
   expectedIntegrationId?: string;
+  // Supply the resolved owner with the pin; orgId remains the session context.
+  expectedIntegrationOwner?: Owner;
 };
 
 export type GetTokenForRepoSuccess = {
   success: true;
   token: string;
+  integrationId: string;
+  integrationOwner: Owner;
   installationId: string;
   accountLogin: string;
   appType: GitHubAppType;
@@ -145,6 +150,8 @@ export type GetCloudAgentAuthForRepoParams = GetTokenForRepoParams & {
 export type GetCloudAgentAuthForRepoSuccess = {
   success: true;
   githubToken: string;
+  integrationId: string;
+  integrationOwner: Owner;
   installationId: string;
   accountLogin: string;
   appType: GitHubAppType;
@@ -842,6 +849,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return {
       success: true,
       token,
+      integrationId: installation.integrationId,
+      integrationOwner: installation.integrationOwner,
       installationId: installation.installationId,
       accountLogin: installation.accountLogin,
       appType: installation.githubAppType,
@@ -876,6 +885,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         installation.repoName,
         installation.githubAppType
       ),
+      integrationId: installation.integrationId,
+      integrationOwner: installation.integrationOwner,
       installationId: installation.installationId,
       accountLogin: installation.accountLogin,
       appType: installation.githubAppType,
@@ -899,6 +910,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return {
       success: true,
       githubToken: selection.token,
+      integrationId: installation.integrationId,
+      integrationOwner: installation.integrationOwner,
       installationId: installation.installationId,
       accountLogin: installation.accountLogin,
       appType: installation.githubAppType,
@@ -929,9 +942,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
           ? { outboundContainerId: params.outboundContainerId }
           : {}),
         ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
-        ...(params.expectedIntegrationId !== undefined
-          ? { integrationId: params.expectedIntegrationId }
-          : {}),
+        integrationId: auth.integrationId,
+        integrationOwner: auth.integrationOwner,
         ...repository,
         source: auth.source,
         identity: this.getSessionIdentity(auth),
@@ -942,6 +954,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return {
       success: true,
       capability,
+      integrationId: auth.integrationId,
+      integrationOwner: auth.integrationOwner,
       installationId: auth.installationId,
       accountLogin: auth.accountLogin,
       appType: auth.appType,
@@ -976,11 +990,14 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         : validateLegacyGitHubCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
     if (upstreamFailure) return { success: false, reason: upstreamFailure };
 
-    const authParams = {
+    const authParams: GetTokenForRepoParams = {
       userId: claims.userId,
       ...(claims.orgId !== undefined ? { orgId: claims.orgId } : {}),
       ...(claims.integrationId !== undefined
         ? { expectedIntegrationId: claims.integrationId }
+        : {}),
+      ...(claims.integrationOwner !== undefined
+        ? { expectedIntegrationOwner: claims.integrationOwner }
         : {}),
       githubRepo: `${claims.owner}/${claims.repo}`,
     };
@@ -999,6 +1016,14 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     }
     if (!auth || !auth.success || auth.source !== claims.source) {
       return { success: false, reason: 'source_unavailable' };
+    }
+    if (
+      (claims.integrationId !== undefined && auth.integrationId !== claims.integrationId) ||
+      (claims.integrationOwner !== undefined &&
+        (auth.integrationOwner.type !== claims.integrationOwner.type ||
+          auth.integrationOwner.id !== claims.integrationOwner.id))
+    ) {
+      return { success: false, reason: 'integration_mismatch' };
     }
     if (!this.matchesSessionIdentity(claims.identity, auth)) {
       return { success: false, reason: 'identity_mismatch' };
@@ -1051,6 +1076,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return {
       success: true,
       githubToken: selection.token,
+      integrationId: installation.integrationId,
+      integrationOwner: installation.integrationOwner,
       installationId: installation.installationId,
       accountLogin: installation.accountLogin,
       appType: installation.githubAppType,

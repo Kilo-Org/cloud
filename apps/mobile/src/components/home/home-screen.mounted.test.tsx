@@ -177,7 +177,8 @@ function action(label: string) {
     node =>
       node.props.accessibilityLabel === label ||
       (node.props.accessibilityLabel == null &&
-        node.findAll(child => child.type === 'Text' && child.children.includes(label)).length > 0)
+        node.findAll(child => Object.is(child.type, 'Text') && child.children.includes(label))
+          .length > 0)
   );
   if (!button) {
     throw new Error(`Missing action: ${label}`);

@@ -737,6 +737,12 @@ export function createBrowserJobStore(storage: Storage) {
         providerId: provider.providerId,
         jobs: [],
       };
+      if (provider.fence) {
+        frame.unresolvedFence = {
+          invocationId: provider.fence.invocationId,
+          ...(provider.fence.tabId === undefined ? {} : { tabId: provider.fence.tabId }),
+        };
+      }
       return providerPage(c, frame, now, message.cursor);
     });
     return result.value;

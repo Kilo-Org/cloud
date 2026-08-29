@@ -21,6 +21,7 @@ type Input = { session_id: string; title?: string };
 type MutationOptions = ReactQuery.MutationOptions<unknown, Error, Input>;
 let client = makeTestQueryClient();
 const rpc = { rename: vi.fn(), delete: vi.fn() };
+let renameMutationFn: MutationOptions['mutationFn'] = rpc.rename;
 const messages: string[] = [];
 const settled: (() => void)[] = [];
 const listKey = [['cliSessionsV2', 'list'], { type: 'infinite' }] as const;
@@ -48,7 +49,10 @@ vi.mock('@/lib/trpc', () => ({
     cliSessionsV2: {
       list: { infiniteQueryKey: () => listKey },
       rename: {
-        mutationOptions: (options: MutationOptions) => ({ ...options, mutationFn: rpc.rename }),
+        mutationOptions: (options: MutationOptions) => ({
+          ...options,
+          mutationFn: renameMutationFn,
+        }),
       },
       delete: {
         mutationOptions: (options: MutationOptions) => ({ ...options, mutationFn: rpc.delete }),
@@ -89,7 +93,7 @@ afterAll(
 beforeEach(() => {
   setSignOutActive(false);
   client = makeTestQueryClient();
-  rpc.rename.mockReset().mockResolvedValue(undefined);
+  renameMutationFn = rpc.rename.mockReset().mockResolvedValue(undefined);
   rpc.delete.mockReset().mockResolvedValue(undefined);
   messages.length = 0;
   settled.length = 0;
@@ -101,6 +105,13 @@ afterEach(() => {
 });
 
 describe('useSessionMutations account publication', () => {
+  it('rejects a missing rename mutation function and restores both caches', async () => {
+    renameMutationFn = undefined;
+    await expect(useSessionMutations().renameSessionAsync('s1', 'New')).rejects.toThrow();
+    expect(titles(client, listKey)).toEqual(['Old', 'Other']);
+    expect(activeTitle(client)).toBe('Old');
+  });
+
   it('retitles and rolls back both caches without accepting manual writes or clearing a fetch failure', async () => {
     const query = client.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
     await client.fetchQuery({

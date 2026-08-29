@@ -1,5 +1,6 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free React Native row integration */
 import { createElement } from 'react';
+import { Pressable } from 'react-native';
 import { type QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -126,7 +127,7 @@ async function exit() {
     if (!renderer) {
       throw new Error('Missing row');
     }
-    const props = renderer.root.findByType('Pressable').props as { onLongPress: () => void };
+    const props = renderer.root.findByType(Pressable).props as { onLongPress: () => void };
     props.onLongPress();
     if (!state.exit) {
       throw new Error('Missing exit action');

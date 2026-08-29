@@ -132,6 +132,9 @@ export function useSessionMutations() {
     mutationFn: async (input, context) => {
       const epoch = operationEpochs.get(input);
       assertCurrentOperation(epoch);
+      if (!deleteOptions.mutationFn) {
+        throw new Error('No mutationFn found');
+      }
       const result = await settleCurrentOperation(epoch, deleteOptions.mutationFn(input, context));
       return result;
     },
@@ -173,6 +176,9 @@ export function useSessionMutations() {
     mutationFn: async (input, context) => {
       const epoch = operationEpochs.get(input);
       assertCurrentOperation(epoch);
+      if (!renameOptions.mutationFn) {
+        throw new Error('No mutationFn found');
+      }
       const result = await settleCurrentOperation(epoch, renameOptions.mutationFn(input, context));
       return result;
     },

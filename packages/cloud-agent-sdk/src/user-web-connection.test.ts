@@ -2995,6 +2995,227 @@ describe('createUserWebConnection browser provider', () => {
     expect(frames().map(frame => frame.type)).toEqual(['ping']);
   });
 
+  it('reads status with explicit proof after withdrawal without restoring authority', async () => {
+    const f = await relayRegistered();
+    const { client } = f;
+    const identity = {
+      providerId: registration.providerId,
+      providerProof: registration.providerProof,
+    };
+    const current = await f.invoke();
+    client.approveBrowserProviderJob({
+      ...binding(current),
+      approval: { decision: 'approved', tab },
+    });
+    await f.flush();
+    client.markBrowserProviderUnavailable({
+      providerId: current.providerId,
+      generation: current.generation,
+      reason: 'effects_uncertain',
+      effectsUncertain: true,
+    });
+    await f.flush();
+    const terminal = f.snapshot(current.jobId);
+    expect(terminal.result).toMatchObject({ effectsUncertain: true });
+    const unavailable = client.getBrowserProviderState();
+    const frameCount = frames().length;
+    const messageCount = f.messages.length;
+    await expect(client.requestBrowserProviderStatus()).rejects.toMatchObject({
+      code: 'provider_unavailable',
+      retryable: true,
+    });
+
+    const pending = client.requestBrowserProviderStatus(undefined, identity);
+    await f.flush();
+    const history = await pending;
+    const unresolvedFence = { invocationId: current.invocationId, tabId: tab.tabId };
+    expect(history).toMatchObject({
+      type: 'provider_status_result',
+      providerId: current.providerId,
+      jobs: [terminal],
+      unresolvedFence,
+    });
+    expect(client.getBrowserProviderState()).toEqual(unavailable);
+    await expect(client.requestBrowserProviderStatus()).rejects.toMatchObject({
+      code: 'provider_unavailable',
+      retryable: true,
+    });
+    await expect(client.heartbeatBrowserProvider()).rejects.toMatchObject({
+      code: 'effects_uncertain',
+      retryable: false,
+    });
+    expect(() =>
+      client.approveBrowserProviderJob({
+        ...binding(current),
+        approval: { decision: 'approved', tab },
+      })
+    ).toThrow('effects_uncertain');
+    expect(() => client.sendBrowserProviderResult(completion(current))).toThrow(
+      'effects_uncertain'
+    );
+    await jest.advanceTimersByTimeAsync(15_000);
+    await f.flush();
+    expect(f.snapshot(current.jobId)).toStrictEqual(terminal);
+    expect(f.messages.slice(messageCount)).toStrictEqual([history]);
+    expect(
+      frames()
+        .slice(frameCount)
+        .map(frame => frame.type)
+    ).toEqual(['provider_status']);
+
+    await f.disconnect(4001);
+    await jest.advanceTimersByTimeAsync(0);
+    await f.connect();
+    expect(frames().map(frame => frame.type)).toEqual(['ping']);
+    await expect(client.requestBrowserProviderStatus()).rejects.toMatchObject({
+      code: 'provider_unavailable',
+      retryable: true,
+    });
+    const nextPage = client.requestBrowserProviderStatus(current.jobId, identity);
+    await f.flush();
+    await expect(nextPage).resolves.toMatchObject({ jobs: [], unresolvedFence });
+    expect(client.getBrowserProviderState()).toEqual({ status: 'ready' });
+    expect(frames().map(frame => frame.type)).toEqual(['ping', 'provider_status']);
+  });
+
+  it('uses explicit status identity without replacing cached registration', async () => {
+    const client = await registered();
+    const before = client.getBrowserProviderState();
+    const identity = {
+      providerId: `bp_${uuid(2)}`,
+      providerProof: 'e'.repeat(64),
+    } satisfies Pick<BrowserProviderRegistration, 'providerId' | 'providerProof'>;
+    const cursor = job(3).jobId;
+    const pending = client.requestBrowserProviderStatus(cursor, identity).catch(error => error);
+    expect(lastFrame('provider_status')).toStrictEqual({
+      type: 'provider_status',
+      requestId: expect.any(String),
+      ...identity,
+      cursor,
+    });
+    const history = statusReply([job(4, { providerId: identity.providerId })]);
+    await expect(pending).resolves.toStrictEqual(history);
+
+    const cached = client.requestBrowserProviderStatus(cursor);
+    expect(lastFrame('provider_status')).toMatchObject({
+      providerId: registration.providerId,
+      providerProof: registration.providerProof,
+      cursor,
+    });
+    const cachedHistory = statusReply();
+    await expect(cached).resolves.toStrictEqual(cachedHistory);
+    expect(client.getBrowserProviderState()).toEqual(before);
+  });
+
+  it('keeps explicit status proof subject to relay authorization', async () => {
+    const f = await relayRegistered();
+    const current = await f.invoke();
+    const before = f.client.getBrowserProviderState();
+    const messageCount = f.messages.length;
+    const pending = f.client
+      .requestBrowserProviderStatus(undefined, {
+        providerId: registration.providerId,
+        providerProof: 'e'.repeat(64),
+      })
+      .catch(error => error);
+    await f.flush();
+    await expect(pending).resolves.toMatchObject({
+      code: 'owner_mismatch',
+      retryable: false,
+      message: 'Browser provider request failed: owner_mismatch',
+    });
+    expect(f.messages.slice(messageCount)).toEqual([]);
+    expect(f.client.getBrowserProviderState()).toEqual(before);
+
+    const cached = f.client.requestBrowserProviderStatus(current.jobId);
+    await f.flush();
+    await expect(cached).resolves.toMatchObject({ jobs: [] });
+    expect(lastFrame('provider_status').providerProof).toBe(registration.providerProof);
+  });
+
+  it.each([
+    { condition: 'disabled', code: 'disabled', retryable: false },
+    { condition: 'unretained', code: 'disconnected', retryable: true },
+    { condition: 'unnegotiated', code: 'not_negotiated', retryable: true },
+    { condition: 'unsupported', code: 'unsupported', retryable: false },
+  ])('keeps explicit status blocked while $condition', async ({ condition, code, retryable }) => {
+    const client = createProvider({ browserProvider: condition !== 'disabled' });
+    if (condition !== 'unretained') {
+      client.retain();
+      open();
+    }
+    if (condition === 'unsupported') {
+      inbound({ type: 'pong', nonce: lastFrame('ping').nonce });
+    }
+    const sent = sockets.length ? frames() : [];
+    await expect(
+      client.requestBrowserProviderStatus(undefined, registration)
+    ).rejects.toMatchObject({ code, retryable });
+    expect(sockets).toHaveLength(condition === 'unretained' ? 0 : 1);
+    expect(sockets.length ? frames() : []).toStrictEqual(sent);
+  });
+
+  it.each([
+    [
+      'provider ID',
+      {
+        ...registration,
+        providerId: 'invalid-provider' as BrowserProviderRegistration['providerId'],
+      },
+      undefined,
+    ],
+    ['provider proof', { ...registration, providerProof: 'invalid-proof' }, undefined],
+    ['cursor', registration, 'invalid-cursor'],
+  ] as const)(
+    'rejects invalid explicit status %s before transport',
+    async (_field, identity, cursor) => {
+      const client = await registered();
+      const sent = frames();
+      const before = client.getBrowserProviderState();
+      await expect(client.requestBrowserProviderStatus(cursor, identity)).rejects.toMatchObject({
+        code: 'invalid_request',
+        retryable: false,
+        message: 'Browser provider request failed: invalid_request',
+      });
+      expect(frames()).toStrictEqual(sent);
+      expect(client.getBrowserProviderState()).toEqual(before);
+    }
+  );
+
+  it.each(['release', 'destroy', 'disconnect'] as const)(
+    'rejects pending explicit status after %s and ignores late replies',
+    async loss => {
+      const client = createProvider();
+      const release = client.retain();
+      negotiate();
+      const messages: BrowserProviderInboundMessage[] = [];
+      client.onBrowserProviderMessage(message => messages.push(message));
+      const pending = client
+        .requestBrowserProviderStatus(undefined, registration)
+        .catch(error => error);
+      const request = lastFrame('provider_status');
+      const ws = sockets[0];
+      if (loss === 'release') release();
+      else if (loss === 'destroy') client.destroy();
+      else ws.onclose?.({ code: 4001 } as CloseEvent);
+      await expect(pending).resolves.toMatchObject({ code: 'disconnected', retryable: true });
+      inbound(
+        {
+          type: 'provider_status_result',
+          requestId: request.requestId,
+          providerId: request.providerId,
+          jobs: [job()],
+        },
+        ws
+      );
+      expect(messages).toEqual([]);
+      await expect(
+        client.requestBrowserProviderStatus(undefined, registration)
+      ).rejects.toMatchObject({ code: 'disconnected', retryable: true });
+      expect(frames(ws).map(frame => frame.type)).toEqual(['ping', 'provider_status']);
+    }
+  );
+
   it('keeps queue metadata read-only while correlating history and preserving the live lease', async () => {
     const client = await registered(2);
     const current = job(1, { generation: 2, ownerLabel: 'ses_live_parent' });
@@ -3007,7 +3228,7 @@ describe('createUserWebConnection browser provider', () => {
     const messages: BrowserProviderInboundMessage[] = [];
     client.onBrowserProviderMessage(message => messages.push(message));
     jest.setSystemTime(now + 1_000);
-    const pending = client.requestBrowserProviderStatus();
+    const pending = client.requestBrowserProviderStatus(undefined, registration);
     const request = lastFrame('provider_status');
     const sent = frames();
     const unresolvedFence = { invocationId: current.invocationId, tabId: tab.tabId };
@@ -3023,6 +3244,13 @@ describe('createUserWebConnection browser provider', () => {
       requestId: request.requestId,
       providerId: `bp_${uuid(2)}`,
       jobs: [],
+      unresolvedFence,
+    });
+    inbound({
+      type: 'provider_status_result',
+      requestId: request.requestId,
+      providerId: registration.providerId,
+      jobs: [{ ...current, providerId: `bp_${uuid(2)}` }],
       unresolvedFence,
     });
     inbound({

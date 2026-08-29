@@ -1,6 +1,7 @@
 import {
   GitHubPrReviewApplicationBindingSchema,
   GitHubPrReviewContextSchema,
+  GitHubPrReviewRequirementSchema,
 } from './context-dtos';
 import {
   GitHubPrReviewChecksResultSchema,
@@ -99,6 +100,25 @@ const evidence = [
     observedAt,
   },
 ];
+const legacyPolicy = { id: 'rule-1', source: 'classic', enforcement: 'active' };
+const policyDefaults = {
+  base: null,
+  ruleType: null,
+  parameters: null,
+  ruleset: null,
+  viewerEnforcement: 'unknown',
+  viewerBypass: 'unknown',
+  bypassActors: null,
+};
+const legacyRequirement = {
+  id: 'rule-1',
+  kind: 'status-check',
+  title: 'CI',
+  state: 'unmet',
+  policy: legacyPolicy,
+  check: { name: 'ci', kind: 'check-run', application: { kind: 'app', appId: 1 } },
+  evidence,
+};
 const fullContext = {
   revision,
   observedAt,
@@ -167,15 +187,7 @@ const fullContext = {
   ]),
   issueCoverage: 'supported-pr-sources',
   requirements: complete([
-    {
-      id: 'rule-1',
-      kind: 'status-check',
-      title: 'CI',
-      state: 'unmet',
-      policy: { id: 'rule-1', source: 'classic', enforcement: 'active' },
-      check: { name: 'ci', kind: 'check-run', application: { kind: 'app', appId: 1 } },
-      evidence,
-    },
+    { ...legacyRequirement, policy: { ...legacyPolicy, ...policyDefaults } },
   ]),
   checks: complete([
     {
@@ -220,6 +232,160 @@ const fullContext = {
   },
 };
 
+test.each(['active', 'evaluate', 'disabled', 'unknown'])(
+  'normalizes legacy policies with %s enforcement without inventing evidence',
+  enforcement => {
+    const input = { ...legacyRequirement, policy: { ...legacyPolicy, enforcement } };
+    expect(GitHubPrReviewRequirementSchema.parse(input)).toStrictEqual({
+      ...input,
+      policy: { ...input.policy, ...policyDefaults },
+    });
+  }
+);
+
+test.each([
+  [
+    'pull_request',
+    {
+      required_approving_review_count: 2,
+      require_code_owner_review: true,
+      require_last_push_approval: true,
+      dismiss_stale_reviews_on_push: true,
+      required_review_thread_resolution: true,
+    },
+  ],
+  [
+    'required_status_checks',
+    {
+      strict_required_status_checks_policy: true,
+      required_status_checks: [{ context: 'ci', integration_id: 7 }, { context: 'unbound' }],
+    },
+  ],
+  ['required_deployments', { required_deployment_environments: ['production'] }],
+  ['required_signatures', {}],
+  [
+    'workflows',
+    {
+      workflows: [
+        {
+          repository_id: 42,
+          path: '.github/workflows/ci.yml',
+          ref: 'release',
+          sha: 'workflow-sha',
+        },
+      ],
+    },
+  ],
+  ['future_rule', { nested: [{ enabled: false, limit: 3, label: 'opaque', value: null }] }],
+])('retains %s policy evidence without evaluating it', (ruleType, parameters) => {
+  const input = {
+    ...legacyRequirement,
+    state: 'unavailable',
+    check: null,
+    evidence: [],
+    policy: {
+      ...legacyPolicy,
+      ...policyDefaults,
+      source: 'ruleset',
+      ruleType,
+      parameters,
+      base: { baseRepoFullName: 'kilo/upstream', baseRef: 'release/1', baseSha: 'release-sha' },
+      ruleset: { id: 7, source: 'kilo', sourceType: 'Organization' },
+      bypassActors: [{ actorId: 7, actorType: 'Integration', bypassMode: 'pull_request' }],
+    },
+  };
+  const { context } = NormalizedGitHubPrReviewOverviewSchema.parse({
+    ...oldOverview,
+    context: { revision, requirements: complete([input]) },
+  });
+  expect(context.requirements.items).toStrictEqual([input]);
+});
+
+test.each([
+  ['enforced', 'never'],
+  ['not-enforced', 'always'],
+  ['unknown', 'pull_requests_only'],
+  ['not-enforced', 'exempt'],
+  ['unknown', 'unknown'],
+])(
+  'retains viewer enforcement %s and bypass %s independently',
+  (viewerEnforcement, viewerBypass) => {
+    const policy = {
+      ...legacyPolicy,
+      ...policyDefaults,
+      viewerEnforcement,
+      viewerBypass,
+      bypassActors: [],
+    };
+    expect(
+      GitHubPrReviewRequirementSchema.parse({ ...legacyRequirement, policy }).policy
+    ).toStrictEqual(policy);
+  }
+);
+
+test('preserves nullable policy identities without inventing bypass or check bindings', () => {
+  const absent = { ...legacyRequirement, policy: null, check: null };
+  expect(GitHubPrReviewRequirementSchema.parse(absent)).toStrictEqual(absent);
+  const policy = {
+    ...legacyPolicy,
+    ...policyDefaults,
+    base: { baseRepoFullName: null, baseRef: 'release/1', baseSha: null },
+    ruleset: {},
+    bypassActors: [{ actorType: 'DeployKey' }],
+  };
+  expect(GitHubPrReviewRequirementSchema.parse({ ...absent, policy }).policy).toStrictEqual({
+    ...policy,
+    ruleset: { id: null, source: null, sourceType: null },
+    bypassActors: [{ actorType: 'DeployKey', actorId: null, bypassMode: 'unknown' }],
+  });
+});
+
+test.each([
+  ['encoded parameters', { parameters: '{"required_approving_review_count":2}' }],
+  ['undefined parameter values', { parameters: { nested: [undefined] } }],
+  ['function parameter values', { parameters: { nested: { callback: () => true } } }],
+  ['non-finite parameter values', { parameters: { limit: Infinity } }],
+  ['invalid base identity', { base: { baseRepoFullName: null, baseRef: 'release', baseSha: 17 } }],
+  ['empty rule type', { ruleType: '' }],
+  ['invalid ruleset identity', { ruleset: { id: -1 } }],
+  ['invalid ruleset source type', { ruleset: { sourceType: 'User' } }],
+  ['invalid viewer enforcement', { viewerEnforcement: 'active' }],
+  ['invalid viewer bypass', { viewerBypass: 'allowed' }],
+  ['invalid actor identity', { bypassActors: [{ actorType: 'Team', actorId: '12' }] }],
+  ['invalid actor type', { bypassActors: [{ actorType: 'User' }] }],
+  ['invalid bypass mode', { bypassActors: [{ actorType: 'Team', bypassMode: 'never' }] }],
+])('rejects %s in structured policy evidence', (_name, invalid) => {
+  expect(
+    GitHubPrReviewRequirementSchema.safeParse({
+      ...legacyRequirement,
+      policy: { ...legacyPolicy, ...invalid },
+    }).success
+  ).toBe(false);
+});
+
+test.each([
+  ['partial', true],
+  ['stale', true],
+  ['unavailable', true],
+  ['denied', false],
+])(
+  'preserves policy evidence and retryability when its source is %s',
+  (availability, retryable) => {
+    const requirements = {
+      ...fullContext.requirements,
+      source: { ...source, availability, retryable, reason: 'policy-source-failure' },
+      completeness: 'unknown',
+    };
+    const context = GitHubPrReviewContextSchema.parse({
+      revision,
+      requirements,
+      labels: complete([]),
+    });
+    expect(context.requirements).toStrictEqual(requirements);
+    expect(context.labels).toStrictEqual(complete([]));
+  }
+);
+
 test('normalizes omitted sources without claiming complete empty collections', () => {
   const context = GitHubPrReviewContextSchema.parse({ revision });
   for (const collection of [
@@ -261,7 +427,13 @@ test('preserves successful siblings, exact lifecycle times, and confirmed emptin
     closedAt: null,
     mergedAt: null,
   };
-  const input = { revision, labels, lifecycle, assignees: complete([]) };
+  const input = {
+    revision,
+    labels,
+    lifecycle,
+    assignees: complete([]),
+    requirements: complete([]),
+  };
   expect(GitHubPrReviewContextSchema.parse(input)).toMatchObject(input);
 });
 
@@ -306,6 +478,10 @@ test.each([{ kind: 'app', appId: 1 }, { kind: 'any' }, { kind: 'unknown' }])(
   'preserves the explicit application binding %j',
   binding => {
     expect(GitHubPrReviewApplicationBindingSchema.parse(binding)).toEqual(binding);
+    const check = { ...legacyRequirement.check, application: binding };
+    expect(
+      GitHubPrReviewRequirementSchema.parse({ ...legacyRequirement, check }).check
+    ).toStrictEqual(check);
   }
 );
 

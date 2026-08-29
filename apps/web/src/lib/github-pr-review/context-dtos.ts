@@ -140,20 +140,64 @@ export const GitHubPrReviewApplicationBindingSchema = z.discriminatedUnion('kind
   z.object({ kind: z.literal('unknown') }).strict(),
 ]);
 
+export const GitHubPrReviewPolicySchema = z
+  .object({
+    id: z.string().min(1),
+    source: z.enum(['classic', 'ruleset', 'github']),
+    enforcement: z.enum(['active', 'evaluate', 'disabled', 'unknown']),
+    // Old policies contain only id, source, and enforcement. Retain defaults until all old clients, servers, and records are gone.
+    base: GitHubPrReviewRevisionSchema.pick({
+      baseRepoFullName: true,
+      baseRef: true,
+      baseSha: true,
+    })
+      .nullable()
+      .default(null),
+    ruleType: nullableId.default(null),
+    // JSON parameters preserve unsupported rules without claiming an evaluated outcome.
+    parameters: z.record(z.string(), z.json()).nullable().default(null),
+    ruleset: z
+      .object({
+        id: z.number().int().positive().nullable().default(null),
+        source: nullableId.default(null),
+        sourceType: z.enum(['Repository', 'Organization', 'Enterprise']).nullable().default(null),
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    viewerEnforcement: z.enum(['enforced', 'not-enforced', 'unknown']).default('unknown'),
+    viewerBypass: z
+      .enum(['always', 'pull_requests_only', 'never', 'exempt', 'unknown'])
+      .default('unknown'),
+    // An omitted actor list is not evidence that bypass is unavailable to the viewer.
+    bypassActors: z
+      .array(
+        z
+          .object({
+            actorId: z.number().int().positive().nullable().default(null),
+            actorType: z.enum([
+              'Integration',
+              'OrganizationAdmin',
+              'RepositoryRole',
+              'Team',
+              'DeployKey',
+            ]),
+            bypassMode: z.enum(['always', 'pull_request', 'exempt', 'unknown']).default('unknown'),
+          })
+          .strict()
+      )
+      .nullable()
+      .default(null),
+  })
+  .strict();
+
 export const GitHubPrReviewRequirementSchema = z
   .object({
     id: z.string().min(1),
     kind: z.string().min(1),
     title: z.string(),
     state: z.enum(['met', 'unmet', 'unavailable']),
-    policy: z
-      .object({
-        id: z.string().min(1),
-        source: z.enum(['classic', 'ruleset', 'github']),
-        enforcement: z.enum(['active', 'evaluate', 'disabled', 'unknown']),
-      })
-      .strict()
-      .nullable(),
+    policy: GitHubPrReviewPolicySchema.nullable(),
     check: z
       .object({
         name: z.string().min(1),

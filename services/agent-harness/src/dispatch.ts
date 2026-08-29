@@ -1,8 +1,8 @@
 import { toolModelMessageSchema } from 'ai';
 import { eq } from 'drizzle-orm';
-import type { ToolCall, ToolOutcome } from '@kilocode/agent-harness/contracts';
+import type { ExecutionGrant, ToolCall, ToolOutcome } from '@kilocode/agent-harness/contracts';
 import { evaluateDispatch, type DispatchPolicy } from '@kilocode/agent-harness/policy';
-import { compareAndSetCall, insertAttempt, type StoreDatabase } from './db/records';
+import { compareAndSetCall, insertAttempt, insertGrant, type StoreDatabase } from './db/records';
 import type { ConversationStore } from './db/store';
 import * as s from './db/sqlite-schema';
 import { StoreError } from './db/wake';
@@ -16,7 +16,8 @@ export function commitDispatch(
   proposed: ToolCall,
   policy: DispatchPolicy,
   attemptId: string,
-  generation: number
+  generation: number,
+  grant?: ExecutionGrant
 ) {
   const decision = evaluateDispatch(stored.data, proposed, policy);
   db.update(s.calls)
@@ -24,7 +25,8 @@ export function commitDispatch(
     .where(eq(s.calls.id, stored.id))
     .run();
   if (decision === 'dispatch') {
-    insertAttempt(db, { id: attemptId, toolCallId: stored.id, generation });
+    if (grant) insertGrant(db, grant);
+    insertAttempt(db, { id: attemptId, toolCallId: stored.id, generation, grantId: grant?.id });
     if (
       !compareAndSetCall(db, stored.id, stored.revision, {
         state: 'executing',

@@ -1,6 +1,9 @@
-import { createElement, useState } from 'react';
-import { vi } from 'vitest';
-import { type appUnlockScreenLayout } from '@/components/app-unlock-screen';
+/* eslint-disable typescript-eslint/no-deprecated -- Use the repository's DOM-free mounted renderer. */
+import { createElement, type ReactElement, useState } from 'react';
+import { type AppStateStatus } from 'react-native';
+import { act, type ReactTestInstance } from 'react-test-renderer';
+import { expect, vi } from 'vitest';
+import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 
 const native = vi.hoisted(() => ({
   hasHardwareAsync: vi.fn(),
@@ -11,7 +14,12 @@ const native = vi.hoisted(() => ({
 }));
 const storage = vi.hoisted(() => ({ getItemAsync: vi.fn(), setItemAsync: vi.fn() }));
 const catalogs = vi.hoisted(() => ({ fr: vi.fn() }));
-export { catalogs, native, storage };
+const announcements = vi.hoisted(() => vi.fn());
+const platform = vi.hoisted(() => ({ OS: 'ios' }));
+const lifecycle = vi.hoisted(() => ({
+  change: undefined as ((state: AppStateStatus) => void) | undefined,
+}));
+export { announcements, catalogs, lifecycle, native, platform, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
@@ -20,11 +28,22 @@ vi.mock('react-native', () => ({
   Text: 'Text',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
+  Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
-  Platform: { OS: 'android' },
+  Platform: platform,
   I18nManager: { isRTL: false },
-  AccessibilityInfo: {},
-  AppState: { currentState: 'active', addEventListener: () => ({ remove: () => undefined }) },
+  AccessibilityInfo: { announceForAccessibility: announcements },
+  AppState: {
+    currentState: 'active',
+    addEventListener: (_event: string, listener: (state: AppStateStatus) => void) => {
+      lifecycle.change = listener;
+      return {
+        remove: () => {
+          lifecycle.change = undefined;
+        },
+      };
+    },
+  },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 12, left: 0, right: 0 }),
@@ -37,9 +56,16 @@ vi.mock('react-native-reanimated', () => ({
 vi.mock('expo-screen-capture', () => ({}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({
+  Bell: 'Icon',
+  Brain: 'Icon',
   CheckCircle2: 'Icon',
+  CornerDownLeft: 'Icon',
+  Globe: 'Icon',
   Info: 'Icon',
   Loader: 'Icon',
+  MessageSquare: 'Icon',
+  Shield: 'Icon',
+  Smartphone: 'Icon',
   TriangleAlert: 'Icon',
   XCircle: 'Icon',
 }));
@@ -50,6 +76,7 @@ vi.mock('expo-router', () => ({
       createElement('Scene', null, screenLayout({ children: <Draft /> })),
     { Screen: 'StackScreen' }
   ),
+  useRouter: () => ({ push: vi.fn() }),
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
   useSegments: () => ['(app)', '(tabs)', '(3_profile)', 'organization'],
 }));
@@ -83,6 +110,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     background: '#ffffff',
     foreground: '#000000',
     primaryForeground: '#000000',
+    secondaryForeground: '#000000',
+    mutedForeground: '#000000',
   }),
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({ useCurrentUserId: () => ({ userId: null }) }));
@@ -92,7 +121,9 @@ vi.mock('@/lib/hooks/use-security-lifecycle-invalidation', () => ({
   useSecurityLifecycleInvalidation: vi.fn(),
 }));
 vi.mock('@/lib/auth/logout-reconciliation', () => ({ attemptLogoutReconciliation: vi.fn() }));
-vi.mock('@/lib/auth/push-registration-reconciliation', () => ({}));
+vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
+  attemptPushRegistrationReconciliation: vi.fn(),
+}));
 vi.mock('@rn-primitives/slot', () => ({}));
 vi.mock('@/components/agents/user-web-connection-provider', () => ({
   UserWebConnectionProvider: 'UserWebConnectionProvider',
@@ -123,8 +154,119 @@ vi.mock('@/lib/pr-review/pending-review-provider', () => ({
 vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
   SecurityAgentCommandObserver: 'SecurityAgentCommandObserver',
 }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'en',
+  useLanguagePreference: () => ({ preference: 'device', hasLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
+  useKeepScreenOnPreference: () => ({
+    keepScreenOn: false,
+    hasLoaded: true,
+    setKeepScreenOn: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
+  usePrReviewFooterPreference: () => ({
+    prReviewFooter: true,
+    hasLoaded: true,
+    setPrReviewFooter: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
+  useReasoningPreference: () => ({
+    defaultExpanded: false,
+    hasLoaded: true,
+    setDefaultExpanded: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: false,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-theme-preference', () => ({
+  setThemePreference: vi.fn(),
+  useThemePreference: () => ({ preference: 'system' }),
+}));
+vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
+  useTrustedHosts: () => ({ trustedHosts: [], hasLoaded: true }),
+}));
+vi.mock('@/lib/picker-bridge', () => ({ setLanguagePickerBridge: vi.fn() }));
 
 function Draft() {
   const [value, onChange] = useState('saved draft');
   return createElement('Draft', { value, onChange });
+}
+
+export function resetUnlockMocks() {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('__DEV__', true);
+  vi.resetAllMocks();
+  platform.OS = 'ios';
+  storage.getItemAsync.mockResolvedValue('enabled');
+  native.hasHardwareAsync.mockResolvedValue(true);
+  native.isEnrolledAsync.mockResolvedValue(true);
+  native.getEnrolledLevelAsync.mockResolvedValue(3);
+  native.authenticateAsync.mockResolvedValue({ success: true });
+}
+
+export async function flush(update?: () => void) {
+  await act(async () => {
+    update?.();
+    await vi.dynamicImportSettled();
+  });
+}
+
+export function text(root: ReactTestInstance) {
+  const texts = root.findAllByType('Text');
+  return texts.map(node => node.props.children).join('\n');
+}
+
+export function expectHidden(root: ReactTestInstance, hidden: boolean) {
+  const scenes = root.findAllByType('Scene');
+  expect(scenes.length).toBeGreaterThan(0);
+  for (const scene of scenes) {
+    const wrapper = scene.find(
+      node => node.type === 'View' && node.props.pointerEvents !== undefined
+    );
+    expect(wrapper.props).toMatchObject({
+      pointerEvents: hidden ? 'none' : 'auto',
+      accessibilityElementsHidden: hidden,
+      importantForAccessibility: hidden ? 'no-hide-descendants' : 'auto',
+    });
+    expect((wrapper.props.className as string).includes('opacity-0')).toBe(hidden);
+    expect(wrapper.findAllByType('Draft')).toHaveLength(1);
+  }
+}
+
+export function nestedUnlockScenes(children: ReactElement) {
+  return appUnlockScreenLayout({ children: appUnlockScreenLayout({ children }) });
+}
+
+function isHidden(node: ReactTestInstance): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (
+      parent.props.accessibilityElementsHidden ||
+      parent.props.importantForAccessibility === 'no-hide-descendants'
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function expectFeedback(root: ReactTestInstance, message: string, copies: number) {
+  const messages = root.findAll(node => node.type === 'Text' && node.props.children === message);
+  expect(messages).toHaveLength(copies);
+  const visible = messages.filter(node => !isHidden(node));
+  expect(visible).toHaveLength(1);
+  expect(visible[0]?.props.accessibilityLiveRegion).toBe(
+    platform.OS === 'android' ? 'polite' : undefined
+  );
 }

@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
+import { AppUnlockAnnouncements } from '@/components/app-unlock-screen';
 import { DevSessionInjector } from '@/components/dev-session-injector';
 import { OfflineBanner } from '@/components/offline-banner';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
@@ -37,6 +38,7 @@ export function AppRootProviders({
             <AppUnlockProvider
               promptMessage={languageReady ? t('preferences.biometricUnlock') : null}
             >
+              {languageReady ? <AppUnlockAnnouncements /> : null}
               <OrganizationProvider>
                 <ActionSheetProvider>
                   <>

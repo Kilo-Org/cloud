@@ -8,6 +8,7 @@ import { Switch, View } from 'react-native';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -208,20 +209,17 @@ export function SettingsOverviewScreen({
   // Keep progress and Retry visible without hiding cached settings when any
   // settings query fails, even if repositories recover during that attempt.
   const renderRepositoryStatus = () => {
+    if (recoveryError || recovery.isRetrying) {
+      return (
+        <SettingsRecoveryStatus
+          message={recoveryError}
+          isRetrying={recovery.isRetrying}
+          onRetry={() => void recovery.retry()}
+        />
+      );
+    }
     if (repositoriesLoading) {
       return <Skeleton className="h-4 w-56 rounded" />;
-    }
-    if (recoveryError) {
-      return (
-        <View className="flex-row items-center gap-2">
-          <Text variant="muted" className="text-xs">
-            {recoveryError}
-          </Text>
-          <Text className="text-xs font-medium text-primary" onPress={() => void recovery.retry()}>
-            {t('common.retry')}
-          </Text>
-        </View>
-      );
     }
     return (
       <Text variant="muted" className="text-xs">

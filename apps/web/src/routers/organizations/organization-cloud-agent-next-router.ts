@@ -13,7 +13,16 @@ import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
 } from '@/routers/organizations/utils';
-import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
+import {
+  fetchAllGitHubRepositoriesForOrganization,
+  listGitHubRepositoryBranches,
+} from '@/lib/cloud-agent/github-integration-helpers';
+import {
+  launchRepositoryReferenceSchema,
+  listRepositoryBranchesInputSchema,
+  listRepositoryBranchesOutputSchema,
+} from '../cloud-agent-next-schemas';
+import { listBitbucketRepositoryBranches } from '@/lib/integrations/platforms/bitbucket/oauth-integration';
 import {
   BitbucketOrganizationRepositoryListResultSchema,
   fetchBitbucketRepositoriesForOrganization,
@@ -22,6 +31,7 @@ import {
   getGitLabInstanceUrlForOrganization,
   buildGitLabCloneUrl,
   fetchGitLabRepositoriesForOrganization,
+  listGitLabRepositoryBranches,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
@@ -197,6 +207,7 @@ const ListGitHubRepositoriesInput = z.object({
 const ListGitLabRepositoriesInput = z.object({
   organizationId: z.uuid(),
   forceRefresh: z.boolean().optional().default(false),
+  integrationId: z.uuid().optional(),
 });
 
 const ListBitbucketRepositoriesInput = z.object({
@@ -248,6 +259,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
 
       const {
         gitlabProject,
+        gitlabInstanceUrl,
         githubRepo,
         githubIntegrationId,
         bitbucketRepo,
@@ -270,7 +282,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       };
 
       if (gitlabProject) {
-        const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
+        const instanceUrl = await getGitLabInstanceUrlForOrganization(
+          organizationId,
+          input.gitlabIntegrationId,
+          gitlabInstanceUrl
+        );
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };
       } else if (bitbucketRepo) {
@@ -691,6 +707,69 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       ).getComputeBillingStatus(input.cloudAgentSessionId);
     }),
 
+  listRepositoryBranches: organizationMemberProcedure
+    .input(listRepositoryBranchesInputSchema.extend({ organizationId: z.uuid() }))
+    .output(listRepositoryBranchesOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const owner = { type: 'org' as const, id: input.organizationId };
+      if (
+        input.authorization.owner.type !== owner.type ||
+        input.authorization.owner.id !== owner.id
+      ) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Repository owner does not match' });
+      }
+      if (input.repository.provider !== 'bitbucket') {
+        if (input.cursor)
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'This provider returns all branches',
+          });
+        return input.repository.provider === 'github'
+          ? listGitHubRepositoryBranches(owner, input)
+          : listGitLabRepositoryBranches(owner, ctx.user.id, input);
+      }
+      const result = await fetchBitbucketRepositoriesForOrganization(
+        input.organizationId,
+        ctx.user.id
+      );
+      if (result.status !== 'available') {
+        throw new TRPCError({
+          code: result.status === 'temporarily_unavailable' ? 'SERVICE_UNAVAILABLE' : 'FORBIDDEN',
+          message: 'Bitbucket repositories are unavailable',
+        });
+      }
+      const repository = input.repository;
+      const candidates = result.repositories.filter(
+        candidate =>
+          candidate.id === repository.repositoryId &&
+          candidate.fullName === repository.fullName &&
+          candidate.workspaceUuid === repository.workspaceUuid
+      );
+      // Old discovery producers omit identity. Do not invent a pin or use a second
+      // lookup; retain retryable compatibility until old clients/records and the 30-day window expire.
+      if (candidates.some(candidate => !candidate.repositoryReference)) {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Refresh Bitbucket repository identity',
+        });
+      }
+      const selected = candidates.find(
+        candidate =>
+          candidate.repositoryReference?.authorization.integrationId ===
+            input.authorization.integrationId &&
+          candidate.repositoryReference.repository.instanceUrl === repository.instanceUrl
+      );
+      if (!selected?.repositoryReference) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Bitbucket repository not found' });
+      }
+      return listBitbucketRepositoryBranches({
+        actorUserId: ctx.user.id,
+        organizationId: input.organizationId,
+        reference: selected.repositoryReference,
+        cursor: input.cursor,
+      });
+    }),
+
   checkEligibility: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
@@ -711,6 +790,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
             name: z.string(),
             fullName: z.string(),
             private: z.boolean(),
+            instanceUrl: z.string().optional(),
+            repositoryReference: launchRepositoryReferenceSchema.optional(),
             defaultBranch: z.string().optional(),
             platformIntegrationId: z.string().uuid().optional(),
             platformAccountLogin: z.string().optional(),
@@ -752,6 +833,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
             name: z.string(),
             fullName: z.string(),
             private: z.boolean(),
+            instanceUrl: z.string().optional(),
+            repositoryReference: launchRepositoryReferenceSchema.optional(),
+            platformIntegrationId: z.uuid().optional(),
+            defaultBranch: z.string().optional(),
           })
         ),
         integrationInstalled: z.boolean(),
@@ -760,11 +845,18 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const result = await fetchGitLabRepositoriesForOrganization(
-        input.organizationId,
-        ctx.user.id,
-        input.forceRefresh
-      );
+      const result = input.integrationId
+        ? await fetchGitLabRepositoriesForOrganization(
+            input.organizationId,
+            ctx.user.id,
+            input.forceRefresh,
+            input.integrationId
+          )
+        : await fetchGitLabRepositoriesForOrganization(
+            input.organizationId,
+            ctx.user.id,
+            input.forceRefresh
+          );
       return {
         repositories: await orderRepositoriesByUsage({
           userId: ctx.user.id,

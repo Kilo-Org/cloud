@@ -13,6 +13,12 @@ import {
   TOKEN_EXPIRY,
 } from '@/lib/tokens';
 
+import type {
+  LaunchRepositoryReference,
+  Owner,
+} from '@kilocode/app-shared/code-review/repository-identity';
+import { launchRepositoryReferenceSchema } from '@/routers/cloud-agent-next-schemas';
+
 export const BitbucketRepositorySchema = z
   .object({
     id: z.uuid(),
@@ -21,8 +27,53 @@ export const BitbucketRepositorySchema = z
     fullName: z.string().min(3),
     private: z.boolean(),
     defaultBranch: z.string().min(1).optional(),
+    // Old token-service/cache responses omit identity additions. Remove this wire
+    // compatibility only after old clients/records and the 30-day ledger window expire.
+    platformIntegrationId: z.uuid().optional(),
+    instanceUrl: z.literal('https://bitbucket.org').optional(),
+    repositoryReference: launchRepositoryReferenceSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine(value => {
+    const reference = value.repositoryReference;
+    return (
+      !reference ||
+      (reference.repository.provider === 'bitbucket' &&
+        reference.repository.instanceUrl === 'https://bitbucket.org' &&
+        reference.repository.repositoryId === value.id &&
+        reference.repository.workspaceUuid === value.workspaceUuid &&
+        reference.repository.fullName === value.fullName &&
+        reference.repository.defaultBranch === (value.defaultBranch ?? null) &&
+        (value.platformIntegrationId === undefined ||
+          reference.authorization.integrationId === value.platformIntegrationId))
+    );
+  }, 'Bitbucket repository identity mismatch');
+
+export function withBitbucketRepositoryIdentity(
+  repository: z.infer<typeof BitbucketRepositorySchema>,
+  owner: Owner,
+  integrationId: string
+) {
+  const repositoryReference: LaunchRepositoryReference = {
+    repository: {
+      provider: 'bitbucket',
+      instanceUrl: 'https://bitbucket.org',
+      repositoryId: repository.id,
+      workspaceUuid: repository.workspaceUuid,
+      fullName: repository.fullName,
+      // Old cache rows omit default_branch. Keep unavailable until an exact refresh;
+      // remove the fallback after old rows/clients and the 30-day ledger window expire.
+      defaultBranch: repository.defaultBranch ?? null,
+    },
+    authorization: { kind: 'ownerIntegration', owner, integrationId },
+  };
+  return {
+    ...repository,
+    platformIntegrationId: integrationId,
+    instanceUrl: 'https://bitbucket.org' as const,
+    repositoryReference,
+  };
+}
 
 export const BitbucketRepositoryListResultSchema = z.discriminatedUnion('status', [
   z

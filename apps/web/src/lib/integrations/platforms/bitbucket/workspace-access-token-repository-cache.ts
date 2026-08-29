@@ -19,6 +19,7 @@ import { BitbucketWorkspaceAccessTokenMetadataSchema } from './metadata';
 import {
   BitbucketRepositorySchema,
   fetchBitbucketWorkspaceAccessTokenRepositoriesFromTokenService,
+  withBitbucketRepositoryIdentity,
 } from './token-service-client';
 import {
   BitbucketWorkspaceAccessTokenOrganizationAuthorizationError,
@@ -201,7 +202,7 @@ function toIsoTimestamp(value: string | null): string | null {
   return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
 }
 
-function parseIntegration(row: LoadedIntegration) {
+function parseIntegration(row: LoadedIntegration, organizationId: string) {
   const metadata = BitbucketWorkspaceAccessTokenMetadataSchema.safeParse(row.metadata);
   const workspaceUuid = z.uuid().safeParse(row.workspaceUuid);
   const workspaceSlug = WorkspaceSlugSchema.safeParse(row.workspaceSlug);
@@ -213,8 +214,20 @@ function parseIntegration(row: LoadedIntegration) {
     metadata.success && workspaceIdentity
       ? { ...workspaceIdentity, displayName: metadata.data.displayName }
       : null;
-  const cache = workspace
+  const parsedCache = workspace
     ? parseCachedRepositories(row.repositories, row.repositoriesSyncedAt, workspace)
+    : null;
+  const cache = parsedCache
+    ? {
+        ...parsedCache,
+        repositories: parsedCache.repositories.map(repository =>
+          withBitbucketRepositoryIdentity(
+            repository,
+            { type: 'org', id: organizationId },
+            row.integrationId
+          )
+        ),
+      }
     : null;
   const parsedCredential = BitbucketWorkspaceAccessTokenCredentialRowSchema.safeParse(
     row.credential
@@ -261,7 +274,7 @@ function parseIntegration(row: LoadedIntegration) {
 
 async function loadParsedIntegration(organizationId: string) {
   const row = await loadIntegration(organizationId);
-  return row ? parseIntegration(row) : null;
+  return row ? parseIntegration(row, organizationId) : null;
 }
 
 function isRefreshableIntegration(
@@ -636,5 +649,15 @@ async function refreshLoadedBitbucketWorkspaceAccessTokenRepositories({
       organizationId,
     });
   }
-  return { ...providerResult, syncedAt };
+  return {
+    ...providerResult,
+    repositories: providerResult.repositories.map(repository =>
+      withBitbucketRepositoryIdentity(
+        repository,
+        { type: 'org', id: organizationId },
+        integration.row.integrationId
+      )
+    ),
+    syncedAt,
+  };
 }

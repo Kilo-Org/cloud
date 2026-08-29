@@ -11,7 +11,12 @@ import {
   listBitbucketRepositories,
 } from './repository-cache';
 import { BitbucketIntegrationMetadataSchema, type BitbucketWorkspace } from './metadata';
-import { BitbucketRepositorySchema } from './token-service-client';
+import { BitbucketRepositorySchema, withBitbucketRepositoryIdentity } from './token-service-client';
+import type { LaunchRepositoryReference } from '@kilocode/app-shared/code-review/repository-identity';
+import {
+  createBitbucketInteractiveClient,
+  BitbucketInteractiveClientError,
+} from './interactive-client';
 import { platform_integrations, platform_oauth_credentials } from '@kilocode/db/schema';
 
 const CachedRepositorySchema = z
@@ -56,7 +61,9 @@ function emptyRepositoryCache() {
 function readCachedRepositories(
   value: unknown,
   syncedAt: string | null,
-  workspace: BitbucketWorkspace
+  workspace: BitbucketWorkspace,
+  owner: Owner,
+  integrationId: string
 ) {
   if (value === null || syncedAt === null) return emptyRepositoryCache();
   const repositories = z.array(CachedRepositorySchema).safeParse(value);
@@ -64,14 +71,20 @@ function readCachedRepositories(
 
   return {
     status: 'available' as const,
-    repositories: repositories.data.map(repository => ({
-      id: repository.id,
-      workspaceUuid: workspace.uuid,
-      name: repository.name,
-      fullName: repository.full_name,
-      private: repository.private,
-      defaultBranch: repository.default_branch,
-    })),
+    repositories: repositories.data.map(repository =>
+      withBitbucketRepositoryIdentity(
+        {
+          id: repository.id,
+          workspaceUuid: workspace.uuid,
+          name: repository.name,
+          fullName: repository.full_name,
+          private: repository.private,
+          defaultBranch: repository.default_branch,
+        },
+        owner,
+        integrationId
+      )
+    ),
     syncedAt: new Date(syncedAt).toISOString(),
   };
 }
@@ -158,7 +171,9 @@ export async function getBitbucketOAuthIntegrationStatus(owner: Owner, canManage
       repositoryCache: readCachedRepositories(
         row.repositories,
         row.repositoriesSyncedAt,
-        metadata.data.workspace
+        metadata.data.workspace,
+        owner,
+        row.integrationId
       ),
     };
   }
@@ -252,6 +267,113 @@ export async function refreshBitbucketOAuthRepositories(input: {
     forceRefresh: true,
     expectedIntegrationId: input.expectedIntegrationId,
   });
+}
+
+export async function listBitbucketRepositoryBranches(input: {
+  actorUserId: string;
+  organizationId: string;
+  reference: LaunchRepositoryReference;
+  cursor?: string;
+}) {
+  const { repository, authorization } = input.reference;
+  if (
+    repository.provider !== 'bitbucket' ||
+    authorization.owner.type !== 'org' ||
+    authorization.owner.id !== input.organizationId
+  ) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Bitbucket repositories require the selected organization',
+    });
+  }
+  const [workspaceSlug, repositorySlug, extra] = repository.fullName.split('/');
+  if (
+    !workspaceSlug ||
+    !repositorySlug ||
+    extra ||
+    repository.instanceUrl !== 'https://bitbucket.org'
+  ) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid Bitbucket repository' });
+  }
+  const client = createBitbucketInteractiveClient({
+    actorUserId: input.actorUserId,
+    organizationId: input.organizationId,
+    workspace: {
+      integrationId: authorization.integrationId,
+      workspaceUuid: repository.workspaceUuid,
+      workspaceSlug,
+    },
+    repository: {
+      repositoryUuid: repository.repositoryId,
+      repositoryFullName: repository.fullName,
+    },
+  });
+  try {
+    const result = await client.execute({
+      operation: 'branches',
+      params: {
+        path: { workspace: workspaceSlug, repo_slug: repositorySlug },
+        query: { pagelen: 50 },
+      },
+      ...(input.cursor ? { next: input.cursor } : {}),
+    });
+    if (
+      result.status !== 200 ||
+      result.metadata.integrationId !== authorization.integrationId ||
+      result.metadata.organizationId !== input.organizationId ||
+      result.metadata.actorUserId !== input.actorUserId
+    ) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Bitbucket integration changed',
+      });
+    }
+    const page = z
+      .object({ values: z.array(z.object({ name: z.string().min(1) })).max(50) })
+      .safeParse(result.data);
+    if (!page.success)
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Failed to fetch Bitbucket branches',
+      });
+    return {
+      branches: page.data.values.map(branch => ({
+        name: branch.name,
+        isDefault: branch.name === repository.defaultBranch,
+      })),
+      defaultBranch: repository.defaultBranch,
+      // The b1/a3 service validates next links against this exact endpoint and query.
+      nextCursor: result.next ?? null,
+    };
+  } catch (error) {
+    if (error instanceof TRPCError) throw error;
+    if (error instanceof BitbucketInteractiveClientError) {
+      if (
+        [
+          'not_connected',
+          'reconnect_required',
+          'insufficient_permissions',
+          'authentication_rejected',
+        ].includes(error.code)
+      ) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Bitbucket repository access denied' });
+      }
+      if (
+        ['integration_mismatch', 'workspace_mismatch', 'repository_mismatch', 'not_found'].includes(
+          error.code
+        )
+      ) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Bitbucket repository not found' });
+      }
+      if (['invalid_request', 'invalid_pagination'].includes(error.code)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid Bitbucket branch request' });
+      }
+    }
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Failed to fetch Bitbucket branches',
+    });
+  }
 }
 
 export const BitbucketOrganizationRepositoryListResultSchema = z.discriminatedUnion('status', [

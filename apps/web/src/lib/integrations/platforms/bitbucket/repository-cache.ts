@@ -13,6 +13,7 @@ import { BitbucketIntegrationMetadataSchema, type BitbucketWorkspace } from './m
 import {
   BitbucketRepositorySchema,
   fetchBitbucketRepositoriesFromTokenService,
+  withBitbucketRepositoryIdentity,
 } from './token-service-client';
 
 const CachedBitbucketRepositorySchema = z
@@ -147,7 +148,13 @@ export async function listBitbucketRepositories({
     row.repositoriesSyncedAt,
     metadata.data.workspace
   );
-  if (!forceRefresh && cachedResult) return cachedResult;
+  if (!forceRefresh && cachedResult)
+    return {
+      ...cachedResult,
+      repositories: cachedResult.repositories.map(repository =>
+        withBitbucketRepositoryIdentity(repository, owner, row.integrationId)
+      ),
+    };
 
   const result = await fetchBitbucketRepositoriesFromTokenService(
     kiloUserId,
@@ -194,11 +201,14 @@ export async function listBitbucketRepositories({
     )
     .returning({ id: platform_integrations.id });
   if (!updated) {
-    return listBitbucketRepositories({ owner, kiloUserId });
+    return listBitbucketRepositories({ owner, kiloUserId, expectedIntegrationId });
   }
 
   return {
     ...result,
+    repositories: result.repositories.map(repository =>
+      withBitbucketRepositoryIdentity(repository, owner, row.integrationId)
+    ),
     syncedAt,
   };
 }

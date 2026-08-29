@@ -9,11 +9,20 @@ import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { generateCloudAgentToken } from '@/lib/tokens';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
-import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
+import {
+  fetchGitHubRepositoriesForUser,
+  listGitHubRepositoryBranches,
+} from '@/lib/cloud-agent/github-integration-helpers';
+import {
+  launchRepositoryReferenceSchema,
+  listRepositoryBranchesInputSchema,
+  listRepositoryBranchesOutputSchema,
+} from './cloud-agent-next-schemas';
 import {
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
   fetchGitLabRepositoriesForUser,
+  listGitLabRepositoryBranches,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
@@ -150,7 +159,8 @@ export const cloudAgentNextRouter = createTRPCRouter({
       });
       const client = createCloudAgentNextClientForModel(authToken, eligibility);
 
-      const { gitlabProject, githubRepo, attachments, images, ...restInput } = input;
+      const { gitlabProject, gitlabInstanceUrl, githubRepo, attachments, images, ...restInput } =
+        input;
 
       // Determine git source: GitLab uses gitUrl, GitHub uses githubRepo.
       // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
@@ -164,7 +174,11 @@ export const cloudAgentNextRouter = createTRPCRouter({
       };
 
       if (gitlabProject) {
-        const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
+        const instanceUrl = await getGitLabInstanceUrlForUser(
+          ctx.user.id,
+          input.gitlabIntegrationId,
+          gitlabInstanceUrl
+        );
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };
       } else {
@@ -514,6 +528,31 @@ export const cloudAgentNextRouter = createTRPCRouter({
       ).getComputeBillingStatus(input.cloudAgentSessionId);
     }),
 
+  listBitbucketRepositories: baseProcedure.query(() => {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Bitbucket repositories require an organization',
+    });
+  }),
+
+  listRepositoryBranches: baseProcedure
+    .input(listRepositoryBranchesInputSchema)
+    .output(listRepositoryBranchesOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const owner = { type: 'user' as const, id: ctx.user.id };
+      if (input.repository.provider === 'bitbucket') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Bitbucket repositories require an organization',
+        });
+      }
+      if (input.cursor)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'This provider returns all branches' });
+      return input.repository.provider === 'github'
+        ? listGitHubRepositoryBranches(owner, input)
+        : listGitLabRepositoryBranches(owner, ctx.user.id, input);
+    }),
+
   checkEligibility: baseProcedure.query(async ({ ctx }) => {
     const { balance } = await getBalanceForUser(ctx.user);
     return buildCloudAgentNextEligibility(balance);
@@ -536,6 +575,10 @@ export const cloudAgentNextRouter = createTRPCRouter({
             name: z.string(),
             fullName: z.string(),
             private: z.boolean(),
+            platformIntegrationId: z.uuid().optional(),
+            platformAccountLogin: z.string().optional(),
+            instanceUrl: z.string().optional(),
+            repositoryReference: launchRepositoryReferenceSchema.optional(),
             defaultBranch: z.string().optional(),
           })
         ),
@@ -566,6 +609,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(
       z.object({
         forceRefresh: z.boolean().optional().default(false),
+        integrationId: z.uuid().optional(),
       })
     )
     .output(
@@ -576,6 +620,11 @@ export const cloudAgentNextRouter = createTRPCRouter({
             name: z.string(),
             fullName: z.string(),
             private: z.boolean(),
+            platformIntegrationId: z.uuid().optional(),
+            platformAccountLogin: z.string().optional(),
+            instanceUrl: z.string().optional(),
+            repositoryReference: launchRepositoryReferenceSchema.optional(),
+            defaultBranch: z.string().optional(),
           })
         ),
         integrationInstalled: z.boolean(),
@@ -584,7 +633,9 @@ export const cloudAgentNextRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const result = await fetchGitLabRepositoriesForUser(ctx.user.id, input.forceRefresh);
+      const result = input.integrationId
+        ? await fetchGitLabRepositoriesForUser(ctx.user.id, input.forceRefresh, input.integrationId)
+        : await fetchGitLabRepositoriesForUser(ctx.user.id, input.forceRefresh);
       return {
         repositories: await orderRepositoriesByUsage({
           userId: ctx.user.id,

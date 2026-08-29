@@ -21,6 +21,7 @@ import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
 import type { BitbucketRepositoryListResult } from './token-service-client';
+import type * as TokenServiceClientModule from './token-service-client';
 import type {
   listBitbucketRepositories as ListBitbucketRepositories,
   primeBitbucketRepositoryCache as PrimeBitbucketRepositoryCache,
@@ -32,6 +33,7 @@ const mockFetchBitbucketRepositoriesFromTokenService =
   >();
 
 jest.mock('./token-service-client', () => ({
+  ...jest.requireActual<typeof TokenServiceClientModule>('./token-service-client'),
   fetchBitbucketRepositoriesFromTokenService: mockFetchBitbucketRepositoriesFromTokenService,
 }));
 
@@ -154,7 +156,7 @@ describe('Bitbucket repository cache', () => {
         owner: { type: 'user', id: user.id },
         kiloUserId: user.id,
       })
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       status: 'available',
       repositories: [
         {
@@ -195,7 +197,7 @@ describe('Bitbucket repository cache', () => {
         owner: { type: 'user', id: user.id },
         kiloUserId: user.id,
       })
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       status: 'available',
       repositories: [],
       syncedAt: CACHED_AT,

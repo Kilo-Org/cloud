@@ -353,13 +353,49 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
   sendMessageNextPayloadSchema.options[1],
 ]);
 
-/**
- * Shared fields for prepareSession. Discriminated on `cloneFromKiloSessionId`:
- * the non-clone variant keeps the required `prompt` and the current optional
- * initial fields, while the clone-only variant requires the source session,
- * `autoInitiate: true`, and a stable `operationKey`, and forbids any synthetic
- * initial turn fields.
- */
+// Syntax only. Provider helpers must compare this URL with the authorized integration.
+const repositoryInstanceUrlSchema = z
+  .url({ protocol: /^https$/ })
+  .regex(/^https:\/\/[^/?#@]+(?:\/[^?#]*)?$/);
+
+const repositoryIdentityFields = {
+  instanceUrl: repositoryInstanceUrlSchema,
+  repositoryId: z.string().min(1),
+  fullName: z.string().min(3),
+  defaultBranch: z.string().min(1).nullable(),
+};
+
+export const launchRepositoryReferenceSchema = z.strictObject({
+  repository: z.discriminatedUnion('provider', [
+    z.strictObject({ ...repositoryIdentityFields, provider: z.literal('github') }),
+    z.strictObject({ ...repositoryIdentityFields, provider: z.literal('gitlab') }),
+    z.strictObject({
+      ...repositoryIdentityFields,
+      provider: z.literal('bitbucket'),
+      repositoryId: z.uuid(),
+      workspaceUuid: z.uuid(),
+    }),
+  ]),
+  authorization: z.strictObject({
+    kind: z.literal('ownerIntegration'),
+    owner: z.discriminatedUnion('type', [
+      z.strictObject({ type: z.literal('user'), id: z.string().min(1) }),
+      z.strictObject({ type: z.literal('org'), id: z.uuid() }),
+    ]),
+    integrationId: z.uuid(),
+  }),
+});
+
+export const listRepositoryBranchesInputSchema = launchRepositoryReferenceSchema.extend({
+  cursor: z.string().min(1).max(4096).optional(),
+});
+
+export const listRepositoryBranchesOutputSchema = z.object({
+  branches: z.array(z.object({ name: z.string().min(1), isDefault: z.boolean() })),
+  defaultBranch: z.string().min(1).nullable(),
+  nextCursor: z.string().nullable(),
+});
+
 const PrepareSessionSharedFields = {
   // Repository source (mutually exclusive - must provide exactly one)
   githubRepo: z
@@ -367,6 +403,9 @@ const PrepareSessionSharedFields = {
     .regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/, 'Invalid repository format')
     .optional(),
   githubIntegrationId: z.uuid().optional(),
+  gitlabIntegrationId: z.uuid().optional(),
+  gitlabInstanceUrl: repositoryInstanceUrlSchema.optional(),
+  bitbucketIntegrationId: z.uuid().optional(),
   gitlabProject: z
     .string()
     .regex(
@@ -455,6 +494,19 @@ export const basePrepareSessionNextSchema = z
   .refine(data => data.githubIntegrationId === undefined || data.githubRepo !== undefined, {
     message: 'GitHub integration requires a GitHub repository',
     path: ['githubIntegrationId'],
+  })
+  .refine(
+    data =>
+      (data.gitlabIntegrationId === undefined && data.gitlabInstanceUrl === undefined) ||
+      data.gitlabProject !== undefined,
+    {
+      message: 'GitLab integration requires a GitLab project',
+      path: ['gitlabIntegrationId'],
+    }
+  )
+  .refine(data => data.bitbucketIntegrationId === undefined || data.bitbucketRepo !== undefined, {
+    message: 'Bitbucket integration requires a Bitbucket repository',
+    path: ['bitbucketIntegrationId'],
   })
   .refine(hasOnlyOneAttachmentField, {
     message: 'Must not provide both attachments and images',

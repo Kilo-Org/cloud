@@ -58,6 +58,83 @@ describe('CloudAgentNextFetchClient prepareSession', () => {
   });
 });
 
+describe('provider prepare compatibility', () => {
+  const cases = [
+    {
+      platform: 'github' as const,
+      githubRepo: 'acme/API',
+      githubIntegrationId: '11111111-1111-4111-8111-111111111111',
+    },
+    {
+      platform: 'gitlab' as const,
+      gitUrl: 'https://gitlab.example.com/base/Group/API.git',
+      gitlabIntegrationId: '22222222-2222-4222-8222-222222222222',
+    },
+    {
+      platform: 'bitbucket' as const,
+      gitUrl: 'https://bitbucket.org/acme/API.git',
+      bitbucketIntegrationId: '33333333-3333-4333-8333-333333333333',
+      bitbucketWorkspaceUuid: '44444444-4444-4444-8444-444444444444',
+      bitbucketRepositoryUuid: '55555555-5555-4555-8555-555555555555',
+    },
+  ];
+  it.each(cases)(
+    'sends the exact $platform pin and selected branch on the wire',
+    async repository => {
+      let received: unknown;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof fetch>(async (_url, init) => {
+          if (typeof init?.body !== 'string') throw new Error('Expected a JSON request body');
+          received = JSON.parse(init.body);
+          return Response.json({
+            result: {
+              data: { cloudAgentSessionId: 'agent_selected', kiloSessionId: 'ses_selected' },
+            },
+          });
+        })
+      );
+      const input: CloudAgentPrepareSessionInput = {
+        prompt: 'Inspect',
+        mode: 'code',
+        model: 'test',
+        ...repository,
+        upstreamBranch: 'feature/Case-sensitive',
+      };
+      const result = await createCloudAgentNextFetchClient(BASE_URL).prepareSession({}, input);
+      expect(received).toEqual(input);
+      expect(result).toEqual({
+        cloudAgentSessionId: 'agent_selected',
+        kiloSessionId: 'ses_selected',
+      });
+    }
+  );
+
+  it.each([
+    'Code Review',
+    'Auto Triage',
+    'Auto Fix',
+    'Auto Fix prepare adapter',
+    'createCloudAgentNextFetchClient',
+  ])('retains a serialized old %s payload without adding pins', async () => {
+    const serialized =
+      '{"prompt":"Inspect","mode":"code","model":"test","githubRepo":"acme/API","upstreamBranch":"release/old"}';
+    let received = '';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(async (_url, init) => {
+        if (typeof init?.body !== 'string') throw new Error('Expected a JSON request body');
+        received = init.body;
+        return Response.json({
+          result: { data: { cloudAgentSessionId: 'agent_old', kiloSessionId: 'ses_old' } },
+        });
+      })
+    );
+    await createCloudAgentNextFetchClient(BASE_URL).prepareSession({}, JSON.parse(serialized));
+    expect(received).toBe(serialized);
+  });
+});
+
 describe('CloudAgentNextFetchClient billing error detection', () => {
   it('recognizes every exported billing body pattern', () => {
     for (const pattern of CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS) {

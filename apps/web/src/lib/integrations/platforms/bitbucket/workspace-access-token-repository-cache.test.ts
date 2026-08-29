@@ -26,9 +26,7 @@ const mockFetchBitbucketRepositoriesFromTokenService =
   jest.fn<(kiloUserId: string, organizationId: string) => Promise<BitbucketRepositoryListResult>>();
 
 jest.mock('./token-service-client', () => ({
-  BitbucketRepositorySchema:
-    jest.requireActual<typeof TokenServiceClientModule>('./token-service-client')
-      .BitbucketRepositorySchema,
+  ...jest.requireActual<typeof TokenServiceClientModule>('./token-service-client'),
   fetchBitbucketWorkspaceAccessTokenRepositoriesFromTokenService:
     mockFetchBitbucketRepositoriesFromTokenService,
 }));
@@ -176,7 +174,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
       readCachedBitbucketWorkspaceAccessTokenRepositories({
         organizationId: organization.id,
       })
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       status: 'available',
       repositories: [
         {
@@ -603,7 +601,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         kiloUserId: user.id,
         expectedIntegrationId: integration.id,
       })
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       status: 'available',
       repositories: [REFRESHED_REPOSITORY],
       syncedAt: WINNER_CACHED_AT,
@@ -661,7 +659,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
           kiloUserId: user.id,
           expectedIntegrationId: integration.id,
         })
-      ).resolves.toEqual({
+      ).resolves.toMatchObject({
         status: 'available',
         repositories: [REFRESHED_REPOSITORY],
         syncedAt: WINNER_CACHED_AT,
@@ -712,7 +710,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         kiloUserId: user.id,
         expectedIntegrationId: integration.id,
       })
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       status: 'available',
       repositories: [REFRESHED_REPOSITORY],
       syncedAt: WINNER_CACHED_AT,
@@ -809,7 +807,7 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
         kiloUserId: user.id,
         expectedIntegrationId: integration.id,
       })
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       status: 'available',
       repositories: [
         {

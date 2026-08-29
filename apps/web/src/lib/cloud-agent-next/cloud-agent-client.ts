@@ -106,6 +106,8 @@ type PrepareSessionSharedFields = {
   gitToken?: string;
   /** Explicit platform type for correct env var setup (avoids URL-based detection) */
   platform?: 'github' | 'gitlab' | 'bitbucket';
+  gitlabIntegrationId?: string;
+  bitbucketIntegrationId?: string;
   bitbucketWorkspaceUuid?: string;
   bitbucketRepositoryUuid?: string;
   // Common params

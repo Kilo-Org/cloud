@@ -204,6 +204,96 @@ function deployed() {
   return scenario;
 }
 
+it.each([
+  [true, 'FAILURE', 'required', 'failure', 'unmet'],
+  [false, 'FAILURE', 'optional', 'failure', 'unavailable'],
+  [undefined, 'FAILURE', 'unknown', 'failure', 'unavailable'],
+  [null, 'SUCCESS', 'unknown', 'success', 'unavailable'],
+  [true, 'NEUTRAL', 'required', 'skipped', 'met'],
+  [true, 'SKIPPED', 'required', 'skipped', 'met'],
+  [true, 'NEW_CONCLUSION', 'required', 'unknown', 'unavailable'],
+] as const)(
+  'keeps requiredness %s separate from conclusion %s',
+  (isRequired, conclusion, requiredness, outcome, state) => {
+    const scenario = setup();
+    scenario.observations.head = collection([check(run('RUN', 7, { isRequired, conclusion }))]);
+    const result = evaluate(scenario);
+    expect(result.checks.items[0]).toMatchObject({ requiredness, outcome, kind: 'check-run' });
+    expect(result.requirements.items.find(row => row.check)?.state).toBe(state);
+  }
+);
+
+it.each(['bypass', 'denied-bypass', 'unknown-context', 'no-policy'] as const)(
+  'keeps known required failures unavailable without established enforcement: %s',
+  condition => {
+    const scenario = setup(condition === 'no-policy' ? null : checkPolicy());
+    scenario.observations.head = collection([check(run('RUN', 7, { conclusion: 'FAILURE' }))]);
+    if (condition === 'bypass') scenario.facts.canBypassClassic = field(true);
+    if (condition === 'denied-bypass')
+      scenario.facts.canBypassClassic = {
+        data: null,
+        source: { ...source, availability: 'denied' },
+      };
+    if (condition === 'unknown-context')
+      scenario.facts.viewerRule.requiredStatusCheckContexts = field(null);
+    const result = evaluate(scenario);
+    expect(result.checks.items[0]).toMatchObject({ requiredness: 'required', outcome: 'failure' });
+    expect(result.requirements.items.filter(row => row.check)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ state: 'unavailable' })])
+    );
+    expect(result.requirements.items.some(row => row.state === 'unmet')).toBe(false);
+  }
+);
+
+it.each([
+  ['EXPECTED', 'pending', 'unmet'],
+  ['PENDING', 'pending', 'unmet'],
+  ['ERROR', 'failure', 'unmet'],
+  ['SUCCESS', 'success', 'met'],
+  ['NEW_STATE', 'unknown', 'unavailable'],
+] as const)('preserves the observed status state %s', (state, outcome, requirementState) => {
+  const scenario = setup();
+  scenario.observations.head = collection([check(status('STATUS', { state }))]);
+  const result = evaluate(scenario);
+  expect(result.checks.items[0]).toMatchObject({ kind: 'status', status: state, outcome });
+  expect(result.requirements.items[0]?.state).toBe(requirementState);
+});
+
+it('matches application IDs instead of equal display names and retains optional failures', () => {
+  const scenario = setup(checkPolicy(7));
+  scenario.observations.head = collection([
+    check(run('OTHER', 8, { isRequired: false, conclusion: 'FAILURE' })),
+    check(run('BOUND', 7)),
+  ]);
+  const result = evaluate(scenario);
+  expect(result.checks.items).toMatchObject([
+    {
+      id: 'OTHER',
+      application: { id: 8, name: 'Same display name' },
+      outcome: 'failure',
+      requiredness: 'optional',
+    },
+    { id: 'BOUND', application: { id: 7, name: 'Same display name' } },
+  ]);
+  expect(result.requirements.items.filter(row => row.check)).toMatchObject([
+    { state: 'met', check: { application: { kind: 'app', appId: 7 } } },
+  ]);
+  expect(result.requirements.items.some(row => row.state === 'unmet')).toBe(false);
+});
+
+it.each([null, 0])(
+  'does not normalize the undocumented application binding %s to a wildcard',
+  app_id => {
+    const scenario = setup(checkPolicy(app_id));
+    scenario.observations.head = collection([check(run('RUN'))]);
+    expect(
+      evaluate(scenario).requirements.items.find(
+        row => row.policy?.source === 'classic' && row.check
+      )
+    ).toMatchObject({ state: 'unavailable', check: { application: { kind: 'unknown' } } });
+  }
+);
+
 it('preserves both required run and status outcomes under an explicit wildcard', () => {
   const scenario = setup();
   scenario.observations.head = collection([
@@ -214,6 +304,163 @@ it('preserves both required run and status outcomes under an explicit wildcard',
     { state: 'met', check: { kind: 'check-run', application: { kind: 'any' } } },
     { state: 'unmet', check: { kind: 'status', application: { kind: 'any' } } },
   ]);
+});
+
+it('does not use a status creator or an inaccessible app to satisfy an application-bound policy', () => {
+  const scenario = setup(checkPolicy(7));
+  scenario.observations.head = collection([
+    check(status('STATUS', { creator: { id: 7, login: 'app-7' } })),
+    check(run('RUN', 7, { checkSuite: { app: null, commit: { oid: 'head' } } })),
+  ]);
+  const result = evaluate(scenario);
+  expect(
+    result.requirements.items.find(row => row.policy?.source === 'classic' && row.check)?.state
+  ).toBe('unavailable');
+  expect(result.checks.items.every(item => item.application === null)).toBe(true);
+  expect(result.checks.items.some(item => item.observation === 'missing')).toBe(false);
+});
+
+it.each([7, 8])(
+  'preserves duplicate names from app %s without guessing the latest run',
+  secondApp => {
+    const scenario = setup();
+    scenario.observations.head = collection([
+      check(run('FIRST', 7)),
+      check(run('SECOND', secondApp, { conclusion: 'FAILURE' })),
+    ]);
+    expect(requirements(scenario, 'status-check').map(row => row.state)).toEqual(
+      secondApp === 7 ? ['unavailable', 'unavailable'] : ['met', 'unmet']
+    );
+  }
+);
+
+it.each([
+  'complete',
+  'policy-partial',
+  'checks-partial',
+  'next-page',
+  'denied',
+  'unknown-bypass',
+] as const)(
+  'reports missing observations only with complete applicable evidence: %s',
+  condition => {
+    const scenario = setup();
+    if (condition === 'policy-partial') scenario.context.requirements.completeness = 'partial';
+    if (condition === 'checks-partial') scenario.observations.head.completeness = 'partial';
+    if (condition === 'next-page') scenario.observations.head.hasNextPage = true;
+    if (condition === 'denied')
+      scenario.observations.head.source = { ...source, availability: 'denied', retryable: false };
+    if (condition === 'unknown-bypass')
+      scenario.facts.canBypassClassic = {
+        data: null,
+        source: { ...source, availability: 'unavailable' },
+      };
+    const result = evaluate(scenario);
+    expect(result.checks.items.filter(item => item.observation === 'missing')).toHaveLength(
+      condition === 'complete' ? 1 : 0
+    );
+    expect(result.requirements.items.find(row => row.check)?.state).toBe(
+      condition === 'complete' ? 'unmet' : 'unavailable'
+    );
+  }
+);
+
+it('retains a directly observed failure when a later check page is unavailable', () => {
+  const scenario = setup();
+  scenario.observations.head = collection([check(run('RUN', 7, { conclusion: 'FAILURE' }))], {
+    completeness: 'partial',
+    totalCount: 2,
+    hasNextPage: true,
+    source: { ...source, availability: 'partial', retryable: true, reason: 'bad_gateway' },
+  });
+  const result = evaluate(scenario);
+  expect(result.checks.source).toMatchObject({ availability: 'partial', retryable: true });
+  expect(result.requirements.items).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ kind: 'status-check', state: 'unmet' }),
+      expect.objectContaining({ kind: 'check-evaluation', state: 'unavailable' }),
+    ])
+  );
+});
+
+it.each(['status', 'empty', 'run-only', 'partial', 'wrong-parents', 'head-only-context'] as const)(
+  'uses documented commit selection without inventing fallback: %s',
+  condition => {
+    const scenario = setup();
+    scenario.facts.testMerge = field({
+      oid: 'merge',
+      parents: {
+        totalCount: 2,
+        nodes: [{ oid: 'head' }, { oid: condition === 'wrong-parents' ? 'old-base' : 'base' }],
+      },
+    });
+    scenario.observations.head = collection([check(run('HEAD', 7, { conclusion: 'FAILURE' }))]);
+    const mergeCheck =
+      condition === 'run-only'
+        ? check(run('MERGE', 7, { checkSuite: { app: null, commit: { oid: 'merge' } } }))
+        : check(
+            status('MERGE', {
+              context: condition === 'head-only-context' ? 'other' : 'ci',
+              commit: { oid: 'merge' },
+              isRequired: condition !== 'head-only-context',
+            })
+          );
+    scenario.observations.merge = collection(condition === 'empty' ? [] : [mergeCheck]);
+    if (condition === 'partial') {
+      scenario.observations.merge = collection([], { completeness: 'partial', totalCount: null });
+    }
+    const result = evaluate(scenario);
+    expect(result.evaluatedShas).toEqual(['head', 'merge']);
+    expect(result.checks.items[0]?.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observation: expect.stringContaining('head:head;test-merge:merge;selected:'),
+        }),
+      ])
+    );
+    const bound = result.requirements.items.filter(
+      row => row.policy?.source === 'classic' && row.check
+    );
+    expect(bound[0]?.state).toBe(
+      condition === 'status' ? 'met' : condition === 'empty' ? 'unmet' : 'unavailable'
+    );
+    if (condition !== 'empty')
+      expect(result.requirements.items.some(row => row.state === 'unmet')).toBe(false);
+    if (condition === 'head-only-context')
+      expect(result.checks.items.some(item => item.observation === 'missing')).toBe(false);
+  }
+);
+
+it.each(['missing', 'old-head', 'old-base', 'missing-time'] as const)(
+  'rejects incomplete or stale direct check evidence: %s',
+  condition => {
+    const scenario = setup();
+    const observed = check(run('RUN', 7, { conclusion: 'FAILURE' }));
+    if (condition === 'missing') observed.evidence = [];
+    for (const entry of observed.evidence) {
+      if (condition === 'old-head') entry.headSha = 'old-head';
+      if (condition === 'old-base') entry.baseSha = 'old-base';
+      if (condition === 'missing-time') entry.observedAt = null;
+    }
+    scenario.observations.head = collection([observed]);
+    expect(requirements(scenario, 'status-check')[0]?.state).toBe('unavailable');
+  }
+);
+
+it('does not satisfy a policy with an observation of unknown kind', () => {
+  const scenario = setup();
+  const observed = check(run('RUN'));
+  observed.kind = 'unknown';
+  scenario.observations.head = collection([observed]);
+  expect(requirements(scenario, 'status-check')[0]?.state).toBe('unavailable');
+});
+
+it('does not use an old check commit as current failure evidence', () => {
+  const scenario = setup();
+  scenario.observations.head = collection([
+    check(status('OLD', { state: 'FAILURE', commit: { oid: 'old-head' } })),
+  ]);
+  expect(requirements(scenario, 'status-check')[0]?.state).toBe('unavailable');
 });
 
 it.each([

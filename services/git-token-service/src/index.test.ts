@@ -553,25 +553,67 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     return result.capability;
   }
 
-  it('issues an opaque capability and the canonical git URL', async () => {
-    const result = await createService().issueBitbucketSessionCapability(issueParams);
-    expect(result).toEqual({
-      success: true,
-      capability: expect.stringMatching(/^kbb1\./),
-      gitUrl: 'https://bitbucket.org/acme/widgets.git',
-    });
-    if (result.success) {
+  it.each([
+    ['legacy request', {}],
+    ['matching pin', { expectedIntegrationId: subject.integrationId }],
+    // The RPC projection must trust the resolver, not echo a caller's claimed pin.
+    ['different caller pin', { expectedIntegrationId: '123e4567-e89b-12d3-a456-426614174099' }],
+  ] as const)(
+    'returns the capability, canonical URL, and resolved integration for %s',
+    async (_name, pin) => {
+      const result = await createService().issueBitbucketSessionCapability({
+        ...issueParams,
+        ...pin,
+      });
+      expect(result).toEqual({
+        success: true,
+        capability: expect.stringMatching(/^kbb1\./),
+        gitUrl: 'https://bitbucket.org/acme/widgets.git',
+        integrationId: subject.integrationId,
+      });
+      if (!result.success) throw new Error(`issue failed: ${result.reason}`);
       expect(result.capability).not.toContain(subject.token);
+      const { BitbucketSessionCapabilityCodec } = await import('./bitbucket-session-capability.js');
+      const claims = new BitbucketSessionCapabilityCodec(
+        Buffer.alloc(32, 7).toString('base64')
+      ).decode(result.capability);
+      expect(claims).toMatchObject({
+        integrationId: subject.integrationId,
+        workspaceUuid: subject.workspaceUuid,
+        repositoryUuid: subject.repositoryUuid,
+        repositoryFullName: 'acme/widgets',
+        outboundContainerId: 'outbound-container-1',
+      });
     }
-  });
+  );
 
-  it('propagates a resolution failure from issue', async () => {
+  it.each([
+    'invalid_request',
+    'not_connected',
+    'reconnect_required',
+    'temporarily_unavailable',
+    'insufficient_permissions',
+    'integration_mismatch',
+    'workspace_mismatch',
+    'repository_not_found',
+    'repository_mismatch',
+  ])('preserves issue failure %s without exposing identity or credentials', async reason => {
     serviceMocks.resolveBitbucketCapabilitySubject
       .mockReset()
-      .mockResolvedValue({ success: false, reason: 'reconnect_required' });
-    await expect(createService().issueBitbucketSessionCapability(issueParams)).resolves.toEqual({
+      .mockResolvedValue({ success: false, reason });
+    await expect(
+      createService().issueBitbucketSessionCapability({
+        ...issueParams,
+        expectedIntegrationId: subject.integrationId,
+      })
+    ).resolves.toEqual({ success: false, reason });
+  });
+
+  it('exposes no resolved identity when capability configuration fails', async () => {
+    const service = new GitTokenRPCEntrypoint({} as ExecutionContext, {} as CloudflareEnv);
+    await expect(service.issueBitbucketSessionCapability(issueParams)).resolves.toEqual({
       success: false,
-      reason: 'reconnect_required',
+      reason: 'capability_configuration_error',
     });
   });
 
@@ -631,6 +673,22 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
   });
 
+  it('rejects redemption when the integration changes without token rotation', async () => {
+    const capability = await issueCapability();
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: { ...subject, integrationId: '123e4567-e89b-12d3-a456-426614174099' },
+    });
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'POST',
+        requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+      })
+    ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+  });
+
   it.each([
     // Single-encoded traversal is caught by the raw check.
     ['https://bitbucket.org/acme/widgets.git/%2e%2e/git-upload-pack'],
@@ -652,42 +710,64 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
 });
 
 describe('GitTokenRPCEntrypoint Bitbucket runtime authorization', () => {
+  const integrationId = '123e4567-e89b-12d3-a456-426614174022';
+  const params = {
+    userId: 'user-1',
+    orgId: '123e4567-e89b-12d3-a456-426614174030',
+    workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+    repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    repositoryUrl: 'https://bitbucket.org/acme/widgets.git',
+  };
+
   it('requires an organization before invoking the reachable V1 resolver', async () => {
     serviceMocks.resolveBitbucketToken.mockReset();
 
     await expect(
-      createService().getBitbucketToken({
-        userId: 'user-1',
-        workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
-        repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
-        repositoryUrl: 'https://bitbucket.org/acme/widgets.git',
-      })
+      createService().getBitbucketToken({ ...params, orgId: undefined })
     ).resolves.toEqual({ success: false, reason: 'invalid_request' });
     expect(serviceMocks.resolveBitbucketToken).not.toHaveBeenCalled();
   });
 
-  it('returns only the opaque token from an integration-fenced V1 resolution', async () => {
+  it.each([
+    ['legacy request', {}],
+    ['matching pin', { expectedIntegrationId: integrationId }],
+    // The resolver owns authorization; this projection must never echo the request pin.
+    ['different caller pin', { expectedIntegrationId: '123e4567-e89b-12d3-a456-426614174099' }],
+  ] as const)('returns only the token and resolved integration for %s', async (_name, pin) => {
     serviceMocks.resolveBitbucketToken.mockReset().mockResolvedValue({
       success: true,
       token: 'ATCT-runtime-token',
-      integrationId: 'must-not-cross-rpc',
+      integrationId,
       credentialId: 'must-not-cross-rpc',
       credentialVersion: 7,
     });
-    const params = {
-      userId: 'user-1',
-      orgId: '123e4567-e89b-12d3-a456-426614174030',
-      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
-      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
-      repositoryUrl: 'https://bitbucket.org/acme/widgets.git',
-      expectedIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
-    };
 
-    await expect(createService().getBitbucketToken(params)).resolves.toEqual({
+    await expect(createService().getBitbucketToken({ ...params, ...pin })).resolves.toEqual({
       success: true,
       token: 'ATCT-runtime-token',
+      integrationId,
     });
-    expect(serviceMocks.resolveBitbucketToken).toHaveBeenCalledWith(expect.anything(), params);
+    expect(serviceMocks.resolveBitbucketToken).toHaveBeenCalledWith(expect.anything(), {
+      ...params,
+      ...pin,
+    });
+  });
+
+  it.each([
+    'invalid_request',
+    'not_connected',
+    'reconnect_required',
+    'temporarily_unavailable',
+    'insufficient_permissions',
+    'integration_mismatch',
+    'workspace_mismatch',
+    'repository_not_found',
+    'repository_mismatch',
+  ])('preserves token failure %s without exposing identity or credentials', async reason => {
+    serviceMocks.resolveBitbucketToken.mockReset().mockResolvedValue({ success: false, reason });
+    await expect(
+      createService().getBitbucketToken({ ...params, expectedIntegrationId: integrationId })
+    ).resolves.toEqual({ success: false, reason });
   });
 });
 

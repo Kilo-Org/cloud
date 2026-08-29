@@ -39,7 +39,7 @@ export type GetBitbucketTokenParams = {
 };
 
 export type GetBitbucketTokenResult =
-  | { success: true; token: string }
+  | { success: true; token: string; integrationId: string }
   | {
       success: false;
       reason:
@@ -398,7 +398,11 @@ export async function resolveBitbucketToken(
 ): Promise<GetBitbucketTokenResult> {
   const resolved = await resolveBitbucketAuthorizedRepository(env, params, dependencyOverrides);
   if (!resolved.success) return resolved;
-  return { success: true, token: resolved.authorization.token };
+  return {
+    success: true,
+    token: resolved.authorization.token,
+    integrationId: resolved.authorization.integrationId,
+  };
 }
 
 export type BitbucketCapabilitySubject = {

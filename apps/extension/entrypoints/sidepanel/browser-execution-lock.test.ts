@@ -221,6 +221,10 @@ describe('profile browser execution locks', () => {
           true
         );
       });
+      await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({
+        ready: false,
+        reason: expect.stringContaining('unwinding'),
+      });
       await expect(panel.recover(async () => [])).resolves.toMatchObject({ recovered: false });
       expect((await state.panel().acquireLocal()).admitted).toBe(false);
     } finally {
@@ -263,59 +267,276 @@ describe('profile browser execution locks', () => {
     }
   });
 
-  it('recovers a discarded failed lease only after a durable fence and affected-tab closure', async () => {
+  it('prepares a discarded failed lease without clearing quarantine or admitting work', async () => {
     const state = profile();
     const panel = state.panel();
+    const otherPanel = state.panel();
+    const provider = admitted(await otherPanel.acquireProviderOwner());
     const write = state.storageArea.setItem;
-    state.storageArea.setItem = () => {
-      throw new Error('storage unavailable');
-    };
     {
       const local = admitted(await panel.acquireLocal());
+      state.storageArea.setItem = () => {
+        throw new Error('storage unavailable');
+      };
       await expect(local.quarantine(7)).rejects.toThrow('storage unavailable');
       await expect(local.release()).rejects.toThrow('storage unavailable');
       leases.delete(local);
     }
-    const persist = Promise.withResolvers<void>();
-    let writing = false;
-    state.storageArea.setItem = async (key, value) => {
-      writing = true;
-      await persist.promise;
-      await write(key, value);
-    };
-    const recovering = panel.recover(async () => [7, 8]);
     try {
-      await vi.waitFor(() => {
-        expect(writing).toBe(true);
+      const unavailable = await panel.prepareRecovery(async () => []);
+      state.storageArea.setItem = write;
+      // A display-only refresh leaves the failed-release lock held after storage returns.
+      await panel.refresh();
+      expect({
+        admitted: (await otherPanel.acquireLocal()).admitted,
+        localRuns: panel.getSnapshot().localRuns,
+        persisted: state.values.has(BROWSER_EXECUTION_SAFETY_KEY),
+        unavailable,
+      }).toStrictEqual({
+        admitted: false,
+        localRuns: 1,
+        persisted: false,
+        unavailable: { ready: false, reason: expect.stringContaining('Restore storage access') },
+      });
+
+      const readiness = await panel.prepareRecovery(async () => []);
+      expect({
+        delegated: (
+          await otherPanel.acquireDelegated(provider, 'parent-b', new AbortController().signal)
+        ).admitted,
+        local: (await otherPanel.acquireLocal()).admitted,
+        localRuns: panel.getSnapshot().localRuns,
+        readiness,
+        safety: state.values.get(BROWSER_EXECUTION_SAFETY_KEY),
+      }).toStrictEqual({
+        delegated: false,
+        local: false,
+        localRuns: 0,
+        readiness: { ready: true, reason: expect.stringContaining('Recover explicitly') },
+        safety: { tabIds: [7], version: 1 },
+      });
+    } finally {
+      state.storageArea.setItem = write;
+      await panel.recover(async () => []);
+    }
+  });
+
+  it('does not prepare a failed lease until its caller requests release', async () => {
+    const state = profile();
+    const panel = state.panel();
+    const local = admitted(await panel.acquireLocal());
+    const write = state.storageArea.setItem;
+    state.storageArea.setItem = () => {
+      throw new Error('storage unavailable');
+    };
+    await expect(local.quarantine(7)).rejects.toThrow('storage unavailable');
+    state.storageArea.setItem = write;
+    try {
+      await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({
+        ready: false,
+        reason: expect.stringContaining('unwinding'),
       });
       expect(state.values.has(BROWSER_EXECUTION_SAFETY_KEY)).toBe(false);
-      expect(
-        (await locks.query()).held?.filter(lock => lock.name === BROWSER_EXECUTION_LOCK)
-      ).toMatchObject([{ mode: 'shared' }]);
-      expect((await state.panel().acquireLocal()).admitted).toBe(false);
-      await expect(panel.recover(async () => [])).resolves.toMatchObject({ recovered: false });
+      expect(panel.getSnapshot().localRuns).toBe(1);
     } finally {
-      persist.resolve();
-      state.storageArea.setItem = write;
+      await local.quarantine(7);
+      await local.release();
     }
-    await expect(recovering).resolves.toStrictEqual({
+  });
+
+  it('rejects queued delegation when preparation drains a failed release', async () => {
+    const state = profile();
+    const panel = state.panel();
+    const otherPanel = state.panel();
+    const local = admitted(await panel.acquireLocal());
+    const provider = admitted(await otherPanel.acquireProviderOwner());
+    const waiting = otherPanel.acquireDelegated(provider, 'parent-b', new AbortController().signal);
+    await vi.waitFor(async () => {
+      expect((await locks.query()).pending).toHaveLength(1);
+    });
+    const write = state.storageArea.setItem;
+    state.storageArea.setItem = () => {
+      throw new Error('storage unavailable');
+    };
+    await expect(local.quarantine(7)).rejects.toThrow('storage unavailable');
+    await expect(local.release()).rejects.toThrow('storage unavailable');
+    state.storageArea.setItem = write;
+    try {
+      // The rejected waiter can still be unwinding during the first native readiness check.
+      await panel.prepareRecovery(async () => []);
+      const admission = await waiting;
+      if (admission.admitted) {
+        admitted(admission);
+      }
+      expect(admission).toMatchObject({
+        admitted: false,
+        reason: expect.stringContaining('Close the affected tabs'),
+      });
+      await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({ ready: true });
+      expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+        tabIds: [7],
+        version: 1,
+      });
+    } finally {
+      await panel.recover(async () => []);
+    }
+  });
+
+  it.each(['shared', 'exclusive'] as const)(
+    'rechecks native %s locks after earlier readiness without waiting or stealing',
+    async mode => {
+      const state = profile();
+      const record = { tabIds: [7], version: 1 };
+      state.values.set(BROWSER_EXECUTION_SAFETY_KEY, record);
+      const panel = state.panel();
+      await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({ ready: true });
+      const entered = Promise.withResolvers<void>();
+      const drain = Promise.withResolvers<void>();
+      const holding = locks.request(BROWSER_EXECUTION_LOCK, { mode }, () => {
+        entered.resolve();
+        return drain.promise;
+      });
+      await entered.promise;
+      try {
+        await expect(state.panel().prepareRecovery(async () => [])).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('unwinding'),
+        });
+        await expect(panel.recover(async () => [])).resolves.toMatchObject({
+          reason: expect.stringContaining('unwinding'),
+          recovered: false,
+        });
+        expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(record);
+        expect(
+          (await locks.query()).held?.filter(lock => lock.name === BROWSER_EXECUTION_LOCK)
+        ).toMatchObject([{ mode }]);
+      } finally {
+        drain.resolve();
+        await holding;
+      }
+    }
+  );
+
+  it.each(['unavailable', 'corrupt'] as const)(
+    'fails preparation closed on %s storage and rechecks it during recovery',
+    async failure => {
+      const state = profile();
+      const record = { tabIds: [7], version: 1 };
+      state.values.set(BROWSER_EXECUTION_SAFETY_KEY, record);
+      const panel = state.panel();
+      await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({ ready: true });
+      const read = state.storageArea.getItem;
+      state.storageArea.getItem = key => {
+        if (key === BROWSER_EXECUTION_SAFETY_KEY) {
+          if (failure === 'unavailable') {
+            throw new Error('storage unavailable');
+          }
+          return { tabIds: ['7'], version: 1 };
+        }
+        return read(key);
+      };
+      try {
+        await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('Restore storage'),
+        });
+        await expect(panel.recover(async () => [])).rejects.toThrow(
+          failure === 'unavailable' ? 'storage unavailable' : 'expected number'
+        );
+        expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(record);
+        expect((await panel.acquireLocal()).admitted).toBe(false);
+      } finally {
+        state.storageArea.getItem = read;
+      }
+      await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({ ready: true });
+      expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(record);
+    }
+  );
+
+  it('rechecks newly persisted affected tabs and all-tabs closure after empty-profile readiness', async () => {
+    const state = profile();
+    const panel = state.panel();
+    await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({ ready: true });
+    expect(state.values.size).toBe(0);
+    state.values.set(BROWSER_EXECUTION_SAFETY_KEY, { tabIds: [7], version: 1 });
+    await expect(panel.recover(async () => [7])).resolves.toStrictEqual({
       reason: 'Close all affected tabs before recovery.',
       recovered: false,
     });
-    expect({
-      admitted: (await state.panel().acquireLocal()).admitted,
-      safety: state.values.get(BROWSER_EXECUTION_SAFETY_KEY),
-    }).toMatchObject({ admitted: false, safety: { tabIds: [7] } });
-    await expect(panel.recover(async () => [8])).resolves.toStrictEqual({
-      reason: 'Browser control recovered. Submit new work explicitly.',
-      recovered: true,
+    state.values.set(BROWSER_EXECUTION_SAFETY_KEY, { allTabs: true, tabIds: [], version: 1 });
+    await expect(panel.recover(async () => [42])).resolves.toMatchObject({
+      reason: expect.stringContaining('Close all target tabs'),
+      recovered: false,
     });
-    expect(
-      (await locks.query()).held?.filter(lock => lock.name === BROWSER_EXECUTION_LOCK)
-    ).toHaveLength(0);
-    const next = admitted(await panel.acquireLocal());
-    await expect(next.run(async () => 'explicit new work')).resolves.toBe('explicit new work');
+    expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+      allTabs: true,
+      tabIds: [],
+      version: 1,
+    });
   });
+
+  it.each(['recover', 'prepareRecovery'] as const)(
+    'retains a failed fence during a pending retry write (%s)',
+    async operation => {
+      const state = profile();
+      const panel = state.panel();
+      const write = state.storageArea.setItem;
+      state.storageArea.setItem = () => {
+        throw new Error('storage unavailable');
+      };
+      {
+        const local = admitted(await panel.acquireLocal());
+        await expect(local.quarantine(7)).rejects.toThrow('storage unavailable');
+        await expect(local.release()).rejects.toThrow('storage unavailable');
+        leases.delete(local);
+      }
+      const persist = Promise.withResolvers<void>();
+      let writing = false;
+      state.storageArea.setItem = async (key, value) => {
+        writing = true;
+        await persist.promise;
+        await write(key, value);
+      };
+      const checking = panel[operation](async () => [7, 8]);
+      try {
+        await vi.waitFor(() => {
+          expect(writing).toBe(true);
+        });
+        expect(state.values.has(BROWSER_EXECUTION_SAFETY_KEY)).toBe(false);
+        expect(
+          (await locks.query()).held?.filter(lock => lock.name === BROWSER_EXECUTION_LOCK)
+        ).toMatchObject([{ mode: 'shared' }]);
+        expect((await state.panel().acquireLocal()).admitted).toBe(false);
+        await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('unwinding'),
+        });
+        await expect(panel.recover(async () => [])).resolves.toMatchObject({ recovered: false });
+      } finally {
+        persist.resolve();
+        state.storageArea.setItem = write;
+      }
+      await expect(checking).resolves.toStrictEqual({
+        ...(operation === 'recover' ? { recovered: false } : { ready: false }),
+        reason: 'Close all affected tabs before recovery.',
+      });
+      const readiness = await panel.prepareRecovery(async () => [8]);
+      expect({
+        admitted: (await state.panel().acquireLocal()).admitted,
+        readiness,
+        safety: state.values.get(BROWSER_EXECUTION_SAFETY_KEY),
+      }).toMatchObject({ admitted: false, readiness: { ready: true }, safety: { tabIds: [7] } });
+      await expect(panel.recover(async () => [8])).resolves.toStrictEqual({
+        reason: 'Browser control recovered. Submit new work explicitly.',
+        recovered: true,
+      });
+      expect(
+        (await locks.query()).held?.filter(lock => lock.name === BROWSER_EXECUTION_LOCK)
+      ).toHaveLength(0);
+      const next = admitted(await panel.acquireLocal());
+      await expect(next.run(async () => 'explicit new work')).resolves.toBe('explicit new work');
+    }
+  );
 
   it('keeps discarded leases fenced across repeated recovery write failures', async () => {
     const state = profile();
@@ -385,6 +606,10 @@ describe('profile browser execution locks', () => {
         expect(leases.size).toBe(0);
         expect(events).toStrictEqual(['issued']);
       });
+      await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({
+        ready: false,
+        reason: expect.stringContaining('unwinding'),
+      });
       await expect(panel.recover(async () => [])).resolves.toMatchObject({
         reason: expect.stringContaining('unwinding'),
         recovered: false,
@@ -397,6 +622,11 @@ describe('profile browser execution locks', () => {
       state.storageArea.setItem = write;
     }
     expect(events).toStrictEqual(['issued', 'unwound']);
+    await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({ ready: true });
+    expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+      tabIds: [7],
+      version: 1,
+    });
     await expect(panel.recover(async () => [])).resolves.toMatchObject({ recovered: true });
   });
 
@@ -502,6 +732,10 @@ describe('profile browser execution locks', () => {
     state.storageArea.setItem = write;
     await panel.refresh();
     const { blockedReason } = panel.getSnapshot();
+    await expect(panel.prepareRecovery(async () => [])).resolves.toMatchObject({
+      ready: false,
+      reason: expect.stringContaining('Restore browser Web Locks support'),
+    });
     await expect(panel.recover(async () => [])).resolves.toMatchObject({
       reason: expect.stringContaining('Recovery requires Web Locks'),
       recovered: false,
@@ -670,12 +904,35 @@ describe('profile browser execution locks', () => {
     state.values.set(BROWSER_EXECUTION_SAFETY_KEY, { allTabs: true, tabIds: [], version: 1 });
     const panel = state.panel();
     await panel.refresh();
-    expect(panel.getSnapshot().blockedReason).toContain('Close all target tabs');
-    await expect(panel.acquireLocal()).resolves.toMatchObject({
-      admitted: false,
-      reason: expect.stringContaining('Close all target tabs'),
+    expect({
+      admission: await panel.acquireLocal(),
+      blockedReason: panel.getSnapshot().blockedReason,
+      preparation: await panel.prepareRecovery(async () => [7]),
+      recovery: await panel.recover(async () => [7]),
+    }).toMatchObject({
+      admission: { admitted: false, reason: expect.stringContaining('Close all target tabs') },
+      blockedReason: expect.stringContaining('Close all target tabs'),
+      preparation: { ready: false, reason: expect.stringContaining('Close all target tabs') },
+      recovery: { recovered: false },
     });
-    await expect(panel.recover(async () => [7])).resolves.toMatchObject({ recovered: false });
+    await expect(
+      panel.prepareRecovery(async () => {
+        throw new Error('tab enumeration failed');
+      })
+    ).resolves.toMatchObject({
+      ready: false,
+      reason: expect.stringContaining('Restore storage and browser access'),
+    });
+    const readiness = await panel.prepareRecovery(async () => []);
+    expect({
+      admitted: (await panel.acquireLocal()).admitted,
+      readiness,
+      safety: state.values.get(BROWSER_EXECUTION_SAFETY_KEY),
+    }).toStrictEqual({
+      admitted: false,
+      readiness: { ready: true, reason: expect.stringContaining('Recover explicitly') },
+      safety: { allTabs: true, tabIds: [], version: 1 },
+    });
     await expect(panel.recover(async () => [])).resolves.toMatchObject({ recovered: true });
     const next = admitted(await panel.acquireLocal());
     await expect(next.run(async () => 'explicit submission')).resolves.toBe('explicit submission');

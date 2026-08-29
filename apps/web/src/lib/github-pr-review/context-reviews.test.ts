@@ -1,4 +1,8 @@
-import { contextReviewSchema, resolveContextReviewDecisions } from './context-reviews';
+import {
+  contextReviewEvidenceConflicts,
+  contextReviewSchema,
+  resolveContextReviewDecisions,
+} from './context-reviews';
 import type { GitHubPrReviewContext } from './context-dtos';
 
 const fields = ['latestOpinionatedReviews', 'latestReviews'] as const;
@@ -55,14 +59,27 @@ const page = (
   };
 };
 
-async function run(serve: (field: Field) => Reviews) {
+async function run(serve: (field: Field) => Reviews, conflictingReviewIds?: ReadonlySet<string>) {
   const opinionated = serve('latestOpinionatedReviews');
   const reviewActivity = serve('latestReviews');
   return {
-    reviewDecisions: resolveContextReviewDecisions(opinionated, reviewActivity),
+    reviewDecisions: resolveContextReviewDecisions(
+      opinionated,
+      reviewActivity,
+      conflictingReviewIds
+    ),
     reviewActivity,
   };
 }
+
+it('does not mistake unavailable evidence for a review conflict', () => {
+  const known = contextReviewSchema.parse(review());
+  const unavailable = contextReviewSchema.parse(
+    review('UNKNOWN', 'decision', { submittedAt: null, commit: null })
+  );
+  expect(contextReviewEvidenceConflicts(known, unavailable)).toBe(false);
+  expect(contextReviewEvidenceConflicts(unavailable, known)).toBe(false);
+});
 
 // These synthetic responses exercise the conservative policy, not undocumented provider transitions.
 it.each([
@@ -247,6 +264,145 @@ it.each(
     completeness: 'partial',
     totalCount: null,
     source: { availability: 'partial', reason: availability, retryable: availability !== 'denied' },
+  });
+});
+
+describe.each(fields)('%s state errors', failedField => {
+  it.each([
+    { error: 'FORBIDDEN', reason: 'graphql-denied', retryable: false },
+    { error: 'INTERNAL', reason: 'graphql-incomplete', retryable: true },
+  ])('preserves source metadata after $error', async ({ reason, retryable }) => {
+    const result = await run(field => {
+      const failed = field === failedField;
+      const reviews = page(field, [
+        review(failed ? 'UNKNOWN' : 'APPROVED'),
+        review('APPROVED', 'unaffected', { author: person('other') }),
+      ]);
+      if (failed) {
+        reviews.completeness = 'partial';
+        reviews.source = { ...reviews.source, availability: 'partial', reason, retryable };
+      }
+      return reviews;
+    });
+    expect(result.reviewDecisions).toMatchObject({
+      items: [
+        { id: 'decision', state: 'UNKNOWN', submittedAt, commitSha: 'reviewed-commit' },
+        { id: 'unaffected', state: 'APPROVED' },
+      ],
+      knownCount: 2,
+      totalCount: null,
+      hasNextPage: null,
+      endCursor: null,
+      completeness: 'partial',
+      source: {
+        availability: 'partial',
+        reason,
+        retryable,
+        provenance: ['graphql.latestOpinionatedReviews', 'graphql.latestReviews'],
+        observedAt: later,
+      },
+    });
+    expect(result.reviewActivity.items).toMatchObject([
+      { id: 'decision', state: failedField === 'latestReviews' ? 'UNKNOWN' : 'APPROVED' },
+      { id: 'unaffected', state: 'APPROVED' },
+    ]);
+  });
+
+  it.each([
+    ['commit', { commit: { oid: 'contradictory-commit' } }],
+    ['submission', { submittedAt: later }],
+    ['actor ID', { author: person('other') }],
+  ])('retains contradictory %s evidence beside a denied state', async (_name, patch) => {
+    const result = await run(field => {
+      const failed = field === failedField;
+      const reviews = page(field, [
+        review(failed ? 'UNKNOWN' : 'APPROVED', 'decision', failed ? patch : {}),
+      ]);
+      if (failed) {
+        reviews.completeness = 'partial';
+        reviews.source = {
+          ...reviews.source,
+          availability: 'partial',
+          reason: 'graphql-denied',
+          retryable: false,
+        };
+      }
+      return reviews;
+    });
+    expect(result.reviewDecisions.items.length).toBeGreaterThan(0);
+    expect(result.reviewDecisions.items.every(item => item.state === 'UNKNOWN')).toBe(true);
+    expect(result.reviewDecisions).toMatchObject({
+      totalCount: null,
+      completeness: 'partial',
+      source: { availability: 'partial', reason: 'review-inconsistent', retryable: true },
+    });
+  });
+});
+
+describe.each(fields)('%s sibling state errors', failedField => {
+  it.each([
+    { error: 'FORBIDDEN', reason: 'graphql-denied', retryable: false },
+    { error: 'INTERNAL', reason: 'graphql-incomplete', retryable: true },
+  ])('retains explicit conflict metadata beside $error', async ({ reason, retryable }) => {
+    const result = await run(
+      field => {
+        const failed = field === failedField;
+        const reviews = page(field, [
+          review(field === 'latestOpinionatedReviews' ? 'UNKNOWN' : 'APPROVED', 'decision', {
+            submittedAt: field === 'latestOpinionatedReviews' ? null : submittedAt,
+            commit: field === 'latestOpinionatedReviews' ? null : { oid: 'reviewed-commit' },
+          }),
+          review(failed ? 'UNKNOWN' : 'APPROVED', 'failed', { author: person('failed') }),
+          review('APPROVED', 'unaffected', { author: person('unaffected') }),
+        ]);
+        if (failed) {
+          reviews.completeness = 'partial';
+          reviews.source = { ...reviews.source, availability: 'partial', reason, retryable };
+        }
+        return reviews;
+      },
+      new Set(['decision'])
+    );
+    expect(result.reviewDecisions).toMatchObject({
+      items: [
+        { id: 'decision', state: 'UNKNOWN', submittedAt: null, commitSha: null },
+        { id: 'failed', state: 'UNKNOWN' },
+        { id: 'unaffected', state: 'APPROVED', submittedAt, commitSha: 'reviewed-commit' },
+      ],
+      knownCount: 3,
+      totalCount: null,
+      hasNextPage: null,
+      endCursor: null,
+      completeness: 'partial',
+      source: {
+        availability: 'partial',
+        reason: 'review-inconsistent',
+        retryable: true,
+        provenance: ['graphql.latestOpinionatedReviews', 'graphql.latestReviews'],
+        observedAt: later,
+      },
+    });
+    expect(result.reviewActivity.items).toMatchObject([
+      { id: 'decision', state: 'APPROVED', submittedAt, commitSha: 'reviewed-commit' },
+      { id: 'failed', state: failedField === 'latestReviews' ? 'UNKNOWN' : 'APPROVED' },
+      { id: 'unaffected', state: 'APPROVED' },
+    ]);
+  });
+});
+
+it('rejects matching final observations for an explicitly conflicted review', async () => {
+  const result = await run(
+    field => page(field, [review(), review('APPROVED', 'stable', { author: person('stable') })]),
+    new Set(['decision'])
+  );
+  expect(result.reviewDecisions).toMatchObject({
+    items: [
+      { id: 'decision', state: 'UNKNOWN' },
+      { id: 'stable', state: 'APPROVED' },
+    ],
+    totalCount: null,
+    completeness: 'partial',
+    source: { availability: 'partial', reason: 'review-inconsistent', retryable: true },
   });
 });
 

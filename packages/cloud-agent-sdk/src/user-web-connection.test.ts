@@ -2578,6 +2578,98 @@ describe('createUserWebConnection browser provider', () => {
     expect(client.getBrowserProviderState().status).toBe('registered');
   });
 
+  it.each(['provider_snapshot', 'provider_status_result'] as const)(
+    'preserves queue metadata across %s pages and later job phases',
+    async type => {
+      const client = await registered();
+      const messages: BrowserProviderInboundMessage[] = [];
+      client.onBrowserProviderMessage(message => messages.push(message));
+      const first = job(1, {
+        status: 'queued',
+        ownerLabel: 'ses_parent_z',
+        queuePosition: 100,
+      });
+      const second = job(2, {
+        status: 'queued',
+        ownerLabel: 'ses_parent_a',
+        queuePosition: 1,
+      });
+      const third = job(3, {
+        status: 'queued',
+        ownerLabel: 'ses_parent_m',
+        queuePosition: 42,
+      });
+      const active = job(1, { ownerLabel: first.ownerLabel });
+      const pages: {
+        cursor?: BrowserJobSnapshot['jobId'];
+        nextCursor?: BrowserJobSnapshot['jobId'];
+        jobs: BrowserJobSnapshot[];
+      }[] = [
+        { jobs: [first, second], nextCursor: second.jobId },
+        { cursor: second.jobId, jobs: [third, job(4, { status: 'queued' })] },
+        {
+          jobs: [
+            { ...first, queuePosition: 99 },
+            { ...third, queuePosition: 41 },
+          ],
+        },
+        { jobs: [active] },
+        { jobs: [{ ...active, status: 'running', approvedTab: tab }] },
+        {
+          jobs: [
+            {
+              ...active,
+              status: 'succeeded',
+              approvedTab: tab,
+              result: completion(active).result,
+            },
+            job(2, {
+              status: 'cancelled',
+              ownerLabel: second.ownerLabel,
+              result: {
+                ...completion(second).result,
+                status: 'cancelled',
+                reason: 'cancelled',
+                effectsUncertain: false,
+              },
+            }),
+            // A legacy refresh must not inherit either field from an earlier page.
+            job(3, { status: 'queued' }),
+          ],
+        },
+        { jobs: [] },
+      ];
+      const expected: BrowserProviderInboundMessage[] = [];
+      for (const { cursor, nextCursor, jobs } of pages) {
+        const pending =
+          type === 'provider_snapshot'
+            ? client.heartbeatBrowserProvider(cursor)
+            : client.requestBrowserProviderStatus(cursor);
+        const request =
+          type === 'provider_snapshot'
+            ? lastFrame('provider_heartbeat')
+            : lastFrame('provider_status');
+        expect(request.cursor).toBe(cursor);
+        if (request.type === 'provider_heartbeat') leaseAck(request);
+        const fields = {
+          requestId: request.requestId,
+          providerId: registration.providerId,
+          jobs,
+          ...(nextCursor === undefined ? {} : { nextCursor }),
+        };
+        const reply =
+          type === 'provider_snapshot' ? { type, generation: 1, ...fields } : { type, ...fields };
+        inbound(reply);
+        await expect(pending).resolves.toStrictEqual(reply);
+        expected.push(reply);
+      }
+      // Check retained callbacks too: a later rank or phase must not mutate an earlier page.
+      expect(messages.filter(message => message.type !== 'provider_lease_ack')).toStrictEqual(
+        expected
+      );
+    }
+  );
+
   it('deduplicates jobs and cancellations and rejects stale or foreign generations', async () => {
     const client = await registered(2);
     const received: string[] = [];
@@ -2903,29 +2995,21 @@ describe('createUserWebConnection browser provider', () => {
     expect(frames().map(frame => frame.type)).toEqual(['ping']);
   });
 
-  it('correlates history without renewing a lease or buffering running and terminal work', async () => {
+  it('keeps queue metadata read-only while correlating history and preserving the live lease', async () => {
     const client = await registered(2);
-    const current = job(1, { generation: 2 });
+    const current = job(1, { generation: 2, ownerLabel: 'ses_live_parent' });
     dispatch(current);
     client.approveBrowserProviderJob({
       ...binding(current),
       approval: { decision: 'approved', tab },
     });
     const before = client.getBrowserProviderState();
-    const histories: BrowserProviderInboundMessage[] = [];
-    const actions: string[] = [];
-    client.onBrowserProviderMessage(message => {
-      if (message.type === 'provider_status_result') histories.push(message);
-      if (
-        message.type === 'provider_snapshot' &&
-        message.jobs.some(job => job.status === 'running')
-      ) {
-        actions.push('browser action');
-      }
-    });
+    const messages: BrowserProviderInboundMessage[] = [];
+    client.onBrowserProviderMessage(message => messages.push(message));
     jest.setSystemTime(now + 1_000);
     const pending = client.requestBrowserProviderStatus();
     const request = lastFrame('provider_status');
+    const sent = frames();
     const unresolvedFence = { invocationId: current.invocationId, tabId: tab.tabId };
     inbound({
       type: 'provider_status_result',
@@ -2948,37 +3032,104 @@ describe('createUserWebConnection browser provider', () => {
       generation: 2,
       leaseExpiresAt: new Date(now + 30_000).toISOString(),
     });
-    expect(histories).toEqual([]);
+    expect(messages).toEqual([]);
     const terminal = job(2, {
       generation: 2,
+      ownerLabel: 'ses_completed_parent',
       status: 'succeeded',
       approvedTab: tab,
       result: completion(job(2)).result,
     });
+    const queued = job(3, {
+      generation: 2,
+      status: 'queued',
+      ownerLabel: 'ses_queued_parent',
+      queuePosition: 47,
+    });
+    const awaiting = job(4, { generation: 2, ownerLabel: 'ses_other_parent' });
     const history = {
       type: 'provider_status_result',
       requestId: request.requestId,
       providerId: request.providerId,
-      jobs: [{ ...current, status: 'running', approvedTab: tab }, terminal],
+      jobs: [{ ...current, status: 'running', approvedTab: tab }, terminal, queued, awaiting],
       unresolvedFence,
     } satisfies BrowserProviderInboundMessage;
     inbound(history);
     await expect(pending).resolves.toStrictEqual(history);
     inbound(history);
-    expect(histories).toStrictEqual([history]);
-    expect(actions).toEqual([]);
+    expect(messages).toStrictEqual([history]);
     expect(client.getBrowserProviderState()).toEqual(before);
-    expect(() => client.sendBrowserProviderResult(completion(current))).toThrow(
-      BrowserProviderError
-    );
+    expect(() => client.sendBrowserProviderResult(completion(current))).toThrow('invalid_request');
+    expect(() => client.cancelBrowserProviderJob(binding(queued))).toThrow('owner_mismatch');
+    expect(() =>
+      client.approveBrowserProviderJob({
+        ...binding(awaiting),
+        approval: { decision: 'approved', tab },
+      })
+    ).toThrow('owner_mismatch');
     expect(() =>
       client.quiesceBrowserProviderJob({ ...binding(terminal), tabId: tab.tabId })
-    ).toThrow(BrowserProviderError);
-    expect(
-      frames().filter(
-        frame => frame.type === 'provider_result' || frame.type === 'provider_quiesced'
-      )
-    ).toEqual([]);
+    ).toThrow('owner_mismatch');
+    expect(frames()).toStrictEqual(sent);
+
+    update({ ...current, status: 'running', approvedTab: tab });
+    client.sendBrowserProviderResult(completion(current));
+    expect(lastFrame('provider_result')).toStrictEqual({
+      type: 'provider_result',
+      ...completion(current),
+    });
+    jest.setSystemTime(now + 15_001);
+    await expect(client.heartbeatBrowserProvider()).rejects.toMatchObject({
+      code: 'lease_expired',
+      retryable: true,
+    });
+  });
+
+  it('does not turn queued history into registration or adopted work', async () => {
+    const client = createProvider();
+    client.retain();
+    negotiate();
+    const registrationResult = client.registerBrowserProvider(registration);
+    inbound({
+      type: 'response',
+      id: lastFrame('provider_register').requestId,
+      error: { source: 'relay', code: 'provider_unavailable', retryable: true },
+    });
+    await expect(registrationResult).rejects.toMatchObject({ code: 'provider_unavailable' });
+    const unavailable = client.getBrowserProviderState();
+    const messages: BrowserProviderInboundMessage[] = [];
+    client.onBrowserProviderMessage(message => messages.push(message));
+    const queued = job(1, {
+      status: 'queued',
+      ownerLabel: 'ses_historical_parent',
+      queuePosition: 100,
+    });
+    const awaiting = job(2, { ownerLabel: 'ses_other_parent' });
+    const sent = frames();
+    const history = statusReply([queued, awaiting]);
+    inbound(history);
+    dispatch(awaiting);
+    update({ ...awaiting, status: 'running', approvedTab: tab });
+    await jest.advanceTimersByTimeAsync(15_000);
+
+    expect(messages).toStrictEqual([history]);
+    expect(client.getBrowserProviderState()).toStrictEqual(unavailable);
+    await expect(client.heartbeatBrowserProvider()).rejects.toMatchObject({
+      code: 'provider_unavailable',
+      retryable: true,
+    });
+    expect(() => client.cancelBrowserProviderJob(binding(queued))).toThrow('provider_unavailable');
+    expect(() =>
+      client.approveBrowserProviderJob({
+        ...binding(awaiting),
+        approval: { decision: 'approved', tab },
+      })
+    ).toThrow('provider_unavailable');
+    expect(() => client.sendBrowserProviderResult(completion(awaiting))).toThrow(
+      'provider_unavailable'
+    );
+    expect(() => client.quiesceBrowserProviderJob(binding(awaiting))).toThrow('owner_mismatch');
+    expect(frames()).toStrictEqual(sent);
   });
 
   it('finishes an in-flight history read after registration loss without restoring availability', async () => {
@@ -3396,7 +3547,8 @@ describe('createUserWebConnection browser provider', () => {
       const recovered = f.messages
         .filter(message => message.type === 'provider_status_result')
         .at(-1);
-      expect(recovered?.jobs).toEqual([completed]);
+      expect(recovered?.jobs).toStrictEqual([{ ...completed, ownerLabel: 'ses_parent' }]);
+      expect(f.snapshot(current.jobId)).toStrictEqual(completed);
       expect(recovered?.jobs[0]).toMatchObject({
         generation: current.generation,
         status: 'succeeded',

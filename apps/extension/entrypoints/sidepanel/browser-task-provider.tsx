@@ -1612,7 +1612,10 @@ export const BrowserTaskProvider = ({
     })();
     return () => {
       cancelled = true;
-      closing.current = lifetime.dispose();
+      // Retain earlier drainage even if this runtime never started.
+      closing.current = (async () => {
+        await Promise.all([previous, lifetime.dispose()]);
+      })();
     };
   }, [connection, organizationId, token, userEmail]);
   return runtime === undefined ? null : (

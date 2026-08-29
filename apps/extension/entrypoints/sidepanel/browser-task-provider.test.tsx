@@ -2817,6 +2817,144 @@ describe('enabled browser provider owner', () => {
     );
   });
 
+  it.each([
+    { replacements: 2, scenario: 'a completed intermediate disposal' },
+    { replacements: 4, scenario: 'repeated scope replacements' },
+  ])('retains earlier drainage across $scenario', async ({ replacements }) => {
+    vi.stubGlobal('navigator', { locks: nativeLocks });
+    const transport = relay();
+    const drain = Promise.withResolvers<void>();
+    const runTurn = fixture.turn;
+    let signal: AbortSignal | undefined;
+    let current: BrowserTaskProviderRuntime | undefined;
+    fixture.turn = async context => {
+      ({ signal } = context.abort);
+      context.executionGuard();
+      fixture.actions.push('issued');
+      await drain.promise;
+      context.executionGuard();
+      fixture.actions.push('after disposal');
+      return outcome();
+    };
+    const View = () => {
+      const task = useBrowserTask();
+      current = task;
+      return <output>{task.state.phase}</output>;
+    };
+    const view = (organizationId: string) => (
+      <BrowserTaskProvider
+        auth={auth}
+        connection={transport.connection}
+        organizationId={organizationId}
+      >
+        <View />
+      </BrowserTaskProvider>
+    );
+    const mounted = render(view('org-0'));
+    try {
+      await screen.findByText('disabled');
+      if (current === undefined) {
+        throw new Error('Missing provider runtime');
+      }
+      const first = current;
+      await act(async () => {
+        await first.setSettings(defaults);
+      });
+      const message = transport.delivery();
+      act(() => {
+        transport.dispatch(message);
+      });
+      await screen.findByText('awaiting_approval');
+      await act(async () => {
+        await first.approve(message.job.jobId, 7);
+      });
+      await waitFor(() => {
+        expect(fixture.actions).toStrictEqual(['issued']);
+      });
+
+      for (let replacement = 1; replacement <= replacements; replacement += 1) {
+        act(() => {
+          mounted.rerender(view(`org-${replacement}`));
+        });
+        expect(signal?.aborted).toBe(true);
+        // Let no-work cleanup settle while the first runtime still drains its issued action.
+        // eslint-disable-next-line no-await-in-loop -- Commit and flush each replacement before the next scope.
+        await act(async () => {
+          transport.setState({ status: 'ready' });
+          await nativeLocks.query();
+        });
+        expect(current.getSnapshot()).toMatchObject({
+          active: undefined,
+          jobs: [],
+          phase: 'connecting',
+          profile: undefined,
+        });
+        expect(fixture.actions).toStrictEqual(['issued']);
+      }
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({ tabIds: [7] });
+      expect(
+        (await nativeLocks.query()).held?.some(lock => lock.name === PROVIDER_OWNER_LOCK)
+      ).toBe(true);
+
+      await act(async () => {
+        drain.resolve();
+      });
+      await screen.findByText('recovery');
+      const newest = current;
+      expect(newest.getSnapshot()).toMatchObject({
+        active: undefined,
+        unresolvedFence: { invocationId: message.job.invocationId, tabId: 7 },
+      });
+      expect(transport.rows.get(message.job.jobId)?.result).toMatchObject({
+        effectsUncertain: true,
+        reason: 'provider_unavailable',
+        status: 'interrupted',
+      });
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({ tabIds: [7] });
+      expect(fixture.actions).toStrictEqual(['issued']);
+      fixture.tabs = fixture.tabs.filter(tab => tab.id !== 7);
+      await act(async () => {
+        await newest.recover();
+      });
+      expect(screen.getByText('idle')).toBeDefined();
+      expect(fixture.actions).toStrictEqual(['issued']);
+
+      fixture.turn = runTurn;
+      const fresh = transport.delivery({ goal: 'New work in the latest scope.' });
+      act(() => {
+        transport.dispatch(fresh);
+      });
+      await screen.findByText('awaiting_approval');
+      expect(fixture.actions).toStrictEqual(['issued']);
+      await act(async () => {
+        await newest.approve(fresh.job.jobId, 8);
+      });
+      await screen.findByText('idle');
+      expect(fixture.actions).toStrictEqual(['issued', 'run:8:1']);
+      expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({
+        jobs: [
+          { snapshot: { result: { status: 'interrupted' } } },
+          {
+            approval: { settings: { organizationId: `org-${replacements}` } },
+            snapshot: { result: { jobId: fresh.job.jobId, status: 'succeeded' } },
+          },
+        ],
+      });
+    } finally {
+      await act(async () => {
+        drain.resolve();
+        mounted.unmount();
+      });
+      await waitFor(async () => {
+        expect(
+          (await nativeLocks.query()).held?.some(
+            lock => lock.name === PROVIDER_OWNER_LOCK || lock.name === BROWSER_EXECUTION_LOCK
+          )
+        ).toBe(false);
+      });
+    }
+  });
+
   it('owns and releases the provider through the injectable component lifetime', async () => {
     vi.stubGlobal('navigator', { locks: nativeLocks });
     const transport = relay();

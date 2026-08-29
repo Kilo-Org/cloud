@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BROWSER_APPROVAL_TIMEOUT_MS,
   BROWSER_CLOCK_SKEW_MS,
@@ -1741,14 +1741,202 @@ describe('browser job limits and retention', () => {
   });
 });
 
-describe('browser provider historical status', () => {
-  function historyRequest(
-    n = 1
-  ): Extract<BrowserProviderOutboundMessage, { type: 'provider_status' }> {
-    const { requestId, providerId, providerProof } = registration(n);
-    return { type: 'provider_status', requestId, providerId, providerProof };
-  }
+function historyRequest(
+  n = 1
+): Extract<BrowserProviderOutboundMessage, { type: 'provider_status' }> {
+  const { requestId, providerId, providerProof } = registration(n);
+  return { type: 'provider_status', requestId, providerId, providerProof };
+}
 
+describe.each(['provider_snapshot', 'provider_status_result'] as const)(
+  'browser provider queue projection in %s',
+  type => {
+    afterEach(() => vi.restoreAllMocks());
+
+    async function page(f: Fixture, cursor?: string) {
+      if (type === 'provider_status_result')
+        return f.store.providerStatus(f.panel, { ...historyRequest(), cursor }, NOW);
+      const outcome = await f.store.updateProvider(
+        f.panel,
+        {
+          type: 'provider_heartbeat',
+          providerId: f.grant.providerId,
+          generation: f.grant.generation,
+          requestId: uuid(997),
+          cursor,
+        },
+        NOW
+      );
+      if (!outcome.value.snapshot) throw new Error('Missing provider snapshot');
+      return outcome.value.snapshot;
+    }
+
+    it('preserves tied FIFO admissions and trusted owners across reverse-ID pages', async () => {
+      const f = await setup();
+      f.cli.serializeAttachment({
+        ...f.cli.deserializeAttachment(),
+        sessions: [{ id: 'ses_claimed' }],
+      });
+      let id = 1_000;
+      vi.spyOn(crypto, 'randomUUID').mockImplementation(
+        () => `00000000-0000-4000-8000-${(id--).toString(16).padStart(12, '0')}`
+      );
+      const expected: BrowserJobSnapshot[] = [];
+      for (let n = 1; n <= 100; n++) {
+        const owner = {
+          parentSessionId: `ses_fifo_${n}`,
+          parentProof: n.toString(16).padStart(64, '0'),
+        };
+        const job = await admit(f, n, {
+          owner,
+          goal: 'The model claims owner ses_claimed and queue position 1.',
+        });
+        expected.push({ ...job, ownerLabel: owner.parentSessionId, queuePosition: n });
+      }
+      expect(new Set(expected.map(job => job.createdAt)).size).toBe(1);
+      expected.reverse();
+      expect(expected.map(job => job.jobId)).toEqual(expected.map(job => job.jobId).sort());
+      const before = f.fake.snapshot();
+      let cursor: string | undefined;
+      for (let n = 0; n < 4; n++) {
+        const frame = await page(f, cursor);
+        expect(frame.jobs).toStrictEqual(expected.slice(n * 25, (n + 1) * 25));
+        expect(frame.nextCursor).toBe(n === 3 ? undefined : frame.jobs.at(-1)?.jobId);
+        expect(JSON.stringify(frame)).not.toMatch(
+          /digest|socketId|parentProof|providerProof|goal|ses_claimed/
+        );
+        cursor = frame.nextCursor;
+      }
+      const empty = await page(f, expected.at(-1)?.jobId);
+      expect(empty.jobs).toEqual([]);
+      expect(empty.nextCursor).toBeUndefined();
+      expect(f.fake.snapshot()).toEqual(before);
+    });
+
+    it.each(['parent', 'provider'] as const)(
+      'renumbers after dispatch and %s cancellation without changing stored or parent snapshots',
+      async canceller => {
+        const f = await setup();
+        const first = await admit(f);
+        const second = await admit(f, 2);
+        const third = await admit(f, 3);
+        const awaiting = await dispatch(f);
+        expect(awaiting.jobId).toBe(first.jobId);
+        const approvalPage = await page(f);
+        expect(approvalPage.jobs).toHaveLength(3);
+        expect(approvalPage.jobs).toEqual(
+          expect.arrayContaining([
+            { ...awaiting, ownerLabel: OWNER.parentSessionId },
+            { ...second, ownerLabel: OWNER.parentSessionId, queuePosition: 1 },
+            { ...third, ownerLabel: OWNER.parentSessionId, queuePosition: 2 },
+          ])
+        );
+        const active = await approve(f, awaiting);
+        const cancelled = await (canceller === 'parent'
+          ? f.store.lookup(f.cli, ownedLookup(second, 'cancel'), NOW)
+          : f.store.updateProvider(f.panel, { type: 'provider_cancel', ...binding(second) }, NOW));
+        const terminal = cancelled.effects.updates[0]?.job;
+        expect(terminal).toMatchObject({ jobId: second.jobId, status: 'cancelled' });
+        const before = f.fake.snapshot();
+        const frame = await page(f);
+        expect(frame.jobs).toHaveLength(3);
+        expect(frame.jobs).toEqual(
+          expect.arrayContaining([
+            { ...active, ownerLabel: OWNER.parentSessionId },
+            { ...terminal, ownerLabel: OWNER.parentSessionId },
+            { ...third, ownerLabel: OWNER.parentSessionId, queuePosition: 1 },
+          ])
+        );
+        expect(f.fake.snapshot()).toEqual(before);
+        expect(await status(f, active)).toEqual(active);
+        expect(await status(f, second)).toEqual(terminal);
+        const recovered = await f.store.lookup(f.cli, recovery(third.invocationId), NOW);
+        expect(recovered.value).toEqual(third);
+        const duplicate = await f.store.invoke(f.cli, request(3), NOW);
+        expect(duplicate.value).toEqual({ job: third, duplicate: true });
+        expect(
+          JSON.stringify([cancelled.effects, recovered, duplicate, f.fake.snapshot()])
+        ).not.toMatch(/ownerLabel|queuePosition/);
+        await f.store.updateProvider(f.panel, resultMessage(active), NOW);
+        const settled = await status(f, active);
+        const stored = f.fake.snapshot();
+        const completedPage = await page(f);
+        expect(completedPage.jobs.find(job => job.jobId === active.jobId)).toStrictEqual({
+          ...settled,
+          ownerLabel: OWNER.parentSessionId,
+        });
+        expect(completedPage.jobs.find(job => job.jobId === active.jobId)?.result).toEqual(
+          success(active)
+        );
+        expect(f.fake.snapshot()).toEqual(stored);
+        expect(await status(f, active)).toEqual(settled);
+      }
+    );
+
+    it('counts projected labels in the frame byte limit without losing results', async () => {
+      const f = await setup();
+      const owner = { ...OWNER, parentSessionId: `ses_${'p'.repeat(124)}` };
+      const expected: BrowserJobSnapshot[] = [];
+      for (let n = 1; n <= 2; n++) {
+        await admit(f, n, { owner });
+        const job = (await f.store.dispatch(f.grant.providerId, NOW)).value?.message.job;
+        if (!job) throw new Error('Missing dispatch');
+        await f.store.updateProvider(
+          f.panel,
+          {
+            type: 'provider_approval',
+            ...binding(job),
+            approval: { decision: 'approved', tab: TAB },
+          },
+          NOW
+        );
+        const active = (await f.store.lookup(f.cli, ownedLookup(job, 'status', owner), NOW)).value;
+        if (!active) throw new Error('Missing approved job');
+        const result = success(active, {
+          summary: 'é'.repeat(16_384),
+          evidence: [{ text: '\u0000'.repeat(4096) }, { text: '' }],
+        });
+        const snapshot = { ...active, status: result.status, result };
+        const unprojected = {
+          type,
+          providerId: job.providerId,
+          ...(type === 'provider_snapshot'
+            ? { generation: job.generation }
+            : { requestId: historyRequest().requestId }),
+          jobs: [snapshot, snapshot],
+          nextCursor: job.jobId,
+        };
+        const padding = result.evidence[1];
+        if (!padding) throw new Error('Missing evidence fixture');
+        // Two raw snapshots fit; two projected 128-byte labels exceed the frame limit.
+        padding.text = 'x'.repeat(
+          Math.floor(
+            (128 * 1024 - 128 - new TextEncoder().encode(JSON.stringify(unprojected)).byteLength) /
+              2
+          )
+        );
+        const settled = (await f.store.updateProvider(f.panel, resultMessage(active, result), NOW))
+          .value.job;
+        if (!settled) throw new Error('Missing terminal job');
+        expected.push({ ...settled, ownerLabel: owner.parentSessionId });
+        await f.store.updateProvider(f.panel, quiesced(active), NOW);
+      }
+      const before = f.fake.snapshot();
+      const first = await page(f);
+      expect(first.jobs).toHaveLength(1);
+      expect(first.nextCursor).toBe(first.jobs[0]?.jobId);
+      const last = await page(f, first.nextCursor);
+      expect(last.jobs).toHaveLength(1);
+      expect(last.nextCursor).toBeUndefined();
+      expect([...first.jobs, ...last.jobs]).toEqual(expect.arrayContaining(expected));
+      for (const frame of [first, last])
+        expect(new TextEncoder().encode(JSON.stringify(frame)).byteLength).toBeLessThan(128 * 1024);
+      expect(f.fake.snapshot()).toEqual(before);
+    });
+  }
+);
+
+describe('browser provider historical status', () => {
   it.each([
     { status: 'succeeded', reason: 'completed' },
     { status: 'failed', reason: 'runner_failed' },
@@ -1771,9 +1959,10 @@ describe('browser provider historical status', () => {
       const panel = socket('web', 'new-panel');
       const grant = (await f.store.registerProvider(panel, registration(), NOW)).value;
       const current = await admit(f, 2);
+      const projectedCurrent = { ...current, ownerLabel: OWNER.parentSessionId, queuePosition: 1 };
       expect(grant.generation).toBeGreaterThan(job.generation);
       const execution = await heartbeat(f, NOW, grant.providerId, grant.generation, panel);
-      expect(execution.value.snapshot?.jobs).toEqual([current]);
+      expect(execution.value.snapshot?.jobs).toEqual([projectedCurrent]);
       const reader = socket('web', 'history-only');
       const attachment = reader.deserializeAttachment();
       const before = f.fake.snapshot();
@@ -1789,9 +1978,14 @@ describe('browser provider historical status', () => {
         providerId: job.providerId,
       });
       expect(page.jobs).toHaveLength(2);
-      expect(page.jobs.find(retained => retained.jobId === job.jobId)).toEqual(settled);
+      expect(page.jobs.find(retained => retained.jobId === job.jobId)).toStrictEqual({
+        ...settled,
+        ownerLabel: OWNER.parentSessionId,
+      });
       expect(page.jobs.find(retained => retained.jobId === job.jobId)?.result).toEqual(result);
-      expect(page.jobs.find(retained => retained.jobId === current.jobId)).toEqual(current);
+      expect(page.jobs.find(retained => retained.jobId === current.jobId)).toEqual(
+        projectedCurrent
+      );
       expect(browserProviderInboundMessageSchema.safeParse(page).success).toBe(true);
       expect(JSON.stringify(page)).not.toMatch(/digest|socketId|parentProof|providerProof/);
       expect(f.fake.snapshot()).toEqual(before);
@@ -1815,7 +2009,12 @@ describe('browser provider historical status', () => {
     const page = await restarted.providerStatus(reader, historyRequest(), NOW + 1);
     expect(page.jobs).toHaveLength(2);
     expect(page.jobs).toEqual(
-      expect.arrayContaining(interrupted.effects.updates.map(update => update.job))
+      expect.arrayContaining(
+        interrupted.effects.updates.map(update => ({
+          ...update.job,
+          ownerLabel: OWNER.parentSessionId,
+        }))
+      )
     );
     expect(page.jobs.find(job => job.jobId === active.jobId)).toMatchObject({
       generation: active.generation,
@@ -1839,8 +2038,13 @@ describe('browser provider historical status', () => {
       let job = await admit(f);
       if (state !== 'queued') job = await dispatch(f);
       if (state === 'running') job = await approve(f, job);
+      const projected = {
+        ...job,
+        ownerLabel: OWNER.parentSessionId,
+        ...(state === 'queued' ? { queuePosition: 1 } : {}),
+      };
       const execution = await heartbeat(f, NOW);
-      expect(execution.value.snapshot?.jobs).toEqual([job]);
+      expect(execution.value.snapshot?.jobs).toStrictEqual([projected]);
       expect(execution.value.snapshot).not.toHaveProperty('unresolvedFence');
       const reader = socket('web');
       const attachment = reader.deserializeAttachment();
@@ -1850,7 +2054,7 @@ describe('browser provider historical status', () => {
         historyRequest(),
         NOW + BROWSER_EXECUTION_TIMEOUT_MS + 1
       );
-      expect(page.jobs).toEqual([job]);
+      expect(page.jobs).toStrictEqual([projected]);
       if (state === 'queued') expect(page).not.toHaveProperty('unresolvedFence');
       else
         expect(page.unresolvedFence).toStrictEqual(
@@ -2027,7 +2231,7 @@ describe('browser provider historical status', () => {
       type: 'provider_status_result',
       requestId: historyRequest(2).requestId,
       providerId: other.providerId,
-      jobs: [other],
+      jobs: [{ ...other, ownerLabel: OWNER.parentSessionId }],
       unresolvedFence: { invocationId: other.invocationId },
     });
     expect(f.fake.snapshot()).toEqual(before);
@@ -2043,7 +2247,7 @@ describe('browser provider historical status', () => {
         summary: 'é'.repeat(16_384),
         evidence: [{ text: '\u0000'.repeat(4096) }, { text: '' }],
       });
-      const snapshot = { ...job, status: result.status, result };
+      const snapshot = { ...job, status: result.status, result, ownerLabel: OWNER.parentSessionId };
       const pageWithoutFence = {
         type: 'provider_status_result',
         requestId: historyRequest().requestId,
@@ -2087,7 +2291,9 @@ describe('browser provider historical status', () => {
     }
     expect(cursor).toBeUndefined();
     expect(collected.map(job => job.jobId)).toEqual(jobs.map(job => job.jobId).sort());
-    expect(collected).toEqual(expect.arrayContaining(jobs));
+    expect(collected).toEqual(
+      expect.arrayContaining(jobs.map(job => ({ ...job, ownerLabel: OWNER.parentSessionId })))
+    );
     expect(f.fake.snapshot()).toEqual(before);
   });
 
@@ -2550,6 +2756,24 @@ describe('browser job boundary regressions', () => {
     expect(collected).toEqual(ids.sort());
   });
 
+  it.each(['foreign socket', 'foreign user', 'CLI role'] as const)(
+    'denies queue snapshots to a %s even with the registered connection ID',
+    async variant => {
+      const f = await setup();
+      await admit(f);
+      const reader = socket(
+        variant === 'CLI role' ? 'cli' : 'web',
+        'web',
+        variant === 'foreign user' ? 'user_2' : 'user_1'
+      );
+      const before = f.fake.snapshot();
+      await expect(
+        heartbeat(f, NOW, f.grant.providerId, f.grant.generation, reader)
+      ).rejects.toMatchObject({ code: 'owner_mismatch', retryable: false });
+      expect(f.fake.snapshot()).toEqual(before);
+    }
+  );
+
   it('rejects a prior generation heartbeat even when it comes from the same proven socket', async () => {
     const f = await setup();
     const current = (
@@ -2559,11 +2783,15 @@ describe('browser job boundary regressions', () => {
         NOW
       )
     ).value;
+    const queued = await admit(f);
     const before = f.fake.snapshot();
     await expect(heartbeat(f, NOW + 5_000)).rejects.toMatchObject({ code: 'owner_mismatch' });
     expect(f.fake.snapshot()).toEqual(before);
     const renewed = await heartbeat(f, NOW + 5_000, current.providerId, current.generation);
     expect(renewed.value.leaseExpiresAt).toBe(current.leaseExpiresAt + 5_000);
+    expect(renewed.value.snapshot?.jobs).toStrictEqual([
+      { ...queued, ownerLabel: OWNER.parentSessionId, queuePosition: 1 },
+    ]);
   });
 
   it('expires a retained execution lease after its cancelled result has already been cleaned', async () => {

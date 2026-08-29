@@ -332,7 +332,7 @@ function quiesced(job: BrowserJobSnapshot) {
   return {
     type: 'provider_quiesced' as const,
     ...binding(job),
-    tabId: job.approvedTab?.tabId ?? TAB.tabId,
+    ...(job.approvedTab === undefined ? {} : { tabId: job.approvedTab.tabId }),
   };
 }
 
@@ -919,7 +919,7 @@ describe('browser job provider fencing and transitions', () => {
     expect((await dispatch(f)).jobId).toBe(job.jobId);
   });
 
-  it('serializes concurrent dispatch and advances FIFO only after confirmed quiescence', async () => {
+  it('serializes dispatch and advances FIFO only after legacy concrete-tab quiescence', async () => {
     const f = await setup();
     const accepted: BrowserJobSnapshot[] = [];
     await Promise.all(
@@ -936,7 +936,7 @@ describe('browser job provider fencing and transitions', () => {
     if (!first) throw new Error('Missing queue head');
     await f.store.lookup(f.cli, ownedLookup(first, 'cancel'), NOW);
     expect((await f.store.dispatch(first.providerId, NOW)).value).toBeNull();
-    await f.store.updateProvider(f.panel, quiesced(first), NOW);
+    await f.store.updateProvider(f.panel, { ...quiesced(first), tabId: TAB.tabId }, NOW);
     const second = await dispatch(f);
     expect(second.jobId).toBe(accepted[1]?.jobId);
     await expect(f.store.updateProvider(f.panel, quiesced(first), NOW)).rejects.toMatchObject({
@@ -945,6 +945,171 @@ describe('browser job provider fencing and transitions', () => {
     expect((await f.store.dispatch(second.providerId, NOW)).value).toBeNull();
     expect(await status(f, second)).toEqual(second);
   });
+
+  it.each([
+    ['approval denial', 'failed', 'approval_denied'],
+    ['owner cancellation', 'cancelled', 'cancelled'],
+    ['provider cancellation', 'cancelled', 'cancelled'],
+  ] as const)(
+    'advances only the owned FIFO queue after no-tab quiescence following %s',
+    async (event, terminalStatus, reason) => {
+      const f = await setup();
+      await admit(f);
+      const first = await dispatch(f);
+      const second = await admit(f, 2);
+      const third = await admit(f, 3);
+      const otherPanel = socket('web', 'other-panel');
+      await f.store.registerProvider(otherPanel, registration(2), NOW);
+      const other = await admit(f, 4, { providerId: registration(2).providerId });
+      await dispatch(f, other.providerId);
+      const otherProvider = f.fake.get(`browser/provider/${other.providerId}`);
+
+      const outcome = await (event === 'owner cancellation'
+        ? f.store.lookup(f.cli, ownedLookup(first, 'cancel'), NOW)
+        : f.store.updateProvider(
+            f.panel,
+            event === 'approval denial'
+              ? {
+                  type: 'provider_approval',
+                  ...binding(first),
+                  approval: { decision: 'denied', reason: 'approval_denied' },
+                }
+              : { type: 'provider_cancel', ...binding(first) },
+            NOW
+          ));
+      const settled = outcome.effects.updates[0]?.job;
+      expect(settled).toMatchObject({
+        jobId: first.jobId,
+        status: terminalStatus,
+        result: { status: terminalStatus, reason, effectsUncertain: false },
+      });
+      expect(settled).not.toHaveProperty('approvedTab');
+      expect(f.fake.get(`browser/provider/${first.providerId}`)).toMatchObject({
+        queue: [second.jobId, third.jobId],
+        fence: { jobId: first.jobId, requiresRecovery: false },
+      });
+      expect(f.fake.get(`browser/provider/${first.providerId}`)).not.toHaveProperty('fence.tabId');
+
+      const restarted = createBrowserJobStore(f.fake.storage);
+      expect((await restarted.dispatch(first.providerId, NOW + 1)).value).toBeNull();
+      const released = await restarted.updateProvider(
+        f.panel,
+        { type: 'provider_quiesced', ...binding(first) },
+        NOW + 1
+      );
+      expect(released).toEqual({
+        value: { job: settled },
+        effects: { updates: [], cancellations: [] },
+      });
+      expect(f.fake.get(`browser/provider/${first.providerId}`)).not.toHaveProperty('fence');
+      expect(f.fake.get('browser/owner/ses_parent')).toMatchObject({ references: 4, fences: 1 });
+      expect(f.fake.get(`browser/provider/${other.providerId}`)).toEqual(otherProvider);
+      expect(await restarted.pendingCancellations()).toEqual([]);
+
+      const current = { ...f, store: restarted };
+      const next = await dispatch(current, first.providerId, NOW + 2);
+      expect(next).toMatchObject({ ...binding(second), status: 'awaiting_approval' });
+      expect(next).not.toHaveProperty('approvedTab');
+      expect(next.deadlines).not.toHaveProperty('execution');
+      expect(await status(current, first, NOW + 2)).toEqual(settled);
+      expect(await status(current, third, NOW + 2)).toEqual(third);
+      expect(f.fake.get(`browser/provider/${first.providerId}`)).toMatchObject({
+        queue: [third.jobId],
+        fence: { jobId: second.jobId, requiresRecovery: false },
+      });
+      expect((await restarted.dispatch(first.providerId, NOW + 2)).value).toBeNull();
+      await expect(
+        restarted.updateProvider(f.panel, resultMessage(next), NOW + 2)
+      ).rejects.toMatchObject({ code: 'invalid_request', retryable: false });
+      expect(await approve(current, next, NOW + 2)).toMatchObject({
+        jobId: second.jobId,
+        status: 'running',
+        approvedTab: TAB,
+      });
+      expect(f.fake.get(`browser/provider/${other.providerId}`)).toEqual(otherProvider);
+      expectBoundedRecords(f);
+    }
+  );
+
+  it.each([
+    'wrong job',
+    'wrong invocation',
+    'wrong conversation',
+    'wrong provider',
+    'foreign socket with the same connectionId',
+    'stale generation',
+    'foreign user',
+    'CLI socket',
+    'nonterminal job',
+  ] as const)('rejects no-tab quiescence for a %s without releasing the fence', async variant => {
+    const f = await setup();
+    await f.store.registerProvider(
+      f.panel,
+      registration(1, { generation: f.grant.generation }),
+      NOW
+    );
+    await admit(f);
+    const job = await dispatch(f);
+    const queued = await admit(f, 2);
+    if (variant !== 'nonterminal job') await f.store.lookup(f.cli, ownedLookup(job, 'cancel'), NOW);
+    const message: Extract<BrowserProviderOutboundMessage, { type: 'provider_quiesced' }> = {
+      type: 'provider_quiesced',
+      ...binding(job),
+    };
+    if (variant === 'wrong job') message.jobId = queued.jobId;
+    else if (variant === 'wrong invocation') message.invocationId = queued.invocationId;
+    else if (variant === 'wrong conversation') message.browserTaskId = queued.browserTaskId;
+    else if (variant === 'stale generation') message.generation = f.grant.generation;
+    else if (variant === 'wrong provider') {
+      await f.store.registerProvider(f.panel, registration(2), NOW);
+      const other = await admit(f, 3, { providerId: registration(2).providerId });
+      await dispatch(f, other.providerId);
+      message.providerId = other.providerId;
+      message.generation = other.generation;
+    }
+    const sender =
+      variant === 'foreign socket with the same connectionId'
+        ? socket('web')
+        : variant === 'foreign user'
+          ? socket('web', 'web', 'user_2')
+          : variant === 'CLI socket'
+            ? f.cli
+            : f.panel;
+    const before = f.fake.snapshot();
+    await expect(f.store.updateProvider(sender, message, NOW)).rejects.toMatchObject({
+      code: variant === 'nonterminal job' ? 'invalid_request' : 'owner_mismatch',
+      retryable: false,
+    });
+    expect(f.fake.snapshot()).toEqual(before);
+    expect((await f.store.dispatch(job.providerId, NOW)).value).toBeNull();
+    expect(await status(f, queued)).toEqual(queued);
+  });
+
+  it.each([0, TAB.tabId])(
+    'requires exact approved tab %s for terminal quiescence before advancing FIFO',
+    async tabId => {
+      const f = await setup();
+      await admit(f);
+      const queued = await admit(f, 2);
+      const job = await approve(f, await dispatch(f), NOW, { ...TAB, tabId });
+      const settled = await f.store.updateProvider(f.panel, resultMessage(job), NOW);
+      const message = { type: 'provider_quiesced' as const, ...binding(job) };
+      const before = f.fake.snapshot();
+      for (const fields of [{}, { tabId: tabId + 1 }]) {
+        await expect(
+          f.store.updateProvider(f.panel, { ...message, ...fields }, NOW)
+        ).rejects.toMatchObject({ code: 'owner_mismatch', retryable: false });
+        expect(f.fake.snapshot()).toEqual(before);
+        expect((await f.store.dispatch(job.providerId, NOW)).value).toBeNull();
+      }
+      const released = await f.store.updateProvider(f.panel, { ...message, tabId }, NOW);
+      expect(released.value.job).toEqual(settled.value.job);
+      expect(f.fake.get(`browser/provider/${job.providerId}`)).not.toHaveProperty('fence');
+      const next = await dispatch(f);
+      expect(next).toMatchObject({ jobId: queued.jobId, status: 'awaiting_approval' });
+      expect(next).not.toHaveProperty('approvedTab');
+    }
+  );
 
   it.each([
     [
@@ -1195,6 +1360,11 @@ describe('browser job provider fencing and transitions', () => {
     expect((await f.store.dispatch(other.providerId, NOW)).value?.message.job.jobId).toBe(
       other.jobId
     );
+    const before = f.fake.snapshot();
+    await expect(
+      f.store.updateProvider(f.panel, { type: 'provider_quiesced', ...binding(active) }, NOW)
+    ).rejects.toMatchObject({ code: 'owner_mismatch', retryable: false });
+    expect(f.fake.snapshot()).toEqual(before);
     await expect(
       f.store.registerProvider(
         socket('web'),

@@ -1,11 +1,17 @@
 import {
   buildChecksResult,
   buildFilesPage,
+  buildInboxResult,
   buildOverviewDto,
   buildReviewThreadsResult,
   sliceFileLines,
+  type PullRequestRestData,
 } from './mappers';
-import { FILES_MAX_PAGES } from './dtos';
+import {
+  FILES_MAX_PAGES,
+  type NormalizedGitHubPrReviewInboxItem,
+  type NormalizedGitHubPrReviewOverview,
+} from './dtos';
 
 describe('buildOverviewDto', () => {
   const basePr = {
@@ -91,6 +97,256 @@ describe('buildOverviewDto', () => {
     expect(dto.author).toBeNull();
     expect(dto.reviewDecision).toBeNull();
     expect(dto.repo.viewerLogin).toBeNull();
+    expect(dto.repo).toEqual({
+      allowMergeCommit: false,
+      allowSquashMerge: false,
+      allowRebaseMerge: false,
+      allowAutoMerge: false,
+      deleteBranchOnMerge: false,
+      allowUpdateBranch: false,
+      viewerCanPush: false,
+      viewerCanAdmin: false,
+      viewerLogin: null,
+    });
+  });
+
+  function contextFor(changes: Partial<PullRequestRestData> = {}) {
+    const dto: NormalizedGitHubPrReviewOverview = buildOverviewDto({
+      pr: { ...basePr, ...changes },
+      repo: {},
+      graphQl: null,
+      viewer: null,
+    });
+    return { dto, context: dto.context };
+  }
+
+  it('retains the known revision and unavailable additions for old REST payloads', () => {
+    const { dto, context } = contextFor({
+      draft: undefined,
+      mergeable_state: undefined,
+      auto_merge: undefined,
+      body: null,
+    });
+    expect(dto).toMatchObject({
+      draft: false,
+      mergeableState: null,
+      autoMerge: null,
+      bodyMarkdown: null,
+    });
+    expect(context.revision).toEqual({
+      prNodeId: 'PR_node',
+      number: 12,
+      headSha: 'abc123',
+      baseRepoFullName: 'kilo/flux',
+      baseRef: 'main',
+      baseSha: null,
+    });
+    expect(context.lifecycle.source).toMatchObject({
+      availability: 'unavailable',
+      reason: 'not-requested',
+    });
+    expect(context.merger.identity).toBeNull();
+    expect(context.queue.membership.state).toBe('unknown');
+    expect(context.checks.source.availability).toBe('unavailable');
+  });
+
+  it('maps REST dates, merger, labels, assignees, requested users, and teams without extra reads', () => {
+    const person = {
+      node_id: 'U_1',
+      login: 'octocat',
+      name: null,
+      avatar_url: 'invalid',
+      type: 'Bot',
+    };
+    const { dto, context } = contextFor({
+      state: 'closed',
+      merged: true,
+      base: { ...basePr.base, sha: 'base123' },
+      created_at: '2026-03-08T01:30:00-05:00',
+      updated_at: '2026-03-08T03:30:00-04:00',
+      closed_at: '2026-03-09T00:00:00Z',
+      merged_at: '2026-03-09T00:01:00Z',
+      merged_by: { ...person, name: 'Octo Cat' },
+      labels: [{ node_id: 'L_1', name: 'long label', color: null }],
+      assignees: [person, null],
+      requested_reviewers: [person, null],
+      requested_teams: [{ node_id: 'T_1', name: 'Core team', slug: 'core' }],
+    });
+    expect(dto.state).toBe('merged');
+    expect(dto.autoMerge).toEqual({ method: 'squash' });
+    expect(context.revision.baseSha).toBe('base123');
+    expect(context.lifecycle).toMatchObject({
+      source: { availability: 'available' },
+      openedAt: '2026-03-08T01:30:00-05:00',
+      updatedAt: '2026-03-08T03:30:00-04:00',
+      closedAt: '2026-03-09T00:00:00Z',
+      mergedAt: '2026-03-09T00:01:00Z',
+    });
+    expect(context.merger.identity).toMatchObject({
+      id: 'U_1',
+      login: 'octocat',
+      name: 'Octo Cat',
+      avatarUrl: null,
+    });
+    expect(context.labels.items).toEqual([{ id: 'L_1', name: 'long label', color: null }]);
+    expect(context.assignees.items).toEqual([
+      {
+        id: 'U_1',
+        kind: 'Bot',
+        login: 'octocat',
+        name: null,
+        avatarUrl: null,
+        url: null,
+        teamSlug: null,
+      },
+      null,
+    ]);
+    expect(context.reviewRequests.items).toEqual([
+      { id: null, reviewer: context.assignees.items[0] },
+      { id: null, reviewer: null },
+      {
+        id: null,
+        reviewer: {
+          id: 'T_1',
+          kind: 'Team',
+          login: null,
+          name: 'Core team',
+          avatarUrl: null,
+          url: null,
+          teamSlug: 'core',
+        },
+      },
+    ]);
+    expect(context.reviewRequests).toMatchObject({
+      knownCount: 3,
+      completeness: 'unknown',
+      totalCount: null,
+      source: { availability: 'partial', provenance: ['rest.pullRequest'] },
+    });
+    expect(context.queue.membership.state).toBe('unknown');
+  });
+
+  it.each([
+    { value: undefined, availability: 'unavailable' },
+    { value: null, availability: 'unavailable' },
+    { value: [], availability: 'partial' },
+  ])(
+    'never calls embedded or missing REST collections complete: $availability/$value',
+    ({ value, availability }) => {
+      const { context } = contextFor({
+        labels: value,
+        assignees: value,
+        requested_reviewers: value,
+        requested_teams: value,
+      });
+      for (const collection of [context.labels, context.assignees, context.reviewRequests]) {
+        expect(collection).toMatchObject({
+          items: [],
+          knownCount: 0,
+          completeness: 'unknown',
+          totalCount: null,
+          hasNextPage: null,
+          source: { availability },
+        });
+      }
+    }
+  );
+
+  // A reopened REST PR also has state=open and closed_at=null.
+  it.each(['open', 'closed'] as const)(
+    'preserves nullable lifecycle events for an unmerged %s PR',
+    state => {
+      const closedAt = state === 'closed' ? '2026-03-09T00:00:00Z' : null;
+      const { dto, context } = contextFor({
+        state,
+        merged: false,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-03-09T00:00:00Z',
+        closed_at: closedAt,
+        merged_at: null,
+        merged_by: null,
+      });
+      expect(dto.state).toBe(state);
+      expect(context.lifecycle).toMatchObject({
+        source: { availability: 'available' },
+        closedAt,
+        mergedAt: null,
+      });
+      expect(context.merger).toMatchObject({
+        source: { availability: 'available' },
+        identity: null,
+      });
+    }
+  );
+
+  it.each([undefined, null, 'invalid', '2026-02-30T00:00:00Z'])(
+    'never substitutes another event time for %s',
+    invalid => {
+      const { context } = contextFor({
+        state: 'closed',
+        merged: true,
+        created_at: invalid,
+        closed_at: invalid,
+        updated_at: '2026-03-09T00:00:00Z',
+        merged_at: '2026-03-09T00:01:00Z',
+      });
+      expect(context.lifecycle).toMatchObject({
+        source: { availability: 'partial', retryable: true },
+        openedAt: null,
+        closedAt: null,
+        updatedAt: '2026-03-09T00:00:00Z',
+        mergedAt: '2026-03-09T00:01:00Z',
+      });
+    }
+  );
+
+  it('preserves merged state when the merger and merge time are unavailable', () => {
+    const { dto, context } = contextFor({
+      state: 'closed',
+      merged: true,
+      merged_by: null,
+      merged_at: 'invalid',
+      closed_at: '2026-03-09T00:00:00Z',
+    });
+    expect(dto.state).toBe('merged');
+    expect(context.lifecycle).toMatchObject({ mergedAt: null, closedAt: '2026-03-09T00:00:00Z' });
+    expect(context.merger).toMatchObject({
+      source: { availability: 'unavailable', retryable: false },
+      identity: null,
+    });
+  });
+});
+
+describe('buildInboxResult', () => {
+  it('normalizes missing display names while retaining author identity and pagination', () => {
+    const result = buildInboxResult({
+      nodes: [
+        {
+          number: 12,
+          title: 'Fix',
+          isDraft: true,
+          updatedAt: '2026-03-09T00:00:00Z',
+          author: { login: 'octocat', avatarUrl: null },
+          repository: { name: 'flux', owner: { login: 'kilo' } },
+        },
+      ],
+      pageInfo: { hasNextPage: true, endCursor: 'next' },
+    }) satisfies { items: NormalizedGitHubPrReviewInboxItem[] };
+    expect(result).toEqual({
+      items: [
+        {
+          owner: 'kilo',
+          repo: 'flux',
+          number: 12,
+          title: 'Fix',
+          isDraft: true,
+          updatedAt: '2026-03-09T00:00:00Z',
+          author: { login: 'octocat', avatarUrl: null },
+          authorDisplayName: null,
+        },
+      ],
+      nextCursor: 'next',
+    });
   });
 });
 

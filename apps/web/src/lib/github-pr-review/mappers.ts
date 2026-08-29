@@ -9,19 +9,36 @@ import {
   type GitHubPrReviewFile,
   type GitHubPrReviewFilesResult,
   type GitHubPrReviewInboxItem,
-  type GitHubPrReviewInboxResult,
   type GitHubPrReviewReviewComment,
   type GitHubPrReviewReviewThread,
   type GitHubPrReviewReviewThreadsResult,
   GitHubPrReviewFilesResultSchema,
-  GitHubPrReviewInboxResultSchema,
+  NormalizedGitHubPrReviewInboxResultSchema,
   GitHubPrReviewReviewThreadsResultSchema,
 } from './dtos';
 import {
   GitHubPrReviewAuthorSchema,
-  GitHubPrReviewOverviewSchema,
+  NormalizedGitHubPrReviewOverviewSchema,
   type GitHubPrReviewOverview,
 } from './dtos';
+import {
+  GitHubPrReviewContextSchema,
+  GitHubPrReviewTimestampSchema,
+  unavailablePrReviewSource,
+  type GitHubPrReviewIdentity,
+  type GitHubPrReviewSource,
+} from './context-dtos';
+
+type RestContextIdentity = {
+  id?: number;
+  node_id?: string;
+  login?: string | null;
+  name?: string | null;
+  avatar_url?: string | null;
+  html_url?: string | null;
+  type?: string;
+  slug?: string;
+};
 
 export type PullRequestRestData = {
   number: number;
@@ -31,7 +48,7 @@ export type PullRequestRestData = {
   state: 'open' | 'closed';
   draft?: boolean;
   merged?: boolean;
-  base: { ref: string; repo?: { full_name: string } | null };
+  base: { ref: string; sha?: string; repo?: { full_name: string } | null };
   head: { ref: string; sha: string; repo?: { full_name: string } | null };
   node_id: string;
   commits: number;
@@ -41,6 +58,16 @@ export type PullRequestRestData = {
   mergeable: boolean | null;
   mergeable_state?: string | null;
   auto_merge?: { merge_method?: string | null } | null;
+  // Older producers omit metadata. Retain until all old clients, servers, and records are gone.
+  created_at?: string | null;
+  updated_at?: string | null;
+  closed_at?: string | null;
+  merged_at?: string | null;
+  merged_by?: RestContextIdentity | null;
+  labels?: Array<{ id?: number; node_id?: string; name: string; color?: string | null }> | null;
+  assignees?: Array<RestContextIdentity | null> | null;
+  requested_reviewers?: Array<RestContextIdentity | null> | null;
+  requested_teams?: Array<RestContextIdentity | null> | null;
 };
 
 export type RepoRestData = {
@@ -78,12 +105,145 @@ const GitHubRestUserSchema = z
   })
   .strict();
 
+const contextUrl = z.string().url().nullable().catch(null);
+const contextTimestamp = GitHubPrReviewTimestampSchema.nullable().catch(null);
+
+function mapRestContextIdentity(
+  actor: RestContextIdentity | null,
+  team = false
+): GitHubPrReviewIdentity | null {
+  if (!actor) return null;
+  return {
+    id: actor.node_id ?? actor.id?.toString() ?? null,
+    kind: team
+      ? 'Team'
+      : actor.type === 'Bot'
+        ? 'Bot'
+        : actor.type === 'Mannequin'
+          ? 'Mannequin'
+          : 'User',
+    login: team ? null : (actor.login ?? null),
+    name: actor.name?.trim() || null,
+    avatarUrl: team ? null : contextUrl.parse(actor.avatar_url),
+    url: contextUrl.parse(actor.html_url),
+    teamSlug: team ? (actor.slug ?? null) : null,
+  };
+}
+
+function buildRestContext(pr: PullRequestRestData) {
+  const observedAt = new Date().toISOString();
+  const source: GitHubPrReviewSource = {
+    availability: 'available',
+    retryable: false,
+    provenance: ['rest.pullRequest'],
+    reason: null,
+    observedAt,
+  };
+  function collection<T>(items: T[] | undefined) {
+    return {
+      items: items ?? [],
+      knownCount: items?.length ?? 0,
+      totalCount: null,
+      completeness: 'unknown',
+      hasNextPage: null,
+      endCursor: null,
+      source:
+        items === undefined
+          ? unavailablePrReviewSource()
+          : {
+              ...source,
+              availability: 'partial',
+              retryable: true,
+              reason: 'unproved-completeness',
+            },
+    };
+  }
+  const dates = {
+    openedAt: contextTimestamp.parse(pr.created_at),
+    updatedAt: contextTimestamp.parse(pr.updated_at),
+    closedAt: contextTimestamp.parse(pr.closed_at),
+    mergedAt: contextTimestamp.parse(pr.merged_at),
+  };
+  const rawDates = [pr.created_at, pr.updated_at, pr.closed_at, pr.merged_at];
+  const requiredDates = [
+    dates.openedAt,
+    dates.updatedAt,
+    ...(pr.state === 'closed' || pr.merged ? [dates.closedAt] : []),
+    ...(pr.merged ? [dates.mergedAt] : []),
+  ];
+  const incompleteDates =
+    requiredDates.includes(null) ||
+    rawDates.some(
+      value => value != null && !GitHubPrReviewTimestampSchema.safeParse(value).success
+    );
+  const requests =
+    pr.requested_reviewers != null || pr.requested_teams != null
+      ? [
+          ...(pr.requested_reviewers ?? []).map(actor => ({
+            id: null,
+            reviewer: mapRestContextIdentity(actor),
+          })),
+          ...(pr.requested_teams ?? []).map(actor => ({
+            id: null,
+            reviewer: mapRestContextIdentity(actor, true),
+          })),
+        ]
+      : undefined;
+  return GitHubPrReviewContextSchema.parse({
+    revision: {
+      prNodeId: pr.node_id,
+      number: pr.number,
+      headSha: pr.head.sha,
+      baseRepoFullName: pr.base.repo?.full_name ?? null,
+      baseRef: pr.base.ref,
+      baseSha: pr.base.sha ?? null,
+    },
+    observedAt,
+    labels: collection(
+      pr.labels?.map(label => ({
+        id: label.node_id ?? label.id?.toString() ?? null,
+        name: label.name,
+        color: label.color ?? null,
+      }))
+    ),
+    assignees: collection(pr.assignees?.map(actor => mapRestContextIdentity(actor))),
+    reviewRequests: collection(requests),
+    lifecycle: rawDates.some(value => value !== undefined)
+      ? {
+          ...dates,
+          source: incompleteDates
+            ? {
+                ...source,
+                availability: 'partial',
+                retryable: true,
+                reason: 'invalid-or-missing-date',
+              }
+            : source,
+        }
+      : undefined,
+    merger:
+      pr.merged_by === undefined
+        ? undefined
+        : {
+            identity: mapRestContextIdentity(pr.merged_by),
+            source:
+              pr.merged && pr.merged_by === null
+                ? {
+                    ...source,
+                    availability: 'unavailable',
+                    reason: 'identity-unavailable',
+                  }
+                : source,
+          },
+  });
+}
+
 export function buildOverviewDto(args: {
   pr: PullRequestRestData;
   repo: RepoRestData;
   graphQl: OverviewGraphQlData;
   viewer: ViewerInfo;
-}): GitHubPrReviewOverview {
+}) {
   const { pr, repo, graphQl, viewer } = args;
   const state: GitHubPrReviewOverview['state'] = pr.merged
     ? 'merged'
@@ -116,6 +276,7 @@ export function buildOverviewDto(args: {
     headRepoFullName,
     headSha: pr.head.sha,
     prNodeId: pr.node_id,
+    context: buildRestContext(pr),
     counts: {
       commits: pr.commits,
       changedFiles: pr.changed_files,
@@ -140,7 +301,7 @@ export function buildOverviewDto(args: {
       viewerLogin: viewer?.login ?? null,
     },
   };
-  return GitHubPrReviewOverviewSchema.parse(overview);
+  return NormalizedGitHubPrReviewOverviewSchema.parse(overview);
 }
 
 const GitHubCheckRunRestSchema = z
@@ -369,7 +530,7 @@ export type GraphQlInboxNode = {
 export function buildInboxResult(args: {
   nodes: (GraphQlInboxNode | null)[];
   pageInfo: { hasNextPage: boolean; endCursor: string | null } | null;
-}): GitHubPrReviewInboxResult {
+}) {
   const { nodes, pageInfo } = args;
   const items: GitHubPrReviewInboxItem[] = [];
   for (const node of nodes) {
@@ -391,7 +552,7 @@ export function buildInboxResult(args: {
     });
   }
   const nextCursor = pageInfo?.hasNextPage ? pageInfo.endCursor : null;
-  return GitHubPrReviewInboxResultSchema.parse({ items, nextCursor });
+  return NormalizedGitHubPrReviewInboxResultSchema.parse({ items, nextCursor });
 }
 
 export { GitHubRestUserSchema };

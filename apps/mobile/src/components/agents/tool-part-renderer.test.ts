@@ -1,8 +1,13 @@
-import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
+/* eslint-disable max-lines -- routing fixtures and the shared status/part matrix cover both card entry points */
+import { type Part, type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import * as React from 'react';
+import { type ReactTestInstance } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { renderWithProviders } from '@/test/render-with-providers';
+
+import '@/i18n';
 
 import {
   BashToolCard,
@@ -19,26 +24,21 @@ import {
   WriteToolCard,
 } from './tool-cards';
 import { SuggestToolCard } from './suggest-tool-card';
-import { ChildSessionSection } from './child-session-section';
+import { ChildSessionMessage, ChildSessionSection } from './child-session-section';
+import { getChildSessionActivityLabel, getChildSessionCardState } from './child-session-card-state';
 import { ToolPartRenderer } from './tool-part-renderer';
 
-// The seam test must not pull in React Native, so the child-session section is
-// mocked entirely. getTaskToolSessionId mirrors child-session-card-state so the
-// task-with-handlers route resolves a session id; the real extraction logic has
-// its own coverage in child-session-card-state.test.ts.
-vi.mock('./child-session-section', () => ({
-  ChildSessionSection: 'ChildSessionSection',
-  getTaskToolSessionId: (part: ToolPart) => {
-    if (part.tool !== 'task') {
-      return undefined;
-    }
-    const { state } = part;
-    if (state.status === 'running' || state.status === 'completed' || state.status === 'error') {
-      return state.metadata?.sessionId as string | undefined;
-    }
-    return undefined;
-  },
+vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'AnimatedView' },
+  LinearTransition: { duration: () => ({}) },
 }));
+vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot', Loader2: 'Loader2' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('./message-error-boundary', () => ({ MessageErrorBoundary: 'MessageErrorBoundary' }));
 vi.mock('./suggest-tool-card', () => ({
   SuggestToolCard: 'SuggestToolCard',
 }));
@@ -87,7 +87,7 @@ function makeToolPart(tool: string, state: ToolPart['state']): ToolPart {
   };
 }
 
-function makeStoredMessage(): StoredMessage {
+function makeStoredMessage(parts: Part[] = []): StoredMessage {
   return {
     info: {
       id: 'm1',
@@ -103,7 +103,7 @@ function makeStoredMessage(): StoredMessage {
       cost: 0,
       tokens: { total: 0, input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
     },
-    parts: [],
+    parts,
   };
 }
 
@@ -168,6 +168,173 @@ const routingTable: [string, React.ElementType][] = [
   ['task', TaskToolCard],
   ['suggest', SuggestToolCard],
 ];
+
+function makeTaskState(status: ToolPart['state']['status']): ToolPart['state'] {
+  const input = taskCompletedState.input;
+  const metadata = taskCompletedState.metadata;
+  if (status === 'pending') {
+    return { status, input, raw: '' };
+  }
+  if (status === 'running') {
+    return { status, input, metadata, time: { start: 1 } };
+  }
+  if (status === 'error') {
+    return { status, input, metadata, error: 'failed', time: { start: 1, end: 2 } };
+  }
+  return taskCompletedState;
+}
+
+// eslint-disable-next-line typescript-eslint/no-deprecated -- the existing harness uses this DOM-free React renderer
+function textContent(node: ReactTestInstance | string): string {
+  return typeof node === 'string' ? node : node.children.map(textContent).join('');
+}
+
+const childPartBase = { id: 'activity', sessionID: 'child-1', messageID: 'child-message' };
+const textPart: Part = { ...childPartBase, type: 'text', text: 'The answer' };
+const activityParts: [string, Part, string][] = [
+  ['text', textPart, 'Writing response'],
+  [
+    'reasoning',
+    { ...childPartBase, type: 'reasoning', text: 'Thinking', time: { start: 1 } },
+    'Thinking',
+  ],
+  [
+    'snapshot progress',
+    { ...childPartBase, type: 'text', text: 'Initializing snapshot…', synthetic: true },
+    'Initializing snapshot…',
+  ],
+  ['step start', { ...childPartBase, type: 'step-start' }, 'Considering next steps'],
+  [
+    'step finish',
+    {
+      ...childPartBase,
+      type: 'step-finish',
+      reason: 'stop',
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    },
+    'Considering next steps',
+  ],
+];
+const toolActivities: [string, Record<string, unknown>, string][] = [
+  ['read', { filePath: '/project/spec.md' }, 'read spec.md'],
+  ['edit', { filePath: '/project/spec.md' }, 'edit spec.md'],
+  ['write', { filePath: '/project/spec.md' }, 'write spec.md'],
+  ['bash', { command: 'pnpm test' }, 'bash pnpm'],
+  ['glob', { pattern: '**/*.ts' }, 'glob **/*.ts'],
+  ['grep', { pattern: 'handler' }, 'grep handler'],
+  ['task', { description: 'Nested work' }, 'task Nested work'],
+  ...[
+    'list',
+    'patch',
+    'apply_patch',
+    'websearch',
+    'webfetch',
+    'codesearch',
+    'todoread',
+    'todowrite',
+    'question',
+    'suggest',
+    'plan_enter',
+    'plan_exit',
+    'unknown-tool',
+  ].map(tool => [tool, {}, tool] satisfies [string, Record<string, unknown>, string]),
+];
+const activityHistories: [string, StoredMessage[], string][] = [
+  ['empty history', [], 'Waiting for activity'],
+  ['incomplete history', [makeStoredMessage()], 'Waiting for activity'],
+  [
+    'delayed latest parts',
+    [makeStoredMessage([textPart]), makeStoredMessage()],
+    'Writing response',
+  ],
+  ...activityParts.map(
+    ([name, part, activity]) =>
+      [name, [makeStoredMessage([part])], activity] satisfies [string, StoredMessage[], string]
+  ),
+  ...toolActivities.flatMap(([tool, input, activity]) =>
+    (['pending', 'running', 'completed', 'error'] as const).map(
+      status =>
+        [
+          `${status} ${tool}`,
+          [makeStoredMessage([makeToolPart(tool, { ...makeTaskState(status), input })])],
+          activity,
+        ] satisfies [string, StoredMessage[], string]
+    )
+  ),
+];
+
+// One executable matrix checks the projection and both production entry points.
+describe.each(['top-level', 'nested'] as const)('%s child-card initial history', entry => {
+  describe.each([
+    { status: 'pending', active: true, canOpen: false },
+    { status: 'running', active: true, canOpen: true },
+    { status: 'completed', active: false, canOpen: true },
+    { status: 'error', active: false, canOpen: true },
+  ] as const)('$status parent', ({ status, active, canOpen }) => {
+    it.each(activityHistories)(
+      'keeps activity and child access consistent for %s',
+      async (_name, messages, activity) => {
+        const part = makeToolPart('task', makeTaskState(status));
+        const childMessages = canOpen ? messages : [];
+        const activeActivity = canOpen ? activity : 'Waiting for activity';
+        const expectedActivity = active ? activeActivity : '';
+        const modelLabel = childMessages.length > 0 ? 'Test Model' : '';
+        const projected = getChildSessionCardState(part, childMessages);
+        expect(getChildSessionActivityLabel(projected.latestActivity)).toBe(expectedActivity);
+
+        const openedChildren: [string, string][] = [];
+        const props = {
+          getChildMessages: (id: string) => (id === 'child-1' ? messages : []),
+          renderPart: () => null,
+          onOpenChildSession: (id: string, title: string) => {
+            openedChildren.push([id, title]);
+          },
+          modelOptions,
+        };
+        const element =
+          entry === 'top-level'
+            ? React.createElement(ToolPartRenderer, { ...props, part })
+            : React.createElement(ChildSessionMessage, {
+                ...props,
+                message: makeStoredMessage([part]),
+                depth: 1,
+              });
+        const { renderer, unmount } = await renderWithProviders(element);
+        try {
+          expect(textContent(renderer.root)).toBe(
+            `Generalchild task${modelLabel}${expectedActivity}${status}`
+          );
+          expect(renderer.root.findAll(node => node.type === 'SpinningIcon')).toHaveLength(
+            active ? 1 : 0
+          );
+          const button = renderer.root.findByType('Pressable');
+          expect(button.props.accessibilityRole).toBe('button');
+          expect(button.props.accessibilityLabel).toContain('General, child task');
+          expect(button.props.accessibilityLabel).toContain(status);
+          if (modelLabel) {
+            expect(button.props.accessibilityLabel).toContain(modelLabel);
+          }
+          if (active) {
+            expect(button.props.accessibilityLabel).toContain(expectedActivity);
+          } else {
+            expect(button.props.accessibilityLabel).not.toContain(activity);
+            expect(renderer.root.findAll(node => node.type === 'Text')).toHaveLength(
+              modelLabel ? 4 : 3
+            );
+          }
+          expect(button.props.disabled).toBe(!canOpen);
+          expect(button.props.accessibilityState).toEqual({ disabled: !canOpen });
+          const { onPress } = button.props as { onPress: () => void };
+          onPress();
+          expect(openedChildren).toEqual(canOpen ? [['child-1', 'child task']] : []);
+        } finally {
+          unmount();
+        }
+      }
+    );
+  });
+});
 
 describe('ToolPartRenderer routing', () => {
   it.each(routingTable)('routes tool %s to its card', (tool, card) => {

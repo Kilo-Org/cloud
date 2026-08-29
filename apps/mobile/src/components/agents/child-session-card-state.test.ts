@@ -346,6 +346,68 @@ describe('getChildSessionCardState', () => {
   });
 });
 
+describe.each(['completed', 'error'] as const)('terminal %s parent activity', status => {
+  const part = makeTaskPart(status, { subagent_type: 'Researcher', description: 'Check spec' });
+  const histories: [string, StoredMessage[]][] = [
+    ['empty history', []],
+    ['incomplete history', [makeAssistantMessage([])]],
+    ['text', [makeAssistantMessage([makeTextPart('The answer')])]],
+    ['reasoning', [makeAssistantMessage([makeReasoningPart('Still thinking')])]],
+    [
+      'snapshot progress',
+      [
+        makeAssistantMessage([
+          {
+            id: 'snapshot',
+            sessionID: 'ses-1',
+            messageID: 'msg-1',
+            type: 'text',
+            text: 'Initializing snapshot…',
+            synthetic: true,
+          },
+        ]),
+      ],
+    ],
+    [
+      'structural part',
+      [
+        makeAssistantMessage([
+          {
+            id: 'step',
+            sessionID: 'ses-1',
+            messageID: 'msg-1',
+            type: 'step-start',
+          },
+        ]),
+      ],
+    ],
+    [
+      'delayed latest parts',
+      [makeAssistantMessage([makeTextPart('Earlier response')]), makeAssistantMessage([], 'msg-2')],
+    ],
+    ...(['pending', 'running', 'completed', 'error'] as const).map(
+      childStatus =>
+        [
+          `${childStatus} child tool`,
+          [
+            makeAssistantMessage([
+              makeToolPart('read', {
+                ...makeTaskPart(childStatus).state,
+                input: { filePath: '/project/spec.md' },
+              }),
+            ]),
+          ],
+        ] satisfies [string, StoredMessage[]]
+    ),
+  ];
+
+  it.each(histories)('omits activity for %s without removing task metadata', (_name, messages) => {
+    const state = getChildSessionCardState(part, messages);
+    expect(state).toEqual({ agentName: 'Researcher', taskName: 'Check spec', latestActivity: '' });
+    expect(getChildSessionActivityLabel(state.latestActivity)).toBe('');
+  });
+});
+
 describe('getChildSessionActivityLabel', () => {
   it('returns the activity string with context when present', () => {
     expect(getChildSessionActivityLabel({ tool: 'read', context: 'spec.md' })).toBe('read spec.md');

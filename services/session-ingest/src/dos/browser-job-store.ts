@@ -142,6 +142,8 @@ const jobSchema = z
   .strictObject({
     snapshot: browserJobSnapshotSchema,
     parentSessionId: parentSchema,
+    // Legacy records remain readable, but absence never grants new-conversation authority.
+    conversationMode: z.enum(['new', 'continue']).optional(),
     goal: text(BROWSER_GOAL_MAX_BYTES).optional(),
     sequence: count.min(1),
     dispatch: z.strictObject({ at: timestamp, routing: routingSchema }).optional(),
@@ -613,6 +615,7 @@ export function createBrowserJobStore(storage: Storage) {
       const job: Job = {
         snapshot,
         parentSessionId: request.owner.parentSessionId,
+        conversationMode: request.browserTaskId === undefined ? 'new' : 'continue',
         goal: request.goal,
         sequence: ++c.meta.sequence,
       };
@@ -825,6 +828,19 @@ export function createBrowserJobStore(storage: Storage) {
           provider = await required(c.tx, key.provider(providerId), providerSchema);
           continue;
         }
+        if (job.conversationMode === undefined) {
+          await settle(
+            c,
+            job,
+            {
+              ...relayResult(job, 'failed', 'invalid_request', false),
+              summary: 'The browser task has no recorded conversation intent. It did not start.',
+            },
+            false
+          );
+          provider = await required(c.tx, key.provider(providerId), providerSchema);
+          continue;
+        }
         const registration = provider.registration;
         if (!registration) return null;
         job.dispatch = {
@@ -858,6 +874,7 @@ export function createBrowserJobStore(storage: Storage) {
           job: job.snapshot,
           goal: job.goal,
           ownerLabel: job.parentSessionId,
+          conversationMode: job.conversationMode,
         };
         if (bytes(JSON.stringify(message)) >= BROWSER_FRAME_MAX_BYTES) fail('capacity_exceeded');
         return { routing: job.dispatch.routing, message };

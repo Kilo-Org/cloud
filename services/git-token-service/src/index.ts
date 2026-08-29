@@ -6,6 +6,7 @@ import {
 } from '@kilocode/worker-utils';
 import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
+  BITBUCKET_INTERACTIVE_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
@@ -79,6 +80,11 @@ import {
   BitbucketEnsureWebhookRequestSchema,
   BitbucketPullRequestRequestSchema,
 } from './bitbucket-code-review-service.js';
+import {
+  BitbucketInteractiveHttpRequestSchema,
+  handleBitbucketInteractiveReview,
+} from './interactive-review-handler.js';
+import { BITBUCKET_INTERACTIVE_REQUEST_MAX_BYTES } from './bitbucket-safe-transport.js';
 import {
   KiloSessionCapabilityCodec,
   KiloSessionCapabilityError,
@@ -351,15 +357,17 @@ async function resolveSecret(secret: SecretsStoreSecret | string): Promise<strin
   return typeof secret === 'string' ? secret : secret.get();
 }
 
-async function readBoundedInternalJsonRequest(request: Request): Promise<unknown> {
+async function readBoundedInternalJsonRequest(
+  request: Request,
+  maxBytes = INTERNAL_REQUEST_MAX_BYTES
+): Promise<unknown> {
   const contentType = request.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
   if (contentType !== 'application/json' || !request.body) throw new Error('invalid_request');
 
   const contentLength = request.headers.get('Content-Length');
   if (contentLength) {
-    if (!/^[0-9]+$/.test(contentLength) || Number(contentLength) > INTERNAL_REQUEST_MAX_BYTES) {
-      throw new Error('invalid_request');
-    }
+    if (!/^[0-9]+$/.test(contentLength)) throw new Error('invalid_request');
+    if (Number(contentLength) > maxBytes) throw new Error('request_too_large');
   }
 
   const reader = request.body.getReader();
@@ -371,13 +379,13 @@ async function readBoundedInternalJsonRequest(request: Request): Promise<unknown
       if (chunk.done) break;
       if (!(chunk.value instanceof Uint8Array)) throw new Error('invalid_request');
       totalBytes += chunk.value.byteLength;
-      if (totalBytes > INTERNAL_REQUEST_MAX_BYTES) {
+      if (totalBytes > maxBytes) {
         try {
           await reader.cancel();
         } catch {
           // The request remains rejected when cancellation itself fails.
         }
-        throw new Error('invalid_request');
+        throw new Error('request_too_large');
       }
       chunks.push(chunk.value);
     }
@@ -1424,11 +1432,10 @@ export default {
   async fetch(request: Request, env: ServiceHttpEnv): Promise<Response> {
     const url = new URL(request.url);
     const isGitLabCredentialBroker = url.pathname === GITLAB_CREDENTIAL_BROKER_PATH;
-    // Credential-bearing endpoints must never be cached, including on their
-    // shared early-return error paths (405/401/503). The GitHub user-access
-    // token endpoint joins the GitLab private endpoints here.
+    const isBitbucketInteractive = url.pathname === '/internal/bitbucket/interactive-review';
+    // Private endpoints must not cache successful responses or early errors.
     const privateNoStoreHeaders =
-      isGitLabCredentialBroker || url.pathname === USER_ACCESS_TOKEN_PATH
+      isGitLabCredentialBroker || isBitbucketInteractive || url.pathname === USER_ACCESS_TOKEN_PATH
         ? { 'Cache-Control': 'no-store' }
         : undefined;
     const codeReviewAudience = bitbucketCodeReviewAudiences.get(url.pathname);
@@ -1437,6 +1444,7 @@ export default {
       url.pathname !== USER_ACCESS_TOKEN_PATH &&
       url.pathname !== BITBUCKET_REPOSITORIES_PATH &&
       url.pathname !== GITLAB_CREDENTIAL_BROKER_PATH &&
+      !isBitbucketInteractive &&
       !codeReviewAudience
     ) {
       return new Response(null, { status: 404 });
@@ -1471,8 +1479,9 @@ export default {
 
     let authorization: Awaited<ReturnType<typeof verifyKiloToken>>;
     try {
-      const audience =
-        url.pathname === BITBUCKET_REPOSITORIES_PATH
+      const audience = isBitbucketInteractive
+        ? BITBUCKET_INTERACTIVE_AUDIENCE
+        : url.pathname === BITBUCKET_REPOSITORIES_PATH
           ? BITBUCKET_REPOSITORY_LIST_AUDIENCE
           : url.pathname === GITLAB_CREDENTIAL_BROKER_PATH
             ? GITLAB_CREDENTIAL_BROKER_AUDIENCE
@@ -1485,6 +1494,53 @@ export default {
         { error: 'unauthorized' },
         { status: 401, headers: privateNoStoreHeaders }
       );
+    }
+
+    if (isBitbucketInteractive) {
+      if (!authorization.organizationId) {
+        return Response.json(
+          { error: 'organization_required' },
+          { status: 403, headers: privateNoStoreHeaders }
+        );
+      }
+      let body: unknown;
+      try {
+        body = await readBoundedInternalJsonRequest(
+          request,
+          BITBUCKET_INTERACTIVE_REQUEST_MAX_BYTES
+        );
+      } catch (error) {
+        const oversized = error instanceof Error && error.message === 'request_too_large';
+        return Response.json(
+          { success: false, reason: oversized ? 'request_too_large' : 'invalid_request' },
+          { status: oversized ? 413 : 400, headers: privateNoStoreHeaders }
+        );
+      }
+      const parsed = BitbucketInteractiveHttpRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        return Response.json(
+          { success: false, reason: 'invalid_request' },
+          { status: 400, headers: privateNoStoreHeaders }
+        );
+      }
+      try {
+        return Response.json(
+          await handleBitbucketInteractiveReview(
+            env,
+            {
+              userId: authorization.kiloUserId,
+              orgId: authorization.organizationId,
+            },
+            parsed.data
+          ),
+          { headers: privateNoStoreHeaders }
+        );
+      } catch {
+        return Response.json(
+          { success: false, reason: 'temporarily_unavailable' },
+          { headers: privateNoStoreHeaders }
+        );
+      }
     }
 
     if (url.pathname === BITBUCKET_REPOSITORIES_PATH) {

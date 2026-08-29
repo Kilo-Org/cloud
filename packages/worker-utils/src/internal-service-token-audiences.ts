@@ -1,4 +1,5 @@
 export const BITBUCKET_REPOSITORY_LIST_AUDIENCE = 'git-token-service:bitbucket-repositories';
+export const BITBUCKET_INTERACTIVE_AUDIENCE = 'git-token-service:bitbucket-interactive-review';
 export const BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE =
   'git-token-service:bitbucket-code-review:pull-request';
 export const BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE =

@@ -2,6 +2,7 @@ import { signKiloToken } from '@kilocode/worker-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as GitLabCredentialBrokerHandlerModule from './gitlab-credential-broker-handler.js';
 import type * as GitLabLookupServiceModule from './gitlab-lookup-service.js';
+import type * as InteractiveReviewHandlerModule from './interactive-review-handler.js';
 
 const serviceMocks = vi.hoisted(() => ({
   findInstallationId: vi.fn(),
@@ -20,6 +21,7 @@ const serviceMocks = vi.hoisted(() => ({
   listBitbucketRepositories: vi.fn(),
   resolveBitbucketToken: vi.fn(),
   resolveBitbucketCapabilitySubject: vi.fn(),
+  handleBitbucketInteractiveReview: vi.fn(),
 }));
 
 vi.mock('cloudflare:workers', () => ({
@@ -97,10 +99,22 @@ vi.mock('./bitbucket-runtime-token-resolver.js', () => ({
   resolveBitbucketCapabilitySubject: serviceMocks.resolveBitbucketCapabilitySubject,
 }));
 
+vi.mock('./interactive-review-handler.js', async importOriginal => {
+  const actual = await importOriginal<typeof InteractiveReviewHandlerModule>();
+  return {
+    ...actual,
+    handleBitbucketInteractiveReview: serviceMocks.handleBitbucketInteractiveReview,
+  };
+});
+
 import gitTokenServiceWorker, { GitTokenRPCEntrypoint } from './index.js';
 
 beforeEach(() => {
   serviceMocks.hasGitLabProjectCredentialCandidates.mockReset().mockResolvedValue(false);
+  serviceMocks.findAuthorizedGitLabIntegrations.mockReset().mockImplementation(async actor => {
+    const integration = await serviceMocks.findGitLabIntegration(actor);
+    return integration.success ? { success: true, integrations: [integration] } : integration;
+  });
   serviceMocks.resolveGitLabCredential.mockReset().mockImplementation(async (actor, selector) => {
     const latestIntegrationLookup = serviceMocks.findGitLabIntegration.mock.results.at(-1)?.value;
     const latestAuthorizedLookup =
@@ -155,6 +169,178 @@ beforeEach(() => {
       integrationId: integration.integrationId,
       source: { type: 'integration' },
     };
+  });
+});
+
+describe('Bitbucket interactive HTTP boundary', () => {
+  const secret = 'test-secret-that-is-at-least-32-characters';
+  const audience = 'git-token-service:bitbucket-interactive-review';
+  const organizationId = '123e4567-e89b-12d3-a456-426614174030';
+  const input = {
+    integrationId: '123e4567-e89b-12d3-a456-426614174033',
+    workspaceUuid: '123e4567-e89b-12d3-a456-426614174031',
+    workspaceSlug: 'acme',
+    repositoryUuid: '123e4567-e89b-12d3-a456-426614174032',
+    repositoryFullName: 'acme/widgets',
+    request: {
+      operation: 'createComment',
+      params: { path: { workspace: 'acme', repo_slug: 'widgets', pull_request_id: 7 } },
+      body: { content: { raw: '' } },
+    },
+  };
+  const env = { NEXTAUTH_SECRET: secret } as CloudflareEnv;
+  async function send(
+    options: {
+      audience?: string | null;
+      personal?: boolean;
+      body?: string;
+      path?: string;
+      method?: string;
+      headers?: Record<string, string>;
+    } = {}
+  ) {
+    const { token } = await signKiloToken({
+      userId: 'oauth/member',
+      pepper: null,
+      secret,
+      expiresInSeconds: 60,
+      audience: options.audience === null ? undefined : (options.audience ?? audience),
+      extra: options.personal ? undefined : { organizationId },
+    });
+    return gitTokenServiceWorker.fetch(
+      new Request(
+        `https://service.test${options.path ?? '/internal/bitbucket/interactive-review'}`,
+        {
+          method: options.method ?? 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+          ...(options.method === 'GET' ? {} : { body: options.body ?? JSON.stringify(input) }),
+        }
+      ),
+      env
+    );
+  }
+  beforeEach(() => {
+    serviceMocks.handleBitbucketInteractiveReview
+      .mockReset()
+      .mockImplementation(async (_env, actor) => ({
+        success: true,
+        result: { status: 201, data: { id: 91 } },
+        metadata: {
+          actorUserId: actor.userId,
+          organizationId: actor.orgId,
+          integrationId: input.integrationId,
+          instanceUrl: 'https://bitbucket.org',
+          providerActor: {
+            credentialKind: 'bitbucketWorkspaceToken',
+            workspaceUuid: input.workspaceUuid,
+            workspaceSlug: input.workspaceSlug,
+          },
+          grants: { scopes: ['pullrequest'] },
+        },
+      }));
+  });
+
+  it('dispatches with verified claims and retains allowlisted metadata in a no-store response', async () => {
+    const response = await send();
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      result: { status: 201, data: { id: 91 } },
+      metadata: { actorUserId: 'oauth/member', organizationId },
+    });
+  });
+
+  it.each([
+    [{ method: 'GET' }, 405],
+    [{ audience: null }, 401],
+    [{ audience: 'git-token-service:bitbucket-repositories' }, 401],
+    [{ personal: true }, 403],
+    [{ body: '{' }, 400],
+    [{ headers: { 'Content-Type': 'text/plain' } }, 400],
+    [{ body: JSON.stringify({ ...input, actorUserId: 'attacker' }) }, 400],
+    [{ body: JSON.stringify({ ...input, metadata: { actorUserId: 'attacker' } }) }, 400],
+  ] as const)('does not cache or dispatch invalid requests %#', async (options, status) => {
+    const response = await send(options);
+    expect(response.status).toBe(status);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(serviceMocks.handleBitbucketInteractiveReview).not.toHaveBeenCalled();
+  });
+
+  it.each([256_000, 256_001])(
+    'enforces the separate streamed byte limit at %i bytes',
+    async bytes => {
+      const raw = 'x'.repeat(bytes - new TextEncoder().encode(JSON.stringify(input)).byteLength);
+      const response = await send({
+        body: JSON.stringify({
+          ...input,
+          request: { ...input.request, body: { content: { raw } } },
+        }),
+      });
+      expect(response.status).toBe(bytes === 256_000 ? 200 : 413);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      await expect(response.json()).resolves.toMatchObject(
+        bytes === 256_000 ? { success: true } : { success: false, reason: 'request_too_large' }
+      );
+    }
+  );
+
+  it('rejects oversized declared length before handler dispatch', async () => {
+    const response = await send({ headers: { 'Content-Length': '256001' } });
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({ success: false, reason: 'request_too_large' });
+    expect(serviceMocks.handleBitbucketInteractiveReview).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['/internal/gitlab/credentials', 'git-token-service:gitlab-credentials'],
+    ['/internal/github-user-authorizations/token', 'git-token-service:github-user-access-token'],
+    [
+      '/internal/bitbucket/code-review/pull-request',
+      'git-token-service:bitbucket-code-review:pull-request',
+    ],
+    [
+      '/internal/bitbucket/code-review/webhooks/ensure',
+      'git-token-service:bitbucket-code-review:webhook-ensure',
+    ],
+    [
+      '/internal/bitbucket/code-review/webhooks/delete',
+      'git-token-service:bitbucket-code-review:webhook-delete',
+    ],
+  ])('retains the 16,000-byte limit on %s', async (path, audience) => {
+    const response = await send({ path, audience, body: '{}'.padEnd(16_001, ' ') });
+    expect(response.status).toBe(400);
+  });
+
+  it('does not expose sibling paths', async () => {
+    expect((await send({ path: '/internal/bitbucket/interactive-review/other' })).status).toBe(404);
+  });
+
+  it('sanitizes handler failure and prevents caching', async () => {
+    serviceMocks.handleBitbucketInteractiveReview.mockRejectedValue(new Error('provider-secret'));
+    const response = await send();
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      reason: 'temporarily_unavailable',
+    });
+  });
+
+  it('prevents caching when authentication is unavailable', async () => {
+    const response = await gitTokenServiceWorker.fetch(
+      new Request('https://service.test/internal/bitbucket/interactive-review', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer assertion' },
+      }),
+      { NEXTAUTH_SECRET: '' } as CloudflareEnv
+    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({ error: 'authentication_unavailable' });
   });
 });
 
@@ -1642,6 +1828,120 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       instanceUrl: 'https://gitlab.com',
     });
   });
+
+  it('preserves the selected integration in raw tokens, capability issuance, and redemption', async () => {
+    const integrationId = 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145e';
+    const actor = { userId: 'oauth/pinned-user', orgId: '123e4567-e89b-12d3-a456-426614174030' };
+    const instanceUrl = 'https://gitlab.example.com/gitlab';
+    serviceMocks.findGitLabIntegration.mockImplementation(async (context, pin) =>
+      context.userId === actor.userId && context.orgId === actor.orgId && pin === integrationId
+        ? {
+            success: true,
+            integrationId,
+            integrationType: 'oauth',
+            accountId: '73',
+            accountLogin: 'selected-provider-user',
+            metadata: { auth_type: 'oauth', gitlab_instance_url: instanceUrl },
+          }
+        : { success: false, reason: 'no_integration_found' }
+    );
+    serviceMocks.getGitLabToken.mockResolvedValue({
+      success: true,
+      token: 'selected-token',
+      instanceUrl,
+    });
+    const params = {
+      ...actor,
+      expectedIntegrationId: integrationId,
+      gitUrl: `${instanceUrl}/acme/nested/widgets.git`,
+      outboundContainerId,
+    };
+    const service = createService();
+    await expect(
+      service.getGitLabToken({ ...params, repositoryUrl: params.gitUrl })
+    ).resolves.toMatchObject({ success: true, token: 'selected-token', integrationId });
+    const issued = await service.issueGitLabSessionCapability(params);
+    expect(issued).toMatchObject({
+      success: true,
+      integrationId,
+      instanceOrigin: instanceUrl,
+      projectPath: 'acme/nested/widgets',
+      identity: { accountId: '73', accountLogin: 'selected-provider-user' },
+    });
+    if (!issued.success) throw new Error('Expected capability');
+    await expect(
+      service.redeemGitLabSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'GET',
+        requestUrl: `${instanceUrl}/api/v4/projects/acme%2Fnested%2Fwidgets`,
+      })
+    ).resolves.toEqual({ success: true, headers: { authorization: 'Bearer selected-token' } });
+  });
+
+  it.each([undefined, outboundContainerId])(
+    'issues an old-form capability for an authorized instance subpath with container %s',
+    async containerId => {
+      const instanceUrl = 'https://gitlab.example.com/gitlab+enterprise';
+      const integration: GitLabLookupServiceModule.GitLabLookupSuccess = {
+        success: true,
+        integrationId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145e',
+        integrationType: 'oauth',
+        accountId: '73',
+        accountLogin: 'selected-provider-user',
+        metadata: { auth_type: 'oauth', gitlab_instance_url: instanceUrl },
+      };
+      serviceMocks.findAuthorizedGitLabIntegrations.mockResolvedValue({
+        success: true,
+        integrations: [
+          {
+            ...integration,
+            integrationId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145c',
+            metadata: { gitlab_instance_url: 'https://gitlab.example.com/gitlab' },
+          },
+          integration,
+        ],
+      });
+      serviceMocks.findGitLabIntegration.mockImplementation(async (actor, pin) =>
+        actor.userId === 'oauth/legacy-user' && pin === integration.integrationId
+          ? integration
+          : { success: false, reason: 'no_integration_found' }
+      );
+      serviceMocks.getGitLabToken.mockImplementation(async integrationId =>
+        integrationId === integration.integrationId
+          ? { success: true, token: 'selected-subpath-token', instanceUrl }
+          : { success: false, reason: 'no_token' }
+      );
+      const service = createService();
+      const issued = await service.issueGitLabSessionCapability({
+        userId: 'oauth/legacy-user',
+        gitUrl: 'https://gitlab.example.com/gitlab+enterprise/acme/widgets.git',
+        ...(containerId === undefined ? {} : { outboundContainerId: containerId }),
+      });
+
+      expect(issued).toMatchObject({
+        success: true,
+        integrationId: integration.integrationId,
+        instanceOrigin: instanceUrl,
+        instanceHost: 'gitlab.example.com',
+        projectPath: 'acme/widgets',
+        identity: { accountId: '73', accountLogin: 'selected-provider-user' },
+      });
+      expect(JSON.stringify(issued)).not.toContain('selected-subpath-token');
+      if (!issued.success) throw new Error('Expected capability');
+      await expect(
+        service.redeemGitLabSessionCapability({
+          capability: issued.capability,
+          ...(containerId === undefined ? {} : { outboundContainerId: containerId }),
+          requestMethod: 'GET',
+          requestUrl: `${instanceUrl}/api/v4/projects/acme%2Fwidgets/merge_requests/42`,
+        })
+      ).resolves.toEqual({
+        success: true,
+        headers: { authorization: 'Bearer selected-subpath-token' },
+      });
+    }
+  );
 
   it.each([
     ['https://gitlab.com/acme/widgets.git', 'https://gitlab.com', 'gitlab.com', 'acme/widgets'],

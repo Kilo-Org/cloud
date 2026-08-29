@@ -3,6 +3,7 @@ import type { GitLabCredentialBroker } from './gitlab-credential-broker.js';
 import {
   isValidGitLabRepositoryUrl,
   matchGitLabRepositoryToIntegration,
+  normalizeGitLabInstanceUrl,
   type GitLabLookupService,
   type GitLabRepositoryMatch,
 } from './gitlab-lookup-service.js';
@@ -14,6 +15,7 @@ import {
 export type GetGitLabTokenParams = {
   userId: string;
   orgId?: string;
+  expectedIntegrationId?: string;
   repositoryUrl?: string;
   createdOnPlatform?: string;
 };
@@ -232,14 +234,58 @@ export async function resolveGitLabRuntimeToken(
   params: GetGitLabTokenParams,
   dependencies: GitLabRuntimeTokenDependencies
 ): Promise<GetGitLabTokenResult> {
+  const repositoryUrl = params.repositoryUrl;
+  if (params.createdOnPlatform === 'code-review' && !repositoryUrl) {
+    return { success: false, reason: 'repository_url_required' };
+  }
+  // The generic check includes the instance prefix. Ordinary requests validate the
+  // project relative to an authorized integration before returning this failure.
+  const repositoryUrlFailure: GetGitLabTokenFailure | undefined =
+    repositoryUrl !== undefined && !isValidGitLabRepositoryUrl(repositoryUrl)
+      ? { success: false, reason: 'invalid_repository_url' }
+      : undefined;
+  if (params.createdOnPlatform === 'code-review' && repositoryUrlFailure) {
+    return repositoryUrlFailure;
+  }
+  // Old raw-token and capability requests omit the pin. Keep their authorized lookup
+  // until no old clients/records remain and the 30-day ledger window has expired.
+  const pinned =
+    params.expectedIntegrationId === undefined
+      ? undefined
+      : await dependencies.lookupService.findGitLabIntegration(
+          params,
+          params.expectedIntegrationId
+        );
+  if (pinned && !pinned.success) return repositoryUrlFailure ?? pinned;
+  const authorized = pinned?.success
+    ? { success: true as const, integrations: [pinned] }
+    : await dependencies.lookupService.findAuthorizedGitLabIntegrations(params);
+  if (!authorized.success) return repositoryUrlFailure ?? authorized;
+  const integrations =
+    repositoryUrl === undefined
+      ? authorized.integrations
+      : authorized.integrations.filter(
+          integration => matchGitLabRepositoryToIntegration(repositoryUrl, integration) !== null
+        );
+  if (integrations.length === 0) {
+    return repositoryUrlFailure ?? { success: false, reason: 'no_matching_integration' };
+  }
+
   if (params.createdOnPlatform !== 'code-review') {
-    const integration = await dependencies.lookupService.findGitLabIntegration(params);
-    if (!integration.success) return integration;
+    if (integrations.length !== 1) return { success: false, reason: 'ambiguous_integration' };
+    const integration = integrations[0];
     const credential = await dependencies.credentialResolver.resolveCredential(params, {
       credential: 'integration',
       integrationId: integration.integrationId,
     });
     if (credential.status !== 'available') return mapCredentialFailure(credential.status);
+    if (
+      credential.integrationId !== integration.integrationId ||
+      (repositoryUrl !== undefined &&
+        normalizeGitLabInstanceUrl(credential.instanceUrl) !==
+          matchGitLabRepositoryToIntegration(repositoryUrl, integration)?.instanceUrl)
+    )
+      return { success: false, reason: 'no_matching_integration' };
     return {
       success: true,
       token: credential.token,
@@ -250,17 +296,10 @@ export async function resolveGitLabRuntimeToken(
     };
   }
 
-  const repositoryUrl = params.repositoryUrl;
   if (!repositoryUrl) return { success: false, reason: 'repository_url_required' };
-  if (!isValidGitLabRepositoryUrl(repositoryUrl)) {
-    return { success: false, reason: 'invalid_repository_url' };
-  }
-  const authorized = await dependencies.lookupService.findAuthorizedGitLabIntegrations(params);
-  if (!authorized.success) return authorized;
-  const matches = authorized.integrations
+  const matches = integrations
     .map(integration => matchGitLabRepositoryToIntegration(repositoryUrl, integration))
     .filter((match): match is GitLabRepositoryMatch => match !== null);
-  if (matches.length === 0) return { success: false, reason: 'no_matching_integration' };
 
   const evaluations = await Promise.all(
     matches.map(match =>
@@ -271,10 +310,8 @@ export async function resolveGitLabRuntimeToken(
     evaluation.status === 'qualified' ? [evaluation.candidate] : []
   );
   if (qualified.length > 1) return { success: false, reason: 'ambiguous_integration' };
-  if (qualified.length === 0) {
-    const tokenFailure = evaluations.find(evaluation => evaluation.status === 'token_failed');
-    if (tokenFailure?.status === 'token_failed') return tokenFailure.failure;
-  }
+  const tokenFailure = evaluations.find(evaluation => evaluation.status === 'token_failed');
+  if (tokenFailure?.status === 'token_failed') return tokenFailure.failure;
   if (evaluations.some(evaluation => evaluation.status === 'lookup_failed')) {
     return { success: false, reason: 'project_lookup_failed' };
   }

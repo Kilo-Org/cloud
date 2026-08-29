@@ -187,6 +187,7 @@ async function renderBubbleWithHandlers(
     onRetryMessage?: (m: StoredMessage) => void;
     onCopyToComposer?: (text: string) => void;
     onRestoreQueued?: (m: StoredMessage) => void;
+    onLongPressDetails?: (m: StoredMessage) => void;
   }
 ): Promise<unknown> {
   const { MessageBubble } = await import('./message-bubble');
@@ -375,6 +376,55 @@ describe('MessageBubble queue indicator and restore', () => {
   });
 });
 
+describe('MessageBubble attachment details entry', () => {
+  it.each([false, true])(
+    'selects the whole message from an attachment, with text=%s',
+    async withText => {
+      const actual = await vi.importActual<typeof PartTypes>('./part-types');
+      const { isFilePart, isTextPart } = await import('./part-types');
+      const { FilePartRenderer } = await import('./file-part-renderer');
+      vi.mocked(isFilePart).mockImplementation(actual.isFilePart);
+      vi.mocked(isTextPart).mockImplementation(actual.isTextPart);
+      try {
+        const message = userMessage('attachment-message');
+        const file = {
+          id: 'attachment-part',
+          sessionID: 'ses_1',
+          messageID: message.info.id,
+          type: 'file' as const,
+          mime: 'image/png',
+          url: 'https://example.test/image.png',
+        };
+        message.parts = [...(withText ? message.parts : []), file];
+        const selected: StoredMessage[] = [];
+        const tree = await renderBubbleWithHandlers(message, {
+          deliveryState: { status: 'queued' },
+          onLongPressDetails: value => {
+            selected.push(value);
+          },
+        });
+        const attachment = findElementByTypeFn(tree, FilePartRenderer);
+        if (!attachment) {
+          throw new Error('Attachment control is missing');
+        }
+        expect(attachment.props.part).toBe(file);
+        (attachment.props.onLongPress as () => void)();
+        expect(selected).toEqual([message]);
+        expect(findText(tree, text => text === 'Queued')).toBe(true);
+        expect(findText(tree, text => text === 'Cancel message')).toBe(false);
+
+        const withoutActions = await renderBubbleWithHandlers(message, {});
+        expect(
+          findElementByTypeFn(withoutActions, FilePartRenderer)?.props.onLongPress
+        ).toBeUndefined();
+      } finally {
+        vi.mocked(isFilePart).mockReturnValue(false);
+        vi.mocked(isTextPart).mockReturnValue(false);
+      }
+    }
+  );
+});
+
 describe('MessageBubble copy-to-composer human text', () => {
   it('passes only the first human text part to Copy, not the synthesized notice', async () => {
     const message = userMessage('m-copy-human');
@@ -542,6 +592,15 @@ function findElementByTypeFn(
   node: unknown,
   typeFn: unknown
 ): { type: unknown; props: Record<string, unknown> } | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findElementByTypeFn(child, typeFn);
+      if (hit) {
+        return hit;
+      }
+    }
+    return null;
+  }
   if (node == null || typeof node !== 'object') {
     return null;
   }

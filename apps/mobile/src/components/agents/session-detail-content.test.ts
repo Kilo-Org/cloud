@@ -486,7 +486,9 @@ function makeManager() {
       childSessionError: { value: () => null },
       pendingMessages: { value: new Map<string, { status: string }>() },
       activeSessionType: { value: null },
-      remoteModelState: { value: { catalog: null, ownerConnectionId: null, protocol: 'v1' } },
+      remoteModelState: {
+        value: { catalog: null, ownerConnectionId: null as string | null, protocol: 'v1' },
+      },
       observedModel: { value: null },
       remoteModelOverride: { value: null },
       cloudAgentModelOverride: { value: null },
@@ -924,8 +926,12 @@ describe('SessionDetailContent cancel/restore', () => {
       closeDetails(renderer);
       openDetails(renderer, message);
       expect(cancellationRow(renderer)).toBeUndefined();
+      expect(findByType(renderer, 'Text').map(node => node.props.children)).toContain(upgrade);
+      expect(statusMessages(renderer)).toEqual([]);
       openDetails(renderer, second);
       expect(cancellationRow(renderer)).toBeUndefined();
+      expect(findByType(renderer, 'Text').map(node => node.props.children)).toContain(upgrade);
+      expect(statusMessages(renderer)).toEqual([]);
       expect(hoisted.chatComposer.draft).toEqual(original);
       expect(currentManager.atoms.messagesList.value).toEqual([message, second]);
       expect(readBubble(renderer, message.info.id)).toBeDefined();
@@ -939,6 +945,144 @@ describe('SessionDetailContent cancel/restore', () => {
       unmountScreen(renderer);
     });
   });
+
+  it.each([false, true])(
+    'restores cancellation only for a replacement CLI connection, sheet closed=%s',
+    async closed => {
+      const message = queuedMessage([TEXT_PART, FILE_PART]);
+      seedQueuedMessage(message);
+      currentManager.atoms.remoteModelState.value.ownerConnectionId = 'cli-1';
+      currentManager.cancelQueuedMessage.mockRejectedValueOnce(
+        Object.assign(new Error('Upgrade required'), { code: 'CLI_UPGRADE_REQUIRED' })
+      );
+      const renderer = mount();
+      openDetails(renderer, message);
+      const stalePress = cancellationPress(renderer);
+      await act(async () => {
+        stalePress();
+        await Promise.resolve();
+      });
+      const upgrade = 'agentChat.session.cancelQueuedUpgradeRequired';
+      expect(cancellationRow(renderer)).toBeUndefined();
+      expect(hoisted.chatComposer.draft).toEqual({ text: '', files: [] });
+      if (closed) {
+        closeDetails(renderer);
+        openDetails(renderer, message);
+        expect(findByType(renderer, 'Text').map(node => node.props.children)).toContain(upgrade);
+        expect(statusMessages(renderer)).toEqual([]);
+      }
+
+      for (const ownerConnectionId of ['cli-1', null, 'cli-1']) {
+        currentManager.atoms.remoteModelState.value = {
+          ...currentManager.atoms.remoteModelState.value,
+          ownerConnectionId,
+        };
+        currentManager.atoms.agentStatus.value = {
+          type: ownerConnectionId === null ? 'disconnected' : 'connected',
+        };
+        currentManager.atoms.supportsAttachments.value = ownerConnectionId !== null;
+        updateScreen(renderer);
+        act(() => {
+          stalePress();
+        });
+        expect(cancellationRow(renderer)).toBeUndefined();
+        expect(findByType(renderer, 'Text').map(node => node.props.children)).toContain(upgrade);
+        expect(currentManager.cancelQueuedMessage.mock.calls).toEqual([[message.info.id]]);
+        expect(hoisted.chatComposer.draft).toEqual({ text: '', files: [] });
+      }
+      if (closed) {
+        closeDetails(renderer);
+      }
+      currentManager.atoms.remoteModelState.value = {
+        ...currentManager.atoms.remoteModelState.value,
+        ownerConnectionId: 'cli-2',
+      };
+      updateScreen(renderer);
+      if (closed) {
+        openDetails(renderer, message);
+      }
+      expect(detailsProps(renderer).message).toBe(message);
+      expect(cancellationRow(renderer)).toBeDefined();
+      expect(detailsProps(renderer).canCancelQueued).toBe(true);
+      expect(detailsProps(renderer).cancelQueuedFeedback).toBeNull();
+      expect(findByType(renderer, 'Text').map(node => node.props.children)).not.toContain(upgrade);
+      expect(hoisted.announce.mock.calls).toEqual([[upgrade]]);
+      currentManager.cancelQueuedMessage.mockResolvedValue({ dropped: true });
+      await act(async () => {
+        cancellationPress(renderer)();
+        await Promise.resolve();
+      });
+      expect(hoisted.chatComposer.draft).toEqual({ text: 'Queued prompt', files: [FILE_PART] });
+      expect(readBubble(renderer, message.info.id)).toBeUndefined();
+      expect(detailsProps(renderer).visible).toBe(false);
+      expect(statusMessages(renderer)).toEqual([restored]);
+      expect(hoisted.announce.mock.calls).toEqual([[upgrade], [restored]]);
+      unmountScreen(renderer);
+    }
+  );
+
+  it.each([false, true])(
+    'reports a late upgrade failure once without disabling the replacement, sheet dismissed=%s',
+    async dismissed => {
+      const message = queuedMessage();
+      seedQueuedMessage(message);
+      currentManager.atoms.remoteModelState.value.ownerConnectionId = 'cli-1';
+      const request = Promise.withResolvers<{ dropped: boolean }>();
+      currentManager.cancelQueuedMessage.mockReturnValueOnce(request.promise);
+      const renderer = mount();
+      openDetails(renderer, message);
+      act(() => {
+        cancellationPress(renderer)();
+      });
+      if (dismissed) {
+        closeDetails(renderer);
+      }
+      currentManager.atoms.remoteModelState.value = {
+        ...currentManager.atoms.remoteModelState.value,
+        ownerConnectionId: 'cli-2',
+      };
+      updateScreen(renderer);
+      await act(async () => {
+        request.reject(
+          Object.assign(new Error('Upgrade required'), { code: 'CLI_UPGRADE_REQUIRED' })
+        );
+        await Promise.resolve();
+      });
+      expect(detailsProps(renderer).visible).toBe(!dismissed);
+      expect(detailsProps(renderer).isCancelingQueued).toBe(false);
+      expect(detailsProps(renderer).cancelQueuedFeedback?.message ?? null).toBe(
+        dismissed ? null : failed
+      );
+      expect(detailsProps(renderer).cancelQueuedGuidance).toBeNull();
+      expect(statusMessages(renderer)).toEqual([failed]);
+      const visibleText = findByType(renderer, 'Text').map(node => node.props.children);
+      expect(visibleText.filter(text => text === failed)).toHaveLength(1);
+      expect(visibleText).not.toContain('agentChat.session.cancelQueuedUpgradeRequired');
+      expect(hoisted.announce.mock.calls).toEqual([[failed]]);
+      expect(hoisted.chatComposer.draft).toEqual({ text: '', files: [] });
+      expect(readBubble(renderer, message.info.id)).toBeDefined();
+      if (dismissed) {
+        openDetails(renderer, message);
+      }
+      expect(detailsProps(renderer).canCancelQueued).toBe(true);
+      expect(cancellationRow(renderer)?.props.accessibilityState).toEqual({
+        disabled: false,
+        busy: false,
+      });
+      expect(hoisted.announce.mock.calls).toEqual([[failed]]);
+      currentManager.cancelQueuedMessage.mockResolvedValue({ dropped: true });
+      await act(async () => {
+        cancellationPress(renderer)();
+        await Promise.resolve();
+      });
+      expect(hoisted.chatComposer.draft).toEqual({ text: 'Queued prompt', files: [] });
+      expect(readBubble(renderer, message.info.id)).toBeUndefined();
+      expect(detailsProps(renderer).visible).toBe(false);
+      expect(statusMessages(renderer)).toEqual([restored]);
+      expect(hoisted.announce.mock.calls).toEqual([[failed], [restored]]);
+      unmountScreen(renderer);
+    }
+  );
 
   it('keeps the occupied Restore path usable before late delivery events', async () => {
     const message = queuedMessage([TEXT_PART, FILE_PART]);

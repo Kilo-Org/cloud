@@ -694,20 +694,48 @@ export function SessionDetailContent({
   const [cancelingQueuedIds, setCancelingQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   // Successful drops stay guarded before React commits and after Restore removes a retained row.
   const canceledQueuedIdsRef = useRef(new Set<string>());
-  // Dismissing feedback must not enable another request to the same unsupported session.
-  const cancelQueuedUpgradeRequiredRef = useRef(false);
+  // The SDK owner ID changes when a replacement CLI connection takes over.
+  // Catalog refreshes and temporary owner loss do not prove recovery.
+  const cancelQueuedUpgradeRequiredRef = useRef<{
+    ownerConnectionId: string | null;
+    attempt: number;
+  } | null>(null);
+  const isQueuedCancellationUnsupported = useCallback(() => {
+    const unsupported = cancelQueuedUpgradeRequiredRef.current;
+    const ownerConnectionId = store.get(manager.atoms.remoteModelState).ownerConnectionId;
+    return (
+      unsupported !== null &&
+      (ownerConnectionId === null || ownerConnectionId === unsupported.ownerConnectionId)
+    );
+  }, [manager, store]);
+
+  useEffect(() => {
+    const unsupported = cancelQueuedUpgradeRequiredRef.current;
+    if (
+      unsupported !== null &&
+      remoteModelState.ownerConnectionId !== null &&
+      remoteModelState.ownerConnectionId !== unsupported.ownerConnectionId
+    ) {
+      cancelQueuedUpgradeRequiredRef.current = null;
+      setCancelQueuedStatus(current => (current?.attempt === unsupported.attempt ? null : current));
+      setCancelQueuedSheetStatus(current =>
+        current?.attempt === unsupported.attempt ? null : current
+      );
+    }
+  }, [remoteModelState.ownerConnectionId]);
+
   const isQueuedCancellationEligible = useCallback(
     (
       message: StoredMessage | undefined,
       delivery: MessageDeliveryState | undefined,
       busy: boolean
     ) =>
-      !cancelQueuedUpgradeRequiredRef.current &&
+      !isQueuedCancellationUnsupported() &&
       message?.info.role === 'user' &&
       delivery?.status === 'queued' &&
       !canceledQueuedIdsRef.current.has(message.info.id) &&
       !busy,
-    []
+    [isQueuedCancellationUnsupported]
   );
 
   const handleOpenDetails = useCallback((message: StoredMessage) => {
@@ -785,7 +813,7 @@ export function SessionDetailContent({
     cancelingQueuedIdsRef.current = new Set();
     setCancelingQueuedIds(EMPTY_IDS);
     canceledQueuedIdsRef.current = new Set();
-    cancelQueuedUpgradeRequiredRef.current = false;
+    cancelQueuedUpgradeRequiredRef.current = null;
   } else {
     const next = nextHeldQueuedIds(heldQueuedIds, pendingMessages, isStreaming);
     if (next !== heldQueuedIds) {
@@ -939,12 +967,13 @@ export function SessionDetailContent({
       // The attempt also resets announcement identity if React batches an immediate retry failure.
       cancelQueuedAttemptRef.current += 1;
       const attempt = cancelQueuedAttemptRef.current;
+      const ownerConnectionId = store.get(manager.atoms.remoteModelState).ownerConnectionId;
       const reportFailure = (feedback: string, upgradeRequired = false) => {
         if (inFlight !== cancelingQueuedIdsRef.current) {
           return;
         }
         if (upgradeRequired) {
-          cancelQueuedUpgradeRequiredRef.current = true;
+          cancelQueuedUpgradeRequiredRef.current = { ownerConnectionId, attempt };
         }
         const setStatus =
           detailsMessageIdRef.current === messageId
@@ -965,7 +994,10 @@ export function SessionDetailContent({
         } catch (cancelError) {
           // Old CLI versions without queue drop require an upgrade. Remove only when all
           // supported CLI versions implement queue drop; never fall back to interrupt.
-          const upgrade = isCancelQueuedUpgradeRequired(cancelError);
+          const currentOwner = store.get(manager.atoms.remoteModelState).ownerConnectionId;
+          const upgrade =
+            isCancelQueuedUpgradeRequired(cancelError) &&
+            (currentOwner === null || currentOwner === ownerConnectionId);
           reportFailure(
             upgrade
               ? t('agentChat.session.cancelQueuedUpgradeRequired')
@@ -1475,6 +1507,13 @@ export function SessionDetailContent({
           onCancelQueued={handleCancelQueued}
           cancelQueuedFeedback={
             cancelQueuedSheetStatus?.messageId === detailsMessageId ? cancelQueuedSheetStatus : null
+          }
+          cancelQueuedGuidance={
+            isQueuedCancellationUnsupported() &&
+            detailsMessage?.info.role === 'user' &&
+            detailsDelivery?.status === 'queued'
+              ? t('agentChat.session.cancelQueuedUpgradeRequired')
+              : null
           }
         />
 

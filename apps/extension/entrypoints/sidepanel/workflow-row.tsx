@@ -1,6 +1,6 @@
 import { Play, Trash2 } from 'lucide-react';
 import type { JSX } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { WorkflowRunPrompt } from './workflow-run-prompt';
 import { deriveWorkflowRunDisabledReason } from './workflow-settings-state';
 import type { WorkflowSettingsListItem } from './workflow-settings-state';
@@ -25,6 +25,7 @@ export const WorkflowRow = ({
   activeConversationRunning,
   allowWorkflowsInSafeMode,
   autoApproveChanges,
+  blocker,
   isDangerousMode,
   item,
   onDelete,
@@ -33,10 +34,15 @@ export const WorkflowRow = ({
   activeConversationRunning: boolean;
   allowWorkflowsInSafeMode: boolean;
   autoApproveChanges: boolean;
+  blocker: string | undefined;
   isDangerousMode: boolean;
   item: WorkflowSettingsListItem;
   onDelete: (id: string) => void;
-  onRun: (id: string, input?: Record<string, string>) => void;
+  onRun: (
+    id: string,
+    input: Record<string, string> | undefined,
+    signal: AbortSignal
+  ) => Promise<boolean>;
 }): JSX.Element => {
   const disabledReason = deriveWorkflowRunDisabledReason({
     activeConversationRunning,
@@ -46,13 +52,37 @@ export const WorkflowRow = ({
   });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [collectingInput, setCollectingInput] = useState(false);
+  // eslint-disable-next-line unicorn/no-useless-undefined -- React 19 requires an initial ref value.
+  const pendingRunRef = useRef<AbortController | undefined>(undefined);
+  useEffect(
+    () => () => {
+      pendingRunRef.current?.abort();
+    },
+    []
+  );
 
+  const submitRun = async (input?: Record<string, string>): Promise<void> => {
+    if (pendingRunRef.current !== undefined) {
+      return;
+    }
+    const controller = new AbortController();
+    pendingRunRef.current = controller;
+    try {
+      if ((await onRun(item.id, input, controller.signal)) && !controller.signal.aborted) {
+        setCollectingInput(false);
+      }
+    } finally {
+      if (pendingRunRef.current === controller) {
+        pendingRunRef.current = undefined;
+      }
+    }
+  };
   const startRun = (): void => {
     if (item.params.length > 0) {
       setCollectingInput(true);
       return;
     }
-    onRun(item.id);
+    void submitRun();
   };
 
   return (
@@ -108,17 +138,28 @@ export const WorkflowRow = ({
       </div>
 
       {collectingInput && (
-        <WorkflowRunPrompt
-          name={item.name}
-          onCancel={() => {
-            setCollectingInput(false);
-          }}
-          onRun={input => {
-            setCollectingInput(false);
-            onRun(item.id, input);
-          }}
-          params={item.params}
-        />
+        <>
+          <WorkflowRunPrompt
+            name={item.name}
+            onCancel={() => {
+              pendingRunRef.current?.abort();
+              pendingRunRef.current = undefined;
+              setCollectingInput(false);
+            }}
+            onRun={input => {
+              void submitRun(input);
+            }}
+            params={item.params}
+          />
+          {blocker === undefined ? null : (
+            <p
+              className="type-body fixed inset-x-4 top-4 z-[31] rounded-md border border-status-yellow-500/30 bg-surface-raised p-3 text-status-yellow-400"
+              role="alert"
+            >
+              {blocker}
+            </p>
+          )}
+        </>
       )}
     </li>
   );

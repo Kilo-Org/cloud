@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { createElement } from 'react';
 import { Provider, createStore } from 'jotai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import { runningConversationIdsAtom } from './agent-chat-atoms';
 import {
   activeConversationIdAtom,
@@ -28,9 +28,22 @@ vi.mock('@/src/shared/agent-workflows-storage', () => ({
   saveWorkflowSettings: vi.fn(),
 }));
 
+const lockStorage = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('#imports', () => ({
-  storage: {},
+  storage: {
+    getItem: (key: string) => lockStorage.get(key),
+    setItem: (key: string, value: unknown) => {
+      lockStorage.set(key, value);
+    },
+    watch: () => () => {},
+  },
 }));
+// eslint-disable-next-line import/no-nodejs-modules -- These fixtures exercise native locks under Node.
+import { locks as nativeLocks } from 'node:worker_threads';
+import { BROWSER_EXECUTION_LOCK, getBrowserExecutionCoordinator } from './browser-execution-lock';
+import type { BrowserAdmission, BrowserExecutionLease } from './browser-execution-lock';
+import { reserveWorkflowLease, takeWorkflowLease } from './browser-run-context';
+const heldLeases = new Set<BrowserExecutionLease>();
 
 import { useAgentWorkflows } from './use-agent-workflows';
 import { DEFAULT_WORKFLOW_SETTINGS } from '@/src/shared/agent-workflows';
@@ -72,12 +85,24 @@ describe('workflow settings', () => {
   let store: ReturnType<typeof createStore>;
 
   beforeEach(() => {
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: nativeLocks });
+    lockStorage.clear();
     store = createStore();
     store.set(runningConversationIdsAtom, []);
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    const request = store.get(workflowRunRequestAtom);
+    if (request !== undefined) {
+      const reservation = takeWorkflowLease(request);
+      if (reservation !== undefined) {
+        await reservation.lease.release();
+      }
+    }
+    await Promise.all([...heldLeases].map(lease => lease.release()));
+    heldLeases.clear();
+    vi.restoreAllMocks();
     vi.resetAllMocks();
   });
 
@@ -128,12 +153,13 @@ describe('workflow settings', () => {
       allowWorkflowsInSafeMode: false,
     });
 
-    const { getByText } = render(createElement(WorkflowSettings), {
+    const { getByText, queryByRole } = render(createElement(WorkflowSettings), {
       wrapper: createWrapper(store),
     });
 
     await waitFor(() => {
       expect(getByText(/No workflows yet. Ask Kilo to save one/u)).toBeDefined();
+      expect(queryByRole('status')).toBeNull();
     });
   });
 
@@ -243,9 +269,335 @@ describe('workflow settings', () => {
       runButton.click();
     }
 
-    expect(store.get(workflowRunRequestAtom)).toStrictEqual({ workflowId: 'wf-1' });
-    expect(store.get(settingsDialogOpenAtom)).toBe(false);
+    await waitFor(() => {
+      expect(store.get(workflowRunRequestAtom)).toStrictEqual({ workflowId: 'wf-1' });
+      expect(store.get(settingsDialogOpenAtom)).toBe(false);
+    });
   });
+
+  it.each([
+    { failure: 'request', parameters: false },
+    { failure: 'request', parameters: true },
+    { failure: 'lease', parameters: false },
+    { failure: 'lease', parameters: true },
+  ])(
+    'retains input after a $failure exception (parameters=$parameters)',
+    async ({ failure, parameters }) => {
+      mockUseAgentWorkflows.mockReturnValue({
+        ...emptyResult,
+        workflows: [
+          {
+            ...approvedWorkflow,
+            ...(parameters
+              ? { params: [{ name: 'size', description: 'Pizza size', required: true }] }
+              : {}),
+          },
+        ],
+      });
+      mockLoadWorkflowSettings.mockResolvedValue({
+        ...DEFAULT_WORKFLOW_SETTINGS,
+        allowWorkflowsInSafeMode: true,
+      });
+      store.set(settingsDialogOpenAtom, true);
+      const coordinator = getBrowserExecutionCoordinator();
+      if (failure === 'request') {
+        vi.spyOn(coordinator, 'acquireLocal').mockRejectedValueOnce(
+          new Error('Admission unavailable. Submit again.')
+        );
+      } else {
+        const admission = await coordinator.acquireLocal();
+        if (!admission.admitted) {
+          throw new Error(admission.reason);
+        }
+        await admission.lease.release();
+        vi.spyOn(coordinator, 'acquireLocal').mockResolvedValueOnce(admission);
+      }
+      const view = render(createElement(WorkflowSettings), { wrapper: createWrapper(store) });
+      await waitFor(() => {
+        expect(view.getByLabelText('Run workflow "Order pizza"')).toHaveProperty('disabled', false);
+      });
+      fireEvent.click(view.getByLabelText('Run workflow "Order pizza"'));
+      if (parameters) {
+        fireEvent.change(view.getByRole('textbox'), { target: { value: 'large' } });
+        fireEvent.click(view.getByRole('button', { name: 'Run' }));
+      }
+      await waitFor(() => {
+        expect(view.getByRole(parameters ? 'alert' : 'status').textContent).toContain(
+          failure === 'request' ? 'Admission unavailable' : 'execution_lease_lost'
+        );
+      });
+      expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+      expect(store.get(settingsDialogOpenAtom)).toBe(true);
+      if (parameters) {
+        expect(view.getByDisplayValue('large')).toBeDefined();
+      }
+      const owner = await coordinator.acquireProviderOwner();
+      if (!owner.admitted) {
+        throw new Error(owner.reason);
+      }
+      heldLeases.add(owner.lease);
+      const delegated = await coordinator.acquireDelegated(
+        owner.lease,
+        'temporary-owner',
+        new AbortController().signal
+      );
+      if (!delegated.admitted) {
+        throw new Error(delegated.reason);
+      }
+      heldLeases.add(delegated.lease);
+      await act(async () => {
+        await delegated.lease.release();
+        await coordinator.refresh();
+      });
+      expect(view.getByRole(parameters ? 'alert' : 'status').textContent).toContain(
+        failure === 'request' ? 'Admission unavailable' : 'execution_lease_lost'
+      );
+      expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+      fireEvent.click(
+        parameters
+          ? view.getByRole('button', { name: 'Run' })
+          : view.getByLabelText('Run workflow "Order pizza"')
+      );
+      await waitFor(() => {
+        expect(store.get(workflowRunRequestAtom)).toStrictEqual({
+          workflowId: 'wf-1',
+          ...(parameters ? { input: { size: 'large' } } : {}),
+        });
+        expect(store.get(settingsDialogOpenAtom)).toBe(false);
+        expect(view.queryByRole('dialog')).toBeNull();
+      });
+    }
+  );
+
+  it.each(['cancel', 'row unmount', 'Settings unmount'] as const)(
+    'discards pending parameter admission after %s',
+    async cancellation => {
+      mockUseAgentWorkflows.mockReturnValue({
+        ...emptyResult,
+        workflows: [
+          {
+            ...approvedWorkflow,
+            params: [{ name: 'size', description: 'Pizza size', required: true }],
+          },
+        ],
+      });
+      mockLoadWorkflowSettings.mockResolvedValue({
+        ...DEFAULT_WORKFLOW_SETTINGS,
+        allowWorkflowsInSafeMode: true,
+      });
+      store.set(settingsDialogOpenAtom, true);
+      const coordinator = getBrowserExecutionCoordinator();
+      const admission = await coordinator.acquireLocal();
+      if (!admission.admitted) {
+        throw new Error(admission.reason);
+      }
+      heldLeases.add(admission.lease);
+      const pending = Promise.withResolvers<BrowserAdmission>();
+      vi.spyOn(coordinator, 'acquireLocal').mockReturnValueOnce(pending.promise);
+      const view = render(createElement(WorkflowSettings), { wrapper: createWrapper(store) });
+      await waitFor(() => {
+        expect(view.getByLabelText('Run workflow "Order pizza"')).toHaveProperty('disabled', false);
+      });
+      fireEvent.click(view.getByLabelText('Run workflow "Order pizza"'));
+      fireEvent.change(view.getByRole('textbox'), { target: { value: 'large' } });
+      fireEvent.click(view.getByRole('button', { name: 'Run' }));
+      expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+      if (cancellation === 'cancel') {
+        fireEvent.click(view.getByRole('button', { name: 'Cancel' }));
+      } else if (cancellation === 'row unmount') {
+        mockUseAgentWorkflows.mockReturnValue(emptyResult);
+        view.rerender(createElement(WorkflowSettings));
+      } else {
+        view.unmount();
+      }
+      await act(async () => {
+        pending.resolve(admission);
+        await pending.promise;
+      });
+      expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+      expect(store.get(settingsDialogOpenAtom)).toBe(true);
+      expect(view.queryByRole('dialog')).toBeNull();
+      await waitFor(async () => {
+        const state = await nativeLocks.query();
+        expect(state.held?.some(lock => lock.name === BROWSER_EXECUTION_LOCK)).toBe(false);
+      });
+    }
+  );
+
+  it('releases admission acquired after Settings unmounts', async () => {
+    mockUseAgentWorkflows.mockReturnValue({ ...emptyResult, workflows: [approvedWorkflow] });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: true,
+    });
+    store.set(settingsDialogOpenAtom, true);
+    const coordinator = getBrowserExecutionCoordinator();
+    const admission = await coordinator.acquireLocal();
+    if (!admission.admitted) {
+      throw new Error(admission.reason);
+    }
+    heldLeases.add(admission.lease);
+    const pending = Promise.withResolvers<BrowserAdmission>();
+    vi.spyOn(coordinator, 'acquireLocal').mockReturnValueOnce(pending.promise);
+    const view = render(createElement(WorkflowSettings), { wrapper: createWrapper(store) });
+    await waitFor(() => {
+      expect(view.getByLabelText('Run workflow "Order pizza"')).toHaveProperty('disabled', false);
+    });
+    fireEvent.click(view.getByLabelText('Run workflow "Order pizza"'));
+    view.unmount();
+    pending.resolve(admission);
+    await waitFor(async () => {
+      const state = await nativeLocks.query();
+      expect(state.held?.some(lock => lock.name === BROWSER_EXECUTION_LOCK)).toBe(false);
+    });
+    expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+    expect(store.get(settingsDialogOpenAtom)).toBe(true);
+  });
+
+  it('preserves an existing workflow reservation instead of replacing it and leaking its lease', async () => {
+    mockUseAgentWorkflows.mockReturnValue({ ...emptyResult, workflows: [approvedWorkflow] });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: true,
+    });
+    const admission = await getBrowserExecutionCoordinator().acquireLocal();
+    if (!admission.admitted) {
+      throw new Error(admission.reason);
+    }
+    heldLeases.add(admission.lease);
+    const request = { input: { size: 'small' }, workflowId: 'wf-1' };
+    reserveWorkflowLease(request, admission.lease, 'conversation-1');
+    store.set(workflowRunRequestAtom, request);
+    store.set(settingsDialogOpenAtom, true);
+    const view = render(createElement(WorkflowSettings), { wrapper: createWrapper(store) });
+    await waitFor(() => {
+      expect(view.getByLabelText('Run workflow "Order pizza"')).toHaveProperty('disabled', false);
+    });
+    fireEvent.click(view.getByLabelText('Run workflow "Order pizza"'));
+    await waitFor(() => {
+      expect(view.getByRole('status').textContent).toContain('workflow request');
+    });
+    expect(store.get(workflowRunRequestAtom)).toBe(request);
+    expect(store.get(settingsDialogOpenAtom)).toBe(true);
+    const reservation = takeWorkflowLease(request);
+    await reservation?.lease.release();
+    await waitFor(async () => {
+      const state = await nativeLocks.query();
+      expect(state.held?.some(lock => lock.name === BROWSER_EXECUTION_LOCK)).toBe(false);
+    });
+  });
+
+  it.each([
+    { parameters: false, phase: 'waiting' },
+    { parameters: false, phase: 'running' },
+    { parameters: true, phase: 'waiting' },
+    { parameters: true, phase: 'running' },
+  ])(
+    'retains Settings input when delegation is $phase (parameters=$parameters)',
+    async ({ parameters, phase }) => {
+      mockUseAgentWorkflows.mockReturnValue({
+        ...emptyResult,
+        workflows: [
+          {
+            ...approvedWorkflow,
+            ...(parameters
+              ? { params: [{ name: 'size', description: 'Pizza size', required: true }] }
+              : {}),
+          },
+        ],
+      });
+      mockLoadWorkflowSettings.mockResolvedValue({
+        ...DEFAULT_WORKFLOW_SETTINGS,
+        allowWorkflowsInSafeMode: true,
+      });
+      store.set(settingsDialogOpenAtom, true);
+      const coordinator = getBrowserExecutionCoordinator();
+      const ownerAdmission = await coordinator.acquireProviderOwner();
+      if (!ownerAdmission.admitted) {
+        throw new Error(ownerAdmission.reason);
+      }
+      heldLeases.add(ownerAdmission.lease);
+      const localAdmission = phase === 'waiting' ? await coordinator.acquireLocal() : undefined;
+      if (localAdmission?.admitted === true) {
+        heldLeases.add(localAdmission.lease);
+      }
+      const delegatedPromise = coordinator.acquireDelegated(
+        ownerAdmission.lease,
+        'parent-order',
+        new AbortController().signal
+      );
+      let delegated: BrowserExecutionLease | undefined;
+      if (phase === 'running') {
+        const admission = await delegatedPromise;
+        if (!admission.admitted) {
+          throw new Error(admission.reason);
+        }
+        delegated = admission.lease;
+        heldLeases.add(delegated);
+      } else {
+        await waitFor(async () => {
+          const state = await nativeLocks.query();
+          expect(state.pending).toHaveLength(1);
+        });
+      }
+      const view = render(createElement(WorkflowSettings), { wrapper: createWrapper(store) });
+      await waitFor(() => {
+        expect(view.getByLabelText('Run workflow "Order pizza"')).toHaveProperty('disabled', false);
+      });
+      fireEvent.click(view.getByLabelText('Run workflow "Order pizza"'));
+      if (parameters) {
+        fireEvent.change(view.getByRole('textbox'), { target: { value: 'large' } });
+        fireEvent.click(view.getByRole('button', { name: 'Run' }));
+        await waitFor(() => {
+          expect(view.getByRole('alert').textContent).toContain('parent-order');
+        });
+        expect(view.getByDisplayValue('large')).toBeDefined();
+        expect(view.getByRole('dialog')).toBeDefined();
+      } else {
+        await waitFor(() => {
+          expect(view.getByRole('status').textContent).toContain('parent-order');
+        });
+      }
+      expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+      expect(store.get(settingsDialogOpenAtom)).toBe(true);
+      if (localAdmission?.admitted === true) {
+        await localAdmission.lease.release();
+      }
+      if (delegated === undefined) {
+        const admission = await delegatedPromise;
+        if (!admission.admitted) {
+          throw new Error(admission.reason);
+        }
+        delegated = admission.lease;
+        heldLeases.add(delegated);
+      }
+      const delegatedLease = delegated;
+      await act(async () => {
+        await delegatedLease.release();
+        await coordinator.refresh();
+      });
+      expect(view.getByRole('status').textContent).not.toContain('parent-order');
+      expect(view.getByRole('status').textContent).toMatch(/input is retained.*Run it again/u);
+      if (parameters) {
+        expect(view.getByRole('alert').textContent).not.toContain('parent-order');
+        expect(view.getByDisplayValue('large')).toBeDefined();
+      }
+      expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+      fireEvent.click(
+        parameters
+          ? view.getByRole('button', { name: 'Run' })
+          : view.getByLabelText('Run workflow "Order pizza"')
+      );
+      await waitFor(() => {
+        expect(store.get(workflowRunRequestAtom)).toStrictEqual({
+          workflowId: 'wf-1',
+          ...(parameters ? { input: { size: 'large' } } : {}),
+        });
+        expect(store.get(settingsDialogOpenAtom)).toBe(false);
+        expect(view.queryByRole('dialog')).toBeNull();
+      });
+    }
+  );
 
   it('sets the toggle on click and persists the change', async () => {
     mockUseAgentWorkflows.mockReturnValue(emptyResult);

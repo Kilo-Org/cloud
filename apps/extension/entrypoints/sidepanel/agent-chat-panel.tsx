@@ -2,7 +2,7 @@
 import { browser, storage } from '#imports';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { getDefaultStore, useAtomValue, useSetAtom, useStore } from 'jotai';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { AlertTriangle } from 'lucide-react';
 import {
   compactingConversationIdsAtom,
@@ -22,7 +22,6 @@ import {
 } from './agent-message-queue';
 import {
   createAssistantMessage,
-  createToolResult,
   createUserMessage,
   createWorkflowToolCall,
   groupConversationEvents,
@@ -60,14 +59,20 @@ import {
 } from './agent-conversation-storage';
 import { AgentFooterControls } from './agent-footer-controls';
 import { ContextDonut } from './context-donut';
-import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
-import { createWorkflowToolDefinitions } from '@/src/shared/agent-llm-harness';
+import {
+  getBrowserExecutionCoordinator,
+  QUARANTINE_MESSAGE,
+  useBrowserExecutionSnapshot,
+} from './browser-execution-lock';
+import type { BrowserExecutionLease } from './browser-execution-lock';
+import { runBrowserTurn, runBrowserWorkflow, takeWorkflowLease } from './browser-run-context';
+import type { BrowserRunContext } from './browser-run-context';
+import { ExecutionStoppedError } from '@/src/shared/agent-tool-results';
+import type { WorkflowRunRequest } from './workflow-settings-state';
 import { formatAgentWorkflowIndex } from '@/src/shared/agent-workflows';
 import type { AgentWorkflow } from '@/src/shared/agent-workflows';
 import { loadWorkflowSettings } from '@/src/shared/agent-workflows-storage';
 import { loadWebMcpSettings } from '@/src/shared/web-mcp-settings';
-import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
-import { evalInTab, getTabUrl, navigateTab } from './agent-workflow-runtime';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
 import { addSessionCost } from '@/src/shared/session-cost';
 import { getActiveTabId, useTabDebugger } from './use-tab-debugger';
@@ -77,10 +82,7 @@ import { MessageComposer } from './message-composer';
 import { ConversationHistoryButton } from './conversation-history-button';
 import { useGatewayModels } from './use-gateway-models';
 import { loadRemoteMcpStore } from '@/src/shared/remote-mcp-storage';
-import { buildRemoteMcpToolDefinitions } from '@/src/shared/remote-mcp-tools';
 import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
-import { toRemoteMcpToolCallEvents } from './agent-tool-call-events';
-import { executeRemoteMcpToolCall } from './agent-remote-mcp-tool-runtime';
 import { useAgentMemories } from './use-agent-memories';
 import { useAgentWorkflows } from './use-agent-workflows';
 import type { AgentMemory } from '@/src/shared/agent-memories';
@@ -89,12 +91,12 @@ import { requestApproval } from './pending-approval';
 import { workflowRunRequestAtom } from './workflow-settings-state';
 import { activeConversationIdAtom, conversationModeAtom } from './settings-dialog-state';
 import { sanitizeTabContextText, sanitizeTabContextUrl } from '@/src/shared/tab-context-sanitize';
-import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
 
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
 const emptyDefaultConversationEvents = (): AgentConversationEvent[] => [];
+const recoveryGuidance = 'Browser execution stopped. Submit new work explicitly after recovery.';
 
 interface ConversationRunState {
   readonly abort: AbortController;
@@ -183,6 +185,17 @@ export const AgentChatPanel = ({
   const workflowsRef = useRef(workflows);
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
+  const execution = useBrowserExecutionSnapshot();
+  const [admissionBlocker, setAdmissionBlocker] = useState<string>();
+  const mountedRef = useRef(true);
+  const pendingAdmissionsRef = useRef(new Set<string>());
+  const admissionControllersRef = useRef(new Map<string, AbortController>());
+  const pausedQueuesRef = useRef(new Set<string>());
+  const [pausedQueueIds, setPausedQueueIds] = useState<string[]>([]);
+  // eslint-disable-next-line unicorn/no-useless-undefined -- React 19 requires an initial ref value.
+  const blockedWorkflowRef = useRef<WorkflowRunRequest | undefined>(undefined);
+  const processingWorkflowsRef = useRef(new Map<WorkflowRunRequest, string>());
+  const [workflowResume, setWorkflowResume] = useState(0);
   const [remoteMcpToolWarning, setRemoteMcpToolWarning] = useState<string>();
   const [pendingCreateDefaultConversationId, setPendingCreateDefaultConversationId] = useState<
     string | undefined
@@ -227,6 +240,7 @@ export const AgentChatPanel = ({
   const activePromptTokens = activeUsage?.promptTokens ?? 0;
   const activeSessionCostUsd = useAtomValue(sessionCostAtomFamily(activeConversationId));
   const streamingMessageId = useAtomValue(streamingMessageIdAtomFamily(activeConversationId));
+  const activeQueuedMessage = useAtomValue(queuedMessageAtomFamily(activeConversationId));
   const contextLength = selectedModel?.contextLength;
 
   // Wire the settings-dialog outreach atoms so WorkflowSettings can read the
@@ -353,14 +367,29 @@ export const AgentChatPanel = ({
   memoriesRef.current = memories;
   workflowsRef.current = workflows;
 
-  useEffect(
-    () => () => {
-      for (const runState of runStatesRef.current.values()) {
+  useEffect(() => {
+    mountedRef.current = true;
+    const runs = runStatesRef.current;
+    const admissions = admissionControllersRef.current;
+    return () => {
+      mountedRef.current = false;
+      for (const controller of admissions.values()) {
+        controller.abort();
+      }
+      admissions.clear();
+      for (const runState of runs.values()) {
         runState.abort.abort();
       }
-    },
-    []
-  );
+      const request = store.get(workflowRunRequestAtom);
+      if (request !== undefined) {
+        store.set(workflowRunRequestAtom, undefined);
+        const reservation = takeWorkflowLease(request);
+        if (reservation !== undefined) {
+          void reservation.lease.release();
+        }
+      }
+    };
+  }, [store]);
 
   useEffect(() => {
     let cancelled = false;
@@ -542,6 +571,8 @@ export const AgentChatPanel = ({
 
   interface RunState {
     readonly abort: AbortController;
+    readonly lease: BrowserExecutionLease;
+    readonly selectedTabId: number;
     readonly runToken: number;
     readonly isCurrentRun: () => boolean;
     readonly appendRunEvents: (events: AgentConversationEvent[]) => void;
@@ -551,7 +582,12 @@ export const AgentChatPanel = ({
     readonly currentRunHasUsage: () => boolean;
   }
 
-  const createRunState = (conversationId: string, runSelectedTabId: number): RunState => {
+  const createRunState = (
+    conversationId: string,
+    runSelectedTabId: number,
+    lease: BrowserExecutionLease
+  ): RunState => {
+    lease.guard();
     const abort = new AbortController();
     const runToken = (runTokenRef.current += 1);
     const isCurrentRun = (): boolean =>
@@ -599,406 +635,513 @@ export const AgentChatPanel = ({
       appendRunEvents,
       currentRunHasUsage,
       isCurrentRun,
+      lease,
       runToken,
+      selectedTabId: runSelectedTabId,
       updateRunAssistantMessage,
       updateRunThinkingBlock,
       updateRunUsage,
     };
   };
 
-  const startTurn = async (
-    conversationId: string,
-    conversationEventsForGateway: AgentConversationEvent[],
-    runState: RunState
-  ): Promise<void> => {
-    const cleanupRun = (): void => {
-      if (!runState.isCurrentRun()) {
-        return;
-      }
-
-      store.set(streamingMessageIdAtomFamily(conversationId), undefined);
-      runStatesRef.current.delete(conversationId);
-      setRunningConversationIds(currentIds =>
-        currentIds.filter(currentId => currentId !== conversationId)
-      );
-    };
-
-    const conversation = conversationStoreRef.current.conversations.find(
-      candidate => candidate.id === conversationId
-    );
-    if (conversation === undefined) {
-      cleanupRun();
-      return;
-    }
-
-    const runMode = conversation.mode ?? defaultMode;
-    const runModel = conversation.model ?? '';
-    const runSelectedModel = modelOptions.find(option => option.id === runModel);
-    const runThinkingOptions = runSelectedModel?.variants ?? [];
-    const runThinkingEffort = conversation.thinkingEffort ?? runThinkingOptions[0] ?? '';
-    const runStateEntry = runStatesRef.current.get(conversationId);
-    if (runStateEntry === undefined) {
-      cleanupRun();
-      return;
-    }
-    const runSelectedTabId = runStateEntry.selectedTabId;
-    const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
-
+  const finishRun = async (conversationId: string, runState: RunState): Promise<void> => {
     try {
-      const remoteMcpServers = store.get(remoteMcpStoreAtom).servers;
-      const {
-        routes: remoteMcpRoutes,
-        tools: remoteMcpTools,
-        warning: remoteMcpWarning,
-      } = buildRemoteMcpToolDefinitions({ mode: runMode, servers: remoteMcpServers });
-      setRemoteMcpToolWarning(remoteMcpWarning);
-
-      const settings = await loadWorkflowSettings(storage);
-      if (!runState.isCurrentRun() || runState.abort.signal.aborted) {
-        return;
-      }
-
-      let allowWebMcpInSafeMode = false;
-      try {
-        ({ allowWebMcpInSafeMode } = await loadWebMcpSettings(storage));
-      } catch {
-        allowWebMcpInSafeMode = false;
-      }
-
-      const { allowWorkflowsInSafeMode } = settings;
-      const workflowTools = createWorkflowToolDefinitions({
-        allowWorkflows: allowWorkflowsInSafeMode,
-        mode: runMode,
-      });
-      const runTurn = runMode === 'dangerous' ? runDangerousLlmTurn : runSafeLlmTurn;
-
-      captureEvent(MESSAGE_SENT_EVENT, { mode: runMode });
-      await runTurn({
-        allowWebMcpInSafeMode,
-        apiBaseUrl,
-        appendEvents: runState.appendRunEvents,
-        conversationEvents: conversationEventsForGateway,
-        executeRemoteMcpToolCall: event =>
-          executeRemoteMcpToolCall({
-            event,
-            fetch: globalThis.fetch,
-            routes: remoteMcpRoutes,
-            servers: remoteMcpServers,
-            signal: runState.abort.signal,
-            storageArea: storage,
-          }),
-        fetch: fetchFromWindow,
-        maxToolRounds: maxAgentToolRounds,
-        model: runModel,
-        onAssistantStreaming: eventId => {
-          if (runState.isCurrentRun()) {
-            store.set(streamingMessageIdAtomFamily(conversationId), eventId);
-          }
-        },
-        onUsage: runState.updateRunUsage,
-        organizationId,
-        remoteMcpTools,
-        selectedTabId: runSelectedTabId,
-        signal: runState.abort.signal,
-        supportsImages: runSelectedModel?.supportsImages === true,
-        thinkingEffort: runThinkingEffort,
-        toRemoteMcpToolCallEvents: toolCalls =>
-          toRemoteMcpToolCallEvents(toolCalls, remoteMcpRoutes),
-        token: auth.token,
-        updateAssistantMessage: runState.updateRunAssistantMessage,
-        updateThinkingBlock: runState.updateRunThinkingBlock,
-        workflowToolContext: {
-          allowWorkflowsInSafeMode,
-          evalInTab,
-          getTabUrl,
-          mode: runMode,
-          navigateTab,
-          requestApproval: (kind, draft) =>
-            requestApproval(storage, kind, draft, runState.abort.signal),
-          selectedTabId: runSelectedTabId,
-          selectedTabTitle: selectedTab?.title ?? '',
-          selectedTabUrl: selectedTab?.url ?? '',
-          signal: runState.abort.signal,
-          storage,
-        },
-        workflowTools,
-      });
-    } finally {
-      if (runState.isCurrentRun()) {
-        const latest = store.get(contextUsageAtomFamily(conversationId))?.promptTokens ?? 0;
-        const runContextLength = modelOptions.find(option => option.id === runModel)?.contextLength;
-        const ratio = getContextRatio(latest, runContextLength);
-
-        // Clean up the run state first so compactConversation's running-conversation check passes.
-        cleanupRun();
-
-        // A stopped or aborted run drops its pending message. A clean end leaves it for the
-        // Drain effect, which runs after this run's last events are committed to the store.
-        if (
-          !shouldSendQueuedMessage({
-            aborted: runState.abort.signal.aborted,
-            queued: store.get(queuedMessageAtomFamily(conversationId)),
-          })
-        ) {
-          store.set(queuedMessageAtomFamily(conversationId), undefined);
-        }
-
-        if (runState.currentRunHasUsage() && ratio !== undefined && ratio >= AUTO_COMPACT_RATIO) {
-          void compactConversation(conversationId);
-        }
-      }
+      await runState.lease.release();
+    } catch {
+      setAdmissionBlocker(recoveryGuidance);
+    }
+    if (!runState.isCurrentRun()) {
+      return;
+    }
+    const conversation = conversationStoreRef.current.conversations.find(
+      item => item.id === conversationId
+    );
+    const latest = store.get(contextUsageAtomFamily(conversationId))?.promptTokens ?? 0;
+    const ratio = getContextRatio(
+      latest,
+      modelOptions.find(option => option.id === conversation?.model)?.contextLength
+    );
+    store.set(streamingMessageIdAtomFamily(conversationId), undefined);
+    runStatesRef.current.delete(conversationId);
+    setRunningConversationIds(current => current.filter(id => id !== conversationId));
+    if (
+      !shouldSendQueuedMessage({
+        aborted: runState.abort.signal.aborted,
+        queued: store.get(queuedMessageAtomFamily(conversationId)),
+      })
+    ) {
+      store.set(queuedMessageAtomFamily(conversationId), undefined);
+    }
+    if (runState.currentRunHasUsage() && ratio !== undefined && ratio >= AUTO_COMPACT_RATIO) {
+      void compactConversation(conversationId);
     }
   };
 
-  const submitMessage = (conversationId: string, text: string): void => {
+  const setupRunContext = async (
+    conversationId: string,
+    runState: RunState
+  ): Promise<BrowserRunContext> => {
+    const conversation = conversationStoreRef.current.conversations.find(
+      item => item.id === conversationId
+    );
+    const selectedTab = inspectableTabsRef.current.find(tab => tab.id === runState.selectedTabId);
+    if (conversation === undefined || selectedTab === undefined) {
+      throw new ExecutionStoppedError('tab_lost');
+    }
+    const runModel = conversation.model ?? '';
+    const runSelectedModel = modelOptions.find(option => option.id === runModel);
+    const remoteMcpServers = store.get(remoteMcpStoreAtom).servers;
+    const settings = await loadWorkflowSettings(storage);
+    let allowWebMcpInSafeMode = false;
+    try {
+      ({ allowWebMcpInSafeMode } = await loadWebMcpSettings(storage));
+    } catch {
+      allowWebMcpInSafeMode = false;
+    }
+    return {
+      abort: runState.abort,
+      allowTabFallback: false,
+      allowWebMcpInSafeMode,
+      apiBaseUrl,
+      appendEvents: runState.appendRunEvents,
+      executionGuard: () => {
+        if (!runState.isCurrentRun()) {
+          throw new ExecutionStoppedError('run_replaced');
+        }
+        if (!inspectableTabsRef.current.some(tab => tab.id === runState.selectedTabId)) {
+          throw new ExecutionStoppedError('tab_lost');
+        }
+      },
+      fetch: fetchFromWindow,
+      lease: runState.lease,
+      mode: conversation.mode ?? defaultMode,
+      model: runModel,
+      onAssistantStreaming: eventId => {
+        if (runState.isCurrentRun()) {
+          store.set(streamingMessageIdAtomFamily(conversationId), eventId);
+        }
+      },
+      onRemoteMcpWarning: setRemoteMcpToolWarning,
+      onUsage: runState.updateRunUsage,
+      organizationId,
+      remoteFetch: globalThis.fetch,
+      remoteMcpServers,
+      requestApproval: (kind, draft) =>
+        requestApproval(storage, kind, draft, runState.abort.signal),
+      selectedTab,
+      settings,
+      storage,
+      supportsImages: runSelectedModel?.supportsImages === true,
+      thinkingEffort: conversation.thinkingEffort ?? runSelectedModel?.variants[0] ?? '',
+      token: auth.token,
+      updateAssistantMessage: runState.updateRunAssistantMessage,
+      updateThinkingBlock: runState.updateRunThinkingBlock,
+    };
+  };
+
+  // eslint-disable-next-line max-params -- Workflow continuation reuses the prepared context and existing run state.
+  const startTurn = async (
+    conversationId: string,
+    conversationEvents: AgentConversationEvent[],
+    runState: RunState,
+    preparedContext?: BrowserRunContext
+  ): Promise<void> => {
+    try {
+      const context = preparedContext ?? (await setupRunContext(conversationId, runState));
+      captureEvent(MESSAGE_SENT_EVENT, { mode: context.mode });
+      const outcome = await runBrowserTurn(context, conversationEvents);
+      if (outcome.effectsUncertain) {
+        setAdmissionBlocker(recoveryGuidance);
+      }
+    } catch (error) {
+      runState.appendRunEvents([
+        createAssistantMessage(
+          error instanceof Error
+            ? `Interrupted: ${error.message}`
+            : 'Browser execution was interrupted.'
+        ),
+      ]);
+    } finally {
+      await finishRun(conversationId, runState);
+    }
+  };
+
+  const getConversationSelectedTabId = (conversationId: string): number | undefined => {
     const conversation = conversationStoreRef.current.conversations.find(
       candidate => candidate.id === conversationId
     );
+    return conversation === undefined
+      ? undefined
+      : getSelectedInspectableTabId({
+          activeTabId,
+          inspectableTabs: inspectableTabsRef.current,
+          selectedTabId: conversation.selectedTabId,
+        });
+  };
 
-    if (conversation === undefined) {
-      return;
+  const isTabOpen = async (tabId: number | undefined): Promise<boolean> => {
+    if (tabId === undefined) {
+      return false;
     }
+    try {
+      // The tab list can lag behind a closure while admission is pending.
+      await browser.tabs.get(tabId);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
-    const conversationEvents = conversation.events;
+  const submitMessage = (
+    conversationId: string,
+    text: string,
+    lease: BrowserExecutionLease
+  ): boolean => {
+    lease.guard();
+    const conversation = conversationStoreRef.current.conversations.find(
+      candidate => candidate.id === conversationId
+    );
+    if (
+      conversation === undefined ||
+      store.get(runningConversationIdsAtom).includes(conversationId) ||
+      store.get(compactingConversationIdsAtom).includes(conversationId) ||
+      !isModelInCatalog(conversation.model ?? '')
+    ) {
+      return false;
+    }
     const runSelectedTabId = getSelectedInspectableTabId({
       activeTabId,
-      inspectableTabs,
+      inspectableTabs: inspectableTabsRef.current,
       selectedTabId: conversation.selectedTabId,
     });
-    const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
+    if (runSelectedTabId === undefined) {
+      setAdmissionBlocker('Pick a target tab first. Your message has not been sent.');
+      return false;
+    }
+    const selectedTab = inspectableTabsRef.current.find(tab => tab.id === runSelectedTabId);
     const userEvent = createUserMessage(
       text,
       formatSystemEnvironment({
         memories: memoriesRef.current,
-        selectedTab:
-          selectedTab === undefined
-            ? undefined
-            : { title: selectedTab.title, url: selectedTab.url },
+        selectedTab,
         workflows: workflowsRef.current,
       })
     );
-    const conversationWithUserMessage = [...conversationEvents, userEvent];
-
+    const runState = createRunState(conversationId, runSelectedTabId, lease);
     appendEvents(conversationId, [userEvent]);
-
-    if (runSelectedTabId === undefined) {
-      appendEvents(conversationId, [createAssistantMessage('Pick a target tab first.')]);
-      return;
-    }
-
-    const runState = createRunState(conversationId, runSelectedTabId);
-
-    void startTurn(conversationId, conversationWithUserMessage, runState);
+    void startTurn(conversationId, [...conversation.events, userEvent], runState);
+    return true;
   };
 
-  const submitDraft = (): void => {
-    const text = store.get(draftAtomFamily(activeConversationId)).trim();
-    const conversation = getActiveStoredConversation(conversationStoreRef.current);
-    const action = resolveSendAction({
-      hasModel: isModelInCatalog(conversation.model ?? ''),
-      hasTargetTab:
-        getSelectedInspectableTabId({
-          activeTabId,
-          inspectableTabs,
-          selectedTabId: conversation.selectedTabId,
-        }) !== undefined,
-      isCompacting: store.get(compactingConversationIdsAtom).includes(conversation.id),
-      isRunning: store.get(runningConversationIdsAtom).includes(conversation.id),
-      isStoreLoaded: isConversationStoreLoaded,
-      text,
-    });
+  const getAdmissionSignal = (conversationId: string): AbortSignal => {
+    let controller = admissionControllersRef.current.get(conversationId);
+    if (controller === undefined) {
+      controller = new AbortController();
+      admissionControllersRef.current.set(conversationId, controller);
+    }
+    return controller.signal;
+  };
+  const isAdmissionCurrent = (conversationId: string, signal: AbortSignal): boolean =>
+    mountedRef.current &&
+    !signal.aborted &&
+    isStoredConversationOpen(conversationStoreRef.current, conversationId);
+  const cancelConversationAdmissions = useCallback(
+    (conversationId: string): void => {
+      admissionControllersRef.current.get(conversationId)?.abort();
+      admissionControllersRef.current.delete(conversationId);
+      const request = store.get(workflowRunRequestAtom);
+      if (request !== undefined && processingWorkflowsRef.current.get(request) === conversationId) {
+        store.set(workflowRunRequestAtom, undefined);
+      }
+    },
+    [store]
+  );
 
-    if (action === 'ignore') {
+  const submitDraft = async (): Promise<void> => {
+    const conversationId = conversationStoreRef.current.activeConversationId;
+    const rawDraft = store.get(draftAtomFamily(conversationId));
+    const text = rawDraft.trim();
+    if (text === '' || pendingAdmissionsRef.current.has(conversationId)) {
       return;
     }
-
-    store.set(draftAtomFamily(activeConversationId), '');
-
-    // A send during a run queues one pending message for the next turn.
-    if (action === 'queue') {
-      store.set(queuedMessageAtomFamily(conversation.id), current =>
-        appendQueuedMessage(current, text)
+    const submittedTabId = getConversationSelectedTabId(conversationId);
+    const signal = getAdmissionSignal(conversationId);
+    pendingAdmissionsRef.current.add(conversationId);
+    let lease: BrowserExecutionLease | undefined = undefined;
+    let handedOff = false;
+    try {
+      const admission = await getBrowserExecutionCoordinator().acquireLocal();
+      lease = admission.admitted ? admission.lease : undefined;
+      const targetExists = lease !== undefined && (await isTabOpen(submittedTabId));
+      if (!isAdmissionCurrent(conversationId, signal)) {
+        return;
+      }
+      if (
+        lease === undefined ||
+        !targetExists ||
+        getConversationSelectedTabId(conversationId) !== submittedTabId
+      ) {
+        setAdmissionBlocker(
+          lease === undefined
+            ? 'Your message is retained. Submit it again when browser control is available.'
+            : 'The target tab changed or closed. Your message is retained. Select a target tab and submit again.'
+        );
+        return;
+      }
+      lease.guard();
+      const conversation = conversationStoreRef.current.conversations.find(
+        candidate => candidate.id === conversationId
       );
+      if (conversation === undefined) {
+        return;
+      }
+      const action = resolveSendAction({
+        hasModel: isModelInCatalog(conversation.model ?? ''),
+        hasTargetTab: submittedTabId !== undefined,
+        isCompacting: store.get(compactingConversationIdsAtom).includes(conversationId),
+        isRunning: store.get(runningConversationIdsAtom).includes(conversationId),
+        isStoreLoaded: isConversationStoreLoaded,
+        text,
+      });
+      if (action === 'ignore') {
+        return;
+      }
+      if (action === 'queue') {
+        store.set(queuedMessageAtomFamily(conversationId), current =>
+          appendQueuedMessage(current, text)
+        );
+      } else {
+        handedOff = submitMessage(conversationId, text, lease);
+        if (!handedOff) {
+          return;
+        }
+      }
+      setAdmissionBlocker(undefined);
+      if (store.get(draftAtomFamily(conversationId)) === rawDraft) {
+        store.set(draftAtomFamily(conversationId), '');
+      }
+    } catch (error) {
+      if (isAdmissionCurrent(conversationId, signal)) {
+        setAdmissionBlocker(
+          error instanceof Error ? error.message : 'Browser admission stopped. Submit again.'
+        );
+      }
+    } finally {
+      pendingAdmissionsRef.current.delete(conversationId);
+      if (lease !== undefined && !handedOff) {
+        await lease.release();
+      }
+    }
+  };
+
+  const submitQueuedMessage = async (conversationId: string): Promise<void> => {
+    if (pendingAdmissionsRef.current.has(conversationId)) {
       return;
     }
-
-    submitMessage(conversation.id, text);
+    const queued = store.get(queuedMessageAtomFamily(conversationId));
+    if (queued === undefined) {
+      return;
+    }
+    const submittedTabId = getConversationSelectedTabId(conversationId);
+    const signal = getAdmissionSignal(conversationId);
+    pendingAdmissionsRef.current.add(conversationId);
+    let lease: BrowserExecutionLease | undefined = undefined;
+    let handedOff = false;
+    try {
+      const admission = await getBrowserExecutionCoordinator().acquireLocal();
+      lease = admission.admitted ? admission.lease : undefined;
+      const targetExists = lease !== undefined && (await isTabOpen(submittedTabId));
+      if (
+        !isAdmissionCurrent(conversationId, signal) ||
+        store.get(queuedMessageAtomFamily(conversationId)) !== queued
+      ) {
+        return;
+      }
+      if (
+        lease === undefined ||
+        !targetExists ||
+        getConversationSelectedTabId(conversationId) !== submittedTabId
+      ) {
+        pausedQueuesRef.current.add(conversationId);
+        setPausedQueueIds([...pausedQueuesRef.current]);
+        setAdmissionBlocker(
+          lease === undefined
+            ? 'Your queued message is retained. Use Resume queued message when browser control is available.'
+            : 'The target tab changed or closed. Your queued message is retained. Select a target tab and use Resume queued message.'
+        );
+        return;
+      }
+      handedOff = submitMessage(conversationId, queued, lease);
+      if (handedOff) {
+        store.set(queuedMessageAtomFamily(conversationId), undefined);
+        pausedQueuesRef.current.delete(conversationId);
+        setPausedQueueIds([...pausedQueuesRef.current]);
+        setAdmissionBlocker(undefined);
+      }
+    } catch (error) {
+      if (isAdmissionCurrent(conversationId, signal)) {
+        pausedQueuesRef.current.add(conversationId);
+        setPausedQueueIds([...pausedQueuesRef.current]);
+        setAdmissionBlocker(
+          error instanceof Error ? error.message : 'Browser admission stopped. Resume explicitly.'
+        );
+      }
+    } finally {
+      pendingAdmissionsRef.current.delete(conversationId);
+      if (lease !== undefined && !handedOff) {
+        await lease.release();
+      }
+    }
   };
 
   const stopRun = (): void => {
+    cancelConversationAdmissions(activeConversationId);
     runStatesRef.current.get(activeConversationId)?.abort.abort();
   };
 
   const workflowRunRequest = useAtomValue(workflowRunRequestAtom);
 
   useEffect(() => {
-    if (workflowRunRequest === undefined) {
+    if (
+      workflowRunRequest === undefined ||
+      blockedWorkflowRef.current === workflowRunRequest ||
+      processingWorkflowsRef.current.has(workflowRunRequest)
+    ) {
       return;
     }
     const request = workflowRunRequest;
-
+    const reservation = takeWorkflowLease(request);
+    const conversationId = reservation?.conversationId ?? activeConversationId;
+    const runSelectedTabId = getConversationSelectedTabId(conversationId);
+    const signal = getAdmissionSignal(conversationId);
+    processingWorkflowsRef.current.set(request, conversationId);
     void (async (): Promise<void> => {
-      // Clear the request first so a re-render cannot double-fire.
-      getDefaultStore().set(workflowRunRequestAtom, undefined);
-
-      const conversation = conversationStoreRef.current.conversations.find(
-        candidate => candidate.id === activeConversationId
-      );
-      if (conversation === undefined) {
-        return;
-      }
-      const conversationId = conversation.id;
-      const runModel = conversation.model ?? '';
-      const runSelectedTabId = getSelectedInspectableTabId({
-        activeTabId,
-        inspectableTabs,
-        selectedTabId: conversation.selectedTabId,
-      });
-
-      // Preflight gates match run button disabled states — fail silently.
-      const isCompactingNow = store.get(compactingConversationIdsAtom).includes(conversationId);
-      const isRunningNow = store.get(runningConversationIdsAtom).includes(conversationId);
-
-      if (
-        !isConversationStoreLoaded ||
-        !isModelInCatalog(runModel) ||
-        isCompactingNow ||
-        isRunningNow
-      ) {
-        return;
-      }
-
-      if (runSelectedTabId === undefined) {
-        appendEvents(conversationId, [createAssistantMessage('Pick a target tab first.')]);
-        return;
-      }
-
-      const runState = createRunState(conversationId, runSelectedTabId);
-
-      // Clean up the run state whenever the runner exits before calling startTurn.
-      const cleanupUnstartedRun = (): void => {
-        if (!runState.isCurrentRun()) {
+      let lease = reservation?.lease;
+      let runState: RunState | undefined = undefined;
+      try {
+        if (lease === undefined) {
+          // Old UI callers publish only workflowId/input. Remove this admission fallback after all request writers reserve a lease.
+          const admission = await getBrowserExecutionCoordinator().acquireLocal();
+          lease = admission.admitted ? admission.lease : undefined;
+        }
+        const targetExists = lease !== undefined && (await isTabOpen(runSelectedTabId));
+        if (!isAdmissionCurrent(conversationId, signal)) {
+          if (store.get(workflowRunRequestAtom) === request) {
+            store.set(workflowRunRequestAtom, undefined);
+          }
           return;
         }
-
-        runStatesRef.current.delete(conversationId);
-        setRunningConversationIds(currentIds =>
-          currentIds.filter(currentId => currentId !== conversationId)
+        if (store.get(workflowRunRequestAtom) !== request) {
+          return;
+        }
+        if (lease === undefined) {
+          blockedWorkflowRef.current = request;
+          setAdmissionBlocker(
+            'Workflow input is retained. Use Resume workflow when browser control is available.'
+          );
+          return;
+        }
+        lease.guard();
+        // Admission can finish after a competing send or compaction. Recheck before consuming input.
+        const conversation = conversationStoreRef.current.conversations.find(
+          candidate => candidate.id === conversationId
         );
-        store.set(streamingMessageIdAtomFamily(conversationId), undefined);
-
-        // Same rule as startTurn's finally: an aborted run drops its pending message.
         if (
-          !shouldSendQueuedMessage({
-            aborted: runState.abort.signal.aborted,
-            queued: store.get(queuedMessageAtomFamily(conversationId)),
-          })
+          conversation === undefined ||
+          !isConversationStoreLoaded ||
+          !isModelInCatalog(conversation.model ?? '') ||
+          runSelectedTabId === undefined ||
+          !targetExists ||
+          getConversationSelectedTabId(conversationId) !== runSelectedTabId ||
+          store.get(compactingConversationIdsAtom).includes(conversationId) ||
+          store.get(runningConversationIdsAtom).includes(conversationId)
         ) {
-          store.set(queuedMessageAtomFamily(conversationId), undefined);
+          blockedWorkflowRef.current = request;
+          setAdmissionBlocker(
+            'Workflow input is retained. Select an available conversation, model, and target tab, then resume the workflow.'
+          );
+          return;
         }
-      };
-
-      // Build user message with system environment including workflows index.
-      const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
-      const workflow = workflows.find(wf => wf.id === request.workflowId);
-      const workflowName = workflow?.name ?? 'workflow';
-      const userEvent = createUserMessage(
-        `Run the workflow "${workflowName}".`,
-        formatSystemEnvironment({
-          memories: memoriesRef.current,
-          selectedTab:
-            selectedTab === undefined
-              ? undefined
-              : { title: selectedTab.title, url: selectedTab.url },
-          workflows: workflows,
-        })
-      );
-      appendEvents(conversationId, [userEvent]);
-
-      if (runState.abort.signal.aborted) {
-        cleanupUnstartedRun();
-        return;
-      }
-
-      // Execute the workflow as a tool call and append the result.
-      const toolCall = createWorkflowToolCall({
-        arguments: {
-          workflowId: request.workflowId,
-          ...(request.input === undefined ? {} : { input: request.input }),
-        },
-        name: 'run_workflow',
-        tabId: runSelectedTabId,
-      });
-
-      // eslint-disable-next-line init-declarations -- assigned in try block before any use; catch path returns.
-      let result: Awaited<ReturnType<typeof executeWorkflowToolCall>>;
-      try {
-        const settings = await loadWorkflowSettings(storage);
-        const runMode = conversation.mode ?? defaultMode;
-        result = await executeWorkflowToolCall(toolCall, {
-          allowWorkflowsInSafeMode: settings.allowWorkflowsInSafeMode,
-          evalInTab: (tabId, code) => evalInTab(tabId, code),
-          getTabUrl: tabId => getTabUrl(tabId),
-          mode: runMode,
-          navigateTab: (tabId, url) => navigateTab(tabId, url),
-          requestApproval: (kind, draft) =>
-            requestApproval(storage, kind, draft, runState.abort.signal),
-          selectedTabId: runSelectedTabId,
-          selectedTabTitle: selectedTab?.title ?? '',
-          selectedTabUrl: selectedTab?.url ?? '',
-          signal: runState.abort.signal,
-          storage,
+        // Consume only after admission; keep the same lease through workflow and model continuation.
+        store.set(workflowRunRequestAtom, undefined);
+        setAdmissionBlocker(undefined);
+        runState = createRunState(conversationId, runSelectedTabId, lease);
+        const selectedTab = inspectableTabsRef.current.find(tab => tab.id === runSelectedTabId);
+        const workflowName =
+          workflowsRef.current.find(workflow => workflow.id === request.workflowId)?.name ??
+          'workflow';
+        const userEvent = createUserMessage(
+          `Run the workflow "${workflowName}".`,
+          formatSystemEnvironment({
+            memories: memoriesRef.current,
+            selectedTab,
+            workflows: workflowsRef.current,
+          })
+        );
+        appendEvents(conversationId, [userEvent]);
+        const context = await setupRunContext(conversationId, runState);
+        const toolCall = createWorkflowToolCall({
+          arguments: {
+            workflowId: request.workflowId,
+            ...(request.input === undefined ? {} : { input: request.input }),
+          },
+          name: 'run_workflow',
+          tabId: runSelectedTabId,
         });
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (runState.isCurrentRun()) {
-          appendEvents(conversationId, [
-            toolCall,
-            createToolResult({
-              error: errorMessage,
-              ok: false,
-              toolCallId: toolCall.id,
-            }),
-          ]);
+        const outcome = await runBrowserWorkflow(context, toolCall);
+        runState.appendRunEvents(outcome.events);
+        if (outcome.effectsUncertain) {
+          setAdmissionBlocker(recoveryGuidance);
+          runState.appendRunEvents([createAssistantMessage(QUARANTINE_MESSAGE)]);
+          return;
         }
-        cleanupUnstartedRun();
-        return;
+        if (
+          outcome.status === 'interrupted' ||
+          outcome.status === 'cancelled' ||
+          runState.abort.signal.aborted ||
+          !runState.isCurrentRun()
+        ) {
+          return;
+        }
+        await startTurn(
+          conversationId,
+          [...conversation.events, userEvent, ...outcome.events],
+          runState,
+          context
+        );
+      } catch (error) {
+        if (
+          !isAdmissionCurrent(conversationId, signal) ||
+          (runState === undefined && store.get(workflowRunRequestAtom) !== request)
+        ) {
+          return;
+        }
+        if (store.get(workflowRunRequestAtom) === request) {
+          blockedWorkflowRef.current = request;
+        }
+        setAdmissionBlocker(
+          error instanceof Error
+            ? `Interrupted: ${error.message}`
+            : 'Workflow execution was interrupted.'
+        );
+      } finally {
+        processingWorkflowsRef.current.delete(request);
+        if (runState !== undefined) {
+          await finishRun(conversationId, runState);
+        } else if (lease !== undefined) {
+          await lease.release();
+        }
       }
-
-      if (!runState.isCurrentRun()) {
-        return;
-      }
-
-      const resultEvent = createToolResult({
-        ok: result.ok,
-        toolCallId: toolCall.id,
-        ...(result.ok ? { value: result.value } : { error: result.error }),
-      });
-      appendEvents(conversationId, [toolCall, resultEvent]);
-
-      if (runState.abort.signal.aborted || !runState.isCurrentRun()) {
-        cleanupUnstartedRun();
-        return;
-      }
-
-      const conversationEventsWithToolExchange = [
-        ...conversation.events,
-        userEvent,
-        toolCall,
-        resultEvent,
-      ];
-      void startTurn(conversationId, conversationEventsWithToolExchange, runState);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps — createRunState/startTurn/appendEvents are intentionally defined at component scope and use Refs for latest values; adding them as deps would cause an infinite render loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Execution helpers read current refs. A blocked request resumes only through its explicit button.
   }, [
     workflowRunRequest,
+    workflowResume,
     activeConversationId,
     activeTabId,
-    inspectableTabs,
     isConversationStoreLoaded,
     modelOptions,
     store,
-    workflows,
   ]);
 
   /*
@@ -1024,11 +1167,10 @@ export const AgentChatPanel = ({
         queued !== undefined &&
         !runningIds.includes(conversation.id) &&
         !compactingIds.includes(conversation.id) &&
+        !pausedQueuesRef.current.has(conversation.id) &&
         isModelInCatalog(conversation.model ?? '')
       ) {
-        // Clear before sending so a failing send cannot re-queue itself.
-        store.set(queuedMessageAtomFamily(conversation.id), undefined);
-        submitMessage(conversation.id, queued);
+        void submitQueuedMessage(conversation.id);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- submitMessage and isModelInCatalog are component-scope helpers reading refs for latest values; listing them would loop every render. The listed deps are the only triggers: a run or compaction ending, a catalog change, or a stored conversation update such as the model repair.
@@ -1109,6 +1251,7 @@ export const AgentChatPanel = ({
 
   const abortConversationRun = useCallback(
     (conversationId: string): void => {
+      cancelConversationAdmissions(conversationId);
       runStatesRef.current.get(conversationId)?.abort.abort();
       runStatesRef.current.delete(conversationId);
       // Required: deleting run-state makes the run's later finally see isCurrentRun() === false
@@ -1120,7 +1263,7 @@ export const AgentChatPanel = ({
         currentIds.filter(currentId => currentId !== conversationId)
       );
     },
-    [setRunningConversationIds, store]
+    [cancelConversationAdmissions, setRunningConversationIds, store]
   );
 
   const closeConversation = useCallback(
@@ -1202,16 +1345,17 @@ export const AgentChatPanel = ({
           isStoredConversationEmpty(getActiveStoredConversation(currentStore)),
         store: currentStore,
       });
-      // Opening history can drop the active empty conversation; free its atoms.
+      // Opening history can drop the active empty conversation; cancel admission and free its atoms.
       for (const conversation of currentStore.conversations) {
         if (!nextStore.conversations.some(next => next.id === conversation.id)) {
+          cancelConversationAdmissions(conversation.id);
           evictConversationAtoms(conversation.id);
         }
       }
       conversationStoreRef.current = nextStore;
       setConversationStore(nextStore);
     },
-    [isConversationStoreLoaded, setConversationStore, store]
+    [cancelConversationAdmissions, isConversationStoreLoaded, setConversationStore, store]
   );
 
   useEffect(() => {
@@ -1272,12 +1416,50 @@ export const AgentChatPanel = ({
         </p>
       )}
 
+      {execution.blockedReason === undefined && admissionBlocker === undefined ? null : (
+        <p
+          className="type-body border-t border-border px-4 py-2 text-status-yellow-400"
+          role="status"
+        >
+          {execution.blockedReason ?? admissionBlocker}
+        </p>
+      )}
+      {execution.delegationUnavailableReason === undefined ? null : (
+        <p className="type-label px-4 py-2 text-foreground-muted">
+          {execution.delegationUnavailableReason}
+        </p>
+      )}
+      {pausedQueueIds.includes(activeConversationId) && activeQueuedMessage !== undefined ? (
+        <button
+          className="type-label mx-4 my-2 rounded-md border border-border bg-surface-overlay p-2 text-foreground-on-secondary"
+          onClick={() => {
+            void submitQueuedMessage(activeConversationId);
+          }}
+          type="button"
+        >
+          Resume queued message
+        </button>
+      ) : null}
+      {workflowRunRequest !== undefined && blockedWorkflowRef.current === workflowRunRequest ? (
+        <button
+          className="type-label mx-4 my-2 rounded-md border border-border bg-surface-overlay p-2 text-foreground-on-secondary"
+          onClick={() => {
+            blockedWorkflowRef.current = undefined;
+            setWorkflowResume(current => current + 1);
+          }}
+          type="button"
+        >
+          Resume workflow
+        </button>
+      ) : null}
       <MessageComposer
         activeConversationId={activeConversationId}
         canSend={canSend}
         isRunning={isRunning}
         onStop={stopRun}
-        onSubmit={submitDraft}
+        onSubmit={() => {
+          void submitDraft();
+        }}
       />
 
       <footer className="border-t border-border bg-surface-raised px-4 py-2">

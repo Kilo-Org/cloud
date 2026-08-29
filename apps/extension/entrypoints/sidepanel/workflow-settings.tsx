@@ -1,7 +1,14 @@
+/* eslint-disable import/max-dependencies -- Settings admission uses the shared execution lease and existing workflow controls. */
 import { storage } from '#imports';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import type { JSX } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  getBrowserExecutionCoordinator,
+  useBrowserExecutionSnapshot,
+} from './browser-execution-lock';
+import type { BrowserExecutionLease } from './browser-execution-lock';
+import { reserveWorkflowLease } from './browser-run-context';
 import { runningConversationIdsAtom } from './agent-chat-atoms';
 import {
   deleteAgentWorkflow,
@@ -97,6 +104,7 @@ export const SettingsToggle = ({
 );
 
 export const WorkflowSettings = (): JSX.Element => {
+  const store = useStore();
   const { isLoaded, loadError, reload, workflows } = useAgentWorkflows();
   const view = deriveWorkflowSettingsView({ isLoaded, loadError, workflows });
   const runningConversationIds = useAtomValue(runningConversationIdsAtom);
@@ -199,13 +207,73 @@ export const WorkflowSettings = (): JSX.Element => {
     })();
   }, []);
 
+  const execution = useBrowserExecutionSnapshot();
+  const [admissionBlocker, setAdmissionBlocker] = useState<string>();
+  const admittingRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const handleRun = useCallback(
-    (id: string, input?: Record<string, string>) => {
-      setRunRequest({ workflowId: id, ...(input === undefined ? {} : { input }) });
-      setIsSettingsOpen(false);
+    async (
+      id: string,
+      input: Record<string, string> | undefined,
+      signal: AbortSignal
+    ): Promise<boolean> => {
+      if (admittingRef.current) {
+        return false;
+      }
+      admittingRef.current = true;
+      let lease: BrowserExecutionLease | undefined = undefined;
+      let handedOff = false;
+      try {
+        const admission = await getBrowserExecutionCoordinator().acquireLocal();
+        lease = admission.admitted ? admission.lease : undefined;
+        if (!mountedRef.current || signal.aborted) {
+          return false;
+        }
+        if (lease === undefined) {
+          setAdmissionBlocker(
+            'Workflow input is retained. Run it again when browser control is available.'
+          );
+          return false;
+        }
+        lease.guard();
+        if (store.get(workflowRunRequestAtom) !== undefined) {
+          setAdmissionBlocker(
+            'A workflow request is already pending. Finish or resume it in Browser chat before submitting another workflow.'
+          );
+          return false;
+        }
+        const request = { workflowId: id, ...(input === undefined ? {} : { input }) };
+        reserveWorkflowLease(request, lease, activeConversationId);
+        setRunRequest(request);
+        handedOff = true;
+        setAdmissionBlocker(undefined);
+        setIsSettingsOpen(false);
+        return true;
+      } catch (error) {
+        if (mountedRef.current && !signal.aborted) {
+          setAdmissionBlocker(
+            error instanceof Error
+              ? error.message
+              : 'Browser admission stopped. Submit again explicitly.'
+          );
+        }
+        return false;
+      } finally {
+        admittingRef.current = false;
+        if (lease !== undefined && !handedOff) {
+          await lease.release();
+        }
+      }
     },
-    [setRunRequest, setIsSettingsOpen]
+    [activeConversationId, setRunRequest, setIsSettingsOpen, store]
   );
+  const blocker = execution.blockedReason ?? admissionBlocker;
 
   return (
     <section
@@ -261,6 +329,16 @@ export const WorkflowSettings = (): JSX.Element => {
         )}
       </div>
 
+      {blocker === undefined ? null : (
+        <p className="type-body mt-2 text-status-yellow-400" role="status">
+          {blocker}
+        </p>
+      )}
+      {execution.delegationUnavailableReason === undefined ? null : (
+        <p className="type-body mt-2 text-foreground-muted">
+          {execution.delegationUnavailableReason}
+        </p>
+      )}
       <h2 className="type-label mt-3 text-foreground-muted">Saved workflows</h2>
 
       {view.kind === 'loading' ? (
@@ -293,6 +371,7 @@ export const WorkflowSettings = (): JSX.Element => {
                 activeConversationRunning={activeConversationRunning}
                 allowWorkflowsInSafeMode={settings.allowWorkflowsInSafeMode}
                 autoApproveChanges={settings.autoApproveWorkflowChanges}
+                blocker={blocker}
                 isDangerousMode={isDangerousMode}
                 item={item}
                 key={item.id}

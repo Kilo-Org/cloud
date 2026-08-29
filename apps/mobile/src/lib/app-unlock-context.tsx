@@ -110,7 +110,8 @@ export function AppUnlockProvider({
   promptMessage,
 }: {
   readonly children: ReactNode;
-  readonly promptMessage: string;
+  // Null while the existing language bootstrap resolves the prompt's catalog.
+  readonly promptMessage: string | null;
 }) {
   const [state, setState] = useState<UnlockState>({
     enabled: false,
@@ -141,7 +142,9 @@ export function AppUnlockProvider({
     async (nextEnabled?: boolean) => {
       const saved = current.current;
       const isMounted = mounted.current;
+      const message = prompt.current;
       if (
+        message === null ||
         !isMounted ||
         saved.phase !== 'idle' ||
         appState.current !== 'active' ||
@@ -150,12 +153,13 @@ export function AppUnlockProvider({
       ) {
         return;
       }
+      coldStartPending.current = false;
       publish({
         purpose: nextEnabled === undefined ? 'unlock' : 'setting',
         phase: 'authenticating',
         outcome: null,
       });
-      const outcome = await authenticateDevice(prompt.current);
+      const outcome = await authenticateDevice(message);
       if (!mounted.current) {
         return;
       }
@@ -207,7 +211,6 @@ export function AppUnlockProvider({
       coldStartPending.current = enabled;
       publish({ enabled, status: enabled ? 'locked' : 'unlocked', phase: 'idle' });
       if (enabled && appState.current === 'active') {
-        coldStartPending.current = false;
         void authenticate();
       }
     } catch {
@@ -217,7 +220,10 @@ export function AppUnlockProvider({
 
   useEffect(() => {
     prompt.current = promptMessage;
-  }, [promptMessage]);
+    if (coldStartPending.current) {
+      void authenticate();
+    }
+  }, [authenticate, promptMessage]);
 
   useEffect(() => {
     mounted.current = true;
@@ -244,7 +250,6 @@ export function AppUnlockProvider({
       }
       const alreadyAttempted = interval?.generation === attemptedInterval.current;
       if (coldStartPending.current || (requiresLock && !alreadyAttempted)) {
-        coldStartPending.current = false;
         // A busy operation retains the trigger, but never queues a recursive prompt.
         void authenticate();
       }
@@ -274,11 +279,12 @@ export function AppUnlockProvider({
   const value = useMemo<AppUnlockContextValue>(
     () => ({
       ...state,
-      busy: state.status === 'preference-loading' || state.phase !== 'idle',
+      busy:
+        promptMessage === null || state.status === 'preference-loading' || state.phase !== 'idle',
       retry,
       setEnabled,
     }),
-    [state, retry, setEnabled]
+    [promptMessage, state, retry, setEnabled]
   );
   return <AppUnlockContext value={value}>{children}</AppUnlockContext>;
 }

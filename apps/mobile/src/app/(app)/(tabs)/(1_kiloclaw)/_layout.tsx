@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -6,7 +7,7 @@ export const unstable_settings = {
 
 export default function KiloClawLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen
         name="chat/instance-picker"

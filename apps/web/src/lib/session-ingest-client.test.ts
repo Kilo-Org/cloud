@@ -779,6 +779,191 @@ describe('fetchSessionMessagesPage', () => {
     ],
   };
 
+  describe('bounded transport', () => {
+    const options = { limit: 50, bounded: true };
+    const headers = { 'content-type': 'application/json' };
+    const page = {
+      kiloSessionId: validSessionId,
+      history: { messages: [storedMessage], nextCursor: 'opaque-cursor', omittedItemCount: 0 },
+    };
+    const largePage = {
+      ...page,
+      history: {
+        ...page.history,
+        messages: [
+          {
+            ...storedMessage,
+            parts: [
+              ...storedMessage.parts,
+              {
+                id: 'prt_file_01',
+                sessionID: validSessionId,
+                messageID: 'msg_user_01',
+                type: 'file',
+                mime: 'text/plain',
+                url: '界'.repeat(350_000),
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const largeBody = JSON.stringify({ success: true, ...largePage });
+
+    beforeEach(() => mockCaptureException.mockReset());
+    afterEach(() => {
+      jest.restoreAllMocks();
+      jest.useRealTimers();
+    });
+
+    it('accepts exactly 1 MiB and preserves the page, cursor, and authenticated request', async () => {
+      const body = JSON.stringify({ success: true, ...page });
+      mockFetch.mockResolvedValue(
+        new Response(body + ' '.repeat(1_048_576 - Buffer.byteLength(body)), { headers })
+      );
+      await expect(
+        fetchSessionMessagesPage(validSessionId, 'user_123', {
+          ...options,
+          before: 'opaque-cursor',
+        })
+      ).resolves.toEqual(page);
+      expect(mockFetch).toHaveBeenCalledWith(
+        `https://ingest.test.example.com/api/session/${validSessionId}/messages?limit=50&before=opaque-cursor`,
+        expect.objectContaining({
+          headers: { Authorization: 'Bearer mock-jwt-token', Accept: 'application/json' },
+        })
+      );
+    });
+
+    describe.each([200, 404, 503])('HTTP %s', status => {
+      it.each(['declared', 'streamed', 'understated'])(
+        'rejects %s overflow before decoding and cancels the stream',
+        async length => {
+          let cancelled = false;
+          const bytes = new TextEncoder().encode(
+            length === 'declared' ? JSON.stringify({ success: true, ...page }) : largeBody
+          );
+          expect(largeBody.length).toBeLessThan(1_048_576);
+          const stream = new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(bytes.subarray(0, 600_000));
+              controller.enqueue(bytes.subarray(600_000));
+              if (length === 'declared') controller.close();
+            },
+            cancel() {
+              cancelled = true;
+            },
+          });
+          mockFetch.mockResolvedValue(
+            new Response(stream, {
+              status,
+              headers: {
+                ...headers,
+                ...(length === 'streamed'
+                  ? {}
+                  : { 'content-length': length === 'declared' ? '1048577' : '10' }),
+              },
+            })
+          );
+          const decode = jest.spyOn(TextDecoder.prototype, 'decode');
+          await expect(
+            fetchSessionMessagesPage(validSessionId, 'user_123', options)
+          ).rejects.toThrow('size limit');
+          expect(cancelled).toBe(true);
+          expect(decode).not.toHaveBeenCalled();
+          expect(mockCaptureException).not.toHaveBeenCalled();
+        }
+      );
+    });
+
+    it.each([undefined, false])('keeps oversized legacy pages when bounded=%s', async bounded => {
+      mockFetch.mockResolvedValue(new Response(largeBody));
+      await expect(
+        fetchSessionMessagesPage(validSessionId, 'user_123', { limit: 50, bounded })
+      ).resolves.toEqual(largePage);
+    });
+
+    it.each([
+      null,
+      { messages: [], nextCursor: null, omittedItemCount: 0 },
+      { kind: 'retryable_failure', phase: 'page_parts' },
+      { kind: 'too_large', maximumBytes: 8_388_608, phase: 'message_scan' },
+      { kind: 'invalid_data' },
+    ])('preserves the worker outcome %j', async history => {
+      mockFetch.mockResolvedValue(
+        Response.json({ success: true, kiloSessionId: validSessionId, history })
+      );
+      await expect(fetchSessionMessagesPage(validSessionId, 'user_123', options)).resolves.toEqual({
+        kiloSessionId: validSessionId,
+        history,
+      });
+    });
+
+    it('returns null for a bounded 404 without exposing its body', async () => {
+      mockFetch.mockResolvedValue(new Response('private response', { status: 404 }));
+      await expect(
+        fetchSessionMessagesPage(validSessionId, 'user_123', options)
+      ).resolves.toBeNull();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      {
+        status: 503,
+        body: 'private response',
+        message: 'Session ingest messages page failed: 503',
+      },
+      {
+        status: 200,
+        body: 'private response',
+        message: 'Session ingest messages page returned an unexpected response',
+      },
+      {
+        status: 200,
+        body: JSON.stringify({ success: true, ...page, history: { kind: 'private response' } }),
+        message: 'Session ingest messages page returned an unexpected response',
+      },
+    ])('sanitizes HTTP $status errors and malformed output', async ({ status, body, message }) => {
+      mockFetch.mockResolvedValue(
+        new Response(body, { status, statusText: 'private response', headers })
+      );
+      await expect(
+        fetchSessionMessagesPage(validSessionId, 'user_123', options)
+      ).rejects.toMatchObject({ message });
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it.each(['headers', 'success body', 'error body'])(
+      'ends stalled %s at 30 seconds',
+      async phase => {
+        jest.useFakeTimers();
+        let cancelled = false;
+        let signal: AbortSignal | undefined;
+        mockFetch.mockImplementation((_url, init: RequestInit) => {
+          signal = init.signal ?? undefined;
+          return phase === 'headers'
+            ? new Promise(() => {})
+            : Promise.resolve(
+                new Response(
+                  new ReadableStream({
+                    cancel() {
+                      cancelled = true;
+                    },
+                  }),
+                  { status: phase === 'error body' ? 503 : 200, headers }
+                )
+              );
+        });
+        const result = fetchSessionMessagesPage(validSessionId, 'user_123', options);
+        const rejection = expect(result).rejects.toThrow('timed out');
+        await jest.advanceTimersByTimeAsync(30_000);
+        await rejection;
+        expect(signal?.aborted).toBe(true);
+        expect(cancelled).toBe(phase !== 'headers');
+      }
+    );
+  });
+
   it('returns the bounded page and the opaque next cursor', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
@@ -894,7 +1079,7 @@ describe('fetchSessionMessagesPage', () => {
 
     await expect(
       fetchSessionMessagesPage(validSessionId, 'user_123', { limit: 50 })
-    ).rejects.toThrow(/Session ingest messages page failed/);
+    ).rejects.toThrow('Session ingest messages page failed: 500 Internal Server Error - boom');
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({

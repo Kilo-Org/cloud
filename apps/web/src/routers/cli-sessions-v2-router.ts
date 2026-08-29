@@ -475,6 +475,7 @@ const GetSessionMessagesPageInputSchema = z
       .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
       .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
     cursor: z.string().min(1).optional(),
+    bounded: z.boolean().optional(),
   })
   .superRefine((params, ctx) => {
     if (params.cursor === undefined) return;
@@ -1041,9 +1042,10 @@ export const cliSessionsV2Router = createTRPCRouter({
       // on its first WebSocket connect instead of `replay=false`. Cursor
       // pages skip the Cloud Agent read — the watermark is only seeded once.
       // Failures are swallowed and return null so the page endpoint is
-      // never blocked on an optional watermark read.
+      // never blocked on an optional watermark read. Bounded history reads do
+      // not seed an event stream; keep the old path until legacy callers retire.
       let watermarkEventId: number | null = null;
-      if (!input.cursor && session.cloud_agent_session_id) {
+      if (!input.bounded && !input.cursor && session.cloud_agent_session_id) {
         try {
           const authToken = generateApiToken(ctx.user);
           const client = createCloudAgentNextClient(authToken);
@@ -1062,21 +1064,25 @@ export const cliSessionsV2Router = createTRPCRouter({
         result = await fetchSessionMessagesPage(input.session_id, ctx.user.id, {
           limit: input.limit,
           ...(input.cursor !== undefined ? { before: input.cursor } : {}),
+          ...(input.bounded !== undefined ? { bounded: input.bounded } : {}),
         });
       } catch (error) {
         // Match the existing `getSessionMessages` error contract: surface a
         // stable INTERNAL_SERVER_ERROR so the mobile client can map the
         // outcome without inferring retry semantics from the worker's
-        // text. The client already calls `captureException`; we do not
-        // double-capture here.
-        console.error(
-          `Failed to fetch session messages page for session ${input.session_id}:`,
-          error instanceof Error ? error.message : error
-        );
+        // text. The legacy client already calls `captureException`.
+        // Bounded reads must not send upstream bodies or credentials to logs,
+        // including the Sentry middleware's error cause.
+        if (!input.bounded) {
+          console.error(
+            `Failed to fetch session messages page for session ${input.session_id}:`,
+            error instanceof Error ? error.message : error
+          );
+        }
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch session messages page',
-          cause: error,
+          cause: input.bounded ? undefined : error,
         });
       }
 

@@ -14,7 +14,13 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCError } from '@trpc/server';
-import { parseGitHubOwnerRepo, parseGitHubPrUrl } from '@/routers/cli-sessions-v2-router';
+import {
+  cliSessionsV2Router,
+  parseGitHubOwnerRepo,
+  parseGitHubPrUrl,
+} from '@/routers/cli-sessions-v2-router';
+import { createCallerFactory } from '@/lib/trpc/init';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
@@ -119,6 +125,149 @@ let regularUser: User;
 let otherUser: User;
 let adminUser: User;
 let testOrganization: Organization;
+
+describe('bounded session history router', () => {
+  const user = { id: 'oauth/history-owner', is_admin: false } as User;
+  const session = {
+    session_id: 'ses_messages_page_test_1234',
+    kilo_user_id: user.id,
+    organization_id: null as string | null,
+    cloud_agent_session_id: 'agent_history',
+  };
+  const page = { kiloSessionId: session.session_id, history: null };
+  const fetchPage = jest.mocked(
+    jest.requireMock<{ fetchSessionMessagesPage: typeof FetchSessionMessagesPageType }>(
+      '@/lib/session-ingest-client'
+    ).fetchSessionMessagesPage
+  );
+  const caller = createCallerFactory(cliSessionsV2Router)({ user });
+  const limit = jest.fn();
+  const where = jest.fn((_condition: ReturnType<typeof eq>) => ({ limit }));
+  const query = { from: () => ({ where }) } as ReturnType<typeof db.select>;
+
+  beforeEach(() => {
+    session.organization_id = null;
+    limit.mockReset().mockResolvedValue([session]);
+    where.mockClear();
+    jest.spyOn(db, 'select').mockReturnValue(query);
+    fetchPage.mockReset().mockResolvedValue(page);
+    mockGetSession.mockReset().mockResolvedValue({ latestEventId: 42 });
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it.each([undefined, false, true])(
+    'forwards bounded=%s and preserves legacy defaults and watermarks',
+    async bounded => {
+      await expect(
+        caller.getSessionMessagesPage({ session_id: session.session_id, bounded })
+      ).resolves.toEqual({
+        ...page,
+        watermarkEventId: bounded ? null : 42,
+      });
+      expect(fetchPage).toHaveBeenCalledWith(session.session_id, user.id, {
+        limit: 50,
+        ...(bounded !== undefined ? { bounded } : {}),
+      });
+      expect(new PgDialect().sqlToQuery(where.mock.calls[0][0]).params).toEqual([
+        session.session_id,
+        user.id,
+      ]);
+      expect(mockGetSession).toHaveBeenCalledTimes(bounded ? 0 : 1);
+    }
+  );
+
+  it('forwards a validated cursor without reading the watermark', async () => {
+    const cursor = btoa(JSON.stringify({ id: 'msg_user_01', time: 1761000000100 })).replace(
+      /=+$/,
+      ''
+    );
+    await expect(
+      caller.getSessionMessagesPage({
+        session_id: session.session_id,
+        bounded: true,
+        limit: 25,
+        cursor,
+      })
+    ).resolves.toEqual({ ...page, watermarkEventId: null });
+    expect(fetchPage).toHaveBeenCalledWith(session.session_id, user.id, {
+      bounded: true,
+      limit: 25,
+      before: cursor,
+    });
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+
+  it.each([{ limit: 0 }, { limit: 101 }, { limit: 1.5 }, { cursor: 'bad' }])(
+    'retains input validation for %j',
+    async input => {
+      await expect(
+        caller.getSessionMessagesPage({ session_id: session.session_id, bounded: true, ...input })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(fetchPage).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([undefined, true])(
+    'denies missing or foreign sessions before transport when bounded=%s',
+    async bounded => {
+      limit.mockResolvedValue([]);
+      await expect(
+        caller.getSessionMessagesPage({ session_id: session.session_id, bounded })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Session not found' });
+      expect(fetchPage).not.toHaveBeenCalled();
+      expect(mockGetSession).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['member', 'removed'])(
+    'retains organization authorization for %s membership',
+    async membership => {
+      session.organization_id = '11111111-1111-4111-8111-111111111111';
+      const membershipQuery = {
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue(membership === 'member' ? [{ role: 'member' }] : []),
+      } as ReturnType<typeof db.select>;
+      jest.spyOn(db, 'select').mockReturnValueOnce(query).mockReturnValue(membershipQuery);
+      const result = caller.getSessionMessagesPage({
+        session_id: session.session_id,
+        bounded: true,
+      });
+      if (membership === 'member') {
+        await expect(result).resolves.toEqual({ ...page, watermarkEventId: null });
+      } else {
+        await expect(result).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        expect(fetchPage).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each([undefined, true])(
+    'preserves the public error without bounded raw logging when bounded=%s',
+    async bounded => {
+      const upstream = new Error('private response Bearer private-credential');
+      const log = jest.spyOn(console, 'error').mockImplementation(() => {});
+      fetchPage.mockRejectedValue(upstream);
+      const error = await caller
+        .getSessionMessagesPage({ session_id: session.session_id, bounded })
+        .catch(error => error);
+      expect(error).toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch session messages page',
+      });
+      expect(error.cause).toBe(bounded ? undefined : upstream);
+      if (bounded) expect(log).not.toHaveBeenCalled();
+      else expect(log).toHaveBeenCalledWith(expect.any(String), upstream.message);
+    }
+  );
+
+  it('keeps the worker not-found error in bounded mode', async () => {
+    fetchPage.mockResolvedValue(null);
+    await expect(
+      caller.getSessionMessagesPage({ session_id: session.session_id, bounded: true })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Session not found' });
+  });
+});
 
 describe('cli-sessions-v2-router', () => {
   beforeEach(() => {

@@ -4,6 +4,10 @@ import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { INTERNAL_API_SECRET, SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { generateInternalServiceToken } from '@/lib/tokens';
+import {
+  boundRepositoryResponse,
+  withRepositoryReadDeadline,
+} from '@/lib/integrations/core/repository-read-limits';
 import type { User } from '@kilocode/db/schema';
 import {
   kiloSdkMessageHistorySchema,
@@ -128,6 +132,8 @@ export type SessionMessagesPageOptions = {
   limit?: number;
   /** Opaque cursor returned by a previous page; requires a positive limit. */
   before?: string;
+  /** Opt into the shared 1 MiB/30-second transport limits. */
+  bounded?: boolean;
 };
 
 export type SessionMessagesPageResult = {
@@ -168,6 +174,30 @@ export async function fetchSessionMessagesPage(
   }`;
 
   const token = generateInternalServiceToken(userId);
+  // Omitted bounds preserve the deployed transport until legacy callers retire.
+  if (options.bounded) {
+    return withRepositoryReadDeadline(options, async signal => {
+      const response = await boundRepositoryResponse(
+        await fetch(url, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+          signal,
+        }),
+        signal
+      );
+      if (response.status === 404) return null;
+      if (!response.ok) {
+        throw new Error(`Session ingest messages page failed: ${response.status}`);
+      }
+      const parsed = SessionMessagesPageResponseSchema.safeParse(
+        await response.json().catch(() => undefined)
+      );
+      if (!parsed.success) {
+        throw new Error('Session ingest messages page returned an unexpected response');
+      }
+      return { kiloSessionId: parsed.data.kiloSessionId, history: parsed.data.history };
+    });
+  }
+
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });

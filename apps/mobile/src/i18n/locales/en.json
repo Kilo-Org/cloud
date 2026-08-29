@@ -2064,6 +2064,8 @@
     }
   },
   "agents": {
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE",
     "search": {
       "searching": "Searching",
       "searchSessions": "Search sessions",
@@ -2276,6 +2278,8 @@
     "instancePicker": {
       "runOn": "Run on",
       "runOnAccessibility": "Run on: {{label}}",
+      "terminals": "Terminals",
+      "remotes": "Remotes",
       "couldNotLoad": "Couldn't load instances",
       "couldNotLoadDescription": "Check your connection and try again.",
       "cloudAgent": "Cloud Agent",

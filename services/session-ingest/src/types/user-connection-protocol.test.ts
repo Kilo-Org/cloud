@@ -196,6 +196,16 @@ const providerOutbound = [
 ];
 const providerInbound = [
   { type: 'provider_job', job, goal: invoke.goal, ownerLabel: 'Parent chat' },
+  ...(['new', 'continue'] as const).map(
+    conversationMode =>
+      ({
+        type: 'provider_job',
+        job,
+        goal: invoke.goal,
+        ownerLabel: 'Parent chat',
+        conversationMode,
+      }) satisfies browser.BrowserProviderInboundMessage
+  ),
   { type: 'provider_job_cancel', ...jobBinding, reason: 'cancelled' },
   {
     type: 'provider_snapshot',
@@ -209,6 +219,42 @@ const providerInbound = [
   providerStatusResult,
   { type: 'provider_status_result', requestId, providerId: handle.providerId, jobs: [] },
 ];
+
+describe.each([
+  { name: 'provider', schema: browser.browserProviderInboundMessageSchema },
+  { name: 'negotiated web', schema: browser.webInboundWithBrowserMessageSchema },
+])('provider conversation intent: $name', ({ schema }) => {
+  it('keeps legacy jobs parseable without inventing conversation intent', () => {
+    const parsed = schema.parse(providerInbound[0]);
+    expect(parsed).toStrictEqual(providerInbound[0]);
+    expect(parsed).not.toHaveProperty('conversationMode');
+  });
+
+  it.each(['new', 'continue'] as const)(
+    'preserves explicit %s intent and rejects unknown fields',
+    conversationMode => {
+      const frame = { ...providerInbound[0], conversationMode };
+      expect(schema.parse(frame)).toStrictEqual(frame);
+      expect(schema.safeParse({ ...frame, extra: true }).success).toBe(false);
+      expect(schema.safeParse({ ...frame, job: { ...job, conversationMode } }).success).toBe(false);
+    }
+  );
+
+  it.each([
+    { conversationMode: '' },
+    { conversationMode: 'unknown' },
+    { conversationMode: 'NEW' },
+    { conversationMode: 'CONTINUE' },
+    { conversationMode: 'new ' },
+    { conversationMode: null },
+    { conversationMode: false },
+    { conversationMode: 0 },
+    { conversationMode: [] },
+    { conversationMode: {} },
+  ])('rejects invalid conversation modes: %j', fields => {
+    expect(schema.safeParse({ ...providerInbound[0], ...fields }).success).toBe(false);
+  });
+});
 
 describe.each([
   { name: 'relay', contract: browser },

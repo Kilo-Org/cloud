@@ -123,6 +123,20 @@ const fullContext = {
   revision,
   observedAt,
   evaluatedShas: ['head'],
+  evaluationSources: {
+    mergeable: source,
+    testMerge: source,
+    comparison: source,
+    canBypassClassic: source,
+    requiredApprovingReviewCount: source,
+    requiredStatusCheckContexts: source,
+    requiresConversationResolution: source,
+    threads: source,
+    eligibleReviews: source,
+    reviewDecisions: source,
+    reviewActivity: source,
+    deployments: source,
+  },
   labels: complete([{ id: 'L_1', name: 'bug', color: null }]),
   assignees: complete([identity]),
   reviewRequests: complete([
@@ -629,6 +643,67 @@ test('preserves strict comment-author and legacy aggregate checks contracts', ()
     GitHubPrReviewChecksResultSchema.safeParse({
       ...checks,
       checkRuns: [{ ...checks.checkRuns[0], requiredness: 'required' }],
+    }).success
+  ).toBe(false);
+});
+
+test.each([undefined, {}])(
+  'normalizes missing evaluation sources (%j) without rewriting old evidence',
+  evaluationSources => {
+    const { evaluationSources: knownSources, ...legacyContext } = fullContext;
+    const { context } = NormalizedGitHubPrReviewOverviewSchema.parse({
+      ...oldOverview,
+      context: { ...legacyContext, evaluationSources },
+    });
+    const { evaluationSources: normalized, ...preserved } = context;
+    expect(preserved).toStrictEqual(legacyContext);
+    for (const key of Object.keys(knownSources))
+      expect(normalized).toHaveProperty(key, {
+        availability: 'unavailable',
+        retryable: false,
+        reason: 'source-state-not-recorded',
+        provenance: [],
+        observedAt: null,
+      });
+  }
+);
+
+test.each([
+  { availability: 'unavailable', retryable: true, reason: 'transient' },
+  { availability: 'denied', retryable: false, reason: 'permission' },
+])('retains structured $availability recovery without provenance', failure => {
+  const failed = { ...source, ...failure, provenance: [] };
+  const input = {
+    ...fullContext,
+    evaluationSources: { ...fullContext.evaluationSources, comparison: failed },
+  };
+  expect(
+    NormalizedGitHubPrReviewOverviewSchema.parse({ ...oldOverview, context: input }).context
+  ).toStrictEqual(input);
+  const partial = GitHubPrReviewContextSchema.parse({
+    revision,
+    evaluationSources: { comparison: failed },
+    labels: complete([]),
+  });
+  expect(partial.evaluationSources.comparison).toStrictEqual(failed);
+  expect(partial.evaluationSources.threads).toMatchObject({
+    availability: 'unavailable',
+    retryable: false,
+    reason: 'source-state-not-recorded',
+  });
+  expect(partial.labels).toStrictEqual(complete([]));
+});
+
+test.each([
+  ['availability', { availability: 'unknown' }],
+  ['retryability', { retryable: 'true' }],
+  ['reason', { reason: 403 }],
+  ['provenance', { provenance: [''] }],
+])('rejects invalid evaluation source %s instead of supplying a fallback', (_name, invalid) => {
+  expect(
+    GitHubPrReviewContextSchema.safeParse({
+      revision,
+      evaluationSources: { comparison: { ...source, ...invalid } },
     }).success
   ).toBe(false);
 });

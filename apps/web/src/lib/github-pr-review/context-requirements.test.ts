@@ -152,6 +152,57 @@ function check(raw: unknown): Check {
   ];
   return result;
 }
+function review(
+  id = 'REVIEW',
+  actor = 'USER'
+): GitHubPrReviewContext['reviewDecisions']['items'][number] {
+  return {
+    id,
+    state: 'APPROVED',
+    submittedAt: source.observedAt,
+    commitSha: 'head',
+    actor: {
+      id: actor,
+      kind: 'User',
+      login: actor,
+      name: null,
+      avatarUrl: null,
+      url: null,
+      teamSlug: null,
+    },
+    onBehalfOf: collection([]),
+  };
+}
+function reviewed() {
+  const scenario = setup(reviewPolicy);
+  scenario.observations.eligibleReviews = collection([review()]);
+  scenario.context.reviewDecisions = collection([review()]);
+  scenario.context.reviewActivity = collection([review()]);
+  return scenario;
+}
+function deployed() {
+  const scenario = setup(null, [
+    {
+      type: 'required_deployments',
+      parameters: { required_deployment_environments: ['production'] },
+    },
+  ]);
+  // Explicit normalized enforcement is an input, not proof of provider bypass semantics.
+  for (const row of scenario.context.requirements.items)
+    if (row.policy) {
+      row.policy.viewerEnforcement = 'enforced';
+      row.policy.viewerBypass = 'never';
+    }
+  scenario.observations.deployments = collection([
+    {
+      id: 'DEPLOY',
+      commitOid: 'head',
+      environment: 'production',
+      latestStatus: { state: 'FAILURE' },
+    },
+  ]);
+  return scenario;
+}
 
 it('preserves both required run and status outcomes under an explicit wildcard', () => {
   const scenario = setup();
@@ -163,6 +214,90 @@ it('preserves both required run and status outcomes under an explicit wildcard',
     { state: 'met', check: { kind: 'check-run', application: { kind: 'any' } } },
     { state: 'unmet', check: { kind: 'status', application: { kind: 'any' } } },
   ]);
+});
+
+it.each([
+  'known',
+  'enough',
+  'unknown-actor',
+  'old-commit',
+  'partial',
+  'inconsistent',
+  'code-owner',
+  'dismissal',
+  'last-push',
+  'unknown-flags',
+  'unknown-enforcement',
+] as const)('counts only current eligible and enforced reviews: %s', condition => {
+  const scenario = reviewed();
+  if (condition === 'enough') {
+    scenario.observations.eligibleReviews = collection([review(), review('SECOND', 'USER_2')]);
+    scenario.context.reviewDecisions = collection([review(), review('SECOND', 'USER_2')]);
+    scenario.context.reviewActivity = collection([review(), review('SECOND', 'USER_2')]);
+  }
+  if (condition === 'unknown-actor') scenario.observations.eligibleReviews.items[0]!.actor = null;
+  if (condition === 'old-commit') scenario.observations.eligibleReviews.items[0]!.commitSha = 'old';
+  if (condition === 'partial') scenario.observations.eligibleReviews.completeness = 'partial';
+  if (condition === 'inconsistent') scenario.context.reviewDecisions.items[0]!.state = 'DISMISSED';
+  const parametersByCondition: Record<string, string> = {
+    'code-owner': 'require_code_owner_reviews',
+    dismissal: 'dismiss_stale_reviews',
+    'last-push': 'require_last_push_approval',
+    'unknown-flags': 'dismiss_stale_reviews',
+  };
+  const parameter = parametersByCondition[condition];
+  if (parameter) {
+    for (const row of scenario.context.requirements.items) {
+      const parameters = row.policy?.parameters?.required_pull_request_reviews as Record<
+        string,
+        unknown
+      >;
+      parameters[parameter] = condition === 'unknown-flags' ? null : true;
+    }
+  }
+  if (condition === 'unknown-enforcement')
+    scenario.facts.viewerRule.requiredApprovingReviewCount = {
+      data: null,
+      source: { ...source, availability: 'denied' },
+    };
+  expect(requirements(scenario, 'approving-reviews')[0]?.state).toBe(
+    condition === 'known' ? 'unmet' : condition === 'enough' ? 'met' : 'unavailable'
+  );
+});
+
+it.each([
+  'failed',
+  'successful',
+  'other-environment',
+  'other-commit',
+  'partial',
+  'unknown-bypass',
+  'multiple',
+] as const)('matches deployments to the required environment and commit: %s', condition => {
+  const scenario = deployed();
+  const deployment = scenario.observations.deployments.items[0]!;
+  if (condition === 'successful') deployment.latestStatus = { state: 'SUCCESS' };
+  if (condition === 'other-environment') deployment.environment = 'preview';
+  if (condition === 'other-commit') deployment.commitOid = 'old';
+  if (condition === 'partial') scenario.observations.deployments.completeness = 'partial';
+  if (condition === 'multiple')
+    scenario.observations.deployments = collection([deployment, { ...deployment, id: 'OTHER' }]);
+  if (condition === 'unknown-bypass')
+    scenario.context.requirements.items[0]!.policy!.viewerBypass = 'unknown';
+  const row = requirements(scenario, 'deployment')[0];
+  expect(row?.state).toBe(
+    condition === 'failed' ? 'unmet' : condition === 'successful' ? 'met' : 'unavailable'
+  );
+  if (condition.startsWith('other'))
+    expect(row?.evidence.some(entry => entry.observation.includes('DEPLOY'))).toBe(false);
+  if (condition === 'multiple')
+    expect(
+      row?.evidence.some(
+        entry =>
+          entry.observation.includes('deployment:DEPLOY;') &&
+          entry.observation.includes('deployment:OTHER;')
+      )
+    ).toBe(true);
 });
 
 it.each(['failure', 'missing'] as const)(
@@ -437,4 +572,274 @@ it('keeps required observations unavailable when check-run-only merge selection 
         evaluatedSha: null,
       })
     );
+});
+
+it.each(['current', 'base', 'head', 'viewer', 'retryable', 'denied'] as const)(
+  'requires matching comparison and viewer enforcement for freshness: %s',
+  condition => {
+    const scenario = setup(checkPolicy(-1, true));
+    if (condition === 'base') scenario.facts.comparison.data!.baseTarget.oid = 'old-base';
+    if (condition === 'head') scenario.facts.comparison.data!.headTarget.oid = 'old-head';
+    if (condition === 'viewer') scenario.facts.viewerRule.requiredStatusCheckContexts = field([]);
+    if (condition === 'retryable' || condition === 'denied')
+      scenario.facts.comparison.source = {
+        ...source,
+        availability: condition === 'retryable' ? 'unavailable' : 'denied',
+        retryable: condition === 'retryable',
+        reason: condition === 'retryable' ? 'transient' : 'permission',
+      };
+    expect(requirements(scenario, 'branch-freshness')).toMatchObject([
+      { state: condition === 'current' ? 'met' : 'unavailable' },
+    ]);
+  }
+);
+
+it.each([
+  [false, false, 'unmet', 'observed-unresolved-thread-ids:THREAD'],
+  [false, true, 'unmet', 'unresolved-threads:1;ids:THREAD'],
+  [true, false, 'unavailable', 'conversation-observations-incomplete'],
+  [true, true, 'met', 'unresolved-threads:0;ids:'],
+  [null, true, 'unavailable', 'conversation-observations-incomplete'],
+] as const)(
+  'retains thread evidence for resolution %s with complete pages %s',
+  (isResolved, completePages, state, observation) => {
+    const scenario = setup({ required_conversation_resolution: { enabled: true } });
+    scenario.observations.threads = collection(
+      isResolved === true ? [] : [{ id: 'THREAD', isResolved }],
+      completePages
+        ? {}
+        : {
+            completeness: 'partial',
+            hasNextPage: true,
+            totalCount: null,
+            source: { ...source, availability: 'partial', retryable: true, reason: 'deadline' },
+          }
+    );
+    expect(requirements(scenario, 'conversation-resolution')).toMatchObject([
+      { state, evidence: expect.arrayContaining([expect.objectContaining({ observation })]) },
+    ]);
+  }
+);
+
+it('retains current policy and direct evidence for each non-check failure', () => {
+  const scenario = setup({
+    ...checkPolicy(-1, true),
+    ...reviewPolicy,
+    required_conversation_resolution: { enabled: true },
+    required_deployments: { required_deployment_environments: ['production'] },
+  });
+  scenario.observations.head = collection([check(run('PASS'))]);
+  scenario.facts.comparison.data!.behindBy = 2;
+  scenario.observations.threads = collection([{ id: 'THREAD', isResolved: false }]);
+  scenario.observations.eligibleReviews = collection([review()]);
+  scenario.context.reviewDecisions = collection([review()]);
+  scenario.context.reviewActivity = collection([review()]);
+  scenario.observations.deployments = deployed().observations.deployments;
+  const unmet = evaluate(scenario).requirements.items.filter(row => row.state === 'unmet');
+  expect(unmet.map(row => row.kind)).toEqual([
+    'branch-freshness',
+    'approving-reviews',
+    'conversation-resolution',
+    'deployment',
+  ]);
+  for (const [index, observation] of [
+    'branch-behind:2',
+    'eligible-approvals:1/2;ids:REVIEW',
+    'unresolved-threads:1;ids:THREAD',
+    'deployment:DEPLOY;environment:production;state:FAILURE',
+  ].entries()) {
+    const row = unmet[index]!;
+    expect(row.policy).toMatchObject({
+      enforcement: 'active',
+      base: { baseRepoFullName: 'o/r', baseRef: 'release', baseSha: 'base' },
+      viewerEnforcement: 'enforced',
+      viewerBypass: 'never',
+    });
+    expect(row.evidence).toContainEqual(
+      expect.objectContaining({
+        source: 'graphql.observation',
+        policyId: row.policy!.id,
+        observation,
+        headSha: 'head',
+        baseSha: 'base',
+        evaluatedSha: 'head',
+        observedAt: source.observedAt,
+      })
+    );
+  }
+});
+
+it('retains every viewer-policy contradiction instead of confirming no requirements', () => {
+  const scenario = setup(null);
+  scenario.facts.viewerRule.requiredStatusCheckContexts = field(['ci']);
+  scenario.facts.viewerRule.requiredApprovingReviewCount = field(2);
+  scenario.facts.viewerRule.requiresConversationResolution = field(true);
+  const rows = evaluate(scenario).requirements.items;
+  expect(rows).toMatchObject([{ kind: 'policy-evaluation', state: 'unavailable' }]);
+  expect(rows[0]?.evidence.map(entry => entry.observation)).toEqual([
+    'policy-source-conflict:status-checks',
+    'policy-source-conflict:approving-reviews',
+    'policy-source-conflict:conversations',
+  ]);
+});
+
+function allNonCheckRequirements() {
+  const scenario = setup({
+    ...checkPolicy(-1, true),
+    ...reviewPolicy,
+    required_conversation_resolution: { enabled: true },
+    required_deployments: { required_deployment_environments: ['production'] },
+  });
+  scenario.observations.head = collection([check(run('PASS'))]);
+  scenario.observations.deployments = deployed().observations.deployments;
+  return scenario;
+}
+
+describe.each([
+  { availability: 'unavailable', retryable: true, reason: 'transient' },
+  { availability: 'denied', retryable: false, reason: 'permission' },
+] as const)('source recovery for $availability', failure => {
+  it.each([
+    ['comparison', 'branch-freshness'],
+    ['threads', 'conversation-resolution'],
+    ['eligibleReviews', 'approving-reviews'],
+    ['deployments', 'deployment'],
+  ] as const)('retains %s metadata and successful siblings', (key, kind) => {
+    for (const provenance of [[`graphql.${key}`], []]) {
+      const scenario = allNonCheckRequirements();
+      const before = evaluate(scenario);
+      const failed = { ...source, ...failure, provenance };
+      const inputs = {
+        comparison: scenario.facts.comparison,
+        threads: scenario.observations.threads,
+        eligibleReviews: scenario.observations.eligibleReviews,
+        deployments: scenario.observations.deployments,
+      };
+      inputs[key].source = failed;
+      const result = evaluate(scenario);
+      expect(result.evaluationSources[key]).toStrictEqual(failed);
+      expect(result.requirements.items.filter(row => row.kind === kind)).toMatchObject([
+        { state: 'unavailable' },
+      ]);
+      expect(result.requirements.items.filter(row => row.kind !== kind)).toStrictEqual(
+        before.requirements.items.filter(row => row.kind !== kind)
+      );
+      expect(result.requirements.source).toStrictEqual(before.requirements.source);
+    }
+  });
+
+  it.each([
+    [
+      'canBypassClassic',
+      [
+        'branch-freshness',
+        'approving-reviews',
+        'conversation-resolution',
+        'deployment',
+        'status-check',
+      ],
+    ],
+    ['requiredStatusCheckContexts', ['branch-freshness', 'status-check']],
+    ['requiredApprovingReviewCount', ['approving-reviews']],
+    ['requiresConversationResolution', ['conversation-resolution']],
+    ['reviewDecisions', ['approving-reviews']],
+    ['reviewActivity', ['approving-reviews']],
+  ] as const)('retains the failed %s dependency without hiding siblings', (key, kinds) => {
+    for (const provenance of [[`graphql.${key}`], []]) {
+      const scenario = allNonCheckRequirements();
+      const before = evaluate(scenario);
+      const failed = { ...source, ...failure, provenance };
+      const inputs = {
+        canBypassClassic: scenario.facts.canBypassClassic,
+        ...scenario.facts.viewerRule,
+        reviewDecisions: scenario.context.reviewDecisions,
+        reviewActivity: scenario.context.reviewActivity,
+      };
+      inputs[key].source = failed;
+      const result = evaluate(scenario);
+      expect(result.evaluationSources[key]).toStrictEqual(failed);
+      const affected = result.requirements.items.filter(row =>
+        kinds.some(kind => kind === row.kind)
+      );
+      expect(affected.map(row => [row.kind, row.state])).toEqual(
+        expect.arrayContaining(kinds.map(kind => [kind, 'unavailable']))
+      );
+      expect(
+        result.requirements.items.filter(row => !kinds.some(kind => kind === row.kind))
+      ).toStrictEqual(
+        before.requirements.items.filter(row => !kinds.some(kind => kind === row.kind))
+      );
+    }
+  });
+
+  it('retains unavailable mergeability without discarding non-check policy results', () => {
+    const scenario = allNonCheckRequirements();
+    const before = evaluate(scenario);
+    const failed = { ...source, ...failure, provenance: [] };
+    scenario.facts.mergeable = { data: null, source: failed };
+    const result = evaluate(scenario);
+    expect(result.evaluationSources.mergeable).toStrictEqual(failed);
+    expect(result.requirements.items.filter(row => row.kind === 'merge-conflicts')).toMatchObject([
+      { state: 'unavailable' },
+    ]);
+    expect(result.requirements.items.filter(row => row.kind !== 'merge-conflicts')).toStrictEqual(
+      before.requirements.items
+    );
+  });
+});
+
+it('retains simultaneous transient and denied evaluation sources independently', () => {
+  const scenario = allNonCheckRequirements();
+  scenario.facts.comparison.source = {
+    ...source,
+    availability: 'unavailable',
+    retryable: true,
+    reason: 'transient',
+    provenance: [],
+  };
+  scenario.observations.threads.source = {
+    ...source,
+    availability: 'denied',
+    reason: 'permission',
+    provenance: [],
+  };
+  const result = evaluate(scenario);
+  expect(result.evaluationSources).toMatchObject({
+    comparison: { availability: 'unavailable', retryable: true, reason: 'transient' },
+    threads: { availability: 'denied', retryable: false, reason: 'permission' },
+    deployments: { availability: 'available', retryable: false, reason: null },
+  });
+  expect(result.requirements.items.map(row => [row.kind, row.state])).toEqual([
+    ['branch-freshness', 'unavailable'],
+    ['approving-reviews', 'unmet'],
+    ['conversation-resolution', 'unavailable'],
+    ['deployment', 'unmet'],
+    ['status-check', 'met'],
+  ]);
+});
+
+it('retains retry metadata beside a directly observed unresolved thread', () => {
+  const scenario = allNonCheckRequirements();
+  const partial = {
+    ...source,
+    availability: 'partial' as const,
+    retryable: true,
+    reason: 'deadline',
+  };
+  scenario.observations.threads = collection([{ id: 'THREAD', isResolved: false }], {
+    source: partial,
+    completeness: 'partial',
+    totalCount: null,
+    hasNextPage: true,
+  });
+  const result = evaluate(scenario);
+  expect(result.evaluationSources.threads).toStrictEqual(partial);
+  expect(
+    result.requirements.items.find(row => row.kind === 'conversation-resolution')
+  ).toMatchObject({
+    state: 'unmet',
+    evidence: expect.arrayContaining([
+      expect.objectContaining({ observation: 'observed-unresolved-thread-ids:THREAD' }),
+    ]),
+  });
 });

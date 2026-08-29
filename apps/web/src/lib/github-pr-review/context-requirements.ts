@@ -3,11 +3,13 @@ import 'server-only';
 import { z } from 'zod';
 import {
   GitHubPrReviewPolicySchema,
+  GitHubPrReviewTimestampSchema,
   type GitHubPrReviewContext,
   type GitHubPrReviewRevision,
   type GitHubPrReviewSource,
 } from './context-dtos';
 import type { ContextReadResult } from './context-reader';
+import { contextReviewsAgree } from './context-reviews';
 
 type Check = GitHubPrReviewContext['checks']['items'][number];
 type Requirement = GitHubPrReviewContext['requirements']['items'][number];
@@ -435,9 +437,9 @@ export function evaluateContextRequirements(
   context: GitHubPrReviewContext,
   facts: RequirementFacts,
   observations: RequirementObservations
-): Pick<GitHubPrReviewContext, 'checks' | 'requirements' | 'evaluatedShas'> {
+): Pick<GitHubPrReviewContext, 'checks' | 'requirements' | 'evaluatedShas' | 'evaluationSources'> {
   const { revision } = context;
-  const { head, merge } = observations;
+  const { head, merge, threads, eligibleReviews, deployments } = observations;
   const testMerge = facts.testMerge.data;
   const validMerge =
     available(facts.testMerge) &&
@@ -647,8 +649,178 @@ export function evaluateContextRequirements(
       }
       continue;
     }
-    items.push({ ...row, state: 'unavailable' });
+    const parameters: z.output<typeof objectSchema> = policy.parameters ?? {};
+    const reviewParameters =
+      policy.source === 'classic' ? object(parameters.required_pull_request_reviews) : parameters;
+    const viewerRule = {
+      requiredApprovingReviewCount: available(facts.viewerRule.requiredApprovingReviewCount)
+        ? facts.viewerRule.requiredApprovingReviewCount.data
+        : null,
+      requiresConversationResolution: available(facts.viewerRule.requiresConversationResolution)
+        ? facts.viewerRule.requiresConversationResolution.data
+        : null,
+    };
+    if (row.kind === 'branch-freshness') {
+      const comparison = facts.comparison.data;
+      const names = context.requirements.items.flatMap(item =>
+        item.policy?.id === policy.id && item.check ? [item.check.name] : []
+      );
+      const known =
+        names.length > 0 &&
+        names.every(name => enforced(policy, name)) &&
+        available(facts.comparison) &&
+        comparison !== null &&
+        comparison.baseTarget.oid === revision.baseSha &&
+        comparison.headTarget.oid === revision.headSha;
+      items.push(
+        record(
+          row,
+          known ? (comparison.behindBy > 0 ? 'unmet' : 'met') : 'unavailable',
+          facts.comparison.source,
+          known ? `branch-behind:${comparison.behindBy}` : 'freshness-evaluation-unavailable'
+        )
+      );
+    } else if (row.kind === 'conversation-resolution') {
+      const unresolved = threads.items.filter(thread => thread.isResolved === false);
+      const completeThreads =
+        complete(threads) && threads.items.every(thread => thread.isResolved !== null);
+      const known =
+        enforced(policy) &&
+        (policy.source !== 'classic' || viewerRule?.requiresConversationResolution === true);
+      items.push(
+        record(
+          row,
+          known && unresolved.length ? 'unmet' : known && completeThreads ? 'met' : 'unavailable',
+          threads.source,
+          completeThreads
+            ? `unresolved-threads:${unresolved.length};ids:${unresolved.map(thread => thread.id).join(',')}`
+            : unresolved.length
+              ? `observed-unresolved-thread-ids:${unresolved.map(thread => thread.id).join(',')}`
+              : 'conversation-observations-incomplete'
+        )
+      );
+    } else if (row.kind === 'approving-reviews') {
+      const count = reviewParameters.required_approving_review_count;
+      const consistent =
+        complete(eligibleReviews) &&
+        complete(context.reviewDecisions) &&
+        complete(context.reviewActivity) &&
+        new Set(eligibleReviews.items.map(review => review.actor?.id)).size ===
+          eligibleReviews.items.length &&
+        eligibleReviews.items.every(
+          review =>
+            review.actor?.kind === 'User' &&
+            review.actor.id &&
+            review.commitSha === revision.headSha &&
+            GitHubPrReviewTimestampSchema.safeParse(review.submittedAt).success &&
+            ['APPROVED', 'CHANGES_REQUESTED'].includes(review.state) &&
+            context.reviewDecisions.items.some(current => contextReviewsAgree(review, current))
+        );
+      const known =
+        enforced(policy) &&
+        consistent &&
+        typeof count === 'number' &&
+        Number.isInteger(count) &&
+        count > 0 &&
+        (policy.source !== 'classic' || viewerRule?.requiredApprovingReviewCount === count) &&
+        reviewFlags.every(
+          ([classicField, rulesetField]) =>
+            reviewParameters[policy.source === 'classic' ? classicField : rulesetField] === false
+        );
+      const approved = eligibleReviews.items.filter(review => review.state === 'APPROVED');
+      items.push(
+        record(
+          row,
+          known ? (approved.length < count ? 'unmet' : 'met') : 'unavailable',
+          eligibleReviews.source,
+          known
+            ? `eligible-approvals:${approved.length}/${count};ids:${approved.map(review => review.id).join(',')}`
+            : 'review-eligibility-or-enforcement-unavailable'
+        )
+      );
+    } else if (row.kind === 'deployment') {
+      const matching = deployments.items.filter(
+        deployment =>
+          deployment.environment === row.title && deployment.commitOid === revision.headSha
+      );
+      const deployment = matching.length === 1 ? matching[0] : undefined;
+      const state = deployment?.latestStatus?.state;
+      const known = enforced(policy) && complete(deployments) && deployment;
+      items.push(
+        record(
+          row,
+          known && state === 'SUCCESS'
+            ? 'met'
+            : known && (state === 'FAILURE' || state === 'ERROR')
+              ? 'unmet'
+              : 'unavailable',
+          deployments.source,
+          matching.length
+            ? matching
+                .map(
+                  observed =>
+                    `deployment:${observed.id};environment:${row.title};state:${observed.latestStatus?.state ?? 'unknown'}`
+                )
+                .join('|')
+            : 'matching-deployment-unavailable'
+        )
+      );
+    } else {
+      items.push({ ...row, state: 'unavailable' });
+    }
   }
+  // Names compare source coverage here; only the check matcher can establish an application binding.
+  const viewer = facts.viewerRule;
+  const conflicts = [
+    {
+      field: 'status-checks',
+      source: viewer.requiredStatusCheckContexts.source,
+      conflict:
+        available(viewer.requiredStatusCheckContexts) &&
+        viewer.requiredStatusCheckContexts.data?.some(
+          name =>
+            name === null ||
+            !items.some(row => currentPolicy(row.policy) && row.check?.name === name)
+        ),
+    },
+    {
+      field: 'approving-reviews',
+      source: viewer.requiredApprovingReviewCount.source,
+      conflict:
+        available(viewer.requiredApprovingReviewCount) &&
+        (viewer.requiredApprovingReviewCount.data ?? 0) > 0 &&
+        !items.some(row => {
+          if (row.kind !== 'approving-reviews' || !currentPolicy(row.policy)) return false;
+          const parameters =
+            row.policy.source === 'classic'
+              ? object(row.policy.parameters?.required_pull_request_reviews)
+              : row.policy.parameters;
+          return (
+            parameters?.required_approving_review_count === viewer.requiredApprovingReviewCount.data
+          );
+        }),
+    },
+    {
+      field: 'conversations',
+      source: viewer.requiresConversationResolution.source,
+      conflict:
+        available(viewer.requiresConversationResolution) &&
+        viewer.requiresConversationResolution.data === true &&
+        !items.some(row => currentPolicy(row.policy) && row.kind === 'conversation-resolution'),
+    },
+  ].filter(result => result.conflict);
+  if (complete(context.requirements) && conflicts.length)
+    items.push({
+      id: 'github:policy-evaluation',
+      kind: 'policy-evaluation',
+      title: 'Policy evaluation',
+      state: 'unavailable',
+      policy: null,
+      check: null,
+      evidence: conflicts.flatMap(result =>
+        evidence(result.source, `policy-source-conflict:${result.field}`)
+      ),
+    });
   for (const check of (selected?.items ?? allChecks).filter(
     check =>
       check.requiredness === 'required' && check.observation === 'observed' && !covered.has(check)
@@ -726,6 +898,20 @@ export function evaluateContextRequirements(
     selectedSha
   );
   return {
+    evaluationSources: {
+      mergeable: facts.mergeable.source,
+      testMerge: facts.testMerge.source,
+      comparison: facts.comparison.source,
+      canBypassClassic: facts.canBypassClassic.source,
+      requiredApprovingReviewCount: facts.viewerRule.requiredApprovingReviewCount.source,
+      requiredStatusCheckContexts: facts.viewerRule.requiredStatusCheckContexts.source,
+      requiresConversationResolution: facts.viewerRule.requiresConversationResolution.source,
+      threads: threads.source,
+      eligibleReviews: eligibleReviews.source,
+      reviewDecisions: context.reviewDecisions.source,
+      reviewActivity: context.reviewActivity.source,
+      deployments: deployments.source,
+    },
     evaluatedShas: [
       ...new Set([
         revision.headSha,

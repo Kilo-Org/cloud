@@ -269,6 +269,27 @@ export const GitHubPrReviewQueueSchema = z
   })
   .strict();
 
+const evaluationSourceSchema = GitHubPrReviewSourceSchema.default(() => ({
+  ...unavailablePrReviewSource(),
+  reason: 'source-state-not-recorded',
+}));
+const evaluationSourcesSchema = z
+  .object({
+    mergeable: evaluationSourceSchema,
+    testMerge: evaluationSourceSchema,
+    comparison: evaluationSourceSchema,
+    canBypassClassic: evaluationSourceSchema,
+    requiredApprovingReviewCount: evaluationSourceSchema,
+    requiredStatusCheckContexts: evaluationSourceSchema,
+    requiresConversationResolution: evaluationSourceSchema,
+    threads: evaluationSourceSchema,
+    eligibleReviews: evaluationSourceSchema,
+    reviewDecisions: evaluationSourceSchema,
+    reviewActivity: evaluationSourceSchema,
+    deployments: evaluationSourceSchema,
+  })
+  .strict();
+
 // Old context payloads omit sources. Retain defaults until all old clients, servers, and records are gone.
 // Missing sources never establish an empty collection.
 export const GitHubPrReviewContextSchema = z
@@ -306,6 +327,8 @@ export const GitHubPrReviewContextSchema = z
     // Completeness covers supported PR-side sources, not every outgoing or inaccessible link.
     issueCoverage: z.literal('supported-pr-sources').default('supported-pr-sources'),
     requirements: githubPrReviewCollectionSchema(GitHubPrReviewRequirementSchema),
+    // Old evidence has no recovery metadata. Retain defaults until all old clients, servers, and records are gone.
+    evaluationSources: evaluationSourcesSchema.default(() => evaluationSourcesSchema.parse({})),
     checks: githubPrReviewCollectionSchema(GitHubPrReviewContextCheckSchema),
     queue: GitHubPrReviewQueueSchema.default(() => ({
       membership: { source: unavailablePrReviewSource(), state: 'unknown' as const, entryId: null },

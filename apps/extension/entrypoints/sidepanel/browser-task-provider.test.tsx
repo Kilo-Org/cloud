@@ -125,6 +125,7 @@ import { BROWSER_TASK_STORAGE_KEY } from '@/src/shared/browser-task-store';
 import type { StoredBrowserJob } from '@/src/shared/browser-task-store';
 import {
   createBrowserExecutionCoordinator,
+  BROWSER_EXECUTION_LOCK,
   BROWSER_EXECUTION_SAFETY_KEY,
   PROVIDER_OWNER_LOCK,
 } from './browser-execution-lock';
@@ -173,6 +174,8 @@ const terminalResult = (
 const relay = () => {
   let state: BrowserProviderState = { status: 'ready' };
   let registration: BrowserProviderRegistration | undefined;
+  // Relay history retains its binding after the SDK clears its registration proof.
+  let cachedRegistration: BrowserProviderRegistration | undefined;
   let generation = 0;
   let fence: Fence | undefined;
   let acknowledgeApproval = true;
@@ -290,6 +293,7 @@ const relay = () => {
     },
     markBrowserProviderUnavailable: (input: BrowserProviderUnavailableInput) => {
       record({ ...input, type: 'provider_unavailable' });
+      cachedRegistration = undefined;
       setState({ reason: input.reason, retryable: true, status: 'unavailable' });
       for (const job of rows.values()) {
         if (job.result === undefined) {
@@ -333,6 +337,7 @@ const relay = () => {
         type: 'provider_register',
       });
       registration = input;
+      cachedRegistration = input;
       if (
         fence !== undefined &&
         (input.recovery?.invocationId !== fence.invocationId ||
@@ -346,14 +351,24 @@ const relay = () => {
       generation += 1;
       return renew();
     },
-    requestBrowserProviderStatus: async () => {
+    requestBrowserProviderStatus: async (
+      _cursor?: string,
+      identity?: Pick<BrowserProviderRegistration, 'providerId' | 'providerProof'>
+    ) => {
       events.push('status');
-      if (registration === undefined) {
+      const provider = identity ?? cachedRegistration;
+      if (provider === undefined) {
         throw new BrowserProviderError('provider_unavailable', true);
+      }
+      if (
+        provider.providerId !== registration?.providerId ||
+        provider.providerProof !== registration.providerProof
+      ) {
+        throw new BrowserProviderError('owner_mismatch', false);
       }
       return {
         jobs: [...rows.values()],
-        providerId: registration.providerId,
+        providerId: provider.providerId,
         requestId: crypto.randomUUID(),
         type: 'provider_status_result' as const,
         ...(fence === undefined ? {} : { unresolvedFence: fence }),
@@ -801,6 +816,836 @@ describe('enabled browser provider owner', () => {
     expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({ tabIds: [7] });
     expect((await coordinator.acquireLocal()).admitted).toBe(false);
     expect(transport.events).not.toContain('quiesced');
+  });
+
+  describe('recovery preparation', () => {
+    it('prepares a withdrawn profile without restoring cached proof or execution authority', async () => {
+      const { coordinator, runtime, transport } = await setup();
+      const admission = await coordinator.acquireLocal();
+      if (!admission.admitted) {
+        throw new Error(admission.reason);
+      }
+      localLeases.push(admission.lease);
+      await admission.lease.quarantine(8);
+      await admission.lease.release();
+      await waitFor(() => {
+        expect(runtime.getSnapshot().phase).toBe('recovery');
+      });
+      await expect(transport.connection.requestBrowserProviderStatus()).rejects.toThrow(
+        'provider_unavailable'
+      );
+      fixture.tabs = fixture.tabs.filter(tab => tab.id !== 8);
+      const previous = structuredClone(runtime.getSnapshot());
+      const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+      const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+      const outbound = structuredClone(transport.outbound);
+      const writes = [...fixture.writes];
+
+      await expect(runtime.prepareRecovery()).resolves.toMatchObject({ ready: true });
+      await expect(transport.connection.requestBrowserProviderStatus()).rejects.toThrow(
+        'provider_unavailable'
+      );
+      expect(transport.connection.getBrowserProviderState().status).toBe('unavailable');
+      expect(runtime.getSnapshot()).toStrictEqual(previous);
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+      expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+      expect(fixture.writes).toStrictEqual(writes);
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect((await coordinator.acquireLocal()).admitted).toBe(false);
+      expect(fixture.actions).toStrictEqual([]);
+    });
+
+    it.each([undefined, 0, 7])(
+      'reports a closed, drained fence with tab %s without recovering or changing results',
+      async tabId => {
+        const { coordinator, runtime, transport } = await setup();
+        const message = transport.delivery();
+        transport.dispatch(message);
+        await waitForConsent(runtime);
+        await runtime.approve(message.job.jobId, 7);
+        await waitForDone(runtime);
+        const fence: Fence = {
+          invocationId: `b1.${Date.now() - 700_000_000}.${'b'.repeat(64)}`,
+          ...(tabId === undefined ? {} : { tabId }),
+        };
+        transport.setFence(fence);
+        transport.setState({
+          reason: 'provider_unavailable',
+          retryable: true,
+          status: 'unavailable',
+        });
+        const safety = { allTabs: true, tabIds: [0, 7], version: 1 };
+        fixture.values.set(BROWSER_EXECUTION_SAFETY_KEY, safety);
+        fixture.tabs = [];
+        await coordinator.refresh();
+        const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+        const result = structuredClone(runtime.getSnapshot().result);
+        const outbound = structuredClone(transport.outbound);
+        const writes = [...fixture.writes];
+
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+          ready: true,
+          reason: expect.stringContaining('Recover explicitly'),
+        });
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({ ready: true });
+        expect(runtime.getSnapshot()).toMatchObject({
+          active: undefined,
+          phase: 'recovery',
+          result,
+        });
+        await expect(runtime.refreshStatus()).resolves.toStrictEqual(fence);
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+        expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+        expect(fixture.writes).toStrictEqual(writes);
+        expect(transport.outbound).toStrictEqual(outbound);
+        expect(fixture.actions).toStrictEqual(['run:7:1']);
+        expect((await coordinator.acquireLocal()).admitted).toBe(false);
+      }
+    );
+
+    it('cannot prepare while an active task still awaits consent', async () => {
+      const { runtime, transport } = await setup();
+      transport.dispatch(transport.delivery());
+      await waitForConsent(runtime);
+      const previous = runtime.getSnapshot();
+      const outbound = structuredClone(transport.outbound);
+      const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+      await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+        ready: false,
+        reason: expect.stringContaining('unwinding'),
+      });
+      expect(runtime.getSnapshot()).toStrictEqual(previous);
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+      expect(fixture.actions).toStrictEqual([]);
+    });
+
+    it('keeps an empty provider empty without creating recovery authority', async () => {
+      const { runtime, transport } = await setup();
+      const previous = runtime.getSnapshot();
+      const writes = [...fixture.writes];
+      const outbound = structuredClone(transport.outbound);
+      await expect(runtime.prepareRecovery()).resolves.toMatchObject({ ready: true });
+      expect(runtime.getSnapshot()).toStrictEqual(previous);
+      expect(fixture.writes).toStrictEqual(writes);
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect(fixture.actions).toStrictEqual([]);
+    });
+
+    it.each([
+      { kind: 'remote zero', openId: 0, reason: 'Close the affected tab', tabId: 0, tabIds: [] },
+      {
+        kind: 'remote uninspectable',
+        openId: 7,
+        reason: 'Close the affected tab',
+        tabId: 7,
+        tabIds: [],
+      },
+      {
+        kind: 'local zero',
+        openId: 0,
+        reason: 'Close all affected tabs',
+        tabId: undefined,
+        tabIds: [0],
+      },
+      {
+        kind: 'allTabs',
+        openId: 8,
+        reason: 'Close all target tabs',
+        tabId: undefined,
+        tabIds: [7],
+      },
+      { kind: 'allTabs', openId: 0, reason: 'Close all target tabs', tabId: undefined, tabIds: [] },
+    ])('blocks an open $kind tab outside the inspectable inventory', async testCase => {
+      const { coordinator, runtime, transport } = await setup();
+      const fence: Fence = {
+        invocationId: `b1.${Date.now() - 700_000_000}.${'c'.repeat(64)}`,
+        ...(testCase.tabId === undefined ? {} : { tabId: testCase.tabId }),
+      };
+      transport.setFence(fence);
+      const safety = {
+        ...(testCase.kind === 'allTabs' ? { allTabs: true } : {}),
+        tabIds: testCase.tabIds,
+        version: 1,
+      };
+      fixture.values.set(BROWSER_EXECUTION_SAFETY_KEY, safety);
+      fixture.tabs = [{ id: testCase.openId, title: 'Uninspectable', url: 'chrome://settings' }];
+      await coordinator.refresh();
+      const outbound = structuredClone(transport.outbound);
+      await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+        ready: false,
+        reason: expect.stringContaining(testCase.reason),
+      });
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+      await expect(runtime.refreshStatus()).resolves.toStrictEqual(fence);
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect(fixture.actions).toStrictEqual([]);
+    });
+
+    it('retrieves a fresh fence instead of reusing a status request that predates preparation', async () => {
+      const { runtime, transport } = await setup();
+      const requested = Promise.withResolvers<void>();
+      const resume = Promise.withResolvers<void>();
+      const status = transport.connection.requestBrowserProviderStatus;
+      const spy = vi
+        .spyOn(transport.connection, 'requestBrowserProviderStatus')
+        .mockImplementationOnce(async () => {
+          const page = await status();
+          requested.resolve();
+          await resume.promise;
+          return page;
+        });
+      const retrieving = runtime.refreshStatus();
+      await requested.promise;
+      const fence = { invocationId: `b1.${Date.now()}.${'f'.repeat(64)}`, tabId: 0 };
+      transport.setFence(fence);
+      fixture.tabs = [{ id: 0, title: 'Affected tab', url: 'chrome://settings' }];
+      const preparing = runtime.prepareRecovery();
+      try {
+        resume.resolve();
+        await retrieving;
+        await expect(preparing).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('Close the affected tab'),
+        });
+        expect(runtime.getSnapshot().unresolvedFence).toStrictEqual(fence);
+        expect(transport.events).not.toContain('recovered');
+        expect(fixture.actions).toStrictEqual([]);
+      } finally {
+        resume.resolve();
+        await retrieving;
+        await preparing;
+        spy.mockRestore();
+      }
+    });
+
+    it('enumerates again under the native lock instead of reusing the preflight tab list', async () => {
+      const { coordinator, runtime, transport } = await setup();
+      transport.setFence({ invocationId: `b1.${Date.now()}.${'d'.repeat(64)}`, tabId: 0 });
+      fixture.tabs = [];
+      const prepare = coordinator.prepareRecovery;
+      const spy = vi.spyOn(coordinator, 'prepareRecovery').mockImplementationOnce(getTabs => {
+        fixture.tabs = [{ id: 0, title: 'Affected tab', url: 'chrome://settings' }];
+        return prepare(getTabs);
+      });
+      try {
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('Close the affected tab'),
+        });
+        expect(transport.events).not.toContain('recovered');
+        expect(fixture.actions).toStrictEqual([]);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it.each([
+      { code: 'provider_unavailable', guidance: 'Reopen the signed-in panel', retryable: true },
+      { code: 'request_timeout', guidance: 'Reconnect and retrieve status', retryable: true },
+      { code: 'permission_denied', guidance: 'Restore provider access', retryable: false },
+    ] as const)('fails closed on $code status without probing registration', async failure => {
+      const { runtime, transport } = await setup();
+      const previous = runtime.getSnapshot();
+      const outbound = structuredClone(transport.outbound);
+      const writes = [...fixture.writes];
+      transport.connection.requestBrowserProviderStatus = async () => {
+        throw new BrowserProviderError(failure.code, failure.retryable);
+      };
+      await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+        ready: false,
+        reason: expect.stringContaining(failure.guidance),
+      });
+      expect(runtime.getSnapshot()).toStrictEqual(previous);
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect(fixture.writes).toStrictEqual(writes);
+      expect(fixture.actions).toStrictEqual([]);
+    });
+
+    it('rejects a foreign provider on a later status page before tab or safety preparation', async () => {
+      const { runtime, transport } = await setup();
+      const { providerId } = transport.delivery().job;
+      transport.connection.requestBrowserProviderStatus = async (cursor?: string) => ({
+        jobs: [],
+        providerId: cursor === undefined ? providerId : `bp_${crypto.randomUUID()}`,
+        requestId: crypto.randomUUID(),
+        type: 'provider_status_result',
+        ...(cursor === undefined ? { nextCursor: 'next' } : {}),
+      });
+      const writes = [...fixture.writes];
+      const outbound = structuredClone(transport.outbound);
+      await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+        ready: false,
+        reason: expect.stringContaining('owning signed-in panel'),
+      });
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect(fixture.writes).toStrictEqual(writes);
+      expect(fixture.actions).toStrictEqual([]);
+    });
+
+    it.each(['tabs', 'storage'] as const)(
+      'returns concrete guidance for failed %s access',
+      async failed => {
+        const { runtime, transport } = await setup();
+        const tabs = await browser.tabs.query({});
+        const tabsApi: {
+          query: (queryInfo: Parameters<typeof browser.tabs.query>[0]) => Promise<typeof tabs>;
+        } = browser.tabs;
+        const storageApi = storage as { getItem: (key: string) => unknown };
+        const { getItem } = storageApi;
+        const query = vi.spyOn(tabsApi, 'query');
+        const read = vi.spyOn(storageApi, 'getItem');
+        if (failed === 'tabs') {
+          query.mockRejectedValueOnce(new Error('Private browser error'));
+        } else {
+          read.mockImplementation(key => {
+            if (key === BROWSER_EXECUTION_SAFETY_KEY) {
+              throw new Error('Private storage error');
+            }
+            return getItem(key);
+          });
+        }
+        try {
+          const readiness = await runtime.prepareRecovery();
+          expect(readiness).toMatchObject({
+            ready: false,
+            reason: expect.stringContaining(
+              failed === 'tabs' ? 'Restore browser tab access' : 'Restore storage'
+            ),
+          });
+          expect(readiness.reason).not.toContain('Private');
+          expect(transport.events).not.toContain('recovered');
+          expect(fixture.values.has(BROWSER_EXECUTION_SAFETY_KEY)).toBe(false);
+          expect(fixture.actions).toStrictEqual([]);
+        } finally {
+          query.mockRestore();
+          read.mockRestore();
+        }
+      }
+    );
+
+    it.each(['disabled', 'disposed', 'unsupported'] as const)(
+      'cannot prepare a %s provider',
+      async state => {
+        const { runtime, transport } = await setup(state !== 'disabled', state !== 'unsupported');
+        if (state === 'disposed') {
+          await runtime.dispose();
+        }
+        const outbound = structuredClone(transport.outbound);
+        const writes = [...fixture.writes];
+        const guidance = {
+          disabled: 'Enable CLI tasks',
+          disposed: 'Reopen the signed-in panel',
+          unsupported: 'Restore browser Web Locks support',
+        };
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining(guidance[state]),
+        });
+        expect(transport.outbound).toStrictEqual(outbound);
+        expect(fixture.writes).toStrictEqual(writes);
+        expect(fixture.actions).toStrictEqual([]);
+      }
+    );
+
+    it('rejects a released provider owner after status retrieval starts', async () => {
+      const transport = relay();
+      const coordinator = createBrowserExecutionCoordinator({
+        locks: nativeLocks as LockManager,
+        storageArea: storage,
+      });
+      const owner = await coordinator.acquireProviderOwner();
+      if (!owner.admitted) {
+        throw new Error(owner.reason);
+      }
+      const runtime = createBrowserTaskProviderRuntime({
+        auth,
+        connection: transport.connection,
+        coordinator: { ...coordinator, acquireProviderOwner: async () => owner },
+        organizationId: 'org-approved',
+        storageArea: storage,
+      });
+      runtimes.push(runtime);
+      await runtime.start();
+      await runtime.setSettings(defaults);
+      const requested = Promise.withResolvers<void>();
+      const resume = Promise.withResolvers<void>();
+      const status = transport.connection.requestBrowserProviderStatus;
+      transport.connection.requestBrowserProviderStatus = async () => {
+        const page = await status();
+        requested.resolve();
+        await resume.promise;
+        return page;
+      };
+      const preparing = runtime.prepareRecovery();
+      try {
+        await requested.promise;
+        await owner.lease.release();
+        resume.resolve();
+        await expect(preparing).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('Use the owning panel'),
+        });
+        expect(fixture.actions).toStrictEqual([]);
+        expect(transport.events).not.toContain('recovered');
+      } finally {
+        resume.resolve();
+        await preparing;
+      }
+    });
+
+    it.each([
+      { operation: 'registration', response: 'page' },
+      { operation: 'registration', response: 'failure' },
+      { operation: 'recovery', response: 'page' },
+      { operation: 'recovery', response: 'failure' },
+      { operation: 'recovery registration', response: 'page' },
+      { operation: 'recovery registration', response: 'failure' },
+      { operation: 'recovery bootstrap', response: 'page' },
+      { operation: 'recovery bootstrap', response: 'failure' },
+    ] as const)(
+      'does not publish stale $operation status $response into a changed account',
+      async ({ operation, response }) => {
+        const { runtime, transport } = await setup();
+        if (operation === 'registration') {
+          await runtime.setSettings({ ...defaults, enabled: false });
+        }
+        const paused = Promise.withResolvers<void>();
+        const resume = Promise.withResolvers<void>();
+        const status = transport.connection.requestBrowserProviderStatus;
+        const spy = vi.spyOn(transport.connection, 'requestBrowserProviderStatus');
+        if (operation === 'recovery registration') {
+          spy.mockImplementationOnce(status);
+        } else if (operation === 'recovery bootstrap') {
+          spy.mockRejectedValueOnce(new BrowserProviderError('provider_unavailable', true));
+        }
+        spy.mockImplementationOnce(async () => {
+          const page = await status();
+          const staleJob = transport.delivery().job;
+          paused.resolve();
+          await resume.promise;
+          if (response === 'failure') {
+            throw new BrowserProviderError('disconnected', true);
+          }
+          return {
+            ...page,
+            jobs: [staleJob],
+            unresolvedFence: { invocationId: staleJob.invocationId, tabId: 0 },
+          };
+        });
+        const pending =
+          operation === 'registration' ? runtime.setSettings(defaults) : runtime.recover();
+        try {
+          await paused.promise;
+          await storage.setItem(AUTH_STORAGE_KEY, {
+            token: 'other-token',
+            userEmail: 'other@example.test',
+          });
+          const previous = structuredClone(runtime.getSnapshot());
+          const outbound = structuredClone(transport.outbound);
+          const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+          resume.resolve();
+          await pending;
+          expect(runtime.getSnapshot()).toStrictEqual(previous);
+          expect(transport.outbound).toStrictEqual(outbound);
+          expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+          expect(fixture.actions).toStrictEqual([]);
+        } finally {
+          resume.resolve();
+          await pending;
+          spy.mockRestore();
+        }
+      }
+    );
+
+    describe.each(['registration', 'recovery registration', 'recovery bootstrap'] as const)(
+      'pending %s lifetime',
+      operation => {
+        it.each([
+          { change: 'auth', response: 'success', stage: 'request' },
+          { change: 'auth', response: 'failure', stage: 'request' },
+          { change: 'auth', response: 'success', stage: 'coordinator refresh' },
+          { change: 'auth', response: 'failure', stage: 'coordinator refresh' },
+          { change: 'dispose', response: 'success', stage: 'coordinator refresh' },
+          { change: 'dispose', response: 'failure', stage: 'coordinator refresh' },
+        ] as const)(
+          'ignores delayed $stage $response after $change without withdrawing a replacement',
+          async ({ change, response, stage }) => {
+            const { coordinator, runtime, transport } = await setup();
+            if (operation === 'registration') {
+              await runtime.setSettings({ ...defaults, enabled: false });
+            }
+            const paused = Promise.withResolvers<void>();
+            const resume = Promise.withResolvers<void>();
+            const pause = async () => {
+              paused.resolve();
+              await resume.promise;
+              if (response === 'failure') {
+                throw new BrowserProviderError('permission_denied', false);
+              }
+            };
+            const register = transport.connection.registerBrowserProvider;
+            const { refresh } = coordinator;
+            const spy =
+              stage === 'request'
+                ? vi
+                    .spyOn(transport.connection, 'registerBrowserProvider')
+                    .mockImplementationOnce(async input => {
+                      const lease = await register(input);
+                      await pause();
+                      return lease;
+                    })
+                : vi.spyOn(coordinator, 'refresh').mockImplementationOnce(async () => {
+                    await refresh();
+                    await pause();
+                  });
+            const statusSpy =
+              operation === 'recovery bootstrap'
+                ? vi
+                    .spyOn(transport.connection, 'requestBrowserProviderStatus')
+                    .mockRejectedValueOnce(new BrowserProviderError('provider_unavailable', true))
+                : undefined;
+            const pending =
+              operation === 'registration' ? runtime.setSettings(defaults) : runtime.recover();
+            try {
+              await paused.promise;
+              if (change === 'dispose') {
+                await runtime.dispose();
+              } else {
+                await storage.setItem(AUTH_STORAGE_KEY, {
+                  token: 'other-token',
+                  userEmail: 'other@example.test',
+                });
+                const previousRegistration = transport.outbound.findLast(
+                  frame => frame.type === 'provider_register'
+                );
+                if (previousRegistration === undefined) {
+                  throw new Error('Missing registration');
+                }
+                // A replacement provider must survive the old registration's completion.
+                await register({
+                  generation: previousRegistration.generation + 1,
+                  label: previousRegistration.label,
+                  providerId: previousRegistration.providerId,
+                  providerProof: previousRegistration.providerProof,
+                });
+                fixture.values.set(BROWSER_EXECUTION_SAFETY_KEY, { tabIds: [8], version: 1 });
+                await refresh();
+              }
+              const previous = structuredClone(runtime.getSnapshot());
+              const providerState = structuredClone(transport.connection.getBrowserProviderState());
+              const outbound = structuredClone(transport.outbound);
+              const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+              const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+              resume.resolve();
+              await pending;
+              expect(runtime.getSnapshot()).toStrictEqual(previous);
+              expect(transport.connection.getBrowserProviderState()).toStrictEqual(providerState);
+              expect(transport.outbound).toStrictEqual(outbound);
+              expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+              expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+              expect(fixture.actions).toStrictEqual([]);
+            } finally {
+              resume.resolve();
+              await pending;
+              spy.mockRestore();
+              statusSpy?.mockRestore();
+            }
+          }
+        );
+      }
+    );
+
+    it('keeps preparation valid across a matching lease renewal', async () => {
+      const { coordinator, runtime, transport } = await setup();
+      const paused = Promise.withResolvers<void>();
+      const resume = Promise.withResolvers<void>();
+      const prepare = coordinator.prepareRecovery;
+      const spy = vi.spyOn(coordinator, 'prepareRecovery').mockImplementationOnce(async getTabs => {
+        const readiness = await prepare(getTabs);
+        paused.resolve();
+        await resume.promise;
+        return readiness;
+      });
+      const preparing = runtime.prepareRecovery();
+      try {
+        await paused.promise;
+        transport.renew();
+        const previous = structuredClone(runtime.getSnapshot());
+        const outbound = structuredClone(transport.outbound);
+        resume.resolve();
+        await expect(preparing).resolves.toMatchObject({ ready: true });
+        expect(runtime.getSnapshot()).toStrictEqual(previous);
+        expect(transport.outbound).toStrictEqual(outbound);
+        expect(fixture.actions).toStrictEqual([]);
+      } finally {
+        resume.resolve();
+        await preparing;
+        spy.mockRestore();
+      }
+    });
+
+    describe.each(['status', 'later status page', 'tabs', 'coordinator'] as const)(
+      'pending %s completion',
+      stage => {
+        it.each([
+          'invocation',
+          'finished invocation',
+          'disable',
+          'auth',
+          'organization',
+          'dispose',
+          'generation',
+          'provider binding',
+          'disconnect',
+          'reconnect',
+        ] as const)('cannot report ready or change a newer state after %s', async change => {
+          const { coordinator, runtime, transport } = await setup();
+          const retainedFence = { invocationId: `b1.${Date.now()}.${'e'.repeat(64)}` };
+          const queued: BrowserJobSnapshot = {
+            ...transport.delivery().job,
+            ownerLabel: 'ses_parent_old',
+            queuePosition: 1,
+            status: 'queued',
+          };
+          transport.rows.set(queued.jobId, queued);
+          transport.setFence(retainedFence);
+          if (change === 'disconnect' || change === 'reconnect') {
+            transport.setState({
+              reason: 'provider_unavailable',
+              retryable: true,
+              status: 'unavailable',
+            });
+          }
+          await runtime.refreshStatus();
+          const paused = Promise.withResolvers<void>();
+          const resume = Promise.withResolvers<void>();
+          const pause = async () => {
+            paused.resolve();
+            await resume.promise;
+          };
+          if (stage === 'status' || stage === 'later status page') {
+            const status = transport.connection.requestBrowserProviderStatus;
+            const staleJob = transport.delivery().job;
+            vi.spyOn(transport.connection, 'requestBrowserProviderStatus').mockImplementation(
+              async (cursor?: string) => {
+                const page = await status();
+                if (stage === 'later status page' && cursor === undefined) {
+                  return { ...page, jobs: [], nextCursor: 'next' };
+                }
+                await pause();
+                return {
+                  ...page,
+                  jobs: [...page.jobs, staleJob],
+                  unresolvedFence: { invocationId: staleJob.invocationId, tabId: 0 },
+                };
+              }
+            );
+          } else if (stage === 'tabs') {
+            const tabs = await browser.tabs.query({});
+            const tabsApi: {
+              query: (queryInfo: Parameters<typeof browser.tabs.query>[0]) => Promise<typeof tabs>;
+            } = browser.tabs;
+            vi.spyOn(tabsApi, 'query').mockImplementationOnce(async () => {
+              await pause();
+              return tabs;
+            });
+          } else {
+            const prepare = coordinator.prepareRecovery;
+            vi.spyOn(coordinator, 'prepareRecovery').mockImplementationOnce(async getTabs => {
+              const readiness = await prepare(getTabs);
+              await pause();
+              return readiness;
+            });
+          }
+          const preparing = runtime.prepareRecovery();
+          try {
+            await paused.promise;
+            transport.rows.set(queued.jobId, {
+              ...queued,
+              ownerLabel: 'ses_parent_new',
+              queuePosition: 2,
+            });
+            transport.snapshot();
+            if (change === 'invocation' || change === 'finished invocation') {
+              const message = transport.delivery();
+              transport.dispatch(message);
+              await waitForConsent(runtime);
+              if (change === 'finished invocation') {
+                runtime.reject(message.job.jobId);
+                await waitForDone(runtime);
+              }
+            } else if (change === 'disable') {
+              await runtime.setSettings({ ...defaults, enabled: false });
+            } else if (change === 'auth') {
+              await storage.setItem(AUTH_STORAGE_KEY, {
+                token: 'other-token',
+                userEmail: 'other@example.test',
+              });
+            } else if (change === 'organization') {
+              await storage.setItem('local:kiloSelectedOrganizationId', 'other-org');
+            } else if (change === 'dispose') {
+              await runtime.dispose();
+            } else if (change === 'disconnect' || change === 'reconnect') {
+              transport.setState({ status: 'disconnected' });
+              if (change === 'reconnect') {
+                transport.setState({ status: 'negotiating' });
+                transport.setState({
+                  reason: 'provider_unavailable',
+                  retryable: true,
+                  status: 'unavailable',
+                });
+              }
+            } else {
+              const state = transport.connection.getBrowserProviderState();
+              if (state.status !== 'registered') {
+                throw new Error('Expected a registered provider');
+              }
+              transport.setState({
+                ...state,
+                lease: {
+                  ...state.lease,
+                  ...(change === 'generation'
+                    ? { generation: state.lease.generation + 1 }
+                    : { providerId: `bp_${crypto.randomUUID()}` }),
+                },
+              });
+            }
+            const previous = structuredClone(runtime.getSnapshot());
+            const outbound = structuredClone(transport.outbound);
+            const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+            const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+            resume.resolve();
+            await expect(preparing).resolves.toMatchObject({
+              ready: false,
+              reason: expect.stringMatching(/Wait|Enable|Reopen/u),
+            });
+            expect(runtime.getSnapshot()).toStrictEqual(previous);
+            expect(runtime.getSnapshot().unresolvedFence).toStrictEqual(retainedFence);
+            expect(transport.outbound).toStrictEqual(outbound);
+            expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+            expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+            expect(fixture.actions).toStrictEqual([]);
+          } finally {
+            resume.resolve();
+            await preparing;
+            vi.restoreAllMocks();
+          }
+        });
+      }
+    );
+
+    it('retries only eligible failed releases after successful status without clearing the fence', async () => {
+      const { coordinator, runtime, transport } = await setup();
+      const admission = await coordinator.acquireLocal();
+      if (!admission.admitted) {
+        throw new Error(admission.reason);
+      }
+      localLeases.push(admission.lease);
+      const resume = Promise.withResolvers<void>();
+      const work = admission.lease.run(() => resume.promise);
+      fixture.failWrite = BROWSER_EXECUTION_SAFETY_KEY;
+      await expect(admission.lease.quarantine(7)).rejects.toThrow('Private storage failure');
+      await expect(admission.lease.release()).rejects.toThrow('Private storage failure');
+      fixture.tabs = [];
+      const status = transport.connection.requestBrowserProviderStatus;
+      try {
+        fixture.failWrite = '';
+        transport.connection.requestBrowserProviderStatus = async () => {
+          throw new BrowserProviderError('provider_unavailable', true);
+        };
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('Reopen the signed-in panel'),
+        });
+        expect(fixture.values.has(BROWSER_EXECUTION_SAFETY_KEY)).toBe(false);
+        transport.connection.requestBrowserProviderStatus = status;
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('unwinding'),
+        });
+        expect(fixture.values.has(BROWSER_EXECUTION_SAFETY_KEY)).toBe(false);
+        expect(
+          (await nativeLocks.query()).held?.some(lock => lock.name === BROWSER_EXECUTION_LOCK)
+        ).toBe(true);
+        resume.resolve();
+        await work;
+        transport.setFence({ invocationId: `b1.${Date.now()}.${'a'.repeat(64)}`, tabId: 0 });
+        fixture.tabs = [{ id: 0, title: 'Affected tab', url: 'chrome://settings' }];
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('Close the affected tab'),
+        });
+        expect(fixture.values.has(BROWSER_EXECUTION_SAFETY_KEY)).toBe(false);
+        fixture.tabs = [];
+        fixture.failWrite = BROWSER_EXECUTION_SAFETY_KEY;
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('Restore storage'),
+        });
+        fixture.failWrite = '';
+        const outbound = structuredClone(transport.outbound);
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({ ready: true });
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+          tabIds: [7],
+          version: 1,
+        });
+        expect(
+          (await nativeLocks.query()).held?.some(lock => lock.name === BROWSER_EXECUTION_LOCK)
+        ).toBe(false);
+        expect((await coordinator.acquireLocal()).admitted).toBe(false);
+        expect(transport.outbound).toStrictEqual(outbound);
+        expect(fixture.actions).toStrictEqual([]);
+      } finally {
+        fixture.failWrite = '';
+        transport.connection.requestBrowserProviderStatus = status;
+        resume.resolve();
+        await work;
+        await coordinator.prepareRecovery(async () => []);
+      }
+    });
+
+    it.each(['remote tab', 'allTabs', 'execution lock', 'status', 'disable'] as const)(
+      'rechecks %s during actual recovery after a ready result',
+      async change => {
+        const { coordinator, runtime, transport } = await setup();
+        transport.setFence({ invocationId: `b1.${Date.now()}.${'e'.repeat(64)}`, tabId: 7 });
+        fixture.tabs = [];
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({ ready: true });
+        if (change === 'remote tab') {
+          fixture.tabs = [{ id: 7, title: 'Affected', url: 'chrome://settings' }];
+        } else if (change === 'allTabs') {
+          fixture.values.set(BROWSER_EXECUTION_SAFETY_KEY, {
+            allTabs: true,
+            tabIds: [],
+            version: 1,
+          });
+          fixture.tabs = [{ id: 8, title: 'Other', url: 'chrome://settings' }];
+        } else if (change === 'execution lock') {
+          const local = await coordinator.acquireLocal();
+          if (!local.admitted) {
+            throw new Error(local.reason);
+          }
+          localLeases.push(local.lease);
+        } else if (change === 'status') {
+          transport.connection.requestBrowserProviderStatus = async () => {
+            throw new BrowserProviderError('permission_denied', false);
+          };
+        } else {
+          await runtime.setSettings({ ...defaults, enabled: false });
+        }
+        const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+        await runtime.recover();
+        expect(transport.events).not.toContain('recovered');
+        expect(
+          transport.outbound.filter(
+            frame => frame.type === 'provider_register' && frame.recovery !== undefined
+          )
+        ).toStrictEqual([]);
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+        expect(fixture.actions).toStrictEqual([]);
+      }
+    );
   });
 
   it.each([undefined, 7])(
@@ -1900,24 +2745,6 @@ describe('enabled browser provider owner', () => {
 
   it('withdraws a locally quarantined provider and recovers after the SDK clears its proof cache', async () => {
     const { coordinator, runtime, transport } = await setup();
-    let proofAvailable = true;
-    const register = transport.connection.registerBrowserProvider;
-    const unavailable = transport.connection.markBrowserProviderUnavailable;
-    const status = transport.connection.requestBrowserProviderStatus;
-    transport.connection.registerBrowserProvider = input => {
-      proofAvailable = true;
-      return register(input);
-    };
-    transport.connection.markBrowserProviderUnavailable = input => {
-      proofAvailable = false;
-      unavailable(input);
-    };
-    transport.connection.requestBrowserProviderStatus = async () => {
-      if (!proofAvailable) {
-        throw new BrowserProviderError('provider_unavailable', true);
-      }
-      return status();
-    };
     const admission = await coordinator.acquireLocal();
     if (!admission.admitted) {
       throw new Error(admission.reason);

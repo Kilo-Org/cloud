@@ -48,7 +48,11 @@ import type { BrowserTaskStore, StoredBrowserJob } from '@/src/shared/browser-ta
 import { REMOTE_MCP_STORAGE_KEY } from '@/src/shared/remote-mcp-storage';
 import { WEB_MCP_SETTINGS_STORAGE_KEY } from '@/src/shared/web-mcp-settings';
 import { getBrowserExecutionCoordinator } from './browser-execution-lock';
-import type { BrowserExecutionCoordinator, BrowserExecutionLease } from './browser-execution-lock';
+import type {
+  BrowserExecutionCoordinator,
+  BrowserExecutionLease,
+  BrowserRecoveryReadiness,
+} from './browser-execution-lock';
 import {
   browserTaskFailure,
   getBrowserTaskTabs,
@@ -196,11 +200,12 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
   let leaseUntil = 0;
   let leaseTimer: ReturnType<typeof setTimeout> | undefined = undefined;
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined = undefined;
-  let registering: Promise<void> | undefined = undefined;
+  let registering: Promise<'cancelled' | undefined> | undefined = undefined;
   let starting: Promise<void> | undefined = undefined;
   let statusRequest: Promise<BrowserProviderStatusResult['unresolvedFence']> | undefined =
     undefined;
   let recovering = false;
+  let recoveryRevision = 0;
   let snapshot: BrowserTaskProviderSnapshot = {
     active: undefined,
     jobs: [],
@@ -432,22 +437,50 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
   let lastStatus: { fence: BrowserProviderStatusResult['unresolvedFence'] } | undefined;
   const refreshStatus = (): Promise<BrowserProviderStatusResult['unresolvedFence']> => {
     statusRequest ??= (async () => {
+      const providerOwner = owner;
+      const providerProfile = profile;
+      const providerIdentity = identity;
+      const providerSettings = settings;
+      const providerGeneration = generation;
+      const revision = recoveryRevision;
+      const guard = (): void => {
+        if (
+          disposed ||
+          owner !== providerOwner ||
+          profile !== providerProfile ||
+          identity !== providerIdentity ||
+          settings !== providerSettings ||
+          generation !== providerGeneration ||
+          recoveryRevision !== revision
+        ) {
+          throw new ExecutionStoppedError('provider_lost');
+        }
+        try {
+          // Read-only history needs the panel owner, not a registered execution lease.
+          providerOwner?.guard();
+        } catch {
+          throw new ExecutionStoppedError('provider_lost');
+        }
+      };
       const deadline = Date.now() + 30_000;
       const cursors = new Set<string>();
       let cursor: string | undefined = undefined;
       let fence: BrowserProviderStatusResult['unresolvedFence'] = undefined;
       try {
         do {
-          if (disposed || Date.now() >= deadline) {
+          guard();
+          if (Date.now() >= deadline) {
             throw new ExecutionStoppedError('provider_unavailable');
           }
           // eslint-disable-next-line no-await-in-loop -- Follow bounded history pages without granting execution.
-          const page = await connection.requestBrowserProviderStatus(cursor);
-          if (page.providerId !== identity?.providerId) {
+          const page = await connection.requestBrowserProviderStatus(cursor, providerIdentity);
+          guard();
+          if (page.providerId !== providerIdentity?.providerId) {
             throw new ExecutionStoppedError('owner_mismatch');
           }
           fence = page.unresolvedFence ?? fence;
           for (const job of page.jobs) {
+            guard();
             // Status pages update display state, but never acknowledge approval or grant a lease.
             consumeJob(job, false);
           }
@@ -459,51 +492,79 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
             cursors.add(cursor);
           }
         } while (cursor !== undefined);
+        guard();
         lastStatus = { fence: structuredClone(fence) };
         publish({ unresolvedFence: fence });
         return fence;
+      } catch (error) {
+        guard();
+        throw error;
       } finally {
         statusRequest = undefined;
       }
     })();
     return statusRequest;
   };
-  const register = (recovery?: BrowserProviderRegistration['recovery']): Promise<void> => {
-    registering ??= (async () => {
+  const register = (
+    recovery?: BrowserProviderRegistration['recovery']
+  ): Promise<'cancelled' | undefined> => {
+    registering ??= (async (): Promise<'cancelled' | undefined> => {
+      const providerOwner = owner;
+      const providerProfile = profile;
+      const providerIdentity = identity;
+      const providerSettings = settings;
+      const guard = (): void => {
+        // Registration changes its own generation and transport state, not its owning lifetime.
+        if (
+          disposed ||
+          owner !== providerOwner ||
+          profile !== providerProfile ||
+          identity !== providerIdentity ||
+          settings !== providerSettings
+        ) {
+          throw new ExecutionStoppedError('provider_lost');
+        }
+        try {
+          providerOwner?.guard();
+        } catch {
+          throw new ExecutionStoppedError('provider_lost');
+        }
+      };
       try {
         if (
-          profile === undefined ||
-          identity === undefined ||
-          disposed ||
-          settings?.enabled !== true
+          providerProfile === undefined ||
+          providerIdentity === undefined ||
+          providerSettings?.enabled !== true
         ) {
-          return;
+          return 'cancelled';
         }
-        profile.owner.guard();
+        guard();
         publish({
           message: 'Connecting the enabled browser provider. Keep this panel open.',
           phase: 'connecting',
         });
+        guard();
         try {
           await connection.registerBrowserProvider({
             generation,
-            label: identity.label,
-            providerId: identity.providerId,
-            providerProof: identity.providerProof,
+            label: providerIdentity.label,
+            providerId: providerIdentity.providerId,
+            providerProof: providerIdentity.providerProof,
             ...(recovery === undefined ? {} : { recovery }),
           });
         } catch (error) {
-          // A rejected registration still installs the stable proof for read-only status discovery.
+          guard();
+          // A rejected registration can still leave an authoritative recovery fence.
           const fence = await refreshStatus();
+          guard();
           needsRecovery ||= fence !== undefined;
           throw error;
         }
+        guard();
         await refreshStatus();
-        if (disposed || !settings.enabled) {
-          unavailable('provider_unavailable');
-          return;
-        }
+        guard();
         await coordinator.refresh();
+        guard();
         const execution = coordinator.getSnapshot();
         if (
           execution.quarantinedTabIds.length > 0 ||
@@ -512,6 +573,7 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           needsRecovery = true;
           unavailable('effects_uncertain', true);
         }
+        guard();
         publish({
           message: needsRecovery
             ? (execution.blockedReason ??
@@ -520,16 +582,34 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           phase: restingPhase(),
         });
       } catch (error) {
+        try {
+          guard();
+        } catch {
+          return 'cancelled';
+        }
+        if (error instanceof ExecutionStoppedError && error.reason === 'provider_lost') {
+          // Recovery must stop too; background registration callers can ignore this outcome.
+          return 'cancelled';
+        }
         reportError(error);
       } finally {
         registering = undefined;
       }
+      return undefined;
     })();
     return registering;
   };
   const onState = (state: BrowserProviderState): void => {
     if (disposed) {
       return;
+    }
+    // Matching lease renewals preserve read-only work; transport and binding changes invalidate it.
+    if (
+      state.status !== 'registered' ||
+      state.lease.providerId !== identity?.providerId ||
+      state.lease.generation !== generation
+    ) {
+      recoveryRevision += 1;
     }
     if (state.status === 'registered') {
       if (
@@ -899,6 +979,8 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
       work: undefined,
     };
     current = invocation;
+    // An invocation can finish while readiness awaits status or tab access.
+    recoveryRevision += 1;
     jobs.set(message.job.jobId, message.job);
     publish({
       message: 'Recording the accepted browser task before tab consent.',
@@ -1134,6 +1216,18 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
     })();
     return starting;
   };
+  const getRecoveryTabIds = async (
+    fence: BrowserProviderStatusResult['unresolvedFence'],
+    guard: () => void
+  ): Promise<number[]> => {
+    const tabs = await browser.tabs.query({});
+    guard();
+    if (fence?.tabId !== undefined && tabs.some(tab => tab.id === fence.tabId)) {
+      throw new ExecutionStoppedError('tab_lost');
+    }
+    // Include every open ID, even if an affected tab navigated to an uninspectable address.
+    return tabs.flatMap(tab => (tab.id === undefined ? [] : [tab.id]));
+  };
   const approvalRequests = new WeakSet<Invocation>();
   return {
     approve: async (jobId: string, tabId: number): Promise<void> => {
@@ -1222,13 +1316,124 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
       }
     },
     getSnapshot: (): BrowserTaskProviderSnapshot => snapshot,
+    prepareRecovery: async (): Promise<BrowserRecoveryReadiness> => {
+      const providerOwner = owner;
+      const providerSettings = settings;
+      const providerGeneration = generation;
+      const revision = recoveryRevision;
+      const guard = (): void => {
+        if (coordinator.getSnapshot().delegationUnavailableReason !== undefined) {
+          throw new BrowserPersistenceError(
+            'unsupported',
+            'Recovery requires Web Locks. Restore browser Web Locks support before recovering.'
+          );
+        }
+        if (disposed || providerOwner === undefined || owner !== providerOwner) {
+          throw new BrowserPersistenceError(
+            'owner_mismatch',
+            'This panel no longer owns the browser provider. Reopen the signed-in panel before checking recovery.'
+          );
+        }
+        if (settings?.enabled !== true) {
+          throw new BrowserPersistenceError(
+            'invalid_request',
+            'Enable CLI tasks in the signed-in panel before checking recovery.'
+          );
+        }
+        if (current !== undefined) {
+          throw new BrowserPersistenceError(
+            'invalid_request',
+            'Browser actions are still unwinding. Wait before recovery.'
+          );
+        }
+        if (
+          recovering ||
+          registering !== undefined ||
+          revision !== recoveryRevision ||
+          settings !== providerSettings ||
+          generation !== providerGeneration
+        ) {
+          throw new BrowserPersistenceError(
+            'invalid_request',
+            'The browser provider changed. Wait for it to settle, then check recovery again.'
+          );
+        }
+        try {
+          providerOwner.guard();
+        } catch {
+          throw new BrowserPersistenceError(
+            'owner_mismatch',
+            'This panel no longer owns the browser provider. Use the owning panel to check recovery.'
+          );
+        }
+      };
+      let reason =
+        'Recovery status could not be retrieved. Reconnect and retrieve status before checking recovery again.';
+      const notReady = (error: unknown): BrowserRecoveryReadiness => {
+        if (error instanceof BrowserPersistenceError) {
+          ({ message: reason } = error);
+        } else if (error instanceof ExecutionStoppedError && error.reason === 'tab_lost') {
+          reason =
+            'Close the affected tab before recovery. Status retrieval cannot approve execution.';
+        } else if (error instanceof ExecutionStoppedError && error.reason === 'owner_mismatch') {
+          reason =
+            'Recovery status belongs to another provider. Reopen the owning signed-in panel before checking recovery.';
+        } else if (
+          error instanceof BrowserProviderError &&
+          error.code === 'provider_unavailable' &&
+          error.retryable
+        ) {
+          reason =
+            'Recovery status is unavailable. Reopen the signed-in panel and retrieve status before checking recovery again.';
+        } else if (error instanceof BrowserProviderError && !error.retryable) {
+          reason = `Recovery status is unavailable: ${error.code}. Restore provider access before checking recovery again.`;
+        }
+        // A stale check must not change the current invocation or publish recovery authority.
+        return { ready: false, reason };
+      };
+      try {
+        guard();
+        // An earlier status request can predate this preparation's provider state.
+        await statusRequest;
+        guard();
+        const fence = await refreshStatus();
+        guard();
+        reason =
+          'Open tabs could not be checked. Restore browser tab access before checking recovery again.';
+        // Check remote closure before retrying releases, then enumerate again under the native lock.
+        await getRecoveryTabIds(fence, guard);
+        let tabFailure: BrowserRecoveryReadiness | undefined;
+        const readiness = await coordinator.prepareRecovery(async () => {
+          try {
+            return await getRecoveryTabIds(fence, guard);
+          } catch (error) {
+            tabFailure = notReady(error);
+            throw error;
+          }
+        });
+        if (readiness.ready) {
+          guard();
+        }
+        return tabFailure ?? readiness;
+      } catch (error) {
+        try {
+          guard();
+        } catch (lifecycleError) {
+          return notReady(lifecycleError);
+        }
+        return notReady(error);
+      }
+    },
     recover: async (): Promise<void> => {
       if (recovering || disposed || owner === undefined || settings?.enabled !== true) {
         return;
       }
       recovering = true;
+      recoveryRevision += 1;
       try {
-        await registering;
+        if ((await registering) === 'cancelled') {
+          return;
+        }
         let fence: BrowserProviderStatusResult['unresolvedFence'];
         try {
           fence = await refreshStatus();
@@ -1238,7 +1443,9 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           }
           // A normal registration attempt installs the proof for status; it cannot clear a retained fence.
           const previousStatus = lastStatus;
-          await register();
+          if ((await register()) === 'cancelled') {
+            return;
+          }
           if (lastStatus === undefined || lastStatus === previousStatus) {
             throw new ExecutionStoppedError('provider_unavailable');
           }
@@ -1253,25 +1460,21 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           return;
         }
         owner.guard();
-        const recovery = await coordinator.recover(async () => {
-          const tabs = await browser.tabs.query({});
-          owner?.guard();
-          if (disposed || settings?.enabled !== true || current !== undefined) {
-            throw new ExecutionStoppedError('provider_unavailable');
-          }
-          if (fence?.tabId !== undefined && tabs.some(tab => tab.id === fence.tabId)) {
-            throw new ExecutionStoppedError('tab_lost');
-          }
-          // Include every open ID, even if an affected tab navigated to an uninspectable address.
-          return tabs.flatMap(tab => (tab.id === undefined ? [] : [tab.id]));
-        });
+        const recovery = await coordinator.recover(() =>
+          getRecoveryTabIds(fence, () => {
+            owner?.guard();
+            if (disposed || settings?.enabled !== true || current !== undefined) {
+              throw new ExecutionStoppedError('provider_unavailable');
+            }
+          })
+        );
         if (!recovery.recovered) {
           publish({ message: recovery.reason, phase: 'recovery' });
           return;
         }
         unavailable('provider_unavailable');
         needsRecovery = false;
-        await register(
+        const registration = await register(
           fence === undefined
             ? undefined
             : {
@@ -1281,6 +1484,9 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
                 ...(fence.tabId === undefined ? {} : { tabId: fence.tabId }),
               }
         );
+        if (registration === 'cancelled') {
+          return;
+        }
         assertLease();
         publish({
           message:
@@ -1288,6 +1494,9 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           phase: 'idle',
         });
       } catch (error) {
+        if (error instanceof ExecutionStoppedError && error.reason === 'provider_lost') {
+          return;
+        }
         needsRecovery = true;
         if (error instanceof ExecutionStoppedError && error.reason === 'tab_lost') {
           publish({
@@ -1327,6 +1536,7 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
       if (profile === undefined || disposed) {
         return;
       }
+      recoveryRevision += 1;
       if (!next.enabled) {
         unavailable('provider_unavailable', current?.started === true);
       }

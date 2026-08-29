@@ -6,17 +6,18 @@ import { FlatList, Pressable, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { repositoryKey, repositoryLabel } from '@/components/agents/new-session-repository-state';
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
+import { REPO_PLATFORM_LABEL_KEYS, type RepoPickerBridge } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
 
 type PickerListItem =
   | { key: string; kind: 'header'; titleKey: string }
-  | { key: string; kind: 'repo'; repo: RepoOption };
+  | { key: string; kind: 'repo'; repo: RepoPickerBridge['repositories'][number] };
 
 export default function RepoPickerScreen() {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function RepoPickerScreen() {
   const listItems = useMemo<PickerListItem[]>(() => {
     if (search.trim()) {
       return filtered.map(repo => ({
-        key: `${repo.platform}:${repo.fullName}`,
+        key: repositoryKey(repo),
         kind: 'repo',
         repo,
       }));
@@ -69,7 +70,7 @@ export default function RepoPickerScreen() {
       if (section.repos.length > 0) {
         items.push({ key: `header:${section.key}`, kind: 'header', titleKey: section.titleKey });
         for (const repo of section.repos) {
-          items.push({ key: `${repo.platform}:${repo.fullName}`, kind: 'repo', repo });
+          items.push({ key: repositoryKey(repo), kind: 'repo', repo });
         }
       }
     }
@@ -150,15 +151,16 @@ export default function RepoPickerScreen() {
           }
           const repo = item.repo;
           const platformName = t(REPO_PLATFORM_LABEL_KEYS[repo.platform]);
-          const rowLabel = `${platformName} ${repo.fullName}`;
+          const rowLabel = `${platformName} · ${repositoryLabel(repo)}`;
           return (
             <Pressable
-              className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
+              className="min-h-12 flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
               onPress={() => {
-                handleSelect(`${repo.platform}:${repo.fullName}`);
+                handleSelect(repositoryKey(repo));
               }}
               accessibilityRole="button"
               accessibilityLabel={rowLabel}
+              accessibilityState={{ selected: bridge.currentValue === repositoryKey(repo) }}
             >
               {repo.isPrivate ? (
                 <Lock size={14} color={colors.mutedForeground} />
@@ -171,10 +173,8 @@ export default function RepoPickerScreen() {
               >
                 {platformName}
               </Text>
-              <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-                {repo.fullName}
-              </Text>
-              {bridge.currentValue === `${repo.platform}:${repo.fullName}` ? (
+              <Text className="flex-1 text-base text-foreground">{repositoryLabel(repo)}</Text>
+              {bridge.currentValue === repositoryKey(repo) ? (
                 <Check size={18} color={colors.primary} />
               ) : null}
             </Pressable>

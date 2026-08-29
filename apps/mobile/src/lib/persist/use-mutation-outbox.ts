@@ -29,7 +29,8 @@ export type OutboxRowInput = {
  *   `safe-retry` fingerprint, or null. A caller must check this BEFORE minting
  *   a new key, so a relaunch reuses the stored key instead of minting a new
  *   UUID. `reconcile-first` rows never contribute a key: they are never
- *   auto-replayed.
+ *   auto-replayed. `getStoredSafeRetry` also returns the admitted input for
+ *   compatibility recovery; consumers must validate that unknown input.
  * - `loaded` is false until the launch load settles (or the identity resolves
  *   to no user). `whenLoaded` resolves at that point, so a submit can gate on
  *   the load and read the freshly-loaded rows instead of minting a key over
@@ -139,12 +140,16 @@ export function useMutationOutbox() {
     };
   }, [isLoading, runLoad, resetLoaded]);
 
-  const getStoredOperationKey = useCallback((fingerprint: string): string | null => {
-    const row = rowsRef.current.find(
-      r => r.fingerprint === fingerprint && r.taxonomy === 'safe-retry'
-    );
-    return row?.operationKey ?? null;
-  }, []);
+  const getStoredSafeRetry = useCallback(
+    (fingerprint: string): OutboxRow | null =>
+      rowsRef.current.find(r => r.fingerprint === fingerprint && r.taxonomy === 'safe-retry') ??
+      null,
+    []
+  );
+  const getStoredOperationKey = useCallback(
+    (fingerprint: string): string | null => getStoredSafeRetry(fingerprint)?.operationKey ?? null,
+    [getStoredSafeRetry]
+  );
 
   const writeSafeRetry = useCallback(
     async (row: OutboxRowInput): Promise<void> => {
@@ -222,6 +227,7 @@ export function useMutationOutbox() {
 
   return {
     getStoredOperationKey,
+    getStoredSafeRetry,
     writeSafeRetry,
     writeReconcileFirst,
     remove,

@@ -9,9 +9,11 @@ import * as Haptics from 'expo-haptics';
 import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import {
+  getProviderLaunchFingerprint,
   type ProviderLaunchSelection,
   type ProviderPrepareInput,
   resolveProviderLaunchInput,
+  restoreLegacyLaunchInput,
 } from '@/components/agents/provider-launch-input';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
@@ -33,13 +35,23 @@ type ContinueDestination = {
 export function useContinueCloudCreate(
   organizationId: string | undefined,
   /** Invoked once the clone settled, right before the success navigation. */
-  onCreated?: () => void
+  onCreated?: () => void,
+  current?: {
+    launchSelection: ProviderLaunchSelection | null;
+    confirmLegacyRetry?: () => Promise<boolean>;
+  }
 ): (sessionId: KiloSessionId, dest: ContinueDestination, mode: string) => Promise<void> {
   const router = useRouter();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const { userId } = useCurrentUserId();
-  const scopeKey = JSON.stringify([userId, organizationId]);
+  const { launchSelection: currentLaunchSelection, confirmLegacyRetry } = current ?? {};
+  const selectionIsTracked = currentLaunchSelection !== undefined;
+  const selectedFingerprint =
+    currentLaunchSelection && userId
+      ? getProviderLaunchFingerprint(userId, currentLaunchSelection)
+      : null;
+  const scopeKey = JSON.stringify([userId, organizationId, selectedFingerprint]);
   const scope = useMemo(() => ({ key: scopeKey }), [scopeKey]);
   const currentScope = useRef<typeof scope | null>(scope);
   currentScope.current = scope;
@@ -56,6 +68,7 @@ export function useContinueCloudCreate(
   // reuses the same key instead of minting a duplicate session.
   const {
     getStoredOperationKey,
+    getStoredSafeRetry,
     writeSafeRetry,
     remove: removeOutboxRow,
     whenLoaded,
@@ -81,21 +94,19 @@ export function useContinueCloudCreate(
           { data: { code: 'BAD_REQUEST' } }
         );
       }
-      const intentFingerprint = JSON.stringify({
+      if (selectionIsTracked && launch.fingerprint !== selectedFingerprint) {
+        return;
+      }
+      const intent = {
         cloneFromKiloSessionId: sessionId,
         repo: launch.fingerprint,
         model: dest.model,
         variant: dest.variant || undefined,
         mode,
         organizationId: organizationId ?? null,
-      });
-      // Reuse a stored safe-retry key for this fingerprint on relaunch; mint a
-      // fresh key only when no stored row exists. A stored row must never be
-      // replaced by a new in-memory key. Gate on the outbox load first: a
-      // continue that races the launch load would read empty rows and mint a
-      // duplicate.
-      // A failed outbox read reads as no stored rows, so refuse instead of
-      // minting a fresh key over a row whose POST the server may have accepted.
+      };
+      let intentFingerprint = JSON.stringify(intent);
+      // Gate key lookup on the load; unread stored rows must never mint a replacement.
       const outboxLoaded = await whenLoaded();
       if (currentScope.current !== scope) {
         return;
@@ -103,11 +114,20 @@ export function useContinueCloudCreate(
       if (!outboxLoaded) {
         throw new Error(i18n.t('agentChat.newSession.couldNotReadPendingSessions'));
       }
+      const storedOperationKey = getStoredOperationKey(intentFingerprint);
+      const unpinnedLaunch = resolveProviderLaunchInput(dest.repository, {});
+      // Retain old unpinned Continue records until old clients/records and the
+      // 30-day ledger window expire. Replay the old intent, never newly selected pins.
+      const legacyRow =
+        storedOperationKey === null && dest.launchSelection && unpinnedLaunch
+          ? getStoredSafeRetry(JSON.stringify({ ...intent, repo: unpinnedLaunch.fingerprint }))
+          : null;
       const operationKey =
-        getStoredOperationKey(intentFingerprint) ?? cloudOperationKey.getKey(intentFingerprint);
-      // The clone-only prepare schema forbids `prompt` and `initialMessageId`;
-      // the clone carries no synthetic turn.
-      const baseInput: ContinuePrepareInput = {
+        legacyRow?.operationKey ??
+        storedOperationKey ??
+        cloudOperationKey.getKey(intentFingerprint);
+      // The clone-only prepare carries no synthetic turn.
+      let baseInput: ContinuePrepareInput = {
         mode: normalizeAgentMode(mode),
         model: dest.model,
         variant: dest.variant || undefined,
@@ -115,16 +135,25 @@ export function useContinueCloudCreate(
         autoInitiate: true,
         operationKey,
         cloneFromKiloSessionId: sessionId,
-        ...launch.input,
+        ...(legacyRow && unpinnedLaunch ? unpinnedLaunch.input : launch.input),
       };
       try {
-        // Persist the safe-retry row BEFORE the mutate so a crash mid-flight
-        // reuses the same key on relaunch instead of minting a duplicate.
-        await writeSafeRetry({
-          operationKey,
-          fingerprint: intentFingerprint,
-          input: baseInput,
-        });
+        if (legacyRow) {
+          const restored = restoreLegacyLaunchInput(legacyRow, baseInput);
+          if (!restored || !confirmLegacyRetry) {
+            throw Object.assign(new Error(i18n.t('agentChat.newSession.legacyLaunchUnavailable')), {
+              data: { code: 'BAD_REQUEST' },
+            });
+          }
+          if (!(await confirmLegacyRetry()) || currentScope.current !== scope) {
+            return;
+          }
+          baseInput = restored;
+          intentFingerprint = legacyRow.fingerprint;
+        } else {
+          // Persist before dispatch. An existing legacy row stays unchanged until success.
+          await writeSafeRetry({ operationKey, fingerprint: intentFingerprint, input: baseInput });
+        }
         if (currentScope.current !== scope) {
           return;
         }
@@ -192,9 +221,8 @@ export function useContinueCloudCreate(
         if (currentScope.current !== scope) {
           return;
         }
-        // Only `prepareSession` errors reach here; UI failures are contained
-        // above. A typed terminal rejection ends the intent.
-        if (!isCloudPrepareRetryableError(error)) {
+        // An unresolved legacy identity must keep its original key, even after rejection.
+        if (!legacyRow && !isCloudPrepareRetryableError(error)) {
           cloudOperationKey.rotateKey();
           await removeOutboxRow(intentFingerprint);
         }
@@ -207,15 +235,19 @@ export function useContinueCloudCreate(
       organizationId,
       userId,
       scope,
+      selectionIsTracked,
+      selectedFingerprint,
       queryClient,
       router,
       trpc,
       cloudOperationKey,
       getStoredOperationKey,
+      getStoredSafeRetry,
       writeSafeRetry,
       removeOutboxRow,
       whenLoaded,
       onCreated,
+      confirmLegacyRetry,
     ]
   );
 }

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The screen body wires the form, draft, model, and provider hooks end-to-end from the thin route. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -9,6 +9,11 @@ import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
+import { isProviderLaunchSelectionCurrent } from '@/components/agents/provider-launch-input';
+import {
+  RepositoryBranchContext,
+  useRepositoryBranchSelection,
+} from '@/components/agents/repository-branch-selector';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
@@ -79,6 +84,37 @@ function AndroidPendingPickerRecovery({
     addCandidates,
   });
   return null;
+}
+
+async function confirmLegacyLaunchRetry(): Promise<boolean> {
+  const confirmed = await new Promise<boolean>(resolve => {
+    Alert.alert(
+      i18n.t('agentChat.newSession.legacyLaunchTitle'),
+      i18n.t('agentChat.newSession.legacyLaunchMessage'),
+      [
+        {
+          text: i18n.t('common.cancel'),
+          style: 'cancel',
+          onPress: () => {
+            resolve(false);
+          },
+        },
+        {
+          text: i18n.t('agentChat.newSession.retryLegacyLaunch'),
+          onPress: () => {
+            resolve(true);
+          },
+        },
+      ],
+      {
+        cancelable: true,
+        onDismiss: () => {
+          resolve(false);
+        },
+      }
+    );
+  });
+  return confirmed;
 }
 
 export function NewSessionScreenBody() {
@@ -213,27 +249,34 @@ export function NewSessionScreenBody() {
     refreshReposForceFresh,
   } = useNewSessionRepos({ organizationId });
 
+  const prefillOrganizationId = useRef(organizationId);
   const { selectedRepo, setSelectedRepo } = useNewSessionPrefillTargets({
-    repositories,
+    repositories: prefillOrganizationId.current === organizationId ? repositories : [],
     reposSettled,
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
   });
 
-  // The picker reports a `platform:fullName` key; resolve it to the full row so
-  // the creator can send the platform-specific repository field. The prefill
-  // seeds the same platform-qualified key, so no bare-fullName fallback is
-  // needed (and one would bind a same-named GitLab/Bitbucket row).
-  const selectedRepository = useMemo(() => {
-    if (!selectedRepo) {
-      return null;
-    }
-    return (
+  const selectedRepository = useMemo(
+    () =>
       repositories.find(
-        repository => `${repository.platform}:${repository.fullName}` === selectedRepo
-      ) ?? null
-    );
-  }, [repositories, selectedRepo]);
+        repository =>
+          repository.key === selectedRepo &&
+          repository.accountId === userId &&
+          isProviderLaunchSelectionCurrent({
+            launchSelection: { reference: repository.reference },
+            accountId: userId,
+            organizationId,
+          })
+      ) ?? null,
+    [repositories, selectedRepo, userId, organizationId]
+  );
+  const branchState = useRepositoryBranchSelection(
+    runOnInstance ? null : selectedRepository,
+    userId,
+    organizationId
+  );
+  const launchSelection = branchState.launchSelection;
 
   const {
     profile,
@@ -313,6 +356,8 @@ export function NewSessionScreenBody() {
     organizationId,
     onCreated: handleCreated,
     selectedRepository,
+    launchSelection,
+    confirmLegacyRetry: confirmLegacyLaunchRetry,
     setIsCreating,
     variant: displayVariant,
     autoCommit,
@@ -389,9 +434,20 @@ export function NewSessionScreenBody() {
     onSpawnReady: armCloneNavigateBypass,
   });
 
-  const runCloudCreate = useContinueCloudCreate(organizationId, armCloneNavigateBypass);
+  const runCloudCreate = useContinueCloudCreate(organizationId, armCloneNavigateBypass, {
+    launchSelection,
+    confirmLegacyRetry: confirmLegacyLaunchRetry,
+  });
   // The creator retires its results; its caller must also retire busy/error completion.
-  const continueScope = useMemo(() => ({ userId, organizationId }), [userId, organizationId]);
+  const continueScope = useMemo(
+    () => ({
+      userId,
+      organizationId,
+      repositoryKey: selectedRepository?.key,
+      branch: launchSelection?.upstreamBranch,
+    }),
+    [userId, organizationId, selectedRepository?.key, launchSelection?.upstreamBranch]
+  );
   const currentContinueScope = useRef<typeof continueScope | null>(continueScope);
   currentContinueScope.current = continueScope;
   useEffect(() => {
@@ -564,9 +620,13 @@ export function NewSessionScreenBody() {
     });
   }
 
-  const isStartDisabled = resolveStartDisabled();
+  const isStartDisabled =
+    (!isRemoteTargetSelected && launchSelection === null) || resolveStartDisabled();
 
   const handleStartSession = useCallback(() => {
+    if (runOnInstance === null && launchSelection === null) {
+      return;
+    }
     if (isCloneEntry) {
       if (runOnInstance !== null) {
         // Live CLI import: the dispatch carries the clone source id only when
@@ -584,7 +644,12 @@ export function NewSessionScreenBody() {
         try {
           await runCloudCreate(
             cloneFromKiloSessionId as KiloSessionId,
-            { repository: selectedRepository, model: displayModel, variant: displayVariant },
+            {
+              repository: selectedRepository,
+              launchSelection,
+              model: displayModel,
+              variant: displayVariant,
+            },
             mode
           );
         } catch (error) {
@@ -617,6 +682,7 @@ export function NewSessionScreenBody() {
     runOnInstance,
     cloneFromKiloSessionId,
     selectedRepository,
+    launchSelection,
     displayModel,
     displayVariant,
     mode,
@@ -628,73 +694,75 @@ export function NewSessionScreenBody() {
   ]);
 
   return (
-    <View className="flex-1 bg-background">
-      {!isCloneEntry ? <AndroidPendingPickerRecovery addCandidates={addCandidates} /> : null}
-      <ScreenHeader
-        title={isCloneEntry ? t('agentChat.session.continue') : t('agentChat.newSession.title')}
-      />
-      {isCloneEntry ? (
-        <View className="px-4 pt-4">
-          <Text className="text-sm text-muted-foreground">
-            {t('agentChat.newSession.continueFrom', {
-              title: cloneSourceTitle || t('agentChat.session.title'),
-            })}
-          </Text>
-        </View>
-      ) : null}
-      <NewSessionConfigureForm
-        key={promptSeed === 'restore' ? 'draft' : 'empty'}
-        attachments={attachments.attachments}
-        attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
-        isCreating={isCreating}
-        isModelsError={isModelsError}
-        isLoadingModels={isLoadingModels || (isRemoteTargetSelected && instanceCatalog.isLoading)}
-        mode={mode}
-        model={isRemoteTargetSelected ? modelView.selectedValue : displayModel}
-        variant={isRemoteTargetSelected ? modelView.selectedVariant : displayVariant}
-        modelOptions={isRemoteTargetSelected ? modelView.options : modelOptionsForToolbar}
-        customOptions={customOptions}
-        modelLocked={isRemoteTargetSelected ? false : Boolean(pinned.model)}
-        modelLockLabel={isRemoteTargetSelected ? undefined : pinned.agentName}
-        initialPrompt={initialPrompt}
-        onChangeText={handlePromptChange}
-        onModeChange={setMode}
-        onModelSelect={handleModelSelect}
-        onAddAttachment={() => void handleAddAttachment()}
-        onRemoveAttachment={handleRemoveAttachment}
-        onRetryAttachment={handleRetryAttachment}
-        onRefetchModels={() => void refetchModels()}
-        onPrefillAttachments={addCandidates}
-        shareId={shareId}
-        voiceInputSettlerRef={voiceInputSettlerRef}
-        showRunOnSelector={showRunOnSelector}
-        runOnInstance={runOnInstance}
-        instanceList={instanceList}
-        isLoadingInstances={isLoadingInstances}
-        onChangeRunOnInstance={handleRunOnChange}
-        showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
-        folderPath={folderPath}
-        onChangeFolderPath={setFolderPath}
-        runOnInlineNote={runOnInlineNote}
-        isCloneEntry={isCloneEntry}
-        groups={groups}
-        isRetrying={isRetrying}
-        onChangeRepo={setSelectedRepo}
-        onConnectProvider={openIntegration}
-        onRefreshRepos={() => void refreshReposForceFresh()}
-        repositories={repositories}
-        recents={recents}
-        selectedRepo={selectedRepo}
-        profile={profile}
-        isProfileLoading={isProfileLoading}
-        isProfileError={isProfileError}
-        onRetryProfile={() => void refetchProfile()}
-        autoCommit={autoCommit}
-        onAutoCommitChange={setAutoCommit}
-        isStartDisabled={isStartDisabled}
-        isSpawningRemote={remoteSpawn.isSpawningRemote}
-        onStartSession={handleStartSession}
-      />
-    </View>
+    <RepositoryBranchContext value={branchState}>
+      <View className="flex-1 bg-background">
+        {!isCloneEntry ? <AndroidPendingPickerRecovery addCandidates={addCandidates} /> : null}
+        <ScreenHeader
+          title={isCloneEntry ? t('agentChat.session.continue') : t('agentChat.newSession.title')}
+        />
+        {isCloneEntry ? (
+          <View className="px-4 pt-4">
+            <Text className="text-sm text-muted-foreground">
+              {t('agentChat.newSession.continueFrom', {
+                title: cloneSourceTitle || t('agentChat.session.title'),
+              })}
+            </Text>
+          </View>
+        ) : null}
+        <NewSessionConfigureForm
+          key={promptSeed === 'restore' ? 'draft' : 'empty'}
+          attachments={attachments.attachments}
+          attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
+          isCreating={isCreating}
+          isModelsError={isModelsError}
+          isLoadingModels={isLoadingModels || (isRemoteTargetSelected && instanceCatalog.isLoading)}
+          mode={mode}
+          model={isRemoteTargetSelected ? modelView.selectedValue : displayModel}
+          variant={isRemoteTargetSelected ? modelView.selectedVariant : displayVariant}
+          modelOptions={isRemoteTargetSelected ? modelView.options : modelOptionsForToolbar}
+          customOptions={customOptions}
+          modelLocked={isRemoteTargetSelected ? false : Boolean(pinned.model)}
+          modelLockLabel={isRemoteTargetSelected ? undefined : pinned.agentName}
+          initialPrompt={initialPrompt}
+          onChangeText={handlePromptChange}
+          onModeChange={setMode}
+          onModelSelect={handleModelSelect}
+          onAddAttachment={() => void handleAddAttachment()}
+          onRemoveAttachment={handleRemoveAttachment}
+          onRetryAttachment={handleRetryAttachment}
+          onRefetchModels={() => void refetchModels()}
+          onPrefillAttachments={addCandidates}
+          shareId={shareId}
+          voiceInputSettlerRef={voiceInputSettlerRef}
+          showRunOnSelector={showRunOnSelector}
+          runOnInstance={runOnInstance}
+          instanceList={instanceList}
+          isLoadingInstances={isLoadingInstances}
+          onChangeRunOnInstance={handleRunOnChange}
+          showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
+          folderPath={folderPath}
+          onChangeFolderPath={setFolderPath}
+          runOnInlineNote={runOnInlineNote}
+          isCloneEntry={isCloneEntry}
+          groups={groups}
+          isRetrying={isRetrying}
+          onChangeRepo={setSelectedRepo}
+          onConnectProvider={openIntegration}
+          onRefreshRepos={() => void refreshReposForceFresh()}
+          repositories={repositories}
+          recents={recents}
+          selectedRepo={selectedRepo}
+          profile={profile}
+          isProfileLoading={isProfileLoading}
+          isProfileError={isProfileError}
+          onRetryProfile={() => void refetchProfile()}
+          autoCommit={autoCommit}
+          onAutoCommitChange={setAutoCommit}
+          isStartDisabled={isStartDisabled}
+          isSpawningRemote={remoteSpawn.isSpawningRemote}
+          onStartSession={handleStartSession}
+        />
+      </View>
+    </RepositoryBranchContext>
   );
 }

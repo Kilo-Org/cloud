@@ -9,9 +9,10 @@ import { i18n } from '@/i18n';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import {
+  type NewSessionPrepareInput as PrepareSessionInput,
   type ProviderLaunchSelection,
-  type ProviderPrepareInput,
   resolveProviderLaunchInput,
+  restoreLegacyLaunchInput,
 } from '@/components/agents/provider-launch-input';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
@@ -21,10 +22,7 @@ import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
-import {
-  type AgentAttachmentWire,
-  type useAgentAttachmentUpload,
-} from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { type useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 type UseNewSessionCreatorInput = {
@@ -42,19 +40,7 @@ type UseNewSessionCreatorInput = {
   autoCommit: boolean;
   /** Effective environment profile id; omitted from the create body when unset. */
   profileId?: string | null;
-};
-
-type PrepareSessionInput = ProviderPrepareInput & {
-  prompt: string;
-  initialMessageId: string;
-  mode: AgentMode;
-  model: string;
-  variant: string | undefined;
-  autoCommit: boolean;
-  autoInitiate: boolean;
-  operationKey: string;
-  profileId?: string;
-  attachments?: AgentAttachmentWire;
+  confirmLegacyRetry?: () => Promise<boolean>;
 };
 
 type UseNewSessionCreatorResult = {
@@ -81,6 +67,7 @@ export function useNewSessionCreator({
   variant,
   autoCommit,
   profileId,
+  confirmLegacyRetry,
 }: UseNewSessionCreatorInput): UseNewSessionCreatorResult {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -113,6 +100,7 @@ export function useNewSessionCreator({
   // reuses the same key instead of minting a duplicate session.
   const {
     getStoredOperationKey,
+    getStoredSafeRetry,
     writeSafeRetry,
     remove: removeOutboxRow,
     whenLoaded,
@@ -167,7 +155,7 @@ export function useNewSessionCreator({
     // Computed once and reused for both the fingerprint and the create body, so
     // the two cannot disagree and a swapped attachment set is a fresh intent.
     const attachmentWire = uploaded.wire;
-    const intentFingerprint = JSON.stringify({
+    const intent = {
       prompt,
       mode,
       model,
@@ -177,23 +165,15 @@ export function useNewSessionCreator({
       organizationId: organizationId ?? null,
       profileId: profileId ?? null,
       attachments: attachmentWire ?? null,
-    });
-    // Old GitHub safe-retry rows used the bare name. Never apply that lookup to
-    // a pinned selection. Remove only after old clients/records disappear and
-    // the 30-day ledger window expires; preserve the serialized field order.
+    };
+    let intentFingerprint = JSON.stringify(intent);
+    const unpinnedLaunch = resolveProviderLaunchInput(selectedRepository, {});
+    // Retain both deployed fingerprint forms until old clients/records disappear
+    // and the 30-day ledger window expires. A match identifies an old operation,
+    // not an exact repository.
     const legacyIntentFingerprint =
-      launchSelection === undefined && selectedRepository?.platform === 'github'
-        ? JSON.stringify({
-            prompt,
-            mode,
-            model,
-            variant: variant || undefined,
-            repo: selectedRepository.fullName,
-            autoCommit,
-            organizationId: organizationId ?? null,
-            profileId: profileId ?? null,
-            attachments: attachmentWire ?? null,
-          })
+      selectedRepository?.platform === 'github'
+        ? JSON.stringify({ ...intent, repo: selectedRepository.fullName })
         : null;
     // Reuse a stored safe-retry key for this fingerprint on relaunch; mint a
     // fresh key only when no stored row exists. A stored row must never be
@@ -211,12 +191,23 @@ export function useNewSessionCreator({
       return;
     }
     let operationKey = getStoredOperationKey(intentFingerprint);
-    // The consumed legacy row migrates to the scoped fingerprint so the normal
-    // success/failure cleanup only ever touches the scoped row. Delete it only
-    // after the scoped row exists: a crash between the two writes would
-    // otherwise lose the key and mint a duplicate session on relaunch.
+    const legacyRows =
+      operationKey === null && launchSelection && unpinnedLaunch
+        ? [JSON.stringify({ ...intent, repo: unpinnedLaunch.fingerprint }), legacyIntentFingerprint]
+            .filter(fingerprint => fingerprint !== null)
+            .map(fingerprint => getStoredSafeRetry(fingerprint))
+            .filter(row => row !== null)
+        : [];
+    const legacyRow = legacyRows[0];
+    operationKey ??= legacyRow?.operationKey ?? null;
+    // Old unnormalized callers still migrate the bare GitHub fingerprint only
+    // after persistence. Normalized callers never migrate old intent into new pins.
     let legacyRowToDrop: string | null = null;
-    if (operationKey === null && legacyIntentFingerprint !== null) {
+    if (
+      operationKey === null &&
+      launchSelection === undefined &&
+      legacyIntentFingerprint !== null
+    ) {
       operationKey = getStoredOperationKey(legacyIntentFingerprint);
       if (operationKey !== null) {
         legacyRowToDrop = legacyIntentFingerprint;
@@ -225,17 +216,16 @@ export function useNewSessionCreator({
     operationKey ??= getKey(intentFingerprint);
 
     try {
-      const initialMessageId = generateMessageId();
-      const baseInput: PrepareSessionInput = {
+      let baseInput: PrepareSessionInput = {
         prompt,
-        initialMessageId,
+        initialMessageId: generateMessageId(),
         mode,
         model,
         variant: variant || undefined,
         autoCommit,
         autoInitiate: true,
         operationKey,
-        ...launch.input,
+        ...(legacyRow && unpinnedLaunch ? unpinnedLaunch.input : launch.input),
       };
       if (profileId) {
         baseInput.profileId = profileId;
@@ -243,14 +233,21 @@ export function useNewSessionCreator({
       if (attachmentWire) {
         baseInput.attachments = attachmentWire;
       }
-
-      // Persist the safe-retry row BEFORE the mutate so a crash mid-flight
-      // reuses the same key on relaunch instead of minting a duplicate.
-      await writeSafeRetry({
-        operationKey,
-        fingerprint: intentFingerprint,
-        input: baseInput,
-      });
+      if (legacyRow) {
+        const restored =
+          legacyRows.length === 1 ? restoreLegacyLaunchInput(legacyRow, baseInput) : null;
+        if (!restored || !confirmLegacyRetry) {
+          throw new Error(i18n.t('agentChat.newSession.legacyLaunchUnavailable'));
+        }
+        if (!(await confirmLegacyRetry()) || currentScope.current !== scope) {
+          return;
+        }
+        baseInput = restored;
+        intentFingerprint = legacyRow.fingerprint;
+      } else {
+        // Persist before dispatch. An existing legacy row stays unchanged until success.
+        await writeSafeRetry({ operationKey, fingerprint: intentFingerprint, input: baseInput });
+      }
       if (currentScope.current !== scope) {
         return;
       }
@@ -330,12 +327,12 @@ export function useNewSessionCreator({
       if (currentScope.current !== scope) {
         return;
       }
-      // Only `prepareSession` errors reach here; UI failures are swallowed.
+      // Report recovery and prepare failures; post-success UI failures stay contained.
       const message =
         error instanceof Error ? error.message : i18n.t('agentChat.newSession.failedToCreate');
       toast.error(message);
-      // A typed terminal rejection ends the intent; a retryable one keeps the key.
-      if (!isCloudPrepareRetryableError(error)) {
+      // An unresolved legacy identity must keep its original key, even after rejection.
+      if (!legacyRow && !isCloudPrepareRetryableError(error)) {
         rotateKey();
         await removeOutboxRow(intentFingerprint);
       }
@@ -363,10 +360,12 @@ export function useNewSessionCreator({
     getKey,
     rotateKey,
     getStoredOperationKey,
+    getStoredSafeRetry,
     writeSafeRetry,
     removeOutboxRow,
     whenLoaded,
     onCreated,
+    confirmLegacyRetry,
   ]);
 
   return { createSessionFromDraft, promptRef };

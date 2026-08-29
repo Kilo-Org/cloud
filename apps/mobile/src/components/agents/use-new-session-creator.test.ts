@@ -122,6 +122,7 @@ vi.mock('expo-crypto', () => {
 });
 
 const outboxMock = vi.hoisted(() => ({
+  getStoredSafeRetry: vi.fn(() => null),
   getStoredOperationKey: vi.fn((_fingerprint: string): string | null => null),
   writeSafeRetry: vi.fn(
     async (_row: { operationKey: string; fingerprint: string }): Promise<void> => undefined

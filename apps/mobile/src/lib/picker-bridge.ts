@@ -1,3 +1,8 @@
+import {
+  type NewSessionRepository,
+  type RepositoryPlatform,
+  type ResolvedNewSessionRepository,
+} from '@/components/agents/new-session-repository-state';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type ModeOption } from '@/components/agents/mode-normalize';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -41,7 +46,7 @@ export type ModePickerBridge = {
   customOptions?: ModeOption[];
 };
 
-export type RepoPlatform = 'github' | 'gitlab' | 'bitbucket';
+export type RepoPlatform = RepositoryPlatform;
 
 /** i18n key for each repository provider's display name (rows, closed selector, and group headers). */
 export const REPO_PLATFORM_LABEL_KEYS = {
@@ -50,23 +55,19 @@ export const REPO_PLATFORM_LABEL_KEYS = {
   bitbucket: 'agentChat.repoPicker.platformBitbucket',
 } satisfies Record<RepoPlatform, string>;
 
-export type RepoOption = {
-  platform: RepoPlatform;
-  fullName: string;
-  isPrivate: boolean;
-  workspaceUuid?: string;
-  repositoryUuid?: string;
-};
+// Old search callers can supply unqualified rows, but selection requires resolved identity.
+// Remove after old clients/records disappear and the 30-day ledger window expires.
+export type RepoOption = NewSessionRepository;
 
 export type RepoPickerSection = {
   key: 'recents' | RepoPlatform;
   /** i18n key the picker resolves for the section header. */
   titleKey: string;
-  repos: RepoOption[];
+  repos: ResolvedNewSessionRepository[];
 };
 
 export type RepoPickerBridge = {
-  repositories: RepoOption[];
+  repositories: ResolvedNewSessionRepository[];
   /** Grouped sections (recents, then providers) shown when the search box is empty. */
   sections: RepoPickerSection[];
   currentValue: string;

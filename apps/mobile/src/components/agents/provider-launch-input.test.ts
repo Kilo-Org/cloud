@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { type LaunchRepositoryReference } from '@kilocode/app-shared/code-review/repository-identity';
 import { type SessionManagerConfig } from '@kilocode/cloud-agent-sdk';
 
-import { resolveProviderLaunchInput } from './provider-launch-input';
+import { resolveProviderLaunchInput, restoreLegacyLaunchInput } from './provider-launch-input';
 import { type NewSessionRepository } from './new-session-repository-state';
 
 const reference: LaunchRepositoryReference = {
@@ -172,6 +172,49 @@ describe('provider launch boundary', () => {
     expect(JSON.stringify(result?.fingerprint)).toBe(
       '{"platform":"github","fullName":"Owner/repo"}'
     );
+  });
+});
+
+describe('legacy launch admission', () => {
+  const input = {
+    githubRepo: 'owner/repo',
+    prompt: 'Saved prompt',
+    initialMessageId: 'original-message',
+    operationKey: 'original-key',
+    mode: 'code',
+    model: 'model',
+    autoCommit: false,
+    autoInitiate: true,
+  };
+  const row = {
+    taxonomy: 'safe-retry' as const,
+    operationKey: 'original-key',
+    fingerprint: 'old',
+    input,
+  };
+  const retry = {
+    ...input,
+    initialMessageId: 'replacement-message',
+    operationKey: 'replacement-key',
+  };
+
+  it('restores the admitted key and message without adding current branch or integration pins', () => {
+    expect(restoreLegacyLaunchInput(row, retry)).toEqual(input);
+    expect(restoreLegacyLaunchInput(row, { ...retry, upstreamBranch: 'release' })).toBeNull();
+    expect(restoreLegacyLaunchInput(row, { ...retry, githubIntegrationId: 'new' })).toBeNull();
+  });
+
+  it.each([
+    ['repository mismatch', { githubRepo: 'owner/other' }],
+    ['prompt mismatch', { prompt: 'Another prompt' }],
+    ['key mismatch', { operationKey: 'another-key' }],
+    ['missing message identity', { initialMessageId: undefined }],
+    ['unrecorded branch', { upstreamBranch: 'release' }],
+    ['unrecorded integration', { githubIntegrationId: 'unknown' }],
+    ['unknown intent field', { futureSetting: true }],
+    ['malformed attachments', { attachments: { path: 'a', files: 'not-an-array' } }],
+  ] as const)('quarantines %s instead of reinterpreting the operation', (_name, change) => {
+    expect(restoreLegacyLaunchInput({ ...row, input: { ...input, ...change } }, retry)).toBeNull();
   });
 });
 

@@ -107,6 +107,26 @@ afterEach(() => {
 });
 
 describe('useMutationOutbox key reuse', () => {
+  it('returns the admitted input after loading and excludes other accounts and taxonomies', async () => {
+    const load = deferred<OutboxRow[]>();
+    listOutboxRowsMock.mockReturnValueOnce(load.promise);
+    const { resultRef, rerender } = mountOutbox();
+    const snapshot = requireResult(resultRef);
+    const row = safeRetryRow({ input: { githubRepo: 'owner/repo', initialMessageId: 'original' } });
+    expect(snapshot.getStoredSafeRetry('fp-1')).toBeNull();
+    const loaded = snapshot.whenLoaded();
+    await act(async () => {
+      load.resolve([row, safeRetryRow({ fingerprint: 'reconcile', taxonomy: 'reconcile-first' })]);
+      await loaded;
+    });
+    expect(snapshot.getStoredSafeRetry('fp-1')).toEqual(row);
+    expect(snapshot.getStoredSafeRetry('reconcile')).toBeNull();
+    identityMock.value = { userId: 'u2', isLoading: false };
+    rerender();
+    await flushMicrotasks();
+    expect(requireResult(resultRef).getStoredSafeRetry('fp-1')).toBeNull();
+  });
+
   it('reuses a stored safe-retry key for a matching fingerprint on launch', async () => {
     listOutboxRowsMock.mockResolvedValue([safeRetryRow({ fingerprint: 'fp-1' })]);
     const { resultRef } = mountOutbox();

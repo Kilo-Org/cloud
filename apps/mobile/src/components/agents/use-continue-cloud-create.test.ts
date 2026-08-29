@@ -24,6 +24,7 @@ const operationKeyMock = vi.hoisted(() => ({
 }));
 
 const outboxMock = vi.hoisted(() => ({
+  getStoredSafeRetry: vi.fn(() => null),
   getStoredOperationKey: vi.fn((_fingerprint: string): string | null => null),
   writeSafeRetry: vi.fn(async (): Promise<void> => undefined),
   remove: vi.fn(async (): Promise<void> => undefined),

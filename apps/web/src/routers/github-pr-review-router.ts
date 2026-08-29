@@ -50,6 +50,10 @@ import {
 import { PR_CONTEXT_PEOPLE_QUERIES } from '@/lib/github-pr-review/context-people';
 import { PR_CONTEXT_REVIEW_QUERIES } from '@/lib/github-pr-review/context-reviews';
 import { PR_CONTEXT_ISSUE_QUERIES } from '@/lib/github-pr-review/context-issues';
+import {
+  PR_CONTEXT_EVALUATION_QUERY,
+  PR_CONTEXT_REQUIREMENT_QUERIES,
+} from '@/lib/github-pr-review/context-requirements';
 import { getGitHubUserAccessToken } from '@/lib/integrations/platforms/github/user-token-client';
 import {
   AutoMergeMethodSchema,
@@ -544,6 +548,8 @@ export const CONVERSATION_COMMENTS_QUERY_FOR_TEST = CONVERSATION_COMMENTS_QUERY;
 export const PR_REVIEW_GRAPHQL_DOCUMENTS = {
   PULL_REQUEST_FRAGMENT_QUERY,
   PR_CONTEXT_REVISION_QUERY,
+  PR_CONTEXT_EVALUATION_QUERY,
+  ...PR_CONTEXT_REQUIREMENT_QUERIES,
   ...PR_CONTEXT_PEOPLE_QUERIES,
   ...PR_CONTEXT_REVIEW_QUERIES,
   ...PR_CONTEXT_ISSUE_QUERIES,

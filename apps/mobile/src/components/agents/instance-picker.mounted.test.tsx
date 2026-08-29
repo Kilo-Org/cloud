@@ -116,6 +116,7 @@ const SAME_FOLDER: InstancePickerInstance = {
 const INSTANCES = [TERMINAL, REMOTE, LEGACY, SAME_FOLDER];
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
 type ControlProps = {
+  testID?: string;
   accessibilityRole?: string;
   accessibilityLabel?: string;
   accessibilityState?: { checked?: boolean; disabled?: boolean; busy?: boolean };
@@ -136,8 +137,8 @@ function text(mounted: Mounted) {
     .flatMap(node => node.children.filter(child => typeof child === 'string'))
     .join('\n');
 }
-function press(mounted: Mounted, label: string) {
-  const control = controls(mounted).find(props => props.accessibilityLabel === label);
+function press(mounted: Mounted, matches: (props: ControlProps) => boolean) {
+  const control = controls(mounted).find(props => matches(props));
   expect(control).toBeDefined();
   act(() => {
     control?.onPress?.();
@@ -172,6 +173,12 @@ describe('InstancePickerScreen', () => {
     const mounted = await openPicker();
     await waitFor(() => radios(mounted).length === 5);
     const choices = radios(mounted);
+    expect(choices[0]?.testID).toBeUndefined();
+    expect(new Set(choices.slice(1).map(row => row.testID)).size).toBe(4);
+    expect(text(mounted)).not.toContain('instance-picker-row-');
+    expect(choices.some(row => row.accessibilityLabel?.includes('instance-picker-row-'))).toBe(
+      false
+    );
     expect(choices.map(row => row.accessibilityLabel)).toEqual([
       'Run on Cloud Agent',
       expect.stringMatching(/Remotes.*laptop on kilo.*remote-main.*Started/),
@@ -198,22 +205,30 @@ describe('InstancePickerScreen', () => {
   it.each(
     [null, REMOTE, TERMINAL, LEGACY, SAME_FOLDER].map((target, index) => ({ target, index }))
   )(
-    'returns destination $index with its connection and capabilities',
+    'selects destination $index by identifier after a refresh changes row order, facts, and groups',
     async ({ target, index }) => {
       const mounted = await openPicker(target ? null : TERMINAL);
       await waitFor(() => radios(mounted).length === 5);
-      act(() => {
-        radios(mounted)[index]?.onPress?.();
+      const testID = radios(mounted)[index]?.testID;
+      const checkedID = radios(mounted).find(row => row.accessibilityState?.checked)?.testID;
+      fetchInstances.mockResolvedValue({
+        instances: [SAME_FOLDER, LEGACY, { ...REMOTE, kind: 'cli' }, TERMINAL],
       });
+      await act(async () => {
+        await mounted.queryClient.refetchQueries({ queryKey: QUERY_KEY });
+      });
+      await waitFor(() => !text(mounted).includes('Remotes'));
+      expect(radios(mounted).find(row => row.accessibilityState?.checked)?.testID).toBe(checkedID);
+      press(mounted, row => row.accessibilityRole === 'radio' && row.testID === testID);
       expect(mounted.caller.selection).toEqual(
-        target === null ? null : expect.objectContaining(target)
+        target === null ? null : expect.objectContaining({ ...target, kind: 'cli' })
       );
       expect(navigation.current).toBe('caller');
       expect(instancePickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();
     }
   );
 
-  it('keeps same-folder hashes visible and selects the exact connection', async () => {
+  it('keeps same-folder hashes visible and selects the exact connection by identifier', async () => {
     const first = { ...LEGACY, connectionId: 'a' };
     const second = { ...LEGACY, connectionId: 'b' };
     fetchInstances.mockResolvedValue({ instances: [first, second] });
@@ -223,9 +238,7 @@ describe('InstancePickerScreen', () => {
     expect(text(mounted)).toContain('000062');
     const checked = radios(mounted).map(row => row.accessibilityState?.checked);
     expect(checked).toEqual([false, false, true]);
-    act(() => {
-      radios(mounted)[1]?.onPress?.();
-    });
+    press(mounted, row => row.testID === 'instance-picker-row-000061');
     expect(mounted.caller.selection?.connectionId).toBe('a');
   });
 
@@ -245,7 +258,7 @@ describe('InstancePickerScreen', () => {
     expect(text(mounted)).not.toContain('No CLI instances connected');
     const retry = Promise.withResolvers<{ instances: InstancePickerInstance[] }>();
     fetchInstances.mockReturnValue(retry.promise);
-    press(mounted, 'Retry');
+    press(mounted, row => row.accessibilityLabel === 'Retry');
     await waitFor(
       () => mounted.renderer.root.findAll(node => node.type === 'Skeleton').length === 8
     );
@@ -266,7 +279,7 @@ describe('InstancePickerScreen', () => {
     expect(text(mounted)).not.toContain('Terminals');
     const refresh = Promise.withResolvers<{ instances: InstancePickerInstance[] }>();
     fetchInstances.mockReturnValue(refresh.promise);
-    press(mounted, 'Refresh');
+    press(mounted, row => row.accessibilityLabel === 'Refresh');
     await waitFor(() =>
       controls(mounted).some(row => row.accessibilityLabel === 'Refresh' && row.disabled === true)
     );
@@ -282,31 +295,19 @@ describe('InstancePickerScreen', () => {
     expect(text(mounted)).not.toContain('Terminals');
   });
 
-  it('updates an open picker when its live query cache changes groups', async () => {
-    fetchInstances.mockResolvedValue({ instances: [REMOTE] });
-    const mounted = await openPicker();
-    await waitFor(() => radios(mounted).length === 2);
-    act(() => {
-      mounted.queryClient.setQueryData(QUERY_KEY, { instances: [TERMINAL] });
-    });
-    await waitFor(() => text(mounted).includes('Terminals'));
-    expect(text(mounted)).not.toContain('Remotes');
-    expect(radios(mounted).map(row => row.accessibilityState?.checked)).toEqual([false, true]);
-  });
-
   it('shows expired options without a fetch Retry and returns to the caller', async () => {
     const mounted = await mountScreen();
     expect(text(mounted)).toContain('Options expired');
     expect(text(mounted)).not.toContain('Retry');
     expect(radios(mounted)).toHaveLength(0);
-    press(mounted, 'Done');
+    press(mounted, row => row.accessibilityLabel === 'Done');
     expect(navigation.current).toBe('caller');
   });
 
   it('dismisses without replacing the caller selection and clears the bridge on unmount', async () => {
     const mounted = await openPicker();
     await waitFor(() => radios(mounted).length === 5);
-    press(mounted, 'Done');
+    press(mounted, row => row.accessibilityLabel === 'Done');
     mounted.unmount();
     expect(mounted.caller.selection).toBe(TERMINAL);
     expect(navigation.current).toBe('caller');

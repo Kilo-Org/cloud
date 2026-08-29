@@ -367,7 +367,7 @@ export function createBitbucketInteractiveApi(options: {
             ?.split(';')[0]
             .trim()
             .toLowerCase();
-          const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+          const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes);
           let data: Record<string, unknown> | undefined;
           if (representation === 'text') {
             // Raw file media types come from extensions, not content. fileMetadata carries binary state.

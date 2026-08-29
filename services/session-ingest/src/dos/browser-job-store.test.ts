@@ -630,6 +630,207 @@ describe('browser job ownership and durable admission', () => {
   });
 });
 
+describe('browser job conversation intent', () => {
+  it.each(['new', 'continue'] as const)(
+    'persists %s intent across reload and duplicate delivery without redispatch',
+    async mode => {
+      const f = await setup();
+      let input = request();
+      if (mode === 'continue') {
+        const first = await running(f);
+        await f.store.updateProvider(f.panel, resultMessage(first), NOW);
+        await f.store.updateProvider(f.panel, quiesced(first), NOW);
+        input = request(2, { browserTaskId: first.browserTaskId });
+      }
+      const job = (await f.store.invoke(f.cli, input, NOW)).value.job;
+      const jobKey = `browser/job/${job.jobId}`;
+      const stored = f.fake.get(jobKey);
+      expect(stored).toMatchObject({ conversationMode: mode });
+
+      const restarted = createBrowserJobStore(f.fake.storage);
+      const reconnected = socket('cli', 'reconnected');
+      const duplicate = await restarted.invoke(
+        reconnected,
+        { ...input, requestId: uuid(301) },
+        NOW + 1
+      );
+      expect(duplicate.value).toEqual({ job, duplicate: true });
+      await expect(
+        restarted.invoke(
+          reconnected,
+          { ...input, browserTaskId: mode === 'new' ? job.browserTaskId : undefined },
+          NOW + 1
+        )
+      ).rejects.toMatchObject({ code: 'invocation_conflict' });
+      expect(f.fake.get(jobKey)).toEqual(stored);
+
+      const attempts = await Promise.all(
+        Array.from({ length: 4 }, () => restarted.dispatch(job.providerId, NOW + 2))
+      );
+      const messages = attempts.flatMap(attempt => (attempt.value ? [attempt.value.message] : []));
+      expect(messages).toMatchObject([
+        {
+          type: 'provider_job',
+          conversationMode: mode,
+          job: { jobId: job.jobId, status: 'awaiting_approval' },
+        },
+      ]);
+      expect(browserProviderInboundMessageSchema.parse(messages[0])).toEqual(messages[0]);
+      expect(f.fake.get(jobKey)).toMatchObject({ conversationMode: mode });
+      expect((await restarted.invoke(reconnected, input, NOW + 3)).value).toEqual({
+        job: messages[0]?.job,
+        duplicate: true,
+      });
+      expect(
+        (await createBrowserJobStore(f.fake.storage).dispatch(job.providerId, NOW + 3)).value
+      ).toBeNull();
+    }
+  );
+
+  it('keeps continuation intent after earlier conversation jobs expire', async () => {
+    const f = await setup();
+    const first = await running(f, {
+      invocationId: invocation(1, NOW - BROWSER_RETENTION_MS + 1_000),
+    });
+    await f.store.updateProvider(f.panel, resultMessage(first), NOW);
+    await f.store.updateProvider(f.panel, quiesced(first), NOW);
+    const continuation = await admit(f, 2, { browserTaskId: first.browserTaskId });
+    await f.store.expire(NOW + 1_000);
+    expect((await f.store.cleanup(NOW + 1_000)).value).toBe(1);
+    expect(f.fake.get(`browser/conversation/${first.browserTaskId}`)).toMatchObject({
+      references: 1,
+      latestJobId: continuation.jobId,
+    });
+    const dispatched = await createBrowserJobStore(f.fake.storage).dispatch(
+      continuation.providerId,
+      NOW + 1_001
+    );
+    expect(dispatched.value?.message).toMatchObject({
+      conversationMode: 'continue',
+      job: { jobId: continuation.jobId, browserTaskId: first.browserTaskId },
+    });
+  });
+
+  it('rejects an unknown continuation instead of admitting a new conversation', async () => {
+    const f = await setup();
+    const before = f.fake.snapshot();
+    await expect(
+      f.store.invoke(f.cli, request(1, { browserTaskId: `bt_${uuid(901)}` }), NOW)
+    ).rejects.toMatchObject({ code: 'invocation_expired', retryable: false });
+    expect(f.fake.snapshot()).toEqual(before);
+  });
+
+  it('settles legacy queued intent as a recoverable result without execution authority', async () => {
+    const f = await setup();
+    const job = await admit(f);
+    const jobKey = `browser/job/${job.jobId}`;
+    const legacy = f.fake.get(jobKey) as Record<string, unknown>;
+    delete legacy.conversationMode;
+    f.fake.seed(jobKey, legacy);
+    const providerKey = `browser/provider/${job.providerId}`;
+    const provider = f.fake.get(providerKey) as Record<string, unknown>;
+    const owner = f.fake.get('browser/owner/ses_parent');
+    const restarted = createBrowserJobStore(f.fake.storage);
+    const reconnected = socket('cli', 'reconnected');
+    expect((await restarted.invoke(reconnected, request(), NOW + 1)).value).toEqual({
+      job,
+      duplicate: true,
+    });
+    expect(f.fake.get(jobKey)).toEqual(legacy);
+
+    const rejected = await restarted.dispatch(job.providerId, NOW + 2);
+    expect(rejected.value).toBeNull();
+    expect(rejected.effects).toMatchObject({
+      cancellations: [],
+      updates: [
+        {
+          job: {
+            jobId: job.jobId,
+            status: 'failed',
+            result: {
+              reason: 'invalid_request',
+              effectsUncertain: false,
+              summary: 'The browser task has no recorded conversation intent. It did not start.',
+              evidence: [],
+            },
+          },
+        },
+      ],
+    });
+    expect(f.fake.get(jobKey)).not.toHaveProperty('dispatch');
+    expect(f.fake.get(jobKey)).not.toHaveProperty('conversationMode');
+    expect(f.fake.get(providerKey)).toEqual({ ...provider, queue: [] });
+    expect(f.fake.get('browser/owner/ses_parent')).toEqual(owner);
+    expect(f.fake.get(`browser/conversation/${job.browserTaskId}`)).not.toHaveProperty(
+      'outstandingJobId'
+    );
+    const settled = rejected.effects.updates[0]?.job;
+    expect(
+      (await restarted.lookup(reconnected, recovery(job.invocationId), NOW + 3)).value
+    ).toEqual(settled);
+    expect((await restarted.invoke(reconnected, request(), NOW + 3)).value).toEqual({
+      job: settled,
+      duplicate: true,
+    });
+    expect((await restarted.dispatch(job.providerId, NOW + 3)).value).toBeNull();
+    expect(await restarted.pendingCancellations()).toEqual([]);
+    expectBoundedRecords(f);
+    expect((await restarted.cleanup(NOW + BROWSER_RETENTION_MS - 1)).value).toBe(0);
+    await restarted.expire(NOW + BROWSER_RETENTION_MS);
+    expect((await restarted.cleanup(NOW + BROWSER_RETENTION_MS)).value).toBe(1);
+    expect(f.fake.entries('browser/owner/')).toEqual([]);
+    expect(f.fake.entries('browser/provider/')).toEqual([]);
+  });
+
+  it('skips an ambiguous legacy queue head and dispatches only the next proven intent', async () => {
+    const f = await setup();
+    const legacyJob = await admit(f);
+    const next = await admit(f, 2);
+    const legacyKey = `browser/job/${legacyJob.jobId}`;
+    const legacy = f.fake.get(legacyKey) as Record<string, unknown>;
+    delete legacy.conversationMode;
+    f.fake.seed(legacyKey, legacy);
+    const dispatched = await createBrowserJobStore(f.fake.storage).dispatch(next.providerId, NOW);
+    expect(dispatched.value?.message).toMatchObject({
+      conversationMode: 'new',
+      job: { jobId: next.jobId },
+    });
+    expect(dispatched.effects.updates.map(update => update.job)).toMatchObject([
+      { jobId: legacyJob.jobId, status: 'failed' },
+      { jobId: next.jobId, status: 'awaiting_approval' },
+    ]);
+    expect(dispatched.effects.cancellations).toEqual([]);
+    expect(f.fake.get(legacyKey)).not.toHaveProperty('dispatch');
+    expect(f.fake.get(`browser/provider/${next.providerId}`)).toMatchObject({
+      queue: [],
+      fence: { jobId: next.jobId, requiresRecovery: false },
+    });
+    expect(f.fake.get('browser/owner/ses_parent')).toMatchObject({ references: 2, fences: 1 });
+  });
+
+  it.each(['awaiting_approval', 'running'] as const)(
+    'recovers legacy %s work without inventing intent or dispatching again',
+    async state => {
+      const f = await setup();
+      await admit(f);
+      let job = await dispatch(f);
+      if (state === 'running') job = await approve(f, job);
+      const jobKey = `browser/job/${job.jobId}`;
+      const legacy = f.fake.get(jobKey) as Record<string, unknown>;
+      delete legacy.conversationMode;
+      f.fake.seed(jobKey, legacy);
+      const restarted = createBrowserJobStore(f.fake.storage);
+      expect((await restarted.lookup(f.cli, recovery(job.invocationId), NOW)).value).toEqual(job);
+      expect((await restarted.invoke(f.cli, request(), NOW)).value).toEqual({
+        job,
+        duplicate: true,
+      });
+      expect((await restarted.dispatch(job.providerId, NOW)).value).toBeNull();
+      expect(f.fake.get(jobKey)).toEqual(legacy);
+    }
+  );
+});
+
 describe('browser job provider fencing and transitions', () => {
   it.each(['different proof', 'copied profile proof'] as const)(
     'rejects provider registration with a %s',
@@ -1392,6 +1593,10 @@ describe('browser provider historical status', () => {
       const result: BrowserResult = { ...success(job), ...terminal };
       const settled = (await f.store.updateProvider(f.panel, resultMessage(job, result), NOW)).value
         .job;
+      const jobKey = `browser/job/${job.jobId}`;
+      const legacy = f.fake.get(jobKey) as Record<string, unknown>;
+      delete legacy.conversationMode;
+      f.fake.seed(jobKey, legacy);
       await f.store.updateProvider(f.panel, quiesced(job), NOW);
       const panel = socket('web', 'new-panel');
       const grant = (await f.store.registerProvider(panel, registration(), NOW)).value;
@@ -2075,7 +2280,8 @@ describe('browser job boundary regressions', () => {
     const f = await setup();
     const job = await running(f, { goal: '\u0000'.repeat(16_384) });
     const result = success(job, { summary: '' });
-    const stored = f.fake.get(`browser/job/${job.jobId}`) as { snapshot: BrowserJobSnapshot };
+    const stored = f.fake.get(`browser/job/${job.jobId}`) as Record<string, unknown>;
+    delete stored.conversationMode;
     const complete = { ...stored, snapshot: { ...job, status: 'succeeded', result } };
     result.summary = 'x'.repeat(
       128 * 1024 - 1 - new TextEncoder().encode(JSON.stringify(complete)).byteLength

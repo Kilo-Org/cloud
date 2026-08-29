@@ -239,6 +239,7 @@ export default function InstancePickerScreen() {
     );
     return (
       <Pressable
+        testID={item.testID}
         className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
         onPress={() => {
           handleSelectInstance(item);

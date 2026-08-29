@@ -19,6 +19,7 @@ import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete-re
 import { eq, sql } from 'drizzle-orm';
 import {
   drainLegacyHistory,
+  drainLegacyHistoryWithProgress,
   type DurableImportReceipt,
   type LegacyHistoryImport,
   type LegacyHistoryImporter,
@@ -49,9 +50,14 @@ function receipt(input: LegacyHistoryImport): DurableImportReceipt {
 // These fakes test adapter ordering only. They do not prove SQLite persistence or UUID deduplication.
 function memorySource(rows = [legacyClaim()]) {
   const pending = new Map(rows.map(row => [row.id, row]));
-  const source: Parameters<typeof drainLegacyHistory>[0] = {
-    claimPending: async () => [...pending.values()],
+  const source: Parameters<typeof drainLegacyHistoryWithProgress>[0] = {
+    claimPending: async options =>
+      [...pending.values()]
+        .filter(row => !options?.authority || row.threadId === options.authority.threadId)
+        .slice(0, options?.limit ?? 50),
     withClaim: async (claim, work) => work(async () => pending.delete(claim.id)),
+    hasPending: async authority =>
+      [...pending.values()].some(row => row.threadId === authority.threadId),
   };
   return { source, pending };
 }
@@ -206,6 +212,96 @@ describe('history pure', () => {
     }
   );
 
+  it('reports progress after each bounded batch for only the requested conversation', async () => {
+    const first = legacyClaim();
+    const second = legacyClaim({ id: crypto.randomUUID() });
+    const other = legacyClaim({ id: crypto.randomUUID(), threadId: crypto.randomUUID() });
+    const { source, pending } = memorySource([first, second, other]);
+    const { importer, records } = recordingImporter();
+    const options = { authority: personal, limit: 1 };
+
+    expect(await drainLegacyHistoryWithProgress(source, importer, options)).toEqual({
+      deliveries: [{ id: first.id, status: 'acknowledged' }],
+      backlog: 'pending',
+    });
+    expect([...records.keys()]).toEqual([first.id]);
+    expect(await drainLegacyHistoryWithProgress(source, importer, options)).toEqual({
+      deliveries: [{ id: second.id, status: 'acknowledged' }],
+      backlog: 'drained',
+    });
+    expect([...records.keys()]).toEqual([first.id, second.id]);
+    expect([...pending.keys()]).toEqual([other.id]);
+  });
+
+  it('keeps pending progress when an empty claim batch cannot deliver remaining rows', async () => {
+    const { source, pending } = memorySource();
+    const { importer, records } = recordingImporter();
+    expect(
+      await drainLegacyHistoryWithProgress({ ...source, claimPending: async () => [] }, importer, {
+        authority: personal,
+      })
+    ).toEqual({ deliveries: [], backlog: 'pending' });
+    expect([...pending.keys()]).toEqual([legacyClaim().id]);
+    expect(records.size).toBe(0);
+  });
+
+  it('reports an empty backlog as drained without importing text', async () => {
+    const { importer, records } = recordingImporter();
+    expect(
+      await drainLegacyHistoryWithProgress(memorySource([]).source, importer, {
+        authority: personal,
+      })
+    ).toEqual({ deliveries: [], backlog: 'drained' });
+    expect(records.size).toBe(0);
+  });
+
+  it('keeps failed imports pending until a retry acknowledges them', async () => {
+    const { source, pending } = memorySource();
+    expect(
+      await drainLegacyHistoryWithProgress(
+        source,
+        async () => {
+          throw new Error('Worker unavailable');
+        },
+        { authority: personal }
+      )
+    ).toEqual({
+      deliveries: [{ id: legacyClaim().id, status: 'retry' }],
+      backlog: 'pending',
+    });
+    expect(pending.size).toBe(1);
+    const { importer, records } = recordingImporter();
+    expect(await drainLegacyHistoryWithProgress(source, importer, { authority: personal })).toEqual(
+      {
+        deliveries: [{ id: legacyClaim().id, status: 'acknowledged' }],
+        backlog: 'drained',
+      }
+    );
+    expect([...records.keys()]).toEqual([legacyClaim().id]);
+  });
+
+  it.each([
+    ['revoked authority', new QuickChatAuthorityError()],
+    ['unavailable primary', new Error('Primary unavailable')],
+  ])('does not report completion after %s on the final backlog read', async (_name, error) => {
+    const { source, pending } = memorySource();
+    const { importer, records } = recordingImporter();
+    await expect(
+      drainLegacyHistoryWithProgress(
+        {
+          ...source,
+          hasPending: async () => {
+            throw error;
+          },
+        },
+        importer,
+        { authority: personal }
+      )
+    ).rejects.toBe(error);
+    expect([...records.keys()]).toEqual([legacyClaim().id]);
+    expect(pending.size).toBe(0);
+  });
+
   it('does no import work for an empty batch', async () => {
     const { importer, records } = recordingImporter();
     expect(await drainLegacyHistory(memorySource([]).source, importer)).toEqual([]);
@@ -303,6 +399,91 @@ describe('history PostgreSQL', () => {
       createdAt: '2000-01-01T00:00:00.000Z',
     };
   }
+
+  it('keeps an active lease pending until its acknowledgment commits', async () => {
+    const id = await append();
+    const [claim] = await runtime.claimPending({ authority });
+    const { importer, records } = recordingImporter();
+    expect(await runtime.hasPending(authority)).toBe(true);
+    expect(await drainLegacyHistoryWithProgress(runtime, importer, { authority })).toEqual({
+      deliveries: [],
+      backlog: 'pending',
+    });
+    expect(records.size).toBe(0);
+    expect(
+      await runtime.withClaim(claim, async acknowledge => {
+        const acknowledged = await acknowledge();
+        // Another reader still sees the committed pending row until this acknowledgment commits.
+        const pending = await database.db.transaction(async tx => {
+          await tx.execute(sql`SET LOCAL statement_timeout = '2s'`);
+          return createQuickChatRuntime(tx).hasPending(authority);
+        });
+        expect(pending).toBe(true);
+        return acknowledged;
+      })
+    ).toBe(true);
+    expect((await messages())[0].id).toBe(id);
+    expect((await messages())[0].ingress_acknowledged_at).not.toBeNull();
+    expect(await runtime.hasPending(authority)).toBe(false);
+    expect(await drainLegacyHistoryWithProgress(runtime, importer, { authority })).toEqual({
+      deliveries: [],
+      backlog: 'drained',
+    });
+  });
+
+  it('reports a locked pending row even when the claim batch is empty', async () => {
+    const id = await append();
+    const { importer, records } = recordingImporter();
+    const connection = await database.pool.connect();
+    try {
+      await connection.query('BEGIN');
+      await connection.query('SELECT id FROM quick_chat_messages WHERE id = $1 FOR UPDATE', [id]);
+      const progress = await database.db.transaction(async tx => {
+        // A backlog read must not wait for the delivery lock or skip the locked row.
+        await tx.execute(sql`SET LOCAL statement_timeout = '2s'`);
+        return drainLegacyHistoryWithProgress(createQuickChatRuntime(tx), importer, { authority });
+      });
+      expect(progress).toEqual({ deliveries: [], backlog: 'pending' });
+      expect(records.size).toBe(0);
+    } finally {
+      await connection.query('ROLLBACK');
+      connection.release();
+    }
+    expect(await drainLegacyHistoryWithProgress(runtime, importer, { authority })).toEqual({
+      deliveries: [{ id, status: 'acknowledged' }],
+      backlog: 'drained',
+    });
+    expect([...records.keys()]).toEqual([id]);
+  });
+
+  it('excludes other conversations and harness rows from the legacy backlog', async () => {
+    expect(await runtime.hasPending(authority)).toBe(false);
+    const otherThreadId = crypto.randomUUID();
+    await database.db.insert(quick_chat_threads).values({
+      id: otherThreadId,
+      user_id: authority.userId,
+      organization_id: organizationId,
+    });
+    await database.db.insert(quick_chat_messages).values([
+      { thread_id: otherThreadId, role: 'user', content: 'other context' },
+      {
+        thread_id: authority.threadId,
+        role: 'assistant',
+        content: 'harness text',
+        provenance: 'harness',
+        server_projection_key: crypto.randomUUID(),
+      },
+    ]);
+    expect(await runtime.hasPending(authority)).toBe(false);
+    const id = await append();
+    const { importer, records } = recordingImporter();
+    expect(await runtime.hasPending(authority)).toBe(true);
+    expect(await drainLegacyHistoryWithProgress(runtime, importer, { authority })).toEqual({
+      deliveries: [{ id, status: 'acknowledged' }],
+      backlog: 'drained',
+    });
+    expect([...records.keys()]).toEqual([id]);
+  });
 
   it('discovers delayed and backdated commits without a watermark', async () => {
     const connection = await database.pool.connect();
@@ -457,7 +638,7 @@ describe('history PostgreSQL', () => {
     'deleted account',
     'deleted context',
     'retired',
-  ])('rejects %s authority for import and projection', async defect => {
+  ])('rejects %s authority for backlog, import, and projection', async defect => {
     if (defect === 'deleted context') {
       authority = { ...authority, organizationId };
       await database.db
@@ -511,6 +692,7 @@ describe('history PostgreSQL', () => {
     await expect(runtime.withClaim(claim, acknowledge => acknowledge())).rejects.toBeInstanceOf(
       QuickChatAuthorityError
     );
+    await expect(runtime.hasPending(authority)).rejects.toBeInstanceOf(QuickChatAuthorityError);
     await expect(runtime.projectText(authority, projection())).rejects.toBeInstanceOf(
       QuickChatAuthorityError
     );
@@ -532,6 +714,7 @@ describe('history PostgreSQL', () => {
     const [claim] = await runtime.claimPending({ authority });
     const wrong = { ...authority, ...mismatch };
     expect(await runtime.lookupThread(wrong)).toBeNull();
+    await expect(runtime.hasPending(wrong)).rejects.toBeInstanceOf(QuickChatAuthorityError);
     await expect(
       runtime.withClaim({ ...claim, ...mismatch }, acknowledge => acknowledge())
     ).rejects.toBeInstanceOf(QuickChatAuthorityError);
@@ -557,6 +740,7 @@ describe('history PostgreSQL', () => {
     expect(await drainLegacyHistory(source, importer)).toEqual([{ id, status: 'rejected' }]);
     expect(records.size).toBe(0);
     expect(await runtime.claimPending()).toEqual([]);
+    await expect(runtime.hasPending(authority)).rejects.toBeInstanceOf(QuickChatAuthorityError);
     await expect(runtime.projectText(authority, projection())).rejects.toBeInstanceOf(
       QuickChatAuthorityError
     );
@@ -591,6 +775,7 @@ describe('history PostgreSQL', () => {
       )
     ).toEqual([{ id, status: 'rejected' }]);
     expect((await messages())[0].ingress_acknowledged_at).toBeNull();
+    await expect(runtime.hasPending(authority)).rejects.toBeInstanceOf(QuickChatAuthorityError);
     await expect(runtime.projectText(authority, projection())).rejects.toBeInstanceOf(
       QuickChatAuthorityError
     );

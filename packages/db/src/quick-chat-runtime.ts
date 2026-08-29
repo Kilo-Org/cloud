@@ -107,6 +107,22 @@ export function createQuickChatRuntime(primary: Database) {
     return rows[0] ?? null;
   }
 
+  async function hasPending(input: QuickChatAuthority): Promise<boolean> {
+    const authority = QuickChatAuthoritySchema.parse(input);
+    // Read authority and backlog in one primary snapshot. Leases and row locks are not delivery.
+    const { rows } = await primary.execute<{ pending: boolean }>(sql`
+      SELECT EXISTS (
+        SELECT 1 FROM ${quick_chat_messages} AS message
+        WHERE message.thread_id = authority."threadId"
+          AND message.provenance = 'legacy' AND message.ingress_acknowledged_at IS NULL
+      ) AS pending
+      FROM (${activeThreads(authority)}) AS authority
+    `);
+    const backlog = rows[0];
+    if (!backlog) throw new QuickChatAuthorityError();
+    return backlog.pending;
+  }
+
   async function claimPending(options: { authority?: QuickChatAuthority; limit?: number } = {}) {
     const limit = z
       .int()
@@ -222,5 +238,5 @@ export function createQuickChatRuntime(primary: Database) {
     });
   }
 
-  return { lookupThread, claimPending, withClaim, projectText };
+  return { lookupThread, hasPending, claimPending, withClaim, projectText };
 }

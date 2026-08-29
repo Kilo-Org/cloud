@@ -65,3 +65,20 @@ export async function drainLegacyHistory(
   }
   return deliveries;
 }
+
+export type HistoryProgress = {
+  deliveries: HistoryDelivery[];
+  backlog: 'pending' | 'drained';
+};
+
+/** Supply authenticated authority for one conversation; drained describes only the final primary read. */
+export async function drainLegacyHistoryWithProgress(
+  source: HistorySource & Pick<ReturnType<typeof createQuickChatRuntime>, 'hasPending'>,
+  importer: LegacyHistoryImporter,
+  options: { authority: QuickChatAuthority; limit?: number }
+): Promise<HistoryProgress> {
+  const authority = QuickChatAuthoritySchema.parse(options.authority);
+  const deliveries = await drainLegacyHistory(source, importer, { ...options, authority });
+  const pending = await source.hasPending(authority);
+  return { deliveries, backlog: pending ? 'pending' : 'drained' };
+}

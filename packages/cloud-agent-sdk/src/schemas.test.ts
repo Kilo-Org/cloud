@@ -672,6 +672,99 @@ describe.each([
   });
 });
 
+describe('browser queue metadata Cloud parity', () => {
+  const queuedJob = { ...job, status: 'queued' } as const;
+
+  it.each([
+    {},
+    { ownerLabel: owner.parentSessionId },
+    { queuePosition: 1 },
+    { queuePosition: 100 },
+    { ownerLabel: owner.parentSessionId, queuePosition: 50 },
+  ])('preserves optional metadata through negotiated frames only: %j', fields => {
+    const snapshot = { ...queuedJob, ...fields };
+    for (const contract of [browser, relay]) {
+      expect(contract.browserJobSnapshotSchema.parse(snapshot)).toStrictEqual(snapshot);
+      for (const frame of [
+        { type: 'provider_snapshot', ...binding, jobs: [snapshot] },
+        { ...emptyProviderStatusResult, jobs: [snapshot] },
+      ]) {
+        expect(contract.browserProviderInboundMessageSchema.parse(frame)).toStrictEqual(frame);
+        expect(contract.webInboundWithBrowserMessageSchema.parse(frame)).toStrictEqual(frame);
+        expect(browser.webInboundMessageSchema.safeParse(frame).success).toBe(false);
+        expect(relay.WebInboundMessageSchema.safeParse(frame).success).toBe(false);
+      }
+      for (const frame of [
+        { type: 'browser_response', requestId, response: { kind: 'status', job: snapshot } },
+        { type: 'browser_response', requestId, response: { kind: 'recovered', job: snapshot } },
+        { type: 'browser_event', requestId, event: 'progress', job: snapshot },
+      ]) {
+        expect(contract.browserCLIInboundMessageSchema.parse(frame)).toStrictEqual(frame);
+        expect(relay.cliInboundWithBrowserMessageSchema.parse(frame)).toStrictEqual(frame);
+        expect(relay.CLIInboundMessageSchema.safeParse(frame).success).toBe(false);
+      }
+    }
+  });
+
+  it.each([
+    { queuePosition: 0 },
+    { queuePosition: 101 },
+    { queuePosition: 1.5 },
+    { queuePosition: '1' },
+    { queuePosition: null },
+    { ownerLabel: '' },
+    { ownerLabel: '\u00e9'.repeat(65) },
+    { ownerLabel: null },
+    { status: 'awaiting_approval' },
+    { status: 'running', approvedTab: tab },
+    { ...finishedJob },
+  ])('rejects malformed or stale metadata in both provider parsers: %j', fields => {
+    const snapshot = {
+      ...queuedJob,
+      ownerLabel: owner.parentSessionId,
+      queuePosition: 1,
+      ...fields,
+    };
+    for (const contract of [browser, relay]) {
+      for (const frame of [
+        { type: 'provider_snapshot', ...binding, jobs: [snapshot] },
+        { ...emptyProviderStatusResult, jobs: [snapshot] },
+      ]) {
+        expect(contract.browserProviderInboundMessageSchema.safeParse(frame).success).toBe(false);
+        expect(contract.webInboundWithBrowserMessageSchema.safeParse(frame).success).toBe(false);
+      }
+    }
+  });
+
+  it('counts queue metadata in the unchanged serialized frame limit', () => {
+    const largeJob = {
+      ...finishedJob,
+      result: { ...completed, summary: '\u00e9'.repeat(16384) },
+    };
+    const lastJob = { ...finishedJob, result: { ...completed, summary: '' } };
+    const snapshot = { ...queuedJob, ownerLabel: '\u00e9'.repeat(64), queuePosition: 100 };
+    const page = {
+      type: 'provider_snapshot',
+      ...binding,
+      jobs: [snapshot, largeJob, largeJob, largeJob, lastJob],
+    };
+    lastJob.result.summary = 'x'.repeat(
+      128 * 1024 - 1 - Buffer.byteLength(JSON.stringify(page), 'utf8')
+    );
+    for (const contract of [browser, relay]) {
+      expect(contract.browserProviderInboundMessageSchema.parse(page)).toStrictEqual(page);
+    }
+    lastJob.result.summary += 'x';
+    const legacyPage = { ...page, jobs: [queuedJob, ...page.jobs.slice(1)] };
+    for (const contract of [browser, relay]) {
+      expect(contract.browserProviderInboundMessageSchema.safeParse(page).success).toBe(false);
+      expect(contract.browserProviderInboundMessageSchema.parse(legacyPage)).toStrictEqual(
+        legacyPage
+      );
+    }
+  });
+});
+
 describe('browser jobs v1 Cloud parity', () => {
   const boundaries = [
     { schema: 'browserRequestSchema', frames: cliRequests },

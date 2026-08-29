@@ -19,12 +19,16 @@ type OrganizationContextValue = {
   /** null = personal, string = org UUID */
   organizationId: string | null;
   isLoaded: boolean;
+  isSaving: boolean;
   setOrganizationId: (id: string | null) => void;
   error: 'restore' | 'save' | null;
   retry: () => void;
 };
 
-type OrganizationState = Pick<OrganizationContextValue, 'organizationId' | 'isLoaded' | 'error'> & {
+type OrganizationState = Pick<
+  OrganizationContextValue,
+  'organizationId' | 'isLoaded' | 'isSaving' | 'error'
+> & {
   token: string | undefined;
 };
 
@@ -36,6 +40,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     token,
     organizationId: null,
     isLoaded: false,
+    isSaving: false,
     error: null,
   });
   const generation = useRef(0);
@@ -45,14 +50,20 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     generation.current += 1;
     const operation = generation.current;
     const epoch = currentAuthEpoch();
-    setState(current => ({ ...current, token, isLoaded: false, error: null }));
+    setState(current => ({ ...current, token, isLoaded: false, isSaving: false, error: null }));
     try {
       // Existing installs store a raw organization string; an absent value means
       // Personal. Keep both forms until those installations and records cannot exist.
       const stored = await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
       if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
         activeId.current = stored ?? null;
-        setState({ token, organizationId: stored ?? null, isLoaded: true, error: null });
+        setState({
+          token,
+          organizationId: stored ?? null,
+          isLoaded: true,
+          isSaving: false,
+          error: null,
+        });
       }
     } catch {
       if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
@@ -65,15 +76,17 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     generation.current += 1;
     const operation = generation.current;
     const epoch = currentAuthEpoch();
-    setState(current => ({ ...current, error: null }));
+    setState(current => ({ ...current, isSaving: true }));
+    let error: 'save' | null = null;
     try {
       await (id
         ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
         : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));
     } catch {
-      if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
-        setState(current => ({ ...current, error: 'save' }));
-      }
+      error = 'save';
+    }
+    if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
+      setState(current => ({ ...current, error, isSaving: false }));
     }
   }, []);
 
@@ -85,7 +98,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     } else {
       generation.current += 1;
       activeId.current = null;
-      setState({ token, organizationId: null, isLoaded: true, error: null });
+      setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: null });
     }
     return () => {
       generation.current += 1;
@@ -95,7 +108,13 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
   const setOrganizationId = useCallback(
     (id: string | null) => {
       activeId.current = id;
-      setState({ token, organizationId: id, isLoaded: true, error: null });
+      setState(current => ({
+        token,
+        organizationId: id,
+        isLoaded: true,
+        isSaving: true,
+        error: current.token === token && current.error === 'save' ? 'save' : null,
+      }));
       void persist(id);
     },
     [token, persist]
@@ -114,6 +133,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       // A new token must not publish the prior readiness before its effect runs.
       organizationId: state.organizationId,
       isLoaded: state.token === token && state.isLoaded,
+      isSaving: state.token === token && state.isSaving,
       error: state.token === token ? state.error : null,
       setOrganizationId,
       retry,

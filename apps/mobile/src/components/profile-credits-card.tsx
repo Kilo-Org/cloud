@@ -30,7 +30,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const colors = useThemeColors();
   const { t, i18n } = useTranslation();
   const openPicker = useContextPicker(orgs);
-  const { organizationId, error, retry } = useOrganization();
+  const { organizationId, error, isSaving, retry } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
   const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
@@ -144,10 +144,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
             accessibilityRole="button"
             accessibilityLabel={t('common.retry')}
             accessibilityHint={t('common.couldNotSaveSetting')}
+            accessibilityState={{ busy: isSaving, disabled: isSaving }}
+            disabled={isSaving}
             onPress={retry}
-            className="min-h-11 justify-center active:opacity-70"
+            className="min-h-11 flex-row items-center gap-2 active:opacity-70"
           >
             <Text className="text-sm text-primary">{t('common.retry')}</Text>
+            {isSaving && <ActivityIndicator size="small" color={colors.mutedForeground} />}
           </Pressable>
         </View>
       )}

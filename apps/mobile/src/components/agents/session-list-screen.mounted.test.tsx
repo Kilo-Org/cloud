@@ -56,6 +56,7 @@ const sessionListState = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   AppState: { addEventListener: appState.addEventListener },

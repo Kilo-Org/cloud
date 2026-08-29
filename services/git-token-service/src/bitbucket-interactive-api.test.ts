@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BitbucketInteractiveMetadataSchema,
   createBitbucketInteractiveApi,
   type BitbucketInteractiveData,
+  type BitbucketInteractiveMetadata,
   type BitbucketInteractiveRequest,
 } from './bitbucket-interactive-api.js';
 
@@ -39,6 +41,40 @@ function api(fetch: typeof globalThis.fetch) {
     fetch,
   });
 }
+
+describe('Bitbucket broker metadata contract', () => {
+  it.each([
+    {
+      credentialKind: 'bitbucketOAuth',
+      actor: {
+        provider: 'bitbucket',
+        instanceUrl: 'https://bitbucket.org',
+        id: 'provider-user-42',
+        displayName: null,
+        login: 'provider-user',
+        avatarUrl: null,
+      },
+    },
+    {
+      credentialKind: 'bitbucketWorkspaceToken',
+      workspaceUuid: '{a07d5c40-2d2d-4e79-a812-6a47824a77d6}',
+      workspaceSlug: 'acme',
+    },
+  ] satisfies BitbucketInteractiveMetadata['providerActor'][])(
+    'retains $credentialKind identity without adding a write grant',
+    providerActor => {
+      const metadata = {
+        actorUserId: 'oauth/kilo-user',
+        organizationId: 'kilo-org',
+        integrationId: 'integration-1',
+        instanceUrl: 'https://bitbucket.org',
+        providerActor,
+        grants: { scopes: ['repository:write', 'pullrequest'] },
+      } satisfies BitbucketInteractiveMetadata;
+      expect(BitbucketInteractiveMetadataSchema.parse(metadata)).toEqual(metadata);
+    }
+  );
+});
 
 describe('Bitbucket generated SDK boundary', () => {
   it('preserves JSON data and status without SDK or credential-bearing objects', async () => {

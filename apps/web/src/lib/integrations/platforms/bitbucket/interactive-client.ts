@@ -4,11 +4,15 @@ import { z } from 'zod';
 import { serializeReviewWriteRequest } from '@kilocode/app-shared/provider-review';
 import { GIT_TOKEN_SERVICE_API_URL } from '@/lib/config.server';
 import { generateInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
-import type {
-  BitbucketInteractiveData,
-  BitbucketInteractiveOperation,
-  BitbucketInteractiveRequest,
-  BitbucketInteractiveResult,
+import {
+  BitbucketInteractiveMetadataSchema,
+  type BitbucketInteractiveData,
+  type BitbucketInteractiveMetadata,
+  type BitbucketInteractiveOperation,
+  type BitbucketInteractiveRequest,
+  type BitbucketInteractiveResponse,
+  type BitbucketInteractiveResult,
+  type BitbucketInteractiveServiceSuccess,
 } from '../../../../../../../services/git-token-service/src/bitbucket-interactive-api';
 import {
   BitbucketApiError,
@@ -19,7 +23,13 @@ import type {
   BitbucketCodeReviewWorkspaceIdentity,
 } from './token-service-client';
 
-export type { BitbucketInteractiveRequest, BitbucketInteractiveResult };
+export type {
+  BitbucketInteractiveMetadata,
+  BitbucketInteractiveRequest,
+  BitbucketInteractiveResponse,
+  BitbucketInteractiveResult,
+  BitbucketInteractiveServiceSuccess,
+};
 export const BITBUCKET_INTERACTIVE_PATH = '/internal/bitbucket/interactive-review';
 export const BITBUCKET_INTERACTIVE_AUDIENCE = 'git-token-service:bitbucket-interactive-review';
 
@@ -59,7 +69,11 @@ const resultSchema = z.discriminatedUnion('status', [
   z.strictObject({ status: z.literal(204), data: z.null() }),
 ]);
 export const BitbucketInteractiveServiceResultSchema = z.discriminatedUnion('success', [
-  z.strictObject({ success: z.literal(true), result: resultSchema }),
+  z.strictObject({
+    success: z.literal(true),
+    result: resultSchema,
+    metadata: BitbucketInteractiveMetadataSchema,
+  }),
   z.strictObject({ success: z.literal(false), reason: failureReason }),
 ]);
 
@@ -82,7 +96,7 @@ export function createBitbucketInteractiveClient(options: {
   return {
     async execute<K extends BitbucketInteractiveOperation>(
       request: BitbucketInteractiveRequest<K>
-    ): Promise<BitbucketInteractiveResult<BitbucketInteractiveData<K>>> {
+    ): Promise<BitbucketInteractiveResponse<BitbucketInteractiveData<K>>> {
       if (!options.organizationId || !options.actorUserId)
         throw new BitbucketInteractiveClientError('invalid_request');
       let body: string;
@@ -152,7 +166,10 @@ export function createBitbucketInteractiveClient(options: {
         if (!parsed.success) throw new BitbucketInteractiveClientError('invalid_response');
         if (!parsed.data.success) throw new BitbucketInteractiveClientError(parsed.data.reason);
         // The authenticated Worker selects the generated operation type. The wire envelope is validated above.
-        return parsed.data.result as BitbucketInteractiveResult<BitbucketInteractiveData<K>>;
+        return {
+          ...(parsed.data.result as BitbucketInteractiveResult<BitbucketInteractiveData<K>>),
+          metadata: parsed.data.metadata,
+        };
       } catch (error) {
         if (error instanceof BitbucketInteractiveClientError)
           throw new BitbucketInteractiveClientError(error.code);

@@ -75,7 +75,10 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries }),
 }));
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, options?: { count: number }) =>
+      key === 'agents.liveCount' && options ? `${options.count} LIVE` : key,
+  }),
 }));
 
 // Combined-list machinery is mocked as inert string nodes so a regression that
@@ -168,11 +171,14 @@ async function renderScreen(): Promise<MountedRenderer> {
   return renderer;
 }
 
-function headerRightOf(renderer: MountedRenderer) {
-  const header = renderer.root.find(
+function headerOf(renderer: MountedRenderer) {
+  return renderer.root.find(
     node => typeof node.type === 'string' && (node.type as string) === 'ScreenHeader'
   );
-  return header.props.headerRight as { type: string; props: Record<string, unknown> };
+}
+
+function headerRightOf(renderer: MountedRenderer) {
+  return headerOf(renderer).props.headerRight as { type: string; props: Record<string, unknown> };
 }
 
 function findTypeCount(renderer: MountedRenderer, type: string): number {
@@ -301,6 +307,35 @@ describe('AgentSessionListScreen live tab', () => {
     expect(
       renderer.root.findAll(node => node.props.testID === 'agents-new-session-fab')
     ).toHaveLength(1);
+  });
+
+  it.each([
+    { count: 1, label: '1 LIVE' },
+    { count: 3, label: '3 LIVE' },
+    { count: 4, label: '4 LIVE' },
+    { count: 12, label: '12 LIVE' },
+  ])('shows $label above Agents for the full live list', async ({ count, label }) => {
+    sessionListState.activeSessions = Array.from({ length: count }, (_, index) => ({
+      id: `session-${index}`,
+      organizationId: null,
+    }));
+    const renderer = await renderScreen();
+
+    expect(headerOf(renderer).props.eyebrow).toBe(label);
+    expect(headerOf(renderer).props.title).toBe('tabs.agents');
+  });
+
+  it.each([
+    { state: 'loading', isLoading: true, orgLoaded: true },
+    { state: 'unknown organization', isLoading: false, orgLoaded: false },
+  ])('hides a cached count during $state', async ({ isLoading, orgLoaded }) => {
+    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
+    sessionListState.isLoading = isLoading;
+    orgState.isLoaded = orgLoaded;
+    const renderer = await renderScreen();
+
+    expect(headerOf(renderer).props.eyebrow).toBeUndefined();
+    expect(findTypeCount(renderer, 'FlatList')).toBe(1);
   });
 
   it('treats a not-loaded org as loading so the empty state cannot flash', async () => {

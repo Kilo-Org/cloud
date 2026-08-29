@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import {
+  getAllIntegrationsForOwner,
   getIntegrationsByOrganization,
   getIntegrationForOrganization,
   getIntegrationForOwner,
@@ -209,21 +210,25 @@ export async function fetchGitHubRepositoriesForOrganization(
 
 export async function fetchAllGitHubRepositoriesForOrganization(
   organizationId: string,
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  { requireComplete = false }: { requireComplete?: boolean } = {}
 ): Promise<GitHubRepositoriesResult> {
   const integrations = (
     await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB)
   ).filter(isPlatformIntegrationHealthy);
-  return fetchRepositoriesForIntegrations(integrations, forceRefresh, {
-    type: 'org',
-    id: organizationId,
-  });
+  return fetchRepositoriesForIntegrations(
+    integrations,
+    forceRefresh,
+    { type: 'org', id: organizationId },
+    requireComplete
+  );
 }
 
 async function fetchRepositoriesForIntegrations(
   integrations: Awaited<ReturnType<typeof getIntegrationsByOrganization>>,
   forceRefresh: boolean,
-  owner: Owner
+  owner: Owner,
+  requireComplete: boolean
 ): Promise<GitHubRepositoriesResult> {
   if (integrations.length === 0) {
     return missingIntegrationResponse('No GitHub integration found for this organization');
@@ -232,7 +237,10 @@ async function fetchRepositoriesForIntegrations(
   try {
     const settledResults = await Promise.allSettled(
       integrations.map(async integration => {
-        if (!integration.platform_installation_id) return { repositories: [], syncedAt: null };
+        if (!integration.platform_installation_id) {
+          if (requireComplete) throw new Error('GitHub installation is not configured');
+          return { repositories: [], syncedAt: null };
+        }
         const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
         if (forceRefresh || !cachedRepositories?.length) {
           const repositories = await fetchGitHubRepositories(
@@ -254,8 +262,9 @@ async function fetchRepositoriesForIntegrations(
     const results = settledResults
       .filter(result => result.status === 'fulfilled')
       .map(result => result.value);
-    if (results.length === 0) {
-      throw new Error('All GitHub repository fetches failed');
+    // Browsing keeps partial results; URL-only identity resolution cannot use them.
+    if (results.length === 0 || (requireComplete && results.length !== integrations.length)) {
+      throw new Error('GitHub repository discovery is incomplete');
     }
     return {
       integrationInstalled: true,
@@ -276,9 +285,21 @@ async function fetchRepositoriesForIntegrations(
 
 export async function fetchGitHubRepositoriesForUser(
   userId: string,
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  { requireComplete = false }: { requireComplete?: boolean } = {}
 ): Promise<GitHubRepositoriesResult> {
   const owner: Owner = { type: 'user', id: userId };
+  // URL-only history needs every authorized installation; preserve the browsing default.
+  if (requireComplete) {
+    const integrations = (await getAllIntegrationsForOwner(owner)).filter(
+      integration =>
+        integration.platform === PLATFORM.GITHUB && isPlatformIntegrationHealthy(integration)
+    );
+    if (integrations.length === 0) {
+      return missingIntegrationResponse('No GitHub integration found for this user');
+    }
+    return fetchRepositoriesForIntegrations(integrations, forceRefresh, owner, true);
+  }
   const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITHUB);
 
   if (!integration) {

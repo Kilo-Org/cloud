@@ -125,10 +125,10 @@ export function useMutationOutbox() {
   // `loaded` stays false while the identity is still resolving, so a submit
   // cannot read rows before the user is known.
   useEffect(() => {
+    rowsRef.current = [];
+    setRows([]);
     if (isLoading) {
       loadGenerationRef.current += 1;
-      rowsRef.current = [];
-      setRows([]);
       resetLoaded();
       return undefined;
     }
@@ -157,7 +157,16 @@ export function useMutationOutbox() {
         r => r.fingerprint === row.fingerprint && r.taxonomy === 'safe-retry'
       );
       const operationKey = stored?.operationKey ?? row.operationKey;
-      await writeOutboxRow(userId, { ...row, operationKey, taxonomy: 'safe-retry' });
+      const generation = loadGenerationRef.current;
+      const nextRow: OutboxRow = { ...row, operationKey, taxonomy: 'safe-retry' };
+      await writeOutboxRow(userId, nextRow);
+      if (loadGenerationRef.current === generation) {
+        rowsRef.current = [
+          ...rowsRef.current.filter(r => r.fingerprint !== row.fingerprint),
+          nextRow,
+        ];
+        setRows(rowsRef.current);
+      }
     },
     [userId]
   );
@@ -175,7 +184,16 @@ export function useMutationOutbox() {
         r => r.fingerprint === row.fingerprint && r.taxonomy === 'reconcile-first'
       );
       const operationKey = stored?.operationKey ?? row.operationKey;
-      await writeOutboxRow(userId, { ...row, operationKey, taxonomy: 'reconcile-first' });
+      const generation = loadGenerationRef.current;
+      const nextRow: OutboxRow = { ...row, operationKey, taxonomy: 'reconcile-first' };
+      await writeOutboxRow(userId, nextRow);
+      if (loadGenerationRef.current === generation) {
+        rowsRef.current = [
+          ...rowsRef.current.filter(r => r.fingerprint !== row.fingerprint),
+          nextRow,
+        ];
+        setRows(rowsRef.current);
+      }
       return operationKey;
     },
     [userId]
@@ -186,9 +204,12 @@ export function useMutationOutbox() {
       if (!userId) {
         return;
       }
+      const generation = loadGenerationRef.current;
       await removeOutboxRow(userId, fingerprint);
-      rowsRef.current = rowsRef.current.filter(r => r.fingerprint !== fingerprint);
-      setRows(previous => previous.filter(r => r.fingerprint !== fingerprint));
+      if (loadGenerationRef.current === generation) {
+        rowsRef.current = rowsRef.current.filter(r => r.fingerprint !== fingerprint);
+        setRows(rowsRef.current);
+      }
     },
     [userId]
   );

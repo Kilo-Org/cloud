@@ -1,37 +1,54 @@
 // Performs one `prepareSession` clone for the Cloud Agent Continue entry: a
 // hoisted operation key, a safe-retry outbox row, and post-success navigation.
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import * as Haptics from 'expo-haptics';
 
 import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
+import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import {
-  type NewSessionRepository,
-  type RepositoryPlatform,
-} from '@/components/agents/new-session-repository-state';
+  type ProviderLaunchSelection,
+  type ProviderPrepareInput,
+  resolveProviderLaunchInput,
+} from '@/components/agents/provider-launch-input';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
 import { i18n } from '@/i18n';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
+type ContinueDestination = {
+  repository: NewSessionRepository | null;
+  model: string;
+  variant: string;
+  launchSelection?: ProviderLaunchSelection | null;
+};
+
 export function useContinueCloudCreate(
   organizationId: string | undefined,
   /** Invoked once the clone settled, right before the success navigation. */
   onCreated?: () => void
-): (
-  sessionId: KiloSessionId,
-  dest: { repository: NewSessionRepository | null; model: string; variant: string },
-  mode: string
-) => Promise<void> {
+): (sessionId: KiloSessionId, dest: ContinueDestination, mode: string) => Promise<void> {
   const router = useRouter();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
+  const { userId } = useCurrentUserId();
+  const scopeKey = JSON.stringify([userId, organizationId]);
+  const scope = useMemo(() => ({ key: scopeKey }), [scopeKey]);
+  const currentScope = useRef<typeof scope | null>(scope);
+  currentScope.current = scope;
+  useEffect(() => {
+    currentScope.current = scope;
+    return () => {
+      currentScope.current = null;
+    };
+  }, [scope]);
   // P1-A-08b: cloud prepares and remote spawns are different intents, so each
   // destination family holds its own hoisted `operationKey`.
   const cloudOperationKey = useHoistedOperationKey();
@@ -45,14 +62,28 @@ export function useContinueCloudCreate(
   } = useMutationOutbox();
 
   return useCallback(
-    async (
-      sessionId: KiloSessionId,
-      dest: { repository: NewSessionRepository | null; model: string; variant: string },
-      mode: string
-    ) => {
+    async (sessionId: KiloSessionId, dest: ContinueDestination, mode: string) => {
+      if (!dest.repository || currentScope.current !== scope) {
+        return;
+      }
+      const launch = resolveProviderLaunchInput(dest.repository, {
+        launchSelection: dest.launchSelection,
+        accountId: userId,
+        organizationId,
+      });
+      if (!launch) {
+        throw Object.assign(
+          new Error(
+            i18n.t('agentChat.newSession.prefillRepoUnavailable', {
+              repo: dest.repository.fullName,
+            })
+          ),
+          { data: { code: 'BAD_REQUEST' } }
+        );
+      }
       const intentFingerprint = JSON.stringify({
         cloneFromKiloSessionId: sessionId,
-        repo: resolveRepoFingerprint(dest.repository),
+        repo: launch.fingerprint,
         model: dest.model,
         variant: dest.variant || undefined,
         mode,
@@ -65,7 +96,11 @@ export function useContinueCloudCreate(
       // duplicate.
       // A failed outbox read reads as no stored rows, so refuse instead of
       // minting a fresh key over a row whose POST the server may have accepted.
-      if (!(await whenLoaded())) {
+      const outboxLoaded = await whenLoaded();
+      if (currentScope.current !== scope) {
+        return;
+      }
+      if (!outboxLoaded) {
         throw new Error(i18n.t('agentChat.newSession.couldNotReadPendingSessions'));
       }
       const operationKey =
@@ -80,8 +115,8 @@ export function useContinueCloudCreate(
         autoInitiate: true,
         operationKey,
         cloneFromKiloSessionId: sessionId,
+        ...launch.input,
       };
-      setRepositoryField(baseInput, dest.repository);
       try {
         // Persist the safe-retry row BEFORE the mutate so a crash mid-flight
         // reuses the same key on relaunch instead of minting a duplicate.
@@ -90,6 +125,9 @@ export function useContinueCloudCreate(
           fingerprint: intentFingerprint,
           input: baseInput,
         });
+        if (currentScope.current !== scope) {
+          return;
+        }
 
         const result = organizationId
           ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
@@ -97,11 +135,17 @@ export function useContinueCloudCreate(
               organizationId,
             })
           : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
+        if (currentScope.current !== scope) {
+          return;
+        }
         // The intent settled; the next submit is a fresh intent. Rotate
         // before the post-success work so a UI failure cannot keep the
         // successful key for a retry or rotate it a second time.
         cloudOperationKey.rotateKey();
         await removeOutboxRow(intentFingerprint);
+        if (currentScope.current !== scope) {
+          return;
+        }
 
         // The cloud session already exists, so no post-success UI failure may
         // report the create as failed or invite a duplicate retry. Each step is
@@ -116,10 +160,16 @@ export function useContinueCloudCreate(
         } catch {
           // A failed cache invalidation is cosmetic; navigation must still run.
         }
+        if (currentScope.current !== scope) {
+          return;
+        }
         try {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } catch {
           // A failed haptics call is cosmetic; stay silent and navigate.
+        }
+        if (currentScope.current !== scope) {
+          return;
         }
         try {
           // Arm the route's busy leave-lock bypass right before the replace so
@@ -127,6 +177,9 @@ export function useContinueCloudCreate(
           onCreated?.();
         } catch {
           // The session exists; a host callback failure must not skip navigation.
+        }
+        if (currentScope.current !== scope) {
+          return;
         }
         try {
           // Replace (not push) the continue form with the cloned session so
@@ -136,17 +189,24 @@ export function useContinueCloudCreate(
           // A navigation failure is not a create failure.
         }
       } catch (error) {
+        if (currentScope.current !== scope) {
+          return;
+        }
         // Only `prepareSession` errors reach here; UI failures are contained
         // above. A typed terminal rejection ends the intent.
         if (!isCloudPrepareRetryableError(error)) {
           cloudOperationKey.rotateKey();
           await removeOutboxRow(intentFingerprint);
         }
-        throw error;
+        if (currentScope.current === scope) {
+          throw error;
+        }
       }
     },
     [
       organizationId,
+      userId,
+      scope,
       queryClient,
       router,
       trpc,
@@ -161,73 +221,12 @@ export function useContinueCloudCreate(
 }
 
 /** Clone-only prepare body. Mirrors the ordinary create path's repository fields. */
-type ContinuePrepareInput = {
+type ContinuePrepareInput = ProviderPrepareInput & {
   mode: AgentMode;
   model: string;
   variant: string | undefined;
-  githubRepo?: string;
-  gitlabProject?: string;
-  bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
   autoCommit: boolean;
   autoInitiate: true;
   operationKey: string;
   cloneFromKiloSessionId: KiloSessionId;
 };
-
-/**
- * The retry fingerprint's repository identity. Mirrors the ordinary create
- * path: includes the platform so two same-named repos on different providers
- * mint distinct retry keys, and the Bitbucket workspace/repository uuids so a
- * workspace rename cannot collide.
- */
-function resolveRepoFingerprint(repository: NewSessionRepository | null): {
-  platform: RepositoryPlatform;
-  fullName: string;
-  workspaceUuid?: string | null;
-  repositoryUuid?: string | null;
-} | null {
-  if (!repository) {
-    return null;
-  }
-  if (repository.platform === 'bitbucket') {
-    return {
-      platform: repository.platform,
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid ?? null,
-      repositoryUuid: repository.repositoryUuid ?? null,
-    };
-  }
-  return { platform: repository.platform, fullName: repository.fullName };
-}
-
-/**
- * Write exactly one repository field into the clone prepare body, matching
- * the selected row's platform. Mirrors the ordinary create path's
- * `setRepositoryField`: a picker key (`platform:fullName`) must never reach
- * `githubRepo`. Bitbucket requires workspace + repository uuids, so it
- * contributes nothing when those are missing (which cannot happen for a row
- * that came from `listBitbucketRepositories`).
- */
-function setRepositoryField(
-  input: ContinuePrepareInput,
-  repository: NewSessionRepository | null
-): void {
-  if (!repository) {
-    return;
-  }
-  if (repository.platform === 'github') {
-    input.githubRepo = repository.fullName;
-    return;
-  }
-  if (repository.platform === 'gitlab') {
-    input.gitlabProject = repository.fullName;
-    return;
-  }
-  if (repository.workspaceUuid && repository.repositoryUuid) {
-    input.bitbucketRepo = {
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid,
-      repositoryUuid: repository.repositoryUuid,
-    };
-  }
-}

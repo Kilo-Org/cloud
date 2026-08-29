@@ -1,0 +1,128 @@
+import {
+  type LaunchRepositoryReference,
+  repositoryResourceKey,
+  requireLaunchRepository,
+} from '@kilocode/app-shared/code-review/repository-identity';
+import { type PrepareInput } from '@kilocode/cloud-agent-sdk/session-manager';
+
+import { type NewSessionRepository } from './new-session-repository-state';
+
+export type ProviderLaunchSelection = {
+  reference: LaunchRepositoryReference;
+  upstreamBranch?: string;
+};
+
+export type ProviderPrepareInput = Pick<
+  PrepareInput,
+  | 'githubRepo'
+  | 'githubIntegrationId'
+  | 'gitlabProject'
+  | 'gitlabIntegrationId'
+  | 'gitlabInstanceUrl'
+  | 'bitbucketRepo'
+  | 'bitbucketIntegrationId'
+  | 'upstreamBranch'
+>;
+
+export type ProviderLaunchContext = {
+  launchSelection?: ProviderLaunchSelection | null;
+  accountId?: string;
+  organizationId?: string;
+};
+
+export function isProviderLaunchSelectionCurrent({
+  launchSelection,
+  accountId,
+  organizationId,
+}: ProviderLaunchContext): boolean {
+  // Old picker callers omit normalized selection. Remove only after old clients
+  // and records disappear and the 30-day ledger window expires.
+  if (launchSelection === undefined) {
+    return true;
+  }
+  if (!launchSelection || !accountId) {
+    return false;
+  }
+  const { reference, upstreamBranch } = launchSelection;
+  const { owner } = reference.authorization;
+  return (
+    owner.type === (organizationId ? 'org' : 'user') &&
+    owner.id === (organizationId ?? accountId) &&
+    (reference.repository.provider !== 'bitbucket' || Boolean(organizationId)) &&
+    (upstreamBranch === undefined || upstreamBranch.trim().length > 0)
+  );
+}
+
+export function resolveProviderLaunchInput(
+  repository: NewSessionRepository | null,
+  context: ProviderLaunchContext
+) {
+  if (!repository || !isProviderLaunchSelectionCurrent(context)) {
+    return null;
+  }
+  const { launchSelection, accountId } = context;
+  const reference = launchSelection ? requireLaunchRepository(launchSelection.reference) : null;
+  if (
+    reference &&
+    (reference.repository.provider !== repository.platform ||
+      reference.repository.fullName !== repository.fullName)
+  ) {
+    return null;
+  }
+  const input: ProviderPrepareInput = {};
+  const integrationId = reference?.authorization.integrationId;
+  if (repository.platform === 'github') {
+    input.githubRepo = repository.fullName;
+    if (integrationId) {
+      input.githubIntegrationId = integrationId;
+    }
+  } else if (repository.platform === 'gitlab') {
+    input.gitlabProject = repository.fullName;
+    if (integrationId) {
+      input.gitlabIntegrationId = integrationId;
+      input.gitlabInstanceUrl = reference.repository.instanceUrl;
+    }
+  } else {
+    const identity = reference?.repository;
+    const workspaceUuid =
+      identity?.provider === 'bitbucket' ? identity.workspaceUuid : repository.workspaceUuid;
+    const repositoryUuid = identity?.repositoryId ?? repository.repositoryUuid;
+    if (
+      !workspaceUuid ||
+      !repositoryUuid ||
+      (reference && repository.workspaceUuid && repository.workspaceUuid !== workspaceUuid) ||
+      (reference && repository.repositoryUuid && repository.repositoryUuid !== repositoryUuid)
+    ) {
+      return null;
+    }
+    input.bitbucketRepo = { fullName: repository.fullName, workspaceUuid, repositoryUuid };
+    if (integrationId) {
+      input.bitbucketIntegrationId = integrationId;
+    }
+  }
+  if (launchSelection?.upstreamBranch !== undefined) {
+    input.upstreamBranch = launchSelection.upstreamBranch;
+  }
+  // Old picker rows retain their exact retry bytes and server-side unpinned
+  // lookup until old clients/records and the 30-day ledger window expire.
+  if (reference && accountId) {
+    return {
+      input,
+      fingerprint: JSON.stringify([
+        'provider-launch:v1',
+        repositoryResourceKey(accountId, reference),
+        input.upstreamBranch ?? null,
+      ]),
+    };
+  }
+  const fingerprint =
+    repository.platform === 'bitbucket'
+      ? {
+          platform: repository.platform,
+          fullName: repository.fullName,
+          workspaceUuid: repository.workspaceUuid ?? null,
+          repositoryUuid: repository.repositoryUuid ?? null,
+        }
+      : { platform: repository.platform, fullName: repository.fullName };
+  return { input, fingerprint };
+}

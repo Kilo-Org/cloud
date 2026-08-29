@@ -3933,6 +3933,83 @@ describe('createSessionManager', () => {
   // -------------------------------------------------------------------------
 
   describe('createAndStart', () => {
+    const launchCases = [
+      {
+        provider: 'github',
+        gitUrl: 'https://github.com/owner/repo.git',
+        repository: 'owner/repo',
+        legacy: { githubRepo: 'owner/repo' },
+        pin: { githubIntegrationId: 'integration-a' },
+      },
+      {
+        provider: 'gitlab',
+        gitUrl: 'https://gitlab.com/group/sub/repo.git',
+        repository: 'group/sub/repo',
+        legacy: { gitlabProject: 'group/sub/repo' },
+        pin: { gitlabIntegrationId: 'integration-a', gitlabInstanceUrl: 'https://gitlab.com' },
+      },
+      {
+        provider: 'gitlab',
+        gitUrl: 'https://git.example/base/group/sub/repo.git',
+        repository: 'base/group/sub/repo',
+        legacy: { gitlabProject: 'group/sub/repo' },
+        pin: {
+          gitlabIntegrationId: 'integration-a',
+          gitlabInstanceUrl: 'https://git.example/base',
+        },
+      },
+      {
+        provider: 'bitbucket',
+        gitUrl: 'https://bitbucket.org/workspace/repo.git',
+        repository: 'workspace/repo',
+        legacy: {
+          bitbucketRepo: {
+            fullName: 'workspace/repo',
+            workspaceUuid: 'workspace-1',
+            repositoryUuid: '42',
+          },
+        },
+        pin: { bitbucketIntegrationId: 'integration-a' },
+      },
+    ].flatMap(entry =>
+      (entry.provider === 'bitbucket' ? ['org-1'] : [null, 'org-1']).flatMap(organizationId =>
+        [false, true].map(legacy => ({ ...entry, organizationId, isLegacy: legacy }))
+      )
+    );
+    it.each(launchCases)(
+      'preserves $provider payload and recovered identity, organization=$organizationId legacy=$isLegacy $gitUrl',
+      async ({ legacy, pin, isLegacy, gitUrl, repository, organizationId }) => {
+        const gitBranch = isLegacy ? 'main' : 'release/Case';
+        const config = createMockConfig({
+          fetchSession: jest.fn().mockResolvedValue({
+            ...defaultFetchedSession,
+            gitUrl,
+            gitBranch,
+            repository,
+            organizationId,
+          }),
+        });
+        const mgr = createSessionManager(config);
+        const input = {
+          prompt: 'Fix the bug',
+          mode: 'code',
+          model: 'model',
+          initialMessageId: 'msg_fixed',
+          ...legacy,
+          ...(isLegacy ? {} : { ...pin, upstreamBranch: 'release/Case' }),
+        };
+        await mgr.createAndStart(input);
+        expect(jest.mocked(config.prepare).mock.calls[0]?.[0]).toEqual(input);
+        expect(config.store.get(mgr.atoms.fetchedSessionData)).toMatchObject({
+          gitUrl,
+          gitBranch,
+          repository,
+          organizationId,
+        });
+        mgr.destroy();
+      }
+    );
+
     it('calls prepare then initiate then switchSession', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

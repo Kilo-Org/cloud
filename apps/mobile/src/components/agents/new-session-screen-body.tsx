@@ -390,6 +390,16 @@ export function NewSessionScreenBody() {
   });
 
   const runCloudCreate = useContinueCloudCreate(organizationId, armCloneNavigateBypass);
+  // The creator retires its results; its caller must also retire busy/error completion.
+  const continueScope = useMemo(() => ({ userId, organizationId }), [userId, organizationId]);
+  const currentContinueScope = useRef<typeof continueScope | null>(continueScope);
+  currentContinueScope.current = continueScope;
+  useEffect(() => {
+    currentContinueScope.current = continueScope;
+    return () => {
+      currentContinueScope.current = null;
+    };
+  }, [continueScope]);
 
   const handleModelSelect = useCallback(
     (modelId: string, newVariant: string, pickerSelection?: ModelPickerSelection) => {
@@ -567,6 +577,9 @@ export function NewSessionScreenBody() {
       // Cloud Agent clone: submit the clone-only prepare with the source id and
       // the form's repo/model/variant; success replaces the form.
       void (async () => {
+        if (currentContinueScope.current !== continueScope) {
+          return;
+        }
         setIsCreating(true);
         try {
           await runCloudCreate(
@@ -575,13 +588,18 @@ export function NewSessionScreenBody() {
             mode
           );
         } catch (error) {
+          if (currentContinueScope.current !== continueScope) {
+            return;
+          }
           const message =
             isCloudPrepareRetryableError(error) || !(error instanceof Error) || !error.message
               ? i18n.t('agentChat.session.cloneFailedRetry')
               : error.message;
           toast.error(message);
         } finally {
-          setIsCreating(false);
+          if (currentContinueScope.current === continueScope) {
+            setIsCreating(false);
+          }
         }
       })();
       return;
@@ -603,6 +621,7 @@ export function NewSessionScreenBody() {
     displayVariant,
     mode,
     runCloudCreate,
+    continueScope,
     remoteSpawn,
     createSessionFromDraft,
     submitWithVoiceSettled,

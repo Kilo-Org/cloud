@@ -1,4 +1,4 @@
-import { type RefObject, useCallback, useRef } from 'react';
+import { type RefObject, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
@@ -7,15 +7,18 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import {
-  type NewSessionRepository,
-  type RepositoryPlatform,
-} from '@/components/agents/new-session-repository-state';
+  type ProviderLaunchSelection,
+  type ProviderPrepareInput,
+  resolveProviderLaunchInput,
+} from '@/components/agents/provider-launch-input';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import {
@@ -32,6 +35,7 @@ type UseNewSessionCreatorInput = {
   /** Invoked on the success path before navigation; failures never fire it. */
   onCreated?: () => void;
   selectedRepository: NewSessionRepository | null;
+  launchSelection?: ProviderLaunchSelection | null;
   setIsCreating: (value: boolean) => void;
   variant: string;
   /** Commit and push the agent's changes (true) or leave them uncommitted (false). */
@@ -40,16 +44,12 @@ type UseNewSessionCreatorInput = {
   profileId?: string | null;
 };
 
-type PrepareSessionInput = {
+type PrepareSessionInput = ProviderPrepareInput & {
   prompt: string;
   initialMessageId: string;
   mode: AgentMode;
   model: string;
   variant: string | undefined;
-  /** Exactly one repository field is set, matching the selected row's platform. */
-  githubRepo?: string;
-  gitlabProject?: string;
-  bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
   autoCommit: boolean;
   autoInitiate: boolean;
   operationKey: string;
@@ -76,6 +76,7 @@ export function useNewSessionCreator({
   organizationId,
   onCreated,
   selectedRepository,
+  launchSelection,
   setIsCreating,
   variant,
   autoCommit,
@@ -84,6 +85,26 @@ export function useNewSessionCreator({
   const router = useRouter();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
+  const { userId } = useCurrentUserId();
+  const launch = resolveProviderLaunchInput(selectedRepository, {
+    launchSelection,
+    accountId: userId,
+    organizationId,
+  });
+  const scopeKey = JSON.stringify([userId, organizationId, launch?.fingerprint]);
+  const scope = useMemo(() => ({ key: scopeKey }), [scopeKey]);
+  const currentScope = useRef<typeof scope | null>(scope);
+  currentScope.current = scope;
+  const setIsCreatingRef = useRef(setIsCreating);
+  setIsCreatingRef.current = setIsCreating;
+  useEffect(() => {
+    currentScope.current = scope;
+    // A replacement scope starts idle; retired requests cannot reset its launch.
+    setIsCreatingRef.current(false);
+    return () => {
+      currentScope.current = null;
+    };
+  }, [scope]);
   const promptRef = useRef('');
   // P1-A-08b: one `operationKey` per submit intent, so a retry of the same
   // intent dedupes on the ledger instead of spawning a second session.
@@ -106,7 +127,17 @@ export function useNewSessionCreator({
     // already presented its own feedback, so a no-op here preserves the
     // user's draft and screen state without toasting.
     const prompt = resolveNewSessionPromptForCreate(promptRef.current);
-    if (prompt === null) {
+    if (prompt === null || currentScope.current !== scope) {
+      return;
+    }
+    if (!launch) {
+      if (selectedRepository) {
+        toast.error(
+          i18n.t('agentChat.newSession.prefillRepoUnavailable', {
+            repo: selectedRepository.fullName,
+          })
+        );
+      }
       return;
     }
     if (prompt.startsWith('/') && attachments.attachments.length > 0) {
@@ -126,8 +157,10 @@ export function useNewSessionCreator({
     // payload. `uploaded` is a plain object; `{ ok: false }` is truthy, so
     // test `ok`.
     const uploaded = await attachments.uploadPending();
-    if (!uploaded.ok) {
-      setIsCreating(false);
+    if (!uploaded.ok || currentScope.current !== scope) {
+      if (currentScope.current === scope) {
+        setIsCreating(false);
+      }
       return;
     }
 
@@ -139,18 +172,17 @@ export function useNewSessionCreator({
       mode,
       model,
       variant: variant || undefined,
-      repo: resolveRepoFingerprint(selectedRepository),
+      repo: launch.fingerprint,
       autoCommit,
       organizationId: organizationId ?? null,
       profileId: profileId ?? null,
       attachments: attachmentWire ?? null,
     });
-    // Pre-fix safe-retry rows persisted the bare `fullName` as `repo`. A GitHub
-    // `owner/repo` is inherently a single-provider identity, so only GitHub
-    // intents fall back to the legacy bare-name lookup: two same-named
-    // GitLab/Bitbucket rows must never share the stale retry key.
+    // Old GitHub safe-retry rows used the bare name. Never apply that lookup to
+    // a pinned selection. Remove only after old clients/records disappear and
+    // the 30-day ledger window expires; preserve the serialized field order.
     const legacyIntentFingerprint =
-      selectedRepository?.platform === 'github'
+      launchSelection === undefined && selectedRepository?.platform === 'github'
         ? JSON.stringify({
             prompt,
             mode,
@@ -169,7 +201,11 @@ export function useNewSessionCreator({
     // that races the launch load would read empty rows and mint a duplicate.
     // A failed outbox read reads as no stored rows, so refuse instead of
     // minting a fresh key over a row whose POST the server may have accepted.
-    if (!(await whenLoaded())) {
+    const outboxLoaded = await whenLoaded();
+    if (currentScope.current !== scope) {
+      return;
+    }
+    if (!outboxLoaded) {
       toast.error(i18n.t('agentChat.newSession.couldNotReadPendingSessions'));
       setIsCreating(false);
       return;
@@ -199,8 +235,8 @@ export function useNewSessionCreator({
         autoCommit,
         autoInitiate: true,
         operationKey,
+        ...launch.input,
       };
-      setRepositoryField(baseInput, selectedRepository);
       if (profileId) {
         baseInput.profileId = profileId;
       }
@@ -215,8 +251,14 @@ export function useNewSessionCreator({
         fingerprint: intentFingerprint,
         input: baseInput,
       });
+      if (currentScope.current !== scope) {
+        return;
+      }
       if (legacyRowToDrop !== null) {
         await removeOutboxRow(legacyRowToDrop);
+      }
+      if (currentScope.current !== scope) {
+        return;
       }
 
       const result = organizationId
@@ -225,11 +267,18 @@ export function useNewSessionCreator({
             organizationId,
           })
         : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
+      // A late prepare cannot clear or navigate the newly selected owner's form.
+      if (currentScope.current !== scope) {
+        return;
+      }
 
       // Rotate before the post-success work so a UI failure cannot keep the
       // successful key for a retry.
       rotateKey();
       await removeOutboxRow(intentFingerprint);
+      if (currentScope.current !== scope) {
+        return;
+      }
 
       // The cloud session already exists, so no post-success UI failure may
       // report the create as failed or invite a duplicate retry.
@@ -241,6 +290,9 @@ export function useNewSessionCreator({
         } catch {
           // Analytics and cache invalidation are cosmetic; stay silent.
         }
+        if (currentScope.current !== scope) {
+          return;
+        }
         // Signal the host (e.g. clear the new-session draft) before navigating,
         // so the draft is gone by the time the route unmounts and can never be
         // flushed back by an unmount write.
@@ -248,6 +300,9 @@ export function useNewSessionCreator({
           onCreated?.();
         } catch {
           // The session exists; a host callback failure must not skip navigation.
+        }
+        if (currentScope.current !== scope) {
+          return;
         }
         // The uploads now live on the server: drop the composer's local cache
         // copies so owned temp files never outlive the session handoff.
@@ -257,6 +312,9 @@ export function useNewSessionCreator({
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } catch {
           // A failed haptics call is cosmetic; stay silent and navigate.
+        }
+        if (currentScope.current !== scope) {
+          return;
         }
         // One atomic navigation: `replace` drops the new-session route as it
         // pushes the session route, so back still lands on the session list.
@@ -269,6 +327,9 @@ export function useNewSessionCreator({
         // Stay silent: no create-failure toast, no duplicate-create retry.
       }
     } catch (error) {
+      if (currentScope.current !== scope) {
+        return;
+      }
       // Only `prepareSession` errors reach here; UI failures are swallowed.
       const message =
         error instanceof Error ? error.message : i18n.t('agentChat.newSession.failedToCreate');
@@ -279,10 +340,15 @@ export function useNewSessionCreator({
         await removeOutboxRow(intentFingerprint);
       }
     } finally {
-      setIsCreating(false);
+      if (currentScope.current === scope) {
+        setIsCreating(false);
+      }
     }
   }, [
     selectedRepository,
+    launchSelection,
+    launch,
+    scope,
     model,
     mode,
     variant,
@@ -304,59 +370,4 @@ export function useNewSessionCreator({
   ]);
 
   return { createSessionFromDraft, promptRef };
-}
-
-/**
- * The retry fingerprint's repository identity. Includes the platform so two
- * same-named repos on different providers mint distinct retry keys, and the
- * Bitbucket workspace/repository uuids so a workspace rename cannot collide.
- */
-function resolveRepoFingerprint(repository: NewSessionRepository | null): {
-  platform: RepositoryPlatform;
-  fullName: string;
-  workspaceUuid?: string | null;
-  repositoryUuid?: string | null;
-} | null {
-  if (!repository) {
-    return null;
-  }
-  if (repository.platform === 'bitbucket') {
-    return {
-      platform: repository.platform,
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid ?? null,
-      repositoryUuid: repository.repositoryUuid ?? null,
-    };
-  }
-  return { platform: repository.platform, fullName: repository.fullName };
-}
-
-/**
- * Write exactly one repository field into the create body, matching the
- * selected row's platform. Bitbucket requires workspace + run ids, so it
- * contributes nothing when those are missing (which cannot happen for a row
- * that came from `listBitbucketRepositories`).
- */
-function setRepositoryField(
-  input: PrepareSessionInput,
-  repository: NewSessionRepository | null
-): void {
-  if (!repository) {
-    return;
-  }
-  if (repository.platform === 'github') {
-    input.githubRepo = repository.fullName;
-    return;
-  }
-  if (repository.platform === 'gitlab') {
-    input.gitlabProject = repository.fullName;
-    return;
-  }
-  if (repository.workspaceUuid && repository.repositoryUuid) {
-    input.bitbucketRepo = {
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid,
-      repositoryUuid: repository.repositoryUuid,
-    };
-  }
 }

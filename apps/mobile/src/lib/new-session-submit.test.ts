@@ -144,6 +144,59 @@ describe('resolveNewSessionSubmitDisabled', () => {
   });
 });
 
+it('blocks unresolved normalized selection without changing legacy or remote gates', () => {
+  expect(
+    resolveNewSessionStartDisabled({
+      ...validInput(),
+      selectedRepositoryResolved: true,
+      isProfileLoading: false,
+      launchSelection: null,
+    })
+  ).toBe(true);
+  expect(resolveContinueStartDisabled(continueInput({ launchSelection: null }))).toBe(true);
+  expect(
+    resolveContinueStartDisabled(
+      continueInput({ launchSelection: null, isRemoteTargetSelected: true })
+    )
+  ).toBe(false);
+});
+
+it('blocks both launch forms when normalized selection belongs to another owner', () => {
+  const context = {
+    accountId: 'user-1',
+    organizationId: 'org-2',
+    launchSelection: {
+      reference: {
+        repository: {
+          provider: 'gitlab' as const,
+          instanceUrl: 'https://gitlab.com',
+          repositoryId: '42',
+          fullName: 'group/project',
+          defaultBranch: 'develop',
+        },
+        authorization: {
+          kind: 'ownerIntegration' as const,
+          owner: { type: 'org' as const, id: 'org-1' },
+          integrationId: 'integration-1',
+        },
+      },
+      upstreamBranch: 'release',
+    },
+  };
+  expect(
+    resolveNewSessionStartDisabled({
+      ...validInput(),
+      selectedRepositoryResolved: true,
+      isProfileLoading: false,
+      ...context,
+    })
+  ).toBe(true);
+  expect(resolveContinueStartDisabled({ ...continueInput(), ...context })).toBe(true);
+  expect(
+    resolveContinueStartDisabled({ ...continueInput(), ...context, organizationId: 'org-1' })
+  ).toBe(false);
+});
+
 describe('resolveNewSessionStartDisabled', () => {
   function startInput(
     overrides: Partial<Parameters<typeof resolveNewSessionStartDisabled>[0]> = {}

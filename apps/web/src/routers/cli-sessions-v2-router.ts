@@ -54,6 +54,105 @@ import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-g
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { after } from 'next/server';
+import type {
+  LaunchRepositoryReference,
+  Owner,
+} from '@kilocode/app-shared/code-review/repository-identity';
+import {
+  fetchAllGitHubRepositoriesForOrganization,
+  fetchGitHubRepositoriesForUser,
+} from '@/lib/cloud-agent/github-integration-helpers';
+import {
+  fetchGitLabRepositoriesForOrganization,
+  fetchGitLabRepositoriesForUser,
+} from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { fetchBitbucketRepositoriesForOrganization } from '@/lib/cloud-agent/bitbucket-integration-helpers';
+
+type RecentRepositoryIdentity =
+  | { kind: 'resolved'; accountId: string; reference: LaunchRepositoryReference }
+  | {
+      kind: 'legacy-unresolved';
+      accountId: string;
+      /** URL-only history can span owners, so no single owner is known. */
+      owner: Owner | null;
+      reason: 'unavailable' | 'not-found' | 'ambiguous';
+    };
+
+export function resolveRecentRepositoryIdentity(
+  accountId: string,
+  owner: Owner,
+  gitUrl: string,
+  provider: string | null,
+  references: LaunchRepositoryReference[] | null
+): RecentRepositoryIdentity {
+  const matches = references?.filter(reference => {
+    const { repository, authorization } = reference;
+    if (
+      authorization.owner.type !== owner.type ||
+      authorization.owner.id !== owner.id ||
+      (provider !== null && provider !== repository.provider)
+    )
+      return false;
+    try {
+      const actual = new URL(
+        gitUrl.replace(/^git@([^:]+):/, 'https://$1/').replace(/^ssh:/, 'https:')
+      );
+      const expected = new URL(
+        `${repository.instanceUrl.replace(/\/+$/, '')}/${repository.fullName}`
+      );
+      if (
+        !['http:', 'https:'].includes(actual.protocol) ||
+        actual.host !== expected.host ||
+        actual.search ||
+        actual.hash
+      )
+        return false;
+      const path = actual.pathname.replace(/\/+$/, '').replace(/\.git$/, '');
+      return repository.provider === 'github'
+        ? path.toLowerCase() === expected.pathname.toLowerCase()
+        : path === expected.pathname;
+    } catch {
+      return false;
+    }
+  });
+  // URL-only history has no integration pin. Resolve only an authorized exact
+  // match; retain ambiguous/missing rows. Remove after old records/clients and
+  // the 30-day ledger window expire, never by guessing another integration.
+  const match = matches?.length === 1 ? matches[0] : undefined;
+  return match
+    ? { kind: 'resolved', accountId, reference: match }
+    : {
+        kind: 'legacy-unresolved',
+        accountId,
+        owner,
+        reason: references === null ? 'unavailable' : matches?.length ? 'ambiguous' : 'not-found',
+      };
+}
+
+async function recentRepositoryReferences(owner: Owner, accountId: string) {
+  try {
+    const [github, gitlab, bitbucket] = await Promise.all([
+      owner.type === 'org'
+        ? fetchAllGitHubRepositoriesForOrganization(owner.id, false, { requireComplete: true })
+        : fetchGitHubRepositoriesForUser(owner.id, false, { requireComplete: true }),
+      owner.type === 'org'
+        ? fetchGitLabRepositoriesForOrganization(owner.id, accountId)
+        : fetchGitLabRepositoriesForUser(owner.id),
+      owner.type === 'org' ? fetchBitbucketRepositoriesForOrganization(owner.id, accountId) : null,
+    ]);
+    if (bitbucket?.status === 'temporarily_unavailable') return null;
+    return [
+      ...github.repositories,
+      ...gitlab.repositories,
+      ...(bitbucket?.status === 'available' ? bitbucket.repositories : []),
+    ].flatMap(repository =>
+      repository.repositoryReference ? [repository.repositoryReference] : []
+    );
+  } catch {
+    // A failed discovery must not erase history or resolve against a partial set.
+    return null;
+  }
+}
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
@@ -917,20 +1016,61 @@ export const cliSessionsV2Router = createTRPCRouter({
 
       const { rows } = await db.execute<{
         git_url: string;
+        organization_ids: (string | null)[];
+        platforms: (string | null)[];
         last_used_at: string;
       }>(sql`
-        SELECT ${cli_sessions_v2.git_url} AS git_url, MAX(${cli_sessions_v2.updated_at}) AS last_used_at
+        SELECT ${cli_sessions_v2.git_url} AS git_url,
+          ARRAY_AGG(DISTINCT ${cli_sessions_v2.organization_id}) AS organization_ids,
+          ARRAY_AGG(DISTINCT ${cli_sessions_v2.platform}) AS platforms,
+          MAX(${cli_sessions_v2.updated_at}) AS last_used_at
         FROM ${cli_sessions_v2}
         WHERE ${joinWithAnd(whereConditions)}
         GROUP BY ${cli_sessions_v2.git_url}
         ORDER BY last_used_at DESC
         LIMIT 10`);
 
+      const referencesByOwner = new Map<string, ReturnType<typeof recentRepositoryReferences>>();
       return {
-        repositories: rows.map(row => ({
-          gitUrl: row.git_url,
-          lastUsedAt: row.last_used_at,
-        })),
+        repositories: await Promise.all(
+          rows.map(async row => {
+            const organizationId = row.organization_ids[0];
+            const owner: Owner | null =
+              row.organization_ids.length !== 1
+                ? null
+                : organizationId
+                  ? { type: 'org', id: organizationId }
+                  : { type: 'user', id: ctx.user.id };
+            const providers = row.platforms.filter(provider => provider !== null);
+            const recent = { gitUrl: row.git_url, lastUsedAt: row.last_used_at };
+            // Legacy consumers key by URL. A URL spanning owners cannot select one owner.
+            if (!owner || providers.length > 1) {
+              const identity: RecentRepositoryIdentity = {
+                kind: 'legacy-unresolved',
+                accountId: ctx.user.id,
+                owner,
+                reason: 'ambiguous',
+              };
+              return { ...recent, identity };
+            }
+            const ownerKey = JSON.stringify(owner);
+            let references = referencesByOwner.get(ownerKey);
+            if (!references) {
+              references = recentRepositoryReferences(owner, ctx.user.id);
+              referencesByOwner.set(ownerKey, references);
+            }
+            return {
+              ...recent,
+              identity: resolveRecentRepositoryIdentity(
+                ctx.user.id,
+                owner,
+                row.git_url,
+                providers[0] ?? null,
+                await references
+              ),
+            };
+          })
+        ),
       };
     }),
 

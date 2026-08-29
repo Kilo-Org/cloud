@@ -41,6 +41,10 @@ type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 export type StoredSession = RouterOutputs['cliSessionsV2']['list']['cliSessions'][number];
 
+// Keep gitUrl/lastUsedAt for old pickers; new pickers consume the qualified identity.
+export type RecentAgentRepository =
+  RouterOutputs['cliSessionsV2']['recentRepositories']['repositories'][number];
+
 export type ActiveSession = RouterOutputs['activeSessions']['list']['sessions'][number];
 
 type UseAgentSessionsOptions = {

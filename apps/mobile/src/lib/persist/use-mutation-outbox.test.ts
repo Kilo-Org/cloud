@@ -321,6 +321,111 @@ describe('useMutationOutbox load gating', () => {
   });
 });
 
+describe('useMutationOutbox live snapshot', () => {
+  it('retains each new intent key without a refresh or remount', async () => {
+    const { resultRef } = mountOutbox();
+    await flushMicrotasks();
+    const outbox = requireResult(resultRef);
+    await act(async () => {
+      await outbox.writeSafeRetry({ operationKey: 'key-A', fingerprint: 'A', input: null });
+      await outbox.writeSafeRetry({ operationKey: 'key-B', fingerprint: 'B', input: null });
+      await outbox.writeSafeRetry({ operationKey: 'replacement-A', fingerprint: 'A', input: null });
+    });
+    expect(outbox.getStoredOperationKey('A')).toBe('key-A');
+    expect(outbox.getStoredOperationKey('B')).toBe('key-B');
+    await act(async () => {
+      await outbox.remove('A');
+    });
+    expect(outbox.getStoredOperationKey('A')).toBeNull();
+    expect(outbox.getStoredOperationKey('B')).toBe('key-B');
+  });
+
+  it('publishes a new key only after its persistence completes', async () => {
+    const gate = deferred<undefined>();
+    writeOutboxRowMock.mockReturnValueOnce(gate.promise);
+    const { resultRef } = mountOutbox();
+    await flushMicrotasks();
+    const outbox = requireResult(resultRef);
+    const write = outbox.writeSafeRetry({ operationKey: 'key-A', fingerprint: 'A', input: null });
+    expect(outbox.getStoredOperationKey('A')).toBeNull();
+    await act(async () => {
+      gate.resolve(undefined);
+      await write;
+    });
+    expect(outbox.getStoredOperationKey('A')).toBe('key-A');
+  });
+
+  it.each(['safe-retry', 'reconcile-first'] as const)(
+    'never publishes a late %s write into another identity',
+    async taxonomy => {
+      const { resultRef, rerender } = mountOutbox();
+      await flushMicrotasks();
+      const gate = deferred<undefined>();
+      writeOutboxRowMock.mockReturnValueOnce(gate.promise);
+      const oldOutbox = requireResult(resultRef);
+      const row = { operationKey: 'old-key', fingerprint: 'same', input: null, scope: 'personal' };
+      const write =
+        taxonomy === 'safe-retry'
+          ? oldOutbox.writeSafeRetry(row)
+          : oldOutbox.writeReconcileFirst(row);
+      identityMock.value = { userId: 'u2', isLoading: false };
+      listOutboxRowsMock.mockResolvedValue([
+        safeRetryRow({ operationKey: 'new-key', fingerprint: 'same' }),
+      ]);
+      rerender();
+      await flushMicrotasks();
+      await act(async () => {
+        gate.resolve(undefined);
+        await write;
+      });
+      expect(requireResult(resultRef).getStoredOperationKey('same')).toBe('new-key');
+      expect(requireResult(resultRef).needsReconcile).toEqual([]);
+    }
+  );
+
+  it('never removes the current identity key after a previous identity removal completes', async () => {
+    listOutboxRowsMock.mockResolvedValue([
+      safeRetryRow({ fingerprint: 'same', operationKey: 'old-key' }),
+    ]);
+    const { resultRef, rerender } = mountOutbox();
+    await flushMicrotasks();
+    const gate = deferred<undefined>();
+    removeOutboxRowMock.mockReturnValueOnce(gate.promise);
+    const removal = requireResult(resultRef).remove('same');
+    identityMock.value = { userId: 'u2', isLoading: false };
+    listOutboxRowsMock.mockResolvedValue([
+      safeRetryRow({ fingerprint: 'same', operationKey: 'new-key' }),
+    ]);
+    rerender();
+    await flushMicrotasks();
+    await act(async () => {
+      gate.resolve(undefined);
+      await removal;
+    });
+    expect(requireResult(resultRef).getStoredOperationKey('same')).toBe('new-key');
+  });
+
+  it('publishes a new reconcile row and preserves its key on another write', async () => {
+    const { resultRef } = mountOutbox();
+    await flushMicrotasks();
+    const row = {
+      operationKey: 'original',
+      fingerprint: 'reconcile',
+      input: null,
+      scope: 'personal',
+    };
+    await act(async () => {
+      await requireResult(resultRef).writeReconcileFirst(row);
+      expect(
+        await requireResult(resultRef).writeReconcileFirst({ ...row, operationKey: 'replacement' })
+      ).toBe('original');
+    });
+    expect(requireResult(resultRef).needsReconcile).toEqual([
+      { ...row, taxonomy: 'reconcile-first' },
+    ]);
+  });
+});
+
 describe('useMutationOutbox key preservation and reconcile list', () => {
   it('preserves a stored safe-retry key instead of overwriting it with a fresh key', async () => {
     listOutboxRowsMock.mockResolvedValue([

@@ -8,6 +8,10 @@ import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import { useContinueCloudCreate } from './use-continue-cloud-create';
 
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1' }),
+}));
+
 const prepareSessionMutate = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
 const routerPush = vi.hoisted(() => vi.fn());
@@ -153,6 +157,97 @@ beforeEach(() => {
 });
 
 describe('useContinueCloudCreate', () => {
+  const repository: NewSessionRepository = {
+    platform: 'bitbucket',
+    fullName: 'workspace/repo',
+    isPrivate: true,
+    workspaceUuid: 'workspace-1',
+    repositoryUuid: 'repository-1',
+  };
+  const reference = {
+    repository: {
+      provider: 'bitbucket' as const,
+      fullName: 'workspace/repo',
+      instanceUrl: 'https://bitbucket.org',
+      repositoryId: 'repository-1',
+      workspaceUuid: 'workspace-1',
+      defaultBranch: 'develop',
+    },
+    authorization: {
+      kind: 'ownerIntegration' as const,
+      owner: { type: 'org' as const, id: 'org-1' },
+      integrationId: 'integration-1',
+    },
+  };
+  it('pins Bitbucket continue launches and separates changed branch retries', async () => {
+    const run = mountContinue('org-1');
+    operationKeyMock.getKey.mockImplementation(fingerprint => fingerprint);
+    prepareSessionMutate.mockRejectedValue(creationInProgressError());
+    await Promise.all(
+      ['release', 'release', 'other'].map(async upstreamBranch =>
+        expect(
+          run(
+            SOURCE_SESSION,
+            { ...DEST, repository, launchSelection: { reference, upstreamBranch } },
+            'code'
+          )
+        ).rejects.toThrow('creation_in_progress')
+      )
+    );
+    const inputs = prepareSessionMutate.mock.calls.map(call => call[0] as Record<string, unknown>);
+    expect(inputs[0]).toMatchObject({
+      bitbucketRepo: {
+        fullName: 'workspace/repo',
+        workspaceUuid: 'workspace-1',
+        repositoryUuid: 'repository-1',
+      },
+      bitbucketIntegrationId: 'integration-1',
+      upstreamBranch: 'release',
+      cloneFromKiloSessionId: 'ses_source',
+    });
+    expect(inputs[0]).not.toHaveProperty('prompt');
+    expect(inputs[1]?.operationKey).toBe(inputs[0]?.operationKey);
+    expect(inputs[2]?.operationKey).not.toBe(inputs[0]?.operationKey);
+  });
+
+  it('keeps an empty continue destination inert and rejects a stale owner without a retry key', async () => {
+    const run = mountContinue('org-2');
+    await run(SOURCE_SESSION, { ...DEST, repository: null }, 'code');
+    await expect(
+      run(SOURCE_SESSION, { ...DEST, repository, launchSelection: { reference } }, 'code')
+    ).rejects.toMatchObject({ data: { code: 'BAD_REQUEST' } });
+    expect(prepareSessionMutate.mock.calls).toEqual([]);
+  });
+
+  it('recovers the same clone after a lost response and remount', async () => {
+    const stored = new Map<string, string>();
+    const sessions = new Map<string, string>();
+    let loseResponse = true;
+    outboxMock.getStoredOperationKey.mockImplementation(
+      fingerprint => stored.get(fingerprint) ?? null
+    );
+    outboxMock.writeSafeRetry.mockImplementation(async (...args: unknown[]) => {
+      const row = args[0] as { fingerprint: string; operationKey: string };
+      stored.set(row.fingerprint, row.operationKey);
+    });
+    prepareSessionMutate.mockImplementation(async (payload: { operationKey: string }) => {
+      expect([...stored.values()]).toContain(payload.operationKey);
+      sessions.set(payload.operationKey, 'ses_recovered');
+      if (loseResponse) {
+        throw new Error('Lost response');
+      }
+      return { kiloSessionId: sessions.get(payload.operationKey) };
+    });
+    await expect(mountContinue('org-1')(SOURCE_SESSION, DEST, 'code')).rejects.toThrow(
+      'Lost response'
+    );
+    loseResponse = false;
+    operationKeyMock.getKey.mockReturnValue('replacement-key');
+    await mountContinue('org-1')(SOURCE_SESSION, DEST, 'code');
+    expect(sessions.size).toBe(1);
+    expect(routerReplace.mock.calls.at(-1)?.[0]).toContain('agent-chat/ses_recovered');
+  });
+
   it('success replaces the route (replaceWithAgentSession, never push)', async () => {
     const run = mountContinue('org-1');
 

@@ -14,7 +14,12 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCError } from '@trpc/server';
-import { parseGitHubOwnerRepo, parseGitHubPrUrl } from '@/routers/cli-sessions-v2-router';
+import {
+  parseGitHubOwnerRepo,
+  parseGitHubPrUrl,
+  resolveRecentRepositoryIdentity,
+} from '@/routers/cli-sessions-v2-router';
+import type { LaunchRepositoryReference } from '@kilocode/app-shared/code-review/repository-identity';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
@@ -86,6 +91,9 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => {
   return {
     ...actual,
     fetchPullRequestByNumber: jest.fn(),
+    fetchGitHubRepositories: jest.fn(
+      actual.fetchGitHubRepositories as typeof githubAdapter.fetchGitHubRepositories
+    ),
   };
 });
 
@@ -114,6 +122,194 @@ const mockedFetchPullRequestByNumber =
   githubAdapter.fetchPullRequestByNumber as jest.MockedFunction<
     typeof githubAdapter.fetchPullRequestByNumber
   >;
+
+describe('recent repository identity resolution', () => {
+  it.each([
+    ['github', 'user', 'https://github.com', 'owner/repo'],
+    ['github', 'org', 'https://github.com', 'owner/repo'],
+    ['gitlab', 'user', 'https://gitlab.com', 'group/sub/repo'],
+    ['gitlab', 'org', 'https://gitlab.com', 'group/sub/repo'],
+    ['gitlab', 'user', 'https://git.example/base', 'group/sub/repo'],
+    ['gitlab', 'org', 'https://git.example/base', 'group/sub/repo'],
+    ['bitbucket', 'org', 'https://bitbucket.org', 'workspace/repo'],
+  ] as const)(
+    'resolves only the authorized %s %s history on %s',
+    (provider, type, instanceUrl, fullName) => {
+      const owner = { type, id: type === 'org' ? 'org-1' : 'user-1' };
+      const reference: LaunchRepositoryReference = {
+        repository: {
+          instanceUrl,
+          repositoryId: '42',
+          fullName,
+          defaultBranch: 'main',
+          ...(provider === 'bitbucket'
+            ? { provider: 'bitbucket' as const, workspaceUuid: 'workspace-1' }
+            : { provider }),
+        },
+        authorization: { kind: 'ownerIntegration', owner, integrationId: 'integration-a' },
+      };
+      const url = `${instanceUrl}/${fullName}.git`;
+      const otherOwner: LaunchRepositoryReference = {
+        ...reference,
+        authorization: { ...reference.authorization, owner: { type, id: 'other' } },
+      };
+      for (const recordedProvider of [provider, null]) {
+        expect(
+          resolveRecentRepositoryIdentity('user-1', owner, url, recordedProvider, [
+            otherOwner,
+            reference,
+          ])
+        ).toEqual({
+          kind: 'resolved',
+          accountId: 'user-1',
+          reference,
+        });
+        expect(
+          resolveRecentRepositoryIdentity('user-1', owner, url, recordedProvider, [otherOwner])
+        ).toEqual({
+          kind: 'legacy-unresolved',
+          accountId: 'user-1',
+          owner,
+          reason: 'not-found',
+        });
+        expect(
+          resolveRecentRepositoryIdentity('user-1', owner, url, recordedProvider, [
+            reference,
+            {
+              ...reference,
+              authorization: { ...reference.authorization, integrationId: 'integration-b' },
+            },
+          ])
+        ).toEqual({
+          kind: 'legacy-unresolved',
+          accountId: 'user-1',
+          owner,
+          reason: 'ambiguous',
+        });
+        expect(
+          resolveRecentRepositoryIdentity('user-1', owner, url, recordedProvider, null)
+        ).toEqual({
+          kind: 'legacy-unresolved',
+          accountId: 'user-1',
+          owner,
+          reason: 'unavailable',
+        });
+      }
+    }
+  );
+
+  const reference: LaunchRepositoryReference = {
+    repository: {
+      provider: 'gitlab',
+      instanceUrl: 'https://git.example/base',
+      repositoryId: '42',
+      fullName: 'Group/Sub/repo',
+      defaultBranch: null,
+    },
+    authorization: {
+      kind: 'ownerIntegration',
+      owner: { type: 'user', id: 'user-1' },
+      integrationId: 'integration-1',
+    },
+  };
+  const owner = reference.authorization.owner;
+  const url = 'https://git.example/base/Group/Sub/repo.git';
+  it('resolves an authorized full path without substituting a same-named provider', () => {
+    const github: LaunchRepositoryReference = {
+      ...reference,
+      repository: {
+        ...reference.repository,
+        provider: 'github',
+        instanceUrl: 'https://github.com',
+      },
+    };
+    expect(
+      resolveRecentRepositoryIdentity('user-1', owner, url, null, [github, reference])
+    ).toEqual({ kind: 'resolved', accountId: 'user-1', reference });
+  });
+  it.each([
+    ['case change', url.toLowerCase(), null, [reference], 'not-found'],
+    ['host change', url.replace('git.example', 'other.example'), null, [reference], 'not-found'],
+    ['subpath change', url.replace('/base/', '/other/'), null, [reference], 'not-found'],
+    ['provider mismatch', url, 'github', [reference], 'not-found'],
+    [
+      'wrong owner',
+      url,
+      null,
+      [
+        {
+          ...reference,
+          authorization: { ...reference.authorization, owner: { type: 'org', id: 'other' } },
+        },
+      ],
+      'not-found',
+    ],
+    [
+      'ambiguous integrations',
+      url,
+      null,
+      [
+        reference,
+        { ...reference, authorization: { ...reference.authorization, integrationId: 'other' } },
+      ],
+      'ambiguous',
+    ],
+    ['discovery failure', url, null, null, 'unavailable'],
+    ['no authorized match', url, null, [], 'not-found'],
+  ] as const)(
+    'retains unresolved history after %s',
+    (_name, gitUrl, provider, references, reason) => {
+      expect(
+        resolveRecentRepositoryIdentity(
+          'user-1',
+          owner,
+          gitUrl,
+          provider,
+          references === null ? null : [...references]
+        )
+      ).toEqual({ kind: 'legacy-unresolved', accountId: 'user-1', owner, reason });
+    }
+  );
+  it('retains Bitbucket UUIDs from the authorized organization match', () => {
+    const bitbucket: LaunchRepositoryReference = {
+      repository: {
+        provider: 'bitbucket',
+        instanceUrl: 'https://bitbucket.org',
+        repositoryId: 'repository-uuid',
+        workspaceUuid: 'workspace-uuid',
+        fullName: 'workspace/repo',
+        defaultBranch: 'develop',
+      },
+      authorization: { ...reference.authorization, owner: { type: 'org', id: 'org-1' } },
+    };
+    expect(
+      resolveRecentRepositoryIdentity(
+        'user-1',
+        bitbucket.authorization.owner,
+        'https://bitbucket.org/workspace/repo.git',
+        'bitbucket',
+        [bitbucket]
+      )
+    ).toEqual({ kind: 'resolved', accountId: 'user-1', reference: bitbucket });
+  });
+  it('resolves old GitHub SSH history through the exact authorized repository', () => {
+    const github: LaunchRepositoryReference = {
+      ...reference,
+      repository: {
+        provider: 'github',
+        instanceUrl: 'https://github.com',
+        repositoryId: '9',
+        fullName: 'Owner/Repo',
+        defaultBranch: null,
+      },
+    };
+    expect(
+      resolveRecentRepositoryIdentity('user-1', owner, 'git@github.com:owner/repo.git', null, [
+        github,
+      ])
+    ).toEqual({ kind: 'resolved', accountId: 'user-1', reference: github });
+  });
+});
 
 let regularUser: User;
 let otherUser: User;
@@ -1088,6 +1284,183 @@ describe('cli-sessions-v2-router', () => {
 
       expect(result.results).toEqual([]);
     });
+
+    it.each(['user', 'org'] as const)(
+      'recentRepositories requires a complete %s GitHub candidate set',
+      async type => {
+        const gitUrl = 'https://github.com/owner/repo.git';
+        const repository = { id: 42, name: 'repo', full_name: 'owner/repo', private: true };
+        const organizationId = type === 'org' ? testOrganization.id : null;
+        const ownership =
+          type === 'org'
+            ? { owned_by_organization_id: testOrganization.id }
+            : { owned_by_user_id: regularUser.id };
+        await db
+          .update(cli_sessions_v2)
+          .set({ git_url: gitUrl, platform: 'github', organization_id: organizationId })
+          .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+        const integrations = await db
+          .insert(platform_integrations)
+          .values([
+            {
+              ...ownership,
+              platform: 'github',
+              integration_type: 'app',
+              platform_installation_id: 'recent-1',
+              integration_status: 'active',
+              repositories: [repository],
+            },
+            {
+              ...ownership,
+              platform: 'github',
+              integration_type: 'app',
+              platform_installation_id: 'recent-2',
+              integration_status: 'active',
+              repositories: null,
+            },
+          ])
+          .returning({ id: platform_integrations.id });
+        const [first, second] = integrations;
+        if (!first || !second) throw new Error('Missing integration fixtures');
+        const owner = { type, id: type === 'org' ? testOrganization.id : regularUser.id };
+        try {
+          jest
+            .mocked(githubAdapter.fetchGitHubRepositories)
+            .mockRejectedValueOnce(new Error('GitHub unavailable'));
+          const caller = await createCallerForUser(regularUser.id);
+          const input = { organizationId, updatedSince: '2026-01-01T00:00:00.000Z' };
+          const partial = await caller.cliSessionsV2.recentRepositories(input);
+          expect(partial.repositories).toEqual([
+            expect.objectContaining({
+              gitUrl,
+              lastUsedAt: expect.any(String),
+              identity: {
+                kind: 'legacy-unresolved',
+                accountId: regularUser.id,
+                owner,
+                reason: 'unavailable',
+              },
+            }),
+          ]);
+          await db
+            .update(platform_integrations)
+            .set({ repositories: [repository] })
+            .where(eq(platform_integrations.id, second.id));
+          const ambiguous = await caller.cliSessionsV2.recentRepositories(input);
+          expect(ambiguous.repositories[0]?.identity).toEqual({
+            kind: 'legacy-unresolved',
+            accountId: regularUser.id,
+            owner,
+            reason: 'ambiguous',
+          });
+          await db.delete(platform_integrations).where(eq(platform_integrations.id, second.id));
+          const complete = await caller.cliSessionsV2.recentRepositories(input);
+          expect(complete.repositories[0]).toMatchObject({
+            gitUrl,
+            identity: {
+              kind: 'resolved',
+              accountId: regularUser.id,
+              reference: {
+                repository: {
+                  provider: 'github',
+                  instanceUrl: 'https://github.com',
+                  repositoryId: '42',
+                  fullName: 'owner/repo',
+                  defaultBranch: null,
+                },
+                authorization: { kind: 'ownerIntegration', owner, integrationId: first.id },
+              },
+            },
+          });
+        } finally {
+          await db.delete(platform_integrations).where(
+            inArray(
+              platform_integrations.id,
+              integrations.map(row => row.id)
+            )
+          );
+        }
+      }
+    );
+
+    it.each(['owners', 'null platform', 'conflicting platforms'] as const)(
+      'recentRepositories keeps ten distinct URLs across duplicate %s',
+      async duplicate => {
+        const caller = await createCallerForUser(regularUser.id);
+        const input = { updatedSince: '2030-01-01T00:00:00.000Z' };
+        expect((await caller.cliSessionsV2.recentRepositories(input)).repositories).toEqual([]);
+        const rows = Array.from({ length: 14 }, (_, index) => ({
+          session_id: `ses_recent_identity_${index}`,
+          kilo_user_id: index === 13 ? otherUser.id : regularUser.id,
+          organization_id: duplicate === 'owners' && index === 1 ? testOrganization.id : null,
+          platform:
+            index === 1 && duplicate !== 'owners'
+              ? duplicate === 'null platform'
+                ? null
+                : 'github'
+              : 'gitlab',
+          created_on_platform: 'cloud-agent',
+          git_url:
+            index < 2
+              ? 'https://gitlab.com/group/shared'
+              : `https://gitlab.com/group/repo-${index}`,
+          updated_at:
+            index === 13
+              ? '2031-01-01T00:00:00.000Z'
+              : new Date(Date.UTC(2030, 1, 1, 0, 0, 20 - index)).toISOString(),
+        }));
+        await db.insert(cli_sessions_v2).values(rows);
+        try {
+          const result = await caller.cliSessionsV2.recentRepositories(input);
+          expect(result.repositories.map(row => row.gitUrl)).toEqual([
+            'https://gitlab.com/group/shared',
+            ...Array.from(
+              { length: 9 },
+              (_, index) => `https://gitlab.com/group/repo-${index + 2}`
+            ),
+          ]);
+          const shared = result.repositories[0];
+          expect(new Date(shared.lastUsedAt).toISOString()).toBe(rows[0].updated_at);
+          expect(shared.identity).toEqual({
+            kind: 'legacy-unresolved',
+            accountId: regularUser.id,
+            owner: duplicate === 'owners' ? null : { type: 'user', id: regularUser.id },
+            reason: duplicate === 'null platform' ? 'not-found' : 'ambiguous',
+          });
+          expect(
+            result.repositories.every(
+              row => row.lastUsedAt && row.identity.accountId === regularUser.id
+            )
+          ).toBe(true);
+          if (duplicate === 'owners') {
+            for (const organizationId of [null, testOrganization.id]) {
+              const scoped = await caller.cliSessionsV2.recentRepositories({
+                ...input,
+                organizationId,
+              });
+              expect(scoped.repositories[0]).toMatchObject({
+                gitUrl: 'https://gitlab.com/group/shared',
+                identity: {
+                  kind: 'legacy-unresolved',
+                  accountId: regularUser.id,
+                  owner: organizationId
+                    ? { type: 'org', id: organizationId }
+                    : { type: 'user', id: regularUser.id },
+                  reason: 'not-found',
+                },
+              });
+            }
+          }
+        } finally {
+          await db.delete(cli_sessions_v2).where(
+            inArray(
+              cli_sessions_v2.session_id,
+              rows.map(row => row.session_id)
+            )
+          );
+        }
+      }
+    );
 
     it('recentRepositories omits organization sessions after their creator loses membership', async () => {
       const personalSessionId = 'ses_recent_repo_personal_1234';

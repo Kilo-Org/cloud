@@ -1,3 +1,8 @@
+import {
+  isProviderLaunchSelectionCurrent,
+  type ProviderLaunchContext,
+} from '@/components/agents/provider-launch-input';
+
 /**
  * Pure boolean predicate for whether the "Start session" button on the
  * new-agent screen may submit right now. Lives in `lib/` (not next to
@@ -79,23 +84,27 @@ export function resolveNewSessionSubmitDisabled(input: {
  * still-loading profile blocks Start, so an unsettled default is never
  * silently dropped.
  */
-export function resolveNewSessionStartDisabled(input: {
-  attachmentsHasFailed: boolean;
-  attachmentsIsUploading: boolean;
-  hasPrompt: boolean;
-  isCreating: boolean;
-  isRemoteTargetSelected: boolean;
-  isSubmitting: boolean;
-  model: string;
-  selectedRepo: string;
-  /** True when the selected repo key still resolves to a picker row. */
-  selectedRepositoryResolved: boolean;
-  isProfileLoading: boolean;
-}): boolean {
+export function resolveNewSessionStartDisabled(
+  input: {
+    attachmentsHasFailed: boolean;
+    attachmentsIsUploading: boolean;
+    hasPrompt: boolean;
+    isCreating: boolean;
+    isRemoteTargetSelected: boolean;
+    isSubmitting: boolean;
+    model: string;
+    selectedRepo: string;
+    /** True when the selected repo key still resolves to a picker row. */
+    selectedRepositoryResolved: boolean;
+    isProfileLoading: boolean;
+  } & ProviderLaunchContext
+): boolean {
   // A selected key that no longer resolves to a row (after a refresh or a
   // provider change) must not submit: the create body would carry no
   // repository field and the server would reject it.
-  const staleSelection = input.selectedRepo !== '' && !input.selectedRepositoryResolved;
+  const staleSelection =
+    (input.selectedRepo !== '' && !input.selectedRepositoryResolved) ||
+    !isProviderLaunchSelectionCurrent(input);
   return (
     staleSelection ||
     resolveNewSessionSubmitDisabled({
@@ -125,19 +134,21 @@ export function resolveNewSessionStartDisabled(input: {
  *     shown inline. Empty prompt, empty repository, and profile loading do NOT
  *     block.
  */
-export function resolveContinueStartDisabled(input: {
-  isCreating: boolean;
-  isSubmitting: boolean;
-  isSpawningRemote: boolean;
-  model: string;
-  selectedRepo: string;
-  selectedRepositoryResolved: boolean;
-  isRemoteTargetSelected: boolean;
-  instanceCatalogLoading: boolean;
-  instanceHasSessionClone: boolean;
-  cloneImportFailureKey: string | null;
-  isModelUnavailable: boolean;
-}): boolean {
+export function resolveContinueStartDisabled(
+  input: {
+    isCreating: boolean;
+    isSubmitting: boolean;
+    isSpawningRemote: boolean;
+    model: string;
+    selectedRepo: string;
+    selectedRepositoryResolved: boolean;
+    isRemoteTargetSelected: boolean;
+    instanceCatalogLoading: boolean;
+    instanceHasSessionClone: boolean;
+    cloneImportFailureKey: string | null;
+    isModelUnavailable: boolean;
+  } & ProviderLaunchContext
+): boolean {
   if (input.isRemoteTargetSelected) {
     return (
       input.isSpawningRemote ||
@@ -152,7 +163,9 @@ export function resolveContinueStartDisabled(input: {
   // A selected picker key that no longer resolves to a row must not submit:
   // the clone prepare body would carry no repository field and the server
   // would reject it. Mirrors `resolveNewSessionStartDisabled`'s stale gate.
-  const staleSelection = input.selectedRepo !== '' && !input.selectedRepositoryResolved;
+  const staleSelection =
+    (input.selectedRepo !== '' && !input.selectedRepositoryResolved) ||
+    !isProviderLaunchSelectionCurrent(input);
   return (
     input.isCreating ||
     input.isSubmitting ||

@@ -13,6 +13,7 @@ const mockUpdateRepositoriesForIntegration =
   jest.fn<(integrationId: string, repositories: unknown[]) => Promise<void>>();
 const mockGetIntegrationsByOrganization =
   jest.fn<(organizationId: string, platform: string) => Promise<PlatformIntegration[]>>();
+const mockGetAllIntegrationsForOwner = jest.fn<(owner: Owner) => Promise<PlatformIntegration[]>>();
 const mockFetchGitHubRepositories =
   jest.fn<(installationId: string, appType: string) => Promise<unknown[]>>();
 const mockGenerateGitHubInstallationToken =
@@ -34,6 +35,7 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationForOwner: mockGetIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization: mockGetPrimaryGitHubIntegrationForOrganization,
   getIntegrationsByOrganization: mockGetIntegrationsByOrganization,
+  getAllIntegrationsForOwner: mockGetAllIntegrationsForOwner,
   updateRepositoriesForIntegration: mockUpdateRepositoriesForIntegration,
 }));
 
@@ -158,6 +160,68 @@ describe('github-integration-helpers', () => {
     });
   });
 
+  describe('complete Personal repository discovery', () => {
+    it('keeps both authorized installation identities for the same repository', async () => {
+      mockGetAllIntegrationsForOwner.mockResolvedValue([
+        buildIntegration(),
+        buildIntegration({ id: 'integration-2', platform_installation_id: 'installation-2' }),
+        buildIntegration({ id: 'other-platform', platform: 'gitlab' }),
+        buildIntegration({ id: 'suspended', integration_status: 'suspended' }),
+        buildIntegration({ id: 'invalid-auth', auth_invalid_at: '2026-06-25 18:00:00+00' }),
+      ]);
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+      const result = await fetchGitHubRepositoriesForUser('oauth/user', false, {
+        requireComplete: true,
+      });
+      expect(result.repositories.map(row => row.repositoryReference.authorization)).toEqual([
+        {
+          kind: 'ownerIntegration',
+          owner: { type: 'user', id: 'oauth/user' },
+          integrationId: 'integration-1',
+        },
+        {
+          kind: 'ownerIntegration',
+          owner: { type: 'user', id: 'oauth/user' },
+          integrationId: 'integration-2',
+        },
+      ]);
+    });
+
+    it.each(['failed fetch', 'missing installation'])(
+      'rejects an incomplete Personal set after a sibling %s without changing browsing',
+      async failure => {
+        mockGetIntegrationForOwner.mockResolvedValue(buildIntegration());
+        mockGetAllIntegrationsForOwner.mockResolvedValue([
+          buildIntegration(),
+          buildIntegration({
+            id: 'integration-2',
+            repositories: null,
+            platform_installation_id: failure === 'missing installation' ? null : 'installation-2',
+          }),
+        ]);
+        mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+        const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+        await expect(
+          fetchGitHubRepositoriesForUser('oauth/user', false, { requireComplete: true })
+        ).rejects.toThrow('Failed to fetch GitHub repositories');
+        const browsing = await fetchGitHubRepositoriesForUser('oauth/user');
+        expect(browsing.repositories.map(row => row.platformIntegrationId)).toEqual([
+          'integration-1',
+        ]);
+      }
+    );
+
+    it('keeps an empty complete Personal set empty', async () => {
+      mockGetAllIntegrationsForOwner.mockResolvedValue([]);
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+      const result = await fetchGitHubRepositoriesForUser('oauth/user', false, {
+        requireComplete: true,
+      });
+      expect(result.repositories).toEqual([]);
+      expect(result.integrationInstalled).toBe(false);
+    });
+  });
+
   describe('fetchGitHubRepositoriesForOrganization', () => {
     it('returns cached repositories for an active integration', async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([buildIntegration()]);
@@ -239,6 +303,46 @@ describe('github-integration-helpers', () => {
           platformIntegrationId: 'integration-1',
         }),
       ]);
+    });
+
+    it.each(['failed fetch', 'missing installation'])(
+      'requires a complete candidate set after a sibling %s',
+      async failure => {
+        mockGetIntegrationsByOrganization.mockResolvedValue([
+          buildIntegration(),
+          buildIntegration({
+            id: 'integration-2',
+            repositories: null,
+            platform_installation_id: failure === 'missing installation' ? null : 'installation-2',
+          }),
+        ]);
+        mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+        const { fetchAllGitHubRepositoriesForOrganization } =
+          await import('./github-integration-helpers');
+
+        await expect(
+          fetchAllGitHubRepositoriesForOrganization('org-123', false, { requireComplete: true })
+        ).rejects.toThrow('Failed to fetch GitHub repositories');
+        const partial = await fetchAllGitHubRepositoriesForOrganization('org-123');
+        expect(partial.repositories.map(row => row.platformIntegrationId)).toEqual([
+          'integration-1',
+        ]);
+      }
+    );
+
+    it('keeps both authorized matches when complete discovery succeeds', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration(),
+        buildIntegration({ id: 'integration-2' }),
+      ]);
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const complete = await fetchAllGitHubRepositoriesForOrganization('org-123', false, {
+        requireComplete: true,
+      });
+      expect(
+        complete.repositories.map(row => row.repositoryReference.authorization.integrationId)
+      ).toEqual(['integration-1', 'integration-2']);
     });
 
     it('fails when no installation can provide repositories', async () => {

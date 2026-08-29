@@ -18,6 +18,7 @@ import {
 } from '@/components/agents/mobile-session-diagnostics';
 import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
 import { type AgentMode } from '@/components/agents/mode-normalize';
+import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
@@ -382,17 +383,20 @@ export function createMobileAgentSessionManager({
     fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
       const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId);
       const rs = sessionResult.runtimeState;
+      const repositoryUrl = rs?.gitUrl ?? sessionResult.git_url;
       return {
         kiloSessionId,
         cloudAgentSessionId: sessionResult.cloud_agent_session_id as CloudAgentSessionId | null,
         title: sessionResult.title,
         organizationId: sessionResult.organization_id,
-        gitUrl: sessionResult.git_url,
+        gitUrl: sessionResult.git_url ?? rs?.gitUrl ?? null,
         gitBranch: rs?.upstreamBranch ?? sessionResult.git_branch,
         mode: rs?.mode ?? null,
         model: rs?.model ?? null,
         variant: rs?.variant ?? null,
-        repository: rs?.githubRepo ?? null,
+        // GitLab/Bitbucket report gitUrl. Old records without runtime data use
+        // the stored URL until old clients/records and the 30-day window expire.
+        repository: rs?.githubRepo ?? (repositoryUrl ? formatGitUrlProject(repositoryUrl) : null),
         isInitiated: Boolean(rs?.initiatedAt),
         needsLegacyPrepare: Boolean(sessionResult.cloud_agent_session_id && !rs),
         isPreparingAsync: Boolean(rs && !rs.preparedAt),

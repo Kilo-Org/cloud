@@ -11,6 +11,10 @@ import { useNewSessionCreator } from './use-new-session-creator';
 import { clearDraft, flushDraft, loadDraft } from '@/lib/persist/drafts';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1' }),
+}));
+
 const prepareSessionMutate = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
@@ -159,7 +163,7 @@ function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {
     mode: 'code' as AgentMode,
     model: 'anthropic/claude-sonnet-4',
     organizationId: undefined,
-    selectedRepository: null,
+    selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },
     setIsCreating: vi.fn(() => undefined),
     variant: 'medium',
     autoCommit: false,
@@ -272,6 +276,8 @@ type ReactInternals = {
 
 type HookDispatcher = {
   useCallback: <T>(callback: T, _deps?: unknown) => T;
+  useEffect: () => void;
+  useMemo: <T>(factory: () => T) => T;
   useRef: <T>(initial: T) => { current: T };
 };
 
@@ -281,6 +287,7 @@ function runCreator(args: {
   variant?: string;
   organizationId?: string;
   selectedRepository?: NewSessionRepository | null;
+  launchSelection?: CreatorInput['launchSelection'];
   autoCommit?: boolean;
   profileId?: string | null;
 }): CreatorResult {
@@ -290,6 +297,9 @@ function runCreator(args: {
   let refIndex = 0;
 
   const dispatcher: HookDispatcher = {
+    // Lifecycle regressions use the real mounted harness, not this dispatcher.
+    useEffect: () => undefined,
+    useMemo: factory => factory(),
     useCallback: hookCallback => {
       hookIndex += 1;
       return hookCallback;
@@ -331,6 +341,7 @@ function runCreator(args: {
       variant: args.variant ?? 'v1',
       autoCommit: args.autoCommit ?? false,
       profileId: args.profileId,
+      launchSelection: args.launchSelection,
     });
   } finally {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -347,6 +358,145 @@ function usedOperationKeys(): (string | undefined)[] {
 function sessionResult(): { kiloSessionId: string; cloudAgentSessionId: string } {
   return { kiloSessionId: 'ses_12345678901234567890123456', cloudAgentSessionId: 'c-1' };
 }
+
+describe('normalized ordinary launch', () => {
+  const selectedRepository: NewSessionRepository = {
+    platform: 'gitlab',
+    fullName: 'group/sub/project',
+    isPrivate: true,
+  };
+  const launchSelection: NonNullable<CreatorInput['launchSelection']> = {
+    reference: {
+      repository: {
+        provider: 'gitlab',
+        instanceUrl: 'https://git.example/base',
+        repositoryId: '42',
+        fullName: 'group/sub/project',
+        defaultBranch: 'develop',
+      },
+      authorization: {
+        kind: 'ownerIntegration',
+        owner: { type: 'org', id: 'org-1' },
+        integrationId: 'integration-1',
+      },
+    },
+    upstreamBranch: 'release',
+  };
+  const input = { organizationId: 'org-1', selectedRepository, launchSelection };
+
+  it('pins the branch and integration without consuming an unpinned GitHub retry', async () => {
+    outboxMock.getStoredOperationKey.mockImplementation(fingerprint =>
+      (JSON.parse(fingerprint) as { repo: unknown }).repo === 'owner/repo' ? 'old-key' : null
+    );
+    const creator = runCreator({
+      ...input,
+      selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: true },
+      launchSelection: {
+        ...launchSelection,
+        reference: {
+          ...launchSelection.reference,
+          repository: {
+            provider: 'github',
+            instanceUrl: 'https://github.com',
+            repositoryId: '9',
+            fullName: 'owner/repo',
+            defaultBranch: null,
+          },
+        },
+      },
+    });
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+    const payload = prepareSessionMutate.mock.calls[0]?.[0];
+    expect(payload).toMatchObject({
+      githubRepo: 'owner/repo',
+      githubIntegrationId: 'integration-1',
+      upstreamBranch: 'release',
+    });
+    expect((payload as { operationKey: string }).operationKey).not.toBe('old-key');
+  });
+
+  it('creates one session across repeat taps, a lost response, and a remount retry', async () => {
+    const stored = new Map<string, string>();
+    const sessions = new Map<string, string>();
+    let loseResponse = true;
+    outboxMock.getStoredOperationKey.mockImplementation(
+      fingerprint => stored.get(fingerprint) ?? null
+    );
+    outboxMock.writeSafeRetry.mockImplementation(async row => {
+      stored.set(row.fingerprint, row.operationKey);
+    });
+    outboxMock.remove.mockImplementation(async fingerprint => {
+      stored.delete(fingerprint);
+    });
+    prepareSessionMutate.mockImplementation(async (payload: { operationKey: string }) => {
+      expect([...stored.values()]).toContain(payload.operationKey);
+      if (!sessions.has(payload.operationKey)) {
+        sessions.set(payload.operationKey, `session-${sessions.size + 1}`);
+      }
+      if (loseResponse) {
+        throw new Error('Lost response');
+      }
+      return { kiloSessionId: sessions.get(payload.operationKey) };
+    });
+    const first = runCreator(input);
+    first.promptRef.current = 'hello';
+    await Promise.all([first.createSessionFromDraft(), first.createSessionFromDraft()]);
+    expect(sessions.size).toBe(1);
+    expect(first.promptRef.current).toBe('hello');
+    loseResponse = false;
+    const retry = runCreator(input);
+    retry.promptRef.current = 'hello';
+    await retry.createSessionFromDraft();
+    expect(sessions.size).toBe(1);
+    expect(stored.size).toBe(0);
+    expect(routerReplace.mock.calls.at(-1)?.[0]).toContain('agent-chat/session-1');
+  });
+
+  it('does not clear the draft or navigate after the owner changes during prepare', async () => {
+    const pending = deferred<ReturnType<typeof sessionResult>>();
+    prepareSessionMutate.mockReturnValueOnce(pending.promise);
+    const resultRef: { current: CreatorResult | null } = { current: null };
+    const onCreated = () => {
+      requireResult(resultRef).promptRef.current = '';
+    };
+    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+    act(() => {
+      renderer = TestRenderer.create(
+        React.createElement(Harness, { input: createInput({ ...input, onCreated }), resultRef })
+      );
+    });
+    requireResult(resultRef).promptRef.current = 'keep this draft';
+    const request = requireResult(resultRef).createSessionFromDraft();
+    await flushMicrotasks();
+    act(() => {
+      renderer?.update(
+        React.createElement(Harness, {
+          input: createInput({ ...input, organizationId: 'org-2', onCreated }),
+          resultRef,
+        })
+      );
+    });
+    await act(async () => {
+      pending.resolve(sessionResult());
+      await request;
+    });
+    expect(requireResult(resultRef).promptRef.current).toBe('keep this draft');
+    expect(routerReplace.mock.calls).toEqual([]);
+    expect(outboxMock.remove.mock.calls).toEqual([]);
+    act(() => {
+      renderer?.unmount();
+    });
+  });
+
+  it('keeps a repository-free draft without sending an invalid prepare', async () => {
+    const result = requireResult(mountCreator(createInput({ selectedRepository: null })));
+    result.promptRef.current = 'keep this draft';
+    await result.createSessionFromDraft();
+    expect(result.promptRef.current).toBe('keep this draft');
+    expect(prepareSessionMutate.mock.calls).toEqual([]);
+  });
+});
 
 describe('useNewSessionCreator operationKey', () => {
   beforeEach(() => {
@@ -815,12 +965,11 @@ describe('useNewSessionCreator intentFingerprint repo identity', () => {
   // migrate the row to the scoped fingerprint) instead of minting a duplicate
   // session.
   it('reuses a persisted legacy bare-name key for a GitHub intent', async () => {
-    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) => {
-      const parsed = JSON.parse(fingerprint) as { repo: unknown };
-      return typeof parsed.repo === 'string' && parsed.repo === 'owner/repo'
-        ? 'legacy-stored-key'
-        : null;
-    });
+    const legacyFingerprint =
+      '{"prompt":"hello","mode":"code","model":"model-1","variant":"v1","repo":"owner/repo","autoCommit":false,"organizationId":null,"profileId":null,"attachments":null}';
+    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) =>
+      fingerprint === legacyFingerprint ? 'legacy-stored-key' : null
+    );
 
     const creator = runCreator({
       selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },

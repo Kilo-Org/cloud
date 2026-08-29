@@ -250,6 +250,13 @@ type PrepareInput = {
   variant?: string;
   githubRepo?: string;
   gitlabProject?: string;
+  bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
+  // Old manager clients omit pins. Keep the authorized server lookup until old
+  // clients/records disappear and the 30-day ledger window expires.
+  githubIntegrationId?: string;
+  gitlabIntegrationId?: string;
+  gitlabInstanceUrl?: string;
+  bitbucketIntegrationId?: string;
   envVars?: Record<string, string>;
   setupCommands?: string[];
   upstreamBranch?: string;

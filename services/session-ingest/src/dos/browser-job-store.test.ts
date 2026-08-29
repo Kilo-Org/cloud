@@ -1669,6 +1669,9 @@ describe('browser provider historical status', () => {
       let job = await admit(f);
       if (state !== 'queued') job = await dispatch(f);
       if (state === 'running') job = await approve(f, job);
+      const execution = await heartbeat(f, NOW);
+      expect(execution.value.snapshot?.jobs).toEqual([job]);
+      expect(execution.value.snapshot).not.toHaveProperty('unresolvedFence');
       const reader = socket('web');
       const attachment = reader.deserializeAttachment();
       const before = f.fake.snapshot();
@@ -1678,18 +1681,26 @@ describe('browser provider historical status', () => {
         NOW + BROWSER_EXECUTION_TIMEOUT_MS + 1
       );
       expect(page.jobs).toEqual([job]);
+      if (state === 'queued') expect(page).not.toHaveProperty('unresolvedFence');
+      else
+        expect(page.unresolvedFence).toStrictEqual(
+          state === 'running'
+            ? { invocationId: job.invocationId, tabId: TAB.tabId }
+            : { invocationId: job.invocationId }
+        );
       expect(reader.deserializeAttachment()).toEqual(attachment);
       expect(f.fake.snapshot()).toEqual(before);
     }
   );
 
   it.each(['wrong proof', 'other provider', 'wrong user', 'CLI role', 'missing identity'] as const)(
-    'denies history for a %s without granting socket or ledger authority',
+    'denies fence discovery for a %s before and after job cleanup',
     async variant => {
       const f = await setup();
-      await admit(f);
+      await running(f);
       await f.store.registerProvider(socket('web', 'other-panel'), registration(2), NOW);
       await admit(f, 2, { providerId: registration(2).providerId });
+      await dispatch(f, registration(2).providerId);
       const reader = socket(
         variant === 'CLI role' ? 'cli' : 'web',
         'web',
@@ -1702,14 +1713,21 @@ describe('browser provider historical status', () => {
         ...(variant === 'wrong proof' ? { providerProof: 'b'.repeat(64) } : {}),
         ...(variant === 'other provider' ? { providerId: registration(2).providerId } : {}),
       };
-      const before = f.fake.snapshot();
       const attachment = reader.deserializeAttachment();
-      await expect(f.store.providerStatus(reader, input, NOW)).rejects.toMatchObject({
-        code: variant === 'missing identity' ? 'invalid_request' : 'owner_mismatch',
-        retryable: false,
-      });
-      expect(f.fake.snapshot()).toEqual(before);
-      expect(reader.deserializeAttachment()).toEqual(attachment);
+      for (const now of [NOW, NOW + BROWSER_RETENTION_MS]) {
+        if (now !== NOW) {
+          await f.store.expire(now);
+          expect((await f.store.cleanup(now)).value).toBe(2);
+          expect(f.fake.entries('browser/job/')).toEqual([]);
+        }
+        const before = f.fake.snapshot();
+        await expect(f.store.providerStatus(reader, input, now)).rejects.toMatchObject({
+          code: variant === 'missing identity' ? 'invalid_request' : 'owner_mismatch',
+          retryable: false,
+        });
+        expect(f.fake.snapshot()).toEqual(before);
+        expect(reader.deserializeAttachment()).toEqual(attachment);
+      }
     }
   );
 
@@ -1797,15 +1815,17 @@ describe('browser provider historical status', () => {
     expect(f.fake.snapshot()).toEqual(before);
   });
 
-  it('paginates across generations in storage order without leaking another provider or skipping jobs', async () => {
+  it('paginates across generations with the same fence without leaking another provider or skipping jobs', async () => {
     const f = await setup();
     const ids: string[] = [];
     for (let n = 1; n <= 26; n++) {
       if (n === 14) await f.store.registerProvider(f.panel, registration(), NOW);
       ids.push((await admit(f, n)).jobId);
     }
+    const active = await approve(f, await dispatch(f));
     await f.store.registerProvider(socket('web', 'other-panel'), registration(2), NOW);
     await admit(f, 27, { providerId: registration(2).providerId });
+    const other = await dispatch(f, registration(2).providerId);
     const before = f.fake.snapshot();
     const reader = socket('web', 'history-only');
     const first = await f.store.providerStatus(reader, historyRequest(), NOW);
@@ -1826,10 +1846,24 @@ describe('browser provider historical status', () => {
     );
     expect(empty.jobs).toEqual([]);
     expect(empty.nextCursor).toBeUndefined();
+    for (const page of [first, last, empty]) {
+      expect(page.unresolvedFence).toStrictEqual({
+        invocationId: active.invocationId,
+        tabId: TAB.tabId,
+      });
+      expect(new TextEncoder().encode(JSON.stringify(page)).byteLength).toBeLessThan(128 * 1024);
+    }
+    expect(await f.store.providerStatus(reader, historyRequest(2), NOW)).toStrictEqual({
+      type: 'provider_status_result',
+      requestId: historyRequest(2).requestId,
+      providerId: other.providerId,
+      jobs: [other],
+      unresolvedFence: { invocationId: other.invocationId },
+    });
     expect(f.fake.snapshot()).toEqual(before);
   });
 
-  it('bounds serialized history bytes without truncating escaped or multibyte results', async () => {
+  it('counts the retained fence in near-limit history pages without truncating results', async () => {
     const f = await setup();
     const jobs: BrowserJobSnapshot[] = [];
     for (let n = 1; n <= 4; n++) {
@@ -1837,13 +1871,32 @@ describe('browser provider historical status', () => {
       const job = await approve(f, await dispatch(f));
       const result = success(job, {
         summary: 'é'.repeat(16_384),
-        evidence: [{ text: '\u0000'.repeat(4096) }],
+        evidence: [{ text: '\u0000'.repeat(4096) }, { text: '' }],
       });
+      const snapshot = { ...job, status: result.status, result };
+      const pageWithoutFence = {
+        type: 'provider_status_result',
+        requestId: historyRequest().requestId,
+        providerId: job.providerId,
+        jobs: [snapshot, snapshot],
+        nextCursor: job.jobId,
+      };
+      const padding = result.evidence[1];
+      if (!padding) throw new Error('Missing evidence fixture');
+      // Two results fit without the fence, but the compact identity exceeds the remaining 100 bytes.
+      padding.text = 'x'.repeat(
+        Math.floor(
+          (128 * 1024 -
+            100 -
+            new TextEncoder().encode(JSON.stringify(pageWithoutFence)).byteLength) /
+            2
+        )
+      );
       const settled = (await f.store.updateProvider(f.panel, resultMessage(job, result), NOW)).value
         .job;
       if (!settled) throw new Error('Missing retained result');
       jobs.push(settled);
-      await f.store.updateProvider(f.panel, quiesced(job), NOW);
+      if (n < 4) await f.store.updateProvider(f.panel, quiesced(job), NOW);
     }
     const before = f.fake.snapshot();
     const collected: BrowserJobSnapshot[] = [];
@@ -1854,8 +1907,8 @@ describe('browser provider historical status', () => {
         { ...historyRequest(), cursor },
         NOW
       );
-      expect(page.jobs.length).toBeGreaterThan(0);
-      expect(page.jobs.length).toBeLessThan(4);
+      expect(page.jobs).toHaveLength(1);
+      expect(page.unresolvedFence).toStrictEqual({ invocationId: invocation(4), tabId: TAB.tabId });
       expect(new TextEncoder().encode(JSON.stringify(page)).byteLength).toBeLessThan(128 * 1024);
       expect(browserProviderInboundMessageSchema.safeParse(page).success).toBe(true);
       collected.push(...page.jobs);
@@ -1868,25 +1921,133 @@ describe('browser provider historical status', () => {
     expect(f.fake.snapshot()).toEqual(before);
   });
 
-  it('omits jobs at retention expiry without cleaning records or changing terminal outcomes', async () => {
+  it.each([undefined, 0, TAB.tabId])(
+    'retains only the compact fence with tab %s through job expiry and cleanup',
+    async tabId => {
+      const f = await setup();
+      await admit(f, 1, { invocationId: invocation(1, NOW - BROWSER_RETENTION_MS + 1_000) });
+      let job = await dispatch(f);
+      if (tabId !== undefined) {
+        job = await approve(f, job, NOW, { ...TAB, tabId });
+        await f.store.updateProvider(f.panel, resultMessage(job), NOW);
+      }
+      const fence =
+        tabId === undefined
+          ? { invocationId: job.invocationId }
+          : { invocationId: job.invocationId, tabId };
+      const reader = socket('web');
+      const attachment = reader.deserializeAttachment();
+      const before = f.fake.snapshot();
+      const retained = await f.store.providerStatus(reader, historyRequest(), NOW + 999);
+      expect(retained.jobs).toMatchObject([
+        tabId === undefined ? job : { ...job, status: 'succeeded', result: success(job) },
+      ]);
+      expect(retained.unresolvedFence).toStrictEqual(fence);
+      const expired = await f.store.providerStatus(reader, historyRequest(), NOW + 1_000);
+      expect(expired).toStrictEqual({
+        type: 'provider_status_result',
+        requestId: historyRequest().requestId,
+        providerId: job.providerId,
+        jobs: [],
+        unresolvedFence: fence,
+      });
+      expect(f.fake.snapshot()).toEqual(before);
+      await f.store.expire(NOW + 1_000);
+      expect((await f.store.cleanup(NOW + 1_000)).value).toBe(1);
+      expect(f.fake.entries('browser/job/')).toEqual([]);
+      expect(f.fake.entries('browser/invocation/')).toEqual([]);
+      const cleaned = f.fake.snapshot();
+      const restarted = createBrowserJobStore(f.fake.storage);
+      expect(await restarted.providerStatus(reader, historyRequest(), NOW + 1_001)).toStrictEqual(
+        expired
+      );
+      expect(f.fake.snapshot()).toEqual(cleaned);
+      expect(reader.deserializeAttachment()).toEqual(attachment);
+    }
+  );
+
+  it('recovers an expired fence only with its discovered identity and explicit safety proof', async () => {
     const f = await setup();
-    const job = await running(f, {
+    const active = await running(f, {
       invocationId: invocation(1, NOW - BROWSER_RETENTION_MS + 1_000),
     });
-    await f.store.updateProvider(f.panel, resultMessage(job), NOW);
-    const reader = socket('web');
-    const before = f.fake.snapshot();
-    const retained = await f.store.providerStatus(reader, historyRequest(), NOW + 999);
-    expect(retained.jobs).toMatchObject([{ jobId: job.jobId, result: success(job) }]);
-    const expired = await f.store.providerStatus(reader, historyRequest(), NOW + 1_000);
-    expect(expired.jobs).toEqual([]);
-    expect(expired.nextCursor).toBeUndefined();
-    expect(f.fake.snapshot()).toEqual(before);
+    await f.store.updateProvider(f.panel, resultMessage(active), NOW);
+    const queued = await admit(f, 2);
     await f.store.expire(NOW + 1_000);
-    await f.store.cleanup(NOW + 1_000);
-    const cleaned = f.fake.snapshot();
-    expect((await f.store.providerStatus(reader, historyRequest(), NOW + 1_001)).jobs).toEqual([]);
-    expect(f.fake.snapshot()).toEqual(cleaned);
+    expect((await f.store.cleanup(NOW + 1_000)).value).toBe(1);
+    expect(f.fake.get(`browser/job/${active.jobId}`)).toBeUndefined();
+    expect(f.fake.get(`browser/invocation/${active.invocationId}`)).toBeUndefined();
+    const restarted = createBrowserJobStore(f.fake.storage);
+    const reader = socket('web', 'reconnected');
+    const attachment = reader.deserializeAttachment();
+    const before = f.fake.snapshot();
+    const cancellations = await restarted.pendingCancellations();
+    const page = await restarted.providerStatus(reader, historyRequest(), NOW + 1_001);
+    expect(page.unresolvedFence).toStrictEqual({
+      invocationId: active.invocationId,
+      tabId: TAB.tabId,
+    });
+    expect(page.jobs).toMatchObject([
+      { jobId: queued.jobId, status: 'interrupted', result: { reason: 'provider_unavailable' } },
+    ]);
+    expect(f.fake.snapshot()).toEqual(before);
+    expect(reader.deserializeAttachment()).toEqual(attachment);
+    expect(await restarted.pendingCancellations()).toEqual(cancellations);
+    expect((await restarted.deadlines()).lease).toBeNull();
+    expect((await restarted.dispatch(active.providerId, NOW + 1_001)).value).toBeNull();
+    await expect(
+      restarted.updateProvider(reader, quiesced(active), NOW + 1_001)
+    ).rejects.toMatchObject({ code: 'owner_mismatch' });
+    await expect(
+      restarted.registerProvider(reader, registration(), NOW + 1_001)
+    ).rejects.toMatchObject({ code: 'provider_unavailable', retryable: true });
+
+    const fence = page.unresolvedFence;
+    if (!fence || fence.tabId === undefined) throw new Error('Missing approved recovery identity');
+    const safetyProof = {
+      ...fence,
+      tabId: fence.tabId,
+      tabClosed: true,
+      locksDrained: true,
+    } as const;
+    for (const [recoveryFields, code] of [
+      [{ ...safetyProof, invocationId: invocation(99) }, 'provider_unavailable'],
+      [{ ...safetyProof, tabId: fence.tabId + 1 }, 'provider_unavailable'],
+      [{ ...safetyProof, tabId: undefined }, 'invalid_request'],
+      [{ ...safetyProof, tabClosed: false }, 'invalid_request'],
+      [{ ...safetyProof, locksDrained: false }, 'invalid_request'],
+    ] as const) {
+      await expect(
+        restarted.registerProvider(
+          reader,
+          { ...registration(), recovery: recoveryFields },
+          NOW + 1_001
+        )
+      ).rejects.toMatchObject({ code, retryable: code === 'provider_unavailable' });
+      expect(f.fake.snapshot()).toEqual(before);
+    }
+    const recovered = await restarted.registerProvider(
+      reader,
+      registration(1, { recovery: safetyProof }),
+      NOW + 1_001
+    );
+    expect(recovered.value.generation).toBeGreaterThan(active.generation);
+    expect(await restarted.pendingCancellations()).toEqual([]);
+    expect(await restarted.dispatch(active.providerId, NOW + 1_001)).toEqual({
+      value: null,
+      effects: { updates: [], cancellations: [] },
+    });
+    expect(f.fake.get(`browser/job/${queued.jobId}`)).toMatchObject({
+      snapshot: { status: 'interrupted' },
+    });
+    expect(f.fake.get(`browser/job/${queued.jobId}`)).not.toHaveProperty('dispatch');
+    expect(
+      await restarted.providerStatus(reader, historyRequest(), NOW + 1_001)
+    ).not.toHaveProperty('unresolvedFence');
+    const next = (await restarted.invoke(f.cli, request(3), NOW + 1_002)).value.job;
+    expect(
+      (await restarted.dispatch(active.providerId, NOW + 1_002)).value?.message.job.jobId
+    ).toBe(next.jobId);
   });
 
   it('fails closed when a retained job belongs to another provider', async () => {

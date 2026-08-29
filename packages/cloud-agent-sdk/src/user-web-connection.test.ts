@@ -2552,8 +2552,15 @@ describe('createUserWebConnection browser provider', () => {
     }
   );
 
-  it('returns an empty status page and renews a short lease before viewer ping', async () => {
+  it('preserves empty legacy status and renews a short lease before viewer ping', async () => {
     const client = await registered();
+    const messages: BrowserProviderInboundMessage[] = [];
+    client.onBrowserProviderMessage(message => messages.push(message));
+    const status = client.requestBrowserProviderStatus();
+    const history = statusReply();
+    await expect(status).resolves.toStrictEqual(history);
+    expect(messages).toStrictEqual([history]);
+
     const pending = client.heartbeatBrowserProvider(`bj_${uuid(9)}`);
     expect(lastFrame('provider_heartbeat').cursor).toBe(`bj_${uuid(9)}`);
     const snapshot = heartbeatReply();
@@ -2693,10 +2700,10 @@ describe('createUserWebConnection browser provider', () => {
       approval: { decision: 'approved', tab },
     });
     const before = client.getBrowserProviderState();
-    const histories: BrowserJobSnapshot[][] = [];
+    const histories: BrowserProviderInboundMessage[] = [];
     const actions: string[] = [];
     client.onBrowserProviderMessage(message => {
-      if (message.type === 'provider_status_result') histories.push(message.jobs);
+      if (message.type === 'provider_status_result') histories.push(message);
       if (
         message.type === 'provider_snapshot' &&
         message.jobs.some(job => job.status === 'running')
@@ -2707,17 +2714,20 @@ describe('createUserWebConnection browser provider', () => {
     jest.setSystemTime(now + 1_000);
     const pending = client.requestBrowserProviderStatus();
     const request = lastFrame('provider_status');
+    const unresolvedFence = { invocationId: current.invocationId, tabId: tab.tabId };
     inbound({
       type: 'provider_status_result',
       requestId: uuid(999),
       providerId: registration.providerId,
       jobs: [],
+      unresolvedFence,
     });
     inbound({
       type: 'provider_status_result',
       requestId: request.requestId,
       providerId: `bp_${uuid(2)}`,
       jobs: [],
+      unresolvedFence,
     });
     inbound({
       type: 'provider_lease_ack',
@@ -2733,10 +2743,17 @@ describe('createUserWebConnection browser provider', () => {
       approvedTab: tab,
       result: completion(job(2)).result,
     });
-    const history = statusReply([{ ...current, status: 'running', approvedTab: tab }, terminal]);
-    await expect(pending).resolves.toEqual(history);
+    const history = {
+      type: 'provider_status_result',
+      requestId: request.requestId,
+      providerId: request.providerId,
+      jobs: [{ ...current, status: 'running', approvedTab: tab }, terminal],
+      unresolvedFence,
+    } satisfies BrowserProviderInboundMessage;
     inbound(history);
-    expect(histories).toEqual([history.jobs]);
+    await expect(pending).resolves.toStrictEqual(history);
+    inbound(history);
+    expect(histories).toStrictEqual([history]);
     expect(actions).toEqual([]);
     expect(client.getBrowserProviderState()).toEqual(before);
     expect(() => client.sendBrowserProviderResult(completion(current))).toThrow(
@@ -3209,7 +3226,8 @@ describe('createUserWebConnection browser provider', () => {
     const recovered = f.messages
       .filter(message => message.type === 'provider_status_result')
       .at(-1);
-    expect(recovered?.jobs).toEqual([interrupted]);
+    const unresolvedFence = { invocationId: current.invocationId, tabId: tab.tabId };
+    expect(recovered).toMatchObject({ jobs: [interrupted], unresolvedFence });
     expect(interrupted).toMatchObject({
       generation: current.generation,
       status: 'interrupted',
@@ -3222,7 +3240,7 @@ describe('createUserWebConnection browser provider', () => {
     });
     const status = f.client.requestBrowserProviderStatus(current.jobId);
     await f.flush();
-    await expect(status).resolves.toMatchObject({ jobs: [] });
+    await expect(status).resolves.toMatchObject({ jobs: [], unresolvedFence });
     expect(() => f.client.sendBrowserProviderResult(completion(current))).toThrow(
       BrowserProviderError
     );
@@ -3244,6 +3262,91 @@ describe('createUserWebConnection browser provider', () => {
       )
     ).toEqual([]);
   });
+
+  it.each(['approved', 'unapproved'] as const)(
+    'delivers an expired %s fence after refused registration without execution authority',
+    async phase => {
+      const f = await relayRegistered();
+      const current = await f.invoke();
+      if (phase === 'approved') {
+        f.client.approveBrowserProviderJob({
+          ...binding(current),
+          approval: { decision: 'approved', tab },
+        });
+        await f.flush();
+      }
+      await f.disconnect(4001);
+      jest.setSystemTime(Date.parse(current.expiresAt) + 1);
+      await f.alarm();
+      expect(() => f.snapshot(current.jobId)).toThrow('Expected a persisted job');
+      await jest.advanceTimersByTimeAsync(0);
+
+      const messageCount = f.messages.length;
+      await f.connect();
+      const unresolvedFence =
+        phase === 'approved'
+          ? { invocationId: current.invocationId, tabId: tab.tabId }
+          : { invocationId: current.invocationId };
+      const automaticHistory = {
+        type: 'provider_status_result',
+        requestId: lastFrame('provider_status').requestId,
+        providerId: registration.providerId,
+        jobs: [],
+        unresolvedFence,
+      } satisfies BrowserProviderInboundMessage;
+      expect(f.messages.slice(messageCount)).toStrictEqual([automaticHistory]);
+      const unavailable = f.client.getBrowserProviderState();
+      expect(unavailable).toEqual({
+        status: 'unavailable',
+        reason: 'provider_unavailable',
+        retryable: true,
+      });
+
+      const status = f.client.requestBrowserProviderStatus();
+      const history = { ...automaticHistory, requestId: lastFrame('provider_status').requestId };
+      await f.flush();
+      await expect(status).resolves.toStrictEqual(history);
+      dispatch(current);
+      update({ ...current, status: 'running', approvedTab: tab });
+      expect(f.messages.slice(messageCount)).toStrictEqual([automaticHistory, history]);
+      expect(f.client.getBrowserProviderState()).toEqual(unavailable);
+      await expect(f.client.heartbeatBrowserProvider()).rejects.toMatchObject({
+        code: 'provider_unavailable',
+        retryable: true,
+      });
+      expect(() =>
+        f.client.approveBrowserProviderJob({
+          ...binding(current),
+          approval: { decision: 'approved', tab },
+        })
+      ).toThrow(BrowserProviderError);
+      expect(() => f.client.sendBrowserProviderResult(completion(current))).toThrow(
+        BrowserProviderError
+      );
+      expect(() =>
+        f.client.quiesceBrowserProviderJob({ ...binding(current), tabId: tab.tabId })
+      ).toThrow(BrowserProviderError);
+
+      const retry = f.client
+        .registerBrowserProvider({ ...registration, generation: current.generation })
+        .catch(error => error);
+      await f.flush();
+      await expect(retry).resolves.toMatchObject({ code: 'provider_unavailable' });
+      expect(f.messages.slice(messageCount)).toStrictEqual([
+        automaticHistory,
+        history,
+        { ...history, requestId: lastFrame('provider_status').requestId },
+      ]);
+      expect(frames().map(frame => frame.type)).toEqual([
+        'ping',
+        'provider_register',
+        'provider_status',
+        'provider_status',
+        'provider_register',
+        'provider_status',
+      ]);
+    }
+  );
 
   it('stops later callbacks when a listener releases the connection and ignores late socket events', async () => {
     const client = createProvider();

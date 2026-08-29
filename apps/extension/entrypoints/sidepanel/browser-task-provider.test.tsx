@@ -936,40 +936,313 @@ describe('enabled browser provider owner', () => {
     expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({ jobs: [] });
   });
 
-  it('keeps relay cancellation immutable when a late success snapshot arrives', async () => {
+  describe.each(['provider_snapshot', 'provider_status_result'] as const)(
+    '%s queue metadata',
+    pageType => {
+      it.each(['awaiting_approval', 'running', 'cancelled'] as const)(
+        'preserves paginated ranks through a queued-to-%s transition without granting authority',
+        async status => {
+          vi.useFakeTimers();
+          const { runtime, transport } = await setup();
+          const startedAt = Date.now();
+          const head: BrowserJobSnapshot = {
+            ...transport.delivery().job,
+            jobId: 'bj_ffffffff-ffff-4fff-8fff-ffffffffffff',
+          };
+          const first: BrowserJobSnapshot = {
+            ...head,
+            ownerLabel: 'ses_parent_a',
+            queuePosition: 1,
+            status: 'queued',
+          };
+          const second: BrowserJobSnapshot = {
+            ...transport.delivery().job,
+            jobId: 'bj_00000000-0000-4000-8000-000000000001',
+            ownerLabel: 'ses_parent_b',
+            queuePosition: 2,
+            status: 'queued',
+          };
+          const legacy: BrowserJobSnapshot = {
+            ...transport.delivery().job,
+            jobId: 'bj_80000000-0000-4000-8000-000000000001',
+            status: 'queued',
+          };
+          let firstPage = [second, legacy];
+          let lastPage = [first];
+          const page = (cursor?: string) => ({
+            jobs: structuredClone(cursor === legacy.jobId ? lastPage : firstPage),
+            ...(cursor === legacy.jobId ? {} : { nextCursor: legacy.jobId }),
+          });
+          transport.connection.heartbeatBrowserProvider = async (cursor?: string) => ({
+            ...page(cursor),
+            generation: head.generation,
+            providerId: head.providerId,
+            type: 'provider_snapshot',
+          });
+          transport.connection.requestBrowserProviderStatus = async (cursor?: string) => ({
+            ...page(cursor),
+            providerId: head.providerId,
+            requestId: crypto.randomUUID(),
+            type: 'provider_status_result',
+          });
+          const refresh = () =>
+            pageType === 'provider_snapshot'
+              ? vi.advanceTimersByTimeAsync(5000)
+              : runtime.refreshStatus();
+          const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+          const writes = [...fixture.writes];
+          const outbound = structuredClone(transport.outbound);
+          await vi.advanceTimersByTimeAsync(1000);
+          await refresh();
+          const previous = runtime.getSnapshot();
+          const previousCopy = structuredClone(previous);
+          expect(previous.jobs).toStrictEqual([second, legacy, first]);
+          expect(previous.jobs[1]).not.toHaveProperty('ownerLabel');
+          expect(previous.jobs[1]).not.toHaveProperty('queuePosition');
+
+          const promoted = { ...second, queuePosition: 1 };
+          delete promoted.ownerLabel;
+          const transitioned: BrowserJobSnapshot = {
+            ...head,
+            ownerLabel: 'ses_parent_a',
+            status,
+            ...(status === 'running'
+              ? {
+                  approvedTab: {
+                    effectiveMode: 'safe' as const,
+                    tabId: 7,
+                    title: 'Approved tab',
+                    url: 'https://example.test/task',
+                  },
+                  deadlines: {
+                    ...head.deadlines,
+                    execution: new Date(startedAt + 600_000).toISOString(),
+                  },
+                }
+              : {}),
+            ...(status === 'cancelled'
+              ? { result: terminalResult(head, 'cancelled', 'cancelled') }
+              : {}),
+          };
+          firstPage = [promoted, legacy];
+          lastPage = [transitioned];
+          await refresh();
+          expect(runtime.getSnapshot().jobs).toStrictEqual([promoted, legacy, transitioned]);
+          expect(runtime.getSnapshot().jobs[0]).not.toHaveProperty('ownerLabel');
+          expect(runtime.getSnapshot().jobs[2]).not.toHaveProperty('queuePosition');
+          expect(previous).toStrictEqual(previousCopy);
+          await runtime.approve(head.jobId, 7);
+          await runtime.approve(legacy.jobId, 8);
+          expect(runtime.getSnapshot()).toMatchObject({ active: undefined, phase: 'idle' });
+          expect(fixture.actions).toStrictEqual([]);
+          expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+          expect(fixture.writes).toStrictEqual(writes);
+          expect(transport.outbound).toStrictEqual(outbound);
+
+          await vi.advanceTimersByTimeAsync(startedAt + 15_001 - Date.now());
+          expect(runtime.getSnapshot().phase).toBe('interrupted');
+          expect(fixture.actions).toStrictEqual([]);
+        }
+      );
+
+      it.each([
+        'browserTaskId',
+        'generation',
+        'invocationId',
+        'payloadFingerprint',
+        'providerId',
+      ] as const)('rejects terminal metadata with a different %s', async field => {
+        const { runtime, transport } = await setup();
+        const { job } = transport.delivery();
+        const terminal: BrowserJobSnapshot = {
+          ...job,
+          ownerLabel: 'ses_parent_a',
+          result: terminalResult(job, 'cancelled', 'cancelled'),
+          status: 'cancelled',
+        };
+        transport.rows.set(job.jobId, terminal);
+        transport.snapshot();
+        const previous = structuredClone(runtime.getSnapshot());
+        const different: BrowserJobSnapshot = {
+          ...transport.delivery().job,
+          generation: job.generation + 1,
+          payloadFingerprint: 'b'.repeat(64),
+          providerId: `bp_${crypto.randomUUID()}`,
+        };
+        const wrong: BrowserJobSnapshot = {
+          ...job,
+          [field]: different[field],
+          ownerLabel: 'ses_parent_other',
+          queuePosition: 1,
+          status: 'queued',
+        };
+        if (pageType === 'provider_snapshot') {
+          transport.send({
+            generation: wrong.generation,
+            jobs: [wrong],
+            providerId: wrong.providerId,
+            type: 'provider_snapshot',
+          });
+        } else {
+          transport.connection.requestBrowserProviderStatus = async () => ({
+            jobs: [wrong],
+            providerId: wrong.providerId,
+            requestId: crypto.randomUUID(),
+            type: 'provider_status_result',
+          });
+          if (field === 'providerId') {
+            const request = runtime.refreshStatus();
+            await expect(request).rejects.toThrow('owner_mismatch');
+          } else {
+            await runtime.refreshStatus();
+          }
+        }
+        expect(runtime.getSnapshot()).toStrictEqual(previous);
+        expect(fixture.actions).toStrictEqual([]);
+        expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({ jobs: [] });
+      });
+    }
+  );
+
+  it('exposes current status metadata without treating it as consent or a live running acknowledgement', async () => {
     const { runtime, transport } = await setup();
+    transport.setApprovalAck(false);
     const message = transport.delivery();
     transport.dispatch(message);
     await waitForConsent(runtime);
-    runtime.cancel(message.job.jobId);
-    await waitForDone(runtime);
-    const late: BrowserJobSnapshot = {
+    const running: BrowserJobSnapshot = {
       ...message.job,
-      result: {
-        browserTaskId: message.job.browserTaskId,
-        effectsUncertain: false,
-        evidence: [],
-        invocationId: message.job.invocationId,
-        jobId: message.job.jobId,
-        providerId: message.job.providerId,
-        reason: 'completed',
-        status: 'succeeded',
-        summary: 'Late success',
+      approvedTab: {
+        effectiveMode: 'safe',
+        tabId: 7,
+        title: 'Approved tab',
+        url: 'https://example.test/task',
       },
-      status: 'succeeded',
+      deadlines: {
+        ...message.job.deadlines,
+        execution: new Date(Date.now() + 600_000).toISOString(),
+      },
+      ownerLabel: message.ownerLabel,
+      status: 'running',
     };
-    transport.send({
-      generation: message.job.generation,
-      jobs: [late],
-      providerId: message.job.providerId,
-      type: 'provider_snapshot',
-    });
+    transport.rows.set(message.job.jobId, running);
+    await runtime.refreshStatus();
     expect(runtime.getSnapshot()).toMatchObject({
-      jobs: [{ jobId: message.job.jobId, status: 'cancelled' }],
-      result: { reason: 'cancelled', status: 'cancelled' },
+      active: { approval: undefined, job: { status: 'awaiting_approval' } },
+      jobs: [running],
+      phase: 'awaiting_approval',
     });
     expect(fixture.actions).toStrictEqual([]);
+    expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({
+      jobs: [{ approval: null, snapshot: { status: 'awaiting_approval' } }],
+    });
+
+    await runtime.approve(message.job.jobId, 7);
+    await waitFor(() => {
+      expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({
+        jobs: [{ approval: { tab: { tabId: 7 } } }],
+      });
+    });
+    await runtime.refreshStatus();
+    expect(runtime.getSnapshot().phase).toBe('waiting');
+    expect(fixture.actions).toStrictEqual([]);
+    transport.snapshot();
+    await waitForDone(runtime);
+    expect(fixture.actions).toStrictEqual(['run:7:1']);
+    expect(runtime.getSnapshot().result?.status).toBe('succeeded');
   });
+
+  it.each(['provider_snapshot', 'provider_status_result'] as const)(
+    'restores terminal owners from %s without changing cancellation or stored results',
+    async pageType => {
+      const { runtime, transport } = await setup();
+      const message = transport.delivery();
+      const initial: BrowserJobSnapshot = {
+        ...message.job,
+        ownerLabel: message.ownerLabel,
+        queuePosition: 1,
+        status: 'queued',
+      };
+      transport.rows.set(initial.jobId, initial);
+      transport.snapshot();
+      const queuedSnapshot = runtime.getSnapshot();
+      const queuedCopy = structuredClone(queuedSnapshot);
+      expect(queuedSnapshot.jobs).toStrictEqual([initial]);
+      transport.dispatch(message);
+      await waitForConsent(runtime);
+      const queued: BrowserJobSnapshot = {
+        ...transport.delivery().job,
+        ownerLabel: 'ses_parent_b',
+        queuePosition: 2,
+        status: 'queued',
+      };
+      transport.rows.set(queued.jobId, queued);
+      transport.snapshot();
+      runtime.cancel(message.job.jobId);
+      await waitForDone(runtime);
+      const terminal = transport.rows.get(message.job.jobId);
+      if (terminal?.result === undefined) {
+        throw new Error('Missing terminal fixture');
+      }
+      const previous = runtime.getSnapshot();
+      const previousCopy = structuredClone(previous);
+      expect(previous.jobs[0]).not.toHaveProperty('ownerLabel');
+      expect(previous.jobs[0]).not.toHaveProperty('queuePosition');
+      expect(previous.result).toMatchObject({ reason: 'cancelled', status: 'cancelled' });
+      const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+      const writes = [...fixture.writes];
+      const outbound = structuredClone(transport.outbound);
+      const refresh = async (): Promise<void> => {
+        if (pageType === 'provider_snapshot') {
+          transport.snapshot();
+          return;
+        }
+        await runtime.refreshStatus();
+      };
+      const labelled = { ...terminal, ownerLabel: message.ownerLabel };
+      transport.rows.set(message.job.jobId, labelled);
+      transport.rows.set(queued.jobId, { ...queued, queuePosition: 1 });
+      await refresh();
+      const restored = {
+        ...previous,
+        jobs: [labelled, { ...queued, queuePosition: 1 }],
+      };
+      expect(runtime.getSnapshot()).toStrictEqual(restored);
+
+      const late: BrowserJobSnapshot = {
+        ...message.job,
+        ownerLabel: message.ownerLabel,
+        result: {
+          browserTaskId: message.job.browserTaskId,
+          effectsUncertain: false,
+          evidence: [],
+          invocationId: message.job.invocationId,
+          jobId: message.job.jobId,
+          providerId: message.job.providerId,
+          reason: 'completed',
+          status: 'succeeded',
+          summary: 'Late success',
+        },
+        status: 'succeeded',
+      };
+      transport.rows.set(message.job.jobId, late);
+      await refresh();
+      expect(runtime.getSnapshot()).toStrictEqual(restored);
+      transport.rows.set(message.job.jobId, terminal);
+      await refresh();
+      expect(runtime.getSnapshot()).toStrictEqual(restored);
+      transport.rows.set(message.job.jobId, initial);
+      await refresh();
+      expect(runtime.getSnapshot()).toStrictEqual(restored);
+      expect(runtime.getSnapshot().jobs[0]).not.toHaveProperty('queuePosition');
+      expect(previous).toStrictEqual(previousCopy);
+      expect(queuedSnapshot).toStrictEqual(queuedCopy);
+      expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+      expect(fixture.writes).toStrictEqual(writes);
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect(fixture.actions).toStrictEqual([]);
+    }
+  );
 
   it.each(['rejection', 'cancellation', 'cancellation while waiting'] as const)(
     'offers fresh FIFO consent after %s without recovery',
@@ -989,6 +1262,16 @@ describe('enabled browser provider owner', () => {
       transport.dispatch(first);
       await waitForConsent(runtime);
       transport.enqueue(next);
+      const queued: BrowserJobSnapshot = {
+        ...next.job,
+        ownerLabel: next.ownerLabel,
+        queuePosition: 1,
+        status: 'queued',
+      };
+      transport.rows.set(next.job.jobId, queued);
+      transport.snapshot();
+      const beforeDispatch = runtime.getSnapshot();
+      expect(beforeDispatch.jobs).toContainEqual(queued);
       if (local !== undefined) {
         await runtime.approve(first.job.jobId, 7);
         await waitFor(() => {
@@ -1022,6 +1305,12 @@ describe('enabled browser provider owner', () => {
           result: { reason },
         });
       });
+      expect(runtime.getSnapshot().active?.ownerLabel).toBe(next.ownerLabel);
+      expect(runtime.getSnapshot().active?.job).not.toHaveProperty('queuePosition');
+      expect(
+        runtime.getSnapshot().jobs.find(job => job.jobId === next.job.jobId)
+      ).not.toHaveProperty('queuePosition');
+      expect(beforeDispatch.jobs).toContainEqual(queued);
       expect(
         transport.outbound.find(frame => frame.type === 'provider_quiesced')
       ).not.toHaveProperty('tabId');

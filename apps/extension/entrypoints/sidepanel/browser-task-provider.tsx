@@ -392,9 +392,17 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
       )
     );
   };
-  const consumeJob = (job: BrowserJobSnapshot): void => {
+  const consumeJob = (job: BrowserJobSnapshot, acknowledgeRunning = true): void => {
     const previous = jobs.get(job.jobId);
-    if (previous !== undefined && (!sameJob(previous, job) || previous.result !== undefined)) {
+    if (previous !== undefined && !sameJob(previous, job)) {
+      return;
+    }
+    if (previous?.result !== undefined) {
+      // Later provider pages can supply an owner without replacing the first terminal snapshot.
+      if (job.ownerLabel !== undefined && job.ownerLabel !== previous.ownerLabel) {
+        jobs.set(job.jobId, { ...previous, ownerLabel: job.ownerLabel });
+        publish();
+      }
       return;
     }
     jobs.set(job.jobId, job);
@@ -409,7 +417,7 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           job.result.reason === 'completed' ? 'provider_unavailable' : job.result.reason
         );
         publish({ result: job.result });
-      } else if (job.status === 'running') {
+      } else if (job.status === 'running' && acknowledgeRunning) {
         if (current.selected === undefined || !sameTab(job.approvedTab, current.selected.tab)) {
           needsRecovery = true;
           unavailable('tab_lost', current.started);
@@ -440,10 +448,8 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           }
           fence = page.unresolvedFence ?? fence;
           for (const job of page.jobs) {
-            // Historical running rows never acknowledge approval or grant a lease.
-            if (job.result !== undefined || job.generation !== generation) {
-              consumeJob(job);
-            }
+            // Status pages update display state, but never acknowledge approval or grant a lease.
+            consumeJob(job, false);
           }
           cursor = page.nextCursor;
           if (cursor !== undefined && cursors.has(cursor)) {

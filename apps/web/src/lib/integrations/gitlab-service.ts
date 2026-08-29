@@ -138,19 +138,39 @@ function requireGitLabProjectId(projectId: string | number): string {
 /**
  * Get GitLab integration for an owner
  */
-export async function getGitLabIntegration(owner: Owner): Promise<PlatformIntegration | null> {
+export async function getGitLabIntegration(
+  owner: Owner,
+  integrationId?: string
+): Promise<PlatformIntegration | null> {
   const ownershipCondition =
     owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
+      ? and(
+          eq(platform_integrations.owned_by_user_id, owner.id),
+          isNull(platform_integrations.owned_by_organization_id)
+        )
+      : and(
+          eq(platform_integrations.owned_by_organization_id, owner.id),
+          isNull(platform_integrations.owned_by_user_id)
+        );
 
-  const [integration] = await db
+  const integrations = await db
     .select()
     .from(platform_integrations)
-    .where(and(ownershipCondition, eq(platform_integrations.platform, PLATFORM.GITLAB)))
-    .limit(1);
+    .where(
+      and(
+        ownershipCondition,
+        eq(platform_integrations.platform, PLATFORM.GITLAB),
+        integrationId ? eq(platform_integrations.id, integrationId) : undefined
+      )
+    )
+    .limit(2);
 
-  return integration || null;
+  // Old callers omit the selector. Resolve only an unambiguous owner lookup until
+  // old clients/records disappear and the 30-day ledger window expires.
+  if (integrations.length > 1) {
+    throw new TRPCError({ code: 'CONFLICT', message: 'Select a GitLab integration' });
+  }
+  return integrations[0] ?? null;
 }
 
 /**
@@ -266,7 +286,7 @@ export async function listGitLabRepositories(
     const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
 
     const repos = await fetchGitLabProjects(accessToken, instanceUrl);
-    await updateRepositoriesForIntegration(integrationId, repos);
+    await updateRepositoriesForIntegration(integrationId, repos, integration);
 
     return {
       repositories: repos,
@@ -289,43 +309,49 @@ export async function listGitLabBranches(
   owner: Owner,
   integrationId: string,
   actor: GitLabCredentialActor,
-  projectPath: string // e.g., "group/project" or project ID
+  projectPath: string,
+  expectedRepository?: { instanceUrl: string; repositoryId: string }
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
-
-  const [integration] = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.id, integrationId),
-        ownershipCondition,
-        eq(platform_integrations.platform, PLATFORM.GITLAB)
-      )
-    )
-    .limit(1);
-
+  const integration = await getGitLabIntegration(owner, integrationId);
   if (!integration) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'GitLab integration not found',
-    });
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'GitLab integration not found' });
   }
 
-  const accessToken = await getValidGitLabToken(integration, actor);
   const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
   const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
-
-  const branches = await fetchGitLabBranches(accessToken, projectPath, instanceUrl);
-
+  if (
+    expectedRepository &&
+    (normalizeInstanceUrl(expectedRepository.instanceUrl) !== instanceUrl ||
+      integration.integration_status !== INTEGRATION_STATUS.ACTIVE ||
+      integration.suspended_at ||
+      integration.auth_invalid_at)
+  ) {
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'GitLab integration changed' });
+  }
+  const accessToken = await getValidGitLabToken(integration, actor);
+  if (expectedRepository) {
+    const repositories =
+      requireNumericPlatformRepositories(integration.repositories) ??
+      (await fetchGitLabProjects(accessToken, instanceUrl));
+    if (
+      !repositories.some(
+        repository =>
+          String(repository.id) === expectedRepository.repositoryId &&
+          repository.full_name === projectPath
+      )
+    ) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'GitLab repository not found' });
+    }
+  }
+  // Legacy branch callers supply a path only. Keep that form until old clients
+  // and records disappear and the 30-day ledger window expires.
+  const branches = await fetchGitLabBranches(
+    accessToken,
+    expectedRepository?.repositoryId ?? projectPath,
+    instanceUrl
+  );
   return {
-    branches: branches.map(b => ({
-      name: b.name,
-      isDefault: b.default,
-    })),
+    branches: branches.map(b => ({ name: b.name, isDefault: b.default })),
   };
 }
 
@@ -1011,7 +1037,7 @@ export async function connectWithPAT(
     let existingMetadata: Record<string, unknown> = {};
     let isInstanceChange = false;
 
-    await db.transaction(async tx => {
+    const refreshedIntegration = await db.transaction(async tx => {
       existingMetadata = await readGitLabMetadataInTransaction(tx, existingIntegration.id);
       isInstanceChange = instanceUrlChanged(
         readOptionalMetadataString(existingMetadata, 'gitlab_instance_url'),
@@ -1058,7 +1084,7 @@ export async function connectWithPAT(
         ],
       });
 
-      await tx
+      const [updatedIntegration] = await tx
         .update(platform_integrations)
         .set({
           integration_type: 'pat',
@@ -1067,9 +1093,12 @@ export async function connectWithPAT(
           platform_account_login: validatedUser.username,
           scopes: validation.tokenInfo?.scopes ?? ['api'],
           integration_status: INTEGRATION_STATUS.ACTIVE,
+          ...(isInstanceChange ? { repositories: null, repositories_synced_at: null } : {}),
           updated_at: new Date().toISOString(),
         })
-        .where(eq(platform_integrations.id, existingIntegration.id));
+        .where(eq(platform_integrations.id, existingIntegration.id))
+        .returning();
+      if (!updatedIntegration) throw new Error('GitLab integration changed during reconnect');
 
       if (isInstanceChange) {
         await tx
@@ -1129,6 +1158,7 @@ export async function connectWithPAT(
       await tx
         .delete(platform_oauth_credentials)
         .where(eq(platform_oauth_credentials.platform_integration_id, existingIntegration.id));
+      return updatedIntegration;
     });
 
     if (isInstanceChange) {
@@ -1161,7 +1191,7 @@ export async function connectWithPAT(
 
     // Fetch and cache repositories
     const repos = await fetchGitLabProjects(token, normalizedInstanceUrl);
-    await updateRepositoriesForIntegration(existingIntegration.id, repos);
+    await updateRepositoriesForIntegration(existingIntegration.id, repos, refreshedIntegration);
 
     return {
       success: true,
@@ -1253,7 +1283,7 @@ export async function connectWithPAT(
 
   // 6. Fetch and cache repositories
   const repos = await fetchGitLabProjects(token, normalizedInstanceUrl);
-  await updateRepositoriesForIntegration(integration.id, repos);
+  await updateRepositoriesForIntegration(integration.id, repos, integration);
 
   logExceptInTest('[connectWithPAT] Repositories cached', {
     integrationId: integration.id,

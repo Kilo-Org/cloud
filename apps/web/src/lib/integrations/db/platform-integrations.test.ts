@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { db } from '@/lib/drizzle';
 import { platform_integrations, kilocode_users, organizations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
@@ -12,9 +12,29 @@ import {
   unsuspendIntegration,
   unsuspendIntegrationForOwner,
   updateIntegrationRepositories,
+  updateRepositoriesForIntegration,
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
+import type * as GitLabAdapter from '../platforms/gitlab/adapter';
+import type { fetchGitLabCredential } from '../platforms/gitlab/credential-broker-client';
+
+const mockFetchGitLabProjects = jest.fn<typeof GitLabAdapter.fetchGitLabProjects>();
+const mockValidatePersonalAccessToken = jest.fn<typeof GitLabAdapter.validatePersonalAccessToken>();
+const mockFetchGitLabCredential = jest.fn<typeof fetchGitLabCredential>();
+jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  fetchGitLabProjects: mockFetchGitLabProjects,
+  validatePersonalAccessToken: mockValidatePersonalAccessToken,
+}));
+jest.mock('@/lib/integrations/platforms/gitlab/credential-broker-client', () => ({
+  fetchGitLabCredential: mockFetchGitLabCredential,
+}));
+jest.mock('@/lib/integrations/platforms/gitlab/credential-encryption', () => ({
+  encryptGitLabPersonalAccessToken: () => 'test-encrypted-token',
+}));
+jest.mock('@/lib/agent-config/db/agent-configs', () => ({
+  resetCodeReviewConfigForOwner: jest.fn(),
+}));
 
 const INSTALLATION_ID = `test-github-install-${Date.now()}`;
 
@@ -354,6 +374,249 @@ describe('upsertPlatformIntegrationForOwner', () => {
     expect(standard?.github_app_type).toBe('standard');
     expect(lite?.owned_by_user_id).toBe(otherUserId);
     expect(lite?.github_app_type).toBe('lite');
+  });
+
+  describe('GitLab repository cache snapshots', () => {
+    const instanceUrl = 'https://gitlab.example.com/Enterprise';
+    const replacementUrl = 'https://other.example.com/gitlab';
+    const project = {
+      id: 42,
+      name: 'API',
+      full_name: 'Group/Subgroup/API',
+      private: true,
+      created_at: '2026-08-01T00:00:00Z',
+      default_branch: 'release/Original',
+    };
+    const replacementProject = { ...project, default_branch: 'release/Replacement' };
+
+    async function createIntegration(
+      owner: Owner,
+      metadata: unknown = { gitlab_instance_url: instanceUrl }
+    ) {
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: owner.type === 'user' ? owner.id : null,
+          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+          platform: 'gitlab',
+          integration_type: 'oauth',
+          integration_status: 'active',
+          repositories: [project],
+          repositories_synced_at: '2026-08-29T08:00:00Z',
+          metadata,
+          updated_at: '2026-08-29 08:00:00.123456+00',
+        })
+        .returning();
+      return integration;
+    }
+
+    beforeEach(() => {
+      mockFetchGitLabProjects.mockReset();
+      mockValidatePersonalAccessToken.mockReset();
+      mockValidatePersonalAccessToken.mockResolvedValue({
+        valid: true,
+        user: {
+          id: 123,
+          username: 'gitlab-user',
+          name: 'GitLab User',
+          email: 'gitlab-user@example.com',
+          avatar_url: 'https://gitlab.com/avatar.png',
+          web_url: 'https://gitlab.com/gitlab-user',
+        },
+      });
+      mockFetchGitLabCredential.mockReset();
+      mockFetchGitLabCredential.mockResolvedValue({
+        status: 'available',
+        token: 'test-gitlab-token',
+        instanceUrl,
+        glabIsOAuth2: true,
+      });
+    });
+
+    test.each([null, { gitlab_instance_url: instanceUrl }])(
+      'updates a matching snapshot with metadata %j',
+      async metadata => {
+        const integration = await createIntegration({ type: 'user', id: userId }, metadata);
+        await updateRepositoriesForIntegration(integration.id, [replacementProject], integration);
+        const [current] = await db
+          .select()
+          .from(platform_integrations)
+          .where(eq(platform_integrations.id, integration.id));
+        expect(current.repositories).toEqual([replacementProject]);
+      }
+    );
+
+    test.each(['timestamp', 'metadata'] as const)(
+      'does not overwrite the cache or authorization after a changed %s',
+      async changed => {
+        const integration = await createIntegration({ type: 'user', id: userId });
+        const [replacement] = await db
+          .update(platform_integrations)
+          .set({
+            repositories: [replacementProject],
+            repositories_synced_at: '2026-08-29T09:00:00Z',
+            auth_invalid_at: '2026-08-29T09:00:00Z',
+            auth_invalid_reason: 'reconnect_required',
+            metadata:
+              changed === 'metadata'
+                ? { gitlab_instance_url: replacementUrl }
+                : integration.metadata,
+            updated_at: changed === 'timestamp' ? '2026-08-29T09:00:00Z' : integration.updated_at,
+          })
+          .where(eq(platform_integrations.id, integration.id))
+          .returning();
+        await updateRepositoriesForIntegration(integration.id, [project], integration);
+        const [current] = await db
+          .select()
+          .from(platform_integrations)
+          .where(eq(platform_integrations.id, integration.id));
+        expect(current).toEqual(replacement);
+      }
+    );
+
+    test('preserves the old two-argument cache writer', async () => {
+      const integration = await createIntegration({ type: 'user', id: userId });
+      await updateRepositoriesForIntegration(integration.id, [replacementProject]);
+      const [current] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+      expect(current.repositories).toEqual([replacementProject]);
+    });
+
+    test.each(['personal', 'organization', 'service'] as const)(
+      'keeps the reconnected host cache after a late %s refresh',
+      async context => {
+        const owner: Owner =
+          context === 'organization' ? { type: 'org', id: orgId } : { type: 'user', id: userId };
+        const integration = await createIntegration(owner);
+        mockFetchGitLabProjects.mockImplementationOnce(async () => {
+          await db
+            .update(platform_integrations)
+            .set({
+              metadata: { gitlab_instance_url: replacementUrl },
+              repositories: [replacementProject],
+              updated_at: '2026-08-29T09:00:00Z',
+            })
+            .where(eq(platform_integrations.id, integration.id));
+          return [project];
+        });
+        const helpers = await import('@/lib/cloud-agent/gitlab-integration-helpers');
+        const { listGitLabRepositories } = await import('../gitlab-service');
+        const fresh =
+          context === 'service'
+            ? await listGitLabRepositories(owner, integration.id, { userId }, true)
+            : owner.type === 'user'
+              ? await helpers.fetchGitLabRepositoriesForUser(owner.id, true, integration.id)
+              : await helpers.fetchGitLabRepositoriesForOrganization(
+                  owner.id,
+                  userId,
+                  true,
+                  integration.id
+                );
+        if ('instanceUrl' in fresh) {
+          expect(fresh.instanceUrl).toBe(instanceUrl);
+          expect(fresh.repositories[0]).toMatchObject({
+            repositoryReference: {
+              repository: { instanceUrl, repositoryId: '42', defaultBranch: 'release/Original' },
+              authorization: { kind: 'ownerIntegration', owner, integrationId: integration.id },
+            },
+          });
+        } else {
+          expect(fresh.repositories).toEqual([project]);
+        }
+        const cached =
+          owner.type === 'user'
+            ? await helpers.fetchGitLabRepositoriesForUser(owner.id, false, integration.id)
+            : await helpers.fetchGitLabRepositoriesForOrganization(
+                owner.id,
+                userId,
+                false,
+                integration.id
+              );
+        expect(cached.repositories[0]).toMatchObject({
+          fullName: 'Group/Subgroup/API',
+          defaultBranch: 'release/Replacement',
+          repositoryReference: {
+            repository: {
+              instanceUrl: replacementUrl,
+              repositoryId: '42',
+              defaultBranch: 'release/Replacement',
+            },
+            authorization: { kind: 'ownerIntegration', owner, integrationId: integration.id },
+          },
+        });
+      }
+    );
+
+    test('clears the old host cache before fetching projects during PAT reconnect', async () => {
+      const owner: Owner = { type: 'user', id: userId };
+      const integration = await createIntegration(owner);
+      const service = await import('../gitlab-service');
+      mockFetchGitLabProjects.mockImplementationOnce(async () => {
+        const current = await service.getGitLabIntegration(owner, integration.id);
+        expect(current?.metadata).toMatchObject({ gitlab_instance_url: replacementUrl });
+        expect(current?.repositories).toBeNull();
+        expect(current?.repositories_synced_at).toBeNull();
+        return [replacementProject];
+      });
+      await expect(
+        service.connectWithPAT(owner, 'test-pat', replacementUrl, userId)
+      ).resolves.toMatchObject({
+        success: true,
+        integration: { id: integration.id, instanceUrl: replacementUrl },
+      });
+      const current = await service.getGitLabIntegration(owner, integration.id);
+      expect(current?.repositories).toEqual([replacementProject]);
+    });
+
+    test.each(['existing', 'new'] as const)(
+      'does not replace a reconnected cache after an %s PAT connection fetch',
+      async kind => {
+        const owner: Owner = { type: 'user', id: userId };
+        if (kind === 'existing') await createIntegration(owner);
+        const service = await import('../gitlab-service');
+        mockFetchGitLabProjects.mockImplementationOnce(async () => {
+          const current = await service.getGitLabIntegration(owner);
+          if (!current) throw new Error('Missing test integration');
+          await db
+            .update(platform_integrations)
+            .set({
+              metadata: { gitlab_instance_url: replacementUrl },
+              repositories: [replacementProject],
+              updated_at: '2026-08-29T09:00:00Z',
+            })
+            .where(eq(platform_integrations.id, current.id));
+          return [project];
+        });
+        await service.connectWithPAT(owner, 'test-pat', instanceUrl, userId);
+        const current = await service.getGitLabIntegration(owner);
+        expect(current?.metadata).toEqual({ gitlab_instance_url: replacementUrl });
+        expect(current?.repositories).toEqual([replacementProject]);
+      }
+    );
+
+    test.each(['user', 'org'] as const)(
+      'rejects ambiguous legacy %s lookups but accepts exact selectors',
+      async type => {
+        const owner: Owner = type === 'user' ? { type, id: userId } : { type, id: orgId };
+        const integration = await createIntegration(owner);
+        const { getGitLabIntegration } = await import('../gitlab-service');
+        expect((await getGitLabIntegration(owner))?.id).toBe(integration.id);
+        const second = await createIntegration(owner, { gitlab_instance_url: replacementUrl });
+        await expect(getGitLabIntegration(owner)).rejects.toMatchObject({ code: 'CONFLICT' });
+        expect((await getGitLabIntegration(owner, integration.id))?.metadata).toEqual({
+          gitlab_instance_url: instanceUrl,
+        });
+        expect((await getGitLabIntegration(owner, second.id))?.metadata).toEqual({
+          gitlab_instance_url: replacementUrl,
+        });
+        const otherOwner: Owner =
+          type === 'user' ? { type, id: otherUserId } : { type, id: otherOrgId };
+        await expect(getGitLabIntegration(otherOwner, integration.id)).resolves.toBeNull();
+        await expect(getGitLabIntegration(owner, crypto.randomUUID())).resolves.toBeNull();
+      }
+    );
   });
 
   describe('app-type-scoped destructive mutations', () => {

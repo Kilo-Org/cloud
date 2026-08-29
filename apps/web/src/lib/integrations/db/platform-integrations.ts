@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { platform_integrations } from '@kilocode/db/schema';
+import { platform_integrations, type PlatformIntegration } from '@kilocode/db/schema';
 import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm';
 import type {
   GitHubRequester,
@@ -228,11 +228,14 @@ export async function updateIntegrationRepositories(
 }
 
 /**
- * Updates repository list for an integration by integration ID
+ * Updates the cache only if the optional integration snapshot still matches.
+ * Old writers omit the snapshot. Keep that form until old callers/records
+ * disappear and the 30-day ledger window expires.
  */
 export async function updateRepositoriesForIntegration(
   integrationId: string,
-  repositories: PlatformRepository[]
+  repositories: PlatformRepository[],
+  expectedIntegration?: Pick<PlatformIntegration, 'updated_at' | 'metadata'>
 ) {
   await db
     .update(platform_integrations)
@@ -243,7 +246,19 @@ export async function updateRepositoriesForIntegration(
       auth_invalid_reason: null,
       updated_at: new Date().toISOString(),
     })
-    .where(eq(platform_integrations.id, integrationId));
+    .where(
+      and(
+        eq(platform_integrations.id, integrationId),
+        expectedIntegration
+          ? eq(platform_integrations.updated_at, expectedIntegration.updated_at)
+          : undefined,
+        expectedIntegration
+          ? expectedIntegration.metadata === null
+            ? isNull(platform_integrations.metadata)
+            : eq(platform_integrations.metadata, expectedIntegration.metadata)
+          : undefined
+      )
+    );
 }
 
 export async function updateIntegrationAccountIdentity(

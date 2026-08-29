@@ -1,10 +1,20 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { describe, expect, it, jest, beforeEach, beforeAll } from '@jest/globals';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
-import { buildGitLabCloneUrl } from './gitlab-integration-helpers';
+import type * as GitLabHelpers from './gitlab-integration-helpers';
+import type * as GitLabService from '@/lib/integrations/gitlab-service';
+import type { updateRepositoriesForIntegration } from '@/lib/integrations/db/platform-integrations';
+import type { fetchGitLabBranches } from '@/lib/integrations/platforms/gitlab/adapter';
+import type { fetchGitLabCredential } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
+
+let buildGitLabCloneUrl: typeof GitLabHelpers.buildGitLabCloneUrl;
+beforeAll(async () => {
+  ({ buildGitLabCloneUrl } = await import('./gitlab-integration-helpers'));
+});
 
 // Define mock functions at module level with proper typing
-const mockGetGitLabIntegration = jest.fn<(owner: Owner) => Promise<PlatformIntegration | null>>();
+const mockGetGitLabIntegration =
+  jest.fn<(owner: Owner, integrationId?: string) => Promise<PlatformIntegration | null>>();
 const mockGetValidGitLabToken =
   jest.fn<
     (
@@ -16,15 +26,30 @@ const mockGetIntegrationForOrganization =
   jest.fn<(organizationId: string, platform: string) => Promise<PlatformIntegration | null>>();
 const mockGetIntegrationForOwner =
   jest.fn<(owner: Owner, platform: string) => Promise<PlatformIntegration | null>>();
-const mockUpdateRepositoriesForIntegration =
-  jest.fn<(integrationId: string, repositories: unknown[]) => Promise<void>>();
+const mockUpdateRepositoriesForIntegration = jest.fn<typeof updateRepositoriesForIntegration>();
 const mockFetchGitLabProjects =
   jest.fn<(accessToken: string, instanceUrl: string) => Promise<unknown[]>>();
+const mockListGitLabBranches = jest.fn<typeof GitLabService.listGitLabBranches>();
+const mockFetchGitLabBranches = jest.fn<typeof fetchGitLabBranches>();
+const mockIntegrationRows = jest.fn<() => Promise<PlatformIntegration[]>>();
+const mockFetchGitLabCredential = jest.fn<typeof fetchGitLabCredential>();
+
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    select: () => ({ from: () => ({ where: () => ({ limit: mockIntegrationRows }) }) }),
+  },
+}));
+jest.mock('@/lib/agent-config/db/agent-configs', () => ({}));
+jest.mock('@/lib/integrations/platforms/gitlab/credential-encryption', () => ({}));
+jest.mock('@/lib/integrations/platforms/gitlab/credential-broker-client', () => ({
+  fetchGitLabCredential: mockFetchGitLabCredential,
+}));
 
 // Wire up the mocks
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getGitLabIntegration: mockGetGitLabIntegration,
   getValidGitLabToken: mockGetValidGitLabToken,
+  listGitLabBranches: mockListGitLabBranches,
 }));
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
@@ -35,12 +60,19 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
 
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   fetchGitLabProjects: mockFetchGitLabProjects,
+  fetchGitLabBranches: mockFetchGitLabBranches,
 }));
+jest.mock('@/lib/utils.server', () => ({ logExceptInTest: jest.fn() }));
 
 describe('gitlab-integration-helpers', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     jest.resetModules();
+    mockGetGitLabIntegration.mockImplementation(owner =>
+      owner.type === 'org'
+        ? mockGetIntegrationForOrganization(owner.id, 'gitlab')
+        : mockGetIntegrationForOwner(owner, 'gitlab')
+    );
   });
 
   describe('buildGitLabCloneUrl', () => {
@@ -98,7 +130,10 @@ describe('gitlab-integration-helpers', () => {
       const result = await getGitLabInstanceUrlForUser('user-123');
 
       expect(result).toBe('https://gitlab.com');
-      expect(mockGetGitLabIntegration).toHaveBeenCalledWith({ type: 'user', id: 'user-123' });
+      expect(mockGetGitLabIntegration).toHaveBeenCalledWith(
+        { type: 'user', id: 'user-123' },
+        undefined
+      );
     });
 
     it('should return default URL when integration has no custom instance URL', async () => {
@@ -488,7 +523,12 @@ describe('gitlab-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 1, name: 'project', fullName: 'group/project', private: false },
+        expect.objectContaining({
+          id: 1,
+          name: 'project',
+          fullName: 'group/project',
+          private: false,
+        }),
       ]);
       expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
     });
@@ -546,7 +586,12 @@ describe('gitlab-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 1, name: 'project', fullName: 'org/project', private: false },
+        expect.objectContaining({
+          id: 1,
+          name: 'project',
+          fullName: 'org/project',
+          private: false,
+        }),
       ]);
       expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
     });
@@ -580,6 +625,321 @@ describe('gitlab-integration-helpers', () => {
       expect(result.integrationInstalled).toBe(false);
       expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
       expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('branch identity through the GitLab service', () => {
+    const owner: Owner = { type: 'user', id: 'oauth/user' };
+    const instanceUrl = 'https://gitlab.example.com/Enterprise';
+    const projectPath = 'Group/Subgroup/API';
+    const integration = {
+      id: 'integration-1',
+      platform: 'gitlab',
+      integration_status: 'active',
+      suspended_at: null,
+      auth_invalid_at: null,
+      metadata: { gitlab_instance_url: instanceUrl },
+      repositories: [{ id: 42, name: 'API', full_name: projectPath, private: true }],
+    } as PlatformIntegration;
+    const reference = {
+      repository: {
+        provider: 'gitlab' as const,
+        instanceUrl,
+        repositoryId: '42',
+        fullName: projectPath,
+        defaultBranch: null,
+      },
+      authorization: { kind: 'ownerIntegration' as const, owner, integrationId: integration.id },
+    };
+
+    beforeEach(() => {
+      const service = jest.requireActual<typeof GitLabService>('@/lib/integrations/gitlab-service');
+      mockGetGitLabIntegration.mockImplementation(service.getGitLabIntegration);
+      mockListGitLabBranches.mockImplementation(service.listGitLabBranches);
+      mockIntegrationRows.mockResolvedValue([integration]);
+      mockFetchGitLabCredential.mockResolvedValue({
+        status: 'available',
+        token: 'test-token',
+        instanceUrl,
+        glabIsOAuth2: true,
+      });
+      mockFetchGitLabBranches.mockImplementation(async (_token, projectId, host) => {
+        if (host !== instanceUrl) throw new Error('Wrong GitLab host');
+        if (projectId === '42') return [{ name: 'release/Case', default: true, protected: true }];
+        if (projectId === projectPath)
+          return [{ name: 'legacy-path', default: true, protected: false }];
+        throw new Error('Wrong GitLab project');
+      });
+    });
+
+    it.each<Owner>([owner, { type: 'org', id: 'organization-1' }])(
+      'uses the immutable project ID and configured host for $type branches',
+      async selectedOwner => {
+        const { listGitLabRepositoryBranches } = await import('./gitlab-integration-helpers');
+        await expect(
+          listGitLabRepositoryBranches(selectedOwner, 'actor', {
+            ...reference,
+            authorization: { ...reference.authorization, owner: selectedOwner },
+          })
+        ).resolves.toEqual({
+          branches: [{ name: 'release/Case', isDefault: true }],
+          defaultBranch: 'release/Case',
+          nextCursor: null,
+        });
+      }
+    );
+
+    it.each(['owner', 'integration', 'instance', 'repository', 'path'] as const)(
+      'rejects a changed %s without substituting a project',
+      async changed => {
+        if (changed === 'integration') mockIntegrationRows.mockResolvedValue([]);
+        const { listGitLabRepositoryBranches } = await import('./gitlab-integration-helpers');
+        await expect(
+          listGitLabRepositoryBranches(owner, 'actor', {
+            repository: {
+              ...reference.repository,
+              ...(changed === 'instance' ? { instanceUrl: 'https://other.example.com' } : {}),
+              ...(changed === 'repository' ? { repositoryId: '99' } : {}),
+              ...(changed === 'path' ? { fullName: projectPath.toLowerCase() } : {}),
+            },
+            authorization: {
+              ...reference.authorization,
+              owner: changed === 'owner' ? { type: 'org', id: owner.id } : owner,
+            },
+          })
+        ).rejects.toMatchObject({
+          code:
+            changed === 'owner'
+              ? 'FORBIDDEN'
+              : changed === 'instance'
+                ? 'PRECONDITION_FAILED'
+                : 'NOT_FOUND',
+        });
+      }
+    );
+
+    it('returns zero branches without guessing a default', async () => {
+      mockFetchGitLabBranches.mockResolvedValue([]);
+      const { listGitLabRepositoryBranches } = await import('./gitlab-integration-helpers');
+      await expect(listGitLabRepositoryBranches(owner, 'actor', reference)).resolves.toEqual({
+        branches: [],
+        defaultBranch: null,
+        nextCursor: null,
+      });
+    });
+
+    it('keeps the default unavailable when no branch is marked default', async () => {
+      mockFetchGitLabBranches.mockResolvedValue([
+        { name: 'feature/Case', default: false, protected: false },
+      ]);
+      const { listGitLabRepositoryBranches } = await import('./gitlab-integration-helpers');
+      await expect(listGitLabRepositoryBranches(owner, 'actor', reference)).resolves.toEqual({
+        branches: [{ name: 'feature/Case', isDefault: false }],
+        defaultBranch: null,
+        nextCursor: null,
+      });
+    });
+
+    it('preserves a retryable provider branch failure', async () => {
+      const error = new Error('GitLab branch page unavailable');
+      mockFetchGitLabBranches.mockRejectedValue(error);
+      const { listGitLabRepositoryBranches } = await import('./gitlab-integration-helpers');
+      await expect(listGitLabRepositoryBranches(owner, 'actor', reference)).rejects.toBe(error);
+    });
+
+    it('retains path-only branch lookup for a legacy caller', async () => {
+      await expect(
+        mockListGitLabBranches(owner, integration.id, { userId: owner.id }, projectPath)
+      ).resolves.toEqual({ branches: [{ name: 'legacy-path', isDefault: true }] });
+    });
+
+    it('rejects an ambiguous unpinned clone host', async () => {
+      mockIntegrationRows.mockResolvedValue([integration, { ...integration, id: 'integration-2' }]);
+      const { getGitLabInstanceUrlForUser } = await import('./gitlab-integration-helpers');
+      await expect(getGitLabInstanceUrlForUser(owner.id)).rejects.toMatchObject({
+        code: 'CONFLICT',
+      });
+    });
+  });
+
+  describe('discovery identity', () => {
+    const integrationId = '11111111-1111-4111-8111-111111111111';
+    const instanceUrl = 'https://gitlab.example.com/Enterprise';
+    const project = {
+      id: 42,
+      name: 'API',
+      full_name: 'Group/Subgroup/API',
+      private: true,
+      default_branch: 'release/Case',
+    };
+    const owners = [
+      { type: 'user', id: 'oauth/user' },
+      { type: 'org', id: '22222222-2222-4222-8222-222222222222' },
+    ] as const;
+
+    it.each(owners.flatMap(owner => [false, true].map(fresh => ({ owner, fresh }))))(
+      'retains the producing identity for $owner.type, fresh=$fresh',
+      async ({ owner, fresh }) => {
+        mockGetGitLabIntegration.mockResolvedValue({
+          id: integrationId,
+          integration_status: 'active',
+          repositories: [project],
+          metadata: { gitlab_instance_url: `${instanceUrl}/` },
+          repositories_synced_at: '2026-08-29T00:00:00Z',
+        } as PlatformIntegration);
+        mockGetValidGitLabToken.mockResolvedValue('token');
+        mockFetchGitLabProjects.mockResolvedValue([project]);
+        const helpers = await import('./gitlab-integration-helpers');
+        const result =
+          owner.type === 'user'
+            ? await helpers.fetchGitLabRepositoriesForUser(owner.id, fresh)
+            : await helpers.fetchGitLabRepositoriesForOrganization(owner.id, 'actor', fresh);
+        expect(result.repositories).toEqual([
+          {
+            id: 42,
+            name: 'API',
+            fullName: 'Group/Subgroup/API',
+            private: true,
+            defaultBranch: 'release/Case',
+            platformIntegrationId: integrationId,
+            instanceUrl,
+            repositoryReference: {
+              repository: {
+                provider: 'gitlab',
+                repositoryId: '42',
+                instanceUrl,
+                fullName: 'Group/Subgroup/API',
+                defaultBranch: 'release/Case',
+              },
+              authorization: { kind: 'ownerIntegration', owner, integrationId },
+            },
+          },
+        ]);
+      }
+    );
+
+    it('keeps a missing old default explicitly unavailable', async () => {
+      mockGetGitLabIntegration.mockResolvedValue({
+        id: integrationId,
+        repositories: [{ id: 42, name: 'API', full_name: project.full_name, private: true }],
+        metadata: null,
+      } as PlatformIntegration);
+      const { fetchGitLabRepositoriesForUser } = await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForUser('oauth/user');
+      expect(result.repositories[0].repositoryReference.repository).toEqual({
+        provider: 'gitlab',
+        repositoryId: '42',
+        instanceUrl: 'https://gitlab.com',
+        fullName: project.full_name,
+        defaultBranch: null,
+      });
+      expect(result.repositories[0].defaultBranch).toBeUndefined();
+    });
+
+    it('does not relabel fresh repositories after the integration is replaced', async () => {
+      mockGetGitLabIntegration.mockResolvedValue({
+        id: integrationId,
+        repositories: [],
+        metadata: { gitlab_instance_url: instanceUrl },
+      } as unknown as PlatformIntegration);
+      mockGetValidGitLabToken.mockResolvedValue('token');
+      mockFetchGitLabProjects.mockImplementation(async () => {
+        mockGetGitLabIntegration.mockResolvedValue({
+          id: 'replacement',
+          metadata: { gitlab_instance_url: 'https://other.example.com' },
+        } as PlatformIntegration);
+        return [project];
+      });
+      const { fetchGitLabRepositoriesForUser } = await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForUser('oauth/user', true);
+      expect(result.repositories[0].repositoryReference).toMatchObject({
+        repository: { instanceUrl, repositoryId: '42' },
+        authorization: { integrationId },
+      });
+    });
+
+    it.each(owners)(
+      'keeps same-name projects on the selected $type integration host',
+      async owner => {
+        mockGetGitLabIntegration.mockImplementation(
+          async (_owner, selector) =>
+            ({
+              id: selector,
+              repositories: [project],
+              metadata: {
+                gitlab_instance_url:
+                  selector === integrationId ? instanceUrl : 'https://other.example.com/gitlab',
+              },
+            }) as PlatformIntegration
+        );
+        const helpers = await import('./gitlab-integration-helpers');
+        const getHost =
+          owner.type === 'user'
+            ? helpers.getGitLabInstanceUrlForUser
+            : helpers.getGitLabInstanceUrlForOrganization;
+        expect(
+          helpers.buildGitLabCloneUrl(project.full_name, await getHost(owner.id, integrationId))
+        ).toBe('https://gitlab.example.com/Enterprise/Group/Subgroup/API.git');
+        expect(
+          helpers.buildGitLabCloneUrl(project.full_name, await getHost(owner.id, 'other'))
+        ).toBe('https://other.example.com/gitlab/Group/Subgroup/API.git');
+      }
+    );
+
+    it.each(owners)('rejects a stale $type selector instead of using gitlab.com', async owner => {
+      mockGetGitLabIntegration.mockResolvedValue(null);
+      const helpers = await import('./gitlab-integration-helpers');
+      const getHost =
+        owner.type === 'user'
+          ? helpers.getGitLabInstanceUrlForUser
+          : helpers.getGitLabInstanceUrlForOrganization;
+      await expect(getHost(owner.id, integrationId)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('rejects a changed configured host on an existing integration', async () => {
+      mockGetGitLabIntegration.mockResolvedValue({
+        id: integrationId,
+        metadata: { gitlab_instance_url: 'https://other.example.com' },
+      } as PlatformIntegration);
+      const { getGitLabInstanceUrlForUser } = await import('./gitlab-integration-helpers');
+      await expect(
+        getGitLabInstanceUrlForUser('oauth/user', integrationId, instanceUrl)
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    });
+
+    it('preserves the old discovery error when a provider page fails', async () => {
+      mockGetGitLabIntegration.mockResolvedValue({
+        id: integrationId,
+        repositories: null,
+        metadata: {},
+      } as PlatformIntegration);
+      mockGetValidGitLabToken.mockResolvedValue('token');
+      mockFetchGitLabProjects.mockRejectedValue(new Error('page 2 failed'));
+      const { fetchGitLabRepositoriesForUser } = await import('./gitlab-integration-helpers');
+      await expect(fetchGitLabRepositoriesForUser('oauth/user', true)).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch GitLab repositories',
+      });
+    });
+
+    it('distinguishes a connected empty repository list from no integration', async () => {
+      mockGetGitLabIntegration.mockResolvedValue({
+        id: integrationId,
+        repositories: null,
+        metadata: {},
+      } as PlatformIntegration);
+      mockGetValidGitLabToken.mockResolvedValue('token');
+      mockFetchGitLabProjects.mockResolvedValue([]);
+      const { fetchGitLabRepositoriesForUser } = await import('./gitlab-integration-helpers');
+      await expect(fetchGitLabRepositoriesForUser('oauth/user')).resolves.toMatchObject({
+        integrationInstalled: true,
+        repositories: [],
+      });
+      mockGetGitLabIntegration.mockResolvedValue(null);
+      await expect(fetchGitLabRepositoriesForUser('oauth/user')).resolves.toMatchObject({
+        integrationInstalled: false,
+        repositories: [],
+      });
     });
   });
 });

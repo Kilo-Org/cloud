@@ -29,6 +29,7 @@ const mockCheckExistingFork =
 
 // Wire up the mocks
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  getGitHubIntegrationById: jest.fn(),
   getIntegrationForOrganization: mockGetIntegrationForOrganization,
   getIntegrationForOwner: mockGetIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization: mockGetPrimaryGitHubIntegrationForOrganization,
@@ -37,6 +38,7 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
+  fetchGitHubBranches: jest.fn(),
   fetchGitHubRepositories: mockFetchGitHubRepositories,
   generateGitHubInstallationToken: mockGenerateGitHubInstallationToken,
   checkExistingFork: mockCheckExistingFork,
@@ -78,7 +80,7 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 1, name: 'repo', fullName: 'org/repo', private: false },
+        expect.objectContaining({ id: 1, name: 'repo', fullName: 'org/repo', private: false }),
       ]);
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     });
@@ -148,7 +150,7 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 2, name: 'fresh', fullName: 'org/fresh', private: true },
+        expect.objectContaining({ id: 2, name: 'fresh', fullName: 'org/fresh', private: true }),
       ]);
       expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-1', [
         { id: 2, name: 'fresh', full_name: 'org/fresh', private: true },
@@ -166,13 +168,13 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        {
+        expect.objectContaining({
           id: 1,
           name: 'repo',
           fullName: 'org/repo',
           private: false,
           platformIntegrationId: 'integration-1',
-        },
+        }),
       ]);
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     });
@@ -318,6 +320,188 @@ describe('github-integration-helpers', () => {
       expect(result.integrationInstalled).toBe(false);
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
       expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('discovery identity and branches', () => {
+    const integrationId = '11111111-1111-4111-8111-111111111111';
+    const userOwner = { type: 'user' as const, id: 'oauth/user' };
+    const orgOwner = { type: 'org' as const, id: '22222222-2222-4222-8222-222222222222' };
+    const repository = {
+      id: 42,
+      name: 'API',
+      full_name: 'acme/API',
+      private: true,
+      default_branch: 'release/Case',
+    };
+    const expectedRepository = {
+      provider: 'github' as const,
+      repositoryId: '42',
+      instanceUrl: 'https://github.com',
+      fullName: 'acme/API',
+      defaultBranch: 'release/Case',
+    };
+
+    it.each(
+      ['personal', 'primary', 'all'].flatMap(context =>
+        [false, true].map(fresh => ({ context, fresh }))
+      )
+    )(
+      'preserves defaults and producing identity for $context, fresh=$fresh',
+      async ({ context, fresh }) => {
+        const integration = buildIntegration({ id: integrationId, repositories: [repository] });
+        mockGetIntegrationForOwner.mockResolvedValue(integration);
+        mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(integration);
+        mockGetIntegrationsByOrganization.mockResolvedValue([integration]);
+        mockFetchGitHubRepositories.mockResolvedValue([repository]);
+        const helpers = await import('./github-integration-helpers');
+        const result =
+          context === 'personal'
+            ? await helpers.fetchGitHubRepositoriesForUser(userOwner.id, fresh)
+            : context === 'primary'
+              ? await helpers.fetchGitHubRepositoriesForOrganization(orgOwner.id, fresh)
+              : await helpers.fetchAllGitHubRepositoriesForOrganization(orgOwner.id, fresh);
+        expect(result.repositories[0]).toMatchObject({
+          id: 42,
+          fullName: 'acme/API',
+          defaultBranch: 'release/Case',
+          platformIntegrationId: integrationId,
+          repositoryReference: {
+            repository: expectedRepository,
+            authorization: {
+              kind: 'ownerIntegration',
+              owner: context === 'personal' ? userOwner : orgOwner,
+              integrationId,
+            },
+          },
+        });
+      }
+    );
+
+    it('does not invent a default for an old Personal cache row', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration({ id: integrationId }));
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+      const result = await fetchGitHubRepositoriesForUser(userOwner.id);
+      expect(result.repositories[0].repositoryReference.repository.defaultBranch).toBeNull();
+    });
+
+    it('keeps same-name repositories distinct across installations', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({ id: integrationId, repositories: [repository] }),
+        buildIntegration({
+          id: '33333333-3333-4333-8333-333333333333',
+          repositories: [repository],
+        }),
+      ]);
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization(orgOwner.id);
+      expect(
+        result.repositories.map(row => row.repositoryReference.authorization.integrationId)
+      ).toEqual([integrationId, '33333333-3333-4333-8333-333333333333']);
+    });
+
+    it('keeps the producing integration when replacement occurs during a fresh fetch', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration({ id: integrationId }));
+      mockFetchGitHubRepositories.mockImplementation(async () => {
+        mockGetIntegrationForOwner.mockResolvedValue(buildIntegration({ id: 'replacement' }));
+        return [repository];
+      });
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+      const result = await fetchGitHubRepositoriesForUser(userOwner.id, true);
+      expect(result.repositories[0].repositoryReference.authorization).toEqual({
+        kind: 'ownerIntegration',
+        owner: userOwner,
+        integrationId,
+      });
+    });
+
+    it.each([userOwner, orgOwner])(
+      'uses the provider default and preserves branch case for $type',
+      async owner => {
+        const lookups = jest.requireMock<{
+          getGitHubIntegrationById: jest.Mock<
+            (owner: Owner, id: string) => Promise<PlatformIntegration | null>
+          >;
+        }>('@/lib/integrations/db/platform-integrations');
+        lookups.getGitHubIntegrationById.mockImplementation(async (actualOwner, id) =>
+          actualOwner.id === owner.id && id === integrationId
+            ? buildIntegration({ id: integrationId, repositories: [repository] })
+            : null
+        );
+        const adapter = jest.requireMock<{
+          fetchGitHubBranches: jest.Mock<() => Promise<{ name: string; isDefault: boolean }[]>>;
+        }>('@/lib/integrations/platforms/github/adapter');
+        adapter.fetchGitHubBranches.mockResolvedValue([
+          { name: 'feature/Case', isDefault: false },
+          { name: 'release/Case', isDefault: true },
+        ]);
+        const { listGitHubRepositoryBranches } = await import('./github-integration-helpers');
+        await expect(
+          listGitHubRepositoryBranches(owner, {
+            repository: expectedRepository,
+            authorization: { kind: 'ownerIntegration', owner, integrationId },
+          })
+        ).resolves.toEqual({
+          branches: [
+            { name: 'feature/Case', isDefault: false },
+            { name: 'release/Case', isDefault: true },
+          ],
+          defaultBranch: 'release/Case',
+          nextCursor: null,
+        });
+      }
+    );
+
+    it.each(['owner', 'integration', 'repository', 'instance'] as const)(
+      'rejects a changed %s without selecting a same-name repository',
+      async change => {
+        const lookups = jest.requireMock<{
+          getGitHubIntegrationById: jest.Mock<
+            (owner: Owner, id: string) => Promise<PlatformIntegration | null>
+          >;
+        }>('@/lib/integrations/db/platform-integrations');
+        lookups.getGitHubIntegrationById.mockImplementation(async (_owner, id) =>
+          id === integrationId
+            ? buildIntegration({ id: integrationId, repositories: [repository] })
+            : null
+        );
+        const { listGitHubRepositoryBranches } = await import('./github-integration-helpers');
+        await expect(
+          listGitHubRepositoryBranches(userOwner, {
+            repository: {
+              ...expectedRepository,
+              ...(change === 'repository' ? { repositoryId: '999' } : {}),
+              ...(change === 'instance' ? { instanceUrl: 'https://other.test' } : {}),
+            },
+            authorization: {
+              kind: 'ownerIntegration',
+              owner: change === 'owner' ? orgOwner : userOwner,
+              integrationId: change === 'integration' ? 'stale' : integrationId,
+            },
+          })
+        ).rejects.toMatchObject({ code: change === 'owner' ? 'FORBIDDEN' : 'NOT_FOUND' });
+      }
+    );
+
+    it('returns an empty branch list without guessing main', async () => {
+      const lookups = jest.requireMock<{
+        getGitHubIntegrationById: jest.Mock<() => Promise<PlatformIntegration | null>>;
+      }>('@/lib/integrations/db/platform-integrations');
+      lookups.getGitHubIntegrationById.mockResolvedValue(
+        buildIntegration({ id: integrationId, repositories: [repository] })
+      );
+      const adapter = jest.requireMock<{ fetchGitHubBranches: jest.Mock<() => Promise<never[]>> }>(
+        '@/lib/integrations/platforms/github/adapter'
+      );
+      adapter.fetchGitHubBranches.mockResolvedValue([]);
+      const { listGitHubRepositoryBranches } = await import('./github-integration-helpers');
+      await expect(
+        listGitHubRepositoryBranches(userOwner, {
+          repository: expectedRepository,
+          authorization: { kind: 'ownerIntegration', owner: userOwner, integrationId },
+        })
+      ).resolves.toEqual({ branches: [], defaultBranch: null, nextCursor: null });
     });
   });
 });

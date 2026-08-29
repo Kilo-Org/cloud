@@ -22,6 +22,11 @@ import {
   type PlatformRepository,
 } from '@/lib/integrations/core/types';
 
+import type {
+  LaunchRepositoryReference,
+  Owner,
+} from '@kilocode/app-shared/code-review/repository-identity';
+
 type GitHubRepositoriesResult = {
   integrationInstalled: boolean;
   repositories: {
@@ -29,8 +34,11 @@ type GitHubRepositoriesResult = {
     name: string;
     fullName: string;
     private: boolean;
-    platformIntegrationId?: string;
+    defaultBranch?: string;
+    platformIntegrationId: string;
     platformAccountLogin?: string;
+    instanceUrl: string;
+    repositoryReference: LaunchRepositoryReference;
   }[];
   syncedAt?: string | null;
   errorMessage?: string;
@@ -38,19 +46,30 @@ type GitHubRepositoriesResult = {
 
 const mapRepositories = (
   repositories: PlatformRepository[],
-  integration?: { id: string; platform_account_login: string | null }
+  integration: { id: string; platform_account_login: string | null },
+  owner: Owner
 ): GitHubRepositoriesResult['repositories'] => {
   return repositories.map(repo => ({
     id: repo.id,
     name: repo.name,
     fullName: repo.full_name,
     private: repo.private,
-    ...(integration
-      ? {
-          platformIntegrationId: integration.id,
-          platformAccountLogin: integration.platform_account_login ?? undefined,
-        }
-      : {}),
+    defaultBranch: repo.default_branch,
+    platformIntegrationId: integration.id,
+    platformAccountLogin: integration.platform_account_login ?? undefined,
+    instanceUrl: 'https://github.com',
+    repositoryReference: {
+      repository: {
+        provider: 'github',
+        instanceUrl: 'https://github.com',
+        repositoryId: String(repo.id),
+        fullName: repo.full_name,
+        // Old cache rows omit defaults. Remove this unavailable fallback only after
+        // old rows/clients disappear and the 30-day ledger window expires.
+        defaultBranch: repo.default_branch ?? null,
+      },
+      authorization: { kind: 'ownerIntegration', owner, integrationId: integration.id },
+    },
   }));
 };
 
@@ -137,6 +156,7 @@ export async function fetchGitHubRepositoriesForOrganization(
   organizationId: string,
   forceRefresh: boolean = false
 ): Promise<GitHubRepositoriesResult> {
+  const owner: Owner = { type: 'org', id: organizationId };
   const integration = await getPrimaryGitHubIntegrationForOrganization(organizationId);
 
   if (!integration) {
@@ -170,13 +190,13 @@ export async function fetchGitHubRepositoriesForOrganization(
       await updateRepositoriesForIntegration(integration.id, repositories);
       return {
         integrationInstalled: true,
-        repositories: mapRepositories(repositories),
+        repositories: mapRepositories(repositories, integration, owner),
         syncedAt: new Date().toISOString(),
       };
     }
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
+      repositories: mapRepositories(cachedRepositories, integration, owner),
       syncedAt: integration.repositories_synced_at,
     };
   } catch (_error) {
@@ -194,12 +214,16 @@ export async function fetchAllGitHubRepositoriesForOrganization(
   const integrations = (
     await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB)
   ).filter(isPlatformIntegrationHealthy);
-  return fetchRepositoriesForIntegrations(integrations, forceRefresh);
+  return fetchRepositoriesForIntegrations(integrations, forceRefresh, {
+    type: 'org',
+    id: organizationId,
+  });
 }
 
 async function fetchRepositoriesForIntegrations(
   integrations: Awaited<ReturnType<typeof getIntegrationsByOrganization>>,
-  forceRefresh: boolean
+  forceRefresh: boolean,
+  owner: Owner
 ): Promise<GitHubRepositoriesResult> {
   if (integrations.length === 0) {
     return missingIntegrationResponse('No GitHub integration found for this organization');
@@ -217,12 +241,12 @@ async function fetchRepositoriesForIntegrations(
           );
           await updateRepositoriesForIntegration(integration.id, repositories);
           return {
-            repositories: mapRepositories(repositories, integration),
+            repositories: mapRepositories(repositories, integration, owner),
             syncedAt: new Date().toISOString(),
           };
         }
         return {
-          repositories: mapRepositories(cachedRepositories, integration),
+          repositories: mapRepositories(cachedRepositories, integration, owner),
           syncedAt: integration.repositories_synced_at,
         };
       })
@@ -254,6 +278,7 @@ export async function fetchGitHubRepositoriesForUser(
   userId: string,
   forceRefresh: boolean = false
 ): Promise<GitHubRepositoriesResult> {
+  const owner: Owner = { type: 'user', id: userId };
   const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITHUB);
 
   if (!integration) {
@@ -280,7 +305,7 @@ export async function fetchGitHubRepositoriesForUser(
       await updateRepositoriesForIntegration(integration.id, repositories);
       return {
         integrationInstalled: true,
-        repositories: mapRepositories(repositories),
+        repositories: mapRepositories(repositories, integration, owner),
         syncedAt: new Date().toISOString(),
       };
     }
@@ -288,7 +313,7 @@ export async function fetchGitHubRepositoriesForUser(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
+      repositories: mapRepositories(cachedRepositories, integration, owner),
       syncedAt: integration.repositories_synced_at,
     };
   } catch (_error) {
@@ -297,6 +322,56 @@ export async function fetchGitHubRepositoriesForUser(
       message: 'Failed to fetch GitHub repositories',
     });
   }
+}
+
+export async function listGitHubRepositoryBranches(
+  owner: Owner,
+  reference: LaunchRepositoryReference
+) {
+  const { repository, authorization } = reference;
+  if (
+    repository.provider !== 'github' ||
+    authorization.owner.type !== owner.type ||
+    authorization.owner.id !== owner.id
+  ) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Repository owner does not match' });
+  }
+  if (repository.instanceUrl !== 'https://github.com') {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'GitHub repository not found' });
+  }
+  const { getGitHubIntegrationById } = await import('@/lib/integrations/db/platform-integrations');
+  const integration = await getGitHubIntegrationById(owner, authorization.integrationId);
+  if (
+    !integration ||
+    !isPlatformIntegrationHealthy(integration) ||
+    !integration.platform_installation_id
+  ) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'GitHub integration not found' });
+  }
+  const repositories =
+    requireNumericPlatformRepositories(integration.repositories) ??
+    (await fetchGitHubRepositories(
+      integration.platform_installation_id,
+      integration.github_app_type || 'standard'
+    ));
+  const selected = repositories.find(
+    candidate =>
+      String(candidate.id) === repository.repositoryId &&
+      candidate.full_name.toLowerCase() === repository.fullName.toLowerCase()
+  );
+  if (!selected) throw new TRPCError({ code: 'NOT_FOUND', message: 'GitHub repository not found' });
+  const { fetchGitHubBranches } = await import('@/lib/integrations/platforms/github/adapter');
+  const branches = await fetchGitHubBranches(
+    integration.platform_installation_id,
+    selected.full_name,
+    integration.github_app_type || 'standard',
+    repository.repositoryId
+  );
+  return {
+    branches,
+    defaultBranch: branches.find(branch => branch.isDefault)?.name ?? null,
+    nextCursor: null,
+  };
 }
 
 export async function validateGitHubRepoAccessForUser(

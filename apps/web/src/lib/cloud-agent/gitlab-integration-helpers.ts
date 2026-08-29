@@ -1,10 +1,13 @@
 import { TRPCError } from '@trpc/server';
 import {
   getIntegrationForOrganization,
-  getIntegrationForOwner,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
-import { getGitLabIntegration, getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import {
+  getGitLabIntegration,
+  getValidGitLabToken,
+  listGitLabBranches,
+} from '@/lib/integrations/gitlab-service';
 import { fetchGitLabProjects } from '@/lib/integrations/platforms/gitlab/adapter';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationSuspended } from '@/lib/integrations/core/health';
@@ -12,6 +15,11 @@ import {
   requireNumericPlatformRepositories,
   type PlatformRepository,
 } from '@/lib/integrations/core/types';
+import type {
+  LaunchRepositoryReference,
+  Owner,
+} from '@kilocode/app-shared/code-review/repository-identity';
+import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
 
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
 
@@ -22,6 +30,10 @@ type GitLabRepositoriesResult = {
     name: string;
     fullName: string;
     private: boolean;
+    defaultBranch?: string;
+    platformIntegrationId: string;
+    instanceUrl: string;
+    repositoryReference: LaunchRepositoryReference;
   }[];
   syncedAt?: string | null;
   errorMessage?: string;
@@ -29,13 +41,31 @@ type GitLabRepositoriesResult = {
 };
 
 const mapRepositories = (
-  repositories: PlatformRepository[]
+  repositories: PlatformRepository[],
+  integrationId: string,
+  instanceUrl: string,
+  owner: Owner
 ): GitLabRepositoriesResult['repositories'] => {
   return repositories.map(repo => ({
     id: repo.id,
     name: repo.name,
     fullName: repo.full_name,
     private: repo.private,
+    defaultBranch: repo.default_branch,
+    platformIntegrationId: integrationId,
+    instanceUrl,
+    repositoryReference: {
+      repository: {
+        provider: 'gitlab',
+        instanceUrl,
+        repositoryId: String(repo.id),
+        fullName: repo.full_name,
+        // Old cache rows omit defaults. Remove this unavailable fallback only after
+        // old rows/clients disappear and the 30-day ledger window expires.
+        defaultBranch: repo.default_branch ?? null,
+      },
+      authorization: { kind: 'ownerIntegration', owner, integrationId },
+    },
   }));
 };
 
@@ -47,35 +77,19 @@ const missingIntegrationResponse = (message: string): GitLabRepositoriesResult =
 });
 
 type GitLabMetadata = {
-  access_token?: string;
-  refresh_token?: string;
-  token_expires_at?: string;
   gitlab_instance_url?: string;
-  client_id?: string;
-  client_secret?: string;
 };
 
-/**
- * Get GitLab OAuth token for an organization
- * Automatically refreshes the token if expired
- */
+/** Get the organization's GitLab token through the credential broker. */
 export async function getGitLabTokenForOrganization(
   organizationId: string,
   actorUserId: string
 ): Promise<string | undefined> {
   const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
-
-  if (!integration) {
-    return undefined;
-  }
-
+  if (!integration) return undefined;
   try {
-    const token = await getValidGitLabToken(integration, {
-      userId: actorUserId,
-      organizationId,
-    });
-    return token;
-  } catch (_error) {
+    return await getValidGitLabToken(integration, { userId: actorUserId, organizationId });
+  } catch {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to authenticate with GitLab integration',
@@ -83,21 +97,13 @@ export async function getGitLabTokenForOrganization(
   }
 }
 
-/**
- * Get GitLab OAuth token for a user
- * Automatically refreshes the token if expired
- */
+/** Get the user's GitLab token through the credential broker. */
 export async function getGitLabTokenForUser(userId: string): Promise<string | undefined> {
   const integration = await getGitLabIntegration({ type: 'user', id: userId });
-
-  if (!integration) {
-    return undefined;
-  }
-
+  if (!integration) return undefined;
   try {
-    const token = await getValidGitLabToken(integration, { userId });
-    return token;
-  } catch (_error) {
+    return await getValidGitLabToken(integration, { userId });
+  } catch {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to authenticate with GitLab integration',
@@ -105,54 +111,47 @@ export async function getGitLabTokenForUser(userId: string): Promise<string | un
   }
 }
 
-/**
- * Fetch GitLab repositories for an organization
- * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true
- */
-export async function fetchGitLabRepositoriesForOrganization(
-  organizationId: string,
+async function fetchRepositories(
+  owner: Owner,
   actorUserId: string,
-  forceRefresh: boolean = false
+  forceRefresh: boolean,
+  integrationId?: string
 ): Promise<GitLabRepositoriesResult> {
-  const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
-
+  const integration = await getGitLabIntegration(owner, integrationId);
   if (!integration) {
-    return missingIntegrationResponse('No GitLab integration found for this organization');
+    return missingIntegrationResponse(
+      `No GitLab integration found for this ${owner.type === 'org' ? 'organization' : 'user'}`
+    );
   }
-
   if (isPlatformIntegrationSuspended(integration)) {
     return missingIntegrationResponse('GitLab integration is suspended');
   }
 
-  const metadata = integration.metadata as GitLabMetadata | null;
-  const instanceUrl = metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
-
   try {
+    const metadata = integration.metadata as GitLabMetadata | null;
+    const instanceUrl = normalizeGitLabInstanceUrl(metadata?.gitlab_instance_url);
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    // If forceRefresh or no cached repos, fetch from GitLab and update cache
     if (forceRefresh || !cachedRepositories?.length) {
       const accessToken = await getValidGitLabToken(integration, {
         userId: actorUserId,
-        organizationId,
+        ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
       });
       const repositories = await fetchGitLabProjects(accessToken, instanceUrl);
-      await updateRepositoriesForIntegration(integration.id, repositories);
+      await updateRepositoriesForIntegration(integration.id, repositories, integration);
       return {
         integrationInstalled: true,
-        repositories: mapRepositories(repositories),
+        repositories: mapRepositories(repositories, integration.id, instanceUrl, owner),
         syncedAt: new Date().toISOString(),
         instanceUrl,
       };
     }
-
-    // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
+      repositories: mapRepositories(cachedRepositories, integration.id, instanceUrl, owner),
       syncedAt: integration.repositories_synced_at,
       instanceUrl,
     };
-  } catch (_error) {
+  } catch {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to fetch GitLab repositories',
@@ -160,77 +159,39 @@ export async function fetchGitLabRepositoriesForOrganization(
   }
 }
 
-/**
- * Fetch GitLab repositories for a user
- * Returns cached repositories by default, fetches fresh from GitLab when forceRefresh is true
- */
-export async function fetchGitLabRepositoriesForUser(
-  userId: string,
-  forceRefresh: boolean = false
+export function fetchGitLabRepositoriesForOrganization(
+  organizationId: string,
+  actorUserId: string,
+  forceRefresh: boolean = false,
+  integrationId?: string
 ): Promise<GitLabRepositoriesResult> {
-  const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITLAB);
-
-  if (!integration) {
-    return missingIntegrationResponse('No GitLab integration found for this user');
-  }
-
-  if (isPlatformIntegrationSuspended(integration)) {
-    return missingIntegrationResponse('GitLab integration is suspended');
-  }
-
-  const metadata = integration.metadata as GitLabMetadata | null;
-  const instanceUrl = metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
-
-  try {
-    const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    // If forceRefresh or no cached repos, fetch from GitLab and update cache
-    if (forceRefresh || !cachedRepositories?.length) {
-      const accessToken = await getValidGitLabToken(integration, { userId });
-      const repositories = await fetchGitLabProjects(accessToken, instanceUrl);
-      await updateRepositoriesForIntegration(integration.id, repositories);
-      return {
-        integrationInstalled: true,
-        repositories: mapRepositories(repositories),
-        syncedAt: new Date().toISOString(),
-        instanceUrl,
-      };
-    }
-
-    // Return cached repos
-    return {
-      integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
-      syncedAt: integration.repositories_synced_at,
-      instanceUrl,
-    };
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to fetch GitLab repositories',
-    });
-  }
+  return fetchRepositories(
+    { type: 'org', id: organizationId },
+    actorUserId,
+    forceRefresh,
+    integrationId
+  );
 }
 
-/**
- * Validate that a user has access to a specific GitLab project
- * @param userId - The user ID
- * @param projectPath - GitLab project path (e.g., "group/project" or "group/subgroup/project")
- */
+export function fetchGitLabRepositoriesForUser(
+  userId: string,
+  forceRefresh: boolean = false,
+  integrationId?: string
+): Promise<GitLabRepositoriesResult> {
+  return fetchRepositories({ type: 'user', id: userId }, userId, forceRefresh, integrationId);
+}
+
 export async function validateGitLabRepoAccessForUser(
   userId: string,
   projectPath: string
 ): Promise<boolean> {
   try {
     const result = await fetchGitLabRepositoriesForUser(userId, false);
-
-    if (!result.integrationInstalled || !result.repositories.length) {
-      return false;
-    }
-
-    return result.repositories.some(
-      repo => repo.fullName.toLowerCase() === projectPath.toLowerCase()
+    return (
+      result.integrationInstalled &&
+      result.repositories.some(repo => repo.fullName.toLowerCase() === projectPath.toLowerCase())
     );
-  } catch (_error) {
+  } catch {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to validate GitLab repository access',
@@ -238,11 +199,6 @@ export async function validateGitLabRepoAccessForUser(
   }
 }
 
-/**
- * Validate that an organization has access to a specific GitLab project
- * @param organizationId - The organization ID
- * @param projectPath - GitLab project path (e.g., "group/project" or "group/subgroup/project")
- */
 export async function validateGitLabRepoAccessForOrganization(
   organizationId: string,
   actorUserId: string,
@@ -250,15 +206,11 @@ export async function validateGitLabRepoAccessForOrganization(
 ): Promise<boolean> {
   try {
     const result = await fetchGitLabRepositoriesForOrganization(organizationId, actorUserId, false);
-
-    if (!result.integrationInstalled || !result.repositories.length) {
-      return false;
-    }
-
-    return result.repositories.some(
-      repo => repo.fullName.toLowerCase() === projectPath.toLowerCase()
+    return (
+      result.integrationInstalled &&
+      result.repositories.some(repo => repo.fullName.toLowerCase() === projectPath.toLowerCase())
     );
-  } catch (_error) {
+  } catch {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to validate GitLab repository access',
@@ -266,51 +218,81 @@ export async function validateGitLabRepoAccessForOrganization(
   }
 }
 
-/**
- * Build a GitLab clone URL from a project path
- * @param projectPath - GitLab project path (e.g., "group/project" or "group/subgroup/project")
- * @param instanceUrl - GitLab instance URL (defaults to https://gitlab.com)
- * @returns HTTPS clone URL for the project
- */
 export function buildGitLabCloneUrl(
   projectPath: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): string {
-  // Ensure instanceUrl doesn't have a trailing slash
   const baseUrl = instanceUrl.replace(/\/$/, '');
-  // Ensure projectPath doesn't have leading/trailing slashes
   const cleanPath = projectPath.replace(/^\/|\/$/g, '');
   return `${baseUrl}/${cleanPath}.git`;
 }
 
-/**
- * Get the GitLab instance URL for a user's integration
- * @param userId - The user ID
- * @returns The GitLab instance URL or default gitlab.com
- */
-export async function getGitLabInstanceUrlForUser(userId: string): Promise<string> {
-  const integration = await getGitLabIntegration({ type: 'user', id: userId });
-
-  if (!integration) {
-    return DEFAULT_GITLAB_URL;
+async function getInstanceUrl(owner: Owner, integrationId?: string, expectedInstanceUrl?: string) {
+  const integration = await getGitLabIntegration(owner, integrationId);
+  if (!integration && (integrationId || expectedInstanceUrl)) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'GitLab integration not found' });
   }
-
-  const metadata = integration.metadata as GitLabMetadata | null;
-  return metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
+  // Old unpinned callers retain downstream authorization errors. Remove this
+  // fallback only after old clients/records and the 30-day ledger window expire.
+  if (
+    (integrationId || expectedInstanceUrl) &&
+    integration &&
+    isPlatformIntegrationSuspended(integration)
+  ) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'GitLab integration is suspended',
+    });
+  }
+  const metadata = integration?.metadata as GitLabMetadata | null;
+  // Old callers omit selectors and old metadata omits the host. The unambiguous
+  // lookup retains gitlab.com until old clients/records and the 30-day window expire.
+  const instanceUrl = normalizeGitLabInstanceUrl(metadata?.gitlab_instance_url);
+  if (expectedInstanceUrl && normalizeGitLabInstanceUrl(expectedInstanceUrl) !== instanceUrl) {
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'GitLab integration changed' });
+  }
+  return instanceUrl;
 }
 
-/**
- * Get the GitLab instance URL for an organization's integration
- * @param organizationId - The organization ID
- * @returns The GitLab instance URL or default gitlab.com
- */
-export async function getGitLabInstanceUrlForOrganization(organizationId: string): Promise<string> {
-  const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
+export function getGitLabInstanceUrlForUser(
+  userId: string,
+  integrationId?: string,
+  expectedInstanceUrl?: string
+): Promise<string> {
+  return getInstanceUrl({ type: 'user', id: userId }, integrationId, expectedInstanceUrl);
+}
 
-  if (!integration) {
-    return DEFAULT_GITLAB_URL;
+export function getGitLabInstanceUrlForOrganization(
+  organizationId: string,
+  integrationId?: string,
+  expectedInstanceUrl?: string
+): Promise<string> {
+  return getInstanceUrl({ type: 'org', id: organizationId }, integrationId, expectedInstanceUrl);
+}
+
+export async function listGitLabRepositoryBranches(
+  owner: Owner,
+  actorUserId: string,
+  reference: LaunchRepositoryReference
+) {
+  const { repository, authorization } = reference;
+  if (
+    repository.provider !== 'gitlab' ||
+    authorization.owner.type !== owner.type ||
+    authorization.owner.id !== owner.id
+  ) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Repository owner does not match' });
   }
-
-  const metadata = integration.metadata as GitLabMetadata | null;
-  return metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
+  const { branches } = await listGitLabBranches(
+    owner,
+    authorization.integrationId,
+    { userId: actorUserId, ...(owner.type === 'org' ? { organizationId: owner.id } : {}) },
+    repository.fullName,
+    repository
+  );
+  return {
+    branches,
+    defaultBranch: branches.find(branch => branch.isDefault)?.name ?? null,
+    nextCursor: null,
+  };
 }

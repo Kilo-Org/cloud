@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import { exchangeWebFlowCode } from '@octokit/oauth-methods';
+import { TRPCError } from '@trpc/server';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 import crypto from 'crypto';
@@ -123,6 +124,7 @@ type GitHubRepository = {
   full_name: string;
   private: boolean;
   created_at: string;
+  default_branch?: string;
 };
 
 type GitHubBranch = {
@@ -162,6 +164,7 @@ export async function fetchGitHubRepositories(
           full_name: repo.full_name,
           private: repo.private,
           created_at: repo.created_at ?? new Date().toISOString(),
+          default_branch: repo.default_branch ?? undefined,
         }))
     );
 
@@ -179,18 +182,24 @@ export async function fetchGitHubRepositories(
 export async function fetchGitHubBranches(
   installationId: string,
   repositoryFullName: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  expectedRepositoryId?: string
 ): Promise<GitHubBranch[]> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
 
   const [owner, repo] = repositoryFullName.split('/');
 
-  // Fetch the repository to get the default branch
+  // Fetch the repository to get the default branch and validate its live identity.
   const { data: repoData } = await octokit.repos.get({
     owner,
     repo,
   });
+  // Old callers supply only a repository name. Keep that form until old clients
+  // and records disappear and the 30-day ledger window expires.
+  if (expectedRepositoryId !== undefined && String(repoData.id) !== expectedRepositoryId) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'GitHub repository not found' });
+  }
   const defaultBranch = repoData.default_branch;
 
   // Fetch all branches using pagination

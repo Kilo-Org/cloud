@@ -216,6 +216,229 @@ it('deduplicates by issue ID without losing categories, direction, full titles, 
   ]);
 });
 
+describe.each([
+  ['ConnectedEvent', 'DisconnectedEvent'],
+  ['MarkedAsDuplicateEvent', 'UnmarkedAsDuplicateEvent'],
+])('%s removal', (added, removed) => {
+  it.each([false, true])('replays complete history with reversed endpoints=%s', async reversed => {
+    const source = reversed ? issue() : prEndpoint;
+    const target = reversed ? prEndpoint : issue();
+    const result = await run(field =>
+      page(
+        field,
+        field === 'timelineItems'
+          ? [event(added, 1, source, target), event(removed, 2, source, target)]
+          : []
+      )
+    );
+    expect(result.issues).toMatchObject({
+      items: [],
+      knownCount: 0,
+      totalCount: 0,
+      completeness: 'complete',
+      source: { availability: 'available' },
+    });
+  });
+  it('removes only the matching category and directed endpoint key', async () => {
+    const result = await run(field =>
+      page(
+        field,
+        field === 'closingIssuesReferences'
+          ? [issue()]
+          : [
+              event(added),
+              event(added, 2, issue(), prEndpoint),
+              event(removed, 3),
+              event('CrossReferencedEvent', 4),
+            ]
+      )
+    );
+    expect(result.issues.items[0]?.relationships).toMatchObject([
+      { category: 'closing', membership: 'current' },
+      { evidenceId: 'E2', sourceId: 'I', targetId: 'PR', membership: 'current' },
+      { category: 'referenced', membership: 'historical' },
+    ]);
+  });
+});
+
+it.each([
+  [issue(), issue('OTHER')],
+  [{ ...prEndpoint, id: 'OTHER_PR' }, issue()],
+  [prEndpoint, { ...prEndpoint, id: 'OTHER_PR' }],
+])('ignores endpoints that do not join this PR to an issue: %p', async (source, target) => {
+  const result = await run(field =>
+    page(field, field === 'timelineItems' ? [event('ConnectedEvent', 1, source, target)] : [])
+  );
+  expect(result.issues).toMatchObject({ items: [], completeness: 'complete' });
+});
+
+it('paginates both sources past 100 entries with independent cursors', async () => {
+  const result = await run((field, after) => {
+    if (after !== null && after !== field) throw new Error('Wrong cursor');
+    return page(
+      field,
+      Array.from({ length: after ? 1 : 100 }, (_, i) => {
+        const index = i + (after ? 101 : 1);
+        const endpoint = issue(`${field}-${index}`);
+        return field === 'closingIssuesReferences'
+          ? endpoint
+          : event('ConnectedEvent', index, prEndpoint, endpoint);
+      }),
+      101,
+      after ? null : field
+    );
+  });
+  expect(result.issues).toMatchObject({
+    completeness: 'complete',
+    knownCount: 202,
+    totalCount: 202,
+    hasNextPage: false,
+    source: { availability: 'available' },
+  });
+  expect(result.issues.items).toHaveLength(202);
+  expect(result.issues.items.every(item => item.relationships[0]?.membership === 'current')).toBe(
+    true
+  );
+});
+
+it.each([403, 503])(
+  'retains additions and removals as historical after a failed page: %s',
+  async status => {
+    const result = await run((field, after) => {
+      if (field === 'closingIssuesReferences') return page(field, [issue()]);
+      if (after) throw { status };
+      return page(field, [event('ConnectedEvent'), event('DisconnectedEvent', 2)], 3, 'next');
+    });
+    expect(result.issues).toMatchObject({
+      completeness: 'partial',
+      totalCount: null,
+      hasNextPage: true,
+      source: { availability: 'partial', retryable: status === 503 },
+    });
+    expect(result.issues.items[0]?.relationships).toMatchObject([
+      { category: 'closing', membership: 'current' },
+      { evidenceId: 'E1', membership: 'historical' },
+      { evidenceId: 'E2', membership: 'historical' },
+    ]);
+    expect(result.labels.completeness).toBe('complete');
+  }
+);
+
+it.each([
+  ['null source', event('DisconnectedEvent', 2, null), false],
+  ['deleted issue', event('UnmarkedAsDuplicateEvent', 2, prEndpoint, null), false],
+  ['null node', null, true],
+  [
+    'malformed issue',
+    event('DisconnectedEvent', 2, prEndpoint, { ...issue(), number: null }),
+    true,
+  ],
+  ['invalid time', { ...event('DisconnectedEvent', 2), createdAt: 'invalid' }, true],
+  [
+    'unordered events',
+    { ...event('DisconnectedEvent', 2), createdAt: '2026-08-28T00:00:00Z' },
+    true,
+  ],
+])('does not replay incomplete history: %s', async (_name, broken, retryable) => {
+  const result = await run(field =>
+    page(field, field === 'timelineItems' ? [event('ConnectedEvent'), broken] : [])
+  );
+  expect(result.issues).toMatchObject({
+    completeness: 'partial',
+    source: { availability: 'partial', retryable },
+  });
+  expect(result.issues.items[0]?.relationships[0]).toMatchObject({
+    evidenceId: 'E1',
+    membership: 'historical',
+  });
+});
+
+it.each(['repeat', 'null-page', 'count-change'])(
+  'keeps incomplete pagination historical: %s',
+  async fault => {
+    const result = await run((field, after) => {
+      if (field === 'closingIssuesReferences') return page(field, []);
+      if (!after) return page(field, [event('ConnectedEvent')], 2, 'next');
+      if (fault === 'null-page')
+        return { data: { data: { repository: { pullRequest: { timelineItems: null } } } } };
+      return page(
+        field,
+        [event('DisconnectedEvent', 2)],
+        fault === 'count-change' ? 3 : 2,
+        fault === 'repeat' ? 'next' : null
+      );
+    });
+    expect(result.issues).toMatchObject({ completeness: 'partial', source: { retryable: true } });
+    expect(
+      result.issues.items[0]?.relationships.every(link => link.membership === 'historical')
+    ).toBe(true);
+  }
+);
+
+it.each(fields)('preserves the successful sibling when %s is denied', async denied => {
+  const result = await run(field => {
+    if (field === denied)
+      return page(field, [], 0, null, [
+        { type: 'FORBIDDEN', path: ['repository', 'pullRequest', field] },
+      ]);
+    return page(field, field === 'timelineItems' ? [event('ConnectedEvent')] : [issue()]);
+  });
+  expect(result.issues).toMatchObject({
+    knownCount: 1,
+    completeness: 'partial',
+    source: { availability: 'partial', retryable: false, reason: 'graphql-denied' },
+  });
+  expect(result.issues.items[0]?.relationships).toMatchObject([{ membership: 'current' }]);
+});
+
+it.each([
+  ['FORBIDDEN', false, 'graphql-denied'],
+  ['INTERNAL', true, 'graphql-incomplete'],
+])(
+  'preserves the retry policy for an event timestamp error: %s',
+  async (type, retryable, reason) => {
+    const result = await run(field => {
+      if (field !== 'timelineItems') return page(field, []);
+      return page(field, [{ ...event('ConnectedEvent'), createdAt: null }], 1, null, [
+        { type, path: ['repository', 'pullRequest', field, 'nodes', 0, 'createdAt'] },
+      ]);
+    });
+    expect(result.issues).toMatchObject({ completeness: 'partial', source: { retryable, reason } });
+    expect(result.issues.items[0]?.relationships).toMatchObject([
+      { evidenceId: 'E1', membership: 'historical' },
+    ]);
+  }
+);
+
+it.each([403, 503])('does not turn a failed source into supported emptiness: %s', async status => {
+  const result = await run(() => {
+    throw { status };
+  });
+  expect(result.issues).toMatchObject({
+    items: [],
+    completeness: 'unknown',
+    totalCount: null,
+    source: { availability: status === 403 ? 'denied' : 'unavailable', retryable: status === 503 },
+  });
+});
+
+it('retains known event evidence when the shared deadline aborts a later page', async () => {
+  const pending = run((field, after) =>
+    field === 'closingIssuesReferences'
+      ? page(field, [])
+      : after
+        ? new Promise(() => undefined)
+        : page(field, [event('ConnectedEvent')], 2, 'next')
+  );
+  await jest.advanceTimersByTimeAsync(10_000);
+  const result = await pending;
+  expect(result.issues).toMatchObject({
+    completeness: 'partial',
+    source: { retryable: true, reason: 'deadline' },
+  });
+  expect(result.issues.items[0]?.relationships).toMatchObject([{ membership: 'historical' }]);
+});
+
 it('reports complete supported emptiness without parsing body references or claiming universal coverage', async () => {
   const result = await run(field => page(field, []));
   expect(result).toMatchObject({
@@ -234,3 +457,20 @@ it('reports complete supported emptiness without parsing body references or clai
     },
   });
 });
+
+it.each([null, 'https://github.com/o/r/issues/7'])(
+  'retains issue identity and the available link across relationships: %s',
+  async url => {
+    const result = await run(field =>
+      page(
+        field,
+        field === 'closingIssuesReferences'
+          ? [{ ...issue(), url: null }]
+          : [event('ConnectedEvent', 1, prEndpoint, { ...issue(), url })]
+      )
+    );
+    expect(result.issues.items).toMatchObject([
+      { id: 'I', title, repository: 'o/r', number: 7, url },
+    ]);
+  }
+);

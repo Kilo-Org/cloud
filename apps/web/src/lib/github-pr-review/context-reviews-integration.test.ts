@@ -334,3 +334,218 @@ describe.each(fields)('%s final-null cross-connection evidence', nullField => {
     });
   });
 });
+
+describe.each(fields)('%s sibling state errors', failedField => {
+  describe.each(fields)('%s completes last', slowField => {
+    it.each([
+      {
+        state: 'CHANGES_REQUESTED',
+        error: 'FORBIDDEN',
+        reason: 'review-inconsistent',
+        retryable: true,
+      },
+      {
+        state: 'CHANGES_REQUESTED',
+        error: 'INTERNAL',
+        reason: 'review-inconsistent',
+        retryable: true,
+      },
+      { state: 'APPROVED', error: 'FORBIDDEN', reason: 'graphql-denied', retryable: false },
+      { state: 'APPROVED', error: 'INTERNAL', reason: 'graphql-incomplete', retryable: true },
+    ])(
+      'keeps $state evidence separate from $error',
+      async ({ state, error, reason, retryable }) => {
+        const pending = run(async (field, after) => {
+          if (field === slowField) await new Promise(resolve => setTimeout(resolve, 1));
+          return page(
+            field,
+            [
+              review(field === 'latestReviews' ? state : 'APPROVED'),
+              review('APPROVED', 'failed', { author: person('failed') }),
+              review('APPROVED', 'stable', { author: person('stable') }),
+            ],
+            3,
+            field === failedField && !after ? 'last' : null,
+            field === failedField
+              ? [{ type: error, path: ['repository', 'pullRequest', field, 'nodes', 1, 'state'] }]
+              : undefined
+          );
+        });
+        await jest.advanceTimersByTimeAsync(10);
+        const result = await pending;
+        expect(result.reviewDecisions).toMatchObject({
+          items: [
+            { id: 'decision', state: state === 'APPROVED' ? 'APPROVED' : 'UNKNOWN' },
+            { id: 'failed', state: 'UNKNOWN' },
+            { id: 'stable', state: 'APPROVED', submittedAt, commitSha: 'reviewed-commit' },
+          ],
+          knownCount: 3,
+          totalCount: null,
+          completeness: 'partial',
+          source: {
+            availability: 'partial',
+            reason,
+            retryable,
+            provenance: ['graphql.latestOpinionatedReviews', 'graphql.latestReviews'],
+          },
+        });
+        expect(result.reviewActivity.items).toMatchObject([
+          { id: 'decision', state, submittedAt, commitSha: 'reviewed-commit' },
+          { id: 'failed', state: failedField === 'latestReviews' ? 'UNKNOWN' : 'APPROVED' },
+          { id: 'stable', state: 'APPROVED' },
+        ]);
+        expect(result.reviewActivity.source).toMatchObject({
+          availability: failedField === 'latestReviews' ? 'partial' : 'available',
+          reason:
+            failedField !== 'latestReviews'
+              ? null
+              : error === 'FORBIDDEN'
+                ? 'graphql-denied'
+                : 'graphql-incomplete',
+          retryable: failedField === 'latestReviews' && error === 'INTERNAL',
+        });
+      }
+    );
+  });
+});
+
+describe.each(fields)('%s retained conflicts beside denial', changingField => {
+  describe.each(fields)('%s completes last', slowField => {
+    it.each([
+      { name: 'state across pages', acrossPages: true, changed: { state: 'CHANGES_REQUESTED' } },
+      { name: 'timestamp across pages', acrossPages: true, changed: { submittedAt: later } },
+      {
+        name: 'commit across pages',
+        acrossPages: true,
+        changed: { commit: { oid: 'other-commit' } },
+      },
+      {
+        name: 'timestamp and commit across pages',
+        acrossPages: true,
+        changed: { submittedAt: later, commit: { oid: 'other-commit' } },
+      },
+      { name: 'timestamp across connections', acrossPages: false, changed: { submittedAt: later } },
+      {
+        name: 'commit across connections',
+        acrossPages: false,
+        changed: { commit: { oid: 'other-commit' } },
+      },
+      {
+        name: 'timestamp and commit across connections',
+        acrossPages: false,
+        changed: { submittedAt: later, commit: { oid: 'other-commit' } },
+      },
+    ])('retains $name after final null observations', async ({ acrossPages, changed }) => {
+      const pending = run(async (field, after) => {
+        if (field === slowField) await new Promise(resolve => setTimeout(resolve, 1));
+        const patch =
+          after === 'last' || (acrossPages && field !== changingField)
+            ? { submittedAt: null, commit: null }
+            : acrossPages
+              ? after
+                ? changed
+                : {}
+              : field === changingField
+                ? {}
+                : changed;
+        return page(
+          field,
+          [
+            review('APPROVED', 'decision', patch),
+            review('APPROVED', 'failed', { author: person('failed') }),
+            review('APPROVED', 'stable', { author: person('stable') }),
+          ],
+          3,
+          after === 'last' || (acrossPages && field !== changingField)
+            ? null
+            : acrossPages && !after
+              ? 'middle'
+              : 'last',
+          field === changingField
+            ? [
+                {
+                  type: 'FORBIDDEN',
+                  path: ['repository', 'pullRequest', field, 'nodes', 1, 'state'],
+                },
+              ]
+            : undefined
+        );
+      });
+      await jest.advanceTimersByTimeAsync(10);
+      const result = await pending;
+      expect(result.reviewDecisions).toMatchObject({
+        items: [
+          { id: 'decision', state: 'UNKNOWN', submittedAt: null, commitSha: null },
+          { id: 'failed', state: 'UNKNOWN' },
+          { id: 'stable', state: 'APPROVED', submittedAt, commitSha: 'reviewed-commit' },
+        ],
+        knownCount: 3,
+        totalCount: null,
+        completeness: 'partial',
+        source: {
+          availability: 'partial',
+          reason: 'review-inconsistent',
+          retryable: true,
+          provenance: ['graphql.latestOpinionatedReviews', 'graphql.latestReviews'],
+        },
+      });
+      expect(result.reviewActivity.items).toMatchObject([
+        {
+          id: 'decision',
+          state: acrossPages && changingField === 'latestReviews' ? 'UNKNOWN' : 'APPROVED',
+          submittedAt: null,
+          commitSha: null,
+        },
+        { id: 'failed', state: changingField === 'latestReviews' ? 'UNKNOWN' : 'APPROVED' },
+        { id: 'stable', state: 'APPROVED' },
+      ]);
+    });
+
+    it('retains known state through an unavailable page', async () => {
+      const pending = run(async (field, after) => {
+        if (field === slowField) await new Promise(resolve => setTimeout(resolve, 1));
+        const missingState = field === changingField && after === 'missing';
+        const final = field !== changingField || after === 'last';
+        return page(
+          field,
+          [
+            review(final ? 'CHANGES_REQUESTED' : 'APPROVED', 'decision', {
+              ...(missingState ? { state: null } : {}),
+              ...(after || final ? { submittedAt: null, commit: null } : {}),
+            }),
+            review('APPROVED', 'failed', { author: person('failed') }),
+          ],
+          2,
+          final ? null : after ? 'last' : 'missing',
+          field === changingField
+            ? [
+                {
+                  type: 'FORBIDDEN',
+                  path: ['repository', 'pullRequest', field, 'nodes', 1, 'state'],
+                },
+                ...(missingState
+                  ? [
+                      {
+                        type: 'FORBIDDEN',
+                        path: ['repository', 'pullRequest', field, 'nodes', 0, 'state'],
+                      },
+                    ]
+                  : []),
+              ]
+            : undefined
+        );
+      });
+      await jest.advanceTimersByTimeAsync(10);
+      const result = await pending;
+      expect(result.reviewDecisions).toMatchObject({
+        items: [
+          { id: 'decision', state: 'UNKNOWN', submittedAt: null, commitSha: null },
+          { id: 'failed', state: 'UNKNOWN' },
+        ],
+        totalCount: null,
+        completeness: 'partial',
+        source: { availability: 'partial', reason: 'review-inconsistent', retryable: true },
+      });
+    });
+  });
+});

@@ -22,7 +22,7 @@ import {
 import {
   PR_CONTEXT_REVIEW_QUERIES,
   contextReviewSchema,
-  contextReviewsAgree,
+  contextReviewEvidenceConflicts,
   resolveContextReviewDecisions,
 } from './context-reviews';
 
@@ -376,11 +376,13 @@ export async function readPullRequestContext(
     latestOpinionatedReviews: new Map<string, z.output<typeof contextReviewSchema>>(),
     latestReviews: new Map<string, z.output<typeof contextReviewSchema>>(),
   };
+  const conflictingReviewIds = new Set<string>();
   const collectReviews = (
     field: keyof typeof PR_CONTEXT_REVIEW_QUERIES,
     fallback: GitHubPrReviewContext['reviewDecisions']
   ) => {
     const evidence = reviewEvidence[field];
+    const pageConflicts = new Set<string>();
     return collect(
       field,
       contextReviewSchema,
@@ -410,12 +412,7 @@ export async function readPullRequestContext(
         const current: z.output<typeof contextReviewSchema> = {
           ...review,
           submittedAt,
-          // A failed field or conflicting page cannot establish a current decision.
-          state:
-            state.source.availability !== 'available' ||
-            (previous && !contextReviewsAgree(previous, { ...review, submittedAt }))
-              ? 'UNKNOWN'
-              : review.state,
+          state: state.source.availability === 'available' ? review.state : 'UNKNOWN',
           onBehalfOf: {
             ...review.onBehalfOf,
             completeness: available
@@ -430,12 +427,18 @@ export async function readPullRequestContext(
             },
           },
         };
-        // Null observations cannot erase comparison evidence or supply public field values.
+        if (previous && contextReviewEvidenceConflicts(previous, current)) {
+          pageConflicts.add(review.id);
+          conflictingReviewIds.add(review.id);
+        }
+        // Missing observations cannot erase comparison evidence or supply public field values.
         evidence.set(review.id, {
           ...current,
+          state: current.state === 'UNKNOWN' ? (previous?.state ?? 'UNKNOWN') : current.state,
           submittedAt: current.submittedAt ?? previous?.submittedAt ?? null,
           commitSha: current.commitSha ?? previous?.commitSha ?? null,
         });
+        if (pageConflicts.has(review.id)) current.state = 'UNKNOWN';
         return current;
       }
     );
@@ -477,13 +480,15 @@ export async function readPullRequestContext(
   for (const review of context.reviewDecisions.items) {
     const opinionated = reviewEvidence.latestOpinionatedReviews.get(review.id);
     const activity = reviewEvidence.latestReviews.get(review.id);
-    if (opinionated && activity && !contextReviewsAgree(opinionated, activity)) {
+    if (opinionated && activity && contextReviewEvidenceConflicts(opinionated, activity)) {
+      conflictingReviewIds.add(review.id);
       review.state = 'UNKNOWN';
     }
   }
   context.reviewDecisions = resolveContextReviewDecisions(
     context.reviewDecisions,
-    context.reviewActivity
+    context.reviewActivity,
+    conflictingReviewIds
   );
   const final = decodeContextGraphQlSource(
     await read('graphql.revision', async (signal): Promise<unknown> => {

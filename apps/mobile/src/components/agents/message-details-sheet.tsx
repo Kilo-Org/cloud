@@ -1,7 +1,7 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,6 +9,8 @@ import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useTRPC } from '@/lib/trpc';
 import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { formatExactTokens } from './context-usage-display';
@@ -29,6 +31,10 @@ type MessageDetailsSheetProps = {
   message: StoredMessage | null;
   modelOptions: SessionModelOption[];
   onClose: () => void;
+  canCancelQueued?: boolean;
+  isCancelingQueued?: boolean;
+  onCancelQueued?: (message: StoredMessage) => void | Promise<void>;
+  cancelQueuedFeedback?: { message: string; attempt: number } | null;
 };
 
 export function MessageDetailsSheet({
@@ -36,8 +42,13 @@ export function MessageDetailsSheet({
   message,
   modelOptions,
   onClose,
+  canCancelQueued = false,
+  isCancelingQueued = false,
+  onCancelQueued,
+  cancelQueuedFeedback,
 }: Readonly<MessageDetailsSheetProps>) {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const trpc = useTRPC();
   const { t } = useTranslation();
   const [reportedMessageId, setReportedMessageId] = useState<string | null>(null);
@@ -116,6 +127,12 @@ export function MessageDetailsSheet({
           : onClose
       }
     >
+      <AccessibleStatus
+        key={cancelQueuedFeedback?.attempt}
+        message={visible ? (cancelQueuedFeedback?.message ?? null) : null}
+        tone="error"
+        className="px-6 pt-4 text-sm"
+      />
       {selectVisible ? (
         <MessageTextSelectSheet
           text={content?.copyableText ?? ''}
@@ -163,6 +180,32 @@ export function MessageDetailsSheet({
                     </Pressable>
                   ) : null}
                 </View>
+              ) : null}
+
+              {visible && message && onCancelQueued && (canCancelQueued || isCancelingQueued) ? (
+                <Pressable
+                  onPress={() => {
+                    if (canCancelQueued && !isCancelingQueued) {
+                      void onCancelQueued(message);
+                    }
+                  }}
+                  disabled={!canCancelQueued || isCancelingQueued}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('agentChat.messageBubble.cancelQueuedAccessibility')}
+                  accessibilityState={{
+                    disabled: !canCancelQueued || isCancelingQueued,
+                    busy: isCancelingQueued,
+                  }}
+                  className="mb-6 min-h-12 flex-row items-center justify-center gap-2 rounded-md border border-border px-4 py-3 active:opacity-70 disabled:opacity-50"
+                  testID="message-details-cancel-queued"
+                >
+                  {isCancelingQueued ? (
+                    <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  ) : null}
+                  <Text className="text-center text-base font-medium text-foreground">
+                    {t('agentChat.messageBubble.cancelQueued')}
+                  </Text>
+                </Pressable>
               ) : null}
 
               {showReport ? (

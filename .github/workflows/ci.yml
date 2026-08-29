@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, 'mobile-pr-review-context-5458-s*']
 
 # Cancel in-progress runs when a new commit is pushed to the same PR
 concurrency:
@@ -45,6 +45,9 @@ jobs:
       - name: Test dependency change detection
         run: node --test scripts/changed-dependencies.test.mjs
 
+      - name: Test stack CI configuration
+        run: node --test scripts/stack-ci-config.test.mjs
+
       - name: Detect changes
         id: filter
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
@@ -72,6 +75,13 @@ jobs:
               - 'pnpm-lock.yaml'
             cloud_agent_next:
               - 'services/cloud-agent-next/**'
+            pr_review_fixtures:
+              - 'dev/local/scripts/pr-review-provider-*.ts'
+
+      - name: Test PR review provider fixtures
+        if: steps.filter.outputs.pr_review_fixtures == 'true'
+        run: pnpm exec tsx --test dev/local/scripts/pr-review-provider-*.test.ts
+
       - name: Detect changed workspaces with tests
         id: workspaces
         run: |

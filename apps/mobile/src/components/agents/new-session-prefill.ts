@@ -1,3 +1,4 @@
+import { type ResolvedNewSessionRepository } from '@/components/agents/new-session-repository-state';
 import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
@@ -38,8 +39,8 @@ function isGitHubUrl(gitUrl: string): boolean {
 
 /**
  * Build query-param prefill values from a session's displayed targets.
- * Each field is included only when non-empty; repo is included only when
- * it reduces to exactly two non-empty `/` segments.
+ * GitHub keeps its legacy owner/repo prefill. Other providers retain the full
+ * clone URL for exact instance/path resolution against authorized discovery.
  */
 export function buildContinuePrefillParams(input: {
   gitUrl: string | null | undefined;
@@ -51,8 +52,13 @@ export function buildContinuePrefillParams(input: {
 
   if (input.gitUrl) {
     const project = formatGitUrlProject(input.gitUrl);
-    if (isGitHubUrl(input.gitUrl) && isValidOwnerRepo(project)) {
-      params.repo = project;
+    if (isGitHubUrl(input.gitUrl)) {
+      if (isValidOwnerRepo(project)) {
+        params.repo = project;
+      }
+    } else {
+      // Preserve the full instance/subpath until authorized discovery resolves it.
+      params.repo = input.gitUrl;
     }
   }
   if (input.mode) {
@@ -222,35 +228,22 @@ export function resolvePrefillRepo(
   return match?.fullName ?? null;
 }
 
-/**
- * Resolve a prefill repository to a platform-qualified picker key
- * `platform:fullName`. Continuation prefill is GitHub-only (see
- * `buildContinuePrefillParams` + `isGitHubUrl`), so only a GitHub row may
- * satisfy it: a same-named GitLab/Bitbucket row must never be selected.
- * Kept separate from `resolvePrefillRepo`, which returns the bare matched
- * `fullName` and is used where a bare fullName is needed.
- */
+/** Resolve an exact authorized key, never uniqueness inferred from partial browsing. */
 export function resolvePrefillRepoSelection(
-  repositories: { platform: string; fullName: string }[],
+  repositories: readonly ResolvedNewSessionRepository[],
   prefill: NewSessionPrefill
 ): string | null {
-  if (!prefill.repo) {
-    return null;
-  }
-
-  const lower = prefill.repo.toLowerCase();
-  const match = repositories.find(
-    repository => repository.platform === 'github' && repository.fullName.toLowerCase() === lower
-  );
-  return match ? `github:${match.fullName}` : null;
+  // Old name/clone-URL prefills omit integration identity. Browsing can omit other
+  // authorized integrations, so these require explicit selection, even with one match.
+  // Remove only after old clients/records disappear and the 30-day ledger window expires.
+  return repositories.find(repository => repository.key === prefill.repo)?.key ?? null;
 }
 
 /**
  * Describe what could not be carried over, if anything.
  *
- * `settled` means "the list finished loading, without error, and is
- * **non-empty**". An account with no GitHub integration leaves
- * `repos.settled === false` forever (empty list ≠ settled).
+ * An unmatched repository can settle only with complete authorized evidence.
+ * A known exact match can settle while other providers still load.
  *
  * Per-field gating: a field that was **not** requested never blocks
  * and never contributes, whatever its `settled` value is.
@@ -265,15 +258,12 @@ export function describePrefillFallback(input: {
   const repoRequested = Boolean(prefill.repo);
   const modelRequested = Boolean(prefill.model);
 
-  // Wait only on the fields that were actually requested.
-  if (repoRequested && !repos.settled) {
-    return null;
-  }
   if (modelRequested && !models.settled) {
     return null;
   }
 
-  const repoDropped = repoRequested && !repos.matched;
+  // Unresolved repository identity cannot block an independently confirmed model fallback.
+  const repoDropped = repoRequested && repos.settled && !repos.matched;
   const modelDropped = modelRequested && !models.matched;
 
   if (repoDropped && modelDropped) {

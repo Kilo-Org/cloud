@@ -2,6 +2,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { type LaunchRepositoryReference } from '@kilocode/app-shared/code-review/repository-identity';
+import { normalizeSessionRepository } from './new-session-repository-state';
 
 import {
   appendNewSessionPrefill,
@@ -42,10 +44,6 @@ describe('buildContinuePrefillParams', () => {
   it.each([
     { gitUrl: null as string | null, desc: 'null' },
     { gitUrl: 'https://github.com/group/sub/repo', desc: 'too many segments' },
-    { gitUrl: 'https://gitlab.com/owner/repo.git', desc: 'non-GitHub HTTPS' },
-    { gitUrl: 'git@gitlab.com:owner/repo.git', desc: 'non-GitHub scp-style' },
-    { gitUrl: 'https://git.example.com/owner/repo.git', desc: 'self-hosted HTTPS' },
-    { gitUrl: 'git@git.example.com:owner/repo.git', desc: 'self-hosted scp-style' },
   ])('omits repo when gitUrl is $desc', ({ gitUrl }) => {
     const params = buildContinuePrefillParams({ gitUrl, mode: 'code', model: '', variant: '' });
     expect(params.repo).toBeUndefined();
@@ -259,48 +257,144 @@ describe('resolvePrefillRepo', () => {
 // ════════════════════════════════════════════════════════════════
 
 describe('resolvePrefillRepoSelection', () => {
-  const repos = [
-    { platform: 'gitlab', fullName: 'kilo-org/cloud' },
-    { platform: 'bitbucket', fullName: 'kilo-org/cloud' },
-    { platform: 'github', fullName: 'Kilo-Org/cloud' },
-  ];
-
-  it('selects the GitHub row and never a same-named GitLab/Bitbucket row', () => {
-    const result = resolvePrefillRepoSelection(repos, { mode: 'code', repo: 'kilo-org/cloud' });
-    expect(result).toBe('github:Kilo-Org/cloud');
-  });
-
-  it('returns the GitHub row when only the GitLab row shares the name', () => {
-    const result = resolvePrefillRepoSelection(
-      [
-        { platform: 'gitlab', fullName: 'owner/repo' },
-        { platform: 'github', fullName: 'owner/repo' },
-      ],
-      { mode: 'code', repo: 'owner/repo' }
-    );
-    expect(result).toBe('github:owner/repo');
-  });
-
-  it('returns null when no GitHub row matches, even if a GitLab row does', () => {
-    const result = resolvePrefillRepoSelection([{ platform: 'gitlab', fullName: 'owner/repo' }], {
-      mode: 'code',
-      repo: 'owner/repo',
+  function repositories() {
+    return (['github', 'gitlab', 'bitbucket'] as const).flatMap(provider => {
+      const row = normalizeSessionRepository(
+        {
+          private: true,
+          repositoryReference: {
+            ...reference,
+            repository:
+              provider === 'bitbucket'
+                ? {
+                    provider,
+                    fullName: 'Kilo-Org/cloud',
+                    repositoryId: '7',
+                    instanceUrl: 'https://bitbucket.org',
+                    defaultBranch: 'develop',
+                    workspaceUuid: 'workspace-uuid',
+                  }
+                : {
+                    provider,
+                    fullName: 'Kilo-Org/cloud',
+                    repositoryId: '7',
+                    instanceUrl: `https://${provider}.com`,
+                    defaultBranch: 'develop',
+                  },
+          },
+        },
+        'user-1',
+        'org-1'
+      );
+      return row ? [row] : [];
     });
-    expect(result).toBeNull();
-  });
+  }
 
-  it('matches case-insensitively and returns the canonical GitHub casing', () => {
-    const result = resolvePrefillRepoSelection(repos, { mode: 'code', repo: 'kilo-Org/Cloud' });
-    expect(result).toBe('github:Kilo-Org/cloud');
-  });
+  it.each(['github', 'gitlab', 'bitbucket'] as const)(
+    'selects only the exact %s identity among same-named provider rows',
+    platform => {
+      const rows = repositories();
+      const requested = rows.find(row => row.platform === platform);
+      if (!requested) {
+        throw new Error('Missing provider fixture');
+      }
+      expect(resolvePrefillRepoSelection(rows, { mode: 'code', repo: requested.key })).toBe(
+        requested.key
+      );
+      expect(
+        resolvePrefillRepoSelection(
+          rows.filter(row => row !== requested),
+          { mode: 'code', repo: requested.key }
+        )
+      ).toBeNull();
+    }
+  );
+
+  it.each(['Kilo-Org/cloud', 'kilo-org/CLOUD', 'https://github.com/Kilo-Org/cloud.git'])(
+    'does not infer legacy uniqueness for %s from one visible GitHub integration',
+    repo => {
+      const rows = repositories().filter(row => row.platform === 'github');
+      expect(rows).toHaveLength(1);
+      expect(resolvePrefillRepoSelection(rows, { mode: 'code', repo })).toBeNull();
+    }
+  );
 
   it.each([
     { repo: 'gh/other', desc: 'no match' },
     { repo: undefined, desc: 'absent' },
     { repo: '', desc: 'empty string' },
   ])('returns null when repo is $desc', ({ repo }) => {
-    expect(resolvePrefillRepoSelection(repos, { mode: 'code', repo })).toBeNull();
+    expect(resolvePrefillRepoSelection(repositories(), { mode: 'code', repo })).toBeNull();
   });
+});
+
+const reference: LaunchRepositoryReference = {
+  repository: {
+    provider: 'gitlab',
+    instanceUrl: 'https://git.example.com/base',
+    repositoryId: '7',
+    fullName: 'group/nested/Repo',
+    defaultBranch: 'develop',
+  },
+  authorization: {
+    kind: 'ownerIntegration',
+    owner: { type: 'org', id: 'org-1' },
+    integrationId: 'integration-1',
+  },
+};
+
+it.each([
+  'https://git.example.com/base/group/nested/Repo.git',
+  'git@git.example.com:base/group/nested/Repo.git',
+])('preserves the self-managed URL %s but requires an exact identity for selection', gitUrl => {
+  const params = buildContinuePrefillParams({ gitUrl, mode: 'code', model: '', variant: '' });
+  expect(params.repo).toBe(gitUrl);
+  const row = normalizeSessionRepository(
+    { private: true, repositoryReference: reference },
+    'user-1',
+    'org-1'
+  );
+  if (!row) {
+    throw new Error('Invalid fixture');
+  }
+  const prefill = readNewSessionPrefill({ prefillRepo: params.repo });
+  expect(resolvePrefillRepoSelection([row], prefill)).toBeNull();
+  expect(resolvePrefillRepoSelection([row], { mode: 'code', repo: row.key })).toBe(row.key);
+  expect(
+    resolvePrefillRepoSelection([row], { mode: 'code', repo: gitUrl.replace('/Repo', '/repo') })
+  ).toBeNull();
+  expect(
+    resolvePrefillRepoSelection([row], { mode: 'code', repo: gitUrl.replace('base/', 'other/') })
+  ).toBeNull();
+});
+
+it('quarantines a legacy name or URL shared by multiple integrations instead of picking the first', () => {
+  const rows = ['integration-1', 'integration-2'].flatMap(integrationId => {
+    const row = normalizeSessionRepository(
+      {
+        private: true,
+        repositoryReference: {
+          ...reference,
+          authorization: { ...reference.authorization, integrationId },
+        },
+      },
+      'user-1',
+      'org-1'
+    );
+    return row ? [row] : [];
+  });
+  expect(
+    resolvePrefillRepoSelection(rows, {
+      mode: 'code',
+      repo: 'https://git.example.com/base/group/nested/Repo.git',
+    })
+  ).toBeNull();
+  for (const row of rows) {
+    expect(resolvePrefillRepoSelection(rows, { mode: 'code', repo: row.key })).toBe(row.key);
+  }
+  expect(
+    resolvePrefillRepoSelection(rows.slice(1), { mode: 'code', repo: rows[0]?.key })
+  ).toBeNull();
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -338,6 +432,19 @@ describe('describePrefillFallback', () => {
         model: 'anthropic/claude-sonnet-4',
       }),
     },
+    {
+      desc: 'model unmatched, repository identity unresolved',
+      prefill: {
+        mode: 'code',
+        repo: 'owner/repo',
+        model: 'anthropic/claude-sonnet-4',
+      } satisfies NewSessionPrefill,
+      repos: unsettled,
+      models: settled,
+      expected: i18n.t('agentChat.newSession.prefillModelUnavailable', {
+        model: 'anthropic/claude-sonnet-4',
+      }),
+    },
   ])('returns per-field message when $desc', ({ prefill, repos, models, expected }) => {
     expect(describePrefillFallback({ prefill, repos, models })).toBe(expected);
   });
@@ -352,16 +459,6 @@ describe('describePrefillFallback', () => {
       } satisfies NewSessionPrefill,
       repos: settled,
       models: unsettled,
-    },
-    {
-      desc: 'both requested, only models settled',
-      prefill: {
-        mode: 'code',
-        repo: 'owner/repo',
-        model: 'anthropic/claude-sonnet-4',
-      } satisfies NewSessionPrefill,
-      repos: unsettled,
-      models: settled,
     },
     {
       desc: 'both matched',

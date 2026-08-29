@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { toast } from 'sonner-native';
+import { type ResolvedNewSessionRepository } from '@/components/agents/new-session-repository-state';
 
 import {
   describePrefillFallback,
@@ -33,8 +34,8 @@ export function useNewSessionPrefill(): NewSessionPrefill {
 }
 
 export type UseNewSessionPrefillTargetsInput = {
-  repositories: { platform: string; fullName: string }[];
-  // !isLoadingRepos && !isReposError && repositories.length > 0
+  repositories: ResolvedNewSessionRepository[];
+  /** Request settlement does not prove complete authorized discovery. */
   reposSettled: boolean;
   models: { id: string; variants: string[] }[];
   // !isLoadingModels && !isModelsError && models.length > 0
@@ -42,27 +43,25 @@ export type UseNewSessionPrefillTargetsInput = {
 };
 
 /**
- * Owns the `selectedRepo` state and applies the repo prefill exactly once
- * when the repository list settles. Also fires the fallback info toast at
- * most once per mount.
+ * Owns the `selectedRepo` state and applies an exact authorized prefill once.
+ * Partial browsing can establish an exact match, but never a legacy match or absence.
+ * Fires the fallback info toast at most once per mount.
  *
  * The repo prefill apply mirrors the existing `hasAppliedAutoSelection`
  * pattern in `agent-chat/new.tsx` — a same-component render-phase update
  * guarded by a ref.
  */
 export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsInput) {
-  const { repositories, reposSettled, models, modelsSettled } = input;
+  const { repositories, models, modelsSettled } = input;
   const prefill = useNewSessionPrefill();
   const [selectedRepo, setSelectedRepo] = useState('');
   const hasAppliedRepo = useRef(false);
   const hasFiredToast = useRef(false);
+  const resolvedRepo = resolvePrefillRepoSelection(repositories, prefill);
 
-  if (!hasAppliedRepo.current && reposSettled && !selectedRepo) {
+  if (!hasAppliedRepo.current && resolvedRepo && !selectedRepo) {
     hasAppliedRepo.current = true;
-    const resolved = resolvePrefillRepoSelection(repositories, prefill);
-    if (resolved) {
-      setSelectedRepo(resolved);
-    }
+    setSelectedRepo(resolvedRepo);
   }
 
   useEffect(() => {
@@ -73,8 +72,9 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
     const note = describePrefillFallback({
       prefill,
       repos: {
-        settled: reposSettled,
-        matched: resolvePrefillRepoSelection(repositories, prefill) !== null,
+        // Browsing cannot prove absence. Do not announce that an unresolved prefill is unavailable.
+        settled: !prefill.repo || resolvedRepo !== null,
+        matched: resolvedRepo !== null,
       },
       models: {
         settled: modelsSettled,
@@ -86,7 +86,7 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
       hasFiredToast.current = true;
       toast.info(note);
     }
-  }, [prefill, reposSettled, modelsSettled, repositories, models]);
+  }, [prefill, resolvedRepo, modelsSettled, models]);
 
   return { selectedRepo, setSelectedRepo };
 }

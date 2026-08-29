@@ -14,12 +14,15 @@ describe('getGitLabIntegrationUrl', () => {
 });
 
 describe('getBitbucketIntegrationUrl', () => {
-  it('links to the org code-reviews page with the Bitbucket tab selected', () => {
+  it('opens the actual organization integration setup', () => {
     expect(getBitbucketIntegrationUrl('https://app.kilo.ai', 'org_123')).toBe(
-      'https://app.kilo.ai/organizations/org_123/code-reviews?platform=bitbucket'
+      'https://app.kilo.ai/organizations/org_123/integrations/bitbucket'
     );
     expect(getBitbucketIntegrationUrl('https://app.kilo.ai/', 'org_123')).toBe(
-      'https://app.kilo.ai/organizations/org_123/code-reviews?platform=bitbucket'
+      'https://app.kilo.ai/organizations/org_123/integrations/bitbucket'
+    );
+    expect(getBitbucketIntegrationUrl('https://app.kilo.ai', 'org/a')).toBe(
+      'https://app.kilo.ai/organizations/org%2Fa/integrations/bitbucket'
     );
   });
 });

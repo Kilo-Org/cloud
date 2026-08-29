@@ -1,28 +1,34 @@
 /* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { repositoryResourceKey } from '@kilocode/app-shared/code-review/repository-identity';
 import {
   dedupeRepositoriesByPlatformAndFullName,
-  detectRepositoryPlatform,
-  type NewSessionRepository,
+  normalizeSessionRepository,
   type RepositoryGroup,
   type RepositoryGroups,
   type RepositoryPlatform,
   resolveBitbucketStatus,
+  type ResolvedNewSessionRepository,
   resolveProviderStatus,
   resolveRepositoryGroups,
 } from '@/components/agents/new-session-repository-state';
-import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
 import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
-import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
+import {
+  setRepositoryDiscoveryError,
+  useGitHubReposRefresh,
+  withRepositoryAccount,
+} from '@/lib/use-github-repos-refresh';
 import { useTRPC } from '@/lib/trpc';
 
 type UseNewSessionReposArgs = {
@@ -30,54 +36,128 @@ type UseNewSessionReposArgs = {
 };
 
 type UseNewSessionReposResult = {
-  /** Merged + deduped rows (recents first) for the picker and prefill. */
-  repositories: NewSessionRepository[];
+  /** Merged + deduped authorized rows (recents first) for the picker and prefill. */
+  repositories: ResolvedNewSessionRepository[];
   /** Recently used rows resolved against connected providers ("Recently used" picker section). */
-  recents: NewSessionRepository[];
+  recents: ResolvedNewSessionRepository[];
   groups: RepositoryGroup[];
   isRetrying: boolean;
-  /** True once every provider query has settled and at least one repo is visible. */
+  /** Visible requests have settled; browsing does not prove complete authorized discovery. */
   reposSettled: boolean;
   openIntegration: (platform: RepositoryPlatform) => void;
   refreshReposForceFresh: () => Promise<void>;
 };
+
+function canAutomaticallyDiscoverRepositories(error: unknown): boolean {
+  const code = readTrpcErrorField(error, 'code');
+  return code !== 'FORBIDDEN' && code !== 'UNAUTHORIZED';
+}
 
 export function useNewSessionRepos({
   organizationId,
 }: UseNewSessionReposArgs): UseNewSessionReposResult {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-
-  const githubQuery = useQuery(
-    organizationId
-      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
-          organizationId,
+  const { userId } = useCurrentUserId();
+  const scope = useMemo(
+    () => ({
+      userId,
+      queryClient,
+      github: withRepositoryAccount(
+        organizationId
+          ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
+              organizationId,
+              forceRefresh: false,
+            })
+          : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({ forceRefresh: false }),
+        userId
+      ),
+      gitlab: withRepositoryAccount(
+        organizationId
+          ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
+              organizationId,
+              forceRefresh: false,
+            })
+          : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({ forceRefresh: false }),
+        userId
+      ),
+      bitbucket: withRepositoryAccount(
+        trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
+          organizationId: organizationId ?? '',
           forceRefresh: false,
-        })
-      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
-          forceRefresh: false,
-        })
+        }),
+        userId
+      ),
+      gitlabFresh: withRepositoryAccount(
+        organizationId
+          ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
+              organizationId,
+              forceRefresh: true,
+            })
+          : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({ forceRefresh: true }),
+        userId
+      ),
+      bitbucketFresh: organizationId
+        ? withRepositoryAccount(
+            trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
+              organizationId,
+              forceRefresh: true,
+            }),
+            userId
+          )
+        : null,
+    }),
+    [userId, organizationId, queryClient, trpc]
   );
+  const currentScope = useRef<typeof scope | null>(scope);
+  currentScope.current = scope;
 
-  const gitlabQuery = useQuery(
-    organizationId
-      ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
-          organizationId,
-          forceRefresh: false,
-        })
-      : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({
-          forceRefresh: false,
-        })
+  // Keep normal observers active until their own error reaches the permission cache handler.
+  // A denial already present at render blocks automatic discovery, including rebuilt queries.
+  const githubDiscoveryAllowed = canAutomaticallyDiscoverRepositories(
+    queryClient.getQueryState(scope.github.queryKey)?.error
   );
-
+  const gitlabDiscoveryAllowed = canAutomaticallyDiscoverRepositories(
+    queryClient.getQueryState(scope.gitlab.queryKey)?.error
+  );
+  const bitbucketDiscoveryAllowed = canAutomaticallyDiscoverRepositories(
+    queryClient.getQueryState(scope.bitbucket.queryKey)?.error
+  );
+  // A forced success clears the current error without starting another normal fetch.
+  const githubQuery = useQuery({
+    ...scope.github,
+    enabled: query =>
+      Boolean(userId) &&
+      (githubDiscoveryAllowed || canAutomaticallyDiscoverRepositories(query.state.error)),
+  });
+  const gitlabQuery = useQuery({
+    ...scope.gitlab,
+    enabled: query =>
+      Boolean(userId) &&
+      (gitlabDiscoveryAllowed || canAutomaticallyDiscoverRepositories(query.state.error)),
+  });
   // Bitbucket is organization-only: the query is disabled without an org.
   const bitbucketQuery = useQuery({
-    ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
-      organizationId: organizationId ?? '',
-      forceRefresh: false,
-    }),
-    enabled: Boolean(organizationId),
+    ...scope.bitbucket,
+    enabled: query =>
+      Boolean(userId && organizationId) &&
+      (bitbucketDiscoveryAllowed || canAutomaticallyDiscoverRepositories(query.state.error)),
   });
+
+  // Reconnect/refresh must also release a stale branch error, even when discovery rows are unchanged.
+  useEffect(() => {
+    const branches = organizationId
+      ? trpc.organizations.cloudAgentNext.listRepositoryBranches
+      : trpc.cloudAgentNext.listRepositoryBranches;
+    void queryClient.invalidateQueries(branches.pathFilter());
+  }, [
+    githubQuery.dataUpdatedAt,
+    gitlabQuery.dataUpdatedAt,
+    bitbucketQuery.dataUpdatedAt,
+    organizationId,
+    queryClient,
+    trpc,
+  ]);
 
   const { data: recentRepoData } = useRecentAgentRepositories({ organizationId });
 
@@ -90,95 +170,86 @@ export function useNewSessionRepos({
     integrationInstalled: githubQuery.data?.integrationInstalled,
   });
 
-  const githubRepositories = useMemo<NewSessionRepository[]>(
+  const [providerRefreshCounts, setProviderRefreshCounts] = useState({ gitlab: 0, bitbucket: 0 });
+
+  const normalize = useCallback(
+    (row: Parameters<typeof normalizeSessionRepository>[0]) => {
+      const repository = normalizeSessionRepository(row, userId, organizationId);
+      return repository ? [repository] : [];
+    },
+    [userId, organizationId]
+  );
+  const githubRepositories = useMemo(
+    () => (githubQuery.data?.repositories ?? []).flatMap(row => normalize(row)),
+    [githubQuery.data, normalize]
+  );
+  const gitlabRepositories = useMemo(
+    () => (gitlabQuery.data?.repositories ?? []).flatMap(row => normalize(row)),
+    [gitlabQuery.data, normalize]
+  );
+  const bitbucketRepositories = useMemo(
     () =>
-      (githubQuery.data?.repositories ?? []).map(repo => ({
-        platform: 'github',
-        fullName: repo.fullName,
-        isPrivate: repo.private,
-      })),
-    [githubQuery.data]
+      bitbucketQuery.data?.status === 'available'
+        ? bitbucketQuery.data.repositories.flatMap(row => normalize(row))
+        : [],
+    [bitbucketQuery.data, normalize]
   );
 
-  const gitlabRepositories = useMemo<NewSessionRepository[]>(
-    () =>
-      (gitlabQuery.data?.repositories ?? []).map(repo => ({
-        platform: 'gitlab',
-        fullName: repo.fullName,
-        isPrivate: repo.private,
-      })),
-    [gitlabQuery.data]
-  );
-
-  const bitbucketRepositories = useMemo<NewSessionRepository[]>(() => {
-    const data = bitbucketQuery.data;
-    if (data?.status !== 'available') {
-      return [];
-    }
-    return data.repositories.map(repo => ({
-      platform: 'bitbucket',
-      fullName: repo.fullName,
-      isPrivate: repo.private,
-      workspaceUuid: repo.workspaceUuid,
-      repositoryUuid: repo.id,
-    }));
-  }, [bitbucketQuery.data]);
-
-  // Recently used rows: only recents that resolve to a connected repository
-  // appear, and they are deduped by platform + fullName.
-  const recentlyUsed = useMemo<NewSessionRepository[]>(() => {
-    const recentList = recentRepoData?.repositories;
-    if (!recentList?.length) {
-      return [];
-    }
-    const unified = [...githubRepositories, ...gitlabRepositories, ...bitbucketRepositories];
-    const byKey = new Map(unified.map(repo => [repoKey(repo), repo]));
-    const seen = new Set<string>();
-    const result: NewSessionRepository[] = [];
-    for (const recent of recentList) {
-      const platform = detectRepositoryPlatform(recent.gitUrl);
-      const fullName = formatGitUrlProject(recent.gitUrl);
-      const match =
-        platform && fullName ? byKey.get(`${platform}/${fullName.toLowerCase()}`) : undefined;
-      if (match) {
-        const key = repoKey(match);
-        if (!seen.has(key)) {
-          seen.add(key);
-          result.push(match);
+  const recentlyUsed = useMemo(() => {
+    const byKey = new Map(
+      [...githubRepositories, ...gitlabRepositories, ...bitbucketRepositories].map(repo => [
+        repo.key,
+        repo,
+      ])
+    );
+    // Old URL-only or unresolved recents stay in history, not in another identity's picker.
+    // Remove after old clients/records disappear and the 30-day ledger window expires.
+    return dedupeRepositoriesByPlatformAndFullName(
+      (recentRepoData?.repositories ?? []).flatMap(recent => {
+        if (recent.identity?.kind !== 'resolved' || recent.identity.accountId !== userId) {
+          return [];
         }
-      }
-    }
-    return result;
-  }, [recentRepoData, githubRepositories, gitlabRepositories, bitbucketRepositories]);
-
-  const repositories = useMemo(
-    () =>
-      dedupeRepositoriesByPlatformAndFullName([
-        ...recentlyUsed,
-        ...githubRepositories,
-        ...gitlabRepositories,
-        ...bitbucketRepositories,
-      ]),
-    [recentlyUsed, githubRepositories, gitlabRepositories, bitbucketRepositories]
-  );
+        const match = byKey.get(
+          repositoryResourceKey(recent.identity.accountId, recent.identity.reference)
+        );
+        return match ? [match] : [];
+      })
+    );
+  }, [recentRepoData, userId, githubRepositories, gitlabRepositories, bitbucketRepositories]);
 
   const githubStatus = resolveProviderStatus({
-    isLoading: githubQuery.isLoading,
-    isError: githubQuery.isError,
+    isLoading: !userId || githubQuery.isLoading || githubQuery.isRefetching || isRefreshingGitHub,
+    isError: githubQuery.isError || Boolean(githubQuery.data?.errorMessage),
+    errorCode: readTrpcErrorField(githubQuery.error, 'code'),
     integrationInstalled: githubQuery.data?.integrationInstalled,
     repositoryCount: githubRepositories.length,
+    hasUnresolved: (githubQuery.data?.repositories.length ?? 0) > githubRepositories.length,
   });
   const gitlabStatus = resolveProviderStatus({
-    isLoading: gitlabQuery.isLoading,
-    isError: gitlabQuery.isError,
+    isLoading:
+      !userId ||
+      gitlabQuery.isLoading ||
+      gitlabQuery.isRefetching ||
+      providerRefreshCounts.gitlab > 0,
+    isError: gitlabQuery.isError || Boolean(gitlabQuery.data?.errorMessage),
+    errorCode: readTrpcErrorField(gitlabQuery.error, 'code'),
     integrationInstalled: gitlabQuery.data?.integrationInstalled,
     repositoryCount: gitlabRepositories.length,
+    hasUnresolved: (gitlabQuery.data?.repositories.length ?? 0) > gitlabRepositories.length,
   });
   const bitbucketStatus = resolveBitbucketStatus({
-    isLoading: bitbucketQuery.isLoading,
+    isLoading:
+      !userId ||
+      bitbucketQuery.isLoading ||
+      bitbucketQuery.isRefetching ||
+      providerRefreshCounts.bitbucket > 0,
     isError: bitbucketQuery.isError,
     status: bitbucketQuery.data?.status,
     repositoryCount: bitbucketRepositories.length,
+    errorCode: readTrpcErrorField(bitbucketQuery.error, 'code'),
+    hasUnresolved:
+      bitbucketQuery.data?.status === 'available' &&
+      bitbucketQuery.data.repositories.length > bitbucketRepositories.length,
   });
 
   const { groups, recents } = useMemo<RepositoryGroups>(
@@ -205,145 +276,189 @@ export function useNewSessionRepos({
       recentlyUsed,
     ]
   );
+  const repositories = useMemo(
+    () =>
+      dedupeRepositoriesByPlatformAndFullName([
+        ...recents,
+        ...groups.flatMap(group => group.repositories),
+      ]),
+    [recents, groups]
+  );
 
-  // ── Force-fresh per-provider refresh ──────────────────────────────
-  const [isRefreshingProviders, setIsRefreshingProviders] = useState(false);
-
-  const forceFreshGitLab = useCallback(async () => {
-    const fresh = await queryClient.fetchQuery({
-      ...(organizationId
-        ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
-            organizationId,
-            forceRefresh: true,
-          })
-        : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({
-            forceRefresh: true,
-          })),
-      staleTime: 0,
-    });
-    queryClient.setQueryData(
-      organizationId
-        ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryKey({
-            organizationId,
-            forceRefresh: false,
-          })
-        : trpc.cloudAgentNext.listGitLabRepositories.queryKey({
-            forceRefresh: false,
-          }),
-      fresh
-    );
-  }, [organizationId, trpc, queryClient]);
-
-  const forceFreshBitbucket = useCallback(async () => {
-    if (!organizationId) {
-      return;
-    }
-    const fresh = await queryClient.fetchQuery({
-      ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
-        organizationId,
-        forceRefresh: true,
-      }),
-      staleTime: 0,
-    });
-    // A non-`available` force-fresh result is a refresh failure, not a
-    // cacheable snapshot: writing it over an existing `available` cache would
-    // clear good rows on a transient Bitbucket outage. Throw so
-    // `refreshReposForceFresh` toasts `couldNotRefreshRepositories`.
-    if (fresh.status !== 'available') {
-      throw new Error('Bitbucket repositories are not available');
-    }
-    queryClient.setQueryData(
-      trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({
-        organizationId,
-        forceRefresh: false,
-      }),
-      fresh
-    );
-  }, [organizationId, trpc, queryClient]);
+  const forceFreshProvider = useCallback(
+    async (platform: 'gitlab' | 'bitbucket') => {
+      if (
+        !scope.userId ||
+        currentScope.current !== scope ||
+        (platform === 'bitbucket' && !scope.bitbucketFresh)
+      ) {
+        return;
+      }
+      setProviderRefreshCounts(counts => ({ ...counts, [platform]: counts[platform] + 1 }));
+      try {
+        if (platform === 'gitlab') {
+          const fresh = await queryClient.fetchQuery({ ...scope.gitlabFresh, staleTime: 0 });
+          if (currentScope.current !== scope) {
+            return;
+          }
+          await queryClient.cancelQueries({ queryKey: scope.gitlab.queryKey, exact: true });
+          if (currentScope.current !== scope) {
+            return;
+          }
+          queryClient.setQueryData(scope.gitlab.queryKey, fresh);
+        } else if (scope.bitbucketFresh) {
+          const fresh = await queryClient.fetchQuery({ ...scope.bitbucketFresh, staleTime: 0 });
+          if (currentScope.current !== scope) {
+            return;
+          }
+          // Only a transient outage permits the previous authorized snapshot to remain usable.
+          if (fresh.status === 'temporarily_unavailable') {
+            throw new Error('Bitbucket repositories are temporarily unavailable');
+          }
+          await queryClient.cancelQueries({ queryKey: scope.bitbucket.queryKey, exact: true });
+          if (currentScope.current !== scope) {
+            return;
+          }
+          queryClient.setQueryData(scope.bitbucket.queryKey, fresh);
+        }
+      } catch (error) {
+        if (currentScope.current !== scope) {
+          return;
+        }
+        await queryClient.cancelQueries({ queryKey: scope[platform].queryKey, exact: true });
+        if (currentScope.current !== scope) {
+          return;
+        }
+        if (setRepositoryDiscoveryError(queryClient, scope[platform].queryKey, error) === 'error') {
+          throw error;
+        }
+      } finally {
+        if (currentScope.current === scope) {
+          setProviderRefreshCounts(counts => ({ ...counts, [platform]: counts[platform] - 1 }));
+        }
+      }
+    },
+    [scope, queryClient]
+  );
 
   const refreshReposForceFresh = useCallback(async () => {
-    setIsRefreshingProviders(true);
-    try {
-      const results = await Promise.allSettled([
-        refreshGitHubForceFresh(),
-        forceFreshGitLab(),
-        forceFreshBitbucket(),
-      ]);
-      // GitHub resolves always (it catches its own errors and toasts), so a
-      // rejection here is a GitLab or Bitbucket force-fresh failure. Toast once.
-      if (results[1].status === 'rejected' || results[2].status === 'rejected') {
-        toast.error(i18n.t('agentChat.newSession.couldNotRefreshRepositories'));
-      }
-    } finally {
-      setIsRefreshingProviders(false);
+    if (currentScope.current !== scope) {
+      return;
     }
-  }, [refreshGitHubForceFresh, forceFreshGitLab, forceFreshBitbucket]);
+    const results = await Promise.allSettled([
+      refreshGitHubForceFresh(),
+      forceFreshProvider('gitlab'),
+      forceFreshProvider('bitbucket'),
+    ]);
+    // GitHub handles its own errors. Report current GitLab/Bitbucket failures once.
+    if (
+      currentScope.current === scope &&
+      (results[1].status === 'rejected' || results[2].status === 'rejected')
+    ) {
+      toast.error(i18n.t('agentChat.newSession.couldNotRefreshRepositories'));
+    }
+  }, [scope, refreshGitHubForceFresh, forceFreshProvider]);
 
-  // ── Per-provider connect ──────────────────────────────────────────
-  // Android: `openAuthorizationAndWaitForReturn` returns `'app-foreground'`
-  // (the browser launch is fire-and-forget), so each provider's refresh runs
-  // from a shared foreground listener when the app returns.
+  const refreshAfterReturn = useCallback(
+    async (platform: 'gitlab' | 'bitbucket') => {
+      try {
+        await forceFreshProvider(platform);
+      } catch {
+        if (currentScope.current === scope) {
+          toast.error(
+            i18n.t(
+              platform === 'gitlab'
+                ? 'codeReviewer.providerConnect.gitlabError'
+                : 'codeReviewer.providerConnect.bitbucketError'
+            )
+          );
+        }
+      }
+    },
+    [scope, forceFreshProvider]
+  );
   const { markLaunched: markGitLabLaunched, clearLaunch: clearGitLabLaunch } =
     useExternalAuthReturn(() => {
-      void forceFreshGitLab();
+      void refreshAfterReturn('gitlab');
     });
   const { markLaunched: markBitbucketLaunched, clearLaunch: clearBitbucketLaunch } =
     useExternalAuthReturn(() => {
-      void forceFreshBitbucket();
+      void refreshAfterReturn('bitbucket');
     });
-
-  const openGitLabIntegration = useCallback(() => {
-    void (async () => {
-      try {
-        markGitLabLaunched();
-        const trigger = await openAuthorizationAndWaitForReturn(
-          Platform.OS,
-          getGitLabIntegrationUrl(WEB_BASE_URL, organizationId)
-        );
-        if (trigger === 'sheet-close') {
-          clearGitLabLaunch();
-          await forceFreshGitLab();
+  useEffect(() => {
+    currentScope.current = scope;
+    setProviderRefreshCounts({ gitlab: 0, bitbucket: 0 });
+    return () => {
+      currentScope.current = null;
+      clearGitLabLaunch();
+      clearBitbucketLaunch();
+      for (const options of [
+        scope.github,
+        scope.gitlab,
+        scope.bitbucket,
+        scope.gitlabFresh,
+        scope.bitbucketFresh,
+      ]) {
+        if (options) {
+          void scope.queryClient.cancelQueries({ queryKey: options.queryKey, exact: true });
         }
-      } catch {
-        clearGitLabLaunch();
-        toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
       }
-    })();
-  }, [organizationId, forceFreshGitLab, markGitLabLaunched, clearGitLabLaunch]);
-
-  const openBitbucketIntegration = useCallback(() => {
-    if (!organizationId) {
-      return;
-    }
-    void (async () => {
-      try {
-        markBitbucketLaunched();
-        const trigger = await openAuthorizationAndWaitForReturn(
-          Platform.OS,
-          getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId)
-        );
-        if (trigger === 'sheet-close') {
-          clearBitbucketLaunch();
-          await forceFreshBitbucket();
-        }
-      } catch {
-        clearBitbucketLaunch();
-        toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));
-      }
-    })();
-  }, [organizationId, forceFreshBitbucket, markBitbucketLaunched, clearBitbucketLaunch]);
+    };
+  }, [scope, clearGitLabLaunch, clearBitbucketLaunch]);
 
   const openIntegration = useCallback(
     (platform: RepositoryPlatform) => {
+      if (!scope.userId || currentScope.current !== scope) {
+        return;
+      }
       if (platform === 'github') {
         openGitHubIntegration();
-      } else if (platform === 'gitlab') {
-        openGitLabIntegration();
-      } else {
-        openBitbucketIntegration();
+        return;
       }
+      if (platform === 'bitbucket' && !organizationId) {
+        return;
+      }
+      const markLaunched = platform === 'gitlab' ? markGitLabLaunched : markBitbucketLaunched;
+      const clearLaunch = platform === 'gitlab' ? clearGitLabLaunch : clearBitbucketLaunch;
+      void (async () => {
+        try {
+          markLaunched();
+          const url =
+            platform === 'bitbucket' && organizationId
+              ? getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId)
+              : getGitLabIntegrationUrl(WEB_BASE_URL, organizationId);
+          const trigger = await openAuthorizationAndWaitForReturn(Platform.OS, url);
+          if (currentScope.current !== scope) {
+            return;
+          }
+          if (trigger === 'sheet-close') {
+            clearLaunch();
+            await refreshAfterReturn(platform);
+          }
+        } catch {
+          if (currentScope.current === scope) {
+            clearLaunch();
+            toast.error(
+              i18n.t(
+                platform === 'gitlab'
+                  ? 'codeReviewer.providerConnect.gitlabError'
+                  : 'codeReviewer.providerConnect.bitbucketError'
+              )
+            );
+          }
+        }
+      })();
     },
-    [openGitHubIntegration, openGitLabIntegration, openBitbucketIntegration]
+    [
+      scope,
+      organizationId,
+      openGitHubIntegration,
+      markGitLabLaunched,
+      markBitbucketLaunched,
+      clearGitLabLaunch,
+      clearBitbucketLaunch,
+      refreshAfterReturn,
+    ]
   );
 
   const isRetrying =
@@ -351,13 +466,17 @@ export function useNewSessionRepos({
     gitlabQuery.isRefetching ||
     bitbucketQuery.isRefetching ||
     isRefreshingGitHub ||
-    isRefreshingProviders;
+    providerRefreshCounts.gitlab > 0 ||
+    providerRefreshCounts.bitbucket > 0;
 
   const reposSettled =
-    !githubQuery.isLoading &&
-    !gitlabQuery.isLoading &&
-    !bitbucketQuery.isLoading &&
-    repositories.length > 0;
+    Boolean(userId) &&
+    groups.every(
+      group =>
+        group.status !== 'loading' &&
+        group.status !== 'error' &&
+        group.status !== 'identity-unavailable'
+    );
 
   return {
     repositories,
@@ -368,8 +487,4 @@ export function useNewSessionRepos({
     openIntegration,
     refreshReposForceFresh,
   };
-}
-
-function repoKey(repository: NewSessionRepository): string {
-  return `${repository.platform}/${repository.fullName.toLowerCase()}`;
 }

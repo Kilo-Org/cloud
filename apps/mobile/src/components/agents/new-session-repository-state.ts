@@ -1,24 +1,96 @@
-import { type RepoPlatform } from '@/lib/picker-bridge';
+import { type CodeReviewPlatform } from '@kilocode/app-shared/code-review';
+import {
+  type LaunchRepositoryReference,
+  repositoryResourceKey,
+} from '@kilocode/app-shared/code-review/repository-identity';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
-export type RepositoryPlatform = RepoPlatform;
+export type RepositoryPlatform = CodeReviewPlatform;
 
-/**
- * One selectable repository row. `platform` is required so two rows with the
- * same `fullName` on different providers stay distinct in the picker and in
- * the create payload. `workspaceUuid`/`repositoryUuid` are only present on
- * Bitbucket rows (`repositoryUuid` = the Bitbucket repository `id`).
- */
 export type NewSessionRepository = {
   platform: RepositoryPlatform;
   fullName: string;
   isPrivate: boolean;
   workspaceUuid?: string;
   repositoryUuid?: string;
+  // Old creator callers omit identity. Remove this input form only after old
+  // clients/records disappear and the 30-day ledger window expires.
+  reference?: LaunchRepositoryReference;
+  key?: string;
+  accountId?: string;
+  accountLogin?: string;
 };
+
+export type ResolvedNewSessionRepository = NewSessionRepository & {
+  reference: LaunchRepositoryReference;
+  key: string;
+  accountId: string;
+};
+
+type RepositoryWire = Pick<
+  inferRouterOutputs<MobileRouter>['cloudAgentNext']['listGitHubRepositories']['repositories'][number],
+  'private' | 'repositoryReference' | 'platformAccountLogin'
+>;
+
+export function normalizeSessionRepository(
+  row: RepositoryWire,
+  accountId: string | undefined,
+  organizationId: string | undefined
+): ResolvedNewSessionRepository | null {
+  const reference = row.repositoryReference;
+  // Old discovery responses without identity remain quarantined until refreshed.
+  // Remove after old clients/records disappear and the 30-day ledger window expires.
+  if (!reference || !accountId) {
+    return null;
+  }
+  const { repository, authorization } = reference;
+  if (
+    authorization.owner.type !== (organizationId ? 'org' : 'user') ||
+    authorization.owner.id !== (organizationId ?? accountId) ||
+    (repository.provider === 'bitbucket' && !organizationId)
+  ) {
+    return null;
+  }
+  return {
+    platform: repository.provider,
+    fullName: repository.fullName,
+    isPrivate: row.private,
+    reference,
+    accountId,
+    key: repositoryResourceKey(accountId, reference),
+    accountLogin: row.platformAccountLogin,
+    ...(repository.provider === 'bitbucket'
+      ? { workspaceUuid: repository.workspaceUuid, repositoryUuid: repository.repositoryId }
+      : {}),
+  };
+}
+
+export function repositoryKey(repository: ResolvedNewSessionRepository): string {
+  return repository.key;
+}
+
+export function repositoryLabel(repository: NewSessionRepository): string {
+  const reference = repository.reference;
+  if (!reference) {
+    return repository.fullName;
+  }
+  const { owner, integrationId } = reference.authorization;
+  return [
+    repository.fullName,
+    repository.accountLogin,
+    reference.repository.instanceUrl,
+    `${owner.type}:${owner.id}`,
+    integrationId,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
 
 export type RepositoryProviderStatus =
   | 'loading'
   | 'error'
+  | 'access-denied'
+  | 'identity-unavailable'
   | 'connect'
   | 'connected-empty'
   | 'repos';
@@ -26,12 +98,12 @@ export type RepositoryProviderStatus =
 export type RepositoryGroup = {
   key: RepositoryPlatform;
   status: RepositoryProviderStatus;
-  repositories: NewSessionRepository[];
+  repositories: ResolvedNewSessionRepository[];
 };
 
 export type RepositoryGroups = {
   /** Recently used rows, resolved against connected providers. */
-  recents: NewSessionRepository[];
+  recents: ResolvedNewSessionRepository[];
   /** Ordered groups: GitHub, GitLab, then Bitbucket (only when an organization is set). */
   groups: RepositoryGroup[];
 };
@@ -47,20 +119,34 @@ export function resolveProviderStatus({
   isError,
   integrationInstalled,
   repositoryCount,
+  errorCode,
+  hasUnresolved = false,
 }: {
   isLoading: boolean;
   isError: boolean;
   integrationInstalled: boolean | undefined;
   repositoryCount: number;
+  errorCode?: string;
+  hasUnresolved?: boolean;
 }): RepositoryProviderStatus {
+  if (errorCode === 'FORBIDDEN' || errorCode === 'BAD_REQUEST') {
+    return 'access-denied';
+  }
+  if (
+    errorCode === 'UNAUTHORIZED' ||
+    errorCode === 'PRECONDITION_FAILED' ||
+    integrationInstalled === false
+  ) {
+    return 'connect';
+  }
   if (isLoading) {
     return 'loading';
   }
-  if (isError && repositoryCount === 0) {
+  if (isError) {
     return 'error';
   }
-  if (integrationInstalled === false) {
-    return 'connect';
+  if (hasUnresolved) {
+    return 'identity-unavailable';
   }
   if (integrationInstalled === true && repositoryCount === 0) {
     return 'connected-empty';
@@ -75,24 +161,47 @@ export function resolveProviderStatus({
  *
  *  - `available`             -> repos / connected-empty
  *  - connect-shaped statuses -> connect (open the Bitbucket settings page)
- *  - transient/invalid       -> error (retry)
+ *  - transient failure       -> error (retry)
+ *  - invalid/denied          -> access-denied (correct access or selection)
  */
 export function resolveBitbucketStatus({
   isLoading,
   isError,
   status,
   repositoryCount,
+  errorCode,
+  hasUnresolved = false,
 }: {
   isLoading: boolean;
   isError: boolean;
   status: string | undefined;
   repositoryCount: number;
+  errorCode?: string;
+  hasUnresolved?: boolean;
 }): RepositoryProviderStatus {
+  if (
+    errorCode === 'FORBIDDEN' ||
+    status === 'insufficient_permissions' ||
+    status === 'invalid_request'
+  ) {
+    return 'access-denied';
+  }
+  if (
+    errorCode === 'UNAUTHORIZED' ||
+    status === 'not_connected' ||
+    status === 'workspace_selection_required' ||
+    status === 'reconnect_required'
+  ) {
+    return 'connect';
+  }
   if (isLoading) {
     return 'loading';
   }
-  if (isError && repositoryCount === 0) {
+  if (isError || status === 'temporarily_unavailable') {
     return 'error';
+  }
+  if (hasUnresolved) {
+    return 'identity-unavailable';
   }
   if (status === undefined) {
     return 'loading';
@@ -100,28 +209,19 @@ export function resolveBitbucketStatus({
   if (status === 'available') {
     return repositoryCount === 0 ? 'connected-empty' : 'repos';
   }
-  if (status === 'temporarily_unavailable' || status === 'invalid_request') {
-    return 'error';
-  }
-  // not_connected, workspace_selection_required, reconnect_required,
-  // insufficient_permissions -> the user must (re)establish the connection.
+  // not_connected, workspace_selection_required, reconnect_required:
+  // the user must establish the connection.
   return 'connect';
 }
 
 // ── Dedup and grouping ───────────────────────────────────────────────
 
-const repositoryKey = (repository: NewSessionRepository): string =>
-  `${repository.platform}/${repository.fullName}`;
-
-/**
- * Deduplicate repository rows by `platform + fullName`, so the same
- * `fullName` on two platforms stays two rows.
- */
-export function dedupeRepositoriesByPlatformAndFullName(
-  repositories: readonly NewSessionRepository[]
-): NewSessionRepository[] {
+/** Keep the old export name; normalized discovery deduplicates by the complete identity. */
+export function dedupeRepositoriesByPlatformAndFullName<T extends ResolvedNewSessionRepository>(
+  repositories: readonly T[]
+): T[] {
   const seen = new Set<string>();
-  const result: NewSessionRepository[] = [];
+  const result: T[] = [];
   for (const repository of repositories) {
     const key = repositoryKey(repository);
     if (!seen.has(key)) {
@@ -143,20 +243,20 @@ export function resolveRepositoryGroups(input: {
   github: RepositoryGroup;
   gitlab: RepositoryGroup;
   bitbucket: RepositoryGroup;
-  recents: NewSessionRepository[];
+  recents: ResolvedNewSessionRepository[];
 }): RepositoryGroups {
-  const groups: RepositoryGroup[] = [
-    { key: 'github', status: input.github.status, repositories: input.github.repositories },
-    { key: 'gitlab', status: input.gitlab.status, repositories: input.gitlab.repositories },
-  ];
-  if (input.organizationId) {
-    groups.push({
-      key: 'bitbucket',
-      status: input.bitbucket.status,
-      repositories: input.bitbucket.repositories,
-    });
-  }
-  return { recents: input.recents, groups };
+  const groups = [
+    input.github,
+    input.gitlab,
+    ...(input.organizationId ? [input.bitbucket] : []),
+  ].map(group => ({
+    key: group.key,
+    status: group.status,
+    repositories:
+      group.status === 'connect' || group.status === 'access-denied' ? [] : group.repositories,
+  }));
+  const usableKeys = new Set(groups.flatMap(group => group.repositories.map(repo => repo.key)));
+  return { recents: input.recents.filter(repo => usableKeys.has(repo.key)), groups };
 }
 
 /**

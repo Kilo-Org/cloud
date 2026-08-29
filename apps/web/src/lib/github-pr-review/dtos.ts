@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { z } from 'zod';
+import { GitHubPrReviewContextSchema } from './context-dtos';
 
 export const GitHubPrReviewAuthorSchema = z
   .object({
@@ -52,9 +53,32 @@ export const GitHubPrReviewOverviewSchema = z
         viewerLogin: z.string().nullable(),
       })
       .strict(),
+    // Old overview payloads omit context. Retain until all old clients, servers, and records are gone.
+    context: GitHubPrReviewContextSchema.optional(),
   })
   .strict();
 export type GitHubPrReviewOverview = z.infer<typeof GitHubPrReviewOverviewSchema>;
+
+export const NormalizedGitHubPrReviewOverviewSchema = GitHubPrReviewOverviewSchema.transform(
+  overview => ({
+    ...overview,
+    context:
+      overview.context ??
+      GitHubPrReviewContextSchema.parse({
+        revision: {
+          prNodeId: overview.prNodeId,
+          number: overview.number,
+          headSha: overview.headSha,
+          baseRepoFullName: null,
+          baseRef: overview.baseRef,
+          baseSha: null,
+        },
+      }),
+  })
+);
+export type NormalizedGitHubPrReviewOverview = z.infer<
+  typeof NormalizedGitHubPrReviewOverviewSchema
+>;
 
 export const GitHubPrReviewCheckRunSchema = z
   .object({
@@ -167,11 +191,20 @@ export const GitHubPrReviewInboxItemSchema = z
     number: z.number().int().positive(),
     title: z.string(),
     author: GitHubPrReviewAuthorSchema.nullable(),
+    // Old Inbox payloads omit names. Retain until all old clients, servers, and records are gone.
+    authorDisplayName: z.string().nullable().optional(),
     isDraft: z.boolean(),
     updatedAt: z.string(),
   })
   .strict();
 export type GitHubPrReviewInboxItem = z.infer<typeof GitHubPrReviewInboxItemSchema>;
+
+export const NormalizedGitHubPrReviewInboxItemSchema = GitHubPrReviewInboxItemSchema.extend({
+  authorDisplayName: z.string().nullable().default(null),
+});
+export type NormalizedGitHubPrReviewInboxItem = z.infer<
+  typeof NormalizedGitHubPrReviewInboxItemSchema
+>;
 
 export const GitHubPrReviewInboxResultSchema = z
   .object({
@@ -180,6 +213,10 @@ export const GitHubPrReviewInboxResultSchema = z
   })
   .strict();
 export type GitHubPrReviewInboxResult = z.infer<typeof GitHubPrReviewInboxResultSchema>;
+
+export const NormalizedGitHubPrReviewInboxResultSchema = GitHubPrReviewInboxResultSchema.extend({
+  items: z.array(NormalizedGitHubPrReviewInboxItemSchema),
+});
 
 export const INBOX_PAGE_SIZE = 25;
 

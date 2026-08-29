@@ -463,6 +463,53 @@ it('does not use an old check commit as current failure evidence', () => {
   expect(requirements(scenario, 'status-check')[0]?.state).toBe('unavailable');
 });
 
+it.each([true, false])('requires freshness enforcement before reporting branch lag: %s', strict => {
+  const scenario = setup(checkPolicy(-1, strict));
+  scenario.facts.comparison = field({
+    behindBy: 3,
+    baseTarget: { oid: 'base' },
+    headTarget: { oid: 'head' },
+  });
+  expect(requirements(scenario, 'branch-freshness')).toMatchObject(
+    strict ? [{ state: 'unmet' }] : []
+  );
+});
+
+it.each([
+  'partial-unresolved',
+  'partial-empty',
+  'complete-empty',
+  'unknown-field',
+  'unknown-enforcement',
+] as const)('keeps conversation evidence exact: %s', condition => {
+  const scenario = setup({ required_conversation_resolution: { enabled: true } });
+  scenario.observations.threads = collection(
+    condition === 'partial-unresolved'
+      ? [{ id: 'THREAD', isResolved: false }]
+      : condition === 'unknown-field'
+        ? [{ id: 'THREAD', isResolved: null }]
+        : []
+  );
+  if (condition.startsWith('partial')) scenario.observations.threads.completeness = 'partial';
+  if (condition === 'unknown-enforcement')
+    scenario.facts.canBypassClassic = { data: null, source: { ...source, availability: 'denied' } };
+  const row = requirements(scenario, 'conversation-resolution')[0];
+  expect(row?.state).toBe(
+    condition === 'partial-unresolved'
+      ? 'unmet'
+      : condition === 'complete-empty'
+        ? 'met'
+        : 'unavailable'
+  );
+  if (condition.startsWith('partial')) {
+    expect(row?.evidence.some(entry => entry.observation.startsWith('unresolved-threads:'))).toBe(
+      false
+    );
+    if (condition === 'partial-unresolved')
+      expect(row?.evidence.some(entry => entry.observation.includes('THREAD'))).toBe(true);
+  }
+});
+
 it.each([
   'known',
   'enough',
@@ -546,6 +593,201 @@ it.each([
       )
     ).toBe(true);
 });
+
+it('keeps ruleset review restrictions named with their installed REST field names', () => {
+  const scenario = setup(null, [
+    {
+      type: 'pull_request',
+      parameters: {
+        required_approving_review_count: 2,
+        dismiss_stale_reviews_on_push: true,
+        require_code_owner_review: true,
+        require_last_push_approval: true,
+        required_review_thread_resolution: true,
+        allowed_merge_methods: ['squash'],
+      },
+    },
+  ]);
+  expect(evaluate(scenario).requirements.items.map(row => [row.kind, row.state])).toEqual([
+    ['approving-reviews', 'unavailable'],
+    ['code-owner-reviews', 'unavailable'],
+    ['last-push-approval', 'unavailable'],
+    ['stale-review-dismissal', 'unavailable'],
+    ['conversation-resolution', 'unavailable'],
+    ['allowed-merge-methods', 'unavailable'],
+  ]);
+});
+
+it.each(['checks', 'reviews', 'conversations'] as const)(
+  'does not claim no policy when viewer enforcement contradicts it: %s',
+  field => {
+    const scenario = setup(null);
+    if (field === 'checks')
+      scenario.facts.viewerRule.requiredStatusCheckContexts = { data: ['ci'], source };
+    if (field === 'reviews')
+      scenario.facts.viewerRule.requiredApprovingReviewCount = { data: 2, source };
+    if (field === 'conversations')
+      scenario.facts.viewerRule.requiresConversationResolution = { data: true, source };
+    expect(evaluate(scenario).requirements.items).toMatchObject([
+      { kind: 'policy-evaluation', state: 'unavailable' },
+    ]);
+  }
+);
+
+it('preserves named unsupported rules without expanding generic merge states into failures', () => {
+  const scenario = setup({ required_signatures: { enabled: true } }, [
+    { type: 'workflows', parameters: { workflows: [] } },
+    { type: 'code_scanning', parameters: {} },
+    { type: 'future_rule', parameters: { required_conversation_resolution: { enabled: true } } },
+  ]);
+  expect(evaluate(scenario).requirements.items.map(row => [row.kind, row.state])).toEqual([
+    ['commit-signatures', 'unavailable'],
+    ['workflows', 'unavailable'],
+    ['code_scanning', 'unavailable'],
+    ['future_rule', 'unavailable'],
+  ]);
+});
+
+it.each([null, 'unknown'])('keeps an invalid signature flag %s named and unavailable', enabled => {
+  const scenario = setup({ ...checkPolicy(), required_signatures: { enabled } });
+  scenario.observations.head = collection([check(run('RUN'))]);
+  expect(evaluate(scenario).requirements.items).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ kind: 'commit-signatures', state: 'unavailable' }),
+    ])
+  );
+});
+
+it('keeps missing freshness configuration unavailable even when every observed check passes', () => {
+  const policy = checkPolicy();
+  const scenario = setup({
+    required_status_checks: {
+      contexts: policy.required_status_checks.contexts,
+      checks: policy.required_status_checks.checks,
+    },
+  });
+  scenario.observations.head = collection([check(run('RUN'))]);
+  expect(evaluate(scenario).requirements.items).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ kind: 'status-policy', state: 'unavailable' }),
+    ])
+  );
+});
+
+it('does not retain a generic unknown row after a fully supported check policy passes', () => {
+  const scenario = setup();
+  scenario.observations.head = collection([check(run('RUN'))]);
+  expect(evaluate(scenario).requirements.items).toMatchObject([
+    { kind: 'status-check', state: 'met' },
+  ]);
+});
+
+it.each(['complete', 'denied-policy', 'denied-checks'])(
+  'distinguishes no requirements from unavailable evidence: %s',
+  condition => {
+    const scenario = setup(null);
+    if (condition === 'denied-policy')
+      scenario.context.requirements = collection([], {
+        completeness: 'unknown',
+        totalCount: null,
+        source: { ...source, availability: 'denied', retryable: false },
+      });
+    if (condition === 'denied-checks')
+      scenario.observations.head = collection([], {
+        completeness: 'unknown',
+        totalCount: null,
+        source: { ...source, availability: 'denied', retryable: false },
+      });
+    const result = evaluate(scenario);
+    if (condition === 'complete')
+      expect(result.requirements).toMatchObject({
+        items: [],
+        completeness: 'complete',
+        source: { availability: 'available' },
+      });
+    if (condition === 'denied-policy')
+      expect(result.requirements.source).toMatchObject({
+        availability: 'denied',
+        retryable: false,
+      });
+    if (condition === 'denied-checks')
+      expect(result.requirements.items).toMatchObject([
+        { kind: 'check-evaluation', state: 'unavailable' },
+      ]);
+  }
+);
+
+it.each([
+  [
+    'check',
+    () => {
+      const scenario = setup();
+      scenario.observations.head = collection([check(run('FAILED', 7, { conclusion: 'FAILURE' }))]);
+      return scenario;
+    },
+    /^check:FAILED:failure$/,
+  ],
+  ['missing', () => setup(), /^required-check-missing:/],
+  [
+    'freshness',
+    () => {
+      const scenario = setup(checkPolicy(-1, true));
+      scenario.observations.head = collection([check(run('PASS'))]);
+      scenario.facts.comparison = field({
+        behindBy: 2,
+        baseTarget: { oid: 'base' },
+        headTarget: { oid: 'head' },
+      });
+      return scenario;
+    },
+    /^branch-behind:2$/,
+  ],
+  [
+    'conversation',
+    () => {
+      const scenario = setup({ required_conversation_resolution: { enabled: true } });
+      scenario.observations.threads = collection([{ id: 'UNRESOLVED', isResolved: false }]);
+      return scenario;
+    },
+    /^unresolved-threads:1;ids:UNRESOLVED$/,
+  ],
+  ['review', reviewed, /^eligible-approvals:1\/2;ids:REVIEW$/],
+  ['deployment', deployed, /^deployment:DEPLOY;environment:production;state:FAILURE$/],
+  [
+    'conflict',
+    () => {
+      const scenario = setup(null);
+      scenario.facts.mergeable = field('CONFLICTING');
+      return scenario;
+    },
+    /^mergeable:CONFLICTING$/,
+  ],
+] as const)(
+  'requires policy, current revision, and direct observation for every unmet %s row',
+  (_name, create, failure) => {
+    const result = evaluate(create());
+    const unmet = result.requirements.items.filter(row => row.state === 'unmet');
+    expect(unmet.length).toBeGreaterThan(0);
+    for (const row of unmet) {
+      expect(row.policy).toMatchObject({
+        enforcement: 'active',
+        base: { baseRepoFullName: 'o/r', baseRef: 'release', baseSha: 'base' },
+      });
+      expect(row.evidence).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            policyId: row.policy?.id,
+            headSha: 'head',
+            baseSha: 'base',
+            evaluatedSha: 'head',
+            observedAt: source.observedAt,
+            observation: expect.stringMatching(failure),
+          }),
+        ])
+      );
+    }
+  }
+);
 
 it.each(['failure', 'missing'] as const)(
   'retains current proof for a required check %s',

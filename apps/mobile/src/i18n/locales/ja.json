@@ -1817,7 +1817,9 @@
       "noCliInstancesDescription": "コンピューター上のプロジェクトで`kilo remote`を実行するか、すでに実行中の場合はKilo CLIを更新してください。",
       "instanceOnProject": "{{project}} の {{name}}",
       "instanceOnProjectSuffix": "{{project}} の {{name}} ({{suffix}})",
-      "runOnCloudAgent": "クラウドエージェントで実行"
+      "runOnCloudAgent": "クラウドエージェントで実行",
+      "terminals": "ターミナル",
+      "remotes": "リモートインスタンス"
     },
     "modePicker": {
       "title": "モードを選択",

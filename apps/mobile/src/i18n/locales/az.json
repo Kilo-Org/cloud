@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Kompüterinizdəki layihədə `kilo remote` işə salın və ya artıq işləyirsə Kilo CLI-ni yeniləyin.",
       "instanceOnProject": "{{project}} üzərində {{name}}",
       "instanceOnProjectSuffix": "{{project}} üzərində {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent-də işə salın"
+      "runOnCloudAgent": "Cloud Agent-də işə salın",
+      "terminals": "Terminallar",
+      "remotes": "Uzaq instansiyalar"
     },
     "modePicker": {
       "title": "Rejim seçin",

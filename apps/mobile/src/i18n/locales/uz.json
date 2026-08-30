@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Kompyuteringizdagi loyihada `kilo remote` ni ishga tushiring yoki allaqachon ishlayotgan bo'lsa Kilo CLI'ni yangilang.",
       "instanceOnProject": "{{project}} ustida {{name}}",
       "instanceOnProjectSuffix": "{{project}} ustida {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent'da yurgizish"
+      "runOnCloudAgent": "Cloud Agent'da yurgizish",
+      "terminals": "Terminallar",
+      "remotes": "Masofaviy missallar"
     },
     "modePicker": {
       "title": "Rejimni tanlash",

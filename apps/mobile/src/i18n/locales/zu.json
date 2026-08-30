@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Qalisa `kilo remote` kuphrojetha ekhompuyutheni yakho, noma buyekeza i-Kilo CLI uma isivele isebenza.",
       "instanceOnProject": "{{name}} ku-{{project}}",
       "instanceOnProjectSuffix": "{{name}} ku-{{project}} ({{suffix}})",
-      "runOnCloudAgent": "Sebenza ku-Cloud Agent"
+      "runOnCloudAgent": "Sebenza ku-Cloud Agent",
+      "terminals": "Amatheminali",
+      "remotes": "Izimo ezikude"
     },
     "modePicker": {
       "title": "Khetha imodi",

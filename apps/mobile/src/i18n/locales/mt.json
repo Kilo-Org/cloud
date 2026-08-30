@@ -2319,7 +2319,9 @@
       "noCliInstancesDescription": "Mexxi `kilo remote` fi proġett fuq il-kompjuter tiegħek, jew aġġorna l-Kilo CLI jekk waħda diġà qed taħdem.",
       "instanceOnProject": "{{name}} fuq {{project}}",
       "instanceOnProjectSuffix": "{{name}} fuq {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Mexxi fuq Cloud Agent"
+      "runOnCloudAgent": "Mexxi fuq Cloud Agent",
+      "terminals": "Terminali",
+      "remotes": "Istanzi remoti"
     },
     "modePicker": {
       "title": "Agħżel il-mod",

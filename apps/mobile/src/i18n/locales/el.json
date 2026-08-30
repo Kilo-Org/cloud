@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Εκτελέστε το `kilo remote` σε ένα έργο στον υπολογιστή σας ή ενημερώστε το Kilo CLI εάν εκτελείται ήδη.",
       "instanceOnProject": "{{name}} στο {{project}}",
       "instanceOnProjectSuffix": "{{name}} στο {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Εκτέλεση σε Cloud Agent"
+      "runOnCloudAgent": "Εκτέλεση σε Cloud Agent",
+      "terminals": "Τερματικά",
+      "remotes": "Απομακρυσμένες περιπτώσεις"
     },
     "modePicker": {
       "title": "Επιλογή λειτουργίας",

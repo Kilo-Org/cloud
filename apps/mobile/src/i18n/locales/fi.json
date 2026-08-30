@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Aja `kilo remote` projektissa tietokoneellasi tai päivitä Kilo CLI, jos sellainen on jo käynnissä.",
       "instanceOnProject": "{{name}} projektissa {{project}}",
       "instanceOnProjectSuffix": "{{name}} projektissa {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Aja Cloud Agentissa"
+      "runOnCloudAgent": "Aja Cloud Agentissa",
+      "terminals": "Päätteet",
+      "remotes": "Etäinstanssit"
     },
     "modePicker": {
       "title": "Valitse tila",

@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Компьютерийнхээ төсөлд `kilo remote` ажиллуулах, эсвэл аль хэдийн ажиллаж байгаа бол Kilo CLI-г шинэчилнэ үү.",
       "instanceOnProject": "{{name}} дээр {{project}}",
       "instanceOnProjectSuffix": "{{name}} дээр {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent дээр ажиллуулах"
+      "runOnCloudAgent": "Cloud Agent дээр ажиллуулах",
+      "terminals": "Терминалууд",
+      "remotes": "Алсын инстанцууд"
     },
     "modePicker": {
       "title": "Режим сонгох",

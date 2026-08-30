@@ -2303,7 +2303,9 @@
       "noCliInstancesDescription": "Vykdykite `kilo remote` projekte savo kompiuteryje arba atnaujinkite Kilo CLI, jei jis jau veikia.",
       "instanceOnProject": "{{name}} projekte {{project}}",
       "instanceOnProjectSuffix": "{{name}} projekte {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Vykdyti „Cloud Agent\""
+      "runOnCloudAgent": "Vykdyti „Cloud Agent\"",
+      "terminals": "Terminalai",
+      "remotes": "Nuotoliniai egzemplioriai"
     },
     "modePicker": {
       "title": "Pasirinkti režimą",

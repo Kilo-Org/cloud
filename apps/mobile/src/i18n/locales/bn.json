@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "আপনার কম্পিউটারের একটি প্রজেক্টে `kilo remote` চালান, অথবা একটি ইতিমধ্যে চলমান থাকলে কিলো CLI আপডেট করুন।",
       "instanceOnProject": "{{project}}-এ {{name}}",
       "instanceOnProjectSuffix": "{{project}}-এ {{name}} ({{suffix}})",
-      "runOnCloudAgent": "ক্লাউড এজেন্টে চালান"
+      "runOnCloudAgent": "ক্লাউড এজেন্টে চালান",
+      "terminals": "টার্মিনালসমূহ",
+      "remotes": "রিমোট ইনস্ট্যান্সসমূহ"
     },
     "modePicker": {
       "title": "মোড নির্বাচন করুন",

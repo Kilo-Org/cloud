@@ -355,15 +355,18 @@ const functionBody = (source: ts.SourceFile, name: string): ts.Node => {
   }
   return found;
 };
-const callPositions = (node: ts.Node, name: string): number[] => {
+type CallMatcher = string | ((call: ts.CallExpression) => boolean);
+const callPositions = (node: ts.Node, match: CallMatcher): number[] => {
   const found: number[] = [];
   const visit = (child: ts.Node): void => {
     if (ts.isCallExpression(child)) {
       const { expression } = child;
-      if (
-        (ts.isIdentifier(expression) && expression.text === name) ||
-        (ts.isPropertyAccessExpression(expression) && expression.name.text === name)
-      ) {
+      const matches =
+        typeof match === 'function'
+          ? match(child)
+          : (ts.isIdentifier(expression) && expression.text === match) ||
+            (ts.isPropertyAccessExpression(expression) && expression.name.text === match);
+      if (matches) {
         found.push(child.pos);
       }
     }
@@ -371,6 +374,20 @@ const callPositions = (node: ts.Node, name: string): number[] => {
   };
   visit(node);
   return found;
+};
+const isChatInputWrite = (call: ts.CallExpression): boolean => {
+  const { expression } = call;
+  // Exclude only the known pending-map write; other set calls can consume aliased input.
+  return (
+    expression.getText() !== 'pendingAdmissionsRef.current.set' &&
+    ((ts.isIdentifier(expression) && expression.text === 'set') ||
+      (ts.isPropertyAccessExpression(expression) && expression.name.text === 'set'))
+  );
+};
+const admissionPrecedesAction = (node: ts.Node, guard: string, action: CallMatcher): boolean => {
+  const [gate] = callPositions(node, guard);
+  const [firstAction] = callPositions(node, action);
+  return gate !== undefined && firstAction !== undefined && gate < firstAction;
 };
 
 describe('browser action boundary inventory', () => {
@@ -460,7 +477,7 @@ describe('browser action boundary inventory', () => {
 
   it.each([
     {
-      action: 'set',
+      action: isChatInputWrite,
       entry: 'submitDraft',
       file: 'agent-chat-panel.tsx',
       guard: 'acquireLocal',
@@ -472,6 +489,13 @@ describe('browser action boundary inventory', () => {
       file: 'agent-chat-panel.tsx',
       guard: 'acquireLocal',
       label: 'queued drain',
+    },
+    {
+      action: isChatInputWrite,
+      entry: 'submitQueuedMessage',
+      file: 'agent-chat-panel.tsx',
+      guard: 'acquireLocal',
+      label: 'queued input consumption',
     },
     {
       action: 'setRunRequest',
@@ -497,11 +521,50 @@ describe('browser action boundary inventory', () => {
   ])('keeps admission before execution for $label', ({ file, entry, guard, action }) => {
     const path = join(root, panel, file);
     const body = functionBody(parse(path, readFileSync(path, 'utf8')), entry);
-    const gates = callPositions(body, guard);
-    const actions = callPositions(body, action);
-    expect(gates.length).toBeGreaterThan(0);
-    expect(actions.length).toBeGreaterThan(0);
-    expect(gates[0]).toBeLessThan(actions[0] ?? -1);
+    expect(admissionPrecedesAction(body, guard, action)).toBe(true);
+  });
+
+  it.each([
+    ['draft clearing', 'submitDraft', "store.set(draftAtomFamily(conversationId), '');"],
+    [
+      'draft queueing',
+      'submitDraft',
+      'store.set(queuedMessageAtomFamily(conversationId), current => appendQueuedMessage(current, text));',
+    ],
+    [
+      'queue consumption',
+      'submitQueuedMessage',
+      'store.set(queuedMessageAtomFamily(conversationId), undefined);',
+    ],
+    [
+      'aliased draft clearing',
+      'submitDraft',
+      "const inputStore = store; inputStore.set(draftAtomFamily(conversationId), '');",
+    ],
+    [
+      'aliased queue consumption',
+      'submitQueuedMessage',
+      'const inputStore = store; inputStore.set(queuedMessageAtomFamily(conversationId), undefined);',
+    ],
+    [
+      'draft atom alias clearing',
+      'submitDraft',
+      "const draft = draftAtomFamily(conversationId); store.set(draft, '');",
+    ],
+    [
+      'queued atom alias consumption',
+      'submitQueuedMessage',
+      'const queuedAtom = queuedMessageAtomFamily(conversationId); store.set(queuedAtom, undefined);',
+    ],
+  ])('rejects %s before admission', (_label, entry, mutation) => {
+    const path = join(root, panel, 'agent-chat-panel.tsx');
+    const source = parse(path, readFileSync(path, 'utf8'));
+    const original = functionBody(source, entry).getText(source);
+    const gate = 'const admission = await getBrowserExecutionCoordinator().acquireLocal();';
+    const broken = original.replace(gate, `${mutation}\n${gate}`);
+    expect(broken).not.toBe(original);
+    const body = functionBody(parse(path, `const ${entry} = ${broken};`), entry);
+    expect(admissionPrecedesAction(body, 'acquireLocal', isChatInputWrite)).toBe(false);
   });
 
   it('keeps the workflow effect on the admitted shared context path', () => {

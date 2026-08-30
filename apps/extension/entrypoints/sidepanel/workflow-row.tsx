@@ -23,6 +23,7 @@ const confirmDeleteButtonClass =
  */
 export const WorkflowRow = ({
   activeConversationRunning,
+  admissionPending,
   allowWorkflowsInSafeMode,
   autoApproveChanges,
   blocker,
@@ -32,6 +33,7 @@ export const WorkflowRow = ({
   onRun,
 }: {
   activeConversationRunning: boolean;
+  admissionPending: boolean;
   allowWorkflowsInSafeMode: boolean;
   autoApproveChanges: boolean;
   blocker: string | undefined;
@@ -108,9 +110,10 @@ export const WorkflowRow = ({
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <button
+          aria-busy={admissionPending}
           aria-label={`Run workflow "${item.name}"`}
           className={runButtonClass}
-          disabled={disabledReason !== undefined}
+          disabled={admissionPending || disabledReason !== undefined}
           onClick={startRun}
           title={disabledReason?.label}
           type="button"
@@ -138,28 +141,20 @@ export const WorkflowRow = ({
       </div>
 
       {collectingInput && (
-        <>
-          <WorkflowRunPrompt
-            name={item.name}
-            onCancel={() => {
-              pendingRunRef.current?.abort();
-              pendingRunRef.current = undefined;
-              setCollectingInput(false);
-            }}
-            onRun={input => {
-              void submitRun(input);
-            }}
-            params={item.params}
-          />
-          {blocker === undefined ? null : (
-            <p
-              className="type-body fixed inset-x-4 top-4 z-[31] rounded-md border border-status-yellow-500/30 bg-surface-raised p-3 text-status-yellow-400"
-              role="alert"
-            >
-              {blocker}
-            </p>
-          )}
-        </>
+        <WorkflowRunPrompt
+          admissionPending={admissionPending}
+          blocker={blocker}
+          name={item.name}
+          onCancel={() => {
+            pendingRunRef.current?.abort();
+            pendingRunRef.current = undefined;
+            setCollectingInput(false);
+          }}
+          onRun={input => {
+            void submitRun(input);
+          }}
+          params={item.params}
+        />
       )}
     </li>
   );

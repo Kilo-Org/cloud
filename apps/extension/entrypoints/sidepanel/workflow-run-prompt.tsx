@@ -14,11 +14,15 @@ const primaryButtonClass =
  * from the input so the script sees undefined rather than an empty string.
  */
 export const WorkflowRunPrompt = ({
+  admissionPending,
+  blocker,
   name,
   onCancel,
   onRun,
   params,
 }: {
+  admissionPending: boolean;
+  blocker: string | undefined;
   name: string;
   onCancel: () => void;
   onRun: (input: Record<string, string>) => void;
@@ -66,13 +70,25 @@ export const WorkflowRunPrompt = ({
             />
           </label>
         ))}
+        <p
+          className={admissionPending ? 'type-body text-status-yellow-400' : 'sr-only'}
+          role="status"
+        >
+          {admissionPending ? blocker : undefined}
+        </p>
+        {!admissionPending && blocker !== undefined ? (
+          <p className="type-body text-status-yellow-400" role="alert">
+            {blocker}
+          </p>
+        ) : null}
         <div className="flex justify-end gap-2">
           <button className={secondaryButtonClass} onClick={onCancel} type="button">
             Cancel
           </button>
           <button
+            aria-busy={admissionPending}
             className={primaryButtonClass}
-            disabled={missingRequired}
+            disabled={missingRequired || admissionPending}
             onClick={submit}
             type="button"
           >

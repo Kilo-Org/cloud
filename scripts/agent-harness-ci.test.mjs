@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   globSync,
   mkdirSync,
@@ -170,6 +170,58 @@ test('workspace selection uses the PR target/head, pushed range, and local fallb
     assert.deepEqual(selected('push', { before }), ['@kilocode/agent-harness-worker']);
   write('services/base-only/src/probe.test.ts', 'export const local = 1;');
   assert.deepEqual(selected('', {}), [...names].sort());
+});
+
+test('Vitest declarations preserve Worker byte responses and timingSafeEqual without DOM types', t => {
+  const { directory, write } = fixture(t, join(root, 'services/agent-harness'));
+  write(
+    'tsconfig.json',
+    JSON.stringify({
+      compilerOptions: {
+        target: 'ESNext',
+        module: 'ESNext',
+        moduleResolution: 'Bundler',
+        lib: ['ESNext'],
+        types: ['node', '@cloudflare/workers-types'],
+        strict: true,
+        skipLibCheck: true,
+        declaration: true,
+        emitDeclarationOnly: true,
+        noEmitOnError: true,
+        outDir: 'declarations',
+      },
+      files: ['probe.ts'],
+    })
+  );
+  for (const withVitest of [false, true]) {
+    write(
+      'probe.ts',
+      `${withVitest ? "import 'vitest/config';" : ''}
+export function byteResponse(bytes: Uint8Array<ArrayBufferLike>) {
+  return new Response(bytes);
+}
+export function safeEqual(left: ArrayBuffer, right: ArrayBuffer) {
+  return crypto.subtle.timingSafeEqual(left, right);
+}`
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(root, 'node_modules/@typescript/native-preview/bin/tsgo.js'),
+        '-p',
+        directory,
+        '--listFiles',
+      ],
+      { cwd: directory, encoding: 'utf8' }
+    );
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.doesNotMatch(result.stdout, /[/\\]lib\.dom(?:\.iterable)?\.d\.ts/);
+    if (withVitest) assert.match(result.stdout, /vitest[/\\]optional-types\.d\.ts/);
+    assert.match(
+      readFileSync(join(directory, 'declarations/probe.d.ts'), 'utf8'),
+      /export declare function safeEqual\(left: ArrayBuffer, right: ArrayBuffer\): boolean;/
+    );
+  }
 });
 
 test('Jest discovers every harness TSX test without expanding unrelated discovery', t => {

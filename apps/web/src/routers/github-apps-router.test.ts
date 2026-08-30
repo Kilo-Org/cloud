@@ -128,6 +128,7 @@ beforeAll(async () => {
 });
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
+const multiInstallationOrganizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const integrationId = '00000000-0000-4000-8000-000000000002';
 const organizationRoles = [
   'owner',
@@ -172,6 +173,8 @@ function organizationIntegration(): PlatformIntegration {
 describe('githubAppsRouter organization install capability', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS =
+      '9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55';
     mockEnsureOrganizationAccess.mockResolvedValue('member');
     mockGetGitHubAppTypeForOrganization.mockResolvedValue('standard');
     mockCreateInstallState.mockResolvedValue('install-token');
@@ -222,15 +225,68 @@ describe('githubAppsRouter organization install capability', () => {
     }
   );
 
-  it.each(organizationRoles)('reports add capability for organization %s roles', async role => {
-    mockEnsureOrganizationAccess.mockResolvedValue(role);
+  it.each(organizationRoles)(
+    'reports first-install capability for organization %s roles',
+    async role => {
+      mockEnsureOrganizationAccess.mockResolvedValue(role);
+      const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+      const listed = await caller.listOrganizationInstallations({ organizationId });
+
+      expect(listed.canAdd).toBe(role === 'owner' || role === 'admin');
+      expect(listed.installations).toHaveLength(0);
+    }
+  );
+
+  it('hides additional installation capability for organizations outside the allowlist', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockListIntegrations.mockResolvedValue([organizationIntegration()]);
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
 
     const listed = await caller.listOrganizationInstallations({ organizationId });
 
-    expect(listed.canAdd).toBe(role === 'owner' || role === 'admin');
+    expect(listed.canAdd).toBe(false);
     expect(listed.installations).toHaveLength(1);
+  });
+
+  it('reports additional installation capability for allowlisted organizations', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([
+      { ...organizationIntegration(), owned_by_organization_id: multiInstallationOrganizationId },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    const listed = await caller.listOrganizationInstallations({
+      organizationId: multiInstallationOrganizationId,
+    });
+
+    expect(listed.canAdd).toBe(true);
+  });
+
+  it('refuses to mint another install state outside the allowlist', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([organizationIntegration()]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.mintInstallState({ organizationId })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(mockCreateInstallState).not.toHaveBeenCalled();
+  });
+
+  it('mints another install state for an allowlisted organization', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([
+      { ...organizationIntegration(), owned_by_organization_id: multiInstallationOrganizationId },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.mintInstallState({ organizationId: multiInstallationOrganizationId })
+    ).resolves.toEqual({ token: 'install-token' });
+    expect(mockCreateInstallState).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerId: multiInstallationOrganizationId })
+    );
   });
 
   it('still denies callers outside the organization role matrix before minting state', async () => {

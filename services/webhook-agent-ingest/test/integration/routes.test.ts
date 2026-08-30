@@ -1,4 +1,4 @@
-import { SELF, env } from 'cloudflare:test';
+import { SELF, env, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import { encodeUserIdForPath } from '../../src/util/user-id-encoding';
 
@@ -268,6 +268,50 @@ describe('Hono Routes', () => {
       const body = await response.json();
       expect(body.success).toBe(false);
       expect(body.error).toBe('Missing webhook identification headers');
+    });
+  });
+
+  describe('Scheduled trigger invocation', () => {
+    it('requires internal authentication and invokes a scheduled OAuth user trigger', async () => {
+      const userId = 'oauth/google:invoke-user';
+      const triggerId = 'invoke-trigger';
+      const namespace = `user/${userId}`;
+      const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(`${namespace}/${triggerId}`));
+      await stub.configure(namespace, triggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Run now',
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+      });
+
+      const path = `/api/triggers/user/${encodeUserIdForPath(userId)}/${triggerId}/invoke`;
+      const originalSecret = env.INTERNAL_API_SECRET;
+      Object.defineProperty(env, 'INTERNAL_API_SECRET', {
+        configurable: true,
+        value: { get: async () => 'test-internal-secret' },
+      });
+      try {
+        const unauthorized = await SELF.fetch(`http://localhost${path}`, { method: 'POST' });
+        expect(unauthorized.status).toBe(401);
+
+        const response = await SELF.fetch(`http://localhost${path}`, {
+          method: 'POST',
+          headers: { 'X-Internal-API-Key': 'test-internal-secret' },
+        });
+        expect(response.status).toBe(202);
+        const body = await response.json();
+        expect(body).toMatchObject({ success: true, data: { requestId: expect.any(String) } });
+      } finally {
+        Object.defineProperty(env, 'INTERNAL_API_SECRET', {
+          configurable: true,
+          value: originalSecret,
+        });
+      }
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(await state.storage.getAlarm()).not.toBeNull();
+      });
     });
   });
 });

@@ -9,7 +9,8 @@ import { SessionMessageList } from '@/components/agents/session-message-list';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { CompactRetry } from '@/components/code-reviewer/review-spectator-retry';
 import {
-  appendSpectatorRow,
+  appendSpectatorRows,
+  createSpectatorRowBatcher,
   formatSpectatorTime,
   type SpectatorRow,
   spectatorRowsFromEntries,
@@ -117,6 +118,16 @@ export function ReviewSpectator({
     // stale start from calling `connect()` and makes it destroy its connection.
     let disposed = false;
     let connection: Connection | null = null;
+    const clearLiveError = () => {
+      if (!disposed) {
+        setLiveError(false);
+      }
+    };
+    const batcher = createSpectatorRowBatcher(batch => {
+      if (!disposed) {
+        setLiveRows(prev => appendSpectatorRows(prev, batch));
+      }
+    });
 
     void (async () => {
       if (liveCloudId === null) {
@@ -132,17 +143,19 @@ export function ReviewSpectator({
               return;
             }
             const row = toSpectatorRow(event, t);
-            if (row !== null) {
-              const keyedRow =
-                row.key === undefined ? { ...row, key: `event-${event.eventId}` } : row;
-              setLiveRows(prev => appendSpectatorRow(prev, keyedRow));
+            if (row === null) {
+              return;
             }
+            // Synthetic events (connected, snapshots, queued messages) all carry
+            // eventId 0. A shared key would collapse them into one row.
+            const keyedRow =
+              row.key === undefined && event.eventId > 0
+                ? { ...row, key: `event-${event.eventId}` }
+                : row;
+            batcher.push(keyedRow);
           },
-          onConnected: () => {
-            if (!disposed) {
-              setLiveError(false);
-            }
-          },
+          onConnected: clearLiveError,
+          onReconnected: clearLiveError,
           onDisconnected: () => {
             if (!disposed) {
               setLiveError(true);
@@ -171,6 +184,7 @@ export function ReviewSpectator({
 
     return () => {
       disposed = true;
+      batcher.dispose();
       connection?.destroy();
     };
   }, [liveCloudId, info?.organizationId, retryNonce, t]);

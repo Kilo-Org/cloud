@@ -76,6 +76,9 @@ test('Android fingerprint skips only Expo extra beyond defaults', () => {
   assert.deepEqual(options.platforms, ['android']);
   assert.equal(options.silent, true);
   assert.notEqual(options.sourceSkips, 0);
+  // The generated tree is ignored so the hash is input-deterministic across
+  // worktrees and machines.
+  assert.deepEqual(options.ignorePaths, ['android/**']);
   assert.deepEqual(
     options.extraSources.map(source => ({
       type: source.type,

@@ -1,12 +1,12 @@
 /* eslint-disable max-lines, typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; max-lines holds the focus and foreground refetch tests beside the existing render-branch assertions in one mount test. */
 import { createElement, type ReactElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, type default as TestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { type QueryClient } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
-import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
+import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { SessionHistoryScreen } from './session-history-screen';
 
 const listState = vi.hoisted(() => ({
@@ -174,23 +174,9 @@ function fireFocus(): void {
 async function renderScreen(
   queryClient: QueryClient = createTestQueryClient()
 ): Promise<TestRenderer.ReactTestRenderer> {
-  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
-    current: undefined,
-  };
-  await act(async () => {
-    await Promise.resolve();
-    rendererRef.current = TestRenderer.create(
-      createElement(
-        QueryClientProvider,
-        { client: queryClient },
-        createElement(SessionHistoryScreen)
-      )
-    );
+  const { renderer } = await renderWithProviders(createElement(SessionHistoryScreen), {
+    queryClient,
   });
-  const renderer = rendererRef.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
   mountedRenderers.push(renderer);
   return renderer;
 }

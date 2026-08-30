@@ -315,7 +315,9 @@ describe('AgentSessionListScreen live tab', () => {
 
     expect(seeAll.props.accessibilityRole).toBe('button');
     const control = renderer.root.find(
-      node => node.type === 'Pressable' && node.props.accessibilityHint === 'profile.selectAccount'
+      node =>
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityHint === 'profile.selectAccount'
     );
     expect(control.props.accessibilityRole).toBe('button');
     expect(control.props.accessibilityLabel).toBe('profile.personal');
@@ -542,11 +544,12 @@ describe('AgentSessionListScreen live tab', () => {
     const control = () =>
       renderer.root.find(
         node =>
-          node.type === 'Pressable' && node.props.accessibilityHint === 'profile.selectAccount'
+          (node.type as string) === 'Pressable' &&
+          node.props.accessibilityHint === 'profile.selectAccount'
       );
     expect(control().props.accessibilityState).toEqual({ busy: true, disabled: true });
     expect(
-      renderer.root.findAll(node => node.type === 'Text').flatMap(node => node.children)
+      renderer.root.findAll(node => (node.type as string) === 'Text').flatMap(node => node.children)
     ).not.toContain('profile.personal');
     orgState.organizationId = 'org-1';
     orgState.isLoaded = true;

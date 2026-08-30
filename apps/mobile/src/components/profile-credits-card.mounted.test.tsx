@@ -5,7 +5,7 @@
 // safe because sign-out clears the React Query cache (`queryClient.clear()`), so
 // a new owner refetches and never reuses the previous owner's cached balance.
 
-import { createElement } from 'react';
+import { createElement, type ElementType } from 'react';
 import { Platform, Pressable } from 'react-native';
 import { act, type ReactTestRenderer } from 'react-test-renderer';
 import { type QueryClient } from '@tanstack/react-query';
@@ -258,7 +258,7 @@ describe('CreditsCard balance state', () => {
       expect(texts()).toContain(label);
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
       const status = renderer.root.find(
-        node => node.type === 'Text' && node.props.accessibilityLiveRegion === 'polite'
+        node => (node.type as string) === 'Text' && node.props.accessibilityLiveRegion === 'polite'
       );
       expect(status.children).toContain('Could not save setting');
       const save = Promise.withResolvers<undefined>();
@@ -271,7 +271,7 @@ describe('CreditsCard balance state', () => {
       const busyRetry = renderer.root.findByProps({ accessibilityLabel: 'Retry' });
       expect(busyRetry.props.accessibilityState).toEqual({ busy: true, disabled: true });
       expect(busyRetry.props.disabled).toBe(true);
-      expect(busyRetry.findAllByType('ActivityIndicator')).toHaveLength(1);
+      expect(busyRetry.findAllByType('ActivityIndicator' as ElementType)).toHaveLength(1);
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
       await act(() => {
         save.resolve(undefined);

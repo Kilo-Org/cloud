@@ -122,13 +122,14 @@ describe('HomeScreen composition', () => {
     activeIsError.value = false;
     const renderer = await mountHome();
     const control = renderer.root.find(
-      node => node.type === 'Pressable' && node.props.accessibilityHint === 'Select account'
+      node =>
+        (node.type as string) === 'Pressable' && node.props.accessibilityHint === 'Select account'
     );
     expect(control.props.accessibilityRole).toBe('button');
     expect(control.props.accessibilityState).toEqual({ busy: !loaded, disabled: !loaded });
     expect(control.props.accessibilityLabel).toBe(loaded ? 'Home organization' : 'Select account');
     expect(
-      renderer.root.findAll(node => node.type === 'Text').flatMap(node => node.children)
+      renderer.root.findAll(node => (node.type as string) === 'Text').flatMap(node => node.children)
     ).not.toContain('Personal');
     act(() => {
       renderer.unmount();
@@ -177,7 +178,7 @@ describe('HomeScreen composition', () => {
     orgLoaded.value = true;
     const renderer = await mountHome();
     expect(
-      renderer.root.findAll(node => node.type === 'Text').flatMap(node => node.children)
+      renderer.root.findAll(node => (node.type as string) === 'Text').flatMap(node => node.children)
     ).toContain('Home organization');
     const queryError = findNode(renderer.root, 'QueryError');
     expect(queryError).toBeDefined();
@@ -200,7 +201,7 @@ describe('HomeScreen composition', () => {
     orgLoaded.value = true;
     const renderer = await mountHome();
     expect(
-      renderer.root.findAll(node => node.type === 'Text').flatMap(node => node.children)
+      renderer.root.findAll(node => (node.type as string) === 'Text').flatMap(node => node.children)
     ).toContain('Home organization');
     const queryError = findNode(renderer.root, 'QueryError');
     expect(queryError).toBeDefined();

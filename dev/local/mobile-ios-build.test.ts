@@ -99,6 +99,9 @@ test('fingerprint options include iOS platform and only skip the Expo extra sect
   const options = buildFingerprintOptions();
   assert.deepEqual(options.platforms, ['ios']);
   assert.equal(options.silent, true);
+  // The generated tree is ignored so the hash is input-deterministic across
+  // worktrees and machines.
+  assert.deepEqual(options.ignorePaths, ['ios/**']);
   // SourceSkips.ExpoConfigExtraSection === 4096
   assert.equal(options.sourceSkips & 4096, 4096);
   assert.deepEqual(
@@ -888,6 +891,115 @@ test('runBuild on miss invokes the builder once, publishes, and installs', async
       onMiss: async () => undefined,
     });
     assert.ok(hit);
+  } finally {
+    fs.rmSync(cacheRoot, { recursive: true, force: true });
+    fs.rmSync(claimRoot, { recursive: true, force: true });
+    fs.rmSync(worktree, { recursive: true, force: true });
+  }
+});
+
+test('runBuild on miss publishes a remote-fetched app without the local builder or the build slot', async () => {
+  const cacheRoot = makeTempDir('build-remote');
+  const claimRoot = makeTempDir('claims');
+  const worktree = makeTempDir('wt');
+  const udid = 'UDID-remote';
+  fs.writeFileSync(
+    path.join(claimRoot, `${udid}.json`),
+    JSON.stringify({
+      worktreeRoot: worktree,
+      claimId: 'c',
+      status: 'ready',
+      claimedAt: new Date().toISOString(),
+      deviceId: udid,
+    })
+  );
+  let builderCalls = 0;
+  let slots = 0;
+  let fetches = 0;
+  const installs: string[] = [];
+  const deps: BuildDeps = makeBuildDeps({
+    env: fixedEnv({ cacheRoot }),
+    worktreeRoot: worktree,
+    claimRoot,
+    build: async () => {
+      builderCalls += 1;
+    },
+    withNativeBuildSlot: async run => {
+      slots += 1;
+      return run();
+    },
+    fetchRemote: async ({ nativeHash, productsDir }) => {
+      fetches += 1;
+      assert.equal(nativeHash, 'native-hash');
+      const app = path.join(productsDir, 'Kilo.app');
+      fs.mkdirSync(app, { recursive: true });
+      fs.writeFileSync(path.join(app, 'Info.plist'), '<plist/>');
+      return true;
+    },
+    install: (_udid, app) => {
+      installs.push(app);
+    },
+  });
+  try {
+    await runBuild(udid, deps);
+    assert.equal(fetches, 1);
+    assert.equal(builderCalls, 0);
+    assert.equal(slots, 0);
+    assert.equal(installs.length, 1);
+    const key = buildCompatibilityKey({
+      nativeHash: 'native-hash',
+      xcodeBuildVersion: '16A0000',
+      simulatorSdkVersion: '17.5',
+      hostArch: 'arm64',
+      buildMode: 'debug-dev-client',
+    });
+    // The remote-fetched app went through the full publish path: the
+    // installed path is the validated on-disk cache entry.
+    assert.equal(installs[0], path.join(cacheRoot, 'entries', key, 'Kilo.app'));
+  } finally {
+    fs.rmSync(cacheRoot, { recursive: true, force: true });
+    fs.rmSync(claimRoot, { recursive: true, force: true });
+    fs.rmSync(worktree, { recursive: true, force: true });
+  }
+});
+
+test('runBuild falls back to the local builder when the remote fetch misses', async () => {
+  const cacheRoot = makeTempDir('build-remote-miss');
+  const claimRoot = makeTempDir('claims');
+  const worktree = makeTempDir('wt');
+  const udid = 'UDID-remote-miss';
+  fs.writeFileSync(
+    path.join(claimRoot, `${udid}.json`),
+    JSON.stringify({
+      worktreeRoot: worktree,
+      claimId: 'c',
+      status: 'ready',
+      claimedAt: new Date().toISOString(),
+      deviceId: udid,
+    })
+  );
+  let builderCalls = 0;
+  const deps: BuildDeps = makeBuildDeps({
+    env: fixedEnv({ cacheRoot }),
+    worktreeRoot: worktree,
+    claimRoot,
+    fetchRemote: async () => false,
+    build: async ({ derivedDataPath }) => {
+      builderCalls += 1;
+      const app = path.join(
+        derivedDataPath,
+        'Build',
+        'Products',
+        'Debug-iphonesimulator',
+        'Kilo.app'
+      );
+      fs.mkdirSync(app, { recursive: true });
+      fs.writeFileSync(path.join(app, 'Info.plist'), '<plist/>');
+    },
+  });
+  try {
+    await runBuild(udid, deps);
+    assert.equal(builderCalls, 1);
   } finally {
     fs.rmSync(cacheRoot, { recursive: true, force: true });
     fs.rmSync(claimRoot, { recursive: true, force: true });

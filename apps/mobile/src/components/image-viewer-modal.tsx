@@ -141,7 +141,12 @@ export function ImageViewerModal({
   }));
 
   return (
-    <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      backdropColor={colors.background}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <View className="flex-1 bg-background">
         <View
           className="flex-row items-center justify-between border-b border-border bg-background px-4"

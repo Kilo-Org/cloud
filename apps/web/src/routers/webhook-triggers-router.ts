@@ -21,6 +21,7 @@ import {
   getWorkerTrigger,
   updateWorkerTrigger,
   deleteWorkerTrigger,
+  invokeWorkerScheduledTrigger,
   listWorkerRequests,
   buildInboundUrl,
   type EnrichedCapturedRequest,
@@ -44,6 +45,7 @@ export const WebhookTriggerCreateInput = z
     mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
     model: z.string().min(1, 'Model is required').optional(),
     variant: variantSchema.optional(),
+    sandboxAllocation: z.literal('isolated-standard').optional(),
     profileId: z.string().uuid().optional(),
     // Shared fields
     promptTemplate: z
@@ -118,6 +120,13 @@ export const WebhookTriggerCreateInput = z
           message: 'KiloClaw instance is required',
           path: ['kiloclawInstanceId'],
         });
+      if (data.sandboxAllocation !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Sandbox allocation is not applicable for KiloClaw Chat triggers',
+          path: ['sandboxAllocation'],
+        });
+      }
     }
   });
 
@@ -130,6 +139,7 @@ export const WebhookTriggerUpdateInput = z
     mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
     model: z.string().min(1).optional(),
     variant: variantSchema.nullable().optional(),
+    sandboxAllocation: z.literal('isolated-standard').nullable().optional(),
     promptTemplate: z.string().min(1).max(10000).optional(),
     profileId: z.string().uuid().optional(),
     autoCommit: z.boolean().nullable().optional(),
@@ -170,6 +180,13 @@ export const WebhookTriggerUpdateInput = z
       });
     }
   });
+
+export const WebhookTriggerInvokeInput = z
+  .object({
+    triggerId: triggerIdSchema,
+    organizationId: z.string().uuid().optional(),
+  })
+  .strict();
 
 /**
  * Helper to verify trigger ownership via PostgreSQL.
@@ -260,6 +277,15 @@ async function assertProfileOwnership(
 }
 
 export const webhookTriggersRouter = createTRPCRouter({
+  capabilities: baseProcedure
+    .input(z.object({ organizationId: z.string().uuid().optional() }))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      return { canSetSandboxAllocation: ctx.user.is_admin };
+    }),
+
   /**
    * List triggers for current user or organization.
    * Reads from PostgreSQL only (can't enumerate DOs).
@@ -398,6 +424,13 @@ export const webhookTriggersRouter = createTRPCRouter({
       await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
     }
 
+    if (input.sandboxAllocation === 'isolated-standard' && !ctx.user.is_admin) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Kilo admin access is required to select Dedicated Standard',
+      });
+    }
+
     // KiloClaw Chat triggers are personal only — org-scoped triggers would fail at delivery
     if (input.targetType === 'kiloclaw_chat' && input.organizationId) {
       throw new TRPCError({
@@ -486,6 +519,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           mode: input.mode,
           model: input.model,
           variant: input.variant,
+          sandboxAllocation: input.sandboxAllocation,
           promptTemplate: input.promptTemplate,
           profileId: input.profileId,
           autoCommit: input.autoCommit,
@@ -568,6 +602,20 @@ export const webhookTriggersRouter = createTRPCRouter({
     // Verify ownership via PostgreSQL
     const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
 
+    if (input.sandboxAllocation !== undefined && dbTrigger.target_type === 'kiloclaw_chat') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Sandbox allocation is not applicable for KiloClaw Chat triggers',
+      });
+    }
+
+    if (input.sandboxAllocation === 'isolated-standard' && !ctx.user.is_admin) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Kilo admin access is required to select Dedicated Standard',
+      });
+    }
+
     // Validate profile ownership if profileId provided
     if (input.profileId) {
       await assertProfileOwnership(userId, input.organizationId, input.profileId);
@@ -577,6 +625,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       input.mode,
       input.model,
       input.variant,
+      input.sandboxAllocation,
       input.promptTemplate,
       input.profileId,
       input.autoCommit,
@@ -602,6 +651,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       mode: input.mode,
       model: input.model,
       variant: input.variant,
+      sandboxAllocation: input.sandboxAllocation,
       promptTemplate: input.promptTemplate,
       isActive: input.isActive,
       profileId: input.profileId,
@@ -662,6 +712,43 @@ export const webhookTriggersRouter = createTRPCRouter({
       ...workerResult.config,
       inboundUrl,
     };
+  }),
+
+  invoke: baseProcedure.input(WebhookTriggerInvokeInput).mutation(async ({ ctx, input }) => {
+    const userId = ctx.user.id;
+
+    if (input.organizationId) {
+      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
+    }
+
+    await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
+
+    const result = await invokeWorkerScheduledTrigger(
+      input.organizationId ? undefined : userId,
+      input.organizationId,
+      input.triggerId
+    );
+
+    if (result.success) {
+      return { requestId: result.requestId };
+    }
+
+    if (result.status === 404) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Trigger not found' });
+    }
+    if (result.status === 400) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Trigger is not scheduled' });
+    }
+    if (result.status === 409) {
+      throw new TRPCError({ code: 'CONFLICT', message: 'Trigger is inactive' });
+    }
+    if (result.status === 429) {
+      throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: 'Invocation limit reached' });
+    }
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Unable to confirm invocation. Check captured requests before trying again.',
+    });
   }),
 
   /**

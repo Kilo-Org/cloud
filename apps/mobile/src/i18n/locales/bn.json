@@ -2111,7 +2111,9 @@
     "sessionExited": "সেশন শেষ হয়েছে",
     "remoteSpawnRetryable": "ইনস্ট্যান্সে পৌঁছানো যায়নি — এটি সংযোগ বিচ্ছিন্ন হতে পারে।",
     "remoteSpawnNonRetryable": "ইনস্ট্যান্সটি সেশন শুরু করতে ব্যর্থ হয়েছে — মেশিনটি পরীক্ষা করুন বা CLI আপডেট করুন।",
-    "remoteSpawnInstanceDisconnected": "নির্বাচিত ইনস্ট্যান্সটি সংযোগ বিচ্ছিন্ন হয়েছে। Cloud Agent-এ একটি সেশন শুরু করুন বা অন্য একটি ইনস্ট্যান্স বেছে নিন।"
+    "remoteSpawnInstanceDisconnected": "নির্বাচিত ইনস্ট্যান্সটি সংযোগ বিচ্ছিন্ন হয়েছে। Cloud Agent-এ একটি সেশন শুরু করুন বা অন্য একটি ইনস্ট্যান্স বেছে নিন।",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2271,7 +2273,9 @@
       "noCliInstancesDescription": "আপনার কম্পিউটারের একটি প্রজেক্টে `kilo remote` চালান, অথবা একটি ইতিমধ্যে চলমান থাকলে কিলো CLI আপডেট করুন।",
       "instanceOnProject": "{{project}}-এ {{name}}",
       "instanceOnProjectSuffix": "{{project}}-এ {{name}} ({{suffix}})",
-      "runOnCloudAgent": "ক্লাউড এজেন্টে চালান"
+      "runOnCloudAgent": "ক্লাউড এজেন্টে চালান",
+      "terminals": "টার্মিনালসমূহ",
+      "remotes": "রিমোট ইনস্ট্যান্সসমূহ"
     },
     "modePicker": {
       "title": "মোড নির্বাচন করুন",

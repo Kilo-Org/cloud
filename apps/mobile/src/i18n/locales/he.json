@@ -1665,7 +1665,10 @@
     "sessionExited": "ההפעלה הסתיימה",
     "remoteSpawnRetryable": "לא ניתן היה ליצור קשר עם המופע — ייתכן שהחיבור נותק.",
     "remoteSpawnNonRetryable": "המופע לא הצליח להפעיל את הסשן — בדוק את המחשב או עדכן את ה-CLI.",
-    "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל סשן ב-Cloud Agent או בחר מופע אחר."
+    "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל סשן ב-Cloud Agent או בחר מופע אחר.",
+    "liveCount_one": "{{count}} חי",
+    "liveCount_other": "{{count}} חי",
+    "liveCount_two": "{{count}} חי"
   },
   "agentChat": {
     "session": {
@@ -1826,7 +1829,9 @@
       "noCliInstancesDescription": "הרץ `kilo remote` בפרויקט במחשב שלך, או עדכן את Kilo CLI אם אחד כבר פועל.",
       "instanceOnProject": "{{name}} ב-{{project}}",
       "instanceOnProjectSuffix": "{{name}} ב-{{project}} ({{suffix}})",
-      "runOnCloudAgent": "הרץ על סוכן ענן"
+      "runOnCloudAgent": "הרץ על סוכן ענן",
+      "terminals": "מסופים",
+      "remotes": "מופעים מרוחקים"
     },
     "modePicker": {
       "title": "בחר מצב",

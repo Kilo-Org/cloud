@@ -2111,7 +2111,9 @@
     "sessionExited": "Oge nnọkọ kwụsịrị",
     "remoteSpawnRetryable": "Enweghị ike iru ebe a na-akpọ — o nwere ike ịkpụpụla.",
     "remoteSpawnNonRetryable": "Ụlọ ọrụ ahụ adịghị ebido oge nnọkọ — lelee igwe ma ọ bụ melite CLI.",
-    "remoteSpawnInstanceDisconnected": "Ebe a họpụtara ịkpụpụla. Malite oge nnọkọ na Cloud Agent ma ọ bụ họrọ ebe ọzọ."
+    "remoteSpawnInstanceDisconnected": "Ebe a họpụtara ịkpụpụla. Malite oge nnọkọ na Cloud Agent ma ọ bụ họrọ ebe ọzọ.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2271,7 +2273,9 @@
       "noCliInstancesDescription": "Gbaa `kilo remote` n'ọrụ dị na kọmputa gị, ma ọ bụ melite Kilo CLI ma ọ bụrụ na otu na-agba ọsọ.",
       "instanceOnProject": "{{name}} na {{project}}",
       "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Gbaa na Cloud Agent"
+      "runOnCloudAgent": "Gbaa na Cloud Agent",
+      "terminals": "Terminal",
+      "remotes": "Ihe atụ dị anya"
     },
     "modePicker": {
       "title": "Họrọ ụdị",

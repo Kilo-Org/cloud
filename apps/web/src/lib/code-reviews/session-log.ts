@@ -42,7 +42,7 @@ export function v2SnapshotToLogEntries(
     const time = info.time as { created?: number } | undefined;
     const baseTs = time?.created ? new Date(time.created).toISOString() : '';
 
-    // Show the initial user prompt as a single log line (truncated)
+    // Show the initial user prompt as a single log line
     if (role === 'user') {
       if (options.includeFullAssistantText) continue;
       const textContent = (msg.parts ?? [])
@@ -51,8 +51,7 @@ export function v2SnapshotToLogEntries(
         .join('')
         .trim();
       if (textContent) {
-        const truncated = textContent.length > 300 ? textContent.slice(0, 300) + '…' : textContent;
-        entries.push({ timestamp: baseTs, eventType: 'info', message: truncated });
+        entries.push({ timestamp: baseTs, eventType: 'info', message: textContent });
       }
       continue;
     }
@@ -79,8 +78,7 @@ export function v2SnapshotToLogEntries(
           const command = input.command;
           const query = input.query ?? input.pattern;
           if (typeof filePath === 'string') detail = filePath;
-          else if (typeof command === 'string')
-            detail = command.length > 120 ? command.slice(0, 120) + '…' : command;
+          else if (typeof command === 'string') detail = command;
           else if (typeof query === 'string') detail = query;
         }
 
@@ -115,8 +113,7 @@ export function v2SnapshotToLogEntries(
           });
           continue;
         }
-        const truncated = text.length > 200 ? text.slice(0, 200) + '…' : text;
-        entries.push({ timestamp: baseTs, eventType: 'text', message: truncated });
+        entries.push({ timestamp: baseTs, eventType: 'text', message: text });
         continue;
       }
 
@@ -164,8 +161,7 @@ export function v1BlobToLogEntries(
       if (options.includeFullAssistantText) continue;
       const text = (msg.text || msg.content || '').trim();
       if (text) {
-        const truncated = text.length > 300 ? text.slice(0, 300) + '…' : text;
-        entries.push({ timestamp: ts, eventType: 'info', message: truncated });
+        entries.push({ timestamp: ts, eventType: 'info', message: text });
       }
       continue;
     }
@@ -193,8 +189,7 @@ function cloudMessageToLogEntry(
       const filePath = meta.path ?? meta.filePath;
       const command = meta.command;
       if (typeof filePath === 'string') detail = filePath;
-      else if (typeof command === 'string')
-        detail = command.length > 120 ? command.slice(0, 120) + '…' : command;
+      else if (typeof command === 'string') detail = command;
     }
     return { timestamp: ts, eventType: 'tool', message: `Tool: ${toolName}`, content: detail };
   }
@@ -211,8 +206,7 @@ function cloudMessageToLogEntry(
     if (options.includeFullAssistantText) {
       return { timestamp: ts, eventType: 'text', message: 'Assistant response', content: text };
     }
-    const truncated = text.length > 200 ? text.slice(0, 200) + '…' : text;
-    return { timestamp: ts, eventType: 'text', message: truncated };
+    return { timestamp: ts, eventType: 'text', message: text };
   }
 
   // General text output
@@ -222,8 +216,7 @@ function cloudMessageToLogEntry(
     if (options.includeFullAssistantText) {
       return { timestamp: ts, eventType: 'text', message: 'Assistant response', content: text };
     }
-    const truncated = text.length > 200 ? text.slice(0, 200) + '…' : text;
-    return { timestamp: ts, eventType: 'text', message: truncated };
+    return { timestamp: ts, eventType: 'text', message: text };
   }
 
   // Error messages
@@ -232,7 +225,7 @@ function cloudMessageToLogEntry(
     return {
       timestamp: ts,
       eventType: 'error',
-      message: `Error: ${text.length > 200 ? text.slice(0, 200) + '…' : text}`,
+      message: `Error: ${text}`,
     };
   }
 

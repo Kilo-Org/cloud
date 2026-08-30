@@ -58,6 +58,7 @@ describe('createReviewSpectatorStream', () => {
       organizationId: 'org-1',
       onEvent: noopCallback,
       onConnected: noopCallback,
+      onReconnected: noopCallback,
       onDisconnected: noopCallback,
       onError: noopCallback,
     });
@@ -94,6 +95,7 @@ describe('createReviewSpectatorStream', () => {
       organizationId: 'org-1',
       onEvent: noopCallback,
       onConnected: noopCallback,
+      onReconnected: noopCallback,
       onDisconnected: noopCallback,
       onError: noopCallback,
     });
@@ -120,6 +122,7 @@ describe('createReviewSpectatorStream', () => {
       organizationId: '',
       onEvent: noopCallback,
       onConnected: noopCallback,
+      onReconnected: noopCallback,
       onDisconnected: noopCallback,
       onError: noopCallback,
     });

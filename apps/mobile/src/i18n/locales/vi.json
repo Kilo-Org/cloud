@@ -152,7 +152,9 @@
     "appearanceDark": "Tối",
     "account": "Tài khoản",
     "prReviewAttribution": "Thêm ghi công ứng dụng vào các đánh giá PR",
-    "prReviewAttributionSubtitle": "Thêm chân trang Reviewed via Kilo khi bạn gửi đánh giá."
+    "prReviewAttributionSubtitle": "Thêm chân trang Reviewed via Kilo khi bạn gửi đánh giá.",
+    "returnSendsMessage": "Phím xuống dòng gửi tin nhắn",
+    "returnSendsMessageSubtitle": "Khi tắt, phím xuống dòng chèn dòng mới trong ô nhập tin nhắn của tác nhân."
   },
   "notifications": {
     "title": "Thông báo",
@@ -296,7 +298,8 @@
       "networkError": "Lỗi mạng",
       "uploadFailed": "Tải lên thất bại",
       "failedToUploadFile": "Không thể tải tệp lên: {{reason}}",
-      "nothingToPaste": "Không có gì để dán"
+      "nothingToPaste": "Không có gì để dán",
+      "metadataStripFailed": "Không thể xóa siêu dữ liệu ảnh."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1687,7 +1690,11 @@
       "previousTaskFinishing": "Tác vụ trước vẫn đang hoàn tất. Vui lòng chờ một chút.",
       "serviceUnavailable": "Dịch vụ hiện không khả dụng. Vui lòng thử lại.",
       "connectionTrouble": "Sự cố kết nối. Vui lòng thử lại sau giây lát.",
-      "modelUnavailable": "Mô hình này không khả dụng cho Cloud Agent. Vui lòng chọn mô hình khác và thử lại."
+      "modelUnavailable": "Mô hình này không khả dụng cho Cloud Agent. Vui lòng chọn mô hình khác và thử lại.",
+      "cancelQueuedFailed": "Không thể hủy tin nhắn.",
+      "cancelQueuedRestoreAvailable": "Đã hủy tin nhắn. Chạm vào Khôi phục để đưa tin nhắn trở lại ô nhập tin nhắn.",
+      "cancelQueuedRestored": "Đã hủy tin nhắn. Lời nhắc đã trở lại ô nhập tin nhắn.",
+      "cancelQueuedUpgradeRequired": "Việc hủy tin nhắn đang chờ yêu cầu Kilo CLI mới hơn. Hãy cập nhật Kilo CLI và kết nối lại."
     },
     "remoteSession": {
       "failedToCreate": "Không thể tạo phiên từ xa",
@@ -1759,7 +1766,8 @@
       "continueFrom": "Đang tiếp tục {{title}}",
       "importingSession": "Đang nhập phiên",
       "cliCannotContinue": "CLI này không thể tiếp tục một phiên. Hãy chọn Tác nhân đám mây hoặc CLI khác.",
-      "importFailed": "Không thể nhập phiên này."
+      "importFailed": "Không thể nhập phiên này.",
+      "discardWithUploadsMessage": "Lời nhắc của bạn và các tệp đã tải lên nhưng chưa đính kèm vào tin nhắn đã gửi sẽ bị xóa."
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp",
@@ -2007,7 +2015,11 @@
       "queuedAccessibility": "Tin nhắn đã xếp hàng đợi",
       "userMessage": "Tin nhắn người dùng",
       "assistantMessage": "Tin nhắn trợ lý",
-      "longPressHint": "Nhấn giữ để xem chi tiết tin nhắn"
+      "longPressHint": "Nhấn giữ để xem chi tiết tin nhắn",
+      "cancelQueued": "Hủy tin nhắn",
+      "cancelQueuedAccessibility": "Hủy tin nhắn đang chờ",
+      "restoreQueued": "Khôi phục",
+      "restoreQueuedAccessibility": "Khôi phục tin nhắn đã hủy vào ô nhập tin nhắn"
     },
     "olderMessages": {
       "arrived": "Đã tải các tin nhắn trước đó",
@@ -2035,9 +2047,6 @@
     },
     "sessionFilter": {
       "title": "Lọc phiên",
-      "sortBy": "Sắp xếp theo",
-      "sortLastUpdated": "Cập nhật gần nhất",
-      "sortCreated": "Đã tạo",
       "platform": "Nền tảng",
       "platformCloud": "Đám mây",
       "platformExtension": "Tiện ích mở rộng",
@@ -2091,7 +2100,9 @@
       "uploading": "Đang tải lên…",
       "uploaded": "Đã tải lên",
       "uploadFailedRetry": "Tải lên thất bại. Chạm để thử lại.",
-      "uploadFailedTerminal": "Không thể tải lên tệp này."
+      "uploadFailedTerminal": "Không thể tải lên tệp này.",
+      "moveLeft": "Di chuyển {{filename}} sang trái",
+      "moveRight": "Di chuyển {{filename}} sang phải"
     },
     "attachmentPasteHint": {
       "accessibility": "Dán hình ảnh từ bảng nhớ tạm",
@@ -2121,7 +2132,17 @@
       "finalizingPlaceholder": "Đang hoàn tất...",
       "messagePlaceholder": "Tin nhắn...",
       "cannotReceiveFiles": "Phiên này không thể nhận tệp. Hãy gỡ tệp đính kèm để gửi tin nhắn của bạn.",
-      "couldNotAttachFiles": "Không thể đính kèm tệp. Chạm vào Gửi để thử lại."
+      "couldNotAttachFiles": "Không thể đính kèm tệp. Chạm vào Gửi để thử lại.",
+      "discardAttachmentsMessage": "Các tệp đã tải lên nhưng chưa đính kèm vào tin nhắn đã gửi sẽ bị xóa.",
+      "discardAttachmentsTitle": "Hủy bỏ tệp đính kèm?",
+      "charactersRemaining": "Còn {{count}} ký tự",
+      "insertNewline": "Chèn dòng mới",
+      "starterChipBuild": "Xây dựng một tính năng",
+      "starterChipEmpty": "Bắt đầu với một ý tưởng",
+      "starterChipFix": "Sửa lỗi",
+      "starterChipPrepare": "Thiết lập môi trường của mình",
+      "starterChipWrapUp": "Kết thúc phiên của mình",
+      "starterChipWriteTests": "Viết kiểm thử"
     },
     "chatLink": {
       "linkCopied": "Đã sao chép liên kết",
@@ -2340,7 +2361,8 @@
     "busy": "Nhập giọng nói đang bận. Thử lại.",
     "stopped": "Đã dừng nhập giọng nói. Chạm vào micro để thử lại.",
     "unavailableDevice": "Không thể nhập giọng nói trên thiết bị này.",
-    "unavailableLanguage": "Không thể nhập giọng nói bằng ngôn ngữ của thiết bị này."
+    "unavailableLanguage": "Không thể nhập giọng nói bằng ngôn ngữ của thiết bị này.",
+    "listeningStopped": "Đã dừng nghe."
   },
   "share": {
     "title": "Chia sẻ đến Kilo",

@@ -331,6 +331,12 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           ...(input.images ? { images: input.images } : {}),
         }),
       interrupt: () => config.api.interrupt({ sessionId: config.sessionId }),
+      dropQueuedMessage: async messageId => {
+        if (!config.api.cancelQueuedMessage) {
+          throw new Error('Cloud Agent cancel queued message is not configured');
+        }
+        return config.api.cancelQueuedMessage({ sessionId: config.sessionId, messageId });
+      },
       answer: payload => config.api.answer({ sessionId: config.sessionId, ...payload }),
       reject: payload => config.api.reject({ sessionId: config.sessionId, ...payload }),
       respondToPermission: payload =>

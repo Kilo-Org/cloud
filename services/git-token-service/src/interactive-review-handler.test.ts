@@ -563,6 +563,145 @@ describe('interactive Bitbucket authorization', () => {
   });
 });
 
+describe('authorized canonical merge task locations', () => {
+  const canonicalTaskUrl =
+    'https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests/7/merge/task-status/task-1';
+  const mergeUrl = `https://api.bitbucket.org${destinationApiPath}/pullrequests/7/merge`;
+  const uuidTaskUrl = `${mergeUrl}/task-status/task-1`;
+  const writeScopes = [...readScopes, 'pullrequest:write'];
+  const mergeRequest = { ...request, operation: 'merge' };
+
+  beforeEach(() => {
+    mocks.rows.mockResolvedValue([
+      { ...integration, accessScopes: writeScopes, scopes: writeScopes },
+    ]);
+  });
+
+  it.each([
+    ['workspace_access_token', 'canonical', canonicalTaskUrl],
+    ['oauth', 'canonical', canonicalTaskUrl],
+    ['workspace_access_token', 'UUID', uuidTaskUrl],
+    ['oauth', 'UUID', uuidTaskUrl],
+  ] as const)(
+    'retains the %s %s task and polls its exact UUID path',
+    async (integrationType, _name, location) => {
+      mocks.rows.mockResolvedValue([
+        { ...integration, integrationType, accessScopes: writeScopes, scopes: writeScopes },
+      ]);
+      const effects: string[] = [];
+      providerFetch.mockImplementation(async (url, options) => {
+        if (
+          options.redirect !== 'manual' ||
+          new Headers(options.headers).get('authorization') !== 'Bearer provider-secret'
+        )
+          return Response.json({}, { status: 403 });
+        if (url === mergeUrl && options.method === 'POST') {
+          effects.push('merge');
+          return new Response(null, { status: 202, headers: { location } });
+        }
+        if (url === uuidTaskUrl && options.method === 'GET') {
+          effects.push('poll');
+          return Response.json({ task_status: 'PENDING' });
+        }
+        return Response.json({}, { status: 404 });
+      });
+      const accepted = await run({ ...target, request: mergeRequest });
+      expect(accepted).toMatchObject({
+        success: true,
+        result: { status: 202, location, data: null },
+        metadata: { integrationId: target.integrationId, grants: { scopes: writeScopes } },
+      });
+      if (!accepted.success || accepted.result.status !== 202)
+        throw new Error('Expected an accepted merge task');
+      const taskId = new URL(accepted.result.location).pathname.split('/').at(-1);
+      if (!taskId) throw new Error('Expected a task identity');
+      const polled = await run({
+        ...target,
+        request: {
+          operation: 'mergeTask',
+          params: { path: { ...request.params.path, task_id: taskId } },
+        },
+      });
+      expect(polled).toMatchObject({
+        success: true,
+        result: { status: 200, data: { task_status: 'PENDING' } },
+      });
+      expect(effects).toEqual(['merge', 'poll']);
+      expect(JSON.stringify([accepted, polled])).not.toContain('provider-secret');
+    }
+  );
+
+  it.each([
+    canonicalTaskUrl.replace('/acme/', '/foreign/'),
+    canonicalTaskUrl.replace('/widgets/', '/other/'),
+    uuidTaskUrl.replace(target.repositoryUuid, sourceSelector.repositoryUuid),
+    uuidTaskUrl.replace(target.workspaceUuid, sourceSelector.workspaceUuid),
+    canonicalTaskUrl.replace('/7/', '/8/'),
+    canonicalTaskUrl.replace('task-1', ''),
+    `${canonicalTaskUrl}/child`,
+    canonicalTaskUrl.replace('task-1', 'task%2Fother'),
+    canonicalTaskUrl.replace('/widgets/', '/%77idgets/'),
+    canonicalTaskUrl.replace('api.bitbucket.org', 'attacker.example'),
+    canonicalTaskUrl.replace('https://', 'https://user:provider-secret@'),
+    `${canonicalTaskUrl}?access_token=provider-secret`,
+    `${canonicalTaskUrl}#fragment`,
+  ])('rejects a foreign or unsafe canonical task %s without retrying', async location => {
+    providerFetch.mockImplementation(
+      async () => new Response(null, { status: 202, headers: { location } })
+    );
+    const result = await run({ ...target, request: mergeRequest });
+    expect(result).toEqual({ success: false, reason: 'invalid_response' });
+    expect(providerFetch).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(result)).not.toContain('provider-secret');
+  });
+
+  it.each([302, 307])('rejects a canonical task redirect (%s) without replay', async status => {
+    providerFetch.mockImplementation(
+      async () => new Response(null, { status, headers: { location: canonicalTaskUrl } })
+    );
+    await expect(run({ ...target, request: mergeRequest })).resolves.toEqual({
+      success: false,
+      reason: 'redirect_rejected',
+    });
+    expect(providerFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    {
+      ...target,
+      request: mergeRequest,
+      canonicalTaskRepository: { workspace: 'foreign', repository: 'widgets' },
+    },
+    {
+      ...target,
+      request: {
+        ...mergeRequest,
+        canonicalTaskRepository: { workspace: 'foreign', repository: 'widgets' },
+      },
+    },
+  ])('rejects a client-selected canonical repository before authorization %#', async input => {
+    await expect(run(input)).resolves.toEqual({ success: false, reason: 'invalid_request' });
+    expect(mocks.resolve).not.toHaveBeenCalled();
+    expect(providerFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not authorize a task through a cached slug reused by another UUID', async () => {
+    mocks.rows.mockResolvedValue([
+      {
+        ...integration,
+        accessScopes: writeScopes,
+        repositories: [{ ...integration.repositories[0], id: sourceSelector.repositoryUuid }],
+      },
+    ]);
+    await expect(run({ ...target, request: mergeRequest })).resolves.toEqual({
+      success: false,
+      reason: 'not_found',
+    });
+    expect(mocks.resolve).not.toHaveBeenCalled();
+    expect(providerFetch).not.toHaveBeenCalled();
+  });
+});
+
 describe('destination-authorized source reads', () => {
   const abbreviatedCommit = sourceCommit.slice(0, 12);
   const abbreviatedFork = {

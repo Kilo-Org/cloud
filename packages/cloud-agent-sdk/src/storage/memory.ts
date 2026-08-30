@@ -11,7 +11,7 @@ import {
   insertSorted,
   isSupportedDeltaField,
   notify,
-  upsertPartDroppingStaleSyntheticTextParts,
+  upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
 function createMemoryStorage(): SessionStorage {
@@ -45,7 +45,7 @@ function createMemoryStorage(): SessionStorage {
 
     upsertPart(messageId, part) {
       const arr = parts.get(messageId) ?? [];
-      parts.set(messageId, upsertPartDroppingStaleSyntheticTextParts(arr, part));
+      parts.set(messageId, upsertPartDroppingStaleSyntheticParts(arr, part));
       partsSnapshot.set(messageId, null);
       notify(subscribers, `parts:${messageId}`);
     },

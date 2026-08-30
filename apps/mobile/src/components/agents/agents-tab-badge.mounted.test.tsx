@@ -1,7 +1,7 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the React Native tree without a DOM. */
 import { createElement, Fragment, type ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { act } from 'react-test-renderer';
+import { act, type ReactTestInstance } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import TabsLayout from '@/app/(app)/(tabs)/_layout';
@@ -122,13 +122,18 @@ async function mount(queryClient = createTestQueryClient()) {
   return result;
 }
 
+function isHostType(item: ReactTestInstance, type: string) {
+  return typeof item.type === 'string' && item.type === type;
+}
+
 function node(renderer: Mount['renderer'], type: string) {
-  return renderer.root.find(item => typeof item.type === 'string' && item.type === type);
+  return renderer.root.find(item => isHostType(item, type));
 }
 
 function agentsOptions(renderer: Mount['renderer']) {
-  return renderer.root.find(item => item.type === 'TabScreen' && item.props.name === '(2_agents)')
-    .props.options as { title: string; tabBarBadge?: number; tabBarAccessibilityLabel: string };
+  return renderer.root.find(
+    item => isHostType(item, 'TabScreen') && item.props.name === '(2_agents)'
+  ).props.options as { title: string; tabBarBadge?: number; tabBarAccessibilityLabel: string };
 }
 
 function expectCounts(renderer: Mount['renderer'], count?: number, label?: string) {
@@ -228,7 +233,7 @@ describe('Agents live count surfaces', () => {
   it('hides counts after a fetch failure and restores them through Retry', async () => {
     fetchSessions.mockRejectedValue(new TypeError('Network request failed'));
     const { renderer } = await mount();
-    await waitFor(() => renderer.root.findAll(item => item.type === 'QueryError').length === 1);
+    await waitFor(() => renderer.root.findAll(item => isHostType(item, 'QueryError')).length === 1);
     expectCounts(renderer);
 
     fetchSessions.mockResolvedValue({ sessions: sessions(1) });
@@ -252,7 +257,7 @@ describe('Agents live count surfaces', () => {
     expectCounts(renderer);
     expect(node(renderer, 'FlatList').props.data).toEqual(expect.arrayContaining(cachedRows));
     expect(node(renderer, 'FlatList').props.data).toHaveLength(3);
-    expect(renderer.root.findAll(item => item.type === 'QueryError')).toHaveLength(0);
+    expect(renderer.root.findAll(item => isHostType(item, 'QueryError'))).toHaveLength(0);
 
     fetchSessions.mockResolvedValue({ sessions: sessions(4) });
     const refreshControl = node(renderer, 'FlatList').props.refreshControl as {
@@ -280,7 +285,7 @@ describe('Agents live count surfaces', () => {
       pending.reject(Object.assign(new Error('Unauthorized'), { data: { code: 'UNAUTHORIZED' } }));
     });
     await waitFor(
-      () => result.renderer.root.findAll(item => item.type === 'QueryError').length === 1
+      () => result.renderer.root.findAll(item => isHostType(item, 'QueryError')).length === 1
     );
     expectCounts(result.renderer);
 

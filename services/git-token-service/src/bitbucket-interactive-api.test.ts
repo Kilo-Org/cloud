@@ -296,6 +296,42 @@ describe('Bitbucket generated SDK boundary', () => {
     expect(effects).toBe(0);
   });
 
+  it.each(['file', 'createComment', 'deleteBranch'] as const)(
+    'never resolves a broker source selector inside the exact SDK scope: %s',
+    async operation => {
+      let effects = 0;
+      const operationRequest =
+        operation === 'file'
+          ? {
+              operation,
+              params: {
+                path: { ...branches.params.path, commit: 'a'.repeat(40), path: 'file.ts' },
+              },
+            }
+          : operation === 'createComment'
+            ? comment
+            : {
+                operation,
+                params: { path: { ...branches.params.path, name: 'feature' } },
+              };
+      const request = {
+        ...operationRequest,
+        source: {
+          pullRequestId: 7,
+          workspaceUuid: '123e4567-e89b-12d3-a456-426614174098',
+          repositoryUuid: '123e4567-e89b-12d3-a456-426614174099',
+        },
+      };
+      await expect(
+        api(async () => {
+          effects += 1;
+          return json({ id: 91 });
+        }).execute(request as BitbucketInteractiveRequest)
+      ).rejects.toMatchObject({ code: 'invalid_request' });
+      expect(effects).toBe(0);
+    }
+  );
+
   it.each([
     { ...comment, body: null },
     { ...comment, body: undefined },

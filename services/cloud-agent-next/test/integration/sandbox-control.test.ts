@@ -10429,7 +10429,7 @@ describe('SandboxSession running stream state', () => {
 });
 
 describe('SandboxSession root-scoped reconnect sync', () => {
-  it('reconciles an accepted root before connected and filters sibling questions and permissions', async () => {
+  it('reconciles an accepted root before connected and replays only its questions and permissions afterward', async () => {
     const wrapperInstanceId = crypto.randomUUID();
     const ownerId = 'user_grouped_sync';
     const activeSessionId = GRANT_SESSION_ID;
@@ -10545,12 +10545,16 @@ describe('SandboxSession root-scoped reconnect sync', () => {
       throw new Error(`Unexpected active-session stream status: ${activeResponse.status}`);
     }
     activeResponse.webSocket.accept();
-    const events = (await nextMessages(activeResponse.webSocket, 4)).map(
+    const events = (await nextMessages(activeResponse.webSocket, 8)).map(
       message => JSON.parse(message) as SessionStreamEvent
     );
     expect(events.map(event => event.streamEventType)).toEqual([
       'kilocode',
       'connected',
+      'kilocode',
+      'kilocode',
+      'kilocode',
+      'kilocode',
       'cloud.message.queued',
       'cloud.message.sent',
     ]);
@@ -10559,6 +10563,24 @@ describe('SandboxSession root-scoped reconnect sync', () => {
       activeMessageId: INITIAL_MESSAGE_ID,
       pendingInteractions: { questions, permissions },
     });
+    expect(events.slice(2, 4)).toEqual(
+      questions.map(question =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'question.asked', event: 'question.asked', properties: question },
+        })
+      )
+    );
+    expect(events.slice(4, 6)).toEqual(
+      permissions.map(permission =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'permission.asked', event: 'permission.asked', properties: permission },
+        })
+      )
+    );
     await runInDurableObject(active, async (_instance, state) => {
       expect(await state.storage.get('session_pending_interactions')).toMatchObject({
         questions,

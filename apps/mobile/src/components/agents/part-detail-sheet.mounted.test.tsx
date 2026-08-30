@@ -10,6 +10,9 @@ import { describe, expect, it, type Mock, vi } from 'vitest';
 import { MonoScrollBlock } from './mono-scroll-block';
 import { PartDetailSheet } from './part-detail-sheet';
 
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ background: '#000' }),
+}));
 vi.mock('react-native', () => ({
   Modal: 'Modal',
   ScrollView: 'ScrollView',

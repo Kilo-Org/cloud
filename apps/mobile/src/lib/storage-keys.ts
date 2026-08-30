@@ -8,7 +8,10 @@
 
 export const AUTH_TOKEN_KEY = 'auth-token';
 export const ORGANIZATION_STORAGE_KEY = 'selected-organization';
+/** Filter record for the session history page. */
 export const SESSION_FILTERS_KEY = 'agent-session-filters';
+/** Filter record for the live sessions page. Separate: the pages filter separate lists. */
+export const LIVE_SESSION_FILTERS_KEY = 'live-session-filters';
 export const NOTIFICATION_PROMPT_SEEN_KEY = 'notification-prompt-seen';
 export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
 export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';
@@ -28,6 +31,8 @@ export const LOGIN_EMAIL_DRAFT_KEY = 'login-email-draft';
 /** Login SSO-recovery banner draft, persisted before an RTL language reload. */
 export const LOGIN_SSO_RECOVERY_DRAFT_KEY = 'login-sso-recovery-draft';
 export const KEEP_SCREEN_ON_KEY = 'keep-session-screen-on';
+/** Return key in the agent composer sends/start instead of inserting a newline. */
+export const RETURN_SENDS_MESSAGE_KEY = 'return-sends-message';
 /** Revocable per-host list of markdown link hosts that open without an Alert. */
 export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';

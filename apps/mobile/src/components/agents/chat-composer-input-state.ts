@@ -9,6 +9,8 @@ type ChatComposerControlInput = {
   isSending: boolean;
   /** True while an attachment upload is in flight; blocks send until it settles. */
   isUploading: boolean;
+  /** True when at least one attachment chip is terminally failed; gates send. */
+  hasFailedAttachments: boolean;
   voiceInputActive: boolean;
 };
 
@@ -36,8 +38,11 @@ type ChatComposerControlState = {
  * the rules in one place lets the component stay a thin presenter and makes
  * every state — happy, blocked, and listening — testable without rendering
  * the composer. Voice input integrates here too: an active voice session
- * makes the input read-only and locks the attachment picker while speech is
- * being recognized.
+ * locks the attachment picker while speech is being recognized, but it keeps
+ * the input editable so dictation can insert at the caret (a user edit during
+ * dictation aborts the session in the selection-aware draft path). A
+ * terminally failed attachment chip gates send (`hasFailedAttachments`), so a
+ * failed upload renders Send disabled instead of toasting on press.
  */
 export function resolveChatComposerControlState(
   input: ChatComposerControlInput
@@ -51,6 +56,7 @@ export function resolveChatComposerControlState(
     isFocused,
     isSending,
     isUploading,
+    hasFailedAttachments,
     voiceInputActive,
   } = input;
   // Streaming is intentionally NOT a composer gate. The user must be able to
@@ -63,11 +69,13 @@ export function resolveChatComposerControlState(
   const voiceDisabled = toolbarDisabled;
   const paperclipDisabled =
     toolbarDisabled || voiceInputActive || attachmentsCount >= attachmentMax;
-  const inputEditable = !toolbarDisabled && !voiceInputActive;
+  // Voice activity no longer makes the input read-only: dictation inserts at
+  // the caret, so the user can keep editing (an edit aborts the session).
+  const inputEditable = !toolbarDisabled;
   const showToolbar = isFocused || hasText || attachmentsCount > 0 || voiceInputActive;
   const hasSendableContent = hasText || sendableAttachmentsCount > 0;
   return {
-    canSend: hasSendableContent && !disabled && !isSending && !isUploading,
+    canSend: hasSendableContent && !disabled && !isSending && !isUploading && !hasFailedAttachments,
     hasSendableContent,
     inputAccessibilityDisabled: !inputEditable,
     inputEditable,

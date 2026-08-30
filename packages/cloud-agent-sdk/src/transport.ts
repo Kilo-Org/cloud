@@ -151,6 +151,13 @@ type Transport = {
   createSession?: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitSession?: () => Promise<void>;
   interrupt?: () => Promise<unknown>;
+  /**
+   * Drop one queued (not yet accepted) message by its client message id. The
+   * remote CLI transport relays `drop_queued_message`; the cloud-agent transport
+   * calls the `cancelQueuedMessage` tRPC mutation. Old remotes reject the drop
+   * with CLI_UPGRADE_REQUIRED.
+   */
+  dropQueuedMessage?: (messageId: string) => Promise<{ dropped: boolean }>;
   answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
   reject?: (payload: { requestId: string }) => Promise<unknown>;
   respondToPermission?: (payload: {
@@ -180,6 +187,15 @@ type CloudAgentApi = {
     images?: Images;
   }) => Promise<unknown>;
   interrupt: (payload: { sessionId: CloudAgentSessionId }) => Promise<unknown>;
+  /**
+   * Cancel one queued message by id (cloud-agent branch of
+   * `dropQueuedMessage`). Optional so legacy providers that predate the
+   * mutation keep compiling; the transport surfaces a clear error when absent.
+   */
+  cancelQueuedMessage?: (payload: {
+    sessionId: CloudAgentSessionId;
+    messageId: string;
+  }) => Promise<{ dropped: boolean }>;
   answer: (payload: {
     sessionId: CloudAgentSessionId;
     requestId: string;

@@ -18,10 +18,76 @@ import {
   updateSheet,
 } from './child-session-sheet-test-helpers';
 import { QueryError } from '@/components/query-error';
+import { i18n } from '@/i18n';
 import { ChildSessionModelLabel } from './child-session-model-label';
 
+describe('ChildSessionSheet title layout', () => {
+  it.each([
+    {
+      state: 'loading',
+      hydrationState: { status: 'loading' } as const,
+      messages: [],
+      sessionError: null,
+      expectedText: i18n.t('agentChat.childSessionSheet.loading'),
+      retryCount: 0,
+    },
+    {
+      state: 'ready',
+      hydrationState: readyState,
+      messages: [makeAssistantMessage()],
+      sessionError: null,
+      expectedText: 'child text',
+      retryCount: 0,
+    },
+    {
+      state: 'empty',
+      hydrationState: readyState,
+      messages: [],
+      sessionError: null,
+      expectedText: i18n.t('agentChat.childSessionSheet.noMessages'),
+      retryCount: 0,
+    },
+    {
+      state: 'retryable error',
+      hydrationState: errorState,
+      messages: [],
+      sessionError: null,
+      expectedText: 'Failed',
+      retryCount: 1,
+    },
+    {
+      state: 'terminal error',
+      hydrationState: readyState,
+      messages: [],
+      sessionError: 'Runtime failure',
+      expectedText: 'Runtime failure',
+      retryCount: 0,
+    },
+  ])('keeps the selected title wrapped during $state', async state => {
+    const props = {
+      ...buildProps({
+        getChildMessages: () => state.messages,
+        hydrationState: state.hydrationState,
+      }),
+      title: 'Inspect performance child 01',
+      sessionError: state.sessionError,
+    };
+    const renderer = await renderSheet(props);
+    const header = host(renderer.root, 'SheetHeader');
+
+    expect(header.props).toMatchObject({ title: 'Inspect performance child 01', wrapTitle: true });
+    expect(header.props.onDone).toBe(props.onClose);
+    expect(textValues(renderer.root)).toContain(state.expectedText);
+    expect(
+      renderer.root.findAll(
+        node => (node.type as string) === 'Pressable' && node.props.accessibilityLabel === 'Retry'
+      )
+    ).toHaveLength(state.retryCount);
+  });
+});
+
 describe('ChildSessionSheet mounted', () => {
-  it('keeps live rows mounted and exposes Retry after first-page hydration fails', async () => {
+  it('keeps the wrapped title, live rows, and Retry through hydration recovery', async () => {
     const messages = [makeAssistantMessage()];
     const props = buildProps({
       getChildMessages: () => messages,
@@ -29,6 +95,7 @@ describe('ChildSessionSheet mounted', () => {
     });
     const renderer = await renderSheet(props);
     const list = host(renderer.root, 'FlashList');
+    const header = host(renderer.root, 'SheetHeader');
 
     await updateSheet(renderer, { ...props, hydrationState: errorState });
 
@@ -39,6 +106,24 @@ describe('ChildSessionSheet mounted', () => {
       disabled: false,
       busy: false,
     });
+    expect(host(renderer.root, 'FlashList')).toBe(list);
+
+    await updateSheet(renderer, props);
+
+    expect(host(renderer.root, 'SheetHeader')).toBe(header);
+    expect(header.props).toMatchObject({ title: props.title, wrapTitle: true });
+    expect(textValues(renderer.root)).toEqual(expect.arrayContaining(['child text', 'Failed']));
+    expect(retryButton(renderer.root).props.accessibilityState).toEqual({
+      disabled: true,
+      busy: true,
+    });
+    expect(host(renderer.root, 'FlashList')).toBe(list);
+
+    await updateSheet(renderer, { ...props, hydrationState: readyState });
+
+    expect(host(renderer.root, 'SheetHeader')).toBe(header);
+    expect(header.props).toMatchObject({ title: props.title, wrapTitle: true });
+    expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
     expect(host(renderer.root, 'FlashList')).toBe(list);
   });
   it('renders the model row when child messages carry model data', async () => {
@@ -138,21 +223,22 @@ describe('ChildSessionSheet sheet surface', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('closes when Done is pressed', async () => {
-    const onClose = vi.fn<() => void>();
-    const renderer = await renderSheet({
-      ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
-      onClose,
-    });
+  it('closes the loading child once when Done is pressed', async () => {
+    const props = buildProps({ getChildMessages: () => [], hydrationState: { status: 'loading' } });
+    let closeCount = 0;
+    props.onClose = () => {
+      closeCount += 1;
+      props.visible = false;
+    };
+    const renderer = await renderSheet(props);
 
-    const header = renderer.root.findAll(node => (node.type as string) === 'SheetHeader')[0];
-    if (!header) {
-      throw new Error('SheetHeader not found');
-    }
     await act(async () => {
+      (host(renderer.root, 'SheetHeader').props.onDone as () => void)();
       await Promise.resolve();
-      (header.props.onDone as () => void)();
     });
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await updateSheet(renderer, props);
+
+    expect(modal(renderer.root).props.visible).toBe(false);
+    expect(closeCount).toBe(1);
   });
 });

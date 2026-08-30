@@ -179,7 +179,7 @@ export function ChildSessionSheet({
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose} onDismiss={onDismiss}>
-      <SheetHeader title={title} onDone={onClose} />
+      <SheetHeader title={title} wrapTitle onDone={onClose} />
       {modelLabel ? (
         <View className="border-b border-border px-4 py-2">
           <ChildSessionModelLabel modelLabel={modelLabel} />

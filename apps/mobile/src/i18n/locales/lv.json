@@ -154,7 +154,9 @@
     "prReviewAttribution": "Pievienot lietotnes attiecinājumu PR pārskatiem",
     "prReviewAttributionSubtitle": "Pievienot \"Reviewed via Kilo\" kājeni, kad iesniedzat pārskatu.",
     "returnSendsMessage": "Ievades taustiņš nosūta ziņojumu",
-    "returnSendsMessageSubtitle": "Ja izslēgts, ievades taustiņš ievieto jaunu rindu aģenta ziņojuma ievades laukā."
+    "returnSendsMessageSubtitle": "Ja izslēgts, ievades taustiņš ievieto jaunu rindu aģenta ziņojuma ievades laukā.",
+    "biometricUnlock": "Atbloķēt ar biometriju",
+    "biometricUnlockSubtitle": "Atbloķēšana ir nepieciešama, palaižot lietotni un pēc piecām fonā pavadītām minūtēm. Ierīces iestatījumos iestatiet biometriju vai ierīces piekļuves kodu. Jūsu ierīces piekļuves kods ir pieejams kā rezerves iespēja."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nav pieejams",

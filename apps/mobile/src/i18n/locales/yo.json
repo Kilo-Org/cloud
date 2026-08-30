@@ -154,7 +154,9 @@
     "prReviewAttribution": "Fi àtọ̀tọ̀ app kun si àwọn àtúnyẹ̀wò PR",
     "prReviewAttributionSubtitle": "Fi àtẹ̀lẹ̀ 'Reviewed via Kilo' kun nígbà tí o bá fi àtúnyẹ̀wò sílẹ̀.",
     "returnSendsMessage": "Bọtini ipadabọ n fi ifiranṣẹ ranṣẹ",
-    "returnSendsMessageSubtitle": "Nigbati o ba wa ni pipa, bọtini ipadabọ n fi ila tuntun sii ni awọn aaye kikọ ifiranṣẹ aṣoju."
+    "returnSendsMessageSubtitle": "Nigbati o ba wa ni pipa, bọtini ipadabọ n fi ila tuntun sii ni awọn aaye kikọ ifiranṣẹ aṣoju.",
+    "biometricUnlock": "Ṣii titiipa pẹ̀lú ìdánimọ̀ àbùdá ara",
+    "biometricUnlockSubtitle": "A nílò ṣíṣí titiipa nígbà tí ìṣàfilọ́lẹ̀ bá bẹ̀rẹ̀ àti lẹ́yìn tí ó bá ti wà ní ẹ̀hìn fún ìṣẹ́jú márùn-ún. Ṣètò ìdánimọ̀ àbùdá ara tàbí kóòdù ìwọlé ẹ̀rọ nínú eto ẹ̀rọ. Kóòdù ìwọlé ẹ̀rọ rẹ wà gẹ́gẹ́ bí ọ̀nà àfidípò."
   },
   "prReview": {
     "pullRequestUnavailable": "Ibeere fifa ko si",

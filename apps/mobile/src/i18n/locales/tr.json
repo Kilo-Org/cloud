@@ -154,7 +154,9 @@
     "prReviewAttribution": "PR incelemelerine uygulama atfı ekle",
     "prReviewAttributionSubtitle": "İnceleme gönderdiğinde 'Kilo ile incelendi' alt bilgisi ekle",
     "returnSendsMessage": "Enter tuşu mesaj gönderir",
-    "returnSendsMessageSubtitle": "Kapalıyken Enter tuşu, ajan mesaj giriş alanlarına yeni satır ekler."
+    "returnSendsMessageSubtitle": "Kapalıyken Enter tuşu, ajan mesaj giriş alanlarına yeni satır ekler.",
+    "biometricUnlock": "Biyometrik doğrulama ile kilit açma",
+    "biometricUnlockSubtitle": "Uygulama başlatıldığında ve arka planda beş dakika kaldıktan sonra kilidin açılması gerekir. Cihaz ayarlarında biyometrik doğrulamayı veya cihaz parolasını ayarlayın. Cihaz parolanızı yedek yöntem olarak kullanabilirsiniz."
   },
   "notifications": {
     "title": "Bildirimler",

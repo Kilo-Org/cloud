@@ -154,7 +154,9 @@
     "prReviewAttribution": "Tilføj app-tilskrivning til PR-anmeldelser",
     "prReviewAttributionSubtitle": "Tilføj en \"Reviewed via Kilo\"-sidefod, når du sender en anmeldelse.",
     "returnSendsMessage": "Returtasten sender beskeden",
-    "returnSendsMessageSubtitle": "Når dette er slået fra, indsætter returtasten et linjeskift i agenternes beskedfelter."
+    "returnSendsMessageSubtitle": "Når dette er slået fra, indsætter returtasten et linjeskift i agenternes beskedfelter.",
+    "biometricUnlock": "Lås op med biometri",
+    "biometricUnlockSubtitle": "Lås op ved opstart, og når appen har været i baggrunden i fem minutter. Indstil biometri eller en adgangskode til enheden i enhedens indstillinger. Du kan altid bruge enhedens adgangskode som alternativ."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgængelig",

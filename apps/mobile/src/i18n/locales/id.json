@@ -154,7 +154,9 @@
     "prReviewAttribution": "Tambahkan atribusi aplikasi ke ulasan PR",
     "prReviewAttributionSubtitle": "Tambahkan footer Ditinjau melalui Kilo saat Anda mengirimkan ulasan.",
     "returnSendsMessage": "Tombol Enter mengirim pesan",
-    "returnSendsMessageSubtitle": "Saat nonaktif, Enter menyisipkan baris baru di kolom pesan agen."
+    "returnSendsMessageSubtitle": "Saat nonaktif, Enter menyisipkan baris baru di kolom pesan agen.",
+    "biometricUnlock": "Buka kunci dengan biometrik",
+    "biometricUnlockSubtitle": "Buka kunci saat aplikasi diluncurkan dan setelah berada di latar belakang selama lima menit. Siapkan biometrik atau kode sandi perangkat di pengaturan perangkat. Kode sandi perangkat Anda tetap tersedia sebagai cadangan."
   },
   "notifications": {
     "title": "Notifikasi",

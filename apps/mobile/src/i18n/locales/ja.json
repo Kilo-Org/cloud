@@ -154,7 +154,9 @@
     "prReviewAttribution": "PRレビューにアプリの帰属を追加",
     "prReviewAttributionSubtitle": "レビューを送信すると、Reviewed via Kiloフッターが追加されます。",
     "returnSendsMessage": "リターンキーでメッセージを送信",
-    "returnSendsMessageSubtitle": "オフの場合、リターンキーでエージェントのメッセージ入力欄に改行を挿入します。"
+    "returnSendsMessageSubtitle": "オフの場合、リターンキーでエージェントのメッセージ入力欄に改行を挿入します。",
+    "biometricUnlock": "生体認証でロック解除",
+    "biometricUnlockSubtitle": "アプリの起動時と、バックグラウンドで5分経過した後は、ロック解除が必要です。デバイスの設定で、生体認証またはデバイスのパスコードを設定してください。生体認証の代わりにデバイスのパスコードも使用できます。"
   },
   "notifications": {
     "title": "通知",

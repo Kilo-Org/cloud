@@ -154,7 +154,9 @@
     "prReviewAttribution": "Adicionar atribuição da app às revisões de PR",
     "prReviewAttributionSubtitle": "Adicionar um rodapé «Revisto via Kilo» quando submeter uma revisão.",
     "returnSendsMessage": "A tecla de retorno envia a mensagem",
-    "returnSendsMessageSubtitle": "Quando desativado, a tecla de retorno insere uma nova linha nos campos de mensagem dos agentes."
+    "returnSendsMessageSubtitle": "Quando desativado, a tecla de retorno insere uma nova linha nos campos de mensagem dos agentes.",
+    "biometricUnlock": "Desbloquear com biometria",
+    "biometricUnlockSubtitle": "É necessário desbloquear ao iniciar e após cinco minutos em segundo plano. Configure a biometria ou um código de acesso do dispositivo nas definições do dispositivo. O código de acesso do seu dispositivo continua disponível como alternativa."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request indisponível",

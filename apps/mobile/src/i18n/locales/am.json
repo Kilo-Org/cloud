@@ -154,7 +154,9 @@
     "prReviewAttribution": "የመተግበሪያ መለያን ወደ PR ግምገማዎች ያክሉ",
     "prReviewAttributionSubtitle": "ግምገማ ሲያስገቡ የ'በKilo ተገምግሟል' ግርጌ ያክሉ።",
     "returnSendsMessage": "የመመለሻ ቁልፍ መልእክት ይልካል",
-    "returnSendsMessageSubtitle": "ሲጠፋ፣ የመመለሻ ቁልፍ በወኪል መልእክት ማስገቢያዎች ውስጥ አዲስ መስመር ያስገባል።"
+    "returnSendsMessageSubtitle": "ሲጠፋ፣ የመመለሻ ቁልፍ በወኪል መልእክት ማስገቢያዎች ውስጥ አዲስ መስመር ያስገባል።",
+    "biometricUnlock": "በባዮሜትሪክስ መክፈት",
+    "biometricUnlockSubtitle": "መተግበሪያው ሲጀመር እና ከበስተጀርባ ለአምስት ደቂቃዎች ከቆየ በኋላ መክፈት ያስፈልጋል። በመሣሪያው ቅንብሮች ውስጥ ባዮሜትሪክስ ወይም የመሣሪያ የይለፍ ኮድ ያዘጋጁ። የመሣሪያዎን የይለፍ ኮድ እንደ አማራጭ መጠቀም ይችላሉ።"
   },
   "prReview": {
     "pullRequestUnavailable": "የጎተራ ጥያቄ የለም",

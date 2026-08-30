@@ -2268,7 +2268,9 @@
     "prReviewAttribution": "Adicionar atribuição do app às avaliações de PR",
     "prReviewAttributionSubtitle": "Anexe um rodapé \"Reviewed via Kilo\" ao enviar uma avaliação.",
     "returnSendsMessage": "A tecla Enter envia a mensagem",
-    "returnSendsMessageSubtitle": "Quando desativada, a tecla Enter insere uma quebra de linha nos campos de mensagem dos agentes."
+    "returnSendsMessageSubtitle": "Quando desativada, a tecla Enter insere uma quebra de linha nos campos de mensagem dos agentes.",
+    "biometricUnlock": "Desbloquear com biometria",
+    "biometricUnlockSubtitle": "Desbloqueie ao iniciar o app e após cinco minutos em segundo plano. Configure a biometria ou um código de acesso do dispositivo nos Ajustes do dispositivo. O código de acesso do seu dispositivo fica disponível como alternativa."
   },
   "addCredits": {
     "cta": "Adicionar créditos",

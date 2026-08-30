@@ -154,7 +154,9 @@
     "prReviewAttribution": "App-Zuordnung zu PR-Reviews hinzufügen",
     "prReviewAttributionSubtitle": "Hänge beim Einreichen eines Reviews eine „Reviewed via Kilo“-Fußzeile an.",
     "returnSendsMessage": "Eingabetaste sendet Nachricht",
-    "returnSendsMessageSubtitle": "Wenn deaktiviert, fügt die Eingabetaste einen Zeilenumbruch in die Nachrichteneingabe für Agenten ein."
+    "returnSendsMessageSubtitle": "Wenn deaktiviert, fügt die Eingabetaste einen Zeilenumbruch in die Nachrichteneingabe für Agenten ein.",
+    "biometricUnlock": "Mit Biometrie entsperren",
+    "biometricUnlockSubtitle": "Beim Start und nach fünf Minuten im Hintergrund ist das Entsperren erforderlich. Richte Biometrie oder einen Gerätecode in den Geräteeinstellungen ein. Dein Gerätecode bleibt als Alternative verfügbar."
   },
   "notifications": {
     "title": "Benachrichtigungen",

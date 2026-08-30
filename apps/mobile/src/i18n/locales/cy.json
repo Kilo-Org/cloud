@@ -154,7 +154,9 @@
     "prReviewAttribution": "Ychwanegu priodoli ap at adolygiadau PR",
     "prReviewAttributionSubtitle": "Atodwch droedyn 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno adolygiad",
     "returnSendsMessage": "Mae'r fysell Dychwelyd yn anfon neges",
-    "returnSendsMessageSubtitle": "Pan fydd wedi'i ddiffodd, mae Dychwelyd yn mewnosod llinell newydd ym meysydd mewnbwn neges asiantau."
+    "returnSendsMessageSubtitle": "Pan fydd wedi'i ddiffodd, mae Dychwelyd yn mewnosod llinell newydd ym meysydd mewnbwn neges asiantau.",
+    "biometricUnlock": "Datgloi gyda biometreg",
+    "biometricUnlockSubtitle": "Rhaid datgloi wrth gychwyn yr ap ac ar ôl pum munud yn y cefndir. Gosodwch fiometreg neu god pas y ddyfais yng ngosodiadau'r ddyfais. Mae cod pas eich dyfais ar gael fel dewis wrth gefn."
   },
   "prReview": {
     "pullRequestUnavailable": "Ni ellir cael y cais tynnu",

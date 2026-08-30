@@ -154,7 +154,9 @@
     "prReviewAttribution": "App-attributie aan PR-reviews toevoegen",
     "prReviewAttributionSubtitle": "Voeg een 'Reviewed via Kilo'-voettekst toe wanneer je een review indient.",
     "returnSendsMessage": "Return-toets verzendt bericht",
-    "returnSendsMessageSubtitle": "Als dit uitstaat, voegt Return een nieuwe regel in de berichtinvoervelden van agents in."
+    "returnSendsMessageSubtitle": "Als dit uitstaat, voegt Return een nieuwe regel in de berichtinvoervelden van agents in.",
+    "biometricUnlock": "Ontgrendelen met biometrie",
+    "biometricUnlockSubtitle": "Ontgrendelen is vereist bij het starten van de app en nadat de app vijf minuten op de achtergrond heeft gestaan. Stel biometrie of een toegangscode in via de instellingen van je apparaat. De toegangscode van je apparaat blijft beschikbaar als alternatief."
   },
   "notifications": {
     "channel": {

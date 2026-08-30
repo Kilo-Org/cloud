@@ -154,7 +154,9 @@
     "prReviewAttribution": "PR جائزوں میں ایپ انتساب شامل کریں",
     "prReviewAttributionSubtitle": "جائزہ جمع کرتے وقت Reviewed via Kilo فوٹر جوڑیں۔",
     "returnSendsMessage": "ریٹرن کلید پیغام بھیجتی ہے",
-    "returnSendsMessageSubtitle": "بند ہونے پر، ریٹرن ایجنٹ کے پیغام لکھنے کے خانوں میں نئی سطر داخل کرتی ہے۔"
+    "returnSendsMessageSubtitle": "بند ہونے پر، ریٹرن ایجنٹ کے پیغام لکھنے کے خانوں میں نئی سطر داخل کرتی ہے۔",
+    "biometricUnlock": "بایومیٹرکس سے انلاک کریں",
+    "biometricUnlockSubtitle": "ایپ شروع کرنے پر اور پس منظر میں پانچ منٹ رہنے کے بعد انلاک کرنا ضروری ہے۔ ڈیوائس کی سیٹنگز میں بایومیٹرکس یا ڈیوائس کا پاس کوڈ ترتیب دیں۔ آپ کی ڈیوائس کا پاس کوڈ متبادل کے طور پر دستیاب ہے۔"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",

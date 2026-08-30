@@ -2202,7 +2202,9 @@
     "prReviewAttribution": "Ajouter l'attribution de l'application aux revues de PR",
     "prReviewAttributionSubtitle": "Ajouter un pied de page « Revue via Kilo » lorsque vous soumettez une revue.",
     "returnSendsMessage": "La touche Entrée envoie le message",
-    "returnSendsMessageSubtitle": "Si cette option est désactivée, la touche Entrée insère un saut de ligne dans les champs de saisie des agents."
+    "returnSendsMessageSubtitle": "Si cette option est désactivée, la touche Entrée insère un saut de ligne dans les champs de saisie des agents.",
+    "biometricUnlock": "Déverrouiller avec la biométrie",
+    "biometricUnlockSubtitle": "Déverrouillage requis au lancement et après cinq minutes en arrière-plan. Configurez la biométrie ou un code d'accès dans les réglages de votre appareil. Le code d'accès de votre appareil reste disponible comme solution de secours."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",

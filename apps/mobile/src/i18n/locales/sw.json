@@ -154,7 +154,9 @@
     "prReviewAttribution": "Ongeza sifa ya app kwenye ukaguzi wa PR",
     "prReviewAttributionSubtitle": "Ongeza 'Reviewed via Kilo' kwenye sehemu ya chini unapowasilisha ukaguzi.",
     "returnSendsMessage": "Kitufe cha kurudi hutuma ujumbe",
-    "returnSendsMessageSubtitle": "Kikiwa kimezimwa, kitufe cha kurudi huingiza mstari mpya kwenye sehemu za kuandika ujumbe kwa mawakala."
+    "returnSendsMessageSubtitle": "Kikiwa kimezimwa, kitufe cha kurudi huingiza mstari mpya kwenye sehemu za kuandika ujumbe kwa mawakala.",
+    "biometricUnlock": "Fungua kwa bayometriki",
+    "biometricUnlockSubtitle": "Kufungua kunahitajika unapoanzisha programu na baada ya programu kukaa chinichini kwa dakika tano. Sanidi bayometriki au nambari ya siri ya kifaa katika mipangilio ya kifaa. Nambari ya siri ya kifaa chako inapatikana kama njia mbadala."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request haipatikani",

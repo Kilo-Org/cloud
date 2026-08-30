@@ -154,7 +154,9 @@
     "prReviewAttribution": "Añadir atribución de la app a las revisiones de PR",
     "prReviewAttributionSubtitle": "Añade un pie de página Revisado vía Kilo cuando envías una revisión.",
     "returnSendsMessage": "La tecla Intro envía el mensaje",
-    "returnSendsMessageSubtitle": "Si está desactivado, Intro inserta un salto de línea en los campos de mensaje del agente."
+    "returnSendsMessageSubtitle": "Si está desactivado, Intro inserta un salto de línea en los campos de mensaje del agente.",
+    "biometricUnlock": "Desbloquear con biometría",
+    "biometricUnlockSubtitle": "Se requiere desbloquear la aplicación al iniciarla y después de cinco minutos en segundo plano. Configura la biometría o un código de acceso del dispositivo en los ajustes del dispositivo. El código de acceso de tu dispositivo está disponible como alternativa."
   },
   "notifications": {
     "channel": {

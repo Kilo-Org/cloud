@@ -154,7 +154,9 @@
     "prReviewAttribution": "Dodaj atribuciju aplikacije u preglede PR-a",
     "prReviewAttributionSubtitle": "Dodajte potpis „Reviewed via Kilo\" kada podnesete pregled.",
     "returnSendsMessage": "Tipka za novi redak šalje poruku",
-    "returnSendsMessageSubtitle": "Kad je isključeno, tipka za novi redak umeće novi redak u polja za unos poruke agentima."
+    "returnSendsMessageSubtitle": "Kad je isključeno, tipka za novi redak umeće novi redak u polja za unos poruke agentima.",
+    "biometricUnlock": "Otključavanje biometrijom",
+    "biometricUnlockSubtitle": "Otključavanje je potrebno pri pokretanju aplikacije i nakon pet minuta u pozadini. Postavite biometriju ili šifru uređaja u postavkama uređaja. Šifra uređaja dostupna je kao zamjenski način otključavanja."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nedostupan",

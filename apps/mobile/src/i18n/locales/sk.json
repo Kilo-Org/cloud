@@ -154,7 +154,9 @@
     "prReviewAttribution": "Pridať atribúciu aplikácie do kontrol PR",
     "prReviewAttributionSubtitle": "Keď odošlete kontrolu, pridajte pätičku Reviewed via Kilo.",
     "returnSendsMessage": "Kláves Enter odošle správu",
-    "returnSendsMessageSubtitle": "Keď je táto možnosť vypnutá, kláves Enter vloží nový riadok do polí na zadávanie správy agentom."
+    "returnSendsMessageSubtitle": "Keď je táto možnosť vypnutá, kláves Enter vloží nový riadok do polí na zadávanie správy agentom.",
+    "biometricUnlock": "Odomknúť pomocou biometrie",
+    "biometricUnlockSubtitle": "Odomknutie sa vyžaduje pri spustení aplikácie a po piatich minútach na pozadí. V nastaveniach zariadenia si nastavte biometriu alebo prístupový kód zariadenia. Prístupový kód zariadenia môžete použiť ako náhradnú možnosť."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nie je dostupný",

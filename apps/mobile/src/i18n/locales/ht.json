@@ -154,7 +154,9 @@
     "prReviewAttribution": "Ajoute atribisyon aplikasyon nan revizyon PR",
     "prReviewAttributionSubtitle": "Ajoute yon footer Reviewed via Kilo lè ou soumèt yon revizyon.",
     "returnSendsMessage": "Kle Retou a voye mesaj",
-    "returnSendsMessageSubtitle": "Lè li dezaktive, kle Retou a antre yon nouvo liy nan chan mesaj ajan yo."
+    "returnSendsMessageSubtitle": "Lè li dezaktive, kle Retou a antre yon nouvo liy nan chan mesaj ajan yo.",
+    "biometricUnlock": "Debloke ak byometri",
+    "biometricUnlockSubtitle": "Ou dwe debloke aplikasyon an lè li kòmanse ak apre li pase senk minit an aryèplan. Konfigire byometri oswa yon kòd aksè pou aparèy la nan paramèt aparèy la. Kòd aksè aparèy ou a rete disponib kòm yon lòt mwayen pou debloke."
   },
   "prReview": {
     "pullRequestUnavailable": "Demand rale pa disponib",

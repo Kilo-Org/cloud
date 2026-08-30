@@ -154,7 +154,9 @@
     "prReviewAttribution": "PR sharhlariga ilova atributini qo'shish",
     "prReviewAttributionSubtitle": "Sharh yuborganingizda Reviewed via Kilo taglavhasini qo'shing.",
     "returnSendsMessage": "Qaytarish tugmasi xabar yuboradi",
-    "returnSendsMessageSubtitle": "O'chirilganda, Qaytarish tugmasi agentlarning xabar kiritish maydonlarida yangi qator kiritadi."
+    "returnSendsMessageSubtitle": "O'chirilganda, Qaytarish tugmasi agentlarning xabar kiritish maydonlarida yangi qator kiritadi.",
+    "biometricUnlock": "Biometriya yordamida qulfni ochish",
+    "biometricUnlockSubtitle": "Ilova ishga tushirilganda va fonda besh daqiqa turgandan keyin qulfni ochish talab qilinadi. Qurilma sozlamalarida biometriya yoki qurilma parol kodini sozlang. Qurilmangizning parol kodidan zaxira usul sifatida foydalanishingiz mumkin."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mavjud emas",

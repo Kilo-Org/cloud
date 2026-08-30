@@ -154,7 +154,9 @@
     "prReviewAttribution": "Magdagdag ng app attribution sa mga PR review",
     "prReviewAttributionSubtitle": "Magdagdag ng footer na Reviewed via Kilo kapag nagsumite ka ng review.",
     "returnSendsMessage": "Nagpapadala ng mensahe ang Return key",
-    "returnSendsMessageSubtitle": "Kapag naka-off, naglalagay ang Return ng bagong linya sa mga input ng mensahe ng agent."
+    "returnSendsMessageSubtitle": "Kapag naka-off, naglalagay ang Return ng bagong linya sa mga input ng mensahe ng agent.",
+    "biometricUnlock": "I-unlock gamit ang biometrika",
+    "biometricUnlockSubtitle": "Kailangang i-unlock sa pagbukas ng app at matapos ang limang minuto sa background. Magtakda ng biometrika o kodigong pang-unlock ng device sa Settings ng device. Maaari pa ring gamitin ang iyong kodigong pang-unlock ng device bilang alternatibo."
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi available ang pull request",

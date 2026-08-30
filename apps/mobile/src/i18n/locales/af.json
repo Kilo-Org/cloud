@@ -154,7 +154,9 @@
     "prReviewAttribution": "Voeg app-toeskrywing by PR-hersienings toe",
     "prReviewAttributionSubtitle": "Voeg 'n \"Reviewed via Kilo\"-voetskrif by wanneer jy 'n hersiening indien",
     "returnSendsMessage": "Terugkeersleutel stuur boodskap",
-    "returnSendsMessageSubtitle": "Wanneer dit af is, voeg die terugkeersleutel 'n nuwe reël in agente se boodskapinvoer in."
+    "returnSendsMessageSubtitle": "Wanneer dit af is, voeg die terugkeersleutel 'n nuwe reël in agente se boodskapinvoer in.",
+    "biometricUnlock": "Ontsluit met biometrie",
+    "biometricUnlockSubtitle": "Ontsluit wanneer die app begin en nadat dit vyf minute in die agtergrond was. Stel biometrie of 'n toesteltoegangskode in die toestelinstellings op. Jou toesteltoegangskode bly as 'n alternatief beskikbaar."
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",

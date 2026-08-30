@@ -154,7 +154,9 @@
     "prReviewAttribution": "Thêm ghi công ứng dụng vào các đánh giá PR",
     "prReviewAttributionSubtitle": "Thêm chân trang Reviewed via Kilo khi bạn gửi đánh giá.",
     "returnSendsMessage": "Phím xuống dòng gửi tin nhắn",
-    "returnSendsMessageSubtitle": "Khi tắt, phím xuống dòng chèn dòng mới trong ô nhập tin nhắn của tác nhân."
+    "returnSendsMessageSubtitle": "Khi tắt, phím xuống dòng chèn dòng mới trong ô nhập tin nhắn của tác nhân.",
+    "biometricUnlock": "Mở khóa bằng sinh trắc học",
+    "biometricUnlockSubtitle": "Yêu cầu mở khóa khi khởi chạy ứng dụng và sau khi ứng dụng ở chế độ nền trong năm phút. Thiết lập sinh trắc học hoặc mật mã thiết bị trong cài đặt thiết bị. Bạn vẫn có thể dùng mật mã thiết bị làm phương thức dự phòng."
   },
   "notifications": {
     "title": "Thông báo",

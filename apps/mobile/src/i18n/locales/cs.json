@@ -154,7 +154,9 @@
     "prReviewAttribution": "Přidat atribuci aplikace k recenzím PR",
     "prReviewAttributionSubtitle": "Při odeslání recenze přidejte zápatí „Reviewed via Kilo“.",
     "returnSendsMessage": "Klávesa Enter odesílá zprávu",
-    "returnSendsMessageSubtitle": "Když je tato volba vypnutá, klávesa Enter vloží nový řádek do polí pro zprávu agentům."
+    "returnSendsMessageSubtitle": "Když je tato volba vypnutá, klávesa Enter vloží nový řádek do polí pro zprávu agentům.",
+    "biometricUnlock": "Odemykat pomocí biometrie",
+    "biometricUnlockSubtitle": "Vyžaduje odemknutí při spuštění aplikace a po pěti minutách na pozadí. V nastavení zařízení nastavte biometrii nebo přístupový kód zařízení. Přístupový kód zařízení můžete použít jako záložní možnost."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request není dostupný",

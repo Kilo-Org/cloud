@@ -1,13 +1,14 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts RN trees without a DOM. */
 import { type MobileRouter } from '@kilocode/trpc/mobile';
-import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, type default as TestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
+import { renderWithProviders } from '@/test/render-with-providers';
 import { ScopeEntryScreen } from './scope-entry-screen';
 import { SettingsOverviewScreen } from './settings-overview-screen';
 
@@ -86,24 +87,17 @@ async function advanceBy() {
   });
 }
 async function mount(scope = 'personal', Screen = ScopeEntryScreen) {
-  await act(() => {
-    renderer = TestRenderer.create(
-      createElement(
-        QueryClientProvider,
-        { client: queryClient },
-        createElement(TRPCProvider, {
-          trpcClient,
-          queryClient,
-          // eslint-disable-next-line react/no-children-prop -- tRPC requires this prop in createElement calls without JSX.
-          children: createElement(Screen, { scope }),
-        })
-      )
-    );
-  });
+  const mounted = await renderWithProviders(
+    createElement(TRPCProvider, {
+      trpcClient,
+      queryClient,
+      // eslint-disable-next-line react/no-children-prop -- tRPC requires this prop in createElement calls without JSX.
+      children: createElement(Screen, { scope }),
+    }),
+    { queryClient }
+  );
+  renderer = mounted.renderer;
   await advanceBy();
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
   return renderer.root;
 }
 async function retry(root: TestRenderer.ReactTestInstance) {

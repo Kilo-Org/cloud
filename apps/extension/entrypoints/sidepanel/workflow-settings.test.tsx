@@ -329,9 +329,13 @@ describe('workflow settings', () => {
           text: '',
         });
         if (parameters) {
+          expect(controls.getByRole('textbox')).toHaveProperty('readOnly', false);
           fireEvent.change(controls.getByRole('textbox'), { target: { value: 'large' } });
         }
         fireEvent.click(runButton);
+        if (parameters) {
+          expect(controls.getByRole('textbox')).toHaveProperty('readOnly', true);
+        }
         expect({
           busy: runButton.getAttribute('aria-busy'),
           cancelDisabled: parameters
@@ -398,12 +402,16 @@ describe('workflow settings', () => {
             sameStatus: true,
             settingsOpen: true,
           });
+          if (parameters) {
+            expect(controls.getByRole('textbox')).toHaveProperty('readOnly', false);
+            fireEvent.change(controls.getByRole('textbox'), { target: { value: 'medium' } });
+          }
           fireEvent.click(runButton);
         }
         await waitFor(() => {
           expect(store.get(workflowRunRequestAtom)).toStrictEqual({
             workflowId: 'wf-1',
-            ...(parameters ? { input: { size: 'large' } } : {}),
+            ...(parameters ? { input: { size: outcome === 'success' ? 'large' : 'medium' } } : {}),
           });
           expect(store.get(settingsDialogOpenAtom)).toBe(false);
           expect(view.queryByRole('dialog')).toBeNull();

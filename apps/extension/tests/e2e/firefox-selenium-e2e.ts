@@ -59,6 +59,8 @@ const chromeWorkflowNames = [
   'model picker search filters and selects by model id',
   'workflow create, approve, and run returns result',
   'workflow auto-approve save stores approved hash',
+  'CLI task consent and cancellation use native cross-panel locks',
+  'unsupported native locks keep CLI delegation disabled',
 ] as const;
 
 const PENDING_DRAFT_KEY = 'kiloPendingAgentMemoryDraft';
@@ -96,6 +98,7 @@ interface Organization {
 interface KiloApiOptions {
   readonly beforeFirstCompletion?: () => Promise<void>;
   readonly beforeModels?: (organizationId: string) => Promise<void>;
+  readonly browserTasks?: boolean;
   readonly firstCompletionEvents?: unknown[];
   readonly modelFailuresBeforeSuccess?: number;
   readonly modelFailuresBeforeSuccessByOrganizationId?: Record<string, number>;
@@ -124,8 +127,10 @@ interface ScenarioContext {
   readonly api: KiloApiHandle;
 }
 
+// Selenium 4.45 supplies script().pin; the installed 4.35 declarations omit it.
 type FirefoxWebDriver = WebDriver & {
   readonly installAddon: (path: string, temporary: boolean) => Promise<string>;
+  readonly script: () => { pin: (script: string) => Promise<string> };
 };
 
 interface FirefoxScenario {
@@ -350,6 +355,15 @@ const startKiloApiServer = async (): Promise<KiloApiHandle> => {
 
         {
           const requestPath = (request.url ?? '').split('?')[0] ?? '';
+
+          if (
+            options.browserTasks === true &&
+            requestPath === '/api/trpc/activeSessions.createWebTicket'
+          ) {
+            const result = { result: { data: { token: 'firefox-fixture-ticket' } } };
+            sendJson(response, request.url?.includes('batch=1') === true ? [result] : result);
+            return;
+          }
 
           if (requestPath.startsWith('/api/trpc/modelPreferences.')) {
             if (requestPath.endsWith('/modelPreferences.get')) {
@@ -803,6 +817,7 @@ const startFirefoxSession = async (): Promise<FirefoxSession> => {
   const options = new firefox.Options();
 
   options.addArguments('-headless');
+  options.set('webSocketUrl', true);
   options.setPreference('extensions.install.requireBuiltInCerts', false);
   options.setPreference('xpinstall.signatures.required', false);
 
@@ -3204,6 +3219,238 @@ const scenarios: FirefoxScenario[] = [
       } finally {
         await targetServer.close();
       }
+    },
+  },
+  {
+    name: 'CLI task consent and cancellation use native cross-panel locks',
+    run: async context => {
+      const completion = Promise.withResolvers<void>();
+      const bodies: unknown[] = [];
+      await withSession(
+        context.api,
+        {
+          beforeFirstCompletion: () => completion.promise,
+          browserTasks: true,
+          firstCompletionEvents: [
+            {
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        function: {
+                          arguments: JSON.stringify({
+                            code: 'document.documentElement.setAttribute("data-cli-effect", "issued"); return "issued";',
+                          }),
+                          name: 'eval',
+                        },
+                        id: 'firefox-cli-action',
+                        index: 0,
+                        type: 'function',
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+          seenChatBodies: bodies,
+          toolNames: dangerousToolNames,
+        },
+        async session => {
+          // Only the network peer is a fixture. Both browsers run the same shipped provider and coordinator.
+          await session.driver.script().pin(`() => {
+          if (location.protocol !== 'moz-extension:') return;
+          const key = 'firefox-browser-task-peer';
+          const state = JSON.parse(sessionStorage.getItem(key) || '{"generation":0}');
+          const persist = () => sessionStorage.setItem(key, JSON.stringify(state));
+          let socket;
+          const snapshot = () => socket.receive({ type: 'provider_snapshot', providerId: state.providerId, generation: state.generation, jobs: state.job ? [state.job] : [] });
+          class PeerSocket extends EventTarget {
+            static CONNECTING = 0;
+            static OPEN = 1;
+            static CLOSING = 2;
+            static CLOSED = 3;
+            readyState = 0;
+            onopen = null;
+            onmessage = null;
+            onclose = null;
+            onerror = null;
+            constructor(url) {
+              super();
+              this.url = String(url);
+              socket = this;
+              setTimeout(() => {
+                this.readyState = 1;
+                const event = new Event('open');
+                this.dispatchEvent(event);
+                this.onopen?.(event);
+                this.receive({ type: 'system', event: 'connected', data: {} });
+              }, 0);
+            }
+            receive(value) {
+              queueMicrotask(() => {
+                if (this.readyState !== 1) return;
+                const event = new MessageEvent('message', { data: JSON.stringify(value) });
+                this.dispatchEvent(event);
+                this.onmessage?.(event);
+              });
+            }
+            send(raw) {
+              const message = JSON.parse(raw);
+              if (message.type === 'ping') this.receive({ type: 'pong', nonce: message.nonce, capabilities: { browserJobsV1: true } });
+              if (message.type === 'provider_register') {
+                state.providerId = message.providerId;
+                state.generation = Math.max(state.generation, message.generation) + 1;
+                persist();
+              }
+              if (message.type === 'provider_register' || message.type === 'provider_heartbeat') {
+                this.receive({ type: 'provider_lease_ack', providerId: state.providerId, generation: state.generation, requestId: message.requestId, leaseExpiresAt: new Date(Date.now() + 15000).toISOString() });
+                if (message.type === 'provider_heartbeat') this.receive({ type: 'provider_snapshot', providerId: state.providerId, generation: state.generation, requestId: message.requestId, jobs: state.job?.generation === state.generation ? [state.job] : [] });
+              }
+              if (message.type === 'provider_status') this.receive({ type: 'provider_status_result', providerId: state.providerId, requestId: message.requestId, jobs: state.job ? [state.job] : [] });
+              if (message.type === 'provider_approval' && message.approval.decision === 'approved') {
+                state.job.approvedTab = message.approval.tab;
+                state.job.status = 'running';
+                state.job.deadlines.execution = new Date(Date.now() + 600000).toISOString();
+                persist();
+                snapshot();
+              }
+              if (message.type === 'provider_cancel') {
+                const job = state.job;
+                job.status = 'cancelled';
+                job.result = { providerId: job.providerId, browserTaskId: job.browserTaskId, jobId: job.jobId, invocationId: job.invocationId, status: 'cancelled', reason: 'cancelled', summary: 'Cancelled without replay.', evidence: [], effectsUncertain: false };
+                persist();
+                this.receive({ ...message, type: 'provider_job_cancel', reason: 'cancelled' });
+                snapshot();
+              }
+            }
+            close() {
+              this.readyState = 3;
+              const event = new CloseEvent('close', { code: 1000 });
+              this.dispatchEvent(event);
+              this.onclose?.(event);
+            }
+          }
+          Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: PeerSocket });
+          globalThis.submitFirefoxBrowserTask = () => {
+            const now = Date.now();
+            state.job = { providerId: state.providerId, generation: state.generation, browserTaskId: 'bt_' + crypto.randomUUID(), jobId: 'bj_' + crypto.randomUUID(), invocationId: 'b1.' + now + '.' + 'a'.repeat(64), payloadFingerprint: 'b'.repeat(64), createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 604800000).toISOString(), deadlines: { approval: new Date(now + 120000).toISOString(), queue: new Date(now + 600000).toISOString() }, ownerLabel: 'ses_firefox_parent_A1', status: 'awaiting_approval' };
+            persist();
+            socket.receive({ type: 'provider_job', job: state.job, ownerLabel: 'ses_firefox_parent_A1', goal: 'Inspect only the explicitly approved tab.', conversationMode: 'new' });
+          };
+        }`);
+          await session.openTargetPage();
+          const targetHandle = await session.driver.getWindowHandle();
+          await openAuthenticatedPanel(session);
+          const ownerHandle = await session.driver.getWindowHandle();
+          await waitForModel(session.driver);
+          await session.driver.findElement(By.css('button[aria-label="Settings"]')).click();
+          await session.driver
+            .findElement(By.css('[aria-label="CLI task settings"] button[aria-label="Model"]'))
+            .click();
+          await selectModelByIdFirefox(session.driver, 'anthropic/claude-sonnet-4');
+          await session.driver
+            .findElement(By.css('[aria-label="CLI task settings"] button[aria-label*="Safe mode"]'))
+            .click();
+          await clickButtonByText(session.driver, 'Dangerous');
+          await session.driver
+            .findElement(
+              By.css('[aria-label="CLI task settings"] [role="switch"][aria-label="CLI tasks"]')
+            )
+            .click();
+          await session.driver.findElement(By.css('button[aria-label="Close settings"]')).click();
+          await waitForText(session.driver, 'Enabled — idle');
+          await session.driver.executeScript('globalThis.submitFirefoxBrowserTask()');
+          await waitForText(session.driver, 'Tab approval required');
+          const approveButton = await session.driver.findElement(
+            By.xpath('//button[normalize-space(.)="Approve tab"]')
+          );
+          assert.equal(await approveButton.isEnabled(), false);
+          await session.driver
+            .findElement(
+              By.xpath(
+                '//section[@aria-label="CLI task supervision"]//select/option[contains(., "Kilo extension fixture")]'
+              )
+            )
+            .click();
+          await approveButton.click();
+          await waitForText(session.driver, 'CLI tasks: Running');
+          await waitForText(session.driver, 'Bound tab: Kilo extension fixture');
+          const modes = await session.driver.executeAsyncScript(
+            (done: (value: unknown) => void) => {
+              void navigator.locks.query().then(state => {
+                done(
+                  state.held
+                    ?.filter(lock => lock.name === 'kilo:browser-execution')
+                    .map(lock => lock.mode)
+                );
+                return null;
+              });
+            }
+          );
+          assert.deepEqual(modes, ['exclusive']);
+          await session.openSidePanel();
+          const otherHandle = await session.driver.getWindowHandle();
+          await waitForText(session.driver, 'Owned by another panel');
+          const draft = await session.driver.findElement(By.css('[aria-label="Message agent"]'));
+          await draft.sendKeys('Preserve this blocked Firefox draft.', Key.ENTER);
+          assert.equal(await draft.getAttribute('value'), 'Preserve this blocked Firefox draft.');
+          await waitForText(session.driver, 'owns browser control');
+          await session.driver.switchTo().window(ownerHandle);
+          await session.driver.findElement(By.css('[aria-label="Stop CLI task"]')).click();
+          await waitForText(session.driver, 'cancelled');
+          completion.resolve();
+          await session.driver.navigate().refresh();
+          await waitForText(session.driver, 'Cancelled without replay.');
+          const stopButtons = await session.driver.findElements(
+            By.css('[aria-label="Stop CLI task"]')
+          );
+          assert.equal(stopButtons.length, 0);
+          await session.driver.switchTo().window(targetHandle);
+          assert.equal(
+            await session.driver.findElement(By.css('html')).getAttribute('data-cli-effect'),
+            null
+          );
+          await session.driver.switchTo().window(otherHandle);
+          assert.equal(
+            await session.driver
+              .findElement(By.css('[aria-label="Message agent"]'))
+              .getAttribute('value'),
+            'Preserve this blocked Firefox draft.'
+          );
+          assert.equal(bodies.length, 1);
+        }
+      );
+    },
+  },
+  {
+    name: 'unsupported native locks keep CLI delegation disabled',
+    run: async context => {
+      await withSession(
+        context.api,
+        {
+          firstCompletionEvents: contentOnlyCompletion('Local Firefox work remains available.'),
+          toolNames: [...safeToolNames],
+        },
+        async session => {
+          await session.driver
+            .script()
+            .pin(
+              "() => { Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined }); }"
+            );
+          await session.openTargetPage();
+          await openAuthenticatedPanel(session);
+          await waitForText(session.driver, 'does not support Web Locks');
+          await waitForModel(session.driver);
+          await sendMessage(session.driver, 'Read the page locally.');
+          await waitForText(session.driver, 'Local Firefox work remains available.');
+          const approvals = await session.driver.findElements(
+            By.xpath('//button[normalize-space(.)="Approve tab"]')
+          );
+          assert.equal(approvals.length, 0);
+        }
+      );
     },
   },
 ];

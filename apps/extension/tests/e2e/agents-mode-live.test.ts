@@ -1,8 +1,9 @@
 /* eslint-disable import/no-nodejs-modules, jest/no-conditional-in-test, max-lines, no-await-in-loop, promise/avoid-new */
 import { expect, test } from '@playwright/test';
-import type { BrowserContext, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { launchExtensionContext, startFixtureServer } from './extension-context-fixture';
+import { signInWithLocalDeviceAuth } from './local-device-auth-helpers';
 
 const runLive = process.env['EXTENSION_LOCAL_BACKEND_E2E'] === '1';
 test.skip(!runLive, 'local backend only');
@@ -11,75 +12,6 @@ test.setTimeout(150_000);
 
 const localBackendUrl = process.env['LOCAL_BACKEND_ORIGIN'] ?? 'http://localhost:3000';
 const localUserEmail = process.env['LOCAL_USER_EMAIL'] ?? 'fl@fl.fl';
-
-// ---------------------------------------------------------------------------
-// Sign-in helper (adapted from local-backend-live.test.ts)
-// ---------------------------------------------------------------------------
-
-const signInWithLocalDeviceAuth = async ({
-  context,
-  extensionId,
-  sidePanel,
-}: {
-  context: BrowserContext;
-  extensionId: string;
-  sidePanel: Page;
-}): Promise<void> => {
-  await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-  const codeLocator = sidePanel.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/u).first();
-  let codeText: string | null = null;
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await sidePanel.getByRole('button', { name: 'Sign in' }).click();
-
-    const didShowCode = await codeLocator
-      .waitFor({ state: 'visible', timeout: 20_000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (didShowCode) {
-      codeText = await codeLocator.textContent();
-      break;
-    }
-
-    await expect(sidePanel.getByText('Failed to start sign in. Try again.')).toBeVisible();
-  }
-
-  const code = codeText?.trim();
-
-  if (code === undefined || code === '') {
-    throw new Error('Device auth code was not visible.');
-  }
-
-  const authPage = await context.newPage();
-  const callbackPath = `/device-auth?code=${encodeURIComponent(code)}&app=1`;
-  let authOrigin = localBackendUrl;
-
-  try {
-    const probe = await context.request.get(`${localBackendUrl}/users/after-sign-in`, {
-      maxRedirects: 0,
-    });
-    const { location } = probe.headers();
-
-    if (
-      probe.status() >= 300 &&
-      probe.status() < 400 &&
-      location !== undefined &&
-      location !== ''
-    ) {
-      authOrigin = new URL(location).origin;
-    }
-  } catch {
-    // Fall back to localBackendUrl
-  }
-
-  await authPage.goto(
-    `${authOrigin}/users/sign_in?fakeUser=${encodeURIComponent(localUserEmail)}&callbackPath=${encodeURIComponent(callbackPath)}`
-  );
-  await authPage.getByRole('button', { name: 'Authorize' }).click({ timeout: 60_000 });
-  await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
-  await authPage.close();
-};
 
 // ---------------------------------------------------------------------------
 // Shared phase helpers
@@ -441,7 +373,13 @@ test('live local backend: remote CLI agent covers start, reopen, queue, and stop
     await targetPage.goto(fixture.url);
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 15_000 });
 
     await sidePanel.getByRole('tab', { name: 'Agents' }).click();
@@ -490,7 +428,13 @@ test('live local backend: cloud agent covers start, reopen, queue, and stop', as
     await targetPage.goto(fixture.url);
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 15_000 });
 
     await sidePanel.getByRole('tab', { name: 'Agents' }).click();

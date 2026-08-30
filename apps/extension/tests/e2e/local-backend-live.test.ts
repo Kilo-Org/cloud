@@ -5,6 +5,7 @@ import { rm } from 'node:fs/promises';
 import { z } from 'zod';
 import { launchExtensionContext, startFixtureServer } from './extension-context-fixture';
 import { expectSelectedModelId, selectModelById } from './model-picker-e2e-helpers';
+import { signInWithLocalDeviceAuth } from './local-device-auth-helpers';
 
 const localBackendUrl = process.env['LOCAL_BACKEND_ORIGIN'] ?? 'http://localhost:3000';
 const localUserEmail = 'fl@fl.fl';
@@ -176,73 +177,6 @@ const recordChatRequestOutcomes = (
   });
 };
 
-const signInWithLocalDeviceAuth = async ({
-  context,
-  extensionId,
-  sidePanel,
-}: {
-  context: BrowserContext;
-  extensionId: string;
-  sidePanel: Page;
-}): Promise<void> => {
-  await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-  const codeLocator = sidePanel.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/u).first();
-  let codeText: string | null = null;
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await sidePanel.getByRole('button', { name: 'Sign in' }).click();
-
-    const didShowCode = await codeLocator
-      .waitFor({ state: 'visible', timeout: 20_000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (didShowCode) {
-      codeText = await codeLocator.textContent();
-      break;
-    }
-
-    await expect(sidePanel.getByText('Failed to start sign in. Try again.')).toBeVisible();
-  }
-
-  const code = codeText?.trim();
-
-  if (code === undefined || code === '') {
-    throw new Error('Device auth code was not visible.');
-  }
-
-  const authPage = await context.newPage();
-  const callbackPath = `/device-auth?code=${encodeURIComponent(code)}&app=1`;
-  // Shared stack may run with APP_URL_OVERRIDE at a LAN IP.
-  // Cookies set off-origin make the post-login redirect silently drop authentication.
-  let authOrigin = localBackendUrl;
-
-  try {
-    const probe = await context.request.get(`${localBackendUrl}/users/after-sign-in`, {
-      maxRedirects: 0,
-    });
-    const { location } = probe.headers();
-
-    if (
-      probe.status() >= 300 &&
-      probe.status() < 400 &&
-      location !== undefined &&
-      location !== ''
-    ) {
-      authOrigin = new URL(location).origin;
-    }
-  } catch {
-    // Fall back to localBackendUrl on non-redirect, missing/invalid location, or request error.
-  }
-
-  await authPage.goto(
-    `${authOrigin}/users/sign_in?fakeUser=${encodeURIComponent(localUserEmail)}&callbackPath=${encodeURIComponent(callbackPath)}`
-  );
-  await authPage.getByRole('button', { name: 'Authorize' }).click({ timeout: 60_000 });
-  await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
-  await authPage.close();
-};
-
 const selectFrontierModel = async (sidePanel: Page): Promise<void> => {
   await selectModelById(sidePanel, frontierModel);
 
@@ -377,7 +311,13 @@ test('live local backend keeps frontier conversations stable across modes, reloa
     await targetPage.goto(fixture.url);
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live backend E2E target');
     await selectFrontierModel(sidePanel);
 
@@ -470,7 +410,13 @@ test('live local backend snapshots the selected target tab per send', async () =
     await firstTarget.bringToFront();
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live target alpha');
     await selectFrontierModel(sidePanel);
     await sidePanel.getByLabel('Target tab').selectOption({ label: 'Kilo live target alpha' });
@@ -530,7 +476,13 @@ test('live local backend runs parallel frontier conversations without switching 
     await targetPage.goto(fixture.url);
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live parallel target');
     await selectFrontierModel(sidePanel);
 
@@ -617,7 +569,13 @@ test('live local backend aborts an active frontier request on logout', async () 
     await targetPage.goto(fixture.url);
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live logout abort target');
     await selectFrontierModel(sidePanel);
 
@@ -658,7 +616,13 @@ test('live local backend can stop a frontier response and continue chatting', as
     await targetPage.goto(fixture.url);
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live manual stop target');
     await selectFrontierModel(sidePanel);
 
@@ -708,7 +672,13 @@ test('live local backend recovers after side panel reload during an active reque
     await targetPage.goto(fixture.url);
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Target tab')).toContainText(
       'Kilo live reload recovery target'
     );
@@ -769,7 +739,13 @@ test('live local backend keeps real tool rows from overlapping', async () => {
     await targetPage.goto(fixture.url);
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live tool spacing target');
     await selectFrontierModel(sidePanel);
     await startConversationGapSampler(sidePanel);
@@ -805,7 +781,13 @@ test('live local backend preserves and deletes frontier conversations through hi
     await targetPage.goto(fixture.url);
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live history target');
     await selectFrontierModel(sidePanel);
 
@@ -884,7 +866,13 @@ test('live local backend dangerous mode eval can update the selected page', asyn
     await targetPage.goto(fixture.url);
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live eval target');
     await selectFrontierModel(sidePanel);
     await sidePanel.getByLabel('Target tab').selectOption({ label: 'Kilo live eval target' });
@@ -933,7 +921,13 @@ test('live local backend manual Compact now compacts a frontier conversation', a
     await targetPage.goto(fixture.url);
 
     const sidePanel = await context.newPage();
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live compaction target');
     await selectFrontierModel(sidePanel);
 
@@ -1039,7 +1033,13 @@ test('live local backend personal favorites round-trip for frontier', async () =
   let wasFavoriteBefore: 'unknown' | boolean = 'unknown';
 
   try {
-    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await signInWithLocalDeviceAuth({
+      context,
+      extensionId,
+      localBackendUrl,
+      localUserEmail,
+      sidePanel,
+    });
     await expect(sidePanel.getByLabel('Model')).toBeEnabled({ timeout: 30_000 });
 
     await sidePanel.getByLabel('Model').click();

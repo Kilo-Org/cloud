@@ -2111,9 +2111,7 @@
     "sessionExited": "Saioa itxi da",
     "remoteSpawnRetryable": "Ezin izan da instantziara iritsi; baliteke deskonektatuta egotea.",
     "remoteSpawnNonRetryable": "Instantziak ezin izan du saioa hasi; egiaztatu makina edo eguneratu CLI-a.",
-    "remoteSpawnInstanceDisconnected": "Hautatutako instantzia deskonektatu da. Hasi saioa Cloud Agent-en edo aukeratu beste instantzia bat.",
-    "liveCount_one": "{{count}} ZUZENEAN",
-    "liveCount_other": "{{count}} ZUZENEAN"
+    "remoteSpawnInstanceDisconnected": "Hautatutako instantzia deskonektatu da. Hasi saioa Cloud Agent-en edo aukeratu beste instantzia bat."
   },
   "agentChat": {
     "session": {
@@ -2273,9 +2271,7 @@
       "noCliInstancesDescription": "Exekutatu `kilo remote` zure ordenagailuko projektuan, edo eguneratu Kilo CLI jada exekutatzen ari bada.",
       "instanceOnProject": "{{name}} {{project}}n",
       "instanceOnProjectSuffix": "{{name}} {{project}}n ({{suffix}})",
-      "runOnCloudAgent": "Exekutatu Cloud Agent-en",
-      "terminals": "Terminalak",
-      "remotes": "Urruneko instantziak"
+      "runOnCloudAgent": "Exekutatu Cloud Agent-en"
     },
     "modePicker": {
       "title": "Hautatu modua",

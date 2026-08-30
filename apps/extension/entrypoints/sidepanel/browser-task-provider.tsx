@@ -194,6 +194,7 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
   let store: BrowserTaskStore | undefined = undefined;
   let settings: BrowserProviderSettings | undefined = undefined;
   let disposed = false;
+  let accountChanged = false;
   let needsRecovery = false;
   let generation = 0;
   let revokedGeneration = 0;
@@ -217,7 +218,20 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
     settings: undefined,
     unresolvedFence: undefined,
   };
+  let displayedJob: BrowserJobSnapshot | undefined = undefined;
   const publish = (change: Partial<BrowserTaskProviderSnapshot> = {}): void => {
+    if ('result' in change) {
+      // Keep the displayed outcome's ordering and terminal binding after history expires.
+      const resultJobId = change.result?.jobId;
+      displayedJob =
+        resultJobId === undefined
+          ? undefined
+          : structuredClone(
+              jobs.get(resultJobId) ??
+                (current?.relay.jobId === resultJobId ? current.relay : undefined) ??
+                (displayedJob?.jobId === resultJobId ? displayedJob : undefined)
+            );
+    }
     for (const [id, job] of jobs) {
       if (Date.parse(job.expiresAt) <= Date.now()) {
         jobs.delete(id);
@@ -398,7 +412,8 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
     );
   };
   const consumeJob = (job: BrowserJobSnapshot, acknowledgeRunning = true): void => {
-    const previous = jobs.get(job.jobId);
+    const previous =
+      jobs.get(job.jobId) ?? (displayedJob?.jobId === job.jobId ? displayedJob : undefined);
     if (previous !== undefined && !sameJob(previous, job)) {
       return;
     }
@@ -431,6 +446,19 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
         current.relay = job;
         current.running.resolve(job);
       }
+    } else if (current === undefined && job.result !== undefined) {
+      const displayed = displayedJob;
+      // History pages have no completion order. Use creation time and a stable tie-breaker.
+      if (
+        snapshot.result === undefined ||
+        snapshot.result.jobId === job.jobId ||
+        (displayed !== undefined &&
+          (Date.parse(job.createdAt) > Date.parse(displayed.createdAt) ||
+            (Date.parse(job.createdAt) === Date.parse(displayed.createdAt) &&
+              job.jobId > displayed.jobId)))
+      ) {
+        publish({ result: job.result });
+      }
     }
     publish();
   };
@@ -446,6 +474,7 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
       const guard = (): void => {
         if (
           disposed ||
+          accountChanged ||
           owner !== providerOwner ||
           profile !== providerProfile ||
           identity !== providerIdentity ||
@@ -472,8 +501,25 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           if (Date.now() >= deadline) {
             throw new ExecutionStoppedError('provider_unavailable');
           }
-          // eslint-disable-next-line no-await-in-loop -- Follow bounded history pages without granting execution.
-          const page = await connection.requestBrowserProviderStatus(cursor, providerIdentity);
+          let page: BrowserProviderStatusResult;
+          try {
+            // eslint-disable-next-line no-await-in-loop -- Follow bounded history pages without granting execution.
+            page = await connection.requestBrowserProviderStatus(cursor, providerIdentity);
+          } catch (error) {
+            guard();
+            if (
+              providerSettings?.enabled === false &&
+              providerIdentity !== undefined &&
+              cursor === undefined &&
+              Date.now() < deadline &&
+              error instanceof BrowserProviderError &&
+              error.code === 'not_found'
+            ) {
+              // Only this authenticated request proves an absent provider has no remote fence.
+              break;
+            }
+            throw error;
+          }
           guard();
           if (page.providerId !== providerIdentity?.providerId) {
             throw new ExecutionStoppedError('owner_mismatch');
@@ -517,6 +563,7 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
         // Registration changes its own generation and transport state, not its owning lifetime.
         if (
           disposed ||
+          accountChanged ||
           owner !== providerOwner ||
           profile !== providerProfile ||
           identity !== providerIdentity ||
@@ -1089,6 +1136,7 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           }
         };
         const authChanged = (): void => {
+          accountChanged = true;
           unavailable('provider_unavailable', current?.started === true);
           needsRecovery ||= current !== undefined;
           if (settings !== undefined) {
@@ -1228,6 +1276,8 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
     // Include every open ID, even if an affected tab navigated to an uninspectable address.
     return tabs.flatMap(tab => (tab.id === undefined ? [] : [tab.id]));
   };
+  const disabledRecoveryMessage =
+    'CLI tasks are disabled. A remote browser task still requires recovery. Enable CLI tasks, retrieve status, then recover explicitly.';
   const approvalRequests = new WeakSet<Invocation>();
   return {
     approve: async (jobId: string, tabId: number): Promise<void> => {
@@ -1254,6 +1304,7 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           publish({
             message:
               'That tab is no longer available. Select an inspectable tab before the deadline.',
+            phase: 'awaiting_approval',
             retryable: true,
           });
           return;
@@ -1265,10 +1316,32 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
         };
         invocation.selected = selected;
         invocation.consent.resolve(selected);
-        publish();
+        publish({ retryable: false });
       } catch (error) {
-        // Quiescence can deliver the next job before this approval finishes.
-        if (current === invocation) {
+        // Quiescence or revocation can precede a delayed settings/tab failure.
+        if (current !== invocation || invocation.abort.signal.aborted) {
+          return;
+        }
+        try {
+          guardInvocation(invocation);
+        } catch (lifetimeError) {
+          unavailable(failureReason(lifetimeError));
+          reportError(lifetimeError);
+          return;
+        }
+        const retryable =
+          error instanceof BrowserPersistenceError || error instanceof BrowserProviderError
+            ? error.retryable
+            : !(error instanceof ExecutionStoppedError);
+        if (retryable) {
+          publish({
+            message:
+              'Tab approval could not read settings or tabs. Restore access, then approve this goal again before its deadline.',
+            phase: 'awaiting_approval',
+            retryable: true,
+          });
+        } else {
+          unavailable(failureReason(error));
           reportError(error);
         }
       } finally {
@@ -1328,16 +1401,16 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
             'Recovery requires Web Locks. Restore browser Web Locks support before recovering.'
           );
         }
-        if (disposed || providerOwner === undefined || owner !== providerOwner) {
+        if (disposed || accountChanged || providerOwner === undefined || owner !== providerOwner) {
           throw new BrowserPersistenceError(
             'owner_mismatch',
             'This panel no longer owns the browser provider. Reopen the signed-in panel before checking recovery.'
           );
         }
-        if (settings?.enabled !== true) {
+        if (settings === undefined) {
           throw new BrowserPersistenceError(
             'invalid_request',
-            'Enable CLI tasks in the signed-in panel before checking recovery.'
+            'Wait for the signed-in panel to finish loading before checking recovery.'
           );
         }
         if (current !== undefined) {
@@ -1398,6 +1471,9 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
         guard();
         const fence = await refreshStatus();
         guard();
+        if (providerSettings?.enabled !== true && fence !== undefined) {
+          return { ready: false, reason: disabledRecoveryMessage };
+        }
         reason =
           'Open tabs could not be checked. Restore browser tab access before checking recovery again.';
         // Check remote closure before retrying releases, then enumerate again under the native lock.
@@ -1425,23 +1501,53 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
       }
     },
     recover: async (): Promise<void> => {
-      if (recovering || disposed || owner === undefined || settings?.enabled !== true) {
+      const providerOwner = owner;
+      const providerSettings = settings;
+      const providerProfile = profile;
+      const providerIdentity = identity;
+      if (recovering || disposed || providerOwner === undefined || providerSettings === undefined) {
         return;
       }
+      const guard = (): void => {
+        if (
+          disposed ||
+          accountChanged ||
+          owner !== providerOwner ||
+          settings !== providerSettings ||
+          profile !== providerProfile ||
+          identity !== providerIdentity
+        ) {
+          throw new ExecutionStoppedError('provider_lost');
+        }
+        try {
+          providerOwner.guard();
+        } catch {
+          throw new ExecutionStoppedError('provider_lost');
+        }
+      };
+      let checkRecovery = guard;
       recovering = true;
       recoveryRevision += 1;
       try {
         if ((await registering) === 'cancelled') {
           return;
         }
+        guard();
         let fence: BrowserProviderStatusResult['unresolvedFence'];
         try {
+          await statusRequest;
+          guard();
           fence = await refreshStatus();
         } catch (error) {
-          if (!(error instanceof BrowserProviderError) || error.code !== 'provider_unavailable') {
+          guard();
+          if (
+            !providerSettings.enabled ||
+            !(error instanceof BrowserProviderError) ||
+            error.code !== 'provider_unavailable'
+          ) {
             throw error;
           }
-          // A normal registration attempt installs the proof for status; it cannot clear a retained fence.
+          // Only enabled recovery can register when read-only status is unavailable.
           const previousStatus = lastStatus;
           if ((await register()) === 'cancelled') {
             return;
@@ -1452,6 +1558,7 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           // Registration already retrieved status before withdrawing a locally quarantined profile.
           ({ fence } = lastStatus);
         }
+        guard();
         if (current !== undefined) {
           publish({
             message: 'Browser actions are still unwinding. Wait before recovery.',
@@ -1459,21 +1566,42 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           });
           return;
         }
-        owner.guard();
-        const recovery = await coordinator.recover(() =>
-          getRecoveryTabIds(fence, () => {
-            owner?.guard();
-            if (disposed || settings?.enabled !== true || current !== undefined) {
-              throw new ExecutionStoppedError('provider_unavailable');
-            }
-          })
-        );
+        if (!providerSettings.enabled && fence !== undefined) {
+          needsRecovery = true;
+          publish({ message: disabledRecoveryMessage, phase: 'recovery', retryable: false });
+          return;
+        }
+        const revision = recoveryRevision;
+        const providerGeneration = generation;
+        checkRecovery = () => {
+          guard();
+          if (
+            current !== undefined ||
+            recoveryRevision !== revision ||
+            generation !== providerGeneration
+          ) {
+            throw new ExecutionStoppedError('provider_lost');
+          }
+        };
+        const recovery = await coordinator.recover(() => getRecoveryTabIds(fence, checkRecovery));
+        checkRecovery();
         if (!recovery.recovered) {
           publish({ message: recovery.reason, phase: 'recovery' });
           return;
         }
-        unavailable('provider_unavailable');
         needsRecovery = false;
+        if (!providerSettings.enabled) {
+          publish({
+            message:
+              'Local browser control recovered. CLI tasks remain disabled. Submit local work explicitly; old work will not replay.',
+            phase: 'disabled',
+            retryable: false,
+          });
+          return;
+        }
+        // Registration changes transport state; its completion still belongs to this captured lifetime.
+        checkRecovery = guard;
+        unavailable('provider_unavailable');
         const registration = await register(
           fence === undefined
             ? undefined
@@ -1487,6 +1615,7 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
         if (registration === 'cancelled') {
           return;
         }
+        guard();
         assertLease();
         publish({
           message:
@@ -1494,6 +1623,11 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
           phase: 'idle',
         });
       } catch (error) {
+        try {
+          checkRecovery();
+        } catch {
+          return;
+        }
         if (error instanceof ExecutionStoppedError && error.reason === 'provider_lost') {
           return;
         }
@@ -1505,8 +1639,19 @@ export const createBrowserTaskProviderRuntime = (options: BrowserTaskProviderOpt
             phase: 'recovery',
             retryable: true,
           });
-        } else {
+        } else if (
+          error instanceof BrowserPersistenceError ||
+          error instanceof BrowserProviderError ||
+          error instanceof ExecutionStoppedError
+        ) {
           reportError(error);
+        } else {
+          publish({
+            message:
+              'Recovery could not verify status, storage, or tab access. Restore access, retrieve status, then try recovery again.',
+            phase: 'recovery',
+            retryable: true,
+          });
         }
       } finally {
         recovering = false;

@@ -15,6 +15,9 @@ import { PartDetailSheetHost } from './part-detail-sheet-host';
 // while the sheet module loads, so its binding must already be initialized.
 import { MonoScrollBlock } from './mono-scroll-block';
 
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ background: '#000' }),
+}));
 vi.mock('react-native', () => ({
   Modal: 'Modal',
   ScrollView: 'ScrollView',

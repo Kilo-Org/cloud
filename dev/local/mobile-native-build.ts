@@ -75,12 +75,35 @@ export function hashRootNativeInputs(repoRoot: string): string {
     hash.update('\0');
   };
   add('pnpm-workspace.yaml', path.join(repoRoot, 'pnpm-workspace.yaml'));
-  add('pnpm-lock.yaml', path.join(repoRoot, 'pnpm-lock.yaml'));
+  hash.update('pnpm-lock.yaml#apps/mobile');
+  hash.update('\0');
+  hash.update(mobileLockfileSlice(path.join(repoRoot, 'pnpm-lock.yaml')));
+  hash.update('\0');
   const patchesRoot = path.join(repoRoot, 'patches');
   for (const relativePath of listFilesRecursively(patchesRoot)) {
     add(`patches/${relativePath}`, path.join(patchesRoot, relativePath));
   }
   return hash.digest('hex');
+}
+
+// The full lockfile churns on every dependency change anywhere in the
+// monorepo, re-keying mobile native builds whose inputs did not change
+// (observed: byte-identical APKs cached under distinct keys). Only the
+// apps/mobile importer block records resolutions the native build can see —
+// autolinked native modules are direct dependencies, and the block pins
+// their full resolved versions — so hash just that block. On any format
+// surprise, fall back to the whole file: over-keying is safe, under-keying
+// is not.
+export function mobileLockfileSlice(lockPath: string): Buffer {
+  let body: string;
+  try {
+    body = fs.readFileSync(lockPath, 'utf8');
+  } catch (error) {
+    if (hasCode(error, 'ENOENT')) return Buffer.from('<missing>');
+    throw error;
+  }
+  const block = body.match(/^ {2}apps\/mobile:\n(?:(?: {4}.*)?\n)*/m);
+  return Buffer.from(block ? block[0] : body);
 }
 
 function listFilesRecursively(root: string): string[] {

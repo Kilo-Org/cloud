@@ -68,37 +68,7 @@ describe('admin.github.getKilocodeOpenPullRequestsSummary', () => {
     );
   });
 
-  it('returns summary for admin users', async () => {
-    const mockSummary = {
-      totalOpenPullRequests: 10,
-      teamOpenPullRequests: 4,
-      externalOpenPullRequests: 6,
-      externalOpenPullRequestsList: [
-        {
-          number: 123,
-          title: 'Fix thing',
-          url: 'https://github.com/Kilo-Org/kilocode/pull/123',
-          repo: 'kilocode',
-          authorLogin: 'external-user',
-          createdAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
-          ageDays: 12,
-          commentCount: 3,
-          teamCommented: true,
-          reviewStatus: 'commented',
-        },
-      ],
-      updatedAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
-    };
-
-    (getKilocodeRepoOpenPullRequestsSummary as jest.Mock).mockResolvedValue(mockSummary);
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeOpenPullRequestsSummary();
-
-    expect(result).toEqual(mockSummary);
-  });
-
-  it('passes repos parameter through to the service', async () => {
+  it('returns the service response and passes repos/includeDrafts through to the service', async () => {
     const mockSummary = {
       totalOpenPullRequests: 1,
       teamOpenPullRequests: 0,
@@ -110,11 +80,12 @@ describe('admin.github.getKilocodeOpenPullRequestsSummary', () => {
     (getKilocodeRepoOpenPullRequestsSummary as jest.Mock).mockResolvedValue(mockSummary);
 
     const caller = await createCallerForUser(adminUser.id);
-    await caller.admin.github.getKilocodeOpenPullRequestsSummary({
+    const result = await caller.admin.github.getKilocodeOpenPullRequestsSummary({
       repos: ['kilocode', 'cloud'],
       includeDrafts: true,
     });
 
+    expect(result).toEqual(mockSummary);
     expect(getKilocodeRepoOpenPullRequestsSummary).toHaveBeenCalledWith(
       expect.objectContaining({
         repos: ['kilocode', 'cloud'],
@@ -157,8 +128,6 @@ describe('admin.github.getKilocodeRecentlyMergedExternalPRs', () => {
     const result = await caller.admin.github.getKilocodeRecentlyMergedExternalPRs();
 
     expect(result).toEqual(mockMergedPrs);
-    expect(result.length).toBe(2);
-    expect(result[0]?.number).toBe(456);
   });
 });
 
@@ -171,7 +140,7 @@ describe('admin.github.getKilocodeRecentlyClosedExternalPRs', () => {
     );
   });
 
-  it('returns recently closed external PRs for admin users', async () => {
+  it('returns the service response and passes repos parameter through to the service', async () => {
     const mockClosedPrs = {
       prs: [
         {
@@ -206,32 +175,11 @@ describe('admin.github.getKilocodeRecentlyClosedExternalPRs', () => {
     (getKilocodeRepoRecentlyClosedExternalPRs as jest.Mock).mockResolvedValue(mockClosedPrs);
 
     const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeRecentlyClosedExternalPRs();
-
-    expect(result).toEqual(mockClosedPrs);
-    expect(result.prs.length).toBe(2);
-    expect(result.prs[0]?.status).toBe('merged');
-    expect(result.prs[1]?.status).toBe('closed');
-    expect(typeof result.thisWeekMergedCount).toBe('number');
-    expect(typeof result.thisWeekClosedCount).toBe('number');
-    expect(typeof result.weekStart).toBe('string');
-  });
-
-  it('passes repos parameter through to the service', async () => {
-    const mockClosedPrs = {
-      prs: [],
-      thisWeekMergedCount: 0,
-      thisWeekClosedCount: 0,
-      weekStart: new Date('2024-01-15T00:00:00.000Z').toISOString(),
-    };
-
-    (getKilocodeRepoRecentlyClosedExternalPRs as jest.Mock).mockResolvedValue(mockClosedPrs);
-
-    const caller = await createCallerForUser(adminUser.id);
-    await caller.admin.github.getKilocodeRecentlyClosedExternalPRs({
+    const result = await caller.admin.github.getKilocodeRecentlyClosedExternalPRs({
       repos: ['cloud'],
     });
 
+    expect(result).toEqual(mockClosedPrs);
     expect(getKilocodeRepoRecentlyClosedExternalPRs).toHaveBeenCalledWith(
       expect.objectContaining({
         repos: ['cloud'],

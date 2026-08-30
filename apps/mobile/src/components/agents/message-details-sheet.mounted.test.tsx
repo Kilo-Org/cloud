@@ -11,6 +11,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { MessageDetailsSheet } from './message-details-sheet';
 
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ background: '#000' }),
+}));
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   Modal: 'Modal',

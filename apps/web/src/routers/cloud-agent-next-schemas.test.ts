@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   basePrepareSessionNextSchema,
+  baseCancelQueuedMessageNextSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentRelaxedAttachmentFilenameSchema,
@@ -262,5 +263,27 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
       cloneFromKiloSessionId: undefined,
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('baseCancelQueuedMessageNextSchema', () => {
+  const VALID_MESSAGE_ID = 'msg_123456789abc123456789ABCDE';
+
+  it('accepts a session id with a message id', () => {
+    expect(
+      baseCancelQueuedMessageNextSchema.safeParse({
+        sessionId: 'agent_123',
+        messageId: VALID_MESSAGE_ID,
+      }).success
+    ).toBe(true);
+  });
+
+  it('requires both sessionId and messageId', () => {
+    expect(baseCancelQueuedMessageNextSchema.safeParse({ sessionId: 'agent_123' }).success).toBe(
+      false
+    );
+    expect(
+      baseCancelQueuedMessageNextSchema.safeParse({ messageId: VALID_MESSAGE_ID }).success
+    ).toBe(false);
   });
 });

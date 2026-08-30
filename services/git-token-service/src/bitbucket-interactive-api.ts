@@ -267,12 +267,21 @@ function validIdentity(value: string): boolean {
 export function createBitbucketInteractiveApi(options: {
   scope: BitbucketInteractiveScope;
   accessToken: string;
+  // Server-verified aliases for 202 merge-task locations only, never request paths.
+  canonicalTaskRepository?: { workspace: string; repository: string };
   fetch?: typeof fetch;
   requestTimeoutMs?: number;
 }) {
+  const canonicalTaskRepository = options.canonicalTaskRepository;
   if (
     !validIdentity(options.scope.workspace) ||
-    (options.scope.kind === 'repository' && !validIdentity(options.scope.repository))
+    (options.scope.kind === 'repository' && !validIdentity(options.scope.repository)) ||
+    (canonicalTaskRepository &&
+      (options.scope.kind !== 'repository' ||
+        normalizeBitbucketUuid(options.scope.workspace) === null ||
+        normalizeBitbucketUuid(options.scope.repository) === null ||
+        !validIdentity(canonicalTaskRepository.workspace) ||
+        !validIdentity(canonicalTaskRepository.repository)))
   ) {
     throw new BitbucketInteractiveError('invalid_request');
   }
@@ -439,11 +448,21 @@ export function createBitbucketInteractiveApi(options: {
               const task = new URL(candidate);
               assertBitbucketUrl(candidate, task.pathname);
               if (task.search !== '') throw new Error('location_query');
-              const prefix = `${expected.pathname}/task-status/`;
+              const prefixes = [`${expected.pathname}/task-status/`];
+              if (response.status === 202 && canonicalTaskRepository) {
+                prefixes.push(
+                  new URL(
+                    `${BITBUCKET_API_ROOT}/repositories/${encodeURIComponent(canonicalTaskRepository.workspace)}/${encodeURIComponent(canonicalTaskRepository.repository)}/pullrequests/${pathParams.pull_request_id}/merge/task-status/`
+                  ).pathname
+                );
+              }
               if (
                 response.status === 202
-                  ? !task.pathname.startsWith(prefix) ||
-                    !validIdentity(decodeURIComponent(task.pathname.slice(prefix.length)))
+                  ? !prefixes.some(
+                      prefix =>
+                        task.pathname.startsWith(prefix) &&
+                        validIdentity(decodeURIComponent(task.pathname.slice(prefix.length)))
+                    )
                   : task.pathname !== expected.pathname &&
                     !task.pathname.startsWith(`${expected.pathname}/`)
               )

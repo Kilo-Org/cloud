@@ -595,6 +595,153 @@ describe('Bitbucket generated SDK boundary', () => {
   });
 });
 
+describe('UUID-addressed merge task locations', () => {
+  const scope = {
+    kind: 'repository' as const,
+    workspace: '{123e4567-e89b-12d3-a456-426614174031}',
+    repository: '{123e4567-e89b-12d3-a456-426614174032}',
+  };
+  const options = {
+    scope,
+    accessToken: token,
+    canonicalTaskRepository: { workspace: 'acme', repository: 'widgets' },
+  };
+  const request = {
+    ...merge,
+    params: {
+      path: { workspace: scope.workspace, repo_slug: scope.repository, pull_request_id: 7 },
+    },
+  };
+  const mergeUrl =
+    'https://api.bitbucket.org/2.0/repositories/%7B123e4567-e89b-12d3-a456-426614174031%7D/%7B123e4567-e89b-12d3-a456-426614174032%7D/pullrequests/7/merge';
+  const uuidTaskUrl = `${mergeUrl}/task-status/task-1`;
+
+  it.each([
+    ['canonical header', taskUrl, null, true],
+    ['canonical body', taskUrl, { task_status_url: taskUrl }, true],
+    [
+      'canonical UUID task',
+      `${prUrl}/merge/task-status/%7B123e4567-e89b-12d3-a456-426614174099%7D`,
+      null,
+      true,
+    ],
+    ['UUID with mapping', uuidTaskUrl, null, true],
+    ['legacy UUID without mapping', uuidTaskUrl, null, false],
+  ] as const)(
+    'retains the %s after a UUID-addressed merge',
+    async (_name, location, data, mapped) => {
+      const result = await createBitbucketInteractiveApi({
+        ...options,
+        canonicalTaskRepository: mapped ? options.canonicalTaskRepository : undefined,
+        fetch: async (url, init) => {
+          if (url !== mergeUrl || init?.method !== 'POST' || init.redirect !== 'manual')
+            return json({}, 404);
+          return data === null
+            ? new Response(null, { status: 202, headers: { location } })
+            : json(data, 202, { location });
+        },
+      }).execute(request);
+      expect(result).toEqual({ status: 202, location, data });
+      expect(JSON.stringify(result)).not.toContain(token);
+    }
+  );
+
+  it('rejects a canonical task without a verified alias mapping', async () => {
+    await expect(
+      createBitbucketInteractiveApi({
+        scope,
+        accessToken: token,
+        fetch: async () => new Response(null, { status: 202, headers: { location: taskUrl } }),
+      }).execute(request)
+    ).rejects.toMatchObject({ code: 'invalid_response' });
+  });
+
+  it.each([
+    taskUrl.replace('/acme/', '/foreign/'),
+    taskUrl.replace('/widgets/', '/other/'),
+    uuidTaskUrl.replace('426614174032', '426614174099'),
+    uuidTaskUrl.replace('426614174031', '426614174098'),
+    taskUrl.replace('/widgets/', `/%7B123e4567-e89b-12d3-a456-426614174032%7D/`),
+    taskUrl.replace('/7/', '/8/'),
+    taskUrl.replace('task-1', ''),
+    `${taskUrl}/child`,
+    taskUrl.replace('task-1', 'task%2Fother'),
+    taskUrl.replace('task-1', 'task%252Fother'),
+    taskUrl.replace('task-1', '%2e%2e'),
+    taskUrl.replace('task-1', 'task%5Cother'),
+    taskUrl.replace('task-1', '%ZZ'),
+    taskUrl.replace('task-1', 'x'.repeat(256)),
+    taskUrl.replace('/acme/', '/%61cme/'),
+    taskUrl.replace('/widgets/', '/%77idgets/'),
+    taskUrl.replace('/widgets/', '/widgets/../widgets/'),
+    taskUrl.replace('api.bitbucket.org', 'api.bitbucket.org.evil.example'),
+    taskUrl.replace('https:', 'http:'),
+    taskUrl.replace('api.bitbucket.org', 'api.bitbucket.org:444'),
+    taskUrl.replace('https://', 'https://user:private-provider-token@'),
+    `${taskUrl}?page=2`,
+    `${taskUrl}?access_token=${token}`,
+    `${taskUrl}#fragment`,
+  ])('rejects an unbound or unsafe task location %s', async location => {
+    const error = await createBitbucketInteractiveApi({
+      ...options,
+      fetch: async () => new Response(null, { status: 202, headers: { location } }),
+    })
+      .execute(request)
+      .catch(error => error);
+    expect(error).toMatchObject({ code: 'invalid_response' });
+    expect(`${String(error)} ${JSON.stringify(error)} ${error.stack}`).not.toContain(token);
+  });
+
+  it.each([
+    { workspace: '../acme', repository: 'widgets' },
+    { workspace: 'acme', repository: 'widgets/other' },
+  ])('rejects an unsafe server alias %#', canonicalTaskRepository => {
+    expect(() => createBitbucketInteractiveApi({ ...options, canonicalTaskRepository })).toThrow(
+      'invalid_request'
+    );
+  });
+
+  it.each([
+    { kind: 'workspace', workspace: scope.workspace },
+    { kind: 'repository', workspace: 'acme', repository: 'widgets' },
+  ] as const)('requires an immutable repository scope for aliases %#', scope => {
+    expect(() => createBitbucketInteractiveApi({ ...options, scope })).toThrow('invalid_request');
+  });
+
+  it('rejects a request-selected alias before dispatch', async () => {
+    let effects = 0;
+    await expect(
+      createBitbucketInteractiveApi({
+        ...options,
+        fetch: async () => {
+          effects += 1;
+          return new Response(null, { status: 202, headers: { location: taskUrl } });
+        },
+      }).execute({
+        ...request,
+        canonicalTaskRepository: options.canonicalTaskRepository,
+      } as BitbucketInteractiveRequest<'merge'>)
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(effects).toBe(0);
+  });
+
+  it('does not extend the alias mapping to pagination', async () => {
+    await expect(
+      createBitbucketInteractiveApi({
+        ...options,
+        fetch: async () =>
+          json({
+            values: [],
+            next: 'https://api.bitbucket.org/2.0/repositories/acme/widgets/refs/branches?pagelen=50&page=2',
+          }),
+      }).execute({
+        operation: 'branches',
+        params: { path: { workspace: scope.workspace, repo_slug: scope.repository } },
+      })
+    ).rejects.toMatchObject({ code: 'invalid_pagination' });
+  });
+});
+
 describe('SDK credential boundary', () => {
   it.each(['access_token', 'oauth_token', 'Authorization', 'callback'])(
     'rejects credential or unknown query key %s before dispatch',

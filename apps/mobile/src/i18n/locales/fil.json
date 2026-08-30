@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Patakbuhin ang `kilo remote` sa isang project sa iyong computer, o i-update ang Kilo CLI kung mayroon nang tumatakbo.",
       "instanceOnProject": "{{name}} sa {{project}}",
       "instanceOnProjectSuffix": "{{name}} sa {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Patakbuhin sa Cloud Agent"
+      "runOnCloudAgent": "Patakbuhin sa Cloud Agent",
+      "terminals": "Mga terminal",
+      "remotes": "Mga instance ng kilo remote"
     },
     "modePicker": {
       "title": "Pumili ng mode",

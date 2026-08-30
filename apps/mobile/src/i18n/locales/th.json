@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "รัน `kilo remote` ในโปรเจกต์บนคอมพิวเตอร์ของคุณ หรืออัปเดต Kilo CLI หากมีอยู่แล้วกำลังทำงาน",
       "instanceOnProject": "{{name}} บน {{project}}",
       "instanceOnProjectSuffix": "{{name}} บน {{project}} ({{suffix}})",
-      "runOnCloudAgent": "รันบน Cloud Agent"
+      "runOnCloudAgent": "รันบน Cloud Agent",
+      "terminals": "เทอร์มินัล",
+      "remotes": "อินสแตนซ์ระยะไกล"
     },
     "modePicker": {
       "title": "เลือกโหมด",

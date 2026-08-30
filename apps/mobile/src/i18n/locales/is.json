@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Keyrðu `kilo remote` í verkefni á tölvunni þinni, eða uppfærðu Kilo CLI ef eitt er þegar í gangi.",
       "instanceOnProject": "{{name}} á {{project}}",
       "instanceOnProjectSuffix": "{{name}} á {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Keyra á Cloud Agent"
+      "runOnCloudAgent": "Keyra á Cloud Agent",
+      "terminals": "Útstöðvar",
+      "remotes": "Fjartilvik"
     },
     "modePicker": {
       "title": "Veldu ham",

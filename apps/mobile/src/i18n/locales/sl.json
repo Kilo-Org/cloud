@@ -2303,7 +2303,9 @@
       "noCliInstancesDescription": "Zaženi `kilo remote` v projektu na svojem računalniku ali pa posodobi Kilo CLI, če že teče.",
       "instanceOnProject": "{{name}} na {{project}}",
       "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Zaženi na Cloud Agent"
+      "runOnCloudAgent": "Zaženi na Cloud Agent",
+      "terminals": "Terminali",
+      "remotes": "Oddaljene instance"
     },
     "modePicker": {
       "title": "Izberi način",

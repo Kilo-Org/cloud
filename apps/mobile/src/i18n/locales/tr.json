@@ -1817,7 +1817,9 @@
       "noCliInstancesDescription": "Bilgisayarınızdaki bir projede `kilo remote` çalıştırın veya zaten çalışıyorsa Kilo CLI'yi güncelleyin.",
       "instanceOnProject": "{{project}} üzerinde {{name}}",
       "instanceOnProjectSuffix": "{{project}} üzerinde {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Bulut Ajanında çalıştır"
+      "runOnCloudAgent": "Bulut Ajanında çalıştır",
+      "terminals": "Terminaller",
+      "remotes": "Uzak örnekler"
     },
     "modePicker": {
       "title": "Mod seç",

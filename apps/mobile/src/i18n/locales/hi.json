@@ -1790,7 +1790,9 @@
       "noCliInstancesDescription": "अपने कंप्यूटर पर किसी प्रोजेक्ट में `kilo remote` चलाएँ, या अगर पहले से चल रहा है तो Kilo CLI अपडेट करें।",
       "instanceOnProject": "{{project}} पर {{name}}",
       "instanceOnProjectSuffix": "{{project}} पर {{name}} ({{suffix}})",
-      "runOnCloudAgent": "क्लाउड एजेंट पर चलाएँ"
+      "runOnCloudAgent": "क्लाउड एजेंट पर चलाएँ",
+      "terminals": "टर्मिनल",
+      "remotes": "रिमोट इंस्टेंस"
     },
     "modePicker": {
       "title": "मोड चुनें",

@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରର ଏକ ପ୍ରୋଜେକ୍ଟରେ `kilo remote` ଚଲାନ୍ତୁ, କିମ୍ବା ଯଦି ଏକ ପୂର୍ବରୁ ଚାଲୁଅଛି ତେବେ Kilo CLI ଅଦ୍ୟତନ କରନ୍ତୁ।",
       "instanceOnProject": "{{name}} ଚାଲୁଥିବା {{project}}",
       "instanceOnProjectSuffix": "{{name}} ଚାଲୁଥିବା {{project}} ({{suffix}})",
-      "runOnCloudAgent": "କ୍ଲାଉଡ୍ ଏଜେଣ୍ଟରେ ଚଲାନ୍ତୁ"
+      "runOnCloudAgent": "କ୍ଲାଉଡ୍ ଏଜେଣ୍ଟରେ ଚଲାନ୍ତୁ",
+      "terminals": "ଟର୍ମିନାଲ୍‌ଗୁଡ଼ିକ",
+      "remotes": "ରିମୋଟ୍ ଇନଷ୍ଟାନ୍ସଗୁଡ଼ିକ"
     },
     "modePicker": {
       "title": "ମୋଡ୍ ଚୟନ କରନ୍ତୁ",

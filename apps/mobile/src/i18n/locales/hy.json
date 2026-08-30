@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Գործարկեք `kilo remote`-ը ձեր համակարգչի նախագծում, կամ թարմացրեք Kilo CLI-ն, եթե այն արդեն աշխատում է։",
       "instanceOnProject": "{{name}} {{project}}-ում",
       "instanceOnProjectSuffix": "{{name}} {{project}}-ում ({{suffix}})",
-      "runOnCloudAgent": "Գործարկել Ամպային գործակալում"
+      "runOnCloudAgent": "Գործարկել Ամպային գործակալում",
+      "terminals": "Տերմինալներ",
+      "remotes": "Հեռակա օրինակներ"
     },
     "modePicker": {
       "title": "Ընտրել ռեժիմը",

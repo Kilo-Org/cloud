@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Kompiutara kee irratti project tokko keessatti `kilo remote` hojjedhu, ykn yoo tokko hojjechaa jiraate Kilo CLI haaromsi.",
       "instanceOnProject": "{{name}} kan {{project}} irratti",
       "instanceOnProjectSuffix": "{{name}} kan {{project}} irratti ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent irratti hojjedhu"
+      "runOnCloudAgent": "Cloud Agent irratti hojjedhu",
+      "terminals": "Terminaloota",
+      "remotes": "Fagootti hojjetan"
     },
     "modePicker": {
       "title": "Haala filadhu",

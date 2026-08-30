@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "በኮምፒውተርዎ ላይ ባለ ፕሮጀክት ውስጥ `kilo remote` ያሂዱ፣ ወይም አንድ እየሰራ ካለ የKilo CLIን ያዘምኑ።",
       "instanceOnProject": "{{name}} በ{{project}} ላይ",
       "instanceOnProjectSuffix": "{{name}} በ{{project}} ላይ ({{suffix}})",
-      "runOnCloudAgent": "በክላውድ ወኪል ላይ ያሂዱ"
+      "runOnCloudAgent": "በክላውድ ወኪል ላይ ያሂዱ",
+      "terminals": "ተርሚናሎች",
+      "remotes": "የርቀት አጋጣሚዎች"
     },
     "modePicker": {
       "title": "ሁነታን ይምረጡ",

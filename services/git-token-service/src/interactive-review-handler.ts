@@ -263,7 +263,14 @@ export async function handleBitbucketInteractiveReview(
       workspace: `{${subject.workspaceUuid}}`,
       repository: `{${subject.repositoryUuid}}`,
     };
-    let api = createBitbucketInteractiveApi({ scope, accessToken: subject.token });
+    let api = createBitbucketInteractiveApi({
+      scope,
+      accessToken: subject.token,
+      canonicalTaskRepository: {
+        workspace: subject.workspaceSlug,
+        repository: subject.repositoryFullName.split('/')[1],
+      },
+    });
     let params: typeof request.params & { path: { workspace: string; repo_slug: string } } = {
       ...request.params,
       path: { ...path, workspace: scope.workspace, repo_slug: scope.repository },

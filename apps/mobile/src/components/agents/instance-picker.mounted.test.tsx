@@ -123,17 +123,17 @@ type ControlProps = {
   disabled?: boolean;
   onPress?: () => void;
 };
+function hosts(mounted: Mounted, type: string) {
+  return mounted.renderer.root.findAll(node => node.type === type);
+}
 function controls(mounted: Mounted) {
-  return mounted.renderer.root
-    .findAll(node => node.type === 'Pressable')
-    .map(node => node.props as ControlProps);
+  return hosts(mounted, 'Pressable').map(node => node.props as ControlProps);
 }
 function radios(mounted: Mounted) {
   return controls(mounted).filter(props => props.accessibilityRole === 'radio');
 }
 function text(mounted: Mounted) {
-  return mounted.renderer.root
-    .findAll(node => node.type === 'Text')
+  return hosts(mounted, 'Text')
     .flatMap(node => node.children.filter(child => typeof child === 'string'))
     .join('\n');
 }
@@ -188,8 +188,8 @@ describe('InstancePickerScreen', () => {
     ]);
     const checked = choices.map(row => row.accessibilityState?.checked);
     expect(checked).toEqual([false, false, true, false, false]);
-    const headings = mounted.renderer.root.findAll(
-      node => node.type === 'Text' && (node.props as ControlProps).accessibilityRole === 'header'
+    const headings = hosts(mounted, 'Text').filter(
+      node => (node.props as ControlProps).accessibilityRole === 'header'
     );
     expect(headings.map(node => node.children)).toEqual([['Run on'], ['Remotes'], ['Terminals']]);
     expect(
@@ -197,8 +197,8 @@ describe('InstancePickerScreen', () => {
         row => row.accessibilityLabel === 'Remotes' || row.accessibilityLabel === 'Terminals'
       )
     ).toBe(false);
-    expect(mounted.renderer.root.findAll(node => node.type === 'Server')).toHaveLength(1);
-    expect(mounted.renderer.root.findAll(node => node.type === 'Terminal')).toHaveLength(3);
+    expect(hosts(mounted, 'Server')).toHaveLength(1);
+    expect(hosts(mounted, 'Terminal')).toHaveLength(3);
     expect(text(mounted)).toContain('remote-main · Started Aug 28, 2026, 12:34 PM');
   });
 
@@ -245,7 +245,7 @@ describe('InstancePickerScreen', () => {
   it('shows loading skeletons rather than an empty result or stale bridge rows', async () => {
     fetchInstances.mockReturnValue(new Promise(() => undefined));
     const mounted = await openPicker();
-    expect(mounted.renderer.root.findAll(node => node.type === 'Skeleton')).toHaveLength(8);
+    expect(hosts(mounted, 'Skeleton')).toHaveLength(8);
     expect(radios(mounted)).toHaveLength(0);
     expect(text(mounted)).not.toContain('No CLI instances connected');
   });
@@ -259,9 +259,7 @@ describe('InstancePickerScreen', () => {
     const retry = Promise.withResolvers<{ instances: InstancePickerInstance[] }>();
     fetchInstances.mockReturnValue(retry.promise);
     press(mounted, row => row.accessibilityLabel === 'Retry');
-    await waitFor(
-      () => mounted.renderer.root.findAll(node => node.type === 'Skeleton').length === 8
-    );
+    await waitFor(() => hosts(mounted, 'Skeleton').length === 8);
     await act(async () => {
       retry.resolve({ instances: [REMOTE] });
       await retry.promise;

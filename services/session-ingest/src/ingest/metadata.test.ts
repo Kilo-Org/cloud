@@ -649,6 +649,84 @@ describe('applyMetadataChanges', () => {
     expect(db.applyUpdate).toHaveBeenCalled();
   });
 
+  it.each([
+    [null, 'cloud-agent'],
+    ['cloud-agent-session-scope-1', 'cloud-agent'],
+    ['cloud-agent-session-scope-1', 'cloud-agent-web'],
+    ['cloud-agent-session-scope-1', null],
+  ] as const)(
+    'preserves root platform provenance without notifications (scope: %s, platform: %s)',
+    async (cloudAgentSessionScopeId, platform) => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionId: 'cloud-agent-session-1',
+        cloudAgentSessionScopeId,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['platform', platform]]));
+
+      expect(db.updateSets).toEqual([]);
+      expect(db.applyUpdate).not.toHaveBeenCalled();
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    }
+  );
+
+  it('preserves root platform provenance while applying and notifying other metadata changes', async () => {
+    const db = createApplyMetadataDb({
+      cloudAgentSessionId: 'cloud-agent-session-1',
+      cloudAgentSessionScopeId: 'cloud-agent-session-1',
+    });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['platform', 'cloud-agent'],
+        ['title', 'Agent title'],
+        ['gitBranch', 'feature/provenance'],
+        ['status', 'busy'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([
+      {
+        title: 'Agent title',
+        git_branch: 'feature/provenance',
+        status: 'busy',
+        status_updated_at: expect.any(String),
+      },
+    ]);
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({ type: 'session.updated' }),
+      undefined
+    );
+  });
+
+  it.each([null, 'cloud-agent-session-scope-1'])(
+    'accepts platform metadata without a registered Cloud Agent root (scope: %s)',
+    async cloudAgentSessionScopeId => {
+      const db = createApplyMetadataDb({
+        cloudAgentSessionScopeId,
+        parentSessionId: cloudAgentSessionScopeId ? 'ses_root' : null,
+      });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+      await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['platform', 'vscode']]));
+
+      expect(db.updateSets).toEqual([{ created_on_platform: 'vscode' }]);
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        env,
+        'usr_1',
+        expect.objectContaining({ type: 'session.updated' }),
+        undefined
+      );
+    }
+  );
+
   it('refuses organization metadata changes for Cloud Agent session-scoped sessions', async () => {
     const db = createApplyMetadataDb({
       cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',

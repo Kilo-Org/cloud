@@ -143,6 +143,9 @@ export async function applyMetadataChanges(
     const hasCloudAgentSessionScope = cloudAgentSessionScopeId != null;
     const isCloudAgentManagedSession =
       hasCloudAgentSessionScope || currentRow.cloudAgentSessionId != null;
+    if (currentRow.cloudAgentSessionId != null) {
+      delete updates.created_on_platform;
+    }
 
     const statusChange =
       status === undefined
@@ -344,7 +347,7 @@ export async function applyMetadataChanges(
     // Refused org/parent/title claims must not emit phantom session.updated events.
     const changedNonStatus =
       titleWriteApplied ||
-      mergedChanges.has('platform') ||
+      updates.created_on_platform !== undefined ||
       organizationIdWriteApplied ||
       gitUrlWriteApplied ||
       mergedChanges.has('gitBranch') ||

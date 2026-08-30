@@ -18,6 +18,7 @@ import { describe, expect, it } from '@jest/globals';
 import type { ReviewActor } from '@kilocode/app-shared/provider-review';
 import {
   createBitbucketInteractiveClient,
+  type BitbucketInteractiveBrokerRequest,
   type BitbucketInteractiveMetadata,
   type BitbucketInteractiveRequest,
   type BitbucketInteractiveServiceSuccess,
@@ -76,6 +77,111 @@ const json = (body: unknown, status = 200, headers = {}) =>
   });
 
 describe('server-only Bitbucket interactive broker client', () => {
+  const sourceRequest = {
+    operation: 'file',
+    source: {
+      pullRequestId: 7,
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174098',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174099',
+    },
+    params: {
+      path: {
+        workspace: 'acme',
+        repo_slug: 'widgets',
+        commit: '0123456789abcdef0123456789abcdef01234567',
+        path: 'src/file.ts',
+      },
+    },
+  } satisfies BitbucketInteractiveBrokerRequest<'file'>;
+
+  it.each(['file', 'fileMetadata'] as const)(
+    'forwards the narrow source %s contract while retaining destination authorization',
+    async operation => {
+      const sent: unknown[] = [];
+      const data =
+        operation === 'file'
+          ? 'fork content'
+          : {
+              type: 'commit_file',
+              path: 'src/file.ts',
+              size: 12,
+              commit: { hash: sourceRequest.params.path.commit },
+              attributes: [],
+            };
+      const result = await createBitbucketInteractiveClient({
+        ...options,
+        fetch: async (_url, init) => {
+          if (new Headers(init?.headers).get('authorization') !== 'Bearer internal-token-fixture')
+            return json({}, 403);
+          sent.push(JSON.parse(String(init?.body)));
+          return json({ success: true, result: { status: 200, data }, metadata });
+        },
+      }).execute({ ...sourceRequest, operation });
+      expect(sent).toEqual([
+        {
+          ...options.workspace,
+          ...options.repository,
+          request: { ...sourceRequest, operation },
+        },
+      ]);
+      expect(result).toEqual({ status: 200, data, metadata });
+      expect(JSON.stringify({ sent, result })).not.toContain('internal-token-fixture');
+    }
+  );
+
+  it.each([
+    'invalid_request',
+    'not_connected',
+    'integration_mismatch',
+    'workspace_mismatch',
+    'repository_mismatch',
+    'conflict',
+    'insufficient_permissions',
+    'not_found',
+    'rate_limited',
+    'temporarily_unavailable',
+    'provider_unavailable',
+    'authentication_rejected',
+  ] as const)('retains sanitized source failure %s without automatic retries', async reason => {
+    let requests = 0;
+    const error = await createBitbucketInteractiveClient({
+      ...options,
+      fetch: async () => {
+        requests += 1;
+        return json({ success: false, reason }, 200, { authorization: 'provider-token-fixture' });
+      },
+    })
+      .execute(sourceRequest)
+      .catch(error => error);
+    expect(error).toMatchObject({ code: reason, message: reason });
+    expect(requests).toBe(1);
+    expect(`${String(error)} ${JSON.stringify(error)} ${error.stack}`).not.toContain(
+      'provider-token-fixture'
+    );
+    expect(error).not.toHaveProperty('request');
+    expect(error).not.toHaveProperty('response');
+    expect(error).not.toHaveProperty('cause');
+  });
+
+  it('does not expose an unrecognized source failure or its credential-bearing cause', async () => {
+    const error = await createBitbucketInteractiveClient({
+      ...options,
+      fetch: async () =>
+        json({
+          success: false,
+          reason: 'provider-token-fixture',
+          cause: { token: 'provider-token-fixture' },
+        }),
+    })
+      .execute(sourceRequest)
+      .catch(error => error);
+    expect(error).toMatchObject({ code: 'invalid_response' });
+    expect(`${String(error)} ${JSON.stringify(error)} ${error.stack}`).not.toContain(
+      'provider-token-fixture'
+    );
+    expect(error).not.toHaveProperty('cause');
+  });
+
   it('sends exact identity and exposes workspace-token facts without credential objects', async () => {
     const sent: { url: string; body: unknown; redirect?: RequestRedirect }[] = [];
     const result = await createBitbucketInteractiveClient({

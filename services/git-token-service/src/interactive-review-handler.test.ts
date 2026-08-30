@@ -2,6 +2,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import type * as DbClientModule from '@kilocode/db/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as BitbucketRuntimeTokenResolverModule from './bitbucket-runtime-token-resolver.js';
+import type { BitbucketInteractiveBrokerRequest } from './bitbucket-interactive-api.js';
 import {
   buildBitbucketInteractiveIntegrationQuery,
   handleBitbucketInteractiveReview,
@@ -67,12 +68,46 @@ const request = {
   params: { path: { workspace: 'acme', repo_slug: 'widgets', pull_request_id: 7 } },
 };
 const env = { HYPERDRIVE: { connectionString: 'test' } } as CloudflareEnv;
+const sourceSelector = {
+  pullRequestId: 7,
+  workspaceUuid: '123e4567-e89b-12d3-a456-426614174098',
+  repositoryUuid: '123e4567-e89b-12d3-a456-426614174099',
+};
+const sourceCommit = '0123456789abcdef0123456789abcdef01234567';
 const fork = {
+  type: 'pullrequest',
   id: 7,
   source: {
-    repository: { uuid: '{123e4567-e89b-12d3-a456-426614174099}', full_name: 'fork/widgets' },
+    commit: { hash: sourceCommit },
+    repository: {
+      uuid: `{${sourceSelector.repositoryUuid}}`,
+      full_name: 'fork/widgets',
+      workspace: { uuid: `{${sourceSelector.workspaceUuid}}`, slug: 'fork' },
+    },
   },
-  destination: { repository: { uuid: `{${target.repositoryUuid}}` } },
+  destination: {
+    repository: {
+      uuid: `{${target.repositoryUuid}}`,
+      full_name: target.repositoryFullName,
+      workspace: { uuid: `{${target.workspaceUuid}}`, slug: target.workspaceSlug },
+    },
+  },
+};
+const sourceFileRequest = {
+  operation: 'file',
+  params: {
+    path: { workspace: 'acme', repo_slug: 'widgets', commit: sourceCommit, path: 'src/file.ts' },
+  },
+  source: sourceSelector,
+} satisfies BitbucketInteractiveBrokerRequest<'file'>;
+const destinationApiPath = `/2.0/repositories/%7B${target.workspaceUuid}%7D/%7B${target.repositoryUuid}%7D`;
+const sourceApiPath = `/2.0/repositories/%7B${sourceSelector.workspaceUuid}%7D/%7B${sourceSelector.repositoryUuid}%7D`;
+const sourceFileMetadata = {
+  type: 'commit_file',
+  path: 'src/file.ts',
+  size: 17,
+  attributes: [],
+  commit: { hash: sourceCommit },
 };
 const providerFetch = vi.fn();
 const run = (input: unknown = { ...target, request }, actor = owner) =>
@@ -95,6 +130,73 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('interactive Bitbucket authorization', () => {
+  it.each([
+    ['workspace_access_token', 'file'],
+    ['workspace_access_token', 'fileMetadata'],
+    ['oauth', 'file'],
+    ['oauth', 'fileMetadata'],
+  ] as const)(
+    'reads immutable fork %s %s through the authorized destination pull request',
+    async (integrationType, operation) => {
+      mocks.rows.mockResolvedValue([{ ...integration, integrationType }]);
+      const visits: string[] = [];
+      providerFetch.mockImplementation(async (url, options) => {
+        const endpoint = new URL(String(url));
+        visits.push(endpoint.pathname);
+        if (
+          options.method !== 'GET' ||
+          new Headers(options.headers).get('authorization') !== 'Bearer provider-secret'
+        )
+          return Response.json({}, { status: 403 });
+        if (endpoint.pathname === `${destinationApiPath}/pullrequests/7`) {
+          return Response.json(
+            endpoint.searchParams.get('fields') ===
+              '+source.repository.workspace,+destination.repository.workspace'
+              ? fork
+              : {
+                  ...fork,
+                  source: {
+                    ...fork.source,
+                    repository: { ...fork.source.repository, workspace: undefined },
+                  },
+                }
+          );
+        }
+        if (endpoint.pathname !== `${sourceApiPath}/src/${sourceCommit}/src%2Ffile.ts`)
+          return Response.json({}, { status: 404 });
+        return endpoint.searchParams.get('format') === 'meta'
+          ? Response.json(sourceFileMetadata)
+          : new Response('const value = 1;\n', { headers: { 'content-type': 'text/plain' } });
+      });
+      const result = await run({ ...target, request: { ...sourceFileRequest, operation } });
+      expect(result, JSON.stringify(result)).toMatchObject({
+        success: true,
+        result: {
+          status: 200,
+          data: operation === 'file' ? 'const value = 1;\n' : sourceFileMetadata,
+        },
+        metadata: {
+          actorUserId: owner.userId,
+          organizationId: owner.orgId,
+          integrationId: target.integrationId,
+          providerActor:
+            integrationType === 'oauth'
+              ? { credentialKind: 'bitbucketOAuth', actor: { id: integration.actorId } }
+              : {
+                  credentialKind: 'bitbucketWorkspaceToken',
+                  workspaceUuid: target.workspaceUuid,
+                },
+          grants: { scopes: readScopes },
+        },
+      });
+      expect(JSON.stringify(result)).not.toContain('provider-secret');
+      expect(visits).toEqual([
+        `${destinationApiPath}/pullrequests/7`,
+        `${sourceApiPath}/src/${sourceCommit}/src%2Ffile.ts`,
+      ]);
+    }
+  );
+
   it('queries the exact active organization integration for an unblocked member or administrator', () => {
     const query = buildBitbucketInteractiveIntegrationQuery(
       getWorkerDb('postgres://unused:unused@localhost:0/unused'),
@@ -458,5 +560,543 @@ describe('interactive Bitbucket authorization', () => {
       })
     ).resolves.toEqual({ success: false, reason: 'repository_mismatch' });
     expect(providerFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('destination-authorized source reads', () => {
+  const abbreviatedCommit = sourceCommit.slice(0, 12);
+  const abbreviatedFork = {
+    ...fork,
+    source: { ...fork.source, commit: { hash: abbreviatedCommit } },
+  };
+
+  it.each(['file', 'fileMetadata'] as const)(
+    'resolves abbreviated fork revisions before reading %s at the full SHA',
+    async operation => {
+      const visits: string[] = [];
+      providerFetch.mockImplementation(async (url, options) => {
+        const endpoint = new URL(String(url));
+        visits.push(endpoint.pathname);
+        if (options.method !== 'GET') return Response.json({}, { status: 405 });
+        if (endpoint.pathname === `${destinationApiPath}/pullrequests/7`)
+          return Response.json(abbreviatedFork);
+        if (endpoint.pathname === `${sourceApiPath}/commit/${abbreviatedCommit}`)
+          return Response.json({ hash: sourceCommit.toUpperCase() });
+        if (endpoint.pathname !== `${sourceApiPath}/src/${sourceCommit}/src%2Ffile.ts`)
+          return Response.json({}, { status: 404 });
+        return endpoint.searchParams.get('format') === 'meta'
+          ? Response.json(sourceFileMetadata)
+          : new Response('fork content');
+      });
+      await expect(
+        run({ ...target, request: { ...sourceFileRequest, operation } })
+      ).resolves.toMatchObject({
+        success: true,
+        result: { status: 200, data: operation === 'file' ? 'fork content' : sourceFileMetadata },
+      });
+      expect(visits).toEqual([
+        `${destinationApiPath}/pullrequests/7`,
+        `${sourceApiPath}/commit/${abbreviatedCommit}`,
+        `${sourceApiPath}/src/${sourceCommit}/src%2Ffile.ts`,
+      ]);
+    }
+  );
+
+  it.each([
+    [
+      'same prefix, different revision',
+      { hash: `${abbreviatedCommit}${'f'.repeat(28)}` },
+      'conflict',
+    ],
+    ['missing hash', {}, 'invalid_response'],
+    ['still abbreviated', { hash: abbreviatedCommit }, 'invalid_response'],
+    ['different prefix', { hash: 'f'.repeat(40) }, 'invalid_response'],
+  ] as const)(
+    'rejects resolved source commit %s without reading file content',
+    async (_name, commit, reason) => {
+      providerFetch
+        .mockResolvedValueOnce(Response.json(abbreviatedFork))
+        .mockResolvedValueOnce(Response.json(commit));
+      await expect(run({ ...target, request: sourceFileRequest })).resolves.toEqual({
+        success: false,
+        reason,
+      });
+      expect(providerFetch.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual([
+        `${destinationApiPath}/pullrequests/7`,
+        `${sourceApiPath}/commit/${abbreviatedCommit}`,
+      ]);
+    }
+  );
+
+  it('preserves provider denial while resolving an abbreviated source revision', async () => {
+    providerFetch
+      .mockResolvedValueOnce(Response.json(abbreviatedFork))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+    await expect(run({ ...target, request: sourceFileRequest })).resolves.toEqual({
+      success: false,
+      reason: 'insufficient_permissions',
+    });
+    expect(providerFetch.mock.calls).toHaveLength(2);
+  });
+
+  it.each([
+    [{ integrationId: sourceSelector.repositoryUuid }, 'integration_mismatch'],
+    [{ workspaceUuid: sourceSelector.workspaceUuid }, 'workspace_mismatch'],
+    [{ repositoryUuid: sourceSelector.repositoryUuid }, 'not_found'],
+    [{ repositoryFullName: 'acme/other' }, 'repository_mismatch'],
+  ] as const)(
+    'requires the original destination identity before reading the PR %#',
+    async (change, reason) => {
+      await expect(run({ ...target, ...change, request: sourceFileRequest })).resolves.toEqual({
+        success: false,
+        reason,
+      });
+      expect(providerFetch).not.toHaveBeenCalled();
+      expect(mocks.resolve).not.toHaveBeenCalled();
+    }
+  );
+
+  it('requires destination membership before resolving a source selector', async () => {
+    mocks.rows.mockResolvedValue([]);
+    await expect(run({ ...target, request: sourceFileRequest })).resolves.toEqual({
+      success: false,
+      reason: 'not_connected',
+    });
+    expect(providerFetch).not.toHaveBeenCalled();
+    expect(mocks.resolve).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['workspace_access_token', { accessVersion: 8 }, 'reconnect_required'],
+    ['workspace_access_token', { accessId: 'replacement' }, 'reconnect_required'],
+    [
+      'workspace_access_token',
+      { accessScopes: ['repository', 'pullrequest'] },
+      'insufficient_permissions',
+    ],
+    ['oauth', { oauthId: 'replacement' }, 'reconnect_required'],
+    ['oauth', { actorId: 'replacement' }, 'reconnect_required'],
+    ['oauth', { scopes: ['repository', 'pullrequest'] }, 'insufficient_permissions'],
+  ] as const)(
+    'fences %s credential or grant changes before source reads %#',
+    async (integrationType, change, reason) => {
+      const initial = { ...integration, integrationType };
+      mocks.rows
+        .mockResolvedValueOnce([initial])
+        .mockResolvedValueOnce([{ ...initial, ...change }]);
+      await expect(run({ ...target, request: sourceFileRequest })).resolves.toEqual({
+        success: false,
+        reason,
+      });
+      expect(providerFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects a cached destination slug reused by another UUID', async () => {
+    mocks.rows.mockResolvedValue([
+      {
+        ...integration,
+        repositories: [{ ...integration.repositories[0], id: sourceSelector.repositoryUuid }],
+      },
+    ]);
+    await expect(run({ ...target, request: sourceFileRequest })).resolves.toEqual({
+      success: false,
+      reason: 'not_found',
+    });
+    expect(providerFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing PR', {}, 'invalid_response'],
+    ['wrong PR type', { ...fork, type: 'repository' }, 'invalid_response'],
+    ['malformed PR ID', { ...fork, id: '7' }, 'invalid_response'],
+    ['wrong PR ID', { ...fork, id: 8 }, 'repository_mismatch'],
+    ['missing destination', { ...fork, destination: null }, 'invalid_response'],
+    [
+      'reused destination slug',
+      {
+        ...fork,
+        destination: {
+          repository: { ...fork.destination.repository, uuid: fork.source.repository.uuid },
+        },
+      },
+      'repository_mismatch',
+    ],
+    [
+      'wrong destination name',
+      {
+        ...fork,
+        destination: { repository: { ...fork.destination.repository, full_name: 'acme/other' } },
+      },
+      'repository_mismatch',
+    ],
+    [
+      'wrong destination workspace',
+      {
+        ...fork,
+        destination: {
+          repository: {
+            ...fork.destination.repository,
+            workspace: {
+              ...fork.destination.repository.workspace,
+              uuid: sourceSelector.workspaceUuid,
+            },
+          },
+        },
+      },
+      'workspace_mismatch',
+    ],
+    ['missing source', { ...fork, source: null }, 'invalid_response'],
+    [
+      'missing source workspace',
+      {
+        ...fork,
+        source: { ...fork.source, repository: { ...fork.source.repository, workspace: undefined } },
+      },
+      'invalid_response',
+    ],
+    [
+      'malformed source UUID',
+      {
+        ...fork,
+        source: { ...fork.source, repository: { ...fork.source.repository, uuid: 'fork/widgets' } },
+      },
+      'invalid_response',
+    ],
+    [
+      'malformed workspace UUID',
+      {
+        ...fork,
+        source: {
+          ...fork.source,
+          repository: {
+            ...fork.source.repository,
+            workspace: { ...fork.source.repository.workspace, uuid: '../other' },
+          },
+        },
+      },
+      'invalid_response',
+    ],
+    [
+      'inconsistent source workspace',
+      {
+        ...fork,
+        source: {
+          ...fork.source,
+          repository: {
+            ...fork.source.repository,
+            workspace: { ...fork.source.repository.workspace, slug: 'other' },
+          },
+        },
+      },
+      'invalid_response',
+    ],
+    [
+      'source path traversal',
+      {
+        ...fork,
+        source: {
+          ...fork.source,
+          repository: { ...fork.source.repository, full_name: 'fork/../widgets' },
+        },
+      },
+      'invalid_response',
+    ],
+    [
+      'reused source slug',
+      {
+        ...fork,
+        source: {
+          ...fork.source,
+          repository: { ...fork.source.repository, uuid: target.repositoryUuid },
+        },
+      },
+      'repository_mismatch',
+    ],
+    [
+      'wrong source workspace',
+      {
+        ...fork,
+        source: {
+          ...fork.source,
+          repository: {
+            ...fork.source.repository,
+            workspace: { ...fork.source.repository.workspace, uuid: target.workspaceUuid },
+          },
+        },
+      },
+      'workspace_mismatch',
+    ],
+    [
+      'stale source revision',
+      { ...fork, source: { ...fork.source, commit: { hash: 'b'.repeat(40) } } },
+      'conflict',
+    ],
+    [
+      'malformed provider revision',
+      { ...fork, source: { ...fork.source, commit: { hash: sourceCommit.slice(0, 6) } } },
+      'invalid_response',
+    ],
+    [
+      'stale abbreviated revision',
+      { ...fork, source: { ...fork.source, commit: { hash: 'b'.repeat(12) } } },
+      'conflict',
+    ],
+    [
+      'non-commit provider revision',
+      { ...fork, source: { ...fork.source, commit: { hash: 'main' } } },
+      'invalid_response',
+    ],
+  ] as const)('rejects %s without reading the source', async (_name, review, reason) => {
+    providerFetch.mockImplementation(async () => Response.json(review));
+    await expect(run({ ...target, request: sourceFileRequest })).resolves.toEqual({
+      success: false,
+      reason,
+    });
+    expect(providerFetch.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual([
+      `${destinationApiPath}/pullrequests/7`,
+    ]);
+  });
+
+  it.each([
+    null,
+    {},
+    { ...sourceSelector, pullRequestId: 0 },
+    { ...sourceSelector, pullRequestId: '7' },
+    { ...sourceSelector, pullRequestId: Number.MAX_SAFE_INTEGER + 1 },
+    { ...sourceSelector, workspaceUuid: 'fork' },
+    { ...sourceSelector, repositoryUuid: '../widgets' },
+    { ...sourceSelector, url: 'https://attacker.example' },
+  ])('rejects a malformed source selector before provider access %#', async source => {
+    await expect(run({ ...target, request: { ...sourceFileRequest, source } })).resolves.toEqual({
+      success: false,
+      reason: 'invalid_request',
+    });
+    expect(providerFetch).not.toHaveBeenCalled();
+    expect(mocks.resolve).not.toHaveBeenCalled();
+  });
+
+  it.each(['main', sourceCommit.slice(0, 12), 'a'.repeat(39), 'a'.repeat(41), '../main', 123])(
+    'rejects non-immutable commit selector %s before authorization',
+    async commit => {
+      await expect(
+        run({
+          ...target,
+          request: {
+            ...sourceFileRequest,
+            params: { path: { ...sourceFileRequest.params.path, commit } },
+          },
+        })
+      ).resolves.toEqual({ success: false, reason: 'invalid_request' });
+      expect(providerFetch).not.toHaveBeenCalled();
+      expect(mocks.resolve).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { next: 'https://attacker.example/page/2' },
+    { next: `https://api.bitbucket.org${sourceApiPath}/src/${sourceCommit}/src%2Ffile.ts` },
+    { body: { content: 'not-a-read' } },
+    { params: { ...sourceFileRequest.params, query: { format: 'meta' } } },
+  ])('rejects source next links, bodies, and query overrides %#', async change => {
+    await expect(run({ ...target, request: { ...sourceFileRequest, ...change } })).resolves.toEqual(
+      { success: false, reason: 'invalid_request' }
+    );
+    expect(providerFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { workspace: 'fork' },
+    { workspace: `{${sourceSelector.workspaceUuid}}` },
+    { repo_slug: `{${sourceSelector.repositoryUuid}}` },
+    { repo_slug: 'other' },
+  ])('never uses a caller-selected foreign scope for the source %#', async path => {
+    await expect(
+      run({
+        ...target,
+        request: {
+          ...sourceFileRequest,
+          params: { path: { ...sourceFileRequest.params.path, ...path } },
+        },
+      })
+    ).resolves.toEqual({ success: false, reason: 'repository_mismatch' });
+    expect(providerFetch).not.toHaveBeenCalled();
+  });
+
+  it.each(['../file.ts', 'src/../file.ts', 'src\\file.ts', 'src//file.ts'])(
+    'retains SDK path rejection for source file %s',
+    async path => {
+      await expect(
+        run({
+          ...target,
+          request: {
+            ...sourceFileRequest,
+            params: { path: { ...sourceFileRequest.params.path, path } },
+          },
+        })
+      ).resolves.toEqual({ success: false, reason: 'invalid_request' });
+      expect(providerFetch.mock.calls).toHaveLength(1);
+    }
+  );
+
+  it.each([
+    'createComment',
+    'updateComment',
+    'deleteComment',
+    'resolveComment',
+    'reopenComment',
+    'approve',
+    'unapprove',
+    'requestChanges',
+    'removeChangeRequest',
+    'merge',
+    'deleteBranch',
+  ])('rejects source %s even with destination-looking paths and write grants', async operation => {
+    mocks.rows.mockResolvedValue([
+      { ...integration, accessScopes: [...readScopes, 'pullrequest:write'] },
+    ]);
+    const path =
+      operation === 'deleteBranch'
+        ? { workspace: 'acme', repo_slug: 'widgets', name: 'feature' }
+        : operation.endsWith('Comment') && operation !== 'createComment'
+          ? { ...request.params.path, comment_id: 91 }
+          : request.params.path;
+    const body =
+      operation === 'createComment' || operation === 'updateComment'
+        ? { content: { raw: 'comment' } }
+        : operation === 'merge'
+          ? { close_source_branch: false }
+          : undefined;
+    for (const attempt of [
+      { operation, params: { path }, body, source: sourceSelector },
+      {
+        operation,
+        params: { path: { ...path, commit: sourceCommit } },
+        source: sourceSelector,
+      },
+    ]) {
+      await expect(run({ ...target, request: attempt })).resolves.toEqual({
+        success: false,
+        reason: 'invalid_request',
+      });
+    }
+    expect(providerFetch).not.toHaveBeenCalled();
+    expect(mocks.resolve).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    request,
+    { operation: 'repository', params: { path: { workspace: 'acme', repo_slug: 'widgets' } } },
+    {
+      operation: 'diff',
+      params: {
+        path: {
+          workspace: 'acme',
+          repo_slug: 'widgets',
+          spec: `${sourceCommit}..${'b'.repeat(40)}`,
+        },
+      },
+    },
+    {
+      operation: 'commit',
+      params: { path: { workspace: 'acme', repo_slug: 'widgets', commit: sourceCommit } },
+    },
+  ])('rejects unrelated reads with a source selector %#', async unrelated => {
+    await expect(
+      run({
+        ...target,
+        request: {
+          ...unrelated,
+          params: {
+            ...unrelated.params,
+            path: { ...unrelated.params.path, commit: sourceCommit },
+          },
+          source: sourceSelector,
+        },
+      })
+    ).resolves.toEqual({ success: false, reason: 'invalid_request' });
+    expect(providerFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [403, 'insufficient_permissions'],
+    [404, 'not_found'],
+    [429, 'rate_limited'],
+    [503, 'provider_unavailable'],
+    ['lost', 'transport_failed'],
+    ['oversized', 'response_too_large'],
+    ['redirect', 'redirect_rejected'],
+  ] as const)(
+    'preserves bounded source failure %s without retry or credential leakage',
+    async (status, reason) => {
+      providerFetch.mockResolvedValueOnce(Response.json(fork)).mockImplementation(async () => {
+        if (status === 'lost') throw new Error('provider-secret');
+        if (status === 'oversized')
+          return new Response('provider-secret', { headers: { 'content-length': '1000001' } });
+        if (status === 'redirect')
+          return new Response(null, {
+            status: 302,
+            headers: { location: 'https://attacker.example' },
+          });
+        return Response.json({ error: { message: 'provider-secret' } }, { status });
+      });
+      const result = await run({ ...target, request: sourceFileRequest });
+      expect(result).toEqual({ success: false, reason });
+      expect(JSON.stringify(result)).not.toContain('provider-secret');
+      expect(providerFetch.mock.calls.map(([, options]) => options.method)).toEqual(['GET', 'GET']);
+    }
+  );
+
+  it.each(['workspace_access_token', 'oauth'])(
+    'keeps %s invalidation semantics after source rejection',
+    async integrationType => {
+      mocks.rows.mockResolvedValue([{ ...integration, integrationType }]);
+      const generations = new Map([
+        [7, 'active'],
+        [8, 'active'],
+      ]);
+      mocks.invalidate.mockImplementation(async authorization => {
+        if (authorization.credentialId === integration.accessId)
+          generations.set(authorization.credentialVersion, 'reconnect_required');
+      });
+      providerFetch
+        .mockResolvedValueOnce(Response.json(fork))
+        .mockResolvedValueOnce(new Response(null, { status: 401 }));
+      await expect(run({ ...target, request: sourceFileRequest })).resolves.toEqual({
+        success: false,
+        reason: 'authentication_rejected',
+      });
+      expect([...generations]).toEqual([
+        [7, integrationType === 'oauth' ? 'active' : 'reconnect_required'],
+        [8, 'active'],
+      ]);
+      expect(providerFetch.mock.calls).toHaveLength(2);
+    }
+  );
+
+  it('retains an empty source file instead of reporting missing content', async () => {
+    providerFetch
+      .mockResolvedValueOnce(Response.json(fork))
+      .mockResolvedValueOnce(new Response(''));
+    await expect(run({ ...target, request: sourceFileRequest })).resolves.toMatchObject({
+      success: true,
+      result: { status: 200, data: '' },
+    });
+  });
+
+  it('leaves file calls without a selector on the destination', async () => {
+    providerFetch.mockImplementation(
+      async url =>
+        new Response(
+          new URL(String(url)).pathname ===
+            `${destinationApiPath}/src/${sourceCommit}/src%2Ffile.ts`
+            ? 'destination content'
+            : 'wrong repository'
+        )
+    );
+    await expect(
+      run({ ...target, request: { operation: 'file', params: sourceFileRequest.params } })
+    ).resolves.toMatchObject({ success: true, result: { data: 'destination content' } });
+    expect(providerFetch.mock.calls).toHaveLength(1);
   });
 });

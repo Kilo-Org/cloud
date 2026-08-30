@@ -209,7 +209,9 @@ export const WorkflowSettings = (): JSX.Element => {
 
   const execution = useBrowserExecutionSnapshot();
   const [admissionBlocker, setAdmissionBlocker] = useState<string>();
-  const admittingRef = useRef(false);
+  const [admitting, setAdmitting] = useState(false);
+  // eslint-disable-next-line unicorn/no-useless-undefined -- React 19 requires an initial ref value.
+  const admittingRef = useRef<AbortSignal | undefined>(undefined);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -223,10 +225,20 @@ export const WorkflowSettings = (): JSX.Element => {
       input: Record<string, string> | undefined,
       signal: AbortSignal
     ): Promise<boolean> => {
-      if (admittingRef.current) {
+      if (admittingRef.current !== undefined || signal.aborted) {
         return false;
       }
-      admittingRef.current = true;
+      admittingRef.current = signal;
+      setAdmitting(true);
+      const finishAdmission = (): void => {
+        if (admittingRef.current === signal) {
+          admittingRef.current = undefined;
+          if (mountedRef.current) {
+            setAdmitting(false);
+          }
+        }
+      };
+      signal.addEventListener('abort', finishAdmission, { once: true });
       let lease: BrowserExecutionLease | undefined = undefined;
       let handedOff = false;
       try {
@@ -259,13 +271,14 @@ export const WorkflowSettings = (): JSX.Element => {
         if (mountedRef.current && !signal.aborted) {
           setAdmissionBlocker(
             error instanceof Error
-              ? error.message
+              ? `${error.message} Workflow input is retained. Run it again explicitly.`
               : 'Browser admission stopped. Submit again explicitly.'
           );
         }
         return false;
       } finally {
-        admittingRef.current = false;
+        signal.removeEventListener('abort', finishAdmission);
+        finishAdmission();
         if (lease !== undefined && !handedOff) {
           await lease.release();
         }
@@ -273,7 +286,9 @@ export const WorkflowSettings = (): JSX.Element => {
     },
     [activeConversationId, setRunRequest, setIsSettingsOpen, store]
   );
-  const blocker = execution.blockedReason ?? admissionBlocker;
+  const blocker = admitting
+    ? 'Checking browser control… Your workflow has not started.'
+    : (execution.blockedReason ?? admissionBlocker);
 
   return (
     <section
@@ -329,11 +344,12 @@ export const WorkflowSettings = (): JSX.Element => {
         )}
       </div>
 
-      {blocker === undefined ? null : (
-        <p className="type-body mt-2 text-status-yellow-400" role="status">
-          {blocker}
-        </p>
-      )}
+      <p
+        className={blocker === undefined ? 'sr-only' : 'type-body mt-2 text-status-yellow-400'}
+        role="status"
+      >
+        {blocker}
+      </p>
       {execution.delegationUnavailableReason === undefined ? null : (
         <p className="type-body mt-2 text-foreground-muted">
           {execution.delegationUnavailableReason}
@@ -369,6 +385,7 @@ export const WorkflowSettings = (): JSX.Element => {
             {view.items.map(item => (
               <WorkflowRow
                 activeConversationRunning={activeConversationRunning}
+                admissionPending={admitting}
                 allowWorkflowsInSafeMode={settings.allowWorkflowsInSafeMode}
                 autoApproveChanges={settings.autoApproveWorkflowChanges}
                 blocker={blocker}

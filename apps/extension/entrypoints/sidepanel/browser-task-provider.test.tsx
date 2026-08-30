@@ -360,8 +360,15 @@ const relay = () => {
       if (provider === undefined) {
         throw new BrowserProviderError('provider_unavailable', true);
       }
+      // The relay deletes withdrawn providers without retained jobs or fences.
       if (
-        provider.providerId !== registration?.providerId ||
+        registration === undefined ||
+        (cachedRegistration === undefined && rows.size === 0 && fence === undefined)
+      ) {
+        throw new BrowserProviderError('not_found', false);
+      }
+      if (
+        provider.providerId !== registration.providerId ||
         provider.providerProof !== registration.providerProof
       ) {
         throw new BrowserProviderError('owner_mismatch', false);
@@ -821,6 +828,8 @@ describe('enabled browser provider owner', () => {
   describe('recovery preparation', () => {
     it('prepares a withdrawn profile without restoring cached proof or execution authority', async () => {
       const { coordinator, runtime, transport } = await setup();
+      const { job } = transport.delivery();
+      transport.settle(job, terminalResult(job, 'cancelled', 'cancelled'));
       const admission = await coordinator.acquireLocal();
       if (!admission.admitted) {
         throw new Error(admission.reason);
@@ -1124,31 +1133,27 @@ describe('enabled browser provider owner', () => {
       }
     );
 
-    it.each(['disabled', 'disposed', 'unsupported'] as const)(
-      'cannot prepare a %s provider',
-      async state => {
-        const { runtime, transport } = await setup(state !== 'disabled', state !== 'unsupported');
-        if (state === 'disposed') {
-          await runtime.dispose();
-        }
-        const outbound = structuredClone(transport.outbound);
-        const writes = [...fixture.writes];
-        const guidance = {
-          disabled: 'Enable CLI tasks',
-          disposed: 'Reopen the signed-in panel',
-          unsupported: 'Restore browser Web Locks support',
-        };
-        await expect(runtime.prepareRecovery()).resolves.toMatchObject({
-          ready: false,
-          reason: expect.stringContaining(guidance[state]),
-        });
-        expect(transport.outbound).toStrictEqual(outbound);
-        expect(fixture.writes).toStrictEqual(writes);
-        expect(fixture.actions).toStrictEqual([]);
+    it.each(['disposed', 'unsupported'] as const)('cannot prepare a %s provider', async state => {
+      const { runtime, transport } = await setup(true, state !== 'unsupported');
+      if (state === 'disposed') {
+        await runtime.dispose();
       }
-    );
+      const outbound = structuredClone(transport.outbound);
+      const writes = [...fixture.writes];
+      const guidance = {
+        disposed: 'Reopen the signed-in panel',
+        unsupported: 'Restore browser Web Locks support',
+      };
+      await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+        ready: false,
+        reason: expect.stringContaining(guidance[state]),
+      });
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect(fixture.writes).toStrictEqual(writes);
+      expect(fixture.actions).toStrictEqual([]);
+    });
 
-    it('rejects a released provider owner after status retrieval starts', async () => {
+    it.each([true, false])('rejects a released provider owner with enabled=%s', async enabled => {
       const transport = relay();
       const coordinator = createBrowserExecutionCoordinator({
         locks: nativeLocks as LockManager,
@@ -1168,14 +1173,19 @@ describe('enabled browser provider owner', () => {
       runtimes.push(runtime);
       await runtime.start();
       await runtime.setSettings(defaults);
+      if (!enabled) {
+        await runtime.setSettings({ ...defaults, enabled: false });
+      }
       const requested = Promise.withResolvers<void>();
       const resume = Promise.withResolvers<void>();
       const status = transport.connection.requestBrowserProviderStatus;
-      transport.connection.requestBrowserProviderStatus = async () => {
-        const page = await status();
-        requested.resolve();
-        await resume.promise;
-        return page;
+      transport.connection.requestBrowserProviderStatus = async (...args) => {
+        try {
+          return await status(...args);
+        } finally {
+          requested.resolve();
+          await resume.promise;
+        }
       };
       const preparing = runtime.prepareRecovery();
       try {
@@ -1186,6 +1196,12 @@ describe('enabled browser provider owner', () => {
           ready: false,
           reason: expect.stringContaining('Use the owning panel'),
         });
+        const previous = structuredClone(runtime.getSnapshot());
+        const outbound = structuredClone(transport.outbound);
+        await runtime.recover();
+        expect(runtime.getSnapshot()).toStrictEqual(previous);
+        expect(transport.outbound).toStrictEqual(outbound);
+        expect(fixture.values.has(BROWSER_EXECUTION_SAFETY_KEY)).toBe(false);
         expect(fixture.actions).toStrictEqual([]);
         expect(transport.events).not.toContain('recovered');
       } finally {
@@ -1537,6 +1553,8 @@ describe('enabled browser provider owner', () => {
 
     it('retries only eligible failed releases after successful status without clearing the fence', async () => {
       const { coordinator, runtime, transport } = await setup();
+      const { job } = transport.delivery();
+      transport.settle(job, terminalResult(job, 'cancelled', 'cancelled'));
       const admission = await coordinator.acquireLocal();
       if (!admission.admitted) {
         throw new Error(admission.reason);
@@ -1643,6 +1661,490 @@ describe('enabled browser provider owner', () => {
           )
         ).toStrictEqual([]);
         expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+        expect(fixture.actions).toStrictEqual([]);
+      }
+    );
+  });
+
+  describe('disabled local recovery', () => {
+    const disabledQuarantine = async (previouslyEnabled = false, fence?: Fence) => {
+      const context = await setup(previouslyEnabled);
+      if (fence !== undefined) {
+        context.transport.setFence(fence);
+      }
+      const admission = await context.coordinator.acquireLocal();
+      if (!admission.admitted) {
+        throw new Error(admission.reason);
+      }
+      localLeases.push(admission.lease);
+      await admission.lease.quarantine(7);
+      await admission.lease.release();
+      if (previouslyEnabled) {
+        await context.runtime.setSettings({ ...defaults, enabled: false });
+      }
+      fixture.tabs = fixture.tabs.filter(tab => tab.id !== 7);
+      return context;
+    };
+
+    it.each([
+      { previouslyEnabled: false, reload: false },
+      { previouslyEnabled: false, reload: true },
+      { previouslyEnabled: true, reload: false },
+      { previouslyEnabled: true, reload: true },
+    ])(
+      'restores local control from absent status with previouslyEnabled=$previouslyEnabled and reload=$reload',
+      async ({ previouslyEnabled, reload }) => {
+        vi.useFakeTimers();
+        const initial = await disabledQuarantine(previouslyEnabled);
+        const { transport } = initial;
+        let { coordinator, runtime } = initial;
+        if (reload) {
+          await runtime.dispose();
+          coordinator = createBrowserExecutionCoordinator({
+            locks: nativeLocks as LockManager,
+            storageArea: storage,
+          });
+          runtime = createBrowserTaskProviderRuntime({
+            auth,
+            connection: transport.connection,
+            coordinator,
+            organizationId: 'org-approved',
+            storageArea: storage,
+          });
+          runtimes.push(runtime);
+          await runtime.start();
+        }
+        const identity = fixture.values.get(BROWSER_PROVIDER_IDENTITY_KEY) as Pick<
+          BrowserProviderRegistration,
+          'providerId' | 'providerProof'
+        >;
+        await expect(
+          transport.connection.requestBrowserProviderStatus(undefined, identity)
+        ).rejects.toMatchObject({ code: 'not_found' });
+        await coordinator.refresh();
+        expect(coordinator.getSnapshot().quarantinedTabIds).toStrictEqual([7]);
+        const outbound = structuredClone(transport.outbound);
+        const providerState = structuredClone(transport.connection.getBrowserProviderState());
+        const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+        const savedSettings = structuredClone(
+          fixture.values.get('local:kiloBrowserProviderSettings')
+        );
+        const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({ ready: true });
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+        expect((await coordinator.acquireLocal()).admitted).toBe(false);
+        await runtime.recover();
+        expect(runtime.getSnapshot()).toMatchObject({
+          active: undefined,
+          jobs: [],
+          message: expect.stringContaining('CLI tasks remain disabled'),
+          phase: 'disabled',
+          result: undefined,
+          settings: { enabled: false },
+          unresolvedFence: undefined,
+        });
+        expect(coordinator.getSnapshot().quarantinedTabIds).toStrictEqual([]);
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+          tabIds: [],
+          version: 1,
+        });
+        expect(fixture.values.get('local:kiloBrowserProviderSettings')).toStrictEqual(
+          savedSettings
+        );
+        expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+        if (previouslyEnabled) {
+          transport.send(transport.delivery());
+        }
+        await vi.advanceTimersByTimeAsync(20_000);
+        expect(transport.outbound).toStrictEqual(outbound);
+        expect(transport.heartbeatTimes).toStrictEqual([]);
+        expect(transport.connection.getBrowserProviderState()).toStrictEqual(providerState);
+        expect(fixture.actions).toStrictEqual([]);
+        const local = await coordinator.acquireLocal();
+        expect(local.admitted).toBe(true);
+        if (local.admitted) {
+          localLeases.push(local.lease);
+        }
+      }
+    );
+
+    it.each([undefined, 0, 7])(
+      'retains a remote fence with tab %s without registration',
+      async tabId => {
+        const fence: Fence = {
+          invocationId: `b1.${Date.now() - 700_000_000}.${'b'.repeat(64)}`,
+          ...(tabId === undefined ? {} : { tabId }),
+        };
+        const { coordinator, runtime, transport } = await disabledQuarantine(true, fence);
+        const outbound = structuredClone(transport.outbound);
+        const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('remote browser task still requires recovery'),
+        });
+        await runtime.recover();
+        expect(runtime.getSnapshot()).toMatchObject({
+          active: undefined,
+          message: expect.stringContaining(
+            'Enable CLI tasks, retrieve status, then recover explicitly'
+          ),
+          settings: { enabled: false },
+          unresolvedFence: fence,
+        });
+        expect(coordinator.getSnapshot().quarantinedTabIds).toStrictEqual([7]);
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+        expect(transport.outbound).toStrictEqual(outbound);
+        expect((await coordinator.acquireLocal()).admitted).toBe(false);
+        expect(fixture.actions).toStrictEqual([]);
+      }
+    );
+
+    it.each([
+      { code: 'provider_unavailable', retryable: true },
+      { code: 'request_timeout', retryable: true },
+      { code: 'disconnected', retryable: true },
+      { code: 'permission_denied', retryable: false },
+      { code: 'owner_mismatch', retryable: false },
+      { code: 'invalid_request', retryable: false },
+    ] as const)('requires fresh status after $code without registering', async failure => {
+      const { coordinator, runtime, transport } = await disabledQuarantine();
+      await expect(runtime.prepareRecovery()).resolves.toMatchObject({ ready: true });
+      const outbound = structuredClone(transport.outbound);
+      const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+      transport.connection.requestBrowserProviderStatus = async () => {
+        throw new BrowserProviderError(failure.code, failure.retryable);
+      };
+      await expect(runtime.prepareRecovery()).resolves.toMatchObject({ ready: false });
+      await runtime.recover();
+      expect(runtime.getSnapshot()).toMatchObject({
+        message: expect.stringContaining('Retrieve status before explicit recovery'),
+        retryable: failure.retryable,
+        settings: { enabled: false },
+      });
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect((await coordinator.acquireLocal()).admitted).toBe(false);
+      expect(fixture.actions).toStrictEqual([]);
+    });
+
+    it('does not treat an untyped not_found error as authenticated absence', async () => {
+      const { coordinator, runtime, transport } = await disabledQuarantine();
+      const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+      transport.connection.requestBrowserProviderStatus = async () => {
+        throw new Error('not_found');
+      };
+      await expect(runtime.prepareRecovery()).resolves.toMatchObject({ ready: false });
+      await runtime.recover();
+      expect(runtime.getSnapshot()).toMatchObject({
+        message: expect.stringContaining('Restore access'),
+        phase: 'recovery',
+        settings: { enabled: false },
+      });
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+      expect((await coordinator.acquireLocal()).admitted).toBe(false);
+      expect(transport.outbound).toStrictEqual([]);
+      expect(fixture.actions).toStrictEqual([]);
+    });
+
+    it('does not discard a fence when a later status page returns not_found', async () => {
+      const fence = { invocationId: `b1.${Date.now()}.${'b'.repeat(64)}`, tabId: 7 };
+      const { coordinator, runtime, transport } = await disabledQuarantine(true, fence);
+      await runtime.refreshStatus();
+      const status = transport.connection.requestBrowserProviderStatus;
+      transport.connection.requestBrowserProviderStatus = async (...args) => {
+        if (args[0] !== undefined) {
+          throw new BrowserProviderError('not_found', false);
+        }
+        return { ...(await status(...args)), nextCursor: 'next' };
+      };
+      const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+      const outbound = structuredClone(transport.outbound);
+      await expect(runtime.prepareRecovery()).resolves.toMatchObject({ ready: false });
+      await runtime.recover();
+      expect(runtime.getSnapshot()).toMatchObject({
+        settings: { enabled: false },
+        unresolvedFence: fence,
+      });
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+      expect((await coordinator.acquireLocal()).admitted).toBe(false);
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect(fixture.actions).toStrictEqual([]);
+    });
+
+    it.each(['prepareRecovery', 'recover'] as const)(
+      'cannot reuse an earlier failed absence request for %s',
+      async operation => {
+        const { coordinator, runtime, transport } = await disabledQuarantine();
+        const paused = Promise.withResolvers<void>();
+        const resume = Promise.withResolvers<void>();
+        const spy = vi
+          .spyOn(transport.connection, 'requestBrowserProviderStatus')
+          .mockImplementationOnce(async () => {
+            paused.resolve();
+            await resume.promise;
+            throw new BrowserProviderError('not_found', false);
+          })
+          .mockRejectedValue(new BrowserProviderError('permission_denied', false));
+        const retrieving = (async () => {
+          try {
+            await runtime.refreshStatus();
+          } catch (error) {
+            expect(error).toMatchObject({ reason: 'provider_lost' });
+          }
+        })();
+        await paused.promise;
+        const pending = runtime[operation]();
+        const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+        try {
+          resume.resolve();
+          await retrieving;
+          const readiness = await pending;
+          if (operation === 'prepareRecovery') {
+            expect(readiness).toMatchObject({ ready: false });
+          }
+          expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+          expect((await coordinator.acquireLocal()).admitted).toBe(false);
+          expect(runtime.getSnapshot().settings?.enabled).toBe(false);
+          expect(transport.outbound).toStrictEqual([]);
+          expect(fixture.actions).toStrictEqual([]);
+        } finally {
+          resume.resolve();
+          await retrieving;
+          await pending;
+          spy.mockRestore();
+        }
+        await runtime.recover();
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+          tabIds: [],
+          version: 1,
+        });
+        expect(transport.outbound).toStrictEqual([]);
+        expect(fixture.actions).toStrictEqual([]);
+      }
+    );
+
+    it.each(['prepareRecovery', 'recover'] as const)(
+      'rejects an absence reply after the %s status deadline',
+      async operation => {
+        vi.useFakeTimers();
+        const { coordinator, runtime, transport } = await disabledQuarantine();
+        const paused = Promise.withResolvers<void>();
+        const resume = Promise.withResolvers<void>();
+        transport.connection.requestBrowserProviderStatus = async () => {
+          paused.resolve();
+          await resume.promise;
+          throw new BrowserProviderError('not_found', false);
+        };
+        const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+        const pending = runtime[operation]();
+        await paused.promise;
+        vi.setSystemTime(Date.now() + 30_001);
+        resume.resolve();
+        const readiness = await pending;
+        if (operation === 'prepareRecovery') {
+          expect(readiness).toMatchObject({ ready: false });
+        }
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+        expect((await coordinator.acquireLocal()).admitted).toBe(false);
+        expect(runtime.getSnapshot().settings?.enabled).toBe(false);
+        expect(transport.outbound).toStrictEqual([]);
+        expect(fixture.actions).toStrictEqual([]);
+      }
+    );
+
+    it.each(['open tab', 'allTabs', 'tab read', 'storage read', 'storage write'] as const)(
+      'retains local quarantine after a failed %s check',
+      async failure => {
+        const { runtime, transport } = await disabledQuarantine();
+        const tabs = await browser.tabs.query({});
+        const tabsApi: {
+          query: (queryInfo: Parameters<typeof browser.tabs.query>[0]) => Promise<typeof tabs>;
+        } = browser.tabs;
+        const storageApi = storage as { getItem: (key: string) => unknown };
+        const { getItem } = storageApi;
+        if (failure === 'open tab') {
+          fixture.tabs = [{ id: 7, title: 'Affected tab', url: 'chrome://settings' }];
+        } else if (failure === 'allTabs') {
+          fixture.values.set(BROWSER_EXECUTION_SAFETY_KEY, {
+            allTabs: true,
+            tabIds: [7],
+            version: 1,
+          });
+        } else if (failure === 'tab read') {
+          vi.spyOn(tabsApi, 'query').mockRejectedValue(new Error('Private tab failure'));
+        } else if (failure === 'storage read') {
+          vi.spyOn(storageApi, 'getItem').mockImplementation(key => {
+            if (key === BROWSER_EXECUTION_SAFETY_KEY) {
+              throw new Error('Private storage failure');
+            }
+            return getItem(key);
+          });
+        } else {
+          fixture.failWrite = BROWSER_EXECUTION_SAFETY_KEY;
+        }
+        const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+        const outbound = structuredClone(transport.outbound);
+        try {
+          await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+            ready: failure === 'storage write',
+          });
+          await runtime.recover();
+          expect(runtime.getSnapshot()).toMatchObject({
+            phase: 'recovery',
+            settings: { enabled: false },
+          });
+          expect(runtime.getSnapshot().message).not.toContain('Private');
+          expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+          expect(transport.outbound).toStrictEqual(outbound);
+          expect(fixture.actions).toStrictEqual([]);
+        } finally {
+          fixture.failWrite = '';
+          vi.restoreAllMocks();
+        }
+      }
+    );
+
+    it('waits for native execution to drain before disabled recovery', async () => {
+      const { runtime, transport } = await disabledQuarantine();
+      const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+      const outbound = structuredClone(transport.outbound);
+      await nativeLocks.request(BROWSER_EXECUTION_LOCK, { mode: 'shared' }, async () => {
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('unwinding'),
+        });
+        await runtime.recover();
+        expect(runtime.getSnapshot().message).toContain('unwinding');
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+      });
+      await runtime.recover();
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+        tabIds: [],
+        version: 1,
+      });
+      expect(runtime.getSnapshot().settings?.enabled).toBe(false);
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect(fixture.actions).toStrictEqual([]);
+    });
+
+    describe.each(['preparation status', 'status', 'tabs', 'coordinator'] as const)(
+      'pending disabled %s recovery',
+      stage => {
+        it.each([
+          'settings',
+          'enable',
+          'auth',
+          'organization',
+          'dispose',
+          'disconnect',
+          'generation',
+        ] as const)('keeps quarantine and newer state after %s', async change => {
+          const { coordinator, runtime, transport } = await disabledQuarantine(true);
+          const paused = Promise.withResolvers<void>();
+          const resume = Promise.withResolvers<void>();
+          const pause = async () => {
+            paused.resolve();
+            await resume.promise;
+          };
+          if (stage === 'status' || stage === 'preparation status') {
+            const status = transport.connection.requestBrowserProviderStatus;
+            vi.spyOn(transport.connection, 'requestBrowserProviderStatus').mockImplementationOnce(
+              async (...args) => {
+                try {
+                  return await status(...args);
+                } finally {
+                  await pause();
+                }
+              }
+            );
+          } else if (stage === 'tabs') {
+            const tabs = await browser.tabs.query({});
+            const tabsApi: {
+              query: (queryInfo: Parameters<typeof browser.tabs.query>[0]) => Promise<typeof tabs>;
+            } = browser.tabs;
+            vi.spyOn(tabsApi, 'query').mockImplementationOnce(async () => {
+              await pause();
+              return tabs;
+            });
+          } else {
+            const { recover } = coordinator;
+            vi.spyOn(coordinator, 'recover').mockImplementationOnce(async getTabs => {
+              await pause();
+              return recover(getTabs);
+            });
+          }
+          const pending =
+            stage === 'preparation status' ? runtime.prepareRecovery() : runtime.recover();
+          try {
+            await paused.promise;
+            if (change === 'settings' || change === 'enable') {
+              await runtime.setSettings({
+                ...defaults,
+                enabled: change === 'enable',
+                model: 'new-model',
+              });
+            } else if (change === 'auth') {
+              await storage.setItem(AUTH_STORAGE_KEY, {
+                token: 'new-token',
+                userEmail: 'other@example.test',
+              });
+            } else if (change === 'organization') {
+              await storage.setItem('local:kiloSelectedOrganizationId', 'other-org');
+            } else if (change === 'dispose') {
+              await runtime.dispose();
+            } else if (change === 'disconnect') {
+              transport.setState({ status: 'disconnected' });
+            } else {
+              const { job } = transport.delivery();
+              transport.setState({
+                lease: {
+                  generation: job.generation + 1,
+                  leaseExpiresAt: new Date(Date.now() + 15_000).toISOString(),
+                  providerId: job.providerId,
+                  requestId: crypto.randomUUID(),
+                  type: 'provider_lease_ack',
+                },
+                status: 'registered',
+              });
+            }
+            const previous = structuredClone(runtime.getSnapshot());
+            const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+            const outbound = structuredClone(transport.outbound);
+            resume.resolve();
+            const readiness = await pending;
+            if (stage === 'preparation status') {
+              expect(readiness).toMatchObject({ ready: false });
+            }
+            expect(runtime.getSnapshot()).toStrictEqual(previous);
+            expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+            expect(transport.outbound).toStrictEqual(outbound);
+            expect(fixture.actions).toStrictEqual([]);
+          } finally {
+            resume.resolve();
+            await pending;
+            vi.restoreAllMocks();
+          }
+        });
+      }
+    );
+
+    it.each([AUTH_STORAGE_KEY, 'local:kiloSelectedOrganizationId'] as const)(
+      'cannot recover an already revoked lifetime after %s changes',
+      async key => {
+        const { runtime, transport } = await disabledQuarantine();
+        await storage.setItem(key, null);
+        const previous = structuredClone(runtime.getSnapshot());
+        const safety = structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+        const outbound = structuredClone(transport.outbound);
+        await expect(runtime.prepareRecovery()).resolves.toMatchObject({
+          ready: false,
+          reason: expect.stringContaining('Reopen the signed-in panel'),
+        });
+        await expect(runtime.refreshStatus()).rejects.toThrow('provider_lost');
+        await runtime.recover();
+        expect(runtime.getSnapshot()).toStrictEqual(previous);
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+        expect(transport.outbound).toStrictEqual(outbound);
         expect(fixture.actions).toStrictEqual([]);
       }
     );
@@ -2234,12 +2736,12 @@ describe('enabled browser provider owner', () => {
     }
   );
 
-  it.each([
-    { reason: 'provider_unavailable', retryable: true },
-    { reason: 'permission_denied', retryable: false },
-  ] as const)(
-    'reports current tab approval failure $reason without starting work',
-    async failure => {
+  describe.each(['settings', 'tabs'] as const)('approval %s failures', source => {
+    it.each([
+      { raw: false, reason: 'provider_unavailable', retryable: true },
+      { raw: false, reason: 'permission_denied', retryable: false },
+      { raw: true, reason: 'runner_failed', retryable: true },
+    ] as const)('retains only retryable consent after $reason', async failure => {
       const { runtime, transport } = await setup();
       const message = transport.delivery();
       transport.dispatch(message);
@@ -2248,31 +2750,153 @@ describe('enabled browser provider owner', () => {
       const tabsApi: {
         query: (queryInfo: Parameters<typeof browser.tabs.query>[0]) => Promise<typeof tabs>;
       } = browser.tabs;
-      const query = vi
-        .spyOn(tabsApi, 'query')
-        .mockRejectedValueOnce(new BrowserProviderError(failure.reason, failure.retryable));
+      const storageApi = storage as { getItem: (key: string) => unknown };
+      const { getItem } = storageApi;
+      const error = failure.raw
+        ? new Error('Private read failure')
+        : new BrowserProviderError(failure.reason, failure.retryable);
+      const read =
+        source === 'tabs'
+          ? vi.spyOn(tabsApi, 'query').mockRejectedValueOnce(error)
+          : vi.spyOn(storageApi, 'getItem').mockImplementation(key => {
+              if (key === 'local:kiloRemoteMcpServers') {
+                throw error;
+              }
+              return getItem(key);
+            });
       try {
         await runtime.approve(message.job.jobId, 7);
-        expect(runtime.getSnapshot()).toMatchObject({
-          active: { approval: undefined, job: { jobId: message.job.jobId } },
-          message: expect.stringContaining(failure.reason),
-          phase: 'unavailable',
-          retryable: failure.retryable,
-        });
+        if (failure.retryable) {
+          expect(runtime.getSnapshot()).toMatchObject({
+            active: {
+              approval: undefined,
+              goal: message.goal,
+              job: { deadlines: message.job.deadlines, jobId: message.job.jobId },
+              ownerLabel: message.ownerLabel,
+            },
+            message: expect.stringContaining('approve this goal again before its deadline'),
+            phase: 'awaiting_approval',
+            retryable: true,
+          });
+          expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({
+            jobs: [{ approval: null, snapshot: { status: 'awaiting_approval' } }],
+          });
+          expect(
+            transport.outbound.filter(frame => frame.type === 'provider_approval')
+          ).toStrictEqual([]);
+        } else {
+          await waitForDone(runtime);
+          expect(runtime.getSnapshot()).toMatchObject({
+            active: undefined,
+            result: { reason: 'permission_denied' },
+            retryable: false,
+          });
+          expect(runtime.getSnapshot().phase).not.toBe('awaiting_approval');
+        }
+        expect(JSON.stringify(runtime.getSnapshot())).not.toContain('Private');
         expect(fixture.actions).toStrictEqual([]);
       } finally {
-        query.mockRestore();
+        read.mockRestore();
       }
       if (failure.retryable) {
+        await runtime.setSettings({ ...defaults, model: 'retry-model' });
+        await storage.setItem('local:kiloWorkflowSettings', { allowWorkflowsInSafeMode: true });
+        await runtime.approve('different-job', 8);
+        expect(runtime.getSnapshot().active?.approval).toBeUndefined();
+        expect(fixture.actions).toStrictEqual([]);
         await runtime.approve(message.job.jobId, 7);
         await waitForDone(runtime);
         expect(fixture.actions).toStrictEqual(['run:7:1']);
-        expect(runtime.getSnapshot().result).toMatchObject({ status: 'succeeded' });
+        expect(runtime.getSnapshot()).toMatchObject({
+          message: expect.stringContaining('Keep this panel open'),
+          result: { jobId: message.job.jobId, status: 'succeeded' },
+          retryable: false,
+        });
+        expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toMatchObject({
+          jobs: [
+            {
+              approval: {
+                settings: {
+                  model: 'retry-model',
+                  workflowSettings: { allowWorkflowsInSafeMode: true },
+                },
+              },
+            },
+          ],
+        });
       } else {
-        runtime.reject(message.job.jobId);
-        await waitForDone(runtime);
+        await runtime.approve(message.job.jobId, 7);
+        await runtime.refreshStatus();
+        expect(runtime.getSnapshot().active).toBeUndefined();
+        expect(runtime.getSnapshot().result).toMatchObject({ reason: 'permission_denied' });
         expect(fixture.actions).toStrictEqual([]);
-        expect(runtime.getSnapshot().result).toMatchObject({ reason: 'approval_denied' });
+      }
+    });
+  });
+
+  it.each(['cancel', 'reject', 'permission', 'disable', 'expiry'] as const)(
+    'ignores a delayed retryable read error after %s revokes the same consent',
+    async cause => {
+      vi.useFakeTimers();
+      const { runtime, transport } = await setup();
+      const message = transport.delivery();
+      message.job.deadlines.approval = new Date(Date.now() + 1000).toISOString();
+      transport.dispatch(message);
+      await vi.waitFor(() => {
+        expect(runtime.getSnapshot().phase).toBe('awaiting_approval');
+      });
+      const tabs = await browser.tabs.query({});
+      const tabsApi: {
+        query: (queryInfo: Parameters<typeof browser.tabs.query>[0]) => Promise<typeof tabs>;
+      } = browser.tabs;
+      const paused = Promise.withResolvers<void>();
+      const resume = Promise.withResolvers<void>();
+      const query = vi.spyOn(tabsApi, 'query').mockImplementationOnce(async () => {
+        paused.resolve();
+        await resume.promise;
+        throw new BrowserProviderError('provider_unavailable', true);
+      });
+      const approving = runtime.approve(message.job.jobId, 7);
+      try {
+        await paused.promise;
+        transport.setTerminalAck(false);
+        if (cause === 'cancel') {
+          runtime.cancel(message.job.jobId);
+        } else if (cause === 'reject') {
+          runtime.reject(message.job.jobId);
+        } else if (cause === 'permission') {
+          for (const listener of fixture.permissions) {
+            listener();
+          }
+        } else if (cause === 'disable') {
+          await runtime.setSettings({ ...defaults, enabled: false });
+        } else {
+          await vi.advanceTimersByTimeAsync(1001);
+        }
+        await vi.advanceTimersByTimeAsync(0);
+        const previous = structuredClone(runtime.getSnapshot());
+        expect(previous.active?.job.jobId).toBe(message.job.jobId);
+        resume.resolve();
+        await approving;
+        expect(runtime.getSnapshot()).toStrictEqual(previous);
+        expect(fixture.actions).toStrictEqual([]);
+        transport.setTerminalAck(true);
+        transport.snapshot();
+        await vi.waitFor(() => {
+          expect(runtime.getSnapshot().active).toBeUndefined();
+        });
+        await runtime.approve(message.job.jobId, 7);
+        expect(runtime.getSnapshot().phase).not.toBe('awaiting_approval');
+        expect(
+          transport.outbound.filter(
+            frame => frame.type === 'provider_approval' && frame.approval.decision === 'approved'
+          )
+        ).toStrictEqual([]);
+        expect(fixture.actions).toStrictEqual([]);
+      } finally {
+        resume.resolve();
+        await approving;
+        query.mockRestore();
       }
     }
   );
@@ -2745,6 +3369,8 @@ describe('enabled browser provider owner', () => {
 
   it('withdraws a locally quarantined provider and recovers after the SDK clears its proof cache', async () => {
     const { coordinator, runtime, transport } = await setup();
+    const { job } = transport.delivery();
+    transport.settle(job, terminalResult(job, 'cancelled', 'cancelled'));
     const admission = await coordinator.acquireLocal();
     if (!admission.admitted) {
       throw new Error(admission.reason);
@@ -2782,6 +3408,301 @@ describe('enabled browser provider owner', () => {
     expect(transport.events).toContain('recovered');
     expect(fixture.actions).toStrictEqual([]);
   });
+
+  it('replaces a local fallback with the same job’s authoritative terminal result after drainage', async () => {
+    vi.useFakeTimers();
+    const { runtime, transport } = await setup();
+    const message = transport.delivery();
+    transport.setTerminalAck(false);
+    fixture.turn = async context => {
+      context.executionGuard();
+      fixture.actions.push('issued');
+      const running = transport.rows.get(message.job.jobId);
+      if (running === undefined) {
+        throw new Error('Missing running job');
+      }
+      // The cancellation wins at the relay, but its delivery is lost before local completion.
+      transport.settle(running, terminalResult(running, 'cancelled', 'cancelled'));
+      return outcome();
+    };
+    transport.dispatch(message);
+    await vi.waitFor(() => {
+      expect(runtime.getSnapshot().phase).toBe('awaiting_approval');
+    });
+    await runtime.approve(message.job.jobId, 7);
+    await vi.waitFor(() => {
+      expect(transport.outbound.some(frame => frame.type === 'provider_result')).toBe(true);
+    });
+    await runtime.setSettings({ ...defaults, enabled: false });
+    await vi.advanceTimersByTimeAsync(10_001);
+    await vi.waitFor(() => {
+      expect(runtime.getSnapshot().active).toBeUndefined();
+    });
+    expect(runtime.getSnapshot().result).toMatchObject({
+      jobId: message.job.jobId,
+      reason: 'completed',
+      status: 'succeeded',
+    });
+    const authoritative = transport.rows.get(message.job.jobId)?.result;
+    expect(authoritative).toMatchObject({ effectsUncertain: true, reason: 'cancelled' });
+    const outbound = structuredClone(transport.outbound);
+    const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+    await runtime.refreshStatus();
+    expect(runtime.getSnapshot()).toMatchObject({
+      active: undefined,
+      result: authoritative,
+      settings: { enabled: false },
+    });
+    expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+    expect(transport.outbound).toStrictEqual(outbound);
+    expect(fixture.actions).toStrictEqual(['issued']);
+  });
+
+  describe.each([true, false])('recovered outcomes with delegation enabled=%s', enabled => {
+    it.each([
+      { effectsUncertain: false, reason: 'completed', status: 'succeeded' },
+      { effectsUncertain: true, reason: 'effects_uncertain', status: 'interrupted' },
+    ] as const)(
+      'restores an authoritative $reason result and affected identities without an invocation',
+      async settlement => {
+        const { reason } = settlement;
+        const { runtime, transport } = await setup();
+        const message = transport.delivery();
+        const result: BrowserResult = {
+          ...terminalResult(message.job, 'effects_uncertain'),
+          ...settlement,
+          evidence: [
+            {
+              text: 'Confirmed page observation',
+              title: 'Observed tab',
+              url: 'https://example.test/task',
+            },
+          ],
+          summary:
+            reason === 'completed'
+              ? 'Confirmed the requested page.'
+              : 'Only the first observation is confirmed; later effects are unknown.',
+        };
+        const terminal: BrowserJobSnapshot = {
+          ...message.job,
+          approvedTab: {
+            effectiveMode: 'safe',
+            tabId: 7,
+            title: 'Approved tab',
+            url: 'https://example.test/task',
+          },
+          ownerLabel: message.ownerLabel,
+          result,
+          status: result.status,
+        };
+        transport.rows.set(terminal.jobId, terminal);
+        const fence = { invocationId: terminal.invocationId, tabId: 7 };
+        if (reason === 'effects_uncertain') {
+          transport.setFence(fence);
+          fixture.values.set(BROWSER_EXECUTION_SAFETY_KEY, { tabIds: [7, 8], version: 1 });
+        }
+        if (!enabled) {
+          await runtime.setSettings({ ...defaults, enabled: false });
+        }
+        await runtime.dispose();
+        transport.setState({ status: 'ready' });
+        const coordinator = createBrowserExecutionCoordinator({
+          locks: nativeLocks as LockManager,
+          storageArea: storage,
+        });
+        const reopened = createBrowserTaskProviderRuntime({
+          auth,
+          connection: transport.connection,
+          coordinator,
+          organizationId: 'org-approved',
+          storageArea: storage,
+        });
+        runtimes.push(reopened);
+        const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+        await reopened.start();
+        if (enabled) {
+          expect(reopened.getSnapshot().result).toStrictEqual(result);
+        }
+        const outbound = structuredClone(transport.outbound);
+        await reopened.refreshStatus();
+        await coordinator.refresh();
+        expect(reopened.getSnapshot()).toMatchObject({
+          active: undefined,
+          jobs: [terminal],
+          result,
+          settings: { enabled },
+          unresolvedFence: reason === 'effects_uncertain' ? fence : undefined,
+        });
+        expect(coordinator.getSnapshot().quarantinedTabIds).toStrictEqual(
+          reason === 'effects_uncertain' ? [7, 8] : []
+        );
+        await reopened.approve(terminal.jobId, 7);
+        transport.send(message);
+        expect(reopened.getSnapshot().active).toBeUndefined();
+        expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+        expect(transport.outbound).toStrictEqual(outbound);
+        expect(fixture.actions).toStrictEqual([]);
+      }
+    );
+  });
+
+  it.each([false, true])(
+    'selects immutable recovered outcomes independently of reversed pages=%s',
+    async reversed => {
+      const { runtime, transport } = await setup();
+      const now = Date.now();
+      const clock = vi
+        .spyOn(Date, 'now')
+        .mockReturnValueOnce(now - 2000)
+        .mockReturnValueOnce(now - 1000)
+        .mockReturnValueOnce(now - 1000);
+      const oldest: BrowserJobSnapshot = {
+        ...transport.delivery().job,
+        jobId: 'bj_ffffffff-ffff-4fff-8fff-ffffffffffff',
+      };
+      const earlierTie: BrowserJobSnapshot = {
+        ...transport.delivery().job,
+        jobId: 'bj_00000000-0000-4000-8000-000000000001',
+      };
+      const latest: BrowserJobSnapshot = {
+        ...transport.delivery().job,
+        jobId: 'bj_80000000-0000-4000-8000-000000000001',
+      };
+      clock.mockRestore();
+      const terminals = [oldest, earlierTie, latest];
+      for (const job of terminals) {
+        job.ownerLabel = 'ses_history_owner';
+        job.result = terminalResult(job, 'cancelled', 'cancelled');
+        job.status = 'cancelled';
+      }
+      const expected = latest;
+      let pages = reversed ? terminals.toReversed() : terminals;
+      transport.connection.requestBrowserProviderStatus = async (cursor?: string) => {
+        const index = cursor === undefined ? 0 : Number(cursor);
+        return {
+          jobs: pages.slice(index, index + 1),
+          providerId: latest.providerId,
+          requestId: crypto.randomUUID(),
+          type: 'provider_status_result',
+          ...(index === pages.length - 1 ? {} : { nextCursor: String(index + 1) }),
+        };
+      };
+      const outbound = structuredClone(transport.outbound);
+      const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+      await runtime.refreshStatus();
+      expect(runtime.getSnapshot().result).toStrictEqual(expected?.result);
+      const previous = structuredClone(runtime.getSnapshot());
+      pages = pages.toReversed();
+      await runtime.refreshStatus();
+      expect(runtime.getSnapshot()).toStrictEqual(previous);
+      pages = [
+        {
+          ...latest,
+          ownerLabel: 'ses_history_owner',
+          result: {
+            ...terminalResult(latest, 'provider_lost'),
+            summary: 'Late conflicting terminal data',
+          },
+          status: 'interrupted',
+        },
+      ];
+      await runtime.refreshStatus();
+      expect(runtime.getSnapshot()).toStrictEqual(previous);
+      expect(runtime.getSnapshot().jobs.find(job => job.jobId === latest.jobId)).toStrictEqual(
+        expected
+      );
+      expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect(fixture.actions).toStrictEqual([]);
+    }
+  );
+
+  it.each([false, true])(
+    'selects newer outcomes after displayed history expires with reversed pages=%s',
+    async reversed => {
+      vi.useFakeTimers();
+      const { runtime, transport } = await setup();
+      const now = Date.now();
+      const expired: BrowserJobSnapshot = {
+        ...transport.delivery().job,
+        createdAt: new Date(now - 2000).toISOString(),
+        expiresAt: new Date(now + 1000).toISOString(),
+      };
+      expired.result = terminalResult(expired, 'cancelled', 'cancelled');
+      expired.status = 'cancelled';
+      transport.rows.set(expired.jobId, expired);
+      await runtime.refreshStatus();
+      const original = runtime.getSnapshot();
+      const originalCopy = structuredClone(original);
+      vi.setSystemTime(now + 1001);
+      await runtime.setSettings({ ...defaults, enabled: false });
+      expect(runtime.getSnapshot().jobs).toStrictEqual([]);
+      expect(runtime.getSnapshot().result).toStrictEqual(expired.result);
+
+      const earlierTie: BrowserJobSnapshot = {
+        ...transport.delivery().job,
+        createdAt: new Date(now - 1000).toISOString(),
+        jobId: 'bj_00000000-0000-4000-8000-000000000001',
+      };
+      const latest: BrowserJobSnapshot = {
+        ...transport.delivery().job,
+        createdAt: earlierTie.createdAt,
+        jobId: 'bj_80000000-0000-4000-8000-000000000001',
+      };
+      for (const job of [earlierTie, latest]) {
+        job.ownerLabel = 'ses_history_owner';
+        job.result = terminalResult(job, 'cancelled', 'cancelled');
+        job.status = 'cancelled';
+      }
+      let pages = reversed ? [latest, earlierTie] : [earlierTie, latest];
+      transport.connection.requestBrowserProviderStatus = async (cursor?: string) => {
+        const index = cursor === undefined ? 0 : Number(cursor);
+        return {
+          jobs: pages.slice(index, index + 1),
+          providerId: latest.providerId,
+          requestId: crypto.randomUUID(),
+          type: 'provider_status_result',
+          ...(index === pages.length - 1 ? {} : { nextCursor: String(index + 1) }),
+        };
+      };
+      const outbound = structuredClone(transport.outbound);
+      const persisted = structuredClone(fixture.values.get(BROWSER_TASK_STORAGE_KEY));
+      await runtime.refreshStatus();
+      expect(runtime.getSnapshot()).toMatchObject({
+        active: undefined,
+        result: latest.result,
+        settings: { enabled: false },
+      });
+      const selected = structuredClone(runtime.getSnapshot());
+      pages = pages.toReversed();
+      await runtime.refreshStatus();
+      expect(runtime.getSnapshot()).toStrictEqual(selected);
+      expect(original).toStrictEqual(originalCopy);
+      await runtime.approve(latest.jobId, 7);
+      expect(runtime.getSnapshot().active).toBeUndefined();
+      expect(transport.outbound).toStrictEqual(outbound);
+      expect(fixture.values.get(BROWSER_TASK_STORAGE_KEY)).toStrictEqual(persisted);
+      expect(fixture.actions).toStrictEqual([]);
+
+      vi.setSystemTime(Date.parse(latest.expiresAt) + 1);
+      await runtime.setSettings({ ...defaults, enabled: false });
+      const retained = structuredClone(runtime.getSnapshot());
+      expect(retained.jobs).toStrictEqual([]);
+      pages = [
+        {
+          ...latest,
+          result: {
+            ...terminalResult(latest, 'provider_lost'),
+            summary: 'Late conflicting terminal',
+          },
+          status: 'interrupted',
+        },
+      ];
+      await runtime.refreshStatus();
+      expect(runtime.getSnapshot()).toStrictEqual(retained);
+      expect(fixture.actions).toStrictEqual([]);
+    }
+  );
 
   it('reloads recorded work as status rather than replaying old consent or actions', async () => {
     const { runtime, transport } = await setup();

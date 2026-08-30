@@ -2319,7 +2319,9 @@
       "noCliInstancesDescription": "Rith `kilo remote` i dtionscadal ar do ríomhaire, nó nuashonraigh Kilo CLI má tá ceann ar siúl cheana.",
       "instanceOnProject": "{{name}} ar {{project}}",
       "instanceOnProjectSuffix": "{{name}} ar {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Rith ar Cloud Agent"
+      "runOnCloudAgent": "Rith ar Cloud Agent",
+      "terminals": "Teirminéil",
+      "remotes": "Samplaí cianda"
     },
     "modePicker": {
       "title": "Roghnaigh mód",

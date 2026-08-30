@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Oma `kilo remote` i tētahi kaupapa i tō rorohiko, whakahou rānei i te Kilo CLI mēnā kei te oma tētahi.",
       "instanceOnProject": "{{name}} i runga i {{project}}",
       "instanceOnProjectSuffix": "{{name}} i runga i {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Oma i runga i Cloud Agent"
+      "runOnCloudAgent": "Oma i runga i Cloud Agent",
+      "terminals": "Ngā kāpeka",
+      "remotes": "Ngā tauākī mamao"
     },
     "modePicker": {
       "title": "Kōwhiria te momo",

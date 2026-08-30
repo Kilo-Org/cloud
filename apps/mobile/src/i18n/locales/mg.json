@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Ampandeho `kilo remote` amin'ny tetikasa iray ao amin'ny solosainao, na havaozy ny Kilo CLI raha efa mandeha iray.",
       "instanceOnProject": "{{name}} amin'ny {{project}}",
       "instanceOnProjectSuffix": "{{name}} amin'ny {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Ampandeho amin'ny Cloud Agent"
+      "runOnCloudAgent": "Ampandeho amin'ny Cloud Agent",
+      "terminals": "Terminaly",
+      "remotes": "Instances lavitra"
     },
     "modePicker": {
       "title": "Safidio ny mode",

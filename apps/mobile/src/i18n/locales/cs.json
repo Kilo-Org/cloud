@@ -2303,7 +2303,9 @@
       "noCliInstancesDescription": "Spusťte `kilo remote` v projektu na počítači, nebo aktualizujte Kilo CLI, pokud jeden již běží.",
       "instanceOnProject": "{{name}} na {{project}}",
       "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Spustit na Cloud Agent"
+      "runOnCloudAgent": "Spustit na Cloud Agent",
+      "terminals": "Terminály",
+      "remotes": "Vzdálené instance"
     },
     "modePicker": {
       "title": "Vybrat režim",

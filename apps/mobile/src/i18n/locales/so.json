@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Ku socodsii `kilo remote` mashruuc ku yaal kombiyuutarkaaga, ama cusboonaysii Kilo CLI haddii mid mar hore shaqaynayo.",
       "instanceOnProject": "{{name}} oo ku yaal {{project}}",
       "instanceOnProjectSuffix": "{{name}} oo ku yaal {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Ku socodsii Cloud Agent"
+      "runOnCloudAgent": "Ku socodsii Cloud Agent",
+      "terminals": "Terminal-lada",
+      "remotes": "Nuqullada fog"
     },
     "modePicker": {
       "title": "Doon qaab",

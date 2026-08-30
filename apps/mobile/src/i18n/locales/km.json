@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "ដំណើរការ `kilo remote` ក្នុងគម្រោងមួយនៅលើកុំព្យូទ័ររបស់អ្នក ឬធ្វើបច្ចុប្បន្នភាព Kilo CLI ប្រសិនបើមានមួយកំពុងដំណើរការរួចហើយ។",
       "instanceOnProject": "{{name}} នៅលើ {{project}}",
       "instanceOnProjectSuffix": "{{name}} នៅលើ {{project}} ({{suffix}})",
-      "runOnCloudAgent": "ដំណើរការលើ Cloud Agent"
+      "runOnCloudAgent": "ដំណើរការលើ Cloud Agent",
+      "terminals": "ស្ថានីយបញ្ជា",
+      "remotes": "ឧទាហរណ៍ពីចម្ងាយ"
     },
     "modePicker": {
       "title": "ជ្រើសរើសរបៀប",

@@ -2271,7 +2271,9 @@
       "noCliInstancesDescription": "Ṣiṣẹ `kilo remote` ninu iṣẹ akanṣe lori kọnputa rẹ, tabi ṣe imudojuiwọn Kilo CLI ti o ba ti n ṣiṣẹ tẹlẹ.",
       "instanceOnProject": "{{name}} lori {{project}}",
       "instanceOnProjectSuffix": "{{name}} lori {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Ṣiṣẹ lori Cloud Agent"
+      "runOnCloudAgent": "Ṣiṣẹ lori Cloud Agent",
+      "terminals": "Awọn tẹ́mínà",
+      "remotes": "Awọn ayeye latọna jijin"
     },
     "modePicker": {
       "title": "Yan ipo",

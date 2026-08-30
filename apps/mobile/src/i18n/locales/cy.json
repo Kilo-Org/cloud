@@ -2335,7 +2335,9 @@
       "noCliInstancesDescription": "Rhedwch `kilo remote` mewn prosiect ar eich cyfrifiadur, neu diweddarwch Kilo CLI os yw un eisoes yn rhedeg.",
       "instanceOnProject": "{{name}} ar {{project}}",
       "instanceOnProjectSuffix": "{{name}} ar {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Rhedeg ar Cloud Agent"
+      "runOnCloudAgent": "Rhedeg ar Cloud Agent",
+      "terminals": "Terfynellau",
+      "remotes": "Achosion o bell"
     },
     "modePicker": {
       "title": "Dewis modd",

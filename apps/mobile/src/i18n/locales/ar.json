@@ -1853,7 +1853,9 @@
       "noCliInstancesDescription": "شغّل `kilo remote` في مشروع على جهاز الكمبيوتر الخاص بك، أو حدّث Kilo CLI إذا كان يعمل بالفعل.",
       "instanceOnProject": "{{name}} على {{project}}",
       "instanceOnProjectSuffix": "{{name}} على {{project}} ({{suffix}})",
-      "runOnCloudAgent": "التشغيل على وكيل سحابي"
+      "runOnCloudAgent": "التشغيل على وكيل سحابي",
+      "terminals": "الطرفيات",
+      "remotes": "المثيلات البعيدة"
     },
     "modePicker": {
       "title": "اختيار الوضع",

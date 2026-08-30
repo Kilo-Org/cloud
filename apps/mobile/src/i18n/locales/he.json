@@ -1826,7 +1826,9 @@
       "noCliInstancesDescription": "הרץ `kilo remote` בפרויקט במחשב שלך, או עדכן את Kilo CLI אם אחד כבר פועל.",
       "instanceOnProject": "{{name}} ב-{{project}}",
       "instanceOnProjectSuffix": "{{name}} ב-{{project}} ({{suffix}})",
-      "runOnCloudAgent": "הרץ על סוכן ענן"
+      "runOnCloudAgent": "הרץ על סוכן ענן",
+      "terminals": "מסופים",
+      "remotes": "מופעים מרוחקים"
     },
     "modePicker": {
       "title": "בחר מצב",

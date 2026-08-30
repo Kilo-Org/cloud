@@ -215,7 +215,20 @@ describe('agent LLM harness', () => {
       tabId: 7,
     });
 
-    expect(buildGatewayMessagesFromEvents([firstToolCall, secondToolCall])).toStrictEqual([
+    const firstResult = createToolResult({
+      ok: true,
+      toolCallId: firstToolCall.id,
+      value: 'Title',
+    });
+    const secondResult = createToolResult({
+      error: 'Unavailable.',
+      ok: false,
+      toolCallId: secondToolCall.id,
+    });
+
+    expect(
+      buildGatewayMessagesFromEvents([firstToolCall, secondToolCall, firstResult, secondResult])
+    ).toStrictEqual([
       { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
       {
         content: null,
@@ -239,6 +252,8 @@ describe('agent LLM harness', () => {
           },
         ],
       },
+      { content: '{"ok":true,"value":"Title"}', role: 'tool', tool_call_id: 'call_eval_1' },
+      { content: '{"error":"Unavailable.","ok":false}', role: 'tool', tool_call_id: 'call_eval_2' },
     ]);
   });
 
@@ -254,8 +269,9 @@ describe('agent LLM harness', () => {
       }),
       reasoningDetails,
     };
+    const result = createToolResult({ ok: true, toolCallId: toolCall.id, value: 'Title' });
 
-    expect(buildGatewayMessagesFromEvents([toolCall])).toStrictEqual([
+    expect(buildGatewayMessagesFromEvents([toolCall, result])).toStrictEqual([
       { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
       {
         content: null,
@@ -269,6 +285,139 @@ describe('agent LLM harness', () => {
           },
         ],
       },
+      { content: '{"ok":true,"value":"Title"}', role: 'tool', tool_call_id: 'call_eval_1' },
+    ]);
+  });
+
+  it('pairs an interrupted batch without adding synthetic results to the transcript', () => {
+    const confirmedCall = createEvalToolCall({
+      code: 'return document.title;',
+      providerToolCallId: 'confirmed',
+      tabId: 7,
+    });
+    const missingCall = createWorkflowToolCall({
+      arguments: { text: 'A memory' },
+      name: 'save_memory',
+      providerToolCallId: 'missing',
+      tabId: 7,
+    });
+    const confirmedResult = createToolResult({
+      ok: true,
+      toolCallId: confirmedCall.id,
+      value: 'Observed title',
+    });
+    const events = [
+      confirmedCall,
+      missingCall,
+      confirmedResult,
+      createAssistantMessage('Stopped.'),
+      createUserMessage('Summarize only the confirmed work.'),
+    ];
+    const originalEvents = structuredClone(events);
+    const expectedResults = [
+      { content: '{"ok":true,"value":"Observed title"}', role: 'tool', tool_call_id: 'confirmed' },
+      {
+        content: JSON.stringify({
+          effectsUncertain: true,
+          error:
+            'No result was recorded for this tool call. Execution and effects are unknown. Do not automatically retry it.',
+          ok: false,
+        }),
+        role: 'tool',
+        tool_call_id: 'missing',
+      },
+    ];
+
+    expect(buildGatewayMessagesFromEvents(events)).toMatchObject([
+      { role: 'system' },
+      { role: 'assistant', tool_calls: [{ id: 'confirmed' }, { id: 'missing' }] },
+      ...expectedResults,
+      { content: 'Stopped.', role: 'assistant' },
+      { content: 'Summarize only the confirmed work.', role: 'user' },
+    ]);
+    expect(
+      buildGatewayMessagesFromEvents([confirmedCall, missingCall, confirmedResult]).slice(-2)
+    ).toStrictEqual(expectedResults);
+    expect(events).toStrictEqual(originalEvents);
+  });
+
+  it.each([false, true])('withholds uncertain results and images when ok=%s', ok => {
+    const toolCall = createSafeToolCall({
+      name: 'get_viewport_screenshot',
+      providerToolCallId: 'uncertain',
+      tabId: 7,
+    });
+    const result = {
+      ...createToolResult({
+        error: 'Result timed out.',
+        ok,
+        toolCallId: toolCall.id,
+        value: { dataUrl: 'data:image/png;base64,c2NyZWVu', mediaType: 'image/png' },
+      }),
+      effectsUncertain: true,
+    };
+    const messages = buildGatewayMessagesFromEvents([toolCall, result], { supportsImages: true });
+
+    expect(messages).toMatchObject([
+      { role: 'system' },
+      { role: 'assistant', tool_calls: [{ id: 'uncertain' }] },
+      {
+        content: '{"effectsUncertain":true,"error":"Result timed out.","ok":false}',
+        role: 'tool',
+        tool_call_id: 'uncertain',
+      },
+    ]);
+  });
+
+  it('places screenshot images after every tool response in an interrupted batch', () => {
+    const screenshotCall = createSafeToolCall({
+      name: 'get_viewport_screenshot',
+      providerToolCallId: 'screenshot',
+      tabId: 7,
+    });
+    const skippedCall = createSafeToolCall({
+      name: 'get_page_snapshot',
+      providerToolCallId: 'skipped',
+      tabId: 7,
+    });
+    const screenshotResult = createToolResult({
+      ok: true,
+      toolCallId: screenshotCall.id,
+      value: { dataUrl: 'data:image/png;base64,c2NyZWVu', mediaType: 'image/png' },
+    });
+
+    expect(
+      buildGatewayMessagesFromEvents(
+        [screenshotCall, skippedCall, screenshotResult, createAssistantMessage('Stopped.')],
+        { supportsImages: true }
+      )
+    ).toMatchObject([
+      { role: 'system' },
+      { role: 'assistant', tool_calls: [{ id: 'screenshot' }, { id: 'skipped' }] },
+      {
+        content:
+          '{"ok":true,"value":{"mediaType":"image/png","note":"Viewport screenshot attached as an image input."}}',
+        role: 'tool',
+        tool_call_id: 'screenshot',
+      },
+      {
+        content: JSON.stringify({
+          effectsUncertain: true,
+          error:
+            'No result was recorded for this tool call. Execution and effects are unknown. Do not automatically retry it.',
+          ok: false,
+        }),
+        role: 'tool',
+        tool_call_id: 'skipped',
+      },
+      {
+        content: [
+          { text: 'Viewport screenshot from get_viewport_screenshot.', type: 'text' },
+          { image_url: { url: 'data:image/png;base64,c2NyZWVu' }, type: 'image_url' },
+        ],
+        role: 'user',
+      },
+      { content: 'Stopped.', role: 'assistant' },
     ]);
   });
 

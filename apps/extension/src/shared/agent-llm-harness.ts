@@ -434,21 +434,43 @@ const getToolResultValue = (
 };
 
 const toToolResultContent = (
-  event: ToolResultEvent,
+  event: ToolResultEvent | undefined,
   toolCall: ToolCallEvent,
   supportsImages: boolean
-): string =>
-  JSON.stringify(
+): string => {
+  if (event === undefined) {
+    // Replay-only explanation: a missing result proves neither execution nor non-execution.
+    return JSON.stringify({
+      effectsUncertain: true,
+      error:
+        'No result was recorded for this tool call. Execution and effects are unknown. Do not automatically retry it.',
+      ok: false,
+    });
+  }
+  if ('effectsUncertain' in event && event.effectsUncertain === true) {
+    return JSON.stringify({
+      effectsUncertain: true,
+      error: event.error ?? 'Tool completion is uncertain.',
+      ok: false,
+    });
+  }
+  return JSON.stringify(
     event.ok
       ? { ok: true, value: getToolResultValue(event, toolCall, supportsImages) }
       : { error: event.error ?? 'Eval failed.', ok: false }
   );
+};
 
 const toScreenshotMessage = (
-  event: ToolResultEvent,
+  event: ToolResultEvent | undefined,
   toolCall: ToolCallEvent
 ): KiloGatewayChatMessage | undefined => {
-  if (!event.ok || toolCall.name !== 'get_viewport_screenshot') {
+  if (
+    event === undefined ||
+    !event.ok ||
+    ('effectsUncertain' in event && event.effectsUncertain === true) ||
+    toolCall.name !== 'get_viewport_screenshot'
+  ) {
     return undefined;
   }
 
@@ -467,11 +489,13 @@ const toScreenshotMessage = (
 
 const appendToolResultMessages = ({
   event,
+  imageMessages,
   messages,
   supportsImages,
   toolCall,
 }: {
-  readonly event: ToolResultEvent;
+  readonly event: ToolResultEvent | undefined;
+  readonly imageMessages: KiloGatewayChatMessage[];
   readonly messages: KiloGatewayChatMessage[];
   readonly supportsImages: boolean;
   readonly toolCall: ToolCallEvent;
@@ -485,7 +509,7 @@ const appendToolResultMessages = ({
   const screenshotMessage = toScreenshotMessage(event, toolCall);
 
   if (supportsImages && screenshotMessage !== undefined) {
-    messages.push(screenshotMessage);
+    imageMessages.push(screenshotMessage);
   }
 };
 
@@ -539,7 +563,11 @@ export const buildGatewayMessagesFromEvents = (
   events: AgentConversationEvent[],
   { supportsImages = false }: { readonly supportsImages?: boolean } = {}
 ): KiloGatewayChatMessage[] => {
-  const toolCallsById = new Map<string, ToolCallEvent>();
+  const toolResultsByCallId = new Map(
+    events.flatMap(event =>
+      event.type === 'tool-result' ? [[event.toolCallId, event] as const] : []
+    )
+  );
   const messages: KiloGatewayChatMessage[] = [
     { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
   ];
@@ -553,7 +581,9 @@ export const buildGatewayMessagesFromEvents = (
           messages.push({ content: getGatewayMessageText(event), role: event.role });
           break;
         }
-        case 'thinking': {
+        case 'thinking':
+        case 'tool-result': {
+          // Results are emitted with their batch, before any normal message or image input.
           break;
         }
         case 'tool-call': {
@@ -563,39 +593,40 @@ export const buildGatewayMessagesFromEvents = (
           const toolCalls = consecutiveToolCalls.filter(
             (toolCall): toolCall is ExtensionToolCall => !('source' in toolCall)
           );
-          for (const toolCall of toolCalls) {
-            toolCallsById.set(toolCall.id, toolCall);
-          }
 
           index += consecutiveToolCalls.length - 1;
+          if (toolCalls.length === 0) {
+            break;
+          }
           const reasoningDetails = toolCalls.find(
             toolCall => toolCall.reasoningDetails !== undefined
           )?.reasoningDetails;
-          if (toolCalls.length > 0) {
-            messages.push({
-              content: null,
-              ...(reasoningDetails === undefined ? {} : { reasoning_details: reasoningDetails }),
-              role: 'assistant',
-              tool_calls: toolCalls.map(toolCall => ({
-                function: {
-                  arguments: getToolCallArguments(toolCall),
-                  // WebMCP names are stored as plain strings but are valid gateway tool names.
-                  // eslint-disable-next-line no-unsafe-type-assertion
-                  name: toolCall.name as KiloGatewayToolName,
-                },
-                id: getProviderToolCallId(toolCall),
-                type: 'function',
-              })),
+          messages.push({
+            content: null,
+            ...(reasoningDetails === undefined ? {} : { reasoning_details: reasoningDetails }),
+            role: 'assistant',
+            tool_calls: toolCalls.map(toolCall => ({
+              function: {
+                arguments: getToolCallArguments(toolCall),
+                // WebMCP names are stored as plain strings but are valid gateway tool names.
+                // eslint-disable-next-line no-unsafe-type-assertion
+                name: toolCall.name as KiloGatewayToolName,
+              },
+              id: getProviderToolCallId(toolCall),
+              type: 'function',
+            })),
+          });
+          const imageMessages: KiloGatewayChatMessage[] = [];
+          for (const toolCall of toolCalls) {
+            appendToolResultMessages({
+              event: toolResultsByCallId.get(toolCall.id),
+              imageMessages,
+              messages,
+              supportsImages,
+              toolCall,
             });
           }
-          break;
-        }
-        case 'tool-result': {
-          const toolCall = toolCallsById.get(event.toolCallId);
-
-          if (toolCall !== undefined) {
-            appendToolResultMessages({ event, messages, supportsImages, toolCall });
-          }
+          messages.push(...imageMessages);
           break;
         }
       }

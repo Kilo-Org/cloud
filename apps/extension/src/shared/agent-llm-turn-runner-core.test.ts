@@ -1,8 +1,13 @@
 /* eslint-disable max-lines, sort-keys, no-promise-executor-return, promise/avoid-new, promise/prefer-await-to-then, jest/no-conditional-in-test, consistent-type-imports, jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- Retry fixtures need attempt-conditional fakes and raw promises; the typed stream-client mock needs importOriginal. */
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createSafeToolCall, createUserMessage } from './agent-conversation';
+import {
+  createSafeToolCall,
+  createUserMessage,
+  createWorkflowToolCall,
+} from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
+import { createWorkflowToolDefinitions } from './agent-llm-harness';
 import type { FetchLike } from './auth';
 import { maxAgentToolRounds } from './agent-tool-round-limit';
 import type {
@@ -943,6 +948,287 @@ const outcomeOptions = () => ({
     ),
   updateAssistantMessage: () => {},
   updateThinkingBlock: () => {},
+});
+
+const gatewayRequestSchema = z.object({ messages: z.array(z.unknown()) });
+
+const historyInterruptionCases = [
+  {
+    boundary: 'Stop between calls',
+    reason: 'cancelled',
+    status: 'cancelled',
+    confirmed: 1,
+    saved: false,
+  },
+  {
+    boundary: 'abort after streamed completion',
+    reason: 'cancelled',
+    status: 'cancelled',
+    confirmed: 0,
+    saved: false,
+  },
+  {
+    boundary: 'denied approval',
+    reason: 'permission_denied',
+    status: 'interrupted',
+    confirmed: 1,
+    saved: false,
+  },
+  {
+    boundary: 'uncertain failure',
+    reason: 'effects_uncertain',
+    status: 'interrupted',
+    confirmed: 1,
+    saved: true,
+  },
+  {
+    boundary: 'uncertain success',
+    reason: 'effects_uncertain',
+    status: 'interrupted',
+    confirmed: 1,
+    saved: true,
+  },
+  {
+    boundary: 'issued executor abort',
+    reason: 'cancelled',
+    status: 'cancelled',
+    confirmed: 1,
+    saved: true,
+  },
+] as const;
+
+describe('explicit continuation after interrupted tool batches', () => {
+  it.each(historyInterruptionCases)('continues without replay after $boundary', async entry => {
+    const controller = new AbortController();
+    const history: AgentConversationEvent[] = [createUserMessage('Finish the requested work.')];
+    const savedMemories: string[] = [];
+    const pageReads: string[] = [];
+    const reasoningDetails = [
+      { index: 0, signature: 'batch-signature', text: 'Read, then save.', type: 'reasoning.text' },
+    ];
+    const summary = entry.status === 'cancelled' ? 'Stopped.' : `Interrupted: ${entry.reason}.`;
+    const uncertainResult =
+      entry.boundary === 'uncertain failure' || entry.boundary === 'uncertain success';
+    const unknownResult = JSON.stringify({
+      effectsUncertain: true,
+      error:
+        'No result was recorded for this tool call. Execution and effects are unknown. Do not automatically retry it.',
+      ok: false,
+    });
+    const expectedHistory = [
+      { role: 'user', content: 'Finish the requested work.' },
+      { role: 'assistant', content: 'Starting the batch.' },
+      {
+        role: 'assistant',
+        reasoning_details: reasoningDetails,
+        tool_calls: [
+          { id: 'read-1', function: { name: 'get_page_snapshot', arguments: '{}' } },
+          { id: 'save-1', function: { name: 'save_memory', arguments: '{"text":"First memory"}' } },
+          {
+            id: 'save-2',
+            function: { name: 'save_memory', arguments: '{"text":"Skipped memory"}' },
+          },
+        ],
+      },
+      {
+        role: 'tool',
+        tool_call_id: 'read-1',
+        content: entry.confirmed === 0 ? unknownResult : '{"ok":true,"value":"Observed page."}',
+      },
+      {
+        role: 'tool',
+        tool_call_id: 'save-1',
+        content: uncertainResult
+          ? JSON.stringify({
+              effectsUncertain: true,
+              error:
+                entry.boundary === 'uncertain failure'
+                  ? 'Result timed out.'
+                  : 'Tool completion is uncertain.',
+              ok: false,
+            })
+          : unknownResult,
+      },
+      { role: 'tool', tool_call_id: 'save-2', content: unknownResult },
+      { role: 'assistant', content: summary },
+      { role: 'user', content: 'Read the page once. Do not retry prior saves.' },
+    ];
+    let requests = 0;
+    const fetch: FetchLike = (_input, init) => {
+      requests += 1;
+      const request = gatewayRequestSchema.parse(JSON.parse(stringBodySchema.parse(init?.body)));
+      if (requests === 1) {
+        return streamResponse([
+          `data: ${JSON.stringify({
+            choices: [
+              {
+                delta: {
+                  content: 'Starting the batch.',
+                  reasoning_details: reasoningDetails,
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: 'read-1',
+                      type: 'function',
+                      function: { name: 'get_page_snapshot', arguments: '{}' },
+                    },
+                    {
+                      index: 1,
+                      id: 'save-1',
+                      type: 'function',
+                      function: { name: 'save_memory', arguments: '{"text":"First memory"}' },
+                    },
+                    {
+                      index: 2,
+                      id: 'save-2',
+                      type: 'function',
+                      function: { name: 'save_memory', arguments: '{"text":"Skipped memory"}' },
+                    },
+                  ],
+                },
+                finish_reason: 'tool_calls',
+              },
+            ],
+          })}\n\n`,
+          'data: [DONE]\n\n',
+        ]);
+      }
+      // Reject missing, reordered, or duplicate responses before accepting the follow-up.
+      expect(request.messages.slice(1)).toMatchObject(
+        requests === 2
+          ? expectedHistory
+          : [
+              ...expectedHistory,
+              {
+                role: 'assistant',
+                tool_calls: [
+                  { id: 'fresh-read', function: { name: 'get_page_snapshot', arguments: '{}' } },
+                ],
+              },
+              {
+                role: 'tool',
+                tool_call_id: 'fresh-read',
+                content: '{"ok":true,"value":"Observed page."}',
+              },
+            ]
+      );
+      return streamResponse(
+        requests === 2
+          ? [
+              'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"fresh-read","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+              'data: [DONE]\n\n',
+            ]
+          : [
+              'data: {"choices":[{"delta":{"content":"Read the page. No prior saves were retried."},"finish_reason":"stop"}]}\n\n',
+              'data: [DONE]\n\n',
+            ]
+      );
+    };
+    const options = {
+      ...outcomeOptions(),
+      appendEvents: (events: AgentConversationEvent[]) => history.push(...events),
+      conversationEvents: history,
+      fetch,
+      tools: [getPageSnapshotTool, ...createWorkflowToolDefinitions({ mode: 'safe' })],
+      toToolCallEvents: (calls: KiloGatewayToolCallRequest[]) =>
+        calls.map(call =>
+          call.name === 'save_memory'
+            ? createWorkflowToolCall({
+                arguments: call.arguments,
+                name: 'save_memory',
+                providerToolCallId: call.id,
+                tabId: 1,
+              })
+            : createSafeToolCall({
+                name: 'get_page_snapshot',
+                providerToolCallId: call.id,
+                tabId: 1,
+              })
+        ),
+      onAssistantStreaming: (eventId: string | undefined) => {
+        if (
+          eventId === undefined &&
+          requests === 1 &&
+          entry.boundary === 'abort after streamed completion'
+        ) {
+          controller.abort();
+        }
+      },
+    };
+    const executeToolCall = (
+      call: ReturnType<typeof options.toToolCallEvents>[number]
+    ): Promise<EvalTabResult> => {
+      if (call.name !== 'save_memory') {
+        pageReads.push(call.providerToolCallId ?? '');
+        if (call.providerToolCallId === 'read-1' && entry.boundary === 'Stop between calls') {
+          controller.abort();
+        }
+        return Promise.resolve({ ok: true, value: 'Observed page.' });
+      }
+      if (entry.boundary === 'denied approval') {
+        controller.abort(new ExecutionStoppedError('permission_denied'));
+        controller.signal.throwIfAborted();
+      }
+      savedMemories.push(String(call.arguments['text']));
+      if (entry.boundary === 'issued executor abort') {
+        return Promise.reject(new DOMException('Transport aborted.', 'AbortError'));
+      }
+      return Promise.resolve(
+        entry.boundary === 'uncertain success'
+          ? { effectsUncertain: true, ok: true, value: 'Unconfirmed save.' }
+          : { effectsUncertain: true, error: 'Result timed out.', ok: false }
+      );
+    };
+
+    const interrupted = await runLlmTurn({
+      ...options,
+      executeToolCall,
+      signal: controller.signal,
+    });
+    expect(interrupted).toMatchObject({
+      status: entry.status,
+      reason: entry.reason,
+      effectsUncertain: entry.saved,
+      summary,
+      toolResults:
+        entry.confirmed === 0
+          ? []
+          : [{ ok: true, value: 'Observed page.', effectsUncertain: false }],
+    });
+    expect({
+      recordedResults: history.filter(event => event.type === 'tool-result').length,
+      requests,
+    }).toStrictEqual({ recordedResults: entry.confirmed + (uncertainResult ? 1 : 0), requests: 1 });
+    const interruptedHistory = structuredClone(history);
+    history.push(createUserMessage('Read the page once. Do not retry prior saves.'));
+
+    const continued = await runLlmTurn({
+      ...options,
+      executeToolCall,
+      signal: new AbortController().signal,
+    });
+    expect({ outcome: continued, lastEvent: history.at(-1) }).toMatchObject({
+      outcome: {
+        status: 'succeeded',
+        reason: 'completed',
+        effectsUncertain: false,
+        summary: 'Read the page. No prior saves were retried.',
+        toolResults: [{ ok: true, value: 'Observed page.' }],
+      },
+      lastEvent: { role: 'assistant', text: 'Read the page. No prior saves were retried.' },
+    });
+    expect({
+      pageReads,
+      savedMemories,
+      previousEvents: history.slice(0, interruptedHistory.length),
+      requests,
+    }).toStrictEqual({
+      pageReads: entry.confirmed === 0 ? ['fresh-read'] : ['read-1', 'fresh-read'],
+      savedMemories: entry.saved ? ['First memory'] : [],
+      previousEvents: interruptedHistory,
+      requests: 3,
+    });
+  });
 });
 
 interface OutcomeCase {

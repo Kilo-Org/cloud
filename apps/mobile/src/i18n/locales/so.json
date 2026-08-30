@@ -2111,7 +2111,9 @@
     "sessionExited": "Kalfadhi ayaa ka baxay",
     "remoteSpawnRetryable": "Lama gaadhin kolkuu ahaa — waxaa laga yaabaa inuu ka xidhmo.",
     "remoteSpawnNonRetryable": "Kolkuu ayaa ku guuldareystay inuu bilaabo kalfadhiga — hubi mishiinka ama cusbooneysii CLI-ga.",
-    "remoteSpawnInstanceDisconnected": "Kolkuu la xulay ayaa ka xidhmo. Ku bilow kalfadhi Cloud Agent ama dooro kolkuu kale."
+    "remoteSpawnInstanceDisconnected": "Kolkuu la xulay ayaa ka xidhmo. Ku bilow kalfadhi Cloud Agent ama dooro kolkuu kale.",
+    "liveCount_one": "{{count}} TOOS AH",
+    "liveCount_other": "{{count}} TOOS AH"
   },
   "agentChat": {
     "session": {
@@ -2271,7 +2273,9 @@
       "noCliInstancesDescription": "Ku socodsii `kilo remote` mashruuc ku yaal kombiyuutarkaaga, ama cusboonaysii Kilo CLI haddii mid mar hore shaqaynayo.",
       "instanceOnProject": "{{name}} oo ku yaal {{project}}",
       "instanceOnProjectSuffix": "{{name}} oo ku yaal {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Ku socodsii Cloud Agent"
+      "runOnCloudAgent": "Ku socodsii Cloud Agent",
+      "terminals": "Terminal-lada",
+      "remotes": "Nuqullada fog"
     },
     "modePicker": {
       "title": "Doon qaab",

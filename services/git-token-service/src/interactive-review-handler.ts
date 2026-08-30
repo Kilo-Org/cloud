@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { BitbucketPullRequestRequestSchema } from './bitbucket-code-review-service.js';
 import {
   BitbucketInteractiveMetadataSchema,
-  BitbucketInteractiveRequestSchema,
+  BitbucketInteractiveBrokerRequestSchema,
   createBitbucketInteractiveApi,
   type BitbucketInteractiveRequest,
   type BitbucketInteractiveServiceSuccess,
@@ -33,7 +33,33 @@ import { normalizeBitbucketUuid } from './bitbucket-url.js';
 export const BitbucketInteractiveHttpRequestSchema = BitbucketPullRequestRequestSchema.omit({
   owner: true,
   pullRequestId: true,
-}).extend({ request: BitbucketInteractiveRequestSchema });
+}).extend({ request: BitbucketInteractiveBrokerRequestSchema });
+
+const providerUuid = z.string().transform(normalizeBitbucketUuid).pipe(z.string());
+const sourceReadRepositorySchema = z
+  .object({
+    uuid: providerUuid,
+    full_name: BitbucketPullRequestRequestSchema.shape.repositoryFullName,
+    workspace: z.object({
+      uuid: providerUuid,
+      slug: BitbucketPullRequestRequestSchema.shape.workspaceSlug,
+    }),
+  })
+  .refine(repository => repository.full_name.split('/')[0] === repository.workspace.slug);
+const sourceReadPullRequestSchema = z.object({
+  type: z.literal('pullrequest'),
+  id: BitbucketPullRequestRequestSchema.shape.pullRequestId,
+  source: z.object({
+    repository: sourceReadRepositorySchema,
+    commit: z.object({
+      hash: z
+        .string()
+        .regex(/^[0-9a-fA-F]{7,40}$/)
+        .toLowerCase(),
+    }),
+  }),
+  destination: z.object({ repository: sourceReadRepositorySchema }),
+});
 type Owner = { userId: string; orgId: string };
 type Target = z.infer<typeof BitbucketInteractiveHttpRequestSchema>;
 type FailureReason =
@@ -148,7 +174,7 @@ export async function handleBitbucketInteractiveReview(
       return { success: false, reason: 'invalid_request' };
     const target = parsed.data;
     assertBitbucketRequestSize(JSON.stringify(target), BITBUCKET_INTERACTIVE_REQUEST_MAX_BYTES);
-    const request = target.request;
+    const { source, ...request } = target.request;
     const path = request.params.path;
     const repositorySlug = target.repositoryFullName.split('/')[1];
     if (
@@ -237,12 +263,85 @@ export async function handleBitbucketInteractiveReview(
       workspace: `{${subject.workspaceUuid}}`,
       repository: `{${subject.repositoryUuid}}`,
     };
-    const api = createBitbucketInteractiveApi({ scope, accessToken: subject.token });
-    const params = {
+    let api = createBitbucketInteractiveApi({ scope, accessToken: subject.token });
+    let params: typeof request.params & { path: { workspace: string; repo_slug: string } } = {
       ...request.params,
       path: { ...path, workspace: scope.workspace, repo_slug: scope.repository },
     };
     try {
+      if (source) {
+        const review = await api.execute({
+          operation: 'pullRequest',
+          params: {
+            path: {
+              workspace: scope.workspace,
+              repo_slug: scope.repository,
+              pull_request_id: source.pullRequestId,
+            },
+            query: { fields: '+source.repository.workspace,+destination.repository.workspace' },
+          },
+        });
+        const parsedReview = sourceReadPullRequestSchema.safeParse(review.data);
+        if (!parsedReview.success) return { success: false, reason: 'invalid_response' };
+        const { source: providerSource, destination } = parsedReview.data;
+        if (
+          parsedReview.data.id !== source.pullRequestId ||
+          destination.repository.uuid !== target.repositoryUuid ||
+          destination.repository.full_name !== target.repositoryFullName ||
+          providerSource.repository.uuid !== source.repositoryUuid
+        )
+          return { success: false, reason: 'repository_mismatch' };
+        if (
+          destination.repository.workspace.uuid !== target.workspaceUuid ||
+          destination.repository.workspace.slug !== target.workspaceSlug ||
+          providerSource.repository.workspace.uuid !== source.workspaceUuid
+        )
+          return { success: false, reason: 'workspace_mismatch' };
+        const expectedCommit = String(path.commit).toLowerCase();
+        let sourceCommit = providerSource.commit.hash;
+        if (!expectedCommit.startsWith(sourceCommit)) return { success: false, reason: 'conflict' };
+        // Only a validated PR can select this read scope. Never follow its links or source slugs.
+        const sourceScope = {
+          kind: 'repository' as const,
+          workspace: `{${providerSource.repository.workspace.uuid}}`,
+          repository: `{${providerSource.repository.uuid}}`,
+        };
+        api = createBitbucketInteractiveApi({ scope: sourceScope, accessToken: subject.token });
+        // Condensed PR commits can use short hashes. Resolve provider data, never caller abbreviations.
+        if (sourceCommit.length < 40) {
+          const commit = await api.execute({
+            operation: 'commit',
+            params: {
+              path: {
+                workspace: sourceScope.workspace,
+                repo_slug: sourceScope.repository,
+                commit: sourceCommit,
+              },
+            },
+          });
+          const resolved = z
+            .object({
+              hash: z
+                .string()
+                .regex(/^[0-9a-fA-F]{40}$/)
+                .toLowerCase(),
+            })
+            .safeParse(commit.data);
+          if (!resolved.success || !resolved.data.hash.startsWith(sourceCommit))
+            return { success: false, reason: 'invalid_response' };
+          sourceCommit = resolved.data.hash;
+        }
+        if (sourceCommit !== expectedCommit) return { success: false, reason: 'conflict' };
+        params = {
+          ...request.params,
+          path: {
+            ...path,
+            workspace: sourceScope.workspace,
+            repo_slug: sourceScope.repository,
+            commit: sourceCommit,
+          },
+        };
+      }
       let body = request.body;
       if (request.operation === 'merge') {
         // Omission inherits the PR's deletion preference. Require explicit deletion authorization.

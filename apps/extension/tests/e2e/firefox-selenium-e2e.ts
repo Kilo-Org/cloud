@@ -2,17 +2,17 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { accessSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
-import { dirname, resolve as resolvePath } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve as resolvePath } from 'node:path';
+import { parseArgs } from 'node:util';
 import { Builder, By, Key } from 'selenium-webdriver';
 import type { WebDriver, WebElement } from 'selenium-webdriver';
 import firefox, { ServiceBuilder } from 'selenium-webdriver/firefox';
 import { z } from 'zod';
 
-const extensionRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), '../..');
+const extensionRoot = resolvePath(import.meta.dirname, '../..');
 const packageManifest = z
   .object({ version: z.string().min(1) })
   .parse(JSON.parse(readFileSync(resolvePath(extensionRoot, 'package.json'), 'utf8')));
@@ -282,10 +282,10 @@ const closeServer = (server: Server): Promise<void> =>
     });
   });
 
-const listen = async (server: Server): Promise<ServerHandle> => {
+const listen = async (server: Server, port = 0): Promise<ServerHandle> => {
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
+    server.listen(port, '127.0.0.1', () => {
       server.off('error', reject);
       resolve();
     });
@@ -321,7 +321,7 @@ const sendSse = (response: ServerResponse, events: unknown[]): void => {
   response.end(chatCompletionStreamResponse(events));
 };
 
-const startKiloApiServer = async (): Promise<KiloApiHandle> => {
+const startKiloApiServer = async (port = 0): Promise<KiloApiHandle> => {
   let options: KiloApiOptions = {};
   let chatCompletionCalls = 0;
   let modelCalls = 0;
@@ -490,7 +490,7 @@ const startKiloApiServer = async (): Promise<KiloApiHandle> => {
     })();
   });
 
-  const handle = await listen(server);
+  const handle = await listen(server, port);
 
   return { ...handle, reset };
 };
@@ -3400,7 +3400,7 @@ const scenarios: FirefoxScenario[] = [
           assert.deepEqual(await firefoxExecutionModes(session.driver), ['exclusive']);
           await session.openSidePanel();
           const otherHandle = await session.driver.getWindowHandle();
-          await waitForText(session.driver, 'Owned by another panel');
+          await waitForText(session.driver, 'Ownership not acquired');
           const draft = await session.driver.findElement(By.css('[aria-label="Message agent"]'));
           await draft.sendKeys('Preserve this blocked Firefox draft.', Key.ENTER);
           assert.equal(await draft.getAttribute('value'), 'Preserve this blocked Firefox draft.');
@@ -3468,7 +3468,7 @@ const scenarios: FirefoxScenario[] = [
           await enableFirefoxBrowserTasks(driver);
           await session.openSidePanel();
           const localOwnerHandle = await driver.getWindowHandle();
-          await waitForText(driver, 'Owned by another panel');
+          await waitForText(driver, 'Ownership not acquired');
           await waitForModel(driver);
           await waitForTargetOption(driver, 'Firefox affected local tab');
           await setSelectByText(driver, 'Target tab', 'Firefox affected local tab');
@@ -3649,12 +3649,46 @@ assert.deepStrictEqual(
 );
 
 const main = async (): Promise<void> => {
-  const api = await startKiloApiServer();
+  const { values } = parseArgs({
+    allowPositionals: false,
+    options: {
+      'api-port': { type: 'string' },
+      'no-build': { default: false, type: 'boolean' },
+      scenario: { multiple: true, type: 'string' },
+    },
+    strict: true,
+  });
+  const selectedNames = z
+    .array(z.enum(chromeWorkflowNames))
+    .min(1)
+    .max(6)
+    .optional()
+    .parse(values.scenario);
+  const selectedScenarios =
+    selectedNames === undefined
+      ? scenarios
+      : scenarios.filter(scenario => selectedNames.includes(scenario.name));
+  assert.ok(selectedScenarios.length > 0, 'Select at least one Firefox scenario.');
+  // The prepared ZIP must use this same port in VITE_KILO_API_BASE_URL.
+  assert.ok(
+    !values['no-build'] || values['api-port'] !== undefined,
+    '--no-build requires --api-port matching the prepared Firefox ZIP.'
+  );
+  const apiPort =
+    values['api-port'] === undefined
+      ? 0
+      : z.coerce.number().int().min(1).max(65_535).parse(values['api-port']);
+  if (values['no-build']) {
+    accessSync(firefoxZipPath);
+  }
+  const api = await startKiloApiServer(apiPort);
 
   try {
-    await runCommand('pnpm', ['run', 'zip:firefox'], {
-      VITE_KILO_API_BASE_URL: api.url,
-    });
+    if (!values['no-build']) {
+      await runCommand('pnpm', ['run', 'zip:firefox'], {
+        VITE_KILO_API_BASE_URL: api.url,
+      });
+    }
 
     const firefoxManifestPath = resolvePath(extensionRoot, '.output/firefox-mv3/manifest.json');
     const firefoxManifest = z
@@ -3665,13 +3699,15 @@ const main = async (): Promise<void> => {
       'Firefox manifest must include the contextMenus permission'
     );
 
-    for (const scenario of scenarios) {
+    for (const scenario of selectedScenarios) {
       process.stdout.write(`Firefox e2e: ${scenario.name} ... `);
       await scenario.run({ api });
       process.stdout.write('passed\n');
     }
 
-    console.log(`Firefox e2e passed ${scenarios.length}/${chromeWorkflowNames.length} workflows.`);
+    console.log(
+      `Firefox e2e passed ${selectedScenarios.length}/${selectedScenarios.length} selected workflows (${chromeWorkflowNames.length} available).`
+    );
   } finally {
     await api.close();
   }

@@ -332,8 +332,17 @@ const withHarness = async (
     },
     title: 'Approved browser task tab',
   });
-  const launched = await launchExtensionContext();
+  const launched = await launchExtensionContext({
+    recordVideo: {
+      dir: test.info().outputPath('videos'),
+      size: { height: 720, width: 320 },
+    },
+  });
   const { context, extensionId } = launched;
+  const recordedPages = context.pages();
+  context.on('page', page => {
+    recordedPages.push(page);
+  });
   try {
     await options.init?.(context);
     await mockAgentsApi(context, { activeSessions: [], historySessions: [] });
@@ -359,9 +368,22 @@ const withHarness = async (
     await expect(panel.getByLabel('Message agent')).toBeVisible();
     await run({ context, openPanel, other, panel, relay, target });
   } finally {
-    await context.close();
-    await fixture.close();
-    await rm(launched.userDataDir, { force: true, recursive: true });
+    try {
+      await context.close();
+      for (const [index, page] of recordedPages.entries()) {
+        const video = page.video();
+        expect.soft(video, 'Mocked browser-task pages must retain video.').not.toBeNull();
+        if (video !== null) {
+          await test.info().attach(`browser-task-page-${index}`, {
+            contentType: 'video/webm',
+            path: await video.path(),
+          });
+        }
+      }
+    } finally {
+      await fixture.close();
+      await rm(launched.userDataDir, { force: true, recursive: true });
+    }
   }
 };
 const supervision = (root: Page | Locator) =>
@@ -589,7 +611,7 @@ test('two panels share local locks, drain before delegation, and retain a blocke
   await withHarness(async ({ panel, openPanel, context, relay }) => {
     await enable(panel);
     const second = await openPanel();
-    await expect(supervision(second)).toContainText('Owned by another panel');
+    await expect(supervision(second)).toContainText('Ownership not acquired');
     await context.route('**/api/gateway/v1/chat/completions', async route => {
       await localCompletions.promise;
       await route.abort();
@@ -600,14 +622,18 @@ test('two panels share local locks, drain before delegation, and retain a blocke
       await expect(page.getByRole('button', { exact: true, name: 'Stop' })).toBeVisible();
     }
     await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared', 'shared']);
+    const reload = supervision(second).getByRole('button', { name: 'Reload panel' });
+    await expect(reload).toBeDisabled();
     relay.submit();
     await approve(panel);
     await expect(supervision(panel)).toContainText('Waiting for browser control');
+    await expect(reload).toBeDisabled();
     for (const page of [panel, second]) {
       await page.getByRole('button', { exact: true, name: 'Stop' }).click();
     }
     await expect(supervision(panel)).toContainText('CLI tasks: Running');
     await expect.poll(() => heldExecutionModes(panel)).toEqual(['exclusive']);
+    await expect(reload).toBeDisabled();
     await second.getByLabel('Message agent').fill('Preserve my unsent local draft.');
     await second.getByLabel('Message agent').press('Enter');
     await expect(second.getByLabel('Message agent')).toHaveValue('Preserve my unsent local draft.');
@@ -615,10 +641,128 @@ test('two panels share local locks, drain before delegation, and retain a blocke
     await supervision(panel).getByRole('button', { name: 'Stop CLI task' }).click();
     await expect(supervision(panel)).toContainText('cancelled');
     localCompletions.resolve();
+    await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+    await expect(reload).toBeEnabled();
     await expect(second.getByLabel('Message agent')).toHaveValue('Preserve my unsent local draft.');
     await expect(second.getByRole('button', { name: 'Send message' })).toBeVisible();
   });
 });
+
+const heldProviderLocks = (panel: Page): Promise<LockInfo[]> =>
+  panel.evaluate(async () => {
+    const state = await navigator.locks.query();
+    return (state.held ?? []).filter(lock => lock.name === 'kilo:browser-provider-owner');
+  });
+
+for (const profile of ['enabled', 'quarantined'] as const) {
+  test(`native ownership retry preserves the ${profile} profile after explicit reload`, async () => {
+    await withHarness(
+      async ({ panel, openPanel, context, relay, target, other }) => {
+        let requests = 0;
+        context.on('request', request => {
+          if (request.url().endsWith('/api/gateway/v1/chat/completions')) {
+            requests += 1;
+          }
+        });
+        const quarantined = profile === 'quarantined';
+        const phase = quarantined ? 'Recovery required' : 'Enabled — idle';
+        await setExtensionStorage(panel, {
+          kiloBrowserExecutionSafety: {
+            ...(quarantined ? { allTabs: true } : {}),
+            tabIds: [],
+            version: 1,
+          },
+        });
+        await enable(panel, true, phase);
+        const saved = await Promise.all(
+          [
+            'kiloAuth',
+            'kiloBrowserProviderIdentity',
+            'kiloBrowserProviderSettings',
+            'kiloBrowserExecutionSafety',
+          ].map(async key => ({ key, value: await readExtensionLocalStorage(panel, key) }))
+        );
+        const ownerLocks = await heldProviderLocks(panel);
+        expect(ownerLocks).toEqual([
+          expect.objectContaining({ clientId: expect.any(String), mode: 'exclusive' }),
+        ]);
+        const second = await openPanel();
+        const reload = supervision(second).getByRole('button', { name: 'Reload panel' });
+        await expect(supervision(second)).toContainText('Ownership not acquired');
+        await expect(reload).toBeEnabled();
+        await Promise.all([second.waitForEvent('load'), reload.click()]);
+        await expect(supervision(second)).toContainText('Ownership not acquired');
+        expect(await heldProviderLocks(second)).toEqual(ownerLocks);
+        await expect(target.locator('#count')).toHaveText('0');
+        expect(requests).toBe(0);
+        await capture(second, `native-ownership-${profile}-live-owner-retry`);
+
+        await panel.close();
+        await expect.poll(() => heldProviderLocks(second)).toEqual([]);
+        await expect(supervision(second)).toContainText('Ownership not acquired');
+        await expect(reload).toBeEnabled();
+        await expect(second.getByRole('button', { name: 'Refresh status' })).toHaveCount(0);
+        await Promise.all([second.waitForEvent('load'), reload.click()]);
+        await expect(supervision(second)).toContainText(`CLI tasks: ${phase}`);
+        await expect
+          .poll(() => heldProviderLocks(second))
+          .toEqual([expect.objectContaining({ clientId: expect.any(String), mode: 'exclusive' })]);
+        expect(await heldProviderLocks(second)).not.toEqual(ownerLocks);
+        for (const { key, value } of saved) {
+          expect(await readExtensionLocalStorage(second, key)).toEqual(value);
+        }
+        await expect(reload).toHaveCount(0);
+        await expect(second.getByRole('button', { exact: true, name: 'Approve tab' })).toHaveCount(
+          0
+        );
+        await expect(second.getByRole('button', { name: 'Stop CLI task' })).toHaveCount(0);
+        await expect(target.locator('#count')).toHaveText('0');
+        await expect(other.locator('#count')).toHaveText('0');
+        expect(requests).toBe(0);
+        await capture(second, `native-ownership-${profile}-explicit-acquisition`);
+
+        if (quarantined) {
+          await supervision(second)
+            .getByRole('button', { name: 'Check recovery readiness' })
+            .click();
+          await expect(supervision(second)).toContainText('Close all target tabs before recovery.');
+          await expect(second.getByRole('button', { name: 'Recover browser control' })).toHaveCount(
+            0
+          );
+          const draft = 'Keep this draft while browser control is quarantined.';
+          await second.getByLabel('Message agent').fill(draft);
+          await second.getByLabel('Message agent').press('Enter');
+          await expect(second.getByLabel('Message agent')).toHaveValue(draft);
+          await expect(target.locator('#count')).toHaveText('0');
+          expect(requests).toBe(0);
+        } else {
+          await expect(supervision(second)).toContainText('Queue empty.');
+          relay.submit('Run only after fresh tab consent in the new owning panel.');
+          await expect(supervision(second)).toContainText('Tab approval required');
+          await expect(supervision(second)).toContainText('Bound tab: Not approved');
+          await expect(supervision(second).getByLabel('Tab to approve')).toHaveValue('');
+          await expect(target.locator('#count')).toHaveText('0');
+          expect(requests).toBe(0);
+          await approve(second);
+          await expect(supervision(second)).toContainText('Last outcome: succeeded');
+          await expect(target.locator('#count')).toHaveText('1');
+          await expect(other.locator('#count')).toHaveText('0');
+          expect(requests).toBe(2);
+        }
+        await capture(second, `native-ownership-${profile}-consent-and-safety`);
+      },
+      {
+        gateway: {
+          firstCompletionEvents: toolCall('eval', {
+            code: 'document.querySelector("#effect").click(); return document.querySelector("#count").textContent;',
+          }),
+          secondCompletionEvents: content(resultText),
+          toolNames: dangerousToolNames,
+        },
+      }
+    );
+  });
+}
 
 for (const loss of ['close', 'reload'] as const) {
   test(`native local owner ${loss} blocks local and delegated work until explicit recovery`, async () => {

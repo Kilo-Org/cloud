@@ -1,6 +1,6 @@
 /* eslint-disable import/no-nodejs-modules, max-lines, promise/avoid-new, promise/prefer-await-to-callbacks */
 import { chromium, expect } from '@playwright/test';
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, BrowserContextOptions, Page } from '@playwright/test';
 import { access, mkdtemp } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -77,7 +77,9 @@ export const startFixtureServer = async ({
   };
 };
 
-export const launchExtensionContext = async (): Promise<{
+export const launchExtensionContext = async ({
+  recordVideo,
+}: Pick<BrowserContextOptions, 'recordVideo'> = {}): Promise<{
   context: BrowserContext;
   extensionId: string;
   /** `/flags` and `/decide/` URLs that hit the stub (must stay empty with flags disabled). */
@@ -102,6 +104,7 @@ export const launchExtensionContext = async (): Promise<{
     ...(executablePath === undefined ? { channel } : { executablePath }),
     headless: !isHeaded,
     ignoreDefaultArgs: ['--enable-automation'],
+    ...(recordVideo === undefined ? {} : { recordVideo }),
     userAgent: EXTENSION_E2E_USER_AGENT,
   });
 

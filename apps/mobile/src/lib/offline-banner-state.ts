@@ -1,7 +1,7 @@
 import { type ConnectivityState, connectivityStatus } from '@/lib/connectivity-online';
 
 /** Wait out transient NetInfo reports before confirming offline with a probe. */
-export const OFFLINE_BANNER_SHOW_DELAY_MS = 5000;
+const OFFLINE_BANNER_SHOW_DELAY_MS = 5000;
 
 export type OfflineBannerTimer = {
   set(callback: () => void, delayMs: number): { cancel(): void };
@@ -25,10 +25,8 @@ export function createOfflineBannerStore(options: {
   source: ConnectivitySource;
   timer: OfflineBannerTimer;
   probe: () => Promise<boolean>;
-  showDelayMs?: number;
 }): OfflineBannerStore {
   const { source, timer, probe } = options;
-  const showDelayMs = options.showDelayMs ?? OFFLINE_BANNER_SHOW_DELAY_MS;
 
   // Start unknown: neither NetInfo nor a probe has confirmed connectivity yet.
   let state: BannerState = 'unknown';
@@ -89,7 +87,7 @@ export function createOfflineBannerStore(options: {
       }
       pending = null;
       void confirmConnectivity(attempt);
-    }, showDelayMs);
+    }, OFFLINE_BANNER_SHOW_DELAY_MS);
   }
 
   const unsubscribeSource = source.subscribe(handleSourceState);

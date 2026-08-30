@@ -326,6 +326,8 @@ const ModalExamples = () => {
       </button>
       {workflowOpen ? (
         <WorkflowRunPrompt
+          admissionPending={false}
+          blocker={undefined}
           name="Example"
           onCancel={() => {
             setWorkflowOpen(false);

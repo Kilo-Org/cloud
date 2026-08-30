@@ -1,157 +1,47 @@
-import { NextResponse } from 'next/server';
-import { type NextRequest } from 'next/server';
+import { NextResponse, after, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
-import { EXA_API_KEY } from '@/lib/config.server';
-import { after } from 'next/server';
 import { wrapInSafeNextResponse } from '@/lib/ai-gateway/llm-proxy-helpers';
-import {
-  getExaMonthlyUsage,
-  getExaFreeAllowanceMicrodollars,
-  recordExaUsage,
-} from '@/lib/exa-usage';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { readDb } from '@/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import { EXA_ALLOWED_PATHS, isExaAllowedPath } from '@/lib/exa-paths';
-import { z } from 'zod';
-
-const EXA_BASE_URL = 'https://api.exa.ai';
-const MICRODOLLARS_PER_DOLLAR = 1_000_000;
-const ExaCostResponseSchema = z.object({
-  costDollars: z
-    .object({
-      total: z.number().finite().optional(),
-    })
-    .optional(),
-});
-
-function extractExaPath(url: URL): string | null {
-  const prefix = '/api/exa';
-  if (!url.pathname.startsWith(prefix)) return null;
-  const path = url.pathname.slice(prefix.length);
-  return isExaAllowedPath(path) ? path : null;
-}
-
-function extractCostMicrodollars(responseBody: unknown): number | undefined {
-  const costDollars = ExaCostResponseSchema.parse(responseBody).costDollars?.total;
-  if (costDollars === undefined || costDollars === 0) return undefined;
-  if (costDollars < 0) {
-    throw new Error('Exa response costDollars.total must be positive.');
-  }
-
-  const costMicrodollars = Math.round(costDollars * MICRODOLLARS_PER_DOLLAR);
-  if (!Number.isSafeInteger(costMicrodollars) || costMicrodollars <= 0) {
-    throw new Error('Exa response cost must convert to a positive safe integer.');
-  }
-  return costMicrodollars;
-}
+import { extractExaCostMicrodollars, prepareExaRequest } from '@/lib/exa-provider';
 
 export async function POST(request: NextRequest) {
-  const { user, authFailedResponse, organizationId } = await getUserFromAuth({
-    adminOnly: false,
-  });
+  const { user, authFailedResponse, organizationId } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse) return authFailedResponse;
-
   const url = new URL(request.url);
-  const exaPath = extractExaPath(url);
-  if (!exaPath) {
+  const prefix = '/api/exa';
+  const exaPath = url.pathname.startsWith(prefix) ? url.pathname.slice(prefix.length) : '';
+  if (!isExaAllowedPath(exaPath)) {
     return NextResponse.json(
       { error: `Invalid path. Allowed: ${EXA_ALLOWED_PATHS.join(', ')}` },
       { status: 400 }
     );
   }
-
-  if (!EXA_API_KEY) {
-    captureException(new Error('EXA_API_KEY is not configured'));
-
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
-
-  // Check monthly allowance and balance.
-  // freeAllowance is the stored value from the first request of the month;
-  // null means no row yet, so we compute from the helper.
-  // Use read replica for monthly usage check - this is a read-only operation that can tolerate
-  // slight replication lag, and provides lower latency for US users
-  const { usage: monthlyUsage, freeAllowance: storedAllowance } = await getExaMonthlyUsage(
-    user.id,
-    readDb
-  );
-  const allowance = storedAllowance ?? getExaFreeAllowanceMicrodollars(new Date(), user);
-  const isPaidRequest = monthlyUsage >= allowance;
-
-  if (isPaidRequest) {
-    const { balance } = await getBalanceAndOrgSettings(organizationId, user, readDb);
-    if (balance <= 0) {
-      return NextResponse.json(
-        {
-          error: 'Exa free allowance exhausted and no credit balance available',
-          monthlyAllowance: `$${(allowance / 1_000_000).toFixed(2)}`,
-          used: `$${(monthlyUsage / 1_000_000).toFixed(2)}`,
-        },
-        { status: 402 }
-      );
-    }
-  }
-
-  // Strip `stream` to guarantee JSON responses with costDollars for billing
+  const provider = await prepareExaRequest(user, organizationId);
+  if (provider instanceof Response) return provider;
+  // Old proxy callers retain their body, response, and asynchronous billing contracts until retirement.
   const requestBody: Record<string, unknown> = await request.json();
   delete requestBody.stream;
-
   const featureId = validateFeatureHeader(request.headers.get(FEATURE_HEADER)) ?? undefined;
   const type = typeof requestBody.type === 'string' ? requestBody.type : undefined;
-
-  const response = await fetch(`${EXA_BASE_URL}${exaPath}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': EXA_API_KEY,
-    },
-    body: JSON.stringify(requestBody),
-    signal: request.signal,
-  });
-
-  if (response.status >= 400) {
-    console.error(
-      `[exa] upstream error: status=${response.status} user=${user.id} path=${exaPath}`
-    );
-  }
-
-  // Record cost asynchronously after sending the response
+  const response = await provider.send(exaPath, requestBody, request.signal);
   const cloned = response.clone();
   after(async () => {
-    if (response.status >= 400) {
-      return;
-    }
-
+    if (response.status >= 400) return;
     try {
-      const body: unknown = await cloned.json();
-      const costMicrodollars = extractCostMicrodollars(body);
-      if (costMicrodollars === undefined) return;
-
-      await recordExaUsage({
-        userId: user.id,
-        organizationId,
-        path: exaPath,
-        costMicrodollars,
-        chargedToBalance: isPaidRequest,
-        freeAllowanceMicrodollars: allowance,
+      await provider.record(
+        exaPath,
+        extractExaCostMicrodollars(await cloned.json()),
         featureId,
-        type,
-      });
+        type
+      );
     } catch (error) {
       captureException(error, {
-        tags: {
-          route: '/api/exa/[...path]',
-          exaPath,
-        },
-        extra: {
-          userId: user.id,
-          responseStatus: response.status,
-        },
+        tags: { route: '/api/exa/[...path]', exaPath },
+        extra: { userId: user.id, responseStatus: response.status },
       });
     }
   });
-
   return wrapInSafeNextResponse(response);
 }

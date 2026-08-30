@@ -40,10 +40,49 @@ const profile = (supportsLocks = true) => {
     },
   };
   return {
-    panel: () =>
-      createBrowserExecutionCoordinator({ locks: supportsLocks ? locks : undefined, storageArea }),
+    panel: (panelLocks = locks) =>
+      createBrowserExecutionCoordinator({
+        locks: supportsLocks ? panelLocks : undefined,
+        storageArea,
+      }),
     storageArea,
     values,
+  };
+};
+
+// Model context destruction by releasing its native requests, not by settling the issued page work.
+// Actual Chrome/Firefox panel destruction remains a13 verification.
+const nativeContext = () => {
+  const destroyed = Promise.withResolvers<void>();
+  const requests: Promise<unknown>[] = [];
+  const callbacks: unknown[] = [];
+  type Work = (lock: Lock | null) => unknown;
+  const request = (name: string, options: LockOptions | Work, callback?: Work) => {
+    const work = typeof options === 'function' ? options : callback;
+    if (work === undefined) {
+      throw new Error('Missing native lock callback');
+    }
+    const running = locks.request(name, typeof options === 'function' ? {} : options, lock => {
+      const pending = work(lock);
+      callbacks.push(pending);
+      return Promise.race([pending, destroyed.promise]);
+    });
+    requests.push(running);
+    return running;
+  };
+  return {
+    destroy: async () => {
+      destroyed.resolve();
+      await Promise.all(requests);
+    },
+    drain: async () => {
+      // Late callbacks can append a final safety mutation while earlier callbacks drain.
+      for (const callback of callbacks) {
+        // eslint-disable-next-line no-await-in-loop -- Include callbacks appended by each awaited completion.
+        await callback;
+      }
+    },
+    locks: { query: () => locks.query(), request } as LockManager,
   };
 };
 
@@ -51,6 +90,417 @@ describe('profile browser execution locks', () => {
   afterEach(async () => {
     await Promise.all([...leases].map(lease => lease.release()));
     leases.clear();
+  });
+
+  it('records bound tabs before dispatch and removes only each completed shared run', async () => {
+    const state = profile();
+    const first = state.panel();
+    const second = state.panel();
+    const one = admitted(await first.acquireLocal());
+    const startedOne = Promise.withResolvers<void>();
+    const startedTwo = Promise.withResolvers<void>();
+    const finishOne = Promise.withResolvers<void>();
+    const finishTwo = Promise.withResolvers<void>();
+    const issued: unknown[] = [];
+    const workOne = one.run(async () => {
+      issued.push(structuredClone(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)));
+      startedOne.resolve();
+      await finishOne.promise;
+      return 'first tab completed';
+    }, 0);
+    await startedOne.promise;
+    const two = admitted(await second.acquireLocal());
+    const workTwo = two.run(async () => {
+      issued.push(structuredClone(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)));
+      startedTwo.resolve();
+      await finishTwo.promise;
+      return 'second tab completed';
+    }, 8);
+    try {
+      await startedTwo.promise;
+      expect(issued).toMatchObject([
+        { localRuns: [{ tabId: 0 }], tabIds: [] },
+        { localRuns: [{ tabId: 0 }, { tabId: 8 }], tabIds: [] },
+      ]);
+      finishOne.resolve();
+      await expect(workOne).resolves.toBe('first tab completed');
+      await one.release();
+      expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({
+        localRuns: [{ tabId: 8 }],
+        tabIds: [],
+      });
+      const joining = admitted(await state.panel().acquireLocal());
+      await joining.release();
+      await second.refresh();
+      expect(second.getSnapshot()).toMatchObject({ blockedReason: undefined, localRuns: 1 });
+    } finally {
+      finishOne.resolve();
+      finishTwo.resolve();
+      await Promise.all([workOne, workTwo]);
+      await Promise.all([one.release(), two.release()]);
+    }
+    expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+      tabIds: [],
+      version: 1,
+    });
+    const reloaded = state.panel();
+    const provider = admitted(await reloaded.acquireProviderOwner());
+    const delegated = admitted(
+      await reloaded.acquireDelegated(provider, 'after-completion', new AbortController().signal)
+    );
+    await expect(delegated.run(async () => 'next work')).resolves.toBe('next work');
+  });
+
+  it('keeps guarded shared work running when a populated refresh crosses normal completion', async () => {
+    const state = profile();
+    const first = state.panel();
+    const second = state.panel();
+    const one = admitted(await first.acquireLocal());
+    const two = admitted(await second.acquireLocal());
+    const startedOne = Promise.withResolvers<void>();
+    const startedTwo = Promise.withResolvers<void>();
+    const finishOne = Promise.withResolvers<void>();
+    const finishTwo = Promise.withResolvers<void>();
+    const workOne = one.run(async () => {
+      startedOne.resolve();
+      await finishOne.promise;
+      return 'first tab completed';
+    }, 7);
+    const workTwo = two.run(async guard => {
+      startedTwo.resolve();
+      await finishTwo.promise;
+      guard();
+      return 'second tab completed';
+    }, 8);
+    await Promise.all([startedOne.promise, startedTwo.promise]);
+    const read = state.storageArea.getItem;
+    const captured = Promise.withResolvers<void>();
+    const stale = Promise.withResolvers<void>();
+    let delayed = false;
+    state.storageArea.getItem = async key => {
+      const value = read(key);
+      if (key === BROWSER_EXECUTION_SAFETY_KEY && !delayed) {
+        delayed = true;
+        captured.resolve();
+        await stale.promise;
+      }
+      return value;
+    };
+    const refreshing = second.refresh();
+    try {
+      await captured.promise;
+      finishOne.resolve();
+      await expect(workOne).resolves.toBe('first tab completed');
+      await one.release();
+      expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({
+        localRuns: [{ tabId: 8 }],
+        tabIds: [],
+      });
+      stale.resolve();
+      await refreshing;
+      finishTwo.resolve();
+      await expect(workTwo).resolves.toBe('second tab completed');
+      expect(second.getSnapshot()).toMatchObject({
+        blockedReason: undefined,
+        quarantinedTabIds: [],
+      });
+    } finally {
+      stale.resolve();
+      finishOne.resolve();
+      finishTwo.resolve();
+      state.storageArea.getItem = read;
+      await Promise.allSettled([refreshing, workOne, workTwo]);
+      await Promise.all([one.release(), two.release()]);
+    }
+    expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+      tabIds: [],
+      version: 1,
+    });
+  });
+
+  it('serializes simultaneous completions from separate coordinators', async () => {
+    const state = profile();
+    const one = admitted(await state.panel().acquireLocal());
+    const two = admitted(await state.panel().acquireLocal());
+    const finish = Promise.withResolvers<void>();
+    let issued = 0;
+    const execute = async () => {
+      issued += 1;
+      await finish.promise;
+    };
+    const workOne = one.run(execute, 7);
+    const workTwo = two.run(execute, 8);
+    try {
+      await vi.waitFor(() => {
+        expect(issued).toBe(2);
+      });
+    } finally {
+      finish.resolve();
+      await Promise.all([workOne, workTwo]);
+      await Promise.all([one.release(), two.release()]);
+    }
+    const next = admitted(await state.panel().acquireLocal());
+    await expect(next.run(async () => 'both runs drained', 0)).resolves.toBe('both runs drained');
+    expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+      tabIds: [],
+      version: 1,
+    });
+  });
+
+  it.each([0, 7])('retains tab %s protection after native owner loss and reload', async tabId => {
+    const state = profile();
+    const context = nativeContext();
+    const owner = state.panel(context.locks);
+    const observer = state.panel();
+    const local = admitted(await owner.acquireLocal());
+    const issued = Promise.withResolvers<void>();
+    const finish = Promise.withResolvers<void>();
+    const effects: string[] = [];
+    const running = local.run(async () => {
+      issued.resolve();
+      await finish.promise;
+      effects.push('page work settled');
+    }, tabId);
+    try {
+      await issued.promise;
+      await observer.refresh();
+      expect(observer.getSnapshot().blockedReason).toBeUndefined();
+      await context.destroy();
+      await local.release();
+      const reloaded = state.panel();
+      const provider = admitted(await reloaded.acquireProviderOwner());
+      expect({
+        delegated: (
+          await reloaded.acquireDelegated(provider, 'after-loss', new AbortController().signal)
+        ).admitted,
+        effects,
+        existingPanel: await observer.acquireLocal(),
+        reloadedPanel: await reloaded.acquireLocal(),
+      }).toMatchObject({
+        delegated: false,
+        effects: [],
+        existingPanel: {
+          admitted: false,
+          reason: expect.stringContaining('Close the affected tabs'),
+        },
+        reloadedPanel: {
+          admitted: false,
+          reason: expect.stringContaining('Close the affected tabs'),
+        },
+      });
+      expect(reloaded.getSnapshot().quarantinedTabIds).toStrictEqual([tabId]);
+    } finally {
+      finish.resolve();
+      await running;
+      await local.release();
+      await context.drain();
+    }
+    // A late result cannot prove completion on behalf of a destroyed native owner.
+    expect({
+      admission: await observer.acquireLocal(),
+      effects,
+      openReadiness: await observer.prepareRecovery(async () => [tabId]),
+      readiness: await observer.prepareRecovery(async () => []),
+      rechecked: await observer.recover(async () => [tabId]),
+      recovery: await observer.recover(async () => []),
+    }).toMatchObject({
+      admission: { admitted: false },
+      effects: ['page work settled'],
+      openReadiness: { ready: false },
+      readiness: { ready: true },
+      rechecked: { recovered: false },
+      recovery: { recovered: true },
+    });
+    const next = admitted(await observer.acquireLocal());
+    await expect(next.run(async () => 'explicit new work', 8)).resolves.toBe('explicit new work');
+  });
+
+  it('rechecks durable protection before dispatch despite another panel returning a stale empty read', async () => {
+    const state = profile();
+    const context = nativeContext();
+    const owner = state.panel(context.locks);
+    const observer = state.panel();
+    const existing = admitted(await observer.acquireLocal());
+    const local = admitted(await owner.acquireLocal());
+    const read = state.storageArea.getItem;
+    const captured = Promise.withResolvers<void>();
+    const stale = Promise.withResolvers<void>();
+    let delayed = false;
+    state.storageArea.getItem = async key => {
+      const value = read(key);
+      if (key === BROWSER_EXECUTION_SAFETY_KEY && !delayed) {
+        delayed = true;
+        captured.resolve();
+        await stale.promise;
+      }
+      return value;
+    };
+    const refreshing = observer.refresh();
+    await captured.promise;
+    const issued = Promise.withResolvers<void>();
+    const finish = Promise.withResolvers<void>();
+    const running = local.run(async () => {
+      issued.resolve();
+      await finish.promise;
+    }, 7);
+    const effects: string[] = [];
+    try {
+      await issued.promise;
+      await context.destroy();
+      await local.release();
+      stale.resolve();
+      await refreshing;
+      await expect(
+        existing.run(async () => {
+          effects.push('unsafe dispatch');
+        }, 8)
+      ).rejects.toThrow('profile_quarantined');
+      expect(effects).toStrictEqual([]);
+      await expect(observer.acquireLocal()).resolves.toMatchObject({ admitted: false });
+      await expect(state.panel().acquireLocal()).resolves.toMatchObject({ admitted: false });
+    } finally {
+      stale.resolve();
+      state.storageArea.getItem = read;
+      finish.resolve();
+      await Promise.all([refreshing, running]);
+      await local.release();
+      await context.drain();
+    }
+  });
+
+  it('does not let a stale completion erase a new run or quarantine after recovery', async () => {
+    const state = profile();
+    const context = nativeContext();
+    const lost = admitted(await state.panel(context.locks).acquireLocal());
+    const issued = Promise.withResolvers<void>();
+    const finishLost = Promise.withResolvers<void>();
+    const oldWork = lost.run(async () => {
+      issued.resolve();
+      await finishLost.promise;
+    }, 7);
+    await issued.promise;
+    await context.destroy();
+    await lost.release();
+    const nextPanel = state.panel();
+    await expect(nextPanel.recover(async () => [])).resolves.toMatchObject({ recovered: true });
+    const next = admitted(await nextPanel.acquireLocal());
+    const nextIssued = Promise.withResolvers<void>();
+    const finishNext = Promise.withResolvers<void>();
+    const nextWork = next.run(async () => {
+      nextIssued.resolve();
+      await finishNext.promise;
+    }, 8);
+    try {
+      await nextIssued.promise;
+      const uncertain = admitted(await state.panel().acquireLocal());
+      await uncertain.quarantine(9);
+      await uncertain.release();
+      const protectedState = structuredClone(state.values.get(BROWSER_EXECUTION_SAFETY_KEY));
+      finishLost.resolve();
+      await oldWork;
+      await context.drain();
+      expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(protectedState);
+      expect(protectedState).toMatchObject({ localRuns: [{ tabId: 8 }], tabIds: [9] });
+    } finally {
+      finishLost.resolve();
+      finishNext.resolve();
+      await Promise.all([oldWork, nextWork]);
+      await Promise.all([lost.release(), next.release()]);
+      await context.drain();
+    }
+    expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+      tabIds: [9],
+      version: 1,
+    });
+    await expect(state.panel().acquireLocal()).resolves.toMatchObject({ admitted: false });
+  });
+
+  it.each([false, true])(
+    'rejects dispatch when the protection write fails (persisted=%s)',
+    async persisted => {
+      const state = profile();
+      const panel = state.panel();
+      const local = admitted(await panel.acquireLocal());
+      const write = state.storageArea.setItem;
+      const effects: string[] = [];
+      state.storageArea.setItem = async (key, value) => {
+        if (persisted) {
+          await write(key, value);
+        }
+        throw new Error('storage unavailable');
+      };
+      try {
+        await expect(
+          local.run(async () => {
+            effects.push('unsafe dispatch');
+          }, 7)
+        ).rejects.toThrow('storage unavailable');
+        await local.release();
+        expect({
+          admission: await panel.acquireLocal(),
+          effects,
+          persisted: state.values.has(BROWSER_EXECUTION_SAFETY_KEY),
+        }).toMatchObject({
+          admission: { admitted: false, reason: expect.stringContaining('Restore storage access') },
+          effects: [],
+          persisted,
+        });
+      } finally {
+        state.storageArea.setItem = write;
+      }
+      await expect(panel.recover(async () => [])).resolves.toMatchObject({ recovered: true });
+      const next = admitted(await state.panel().acquireLocal());
+      await expect(next.run(async () => 'explicit retry', 8)).resolves.toBe('explicit retry');
+    }
+  );
+
+  it('retains durable protection when completion cannot be persisted', async () => {
+    const state = profile();
+    const panel = state.panel();
+    const local = admitted(await panel.acquireLocal());
+    const issued = Promise.withResolvers<void>();
+    const finish = Promise.withResolvers<void>();
+    const running = local.run(async () => {
+      issued.resolve();
+      await finish.promise;
+    }, 7);
+    await issued.promise;
+    const write = state.storageArea.setItem;
+    state.storageArea.setItem = () => {
+      throw new Error('storage unavailable');
+    };
+    try {
+      finish.resolve();
+      await expect(running).rejects.toThrow('storage unavailable');
+      await local.release();
+    } finally {
+      state.storageArea.setItem = write;
+    }
+    const reloaded = state.panel();
+    await expect(reloaded.acquireLocal()).resolves.toMatchObject({ admitted: false });
+    await expect(reloaded.recover(async () => [7])).resolves.toMatchObject({ recovered: false });
+    expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({
+      localRuns: [{ tabId: 7 }],
+    });
+    await expect(reloaded.recover(async () => [])).resolves.toMatchObject({ recovered: true });
+    admitted(await reloaded.acquireLocal());
+  });
+
+  it('retains protection for an unexpected result loss without misreporting a storage error', async () => {
+    const state = profile();
+    const local = admitted(await state.panel().acquireLocal());
+    await expect(
+      local.run(async () => {
+        throw new Error('page result lost');
+      }, 7)
+    ).rejects.toThrow('page result lost');
+    await local.release();
+    const reloaded = state.panel();
+    await expect(reloaded.acquireLocal()).resolves.toMatchObject({
+      admitted: false,
+      reason: expect.stringContaining('Close the affected tabs'),
+    });
+    await expect(reloaded.recover(async () => [7])).resolves.toMatchObject({ recovered: false });
   });
 
   it('admits shared local runs in separate panels without sharing provider ownership', async () => {
@@ -657,6 +1107,24 @@ describe('profile browser execution locks', () => {
     await expect(panel.recover(async () => [])).resolves.toMatchObject({ recovered: true });
   });
 
+  it.each([
+    {
+      failure: 'negative tab',
+      localRuns: [{ lockName: `${BROWSER_EXECUTION_LOCK}:local:lost`, tabId: -1 }],
+    },
+    { failure: 'foreign lock', localRuns: [{ lockName: BROWSER_EXECUTION_LOCK, tabId: 7 }] },
+    { failure: 'invalid list', localRuns: 'invalid' },
+  ])('fails closed on $failure protection data', async ({ localRuns }) => {
+    const state = profile();
+    const record = { localRuns, tabIds: [], version: 1 };
+    state.values.set(BROWSER_EXECUTION_SAFETY_KEY, record);
+    await expect(state.panel().acquireLocal()).resolves.toMatchObject({
+      admitted: false,
+      reason: expect.stringContaining('safety state is unavailable'),
+    });
+    expect(state.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(record);
+  });
+
   it('fails closed on corrupt safety data rather than discarding the fence', async () => {
     const state = profile();
     state.values.set(BROWSER_EXECUTION_SAFETY_KEY, { tabIds: ['7'], version: 1 });
@@ -673,7 +1141,7 @@ describe('profile browser execution locks', () => {
       storageArea: state.storageArea,
     });
     const local = admitted(await panel.acquireLocal());
-    await expect(local.run(async () => 'local result')).resolves.toBe('local result');
+    await expect(local.run(async () => 'local result', 0)).resolves.toBe('local result');
     await expect(panel.acquireProviderOwner()).resolves.toMatchObject({
       admitted: false,
       reason: expect.stringContaining('does not support Web Locks'),

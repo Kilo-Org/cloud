@@ -487,6 +487,84 @@ describe('workflow settings', () => {
     });
   });
 
+  it.each([false, true])(
+    'retains Settings input after a local owner disappears (parameters=%s)',
+    async parameters => {
+      const { storage } = await import('#imports');
+      const { BROWSER_EXECUTION_SAFETY_KEY, createBrowserExecutionCoordinator } =
+        await import('./browser-execution-lock');
+      lockStorage.set(BROWSER_EXECUTION_SAFETY_KEY, {
+        localRuns: [{ lockName: `${BROWSER_EXECUTION_LOCK}:local:closed-panel`, tabId: 0 }],
+        tabIds: [],
+        version: 1,
+      });
+      mockUseAgentWorkflows.mockReturnValue({
+        ...emptyResult,
+        workflows: [
+          {
+            ...approvedWorkflow,
+            ...(parameters
+              ? { params: [{ name: 'size', description: 'Pizza size', required: true }] }
+              : {}),
+          },
+        ],
+      });
+      mockLoadWorkflowSettings.mockResolvedValue({
+        ...DEFAULT_WORKFLOW_SETTINGS,
+        allowWorkflowsInSafeMode: true,
+      });
+      store.set(settingsDialogOpenAtom, true);
+      const view = render(createElement(WorkflowSettings), { wrapper: createWrapper(store) });
+      await waitFor(() => {
+        expect(view.getByLabelText('Run workflow "Order pizza"')).toHaveProperty('disabled', false);
+      });
+      fireEvent.click(view.getByLabelText('Run workflow "Order pizza"'));
+      if (parameters) {
+        fireEvent.change(view.getByRole('textbox'), { target: { value: 'large' } });
+        fireEvent.click(view.getByRole('button', { name: 'Run' }));
+      }
+      await waitFor(() => {
+        expect(view.getByRole(parameters ? 'alert' : 'status').textContent).toContain(
+          'Close the affected tabs'
+        );
+      });
+      expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+      expect(store.get(settingsDialogOpenAtom)).toBe(true);
+      const otherPanel = createBrowserExecutionCoordinator({
+        locks: nativeLocks as LockManager,
+        storageArea: storage,
+      });
+      await expect(otherPanel.recover(() => Promise.resolve([0]))).resolves.toMatchObject({
+        recovered: false,
+      });
+      await act(async () => {
+        await expect(otherPanel.recover(() => Promise.resolve([]))).resolves.toMatchObject({
+          recovered: true,
+        });
+        await getBrowserExecutionCoordinator().refresh();
+      });
+      expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+      expect(view.getByRole(parameters ? 'alert' : 'status').textContent).toContain(
+        'input is retained'
+      );
+      if (parameters) {
+        expect(view.getByDisplayValue('large')).toBeDefined();
+      }
+      fireEvent.click(
+        parameters
+          ? view.getByRole('button', { name: 'Run' })
+          : view.getByLabelText('Run workflow "Order pizza"')
+      );
+      await waitFor(() => {
+        expect(store.get(workflowRunRequestAtom)).toStrictEqual({
+          workflowId: 'wf-1',
+          ...(parameters ? { input: { size: 'large' } } : {}),
+        });
+        expect(store.get(settingsDialogOpenAtom)).toBe(false);
+      });
+    }
+  );
+
   it.each([
     { parameters: false, phase: 'waiting' },
     { parameters: false, phase: 'running' },

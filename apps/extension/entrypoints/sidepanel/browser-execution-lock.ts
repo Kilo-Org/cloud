@@ -18,14 +18,23 @@ export const QUARANTINE_MESSAGE =
 const ALL_TABS_RECOVERY_MESSAGE =
   'Close all target tabs before recovery. The affected-tab list is not known to be complete.';
 
+const localRunSchema = z.object({
+  lockName: z.string().startsWith(`${BROWSER_EXECUTION_LOCK}:local:`),
+  tabId: z.number().int().nonnegative(),
+});
 const safetySchema = z.object({
   // Without Web Locks, competing writers can lose tab IDs.
   allTabs: z.literal(true).optional(),
+  localRuns: z.array(localRunSchema).optional(),
   tabIds: z.array(z.number().int().nonnegative()),
   version: z.literal(1),
 });
 const ownerSchema = z.object({ sessionId: z.string().max(80) });
 type SafetyRecord = z.infer<typeof safetySchema>;
+const orphanedTabs = (record: SafetyRecord, held: readonly LockInfo[]): number[] =>
+  (record.localRuns ?? [])
+    .filter(run => !held.some(lock => lock.name === run.lockName))
+    .map(run => run.tabId);
 type StorageKey = typeof BROWSER_EXECUTION_SAFETY_KEY | typeof OWNER_KEY;
 export interface BrowserLockStorage {
   // eslint-disable-next-line anti-slop/no-unknown-returns -- Raw storage is untrusted; readSafety and ownerSchema validate it at this boundary.
@@ -45,7 +54,11 @@ export interface BrowserExecutionSnapshot {
 export interface BrowserExecutionLease {
   readonly kind: 'local' | 'delegated' | 'provider';
   readonly guard: ExecutionGuard;
-  readonly run: <Result>(work: (guard: ExecutionGuard) => Promise<Result>) => Promise<Result>;
+  /** Bound local work must supply its tab and quarantine uncertain effects before returning. */
+  readonly run: <Result>(
+    work: (guard: ExecutionGuard) => Promise<Result>,
+    tabId?: number
+  ) => Promise<Result>;
   readonly quarantine: (tabId: number) => Promise<void>;
   readonly release: () => Promise<void>;
 }
@@ -61,7 +74,7 @@ export interface BrowserRecoveryReadiness {
   readonly reason: string;
 }
 
-/** Native locks grant authority; the observable record supplies display information only. */
+/** Native locks grant authority; durable safety records retain exclusion after owner loss. */
 export const createBrowserExecutionCoordinator = ({
   locks,
   storageArea,
@@ -74,6 +87,7 @@ export const createBrowserExecutionCoordinator = ({
   const pendingSafetyTabs = new Set<number>();
   const failedReleases = new Set<() => Promise<void>>();
   let safety: SafetyRecord = { tabIds: [], version: 1 };
+  let lostLocalTabs: number[] = [];
   let safetyRevision = 0;
   let safetyError = false;
   let fallbackLocalRuns = 0;
@@ -109,17 +123,27 @@ export const createBrowserExecutionCoordinator = ({
     if (safety.allTabs === true) {
       return `Browser control is blocked because an action may still be running. ${ALL_TABS_RECOVERY_MESSAGE} Issued actions cannot be undone.`;
     }
-    return safety.tabIds.length > 0 ? QUARANTINE_MESSAGE : undefined;
+    return safety.tabIds.length > 0 || lostLocalTabs.length > 0 ? QUARANTINE_MESSAGE : undefined;
   };
   const refresh = (): Promise<void> => {
     refreshInFlight ??= (async () => {
       const revision = safetyRevision;
       try {
-        const [record, nativeState, ownerValue] = await Promise.all([
+        const [initialRecord, ownerValue] = await Promise.all([
           readSafety(),
-          locks?.query(),
           storageArea.getItem(OWNER_KEY),
         ]);
+        let record = initialRecord;
+        // Read owners after the record: a newly recorded owner already holds its native lock.
+        let nativeState = await locks?.query();
+        if (locks !== undefined && orphanedTabs(record, nativeState?.held ?? []).length > 0) {
+          // Confirm owner loss under the mutation lock: normal completion can invalidate the first record.
+          await locks.request(SAFETY_WRITE_LOCK, async () => {
+            record = await readSafety();
+            nativeState = await locks.query();
+          });
+        }
+        const held = nativeState?.held ?? [];
         // A stale read cannot erase a fence while this panel writes it.
         if (revision === safetyRevision) {
           safety = {
@@ -127,8 +151,8 @@ export const createBrowserExecutionCoordinator = ({
             ...(safety.allTabs === true && pendingSafetyTabs.size > 0 ? { allTabs: true } : {}),
             tabIds: [...new Set([...record.tabIds, ...pendingSafetyTabs])],
           };
+          lostLocalTabs = orphanedTabs(safety, held);
         }
-        const held = nativeState?.held ?? [];
         const pending = nativeState?.pending ?? [];
         const running = held.some(
           lock => lock.name === BROWSER_EXECUTION_LOCK && lock.mode === 'exclusive'
@@ -158,7 +182,7 @@ export const createBrowserExecutionCoordinator = ({
                   .length,
           owner,
           providerOwned: held.some(lock => lock.name === PROVIDER_OWNER_LOCK),
-          quarantinedTabIds: safety.tabIds,
+          quarantinedTabIds: [...new Set([...safety.tabIds, ...lostLocalTabs])],
         };
         if (JSON.stringify(next) !== JSON.stringify(snapshot)) {
           snapshot = next;
@@ -173,6 +197,78 @@ export const createBrowserExecutionCoordinator = ({
       }
     })();
     return refreshInFlight;
+  };
+  // Call only while holding SAFETY_WRITE_LOCK. Never build a write from a display snapshot.
+  const writeLocalSafety = async (record: SafetyRecord): Promise<void> => {
+    safetyRevision += 1;
+    try {
+      await storageArea.setItem(BROWSER_EXECUTION_SAFETY_KEY, record);
+    } catch (error) {
+      safetyError = true;
+      throw error;
+    }
+    safety = { ...record, tabIds: [...new Set([...record.tabIds, ...pendingSafetyTabs])] };
+    safetyRevision += 1;
+  };
+  const withLocalProtection = <Result>(
+    tabId: number,
+    guard: ExecutionGuard,
+    work: (guard: ExecutionGuard) => Promise<Result>
+  ): Promise<Result> => {
+    if (locks === undefined) {
+      return work(guard);
+    }
+    const lockName = `${BROWSER_EXECUTION_LOCK}:local:${crypto.randomUUID()}`;
+    return locks.request(lockName, async () => {
+      await locks.request(SAFETY_WRITE_LOCK, async () => {
+        const record = await readSafety();
+        const { held = [] } = await locks.query();
+        if (
+          record.allTabs === true ||
+          record.tabIds.length > 0 ||
+          orphanedTabs(record, held).length > 0
+        ) {
+          throw new ExecutionStoppedError('profile_quarantined');
+        }
+        guard();
+        await writeLocalSafety({
+          ...record,
+          localRuns: [...(record.localRuns ?? []), { lockName, tabId }],
+        });
+      });
+      let completed = false;
+      try {
+        guard();
+        const result = await work(guard);
+        completed = true;
+        return result;
+      } catch (error) {
+        completed = error instanceof ExecutionStoppedError && !error.effectsUncertain;
+        throw error;
+      } finally {
+        if (completed) {
+          await locks.request(SAFETY_WRITE_LOCK, async () => {
+            const record = await readSafety();
+            const { held = [] } = await locks.query();
+            if (
+              !held.some(lock => lock.name === lockName) ||
+              record.allTabs === true ||
+              record.tabIds.includes(tabId) ||
+              pendingSafetyTabs.has(tabId) ||
+              record.localRuns?.some(run => run.lockName === lockName) !== true
+            ) {
+              return;
+            }
+            const remaining = record.localRuns.filter(run => run.lockName !== lockName);
+            const next: SafetyRecord = { ...record, localRuns: remaining };
+            if (remaining.length === 0) {
+              delete next.localRuns;
+            }
+            await writeLocalSafety(next);
+          });
+        }
+      }
+    });
   };
   const quarantineBarriers = new Set<() => void>();
   const persistQuarantine = async (tabId: number): Promise<void> => {
@@ -201,6 +297,7 @@ export const createBrowserExecutionCoordinator = ({
     const write = async (): Promise<void> => {
       const persisted = await readSafety();
       safety = {
+        ...persisted,
         ...(locks === undefined || persisted.allTabs === true || safety.allTabs === true
           ? { allTabs: true }
           : {}),
@@ -310,14 +407,16 @@ export const createBrowserExecutionCoordinator = ({
             await released;
             failedReleases.delete(retryRelease);
           },
-          run: async work => {
+          run: async (work, tabId) => {
             if (kind === 'provider') {
               throw new ExecutionStoppedError('execution_lease_required');
             }
             guard();
             users += 1;
             try {
-              return await work(guard);
+              return await (kind === 'local' && tabId !== undefined
+                ? withLocalProtection(tabId, guard, work)
+                : work(guard));
             } finally {
               users -= 1;
               drain();
@@ -395,23 +494,29 @@ export const createBrowserExecutionCoordinator = ({
     const result = await locks.request(
       BROWSER_EXECUTION_LOCK,
       { ifAvailable: true, mode: 'exclusive' },
-      async lock => {
+      lock => {
         if (lock === null) {
           return {
             ready: false,
             reason: 'Browser actions are still unwinding. Wait before recovery.',
           };
         }
-        const record = await readSafety();
-        const affected = new Set([...safety.tabIds, ...record.tabIds]);
-        const open = await getOpenTabIds();
-        if ((record.allTabs === true || safety.allTabs === true) && open.length > 0) {
-          return { ready: false, reason: ALL_TABS_RECOVERY_MESSAGE };
-        }
-        if (open.some(tabId => affected.has(tabId))) {
-          return { ready: false, reason: 'Close all affected tabs before recovery.' };
-        }
-        return { ready: true, reason: await onReady() };
+        return locks.request(SAFETY_WRITE_LOCK, async () => {
+          const record = await readSafety();
+          const affected = new Set([
+            ...safety.tabIds,
+            ...record.tabIds,
+            ...(record.localRuns ?? []).map(run => run.tabId),
+          ]);
+          const open = await getOpenTabIds();
+          if ((record.allTabs === true || safety.allTabs === true) && open.length > 0) {
+            return { ready: false, reason: ALL_TABS_RECOVERY_MESSAGE };
+          }
+          if (open.some(tabId => affected.has(tabId))) {
+            return { ready: false, reason: 'Close all affected tabs before recovery.' };
+          }
+          return { ready: true, reason: await onReady() };
+        });
       }
     );
     await refresh();
@@ -495,6 +600,7 @@ export const createBrowserExecutionCoordinator = ({
         await storageArea.setItem(BROWSER_EXECUTION_SAFETY_KEY, { tabIds: [], version: 1 });
         safetyRevision += 1;
         safety = { tabIds: [], version: 1 };
+        lostLocalTabs = [];
         safetyError = false;
         // A11 must register a fresh generation before delegated execution.
         return 'Browser control recovered. Submit new work explicitly.';

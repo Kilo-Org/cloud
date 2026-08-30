@@ -293,6 +293,13 @@ const inspect = (path: string, text: string): string[] => {
       for (const name of called) {
         const target = leaf(name);
         if (
+          site === `${panel}browser-run-context.ts:withBoundTab` &&
+          name === 'context.lease.run' &&
+          node.arguments?.[1]?.getText(source) !== 'context.selectedTab.id'
+        ) {
+          failures.push(`${site}: missing bound local protection`);
+        }
+        if (
           runnerNames.has(target) &&
           (!(runnerSites.get(site)?.includes(target) ?? false) || !hasGuard(node))
         ) {
@@ -425,6 +432,22 @@ describe('browser action boundary inventory', () => {
     expect(broken).not.toBe(text);
     expect(inspect(path, broken)).toContain(`${path}:runBrowserTurn: unguarded runSafeLlmTurn`);
   });
+
+  it.each(['undefined', '8'])(
+    'rejects shared run setup that replaces the bound protection tab with %s',
+    replacement => {
+      const path = `${panel}browser-run-context.ts`;
+      const text = readFileSync(join(root, path), 'utf8');
+      const broken = text.replace(
+        /,\s*context\.selectedTab\.id(?=\s*,?\s*\))/u,
+        `, ${replacement}`
+      );
+      expect(broken).not.toBe(text);
+      expect(inspect(path, broken)).toContain(
+        `${path}:withBoundTab: missing bound local protection`
+      );
+    }
+  );
 
   it('permits a11 to use only the guarded public context API', () => {
     expect(

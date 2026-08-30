@@ -176,3 +176,13 @@ export function isAnyAttachmentUploading(attachments: AgentAttachment[]): boolea
 export function hasAnyFailedAttachment(attachments: AgentAttachment[]): boolean {
   return attachments.some(item => item.status === 'error');
 }
+
+/**
+ * True when any chip holds an admitted (presign-returned) object key that has
+ * not been sent. Such a key has a pending-ledger row that must be released on
+ * remove or leave; a chip still in the presign window has no key yet and is
+ * covered by the 24-hour reaper instead.
+ */
+export function hasAnyUnclaimedAttachment(attachments: AgentAttachment[]): boolean {
+  return attachments.some(item => item.remoteKey !== undefined);
+}

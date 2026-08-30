@@ -33,6 +33,7 @@ import {
   baseInitiateSessionNextOutputSchema,
   baseSendMessageNextSchema,
   baseInterruptSessionNextSchema,
+  baseCancelQueuedMessageNextSchema,
   baseGetSessionNextSchema,
   baseGetSessionNextOutputSchema,
   baseAnswerQuestionNextSchema,
@@ -140,6 +141,10 @@ const SendMessageInput = baseSendMessageNextSchema.extend({
 });
 
 const InterruptSessionInput = baseInterruptSessionNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const CancelQueuedMessageInput = baseCancelQueuedMessageNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -606,6 +611,26 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
 
       return await client.interruptSession(input.sessionId);
+    }),
+
+  /**
+   * Cancel one queued (not yet accepted) message by id. Never interrupts the
+   * active run; a missing id or the accepted current message returns
+   * `{ dropped: false }`.
+   */
+  cancelQueuedMessage: organizationMemberMutationProcedure
+    .input(CancelQueuedMessageInput)
+    .output(z.object({ dropped: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const authToken = generateCloudAgentToken(ctx.user);
+      const client = createCloudAgentNextClient(authToken);
+
+      return await client.cancelQueuedMessage(input.sessionId, input.messageId);
     }),
 
   answerQuestion: organizationMemberMutationProcedure

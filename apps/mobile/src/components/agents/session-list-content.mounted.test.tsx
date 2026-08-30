@@ -168,8 +168,11 @@ function mount(props: ContentProps): TestRenderer.ReactTestRenderer {
   mounted.push(renderer);
   return renderer;
 }
+function isHost(node: TestRenderer.ReactTestInstance, type: string) {
+  return node.type === type;
+}
 function hosts(renderer: TestRenderer.ReactTestRenderer, type: string) {
-  return renderer.root.findAll(node => node.type === type);
+  return renderer.root.findAll(node => isHost(node, type));
 }
 function rows(renderer: TestRenderer.ReactTestRenderer) {
   return hosts(renderer, 'StoredSessionRow').map(node => {
@@ -222,7 +225,7 @@ describe('AgentSessionListContent liveness', () => {
         },
       });
       const renderer = mount(props);
-      const list = renderer.root.find(node => node.type === 'SectionList');
+      const list = renderer.root.find(node => isHost(node, 'SectionList'));
       if (mode === 'later-page') {
         expect(rows(renderer)).toHaveLength(1);
         const { onEndReached } = list.props as ListProps;
@@ -279,7 +282,7 @@ describe('AgentSessionListContent liveness', () => {
       i18n.t(isSearching ? 'agents.sessionList.couldNotSearch' : 'agents.sessionList.couldNotLoad')
     );
     const retry = renderer.root.find(
-      node => node.type === 'Button' && node.props.accessibilityLabel === 'Retry'
+      node => isHost(node, 'Button') && node.props.accessibilityLabel === 'Retry'
     );
     press(retry);
     expect(rows(renderer).map(item => item.id)).toEqual(['recovered']);

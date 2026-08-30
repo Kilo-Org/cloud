@@ -6,6 +6,8 @@ import { GIT_TOKEN_SERVICE_API_URL } from '@/lib/config.server';
 import { generateInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import {
   BitbucketInteractiveMetadataSchema,
+  type BitbucketInteractiveBrokerRequest,
+  type BitbucketInteractiveSourceSelector,
   type BitbucketInteractiveData,
   type BitbucketInteractiveMetadata,
   type BitbucketInteractiveOperation,
@@ -24,6 +26,8 @@ import type {
 } from './token-service-client';
 
 export type {
+  BitbucketInteractiveBrokerRequest,
+  BitbucketInteractiveSourceSelector,
   BitbucketInteractiveMetadata,
   BitbucketInteractiveRequest,
   BitbucketInteractiveResponse,
@@ -95,7 +99,7 @@ export function createBitbucketInteractiveClient(options: {
 }) {
   return {
     async execute<K extends BitbucketInteractiveOperation>(
-      request: BitbucketInteractiveRequest<K>
+      request: BitbucketInteractiveBrokerRequest<K>
     ): Promise<BitbucketInteractiveResponse<BitbucketInteractiveData<K>>> {
       if (!options.organizationId || !options.actorUserId)
         throw new BitbucketInteractiveClientError('invalid_request');

@@ -50,6 +50,7 @@ import {
 import { PR_CONTEXT_PEOPLE_QUERIES } from '@/lib/github-pr-review/context-people';
 import { PR_CONTEXT_REVIEW_QUERIES } from '@/lib/github-pr-review/context-reviews';
 import { PR_CONTEXT_ISSUE_QUERIES } from '@/lib/github-pr-review/context-issues';
+import { PR_CONTEXT_QUEUE_QUERIES } from '@/lib/github-pr-review/context-queue';
 import {
   PR_CONTEXT_EVALUATION_QUERY,
   PR_CONTEXT_REQUIREMENT_QUERIES,
@@ -553,6 +554,7 @@ export const PR_REVIEW_GRAPHQL_DOCUMENTS = {
   ...PR_CONTEXT_PEOPLE_QUERIES,
   ...PR_CONTEXT_REVIEW_QUERIES,
   ...PR_CONTEXT_ISSUE_QUERIES,
+  ...PR_CONTEXT_QUEUE_QUERIES,
   REVIEW_THREADS_QUERY,
   REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY,
   CONVERSATION_COMMENTS_QUERY,

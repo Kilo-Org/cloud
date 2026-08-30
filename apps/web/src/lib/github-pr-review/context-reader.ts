@@ -33,6 +33,7 @@ import {
   resolveContextIssues,
 } from './context-issues';
 import { normalizeContextPolicies } from './context-rules';
+import { PR_CONTEXT_QUEUE_QUERIES, contextQueueEntrySchema } from './context-queue';
 import {
   PR_CONTEXT_EVALUATION_QUERY,
   PR_CONTEXT_REQUIREMENT_QUERIES,
@@ -275,8 +276,15 @@ function invalidateRevision(context: GitHubPrReviewContext, source: GitHubPrRevi
       },
     });
   }
-  context.queue.membership.source = source;
-  context.queue.position.source = source;
+  // Observed permanent queue failures retain their recovery policy across revision failures.
+  for (const field of [context.queue.membership, context.queue.position]) {
+    if (
+      field.source.availability === 'available' ||
+      field.source.retryable ||
+      field.source.reason === 'not-requested'
+    )
+      field.source = source;
+  }
   return context;
 }
 
@@ -593,6 +601,110 @@ export async function readPullRequestContext(
     ]);
     return normalizeContextPolicies(context.revision, classic, rules);
   }
+  async function collectQueue() {
+    const queue = context.queue;
+    const request = (
+      field: keyof typeof PR_CONTEXT_QUEUE_QUERIES,
+      variables: Record<string, unknown>
+    ) =>
+      read(`graphql.${field}`, async (signal): Promise<unknown> => {
+        const response = await octokit.request('POST /graphql', {
+          query: PR_CONTEXT_QUEUE_QUERIES[field],
+          variables,
+          request: { signal },
+        });
+        return response.data;
+      });
+    const membership = async () => {
+      const result = await request('queueMembership', {
+        owner: input.owner,
+        name: input.repo,
+        number: input.number,
+      });
+      const identity = decodeContextGraphQlSource(
+        result,
+        ['repository', 'pullRequest', 'id'],
+        z.literal(context.revision.prNodeId)
+      );
+      const member = decodeContextGraphQlSource(
+        result,
+        ['repository', 'pullRequest', 'membership'],
+        z.object({ id: z.string().min(1) }).nullable()
+      );
+      const { data, source } =
+        identity.source.availability === 'available'
+          ? member
+          : { data: null, source: identity.source };
+      queue.membership =
+        data && source.availability === 'available'
+          ? { source, state: 'queued', entryId: data.id }
+          : {
+              state: 'unknown',
+              entryId: null,
+              source: {
+                ...source,
+                availability: source.availability === 'denied' ? 'denied' : 'unavailable',
+                // PR access and an error-free null do not prove queue-read capability.
+                reason: source.reason ?? 'queue-read-capability-unproved',
+              },
+            };
+    };
+    await membership();
+    const entryId = queue.membership.entryId;
+    if (!entryId) {
+      queue.position.source = queue.membership.source;
+      return queue;
+    }
+    const result = await request('queueEntry', { entryId });
+    const { data, source } = decodeContextGraphQlSource(result, ['node'], contextQueueEntrySchema);
+    if (
+      data &&
+      source.availability === 'available' &&
+      data.id === entryId &&
+      data.pullRequest.id === context.revision.prNodeId
+    ) {
+      queue.position = {
+        source,
+        entryId,
+        prNodeId: data.pullRequest.id,
+        value: data.position,
+        state: data.state,
+        enqueuedAt: data.enqueuedAt,
+      };
+    } else {
+      queue.position.source = {
+        ...source,
+        availability: source.availability === 'denied' ? 'denied' : 'unavailable',
+        retryable: source.availability === 'available' || source.retryable,
+        reason: source.reason ?? 'queue-entry-changed',
+      };
+      const changed = (
+        [
+          [['node', '__typename'], 'MergeQueueEntry'],
+          [['node', 'id'], entryId],
+          [['node', 'pullRequest', 'id'], context.revision.prNodeId],
+        ] as const
+      ).some(([path, expected]) => {
+        const field = decodeContextGraphQlSource(result, path, z.string());
+        return field.source.availability === 'available' && field.data !== expected;
+      });
+      const disappeared =
+        decodeContextGraphQlSource(result, ['node'], z.null()).source.availability === 'available';
+      // Refresh membership once after movement; never reuse details from the old observation.
+      if (changed || disappeared) {
+        await membership();
+        queue.position.source = queue.membership.entryId
+          ? {
+              ...source,
+              availability: 'unavailable',
+              retryable: true,
+              reason: 'queue-entry-changed',
+            }
+          : queue.membership.source;
+      }
+    }
+    return queue;
+  }
   async function collectEvaluation() {
     const result = await read('graphql.requirements', async (signal): Promise<unknown> => {
       const response = await octokit.request('POST /graphql', {
@@ -794,6 +906,7 @@ export async function readPullRequestContext(
     context.issues,
     context.requirements,
     evaluation,
+    context.queue,
   ] = await Promise.all([
     collect('labels', contextLabelSchema, context.labels, (known, current) => ({
       ...current,
@@ -823,6 +936,7 @@ export async function readPullRequestContext(
     collectIssues(),
     collectPolicies(),
     collectEvaluation(),
+    collectQueue(),
   ]);
   // Final null fields can hide contradictions between the two connections.
   for (const review of context.reviewDecisions.items) {

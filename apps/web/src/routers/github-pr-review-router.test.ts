@@ -1305,7 +1305,11 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
         privatePayload: 'provider-only',
       };
     }
-    function contextEnvelope(identity = revision, labelName = 'known') {
+    function contextEnvelope(
+      identity = revision,
+      labelName = 'known',
+      membership: { id: string } | null = { id: 'QUEUE_1' }
+    ) {
       const empty = { nodes: [], totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null } };
       return {
         data: {
@@ -1348,6 +1352,7 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
                 latestReviews: empty,
                 closingIssuesReferences: empty,
                 timelineItems: empty,
+                membership,
                 privatePayload: 'provider-only',
               },
               object: {
@@ -1355,6 +1360,14 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
                 statusCheckRollup: { contexts: empty },
                 deployments: empty,
               },
+            },
+            node: {
+              __typename: 'MergeQueueEntry',
+              id: 'QUEUE_1',
+              pullRequest: { id: identity.prNodeId },
+              position: 7,
+              state: 'AWAITING_CHECKS',
+              enqueuedAt: '2026-08-28T12:00:00Z',
             },
           },
         },
@@ -1375,7 +1388,7 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
       jest.restoreAllMocks();
     });
 
-    it('enriches people, reviews, issues, and policies without claiming unattached readers are empty', async () => {
+    it('enriches people, reviews, issues, policies, and independent queue evidence', async () => {
       const result = await caller.getPullRequestContext(contextInput);
       expect(result.revision).toEqual(revision);
       expect(result.labels).toMatchObject({
@@ -1410,10 +1423,33 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
         source: { availability: 'available', reason: null },
       });
       expect(result.queue).toMatchObject({
-        membership: { state: 'unknown', source: { availability: 'unavailable' } },
-        position: { value: null, source: { availability: 'unavailable' } },
+        membership: { state: 'queued', entryId: 'QUEUE_1', source: { availability: 'available' } },
+        position: { value: 7, state: 'AWAITING_CHECKS', source: { availability: 'available' } },
       });
     });
+
+    it.each([null, { merge_method: 'squash' }])(
+      'keeps auto-merge %p separate from unproved queue membership',
+      async auto_merge => {
+        const octokit = buildOctokit('t1');
+        octokit.pulls.get.mockResolvedValue({ data: { ...contextPr(), auto_merge } });
+        octokit.request.mockResolvedValue(contextEnvelope(revision, 'known', null));
+        const core = await caller.getPullRequest(prInput);
+        expect(core.autoMerge).toEqual(auto_merge ? { method: 'squash' } : null);
+        const result = await caller.getPullRequestContext(contextInput);
+        expect(result.queue).toMatchObject({
+          membership: {
+            state: 'unknown',
+            source: {
+              availability: 'unavailable',
+              retryable: false,
+              reason: 'queue-read-capability-unproved',
+            },
+          },
+          position: { value: null, state: null },
+        });
+      }
+    );
 
     it('accepts old PR payloads without inventing missing context or base identity', async () => {
       buildOctokit('t1').pulls.get.mockResolvedValue({ data: overviewPrData });

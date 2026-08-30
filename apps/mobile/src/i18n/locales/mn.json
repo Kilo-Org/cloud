@@ -2111,7 +2111,9 @@
     "sessionExited": "Сесс гарсан",
     "remoteSpawnRetryable": "Инстанц руу холбогдож чадсангүй — салсан байж магадгүй.",
     "remoteSpawnNonRetryable": "Инстанц сессийг эхлүүлж чадсангүй — машинаа шалга эсвэл CLI-г шинэчил.",
-    "remoteSpawnInstanceDisconnected": "Сонгосон инстанц салсан. Cloud Agent дээр сесс эхлүүл эсвэл өөр инстанц сонго."
+    "remoteSpawnInstanceDisconnected": "Сонгосон инстанц салсан. Cloud Agent дээр сесс эхлүүл эсвэл өөр инстанц сонго.",
+    "liveCount_one": "{{count}} ШУУД",
+    "liveCount_other": "{{count}} ШУУД"
   },
   "agentChat": {
     "session": {
@@ -2271,7 +2273,9 @@
       "noCliInstancesDescription": "Компьютерийнхээ төсөлд `kilo remote` ажиллуулах, эсвэл аль хэдийн ажиллаж байгаа бол Kilo CLI-г шинэчилнэ үү.",
       "instanceOnProject": "{{name}} дээр {{project}}",
       "instanceOnProjectSuffix": "{{name}} дээр {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent дээр ажиллуулах"
+      "runOnCloudAgent": "Cloud Agent дээр ажиллуулах",
+      "terminals": "Терминалууд",
+      "remotes": "Алсын инстанцууд"
     },
     "modePicker": {
       "title": "Режим сонгох",

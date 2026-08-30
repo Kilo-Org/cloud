@@ -523,9 +523,12 @@ export const BrowserTaskControls = (): JSX.Element => {
             {state.settings?.enabled === false ? ' Local recovery keeps CLI tasks disabled.' : null}
           </p>
         ) : null}
-        {pending === undefined && notice === undefined ? null : (
-          <p role="status">{pending ?? notice}</p>
-        )}
+        <p
+          className={pending === undefined && notice === undefined ? 'sr-only' : undefined}
+          role="status"
+        >
+          {pending ?? notice}
+        </p>
       </div>
     </section>
   );

@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
+import * as sharedPrReview from '@kilocode/app-shared/pr-review';
+import * as serverContext from './context-dtos';
 import {
   GitHubPrReviewApplicationBindingSchema,
   GitHubPrReviewContextSchema,
@@ -706,4 +710,79 @@ test.each([
       evaluationSources: { comparison: { ...source, ...invalid } },
     }).success
   ).toBe(false);
+});
+
+test('keeps every server context export backed by the shared implementation', () => {
+  for (const [name, value] of Object.entries(serverContext)) {
+    expect(sharedPrReview[name as keyof typeof sharedPrReview]).toBe(value);
+  }
+});
+
+test.each([
+  ['legacy source defaults', { revision }, true],
+  ['full context', fullContext, true],
+  ['confirmed empty sources', { revision, labels: complete([]), requirements: complete([]) }, true],
+  ...[
+    { availability: 'unavailable', retryable: true, reason: 'transient' },
+    { availability: 'denied', retryable: false, reason: 'permission' },
+  ].map(failure => [
+    `${failure.availability} recovery`,
+    {
+      ...fullContext,
+      evaluationSources: { comparison: { ...source, ...failure } },
+    },
+    true,
+  ]),
+  [
+    'invalid recovery metadata',
+    { revision, evaluationSources: { comparison: { ...source, retryable: 'true' } } },
+    false,
+  ],
+  ['invalid revision', { revision: { ...revision, headSha: '' } }, false],
+  ['unexpected field', { revision, unsupported: true }, false],
+])('preserves shared/server parsing parity for %s', (_name, input, valid) => {
+  const shared = sharedPrReview.GitHubPrReviewContextSchema.safeParse(input);
+  const server = GitHubPrReviewContextSchema.safeParse(input);
+  expect(shared.success).toBe(valid);
+  expect(server.success).toBe(valid);
+  if (shared.success && server.success) {
+    expect(shared.data).toStrictEqual(server.data);
+  } else if (!shared.success && !server.success) {
+    expect(shared.error.issues).toStrictEqual(server.error.issues);
+  }
+});
+
+test('loads the shared entry without server-only or web runtime dependencies', () => {
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      '--input-type=module',
+      '--eval',
+      `
+        import assert from 'node:assert/strict';
+        import { registerHooks } from 'node:module';
+        registerHooks({
+          resolve(specifier, context, nextResolve) {
+            if (specifier === 'server-only') throw new Error('server-only dependency');
+            const resolved = nextResolve(specifier, context);
+            if (resolved.url.includes('/apps/web/')) throw new Error('web runtime dependency');
+            return resolved;
+          },
+        });
+        await assert.rejects(import('server-only'), /server-only dependency/);
+        await assert.rejects(
+          import('./src/lib/github-pr-review/context-dtos.ts'),
+          /web runtime dependency/
+        );
+        const shared = await import('@kilocode/app-shared/pr-review');
+        process.stdout.write(JSON.stringify(
+          shared.GitHubPrReviewContextSchema.parse(${JSON.stringify(fullContext)})
+        ));
+      `,
+    ],
+    { cwd: resolve(__dirname, '../../..'), encoding: 'utf8', timeout: 10_000 }
+  );
+  expect(JSON.parse(output)).toStrictEqual(fullContext);
 });

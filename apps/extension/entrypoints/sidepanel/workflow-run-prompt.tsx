@@ -72,6 +72,7 @@ export const WorkflowRunPrompt = ({
                 setValues(current => ({ ...current, [param.name]: value }));
               }}
               placeholder={param.example ?? ''}
+              readOnly={admissionPending}
               value={values[param.name] ?? ''}
             />
           </label>

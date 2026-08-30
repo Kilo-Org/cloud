@@ -159,7 +159,10 @@ describe.each(['personal', 'org-example'])('security notification history (%s)',
     apply(StackActions.push('findings/[id]', { scope, id: 'finding-ordinary' }));
     expect(apply(StackActions.pop())).toEqual(list);
 
-    const reset = apply({ type: 'RESET', payload: { routes: list.routes } });
+    const reset = apply({
+      type: 'RESET',
+      payload: { routes: list.routes.map(({ key, name, params }) => ({ key, name, params })) },
+    });
     expect(reset.routes).toEqual(list.routes);
     apply(StackActions.push('findings/[id]', { scope, id: 'finding-ordinary' }));
     expect(apply(StackActions.pop())).toEqual(reset);

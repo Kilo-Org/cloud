@@ -1,7 +1,8 @@
 /* eslint-disable max-lines -- the session test renders the full SessionDetailContent and mocks its RN/expo/SDK surface, so the wiring is long. */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/app/(app)/agent-chat/[session-id].mounted.test.tsx. */
 /* eslint-disable require-await, @typescript-eslint/require-await -- mock factories settle without await because they resolve immediately */
-import { createElement, type ReactElement } from 'react';
+import { createElement, type ElementType, type ReactElement } from 'react';
+import { Modal, Pressable } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,8 +10,10 @@ import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sd
 import type * as ReactI18next from 'react-i18next';
 
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
+import { SessionMessageList } from '@/components/agents/session-message-list';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Text } from '@/components/ui/text';
 import { assistantMessage } from './message-bubble-test-utils';
 import {
   resolveSendAttachmentKind,
@@ -552,9 +555,9 @@ function mount(): TestRenderer.ReactTestRenderer {
 
 function findByType(
   renderer: TestRenderer.ReactTestRenderer,
-  type: string
+  type: ElementType
 ): TestRenderer.ReactTestInstance[] {
-  return renderer.root.findAll(node => node.type === type);
+  return renderer.root.findAllByType(type);
 }
 
 /** Reads the MessageBubble element the current transcript renders for `messageId`. */
@@ -562,7 +565,7 @@ function readBubble(
   renderer: TestRenderer.ReactTestRenderer,
   messageId: string
 ): ReactElement | undefined {
-  const lists = findByType(renderer, 'SessionMessageList');
+  const lists = findByType(renderer, SessionMessageList);
   const listProps = lists[0]?.props as
     | {
         items?: SessionTranscriptItem[];
@@ -592,7 +595,7 @@ function detailsProps(renderer: TestRenderer.ReactTestRenderer) {
 }
 
 function cancellationRow(renderer: TestRenderer.ReactTestRenderer) {
-  return findByType(renderer, 'Pressable').find(
+  return findByType(renderer, Pressable).find(
     node => node.props.testID === 'message-details-cancel-queued'
   );
 }
@@ -615,7 +618,7 @@ function openDetails(renderer: TestRenderer.ReactTestRenderer, message: StoredMe
 }
 
 function closeDetails(renderer: TestRenderer.ReactTestRenderer): void {
-  const close = findByType(renderer, 'Modal')[0]?.props.onRequestClose as () => void;
+  const close = findByType(renderer, Modal)[0]?.props.onRequestClose as () => void;
   act(() => {
     close();
   });
@@ -875,7 +878,7 @@ describe('SessionDetailContent cancel/restore', () => {
         expect(detailsProps(renderer).isCancelingQueued).toBe(false);
         expect(detailsProps(renderer).cancelQueuedFeedback?.message).toBe(failed);
         expect(statusMessages(renderer)).toEqual([failed]);
-        expect(findByType(renderer, 'Text').map(node => node.props.children)).toContain(failed);
+        expect(findByType(renderer, Text).map(node => node.props.children)).toContain(failed);
         expect(hoisted.announce.mock.calls).toEqual([[failed]]);
         expect(currentManager.interrupt).not.toHaveBeenCalled();
         expect(hoisted.chatComposer.control.restoreAttachments).not.toHaveBeenCalled();
@@ -922,15 +925,15 @@ describe('SessionDetailContent cancel/restore', () => {
       expect(cancellationRow(renderer)).toBeUndefined();
       expect(detailsProps(renderer).cancelQueuedFeedback?.message).toBe(upgrade);
       expect(statusMessages(renderer)).toEqual([upgrade]);
-      expect(findByType(renderer, 'Text').map(node => node.props.children)).toContain(upgrade);
+      expect(findByType(renderer, Text).map(node => node.props.children)).toContain(upgrade);
       closeDetails(renderer);
       openDetails(renderer, message);
       expect(cancellationRow(renderer)).toBeUndefined();
-      expect(findByType(renderer, 'Text').map(node => node.props.children)).toContain(upgrade);
+      expect(findByType(renderer, Text).map(node => node.props.children)).toContain(upgrade);
       expect(statusMessages(renderer)).toEqual([]);
       openDetails(renderer, second);
       expect(cancellationRow(renderer)).toBeUndefined();
-      expect(findByType(renderer, 'Text').map(node => node.props.children)).toContain(upgrade);
+      expect(findByType(renderer, Text).map(node => node.props.children)).toContain(upgrade);
       expect(statusMessages(renderer)).toEqual([]);
       expect(hoisted.chatComposer.draft).toEqual(original);
       expect(currentManager.atoms.messagesList.value).toEqual([message, second]);
@@ -968,7 +971,7 @@ describe('SessionDetailContent cancel/restore', () => {
       if (closed) {
         closeDetails(renderer);
         openDetails(renderer, message);
-        expect(findByType(renderer, 'Text').map(node => node.props.children)).toContain(upgrade);
+        expect(findByType(renderer, Text).map(node => node.props.children)).toContain(upgrade);
         expect(statusMessages(renderer)).toEqual([]);
       }
 
@@ -986,7 +989,7 @@ describe('SessionDetailContent cancel/restore', () => {
           stalePress();
         });
         expect(cancellationRow(renderer)).toBeUndefined();
-        expect(findByType(renderer, 'Text').map(node => node.props.children)).toContain(upgrade);
+        expect(findByType(renderer, Text).map(node => node.props.children)).toContain(upgrade);
         expect(currentManager.cancelQueuedMessage.mock.calls).toEqual([[message.info.id]]);
         expect(hoisted.chatComposer.draft).toEqual({ text: '', files: [] });
       }
@@ -1005,7 +1008,7 @@ describe('SessionDetailContent cancel/restore', () => {
       expect(cancellationRow(renderer)).toBeDefined();
       expect(detailsProps(renderer).canCancelQueued).toBe(true);
       expect(detailsProps(renderer).cancelQueuedFeedback).toBeNull();
-      expect(findByType(renderer, 'Text').map(node => node.props.children)).not.toContain(upgrade);
+      expect(findByType(renderer, Text).map(node => node.props.children)).not.toContain(upgrade);
       expect(hoisted.announce.mock.calls).toEqual([[upgrade]]);
       currentManager.cancelQueuedMessage.mockResolvedValue({ dropped: true });
       await act(async () => {
@@ -1055,7 +1058,7 @@ describe('SessionDetailContent cancel/restore', () => {
       );
       expect(detailsProps(renderer).cancelQueuedGuidance).toBeNull();
       expect(statusMessages(renderer)).toEqual([failed]);
-      const visibleText = findByType(renderer, 'Text').map(node => node.props.children);
+      const visibleText = findByType(renderer, Text).map(node => node.props.children);
       expect(visibleText.filter(text => text === failed)).toHaveLength(1);
       expect(visibleText).not.toContain('agentChat.session.cancelQueuedUpgradeRequired');
       expect(hoisted.announce.mock.calls).toEqual([[failed]]);
@@ -1251,7 +1254,7 @@ describe('SessionDetailContent cancel/restore', () => {
       });
       expect(statusMessages(renderer)).toEqual([]);
       expect(detailsProps(renderer).cancelQueuedFeedback).toBeNull();
-      expect(findByType(renderer, 'Text').map(node => node.props.children)).not.toContain(failed);
+      expect(findByType(renderer, Text).map(node => node.props.children)).not.toContain(failed);
       expect(hoisted.announce.mock.calls).toEqual([[failed]]);
       await act(async () => {
         retry.reject(new Error('offline'));
@@ -1377,7 +1380,7 @@ describe('SessionDetailContent cancel/restore', () => {
       expect(
         renderer.root
           .findByType(MessageDetailsSheet)
-          .findAll(node => node.type === 'Text' && node.props.children === failed)
+          .findAll(node => node.type === Text && node.props.children === failed)
       ).toHaveLength(1);
       expect(detailsProps(renderer).canCancelQueued).toBe(outcome !== 'upgrade');
       expect(statusMessages(renderer)).toEqual([firstFeedback, failed]);

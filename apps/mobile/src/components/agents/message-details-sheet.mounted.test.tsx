@@ -7,9 +7,13 @@ import {
   type UserMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { type ComponentProps, createElement, type ReactElement } from 'react';
-import { Alert } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { SheetHeader } from '@/components/sheet-header';
+import { SelectableText } from '@/components/ui/selectable-text';
+import { Text } from '@/components/ui/text';
 
 import { MessageDetailsSheet } from './message-details-sheet';
 
@@ -218,7 +222,7 @@ describe('MessageDetailsSheet mounted', () => {
     expect(row()?.props.accessibilityState).toEqual({ disabled: true, busy: true });
     expect(row()?.props.accessibilityLabel).toBe('Cancel queued message');
     expect(row()?.props.disabled).toBe(true);
-    expect(renderer.root.findAll(node => node.type === 'ActivityIndicator')).toHaveLength(1);
+    expect(renderer.root.findAllByType(ActivityIndicator)).toHaveLength(1);
     act(() => {
       press(row());
     });
@@ -260,7 +264,7 @@ describe('MessageDetailsSheet mounted', () => {
       cancelQueuedFeedback: { message: failure, attempt: 1 },
     });
     expect(
-      renderer.root.findAll(node => node.type === 'Text' && node.props.children === failure)
+      renderer.root.findAll(node => node.type === Text && node.props.children === failure)
     ).toHaveLength(1);
     expect(native.announce.mock.calls).toEqual([[failure]]);
     act(() => {
@@ -269,7 +273,7 @@ describe('MessageDetailsSheet mounted', () => {
       );
     });
     expect(
-      renderer.root.findAll(node => node.type === 'Text' && node.props.children === failure)
+      renderer.root.findAll(node => node.type === Text && node.props.children === failure)
     ).toHaveLength(0);
     expect(native.announce.mock.calls).toEqual([[failure]]);
     act(() => {
@@ -299,7 +303,7 @@ describe('MessageDetailsSheet mounted', () => {
       cancelQueuedFeedback: { message: guidance, attempt: 1 },
     });
     const guidanceNodes = () =>
-      renderer.root.findAll(node => node.type === 'Text' && node.props.children === guidance);
+      renderer.root.findAll(node => node.type === Text && node.props.children === guidance);
     expect(guidanceNodes()).toHaveLength(1);
     expect(native.announce.mock.calls).toEqual([[guidance]]);
     act(() => {
@@ -361,9 +365,7 @@ describe('MessageDetailsSheet mounted', () => {
   it('sizes the details ScrollView to fill the sheet surface with flex-1', async () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('hello world')]));
 
-    const scrollViews = renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'ScrollView'
-    );
+    const scrollViews = renderer.root.findAll(node => node.type === ScrollView);
     expect(scrollViews).toHaveLength(1);
     expect(scrollViews[0]?.props.className).toBe('flex-1');
 
@@ -373,13 +375,10 @@ describe('MessageDetailsSheet mounted', () => {
   it('swaps the details Modal content to the select view when Select text is pressed', async () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('selectable body')]));
 
-    const modals = () =>
-      renderer.root.findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-      );
+    const modals = () => renderer.root.findAll(node => node.type === Modal);
     const sheetHeaderTitles = () =>
       renderer.root
-        .findAll(node => typeof node.type === 'string' && (node.type as string) === 'SheetHeader')
+        .findAll(node => node.type === SheetHeader)
         .map(node => node.props.title as string | undefined);
 
     // Before press: a single Modal shows the details content.
@@ -396,9 +395,7 @@ describe('MessageDetailsSheet mounted', () => {
     expect(sheetHeaderTitles()).toContain('Select text');
     expect(sheetHeaderTitles()).not.toContain('Message details');
 
-    const selectable = renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'SelectableText'
-    );
+    const selectable = renderer.root.findAll(node => node.type === SelectableText);
     expect(selectable).toHaveLength(1);
     expect(selectable[0]?.props.children).toBe('selectable body');
 
@@ -409,9 +406,7 @@ describe('MessageDetailsSheet mounted', () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('selectable body')]));
 
     const modal = () => {
-      const found = renderer.root.findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-      );
+      const found = renderer.root.findAll(node => node.type === Modal);
       if (!found[0]) {
         throw new Error('Modal not found');
       }
@@ -433,7 +428,7 @@ describe('MessageDetailsSheet mounted', () => {
 
     const sheetHeaderTitles = () =>
       renderer.root
-        .findAll(node => typeof node.type === 'string' && (node.type as string) === 'SheetHeader')
+        .findAll(node => node.type === SheetHeader)
         .map(node => node.props.title as string | undefined);
     expect(sheetHeaderTitles()).toContain('Message details');
     expect(sheetHeaderTitles()).not.toContain('Select text');

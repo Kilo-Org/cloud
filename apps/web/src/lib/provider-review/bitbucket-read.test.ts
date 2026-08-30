@@ -436,11 +436,16 @@ it.each(['MERGED', 'DECLINED', 'SUPERSEDED'])('AC4 keeps %s reviews readable', a
   expect(result.counts.files).toBe(1);
   expect(result.authorization.capabilities.merge.restrictions).toContain('review_closed');
 });
-it.each(['workspace', 'oauth'])(
-  'AC4 keeps old %s read grants and explains each missing write grant',
-  async kind => {
+it.each([
+  ['workspace', ['repository', 'pullrequest']],
+  ['oauth', ['repository', 'pullrequest']],
+  ['workspace', ['repository', 'repository:write', 'pullrequest']],
+  ['oauth', ['repository', 'repository:write', 'pullrequest']],
+] as const)(
+  'AC4 keeps old %s read grants %j and explains each missing write grant',
+  async (kind, scopes) => {
     if (kind === 'oauth') oauth();
-    metadata.grants.scopes = ['repository', 'repository:write', 'pullrequest'];
+    metadata.grants.scopes = [...scopes];
     const result = await getBitbucketReview(await auth(), '7');
     expect(result.title).toBe('Fork review');
     for (const action of [
@@ -468,8 +473,105 @@ it.each(['workspace', 'oauth'])(
       });
   }
 );
+it.each(['workspace', 'oauth'])(
+  'AC6 uses implied %s pullrequest permission for comment capabilities',
+  async kind => {
+    if (kind === 'oauth') oauth();
+    metadata.grants.scopes = ['pullrequest:write'];
+    const { capabilities } = (await getBitbucketReview(await auth(), '7')).authorization;
+    for (const action of [
+      'read',
+      'comment',
+      'inlineComment',
+      'reply',
+      'resolveThread',
+      'reopenThread',
+    ] as const) {
+      expect(reviewActionAvailability(capabilities[action])).toBe('available');
+      expect(capabilities[action]).toMatchObject({ explanation: '', recovery: 'none' });
+    }
+    expect(capabilities.deleteBranch).toMatchObject({
+      permission: 'forbidden',
+      explanation: 'missing_scope:repository:write',
+      recovery: kind === 'oauth' ? 'reconnect' : 'replaceToken',
+    });
+  }
+);
+it.each([
+  ['workspace', false, 'available'],
+  ['oauth', false, 'available'],
+  ['workspace', true, 'restricted'],
+  ['oauth', true, 'restricted'],
+] as const)(
+  'AC6 uses implied %s discussion permission with deleted=%s as %s',
+  async (kind, deleted, availability) => {
+    if (kind === 'oauth') oauth();
+    metadata.grants.scopes = ['pullrequest:write'];
+    rows.set('comments', [{ ...comment, deleted }]);
+    const result = await listBitbucketDiscussions(await auth(), identity);
+    for (const action of ['resolveThread', 'reopenThread'] as const) {
+      const capability = result.items[0].capabilities[action]!;
+      expect(reviewActionAvailability(capability)).toBe(availability);
+      expect(capability).toMatchObject({
+        permission: 'allowed',
+        restrictions: deleted ? ['comment_deleted'] : [],
+        recovery: 'none',
+      });
+    }
+  }
+);
+it.each([
+  ['workspace', []],
+  ['oauth', []],
+  ['workspace', ['repository:write']],
+  ['oauth', ['repository:write']],
+] as const)(
+  'AC6 denies missing %s review grants with raw scopes %j and retains recovery',
+  async (kind, scopes) => {
+    if (kind === 'oauth') oauth();
+    metadata.grants.scopes = [...scopes];
+    const selected = await auth();
+    const { capabilities } = (await getBitbucketReview(selected, '7')).authorization;
+    expect(reviewActionAvailability(capabilities.read)).toBe('available');
+    for (const action of [
+      'comment',
+      'inlineComment',
+      'reply',
+      'resolveThread',
+      'reopenThread',
+      'approve',
+      'unapprove',
+      'requestChanges',
+      'removeChangeRequest',
+      'submitReview',
+      'merge',
+    ] as const) {
+      expect(reviewActionAvailability(capabilities[action])).toBe('forbidden');
+      expect(capabilities[action]).toMatchObject({
+        permission: 'forbidden',
+        recovery: kind === 'oauth' ? 'reconnect' : 'replaceToken',
+      });
+    }
+    expect(capabilities.comment.explanation).toBe('missing_scope:pullrequest');
+    expect(capabilities.merge.explanation).toBe('missing_scope:pullrequest:write');
+    if (scopes.length === 0)
+      expect(capabilities.deleteBranch).toMatchObject({
+        permission: 'forbidden',
+        explanation: 'missing_scope:repository:write',
+        recovery: kind === 'oauth' ? 'reconnect' : 'replaceToken',
+      });
+    const discussions = await listBitbucketDiscussions(selected, identity);
+    for (const action of ['resolveThread', 'reopenThread'] as const)
+      expect(discussions.items[0].capabilities[action]).toMatchObject({
+        permission: 'forbidden',
+        explanation: 'missing_scope:pullrequest',
+        recovery: kind === 'oauth' ? 'reconnect' : 'replaceToken',
+      });
+  }
+);
 it('AC6 supports approvals, withdrawal, change requests and resolution when grants permit', async () => {
   oauth();
+  metadata.grants.scopes = ['pullrequest:write'];
   let result = await getBitbucketReview(await auth(), '7');
   for (const action of [
     'approve',
@@ -493,6 +595,7 @@ it('AC6 supports approvals, withdrawal, change requests and resolution when gran
   });
 });
 it('AC6 never derives atomic guards or API support from a successful read', async () => {
+  metadata.grants.scopes = ['pullrequest:write'];
   const result = await getBitbucketReview(await auth(), '7');
   for (const [action, issue] of [
     ['enableAutoMerge', '22062'],

@@ -1673,11 +1673,7 @@
     "sessionExited": "Сеанс завершён",
     "remoteSpawnRetryable": "Не удалось подключиться к экземпляру — возможно, он отключился.",
     "remoteSpawnNonRetryable": "Экземпляр не смог запустить сеанс — проверьте машину или обновите CLI.",
-    "remoteSpawnInstanceDisconnected": "Выбранный экземпляр отключился. Запустите сеанс в Cloud Agent или выберите другой экземпляр.",
-    "liveCount_one": "{{count}} LIVE",
-    "liveCount_other": "{{count}} LIVE",
-    "liveCount_few": "{{count}} LIVE",
-    "liveCount_many": "{{count}} LIVE"
+    "remoteSpawnInstanceDisconnected": "Выбранный экземпляр отключился. Запустите сеанс в Cloud Agent или выберите другой экземпляр."
   },
   "agentChat": {
     "session": {
@@ -1839,9 +1835,7 @@
       "noCliInstancesDescription": "Выполните `kilo remote` в проекте на своем компьютере или обновите Kilo CLI, если она уже запущена.",
       "instanceOnProject": "{{name}} на {{project}}",
       "instanceOnProjectSuffix": "{{name}} на {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Запустить на облачном агенте",
-      "terminals": "Терминалы",
-      "remotes": "Удаленные экземпляры"
+      "runOnCloudAgent": "Запустить на облачном агенте"
     },
     "modePicker": {
       "title": "Выбрать режим",

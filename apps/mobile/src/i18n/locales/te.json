@@ -2111,9 +2111,7 @@
     "sessionExited": "సెషన్ నిష్క్రమించింది",
     "remoteSpawnRetryable": "ఇన్స్టాన్స్ను చేరుకోలేకపోయాం — అది డిస్కనెక్ట్ అయి ఉండవచ్చు.",
     "remoteSpawnNonRetryable": "ఇన్స్టాన్స్ సెషన్ను ప్రారంభించడంలో విఫలమైంది — యంత్రాన్ని తనిఖీ చేయండి లేదా CLIని నవీకరించండి.",
-    "remoteSpawnInstanceDisconnected": "ఎంచుకున్న ఇన్స్టాన్స్ డిస్కనెక్ట్ అయింది. Cloud Agentలో సెషన్ను ప్రారంభించండి లేదా మరొక ఇన్స్టాన్స్ను ఎంచుకోండి.",
-    "liveCount_one": "{{count}} ప్రత్యక్ష",
-    "liveCount_other": "{{count}} ప్రత్యక్ష"
+    "remoteSpawnInstanceDisconnected": "ఎంచుకున్న ఇన్స్టాన్స్ డిస్కనెక్ట్ అయింది. Cloud Agentలో సెషన్ను ప్రారంభించండి లేదా మరొక ఇన్స్టాన్స్ను ఎంచుకోండి."
   },
   "agentChat": {
     "session": {
@@ -2273,9 +2271,7 @@
       "noCliInstancesDescription": "మీ కంప్యూటర్‌లో ఒక ప్రాజెక్ట్‌లో `kilo remote` అమలు చేయండి, లేదా ఒకటి ఇప్పటికే నడుస్తుంటే Kilo CLIను నవీకరించండి.",
       "instanceOnProject": "{{project}}లో {{name}}",
       "instanceOnProjectSuffix": "{{project}}లో {{name}} ({{suffix}})",
-      "runOnCloudAgent": "క్లౌడ్ ఏజెంట్‌లో అమలు చేయండి",
-      "terminals": "టెర్మినల్‌లు",
-      "remotes": "రిమోట్ ఇన్‌స్టాన్స్‌లు"
+      "runOnCloudAgent": "క్లౌడ్ ఏజెంట్‌లో అమలు చేయండి"
     },
     "modePicker": {
       "title": "మోడ్ ఎంచుకోండి",

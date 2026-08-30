@@ -2111,9 +2111,7 @@
     "sessionExited": "Zaman ya fita",
     "remoteSpawnRetryable": "An kasa isa ga instance — yana iya zama an yanke.",
     "remoteSpawnNonRetryable": "Instance ta kasa fara zaman — duba na'urar ko sabunta CLI.",
-    "remoteSpawnInstanceDisconnected": "Instance da aka zaɓa ta yanke. Fara zama a Cloud Agent ko zaɓi wata instance.",
-    "liveCount_one": "{{count}} RAYA",
-    "liveCount_other": "{{count}} RAYA"
+    "remoteSpawnInstanceDisconnected": "Instance da aka zaɓa ta yanke. Fara zama a Cloud Agent ko zaɓi wata instance."
   },
   "agentChat": {
     "session": {
@@ -2273,9 +2271,7 @@
       "noCliInstancesDescription": "Gudanar da `kilo remote` a cikin aiki a kwamfutarka, ko sabunta Kilo CLI idan ɗaya yana gudana.",
       "instanceOnProject": "{{name}} a {{project}}",
       "instanceOnProjectSuffix": "{{name}} a {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Gudanar a Cloud Agent",
-      "terminals": "Tashoshin umarni",
-      "remotes": "Misalan nesa"
+      "runOnCloudAgent": "Gudanar a Cloud Agent"
     },
     "modePicker": {
       "title": "Zaɓi yanayin",

@@ -2111,9 +2111,7 @@
     "sessionExited": "සැසියෙන් ඉවත් විය",
     "remoteSpawnRetryable": "අවස්ථාවට ළඟා විය නොහැකි විය — එය විසන්ධි වන්නට පුළුවන.",
     "remoteSpawnNonRetryable": "සැසිය ආරම්භ කිරීමට අවස්ථාව අසමත් විය — යන්ත්රය පරීක්ෂා කරන්න හෝ CLI යාවත්කාලීන කරන්න.",
-    "remoteSpawnInstanceDisconnected": "තෝරාගත් අවස්ථාව විසන්ධි විය. Cloud Agent හි සැසියක් ආරම්භ කරන්න හෝ වෙනත් අවස්ථාවක් තෝරන්න.",
-    "liveCount_one": "{{count}} සජීවී",
-    "liveCount_other": "{{count}} සජීවී"
+    "remoteSpawnInstanceDisconnected": "තෝරාගත් අවස්ථාව විසන්ධි විය. Cloud Agent හි සැසියක් ආරම්භ කරන්න හෝ වෙනත් අවස්ථාවක් තෝරන්න."
   },
   "agentChat": {
     "session": {
@@ -2273,9 +2271,7 @@
       "noCliInstancesDescription": "ඔබේ පරිගණකයේ ව්යාපෘතියක `kilo remote` ධාවනය කරන්න, නැතහොත් එකක් දැනටමත් ධාවනය වන්නේ නම් Kilo CLI යාවත්කාලීන කරන්න.",
       "instanceOnProject": "{{project}} මත {{name}}",
       "instanceOnProjectSuffix": "{{project}} මත {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent මත ධාවනය කරන්න",
-      "terminals": "පර්යන්ත",
-      "remotes": "දුරස්ථ අවස්ථා"
+      "runOnCloudAgent": "Cloud Agent මත ධාවනය කරන්න"
     },
     "modePicker": {
       "title": "ප්රකාරය තෝරන්න",

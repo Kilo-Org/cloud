@@ -2111,9 +2111,7 @@
     "sessionExited": "Նիստն ավարտվել է",
     "remoteSpawnRetryable": "Չհաջողվեց կապվել օրինակի հետ. հնարավոր է՝ այն անջատվել է:",
     "remoteSpawnNonRetryable": "Օրինակը չկարողացավ սկսել նիստը. ստուգեք մեքենան կամ թարմացրեք CLI-ն:",
-    "remoteSpawnInstanceDisconnected": "Ընտրված օրինակն անջատվել է: Սկսեք նիստ Cloud Agent-ում կամ ընտրեք այլ օրինակ:",
-    "liveCount_one": "{{count}} ՈՒՂԻՂ",
-    "liveCount_other": "{{count}} ՈՒՂԻՂ"
+    "remoteSpawnInstanceDisconnected": "Ընտրված օրինակն անջատվել է: Սկսեք նիստ Cloud Agent-ում կամ ընտրեք այլ օրինակ:"
   },
   "agentChat": {
     "session": {
@@ -2273,9 +2271,7 @@
       "noCliInstancesDescription": "Գործարկեք `kilo remote`-ը ձեր համակարգչի նախագծում, կամ թարմացրեք Kilo CLI-ն, եթե այն արդեն աշխատում է։",
       "instanceOnProject": "{{name}} {{project}}-ում",
       "instanceOnProjectSuffix": "{{name}} {{project}}-ում ({{suffix}})",
-      "runOnCloudAgent": "Գործարկել Ամպային գործակալում",
-      "terminals": "Տերմինալներ",
-      "remotes": "Հեռակա օրինակներ"
+      "runOnCloudAgent": "Գործարկել Ամպային գործակալում"
     },
     "modePicker": {
       "title": "Ընտրել ռեժիմը",

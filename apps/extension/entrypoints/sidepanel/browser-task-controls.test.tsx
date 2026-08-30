@@ -6,6 +6,7 @@ import { useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BrowserJobSnapshot, BrowserResult } from '@kilocode/cloud-agent-sdk/schemas';
+import type { storage as wxtStorage } from '#imports';
 import type {
   BrowserTaskProviderRuntime,
   BrowserTaskProviderSnapshot,
@@ -24,6 +25,20 @@ const fixture = vi.hoisted(() => ({
     | undefined,
   state: {} as BrowserTaskProviderSnapshot,
   tabs: [] as InspectableTab[],
+  tabsUnavailable: false,
+}));
+vi.mock('#imports', async importOriginal => ({
+  ...(await importOriginal<{ storage: typeof wxtStorage }>()),
+  browser: {
+    tabs: {
+      query: async () => {
+        if (fixture.tabsUnavailable) {
+          throw new Error('Tab access unavailable.');
+        }
+        return fixture.tabs;
+      },
+    },
+  },
 }));
 vi.mock('./browser-task-provider', () => ({
   useBrowserTask: () => {
@@ -332,6 +347,7 @@ describe('browser task controls', () => {
       value: vi.fn(),
     });
     fixture.runtime = undefined;
+    fixture.tabsUnavailable = false;
     fixture.tabs = [
       { id: 7, title: 'Requested page', url: 'https://example.test/requested' },
       { id: 8, title: 'Another page', url: 'https://other.test/' },
@@ -699,6 +715,8 @@ describe('browser task controls', () => {
     renderControls();
     fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
     await screen.findByText('Last outcome: failed · approval_denied');
+    expect(screen.getByText('No uncertain effects reported.')).toBeDefined();
+    expect(screen.getByText('No observed evidence.')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
     expect(screen.queryByText(/Bound tab:/u)).toBeNull();
   });
@@ -739,6 +757,65 @@ describe('browser task controls', () => {
     expect(screen.queryByText(/ses_owner_bbbbbbbb/u)).toBeNull();
   });
 
+  it('retains affected IDs with current metadata and closure status without retargeting', async () => {
+    fixture.execution = { ...fixture.execution, quarantinedTabIds: [7, 42] };
+    fixture.state = {
+      ...fixture.state,
+      unresolvedFence: { invocationId: 'retained-invocation', tabId: 7 },
+    };
+    fixture.tabs = [
+      { id: 7, title: 'Current settings page', url: 'chrome://settings/' },
+      { id: 8, title: 'Unrelated tab', url: 'https://other.test/' },
+    ];
+    renderControls();
+    const list = screen.getByRole('list', { name: 'Affected tabs' });
+    await within(list).findByText('Title: Current settings page');
+    expect(within(list).getByText('Address: chrome://settings/')).toBeDefined();
+    expect(
+      within(list).getByText('Tab ID 7: Open — close this tab before recovery.')
+    ).toBeDefined();
+    expect(within(list).getByText('Tab ID 42: Closed')).toBeDefined();
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    fixture.tabs = fixture.tabs.filter(tab => tab.id !== 7);
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh affected tabs' }));
+    await within(list).findByText('Tab ID 7: Closed');
+    expect(within(list).queryByText(/Unrelated tab/u)).toBeNull();
+    expect(within(list).queryByText(/Current settings page/u)).toBeNull();
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    act(() => {
+      fixture.execution = { ...fixture.execution, quarantinedTabIds: [] };
+      change({ unresolvedFence: undefined });
+    });
+    expect(screen.queryByRole('list', { name: 'Affected tabs' })).toBeNull();
+  });
+
+  it('reports unknown closure after a tab read fails and refreshes without inventing a closed tab', async () => {
+    fixture.execution = { ...fixture.execution, quarantinedTabIds: [7] };
+    renderControls();
+    const list = screen.getByRole('list', { name: 'Affected tabs' });
+    await within(list).findByText('Title: Requested page');
+    fixture.tabsUnavailable = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh affected tabs' }));
+    await screen.findByText('Could not retrieve affected tabs. Restore tab access and refresh.');
+    expect(within(list).getByText('Tab ID 7: Closure unknown')).toBeDefined();
+    expect(within(list).queryByText(/Closed|Requested page/u)).toBeNull();
+    fixture.tabsUnavailable = false;
+    fixture.tabs = [{ id: 7, title: '', url: '' }];
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh affected tabs' }));
+    await within(list).findByText('Tab ID 7: Open — close this tab before recovery.');
+    expect(within(list).queryByText(/Title:|Address:/u)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
+  });
+
+  it('does not invent an outcome or an affected identity from the current tabs', () => {
+    renderControls();
+    expect(screen.queryByText(/Last outcome:/u)).toBeNull();
+    expect(screen.queryByText(/Observed evidence|uncertain effects/u)).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Affected tabs' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Refresh affected tabs' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Check recovery readiness' })).toBeNull();
+  });
+
   it('separates status retrieval, preparation, and explicit recovery and invalidates stale readiness', async () => {
     fixture.state = {
       ...fixture.state,
@@ -770,7 +847,7 @@ describe('browser task controls', () => {
     expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
   });
 
-  it('shows concrete all-tabs and unsupported-lock instructions without a recovery bypass', () => {
+  it('shows concrete all-tabs and unsupported-lock instructions without a recovery bypass', async () => {
     fixture.state = { ...fixture.state, phase: 'unsupported' };
     fixture.execution = {
       ...fixture.execution,
@@ -791,6 +868,10 @@ describe('browser task controls', () => {
     ).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reconnect' })).toBeNull();
+    fixture.readiness = { ready: false, reason: 'Web Locks must be restored before recovery.' };
+    fireEvent.click(screen.getByRole('button', { name: 'Check recovery readiness' }));
+    await screen.findByText('Web Locks must be restored before recovery.');
+    expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
   });
 
   it('offers reconnect only for retryable unavailability and never invents consent from status', async () => {

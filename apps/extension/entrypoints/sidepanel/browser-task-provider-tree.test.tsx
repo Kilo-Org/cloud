@@ -18,6 +18,7 @@ import type {
 } from '@kilocode/cloud-agent-sdk/schemas';
 import type {
   BrowserProviderState,
+  BrowserProviderStatusResult,
   BrowserProviderRegistration,
   BrowserProviderApprovalInput,
   BrowserProviderCancelInput,
@@ -204,7 +205,8 @@ vi.mock(import('./browser-run-context'), async importOriginal => ({
     }),
 }));
 
-import { storage } from '#imports';
+import { browser, storage } from '#imports';
+import { BrowserProviderError } from '@kilocode/cloud-agent-sdk/user-web-connection';
 import { SignedInView } from './auth-views';
 import { useExtensionAgents } from './agents-provider';
 import { draftAtomFamily, clearPerConversationAtoms } from './agent-chat-atoms';
@@ -300,10 +302,13 @@ const waitForAbort = async (context: BrowserRunContext): Promise<LlmTurnOutcome>
   return outcome();
 };
 type Delivery = Extract<BrowserProviderInboundMessage, { type: 'provider_job' }>;
-const relay = () => {
+const relay = (fence?: BrowserProviderStatusResult['unresolvedFence']) => {
   let state: BrowserProviderState = { status: 'ready' };
   let generation = 0;
   let retained = 0;
+  let registered = false;
+  const authority: string[] = [];
+  const statusProviders: string[] = [];
   // eslint-disable-next-line init-declarations -- Only explicit enablement creates a registration.
   let registration: BrowserProviderRegistration | undefined;
   const rows = new Map<string, BrowserJobSnapshot>();
@@ -362,6 +367,7 @@ const relay = () => {
   };
   const connection = {
     approveBrowserProviderJob: (input: BrowserProviderApprovalInput) => {
+      authority.push('approval');
       const job = rows.get(input.jobId);
       if (job === undefined) {
         throw new Error('Unknown invocation.');
@@ -386,10 +392,12 @@ const relay = () => {
     },
     getBrowserProviderState: () => state,
     heartbeatBrowserProvider: async () => {
+      authority.push('heartbeat');
       renew();
       return snapshot();
     },
     markBrowserProviderUnavailable: (input: BrowserProviderUnavailableInput) => {
+      registered = false;
       setState({ reason: input.reason, retryable: true, status: 'unavailable' });
       for (const job of rows.values()) {
         if (job.result === undefined) {
@@ -410,19 +418,42 @@ const relay = () => {
       };
     },
     quiesceBrowserProviderJob: (_input: BrowserProviderQuiescenceInput) => {
+      authority.push('quiescence');
       publish();
     },
     registerBrowserProvider: async (input: BrowserProviderRegistration) => {
+      authority.push('registration');
       registration = input;
+      registered = true;
       generation += 1;
       return renew();
     },
-    requestBrowserProviderStatus: async () => ({
-      jobs: [...rows.values()],
-      providerId: identity.providerId,
-      requestId: crypto.randomUUID(),
-      type: 'provider_status_result' as const,
-    }),
+    requestBrowserProviderStatus: async (
+      _cursor?: string,
+      provider?: Pick<BrowserProviderRegistration, 'providerId' | 'providerProof'>
+    ) => {
+      const proof = provider ?? (registered ? registration : undefined);
+      if (proof === undefined) {
+        throw new BrowserProviderError('provider_unavailable', true);
+      }
+      if (
+        proof.providerId !== identity.providerId ||
+        proof.providerProof !== identity.providerProof
+      ) {
+        throw new BrowserProviderError('owner_mismatch', false);
+      }
+      statusProviders.push(proof.providerId);
+      if (!registered && rows.size === 0 && fence === undefined) {
+        throw new BrowserProviderError('not_found', false);
+      }
+      return {
+        jobs: [...rows.values()],
+        providerId: identity.providerId,
+        requestId: crypto.randomUUID(),
+        type: 'provider_status_result' as const,
+        unresolvedFence: fence,
+      };
+    },
     retain: () => {
       fixture.retained += 1;
       retained += 1;
@@ -435,6 +466,7 @@ const relay = () => {
       setState({ status: 'ready' });
     },
     sendBrowserProviderResult: (input: BrowserProviderResultInput) => {
+      authority.push('result');
       const job = rows.get(input.jobId);
       if (job === undefined) {
         throw new Error('Unknown invocation.');
@@ -468,6 +500,7 @@ const relay = () => {
     };
   };
   return {
+    authority,
     connection,
     delivery,
     dispatch: (message: Delivery) => {
@@ -478,6 +511,7 @@ const relay = () => {
     registration: () => registration,
     retained: () => retained,
     rows,
+    statusProviders,
   };
 };
 const clients: QueryClient[] = [];
@@ -786,10 +820,6 @@ describe('browser task provider tree', () => {
         expect(replacement.registration()?.providerId).toBe(
           scope === 'account' ? undefined : identity.providerId
         );
-        if (scope === 'account') {
-          await enable('Recovery required');
-        }
-        await screen.findByText('CLI tasks: Recovery required');
         expect(screen.getByRole('region', { name: 'CLI task supervision' })).toBe(supervision);
         expect(screen.queryByText('CLI tasks: Owned by another panel')).toBeNull();
         expect(screen.getByText('Agents scope: unset')).toBeDefined();
@@ -823,7 +853,11 @@ describe('browser task provider tree', () => {
         expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({ tabIds: [7] });
         expect(effects).toStrictEqual(['issued action']);
         fireEvent.click(recover);
-        await screen.findByText('CLI tasks: Enabled — idle');
+        await screen.findByText(
+          scope === 'account'
+            ? /Local browser control recovered. CLI tasks remain disabled/u
+            : 'CLI tasks: Enabled — idle'
+        );
         expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
           tabIds: [],
           version: 1,
@@ -832,6 +866,9 @@ describe('browser task provider tree', () => {
         expect(transport.rows.get(request.job.jobId)?.status).toBe('interrupted');
         expect(transport.rows.get(queued.jobId)?.status).toBe('interrupted');
         expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
+        if (scope === 'account') {
+          await enable();
+        }
         const fresh = Promise.withResolvers<BrowserRunContext>();
         fixture.turn = async context => {
           context.executionGuard();
@@ -906,6 +943,247 @@ describe('browser task provider tree', () => {
       expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({ tabIds: [7] });
     } finally {
       action.resolve();
+    }
+  });
+
+  it.each(['bootstrap', 'Refresh status'] as const)(
+    'shows an authorized terminal outcome from %s without creating or acknowledging execution',
+    async source => {
+      const transport = relay();
+      fixture.connection = transport.connection;
+      fixture.values.set(BROWSER_PROVIDER_SETTINGS_KEY, {
+        accountKey: await browserAccountKey(auth),
+        settings: { enabled: true, mode: 'safe', model: 'selected-model', thinkingEffort: '' },
+        version: 1,
+      });
+      const { job } = transport.delivery();
+      const result: BrowserResult = {
+        browserTaskId: job.browserTaskId,
+        effectsUncertain: true,
+        evidence: [
+          {
+            text: 'The page showed a pending order.',
+            title: 'Observed checkout',
+            url: 'https://example.test/checkout',
+          },
+        ],
+        invocationId: job.invocationId,
+        jobId: job.jobId,
+        providerId: job.providerId,
+        reason: 'effects_uncertain',
+        status: 'interrupted',
+        summary: 'The page action ended with uncertain effects.',
+      };
+      const terminal: BrowserJobSnapshot = { ...job, result, status: result.status };
+      const effects: string[] = [];
+      fixture.turn = async () => {
+        effects.push('executed');
+        return outcome();
+      };
+      if (source === 'bootstrap') {
+        transport.rows.set(job.jobId, terminal);
+      }
+      renderPanel();
+      await screen.findByText('CLI tasks: Enabled — idle');
+      expect(screen.queryByText(/Last outcome:/u)?.textContent).toBe(
+        source === 'bootstrap' ? 'Last outcome: interrupted · effects_uncertain' : undefined
+      );
+      if (source === 'Refresh status') {
+        transport.rows.set(job.jobId, terminal);
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
+      }
+      await screen.findByText('Last outcome: interrupted · effects_uncertain');
+      for (const mode of ['agents', 'browser'] as const) {
+        switchMode(mode);
+        const controls = screen.getByRole('region', { name: 'CLI task supervision' });
+        expect(within(controls).getByText(result.summary)).toBeDefined();
+        expect(
+          within(controls).getByText(
+            'Effects are uncertain. Close affected tabs before explicit recovery.'
+          )
+        ).toBeDefined();
+        expect(controls.textContent).toContain('Observed checkout');
+        expect(controls.textContent).toContain('https://example.test/checkout');
+        expect(controls.textContent).toContain('The page showed a pending order.');
+        expect(within(controls).queryByText('No observed evidence.')).toBeNull();
+        expect(within(controls).queryByText(/Goal:/u)).toBeNull();
+        expect(within(controls).queryByRole('button', { name: 'Approve tab' })).toBeNull();
+        expect(within(controls).queryByRole('button', { name: 'Stop CLI task' })).toBeNull();
+      }
+      expect([...transport.rows.values()]).toStrictEqual([terminal]);
+      expect(transport.authority).toStrictEqual(['registration']);
+      expect(effects).toStrictEqual([]);
+    }
+  );
+
+  it.each(['settings', 'tabs'] as const)(
+    'retains the goal and visible consent controls after a failed %s read and approves only on retry',
+    async source => {
+      const transport = relay();
+      fixture.connection = transport.connection;
+      const effects: string[] = [];
+      fixture.turn = async context => {
+        context.executionGuard();
+        effects.push('executed');
+        return waitForAbort(context);
+      };
+      renderPanel();
+      await enable();
+      switchMode(source === 'settings' ? 'browser' : 'agents');
+      const request = transport.delivery();
+      act(() => {
+        transport.dispatch(request);
+      });
+      await screen.findByRole('button', { name: 'Approve tab' });
+      await screen.findByRole('option', { name: 'Approved tab' });
+      fireEvent.change(screen.getByLabelText('Tab to approve'), { target: { value: '7' } });
+      const storageApi = storage as { getItem: (key: string) => unknown };
+      const { getItem } = storageApi;
+      const read =
+        source === 'tabs'
+          ? vi
+              .spyOn(browser.tabs, 'query')
+              .mockRejectedValueOnce(new Error('Tab access unavailable.'))
+          : vi.spyOn(storageApi, 'getItem').mockImplementation(key => {
+              if (key === 'local:kiloRemoteMcpServers') {
+                throw new Error('Settings unavailable.');
+              }
+              return getItem(key);
+            });
+      try {
+        fireEvent.click(screen.getByRole('button', { name: 'Approve tab' }));
+        await screen.findByText(/approve this goal again before its deadline/u);
+        expect(screen.getByText(`Goal: ${request.goal}`)).toBeDefined();
+        expect(screen.getByText('Bound tab: Not approved')).toBeDefined();
+        for (const name of ['Approve tab', 'Reject', 'Refresh tabs']) {
+          expect(screen.getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(false);
+        }
+        expect(screen.queryByRole('button', { name: 'Reconnect' })).toBeNull();
+        expect(transport.rows.get(request.job.jobId)?.status).toBe('awaiting_approval');
+        expect(transport.authority).toStrictEqual(['registration']);
+        expect(effects).toStrictEqual([]);
+        read.mockRestore();
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh tabs' }));
+        await waitFor(() => {
+          expect(
+            screen.getByRole<HTMLButtonElement>('button', { name: 'Refresh tabs' }).disabled
+          ).toBe(false);
+        });
+        expect(effects).toStrictEqual([]);
+        fireEvent.click(screen.getByRole('button', { name: 'Approve tab' }));
+        await screen.findByText('CLI tasks: Running');
+        expect(screen.getByText('Bound tab: Approved tab (ID 7)')).toBeDefined();
+        expect(transport.rows.get(request.job.jobId)?.approvedTab?.tabId).toBe(7);
+        expect(effects).toStrictEqual(['executed']);
+        switchMode(source === 'settings' ? 'agents' : 'browser');
+        fireEvent.click(screen.getByRole('button', { name: 'Stop CLI task' }));
+        await screen.findByText('Last outcome: cancelled · cancelled');
+        expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Refresh tabs' })).toBeNull();
+      } finally {
+        read.mockRestore();
+      }
+    }
+  );
+
+  it.each([
+    { ending: 'expiry', outcome: /Last outcome: .* · approval_timeout/u },
+    { ending: 'permission denial', outcome: /Last outcome: .* · permission_denied/u },
+  ] as const)(
+    'removes execution retry controls after consent ends through $ending',
+    async ending => {
+      const transport = relay();
+      fixture.connection = transport.connection;
+      const effects: string[] = [];
+      fixture.turn = async () => {
+        effects.push('executed');
+        return outcome();
+      };
+      renderPanel();
+      await enable();
+      const request = transport.delivery();
+      const deadline = Date.now() + 10_000;
+      request.job.deadlines.approval = new Date(deadline).toISOString();
+      act(() => {
+        transport.dispatch(request);
+      });
+      await screen.findByRole('button', { name: 'Approve tab' });
+      await screen.findByRole('option', { name: 'Approved tab' });
+      fireEvent.change(screen.getByLabelText('Tab to approve'), { target: { value: '7' } });
+      const query = vi
+        .spyOn(browser.tabs, 'query')
+        .mockRejectedValueOnce(new Error('Tabs unavailable.'));
+      const clock = vi.spyOn(Date, 'now');
+      try {
+        fireEvent.click(screen.getByRole('button', { name: 'Approve tab' }));
+        await screen.findByText(/approve this goal again before its deadline/u);
+        if (ending.ending === 'expiry') {
+          clock.mockReturnValue(deadline + 1);
+        } else {
+          query.mockRejectedValueOnce(new BrowserProviderError('permission_denied', false));
+        }
+        fireEvent.click(screen.getByRole('button', { name: 'Approve tab' }));
+        await screen.findByText(ending.outcome);
+        expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Refresh tabs' })).toBeNull();
+        expect(transport.rows.get(request.job.jobId)?.approvedTab).toBeUndefined();
+        expect(transport.authority).not.toContain('approval');
+        expect(effects).toStrictEqual([]);
+      } finally {
+        clock.mockRestore();
+        query.mockRestore();
+      }
+    }
+  );
+
+  it('does not restore stale consent when a pending tab read fails after visible rejection', async () => {
+    const transport = relay();
+    fixture.connection = transport.connection;
+    const effects: string[] = [];
+    fixture.turn = async () => {
+      effects.push('executed');
+      return outcome();
+    };
+    renderPanel();
+    await enable();
+    const request = transport.delivery();
+    act(() => {
+      transport.dispatch(request);
+    });
+    await screen.findByRole('button', { name: 'Approve tab' });
+    await screen.findByRole('option', { name: 'Approved tab' });
+    fireEvent.change(screen.getByLabelText('Tab to approve'), { target: { value: '7' } });
+    const tabs = await browser.tabs.query({});
+    const tabsApi: {
+      query: (queryInfo: Parameters<typeof browser.tabs.query>[0]) => Promise<typeof tabs>;
+    } = browser.tabs;
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const query = vi.spyOn(tabsApi, 'query').mockImplementationOnce(async () => {
+      entered.resolve();
+      await resume.promise;
+      throw new Error('Late tab read failure.');
+    });
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Approve tab' }));
+      await entered.promise;
+      fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+      await screen.findByText(/Last outcome: .* · approval_denied/u);
+      const terminal = structuredClone(transport.rows.get(request.job.jobId));
+      await act(async () => {
+        resume.resolve();
+        await resume.promise;
+      });
+      expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Refresh tabs' })).toBeNull();
+      expect(screen.queryByText(/approve this goal again before its deadline/u)).toBeNull();
+      expect(transport.rows.get(request.job.jobId)).toStrictEqual(terminal);
+      expect(terminal?.approvedTab).toBeUndefined();
+      expect(effects).toStrictEqual([]);
+    } finally {
+      resume.resolve();
+      query.mockRestore();
     }
   });
 
@@ -1153,11 +1431,164 @@ describe('browser task provider tree', () => {
     }
   );
 
-  it('prepares real all-tabs recovery without clearing quarantine or replaying work', async () => {
+  it.each(['never-enabled', 'withdrawn'] as const)(
+    'recovers a %s profile only after closure and drainage while delegation stays disabled',
+    async profile => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      const transport = relay();
+      fixture.connection = transport.connection;
+      const effects: string[] = [];
+      fixture.turn = async () => {
+        effects.push('executed');
+        return outcome();
+      };
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const held = nativeLocks.request(BROWSER_EXECUTION_LOCK, { mode: 'shared' }, async () => {
+        entered.resolve();
+        await release.promise;
+      });
+      try {
+        await entered.promise;
+        renderPanel();
+        await screen.findByText('CLI tasks: Disabled');
+        if (profile === 'withdrawn') {
+          await enable();
+          const dialog = await openSettings();
+          fireEvent.click(within(dialog).getByRole('switch', { name: 'CLI tasks' }));
+          fireEvent.click(within(dialog).getByRole('button', { name: 'Disable CLI tasks' }));
+          await within(dialog).findByText('CLI tasks: Disabled');
+          fireEvent.click(within(dialog).getByRole('button', { name: 'Close settings' }));
+        }
+        switchMode('agents');
+        const settings = structuredClone(fixture.values.get(BROWSER_PROVIDER_SETTINGS_KEY));
+        const authority = [...transport.authority];
+        await act(async () => {
+          await storage.setItem(BROWSER_EXECUTION_SAFETY_KEY, { tabIds: [7], version: 1 });
+        });
+        const affected = await screen.findByRole('list', { name: 'Affected tabs' });
+        await within(affected).findByText('Title: Approved tab');
+        fireEvent.click(screen.getByRole('button', { name: 'Check recovery readiness' }));
+        await screen.findByText('Browser actions are still unwinding. Wait before recovery.');
+        expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
+        await act(async () => {
+          release.resolve();
+          await held;
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Check recovery readiness' }));
+        await screen.findByText('Close all affected tabs before recovery.');
+        expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
+        fixture.tabs = [{ id: 8, title: 'Unrelated tab', url: 'https://other.test/' }];
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh affected tabs' }));
+        await within(affected).findByText('Tab ID 7: Closed');
+        expect(within(affected).queryByText(/Unrelated tab/u)).toBeNull();
+        const statusReads = transport.statusProviders.length;
+        fireEvent.click(screen.getByRole('button', { name: 'Check recovery readiness' }));
+        const recover = await screen.findByRole('button', { name: 'Recover browser control' });
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+          tabIds: [7],
+          version: 1,
+        });
+        expect(screen.getByText('CLI tasks: Disabled')).toBeDefined();
+        fireEvent.click(recover);
+        await screen.findByText(/Local browser control recovered. CLI tasks remain disabled/u);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(5000);
+        });
+        expect(transport.statusProviders.slice(statusReads)).toStrictEqual([
+          identity.providerId,
+          identity.providerId,
+        ]);
+        expect(transport.authority).toStrictEqual(authority);
+        expect(transport.rows.size).toBe(0);
+        expect(effects).toStrictEqual([]);
+        expect(fixture.values.get(BROWSER_PROVIDER_SETTINGS_KEY)).toStrictEqual(settings);
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+          tabIds: [],
+          version: 1,
+        });
+        expect(screen.queryByRole('list', { name: 'Affected tabs' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
+        switchMode('browser');
+        expect(screen.getByText('CLI tasks: Disabled')).toBeDefined();
+        const dialog = await openSettings();
+        expect(
+          within(dialog).getByRole('switch', { name: 'CLI tasks' }).getAttribute('aria-checked')
+        ).toBe('false');
+      } finally {
+        release.resolve();
+        await held;
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it('keeps a disabled remote fence blocked and retains its tab identity without local history', async () => {
+    const transport = relay({ invocationId: `b1.${Date.now()}.${'b'.repeat(64)}`, tabId: 42 });
+    fixture.connection = transport.connection;
+    fixture.tabs = [];
+    renderPanel();
+    await screen.findByText('CLI tasks: Disabled');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
+    await screen.findByText('Tab ID 42: Closed');
+    fireEvent.click(screen.getByRole('button', { name: 'Check recovery readiness' }));
+    await screen.findByText(/A remote browser task still requires recovery/u);
+    expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
+    expect(screen.getByText('CLI tasks: Disabled')).toBeDefined();
+    expect(transport.authority).toStrictEqual([]);
+    expect(transport.rows.size).toBe(0);
+    expect(fixture.values.get(BROWSER_PROVIDER_SETTINGS_KEY)).toMatchObject({
+      settings: { enabled: false },
+    });
+  });
+
+  it.each([
+    {
+      message: /Reopen the signed-in panel and retrieve status/u,
+      reason: 'provider_unavailable',
+      retryable: true,
+    },
+    {
+      message: /Restore provider access before checking recovery again/u,
+      reason: 'owner_mismatch',
+      retryable: false,
+    },
+  ] as const)(
+    'keeps disabled local recovery blocked by $reason',
+    async ({ reason, retryable, message }) => {
+      const transport = relay();
+      fixture.connection = transport.connection;
+      fixture.tabs = [];
+      const safety = { tabIds: [7], version: 1 };
+      fixture.values.set(BROWSER_EXECUTION_SAFETY_KEY, safety);
+      const status = vi
+        .spyOn(transport.connection, 'requestBrowserProviderStatus')
+        .mockRejectedValue(new BrowserProviderError(reason, retryable));
+      try {
+        renderPanel();
+        await screen.findByText('CLI tasks: Disabled');
+        fireEvent.click(await screen.findByRole('button', { name: 'Check recovery readiness' }));
+        await screen.findByText(message);
+        expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+        expect(fixture.values.get(BROWSER_PROVIDER_SETTINGS_KEY)).toMatchObject({
+          settings: { enabled: false },
+        });
+        expect(transport.authority).toStrictEqual([]);
+        expect(transport.rows.size).toBe(0);
+      } finally {
+        status.mockRestore();
+      }
+    }
+  );
+
+  it('keeps all-tabs closure guidance until disabled local recovery completes', async () => {
     const transport = relay();
     fixture.connection = transport.connection;
     renderPanel();
-    await enable();
+    await screen.findByText('CLI tasks: Disabled');
     await act(async () => {
       await storage.setItem(BROWSER_EXECUTION_SAFETY_KEY, {
         allTabs: true,
@@ -1165,7 +1596,14 @@ describe('browser task provider tree', () => {
         version: 1,
       });
     });
-    await screen.findByText('CLI tasks: Recovery required');
+    fireEvent.click(await screen.findByRole('button', { name: 'Check recovery readiness' }));
+    await screen.findByText(
+      'Close all target tabs before recovery. The affected-tab list is not known to be complete.'
+    );
+    expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
+    fixture.tabs = [{ id: 8, title: 'Another open tab', url: 'https://other.test/' }];
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh affected tabs' }));
+    await screen.findByText('Tab ID 7: Closed');
     fireEvent.click(screen.getByRole('button', { name: 'Check recovery readiness' }));
     await screen.findByText(
       'Close all target tabs before recovery. The affected-tab list is not known to be complete.'
@@ -1181,20 +1619,26 @@ describe('browser task provider tree', () => {
     });
     expect(transport.rows.size).toBe(0);
     fireEvent.click(recover);
-    await screen.findByText('CLI tasks: Enabled — idle');
+    await screen.findByText(/Local browser control recovered. CLI tasks remain disabled/u);
     expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
       tabIds: [],
       version: 1,
     });
+    expect(screen.queryByText(/affected-tab list is not known to be complete/u)).toBeNull();
+    expect(transport.authority).toStrictEqual([]);
     expect(transport.rows.size).toBe(0);
     expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
   });
 
-  it('confirms disablement before terminating active and queued jobs without clearing quarantine', async () => {
+  it('retains affected tabs through disablement, settlement, and reload until explicit local recovery', async () => {
     const transport = relay();
     fixture.connection = transport.connection;
-    fixture.turn = waitForAbort;
-    renderPanel();
+    const effects: string[] = [];
+    fixture.turn = async context => {
+      effects.push('issued action');
+      return waitForAbort(context);
+    };
+    const panel = renderPanel();
     await enable();
     const request = transport.delivery();
     act(() => {
@@ -1218,17 +1662,62 @@ describe('browser task provider tree', () => {
     expect(transport.rows.get(queued.jobId)?.status).toBe('queued');
     expect(within(dialog).getByRole('button', { name: 'Stop CLI task' })).toBeDefined();
     fireEvent.click(within(settings).getByRole('button', { name: 'Disable CLI tasks' }));
-    await waitFor(() => {
-      expect(within(dialog).getByText('CLI tasks: Disabled')).toBeDefined();
-    });
+    await within(dialog).findByText('CLI tasks: Disabled');
     expect(transport.rows.get(request.job.jobId)?.status).toBe('interrupted');
     expect(transport.rows.get(queued.jobId)?.status).toBe('interrupted');
     expect(fixture.values.get(BROWSER_PROVIDER_SETTINGS_KEY)).toMatchObject({
       settings: { enabled: false },
     });
-    await waitFor(() => {
+    await waitFor(async () => {
       expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({ tabIds: [7] });
+      const locks = await nativeLocks.query();
+      expect(locks.held?.filter(lock => lock.name === BROWSER_EXECUTION_LOCK)).toHaveLength(0);
     });
+    const settled = structuredClone([...transport.rows.values()]);
+    const affected = within(dialog).getByRole('list', { name: 'Affected tabs' });
+    await within(affected).findByText('Title: Approved tab');
+    fixture.tabs = [{ id: 7, title: 'Renamed affected page', url: 'chrome://settings/' }];
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Refresh affected tabs' }));
+    await within(affected).findByText('Title: Renamed affected page');
+    expect(within(affected).getByText('Address: chrome://settings/')).toBeDefined();
     expect(within(dialog).queryByRole('button', { name: 'Recover browser control' })).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close settings' }));
+    panel.unmount();
+    await waitFor(async () => {
+      const locks = await nativeLocks.query();
+      expect(locks.held?.filter(lock => lock.name === PROVIDER_OWNER_LOCK)).toHaveLength(0);
+      expect(transport.retained()).toBe(0);
+    });
+    renderPanel();
+    await screen.findByText('CLI tasks: Disabled');
+    const reloaded = await screen.findByRole('list', { name: 'Affected tabs' });
+    await within(reloaded).findByText('Title: Renamed affected page');
+    expect(
+      within(reloaded).getByText('Tab ID 7: Open — close this tab before recovery.')
+    ).toBeDefined();
+    expect(within(reloaded).getByText('Address: chrome://settings/')).toBeDefined();
+    const authority = [...transport.authority];
+    fixture.tabs = [{ id: 8, title: 'Unrelated page', url: 'https://other.test/' }];
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh affected tabs' }));
+    await within(reloaded).findByText('Tab ID 7: Closed');
+    expect(within(reloaded).queryByText(/Unrelated page/u)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Check recovery readiness' }));
+    const recover = await screen.findByRole('button', { name: 'Recover browser control' });
+    expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toMatchObject({ tabIds: [7] });
+    expect(screen.getByRole('list', { name: 'Affected tabs' })).toBe(reloaded);
+    fireEvent.click(recover);
+    await screen.findByText(/Local browser control recovered. CLI tasks remain disabled/u);
+    expect(screen.queryByRole('list', { name: 'Affected tabs' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
+    expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+      tabIds: [],
+      version: 1,
+    });
+    expect(fixture.values.get(BROWSER_PROVIDER_SETTINGS_KEY)).toMatchObject({
+      settings: { enabled: false },
+    });
+    expect([...transport.rows.values()]).toStrictEqual(settled);
+    expect(transport.authority).toStrictEqual(authority);
+    expect(effects).toStrictEqual(['issued action']);
   });
 });

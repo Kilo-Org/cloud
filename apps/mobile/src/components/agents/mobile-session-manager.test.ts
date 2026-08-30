@@ -64,17 +64,20 @@ vi.mock('@/components/agents/file-part-cache', () => ({
 const mutate = vi.fn();
 const prepareSessionMutate = vi.fn();
 const sendMessageMutate = vi.fn();
+const cancelQueuedMessageMutate = vi.fn();
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     cloudAgentNext: {
       getAttachmentDownloadUrl: { mutate },
       prepareSession: { mutate: prepareSessionMutate },
       sendMessage: { mutate: sendMessageMutate },
+      cancelQueuedMessage: { mutate: cancelQueuedMessageMutate },
     },
     organizations: {
       cloudAgentNext: {
         prepareSession: { mutate: prepareSessionMutate },
         sendMessage: { mutate: sendMessageMutate },
+        cancelQueuedMessage: { mutate: cancelQueuedMessageMutate },
       },
     },
   },
@@ -85,6 +88,7 @@ const { buildRemoteAttachmentParts } =
 const {
   createMobileAgentSessionManager,
   fetchSessionWithNotFoundRetry,
+  isCancelQueuedUpgradeRequired,
   isCloudPrepareRetryableError,
   readFetchSessionErrorCode,
   StreamTicketResponseSchema,
@@ -502,5 +506,82 @@ describe('createMobileAgentSessionManager api.send', () => {
       payload: 'hi',
       messageId: 'm-1',
     });
+  });
+});
+
+describe('createMobileAgentSessionManager api.cancelQueuedMessage', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+  });
+
+  function setup(organizationId?: string): SessionManagerConfig {
+    const options = {
+      store: {},
+      userWebConnection: {},
+      ...(organizationId ? { organizationId } : {}),
+    };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    return config;
+  }
+
+  it('calls the personal mutation with { sessionId, messageId } when no organizationId is set', async () => {
+    cancelQueuedMessageMutate.mockReset();
+    cancelQueuedMessageMutate.mockResolvedValue({ dropped: true });
+    const config = setup();
+    const cancel = config.api.cancelQueuedMessage;
+    if (!cancel) {
+      throw new Error('expected cancelQueuedMessage api');
+    }
+    const input = { sessionId: 'c-1', messageId: 'm-1' };
+    await expect(cancel(input as never)).resolves.toEqual({ dropped: true });
+
+    expect(cancelQueuedMessageMutate).toHaveBeenCalledTimes(1);
+    expect(cancelQueuedMessageMutate).toHaveBeenCalledWith(
+      { sessionId: 'c-1', messageId: 'm-1' },
+      { context: { skipBatch: true } }
+    );
+  });
+
+  it('adds organizationId to the org mutation payload', async () => {
+    cancelQueuedMessageMutate.mockReset();
+    cancelQueuedMessageMutate.mockResolvedValue({ dropped: false });
+    const config = setup('org-1');
+    const cancel = config.api.cancelQueuedMessage;
+    if (!cancel) {
+      throw new Error('expected cancelQueuedMessage api');
+    }
+    const input = { sessionId: 'c-1', messageId: 'm-1' };
+    await expect(cancel(input as never)).resolves.toEqual({ dropped: false });
+
+    expect(cancelQueuedMessageMutate).toHaveBeenCalledTimes(1);
+    expect(cancelQueuedMessageMutate).toHaveBeenCalledWith(
+      { sessionId: 'c-1', messageId: 'm-1', organizationId: 'org-1' },
+      { context: { skipBatch: true } }
+    );
+  });
+});
+
+describe('isCancelQueuedUpgradeRequired', () => {
+  it('returns true for a CLI_UPGRADE_REQUIRED code', () => {
+    expect(
+      isCancelQueuedUpgradeRequired(
+        Object.assign(new Error('old cli'), { code: 'CLI_UPGRADE_REQUIRED' })
+      )
+    ).toBe(true);
+  });
+
+  it('returns false for another code', () => {
+    expect(
+      isCancelQueuedUpgradeRequired(Object.assign(new Error('timeout'), { code: 'TIMEOUT' }))
+    ).toBe(false);
+  });
+
+  it('returns false for an error with no code', () => {
+    expect(isCancelQueuedUpgradeRequired(new Error('network'))).toBe(false);
   });
 });

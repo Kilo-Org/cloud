@@ -152,7 +152,9 @@
     "appearanceDark": "Qaranlıq",
     "account": "Hesab",
     "prReviewAttribution": "PR icmallarına proqram atribusiyası əlavə et",
-    "prReviewAttributionSubtitle": "İcmal təqdim edərkən 'Reviewed via Kilo' altbilgisini əlavə et."
+    "prReviewAttributionSubtitle": "İcmal təqdim edərkən 'Reviewed via Kilo' altbilgisini əlavə et.",
+    "returnSendsMessage": "Sətirsonu düyməsi mesaj göndərir",
+    "returnSendsMessageSubtitle": "Söndürüldükdə sətirsonu düyməsi agent kompozitorlarında yeni sətir daxil edir."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request əlçatan deyil",
@@ -750,7 +752,8 @@
       "networkError": "Şəbəkə xətası",
       "uploadFailed": "Yükləmə uğursuz oldu",
       "failedToUploadFile": "Fayl yüklənə bilmədi: {{reason}}",
-      "nothingToPaste": "Yapışdırılacaq heç nə yoxdur"
+      "nothingToPaste": "Yapışdırılacaq heç nə yoxdur",
+      "metadataStripFailed": "Foto metadata silinə bilmədi."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "Əvvəlki tapşırıq hələ də tamamlanır. Bir an gözləyin.",
       "serviceUnavailable": "Xidmət hazırda əlçatan deyil. Yenidən cəhd edin.",
       "connectionTrouble": "Əlaqə problemi. Bir dəqiqə sonra yenidən cəhd edin.",
-      "modelUnavailable": "Bu model Cloud Agent üçün mövcud deyil. Başqa bir model seçin və yenidən cəhd edin."
+      "modelUnavailable": "Bu model Cloud Agent üçün mövcud deyil. Başqa bir model seçin və yenidən cəhd edin.",
+      "cancelQueuedFailed": "Mesaj ləğv edilə bilmədi.",
+      "cancelQueuedRestoreAvailable": "Mesaj ləğv edildi. Onu kompozitora qaytarmaq üçün «Bərpa edin» düyməsinə toxunun.",
+      "cancelQueuedRestored": "Mesaj ləğv edildi. İstək kompozitora qaytarıldı.",
+      "cancelQueuedUpgradeRequired": "Növbəyə alınmış mesajları ləğv etmək üçün daha yeni Kilo CLI tələb olunur. Kilo CLI-ni yeniləyin və yenidən qoşulun."
     },
     "remoteSession": {
       "failedToCreate": "Uzaq sessiya yaradıla bilmədi",
@@ -2213,7 +2220,8 @@
       "continueFrom": "{{title}} davam etdirilir",
       "importingSession": "Sessiya idxal edilir",
       "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seçin.",
-      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı."
+      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı.",
+      "discardWithUploadsMessage": "İstəyiniz və göndərilmiş mesajlara əlavə edilməmiş yükləmələr silinəcək."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "Mesaj növbəyə alınıb",
       "userMessage": "İstifadəçi mesajı",
       "assistantMessage": "Köməkçi mesajı",
-      "longPressHint": "Mesaj detalları üçün uzun basın"
+      "longPressHint": "Mesaj detalları üçün uzun basın",
+      "cancelQueued": "Mesajı ləğv edin",
+      "cancelQueuedAccessibility": "Növbəyə alınmış mesajı ləğv edin",
+      "restoreQueued": "Bərpa edin",
+      "restoreQueuedAccessibility": "Ləğv edilmiş mesajı kompozitora bərpa edin"
     },
     "olderMessages": {
       "arrived": "Əvvəlki mesajlar yükləndi",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Sessiyaları filtrlə",
-      "sortBy": "Sırala",
-      "sortLastUpdated": "Son yenilənmə",
-      "sortCreated": "Yaradılıb",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Uzantı",
@@ -2545,7 +2554,9 @@
       "uploading": "Yüklənir…",
       "uploaded": "Yükləndi",
       "uploadFailedRetry": "Yükləmə uğursuz oldu. Yenidən cəhd etmək üçün toxunun.",
-      "uploadFailedTerminal": "Bu fayl yüklənə bilməz."
+      "uploadFailedTerminal": "Bu fayl yüklənə bilməz.",
+      "moveLeft": "{{filename}} faylını sola köçürün",
+      "moveRight": "{{filename}} faylını sağa köçürün"
     },
     "attachmentPasteHint": {
       "accessibility": "Panodan şəkil yapışdır",
@@ -2575,7 +2586,17 @@
       "finalizingPlaceholder": "Tamamlanır...",
       "messagePlaceholder": "Mesaj...",
       "cannotReceiveFiles": "Bu sessiya fayl qəbul edə bilmir. Mesajınızı göndərmək üçün əlavələri silin.",
-      "couldNotAttachFiles": "Fayllar əlavə edilə bilmədi. Yenidən cəhd etmək üçün göndər düyməsinə toxunun."
+      "couldNotAttachFiles": "Fayllar əlavə edilə bilmədi. Yenidən cəhd etmək üçün göndər düyməsinə toxunun.",
+      "discardAttachmentsMessage": "Göndərilmiş mesajlara əlavə edilməmiş yükləmələr silinəcək.",
+      "discardAttachmentsTitle": "Əlavələr ləğv edilsin?",
+      "charactersRemaining": "{{count}} simvol qalıb",
+      "insertNewline": "Yeni sətir daxil edin",
+      "starterChipBuild": "Funksiya yarat",
+      "starterChipEmpty": "Bir ideya ilə başla",
+      "starterChipFix": "Səhvi düzəlt",
+      "starterChipPrepare": "Mühitimi qur",
+      "starterChipWrapUp": "Sessiyamı tamamla",
+      "starterChipWriteTests": "Testlər yaz"
     },
     "chatLink": {
       "linkCopied": "Keçid kopyalandı",
@@ -2794,7 +2815,8 @@
     "busy": "Səs girişi məşğuldur. Yenidən cəhd edin.",
     "stopped": "Səs girişi dayandı. Yenidən cəhd etmək üçün mikrofona toxunun.",
     "unavailableDevice": "Səs girişi bu cihazda mövcud deyil.",
-    "unavailableLanguage": "Səs girişi bu cihaz dili üçün mövcud deyil."
+    "unavailableLanguage": "Səs girişi bu cihaz dili üçün mövcud deyil.",
+    "listeningStopped": "Dinləmə dayandı."
   },
   "share": {
     "title": "Kilo-ya paylaş",

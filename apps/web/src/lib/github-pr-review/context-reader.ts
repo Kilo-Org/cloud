@@ -559,7 +559,8 @@ export async function readPullRequestContext(
           const requestPage = Object.assign(
             async (params: Parameters<typeof octokit.repos.getBranchRules>[0]) => {
               const result = await read('rest.branchRules', async signal => {
-                if (!params?.url || urls.has(params.url)) throw new Error('Repeated policy page');
+                if (typeof params?.url !== 'string' || !params.url || urls.has(params.url))
+                  throw new Error('Repeated policy page');
                 urls.add(params.url);
                 const response = await octokit.repos.getBranchRules({
                   ...params,

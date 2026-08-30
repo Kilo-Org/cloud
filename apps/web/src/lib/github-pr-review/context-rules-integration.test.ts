@@ -32,7 +32,7 @@ const rule = {
   parameters: { required_deployment_environments: ['production'] },
   ruleset_id: 7,
   ruleset_source: 'upstream',
-  ruleset_source_type: 'Organization',
+  ruleset_source_type: 'Organization' as const,
 };
 const protection = {
   required_status_checks: {
@@ -96,7 +96,8 @@ async function run(
   serve: (
     url: URL,
     options: RequestInit
-  ) => Response | undefined | Promise<Response | undefined> = () => undefined
+  ) => Response | undefined | Promise<Response | undefined> = () => undefined,
+  configure?: (octokit: Octokit) => void
 ) {
   const requests: string[] = [];
   let active = 0,
@@ -161,6 +162,7 @@ async function run(
       },
     },
   });
+  configure?.(octokit);
   const context = GitHubPrReviewContextSchema.parse(
     await readPullRequestContext(
       octokit,
@@ -170,6 +172,39 @@ async function run(
   );
   return { context, requests, peak };
 }
+
+it.each([
+  {},
+  { url: undefined },
+  { url: null },
+  { url: '' },
+  { url: false },
+  { url: 0 },
+  { url: true },
+  { url: 42 },
+  { url: {} },
+  { url: [] },
+])('rejects invalid policy page parameters %p without adding ruleset evidence', async params => {
+  const { context } = await run(undefined, octokit => {
+    jest.spyOn(octokit.repos, 'getBranchRules').mockResolvedValue({
+      status: 200,
+      url: nextPage,
+      headers: {},
+      data: [{ ...rule, type: 'required_deployments' }],
+    });
+    jest.spyOn(octokit.paginate, 'iterator').mockImplementation(async function* (requestPage) {
+      // @ts-expect-error These parameters are invalid on purpose to test runtime rejection.
+      yield await requestPage(params);
+    });
+  });
+  expect(context.requirements.items.filter(item => item.policy?.source === 'ruleset')).toEqual([]);
+  expect(context.requirements.items.some(item => item.policy?.source === 'classic')).toBe(true);
+  expect(context.requirements).toMatchObject({
+    completeness: 'partial',
+    source: { availability: 'partial', retryable: true },
+  });
+  expect(context.labels.completeness).toBe('complete');
+});
 
 it('retains exact-base policy evidence while adding named evaluation requirements', async () => {
   const { context, requests } = await run(url =>
@@ -273,6 +308,7 @@ it.each([protectionPath, rulesPath])(
     for (const status of [403, 404, 409, 503]) {
       const { context } = await run(url => {
         if (decodeURIComponent(url.pathname) === path) return failure(status);
+        return undefined;
       });
       // The default exact-ref probe proves classic absence after 404; a rules 404 never does.
       const complete = path === protectionPath && status === 404;
@@ -309,6 +345,7 @@ it('confirms empty policies only after explicit exact-ref absence and empty acti
           },
         },
       });
+    return undefined;
   });
   expect(context.requirements).toMatchObject({
     items: [],
@@ -338,6 +375,7 @@ it.each([
       if (decodeURIComponent(url.pathname) === rulesPath) return Response.json([]);
       if (decodeURIComponent(url.pathname) === branchPath)
         return typeof branch === 'number' ? failure(branch) : Response.json(branch);
+      return undefined;
     });
     expect(context.requirements).toMatchObject({
       items: [],
@@ -356,6 +394,7 @@ it.each([200, 503, 401])('shares one policy authentication probe with status %s'
     const path = decodeURIComponent(url.pathname);
     if (path === protectionPath || path === rulesPath) return failure(401);
     if (path === '/repos/o/r/pulls/1' && ++pulls > 1 && status !== 200) return failure(status);
+    return undefined;
   });
   if (status === 401) await expect(pending).rejects.toMatchObject({ status: 401 });
   else {
@@ -576,6 +615,7 @@ it.each(['head', 'base'])(
             },
           },
         });
+      return undefined;
     });
     expect(context.checks).toMatchObject({
       source: { availability: 'stale', retryable: true },
@@ -645,6 +685,7 @@ describe.each([403, 503])('evaluation source recovery for HTTP %s', status => {
             },
           });
         }
+        return undefined;
       });
       expect(context.evaluationSources.comparison).toMatchObject({
         availability: 'partial',
@@ -725,6 +766,7 @@ describe('evaluation identity', () => {
             },
           },
         });
+      return undefined;
     });
   }
 

@@ -235,8 +235,8 @@ export type RequirementFacts = {
   testMerge: ContextReadResult<z.output<typeof contextTestMergeSchema>>;
   comparison: ContextReadResult<z.output<typeof contextComparisonSchema>>;
   viewerRule: {
-    requiredApprovingReviewCount: ContextReadResult<number>;
-    requiredStatusCheckContexts: ContextReadResult<Array<string | null>>;
+    requiredApprovingReviewCount: ContextReadResult<number | null>;
+    requiredStatusCheckContexts: ContextReadResult<Array<string | null> | null>;
     requiresConversationResolution: ContextReadResult<boolean>;
   };
   canBypassClassic: ContextReadResult<boolean>;

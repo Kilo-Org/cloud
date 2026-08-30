@@ -19,6 +19,7 @@ vi.mock('expo-router', () => ({
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Brain: 'Brain',
+  CornerDownLeft: 'CornerDownLeft',
   Globe: 'Globe',
   MessageSquare: 'MessageSquare',
   Shield: 'Shield',
@@ -69,6 +70,13 @@ vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
 vi.mock('@/lib/hooks/use-theme-preference', () => ({
   setThemePreference: vi.fn(),
   useThemePreference: () => ({ preference: 'system' }),
+}));
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: false,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
+  }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ secondaryForeground: '#000000', mutedForeground: '#000000' }),
@@ -128,6 +136,35 @@ describe('PreferencesScreen account rows', () => {
     expect(setLanguagePickerBridge).toHaveBeenCalledWith({
       onApplied: expect.any(Function),
     });
+
+    renderer.unmount();
+  });
+});
+
+describe('PreferencesScreen Return-sends switch', () => {
+  it('renders the Return-sends switch off by default with its title and subtitle', async () => {
+    const renderer = await mountPreferences();
+
+    const switches = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+    );
+    const returnSends = switches.find(
+      sw => sw.props.accessibilityLabel === 'Return key sends message'
+    );
+
+    expect(returnSends).toBeDefined();
+    expect(returnSends?.props.value).toBe(false);
+
+    const texts = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        typeof node.props.children === 'string'
+    );
+    expect(texts.some(t => t.props.children === 'Return key sends message')).toBe(true);
+    expect(
+      texts.some(t => t.props.children === 'When off, Return inserts a newline in agent composers.')
+    ).toBe(true);
 
     renderer.unmount();
   });

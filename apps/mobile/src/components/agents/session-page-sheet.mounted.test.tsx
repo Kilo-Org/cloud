@@ -34,6 +34,9 @@ const safeAreaMock = vi.hoisted(() => ({
   useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0 })),
 }));
 
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ background: '#000' }),
+}));
 vi.mock('react-native', () => ({
   Modal: 'Modal',
   View: 'View',

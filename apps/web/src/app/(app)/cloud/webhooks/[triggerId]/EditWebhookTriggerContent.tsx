@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useMemo } from 'react';
+import { use, useCallback, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useRouter } from 'next/navigation';
@@ -16,6 +16,7 @@ import {
   type TriggerFormData,
   type TriggerFormProps,
 } from '@/components/webhook-triggers/TriggerForm';
+import { useInvokeWebhookTrigger } from '@/components/webhook-triggers';
 import type { GitHubRepository } from '@/components/webhook-triggers/types';
 import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
@@ -37,9 +38,16 @@ export function EditWebhookTriggerContent({
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { invokeTrigger, isInvoking, invokingTriggerId } = useInvokeWebhookTrigger(organizationId);
+  const saveAndInvokeInFlightRef = useRef(false);
+  const [isSaveAndInvoking, setIsSaveAndInvoking] = useState(false);
 
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
+
+  const { data: capabilities, isPending: isLoadingCapabilities } = useQuery(
+    trpc.webhookTriggers.capabilities.queryOptions({ organizationId })
+  );
 
   // Fetch trigger configuration
   const {
@@ -110,6 +118,7 @@ export function EditWebhookTriggerContent({
       mode: (triggerData.mode ?? 'code') as AgentMode,
       model: triggerData.model ?? '',
       variant: triggerData.variant ?? undefined,
+      sandboxAllocation: triggerData.sandboxAllocation ?? undefined,
       promptTemplate: triggerData.promptTemplate,
       profileId: triggerData.profileId ?? undefined,
       autoCommit: triggerData.autoCommit ?? undefined,
@@ -162,6 +171,7 @@ export function EditWebhookTriggerContent({
         mode: formData.mode,
         model: formData.model,
         variant: formData.variant,
+        sandboxAllocation: formData.sandboxAllocation,
         promptTemplate: formData.promptTemplate,
         profileId: formData.profileId,
         autoCommit: formData.autoCommit ?? null,
@@ -177,6 +187,25 @@ export function EditWebhookTriggerContent({
       });
     },
     [updateTrigger, organizationId]
+  );
+
+  const handleSaveAndInvoke = useCallback(
+    async (formData: TriggerFormData) => {
+      if (saveAndInvokeInFlightRef.current) return;
+
+      saveAndInvokeInFlightRef.current = true;
+      setIsSaveAndInvoking(true);
+      try {
+        await handleSubmit(formData);
+        await invokeTrigger(formData.triggerId);
+      } catch {
+        return;
+      } finally {
+        saveAndInvokeInFlightRef.current = false;
+        setIsSaveAndInvoking(false);
+      }
+    },
+    [handleSubmit, invokeTrigger]
   );
 
   // Handle cancel
@@ -272,6 +301,10 @@ export function EditWebhookTriggerContent({
   }
 
   const isKiloclawChat = triggerData?.targetType === 'kiloclaw_chat';
+  const isScheduled = triggerData?.activationMode === 'scheduled';
+  const isInvokePending = isInvoking && invokingTriggerId === triggerId;
+  const isActionPending =
+    isUpdatePending || isDeletePending || isInvokePending || isSaveAndInvoking;
 
   return (
     <>
@@ -304,7 +337,7 @@ export function EditWebhookTriggerContent({
         </p>
 
         {/* Link to view captured requests */}
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href={routes.requests(triggerId)}>
               <ExternalLink className="mr-2 h-4 w-4" />
@@ -381,10 +414,13 @@ export function EditWebhookTriggerContent({
           repositoriesError={repoError?.message}
           models={modelOptions}
           isLoadingModels={isLoadingModels}
+          canSetSandboxAllocation={capabilities?.canSetSandboxAllocation ?? false}
+          isLoadingCapabilities={isLoadingCapabilities}
           onSubmit={handleSubmit}
+          onSaveAndInvoke={!isKiloclawChat && isScheduled ? handleSaveAndInvoke : undefined}
           onCancel={handleCancel}
           onDelete={handleDelete}
-          isLoading={isUpdatePending || isDeletePending}
+          isLoading={isActionPending}
           inboundUrl={triggerData?.inboundUrl}
         />
       )}

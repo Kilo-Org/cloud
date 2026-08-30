@@ -41,10 +41,10 @@ export function resolveNewSessionPromptForCreate(rawPrompt: string): string | nu
  * Pure projection of the new-session prompt row's gating state. The
  * component file stays a thin presenter and every state — happy, in-flight,
  * voice-active — is testable without rendering React Native. Voice input
- * integrates here too: an active voice session makes the prompt read-only
- * and locks the attachment picker while speech is being recognized, but it
- * does not by itself disable the create button (Create only fires after the
- * user presses "Start session").
+ * integrates here too: an active voice session locks the attachment picker
+ * while speech is being recognized, but it keeps the prompt editable so
+ * dictation can insert at the caret. It does not by itself disable the
+ * create button (Create only fires after the user presses "Start session").
  */
 export function resolveNewSessionPromptControlState(
   input: NewSessionPromptControlInput
@@ -54,7 +54,9 @@ export function resolveNewSessionPromptControlState(
   const createDisabled = isCreating;
   const voiceDisabled = isCreating;
   const paperclipDisabled = isCreating || voiceInputActive || attachmentsCount >= attachmentMax;
-  const inputEditable = !isCreating && !voiceInputActive;
+  // Voice activity no longer makes the prompt read-only: dictation inserts at
+  // the caret, so the user can keep editing (an edit aborts the session).
+  const inputEditable = !isCreating;
   return {
     createDisabled,
     hasPrompt,

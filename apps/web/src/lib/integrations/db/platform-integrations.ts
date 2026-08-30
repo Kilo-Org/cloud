@@ -13,6 +13,7 @@ import type { IntegrationStatus } from '../core/constants';
 import { platformIntegrationHealthSql } from '../core/health';
 import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
+import { canOrganizationUseMultipleGitHubInstallations } from '../github/multiple-installations';
 
 /**
  * Finds a platform integration by installation ID.
@@ -724,7 +725,10 @@ export async function unsuspendIntegrationForOwner(
 
 export type UpsertPlatformIntegrationResult =
   | { ok: true }
-  | { ok: false; reason: 'claimed_by_other_owner' };
+  | {
+      ok: false;
+      reason: 'claimed_by_other_owner' | 'multiple_installations_disabled';
+    };
 
 /**
  * Owner-aware upsert for platform integrations.
@@ -776,6 +780,21 @@ export async function upsertPlatformIntegrationForOwner(
   // Step 2: if the insert was blocked, re-read the row and determine
   // whether this is a same-owner refresh or a cross-owner claim.
   if (data.platform === 'github') {
+    if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
+      const ownerIntegrations = await getIntegrationsByOrganization(owner.id, PLATFORM.GITHUB);
+      const hasExistingInstallation = ownerIntegrations.some(
+        integration => integration.platform_installation_id !== null
+      );
+      const isExistingInstallation = ownerIntegrations.some(
+        integration =>
+          integration.platform_installation_id === data.platformInstallationId &&
+          integration.github_app_type === appType
+      );
+      if (hasExistingInstallation && !isExistingInstallation) {
+        return { ok: false, reason: 'multiple_installations_disabled' };
+      }
+    }
+
     const inserted = await db
       .insert(platform_integrations)
       .values(values)

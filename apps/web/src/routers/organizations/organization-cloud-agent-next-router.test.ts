@@ -59,10 +59,14 @@ const mockGenerateCloudAgentAttachmentUploadUrl = jest.fn<
 
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
 
+const mockCancelQueuedMessage =
+  jest.fn<(input: { sessionId: string; messageId: string }) => Promise<{ dropped: boolean }>>();
+
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
+  cancelQueuedMessage: mockCancelQueuedMessage,
 }));
 
 const mockCreateCloudAgentNextClientForModel = jest.fn(
@@ -213,6 +217,11 @@ let createCaller: (ctx: { user: User }) => {
     attachmentId: string;
     contentType: 'text/markdown';
     contentLength: number;
+  }) => Promise<unknown>;
+  cancelQueuedMessage: (input: {
+    organizationId: string;
+    sessionId: string;
+    messageId: string;
   }) => Promise<unknown>;
   listBitbucketRepositories: (input: {
     organizationId: string;
@@ -469,6 +478,32 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
       contentType: 'text/markdown',
       contentLength: 42,
     });
+  });
+});
+
+describe('organizationCloudAgentNextRouter.cancelQueuedMessage', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureOrganizationAccess.mockImplementation(() => undefined);
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    mockCancelQueuedMessage.mockResolvedValue({ dropped: true });
+  });
+
+  it('denies canceling a queued message on a session outside the organization', async () => {
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValueOnce(null);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.cancelQueuedMessage({
+        organizationId: ORGANIZATION_ID,
+        sessionId: 'agent_123',
+        messageId: 'msg_123456789abc123456789ABCDE',
+      })
+    ).rejects.toThrow('Organization does not own this session');
+
+    expect(mockCancelQueuedMessage).not.toHaveBeenCalled();
   });
 });
 

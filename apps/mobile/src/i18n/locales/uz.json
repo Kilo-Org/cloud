@@ -152,7 +152,9 @@
     "appearanceDark": "Qorong'i",
     "account": "Hisob",
     "prReviewAttribution": "PR sharhlariga ilova atributini qo'shish",
-    "prReviewAttributionSubtitle": "Sharh yuborganingizda Reviewed via Kilo taglavhasini qo'shing."
+    "prReviewAttributionSubtitle": "Sharh yuborganingizda Reviewed via Kilo taglavhasini qo'shing.",
+    "returnSendsMessage": "Qaytarish tugmasi xabar yuboradi",
+    "returnSendsMessageSubtitle": "O'chirilganda, Qaytarish tugmasi agentlarning xabar kiritish maydonlarida yangi qator kiritadi."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mavjud emas",
@@ -750,7 +752,8 @@
       "networkError": "Tarmoq xatosi",
       "uploadFailed": "Yuklash amalga oshmadi",
       "failedToUploadFile": "Faylni yuklab bo'lmadi: {{reason}}",
-      "nothingToPaste": "Joylashtirish uchun hech narsa yo'q"
+      "nothingToPaste": "Joylashtirish uchun hech narsa yo'q",
+      "metadataStripFailed": "Surat metama'lumotlarini olib tashlab bo'lmadi."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "Oldingi vazifa hali ham tugamoqda. Iltimos, bir oz kuting.",
       "serviceUnavailable": "Xizmat hozir mavjud emas. Iltimos, qayta urinib ko'ring.",
       "connectionTrouble": "Ulanish muammosi. Iltimos, bir ozdan keyin qayta urinib ko'ring.",
-      "modelUnavailable": "Bu model Cloud Agent uchun mavjud emas. Boshqa modelni tanlab, qayta urinib ko'ring."
+      "modelUnavailable": "Bu model Cloud Agent uchun mavjud emas. Boshqa modelni tanlab, qayta urinib ko'ring.",
+      "cancelQueuedFailed": "Xabarni bekor qilib bo'lmadi.",
+      "cancelQueuedRestoreAvailable": "Xabar bekor qilindi. Uni xabar kiritish maydoniga qaytarish uchun Tiklash tugmasini bosing.",
+      "cancelQueuedRestored": "Xabar bekor qilindi. Prompt xabar kiritish maydoniga qaytdi.",
+      "cancelQueuedUpgradeRequired": "Navbatdagi xabarlarni bekor qilish yangiroq Kilo CLI'ni talab qiladi. Kilo CLI'ni yangilang va qayta ulaning."
     },
     "remoteSession": {
       "failedToCreate": "Masofaviy sessiya yaratilmadi",
@@ -2213,7 +2220,8 @@
       "continueFrom": "{{title}} ni davom ettirish",
       "importingSession": "Sessiyani import qilish",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent yoki boshqa CLI'ni tanlang.",
-      "importFailed": "Bu sessiyani import qilib bo'lmadi."
+      "importFailed": "Bu sessiyani import qilib bo'lmadi.",
+      "discardWithUploadsMessage": "Promptingiz va yuborilgan xabarlarga biriktirilmagan yuklangan fayllar o'chiriladi."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "Xabar navbatga qo'yildi",
       "userMessage": "Foydalanuvchi xabari",
       "assistantMessage": "Yordamchi xabari",
-      "longPressHint": "Xabar tafsilotlari uchun uzoq bosing"
+      "longPressHint": "Xabar tafsilotlari uchun uzoq bosing",
+      "cancelQueued": "Xabarni bekor qilish",
+      "cancelQueuedAccessibility": "Navbatdagi xabarni bekor qilish",
+      "restoreQueued": "Tiklash",
+      "restoreQueuedAccessibility": "Bekor qilingan xabarni xabar kiritish maydoniga tiklash"
     },
     "olderMessages": {
       "arrived": "Oldingi xabarlar yuklandi",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Sessiyalarni filtrlash",
-      "sortBy": "Saralash",
-      "sortLastUpdated": "Oxirgi yangilangan",
-      "sortCreated": "Yaratilgan",
       "platform": "Platforma",
       "platformCloud": "Bulut",
       "platformExtension": "Kengaytma",
@@ -2545,7 +2554,9 @@
       "uploading": "Yuklanmoqda…",
       "uploaded": "Yuklandi",
       "uploadFailedRetry": "Yuklash amalga oshmadi. Qayta urinish uchun bosing.",
-      "uploadFailedTerminal": "Bu faylni yuklab bo'lmaydi."
+      "uploadFailedTerminal": "Bu faylni yuklab bo'lmaydi.",
+      "moveLeft": "{{filename}} faylini chapga surish",
+      "moveRight": "{{filename}} faylini o'ngga surish"
     },
     "attachmentPasteHint": {
       "accessibility": "Almashinuv buferidan rasm qo'yish",
@@ -2575,7 +2586,17 @@
       "finalizingPlaceholder": "Yakunlanmoqda...",
       "messagePlaceholder": "Xabar...",
       "cannotReceiveFiles": "Bu sessiya fayllarni qabul qila olmaydi. Xabarni yuborish uchun biriktirishlarni olib tashlang.",
-      "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborishga bosing."
+      "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborishga bosing.",
+      "discardAttachmentsMessage": "Yuborilgan xabarlarga biriktirilmagan yuklangan fayllar o'chiriladi.",
+      "discardAttachmentsTitle": "Biriktirilgan fayllar bekor qilinsinmi?",
+      "charactersRemaining": "{{count}} ta belgi qoldi",
+      "insertNewline": "Yangi qator kiritish",
+      "starterChipBuild": "Funksiya yarat",
+      "starterChipEmpty": "G'oya bilan boshla",
+      "starterChipFix": "Xatoni tuzat",
+      "starterChipPrepare": "Muhitimni sozla",
+      "starterChipWrapUp": "Sessiyamni yakunla",
+      "starterChipWriteTests": "Sinovlar yoz"
     },
     "chatLink": {
       "linkCopied": "Havola nusxalandi",
@@ -2794,7 +2815,8 @@
     "busy": "Ovozli kiritish band. Qayta urinib ko'ring.",
     "stopped": "Ovozli kiritish to'xtatildi. Qayta urinish uchun mikrofonni bosing.",
     "unavailableDevice": "Ovozli kiritish bu qurilmada mavjud emas.",
-    "unavailableLanguage": "Ovozli kiritish bu qurilma tili uchun mavjud emas."
+    "unavailableLanguage": "Ovozli kiritish bu qurilma tili uchun mavjud emas.",
+    "listeningStopped": "Tinglash to'xtatildi."
   },
   "share": {
     "title": "Kiloga ulashish",

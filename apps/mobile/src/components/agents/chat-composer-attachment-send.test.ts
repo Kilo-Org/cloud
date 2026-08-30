@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the attachment send-admission suite shares one owned test file with the attachment-only send contract */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
 /* eslint-disable new-cap -- ChatComposer is called as a plain function, matching repo test convention */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake hooks and handlers settle without await because they resolve immediately */
@@ -25,7 +26,12 @@ const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor
 // Controllable upload state. The mock factory reads these at call time, so a
 // test mutates them before mounting to drive the ready vs empty cases.
 const uploadState = vi.hoisted(() => ({
-  attachments: [] as { status?: string; remoteFilename?: string; metadataStripFailed?: boolean }[],
+  attachments: [] as {
+    status?: string;
+    remoteFilename?: string;
+    remoteKey?: string;
+    metadataStripFailed?: boolean;
+  }[],
   uploadPending: (() => ({ ok: false })) as () => unknown,
   isUploading: false,
 }));
@@ -54,12 +60,21 @@ vi.mock('react', async () => {
 });
 
 // ── react-native and native bridges ────────────────────────────────────────
+vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
+
 vi.mock('react-native', () => ({
+  Alert: { alert: vi.fn() },
   AppState: {
     addEventListener: () => ({ remove: vi.fn() }),
   },
-  Keyboard: { dismiss: vi.fn() },
+  Keyboard: {
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+    dismiss: vi.fn(),
+  },
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  Text: 'Text',
+  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
   View: 'View',
 }));
 
@@ -80,10 +95,27 @@ vi.mock('react-native-gesture-handler', () => ({
   GestureDetector: () => null,
 }));
 
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ dispatch: vi.fn() }),
+}));
+
+vi.mock('@/lib/navigation/prevent-remove', () => ({
+  usePreventRemove: vi.fn(),
+}));
+
+vi.mock('@/components/ui/accessible-status', () => ({
+  AccessibleStatus: () => null,
+}));
+
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useReducedMotion: () => false,
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -167,6 +199,14 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'u1' }),
 }));
 
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: false,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
+  }),
+}));
+
 vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
   useAgentAttachmentUpload: () => ({
     attachments: uploadState.attachments,
@@ -174,8 +214,13 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     removeAttachment: vi.fn(() => undefined),
     retryAttachment: vi.fn(() => undefined),
     reset: vi.fn(() => undefined),
+    releaseUnclaimedUploads: vi.fn(() => undefined),
+    commitSent: vi.fn(() => undefined),
     isUploading: uploadState.isUploading,
-    hasFailedAttachments: false,
+    hasFailedAttachments: uploadState.attachments.some(attachment => attachment.status === 'error'),
+    hasUnclaimedAttachments: uploadState.attachments.some(
+      attachment => attachment.remoteKey !== undefined
+    ),
     uploadPending: uploadState.uploadPending,
   }),
 }));
@@ -318,7 +363,11 @@ describe('ChatComposer attachment-only send', () => {
     await settle();
 
     expect(onSendMock).toHaveBeenCalledTimes(1);
-    expect(onSendMock).toHaveBeenCalledWith('', { path: 'path-1', files: ['file.png'] }, undefined);
+    expect(onSendMock).toHaveBeenCalledWith('', {
+      attachments: { path: 'path-1', files: ['file.png'] },
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
   });
 
   it('does not send an empty draft with no attachments', async () => {
@@ -330,26 +379,31 @@ describe('ChatComposer attachment-only send', () => {
     expect(onSendMock).not.toHaveBeenCalled();
   });
 
-  it('warns but still sends when a chip kept its original metadata', async () => {
-    uploadState.attachments = [
-      { status: 'uploaded', remoteFilename: 'file.png', metadataStripFailed: true },
-    ];
-    uploadState.uploadPending = () => ({
-      ok: true,
-      wire: { path: 'path-1', files: ['file.png'] },
-      submission: undefined,
-    });
+  it('blocks send when a chip failed metadata stripping (terminal)', async () => {
+    uploadState.attachments = [{ status: 'error', metadataStripFailed: true }];
 
     const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
 
     requireInputRowOnSubmit(render)();
     await settle();
 
-    expect(toastWarningMock).toHaveBeenCalledWith(
-      'Photo metadata could not be removed from an attachment.'
-    );
-    // Warn, not block: the send still proceeds.
-    expect(onSendMock).toHaveBeenCalledTimes(1);
+    // A strip-fail chip is a terminal error: the send is blocked with the
+    // remove-or-retry copy, and onSend never fires.
+    expect(toastErrorMock).toHaveBeenCalledWith('Remove or retry failed attachments first.');
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks send when a chip failed a retryable upload (non-terminal)', async () => {
+    uploadState.attachments = [{ status: 'error' }];
+
+    const render = await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    // A retryable error chip also blocks send until it is retried or removed.
+    expect(toastErrorMock).toHaveBeenCalledWith('Remove or retry failed attachments first.');
+    expect(onSendMock).not.toHaveBeenCalled();
   });
 
   it('toasts when a send is blocked by an in-flight upload', async () => {

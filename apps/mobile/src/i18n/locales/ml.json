@@ -152,7 +152,9 @@
     "appearanceDark": "ഡാർക്ക്",
     "account": "അക്കൗണ്ട്",
     "prReviewAttribution": "PR അവലോകനങ്ങളിലേക്ക് ആപ്പ് ആട്രിബ്യൂഷൻ ചേർക്കുക",
-    "prReviewAttributionSubtitle": "നിങ്ങൾ ഒരു അവലോകനം സമർപ്പിക്കുമ്പോൾ Reviewed via Kilo ഫൂട്ടർ കൂട്ടിച്ചേർക്കുക."
+    "prReviewAttributionSubtitle": "നിങ്ങൾ ഒരു അവലോകനം സമർപ്പിക്കുമ്പോൾ Reviewed via Kilo ഫൂട്ടർ കൂട്ടിച്ചേർക്കുക.",
+    "returnSendsMessage": "റിട്ടേൺ കീ സന്ദേശം അയയ്ക്കുന്നു",
+    "returnSendsMessageSubtitle": "ഓഫായിരിക്കുമ്പോൾ, റിട്ടേൺ ഏജന്റ് സന്ദേശ ഇൻപുട്ടുകളിൽ പുതിയ വരി ചേർക്കുന്നു."
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -750,7 +752,8 @@
       "networkError": "നെറ്റ്വർക്ക് പിശക്",
       "uploadFailed": "അപ്ലോഡ് പരാജയപ്പെട്ടു",
       "failedToUploadFile": "ഫയൽ അപ്ലോഡ് ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു: {{reason}}",
-      "nothingToPaste": "ഒട്ടിക്കാൻ ഒന്നുമില്ല"
+      "nothingToPaste": "ഒട്ടിക്കാൻ ഒന്നുമില്ല",
+      "metadataStripFailed": "ഫോട്ടോയുടെ മെറ്റാഡാറ്റ നീക്കം ചെയ്യാൻ കഴിഞ്ഞില്ല."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "മുൻ ജോലി ഇപ്പോഴും പൂർത്തിയാകുന്നു. ഒരു നിമിഷം കാത്തിരിക്കുക.",
       "serviceUnavailable": "സേവനം ഇപ്പോൾ ലഭ്യമല്ല. വീണ്ടും ശ്രമിക്കുക.",
       "connectionTrouble": "കണക്ഷൻ പ്രശ്നം. ഒരു നിമിഷത്തിന് ശേഷം വീണ്ടും ശ്രമിക്കുക.",
-      "modelUnavailable": "ഈ മോഡൽ Cloud Agent-ന് ലഭ്യമല്ല. മറ്റൊരു മോഡൽ തിരഞ്ഞെടുത്ത് വീണ്ടും ശ്രമിക്കുക."
+      "modelUnavailable": "ഈ മോഡൽ Cloud Agent-ന് ലഭ്യമല്ല. മറ്റൊരു മോഡൽ തിരഞ്ഞെടുത്ത് വീണ്ടും ശ്രമിക്കുക.",
+      "cancelQueuedFailed": "സന്ദേശം റദ്ദാക്കാൻ കഴിഞ്ഞില്ല.",
+      "cancelQueuedRestoreAvailable": "സന്ദേശം റദ്ദാക്കി. സന്ദേശ ഇൻപുട്ടിലേക്ക് തിരികെ കൊണ്ടുവരാൻ പുനഃസ്ഥാപിക്കുക എന്നതിൽ ടാപ്പ് ചെയ്യുക.",
+      "cancelQueuedRestored": "സന്ദേശം റദ്ദാക്കി. പ്രോംപ്റ്റ് സന്ദേശ ഇൻപുട്ടിൽ തിരിച്ചെത്തി.",
+      "cancelQueuedUpgradeRequired": "ക്യൂവിലുള്ള സന്ദേശങ്ങൾ റദ്ദാക്കാൻ Kilo CLI-യുടെ പുതിയ പതിപ്പ് ആവശ്യമാണ്. Kilo CLI അപ്ഡേറ്റ് ചെയ്ത് വീണ്ടും കണക്റ്റ് ചെയ്യുക."
     },
     "remoteSession": {
       "failedToCreate": "വിദൂര സെഷൻ സൃഷ്ടിക്കാൻ പരാജയപ്പെട്ടു",
@@ -2213,7 +2220,8 @@
       "continueFrom": "{{title}} തുടരുന്നു",
       "importingSession": "സെഷൻ ഇറക്കുമതി ചെയ്യുന്നു",
       "cliCannotContinue": "ഈ CLI-യ്ക്ക് ഒരു സെഷൻ തുടരാൻ കഴിയില്ല. Cloud Agent അല്ലെങ്കിൽ മറ്റൊരു CLI തിരഞ്ഞെടുക്കുക.",
-      "importFailed": "ഈ സെഷൻ ഇറക്കുമതി ചെയ്യാനായില്ല."
+      "importFailed": "ഈ സെഷൻ ഇറക്കുമതി ചെയ്യാനായില്ല.",
+      "discardWithUploadsMessage": "നിങ്ങളുടെ പ്രോംപ്റ്റും അയച്ച സന്ദേശങ്ങളിൽ അറ്റാച്ച് ചെയ്യാത്ത അപ്‌ലോഡുകളും ഇല്ലാതാക്കും."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ഫയൽ അപ്ഡേറ്റ് ചെയ്തു",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "സന്ദേശം ക്യൂവിൽ",
       "userMessage": "ഉപയോക്തൃ സന്ദേശം",
       "assistantMessage": "സഹായി സന്ദേശം",
-      "longPressHint": "സന്ദേശ വിശദാംശങ്ങൾക്കായി ദീർഘനേരം അമർത്തുക"
+      "longPressHint": "സന്ദേശ വിശദാംശങ്ങൾക്കായി ദീർഘനേരം അമർത്തുക",
+      "cancelQueued": "സന്ദേശം റദ്ദാക്കുക",
+      "cancelQueuedAccessibility": "ക്യൂവിലുള്ള സന്ദേശം റദ്ദാക്കുക",
+      "restoreQueued": "പുനഃസ്ഥാപിക്കുക",
+      "restoreQueuedAccessibility": "റദ്ദാക്കിയ സന്ദേശം സന്ദേശ ഇൻപുട്ടിൽ പുനഃസ്ഥാപിക്കുക"
     },
     "olderMessages": {
       "arrived": "മുൻപത്തെ സന്ദേശങ്ങൾ ലോഡ് ചെയ്തു",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "സെഷനുകൾ ഫിൽട്ടർ ചെയ്യുക",
-      "sortBy": "അടുക്കുക",
-      "sortLastUpdated": "അവസാനം അപ്ഡേറ്റ് ചെയ്തത്",
-      "sortCreated": "സൃഷ്ടിച്ചു",
       "platform": "പ്ലാറ്റ്ഫോം",
       "platformCloud": "ക്ലൗഡ്",
       "platformExtension": "എക്സ്റ്റൻഷൻ",
@@ -2545,7 +2554,9 @@
       "uploading": "അപ്ലോഡ് ചെയ്യുന്നു…",
       "uploaded": "അപ്ലോഡ് ചെയ്തു",
       "uploadFailedRetry": "അപ്ലോഡ് പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കാൻ ടാപ്പ് ചെയ്യുക.",
-      "uploadFailedTerminal": "ഈ ഫയൽ അപ്ലോഡ് ചെയ്യാൻ കഴിയില്ല."
+      "uploadFailedTerminal": "ഈ ഫയൽ അപ്ലോഡ് ചെയ്യാൻ കഴിയില്ല.",
+      "moveLeft": "{{filename}} ഇടത്തേക്ക് നീക്കുക",
+      "moveRight": "{{filename}} വലത്തേക്ക് നീക്കുക"
     },
     "attachmentPasteHint": {
       "accessibility": "ക്ലിപ്പ്ബോർഡിൽ നിന്ന് ചിത്രം ഒട്ടിക്കുക",
@@ -2575,7 +2586,17 @@
       "finalizingPlaceholder": "പൂർത്തിയാക്കുന്നു...",
       "messagePlaceholder": "സന്ദേശം...",
       "cannotReceiveFiles": "ഈ സെഷന് ഫയലുകൾ സ്വീകരിക്കാൻ കഴിയില്ല. നിങ്ങളുടെ സന്ദേശം അയയ്ക്കാൻ അറ്റാച്ച്മെന്റുകൾ നീക്കം ചെയ്യുക.",
-      "couldNotAttachFiles": "ഫയലുകൾ അറ്റാച്ച് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കാൻ അയയ്ക്കുക ടാപ്പ് ചെയ്യുക."
+      "couldNotAttachFiles": "ഫയലുകൾ അറ്റാച്ച് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കാൻ അയയ്ക്കുക ടാപ്പ് ചെയ്യുക.",
+      "discardAttachmentsMessage": "അയച്ച സന്ദേശങ്ങളിൽ അറ്റാച്ച് ചെയ്യാത്ത അപ്‌ലോഡുകൾ ഇല്ലാതാക്കും.",
+      "discardAttachmentsTitle": "അറ്റാച്ച്മെന്റുകൾ ഉപേക്ഷിക്കണോ?",
+      "charactersRemaining": "{{count}} അക്ഷരങ്ങൾ ശേഷിക്കുന്നു",
+      "insertNewline": "പുതിയ വരി ചേർക്കുക",
+      "starterChipBuild": "ഒരു ഫീച്ചർ നിർമ്മിക്ക്",
+      "starterChipEmpty": "ഒരു ആശയത്തോടെ ആരംഭിക്ക്",
+      "starterChipFix": "ഒരു ബഗ് പരിഹരിക്ക്",
+      "starterChipPrepare": "എന്റെ എൻവയോൺമെന്റ് സജ്ജീകരിക്ക്",
+      "starterChipWrapUp": "എന്റെ സെഷൻ പൂർത്തിയാക്ക്",
+      "starterChipWriteTests": "ടെസ്റ്റുകൾ എഴുത്"
     },
     "chatLink": {
       "linkCopied": "ലിങ്ക് പകർത്തി",
@@ -2794,7 +2815,8 @@
     "busy": "ശബ്ദ ഇൻപുട്ട് തിരക്കിലാണ്. വീണ്ടും ശ്രമിക്കുക.",
     "stopped": "ശബ്ദ ഇൻപുട്ട് നിർത്തി. വീണ്ടും ശ്രമിക്കാൻ മൈക്രോഫോണിൽ ടാപ്പ് ചെയ്യുക.",
     "unavailableDevice": "ഈ ഉപകരണത്തിൽ ശബ്ദ ഇൻപുട്ട് ലഭ്യമല്ല.",
-    "unavailableLanguage": "ഈ ഉപകരണ ഭാഷയ്ക്ക് ശബ്ദ ഇൻപുട്ട് ലഭ്യമല്ല."
+    "unavailableLanguage": "ഈ ഉപകരണ ഭാഷയ്ക്ക് ശബ്ദ ഇൻപുട്ട് ലഭ്യമല്ല.",
+    "listeningStopped": "കേൾക്കുന്നത് നിർത്തി."
   },
   "share": {
     "title": "Kilo-യിലേക്ക് പങ്കിടുക",

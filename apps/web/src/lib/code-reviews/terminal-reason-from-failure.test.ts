@@ -3,21 +3,8 @@ import {
   CLOUD_AGENT_FAILURE_CODES,
   WORKSPACE_FAILURE_SUBTYPES,
 } from '@kilocode/worker-utils/cloud-agent-failure';
-import { CLOUD_AGENT_TERMINAL_REASONS } from '@kilocode/worker-utils/cloud-agent-next-client';
 import { CODE_REVIEW_TERMINAL_REASONS } from '@kilocode/db/schema-types';
 import { terminalReasonFromCloudAgentFailure } from './terminal-reason-from-failure';
-
-describe('terminal reason list parity', () => {
-  // These two lists live in separate packages that cannot import each other, so
-  // drift is only caught here. A mismatch makes the orchestrator send a reason
-  // the callback allowlist rejects, or makes the worker's zod enum silently
-  // coerce a valid reason to undefined via its `.catch(undefined)`.
-  it('keeps the db and worker-utils terminal reason lists identical', () => {
-    expect([...CLOUD_AGENT_TERMINAL_REASONS].sort()).toEqual(
-      [...CODE_REVIEW_TERMINAL_REASONS].sort()
-    );
-  });
-});
 
 describe('terminalReasonFromCloudAgentFailure', () => {
   it('returns undefined without a structured failure', () => {

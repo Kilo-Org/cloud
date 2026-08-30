@@ -1253,8 +1253,44 @@ describe('local admission and shared run context', () => {
     });
   });
 
+  it.each(['chat', 'Settings workflow'] as const)(
+    'rejects %s execution when durable protection cannot be written',
+    async site => {
+      const view = renderApp(true);
+      try {
+        await waitFor(() => {
+          expect(view.getByLabelText('Run workflow "Read order"')).toHaveProperty(
+            'disabled',
+            false
+          );
+        });
+        fixture.failSafetyWrite = true;
+        if (site === 'chat') {
+          await send(view, 'do not dispatch without protection');
+        } else {
+          fireEvent.click(view.getByLabelText('Run workflow "Read order"'));
+        }
+        await waitFor(() => {
+          expect(coordinator().getSnapshot().blockedReason).toContain('Restore storage access');
+          expect(store.get(runningConversationIdsAtom)).toStrictEqual([]);
+        });
+        expect({ actions, requests }).toStrictEqual({ actions: [], requests: [] });
+        expect(view.getAllByRole('status').map(status => status.textContent)).toStrictEqual(
+          expect.arrayContaining([expect.stringContaining('Restore storage access')])
+        );
+      } finally {
+        fixture.failSafetyWrite = false;
+        await act(async () => {
+          await coordinator().recover(async () => []);
+        });
+      }
+    }
+  );
+
   it('quarantines a Settings workflow timeout before any model continuation or later admission', async () => {
+    const protectionAtDispatch: unknown[] = [];
     fixture.dispatch = async request => {
+      protectionAtDispatch.push(structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)));
       actions.push({ code: request.code, tabId: request.tabId });
       return {
         ok: true,
@@ -1276,6 +1312,7 @@ describe('local admission and shared run context', () => {
       ).toBe(false);
     });
     expect(storedEvents().some(event => event.type === 'tool-result' && !event.ok)).toBe(true);
+    expect(protectionAtDispatch).toMatchObject([{ localRuns: [{ tabId: 7 }], tabIds: [] }]);
     await send(view, 'blocked local action');
     const owner = hold(await coordinator().acquireProviderOwner());
     const delegated = await coordinator().acquireDelegated(
@@ -1302,6 +1339,8 @@ describe('local admission and shared run context', () => {
   it('recovers a failed safety write after the panel drops its completed workflow run', async () => {
     fixture.dispatch = async request => {
       actions.push({ code: request.code, tabId: request.tabId });
+      // Registration must succeed before this issued action loses its completion proof.
+      fixture.failSafetyWrite = true;
       return {
         ok: true,
         result: { effectsUncertain: true, error: 'Script timed out.', ok: false },
@@ -1313,7 +1352,6 @@ describe('local admission and shared run context', () => {
       await waitFor(() => {
         expect(view.getByLabelText('Run workflow "Read order"')).toHaveProperty('disabled', false);
       });
-      fixture.failSafetyWrite = true;
       fireEvent.click(view.getByLabelText('Run workflow "Read order"'));
       await waitFor(() => {
         expect(actions).toHaveLength(1);
@@ -1329,7 +1367,7 @@ describe('local admission and shared run context', () => {
         requests,
       }).toMatchObject({
         held: [{ mode: 'shared' }],
-        persisted: false,
+        persisted: true,
         request: undefined,
         requests: [],
       });
@@ -1360,7 +1398,10 @@ describe('local admission and shared run context', () => {
       expect({
         local: (await coordinator().acquireLocal()).admitted,
         safety: fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY),
-      }).toStrictEqual({ local: false, safety: { tabIds: [7], version: 1 } });
+      }).toMatchObject({
+        local: false,
+        safety: { localRuns: [{ tabId: 7 }], tabIds: [7], version: 1 },
+      });
       fixture.tabs = [];
       await act(async () => {
         await expect(
@@ -1428,6 +1469,16 @@ describe('local admission and shared run context', () => {
         await finalResponse.promise;
         return response();
       };
+      const { dispatch } = fixture;
+      const protectionAtDispatch: unknown[] = [];
+      fixture.dispatch = async request => {
+        if (request.type === EVAL_TAB_MESSAGE) {
+          protectionAtDispatch.push(
+            structuredClone(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY))
+          );
+        }
+        return dispatch(request);
+      };
       const context = runContext(local, mode);
       const running = runBrowserTurn(context, []);
       fixture.activeTabId = 8;
@@ -1443,7 +1494,10 @@ describe('local admission and shared run context', () => {
       await waitFor(async () => {
         expect((await nativeLocks.query()).pending).toHaveLength(1);
       });
-      expect(actions.map(action => action.tabId)).toStrictEqual([7]);
+      expect({ protectionAtDispatch, tabs: actions.map(action => action.tabId) }).toMatchObject({
+        protectionAtDispatch: [{ localRuns: [{ tabId: 7 }], tabIds: [] }],
+        tabs: [7],
+      });
       expect(requests[2]).toContain('Continue: finish the request now');
       expect(events.some(event => event.type === 'message' && event.role === 'user')).toBe(false);
       finalResponse.resolve();
@@ -1452,6 +1506,10 @@ describe('local admission and shared run context', () => {
         status: 'succeeded',
         summary: 'Answer done.',
         toolResults: [expect.objectContaining({ ok: true })],
+      });
+      expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual({
+        tabIds: [],
+        version: 1,
       });
       await local.release();
       hold(await waiting);
@@ -1472,8 +1530,11 @@ describe('local admission and shared run context', () => {
     fixture.tabs = [{ id: 8, title: 'Other tab', url: 'https://example.com/other' }];
     fixture.activeTabId = 8;
     await expect(runBrowserTurn(runContext(local), [])).rejects.toThrow('tab_lost');
-    expect(requests).toStrictEqual([]);
-    expect(actions).toStrictEqual([]);
+    expect({
+      actions,
+      requests,
+      safety: fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY),
+    }).toStrictEqual({ actions: [], requests: [], safety: { tabIds: [], version: 1 } });
   });
 
   it('aborts the bound tab without releasing its lease before the runner unwinds', async () => {

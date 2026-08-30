@@ -103,7 +103,7 @@ const withBoundTab = <Result>(
     } finally {
       browser.tabs.onRemoved.removeListener(onRemoved);
     }
-  });
+  }, context.selectedTab.id);
 
 export const runBrowserTurn = (
   context: BrowserRunContext,

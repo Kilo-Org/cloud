@@ -5,7 +5,7 @@ import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { type Pressable } from 'react-native';
-import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   createSessionManager,
   createUserWebConnection,
@@ -23,6 +23,7 @@ import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
 import { assistantMessage } from '@/components/agents/message-bubble-test-utils';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { type SessionMessageList } from '@/components/agents/session-message-list';
 import {
   resolveSendAttachmentKind,
@@ -43,12 +44,14 @@ vi.mock('@/components/agents/session-provider', () => ({
   },
 }));
 
-// Keep the actual detail/card/sheet callbacks and SDK. Replace native rendering
-// and unrelated composer, account, model-picker, and navigation dependencies.
+// Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
+// rendering and unrelated composer, account, model-picker, and router dependencies.
+const navigationRoutes = vi.hoisted(() => ['session-detail']);
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
 }));
 vi.mock('react-native-reanimated', () => ({
@@ -57,30 +60,47 @@ vi.mock('react-native-reanimated', () => ({
   FadeOut: { duration: () => ({}) },
   LinearTransition: { duration: () => ({}) },
 }));
-vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 16 }) }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 16 }),
+}));
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({
+    canGoBack: () => navigationRoutes.length > 1,
+    back: () => {
+      navigationRoutes.pop();
+    },
+    replace: (href: string) => {
+      navigationRoutes.splice(-1, 1, href);
+    },
+    push: (href: string) => {
+      navigationRoutes.push(href);
+    },
+  }),
 }));
 vi.mock('expo-keep-awake', () => ({ useKeepAwake: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
+  ChevronDown: 'ChevronDown',
   Clock: 'Clock',
   Loader2: 'Loader2',
   MessageSquare: 'MessageSquare',
 }));
-vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronLeft: 'ChevronLeft',
+  DirectionalChevronRight: 'ChevronRight',
+}));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/bubble', () => ({ Bubble: 'Bubble' }));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/agents/part-detail-sheet-host', () => ({
@@ -289,7 +309,14 @@ function page(sessionId: KiloSessionId, messages: StoredMessage[]): SessionSnaps
   };
 }
 
-async function mountDetails(rootMessages = [taskMessage(ROOT_ID, CHILD_IDS)]) {
+beforeEach(() => {
+  navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+});
+
+async function mountDetails(
+  rootMessages = [taskMessage(ROOT_ID, CHILD_IDS)],
+  metadataReady?: Promise<undefined>
+) {
   const store = createStore();
   const rootPages = new Map([[ROOT_ID, rootMessages]]);
   const requests: {
@@ -329,7 +356,7 @@ async function mountDetails(rootMessages = [taskMessage(ROOT_ID, CHILD_IDS)]) {
     prepare: vi.fn(),
     initiate: vi.fn(),
     fetchSession: async id => {
-      await Promise.resolve();
+      await metadataReady;
       return {
         kiloSessionId: id,
         cloudAgentSessionId: null,
@@ -430,6 +457,77 @@ function renderedText(node: ReactTestInstance) {
     .flatMap(child => child.children.filter(value => typeof value === 'string'))
     .join('\n');
 }
+
+function pressHeaderBack(renderer: ReactTestRenderer) {
+  const { onPress } = renderer.root.findByProps({ accessibilityLabel: 'Go back' }).props as {
+    onPress: () => void;
+  };
+  act(onPress);
+}
+
+describe.each([true, false])('session detail return with history=%s', hasHistory => {
+  beforeEach(() => {
+    if (hasHistory) {
+      navigationRoutes.unshift('previous-screen');
+    }
+  });
+
+  it.each(['loaded after child dismissal', 'empty'] as const)('leaves %s content', async state => {
+    const view = await mountDetails(state === 'empty' ? [] : undefined);
+    if (state === 'empty') {
+      expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+        title: i18n.t('agentChat.session.emptyTitle'),
+      });
+    } else {
+      pressCard(view.renderer, SELECTED_ID);
+      await view.respond(SELECTED_ID, [childMessage(SELECTED_ID, 'Selected child row')]);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Selected child row'
+      );
+      act(() => {
+        sheetProps(view.renderer).onClose();
+      });
+      act(() => {
+        sheetProps(view.renderer).onDismiss?.();
+      });
+      expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
+      expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toContain('Task ses-selected');
+    }
+
+    pressHeaderBack(view.renderer);
+    expect(navigationRoutes).toEqual(
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+    );
+  });
+
+  it.each([
+    { state: 'pending metadata', code: undefined },
+    { state: 'retryable metadata failure', code: 'INTERNAL_SERVER_ERROR' },
+    { state: 'terminal access denial', code: 'UNAUTHORIZED' },
+  ] as const)('leaves $state without changing its feedback', async ({ code }) => {
+    const metadata = Promise.withResolvers<undefined>();
+    const view = await mountDetails([], metadata.promise);
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    if (code) {
+      await act(async () => {
+        metadata.reject({ data: { code } });
+        await Promise.resolve();
+      });
+      const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+        typeof QueryError
+      >;
+      expect(error.variant).toBe(code === 'UNAUTHORIZED' ? 'permission' : 'server');
+      expect(Boolean(error.onRetry)).toBe(code !== 'UNAUTHORIZED');
+      expect(renderedText(view.renderer.root)).toContain('Back to sessions');
+      expect(renderedText(view.renderer.root)).toContain('Copy');
+    }
+
+    pressHeaderBack(view.renderer);
+    expect(navigationRoutes).toEqual(
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+    );
+  });
+});
 
 describe('resolveSendAttachmentKind', () => {
   it.each([

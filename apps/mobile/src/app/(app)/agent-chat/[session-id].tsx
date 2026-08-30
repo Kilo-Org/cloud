@@ -134,6 +134,7 @@ export default function SessionDetailScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('agentChat.session.title')}
+          backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={
             <SessionContextMetrics
               info={undefined}
@@ -182,7 +183,10 @@ export default function SessionDetailScreen() {
     const copyText = buildTerminalErrorCopyText({ sessionId, title, message });
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('agentChat.session.title')} />
+        <ScreenHeader
+          title={t('agentChat.session.title')}
+          backFallback="/(app)/(tabs)/(2_agents)"
+        />
         <SessionConnectionIndicator />
         <View className="flex-1 items-center justify-center gap-3 px-6">
           <QueryError

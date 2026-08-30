@@ -69,12 +69,19 @@ const confirmationRequests = vi.hoisted(() => ({
   ticket: vi.fn<() => Promise<{ token: string }>>(),
 }));
 
+const navigationRoutes = ['session-detail'];
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
   Platform: { OS: 'android' },
 }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+}));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronLeft: 'ChevronLeft' }));
+vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn() }));
 vi.mock('@/lib/config', () => ({ SESSION_INGEST_WS_URL: 'wss://ingest.example.com' }));
 vi.mock('@/lib/user-web-connection-lifecycle', () => ({
@@ -84,6 +91,7 @@ vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
+  ChevronDown: 'ChevronDown',
   Lock: 'Lock',
   SearchX: 'SearchX',
   ServerCrash: 'ServerCrash',
@@ -197,10 +205,6 @@ vi.mock('@/components/agents/use-message-copy', () => ({
   performCopy: vi.fn(),
 }));
 
-vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: 'ScreenHeader',
-}));
-
 vi.mock('@/components/ui/text', async () => {
   const { createContext } = await import('react');
   return { Text: 'Text', TextClassContext: createContext<string | undefined>(undefined) };
@@ -219,6 +223,9 @@ function findByType(
   }
   if (type === 'Button') {
     return root.findAllByType(Button);
+  }
+  if (type === 'ScreenHeader') {
+    return root.findAllByType(ScreenHeader);
   }
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
 }
@@ -372,7 +379,16 @@ beforeEach(() => {
   );
   useLocalSearchParamsMock.mockReset();
   useRouterMock.mockReset();
-  useRouterMock.mockReturnValue({ replace: vi.fn() });
+  navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  useRouterMock.mockReturnValue({
+    canGoBack: () => navigationRoutes.length > 1,
+    back: () => {
+      navigationRoutes.pop();
+    },
+    replace: (href: string) => {
+      navigationRoutes.splice(-1, 1, href);
+    },
+  });
   useQueryMock.mockReset();
   useQueryMock.mockImplementation((options: { enabled?: boolean } | undefined) => {
     // A disabled TanStack query stays pending forever (`isPending: true` when
@@ -462,7 +478,11 @@ function transcriptText(renderer: TestRenderer.ReactTestRenderer, type = 'Text')
   if (renderer.toJSON() === null) {
     return '';
   }
+  const headerText = new Set(
+    renderer.root.findAllByType(ScreenHeader).flatMap(header => findByType(header, type))
+  );
   return findByType(renderer.root, type)
+    .filter(node => !headerText.has(node))
     .flatMap(node => node.children.filter(child => typeof child === 'string'))
     .join('\n');
 }
@@ -809,6 +829,48 @@ function pressControl(control: TestRenderer.ReactTestInstance | undefined) {
   onPress();
 }
 
+describe.each([true, false])('SessionDetailScreen header return with history=%s', hasHistory => {
+  it.each([
+    { state: 'pending identity', source: 'identity', code: undefined },
+    { state: 'retryable identity failure', source: 'identity', code: 'INTERNAL_SERVER_ERROR' },
+    { state: 'pending metadata', source: 'metadata', code: undefined },
+    { state: 'retryable metadata failure', source: 'metadata', code: 'INTERNAL_SERVER_ERROR' },
+    { state: 'terminal missing session', source: 'metadata', code: 'NOT_FOUND' },
+    { state: 'terminal access denial', source: 'metadata', code: 'UNAUTHORIZED' },
+  ] as const)('leaves $state without admitting session data', async ({ source, code }) => {
+    if (hasHistory) {
+      navigationRoutes.unshift('previous-screen');
+    }
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    if (source === 'identity') {
+      beginReplacement();
+      commitCredentials('B');
+      if (code) {
+        confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
+      }
+    } else {
+      queryState.isPending = code === undefined;
+      queryState.isError = code !== undefined;
+      queryState.error = code ? { data: { code } } : null;
+    }
+    const renderer = await mountRoute();
+    expect(findByType(renderer.root, code ? 'QueryError' : 'SessionSkeletonMessages')).toHaveLength(
+      1
+    );
+    const back = findByType(renderer.root.findByType(ScreenHeader), 'Pressable').find(
+      node => propOf(node, 'accessibilityLabel') === 'Go back'
+    );
+    act(() => {
+      pressControl(back);
+    });
+
+    expect(navigationRoutes).toEqual(
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+    );
+    expect(rootRequests).toEqual([]);
+  });
+});
+
 describe('SessionDetailScreen identity confirmation feedback', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -844,7 +906,11 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(1);
       expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
       expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
-      expect(findByType(renderer.root, 'Pressable')).toHaveLength(0);
+      expect(
+        findByType(renderer.root, 'Pressable').filter(
+          node => propOf(node, 'accessibilityLabel') === 'Retry'
+        )
+      ).toHaveLength(0);
       expect(findByType(renderer.root, 'UnrelatedScreen')).toHaveLength(1);
       expect(transcriptText(renderer, 'RootText')).toBe('');
       expect(rootRequests).toEqual([]);
@@ -918,12 +984,6 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
 
   it('leaves failed confirmation through Back to sessions', async () => {
     confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
-    let destination = 'session-detail';
-    useRouterMock.mockReturnValue({
-      replace: (href: string) => {
-        destination = href;
-      },
-    });
     const renderer = await mountRoute();
     const back = findByType(renderer.root, 'Button').find(button =>
       findByType(button, 'Text').some(text => text.children.includes('Back to sessions'))
@@ -932,7 +992,7 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       pressControl(back);
     });
 
-    expect(destination).toBe('/(app)/(tabs)/(2_agents)');
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(rootRequests).toEqual([]);
   });
 

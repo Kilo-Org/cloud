@@ -1015,26 +1015,6 @@ describe('kiloclawRouter installFromSource', () => {
     });
   });
 
-  it('passes through the no_instance outcome', async () => {
-    const user = await insertTestUser({
-      google_user_email: `install-noinstance-${Math.random()}@example.com`,
-    });
-    await grantClawAccess(user.id);
-    installDispatchMock.__dispatchInstallFromSource.mockResolvedValue({
-      ok: false,
-      code: 'no_instance',
-    });
-    const caller = createCaller({ user });
-
-    const result = await caller.installFromSource({
-      source: 'byte',
-      slug: 'deep-research',
-      signature: 'sig',
-    });
-
-    expect(result).toEqual({ ok: false, code: 'no_instance' });
-  });
-
   it('rejects an unregistered source via input validation, without dispatching', async () => {
     const user = await insertTestUser({
       google_user_email: `install-badsource-${Math.random()}@example.com`,

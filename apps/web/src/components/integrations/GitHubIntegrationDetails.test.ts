@@ -56,6 +56,15 @@ describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
     expect(view.href).toBe('/cloud/sessions?error=installation_already_claimed');
   });
 
+  it('non-retryable multiple-installation error: Back and no retry', () => {
+    const view = buildAppReturnOutcomeView({ error: 'multiple_installations_disabled' });
+    expect(view.kind).toBe('blocked');
+    expect(view.cta).toBe('Back');
+    expect(view.description).toBe(
+      'This Kilo organization can currently connect only one GitHub organization.'
+    );
+  });
+
   it('non-retryable user mismatch: Back, no retry, mismatch copy preserved', () => {
     const view = buildAppReturnOutcomeView({ error: 'install_state_user_mismatch' });
     expect(view.kind).toBe('blocked');

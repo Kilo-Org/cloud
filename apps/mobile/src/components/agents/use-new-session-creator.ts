@@ -116,15 +116,9 @@ export function useNewSessionCreator({
 
     setIsCreating(true);
 
-    // Warn (never block) when a chip kept its original image because
-    // metadata stripping failed: the photo may still carry EXIF/GPS.
-    if (attachments.attachments.some(attachment => attachment.metadataStripFailed === true)) {
-      toast.warning(i18n.t('agentChat.composer.photoMetadataNotRemoved'));
-    }
-
     // Upload pending attachments now so the create body carries the real
-    // payload. `uploaded` is a plain object; `{ ok: false }` is truthy, so
-    // test `ok`.
+    // payload. A failed or in-flight chip (including a strip-fail) blocks
+    // inside `uploadPending`; `{ ok: false }` is truthy, so test `ok`.
     const uploaded = await attachments.uploadPending();
     if (!uploaded.ok) {
       setIsCreating(false);

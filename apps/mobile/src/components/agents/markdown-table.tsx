@@ -264,6 +264,7 @@ export function MarkdownTable({
       {open ? (
         <Modal
           visible
+          backdropColor={colors.background}
           animationType="slide"
           // Best-effort focus after native presentation; moveA11yFocus is a no-op
           // when the title handle is not mounted yet, so no retry loop is needed.

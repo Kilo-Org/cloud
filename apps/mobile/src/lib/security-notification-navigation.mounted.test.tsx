@@ -95,7 +95,7 @@ function initializeScope(scope: string) {
       if (!next) {
         throw new Error(`Router rejected ${action.type}`);
       }
-      state = next;
+      state = router.getRehydratedState(next, options);
       return state;
     },
   };
@@ -145,7 +145,7 @@ describe.each(['personal', 'org-example'])('security notification history (%s)',
     expect(apply(StackActions.pop())).toEqual(initialState);
   });
 
-  it('returns from an ordinary detail push to the same filtered findings list', () => {
+  it('returns to the same filtered findings list before and after a partial reset', () => {
     const { apply } = initializeScope(scope);
     const list = apply(
       StackActions.push('findings/index', {
@@ -158,6 +158,11 @@ describe.each(['personal', 'org-example'])('security notification history (%s)',
     );
     apply(StackActions.push('findings/[id]', { scope, id: 'finding-ordinary' }));
     expect(apply(StackActions.pop())).toEqual(list);
+
+    const reset = apply({ type: 'RESET', payload: { routes: list.routes } });
+    expect(reset.routes).toEqual(list.routes);
+    apply(StackActions.push('findings/[id]', { scope, id: 'finding-ordinary' }));
+    expect(apply(StackActions.pop())).toEqual(reset);
   });
 });
 

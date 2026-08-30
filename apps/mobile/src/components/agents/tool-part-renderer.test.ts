@@ -1,9 +1,12 @@
 /* eslint-disable max-lines -- routing fixtures and the shared status/part matrix cover both card entry points */
 import { type Part, type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import * as React from 'react';
+import { Pressable } from 'react-native';
 import { type ReactTestInstance } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { SpinningIcon } from '@/components/ui/spinning-icon';
+import { Text } from '@/components/ui/text';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -305,10 +308,8 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
           expect(textContent(renderer.root)).toBe(
             `Generalchild task${modelLabel}${expectedActivity}${status}`
           );
-          expect(renderer.root.findAll(node => node.type === 'SpinningIcon')).toHaveLength(
-            active ? 1 : 0
-          );
-          const button = renderer.root.findByType('Pressable');
+          expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(active ? 1 : 0);
+          const button = renderer.root.findByType(Pressable);
           expect(button.props.accessibilityRole).toBe('button');
           expect(button.props.accessibilityLabel).toContain('General, child task');
           expect(button.props.accessibilityLabel).toContain(status);
@@ -319,9 +320,7 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
             expect(button.props.accessibilityLabel).toContain(expectedActivity);
           } else {
             expect(button.props.accessibilityLabel).not.toContain(activity);
-            expect(renderer.root.findAll(node => node.type === 'Text')).toHaveLength(
-              modelLabel ? 4 : 3
-            );
+            expect(renderer.root.findAllByType(Text)).toHaveLength(modelLabel ? 4 : 3);
           }
           expect(button.props.disabled).toBe(!canOpen);
           expect(button.props.accessibilityState).toEqual({ disabled: !canOpen });

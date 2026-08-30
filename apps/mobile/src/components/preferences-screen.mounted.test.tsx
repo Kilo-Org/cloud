@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as image-viewer-modal.mounted.test.tsx) */
+import { type ElementType } from 'react';
 import { act, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -218,7 +219,9 @@ function expectPreference(renderer: ReactTestRenderer, value: boolean, busy: boo
     disabled: busy,
     accessibilityState: { busy, disabled: busy },
   });
-  expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(busy ? 1 : 0);
+  expect(renderer.root.findAllByType('ActivityIndicator' as ElementType)).toHaveLength(
+    busy ? 1 : 0
+  );
 }
 async function toggle(renderer: ReactTestRenderer, next: boolean) {
   await flush(() => {
@@ -281,7 +284,7 @@ describe.each([false, true])('biometric errors with enabled=%s', enabled => {
     expectPreference(renderer, enabled, false);
     expect(storage.value).toBe(enabled ? 'enabled' : 'disabled');
     const text = renderer.root
-      .findAllByType('Text')
+      .findAllByType('Text' as ElementType)
       .map(node => node.props.children)
       .join('\n');
     if (message) {

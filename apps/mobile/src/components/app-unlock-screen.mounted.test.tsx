@@ -15,7 +15,7 @@ import {
 } from '@/components/app-unlock-screen.test-helpers';
 import { PreferencesScreen } from '@/components/preferences-screen';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { type ReactElement } from 'react';
+import { type ElementType, type ReactElement } from 'react';
 import { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
@@ -50,7 +50,7 @@ function rerender(ui: ReactElement) {
   );
 }
 function retry() {
-  return root().findAllByType('Pressable')[0];
+  return root().findAllByType('Pressable' as ElementType)[0];
 }
 beforeEach(resetUnlockMocks);
 afterEach(async () => {
@@ -93,14 +93,20 @@ it.each([false, true])(
     expect(provider.parent?.type).toBe('AuthProvider');
     expectHidden(root(), true);
     for (const Layout of layouts) {
-      expect(root().findByType(Layout).findAllByType('Scene')).toHaveLength(1);
+      expect(
+        root()
+          .findByType(Layout)
+          .findAllByType('Scene' as ElementType)
+      ).toHaveLength(1);
     }
     for (const Layout of [OrganizationLayout, SecurityAgentScopeLayout]) {
       const wrapper = root().findByType(Layout).findByProps({ pointerEvents: 'none' });
-      expect(wrapper.findAllByType('PrivacyCover')).toHaveLength(1);
+      expect(wrapper.findAllByType('PrivacyCover' as ElementType)).toHaveLength(1);
     }
-    const observer = root().findByType('SecurityAgentCommandObserver');
-    const draft = root().findByType(KiloClawLayout).findByType('Draft');
+    const observer = root().findByType('SecurityAgentCommandObserver' as ElementType);
+    const draft = root()
+      .findByType(KiloClawLayout)
+      .findByType('Draft' as ElementType);
     await flush(() => {
       (draft.props.onChange as (value: string) => void)('unsent work');
     });
@@ -114,7 +120,7 @@ it.each([false, true])(
     });
     expectHidden(root(), true);
     expect(retry()?.props).toMatchObject({ disabled: true, accessibilityState: { busy: true } });
-    expect(root().findAllByType('ActivityIndicator').length).toBeGreaterThan(0);
+    expect(root().findAllByType('ActivityIndicator' as ElementType).length).toBeGreaterThan(0);
     await flush(() => {
       auth.resolve({ success: true });
     });
@@ -123,9 +129,9 @@ it.each([false, true])(
       await i18n.changeLanguage('en');
     });
     expectHidden(root(), false);
-    expect(root().findAllByType('Pressable')).toHaveLength(0);
+    expect(root().findAllByType('Pressable' as ElementType)).toHaveLength(0);
     expect(draft.props.value).toBe('unsent work');
-    expect(root().findByType('SecurityAgentCommandObserver')).toBe(observer);
+    expect(root().findByType('SecurityAgentCommandObserver' as ElementType)).toBe(observer);
     expect(root().findByType(AppUnlockProvider)).toBe(provider);
     expect(root().findAllByType(AppUnlockProvider)).toHaveLength(1);
     expect(announcements).not.toHaveBeenCalled();
@@ -151,7 +157,7 @@ it('hides scenes during preference loading and retries a failed read without dis
   storage.getItemAsync.mockReturnValueOnce(read.promise);
   await mount();
   expectHidden(root(), true);
-  expect(root().findAllByType('Skeleton')).toHaveLength(1);
+  expect(root().findAllByType('Skeleton' as ElementType)).toHaveLength(1);
   expect(root().findByProps({ accessibilityRole: 'progressbar' }).props.accessibilityState).toEqual(
     { busy: true }
   );
@@ -166,7 +172,7 @@ it('hides scenes during preference loading and retries a failed read without dis
   storage.getItemAsync.mockReturnValueOnce(reread.promise);
   await flush(retry()?.props.onPress as () => void);
   expectHidden(root(), true);
-  expect(root().findAllByType('Skeleton')).toHaveLength(1);
+  expect(root().findAllByType('Skeleton' as ElementType)).toHaveLength(1);
   await flush(() => {
     reread.resolve('disabled');
   });

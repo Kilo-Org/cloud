@@ -1,5 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- Use the repository's DOM-free mounted renderer. */
-import { createElement, type ReactElement, useState } from 'react';
+import { createElement, type ElementType, type ReactElement, useState } from 'react';
 import { type AppStateStatus } from 'react-native';
 import { act, type ReactTestInstance } from 'react-test-renderer';
 import { expect, vi } from 'vitest';
@@ -224,16 +224,16 @@ export async function flush(update?: () => void) {
 }
 
 export function text(root: ReactTestInstance) {
-  const texts = root.findAllByType('Text');
+  const texts = root.findAllByType('Text' as ElementType);
   return texts.map(node => node.props.children).join('\n');
 }
 
 export function expectHidden(root: ReactTestInstance, hidden: boolean) {
-  const scenes = root.findAllByType('Scene');
+  const scenes = root.findAllByType('Scene' as ElementType);
   expect(scenes.length).toBeGreaterThan(0);
   for (const scene of scenes) {
     const wrapper = scene.find(
-      node => node.type === 'View' && node.props.pointerEvents !== undefined
+      node => (node.type as string) === 'View' && node.props.pointerEvents !== undefined
     );
     expect(wrapper.props).toMatchObject({
       pointerEvents: hidden ? 'none' : 'auto',
@@ -241,7 +241,7 @@ export function expectHidden(root: ReactTestInstance, hidden: boolean) {
       importantForAccessibility: hidden ? 'no-hide-descendants' : 'auto',
     });
     expect((wrapper.props.className as string).includes('opacity-0')).toBe(hidden);
-    expect(wrapper.findAllByType('Draft')).toHaveLength(1);
+    expect(wrapper.findAllByType('Draft' as ElementType)).toHaveLength(1);
   }
 }
 
@@ -262,7 +262,9 @@ function isHidden(node: ReactTestInstance): boolean {
 }
 
 export function expectFeedback(root: ReactTestInstance, message: string, copies: number) {
-  const messages = root.findAll(node => node.type === 'Text' && node.props.children === message);
+  const messages = root.findAll(
+    node => (node.type as string) === 'Text' && node.props.children === message
+  );
   expect(messages).toHaveLength(copies);
   const visible = messages.filter(node => !isHidden(node));
   expect(visible).toHaveLength(1);

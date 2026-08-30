@@ -40,7 +40,7 @@ describe('SectionHeader mounted layout', () => {
   it.each([
     { isRTL: false, alignment: 'text-right' },
     { isRTL: true, alignment: 'text-left' },
-  ])('gives the action spare width and wrapping with RTL=$isRTL', ({ isRTL, alignment }) => {
+  ])('gives both labels spare width and wrapping with RTL=$isRTL', ({ isRTL, alignment }) => {
     i18nManager.isRTL = isRTL;
     const root = mount(
       createElement(SectionHeader, {
@@ -51,6 +51,29 @@ describe('SectionHeader mounted layout', () => {
     );
     const action = root.findByProps({ accessibilityRole: 'button' });
     const text = action.find(node => Object.is(node.type, 'Text'));
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('Live now')
+    );
+
+    expect((label.props.className as string).split(' ')).toEqual(
+      expect.arrayContaining([
+        'grow',
+        'max-w-full',
+        'font-mono-medium',
+        'text-[10px]',
+        'tracking-[1.5px]',
+        'uppercase',
+        'text-muted-foreground',
+      ])
+    );
+    expect(label.props.numberOfLines).toBeUndefined();
+    expect(label.props.allowFontScaling).not.toBe(false);
+    expect(label.props.maxFontSizeMultiplier).toBeUndefined();
+    expect(label.props.adjustsFontSizeToFit).not.toBe(true);
+    expect(label.children).toEqual(['Live now']);
+    if (isRTL) {
+      expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
+    }
 
     expect((action.parent?.props.className as string | undefined)?.split(' ')).toContain(
       'flex-wrap'

@@ -70,7 +70,7 @@ function toolDetail(input: Record<string, unknown> | undefined): string | undefi
   }
   const commandString = asString(command);
   if (commandString !== undefined) {
-    return commandString.length > 100 ? `${commandString.slice(0, 100)}...` : commandString;
+    return commandString;
   }
   const queryString = asString(query);
   if (queryString !== undefined) {
@@ -100,16 +100,33 @@ function isCompletedStatus(status: string | undefined): boolean {
   return status === 'complete' || status === 'completed';
 }
 
-export function appendSpectatorRow(rows: SpectatorRow[], next: SpectatorRow): SpectatorRow[] {
-  if (next.key === undefined) {
-    return [...rows, next];
-  }
-  const index = rows.findIndex(row => row.key === next.key);
-  if (index === -1) {
-    return [...rows, next];
-  }
+/**
+ * Append a batch of rows. A keyed row replaces the row with the same key; an
+ * unkeyed row is always appended. One pass over the batch keeps a stream replay
+ * of thousands of events linear.
+ */
+export function appendSpectatorRows(
+  rows: readonly SpectatorRow[],
+  batch: readonly SpectatorRow[]
+): SpectatorRow[] {
   const updated = [...rows];
-  updated[index] = next;
+  const indexByKey = new Map<string, number>();
+  for (const [index, row] of updated.entries()) {
+    if (row.key !== undefined) {
+      indexByKey.set(row.key, index);
+    }
+  }
+  for (const next of batch) {
+    const index = next.key === undefined ? undefined : indexByKey.get(next.key);
+    if (index === undefined) {
+      if (next.key !== undefined) {
+        indexByKey.set(next.key, updated.length);
+      }
+      updated.push(next);
+    } else {
+      updated[index] = next;
+    }
+  }
   return updated;
 }
 
@@ -173,8 +190,7 @@ function toRowFromKilocode(
       const text = asString(part.text);
       const trimmed = text?.trim();
       if (trimmed) {
-        const truncated = trimmed.length > 200 ? `${trimmed.slice(0, 200)}...` : trimmed;
-        return { timestamp, message: truncated, eventType: 'text', key: partKey(part) };
+        return { timestamp, message: trimmed, eventType: 'text', key: partKey(part) };
       }
       return null;
     }
@@ -284,4 +300,34 @@ export function formatSpectatorTime(timestamp: string): string {
     return timestamp;
   }
   return dateTimeFormat(i18n.language, { timeStyle: 'short' }).format(date);
+}
+
+/**
+ * Collect live rows and commit them once per tick. The server replays the whole
+ * event log on connect, one event per frame; a commit per event would cost one
+ * render per event.
+ */
+export function createSpectatorRowBatcher(commit: (batch: SpectatorRow[]) => void) {
+  const pending: SpectatorRow[] = [];
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const flush = () => {
+    timer = null;
+    const batch = pending.splice(0);
+    if (batch.length > 0) {
+      commit(batch);
+    }
+  };
+  return {
+    push: (row: SpectatorRow) => {
+      pending.push(row);
+      timer ??= setTimeout(flush, 0);
+    },
+    dispose: () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      pending.length = 0;
+    },
+  };
 }

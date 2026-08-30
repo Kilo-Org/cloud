@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ProfileSelector } from '@/components/cloud-agent/ProfileSelector';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import { ModeCombobox } from '@/components/shared/ModeCombobox';
@@ -44,6 +51,7 @@ export type TriggerFormData = {
   mode: AgentMode;
   model: string;
   variant?: string | null;
+  sandboxAllocation?: 'isolated-standard' | null;
   promptTemplate: string;
   profileId: string;
   autoCommit?: boolean;
@@ -68,6 +76,7 @@ export type TriggerFormProps = {
     mode: AgentMode;
     model: string;
     variant?: string;
+    sandboxAllocation?: 'isolated-standard' | null;
     promptTemplate: string;
     profileId?: string;
     autoCommit?: boolean;
@@ -84,9 +93,12 @@ export type TriggerFormProps = {
   models: ModelOption[];
   isLoadingModels?: boolean;
   onSubmit: (data: TriggerFormData) => Promise<void>;
+  onSaveAndInvoke?: (data: TriggerFormData) => Promise<void>;
   onCancel?: () => void;
   onDelete?: () => Promise<void>;
   isLoading?: boolean;
+  canSetSandboxAllocation?: boolean;
+  isLoadingCapabilities?: boolean;
   /** Full inbound webhook URL (only needed in edit mode) */
   inboundUrl?: string;
 };
@@ -111,9 +123,12 @@ export function TriggerForm({
   models,
   isLoadingModels,
   onSubmit,
+  onSaveAndInvoke,
   onCancel,
   onDelete,
   isLoading = false,
+  canSetSandboxAllocation = false,
+  isLoadingCapabilities = false,
   inboundUrl,
 }: TriggerFormProps) {
   const isEditMode = formMode === 'edit';
@@ -133,6 +148,16 @@ export function TriggerForm({
   const [agentMode, setAgentMode] = useState<AgentMode>((initialData?.mode as AgentMode) ?? 'ask');
   const [model, setModel] = useState(initialData?.model ?? '');
   const [variant, setVariant] = useState(initialData?.variant);
+  const initialSandboxAllocation =
+    initialData?.sandboxAllocation === 'isolated-standard' ? 'isolated-standard' : 'automatic';
+  const [sandboxAllocation, setSandboxAllocation] = useState<'automatic' | 'isolated-standard'>(
+    initialSandboxAllocation
+  );
+  const hasSavedSandboxAllocation = initialSandboxAllocation === 'isolated-standard';
+  const showSandboxAllocation =
+    canSetSandboxAllocation ||
+    hasSavedSandboxAllocation ||
+    sandboxAllocation === 'isolated-standard';
   const modelVariants = models.find(option => option.id === model)?.variants ?? [];
 
   const handleModelChange = (nextModel: string) => {
@@ -159,6 +184,8 @@ export function TriggerForm({
   const [webhookAuthSecret, setWebhookAuthSecret] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const submissionInFlightRef = useRef(false);
+  const [isSaveAndInvoking, setIsSaveAndInvoking] = useState(false);
 
   // Reset form when initialData changes (for edit mode)
   useEffect(() => {
@@ -171,6 +198,7 @@ export function TriggerForm({
       setAgentMode(initialData.mode ?? 'ask');
       setModel(initialData.model);
       setVariant(initialData.variant);
+      setSandboxAllocation(initialData.sandboxAllocation ?? 'automatic');
       setPromptTemplate(initialData.promptTemplate);
       setProfileId(initialData.profileId ?? null);
       setAutoCommit(initialData.autoCommit ?? false);
@@ -182,6 +210,7 @@ export function TriggerForm({
     if (!initialData) {
       setWebhookAuthEnabled(false);
       setWebhookAuthHeader('');
+      setSandboxAllocation('automatic');
     }
     setWebhookAuthSecret('');
   }, [initialData]);
@@ -297,6 +326,16 @@ export function TriggerForm({
       errors.push(webhookAuthSecretError);
     }
 
+    const requiresSandboxAllocationEligibility =
+      sandboxAllocation === 'isolated-standard' &&
+      (!isEditMode || sandboxAllocation !== initialSandboxAllocation);
+    if (
+      requiresSandboxAllocationEligibility &&
+      (!canSetSandboxAllocation || isLoadingCapabilities)
+    ) {
+      errors.push('Dedicated Standard allocation is not available');
+    }
+
     return errors;
   }, [
     activeTriggerIdSchema,
@@ -309,76 +348,120 @@ export function TriggerForm({
     profileId,
     webhookAuthHeaderError,
     webhookAuthSecretError,
+    sandboxAllocation,
+    initialSandboxAllocation,
+    isEditMode,
+    canSetSandboxAllocation,
+    isLoadingCapabilities,
   ]);
 
   const isFormValid = formErrors.length === 0;
 
-  // Handle form submission
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
+  const getFormData = useCallback((): TriggerFormData | undefined => {
+    if (!isFormValid || !profileId) {
+      toast.error('Please fix form errors before submitting');
+      return undefined;
+    }
+    const webhookAuthData: TriggerFormData['webhookAuth'] =
+      !isScheduled && webhookAuthEnabled
+        ? {
+            enabled: true,
+            header: trimmedWebhookAuthHeader,
+            secret: trimmedWebhookAuthSecret ? trimmedWebhookAuthSecret : undefined,
+          }
+        : { enabled: false };
 
-      if (!isFormValid || !profileId) {
-        toast.error('Please fix form errors before submitting');
-        return;
-      }
+    const submittedVariant = isEditMode
+      ? variant === initialData?.variant
+        ? undefined
+        : (variant ?? null)
+      : variant;
+    const submittedSandboxAllocation = isEditMode
+      ? sandboxAllocation === initialSandboxAllocation
+        ? undefined
+        : sandboxAllocation === 'automatic'
+          ? null
+          : sandboxAllocation
+      : sandboxAllocation === 'isolated-standard'
+        ? sandboxAllocation
+        : undefined;
 
-      const webhookAuthData: TriggerFormData['webhookAuth'] =
-        !isScheduled && webhookAuthEnabled
-          ? {
-              enabled: true,
-              header: trimmedWebhookAuthHeader,
-              secret: trimmedWebhookAuthSecret ? trimmedWebhookAuthSecret : undefined,
-            }
-          : { enabled: false };
-
-      const submittedVariant = isEditMode
-        ? variant === initialData?.variant
-          ? undefined
-          : (variant ?? null)
-        : variant;
-
-      await onSubmit({
-        triggerId,
-        activationMode,
-        cronExpression: isScheduled ? cronExpression.trim() : undefined,
-        cronTimezone: isScheduled ? cronTimezone : undefined,
-        githubRepo,
-        mode: agentMode,
-        model,
-        ...(submittedVariant !== undefined ? { variant: submittedVariant } : {}),
-        promptTemplate: promptTemplate.trim(),
-        profileId,
-        autoCommit,
-        condenseOnComplete,
-        isActive: isEditMode ? isActive : undefined,
-        webhookAuth: webhookAuthData,
-      });
-    },
-    [
-      isFormValid,
-      profileId,
-      onSubmit,
+    return {
       triggerId,
       activationMode,
-      cronExpression,
-      cronTimezone,
-      isScheduled,
+      cronExpression: isScheduled ? cronExpression.trim() : undefined,
+      cronTimezone: isScheduled ? cronTimezone : undefined,
       githubRepo,
-      agentMode,
+      mode: agentMode,
       model,
-      variant,
-      initialData?.variant,
-      promptTemplate,
+      ...(submittedVariant !== undefined ? { variant: submittedVariant } : {}),
+      ...(submittedSandboxAllocation !== undefined
+        ? { sandboxAllocation: submittedSandboxAllocation }
+        : {}),
+      promptTemplate: promptTemplate.trim(),
+      profileId,
       autoCommit,
       condenseOnComplete,
-      isEditMode,
-      isActive,
-      webhookAuthEnabled,
-      trimmedWebhookAuthHeader,
-      trimmedWebhookAuthSecret,
-    ]
+      isActive: isEditMode ? isActive : undefined,
+      webhookAuth: webhookAuthData,
+    };
+  }, [
+    isFormValid,
+    profileId,
+    triggerId,
+    activationMode,
+    cronExpression,
+    cronTimezone,
+    isScheduled,
+    githubRepo,
+    agentMode,
+    model,
+    variant,
+    initialData?.variant,
+    sandboxAllocation,
+    initialSandboxAllocation,
+    promptTemplate,
+    autoCommit,
+    condenseOnComplete,
+    isEditMode,
+    isActive,
+    webhookAuthEnabled,
+    trimmedWebhookAuthHeader,
+    trimmedWebhookAuthSecret,
+  ]);
+
+  const runSubmission = useCallback(
+    async (submit: (data: TriggerFormData) => Promise<void>, isSaveAndInvokeAction = false) => {
+      if (isLoading || isDeleting || submissionInFlightRef.current) return;
+      const formData = getFormData();
+      if (!formData) return;
+
+      submissionInFlightRef.current = true;
+      if (isSaveAndInvokeAction) setIsSaveAndInvoking(true);
+      try {
+        await submit(formData);
+      } catch {
+        return;
+      } finally {
+        submissionInFlightRef.current = false;
+        if (isSaveAndInvokeAction) setIsSaveAndInvoking(false);
+      }
+    },
+    [getFormData, isDeleting, isLoading]
   );
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      void runSubmission(onSubmit);
+    },
+    [onSubmit, runSubmission]
+  );
+
+  const handleSaveAndInvoke = useCallback(() => {
+    if (!isEditMode || !isScheduled || !isActive || !onSaveAndInvoke) return;
+    void runSubmission(onSaveAndInvoke, true);
+  }, [isActive, isEditMode, isScheduled, onSaveAndInvoke, runSubmission]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
@@ -570,6 +653,49 @@ export function TriggerForm({
               isScheduled={isScheduled}
             />
 
+            {showSandboxAllocation && (
+              <div className="space-y-2">
+                <Label htmlFor="sandboxAllocation">Container allocation</Label>
+                <Select
+                  value={sandboxAllocation}
+                  onValueChange={value => {
+                    if (value === 'automatic' || value === 'isolated-standard') {
+                      setSandboxAllocation(value);
+                    }
+                  }}
+                  disabled={isLoading || isLoadingCapabilities}
+                >
+                  <SelectTrigger
+                    id="sandboxAllocation"
+                    className="w-full sm:w-80"
+                    aria-describedby="sandboxAllocationHelp"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="automatic">Automatic</SelectItem>
+                    <SelectItem
+                      value="isolated-standard"
+                      disabled={!canSetSandboxAllocation && !hasSavedSandboxAllocation}
+                    >
+                      Dedicated Standard
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p id="sandboxAllocationHelp" className="text-muted-foreground max-w-prose text-xs">
+                  Automatic uses existing Cloud Agent routing. Dedicated Standard provisions one
+                  container per execution with 4 vCPU, 12 GiB RAM, and 20 GB disk, which may affect
+                  compute charges.
+                </p>
+                {!canSetSandboxAllocation && hasSavedSandboxAllocation && (
+                  <p className="text-muted-foreground text-xs">
+                    Only Kilo admins can newly enable Dedicated Standard. You can keep this
+                    allocation or clear it.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Profile Selection (Required) */}
             <div className="space-y-2">
               <Label>
@@ -744,13 +870,15 @@ export function TriggerForm({
 
             {/* Form Actions */}
             <div className="flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   type="submit"
-                  disabled={!isFormValid || isLoading}
+                  disabled={!isFormValid || isLoading || isDeleting || isSaveAndInvoking}
                   className="min-w-[120px]"
                 >
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {(isLoading || isSaveAndInvoking) && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   {isLoading
                     ? isEditMode
                       ? 'Saving...'
@@ -759,8 +887,26 @@ export function TriggerForm({
                       ? 'Save Changes'
                       : 'Create Trigger'}
                 </Button>
+                {isEditMode && isScheduled && onSaveAndInvoke && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleSaveAndInvoke}
+                    disabled={
+                      !isFormValid || isLoading || isDeleting || isSaveAndInvoking || !isActive
+                    }
+                  >
+                    {isSaveAndInvoking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isSaveAndInvoking ? 'Saving and invoking…' : 'Save and invoke now'}
+                  </Button>
+                )}
                 {onCancel && (
-                  <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancel}
+                    disabled={isLoading || isDeleting || isSaveAndInvoking}
+                  >
                     Cancel
                   </Button>
                 )}

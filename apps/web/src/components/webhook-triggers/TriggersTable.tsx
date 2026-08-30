@@ -13,7 +13,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Copy, Pencil, Trash2, Check, Clock, Webhook as WebhookIcon } from 'lucide-react';
+import {
+  Copy,
+  Pencil,
+  Trash2,
+  Check,
+  Clock,
+  Loader2,
+  Play,
+  Webhook as WebhookIcon,
+} from 'lucide-react';
 import { describeCron } from './describe-cron';
 
 export type TriggerItem = {
@@ -41,6 +50,10 @@ type TriggersTableProps = {
   showDelete?: boolean;
   editLabel?: string;
   editIcon?: ComponentType<{ className?: string }>;
+  onInvoke?: (triggerId: string) => void;
+  isInvoking?: boolean;
+  invokingTriggerId?: string | null;
+  isInvokeDisabled?: boolean;
 };
 
 /**
@@ -57,8 +70,12 @@ export const TriggersTable = memo(function TriggersTable({
   showDelete = true,
   editLabel = 'Edit Trigger',
   editIcon,
+  onInvoke,
+  isInvoking,
+  invokingTriggerId,
+  isInvokeDisabled,
 }: TriggersTableProps) {
-  const hasActions = showCopy || showEdit || showDelete;
+  const hasActions = showCopy || showEdit || showDelete || onInvoke !== undefined;
   const showAuthColumn = triggers.some(trigger => trigger.webhookAuthConfigured != null);
 
   return (
@@ -90,6 +107,10 @@ export const TriggersTable = memo(function TriggersTable({
               showDelete={showDelete}
               editLabel={editLabel}
               editIcon={editIcon}
+              onInvoke={onInvoke}
+              isInvoking={isInvoking ?? false}
+              isInvokingThisTrigger={invokingTriggerId === trigger.triggerId}
+              isInvokeDisabled={isInvokeDisabled ?? false}
             />
           ))}
         </TableBody>
@@ -110,6 +131,10 @@ type TriggerRowProps = {
   showDelete: boolean;
   editLabel: string;
   editIcon?: ComponentType<{ className?: string }>;
+  onInvoke?: (triggerId: string) => void;
+  isInvoking: boolean;
+  isInvokingThisTrigger: boolean;
+  isInvokeDisabled: boolean;
 };
 
 const TriggerRow = memo(function TriggerRow({
@@ -124,9 +149,13 @@ const TriggerRow = memo(function TriggerRow({
   showDelete,
   editLabel,
   editIcon,
+  onInvoke,
+  isInvoking,
+  isInvokingThisTrigger,
+  isInvokeDisabled,
 }: TriggerRowProps) {
   const EditIcon = editIcon ?? Pencil;
-  const hasActions = showCopy || showEdit || showDelete;
+  const hasActions = showCopy || showEdit || showDelete || onInvoke !== undefined;
   const showAuthStatus = showAuthColumn && trigger.webhookAuthConfigured !== undefined;
 
   return (
@@ -203,6 +232,32 @@ const TriggerRow = memo(function TriggerRow({
                   <Check className="h-4 w-4 text-green-500" />
                 ) : (
                   <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+
+            {onInvoke && trigger.activationMode === 'scheduled' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                type="button"
+                onClick={() => onInvoke(trigger.triggerId)}
+                disabled={!trigger.isActive || isInvoking || isInvokeDisabled}
+                title={
+                  trigger.isActive
+                    ? `Invoke ${trigger.triggerId} now`
+                    : `Resume ${trigger.triggerId} before invoking it`
+                }
+                aria-label={
+                  trigger.isActive
+                    ? `Invoke ${trigger.triggerId} now`
+                    : `Resume ${trigger.triggerId} before invoking it`
+                }
+              >
+                {isInvokingThisTrigger ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
                 )}
               </Button>
             )}

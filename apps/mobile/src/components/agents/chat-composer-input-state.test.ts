@@ -13,6 +13,7 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     });
 
@@ -42,6 +43,7 @@ describe('resolveChatComposerControlState', () => {
         isFocused: false,
         isSending: override.isSending,
         isUploading: false,
+        hasFailedAttachments: false,
         voiceInputActive: false,
       });
 
@@ -64,6 +66,7 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     });
 
@@ -85,6 +88,7 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     });
 
@@ -105,6 +109,7 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     });
 
@@ -124,6 +129,7 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     });
 
@@ -143,6 +149,7 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     });
 
@@ -162,6 +169,7 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     });
 
@@ -179,6 +187,7 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: true,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     });
 
@@ -186,6 +195,24 @@ describe('resolveChatComposerControlState', () => {
     expect(state.hasSendableContent).toBe(true);
     expect(state.toolbarDisabled).toBe(false);
     expect(state.inputEditable).toBe(true);
+  });
+
+  it('gates send on a failed attachment chip while sendable content remains', () => {
+    const state = resolveChatComposerControlState({
+      attachmentsCount: 1,
+      sendableAttachmentsCount: 1,
+      attachmentMax: 5,
+      disabled: false,
+      hasText: true,
+      isFocused: false,
+      isSending: false,
+      isUploading: false,
+      hasFailedAttachments: true,
+      voiceInputActive: false,
+    });
+
+    expect(state.canSend).toBe(false);
+    expect(state.hasSendableContent).toBe(true);
   });
 
   it('keeps the toolbar visible when focused, has text, has attachments, or voice is active', () => {
@@ -198,6 +225,7 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     };
 
@@ -222,6 +250,7 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     });
 
@@ -238,13 +267,14 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: true,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     });
 
     expect(state.paperclipDisabled).toBe(true);
   });
 
-  it('disables the paperclip and input while this owner is voice active', () => {
+  it('disables the paperclip but keeps the input editable while this owner is voice active', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 0,
       sendableAttachmentsCount: 0,
@@ -254,12 +284,13 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: true,
     });
 
     expect(state.paperclipDisabled).toBe(true);
-    expect(state.inputEditable).toBe(false);
-    expect(state.inputAccessibilityDisabled).toBe(true);
+    expect(state.inputEditable).toBe(true);
+    expect(state.inputAccessibilityDisabled).toBe(false);
   });
 
   it('leaves voice enabled (only toolbar gates it) when the composer is otherwise ready', () => {
@@ -272,6 +303,7 @@ describe('resolveChatComposerControlState', () => {
       isFocused: false,
       isSending: false,
       isUploading: false,
+      hasFailedAttachments: false,
       voiceInputActive: false,
     });
 

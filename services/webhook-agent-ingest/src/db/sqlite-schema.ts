@@ -51,6 +51,7 @@ export const triggerConfig = sqliteTable('trigger_config', {
   mode: text('mode'),
   model: text('model'),
   variant: text('variant'),
+  sandbox_allocation: text('sandbox_allocation'),
   prompt_template: text('prompt_template').notNull(),
   profile_id: text('profile_id'),
   auto_commit: integer('auto_commit'),

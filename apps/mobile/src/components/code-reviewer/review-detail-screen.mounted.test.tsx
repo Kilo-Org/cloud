@@ -754,7 +754,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(spectatorQueries.streamInfo.refetch).not.toHaveBeenCalled();
   });
 
-  it('keeps live rows and shows Retry after a websocket drop', () => {
+  it('keeps live rows and shows Retry after a websocket drop', async () => {
     const captured: {
       onEvent?: (event: unknown) => void;
       onDisconnected?: () => void;
@@ -784,13 +784,16 @@ describe('ReviewDetailScreen spectator transcript', () => {
     renderScreen(true);
 
     expect(captured.onEvent).toBeDefined();
-    act(() => {
+    await act(async () => {
       captured.onEvent?.({
         eventId: 1,
         sessionId: 's-1',
         streamEventType: 'started',
         timestamp: 't1',
         data: null,
+      });
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 0);
       });
     });
     const liveList = sessionListRenders.list.at(-1);
@@ -809,7 +812,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(afterDropItems?.[0]?.message).toBe('Execution started');
   });
 
-  it('keeps a streamed row when the review turns terminal (no skeleton or empty copy)', () => {
+  it('keeps a streamed row when the review turns terminal (no skeleton or empty copy)', async () => {
     const captured: { onEvent?: (event: unknown) => void } = {};
     spectatorStream.createReviewSpectatorStream.mockImplementation(
       (input: { onEvent: (event: unknown) => void }) => {
@@ -835,13 +838,16 @@ describe('ReviewDetailScreen spectator transcript', () => {
     const renderer = mountScreen(true);
 
     expect(captured.onEvent).toBeDefined();
-    act(() => {
+    await act(async () => {
       captured.onEvent?.({
         eventId: 1,
         sessionId: 's-1',
         streamEventType: 'started',
         timestamp: 't1',
         data: null,
+      });
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 0);
       });
     });
 

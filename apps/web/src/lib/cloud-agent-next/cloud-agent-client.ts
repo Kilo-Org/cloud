@@ -367,6 +367,12 @@ export type InterruptResult = {
   processesFound: boolean;
 };
 
+/** Input for canceling one queued (not yet accepted) message. */
+export type CancelQueuedMessageInput = {
+  sessionId: string;
+  messageId: string;
+};
+
 export type AnswerQuestionInput = {
   sessionId: string;
   questionId: string;
@@ -520,6 +526,9 @@ type CloudAgentNextTRPCClient = {
   };
   interruptSession: {
     mutate: (input: { sessionId: string }) => Promise<InterruptResult>;
+  };
+  cancelQueuedMessage: {
+    mutate: (input: CancelQueuedMessageInput) => Promise<{ dropped: boolean }>;
   };
   getSession: {
     query: (input: GetSessionInput) => Promise<GetSessionOutput>;
@@ -678,6 +687,26 @@ export class CloudAgentNextClient {
           endpoint: 'interruptSession',
         },
         extra: { sessionId },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel one queued (not yet accepted) message by id without interrupting the
+   * active run. Returns whether a pending message was dropped.
+   */
+  async cancelQueuedMessage(sessionId: string, messageId: string): Promise<{ dropped: boolean }> {
+    try {
+      return await this.client.cancelQueuedMessage.mutate({ sessionId, messageId });
+    } catch (error) {
+      console.error(`Error canceling queued message ${messageId} in session ${sessionId}:`, error);
+      captureException(error, {
+        tags: {
+          source: 'cloud-agent-next-client',
+          endpoint: 'cancelQueuedMessage',
+        },
+        extra: { sessionId, messageId },
       });
       throw error;
     }

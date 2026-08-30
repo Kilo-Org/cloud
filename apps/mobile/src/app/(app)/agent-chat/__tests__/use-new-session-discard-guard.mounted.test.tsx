@@ -43,14 +43,21 @@ type AlertButton = { text: string; style?: string; onPress?: () => void };
 
 function GuardHarness({
   dirty,
+  hasUnclaimedAttachments = false,
   onDiscard,
   skipRef,
 }: {
   dirty: boolean;
+  hasUnclaimedAttachments?: boolean;
   onDiscard: () => Promise<void>;
   skipRef: RefObject<boolean>;
 }) {
-  useNewSessionDiscardGuard({ dirty, onDiscard, skipNextGuardRef: skipRef });
+  useNewSessionDiscardGuard({
+    dirty,
+    hasUnclaimedAttachments,
+    onDiscard,
+    skipNextGuardRef: skipRef,
+  });
   return null;
 }
 
@@ -68,6 +75,25 @@ function mountGuard(dirty: boolean, onDiscard: () => Promise<void>) {
     throw new Error('guard did not render');
   }
   return { renderer: ref.current, skipRef };
+}
+
+function mountGuardWithAttachments() {
+  const skipRef: RefObject<boolean> = { current: false };
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(
+      createElement(GuardHarness, {
+        dirty: true,
+        hasUnclaimedAttachments: true,
+        onDiscard: noOpDiscard,
+        skipRef,
+      })
+    );
+  });
+  if (!ref.current) {
+    throw new Error('guard did not render');
+  }
+  return { renderer: ref.current };
 }
 
 function triggerPreventRemove(): Action {
@@ -108,6 +134,27 @@ describe('useNewSessionDiscardGuard', () => {
     expect(alertMock).toHaveBeenCalledTimes(1);
     expect(alertMock.mock.calls[0]?.[0]).toBe('Discard draft?');
     expect(lastAlertButtons()?.map(button => button.text)).toEqual(['Keep editing', 'Discard']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('shows the upload-specific confirm for an attachment-only dirty state', () => {
+    const { renderer } = mountGuardWithAttachments();
+
+    // An unsent upload makes the screen dirty even with an empty prompt, so
+    // the leave is still intercepted.
+    expect(usePreventRemoveMock).toHaveBeenCalledTimes(1);
+    expect(usePreventRemoveMock.mock.calls[0]?.[0]).toBe(true);
+
+    triggerPreventRemove();
+    expect(alertMock).toHaveBeenCalledTimes(1);
+    expect(alertMock.mock.calls[0]?.[0]).toBe('Discard draft?');
+    // The copy names the unclaimed uploads instead of the prompt-only message.
+    expect(alertMock.mock.calls[0]?.[1]).toBe(
+      'Your prompt and any unclaimed uploads will be deleted.'
+    );
 
     act(() => {
       renderer.unmount();

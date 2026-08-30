@@ -12,6 +12,13 @@ export type AgentSessionSortBy = (typeof AGENT_SESSION_SORT_OPTIONS)[number];
 
 export const DEFAULT_AGENT_SESSION_SORT: AgentSessionSortBy = 'updated_at';
 
+/**
+ * Order used by the two session-list pages (live and history). They offer no
+ * sort control, so both order by creation time. Home and the Share gate keep
+ * `updated_at` — they pass it explicitly.
+ */
+export const SESSION_LIST_SORT: AgentSessionSortBy = 'created_at';
+
 const agentSessionSortBySchema = z.enum(AGENT_SESSION_SORT_OPTIONS);
 
 /**

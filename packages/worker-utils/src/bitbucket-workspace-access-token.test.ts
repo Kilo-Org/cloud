@@ -11,6 +11,7 @@ import {
   buildBitbucketOrganizationCredentialLockKey,
   buildBitbucketWorkspaceAccessTokenAad,
   getMissingBitbucketWorkspaceAccessTokenScopes,
+  getBitbucketReviewGrantStatus,
   getUnexpectedBitbucketWorkspaceAccessTokenScopes,
   hasBitbucketAccessTokenFamilyPrefix,
   hasRequiredBitbucketWorkspaceAccessTokenScopes,
@@ -214,6 +215,40 @@ describe('Bitbucket Workspace Access Token contract', () => {
       hasRequiredBitbucketWorkspaceAccessTokenScopes(['pullrequest', 'repository:write'])
     ).toBe(false);
   });
+
+  it.each([
+    { method: 'oauth', recoveryAction: 'reconnect' },
+    { method: 'workspace_access_token', recoveryAction: 'replace_token' },
+  ] as const)(
+    'keeps old $method grants readable and enables writes only after recovery',
+    ({ method, recoveryAction }) => {
+      const scopes = Object.freeze(['account', 'repository:write', 'pullrequest', 'webhook']);
+      expect(getBitbucketReviewGrantStatus(scopes, method)).toEqual({
+        readReady: true,
+        writeReady: false,
+        recoveryAction,
+      });
+      expect(
+        getBitbucketReviewGrantStatus(['account', 'pullrequest:write', 'webhook'], method)
+      ).toEqual({
+        readReady: true,
+        writeReady: true,
+        recoveryAction: null,
+      });
+      for (const incompleteScopes of [
+        [],
+        ['pullrequest:write'],
+        ['account', 'pullrequest:write'],
+        ['pullrequest:write', 'webhook'],
+      ]) {
+        expect(getBitbucketReviewGrantStatus(incompleteScopes, method)).toEqual({
+          readReady: false,
+          writeReady: false,
+          recoveryAction,
+        });
+      }
+    }
+  );
 
   it('validates fixed-host repository pagination consistently', () => {
     expect(

@@ -1,6 +1,7 @@
 import { generateKeyPairSync } from 'node:crypto';
 import type * as DbClientModule from '@kilocode/db/client';
-import { encryptKeyedEnvelope } from '@kilocode/encryption';
+import { decryptKeyedEnvelope, encryptKeyedEnvelope } from '@kilocode/encryption';
+import { getBitbucketReviewGrantStatus } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const database = vi.hoisted(() => ({
@@ -41,12 +42,18 @@ vi.mock('@kilocode/db/client', async importOriginal => {
         update: () => ({
           set: (values: Record<string, unknown>) => {
             database.updates.push(values);
+            if (database.row && 'scopes' in values) database.row.scopes = values.scopes;
             const result = {
               returning: async () => {
                 if (!database.returnedCredential) return [];
+                const updated = {
+                  ...database.returnedCredential,
+                  ...values,
+                  credential_version: database.returnedCredential.credential_version,
+                };
                 const row = database.row as { credential?: Record<string, unknown> } | undefined;
-                if (row) row.credential = database.returnedCredential;
-                return [database.returnedCredential];
+                if (row) row.credential = updated;
+                return [updated];
               },
               then: (resolve: (value: unknown[]) => unknown) => Promise.resolve([]).then(resolve),
             };
@@ -379,6 +386,164 @@ describe('BitbucketAuthorizationService', () => {
         scopes: ['account', 'email', 'pullrequest', 'repository', 'repository:write', 'webhook'],
       })
     );
+  });
+
+  function refreshResponse(scope: string) {
+    return Response.json({
+      access_token: 'next-access-token',
+      refresh_token: 'next-refresh-token',
+      token_type: 'bearer',
+      expires_in: 7200,
+      scope,
+    });
+  }
+
+  it.each([
+    {
+      name: 'explicit write grants',
+      scope: 'account repository:write pullrequest pullrequest:write webhook snippet',
+      writeReady: true,
+    },
+    {
+      name: 'implied-only write grants',
+      scope: 'account pullrequest:write webhook',
+      writeReady: true,
+    },
+    {
+      name: 'legacy write aliases',
+      scope:
+        'read:account:bitbucket-legacy write:pullrequest:bitbucket-legacy admin:webhook:bitbucket-legacy',
+      writeReady: true,
+    },
+    {
+      name: 'old read grants',
+      scope: 'account repository:write pullrequest webhook',
+      writeReady: false,
+    },
+    {
+      name: 'old read aliases',
+      scope:
+        'read:account:bitbucket-legacy write:repository:bitbucket-legacy read:pullrequest:bitbucket-legacy admin:webhook:bitbucket-legacy',
+      writeReady: false,
+    },
+  ])(
+    'AC1 preserves $name through rotation and subsequent authorization',
+    async ({ scope, writeReady }) => {
+      const row = activeRow(-1);
+      row.scopes.push('pullrequest:write');
+      database.row = row;
+      database.returnedCredential = { ...credential(), credential_version: 2 };
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(refreshResponse(scope)));
+      const authorizationService = service();
+
+      await expect(
+        authorizationService.getAuthorization({ userId: 'user-1' })
+      ).resolves.toMatchObject({
+        status: 'available',
+        token: 'next-access-token',
+        integrationId: row.integrationId,
+        workspace: row.metadata.workspace,
+      });
+      expect(row.scopes).toEqual(
+        expect.arrayContaining([
+          'account',
+          'email',
+          'pullrequest',
+          'repository',
+          'repository:write',
+          'webhook',
+        ])
+      );
+      expect(row.scopes).not.toContain('snippet');
+      expect(getBitbucketReviewGrantStatus(row.scopes, 'oauth')).toEqual({
+        readReady: true,
+        writeReady,
+        recoveryAction: writeReady ? null : 'reconnect',
+      });
+      expect(row.credential.credential_version).toBe(2);
+      expect(
+        decryptKeyedEnvelope(
+          row.credential.refresh_token_encrypted,
+          scheme,
+          { active: { keyId: 'active', privateKeyPem } },
+          aad('refresh')
+        )
+      ).toBe('next-refresh-token');
+      await expect(
+        authorizationService.getAuthorization({ userId: 'user-1' })
+      ).resolves.toMatchObject({
+        status: 'available',
+        token: 'next-access-token',
+        integrationId: row.integrationId,
+        workspace: row.metadata.workspace,
+      });
+      expect(database.updates.filter(update => 'access_token_encrypted' in update)).toHaveLength(1);
+    }
+  );
+
+  it.each(['pullrequest:write', 'write:pullrequest:bitbucket-legacy'])(
+    'AC1 accepts stored %s without requiring explicit implied read scopes',
+    async grant => {
+      database.row = { ...activeRow(), scopes: ['account', grant, 'webhook'] };
+      await expect(service().getAuthorization({ userId: 'user-1' })).resolves.toMatchObject({
+        status: 'available',
+        token: 'access-token',
+        workspace: { slug: 'acme' },
+      });
+    }
+  );
+
+  it.each([
+    'account pullrequest:write',
+    'pullrequest:write webhook',
+    'account repository:write webhook',
+    '',
+  ])('AC10 does not invent missing grants from refresh scope "%s"', async scope => {
+    const row = activeRow(-1);
+    database.row = row;
+    const previousCredential = row.credential;
+    const previousScopes = [...row.scopes];
+    database.returnedCredential = { ...credential(), credential_version: 2 };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(refreshResponse(scope)));
+
+    await expect(service().getAuthorization({ userId: 'user-1' })).resolves.toEqual({
+      status: 'temporarily_unavailable',
+    });
+    expect(row.credential).toEqual(previousCredential);
+    expect(row.scopes).toEqual(previousScopes);
+    expect(database.updates).toEqual([]);
+  });
+
+  it('AC1 retains credentials after a temporary refresh failure and permits retry', async () => {
+    const row = activeRow(-1);
+    database.row = row;
+    const previousCredential = row.credential;
+    database.returnedCredential = { ...credential(), credential_version: 2 };
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Temporary network failure'))
+        .mockResolvedValueOnce(refreshResponse('account pullrequest:write webhook'))
+    );
+    const authorizationService = service();
+
+    await expect(authorizationService.getAuthorization({ userId: 'user-1' })).resolves.toEqual({
+      status: 'temporarily_unavailable',
+    });
+    expect(row.credential).toEqual(previousCredential);
+    expect(database.updates).toEqual([]);
+    await expect(
+      authorizationService.getAuthorization({ userId: 'user-1' })
+    ).resolves.toMatchObject({
+      status: 'available',
+      token: 'next-access-token',
+    });
+    expect(getBitbucketReviewGrantStatus(row.scopes, 'oauth')).toEqual({
+      readReady: true,
+      writeReady: true,
+      recoveryAction: null,
+    });
   });
 
   it('marks terminal invalid_grant refresh failures as reconnect required', async () => {

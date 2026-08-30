@@ -9,7 +9,9 @@ import {
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { getBitbucketReviewGrantStatus } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import {
+  BitbucketOAuthScopeError,
   exchangeBitbucketOAuthCode,
   fetchBitbucketUser,
   fetchBitbucketWorkspaces,
@@ -17,6 +19,7 @@ import {
 import {
   BitbucketIntegrationAuthorizationError,
   BitbucketIntegrationConnectionConflictError,
+  BitbucketIntegrationRecoveryError,
   storeBitbucketIntegration,
 } from '@/lib/integrations/platforms/bitbucket/credentials';
 import { scheduleBitbucketRepositoryCachePrime } from '@/lib/integrations/platforms/bitbucket/repository-cache';
@@ -103,8 +106,21 @@ export async function handleBitbucketOAuthCallback(request: NextRequest): Promis
       return redirectWithStatus(verifiedState, 'error', 'unauthorized');
     }
 
-    if (searchParams.get('error')) {
-      return redirectWithStatus(verifiedState, 'error', 'authorization_cancelled');
+    // Only the start handler can bind replacement to the signed state.
+    if (searchParams.has('reconnectIntegrationId')) {
+      return redirectWithStatus(verifiedState, 'error', 'invalid_state');
+    }
+    const providerError = searchParams.get('error');
+    if (providerError) {
+      return redirectWithStatus(
+        verifiedState,
+        'error',
+        !verifiedState.bitbucketRecovery || providerError === 'access_denied'
+          ? 'authorization_cancelled'
+          : providerError === 'invalid_scope'
+            ? 'missing_scopes'
+            : 'connection_failed'
+      );
     }
 
     const code = validOAuthCode(searchParams.get('code'));
@@ -114,13 +130,23 @@ export async function handleBitbucketOAuthCallback(request: NextRequest): Promis
 
     callbackPhase = 'token_exchange';
     const tokens = await exchangeBitbucketOAuthCode(code);
+    if (
+      verifiedState.bitbucketRecovery &&
+      !getBitbucketReviewGrantStatus(tokens.scopes, 'oauth').writeReady
+    ) {
+      return redirectWithStatus(verifiedState, 'error', 'missing_scopes');
+    }
     callbackPhase = 'provider_profile';
     const [bitbucketUser, availableWorkspaces] = await Promise.all([
       fetchBitbucketUser(tokens.accessToken),
       fetchBitbucketWorkspaces(tokens.accessToken),
     ]);
     if (availableWorkspaces.length === 0) {
-      return redirectWithStatus(verifiedState, 'error', 'no_workspaces');
+      return redirectWithStatus(
+        verifiedState,
+        'error',
+        verifiedState.bitbucketRecovery ? 'workspace_unavailable' : 'no_workspaces'
+      );
     }
 
     callbackPhase = 'store_integration';
@@ -130,8 +156,9 @@ export async function handleBitbucketOAuthCallback(request: NextRequest): Promis
       bitbucketUser,
       tokens,
       availableWorkspaces,
+      bitbucketRecovery: verifiedState.bitbucketRecovery,
     });
-    if (storedIntegration.status === 'connected') {
+    if (storedIntegration.status === 'connected' && !verifiedState.bitbucketRecovery) {
       scheduleBitbucketRepositoryCachePrime({
         owner,
         kiloUserId: user.id,
@@ -146,6 +173,12 @@ export async function handleBitbucketOAuthCallback(request: NextRequest): Promis
     }
     if (error instanceof BitbucketIntegrationConnectionConflictError) {
       return redirectWithStatus(verifiedState, 'error', 'connection_exists');
+    }
+    if (error instanceof BitbucketIntegrationRecoveryError) {
+      return redirectWithStatus(verifiedState, 'error', error.code);
+    }
+    if (verifiedState?.bitbucketRecovery && error instanceof BitbucketOAuthScopeError) {
+      return redirectWithStatus(verifiedState, 'error', 'missing_scopes');
     }
 
     const callbackContext = safeCallbackContext(searchParams);

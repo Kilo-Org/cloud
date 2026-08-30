@@ -7,6 +7,7 @@ import { AlertCircle, CheckCircle2, ShieldCheck, TriangleAlert } from 'lucide-re
 import { toast } from 'sonner';
 import type { RootRouter } from '@/routers/root-router';
 import { BitbucketLogo } from '@/components/auth/BitbucketLogo';
+import { BitbucketReviewPermissions } from '@/components/integrations/BitbucketConnectSetup';
 import { BitbucketIntegrationControls } from '@/components/integrations/BitbucketIntegrationControls';
 import { BitbucketRepositoryCacheSection } from '@/components/integrations/BitbucketRepositoryCacheSection';
 import { TimeAgo } from '@/components/shared/TimeAgo';
@@ -342,6 +343,7 @@ export function BitbucketConnectedManagement({
           </Alert>
         )}
 
+        <BitbucketReviewPermissions />
         {status.status === 'workspace_selection_required' ? (
           <BitbucketOAuthWorkspaceSelection organizationId={organizationId} status={status} />
         ) : (

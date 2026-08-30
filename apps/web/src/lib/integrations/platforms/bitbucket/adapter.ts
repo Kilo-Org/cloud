@@ -67,11 +67,17 @@ const BitbucketWorkspacePageSchema = z.object({
   next: z.string().min(1).optional(),
 });
 
-export const BITBUCKET_OAUTH_SCOPES = [
+// Preserve old read grants until old clients/records and the 30-day ledger window expire.
+const BITBUCKET_OAUTH_READ_SCOPES = [
   'account',
   'repository:write',
   'pullrequest',
   'webhook',
+] as const;
+// Deployment requires Pull request Write on the OAuth consumer; requesting it cannot grant it.
+export const BITBUCKET_OAUTH_SCOPES = [
+  ...BITBUCKET_OAUTH_READ_SCOPES,
+  'pullrequest:write',
 ] as const;
 
 const BITBUCKET_OAUTH_SCOPE_ALIASES: Record<string, readonly string[]> = {
@@ -84,11 +90,16 @@ const BITBUCKET_OAUTH_SCOPE_ALIASES: Record<string, readonly string[]> = {
   'admin:webhook:bitbucket-legacy': ['webhook'],
   pullrequest: ['pullrequest'],
   'read:pullrequest:bitbucket-legacy': ['pullrequest'],
+  'write:pullrequest:bitbucket-legacy': ['pullrequest:write'],
   offline_access: [],
 };
 
 function expandBitbucketOAuthScopeClosure(scopes: Iterable<string>): Set<string> {
   const closure = new Set(scopes);
+  if (closure.has('pullrequest:write')) {
+    closure.add('pullrequest');
+    closure.add('repository:write');
+  }
   if (closure.has('repository:write')) {
     closure.add('repository');
   }
@@ -97,6 +108,8 @@ function expandBitbucketOAuthScopeClosure(scopes: Iterable<string>): Set<string>
   }
   return closure;
 }
+
+export class BitbucketOAuthScopeError extends Error {}
 
 function normalizeBitbucketOAuthScopes(scope: string): string[] {
   const canonicalScopes = new Set<string>();
@@ -110,11 +123,11 @@ function normalizeBitbucketOAuthScopes(scope: string): string[] {
 
   const returnedScopes = expandBitbucketOAuthScopeClosure(canonicalScopes);
   const allowedScopes = expandBitbucketOAuthScopeClosure(BITBUCKET_OAUTH_SCOPES);
-  if (BITBUCKET_OAUTH_SCOPES.some(requiredScope => !returnedScopes.has(requiredScope))) {
-    const missingScopes = BITBUCKET_OAUTH_SCOPES.filter(
+  if (BITBUCKET_OAUTH_READ_SCOPES.some(requiredScope => !returnedScopes.has(requiredScope))) {
+    const missingScopes = BITBUCKET_OAUTH_READ_SCOPES.filter(
       requiredScope => !returnedScopes.has(requiredScope)
     );
-    throw new Error(
+    throw new BitbucketOAuthScopeError(
       `Bitbucket OAuth token exchange returned invalid credentials: scope_mismatch missing=${missingScopes.join(',') || 'none'} observed=${[...returnedScopes].sort().join(',') || 'none'}`
     );
   }

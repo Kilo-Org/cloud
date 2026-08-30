@@ -16,6 +16,8 @@ import { and, eq } from 'drizzle-orm';
 import {
   BITBUCKET_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
   BitbucketIntegrationConnectionConflictError,
+  BitbucketIntegrationRecoveryError,
+  getBitbucketOAuthRecovery,
   buildBitbucketOAuthCredentialAad,
   storeBitbucketIntegration,
 } from './credentials';
@@ -102,6 +104,52 @@ async function insertExistingBitbucketIntegration(kiloUserId: string) {
   if (!credential) throw new Error('Expected existing Bitbucket credential');
 
   return { integration, credential };
+}
+
+async function readStoredIntegration(integrationId: string) {
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(eq(platform_integrations.id, integrationId));
+  const [credential] = await db
+    .select()
+    .from(platform_oauth_credentials)
+    .where(eq(platform_oauth_credentials.platform_integration_id, integrationId));
+  return { integration, credential };
+}
+
+async function recoveryFixture() {
+  const user = await insertTestUser();
+  const owner = { type: 'user', id: user.id } as const;
+  const { integration } = await insertExistingBitbucketIntegration(user.id);
+  await db
+    .update(platform_integrations)
+    .set({
+      repositories: [
+        {
+          id: '88888888-8888-4888-8888-888888888888',
+          name: 'mobile',
+          full_name: 'workspace-old/mobile',
+          private: true,
+        },
+      ],
+      repositories_synced_at: '2026-08-30T09:00:00.000Z',
+    })
+    .where(eq(platform_integrations.id, integration.id));
+  const replacement = integrationInput(owner, user.id);
+  replacement.bitbucketRecovery = await getBitbucketOAuthRecovery(owner, integration.id);
+  replacement.tokens.scopes.push('pullrequest:write');
+  replacement.availableWorkspaces = [
+    { uuid: '{workspace-other}', slug: 'workspace-other', name: 'Other Workspace' },
+    { uuid: '{WORKSPACE-OLD}', slug: 'workspace-old', name: 'Changed display name' },
+  ];
+  return {
+    user,
+    owner,
+    replacement,
+    before: await readStoredIntegration(integration.id),
+    integrationId: integration.id,
+  };
 }
 
 describe('Bitbucket OAuth credential storage', () => {
@@ -309,11 +357,23 @@ describe('Bitbucket OAuth credential storage', () => {
     expect(credentials[0]?.id).toBe(existing.credential.id);
   });
 
-  it('preserves an organization integration when callback authorization was revoked', async () => {
+  it('preserves organization credentials when recovery authorization was revoked', async () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Revoked Callback Org', user.id, 0);
     const owner = { type: 'org', id: organization.id } as const;
-    const existing = await storeBitbucketIntegration(integrationInput(owner, user.id, 'existing'));
+    const original = integrationInput(owner, user.id, 'existing');
+    const existing = await storeBitbucketIntegration(original);
+    const replacement = {
+      ...original,
+      tokens: {
+        ...original.tokens,
+        accessToken: 'replacement-access',
+        refreshToken: 'replacement-refresh',
+        scopes: [...original.tokens.scopes, 'pullrequest:write'],
+      },
+      bitbucketRecovery: await getBitbucketOAuthRecovery(owner, existing.integrationId),
+    };
+    const before = await readStoredIntegration(existing.integrationId);
 
     await db
       .delete(organization_memberships)
@@ -324,15 +384,8 @@ describe('Bitbucket OAuth credential storage', () => {
         )
       );
 
-    await expect(
-      storeBitbucketIntegration(integrationInput(owner, user.id, 'replacement'))
-    ).rejects.toThrow('no longer authorized');
-    await expect(
-      db
-        .select({ id: platform_integrations.id })
-        .from(platform_integrations)
-        .where(eq(platform_integrations.owned_by_organization_id, organization.id))
-    ).resolves.toEqual([{ id: existing.integrationId }]);
+    await expect(storeBitbucketIntegration(replacement)).rejects.toThrow('no longer authorized');
+    expect(await readStoredIntegration(existing.integrationId)).toEqual(before);
   });
 
   it('rechecks current platform-admin access inside the storage transaction', async () => {
@@ -360,6 +413,172 @@ describe('Bitbucket OAuth credential storage', () => {
         .from(platform_integrations)
         .where(eq(platform_integrations.owned_by_organization_id, organization.id))
     ).resolves.toEqual([{ id: existing.integrationId }]);
+  });
+
+  it('recovers write grants without changing integration identity, workspace, or cached repositories', async () => {
+    const fixture = await recoveryFixture();
+    const result = await storeBitbucketIntegration(fixture.replacement);
+    const after = await readStoredIntegration(fixture.integrationId);
+    expect(result).toEqual({ status: 'connected', integrationId: fixture.integrationId });
+    expect(after.integration).toEqual({
+      ...fixture.before.integration,
+      scopes: fixture.replacement.tokens.scopes,
+      updated_at: after.integration?.updated_at,
+    });
+    expect(after.credential).toMatchObject({
+      id: fixture.before.credential?.id,
+      platform_integration_id: fixture.integrationId,
+      credential_version: 2,
+      provider_subject_login: fixture.replacement.bitbucketUser.nickname,
+    });
+    if (!after.credential) throw new Error('Expected recovered credential');
+    for (const kind of ['access', 'refresh'] as const) {
+      expect(
+        decryptKeyedEnvelope(
+          after.credential[`${kind}_token_encrypted`] ?? '',
+          BITBUCKET_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
+          {
+            active: {
+              keyId: mockBitbucketCredentialEncryptionConfig.keyId,
+              privateKeyPem: testKeyPair.privateKey,
+            },
+          },
+          buildBitbucketOAuthCredentialAad({
+            credentialId: after.credential.id,
+            integrationId: fixture.integrationId,
+            owner: fixture.owner,
+            authorizedByUserId: fixture.user.id,
+            kind,
+          })
+        )
+      ).toBe(fixture.replacement.tokens[kind === 'access' ? 'accessToken' : 'refreshToken']);
+    }
+  });
+
+  it('rolls back a credential update when the following integration write fails', async () => {
+    const fixture = await recoveryFixture();
+    const transaction = db.transaction.bind(db);
+    const transactionSpy = jest.spyOn(db, 'transaction').mockImplementation(callback =>
+      transaction(async tx => {
+        const update = tx.update.bind(tx);
+        const failIntegrationUpdate: typeof tx.update = table => {
+          if (table === platform_integrations) throw new Error('forced integration write failure');
+          return update(table);
+        };
+        jest.spyOn(tx, 'update').mockImplementation(failIntegrationUpdate);
+        return callback(tx);
+      })
+    );
+    try {
+      await expect(storeBitbucketIntegration(fixture.replacement)).rejects.toThrow(
+        'forced integration write failure'
+      );
+    } finally {
+      transactionSpy.mockRestore();
+    }
+    expect(await readStoredIntegration(fixture.integrationId)).toEqual(fixture.before);
+  });
+
+  it.each(['workspace', 'credential revision', 'disconnection'])(
+    'rejects recovery after a changed %s without modifying current rows',
+    async change => {
+      const fixture = await recoveryFixture();
+      if (change === 'workspace') {
+        await db
+          .update(platform_integrations)
+          .set({
+            platform_account_id: 'changed-workspace',
+            platform_installation_id: 'changed-workspace',
+            platform_account_login: 'changed-workspace',
+            metadata: {
+              state: 'active',
+              workspace: {
+                uuid: 'changed-workspace',
+                slug: 'changed-workspace',
+                name: 'Changed Workspace',
+              },
+            },
+          })
+          .where(eq(platform_integrations.id, fixture.integrationId));
+      } else if (change === 'credential revision') {
+        await db
+          .update(platform_oauth_credentials)
+          .set({ credential_version: 2 })
+          .where(eq(platform_oauth_credentials.platform_integration_id, fixture.integrationId));
+      } else {
+        await db
+          .delete(platform_integrations)
+          .where(eq(platform_integrations.id, fixture.integrationId));
+      }
+      const current = await readStoredIntegration(fixture.integrationId);
+      await expect(storeBitbucketIntegration(fixture.replacement)).rejects.toThrow(
+        BitbucketIntegrationRecoveryError
+      );
+      expect(await readStoredIntegration(fixture.integrationId)).toEqual(current);
+    }
+  );
+
+  it.each(['workspace', 'write grants'])(
+    'retains credentials and cache when recovery lacks %s',
+    async missing => {
+      const fixture = await recoveryFixture();
+      if (missing === 'workspace') fixture.replacement.availableWorkspaces = [];
+      else
+        fixture.replacement.tokens.scopes = [
+          'account',
+          'repository:write',
+          'pullrequest',
+          'webhook',
+        ];
+      await expect(storeBitbucketIntegration(fixture.replacement)).rejects.toMatchObject({
+        code: missing === 'workspace' ? 'workspace_unavailable' : 'missing_scopes',
+      });
+      expect(await readStoredIntegration(fixture.integrationId)).toEqual(fixture.before);
+    }
+  );
+
+  it('rejects a recovery target from a different owner without changing either connection', async () => {
+    const first = await recoveryFixture();
+    const second = await recoveryFixture();
+    await expect(getBitbucketOAuthRecovery(second.owner, first.integrationId)).rejects.toThrow(
+      BitbucketIntegrationRecoveryError
+    );
+    await expect(
+      storeBitbucketIntegration({
+        ...second.replacement,
+        bitbucketRecovery: first.replacement.bitbucketRecovery,
+      })
+    ).rejects.toThrow(BitbucketIntegrationRecoveryError);
+    expect(await readStoredIntegration(first.integrationId)).toEqual(first.before);
+    expect(await readStoredIntegration(second.integrationId)).toEqual(second.before);
+  });
+
+  it('rechecks a blocked personal authorizer inside recovery persistence', async () => {
+    const fixture = await recoveryFixture();
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'blocked during OAuth recovery' })
+      .where(eq(kilocode_users.id, fixture.user.id));
+    await expect(storeBitbucketIntegration(fixture.replacement)).rejects.toThrow(
+      'no longer authorized'
+    );
+    expect(await readStoredIntegration(fixture.integrationId)).toEqual(fixture.before);
+  });
+
+  it('allows only one commit for competing callbacks with the same signed recovery revision', async () => {
+    const fixture = await recoveryFixture();
+    const results = await Promise.allSettled([
+      storeBitbucketIntegration(fixture.replacement),
+      storeBitbucketIntegration(fixture.replacement),
+    ]);
+    expect(results.map(result => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const after = await readStoredIntegration(fixture.integrationId);
+    expect(after.credential?.credential_version).toBe(2);
+    expect(after.integration?.metadata).toEqual(fixture.before.integration?.metadata);
+    expect(after.integration?.repositories).toEqual(fixture.before.integration?.repositories);
+    expect(after.integration?.repositories_synced_at).toEqual(
+      fixture.before.integration?.repositories_synced_at
+    );
   });
 
   it('allows one Bitbucket identity to authorize personal and organization integrations', async () => {

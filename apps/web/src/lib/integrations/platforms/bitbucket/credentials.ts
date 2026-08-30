@@ -8,14 +8,21 @@ import {
 import { db } from '@/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
+import {
+  BitbucketOAuthRecoverySchema,
+  type BitbucketOAuthRecovery,
+} from '@/lib/integrations/oauth-state';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { encryptKeyedEnvelope } from '@kilocode/encryption';
+import { getBitbucketReviewGrantStatus } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import {
   kilocode_users,
   organization_memberships,
   platform_integrations,
   platform_oauth_credentials,
   type NewPlatformOAuthCredential,
+  type PlatformIntegration,
+  type PlatformOAuthCredential,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { BitbucketOAuthTokens, BitbucketUser } from './adapter';
@@ -29,6 +36,13 @@ export class BitbucketIntegrationConnectionConflictError extends Error {
   constructor() {
     super('Bitbucket is already connected for this owner');
     this.name = 'BitbucketIntegrationConnectionConflictError';
+  }
+}
+
+export class BitbucketIntegrationRecoveryError extends Error {
+  constructor(readonly code: 'connection_changed' | 'workspace_unavailable' | 'missing_scopes') {
+    super(code);
+    this.name = 'BitbucketIntegrationRecoveryError';
   }
 }
 
@@ -57,6 +71,7 @@ export type StoreBitbucketIntegrationInput = {
   bitbucketUser: Pick<BitbucketUser, 'uuid' | 'nickname'>;
   tokens: BitbucketOAuthTokens;
   availableWorkspaces: BitbucketWorkspace[];
+  bitbucketRecovery?: BitbucketOAuthRecovery;
 };
 
 function normalizeBitbucketUuid(value: string): string {
@@ -92,19 +107,98 @@ function ownerCondition(owner: Owner) {
     : eq(platform_integrations.owned_by_organization_id, owner.id);
 }
 
+function readBitbucketOAuthRecovery(
+  integration: PlatformIntegration | undefined,
+  credential: PlatformOAuthCredential | undefined
+): BitbucketOAuthRecovery {
+  if (
+    !integration ||
+    !credential ||
+    integration.platform !== PLATFORM.BITBUCKET ||
+    integration.integration_type !== 'oauth' ||
+    integration.integration_status !== INTEGRATION_STATUS.ACTIVE ||
+    credential.platform_integration_id !== integration.id ||
+    credential.revoked_at
+  ) {
+    throw new BitbucketIntegrationRecoveryError('connection_changed');
+  }
+  const metadata = BitbucketIntegrationMetadataSchema.safeParse(integration.metadata);
+  if (
+    !metadata.success ||
+    metadata.data.state !== 'active' ||
+    integration.platform_account_id !== metadata.data.workspace.uuid ||
+    integration.platform_installation_id !== metadata.data.workspace.uuid ||
+    integration.platform_account_login !== metadata.data.workspace.slug
+  ) {
+    throw new BitbucketIntegrationRecoveryError('connection_changed');
+  }
+  const target = BitbucketOAuthRecoverySchema.safeParse({
+    integrationId: integration.id,
+    credentialId: credential.id,
+    credentialVersion: credential.credential_version,
+    workspaceUuid: metadata.data.workspace.uuid,
+    workspaceSlug: metadata.data.workspace.slug,
+  });
+  if (!target.success) throw new BitbucketIntegrationRecoveryError('connection_changed');
+  return target.data;
+}
+
+export async function getBitbucketOAuthRecovery(
+  owner: Owner,
+  integrationId: string
+): Promise<BitbucketOAuthRecovery> {
+  if (!BitbucketOAuthRecoverySchema.shape.integrationId.safeParse(integrationId).success) {
+    throw new BitbucketIntegrationRecoveryError('connection_changed');
+  }
+  const [current] = await db
+    .select({ integration: platform_integrations, credential: platform_oauth_credentials })
+    .from(platform_integrations)
+    .innerJoin(
+      platform_oauth_credentials,
+      eq(platform_oauth_credentials.platform_integration_id, platform_integrations.id)
+    )
+    .where(
+      and(
+        ownerCondition(owner),
+        eq(platform_integrations.id, integrationId),
+        eq(platform_integrations.platform, PLATFORM.BITBUCKET)
+      )
+    )
+    .limit(1);
+  return readBitbucketOAuthRecovery(current?.integration, current?.credential);
+}
+
 export async function storeBitbucketIntegration(input: StoreBitbucketIntegrationInput): Promise<{
   status: 'connected' | 'workspace_selection_required';
   integrationId: string;
 }> {
-  const integrationId = randomUUID();
-  const credentialId = randomUUID();
+  if (input.owner.type === 'user' && input.owner.id !== input.authorizedByUserId) {
+    throw new BitbucketIntegrationAuthorizationError(
+      'Bitbucket integration authorizer is no longer authorized'
+    );
+  }
+  const recovery = input.bitbucketRecovery;
+  if (recovery && !getBitbucketReviewGrantStatus(input.tokens.scopes, 'oauth').writeReady) {
+    throw new BitbucketIntegrationRecoveryError('missing_scopes');
+  }
+  const integrationId = recovery?.integrationId ?? randomUUID();
+  const credentialId = recovery?.credentialId ?? randomUUID();
   const providerSubjectId = normalizeBitbucketUuid(input.bitbucketUser.uuid);
   const availableWorkspaces = input.availableWorkspaces.map(workspace => ({
     uuid: normalizeBitbucketUuid(workspace.uuid),
     slug: workspace.slug,
     name: workspace.name,
   }));
-  const selectedWorkspace = availableWorkspaces.length === 1 ? availableWorkspaces[0] : undefined;
+  const selectedWorkspace = recovery
+    ? availableWorkspaces.find(
+        workspace =>
+          workspace.uuid === recovery.workspaceUuid && workspace.slug === recovery.workspaceSlug
+      )
+    : availableWorkspaces.length === 1
+      ? availableWorkspaces[0]
+      : undefined;
+  if (recovery && !selectedWorkspace)
+    throw new BitbucketIntegrationRecoveryError('workspace_unavailable');
   const metadata = BitbucketIntegrationMetadataSchema.parse(
     selectedWorkspace
       ? { state: 'active', workspace: selectedWorkspace }
@@ -152,51 +246,100 @@ export async function storeBitbucketIntegration(input: StoreBitbucketIntegration
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bitbucket-oauth-owner:${input.owner.type}:${input.owner.id}`}, 0))`
     );
+    // Use the refresh lock before row locks so a refresh cannot overwrite recovery.
+    if (recovery) {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bitbucket-oauth-credential:${recovery.credentialId}`}, 0))`
+      );
+    }
 
-    if (input.owner.type === 'org') {
-      const [authorizer] = await tx
-        .select({ isAdmin: kilocode_users.is_admin })
-        .from(kilocode_users)
+    const [authorizer] = await tx
+      .select({ isAdmin: kilocode_users.is_admin })
+      .from(kilocode_users)
+      .where(
+        and(eq(kilocode_users.id, input.authorizedByUserId), isNull(kilocode_users.blocked_reason))
+      )
+      .for('update');
+    if (!authorizer) {
+      throw new BitbucketIntegrationAuthorizationError(
+        'Bitbucket integration authorizer is no longer authorized'
+      );
+    }
+    if (input.owner.type === 'org' && !authorizer.isAdmin) {
+      const [membership] = await tx
+        .select({ id: organization_memberships.id })
+        .from(organization_memberships)
         .where(
           and(
-            eq(kilocode_users.id, input.authorizedByUserId),
-            isNull(kilocode_users.blocked_reason)
+            eq(organization_memberships.organization_id, input.owner.id),
+            eq(organization_memberships.kilo_user_id, input.authorizedByUserId),
+            inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES)
           )
         )
         .for('update');
-      if (!authorizer) {
+      if (!membership) {
         throw new BitbucketIntegrationAuthorizationError(
           'Bitbucket integration authorizer is no longer authorized'
         );
       }
-
-      if (!authorizer.isAdmin) {
-        const [membership] = await tx
-          .select({ id: organization_memberships.id })
-          .from(organization_memberships)
-          .where(
-            and(
-              eq(organization_memberships.organization_id, input.owner.id),
-              eq(organization_memberships.kilo_user_id, input.authorizedByUserId),
-              inArray(organization_memberships.role, ORGANIZATION_BILLING_ROLES)
-            )
-          )
-          .for('update');
-        if (!membership) {
-          throw new BitbucketIntegrationAuthorizationError(
-            'Bitbucket integration authorizer is no longer authorized'
-          );
-        }
-      }
     }
 
     const [currentIntegration] = await tx
-      .select({ id: platform_integrations.id })
+      .select()
       .from(platform_integrations)
       .where(
         and(ownerCondition(input.owner), eq(platform_integrations.platform, PLATFORM.BITBUCKET))
       )
       .for('update');
+    if (recovery) {
+      if (!currentIntegration || currentIntegration.id !== integrationId) {
+        throw new BitbucketIntegrationRecoveryError('connection_changed');
+      }
+      const [currentCredential] = await tx
+        .select()
+        .from(platform_oauth_credentials)
+        .where(eq(platform_oauth_credentials.platform_integration_id, integrationId))
+        .for('update');
+      const current = readBitbucketOAuthRecovery(currentIntegration, currentCredential);
+      if (
+        current.integrationId !== recovery.integrationId ||
+        current.credentialId !== recovery.credentialId ||
+        current.credentialVersion !== recovery.credentialVersion ||
+        current.workspaceUuid !== recovery.workspaceUuid ||
+        current.workspaceSlug !== recovery.workspaceSlug
+      ) {
+        throw new BitbucketIntegrationRecoveryError('connection_changed');
+      }
+
+      const updatedAt = new Date().toISOString();
+      const [updatedCredential] = await tx
+        .update(platform_oauth_credentials)
+        .set({
+          ...credentialValues,
+          credential_version: current.credentialVersion + 1,
+          updated_at: updatedAt,
+        })
+        .where(
+          and(
+            eq(platform_oauth_credentials.id, current.credentialId),
+            eq(platform_oauth_credentials.platform_integration_id, integrationId),
+            eq(platform_oauth_credentials.credential_version, current.credentialVersion)
+          )
+        )
+        .returning({ id: platform_oauth_credentials.id });
+      if (!updatedCredential) throw new BitbucketIntegrationRecoveryError('connection_changed');
+
+      const [updatedIntegration] = await tx
+        .update(platform_integrations)
+        .set({
+          scopes: [...input.tokens.scopes],
+          updated_at: updatedAt,
+        })
+        .where(and(ownerCondition(input.owner), eq(platform_integrations.id, integrationId)))
+        .returning({ id: platform_integrations.id });
+      if (!updatedIntegration) throw new BitbucketIntegrationRecoveryError('connection_changed');
+      return { status: 'connected', integrationId };
+    }
     if (currentIntegration) {
       throw new BitbucketIntegrationConnectionConflictError();
     }

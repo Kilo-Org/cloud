@@ -32,7 +32,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SecretTokenInput } from '@/components/ui/secret-token-input';
 import { useTRPC } from '@/lib/trpc/utils';
-import { buildConnectedWorkspaceAccessTokenStatus } from './BitbucketConnectSetup';
+import {
+  BitbucketTokenPermissions,
+  buildConnectedWorkspaceAccessTokenStatus,
+} from './BitbucketConnectSetup';
 
 const REVOKE_WORKSPACE_TOKEN_URL =
   'https://support.atlassian.com/bitbucket-cloud/docs/revoke-a-workspace-access-token/';
@@ -149,6 +152,7 @@ function ReplaceTokenDialog({
         </DialogTrigger>
       )}
       <DialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
         showCloseButton={!mutation.isPending}
         onEscapeKeyDown={event => mutation.isPending && event.preventDefault()}
         onPointerDownOutside={event => mutation.isPending && event.preventDefault()}
@@ -178,6 +182,7 @@ function ReplaceTokenDialog({
           </div>
 
           <div className="space-y-2">
+            <BitbucketTokenPermissions id="bitbucket-replacement-permissions" />
             <Label htmlFor="bitbucket-replacement-token">New Workspace Access Token</Label>
             <SecretTokenInput
               id="bitbucket-replacement-token"
@@ -190,7 +195,7 @@ function ReplaceTokenDialog({
               required
               maxLength={8192}
               className="h-control-touch sm:h-9"
-              aria-describedby="bitbucket-replacement-token-help"
+              aria-describedby="bitbucket-replacement-token-help bitbucket-replacement-permissions"
             />
             <p id="bitbucket-replacement-token-help" className="text-muted-foreground text-xs">
               Kilo encrypts this token. It is never shown again after submission.
@@ -374,6 +379,20 @@ export function BitbucketIntegrationControls({
         )}
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        {status.method === 'oauth' && status.status === 'connected' && (
+          <Button
+            asChild
+            variant="outline"
+            className="min-h-control-touch w-full sm:h-9 sm:min-h-0 sm:w-auto"
+          >
+            <a
+              href={`/api/integrations/bitbucket/connect?organizationId=${encodeURIComponent(organizationId)}&reconnectIntegrationId=${encodeURIComponent(status.integrationId)}`}
+              aria-describedby="bitbucket-review-permissions"
+            >
+              Reconnect with OAuth
+            </a>
+          </Button>
+        )}
         {status.method === 'workspace_access_token' && (
           <ReplaceTokenDialog
             organizationId={organizationId}

@@ -101,6 +101,7 @@ const BITBUCKET_OAUTH_SCOPE_ALIASES: Record<string, readonly string[]> = {
   'admin:webhook:bitbucket-legacy': ['webhook'],
   pullrequest: ['pullrequest'],
   'read:pullrequest:bitbucket-legacy': ['pullrequest'],
+  'write:pullrequest:bitbucket-legacy': ['pullrequest:write'],
   offline_access: [],
 };
 
@@ -120,6 +121,10 @@ function normalizedScopes(scope: string): string[] | null {
     }
   }
 
+  if (scopes.has('pullrequest:write')) {
+    scopes.add('pullrequest');
+    scopes.add('repository:write');
+  }
   if (scopes.has('repository:write')) scopes.add('repository');
   if (scopes.has('account')) scopes.add('email');
   const allowed = new Set([
@@ -128,6 +133,7 @@ function normalizedScopes(scope: string): string[] | null {
     'repository',
     'repository:write',
     'pullrequest',
+    'pullrequest:write',
     'webhook',
   ]);
   if (

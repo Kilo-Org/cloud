@@ -3,7 +3,9 @@ jest.mock('@/lib/config.server', () => ({
   BITBUCKET_CLIENT_SECRET: 'bitbucket-client-secret',
 }));
 
+import { getBitbucketReviewGrantStatus } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import {
+  BitbucketOAuthScopeError,
   buildBitbucketOAuthUrl,
   exchangeBitbucketOAuthCode,
   fetchBitbucketUser,
@@ -32,7 +34,7 @@ describe('Bitbucket OAuth adapter', () => {
     expect(Object.fromEntries(url.searchParams)).toEqual({
       client_id: 'bitbucket-client-id',
       response_type: 'code',
-      scope: 'account repository:write pullrequest webhook',
+      scope: 'account repository:write pullrequest webhook pullrequest:write',
       state: 'signed-state',
     });
     expect(url.toString()).not.toContain('bitbucket-client-secret');
@@ -42,12 +44,18 @@ describe('Bitbucket OAuth adapter', () => {
     const authorizationCode = 'authorization code+&=';
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(validTokenResponse());
 
-    await expect(exchangeBitbucketOAuthCode(authorizationCode)).resolves.toEqual({
+    const tokens = await exchangeBitbucketOAuthCode(authorizationCode);
+    expect(tokens).toEqual({
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
       tokenType: 'bearer',
       expiresIn: 3600,
       scopes: ['account', 'email', 'pullrequest', 'repository', 'repository:write', 'webhook'],
+    });
+    expect(getBitbucketReviewGrantStatus(tokens.scopes, 'oauth')).toEqual({
+      readReady: true,
+      writeReady: false,
+      recoveryAction: 'reconnect',
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -109,10 +117,10 @@ describe('Bitbucket OAuth adapter', () => {
     );
   });
 
-  it('accepts the transitional plural scopes field alongside canonical scope', async () => {
+  it('does not upgrade read grants from the transitional plural scopes field', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce(
       validTokenResponse({
-        scopes: 'repository:write repository account pullrequest webhook',
+        scopes: 'account pullrequest:write webhook',
       })
     );
 
@@ -146,6 +154,30 @@ describe('Bitbucket OAuth adapter', () => {
     );
   });
 
+  it.each(['pullrequest:write', 'write:pullrequest:bitbucket-legacy'])(
+    'retains %s after OAuth reconnect without requiring it on old grants',
+    async grant => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(validTokenResponse({ scope: `account ${grant} webhook` }));
+      const tokens = await exchangeBitbucketOAuthCode('reconnect-code');
+      expect(tokens.scopes).toEqual([
+        'account',
+        'email',
+        'pullrequest',
+        'pullrequest:write',
+        'repository',
+        'repository:write',
+        'webhook',
+      ]);
+      expect(getBitbucketReviewGrantStatus(tokens.scopes, 'oauth')).toEqual({
+        readReady: true,
+        writeReady: true,
+        recoveryAction: null,
+      });
+    }
+  );
+
   it('rejects the retired plural scopes response field without canonical scope', async () => {
     jest
       .spyOn(global, 'fetch')
@@ -166,9 +198,11 @@ describe('Bitbucket OAuth adapter', () => {
   ])('rejects token responses missing a required OAuth scope', async scope => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce(validTokenResponse({ scope }));
 
-    await expect(exchangeBitbucketOAuthCode('authorization-code')).rejects.toThrow(
+    const exchange = exchangeBitbucketOAuthCode('authorization-code');
+    await expect(exchange).rejects.toThrow(
       'Bitbucket OAuth token exchange returned invalid credentials'
     );
+    await expect(exchange).rejects.toBeInstanceOf(BitbucketOAuthScopeError);
   });
 
   it('ignores token response scopes beyond the required OAuth grant', async () => {

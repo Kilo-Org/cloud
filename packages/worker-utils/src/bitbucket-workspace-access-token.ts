@@ -238,3 +238,23 @@ export function hasRequiredBitbucketWorkspaceAccessTokenScopes(
 ): boolean {
   return getMissingBitbucketWorkspaceAccessTokenScopes(observedScopes).length === 0;
 }
+
+export function getBitbucketReviewGrantStatus(
+  observedScopes: readonly string[],
+  method: 'oauth' | 'workspace_access_token'
+) {
+  // Old read grants remain valid until old clients/records and the 30-day ledger window expire.
+  const readReady = hasRequiredBitbucketWorkspaceAccessTokenScopes(observedScopes);
+  const writeReady =
+    readReady &&
+    buildBitbucketWorkspaceAccessTokenEffectiveScopeSet(observedScopes).has('pullrequest:write');
+  return {
+    readReady,
+    writeReady,
+    recoveryAction: writeReady
+      ? null
+      : method === 'oauth'
+        ? ('reconnect' as const)
+        : ('replace_token' as const),
+  };
+}

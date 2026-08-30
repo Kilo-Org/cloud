@@ -32,7 +32,7 @@ const REQUIRED_PERMISSIONS = [
   'Account Read',
   'Repository Read',
   'Repository Write',
-  'Pull request Read',
+  'Pull request Write',
   'Webhooks Read and Write',
 ];
 
@@ -89,6 +89,35 @@ function CardHeaderContent() {
         </Badge>
       </div>
     </CardHeader>
+  );
+}
+
+export function BitbucketReviewPermissions() {
+  return (
+    <div id="bitbucket-review-permissions" className="text-muted-foreground space-y-2 text-sm">
+      <p>
+        Existing Pull request Read connections remain readable. To enable approvals and merges,
+        replace the workspace token with Pull request Write, or reconnect with OAuth.
+      </p>
+      <p>
+        If OAuth rejects the added scope, the Kilo operator must enable Pull request Write on the
+        Bitbucket OAuth consumer. This is a configuration requirement, not a Bitbucket review
+        limitation.
+      </p>
+    </div>
+  );
+}
+
+export function BitbucketTokenPermissions({ id }: { id: string }) {
+  return (
+    <div id={id} className="border-border space-y-2 rounded-lg border p-4">
+      <p className="text-sm font-medium">Required permissions</p>
+      <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
+        {REQUIRED_PERMISSIONS.map(permission => (
+          <li key={permission}>{permission}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -206,6 +235,8 @@ export function BitbucketConnectSetup({
               </ul>
             </div>
 
+            <BitbucketReviewPermissions />
+
             <Tabs defaultValue="workspace-access-token" className="space-y-4">
               <TabsList
                 aria-label="Bitbucket connection method"
@@ -244,14 +275,7 @@ export function BitbucketConnectSetup({
                       <ExternalLink className="size-icon-sm" />
                     </a>
                   </div>
-                  <div className="border-border space-y-2 rounded-lg border p-4">
-                    <p className="text-sm font-medium">Required permissions</p>
-                    <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
-                      {REQUIRED_PERMISSIONS.map(permission => (
-                        <li key={permission}>{permission}</li>
-                      ))}
-                    </ul>
-                  </div>
+                  <BitbucketTokenPermissions id="bitbucket-workspace-permissions" />
                 </section>
 
                 <form autoComplete="off" className="space-y-5" onSubmit={handleConnect}>
@@ -268,7 +292,7 @@ export function BitbucketConnectSetup({
                       required
                       maxLength={8192}
                       className="h-control-touch sm:h-9"
-                      aria-describedby="bitbucket-workspace-token-help"
+                      aria-describedby="bitbucket-workspace-token-help bitbucket-review-permissions"
                     />
                     <p
                       id="bitbucket-workspace-token-help"

@@ -2,6 +2,25 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
+import { z } from 'zod';
+
+export const BitbucketOAuthRecoverySchema = z
+  .object({
+    integrationId: z.uuid(),
+    credentialId: z.uuid(),
+    credentialVersion: z.number().int().positive().max(2_147_483_646),
+    workspaceUuid: z
+      .string()
+      .min(1)
+      .refine(value => value.trim() === value),
+    workspaceSlug: z
+      .string()
+      .min(1)
+      .refine(value => value.trim() === value),
+  })
+  .strict();
+
+export type BitbucketOAuthRecovery = z.infer<typeof BitbucketOAuthRecoverySchema>;
 
 /**
  * HMAC-signed OAuth state parameter.
@@ -13,7 +32,7 @@ import { validateReturnPath } from '@/lib/integrations/validate-return-path';
  *
  * This module produces a state value of the form:
  *
- *   base64url({ owner, uid, iat, nonce }) . HMAC-SHA256(payload, secret)
+ *   base64url({ owner, uid, iat, nonce, ...optionalContext }) . HMAC-SHA256(payload, secret)
  *
  * where `owner` is the original owner string, `uid` is the ID of the
  * authenticated user who started the flow, `iat` is the issued-at timestamp
@@ -25,8 +44,7 @@ import { validateReturnPath } from '@/lib/integrations/validate-return-path';
  *  2. Check `iat` is within the allowed TTL window (default 10 minutes).
  *  3. Extract `uid` and confirm it matches the session user (same user
  *     who initiated the flow is completing it).
- *  4. Return the `owner` string so the rest of the callback logic is
- *     unchanged.
+ *  4. Return the owner and any validated, signed recovery context.
  */
 
 const HMAC_ALGORITHM = 'sha256';
@@ -47,7 +65,12 @@ function sign(data: string): string {
  * @param owner  – owner string, e.g. `user_abc123` or `org_xyz789`
  * @param userId – the ID of the currently-authenticated user initiating the flow
  */
-export function createOAuthState(owner: string, userId: string, returnTo?: string): string {
+export function createOAuthState(
+  owner: string,
+  userId: string,
+  returnTo?: string,
+  bitbucketRecovery?: BitbucketOAuthRecovery
+): string {
   const iat = Math.floor(Date.now() / 1000);
   const nonce = crypto.randomBytes(NONCE_BYTES).toString('base64url');
   const safeReturnTo = returnTo ? validateReturnPath(returnTo) : null;
@@ -58,6 +81,9 @@ export function createOAuthState(owner: string, userId: string, returnTo?: strin
       iat,
       nonce,
       ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
+      ...(bitbucketRecovery
+        ? { bitbucketRecovery: BitbucketOAuthRecoverySchema.parse(bitbucketRecovery) }
+        : {}),
     })
   ).toString('base64url');
   const signature = sign(payload);
@@ -71,6 +97,8 @@ export type VerifiedOAuthState = {
   userId: string;
   /** Optional relative path to return to after the OAuth callback. */
   returnTo?: string;
+  /** Explicit Bitbucket recovery; absent on legacy first-connect state. */
+  bitbucketRecovery?: BitbucketOAuthRecovery;
 };
 
 /**
@@ -106,6 +134,7 @@ export function verifyOAuthState(state: string | null): VerifiedOAuthState | nul
       iat?: number;
       nonce?: string;
       returnTo?: string;
+      bitbucketRecovery?: unknown;
     };
     if (typeof data.owner !== 'string' || typeof data.uid !== 'string') return null;
 
@@ -118,8 +147,18 @@ export function verifyOAuthState(state: string | null): VerifiedOAuthState | nul
     if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
 
     const returnTo = typeof data.returnTo === 'string' ? validateReturnPath(data.returnTo) : null;
+    const recovery =
+      data.bitbucketRecovery === undefined
+        ? undefined
+        : BitbucketOAuthRecoverySchema.safeParse(data.bitbucketRecovery);
+    if (recovery && !recovery.success) return null;
 
-    return { owner: data.owner, userId: data.uid, ...(returnTo ? { returnTo } : {}) };
+    return {
+      owner: data.owner,
+      userId: data.uid,
+      ...(returnTo ? { returnTo } : {}),
+      ...(recovery?.success ? { bitbucketRecovery: recovery.data } : {}),
+    };
   } catch {
     return null;
   }

@@ -28,6 +28,12 @@ const bitbucketConnectionErrorMessages: Record<string, string> = {
   connection_exists:
     'Bitbucket is already connected. Disconnect the current connection before using OAuth.',
   connection_failed: 'Bitbucket could not be connected. Try OAuth again in a minute.',
+  connection_changed:
+    'The Bitbucket connection changed. No credentials were replaced. Refresh this page before reconnecting with OAuth.',
+  workspace_unavailable:
+    'The authorized Bitbucket account cannot access the connected workspace. Use an account with access to that workspace. The current connection is unchanged.',
+  missing_scopes:
+    'Bitbucket did not grant the required permissions. Ask the Kilo operator to enable Account Read, Repository Write, Pull request Write, and Webhooks on the OAuth consumer, then reconnect. The current connection is unchanged.',
 };
 
 export function getBitbucketConnectionErrorMessage(error: string): string {

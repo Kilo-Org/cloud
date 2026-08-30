@@ -1657,7 +1657,9 @@
     "sessionExited": "会话已退出",
     "remoteSpawnRetryable": "无法连接到实例——它可能已断开。",
     "remoteSpawnNonRetryable": "实例未能启动会话——请检查机器或更新 CLI。",
-    "remoteSpawnInstanceDisconnected": "所选实例已断开。请在 Cloud Agent 上启动会话，或选择其他实例。"
+    "remoteSpawnInstanceDisconnected": "所选实例已断开。请在 Cloud Agent 上启动会话，或选择其他实例。",
+    "liveCount_one": "{{count}} 实时",
+    "liveCount_other": "{{count}} 实时"
   },
   "agentChat": {
     "session": {

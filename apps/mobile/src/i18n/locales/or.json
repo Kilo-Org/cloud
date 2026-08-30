@@ -2111,7 +2111,9 @@
     "sessionExited": "ସେସନ୍ ବାହାରିଛି",
     "remoteSpawnRetryable": "ଇନ୍‌ସ୍ଟାନ୍ସରେ ପହଞ୍ଚି ପାରିଲୁ ନାହିଁ — ଏହା ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହୋଇଥାଇପାରେ।",
     "remoteSpawnNonRetryable": "ଇନ୍‌ସ୍ଟାନ୍ସ ସେସନ୍ ଆରମ୍ଭ କରିବାରେ ବିଫଳ ହେଲା — ମେସିନ୍ ଯାଞ୍ଚ କରନ୍ତୁ କିମ୍ବା CLI ଅପଡେଟ୍ କରନ୍ତୁ।",
-    "remoteSpawnInstanceDisconnected": "ଚୟନ କରାଯାଇଥିବା ଇନ୍‌ସ୍ଟାନ୍ସ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହୋଇଛି। Cloud Agent ରେ ଏକ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ କିମ୍ବା ଅନ୍ୟ ଇନ୍‌ସ୍ଟାନ୍ସ ବାଛନ୍ତୁ।"
+    "remoteSpawnInstanceDisconnected": "ଚୟନ କରାଯାଇଥିବା ଇନ୍‌ସ୍ଟାନ୍ସ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହୋଇଛି। Cloud Agent ରେ ଏକ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ କିମ୍ବା ଅନ୍ୟ ଇନ୍‌ସ୍ଟାନ୍ସ ବାଛନ୍ତୁ।",
+    "liveCount_one": "{{count}} ଲାଇଭ୍",
+    "liveCount_other": "{{count}} ଲାଇଭ୍"
   },
   "agentChat": {
     "session": {

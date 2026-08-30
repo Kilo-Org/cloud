@@ -2111,7 +2111,9 @@
     "sessionExited": "Sesi ditamatkan",
     "remoteSpawnRetryable": "Tidak dapat mencapai instance — ia mungkin telah terputus sambungan.",
     "remoteSpawnNonRetryable": "Instance gagal memulakan sesi — semak mesin atau kemas kini CLI.",
-    "remoteSpawnInstanceDisconnected": "Instance yang dipilih terputus sambungan. Mulakan sesi pada Cloud Agent atau pilih instance lain."
+    "remoteSpawnInstanceDisconnected": "Instance yang dipilih terputus sambungan. Mulakan sesi pada Cloud Agent atau pilih instance lain.",
+    "liveCount_one": "{{count}} LANGSUNG",
+    "liveCount_other": "{{count}} LANGSUNG"
   },
   "agentChat": {
     "session": {

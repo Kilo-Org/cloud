@@ -2111,7 +2111,9 @@
     "sessionExited": "સત્ર બહાર નીકળ્યું",
     "remoteSpawnRetryable": "ઇન્સ્ટન્સ સુધી પહોંચી શકાયું નહીં — તે ડિસ્કનેક્ટ થયું હોઈ શકે છે.",
     "remoteSpawnNonRetryable": "ઇન્સ્ટન્સ સત્ર શરૂ કરવામાં નિષ્ફળ ગયું — મશીન તપાસો અથવા CLI અપડેટ કરો.",
-    "remoteSpawnInstanceDisconnected": "પસંદ કરેલ ઇન્સ્ટન્સ ડિસ્કનેક્ટ થયું. Cloud Agent પર સત્ર શરૂ કરો અથવા બીજું ઇન્સ્ટન્સ પસંદ કરો."
+    "remoteSpawnInstanceDisconnected": "પસંદ કરેલ ઇન્સ્ટન્સ ડિસ્કનેક્ટ થયું. Cloud Agent પર સત્ર શરૂ કરો અથવા બીજું ઇન્સ્ટન્સ પસંદ કરો.",
+    "liveCount_one": "{{count}} લાઇવ",
+    "liveCount_other": "{{count}} લાઇવ"
   },
   "agentChat": {
     "session": {

@@ -2111,7 +2111,9 @@
     "sessionExited": "Sessiya başa çatdı",
     "remoteSpawnRetryable": "İnstansa çatmaq mümkün olmadı — o, əlaqəsi kəsilmiş ola bilər.",
     "remoteSpawnNonRetryable": "İnstans sessiyanı başlada bilmədi — maşını yoxlayın və ya CLI-ni yeniləyin.",
-    "remoteSpawnInstanceDisconnected": "Seçilmiş instansın əlaqəsi kəsildi. Cloud Agent-də sessiya başladın və ya başqa instans seçin."
+    "remoteSpawnInstanceDisconnected": "Seçilmiş instansın əlaqəsi kəsildi. Cloud Agent-də sessiya başladın və ya başqa instans seçin.",
+    "liveCount_one": "{{count}} CANLI",
+    "liveCount_other": "{{count}} CANLI"
   },
   "agentChat": {
     "session": {

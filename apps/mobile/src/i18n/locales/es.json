@@ -1665,7 +1665,10 @@
     "sessionExited": "La sesión finalizó",
     "remoteSpawnRetryable": "No se pudo conectar con la instancia: es posible que se haya desconectado.",
     "remoteSpawnNonRetryable": "La instancia no pudo iniciar la sesión: revisa la máquina o actualiza la CLI.",
-    "remoteSpawnInstanceDisconnected": "La instancia seleccionada se desconectó. Inicia una sesión en Cloud Agent o elige otra instancia."
+    "remoteSpawnInstanceDisconnected": "La instancia seleccionada se desconectó. Inicia una sesión en Cloud Agent o elige otra instancia.",
+    "liveCount_one": "{{count}} EN VIVO",
+    "liveCount_other": "{{count}} EN VIVO",
+    "liveCount_many": "{{count}} EN VIVO"
   },
   "agentChat": {
     "session": {

@@ -2171,7 +2171,13 @@
     "sessionExited": "Wedi gadael y sesiwn",
     "remoteSpawnRetryable": "Ni ellid cyrraedd yr enghraifft — efallai iddi ddatgysylltu.",
     "remoteSpawnNonRetryable": "Methodd yr enghraifft â chychwyn y sesiwn — gwiriwch y peiriant neu diweddarwch y CLI.",
-    "remoteSpawnInstanceDisconnected": "Datgysylltodd yr enghraifft a ddewiswyd. Cychwynnwch sesiwn ar Cloud Agent neu dewiswch enghraifft arall."
+    "remoteSpawnInstanceDisconnected": "Datgysylltodd yr enghraifft a ddewiswyd. Cychwynnwch sesiwn ar Cloud Agent neu dewiswch enghraifft arall.",
+    "liveCount_one": "{{count}} BYW",
+    "liveCount_other": "{{count}} BYW",
+    "liveCount_zero": "{{count}} BYW",
+    "liveCount_two": "{{count}} BYW",
+    "liveCount_few": "{{count}} BYW",
+    "liveCount_many": "{{count}} BYW"
   },
   "agentChat": {
     "session": {

@@ -2111,7 +2111,9 @@
     "sessionExited": "Istunto päättyi",
     "remoteSpawnRetryable": "Yhteyttä instanssiin ei saatu — se on voinut katketa.",
     "remoteSpawnNonRetryable": "Instanssi ei käynnistänyt istuntoa — tarkista kone tai päivitä CLI.",
-    "remoteSpawnInstanceDisconnected": "Valittu instanssi katkaisi yhteyden. Aloita istunto Cloud Agentissa tai valitse toinen instanssi."
+    "remoteSpawnInstanceDisconnected": "Valittu instanssi katkaisi yhteyden. Aloita istunto Cloud Agentissa tai valitse toinen instanssi.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {

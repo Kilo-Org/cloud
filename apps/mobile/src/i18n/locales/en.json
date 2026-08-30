@@ -2064,6 +2064,8 @@
     }
   },
   "agents": {
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE",
     "search": {
       "searching": "Searching",
       "searchSessions": "Search sessions",

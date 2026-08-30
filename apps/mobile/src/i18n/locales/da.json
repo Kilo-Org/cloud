@@ -2111,7 +2111,9 @@
     "sessionExited": "Sessionen blev afsluttet",
     "remoteSpawnRetryable": "Kunne ikke nå instansen — den er måske blevet afbrudt.",
     "remoteSpawnNonRetryable": "Instansen kunne ikke starte sessionen — kontrollér maskinen eller opdater CLI'en.",
-    "remoteSpawnInstanceDisconnected": "Den valgte instans blev afbrudt. Start en session på Cloud Agent, eller vælg en anden instans."
+    "remoteSpawnInstanceDisconnected": "Den valgte instans blev afbrudt. Start en session på Cloud Agent, eller vælg en anden instans.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {

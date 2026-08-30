@@ -2111,7 +2111,9 @@
     "sessionExited": "ಸೆಶನ್ ನಿರ್ಗಮಿಸಿದೆ",
     "remoteSpawnRetryable": "ಇನ್ಸ್ಟೆನ್ಸ್ ಅನ್ನು ತಲುಪಲಾಗಲಿಲ್ಲ — ಅದು ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿರಬಹುದು.",
     "remoteSpawnNonRetryable": "ಇನ್ಸ್ಟೆನ್ಸ್ ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಲು ವಿಫಲವಾಗಿದೆ — ಯಂತ್ರವನ್ನು ಪರಿಶೀಲಿಸಿ ಅಥವಾ CLI ಅನ್ನು ನವೀಕರಿಸಿ.",
-    "remoteSpawnInstanceDisconnected": "ಆಯ್ಕೆಮಾಡಿದ ಇನ್ಸ್ಟೆನ್ಸ್ ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ. Cloud Agent ನಲ್ಲಿ ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ ಅಥವಾ ಮತ್ತೊಂದು ಇನ್ಸ್ಟೆನ್ಸ್ ಆಯ್ಕೆಮಾಡಿ."
+    "remoteSpawnInstanceDisconnected": "ಆಯ್ಕೆಮಾಡಿದ ಇನ್ಸ್ಟೆನ್ಸ್ ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ. Cloud Agent ನಲ್ಲಿ ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ ಅಥವಾ ಮತ್ತೊಂದು ಇನ್ಸ್ಟೆನ್ಸ್ ಆಯ್ಕೆಮಾಡಿ.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {

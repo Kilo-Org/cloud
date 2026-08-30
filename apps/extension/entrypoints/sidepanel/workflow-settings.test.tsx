@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { createElement } from 'react';
 import { Provider, createStore } from 'jotai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, waitFor, within } from '@testing-library/react';
 import { runningConversationIdsAtom } from './agent-chat-atoms';
 import {
   activeConversationIdAtom,
@@ -153,13 +153,14 @@ describe('workflow settings', () => {
       allowWorkflowsInSafeMode: false,
     });
 
-    const { getByText, queryByRole } = render(createElement(WorkflowSettings), {
+    const { getByText, getByRole } = render(createElement(WorkflowSettings), {
       wrapper: createWrapper(store),
     });
 
     await waitFor(() => {
       expect(getByText(/No workflows yet. Ask Kilo to save one/u)).toBeDefined();
-      expect(queryByRole('status')).toBeNull();
+      expect(getByRole('status').textContent).toBe('');
+      expect(getByRole('status').className).toBe('sr-only');
     });
   });
 
@@ -273,6 +274,256 @@ describe('workflow settings', () => {
       expect(store.get(workflowRunRequestAtom)).toStrictEqual({ workflowId: 'wf-1' });
       expect(store.get(settingsDialogOpenAtom)).toBe(false);
     });
+  });
+
+  it.each([
+    { outcome: 'success', parameters: false },
+    { outcome: 'success', parameters: true },
+    { outcome: 'rejection', parameters: false },
+    { outcome: 'rejection', parameters: true },
+    { outcome: 'error', parameters: false },
+    { outcome: 'error', parameters: true },
+  ])(
+    'announces delayed Run admission through $outcome (parameters=$parameters)',
+    async ({ outcome, parameters }) => {
+      mockUseAgentWorkflows.mockReturnValue({
+        ...emptyResult,
+        workflows: [
+          {
+            ...approvedWorkflow,
+            ...(parameters
+              ? { params: [{ name: 'size', description: 'Pizza size', required: true }] }
+              : {}),
+          },
+        ],
+      });
+      mockLoadWorkflowSettings.mockResolvedValue({
+        ...DEFAULT_WORKFLOW_SETTINGS,
+        allowWorkflowsInSafeMode: true,
+      });
+      store.set(settingsDialogOpenAtom, true);
+      const coordinator = getBrowserExecutionCoordinator();
+      const admission = await coordinator.acquireLocal();
+      if (!admission.admitted) {
+        throw new Error(admission.reason);
+      }
+      heldLeases.add(admission.lease);
+      const pending = Promise.withResolvers<BrowserAdmission>();
+      vi.spyOn(coordinator, 'acquireLocal').mockReturnValueOnce(pending.promise);
+      const view = render(createElement(WorkflowSettings), { wrapper: createWrapper(store) });
+      try {
+        const rowRun = view.getByRole('button', { name: 'Run workflow "Order pizza"' });
+        await waitFor(() => {
+          expect(rowRun).toHaveProperty('disabled', false);
+        });
+        const settingsStatus = view.getByRole('status');
+        if (parameters) {
+          fireEvent.click(rowRun);
+        }
+        const controls = parameters ? within(view.getByRole('dialog')) : view;
+        const runName = parameters ? 'Run' : 'Run workflow "Order pizza"';
+        const runButton = controls.getByRole('button', { name: runName });
+        const status = controls.getByRole('status');
+        expect({ className: status.className, text: status.textContent }).toStrictEqual({
+          className: 'sr-only',
+          text: '',
+        });
+        if (parameters) {
+          fireEvent.change(controls.getByRole('textbox'), { target: { value: 'large' } });
+        }
+        fireEvent.click(runButton);
+        expect({
+          busy: runButton.getAttribute('aria-busy'),
+          cancelDisabled: parameters
+            ? controls.getByRole('button', { name: 'Cancel' }).hasAttribute('disabled')
+            : false,
+          disabled: runButton.hasAttribute('disabled'),
+          sameButton: controls.getByRole('button', { name: runName }) === runButton,
+          sameStatus: controls.getByRole('status') === status,
+          screenReaderOnly: status.classList.contains('sr-only'),
+          pending: status.textContent?.includes('Checking browser control'),
+        }).toStrictEqual({
+          busy: 'true',
+          cancelDisabled: false,
+          disabled: true,
+          sameButton: true,
+          sameStatus: true,
+          screenReaderOnly: false,
+          pending: true,
+        });
+        fireEvent.click(rowRun);
+        fireEvent.click(runButton);
+        fireEvent.click(runButton);
+        expect({
+          input: parameters ? controls.queryByDisplayValue('large') !== null : undefined,
+          request: store.get(workflowRunRequestAtom),
+          settingsOpen: store.get(settingsDialogOpenAtom),
+        }).toStrictEqual({
+          input: parameters ? true : undefined,
+          request: undefined,
+          settingsOpen: true,
+        });
+        await act(async () => {
+          if (outcome === 'error') {
+            pending.reject(new Error('Admission unavailable.'));
+          } else {
+            pending.resolve(
+              outcome === 'success' ? admission : { admitted: false, reason: 'Busy' }
+            );
+          }
+          await pending.promise.catch(() => {});
+        });
+        expect({
+          busy: rowRun.getAttribute('aria-busy'),
+          pending: view.queryByText(/Checking browser control/u),
+        }).toStrictEqual({ busy: 'false', pending: null });
+        if (outcome !== 'success') {
+          view.rerender(createElement(WorkflowSettings));
+          expect({
+            busy: runButton.getAttribute('aria-busy'),
+            disabled: runButton.hasAttribute('disabled'),
+            input: parameters ? controls.queryByDisplayValue('large') !== null : undefined,
+            request: store.get(workflowRunRequestAtom),
+            retryGuidance: controls
+              .getByRole(parameters ? 'alert' : 'status')
+              .textContent?.includes('Run it again'),
+            sameStatus: controls.getByRole('status') === status,
+            settingsOpen: store.get(settingsDialogOpenAtom),
+          }).toStrictEqual({
+            busy: 'false',
+            disabled: false,
+            input: parameters ? true : undefined,
+            request: undefined,
+            retryGuidance: true,
+            sameStatus: true,
+            settingsOpen: true,
+          });
+          fireEvent.click(runButton);
+        }
+        await waitFor(() => {
+          expect(store.get(workflowRunRequestAtom)).toStrictEqual({
+            workflowId: 'wf-1',
+            ...(parameters ? { input: { size: 'large' } } : {}),
+          });
+          expect(store.get(settingsDialogOpenAtom)).toBe(false);
+          expect(view.queryByRole('dialog')).toBeNull();
+          expect({
+            className: settingsStatus.className,
+            sameStatus: view.getByRole('status') === settingsStatus,
+            text: settingsStatus.textContent,
+          }).toStrictEqual({ className: 'sr-only', sameStatus: true, text: '' });
+        });
+      } finally {
+        view.unmount();
+        pending.resolve(admission);
+      }
+    }
+  );
+
+  it('keeps a newer Run pending when cancelled admission finishes late', async () => {
+    mockUseAgentWorkflows.mockReturnValue({
+      ...emptyResult,
+      workflows: [
+        {
+          ...approvedWorkflow,
+          params: [{ name: 'size', description: 'Pizza size', required: true }],
+        },
+      ],
+    });
+    mockLoadWorkflowSettings.mockResolvedValue({
+      ...DEFAULT_WORKFLOW_SETTINGS,
+      allowWorkflowsInSafeMode: true,
+    });
+    store.set(settingsDialogOpenAtom, true);
+    const coordinator = getBrowserExecutionCoordinator();
+    const oldAdmission = await coordinator.acquireLocal();
+    const newAdmission = await coordinator.acquireLocal();
+    if (!oldAdmission.admitted || !newAdmission.admitted) {
+      throw new Error('Expected local admission');
+    }
+    heldLeases.add(oldAdmission.lease);
+    heldLeases.add(newAdmission.lease);
+    const oldPending = Promise.withResolvers<BrowserAdmission>();
+    const newPending = Promise.withResolvers<BrowserAdmission>();
+    vi.spyOn(coordinator, 'acquireLocal')
+      .mockReturnValueOnce(oldPending.promise)
+      .mockReturnValueOnce(newPending.promise);
+    const view = render(createElement(WorkflowSettings), { wrapper: createWrapper(store) });
+    try {
+      const rowRun = view.getByRole('button', { name: 'Run workflow "Order pizza"' });
+      await waitFor(() => {
+        expect(rowRun).toHaveProperty('disabled', false);
+      });
+      fireEvent.click(rowRun);
+      const oldDialog = within(view.getByRole('dialog'));
+      const oldStatus = oldDialog.getByRole('status');
+      expect(oldStatus.textContent).toBe('');
+      fireEvent.change(oldDialog.getByRole('textbox'), { target: { value: 'large' } });
+      fireEvent.click(oldDialog.getByRole('button', { name: 'Run' }));
+      expect({
+        pending: oldStatus.textContent?.includes('Checking browser control'),
+        sameStatus: oldDialog.getByRole('status') === oldStatus,
+      }).toStrictEqual({ pending: true, sameStatus: true });
+      fireEvent.click(oldDialog.getByRole('button', { name: 'Cancel' }));
+      expect({
+        dialog: view.queryByRole('dialog'),
+        disabled: rowRun.hasAttribute('disabled'),
+        pending: view.queryByText(/Checking browser control/u),
+      }).toStrictEqual({ dialog: null, disabled: false, pending: null });
+      fireEvent.click(rowRun);
+      const dialog = within(view.getByRole('dialog'));
+      const status = dialog.getByRole('status');
+      const runButton = dialog.getByRole('button', { name: 'Run' });
+      expect(status.textContent).toBe('');
+      fireEvent.change(dialog.getByRole('textbox'), { target: { value: 'medium' } });
+      fireEvent.click(runButton);
+      await act(async () => {
+        oldPending.resolve(oldAdmission);
+        await oldPending.promise;
+      });
+      await waitFor(async () => {
+        const nativeState = await nativeLocks.query();
+        expect(nativeState.held?.filter(lock => lock.name === BROWSER_EXECUTION_LOCK)).toHaveLength(
+          1
+        );
+      });
+      expect({
+        busy: runButton.getAttribute('aria-busy'),
+        cancelDisabled: dialog.getByRole('button', { name: 'Cancel' }).hasAttribute('disabled'),
+        disabled: runButton.hasAttribute('disabled'),
+        input: dialog.queryByDisplayValue('medium') !== null,
+        request: store.get(workflowRunRequestAtom),
+        sameStatus: dialog.getByRole('status') === status,
+        settingsOpen: store.get(settingsDialogOpenAtom),
+        pending: status.textContent?.includes('Checking browser control'),
+      }).toStrictEqual({
+        busy: 'true',
+        cancelDisabled: false,
+        disabled: true,
+        input: true,
+        request: undefined,
+        sameStatus: true,
+        settingsOpen: true,
+        pending: true,
+      });
+      await act(async () => {
+        newPending.resolve(newAdmission);
+        await newPending.promise;
+      });
+      await waitFor(() => {
+        expect(store.get(workflowRunRequestAtom)).toStrictEqual({
+          workflowId: 'wf-1',
+          input: { size: 'medium' },
+        });
+        expect(store.get(settingsDialogOpenAtom)).toBe(false);
+        expect(view.queryByRole('dialog')).toBeNull();
+        expect(view.queryByText(/Checking browser control/u)).toBeNull();
+      });
+    } finally {
+      view.unmount();
+      oldPending.resolve(oldAdmission);
+      newPending.resolve(newAdmission);
+    }
   });
 
   it.each([
@@ -399,24 +650,46 @@ describe('workflow settings', () => {
         expect(view.getByLabelText('Run workflow "Order pizza"')).toHaveProperty('disabled', false);
       });
       fireEvent.click(view.getByLabelText('Run workflow "Order pizza"'));
-      fireEvent.change(view.getByRole('textbox'), { target: { value: 'large' } });
-      fireEvent.click(view.getByRole('button', { name: 'Run' }));
-      expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+      const dialog = within(view.getByRole('dialog'));
+      const status = dialog.getByRole('status');
+      const runButton = dialog.getByRole('button', { name: 'Run' });
+      expect(status.textContent).toBe('');
+      fireEvent.change(dialog.getByRole('textbox'), { target: { value: 'large' } });
+      fireEvent.click(runButton);
+      expect({
+        busy: runButton.getAttribute('aria-busy'),
+        cancelDisabled: dialog.getByRole('button', { name: 'Cancel' }).hasAttribute('disabled'),
+        disabled: runButton.hasAttribute('disabled'),
+        request: store.get(workflowRunRequestAtom),
+        sameStatus: dialog.getByRole('status') === status,
+        pending: status.textContent?.includes('Checking browser control'),
+      }).toStrictEqual({
+        busy: 'true',
+        cancelDisabled: false,
+        disabled: true,
+        request: undefined,
+        sameStatus: true,
+        pending: true,
+      });
       if (cancellation === 'cancel') {
-        fireEvent.click(view.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(dialog.getByRole('button', { name: 'Cancel' }));
       } else if (cancellation === 'row unmount') {
         mockUseAgentWorkflows.mockReturnValue(emptyResult);
         view.rerender(createElement(WorkflowSettings));
       } else {
         view.unmount();
       }
+      expect(view.queryByText(/Checking browser control/u)).toBeNull();
       await act(async () => {
         pending.resolve(admission);
         await pending.promise;
       });
-      expect(store.get(workflowRunRequestAtom)).toBeUndefined();
-      expect(store.get(settingsDialogOpenAtom)).toBe(true);
-      expect(view.queryByRole('dialog')).toBeNull();
+      expect({
+        dialog: view.queryByRole('dialog'),
+        pending: view.queryByText(/Checking browser control/u),
+        request: store.get(workflowRunRequestAtom),
+        settingsOpen: store.get(settingsDialogOpenAtom),
+      }).toStrictEqual({ dialog: null, pending: null, request: undefined, settingsOpen: true });
       await waitFor(async () => {
         const state = await nativeLocks.query();
         expect(state.held?.some(lock => lock.name === BROWSER_EXECUTION_LOCK)).toBe(false);
@@ -444,7 +717,9 @@ describe('workflow settings', () => {
       expect(view.getByLabelText('Run workflow "Order pizza"')).toHaveProperty('disabled', false);
     });
     fireEvent.click(view.getByLabelText('Run workflow "Order pizza"'));
+    expect(view.getByRole('status').textContent).toContain('Checking browser control');
     view.unmount();
+    expect(view.queryByText(/Checking browser control/u)).toBeNull();
     pending.resolve(admission);
     await waitFor(async () => {
       const state = await nativeLocks.query();
@@ -654,10 +929,12 @@ describe('workflow settings', () => {
         await delegatedLease.release();
         await coordinator.refresh();
       });
-      expect(view.getByRole('status').textContent).not.toContain('parent-order');
-      expect(view.getByRole('status').textContent).toMatch(/input is retained.*Run it again/u);
+      const feedback = parameters
+        ? within(view.getByRole('dialog')).getByRole('alert')
+        : view.getByRole('status');
+      expect(feedback.textContent).not.toContain('parent-order');
+      expect(feedback.textContent).toMatch(/input is retained.*Run it again/u);
       if (parameters) {
-        expect(view.getByRole('alert').textContent).not.toContain('parent-order');
         expect(view.getByDisplayValue('large')).toBeDefined();
       }
       expect(store.get(workflowRunRequestAtom)).toBeUndefined();

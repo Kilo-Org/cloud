@@ -30,7 +30,7 @@ const phaseLabels = {
   disabled: 'Disabled',
   idle: 'Enabled — idle',
   interrupted: 'Interrupted',
-  owned_elsewhere: 'Owned by another panel',
+  owned_elsewhere: 'Ownership not acquired',
   recovery: 'Recovery required',
   running: 'Running',
   unavailable: 'Unavailable',
@@ -194,6 +194,7 @@ export const BrowserTaskControls = (): JSX.Element => {
     value: BrowserRecoveryReadiness;
   }>();
   const { active } = state;
+  const ownershipRejected = state.phase === 'owned_elsewhere';
   const initializationFailed =
     state.phase === 'unavailable' &&
     state.retryable &&
@@ -290,7 +291,9 @@ export const BrowserTaskControls = (): JSX.Element => {
         ) : null}
       </div>
       <div className="agent-conversation-scrollbar type-label grid min-h-0 min-w-0 gap-2 overflow-y-auto px-3 pb-3 [overflow-wrap:anywhere]">
-        <p aria-live="polite">{state.message}</p>
+        <p aria-live="polite">
+          {ownershipRejected ? 'This panel could not acquire browser ownership.' : state.message}
+        </p>
         {state.profile === undefined ? null : (
           <p>
             Profile: {state.profile.label} ·{' '}
@@ -427,12 +430,14 @@ export const BrowserTaskControls = (): JSX.Element => {
             )}
           </div>
         )}
-        {initializationFailed ? (
+        {initializationFailed || ownershipRejected ? (
           <div className="grid gap-2">
             <p role="status">
-              Restore storage access, then reload this panel to retry initialization. Reload
-              preserves your account, saved settings, and safety records. It does not enable CLI
-              tasks, approve execution, or resubmit work.
+              {ownershipRejected
+                ? 'Close the panel that held ownership, if it is still open. Then reload this panel to retry ownership.'
+                : 'Restore storage access, then reload this panel to retry initialization.'}{' '}
+              Reload preserves your account, saved settings, and safety records. It does not enable
+              CLI tasks, clear quarantine, approve execution, or resubmit work.
             </p>
             {reloadBlocked ? (
               <p role="status">Stop browser work and wait for cleanup before reloading.</p>
@@ -516,7 +521,7 @@ export const BrowserTaskControls = (): JSX.Element => {
               : readiness.value.reason}
           </p>
         )}
-        {recoverable && !initializationFailed ? (
+        {recoverable && !initializationFailed && !ownershipRejected ? (
           <p>
             Retrieve status first. Close affected tabs and drain execution locks before recovery.
             Recovery never resumes old work. A new invocation requires fresh tab consent.

@@ -558,7 +558,6 @@ describe('browser task controls', () => {
     ['connecting', 'Connecting'],
     ['unsupported', 'Unsupported'],
     ['unavailable', 'Unavailable'],
-    ['owned_elsewhere', 'Owned by another panel'],
     ['awaiting_approval', 'Tab approval required'],
     ['waiting', 'Waiting for browser control'],
     ['running', 'Running'],
@@ -606,36 +605,122 @@ describe('browser task controls', () => {
     expect(screen.queryByText(/Restore storage access, then reload this panel/u)).toBeNull();
   });
 
-  it.each([
-    { delegated: 'idle', label: 'local browser work', localRuns: 1 },
-    { delegated: 'running', label: 'delegated execution', localRuns: 0 },
-    { delegated: 'waiting', label: 'pending execution cleanup', localRuns: 0 },
-  ] as const)('blocks initialization reload during $label', ({ delegated, localRuns }) => {
+  it('offers an ownership retry without claiming that the previous owner is still open', () => {
     fixture.state = {
       ...fixture.state,
-      phase: 'unavailable',
+      message: 'Another panel owns this browser provider. Use that panel to supervise CLI tasks.',
+      phase: 'owned_elsewhere',
       profile: undefined,
-      retryable: true,
       settings: undefined,
     };
-    fixture.execution = { ...fixture.execution, delegated, localRuns };
+    fixture.execution = {
+      ...fixture.execution,
+      blockedReason: 'Browser control remains quarantined.',
+    };
     renderControls();
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Reload panel' }).disabled).toBe(
-      true
-    );
+    const reload = screen.getByRole<HTMLButtonElement>('button', { name: 'Reload panel' });
+    expect(reload.disabled).toBe(false);
+    reload.focus();
+    expect(document.activeElement).toBe(reload);
+    expect(screen.getByText('CLI tasks: Ownership not acquired')).toBeDefined();
+    expect(screen.getByText('This panel could not acquire browser ownership.')).toBeDefined();
     expect(
-      screen.getByText('Stop browser work and wait for cleanup before reloading.')
+      screen.getByText(/Close the panel that held ownership, if it is still open/u)
     ).toBeDefined();
+    expect(screen.getByText(/Then reload this panel to retry ownership/u)).toBeDefined();
+    expect(
+      screen.getByText(/Reload preserves your account, saved settings, and safety records/u)
+    ).toBeDefined();
+    expect(
+      screen.getByText(
+        /does not enable CLI tasks, clear quarantine, approve execution, or resubmit work/u
+      )
+    ).toBeDefined();
+    expect(screen.queryByText(/Another panel owns this browser provider/u)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Refresh status' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reconnect' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Check recovery readiness' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
+    expect(screen.queryByText(/Retrieve status first/u)).toBeNull();
     act(() => {
-      fixture.execution = { ...fixture.execution, delegated: 'idle', localRuns: 0 };
+      fixture.execution = { ...fixture.execution, providerOwned: false };
       change({});
     });
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Reload panel' }).disabled).toBe(
-      false
-    );
-    expect(
-      screen.queryByText('Stop browser work and wait for cleanup before reloading.')
-    ).toBeNull();
+    expect(screen.getByText('This panel could not acquire browser ownership.')).toBeDefined();
+    expect(screen.queryByText(/Another panel owns this browser provider/u)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Reload panel' })).toBe(reload);
+    expect(reload.disabled).toBe(false);
+  });
+
+  it('keeps unsupported ownership separate from reload and quarantine recovery', () => {
+    fixture.state = {
+      ...fixture.state,
+      phase: 'unsupported',
+      profile: undefined,
+      settings: undefined,
+    };
+    fixture.execution = {
+      ...fixture.execution,
+      blockedReason: 'Browser control remains quarantined.',
+      delegationUnavailableReason: 'Web Locks unavailable.',
+      providerOwned: false,
+    };
+    renderControls();
+    expect(screen.getByText('CLI tasks: Unsupported')).toBeDefined();
+    expect(screen.getByText('Browser control remains quarantined.')).toBeDefined();
+    expect(screen.getByText(/Restore browser Web Locks support before recovering/u)).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Reload panel' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reconnect' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
+  });
+
+  describe.each([
+    { label: 'initialization', phase: 'unavailable' },
+    { label: 'ownership', phase: 'owned_elsewhere' },
+  ] as const)('$label reload', ({ phase }) => {
+    it.each([
+      {
+        active: {
+          approval: undefined,
+          goal: 'Read the page',
+          job: job(),
+          ownerLabel: 'ses_12345678',
+        },
+        delegated: 'idle',
+        label: 'an active task',
+        localRuns: 0,
+      },
+      { active: undefined, delegated: 'idle', label: 'local browser work', localRuns: 1 },
+      { active: undefined, delegated: 'running', label: 'delegated execution', localRuns: 0 },
+      { active: undefined, delegated: 'waiting', label: 'pending execution cleanup', localRuns: 0 },
+    ] as const)('blocks reload during $label', ({ active, delegated, localRuns }) => {
+      fixture.state = {
+        ...fixture.state,
+        active,
+        phase,
+        profile: undefined,
+        retryable: phase === 'unavailable',
+        settings: undefined,
+      };
+      fixture.execution = { ...fixture.execution, delegated, localRuns };
+      renderControls();
+      expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Reload panel' }).disabled).toBe(
+        true
+      );
+      expect(
+        screen.getByText('Stop browser work and wait for cleanup before reloading.')
+      ).toBeDefined();
+      act(() => {
+        fixture.execution = { ...fixture.execution, delegated: 'idle', localRuns: 0 };
+        change({ active: undefined });
+      });
+      expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Reload panel' }).disabled).toBe(
+        false
+      );
+      expect(
+        screen.queryByText('Stop browser work and wait for cleanup before reloading.')
+      ).toBeNull();
+    });
   });
 
   it('requires an explicit candidate and approval while retaining a long goal after tab loss', async () => {

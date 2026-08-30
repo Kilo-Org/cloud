@@ -700,6 +700,125 @@ describe('browser task provider tree', () => {
     }
   );
 
+  it.each([
+    { enabled: true, name: 'enabled profile', phase: 'Enabled — idle', quarantined: false },
+    {
+      enabled: true,
+      name: 'quarantined enabled profile',
+      phase: 'Recovery required',
+      quarantined: true,
+    },
+    { enabled: false, name: 'quarantined disabled profile', phase: 'Disabled', quarantined: true },
+  ] as const)(
+    'retries ownership for a $name only after the native owner closes, without consent or replay',
+    async ({ enabled, phase, quarantined }) => {
+      const transport = relay();
+      fixture.connection = transport.connection;
+      const record = {
+        accountKey: await browserAccountKey(auth),
+        settings: { enabled, mode: 'dangerous', model: 'other-model', thinkingEffort: 'high' },
+        version: 1,
+      };
+      const safety = { tabIds: quarantined ? [7] : [], version: 1 };
+      fixture.values.set(BROWSER_PROVIDER_SETTINGS_KEY, record);
+      fixture.values.set(BROWSER_EXECUTION_SAFETY_KEY, safety);
+      const { job } = transport.delivery();
+      const result: BrowserResult = {
+        browserTaskId: job.browserTaskId,
+        effectsUncertain: quarantined,
+        evidence: [],
+        invocationId: job.invocationId,
+        jobId: job.jobId,
+        providerId: job.providerId,
+        reason: 'provider_unavailable',
+        status: 'interrupted',
+        summary: 'The previous invocation stopped.',
+      };
+      const terminal: BrowserJobSnapshot = { ...job, result, status: result.status };
+      transport.rows.set(job.jobId, terminal);
+      const effects: string[] = [];
+      fixture.turn = async () => {
+        effects.push('executed');
+        return outcome();
+      };
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const held = nativeLocks.request(PROVIDER_OWNER_LOCK, { mode: 'exclusive' }, async () => {
+        entered.resolve();
+        await release.promise;
+      });
+      try {
+        await entered.promise;
+        const locksBeforeRetry = await nativeLocks.query();
+        const ownerLocks = locksBeforeRetry.held?.filter(lock => lock.name === PROVIDER_OWNER_LOCK);
+        let panel = renderPanel();
+        const retry = await screen.findByRole('button', { name: 'Reload panel' });
+        expect(screen.getByText('CLI tasks: Ownership not acquired')).toBeDefined();
+        expect(screen.queryByRole('button', { name: 'Refresh status' })).toBeNull();
+        // Native navigation is unavailable in jsdom. Reload disposes and remounts the real tree.
+        vi.stubGlobal('location', { reload: panel.unmount });
+        fireEvent.click(retry);
+        expect(screen.queryByRole('region', { name: 'CLI task supervision' })).toBeNull();
+        panel = renderPanel();
+        await screen.findByRole('button', { name: 'Reload panel' });
+        expect(screen.getByText('CLI tasks: Ownership not acquired')).toBeDefined();
+        const locksAfterRetry = await nativeLocks.query();
+        expect(
+          locksAfterRetry.held?.filter(lock => lock.name === PROVIDER_OWNER_LOCK)
+        ).toStrictEqual(ownerLocks);
+        expect(transport.registration()).toBeUndefined();
+        expect(transport.authority).toStrictEqual([]);
+        await act(async () => {
+          release.resolve();
+          await held;
+        });
+        const locksAfterClosure = await nativeLocks.query();
+        expect(
+          locksAfterClosure.held?.filter(lock => lock.name === PROVIDER_OWNER_LOCK)
+        ).toHaveLength(0);
+        expect(screen.getByText('This panel could not acquire browser ownership.')).toBeDefined();
+        expect(screen.queryByText(/Another panel owns this browser provider/u)).toBeNull();
+        expect(transport.registration()).toBeUndefined();
+        vi.stubGlobal('location', { reload: panel.unmount });
+        fireEvent.click(screen.getByRole('button', { name: 'Reload panel' }));
+        expect(screen.queryByRole('region', { name: 'CLI task supervision' })).toBeNull();
+        renderPanel();
+        await screen.findByText(`CLI tasks: ${phase}`);
+        const locksAfterReload = await nativeLocks.query();
+        expect(
+          locksAfterReload.held?.filter(lock => lock.name === PROVIDER_OWNER_LOCK)
+        ).toHaveLength(1);
+        expect(fixture.values.get(AUTH_STORAGE_KEY)).toStrictEqual(auth);
+        expect(fixture.values.get(BROWSER_PROVIDER_IDENTITY_KEY)).toStrictEqual(identity);
+        expect(fixture.values.get(BROWSER_PROVIDER_SETTINGS_KEY)).toStrictEqual(record);
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+        expect([...transport.rows.values()]).toStrictEqual([terminal]);
+        expect(effects).toStrictEqual([]);
+        expect(screen.queryByRole('button', { name: 'Approve tab' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Reload panel' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
+        if (quarantined) {
+          fireEvent.click(screen.getByRole('button', { name: 'Check recovery readiness' }));
+          await screen.findByText('Close all affected tabs before recovery.');
+        } else {
+          const fresh = transport.delivery();
+          act(() => {
+            transport.dispatch(fresh);
+          });
+          await screen.findByRole('button', { name: 'Approve tab' });
+          await screen.findByText('Bound tab: Not approved');
+        }
+        expect(screen.queryByRole('button', { name: 'Recover browser control' })).toBeNull();
+        expect(fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY)).toStrictEqual(safety);
+        expect(transport.authority).toStrictEqual(enabled ? ['registration'] : []);
+        expect(effects).toStrictEqual([]);
+      } finally {
+        release.resolve();
+        await held;
+      }
+    }
+  );
+
   it('stays off by default, preserves Browser drafts, and keeps one transport and a private Agents store', async () => {
     const transport = relay();
     fixture.connection = transport.connection;

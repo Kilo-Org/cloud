@@ -135,16 +135,21 @@ describe('dangerous turn runner workflow wiring', () => {
     }) as Parameters<typeof runDangerousLlmTurn>[0];
 
   const outcomeCases: {
+    assistantMessages?: string[];
     completion?: KiloGatewayChatCompletion;
     confirmed?: number;
     error?: Error;
-    expected: Pick<LlmTurnOutcome, 'reason' | 'status'> & Partial<Pick<LlmTurnOutcome, 'summary'>>;
+    expected: Pick<LlmTurnOutcome, 'reason' | 'status'> & {
+      summary?: string;
+      toolResults?: Partial<LlmTurnOutcome['toolResults'][number]>[];
+    };
     label: string;
     nextCompletion?: KiloGatewayChatCompletion;
     requests: number;
     rounds?: number;
     stop?: 'cancelled' | 'lease_lost';
     uncertain?: boolean;
+    workflowTools?: KiloGatewayToolDefinition[];
   }[] = [
     {
       error: new ExecutionStoppedError('execution_timeout', 'interrupted', true),
@@ -217,6 +222,59 @@ describe('dangerous turn runner workflow wiring', () => {
       label: 'confirmed action without final answer',
       requests: 1,
       rounds: 1,
+    },
+    {
+      assistantMessages: ['Creating the workflow now.', 'Creating the workflow now.'],
+      completion: {
+        finishReason: 'tool_calls',
+        toolCalls: [{ arguments: {}, id: 'read-1', name: 'get_page_snapshot' }],
+      },
+      confirmed: 1,
+      expected: {
+        reason: 'incomplete_response',
+        status: 'failed',
+        summary: 'Creating the workflow now.',
+        toolResults: [{ effectsUncertain: false, ok: true, value: 'safe' }],
+      },
+      label: 'unconfirmed announcement after continuation exhaustion',
+      nextCompletion: {
+        content: 'Creating the workflow now.',
+        finishReason: 'stop',
+        toolCalls: [],
+      },
+      requests: 3,
+    },
+    {
+      completion: {
+        finishReason: 'tool_calls',
+        toolCalls: [
+          { arguments: {}, id: 'read-1', name: 'get_page_snapshot' },
+          ...Array.from({ length: 25 }, (_value, index) => ({
+            arguments: { workflowId: `missing-${String(index)}` },
+            id: `failure-${String(index)}`,
+            name: 'get_workflow' as const,
+          })),
+          { arguments: { query: 'must not run' }, id: 'read-after-cap', name: 'find_in_page' },
+        ],
+      },
+      confirmed: 26,
+      expected: {
+        reason: 'tool_failure_limit',
+        status: 'failed',
+        toolResults: [
+          { effectsUncertain: false, ok: true, value: 'safe' },
+          ...Array.from({ length: 25 }, () => ({
+            effectsUncertain: false,
+            error: 'Workflow tool get_workflow is no longer available.',
+            ok: false as const,
+          })),
+        ],
+      },
+      label: 'tool failure cap with a pending read',
+      nextCompletion: { content: 'False success.', finishReason: 'stop', toolCalls: [] },
+      requests: 1,
+      // Missing workflow context exercises the wrapper's real confirmed failure path.
+      workflowTools: [makeToolDef('get_workflow')],
     },
     {
       completion: {
@@ -323,6 +381,7 @@ describe('dangerous turn runner workflow wiring', () => {
             );
           },
           signal: controller.signal,
+          workflowTools: entry.workflowTools,
         })
       );
       await vi.runAllTimersAsync();
@@ -331,12 +390,17 @@ describe('dangerous turn runner workflow wiring', () => {
         ...entry.expected,
         effectsUncertain: entry.uncertain ?? false,
       });
-      expect(appended.filter(event => event.type === 'message')).toMatchObject([
-        { role: 'assistant', text: result.summary },
-      ]);
+      expect(appended.filter(event => event.type === 'message')).toMatchObject(
+        (entry.assistantMessages ?? [result.summary]).map(text => ({ role: 'assistant', text }))
+      );
       expect(result.toolResults).toHaveLength(entry.confirmed ?? 0);
-      expect(actions).toHaveLength(entry.confirmed ?? 0);
-      expect(requests).toBe(entry.requests);
+      expect(result.toolResults).toStrictEqual(
+        appended.filter(event => event.type === 'tool-result')
+      );
+      expect({ actions: actions.length, requests }).toStrictEqual({
+        actions: entry.confirmed ?? 0,
+        requests: entry.requests,
+      });
     } finally {
       vi.useRealTimers();
     }

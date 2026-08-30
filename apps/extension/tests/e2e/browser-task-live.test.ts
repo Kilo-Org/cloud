@@ -22,7 +22,8 @@ import type {
   BrowserProviderInboundMessage,
   BrowserTaskArguments,
 } from '@kilocode/cloud-agent-sdk/schemas';
-import { launchExtensionContext } from './extension-context-fixture';
+import { conversationEventsSchema } from '../../entrypoints/sidepanel/agent-conversation-schemas';
+import { launchExtensionContext, readExtensionLocalStorage } from './extension-context-fixture';
 import { signInWithLocalDeviceAuth } from './local-device-auth-helpers';
 import { selectModelById } from './model-picker-e2e-helpers';
 
@@ -89,6 +90,23 @@ const outputSchema = z.object({
   providers: z.array(browserProviderDescriptorSchema).optional(),
 });
 const gatewayRequestSchema = z.object({ messages: z.array(z.unknown()), model: z.string() });
+const replayMessageSchema = z.object({
+  content: z.unknown().optional(),
+  role: z.enum(['system', 'user', 'assistant', 'tool']),
+  tool_call_id: z.string().optional(),
+  tool_calls: z.array(z.object({ id: z.string() })).optional(),
+});
+const toolProjectionSchema = z.object({
+  effectsUncertain: z.boolean().optional(),
+  error: z.string().optional(),
+  ok: z.boolean(),
+  value: z.unknown().optional(),
+});
+const browserHistorySchema = z.object({
+  histories: z.array(
+    z.object({ browserTaskId: browserTaskIdSchema, events: conversationEventsSchema })
+  ),
+});
 const modelCatalogSchema = z.object({ data: z.array(z.object({ id: z.string() })) });
 const proxyStatsSchema = z.object({
   droppedReplies: z.number(),
@@ -899,6 +917,232 @@ test('real CLI parents route queued results and continue only their owned browse
   });
 });
 
+test('real CLI continuation pairs an interrupted multi-call batch without replay', async () => {
+  await withLive(async live => {
+    const { a1, panel, target, other } = live;
+    const provider = await enableProvider(panel);
+    const memoriesBefore = await readExtensionLocalStorage(panel, 'kiloAgentMemories');
+    const interruptedGoal = `Return one batch of exactly three tool calls in this order: ${JSON.stringify(
+      [
+        { arguments: {}, name: 'get_page_snapshot' },
+        { arguments: { text: 'Interrupted batch memory' }, name: 'save_memory' },
+        {
+          arguments: {
+            code: 'document.querySelector("#effect").click(); return document.querySelector("#count").textContent;',
+          },
+          name: 'eval',
+        },
+      ]
+    )}. Put all three calls in the same assistant response, not separate responses. The memory call waits for user approval before the page action can run.`;
+    const running = callTool(a1, {
+      goal: interruptedGoal,
+      operation: 'run',
+      provider_id: provider,
+    });
+    await expect(controls(panel)).toContainText('Tab approval required', { timeout: 90_000 });
+    await approveTab(panel);
+    const card = panel.getByRole('dialog', { name: 'Add to memory' });
+    await expect(card).toBeVisible({ timeout: 90_000 });
+    await expect(target.locator('#count')).toHaveText('0');
+    await live.capture('interrupted-batch-before-stop');
+    await card.getByRole('button', { name: 'Stop CLI task' }).click();
+    const stopped = await running;
+    expect(stopped.status).toBe('cancelled');
+    expect(stopped.reason).toBe('cancelled');
+    expect(stopped.effectsUncertain).toBe(true);
+    const task = browserTaskIdSchema.parse(stopped.browser_task_id);
+    const originalJob = browserJobIdSchema.parse(stopped.job_id);
+    const readHistory = async () => {
+      const parsed = browserHistorySchema.safeParse(
+        await readExtensionLocalStorage(panel, 'kiloBrowserTasks')
+      );
+      if (!parsed.success) {
+        throw new Error('The persisted browser history has an invalid structure.');
+      }
+      return parsed.data.histories.find(history => history.browserTaskId === task)?.events;
+    };
+    await expect
+      .poll(async () => {
+        const storedHistory = await readHistory();
+        return storedHistory?.some(event => event.type === 'tool-call') === true;
+      })
+      .toBe(true);
+    const history = await readHistory();
+    if (history === undefined) {
+      throw new Error('The interrupted browser history is missing.');
+    }
+    const batchStart = history.findIndex(event => event.type === 'tool-call');
+    const batch = history
+      .slice(batchStart, batchStart + 3)
+      .filter(event => event.type === 'tool-call');
+    expect(batch.map(call => call.name)).toEqual(['get_page_snapshot', 'save_memory', 'eval']);
+    const [snapshotCall, memoryCall, skippedCall] = batch;
+    if (snapshotCall === undefined || memoryCall === undefined || skippedCall === undefined) {
+      throw new Error('The required model did not produce the requested multi-call batch.');
+    }
+    const confirmed = history.find(
+      event => event.type === 'tool-result' && event.toolCallId === snapshotCall.id
+    );
+    if (confirmed?.type !== 'tool-result' || !confirmed.ok) {
+      throw new Error('The interrupted batch has no confirmed snapshot result.');
+    }
+    expect(JSON.stringify(confirmed.value).includes('Observed evidence A only.')).toBe(true);
+    for (const call of [memoryCall, skippedCall]) {
+      expect(
+        history.some(event => event.type === 'tool-result' && event.toolCallId === call.id)
+      ).toBe(false);
+    }
+    await expect(card).toBeHidden();
+    await expect(target.locator('#count')).toHaveText('0');
+    const requestsAfterStop = live.modelRequests.length;
+    await expect(controls(panel)).toContainText('Recovery required');
+    await expect
+      .poll(() =>
+        panel.evaluate(async () => {
+          const locks = await navigator.locks.query();
+          return (locks.held ?? []).filter(lock => lock.name === 'kilo:browser-execution').length;
+        })
+      )
+      .toBe(0);
+    await controls(panel).getByRole('button', { name: 'Check recovery readiness' }).click();
+    await expect(panel.getByRole('button', { name: 'Recover browser control' })).toHaveCount(0);
+    await target.close();
+    await controls(panel).getByRole('button', { name: 'Check recovery readiness' }).click();
+    await panel.getByRole('button', { name: 'Recover browser control' }).click();
+    await expect(controls(panel)).toContainText('Enabled — idle', { timeout: 30_000 });
+    expect(live.modelRequests).toHaveLength(requestsAfterStop);
+
+    const responses: { contentType: string | undefined; status: number }[] = [];
+    panel.context().on('response', response => {
+      if (response.url().endsWith('/api/gateway/v1/chat/completions')) {
+        responses.push({
+          contentType: response.headers()['content-type'],
+          status: response.status(),
+        });
+      }
+    });
+    const continuation = callTool(a1, {
+      browser_task_id: task,
+      goal: 'Use only get_page_snapshot to read the newly approved page. Report its observed text and "Current count: <value>". Quote the prior confirmed page text from this browser history. Do not repeat the skipped memory save or eval action; no click or memory save is authorized.',
+      operation: 'run',
+      provider_id: provider,
+    });
+    await expect(controls(panel)).toContainText('Tab approval required', { timeout: 90_000 });
+    expect(live.modelRequests).toHaveLength(requestsAfterStop);
+    await expect(other.locator('#count')).toHaveText('0');
+    await live.capture('interrupted-batch-fresh-consent');
+    await approveTab(panel, 'Browser acceptance B');
+    const continued = await continuation;
+    expect(continued.status).toBe('succeeded');
+    expect(continued.reason).toBe('completed');
+    expect(continued.effectsUncertain).toBe(false);
+    expect(continued.browser_task_id).toBe(task);
+    expect(continued.job_id).not.toBe(originalJob);
+    expect(continued.summary).toContain('Current count: 0');
+    expect(continued.summary).toContain('Observed evidence A only.');
+    expect(continued.summary).toContain('Observed evidence B only.');
+    expect(continued.evidence.some(item => item.url === other.url())).toBe(true);
+    await expect(other.locator('#count')).toHaveText('0');
+    expect(
+      JSON.stringify(await readExtensionLocalStorage(panel, 'kiloAgentMemories')) ===
+        JSON.stringify(memoriesBefore)
+    ).toBe(true);
+    expect(responses.length).toBeGreaterThan(0);
+    expect(responses.every(response => response.status === 200)).toBe(true);
+    expect(
+      responses.every(response => response.contentType?.includes('text/event-stream') === true)
+    ).toBe(true);
+
+    const continuationRequests = live.modelRequests.slice(requestsAfterStop);
+    expect(continuationRequests.length).toBeGreaterThan(0);
+    const batchIds = batch.map(call => call.providerToolCallId ?? call.id);
+    for (const request of continuationRequests) {
+      expect(request.model).toBe(model);
+      const parsed = z.array(replayMessageSchema).safeParse(request.messages);
+      if (!parsed.success) {
+        throw new Error('The continuation gateway messages have an invalid structure.');
+      }
+      const { data: messages } = parsed;
+      const pending = new Set<string>();
+      for (const message of messages) {
+        if (message.role === 'tool') {
+          expect(message.tool_calls).toBeUndefined();
+          expect(message.tool_call_id !== undefined && pending.delete(message.tool_call_id)).toBe(
+            true
+          );
+        } else {
+          expect(pending.size).toBe(0);
+          expect(message.tool_call_id).toBeUndefined();
+          for (const call of message.tool_calls ?? []) {
+            expect(message.role).toBe('assistant');
+            expect(pending.has(call.id)).toBe(false);
+            pending.add(call.id);
+          }
+        }
+      }
+      expect(pending.size).toBe(0);
+      const replayedBatch = messages.find(
+        message => message.tool_calls?.some(call => call.id === batchIds[0]) === true
+      );
+      expect(replayedBatch?.tool_calls?.map(call => call.id)).toEqual(batchIds);
+      for (const [index, id] of batchIds.entries()) {
+        const reply = messages.find(
+          message => message.role === 'tool' && message.tool_call_id === id
+        );
+        let projection: z.infer<typeof toolProjectionSchema>;
+        try {
+          projection = toolProjectionSchema.parse(JSON.parse(z.string().parse(reply?.content)));
+        } catch {
+          throw new Error('The continuation contains an invalid tool result projection.');
+        }
+        if (index === 0) {
+          expect(projection.ok).toBe(true);
+          expect(projection.effectsUncertain === true).toBe(false);
+          expect(JSON.stringify(projection.value) === JSON.stringify(confirmed.value)).toBe(true);
+        } else {
+          expect(projection.ok).toBe(false);
+          expect(projection.effectsUncertain).toBe(true);
+          expect(projection.value).toBeUndefined();
+          expect(projection.error?.includes('No result was recorded')).toBe(true);
+          expect(projection.error?.includes('Execution and effects are unknown')).toBe(true);
+          expect(projection.error?.includes('Do not automatically retry')).toBe(true);
+        }
+      }
+    }
+    const continuedHistory = await readHistory();
+    expect(
+      JSON.stringify(continuedHistory?.slice(0, history.length)) === JSON.stringify(history)
+    ).toBe(true);
+    for (const call of [memoryCall, skippedCall]) {
+      expect(
+        continuedHistory?.some(
+          event => event.type === 'tool-result' && event.toolCallId === call.id
+        )
+      ).toBe(false);
+    }
+    const original = await callTool(a1, {
+      browser_task_id: task,
+      job_id: originalJob,
+      operation: 'status',
+    });
+    expect(original).toEqual(stopped);
+    live.evidence.checks.push(
+      'continuation responses: HTTP 200 and Content-Type text/event-stream',
+      'continuation requests: parsed roles, unique call IDs, exactly paired results',
+      'confirmed snapshot retained; missing results stay uncertain and never enter stored history'
+    );
+    live.evidence.scenarios.push(
+      `interrupted multi-call continuation: ${stopped.status}/${stopped.reason} -> ${continued.status}/${continued.reason}`,
+      'fresh consent after explicit recovery',
+      'required real model accepts paired history',
+      'useful prior and current observations',
+      'skipped eval and memory save not replayed; effects=0',
+      'immutable original cancellation'
+    );
+    await live.capture('interrupted-batch-useful-continuation');
+  });
+});
+
 for (const loss of ['before acceptance', 'entire acceptance response'] as const) {
   test(`real process restart recovers after loss of ${loss} without a fresh invocation`, async () => {
     await withLive(async live => {
@@ -1066,7 +1310,11 @@ for (const [failure, reasons] of [
   test(`real delegated ${failure} settles active and queued parents with finite outcomes`, async () => {
     await withLive(async live => {
       const provider = await enableProvider(live.panel);
-      const active = callTool(live.a1, { goal: heldGoal, operation: 'run', provider_id: provider });
+      const goal =
+        failure === 'disablement'
+          ? 'Use get_page_snapshot to read the approved page, then call save_memory with text "Live disablement observation" and wait for approval. After approval, report the observed title and text. Do not use eval, click, or change the page.'
+          : heldGoal;
+      const active = callTool(live.a1, { goal, operation: 'run', provider_id: provider });
       await expect(controls(live.panel)).toContainText('Tab approval required', {
         timeout: 90_000,
       });
@@ -1102,24 +1350,37 @@ for (const [failure, reasons] of [
         await live.closeBrowser();
       }
       if (failure === 'disablement') {
-        // Hold the next real request, rather than racing the runner after dismissing its card.
+        // Approve, never reject, the memory card. Hold the next real request until disablement.
         const gate = Promise.withResolvers<void>();
+        let requestHeld = false;
         await live.panel.context().route('**/api/gateway/v1/chat/completions', async route => {
+          requestHeld = true;
           await gate.promise;
           await route.continue();
         });
         try {
-          await card.getByRole('button', { exact: true, name: 'Cancel' }).click();
+          await approveMemory(live.panel);
+          await expect.poll(() => requestHeld, { timeout: 30_000 }).toBe(true);
           await live.panel.getByLabel('Settings', { exact: true }).click();
           const settings = live.panel.getByRole('dialog', { name: 'Settings panel' });
-          await settings.getByRole('switch', { exact: true, name: 'CLI tasks' }).click();
+          const toggle = settings.getByRole('switch', { exact: true, name: 'CLI tasks' });
+          await toggle.click();
           await expect(
             settings.getByRole('group', { name: 'Confirm CLI task disablement' })
           ).toContainText('Issued actions are not undone');
+          await expect(toggle).toHaveAttribute('aria-checked', 'true');
+          const supervision = settings.getByRole('region', { name: 'CLI task supervision' });
+          await expect(supervision).toContainText('CLI tasks: Running');
+          await expect(supervision).toContainText(live.a1.id);
+          await expect(supervision.getByRole('button', { name: 'Stop CLI task' })).toBeEnabled();
+          await expect(supervision.getByRole('list', { name: 'Queued CLI tasks' })).toContainText(
+            live.b1.id
+          );
+          await expect(live.target.locator('#count')).toHaveText(beforeCount ?? '0');
+          await live.capture('disablement-confirmation-active-and-queued');
           await settings.getByRole('button', { name: 'Disable CLI tasks' }).click();
-          await expect(
-            settings.getByRole('region', { name: 'CLI task supervision' })
-          ).toContainText('CLI tasks: Disabled');
+          await expect(toggle).toHaveAttribute('aria-checked', 'false');
+          await expect(supervision).toContainText('CLI tasks: Disabled');
         } finally {
           gate.resolve();
         }
@@ -1132,9 +1393,25 @@ for (const [failure, reasons] of [
       expect(reasons).toContain(result.reason);
       expect(terminal.has(queuedResult.status)).toBe(true);
       expect(queuedResult.reason).toBe('provider_unavailable');
+      if (failure === 'disablement') {
+        for (const outcome of [result, queuedResult]) {
+          expect(outcome.status).toBe('interrupted');
+          expect(outcome.reason).toBe('provider_unavailable');
+        }
+      }
       const task = browserTaskIdSchema.parse(result.browser_task_id);
-      const stored = await callTool(live.a1, { browser_task_id: task, operation: 'status' });
+      const stored = await callTool(live.a1, {
+        browser_task_id: task,
+        job_id: browserJobIdSchema.parse(result.job_id),
+        operation: 'status',
+      });
       expect(stored).toEqual(result);
+      const storedQueued = await callTool(live.b1, {
+        browser_task_id: browserTaskIdSchema.parse(queuedResult.browser_task_id),
+        job_id: browserJobIdSchema.parse(queuedResult.job_id),
+        operation: 'status',
+      });
+      expect(storedQueued).toEqual(queuedResult);
       if (failure !== 'tab loss' && failure !== 'extension shutdown') {
         await expect(live.target.locator('#count')).toHaveText(beforeCount ?? '0');
       }

@@ -620,6 +620,117 @@ test('two panels share local locks, drain before delegation, and retain a blocke
   });
 });
 
+for (const loss of ['close', 'reload'] as const) {
+  test(`native local owner ${loss} blocks local and delegated work until explicit recovery`, async () => {
+    const issueAction = Promise.withResolvers<void>();
+    const recoveredText = 'Explicitly submitted browser work completed.';
+    await withHarness(
+      async ({ panel, openPanel, context, relay, target, other }) => {
+        let requests = 0;
+        context.on('request', request => {
+          if (request.url().endsWith('/api/gateway/v1/chat/completions')) {
+            requests += 1;
+          }
+        });
+        await enable(panel, true);
+        const localOwner = await openPanel();
+        await selectModelById(localOwner, model);
+        await localOwner
+          .getByLabel('Target tab')
+          .selectOption({ label: 'Approved browser task tab' });
+        await localOwner.getByRole('button', { name: /(?:Safe|Dangerous) mode/u }).click();
+        await localOwner.getByRole('button', { exact: true, name: 'Dangerous' }).click();
+        await localOwner.getByLabel('Message agent').fill('Issue the local page action and wait.');
+        await localOwner.getByLabel('Message agent').press('Enter');
+        await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+        const delivery = relay.submit('Do not run until local work safely drains.');
+        await approve(panel);
+        await expect(supervision(panel)).toContainText('Waiting for browser control');
+        await expect.poll(() => requests).toBe(1);
+
+        // Queue delegation first, so owner destruction follows the issued action before its eval timeout.
+        issueAction.resolve();
+        await expect(target.locator('#count')).toHaveText('1');
+        await (loss === 'close' ? localOwner.close() : localOwner.reload());
+        await target.evaluate(() => {
+          document.dispatchEvent(new Event('finish-local-action'));
+        });
+        await expect(target.locator('html')).toHaveAttribute('data-local-action', 'finished');
+        await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+        await expect(supervision(panel)).toContainText('Recovery required');
+        // An orphaned local record, not a prior timeout quarantine, must retain exclusion.
+        expect(await readExtensionLocalStorage(panel, 'kiloBrowserExecutionSafety')).toEqual(
+          expect.objectContaining({
+            localRuns: [expect.objectContaining({ tabId: expect.any(Number) })],
+            tabIds: [],
+          })
+        );
+        const draft = 'Keep this draft until explicit recovery.';
+        await panel.getByLabel('Message agent').fill(draft);
+        await panel.getByLabel('Message agent').press('Enter');
+        await expect(panel.getByLabel('Message agent')).toHaveValue(draft);
+        await expect(supervision(panel)).toContainText('an action may still be running');
+        await expect(supervision(panel).getByRole('list', { name: 'Affected tabs' })).toContainText(
+          'Approved browser task tab'
+        );
+        await supervision(panel).getByRole('button', { name: 'Check recovery readiness' }).click();
+        await expect(supervision(panel)).toContainText('Close all affected tabs before recovery.');
+        await expect(panel.getByRole('button', { name: 'Recover browser control' })).toHaveCount(0);
+        relay.send(delivery);
+        await expect(panel.getByRole('button', { exact: true, name: 'Approve tab' })).toHaveCount(
+          0
+        );
+        await expect(target.locator('#count')).toHaveText('1');
+        await expect(other.locator('#count')).toHaveText('0');
+        expect(requests).toBe(1);
+        await capture(panel, `native-local-owner-${loss}-blocked`);
+
+        await target.close();
+        await supervision(panel).getByRole('button', { name: 'Check recovery readiness' }).click();
+        const recover = panel.getByRole('button', { name: 'Recover browser control' });
+        await expect(recover).toBeVisible();
+        await panel.getByLabel('Message agent').press('Enter');
+        await expect(panel.getByLabel('Message agent')).toHaveValue(draft);
+        expect(requests).toBe(1);
+        await recover.click();
+        await expect(supervision(panel)).toContainText('Enabled — idle');
+        await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+        expect(requests).toBe(1);
+        await expect(panel.getByLabel('Message agent')).toHaveValue(draft);
+        await panel.getByLabel('Target tab').selectOption({ label: 'Unapproved tab' });
+        await panel.getByRole('button', { name: /(?:Safe|Dangerous) mode/u }).click();
+        await panel.getByRole('button', { exact: true, name: 'Dangerous' }).click();
+        await panel.getByLabel('Message agent').press('Enter');
+        await expect(panel.getByText(recoveredText, { exact: true })).toBeVisible();
+        await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+        expect(requests).toBe(2);
+        relay.submit('Run only this new explicitly approved invocation.');
+        await expect(supervision(panel)).toContainText('Tab approval required');
+        expect(requests).toBe(2);
+        await supervision(panel)
+          .getByLabel('Tab to approve')
+          .selectOption({ label: 'Unapproved tab' });
+        await supervision(panel).getByRole('button', { exact: true, name: 'Approve tab' }).click();
+        await expect(supervision(panel)).toContainText('Last outcome: succeeded');
+        expect(requests).toBe(3);
+        await expect(other.locator('#count')).toHaveText('0');
+        await capture(panel, `native-local-owner-${loss}-explicit-recovery`);
+      },
+      {
+        gateway: {
+          beforeFirstCompletion: () => issueAction.promise,
+          firstCompletionEvents: toolCall('eval', {
+            code: 'document.querySelector("#effect").click(); await new Promise(resolve => document.addEventListener("finish-local-action", resolve, { once: true })); document.documentElement.setAttribute("data-local-action", "finished"); return "finished";',
+          }),
+          secondCompletionEvents: content(recoveredText),
+          thirdCompletionEvents: content(recoveredText),
+          toolNames: dangerousToolNames,
+        },
+      }
+    );
+  });
+}
+
 for (const mode of ['Browser', 'Agents'] as const) {
   test(`${mode}: memory saving, retry, and confirmation retain keyboard-accessible supervision`, async () => {
     const finish = Promise.withResolvers<void>();

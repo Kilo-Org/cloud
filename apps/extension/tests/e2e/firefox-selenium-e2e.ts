@@ -60,6 +60,8 @@ const chromeWorkflowNames = [
   'workflow create, approve, and run returns result',
   'workflow auto-approve save stores approved hash',
   'CLI task consent and cancellation use native cross-panel locks',
+  'native local owner close blocks local and delegated work until explicit recovery',
+  'native local owner reload blocks local and delegated work until explicit recovery',
   'unsupported native locks keep CLI delegation disabled',
 ] as const;
 
@@ -1364,6 +1366,119 @@ const submitDangerousPrompt = async (
   await switchToDangerousMode(session.driver);
   await sendMessage(session.driver, prompt);
 };
+
+const installFirefoxBrowserTaskPeer = (driver: FirefoxWebDriver): Promise<string> =>
+  driver.script().pin(`() => {
+    if (location.protocol !== 'moz-extension:') return;
+    const key = 'firefox-browser-task-peer';
+    const state = JSON.parse(sessionStorage.getItem(key) || '{"generation":0}');
+    const persist = () => sessionStorage.setItem(key, JSON.stringify(state));
+    let socket;
+    const snapshot = () => socket.receive({ type: 'provider_snapshot', providerId: state.providerId, generation: state.generation, jobs: state.job ? [state.job] : [] });
+    class PeerSocket extends EventTarget {
+      static CONNECTING = 0;
+      static OPEN = 1;
+      static CLOSING = 2;
+      static CLOSED = 3;
+      readyState = 0;
+      onopen = null;
+      onmessage = null;
+      onclose = null;
+      onerror = null;
+      constructor(url) {
+        super();
+        this.url = String(url);
+        socket = this;
+        setTimeout(() => {
+          this.readyState = 1;
+          const event = new Event('open');
+          this.dispatchEvent(event);
+          this.onopen?.(event);
+          this.receive({ type: 'system', event: 'connected', data: {} });
+        }, 0);
+      }
+      receive(value) {
+        queueMicrotask(() => {
+          if (this.readyState !== 1) return;
+          const event = new MessageEvent('message', { data: JSON.stringify(value) });
+          this.dispatchEvent(event);
+          this.onmessage?.(event);
+        });
+      }
+      send(raw) {
+        const message = JSON.parse(raw);
+        if (message.type === 'ping') this.receive({ type: 'pong', nonce: message.nonce, capabilities: { browserJobsV1: true } });
+        if (message.type === 'provider_register') {
+          state.providerId = message.providerId;
+          state.generation = Math.max(state.generation, message.generation) + 1;
+          persist();
+        }
+        if (message.type === 'provider_register' || message.type === 'provider_heartbeat') {
+          this.receive({ type: 'provider_lease_ack', providerId: state.providerId, generation: state.generation, requestId: message.requestId, leaseExpiresAt: new Date(Date.now() + 15000).toISOString() });
+          if (message.type === 'provider_heartbeat') this.receive({ type: 'provider_snapshot', providerId: state.providerId, generation: state.generation, requestId: message.requestId, jobs: state.job?.generation === state.generation ? [state.job] : [] });
+        }
+        if (message.type === 'provider_status') this.receive({ type: 'provider_status_result', providerId: state.providerId, requestId: message.requestId, jobs: state.job ? [state.job] : [] });
+        if (message.type === 'provider_approval' && message.approval.decision === 'approved') {
+          state.job.approvedTab = message.approval.tab;
+          state.job.status = 'running';
+          state.job.deadlines.execution = new Date(Date.now() + 600000).toISOString();
+          persist();
+          snapshot();
+        }
+        if ((message.type === 'provider_cancel' || message.type === 'provider_unavailable') && state.job && !state.job.result) {
+          const job = state.job;
+          const cancelled = message.type === 'provider_cancel';
+          job.status = cancelled ? 'cancelled' : 'interrupted';
+          job.result = { providerId: job.providerId, browserTaskId: job.browserTaskId, jobId: job.jobId, invocationId: job.invocationId, status: job.status, reason: cancelled ? 'cancelled' : message.reason, summary: cancelled ? 'Cancelled without replay.' : 'Provider unavailable without execution.', evidence: [], effectsUncertain: message.effectsUncertain ?? false };
+          persist();
+          if (cancelled) this.receive({ ...message, type: 'provider_job_cancel', reason: 'cancelled' });
+          snapshot();
+        }
+        if (message.type === 'provider_result' && state.job?.jobId === message.jobId && !state.job.result) {
+          state.job.status = message.result.status;
+          state.job.result = message.result;
+          persist();
+          snapshot();
+        }
+      }
+      close() {
+        this.readyState = 3;
+        const event = new CloseEvent('close', { code: 1000 });
+        this.dispatchEvent(event);
+        this.onclose?.(event);
+      }
+    }
+    Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: PeerSocket });
+    globalThis.submitFirefoxBrowserTask = () => {
+      const now = Date.now();
+      state.job = { providerId: state.providerId, generation: state.generation, browserTaskId: 'bt_' + crypto.randomUUID(), jobId: 'bj_' + crypto.randomUUID(), invocationId: 'b1.' + now + '.' + 'a'.repeat(64), payloadFingerprint: 'b'.repeat(64), createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 604800000).toISOString(), deadlines: { approval: new Date(now + 120000).toISOString(), queue: new Date(now + 600000).toISOString() }, ownerLabel: 'ses_firefox_parent_A1', status: 'awaiting_approval' };
+      persist();
+      socket.receive({ type: 'provider_job', job: state.job, ownerLabel: 'ses_firefox_parent_A1', goal: 'Inspect only the explicitly approved tab.', conversationMode: 'new' });
+    };
+  }`);
+
+const enableFirefoxBrowserTasks = async (driver: WebDriver): Promise<void> => {
+  await driver.findElement(By.css('button[aria-label="Settings"]')).click();
+  await driver
+    .findElement(By.css('[aria-label="CLI task settings"] button[aria-label="Model"]'))
+    .click();
+  await selectModelByIdFirefox(driver, 'anthropic/claude-sonnet-4');
+  await driver
+    .findElement(By.css('[aria-label="CLI task settings"] button[aria-label*="Safe mode"]'))
+    .click();
+  await clickButtonByText(driver, 'Dangerous');
+  await driver
+    .findElement(By.css('[aria-label="CLI task settings"] [role="switch"][aria-label="CLI tasks"]'))
+    .click();
+  await driver.findElement(By.css('button[aria-label="Close settings"]')).click();
+  await waitForText(driver, 'Enabled — idle');
+};
+
+const firefoxExecutionModes = (driver: WebDriver): Promise<unknown> =>
+  driver.executeAsyncScript(async (done: (value: unknown) => void) => {
+    const state = await navigator.locks.query();
+    done(state.held?.filter(lock => lock.name === 'kilo:browser-execution').map(lock => lock.mode));
+  });
 
 const scenarios: FirefoxScenario[] = [
   {
@@ -3258,109 +3373,14 @@ const scenarios: FirefoxScenario[] = [
           toolNames: dangerousToolNames,
         },
         async session => {
-          // Only the network peer is a fixture. Both browsers run the same shipped provider and coordinator.
-          await session.driver.script().pin(`() => {
-          if (location.protocol !== 'moz-extension:') return;
-          const key = 'firefox-browser-task-peer';
-          const state = JSON.parse(sessionStorage.getItem(key) || '{"generation":0}');
-          const persist = () => sessionStorage.setItem(key, JSON.stringify(state));
-          let socket;
-          const snapshot = () => socket.receive({ type: 'provider_snapshot', providerId: state.providerId, generation: state.generation, jobs: state.job ? [state.job] : [] });
-          class PeerSocket extends EventTarget {
-            static CONNECTING = 0;
-            static OPEN = 1;
-            static CLOSING = 2;
-            static CLOSED = 3;
-            readyState = 0;
-            onopen = null;
-            onmessage = null;
-            onclose = null;
-            onerror = null;
-            constructor(url) {
-              super();
-              this.url = String(url);
-              socket = this;
-              setTimeout(() => {
-                this.readyState = 1;
-                const event = new Event('open');
-                this.dispatchEvent(event);
-                this.onopen?.(event);
-                this.receive({ type: 'system', event: 'connected', data: {} });
-              }, 0);
-            }
-            receive(value) {
-              queueMicrotask(() => {
-                if (this.readyState !== 1) return;
-                const event = new MessageEvent('message', { data: JSON.stringify(value) });
-                this.dispatchEvent(event);
-                this.onmessage?.(event);
-              });
-            }
-            send(raw) {
-              const message = JSON.parse(raw);
-              if (message.type === 'ping') this.receive({ type: 'pong', nonce: message.nonce, capabilities: { browserJobsV1: true } });
-              if (message.type === 'provider_register') {
-                state.providerId = message.providerId;
-                state.generation = Math.max(state.generation, message.generation) + 1;
-                persist();
-              }
-              if (message.type === 'provider_register' || message.type === 'provider_heartbeat') {
-                this.receive({ type: 'provider_lease_ack', providerId: state.providerId, generation: state.generation, requestId: message.requestId, leaseExpiresAt: new Date(Date.now() + 15000).toISOString() });
-                if (message.type === 'provider_heartbeat') this.receive({ type: 'provider_snapshot', providerId: state.providerId, generation: state.generation, requestId: message.requestId, jobs: state.job?.generation === state.generation ? [state.job] : [] });
-              }
-              if (message.type === 'provider_status') this.receive({ type: 'provider_status_result', providerId: state.providerId, requestId: message.requestId, jobs: state.job ? [state.job] : [] });
-              if (message.type === 'provider_approval' && message.approval.decision === 'approved') {
-                state.job.approvedTab = message.approval.tab;
-                state.job.status = 'running';
-                state.job.deadlines.execution = new Date(Date.now() + 600000).toISOString();
-                persist();
-                snapshot();
-              }
-              if (message.type === 'provider_cancel') {
-                const job = state.job;
-                job.status = 'cancelled';
-                job.result = { providerId: job.providerId, browserTaskId: job.browserTaskId, jobId: job.jobId, invocationId: job.invocationId, status: 'cancelled', reason: 'cancelled', summary: 'Cancelled without replay.', evidence: [], effectsUncertain: false };
-                persist();
-                this.receive({ ...message, type: 'provider_job_cancel', reason: 'cancelled' });
-                snapshot();
-              }
-            }
-            close() {
-              this.readyState = 3;
-              const event = new CloseEvent('close', { code: 1000 });
-              this.dispatchEvent(event);
-              this.onclose?.(event);
-            }
-          }
-          Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: PeerSocket });
-          globalThis.submitFirefoxBrowserTask = () => {
-            const now = Date.now();
-            state.job = { providerId: state.providerId, generation: state.generation, browserTaskId: 'bt_' + crypto.randomUUID(), jobId: 'bj_' + crypto.randomUUID(), invocationId: 'b1.' + now + '.' + 'a'.repeat(64), payloadFingerprint: 'b'.repeat(64), createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 604800000).toISOString(), deadlines: { approval: new Date(now + 120000).toISOString(), queue: new Date(now + 600000).toISOString() }, ownerLabel: 'ses_firefox_parent_A1', status: 'awaiting_approval' };
-            persist();
-            socket.receive({ type: 'provider_job', job: state.job, ownerLabel: 'ses_firefox_parent_A1', goal: 'Inspect only the explicitly approved tab.', conversationMode: 'new' });
-          };
-        }`);
+          // Only the network peer is a fixture. Both browsers run the shipped provider and coordinator.
+          await installFirefoxBrowserTaskPeer(session.driver);
           await session.openTargetPage();
           const targetHandle = await session.driver.getWindowHandle();
           await openAuthenticatedPanel(session);
           const ownerHandle = await session.driver.getWindowHandle();
           await waitForModel(session.driver);
-          await session.driver.findElement(By.css('button[aria-label="Settings"]')).click();
-          await session.driver
-            .findElement(By.css('[aria-label="CLI task settings"] button[aria-label="Model"]'))
-            .click();
-          await selectModelByIdFirefox(session.driver, 'anthropic/claude-sonnet-4');
-          await session.driver
-            .findElement(By.css('[aria-label="CLI task settings"] button[aria-label*="Safe mode"]'))
-            .click();
-          await clickButtonByText(session.driver, 'Dangerous');
-          await session.driver
-            .findElement(
-              By.css('[aria-label="CLI task settings"] [role="switch"][aria-label="CLI tasks"]')
-            )
-            .click();
-          await session.driver.findElement(By.css('button[aria-label="Close settings"]')).click();
-          await waitForText(session.driver, 'Enabled — idle');
+          await enableFirefoxBrowserTasks(session.driver);
           await session.driver.executeScript('globalThis.submitFirefoxBrowserTask()');
           await waitForText(session.driver, 'Tab approval required');
           const approveButton = await session.driver.findElement(
@@ -3377,19 +3397,7 @@ const scenarios: FirefoxScenario[] = [
           await approveButton.click();
           await waitForText(session.driver, 'CLI tasks: Running');
           await waitForText(session.driver, 'Bound tab: Kilo extension fixture');
-          const modes = await session.driver.executeAsyncScript(
-            (done: (value: unknown) => void) => {
-              void navigator.locks.query().then(state => {
-                done(
-                  state.held
-                    ?.filter(lock => lock.name === 'kilo:browser-execution')
-                    .map(lock => lock.mode)
-                );
-                return null;
-              });
-            }
-          );
-          assert.deepEqual(modes, ['exclusive']);
+          assert.deepEqual(await firefoxExecutionModes(session.driver), ['exclusive']);
           await session.openSidePanel();
           const otherHandle = await session.driver.getWindowHandle();
           await waitForText(session.driver, 'Owned by another panel');
@@ -3424,6 +3432,186 @@ const scenarios: FirefoxScenario[] = [
       );
     },
   },
+  ...(['close', 'reload'] as const).map(loss => ({
+    name: `native local owner ${loss} blocks local and delegated work until explicit recovery` as const,
+    run: async (context: ScenarioContext): Promise<void> => {
+      const issueAction = Promise.withResolvers<void>();
+      const bodies: unknown[] = [];
+      const recoveredText = 'Explicitly submitted Firefox work completed.';
+      await withSession(
+        context.api,
+        {
+          beforeFirstCompletion: () => issueAction.promise,
+          browserTasks: true,
+          firstCompletionEvents: toolCallCompletion(
+            'eval',
+            {
+              code: 'document.querySelector("h1").textContent = "Issued local page action"; document.documentElement.setAttribute("data-local-action", "issued"); await new Promise(resolve => document.addEventListener("finish-local-action", resolve, { once: true })); document.documentElement.setAttribute("data-local-action", "finished"); return "finished";',
+            },
+            'firefox-issued-local-action'
+          ),
+          secondCompletionEvents: contentOnlyCompletion(recoveredText),
+          seenChatBodies: bodies,
+          thirdCompletionEvents: contentOnlyCompletion(recoveredText),
+          toolNames: dangerousToolNames,
+        },
+        async session => {
+          const { driver } = session;
+          await installFirefoxBrowserTaskPeer(driver);
+          await session.openTargetPage('Firefox affected local tab');
+          const targetHandle = await driver.getWindowHandle();
+          await session.openTargetPage('Firefox recovery target');
+          const otherHandle = await driver.getWindowHandle();
+          await openAuthenticatedPanel(session);
+          const providerHandle = await driver.getWindowHandle();
+          await waitForModel(driver);
+          await enableFirefoxBrowserTasks(driver);
+          await session.openSidePanel();
+          const localOwnerHandle = await driver.getWindowHandle();
+          await waitForText(driver, 'Owned by another panel');
+          await waitForModel(driver);
+          await waitForTargetOption(driver, 'Firefox affected local tab');
+          await setSelectByText(driver, 'Target tab', 'Firefox affected local tab');
+          await switchToDangerousMode(driver);
+          await sendMessage(driver, 'Issue the local page action and wait.');
+          await waitUntil(
+            driver,
+            async () => JSON.stringify(await firefoxExecutionModes(driver)) === '["shared"]',
+            'The local run must hold a native shared execution lock.'
+          );
+          await driver.switchTo().window(providerHandle);
+          await driver.executeScript('globalThis.submitFirefoxBrowserTask()');
+          await waitForText(driver, 'Tab approval required');
+          await driver
+            .findElement(
+              By.xpath(
+                '//section[@aria-label="CLI task supervision"]//select/option[normalize-space(.)="Firefox affected local tab"]'
+              )
+            )
+            .click();
+          const initialApproval = await getButtonByText(driver, 'Approve tab');
+          await initialApproval.click();
+          await waitForText(driver, 'Waiting for browser control');
+          assert.equal(bodies.length, 1);
+
+          // Destroy the local owner only after real page code starts, not during the held model request.
+          issueAction.resolve();
+          await driver.switchTo().window(targetHandle);
+          await waitUntil(
+            driver,
+            async () =>
+              (await driver.findElement(By.css('html')).getAttribute('data-local-action')) ===
+              'issued',
+            'The local runner must issue a page action before owner loss.'
+          );
+          await driver.switchTo().window(localOwnerHandle);
+          await (loss === 'close' ? driver.close() : driver.navigate().refresh());
+          await driver.switchTo().window(targetHandle);
+          await driver.executeScript('document.dispatchEvent(new Event("finish-local-action"))');
+          await waitUntil(
+            driver,
+            async () =>
+              (await driver.findElement(By.css('html')).getAttribute('data-local-action')) ===
+              'finished',
+            'Issued page code must finish after its panel owner disappears.'
+          );
+          assert.equal(
+            await driver.findElement(By.css('h1')).getText(),
+            'Issued local page action'
+          );
+          await driver.switchTo().window(providerHandle);
+          await waitForText(driver, 'Recovery required');
+          await waitUntil(
+            driver,
+            async () => JSON.stringify(await firefoxExecutionModes(driver)) === '[]',
+            'Native lock release must not clear the durable local protection.'
+          );
+          const stored = await readFirefoxStorage(driver, ['kiloBrowserExecutionSafety']);
+          const safety = z
+            .object({
+              localRuns: z.array(z.object({ tabId: z.number() })),
+              tabIds: z.array(z.number()),
+            })
+            .parse(stored['kiloBrowserExecutionSafety']);
+          assert.equal(safety.localRuns.length, 1);
+          assert.deepEqual(safety.tabIds, []);
+          const draft = 'Keep this Firefox draft until explicit recovery.';
+          await sendMessage(driver, draft);
+          assert.equal(
+            await driver.findElement(By.css('#agent-message')).getAttribute('value'),
+            draft
+          );
+          await waitForText(driver, 'an action may still be running');
+          const affected = await driver
+            .findElement(By.css('[aria-label="Affected tabs"]'))
+            .getText();
+          assert.ok(affected.includes('Firefox affected local tab'));
+          await clickButtonByText(driver, 'Check recovery readiness');
+          await waitForText(driver, 'Close all affected tabs before recovery.');
+          const recoveryButtons = await driver.findElements(
+            By.xpath('//button[normalize-space(.)="Recover browser control"]')
+          );
+          const approvalButtons = await driver.findElements(
+            By.xpath('//button[normalize-space(.)="Approve tab"]')
+          );
+          assert.equal(recoveryButtons.length, 0);
+          assert.equal(approvalButtons.length, 0);
+          assert.equal(bodies.length, 1);
+
+          await driver.switchTo().window(targetHandle);
+          await driver.close();
+          await driver.switchTo().window(providerHandle);
+          await clickButtonByText(driver, 'Check recovery readiness');
+          await waitForText(driver, 'Browser control is ready for recovery.');
+          await sendMessage(driver, draft);
+          assert.equal(
+            await driver.findElement(By.css('#agent-message')).getAttribute('value'),
+            draft
+          );
+          assert.equal(bodies.length, 1);
+          await clickButtonByText(driver, 'Recover browser control');
+          await waitForText(driver, 'Enabled — idle');
+          assert.deepEqual(await firefoxExecutionModes(driver), []);
+          assert.equal(bodies.length, 1);
+          await setSelectByText(driver, 'Target tab', 'Firefox recovery target');
+          await driver
+            .findElement(
+              By.css('button[aria-label^="Safe mode"], button[aria-label^="Dangerous mode"]')
+            )
+            .click();
+          await clickButtonByText(driver, 'Dangerous');
+          await sendMessage(driver, draft);
+          await waitForText(driver, recoveredText);
+          await waitUntil(
+            driver,
+            async () => JSON.stringify(await firefoxExecutionModes(driver)) === '[]',
+            'The explicitly submitted local run must finish.'
+          );
+          assert.equal(bodies.length, 2);
+          await driver.executeScript('globalThis.submitFirefoxBrowserTask()');
+          await waitForText(driver, 'Tab approval required');
+          const freshApproval = await getButtonByText(driver, 'Approve tab');
+          assert.equal(await freshApproval.isEnabled(), false);
+          assert.equal(bodies.length, 2);
+          await driver
+            .findElement(
+              By.xpath(
+                '//section[@aria-label="CLI task supervision"]//select/option[normalize-space(.)="Firefox recovery target"]'
+              )
+            )
+            .click();
+          await freshApproval.click();
+          await waitForText(driver, 'Last outcome: succeeded');
+          assert.equal(bodies.length, 3);
+          await driver.switchTo().window(otherHandle);
+          assert.equal(
+            await driver.findElement(By.css('html')).getAttribute('data-local-action'),
+            null
+          );
+        }
+      );
+    },
+  })),
   {
     name: 'unsupported native locks keep CLI delegation disabled',
     run: async context => {

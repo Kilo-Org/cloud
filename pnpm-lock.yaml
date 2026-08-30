@@ -352,9 +352,6 @@ importers:
       '@formatjs/intl-segmenter':
         specifier: ^12.2.13
         version: 12.2.13
-      '@kilocode/agent-harness':
-        specifier: workspace:*
-        version: file:packages/agent-harness(react@19.2.3)
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../../packages/app-shared
@@ -602,8 +599,6 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     dependenciesMeta:
-      '@kilocode/agent-harness':
-        injected: true
       '@kilocode/kilo-chat-hooks':
         injected: true
     devDependencies:
@@ -5867,14 +5862,6 @@ packages:
       '@jsamr/counter-style': ^1.0.0 || ^2.0.0
       react: '*'
       react-native: '*'
-
-  '@kilocode/agent-harness@file:packages/agent-harness':
-    resolution: {directory: packages/agent-harness, type: directory}
-    peerDependencies:
-      react: ^19.0.0
-    peerDependenciesMeta:
-      react:
-        optional: true
 
   '@kilocode/kilo-chat-hooks@file:packages/kilo-chat-hooks':
     resolution: {directory: packages/kilo-chat-hooks, type: directory}
@@ -22805,13 +22792,6 @@ snapshots:
       '@jsamr/counter-style': 2.0.2
       react: 19.2.3
       react-native: 0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
-
-  '@kilocode/agent-harness@file:packages/agent-harness(react@19.2.3)':
-    dependencies:
-      '@kilocode/mcp-gateway': link:packages/mcp-gateway
-      zod: 4.4.3
-    optionalDependencies:
-      react: 19.2.3
 
   '@kilocode/kilo-chat-hooks@file:packages/kilo-chat-hooks(@tanstack/react-query@5.100.10(react@19.2.3))(react@19.2.3)':
     dependencies:

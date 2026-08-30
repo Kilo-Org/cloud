@@ -34,7 +34,6 @@
     "@formatjs/intl-pluralrules": "^6.3.13",
     "@formatjs/intl-relativetimeformat": "^12.3.13",
     "@formatjs/intl-segmenter": "^12.2.13",
-    "@kilocode/agent-harness": "workspace:*",
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/cloud-agent-sdk": "workspace:*",
     "@kilocode/event-service": "workspace:*",
@@ -134,9 +133,6 @@
     "vitest": "catalog:"
   },
   "dependenciesMeta": {
-    "@kilocode/agent-harness": {
-      "injected": true
-    },
     "@kilocode/kilo-chat-hooks": {
       "injected": true
     }

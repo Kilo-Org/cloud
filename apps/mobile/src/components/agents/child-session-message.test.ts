@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- routing fixtures and mounted completion regression */
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act } from 'react';
+import { Text } from '@/components/ui/text';
 import { renderWithProviders } from '@/test/render-with-providers';
 import {
   type Part,
@@ -276,8 +277,7 @@ describe('ChildSessionMessage completion', () => {
       React.createElement(ChildSessionMessage, { ...props, message: makeMessage([runningPart]) })
     );
     try {
-      const texts = () =>
-        renderer.root.findAll(node => node.type === 'Text').map(node => node.props.children);
+      const texts = () => renderer.root.findAllByType(Text).map(node => node.props.children);
       const button = () => renderer.root.findByType('Pressable');
       expect(texts()).toContain('Considering next steps');
       expect(button().props.accessibilityLabel).toContain('Considering next steps');

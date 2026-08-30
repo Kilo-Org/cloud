@@ -551,6 +551,269 @@ describe('local admission and shared run context', () => {
       'tool_calls'
     );
 
+  /* eslint-disable jest/no-conditional-expect -- Each deferred outcome checks its retained input and explicit retry control. */
+  it.each(['success', 'rejection', 'error'] as const)(
+    'announces delayed Send admission through %s without consuming or duplicating a draft',
+    async outcome => {
+      const history = seedHistory();
+      const admission = await coordinator().acquireLocal();
+      hold(admission);
+      const pending = Promise.withResolvers<BrowserAdmission>();
+      vi.spyOn(coordinator(), 'acquireLocal').mockReturnValueOnce(pending.promise);
+      const finish = Promise.withResolvers<void>();
+      gateway = async () => {
+        await finish.promise;
+        return response();
+      };
+      const view = renderApp();
+      try {
+        await waitFor(() => {
+          expect(view.getByRole('button', { name: 'Close Prior question' })).toBeDefined();
+        });
+        const textbox = view.getByRole('textbox', { name: 'Message agent' });
+        const sendButton = view.getByRole('button', { name: 'Send message' });
+        const status = view.getByRole('status');
+        fireEvent.keyDown(textbox, { key: 'Enter' });
+        expect({ className: status.className, text: status.textContent }).toStrictEqual({
+          className: 'sr-only',
+          text: '',
+        });
+        fireEvent.change(textbox, { target: { value: '  submitted draft  ' } });
+        fireEvent.click(sendButton);
+        expect({
+          disabled: sendButton.hasAttribute('disabled'),
+          draft: store.get(draftAtomFamily('conversation-1')),
+          sameButton: view.getByRole('button', { name: 'Send message' }) === sendButton,
+          sameStatus: view.getByRole('status') === status,
+          screenReaderOnly: status.classList.contains('sr-only'),
+          status: status.textContent,
+        }).toStrictEqual({
+          disabled: true,
+          draft: '  submitted draft  ',
+          sameButton: true,
+          sameStatus: true,
+          screenReaderOnly: false,
+          status: expect.stringContaining('Checking browser control'),
+        });
+        fireEvent.change(textbox, { target: { value: 'updated while waiting' } });
+        fireEvent.click(sendButton);
+        fireEvent.keyDown(textbox, { key: 'Enter' });
+        fireEvent.keyDown(textbox, { key: 'Enter' });
+        expect({
+          actions,
+          draft: store.get(draftAtomFamily('conversation-1')),
+          events: storedEvents(),
+          requests,
+        }).toStrictEqual({
+          actions: [],
+          draft: 'updated while waiting',
+          events: history,
+          requests: [],
+        });
+        await act(async () => {
+          if (outcome === 'error') {
+            pending.reject(new Error('Admission unavailable.'));
+          } else {
+            pending.resolve(
+              outcome === 'success' ? admission : { admitted: false, reason: 'Busy' }
+            );
+          }
+        });
+        if (outcome !== 'success') {
+          view.rerender(app());
+          expect({
+            actions,
+            disabled: sendButton.hasAttribute('disabled'),
+            events: storedEvents(),
+            pending: view.queryByText(/Checking browser control/u),
+            requests,
+            status: view.getByRole('status').textContent,
+          }).toStrictEqual({
+            actions: [],
+            disabled: false,
+            events: history,
+            pending: null,
+            requests: [],
+            status: expect.stringContaining('retained'),
+          });
+          fireEvent.click(sendButton);
+        }
+        await waitFor(() => {
+          expect(requests).toHaveLength(1);
+          expect(view.queryByText(/Checking browser control/u)).toBeNull();
+        });
+        expect({
+          disabled: sendButton.hasAttribute('disabled'),
+          draft: store.get(draftAtomFamily('conversation-1')),
+          queued: store.get(queuedMessageAtomFamily('conversation-1')),
+          requests,
+          sameButton: view.getByRole('button', { name: 'Stop' }) === sendButton,
+        }).toStrictEqual({
+          disabled: false,
+          draft: outcome === 'success' ? 'updated while waiting' : '',
+          queued: undefined,
+          requests: [
+            expect.stringContaining(
+              outcome === 'success' ? 'submitted draft' : 'updated while waiting'
+            ),
+          ],
+          sameButton: true,
+        });
+        await act(async () => {
+          finish.resolve();
+        });
+        await waitFor(() => {
+          expect(store.get(runningConversationIdsAtom)).toStrictEqual([]);
+          expect(requests).toHaveLength(1);
+        });
+      } finally {
+        view.unmount();
+        pending.resolve(admission);
+        finish.resolve();
+      }
+    }
+  );
+
+  it.each([
+    { outcome: 'success', site: 'queue' },
+    { outcome: 'success', site: 'workflow' },
+    { outcome: 'rejection', site: 'queue' },
+    { outcome: 'rejection', site: 'workflow' },
+    { outcome: 'error', site: 'queue' },
+    { outcome: 'error', site: 'workflow' },
+  ] as const)(
+    'announces delayed $site Resume through $outcome without consuming or duplicating input',
+    async ({ site, outcome }) => {
+      const history = seedHistory();
+      const admission = await coordinator().acquireLocal();
+      hold(admission);
+      const pending = Promise.withResolvers<BrowserAdmission>();
+      vi.spyOn(coordinator(), 'acquireLocal')
+        .mockResolvedValueOnce({ admitted: false, reason: 'Busy' })
+        .mockReturnValueOnce(pending.promise);
+      const request = { input: { order: 'order-42' }, workflowId: 'wf-1' };
+      const queued = 'retained queue';
+      if (site === 'queue') {
+        store.set(queuedMessageAtomFamily('conversation-1'), queued);
+      }
+      const finish = Promise.withResolvers<void>();
+      gateway = async () => {
+        await finish.promise;
+        return response();
+      };
+      const view = renderApp();
+      try {
+        await waitFor(() => {
+          expect(view.getByRole('button', { name: 'Close Prior question' })).toBeDefined();
+        });
+        if (site === 'workflow') {
+          await act(async () => {
+            store.set(workflowRunRequestAtom, request);
+          });
+        }
+        const label = site === 'queue' ? 'Resume queued message' : 'Resume workflow';
+        await waitFor(() => {
+          expect(view.getByRole('button', { name: label })).toHaveProperty('disabled', false);
+        });
+        const resume = view.getByRole('button', { name: label });
+        const status = view.getByRole('status');
+        expect(status.textContent).toContain('retained');
+        fireEvent.change(view.getByRole('textbox', { name: 'Message agent' }), {
+          target: { value: 'retain composer draft' },
+        });
+        fireEvent.click(resume);
+        expect({
+          disabled: resume.hasAttribute('disabled'),
+          sameButton: view.getByRole('button', { name: label }) === resume,
+          sameStatus: view.getByRole('status') === status,
+          screenReaderOnly: status.classList.contains('sr-only'),
+          status: status.textContent,
+        }).toStrictEqual({
+          disabled: true,
+          sameButton: true,
+          sameStatus: true,
+          screenReaderOnly: false,
+          status: expect.stringContaining('Checking browser control'),
+        });
+        fireEvent.click(resume);
+        fireEvent.click(resume);
+        expect({
+          actions,
+          events: storedEvents(),
+          input:
+            site === 'queue'
+              ? store.get(queuedMessageAtomFamily('conversation-1'))
+              : store.get(workflowRunRequestAtom),
+          requests,
+        }).toStrictEqual({
+          actions: [],
+          events: history,
+          input: site === 'queue' ? queued : request,
+          requests: [],
+        });
+        await act(async () => {
+          if (outcome === 'error') {
+            pending.reject(new Error('Admission unavailable. Resume explicitly.'));
+          } else {
+            pending.resolve(
+              outcome === 'success' ? admission : { admitted: false, reason: 'Busy' }
+            );
+          }
+        });
+        if (outcome !== 'success') {
+          view.rerender(app());
+          expect({
+            actions,
+            disabled: resume.hasAttribute('disabled'),
+            events: storedEvents(),
+            input:
+              site === 'queue'
+                ? store.get(queuedMessageAtomFamily('conversation-1'))
+                : store.get(workflowRunRequestAtom),
+            pending: view.queryByText(/Checking browser control/u),
+            requests,
+          }).toStrictEqual({
+            actions: [],
+            disabled: false,
+            events: history,
+            input: site === 'queue' ? queued : request,
+            pending: null,
+            requests: [],
+          });
+          fireEvent.click(resume);
+        }
+        await waitFor(() => {
+          expect(requests).toHaveLength(1);
+          expect(view.queryByText(/Checking browser control/u)).toBeNull();
+          expect(view.queryByRole('button', { name: label })).toBeNull();
+        });
+        expect({
+          actions: actions.length,
+          draft: store.get(draftAtomFamily('conversation-1')),
+          queued: store.get(queuedMessageAtomFamily('conversation-1')),
+          request: store.get(workflowRunRequestAtom),
+        }).toStrictEqual({
+          actions: site === 'queue' ? 0 : 1,
+          draft: 'retain composer draft',
+          queued: undefined,
+          request: undefined,
+        });
+        await act(async () => {
+          finish.resolve();
+        });
+        await waitFor(() => {
+          expect(store.get(runningConversationIdsAtom)).toStrictEqual([]);
+          expect(requests).toHaveLength(1);
+        });
+      } finally {
+        view.unmount();
+        pending.resolve(admission);
+        finish.resolve();
+      }
+    }
+  );
+  /* eslint-enable jest/no-conditional-expect */
+
   it.each(['selection change', 'tab removal', 'unrefreshed tab removal'] as const)(
     'retains a submitted draft after %s during delayed admission',
     async change => {
@@ -642,6 +905,132 @@ describe('local admission and shared run context', () => {
       }
     }
   );
+
+  it('clears cancelled queue feedback without clearing a newer draft admission', async () => {
+    seedHistory();
+    const oldAdmission = await coordinator().acquireLocal();
+    const newAdmission = await coordinator().acquireLocal();
+    hold(oldAdmission);
+    hold(newAdmission);
+    const oldPending = Promise.withResolvers<BrowserAdmission>();
+    const newPending = Promise.withResolvers<BrowserAdmission>();
+    vi.spyOn(coordinator(), 'acquireLocal')
+      .mockReturnValueOnce(oldPending.promise)
+      .mockReturnValueOnce(newPending.promise);
+    store.set(queuedMessageAtomFamily('conversation-1'), 'cancel this queue');
+    store.set(draftAtomFamily('conversation-1'), 'keep this draft');
+    const view = renderApp();
+    try {
+      await waitFor(() => {
+        expect(view.getByRole('status').textContent).toContain('Checking browser control');
+      });
+      fireEvent.click(view.getByRole('button', { name: 'Cancel queued message' }));
+      const sendButton = view.getByRole('button', { name: 'Send message' });
+      expect({
+        disabled: sendButton.hasAttribute('disabled'),
+        pending: view.queryByText(/Checking browser control/u),
+      }).toStrictEqual({ disabled: false, pending: null });
+      fireEvent.click(sendButton);
+      expect(view.getByRole('status').textContent).toContain('Checking browser control');
+      await act(async () => {
+        oldPending.resolve(oldAdmission);
+      });
+      await waitFor(async () => {
+        expect(
+          (await nativeLocks.query()).held?.filter(lock => lock.name === BROWSER_EXECUTION_LOCK)
+        ).toHaveLength(1);
+      });
+      expect({
+        actions,
+        disabled: sendButton.hasAttribute('disabled'),
+        draft: store.get(draftAtomFamily('conversation-1')),
+        queued: store.get(queuedMessageAtomFamily('conversation-1')),
+        requests,
+        status: view.getByRole('status').textContent,
+      }).toStrictEqual({
+        actions: [],
+        disabled: true,
+        draft: 'keep this draft',
+        queued: undefined,
+        requests: [],
+        status: expect.stringContaining('Checking browser control'),
+      });
+      fireEvent.keyDown(view.getByRole('textbox', { name: 'Message agent' }), { key: 'Enter' });
+      await act(async () => {
+        newPending.resolve(newAdmission);
+      });
+      await waitFor(() => {
+        expect(
+          storedEvents().some(event => event.type === 'message' && event.text === 'Answer done.')
+        ).toBe(true);
+        expect(store.get(runningConversationIdsAtom)).toStrictEqual([]);
+      });
+      expect({ pending: view.queryByText(/Checking browser control/u), requests }).toStrictEqual({
+        pending: null,
+        requests: [expect.stringContaining('keep this draft')],
+      });
+      expect(requests[0]).not.toContain('cancel this queue');
+    } finally {
+      view.unmount();
+      oldPending.resolve(oldAdmission);
+      newPending.resolve(newAdmission);
+    }
+  });
+
+  it('keeps pending feedback and Send availability isolated between conversations', async () => {
+    seedHistory();
+    const admission = await coordinator().acquireLocal();
+    hold(admission);
+    const pending = Promise.withResolvers<BrowserAdmission>();
+    vi.spyOn(coordinator(), 'acquireLocal').mockReturnValueOnce(pending.promise);
+    const view = renderApp();
+    try {
+      await waitFor(() => {
+        expect(view.getByRole('tab', { name: 'Prior question' })).toBeDefined();
+      });
+      await send(view, 'first conversation draft');
+      expect(view.getByRole('status').textContent).toContain('Checking browser control');
+      fireEvent.click(view.getByRole('button', { name: 'New conversation' }));
+      fireEvent.change(view.getByRole('textbox', { name: 'Message agent' }), {
+        target: { value: 'second conversation draft' },
+      });
+      expect({
+        disabled: view.getByRole('button', { name: 'Send message' }).hasAttribute('disabled'),
+        status: view.getByRole('status').textContent,
+      }).toStrictEqual({ disabled: false, status: '' });
+      fireEvent.click(view.getByRole('button', { name: 'Send message' }));
+      await waitFor(() => {
+        expect(requests).toHaveLength(1);
+        expect(store.get(runningConversationIdsAtom)).toStrictEqual([]);
+      });
+      expect({ draft: store.get(draftAtomFamily('conversation-1')), requests }).toStrictEqual({
+        draft: 'first conversation draft',
+        requests: [expect.stringContaining('second conversation draft')],
+      });
+      fireEvent.click(view.getByRole('tab', { name: 'Prior question' }));
+      expect({
+        disabled: view.getByRole('button', { name: 'Send message' }).hasAttribute('disabled'),
+        status: view.getByRole('status').textContent,
+      }).toStrictEqual({
+        disabled: true,
+        status: expect.stringContaining('Checking browser control'),
+      });
+      await act(async () => {
+        pending.resolve(admission);
+      });
+      await waitFor(() => {
+        expect(requests).toHaveLength(2);
+        expect(store.get(runningConversationIdsAtom)).toStrictEqual([]);
+      });
+      expect({ request: requests[1], status: view.getByRole('status').textContent }).toStrictEqual({
+        request: expect.stringContaining('first conversation draft'),
+        status: '',
+      });
+    } finally {
+      view.unmount();
+      pending.resolve(admission);
+    }
+  });
 
   it('keeps the submitted target when only the active browser tab changes during admission', async () => {
     seedHistory();
@@ -997,11 +1386,15 @@ describe('local admission and shared run context', () => {
         });
       }
       await entered.promise;
+      await waitFor(() => {
+        expect(view.getByRole('status').textContent).toContain('Checking browser control');
+      });
       if (cancellation === 'close') {
         fireEvent.click(view.getByRole('button', { name: 'Close Prior question' }));
       } else {
         view.unmount();
       }
+      expect(view.queryByText(/Checking browser control/u)).toBeNull();
       await act(async () => {
         pending.resolve(admission);
       });
@@ -1010,10 +1403,21 @@ describe('local admission and shared run context', () => {
           (await nativeLocks.query()).held?.some(lock => lock.name === BROWSER_EXECUTION_LOCK)
         ).toBe(false);
       });
-      expect({ actions, requests }).toStrictEqual({ actions: [], requests: [] });
-      expect(storedEvents()).toStrictEqual(history);
-      expect(store.get(runningConversationIdsAtom)).toStrictEqual([]);
-      expect(store.get(workflowRunRequestAtom)).toBeUndefined();
+      expect({
+        actions,
+        events: storedEvents(),
+        pending: view.queryByText(/Checking browser control/u),
+        request: store.get(workflowRunRequestAtom),
+        requests,
+        running: store.get(runningConversationIdsAtom),
+      }).toStrictEqual({
+        actions: [],
+        events: history,
+        pending: null,
+        request: undefined,
+        requests: [],
+        running: [],
+      });
       if (site === 'draft') {
         expect(store.get(draftAtomFamily('conversation-1'))).toBe('retained cancelled draft');
       }
@@ -1038,7 +1442,18 @@ describe('local admission and shared run context', () => {
       });
       vi.spyOn(coordinator(), 'acquireLocal').mockReturnValueOnce(pending.promise);
       await send(view, 'retain this cancelled admission');
+      expect({
+        disabled: view.getByRole('button', { name: 'Stop' }).hasAttribute('disabled'),
+        status: view.getByRole('status').textContent,
+      }).toStrictEqual({
+        disabled: false,
+        status: expect.stringContaining('Checking browser control'),
+      });
       fireEvent.click(view.getByRole('button', { name: 'Stop' }));
+      expect({
+        draft: store.get(draftAtomFamily('conversation-1')),
+        pending: view.queryByText(/Checking browser control/u),
+      }).toStrictEqual({ draft: 'retain this cancelled admission', pending: null });
       await act(async () => {
         pending.resolve(admission);
         finish.resolve();
@@ -1048,11 +1463,19 @@ describe('local admission and shared run context', () => {
           (await nativeLocks.query()).held?.some(lock => lock.name === BROWSER_EXECUTION_LOCK)
         ).toBe(false);
       });
-      expect(store.get(draftAtomFamily('conversation-1'))).toBe('retain this cancelled admission');
-      expect(store.get(queuedMessageAtomFamily('conversation-1'))).toBeUndefined();
-      expect(store.get(runningConversationIdsAtom)).toStrictEqual([]);
-      expect(requests).toHaveLength(1);
-      expect(actions).toStrictEqual([]);
+      expect({
+        actions,
+        draft: store.get(draftAtomFamily('conversation-1')),
+        queued: store.get(queuedMessageAtomFamily('conversation-1')),
+        requests: requests.length,
+        running: store.get(runningConversationIdsAtom),
+      }).toStrictEqual({
+        actions: [],
+        draft: 'retain this cancelled admission',
+        queued: undefined,
+        requests: 1,
+        running: [],
+      });
     } finally {
       view.unmount();
       pending.resolve(admission);
@@ -1131,7 +1554,8 @@ describe('local admission and shared run context', () => {
       await delegated.release();
       await coordinator().refresh();
     });
-    expect(view.queryByRole('status')).toBeNull();
+    expect(view.getByRole('status').textContent).toBe('');
+    expect(view.getByRole('status').className).toBe('sr-only');
     expect(view.queryByRole('button', { name: /Resume/u })).toBeNull();
     expect({ actions, requests }).toStrictEqual({ actions: [], requests: [] });
     await send(view, 'ordinary local send');
@@ -1416,7 +1840,7 @@ describe('local admission and shared run context', () => {
         pending: nativeState.pending?.filter(lock => lock.name === BROWSER_EXECUTION_LOCK),
         requests,
         safety: fixture.values.get(BROWSER_EXECUTION_SAFETY_KEY),
-        status: view.getByRole('status').textContent,
+        statuses: view.getAllByRole('status').map(status => status.textContent),
       }).toStrictEqual({
         actions: 1,
         draft: 'retained after safety failure',
@@ -1424,7 +1848,7 @@ describe('local admission and shared run context', () => {
         pending: [],
         requests: [],
         safety: { tabIds: [], version: 1 },
-        status: expect.stringMatching(/^Your message is retained\. Submit it again/u),
+        statuses: [expect.stringMatching(/^Your message is retained\. Submit it again/u), ''],
       });
       const local = hold(await coordinator().acquireLocal());
       await local.release();

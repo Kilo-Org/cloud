@@ -104,6 +104,11 @@ interface ConversationRunState {
   readonly token: number;
 }
 
+interface PendingAdmission {
+  readonly signal: AbortSignal;
+  readonly queued?: string;
+}
+
 export const getSelectedInspectableTabId = ({
   activeTabId,
   inspectableTabs,
@@ -188,7 +193,13 @@ export const AgentChatPanel = ({
   const execution = useBrowserExecutionSnapshot();
   const [admissionBlocker, setAdmissionBlocker] = useState<string>();
   const mountedRef = useRef(true);
-  const pendingAdmissionsRef = useRef(new Set<string>());
+  const pendingAdmissionsRef = useRef(new Map<string, PendingAdmission>());
+  const [pendingAdmissionIds, setPendingAdmissionIds] = useState<string[]>([]);
+  const [pendingWorkflowAdmission, setPendingWorkflowAdmission] = useState<{
+    request: WorkflowRunRequest;
+    conversationId: string;
+    isResuming: boolean;
+  }>();
   const admissionControllersRef = useRef(new Map<string, AbortController>());
   const pausedQueuesRef = useRef(new Set<string>());
   const [pausedQueueIds, setPausedQueueIds] = useState<string[]>([]);
@@ -371,12 +382,14 @@ export const AgentChatPanel = ({
     mountedRef.current = true;
     const runs = runStatesRef.current;
     const admissions = admissionControllersRef.current;
+    const pendingAdmissions = pendingAdmissionsRef.current;
     return () => {
       mountedRef.current = false;
       for (const controller of admissions.values()) {
         controller.abort();
       }
       admissions.clear();
+      pendingAdmissions.clear();
       for (const runState of runs.values()) {
         runState.abort.abort();
       }
@@ -845,17 +858,39 @@ export const AgentChatPanel = ({
     mountedRef.current &&
     !signal.aborted &&
     isStoredConversationOpen(conversationStoreRef.current, conversationId);
+  const finishAdmission = useCallback((conversationId: string, pending: PendingAdmission): void => {
+    if (pendingAdmissionsRef.current.get(conversationId) === pending) {
+      pendingAdmissionsRef.current.delete(conversationId);
+      if (mountedRef.current) {
+        setPendingAdmissionIds([...pendingAdmissionsRef.current.keys()]);
+      }
+    }
+  }, []);
   const cancelConversationAdmissions = useCallback(
     (conversationId: string): void => {
       admissionControllersRef.current.get(conversationId)?.abort();
       admissionControllersRef.current.delete(conversationId);
+      const pending = pendingAdmissionsRef.current.get(conversationId);
+      if (pending !== undefined) {
+        finishAdmission(conversationId, pending);
+      }
+      setPendingWorkflowAdmission(current =>
+        current?.conversationId === conversationId ? undefined : current
+      );
       const request = store.get(workflowRunRequestAtom);
       if (request !== undefined && processingWorkflowsRef.current.get(request) === conversationId) {
         store.set(workflowRunRequestAtom, undefined);
       }
     },
-    [store]
+    [finishAdmission, store]
   );
+
+  useEffect(() => {
+    const pending = pendingAdmissionsRef.current.get(activeConversationId);
+    if (pending?.queued !== undefined && pending.queued !== activeQueuedMessage) {
+      finishAdmission(activeConversationId, pending);
+    }
+  }, [activeConversationId, activeQueuedMessage, finishAdmission]);
 
   const submitDraft = async (): Promise<void> => {
     const conversationId = conversationStoreRef.current.activeConversationId;
@@ -866,14 +901,19 @@ export const AgentChatPanel = ({
     }
     const submittedTabId = getConversationSelectedTabId(conversationId);
     const signal = getAdmissionSignal(conversationId);
-    pendingAdmissionsRef.current.add(conversationId);
+    const pending = { signal };
+    pendingAdmissionsRef.current.set(conversationId, pending);
+    setPendingAdmissionIds([...pendingAdmissionsRef.current.keys()]);
     let lease: BrowserExecutionLease | undefined = undefined;
     let handedOff = false;
     try {
       const admission = await getBrowserExecutionCoordinator().acquireLocal();
       lease = admission.admitted ? admission.lease : undefined;
       const targetExists = lease !== undefined && (await isTabOpen(submittedTabId));
-      if (!isAdmissionCurrent(conversationId, signal)) {
+      if (
+        !isAdmissionCurrent(conversationId, signal) ||
+        pendingAdmissionsRef.current.get(conversationId) !== pending
+      ) {
         return;
       }
       if (
@@ -921,13 +961,18 @@ export const AgentChatPanel = ({
         store.set(draftAtomFamily(conversationId), '');
       }
     } catch (error) {
-      if (isAdmissionCurrent(conversationId, signal)) {
+      if (
+        isAdmissionCurrent(conversationId, signal) &&
+        pendingAdmissionsRef.current.get(conversationId) === pending
+      ) {
         setAdmissionBlocker(
-          error instanceof Error ? error.message : 'Browser admission stopped. Submit again.'
+          error instanceof Error
+            ? `${error.message} Your message is retained. Submit again explicitly.`
+            : 'Browser admission stopped. Submit again.'
         );
       }
     } finally {
-      pendingAdmissionsRef.current.delete(conversationId);
+      finishAdmission(conversationId, pending);
       if (lease !== undefined && !handedOff) {
         await lease.release();
       }
@@ -944,7 +989,9 @@ export const AgentChatPanel = ({
     }
     const submittedTabId = getConversationSelectedTabId(conversationId);
     const signal = getAdmissionSignal(conversationId);
-    pendingAdmissionsRef.current.add(conversationId);
+    const pending = { queued, signal };
+    pendingAdmissionsRef.current.set(conversationId, pending);
+    setPendingAdmissionIds([...pendingAdmissionsRef.current.keys()]);
     let lease: BrowserExecutionLease | undefined = undefined;
     let handedOff = false;
     try {
@@ -953,6 +1000,7 @@ export const AgentChatPanel = ({
       const targetExists = lease !== undefined && (await isTabOpen(submittedTabId));
       if (
         !isAdmissionCurrent(conversationId, signal) ||
+        pendingAdmissionsRef.current.get(conversationId) !== pending ||
         store.get(queuedMessageAtomFamily(conversationId)) !== queued
       ) {
         return;
@@ -979,15 +1027,20 @@ export const AgentChatPanel = ({
         setAdmissionBlocker(undefined);
       }
     } catch (error) {
-      if (isAdmissionCurrent(conversationId, signal)) {
+      if (
+        isAdmissionCurrent(conversationId, signal) &&
+        pendingAdmissionsRef.current.get(conversationId) === pending
+      ) {
         pausedQueuesRef.current.add(conversationId);
         setPausedQueueIds([...pausedQueuesRef.current]);
         setAdmissionBlocker(
-          error instanceof Error ? error.message : 'Browser admission stopped. Resume explicitly.'
+          error instanceof Error
+            ? `${error.message} Your queued message is retained. Resume explicitly.`
+            : 'Browser admission stopped. Resume explicitly.'
         );
       }
     } finally {
-      pendingAdmissionsRef.current.delete(conversationId);
+      finishAdmission(conversationId, pending);
       if (lease !== undefined && !handedOff) {
         await lease.release();
       }
@@ -1002,8 +1055,11 @@ export const AgentChatPanel = ({
   const workflowRunRequest = useAtomValue(workflowRunRequestAtom);
 
   useEffect(() => {
+    if (workflowRunRequest === undefined) {
+      setPendingWorkflowAdmission(undefined);
+      return;
+    }
     if (
-      workflowRunRequest === undefined ||
       blockedWorkflowRef.current === workflowRunRequest ||
       processingWorkflowsRef.current.has(workflowRunRequest)
     ) {
@@ -1015,6 +1071,11 @@ export const AgentChatPanel = ({
     const runSelectedTabId = getConversationSelectedTabId(conversationId);
     const signal = getAdmissionSignal(conversationId);
     processingWorkflowsRef.current.set(request, conversationId);
+    setPendingWorkflowAdmission(current => ({
+      conversationId,
+      isResuming: current?.request === request && current.isResuming,
+      request,
+    }));
     void (async (): Promise<void> => {
       let lease = reservation?.lease;
       let runState: RunState | undefined = undefined;
@@ -1065,6 +1126,9 @@ export const AgentChatPanel = ({
         // Consume only after admission; keep the same lease through workflow and model continuation.
         store.set(workflowRunRequestAtom, undefined);
         setAdmissionBlocker(undefined);
+        setPendingWorkflowAdmission(current =>
+          current?.request === request ? undefined : current
+        );
         runState = createRunState(conversationId, runSelectedTabId, lease);
         const selectedTab = inspectableTabsRef.current.find(tab => tab.id === runSelectedTabId);
         const workflowName =
@@ -1126,6 +1190,11 @@ export const AgentChatPanel = ({
         );
       } finally {
         processingWorkflowsRef.current.delete(request);
+        if (mountedRef.current) {
+          setPendingWorkflowAdmission(current =>
+            current?.request === request ? undefined : current
+          );
+        }
         if (runState !== undefined) {
           await finishRun(conversationId, runState);
         } else if (lease !== undefined) {
@@ -1397,6 +1466,14 @@ export const AgentChatPanel = ({
     return null;
   }
 
+  const messageAdmissionPending = pendingAdmissionIds.includes(activeConversationId);
+  const workflowAdmissionPending =
+    pendingWorkflowAdmission?.conversationId === activeConversationId;
+  const admissionStatus =
+    messageAdmissionPending || workflowAdmissionPending
+      ? 'Checking browser control… Your input is retained.'
+      : (execution.blockedReason ?? admissionBlocker);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ConversationTabs
@@ -1416,14 +1493,16 @@ export const AgentChatPanel = ({
         </p>
       )}
 
-      {execution.blockedReason === undefined && admissionBlocker === undefined ? null : (
-        <p
-          className="type-body border-t border-border px-4 py-2 text-status-yellow-400"
-          role="status"
-        >
-          {execution.blockedReason ?? admissionBlocker}
-        </p>
-      )}
+      <p
+        className={
+          admissionStatus === undefined
+            ? 'sr-only'
+            : 'type-body border-t border-border px-4 py-2 text-status-yellow-400'
+        }
+        role="status"
+      >
+        {admissionStatus}
+      </p>
       {execution.delegationUnavailableReason === undefined ? null : (
         <p className="type-label px-4 py-2 text-foreground-muted">
           {execution.delegationUnavailableReason}
@@ -1431,7 +1510,9 @@ export const AgentChatPanel = ({
       )}
       {pausedQueueIds.includes(activeConversationId) && activeQueuedMessage !== undefined ? (
         <button
-          className="type-label mx-4 my-2 rounded-md border border-border bg-surface-overlay p-2 text-foreground-on-secondary"
+          aria-busy={messageAdmissionPending}
+          className="type-label mx-4 my-2 rounded-md border border-border bg-surface-overlay p-2 text-foreground-on-secondary disabled:cursor-wait disabled:opacity-50"
+          disabled={messageAdmissionPending}
           onClick={() => {
             void submitQueuedMessage(activeConversationId);
           }}
@@ -1440,10 +1521,23 @@ export const AgentChatPanel = ({
           Resume queued message
         </button>
       ) : null}
-      {workflowRunRequest !== undefined && blockedWorkflowRef.current === workflowRunRequest ? (
+      {workflowRunRequest !== undefined &&
+      (blockedWorkflowRef.current === workflowRunRequest ||
+        (pendingWorkflowAdmission?.request === workflowRunRequest &&
+          pendingWorkflowAdmission.isResuming)) ? (
         <button
-          className="type-label mx-4 my-2 rounded-md border border-border bg-surface-overlay p-2 text-foreground-on-secondary"
+          aria-busy={pendingWorkflowAdmission?.request === workflowRunRequest}
+          className="type-label mx-4 my-2 rounded-md border border-border bg-surface-overlay p-2 text-foreground-on-secondary disabled:cursor-wait disabled:opacity-50"
+          disabled={pendingWorkflowAdmission?.request === workflowRunRequest}
           onClick={() => {
+            if (processingWorkflowsRef.current.has(workflowRunRequest)) {
+              return;
+            }
+            setPendingWorkflowAdmission({
+              conversationId: activeConversationId,
+              isResuming: true,
+              request: workflowRunRequest,
+            });
             blockedWorkflowRef.current = undefined;
             setWorkflowResume(current => current + 1);
           }}
@@ -1454,7 +1548,7 @@ export const AgentChatPanel = ({
       ) : null}
       <MessageComposer
         activeConversationId={activeConversationId}
-        canSend={canSend}
+        canSend={canSend && !messageAdmissionPending}
         isRunning={isRunning}
         onStop={stopRun}
         onSubmit={() => {

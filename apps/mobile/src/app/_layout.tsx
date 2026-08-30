@@ -38,10 +38,6 @@ import { toast } from 'sonner-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
-import {
-  rejectDevSessionRequest,
-  useDevSessionNavigation,
-} from '@/components/dev-session-injector';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { PrivacyCoverOverlay } from '@/components/privacy-cover-overlay';
@@ -80,7 +76,6 @@ import { prewarmIntl } from '@/lib/intl-cache';
 import {
   captureLaunchDeepLink,
   getPendingDeepLink,
-  getPendingDeepLinkRequestId,
   getPendingDeepLinkSnapshot,
   restorePersistedPendingDeepLink,
   subscribeToPendingDeepLink,
@@ -737,39 +732,17 @@ function RootLayoutNav({
     getPendingDeepLinkSnapshot
   );
 
-  const prepareDevNavigation = useDevSessionNavigation({
-    userId,
-    userIdLoading,
-    userIdError,
-    consentCheckError: consentCheckError != null,
-    isShellReady,
-  });
-
   // Declared after the auth effect so that on the same flush a pending
   // deep-link navigate runs first and the share gate opens on top.
   useEffect(() => {
     if (pendingDeepLink === null || !isShellReady) {
       return;
     }
-    const requestId = getPendingDeepLinkRequestId();
-    const href = prepareDevNavigation(pendingDeepLink, requestId);
-    if (href === null) {
-      return;
-    }
     const navigation = resolvePendingNavigation(getPendingDeepLink());
     if (navigation) {
-      try {
-        router.navigate((requestId === null ? navigation.href : href) as Href, {
-          withAnchor: navigation.withAnchor,
-        });
-      } catch (error) {
-        if (requestId === null) {
-          throw error;
-        }
-        rejectDevSessionRequest(requestId);
-      }
+      router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
     }
-  }, [pendingDeepLink, isShellReady, router, prepareDevNavigation]);
+  }, [pendingDeepLink, isShellReady, router]);
 
   useEffect(() => {
     if (pendingShareId === null || !isShellReady) {

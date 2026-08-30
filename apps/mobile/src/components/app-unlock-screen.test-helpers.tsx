@@ -125,7 +125,6 @@ vi.mock('react-native-gesture-handler', () => ({
 vi.mock('sonner-native', () => ({ Toaster: 'Toaster' }));
 vi.mock('@/lib/auth/auth-context', () => ({ AuthProvider: 'AuthProvider' }));
 vi.mock('@/lib/organization-context', () => ({ OrganizationProvider: 'OrganizationProvider' }));
-vi.mock('@/components/dev-session-injector', () => ({ DevSessionInjector: 'DevSessionInjector' }));
 vi.mock('@/components/offline-banner', () => ({ OfflineBanner: 'OfflineBanner' }));
 vi.mock('@/lib/query-client-lifecycle', () => ({
   QueryClientNativeLifecycle: 'QueryClientNativeLifecycle',

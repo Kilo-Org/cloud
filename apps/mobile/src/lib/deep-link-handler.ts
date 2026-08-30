@@ -1,7 +1,6 @@
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
 import { setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
-import { parseDevSessionQuery, takeDevSessionFromUrl } from './dev-session-inject';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
 
 /** Target app path for the /cloud/sessions universal-link route. */
@@ -45,10 +44,6 @@ export function redirectSystemPath({
 }): string | null {
   try {
     const href = resolveIncomingUrl(path);
-    if (takeDevSessionFromUrl(path, href, initial)) {
-      // Credentials and destination stay paired until the old account is gone.
-      return null;
-    }
     // Untouched → default handling (and future share intent).
     if (href == null) {
       return path;
@@ -83,8 +78,7 @@ export function redirectSystemPath({
     // Falsy in both handled cases — critical (see above).
     return null;
   } catch {
-    // Never hand a credential URL back to Expo's ordinary error handling.
     // A deep-link bug must never brick app launch.
-    return parseDevSessionQuery(path) ? null : path;
+    return path;
   }
 }

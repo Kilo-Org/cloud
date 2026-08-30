@@ -27,7 +27,6 @@ vi.mock('@sentry/react-native', () => ({
 /* eslint-disable import/first */
 import * as Sentry from '@sentry/react-native';
 import { PENDING_DEEP_LINK_KEY } from '@/lib/storage-keys';
-import { _resetDevSessionInjectForTests, consumePendingDevSession } from './dev-session-inject';
 import { resolvePendingNavigation } from './pending-navigation';
 import { isShellReadyForShare } from './pending-share-navigation';
 import {
@@ -65,13 +64,11 @@ describe('deep-link-launch', () => {
     _setSecureStoreForTests(secureStoreMock);
     store.clear();
     vi.clearAllMocks();
-    vi.stubGlobal('__DEV__', true);
   });
 
   afterEach(() => {
     _resetDeepLinkLaunchForTests();
     store.clear();
-    vi.unstubAllGlobals();
   });
 
   describe('pending slot', () => {
@@ -407,36 +404,6 @@ describe('deep-link-launch', () => {
   });
 
   describe('captureLaunchDeepLink', () => {
-    it('keeps credentials paired with the destination outside the durable slot', () => {
-      _resetDevSessionInjectForTests();
-      _setGetLinkingURLForTests(
-        () =>
-          'kiloapp:///cloud/sessions/ses_1?dev_session_token=tok&dev_session_refresh=ref&dev_session_expires_in=3600'
-      );
-      captureLaunchDeepLink();
-      expect(getPendingDeepLink()).toBeNull();
-      expect(consumePendingDevSession()).toEqual({
-        id: 1,
-        href: '/(app)/agent-chat/ses_1',
-        credentials: { token: 'tok', refreshToken: 'ref', expiresIn: 3600 },
-      });
-      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
-      _resetDevSessionInjectForTests();
-    });
-
-    it('persists only the ordinary href after development admission', async () => {
-      setPendingDeepLink('/(app)/(tabs)/(2_agents)', 'universal-link', 42);
-      await vi.waitFor(() => {
-        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
-      });
-      expect(JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '')).toEqual({
-        href: '/(app)/(tabs)/(2_agents)',
-        source: 'universal-link',
-        storedAt: expect.any(Number),
-        userId: null,
-      });
-    });
-
     it('stashes a mapped launch URL synchronously', () => {
       _setGetLinkingURLForTests(() => 'https://app.kilo.ai/security-agent/findings');
       captureLaunchDeepLink();

@@ -16,7 +16,7 @@ test('tab layout derives accessibility labels from the visible tab count', () =>
   );
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.agents'\),\s*tabBarPosition\('agents', tabFlags\) \?\? 2,\s*tabCount\s*\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*liveCount\s*\?\s*`\$\{t\('tabs\.agents'\)\}, \$\{t\('agents\.liveCount', \{ count: liveCount \}\)\}`\s*:\s*t\('tabs\.agents'\),\s*tabBarPosition\('agents', tabFlags\) \?\? 2,\s*tabCount\s*\)/
   );
   assert.match(
     layout,

@@ -1,4 +1,5 @@
 /* eslint-disable max-lines, import/max-dependencies, typescript/consistent-type-definitions -- Consent, settings, and modal supervision share the existing provider, not another runtime. */
+import { browser } from '#imports';
 import { useQuery } from '@tanstack/react-query';
 import type { BrowserJobSnapshot } from '@kilocode/cloud-agent-sdk/schemas';
 import { BrowserProviderError } from '@kilocode/cloud-agent-sdk/user-web-connection';
@@ -215,6 +216,19 @@ export const BrowserTaskControls = (): JSX.Element => {
     state.phase === 'unavailable' ||
     state.unresolvedFence !== undefined ||
     (execution.delegated === 'idle' && execution.blockedReason !== undefined);
+  const affectedTabIds = [
+    ...new Set([
+      ...execution.quarantinedTabIds,
+      ...(state.unresolvedFence?.tabId === undefined ? [] : [state.unresolvedFence.tabId]),
+    ]),
+  ];
+  const affectedTabs = useQuery({
+    enabled: affectedTabIds.length > 0,
+    // Recovery includes tabs that navigated to an uninspectable address.
+    queryFn: () => browser.tabs.query({}),
+    queryKey: ['browser-task-affected-tabs'],
+    refetchInterval: 2000,
+  });
   useEffect(() => {
     setNotice(undefined);
   }, [active?.job.jobId]);
@@ -318,6 +332,46 @@ export const BrowserTaskControls = (): JSX.Element => {
         {execution.delegationUnavailableReason === undefined ? null : (
           <p>Recovery requires Web Locks. Restore browser Web Locks support before recovering.</p>
         )}
+        {affectedTabIds.length === 0 ? null : (
+          <div className="grid min-w-0 gap-2">
+            <p>Affected tabs</p>
+            <ul aria-label="Affected tabs" className="grid gap-2">
+              {affectedTabIds.map(tabId => {
+                const tab = affectedTabs.isSuccess
+                  ? affectedTabs.data.find(candidate => candidate.id === tabId)
+                  : undefined;
+                let closure = 'Closure unknown';
+                if (affectedTabs.isSuccess) {
+                  closure = tab === undefined ? 'Closed' : 'Open — close this tab before recovery.';
+                }
+                return (
+                  <li className="rounded-md border border-border p-2" key={tabId}>
+                    <p>
+                      Tab ID {tabId}: {closure}
+                    </p>
+                    {tab?.title !== undefined && tab.title !== '' ? (
+                      <p>Title: {tab.title}</p>
+                    ) : null}
+                    {tab?.url !== undefined && tab.url !== '' ? <p>Address: {tab.url}</p> : null}
+                  </li>
+                );
+              })}
+            </ul>
+            {affectedTabs.isError ? (
+              <p role="status">Could not retrieve affected tabs. Restore tab access and refresh.</p>
+            ) : null}
+            <button
+              className={actionClass}
+              disabled={affectedTabs.isFetching}
+              onClick={() => {
+                void affectedTabs.refetch();
+              }}
+              type="button"
+            >
+              Refresh affected tabs
+            </button>
+          </div>
+        )}
         {queued.length === 0 ? (
           <p className="text-foreground-muted">Queue empty.</p>
         ) : (
@@ -354,7 +408,23 @@ export const BrowserTaskControls = (): JSX.Element => {
               Last outcome: {state.result.status} · {state.result.reason}
             </p>
             <p>{state.result.summary}</p>
-            {state.result.evidence.length === 0 ? <p>No observed evidence.</p> : null}
+            <p>
+              {state.result.effectsUncertain
+                ? 'Effects are uncertain. Close affected tabs before explicit recovery.'
+                : 'No uncertain effects reported.'}
+            </p>
+            {state.result.evidence.length === 0 ? (
+              <p>No observed evidence.</p>
+            ) : (
+              <div>
+                <p>Observed evidence:</p>
+                <p className="whitespace-pre-wrap">
+                  {state.result.evidence
+                    .map(item => [item.title, item.url, item.text].filter(Boolean).join('\n'))
+                    .join('\n\n')}
+                </p>
+              </div>
+            )}
           </div>
         )}
         {initializationFailed ? (
@@ -410,7 +480,7 @@ export const BrowserTaskControls = (): JSX.Element => {
                 Reconnect
               </button>
             ) : null}
-            {recoverable && state.settings?.enabled === true ? (
+            {recoverable ? (
               <button
                 className={actionClass}
                 disabled={pending !== undefined}
@@ -450,6 +520,7 @@ export const BrowserTaskControls = (): JSX.Element => {
           <p>
             Retrieve status first. Close affected tabs and drain execution locks before recovery.
             Recovery never resumes old work. A new invocation requires fresh tab consent.
+            {state.settings?.enabled === false ? ' Local recovery keeps CLI tasks disabled.' : null}
           </p>
         ) : null}
         {pending === undefined && notice === undefined ? null : (

@@ -634,7 +634,7 @@ describe('SessionDetailContent display scope', () => {
   ])('renders a read-only $label and preserves header actions', state => {
     const renderer = mount({ organizationId: state.organizationId, isResolved: state.isResolved });
     const label = renderer.root.find(
-      node => node.type === 'View' && node.props.accessibilityRole === 'text'
+      node => (node.type as string) === 'View' && node.props.accessibilityRole === 'text'
     );
     expect(label.props.accessibilityLabel).toBe(state.label);
     expect(label.props.accessibilityState).toEqual({ busy: !state.isResolved });

@@ -354,7 +354,9 @@ describe('QuickChatScreen composer', () => {
       const { renderer, unmount } = await mountScreen();
       const control = () =>
         renderer.root.find(
-          node => node.type === 'Pressable' && node.props.accessibilityHint === 'Select account'
+          node =>
+            (node.type as string) === 'Pressable' &&
+            node.props.accessibilityHint === 'Select account'
         );
       if (orgLoaded.value) {
         await waitFor(() => control().props.accessibilityLabel === 'Chat organization');
@@ -365,7 +367,9 @@ describe('QuickChatScreen composer', () => {
         disabled: !orgLoaded.value,
       });
       expect(
-        renderer.root.findAll(node => node.type === 'Text').flatMap(node => node.children)
+        renderer.root
+          .findAll(node => (node.type as string) === 'Text')
+          .flatMap(node => node.children)
       ).not.toContain('Personal');
       expect(latestComposer()?.placeholder).toBe('Message');
       unmount();

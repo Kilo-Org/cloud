@@ -268,7 +268,7 @@ describe('SessionDetailScreen display scope', () => {
       queryState.error = { data: { code: state } };
       const renderer = mountRoute();
       const label = renderer.root.find(
-        node => node.type === 'View' && node.props.accessibilityRole === 'text'
+        node => (node.type as string) === 'View' && node.props.accessibilityRole === 'text'
       );
       expect(label.props.accessibilityState).toEqual({ busy: true });
       expect(findByType(renderer.root, 'Text').flatMap(node => node.children)).not.toContain(

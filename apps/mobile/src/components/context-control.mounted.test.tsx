@@ -1,5 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts native presentation with mocked bridges. */
-import { createElement } from 'react';
+import { createElement, type ElementType } from 'react';
 import { act, type ReactTestInstance } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -42,6 +42,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888' }),
 }));
 
+const Text = 'Text' as ElementType;
+const Skeleton = 'Skeleton' as ElementType;
+const Pressable = 'Pressable' as ElementType;
 const name = 'An organization with a long name that must remain fully accessible';
 const orgs = [{ organizationId: 'org-a', organizationName: name, role: 'owner' }];
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
@@ -49,12 +52,8 @@ const mounted: Mounted[] = [];
 let persisted: string | null = null;
 
 function Surface({ scope }: { scope?: ContextDisplayScope }) {
-  const global = useOrganization();
-  return createElement(
-    'GlobalScope',
-    { id: global.organizationId },
-    createElement(ContextControl, { scope })
-  );
+  const { organizationId: id } = useOrganization();
+  return createElement('GlobalScope', { id }, createElement(ContextControl, { scope }));
 }
 
 async function mount(scope?: ContextDisplayScope) {
@@ -66,7 +65,7 @@ async function mount(scope?: ContextDisplayScope) {
 }
 
 function texts(ui: Mounted) {
-  return ui.renderer.root.findAll(node => node.type === 'Text').flatMap(node => node.children);
+  return ui.renderer.root.findAll(node => node.type === Text).flatMap(node => node.children);
 }
 
 function picker(ui: Mounted) {
@@ -128,9 +127,9 @@ describe('ContextControl', () => {
     list.mockReturnValue(names.promise);
     const ui = await mount();
     expect(texts(ui).includes('Personal')).toBe(id === null);
-    expect(ui.renderer.root.findAllByType('Skeleton')).toHaveLength(id === null ? 0 : 1);
+    expect(ui.renderer.root.findAllByType(Skeleton)).toHaveLength(id === null ? 0 : 1);
     expect(picker(ui).props.accessibilityState).toEqual({ busy: true, disabled: true });
-    expect(picker(ui).findAllByType('ActivityIndicator')).toHaveLength(1);
+    expect(picker(ui).findAllByType('ActivityIndicator' as ElementType)).toHaveLength(1);
     await act(() => {
       names.resolve(result);
     });
@@ -139,7 +138,7 @@ describe('ContextControl', () => {
     expect(picker(ui).props.accessibilityLabel).toBe(label);
     expect(picker(ui).props.accessibilityRole).toBe('button');
     expect(picker(ui).props.accessibilityState).toEqual({ busy: false, disabled: false });
-    expect(picker(ui).findAllByType('ActivityIndicator')).toHaveLength(0);
+    expect(picker(ui).findAllByType('ActivityIndicator' as ElementType)).toHaveLength(0);
   });
 
   it.each([
@@ -161,7 +160,7 @@ describe('ContextControl', () => {
       await act(() => {
         native.choose(index);
       });
-      expect(ui.renderer.root.findByType('GlobalScope').props.id).toBe(expected);
+      expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
 
@@ -171,7 +170,7 @@ describe('ContextControl', () => {
     const ui = await mount();
     await waitFor(() => texts(ui).includes('Organization unavailable'));
     expect(texts(ui)).not.toContain('Retry');
-    expect(ui.renderer.root.findByType('GlobalScope').props.id).toBe('org-missing');
+    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-missing');
     await press(picker(ui));
     const native = nativePicker();
     expect(native.options.options).toEqual(['Personal', 'Cancel']);
@@ -189,13 +188,13 @@ describe('ContextControl', () => {
     await waitFor(() => texts(ui).includes("Couldn't load your organizations"));
     expect(retry(ui).props.accessibilityHint).toBe("Couldn't load your organizations");
     const status = ui.renderer.root.find(
-      node => node.type === 'Text' && node.props.accessibilityLiveRegion === 'polite'
+      node => node.type === Text && node.props.accessibilityLiveRegion === 'polite'
     );
     expect(status.children).toContain("Couldn't load your organizations");
     await press(retry(ui));
     await waitFor(() => texts(ui).includes(name));
     expect(texts(ui)).not.toContain('Retry');
-    expect(ui.renderer.root.findByType('GlobalScope').props.id).toBe('org-a');
+    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
   });
 
   it('keeps a cached name visible through refetch failure and a busy explicit Retry', async () => {
@@ -223,7 +222,7 @@ describe('ContextControl', () => {
     await waitFor(() => retry(ui).props.disabled === true);
     expect(texts(ui)).toContain(name);
     expect(retry(ui).props.accessibilityState).toEqual({ busy: true, disabled: true });
-    expect(retry(ui).findAllByType('ActivityIndicator')).toHaveLength(1);
+    expect(retry(ui).findAllByType('ActivityIndicator' as ElementType)).toHaveLength(1);
     await act(() => {
       names.resolve(orgs);
     });
@@ -263,7 +262,7 @@ describe('ContextControl', () => {
     expect(texts(ui)).toContain('Could not save setting');
     expect(retry(ui).props.accessibilityState).toEqual({ busy: true, disabled: true });
     expect(retry(ui).props.disabled).toBe(true);
-    expect(retry(ui).findAllByType('ActivityIndicator')).toHaveLength(1);
+    expect(retry(ui).findAllByType('ActivityIndicator' as ElementType)).toHaveLength(1);
     expect(persisted).toBeNull();
     await act(() => {
       save.resolve(undefined);
@@ -283,8 +282,8 @@ describe('ContextControl', () => {
       storage.read.mockResolvedValue('global-org');
       const ui = await mount({ organizationId, isResolved: true });
       await waitFor(() => texts(ui).includes(expected));
-      expect(ui.renderer.root.findAll(node => node.type === 'Pressable')).toHaveLength(0);
-      expect(ui.renderer.root.findByType('GlobalScope').props.id).toBe('global-org');
+      expect(ui.renderer.root.findAll(node => node.type === Pressable)).toHaveLength(0);
+      expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('global-org');
     }
   );
 
@@ -292,9 +291,9 @@ describe('ContextControl', () => {
     storage.read.mockResolvedValue('global-org');
     const ui = await mount({ organizationId: null, isResolved: false });
     expect(texts(ui)).not.toContain('Personal');
-    expect(ui.renderer.root.findAll(node => node.type === 'Skeleton')).toHaveLength(1);
-    expect(ui.renderer.root.findAll(node => node.type === 'Pressable')).toHaveLength(0);
-    expect(ui.renderer.root.findByType('GlobalScope').props.id).toBe('global-org');
+    expect(ui.renderer.root.findAll(node => node.type === Skeleton)).toHaveLength(1);
+    expect(ui.renderer.root.findAll(node => node.type === Pressable)).toHaveLength(0);
+    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('global-org');
   });
 
   it.each(['pending', 'failed'])(
@@ -309,8 +308,8 @@ describe('ContextControl', () => {
       const ui = await mount({ organizationId: null, isResolved: true });
       expect(texts(ui)).toContain('Personal');
       expect(texts(ui)).not.toContain('Something went wrong');
-      expect(ui.renderer.root.findAll(node => node.type === 'Skeleton')).toHaveLength(0);
-      expect(ui.renderer.root.findAll(node => node.type === 'Pressable')).toHaveLength(0);
+      expect(ui.renderer.root.findAll(node => node.type === Skeleton)).toHaveLength(0);
+      expect(ui.renderer.root.findAll(node => node.type === Pressable)).toHaveLength(0);
     }
   );
 

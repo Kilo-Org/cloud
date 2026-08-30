@@ -171,6 +171,11 @@ export type ServiceEvent =
       content?: string | undefined;
     }
   | {
+      type: 'cloud.message.canceled';
+      messageId: string;
+      executionId?: string | undefined;
+    }
+  | {
       type: 'cloud.message.sent';
       messageId: string;
       executionId?: string | undefined;
@@ -229,6 +234,14 @@ const sessionModelSchema = z.object({
   id: z.string(),
   variant: z.string().optional(),
 });
+
+// `cloud.message.canceled` mirrors the queued payload minus the content field.
+const cloudMessageCanceledDataSchema = z
+  .object({
+    messageId: z.string(),
+    executionId: z.string().optional(),
+  })
+  .passthrough();
 
 function normalizeSessionInfo(rawInfo: { id: string; [key: string]: unknown }): SessionInfo {
   const model = sessionModelSchema.safeParse(rawInfo['model']);
@@ -515,6 +528,16 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         messageId: r.data.messageId,
         executionId: r.data.executionId,
         content: r.data.content,
+      };
+    }
+
+    case 'cloud.message.canceled': {
+      const r = cloudMessageCanceledDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'cloud.message.canceled',
+        messageId: r.data.messageId,
+        executionId: r.data.executionId,
       };
     }
 

@@ -331,13 +331,19 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
   });
 
   it.each([
-    ['webhook', undefined],
-    ['scheduled', 'high'],
-    ['scheduled', undefined],
+    ['webhook', undefined, undefined],
+    ['webhook', 'high', undefined],
+    ['webhook', undefined, 'isolated-standard'],
+    ['webhook', 'high', 'isolated-standard'],
+    ['scheduled', undefined, undefined],
+    ['scheduled', 'high', undefined],
+    ['scheduled', undefined, 'isolated-standard'],
+    ['scheduled', 'high', 'isolated-standard'],
   ] as const)(
-    'forwards variant only when set for %s dispatches',
-    async (triggerSource, variant) => {
+    'forwards configured variant %s/%s and allocation %s only to prepareSession',
+    async (triggerSource, variant, sandboxAllocation) => {
       const prepareRequests: Request[] = [];
+      const initiateRequests: Request[] = [];
       const webhook = makeWebhook();
       const stub = {
         getRequest: vi.fn(async () =>
@@ -352,6 +358,7 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
             profileId: 'profile-1',
             activationMode: triggerSource,
             ...(variant !== undefined ? { variant } : {}),
+            ...(sandboxAllocation !== undefined ? { sandboxAllocation } : {}),
           })
         ),
         updateRequest: vi.fn(async () => ({ success: true })),
@@ -376,21 +383,28 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
                 result: { data: { cloudAgentSessionId: 'cloud-session-1' } },
               });
             }
+            initiateRequests.push(request);
             return Response.json({
               result: { data: { executionId: 'execution-1', status: 'running' } },
             });
           }),
         },
       } as unknown as Env;
+      const ack = vi.fn();
+      const retry = vi.fn();
       const batch = {
         queue: 'webhook-delivery',
-        messages: [{ body: webhook, attempts: 1, ack: vi.fn(), retry: vi.fn() }],
+        messages: [{ body: webhook, attempts: 1, ack, retry }],
       } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
 
       await handleWebhookDeliveryBatch(batch, env);
 
-      const prepareBody = await prepareRequests[0]?.json<{
+      expect(stub.getConfig).toHaveBeenCalledTimes(1);
+      expect(prepareRequests).toHaveLength(1);
+      expect(initiateRequests).toHaveLength(1);
+      const prepareBody = await prepareRequests[0].json<{
         variant?: string;
+        sandboxAllocation?: string;
         createdOnPlatform: string;
       }>();
       if (variant === undefined) {
@@ -398,7 +412,70 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
       } else {
         expect(prepareBody).toHaveProperty('variant', variant);
       }
-      expect(prepareBody?.createdOnPlatform).toBe(triggerSource);
+      if (sandboxAllocation === undefined) {
+        expect(prepareBody).not.toHaveProperty('sandboxAllocation');
+      } else {
+        expect(prepareBody).toHaveProperty('sandboxAllocation', sandboxAllocation);
+      }
+      expect(prepareBody.createdOnPlatform).toBe(triggerSource);
+      expect(await initiateRequests[0].json()).not.toHaveProperty('sandboxAllocation');
+      expect(ack).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['webhook', 'scheduled'] as const)(
+    'keeps %s KiloClaw dispatch independent of Cloud Agent allocation',
+    async activationMode => {
+      mockFindActiveSandboxIdForInstance.mockReset();
+      mockPostMessageAsUser.mockReset();
+      mockFindActiveSandboxIdForInstance.mockResolvedValue('sandbox-1');
+      mockPostMessageAsUser.mockResolvedValue({
+        ok: true,
+        conversationId: 'conv-1',
+        messageId: 'msg-1',
+        conversationCreated: true,
+      });
+      const stub = {
+        getRequest: vi.fn(async () =>
+          makeRequest('captured', { method: activationMode === 'scheduled' ? 'SCHEDULED' : 'POST' })
+        ),
+        getConfig: vi.fn(async () => makeTriggerConfig({ activationMode })),
+        updateRequest: vi.fn(async () => ({ success: true })),
+      };
+      const cloudAgentFetch = vi.fn();
+      const env = {
+        ...makeEnv(),
+        TRIGGER_DO: {
+          idFromName: vi.fn((name: string) => name),
+          get: vi.fn(() => stub),
+        },
+        CLOUD_AGENT: { fetch: cloudAgentFetch },
+      } as unknown as Env;
+      const ack = vi.fn();
+      const retry = vi.fn();
+      const batch = {
+        queue: 'webhook-delivery',
+        messages: [{ body: makeWebhook(), attempts: 1, ack, retry }],
+      } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
+
+      await handleWebhookDeliveryBatch(batch, env);
+
+      expect(cloudAgentFetch).not.toHaveBeenCalled();
+      expect(mockPostMessageAsUser).toHaveBeenCalledTimes(1);
+      expect(mockPostMessageAsUser.mock.calls[0][0]).toMatchObject({
+        userId: 'user-1',
+        sandboxId: 'sandbox-1',
+        source: 'webhook',
+        correlation: { triggerId: 'trigger-1', webhookRequestId: 'req-1' },
+      });
+      expect(mockPostMessageAsUser.mock.calls[0][0]).not.toHaveProperty('sandboxAllocation');
+      expect(stub.updateRequest).toHaveBeenLastCalledWith(
+        'req-1',
+        expect.objectContaining({ process_status: 'success' })
+      );
+      expect(ack).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
     }
   );
 });

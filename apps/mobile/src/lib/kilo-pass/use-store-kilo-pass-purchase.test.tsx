@@ -339,7 +339,6 @@ function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
     id: 'purchase-1',
     ids: null,
     isAutoRenewing: true,
-    platform: 'ios',
     productId: product.appleProductId,
     purchaseState: 'purchased',
     purchaseToken: 'signed-jws',

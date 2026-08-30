@@ -106,6 +106,87 @@ describe('pending session messages', () => {
     ]);
   });
 
+  it('cancels a pending message without touching the accepted current message', async () => {
+    const userId = 'user_pending_cancel_queued';
+    const sessionId = 'agent_pending_cancel_queued';
+    const pendingMessageId = 'msg_018f1e2d3c4bCancelQueuedAA';
+    const currentMessageId = 'msg_018f1e2d3c4bCurrentRunABCD';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '55555555-5555-4555-5555-555555555550',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-cancel-queued',
+      });
+      // Admit the turn so the pending row, queued `SessionMessageState`, and the
+      // queued replay event all exist before the drop — the exact shape finding
+      // 1 must terminalize.
+      const admission = await instance.admitSubmittedMessage(
+        queueUserMessageInput({
+          userId,
+          prompt: 'queued to cancel',
+          messageId: pendingMessageId,
+          mode: 'code',
+          model: 'test-model',
+        })
+      );
+      expect(admission).toMatchObject({ success: true, outcome: 'queued' });
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: currentMessageId,
+        status: 'accepted',
+        prompt: 'current run',
+        createdAt: 1,
+        acceptedAt: 2,
+        wrapperRunId: 'wr_cancel_queued',
+      });
+
+      const cancelPending = await instance.cancelQueuedMessage(pendingMessageId);
+      const cancelMissing = await instance.cancelQueuedMessage('msg_018f1e2d3c4bMissingMsgABC');
+      const cancelCurrent = await instance.cancelQueuedMessage(currentMessageId);
+
+      const db = drizzle(instance.ctx.storage, { logger: false });
+      const eventQueries = createEventQueries(db, instance.ctx.storage.sql);
+      const queuedEvents = eventQueries
+        .findByFilters({ eventTypes: ['cloud.message.queued'] })
+        .filter(event => JSON.parse(event.payload).messageId === pendingMessageId);
+      const canceledEvents = eventQueries
+        .findByFilters({ eventTypes: ['cloud.message.canceled'] })
+        .filter(event => JSON.parse(event.payload).messageId === pendingMessageId);
+
+      return {
+        cancelPending,
+        cancelMissing,
+        cancelCurrent,
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+        current: await getSessionMessageState(instance.ctx.storage, currentMessageId),
+        canceled: await getSessionMessageState(instance.ctx.storage, pendingMessageId),
+        queuedEvents,
+        canceledEvents,
+      };
+    });
+
+    expect(result.cancelPending).toEqual({ dropped: true });
+    expect(result.cancelMissing).toEqual({ dropped: false });
+    expect(result.cancelCurrent).toEqual({ dropped: false });
+    expect(result.pending).toHaveLength(0);
+    expect(result.current).toMatchObject({ status: 'accepted' });
+    // The dropped id's durable state is terminal, not queued, so a re-admit
+    // rejects it as already terminal instead of ACKing it as still queued.
+    expect(result.canceled?.status).toBe('interrupted');
+    expect(result.canceled?.completionSource).toBe('canceled');
+    // The drop persists `cloud.message.canceled` after the queued replay event.
+    expect(result.queuedEvents).toHaveLength(1);
+    expect(result.canceledEvents).toHaveLength(1);
+    expect(result.canceledEvents[0].id).toBeGreaterThan(result.queuedEvents[0].id);
+  });
+
   it('finds by clientRequestId', async () => {
     const userId = 'user_pending_client_request';
     const sessionId = 'agent_pending_client_request';
@@ -2753,7 +2834,7 @@ describe('pending session messages', () => {
       env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
     );
 
-    const result = await runInDurableObject(stub, async (instance, state) => {
+    const result = await runInDurableObject(stub, async (instance, _state) => {
       (instance as any).orchestrator = {
         execute: async () => {
           throw new Error('wrapper still unavailable');
@@ -2834,7 +2915,7 @@ describe('pending session messages', () => {
       env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
     );
 
-    const result = await runInDurableObject(stub, async (instance, state) => {
+    const result = await runInDurableObject(stub, async (instance, _state) => {
       (instance as any).orchestrator = {
         execute: async () => {
           throw new Error('wrapper still unavailable');

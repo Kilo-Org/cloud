@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- routing fixtures and mounted completion regression */
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act } from 'react';
+import { Pressable } from 'react-native';
+import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { renderWithProviders } from '@/test/render-with-providers';
 import {
@@ -238,7 +240,7 @@ describe('ChildSessionMessage routing seam', () => {
 
     const limitTexts = findAll(
       root,
-      el => el.type === 'Text' && textChildren(el) === 'Maximum nesting depth reached.'
+      el => el.type === Text && textChildren(el) === 'Maximum nesting depth reached.'
     );
     expect(limitTexts).toHaveLength(1);
     expect(renderPart).not.toHaveBeenCalled();
@@ -278,10 +280,10 @@ describe('ChildSessionMessage completion', () => {
     );
     try {
       const texts = () => renderer.root.findAllByType(Text).map(node => node.props.children);
-      const button = () => renderer.root.findByType('Pressable');
+      const button = () => renderer.root.findByType(Pressable);
       expect(texts()).toContain('Considering next steps');
       expect(button().props.accessibilityLabel).toContain('Considering next steps');
-      expect(renderer.root.findAll(node => node.type === 'SpinningIcon')).toHaveLength(1);
+      expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(1);
 
       await act(async () => {
         renderer.update(
@@ -300,7 +302,7 @@ describe('ChildSessionMessage completion', () => {
       expect(texts()).toEqual(['General', 'child task', 'Test Model', 'completed']);
       expect(button().props.accessibilityLabel).toContain('completed');
       expect(button().props.accessibilityLabel).not.toContain('Considering next steps');
-      expect(renderer.root.findAll(node => node.type === 'SpinningIcon')).toHaveLength(0);
+      expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(0);
       const { onPress } = button().props as { onPress: () => void };
       onPress();
       expect(openedChildren).toEqual([['child-1', 'child task']]);
@@ -344,7 +346,7 @@ describe('ChildSessionSection model label', () => {
     expect(findByType(root, ChildSessionModelLabel)).toHaveLength(0);
     const taskNameTexts = findAll(
       root,
-      el => el.type === 'Text' && textChildren(el) === 'child task'
+      el => el.type === Text && textChildren(el) === 'child task'
     );
     expect(taskNameTexts).toHaveLength(1);
   });

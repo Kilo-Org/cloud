@@ -2111,7 +2111,9 @@
     "sessionExited": "Sesyon an soti",
     "remoteSpawnRetryable": "Pa t kapab rive jwenn enstans lan — li ka te dekonekte.",
     "remoteSpawnNonRetryable": "Enstans lan echwe pou kòmanse sesyon an — tcheke machin lan oswa mete ajou CLI la.",
-    "remoteSpawnInstanceDisconnected": "Enstans chwazi a dekonekte. Kòmanse yon sesyon sou Cloud Agent oswa chwazi yon lòt enstans."
+    "remoteSpawnInstanceDisconnected": "Enstans chwazi a dekonekte. Kòmanse yon sesyon sou Cloud Agent oswa chwazi yon lòt enstans.",
+    "liveCount_one": "{{count}} AN DIRÈK",
+    "liveCount_other": "{{count}} AN DIRÈK"
   },
   "agentChat": {
     "session": {
@@ -2271,7 +2273,9 @@
       "noCliInstancesDescription": "Kouri `kilo remote` nan yon pwojè sou òdinatè ou, oswa mete ajou Kilo CLI si youn deja k ap kouri.",
       "instanceOnProject": "{{name}} sou {{project}}",
       "instanceOnProjectSuffix": "{{name}} sou {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Kouri sou Cloud Agent"
+      "runOnCloudAgent": "Kouri sou Cloud Agent",
+      "terminals": "Tèminal yo",
+      "remotes": "Enstans adistans yo"
     },
     "modePicker": {
       "title": "Chwazi mòd",

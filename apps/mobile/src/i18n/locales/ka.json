@@ -2111,7 +2111,9 @@
     "sessionExited": "სესია დასრულდა",
     "remoteSpawnRetryable": "ინსტანციასთან დაკავშირება ვერ მოხერხდა — შესაძლოა გათიშული იყოს.",
     "remoteSpawnNonRetryable": "ინსტანციამ ვერ დაიწყო სესია — შეამოწმეთ მანქანა ან განაახლეთ CLI.",
-    "remoteSpawnInstanceDisconnected": "არჩეული ინსტანცია გათიშდა. დაიწყეთ სესია Cloud Agent-ზე ან აირჩიეთ სხვა ინსტანცია."
+    "remoteSpawnInstanceDisconnected": "არჩეული ინსტანცია გათიშდა. დაიწყეთ სესია Cloud Agent-ზე ან აირჩიეთ სხვა ინსტანცია.",
+    "liveCount_one": "{{count}} პირდაპირი",
+    "liveCount_other": "{{count}} პირდაპირი"
   },
   "agentChat": {
     "session": {
@@ -2271,7 +2273,9 @@
       "noCliInstancesDescription": "გაუშვით `kilo remote` პროექტში თქვენს კომპიუტერზე, ან განაახლეთ Kilo CLI, თუ ის უკვე მუშაობს.",
       "instanceOnProject": "{{name}} პროექტზე {{project}}",
       "instanceOnProjectSuffix": "{{name}} პროექტზე {{project}} ({{suffix}})",
-      "runOnCloudAgent": "გაშვება Cloud Agent-ზე"
+      "runOnCloudAgent": "გაშვება Cloud Agent-ზე",
+      "terminals": "ტერმინალები",
+      "remotes": "დისტანციური ინსტანციები"
     },
     "modePicker": {
       "title": "რეჟიმის არჩევა",

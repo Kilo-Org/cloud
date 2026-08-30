@@ -1673,7 +1673,11 @@
     "sessionExited": "Sesja zakończona",
     "remoteSpawnRetryable": "Nie udało się połączyć z instancją — mogła się rozłączyć.",
     "remoteSpawnNonRetryable": "Instancja nie uruchomiła sesji — sprawdź maszynę lub zaktualizuj CLI.",
-    "remoteSpawnInstanceDisconnected": "Wybrana instancja się rozłączyła. Uruchom sesję na Cloud Agent lub wybierz inną instancję."
+    "remoteSpawnInstanceDisconnected": "Wybrana instancja się rozłączyła. Uruchom sesję na Cloud Agent lub wybierz inną instancję.",
+    "liveCount_one": "{{count}} NA ŻYWO",
+    "liveCount_other": "{{count}} NA ŻYWO",
+    "liveCount_few": "{{count}} NA ŻYWO",
+    "liveCount_many": "{{count}} NA ŻYWO"
   },
   "agentChat": {
     "session": {
@@ -1835,7 +1839,9 @@
       "noCliInstancesDescription": "Uruchom `kilo remote` w projekcie na swoim komputerze lub zaktualizuj Kilo CLI, jeśli już działa.",
       "instanceOnProject": "{{name}} na {{project}}",
       "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Uruchom na agencie w chmurze"
+      "runOnCloudAgent": "Uruchom na agencie w chmurze",
+      "terminals": "Terminale",
+      "remotes": "Instancje zdalne"
     },
     "modePicker": {
       "title": "Wybierz tryb",

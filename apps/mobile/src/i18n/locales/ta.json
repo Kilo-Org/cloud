@@ -2111,7 +2111,9 @@
     "sessionExited": "அமர்வு வெளியேறியது",
     "remoteSpawnRetryable": "இன்ஸ்டன்ஸை அணுக முடியவில்லை — அது துண்டிக்கப்பட்டிருக்கலாம்.",
     "remoteSpawnNonRetryable": "இன்ஸ்டன்ஸால் அமர்வைத் தொடங்க முடியவில்லை — கணினியைச் சரிபார்க்கவும் அல்லது CLI-ஐப் புதுப்பிக்கவும்.",
-    "remoteSpawnInstanceDisconnected": "தேர்ந்தெடுத்த இன்ஸ்டன்ஸ் துண்டிக்கப்பட்டது. Cloud Agent-ல் அமர்வைத் தொடங்கவும் அல்லது வேறு இன்ஸ்டன்ஸைத் தேர்ந்தெடுக்கவும்."
+    "remoteSpawnInstanceDisconnected": "தேர்ந்தெடுத்த இன்ஸ்டன்ஸ் துண்டிக்கப்பட்டது. Cloud Agent-ல் அமர்வைத் தொடங்கவும் அல்லது வேறு இன்ஸ்டன்ஸைத் தேர்ந்தெடுக்கவும்.",
+    "liveCount_one": "{{count}} நேரலை",
+    "liveCount_other": "{{count}} நேரலை"
   },
   "agentChat": {
     "session": {
@@ -2271,7 +2273,9 @@
       "noCliInstancesDescription": "உங்கள் கணினியில் ஒரு திட்டத்தில் `kilo remote` ஐ இயக்கவும், அல்லது ஒன்று ஏற்கனவே இயங்கினால் Kilo CLI ஐ புதுப்பிக்கவும்.",
       "instanceOnProject": "{{project}} இல் {{name}}",
       "instanceOnProjectSuffix": "{{project}} இல் {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent இல் இயக்கு"
+      "runOnCloudAgent": "Cloud Agent இல் இயக்கு",
+      "terminals": "முனையங்கள்",
+      "remotes": "தொலைநிலை நிகழ்வுகள்"
     },
     "modePicker": {
       "title": "முறையைத் தேர்ந்தெடு",

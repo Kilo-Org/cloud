@@ -413,6 +413,143 @@ it('shares four request slots and aborts late policy pages at the ten-second dea
   expect(requests.filter(path => path.startsWith(rulesPath))).toHaveLength(2);
 });
 
+it('isolates an unavailable check policy field from conversation enforcement', async () => {
+  const { context } = await run((url, options) => {
+    if (
+      url.pathname !== '/graphql' ||
+      JSON.parse(String(options.body)).query !== PR_CONTEXT_EVALUATION_QUERY
+    )
+      return;
+    return Response.json({
+      data: { repository: { pullRequest: evaluationPr } },
+      errors: [
+        {
+          type: 'FORBIDDEN',
+          path: [
+            'repository',
+            'pullRequest',
+            'baseRef',
+            'refUpdateRule',
+            'requiredStatusCheckContexts',
+          ],
+        },
+      ],
+    });
+  });
+  expect(
+    context.requirements.items.find(item => item.kind === 'conversation-resolution')?.state
+  ).toBe('met');
+  expect(context.requirements.items.find(item => item.kind === 'branch-freshness')?.state).toBe(
+    'unavailable'
+  );
+  expect(
+    context.requirements.items
+      .filter(item => item.check)
+      .every(item => item.state === 'unavailable')
+  ).toBe(true);
+  expect(context.labels.completeness).toBe('complete');
+});
+
+it.each([true, false])(
+  'does not turn an errored thread resolution %s into a verdict or count',
+  async isResolved => {
+    const { context } = await run((url, options) => {
+      if (
+        url.pathname !== '/graphql' ||
+        JSON.parse(String(options.body)).query !== PR_CONTEXT_REQUIREMENT_QUERIES.reviewThreads
+      )
+        return;
+      return Response.json({
+        data: {
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                nodes: [{ id: 'THREAD', isResolved }],
+                totalCount: 1,
+                pageInfo: empty.pageInfo,
+              },
+            },
+          },
+        },
+        errors: [
+          {
+            type: 'FORBIDDEN',
+            path: ['repository', 'pullRequest', 'reviewThreads', 'nodes', 0, 'isResolved'],
+          },
+        ],
+      });
+    });
+    const row = context.requirements.items.find(item => item.kind === 'conversation-resolution');
+    expect(row?.state).toBe('unavailable');
+    expect(row?.evidence.some(entry => entry.observation.startsWith('unresolved-threads:'))).toBe(
+      false
+    );
+  }
+);
+
+it.each(['BLOCKED', 'UNSTABLE'])(
+  'does not expand generic %s into invented requirements',
+  async mergeStateStatus => {
+    const { context } = await run((url, options) => {
+      const path = decodeURIComponent(url.pathname);
+      if (path === protectionPath) return failure(404);
+      if (path === rulesPath) return Response.json([]);
+      if (
+        path === '/graphql' &&
+        JSON.parse(String(options.body)).query === PR_CONTEXT_EVALUATION_QUERY
+      )
+        return Response.json({
+          data: {
+            repository: {
+              pullRequest: {
+                ...evaluationPr,
+                mergeStateStatus,
+                baseRef: { ...evaluationPr.baseRef, refUpdateRule: null },
+              },
+            },
+          },
+        });
+    });
+    expect(context.requirements).toMatchObject({ items: [], completeness: 'complete' });
+  }
+);
+
+it('rejects a mismatching evaluation revision even when both outer revisions agree', async () => {
+  const { context } = await run((url, options) => {
+    if (url.pathname !== '/graphql') return;
+    const { query } = JSON.parse(String(options.body));
+    if (query === PR_CONTEXT_EVALUATION_QUERY)
+      return Response.json({
+        data: { repository: { pullRequest: { ...evaluationPr, headRefOid: 'other-head' } } },
+      });
+    if (query === PR_CONTEXT_REQUIREMENT_QUERIES.checks) return checkPage([observedRun]);
+  });
+  expect(context.requirements.source).toMatchObject({
+    availability: 'stale',
+    reason: 'revision-mismatch',
+  });
+  expect(context.requirements.items.every(item => item.state === 'unavailable')).toBe(true);
+  expect(context.labels.completeness).toBe('complete');
+});
+
+it('does not use an errored revision field to invalidate independent context', async () => {
+  const { context } = await run((url, options) => {
+    if (url.pathname !== '/graphql') return;
+    const { query } = JSON.parse(String(options.body));
+    if (query === PR_CONTEXT_REQUIREMENT_QUERIES.checks) return checkPage([observedRun]);
+    if (query === PR_CONTEXT_EVALUATION_QUERY)
+      return Response.json({
+        data: { repository: { pullRequest: { ...evaluationPr, headRefOid: 'untrusted-head' } } },
+        errors: [{ type: 'FORBIDDEN', path: ['repository', 'pullRequest', 'headRefOid'] }],
+      });
+  });
+  expect(context.requirements.source.availability).not.toBe('stale');
+  expect(context.requirements.items.every(item => item.state === 'unavailable')).toBe(true);
+  expect(context.checks.source).toMatchObject({ availability: 'partial', retryable: false });
+  expect(context.reviewDecisions.source.availability).toBe('available');
+  expect(context.labels.completeness).toBe('complete');
+});
+
 const observedRun = {
   __typename: 'CheckRun',
   id: 'RUN',

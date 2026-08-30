@@ -2111,9 +2111,7 @@
     "sessionExited": "စက်ရှင် ထွက်သွားသည်",
     "remoteSpawnRetryable": "အင်​စတ​န်း​စ သို့ မရောက်​ရှိ​နိုင်​ပါ — ၎င်း ချိတ်​ဆက်​မှု ပြတ်​တောက်​နေ​သည်​ ဖြစ်​နိုင်​သည်​။",
     "remoteSpawnNonRetryable": "အင်​စတ​န်း​စ သည် ဆက်​ရှင် စတင်​မှု မအောင်မြင်​ပါ — စက် ကို စစ်​ဆေး​ပါ သို့​မဟုတ် CLI ကို အပ်​ဒိတ်​လုပ်​ပါ​။",
-    "remoteSpawnInstanceDisconnected": "ရွေး​ထား​သော အင်​စတ​န်း​စ ချိတ်​ဆက်​မှု ပြတ်​သွား​သည်​။ Cloud Agent တွင် ဆက်​ရှင် တစ်​ခု စတင်​ပါ သို့​မဟုတ် အခြား အင်​စတ​န်း​စ တစ်​ခု ရွေး​ပါ​။",
-    "liveCount_one": "{{count}} LIVE",
-    "liveCount_other": "{{count}} LIVE"
+    "remoteSpawnInstanceDisconnected": "ရွေး​ထား​သော အင်​စတ​န်း​စ ချိတ်​ဆက်​မှု ပြတ်​သွား​သည်​။ Cloud Agent တွင် ဆက်​ရှင် တစ်​ခု စတင်​ပါ သို့​မဟုတ် အခြား အင်​စတ​န်း​စ တစ်​ခု ရွေး​ပါ​။"
   },
   "agentChat": {
     "session": {
@@ -2273,9 +2271,7 @@
       "noCliInstancesDescription": "သင့်ကွန်ပျူတာရှိ ပရောဂျက်တစ်ခုတွင် `kilo remote` ကို လုပ်ဆောင်ပါ၊ သို့မဟုတ် တစ်ခုလုပ်ဆောင်နေပြီးသားဖြစ်ပါက Kilo CLI ကို မွမ်းမံပါ။",
       "instanceOnProject": "{{project}} ပေါ်ရှိ {{name}}",
       "instanceOnProjectSuffix": "{{project}} ပေါ်ရှိ {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent တွင် လုပ်ဆောင်ပါ",
-      "terminals": "တာမင်နယ်များ",
-      "remotes": "အဝေးရှိ instance များ"
+      "runOnCloudAgent": "Cloud Agent တွင် လုပ်ဆောင်ပါ"
     },
     "modePicker": {
       "title": "မုဒ်ကို ရွေးချယ်ပါ",

@@ -2111,9 +2111,7 @@
     "sessionExited": "Sessie beëindig",
     "remoteSpawnRetryable": "Kon nie die instansie bereik nie — dit het moontlik ontkoppel.",
     "remoteSpawnNonRetryable": "Die instansie kon nie die sessie begin nie — kontroleer die masjien of werk die CLI op.",
-    "remoteSpawnInstanceDisconnected": "Die gekose instansie het ontkoppel. Begin 'n sessie op Cloud Agent of kies 'n ander instansie.",
-    "liveCount_one": "{{count}} LEWEND",
-    "liveCount_other": "{{count}} LEWEND"
+    "remoteSpawnInstanceDisconnected": "Die gekose instansie het ontkoppel. Begin 'n sessie op Cloud Agent of kies 'n ander instansie."
   },
   "agentChat": {
     "session": {
@@ -2273,9 +2271,7 @@
       "noCliInstancesDescription": "Loop `kilo remote` in 'n projek op jou rekenaar, of werk Kilo CLI by as een reeds loop.",
       "instanceOnProject": "{{name}} op {{project}}",
       "instanceOnProjectSuffix": "{{name}} op {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Loop op Cloud Agent",
-      "terminals": "Terminale",
-      "remotes": "Afgeleë instansies"
+      "runOnCloudAgent": "Loop op Cloud Agent"
     },
     "modePicker": {
       "title": "Kies modus",

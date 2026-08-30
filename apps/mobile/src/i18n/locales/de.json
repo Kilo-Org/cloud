@@ -1657,9 +1657,7 @@
     "sessionExited": "Sitzung beendet",
     "remoteSpawnRetryable": "Die Instanz konnte nicht erreicht werden – sie wurde möglicherweise getrennt.",
     "remoteSpawnNonRetryable": "Die Instanz konnte die Sitzung nicht starten – überprüfe die Maschine oder aktualisiere die CLI.",
-    "remoteSpawnInstanceDisconnected": "Die ausgewählte Instanz wurde getrennt. Starte eine Sitzung auf Cloud Agent oder wähle eine andere Instanz.",
-    "liveCount_one": "{{count}} LIVE",
-    "liveCount_other": "{{count}} LIVE"
+    "remoteSpawnInstanceDisconnected": "Die ausgewählte Instanz wurde getrennt. Starte eine Sitzung auf Cloud Agent oder wähle eine andere Instanz."
   },
   "agentChat": {
     "session": {
@@ -1819,9 +1817,7 @@
       "noCliInstancesDescription": "Führe `kilo remote` in einem Projekt auf deinem Computer aus, oder aktualisiere die Kilo CLI, falls bereits eine läuft.",
       "instanceOnProject": "{{name}} auf {{project}}",
       "instanceOnProjectSuffix": "{{name}} auf {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Auf Cloud-Agent ausführen",
-      "terminals": "Terminals",
-      "remotes": "Remote-Instanzen"
+      "runOnCloudAgent": "Auf Cloud-Agent ausführen"
     },
     "modePicker": {
       "title": "Modus wählen",

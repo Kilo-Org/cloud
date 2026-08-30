@@ -1657,9 +1657,7 @@
     "sessionExited": "Oturumdan çıkıldı",
     "remoteSpawnRetryable": "Örneğe ulaşılamadı — bağlantısı kesilmiş olabilir.",
     "remoteSpawnNonRetryable": "Örnek oturumu başlatamadı — makineyi kontrol edin veya CLI'yı güncelleyin.",
-    "remoteSpawnInstanceDisconnected": "Seçili örnek bağlantısı kesildi. Cloud Agent'ta bir oturum başlatın veya başka bir örnek seçin.",
-    "liveCount_one": "{{count}} CANLI",
-    "liveCount_other": "{{count}} CANLI"
+    "remoteSpawnInstanceDisconnected": "Seçili örnek bağlantısı kesildi. Cloud Agent'ta bir oturum başlatın veya başka bir örnek seçin."
   },
   "agentChat": {
     "session": {
@@ -1819,9 +1817,7 @@
       "noCliInstancesDescription": "Bilgisayarınızdaki bir projede `kilo remote` çalıştırın veya zaten çalışıyorsa Kilo CLI'yi güncelleyin.",
       "instanceOnProject": "{{project}} üzerinde {{name}}",
       "instanceOnProjectSuffix": "{{project}} üzerinde {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Bulut Ajanında çalıştır",
-      "terminals": "Terminaller",
-      "remotes": "Uzak örnekler"
+      "runOnCloudAgent": "Bulut Ajanında çalıştır"
     },
     "modePicker": {
       "title": "Mod seç",

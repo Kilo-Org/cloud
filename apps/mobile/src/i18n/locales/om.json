@@ -2111,9 +2111,7 @@
     "sessionExited": "Xalayyiin bahe",
     "remoteSpawnRetryable": "Instance bira ga'uu hin dandeenye — addaan citee ta'a.",
     "remoteSpawnNonRetryable": "Instance sessi jalqabuun hin milkaa'in — meeshaa sakatta'i ykn CLI haaromsi.",
-    "remoteSpawnInstanceDisconnected": "Instance filatame addaan citeera. Sessa Cloud Agent irratti jalqabi ykn instance biraa filadhu.",
-    "liveCount_one": "{{count}} LIVE",
-    "liveCount_other": "{{count}} LIVE"
+    "remoteSpawnInstanceDisconnected": "Instance filatame addaan citeera. Sessa Cloud Agent irratti jalqabi ykn instance biraa filadhu."
   },
   "agentChat": {
     "session": {
@@ -2273,9 +2271,7 @@
       "noCliInstancesDescription": "Kompiutara kee irratti project tokko keessatti `kilo remote` hojjedhu, ykn yoo tokko hojjechaa jiraate Kilo CLI haaromsi.",
       "instanceOnProject": "{{name}} kan {{project}} irratti",
       "instanceOnProjectSuffix": "{{name}} kan {{project}} irratti ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent irratti hojjedhu",
-      "terminals": "Terminaloota",
-      "remotes": "Fagootti hojjetan"
+      "runOnCloudAgent": "Cloud Agent irratti hojjedhu"
     },
     "modePicker": {
       "title": "Haala filadhu",

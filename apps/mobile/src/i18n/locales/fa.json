@@ -2111,9 +2111,7 @@
     "sessionExited": "جلسه خاتمه یافت",
     "remoteSpawnRetryable": "امکان دسترسی به نمونه وجود نداشت — شاید قطع شده باشد.",
     "remoteSpawnNonRetryable": "نمونه نتوانست جلسه را شروع کند — دستگاه را بررسی کنید یا CLI را بهروزرسانی کنید.",
-    "remoteSpawnInstanceDisconnected": "نمونه انتخابی قطع شد. یک جلسه در Cloud Agent شروع کنید یا نمونه دیگری انتخاب کنید.",
-    "liveCount_one": "{{count}} زنده",
-    "liveCount_other": "{{count}} زنده"
+    "remoteSpawnInstanceDisconnected": "نمونه انتخابی قطع شد. یک جلسه در Cloud Agent شروع کنید یا نمونه دیگری انتخاب کنید."
   },
   "agentChat": {
     "session": {
@@ -2273,9 +2271,7 @@
       "noCliInstancesDescription": "در یک پروژه روی رایانه خود `kilo remote` را اجرا کنید، یا اگر CLI کیلا در حال اجرا است آن را بهروزرسانی کنید.",
       "instanceOnProject": "{{name}} در {{project}}",
       "instanceOnProjectSuffix": "{{name}} در {{project}} ({{suffix}})",
-      "runOnCloudAgent": "اجرا بر روی Cloud Agent",
-      "terminals": "پایانه‌ها",
-      "remotes": "نمونه‌های راه دور"
+      "runOnCloudAgent": "اجرا بر روی Cloud Agent"
     },
     "modePicker": {
       "title": "انتخاب حالت",

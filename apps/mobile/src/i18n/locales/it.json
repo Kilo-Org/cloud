@@ -280,7 +280,8 @@
       "networkError": "Errore di rete",
       "uploadFailed": "Caricamento non riuscito",
       "failedToUploadFile": "Caricamento del file non riuscito: {{reason}}",
-      "nothingToPaste": "Niente da incollare"
+      "nothingToPaste": "Niente da incollare",
+      "metadataStripFailed": "Impossibile rimuovere i metadati della foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1679,7 +1680,11 @@
       "previousTaskFinishing": "L'attività precedente sta ancora terminando. Attendere un momento.",
       "serviceUnavailable": "Il servizio non è disponibile al momento. Riprova.",
       "connectionTrouble": "Problemi di connessione. Riprova tra un momento.",
-      "modelUnavailable": "Questo modello non è disponibile per Cloud Agent. Scegli un altro modello e riprova."
+      "modelUnavailable": "Questo modello non è disponibile per Cloud Agent. Scegli un altro modello e riprova.",
+      "cancelQueuedFailed": "Impossibile annullare il messaggio.",
+      "cancelQueuedRestoreAvailable": "Messaggio annullato. Tocca Ripristina per riportarlo nel campo di inserimento del messaggio.",
+      "cancelQueuedRestored": "Messaggio annullato. Il prompt è di nuovo nel campo di inserimento del messaggio.",
+      "cancelQueuedUpgradeRequired": "Per annullare i messaggi in coda è necessaria una versione più recente di Kilo CLI. Aggiorna Kilo CLI e riconnettiti."
     },
     "remoteSession": {
       "failedToCreate": "Impossibile creare la sessione remota",
@@ -1751,7 +1756,8 @@
       "continueFrom": "Continuazione di {{title}}",
       "importingSession": "Importazione della sessione",
       "cliCannotContinue": "Questa CLI non può continuare una sessione. Scegli Cloud Agent o un'altra CLI.",
-      "importFailed": "Impossibile importare questa sessione."
+      "importFailed": "Impossibile importare questa sessione.",
+      "discardWithUploadsMessage": "Il tuo prompt e i file caricati non allegati a messaggi inviati verranno eliminati."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aggiornato {{displayCount}} file",
@@ -2000,7 +2006,11 @@
       "queuedAccessibility": "Messaggio in coda",
       "userMessage": "Messaggio utente",
       "assistantMessage": "Messaggio assistente",
-      "longPressHint": "Tieni premuto per i dettagli del messaggio"
+      "longPressHint": "Tieni premuto per i dettagli del messaggio",
+      "cancelQueued": "Annulla messaggio",
+      "cancelQueuedAccessibility": "Annulla messaggio in coda",
+      "restoreQueued": "Ripristina",
+      "restoreQueuedAccessibility": "Ripristina il messaggio annullato nel campo di inserimento del messaggio"
     },
     "olderMessages": {
       "arrived": "Messaggi precedenti caricati",
@@ -2031,9 +2041,6 @@
     },
     "sessionFilter": {
       "title": "Filtra sessioni",
-      "sortBy": "Ordina per",
-      "sortLastUpdated": "Ultimo aggiornamento",
-      "sortCreated": "Creato",
       "platform": "Piattaforma",
       "platformCloud": "Cloud",
       "platformExtension": "Estensione",
@@ -2087,7 +2094,9 @@
       "uploading": "Caricamento…",
       "uploaded": "Caricato",
       "uploadFailedRetry": "Caricamento non riuscito. Tocca per riprovare.",
-      "uploadFailedTerminal": "Questo file non può essere caricato."
+      "uploadFailedTerminal": "Questo file non può essere caricato.",
+      "moveLeft": "Sposta {{filename}} a sinistra",
+      "moveRight": "Sposta {{filename}} a destra"
     },
     "attachmentPasteHint": {
       "accessibility": "Incolla immagine dagli appunti",
@@ -2117,7 +2126,17 @@
       "finalizingPlaceholder": "Finalizzazione...",
       "messagePlaceholder": "Messaggio...",
       "cannotReceiveFiles": "Questa sessione non può ricevere file. Rimuovi gli allegati per inviare il messaggio.",
-      "couldNotAttachFiles": "Impossibile allegare i file. Tocca Invia per riprovare."
+      "couldNotAttachFiles": "Impossibile allegare i file. Tocca Invia per riprovare.",
+      "discardAttachmentsMessage": "I file caricati non allegati a messaggi inviati verranno eliminati.",
+      "discardAttachmentsTitle": "Scartare gli allegati?",
+      "charactersRemaining": "{{count}} caratteri rimanenti",
+      "insertNewline": "Inserisci un'interruzione di riga",
+      "starterChipBuild": "Crea una funzionalità",
+      "starterChipEmpty": "Inizia con un'idea",
+      "starterChipFix": "Correggi un errore",
+      "starterChipPrepare": "Configura il mio ambiente",
+      "starterChipWrapUp": "Concludi la mia sessione",
+      "starterChipWriteTests": "Scrivi test"
     },
     "chatLink": {
       "linkCopied": "Link copiato",
@@ -2247,7 +2266,9 @@
     "appearanceDark": "Scuro",
     "account": "Account",
     "prReviewAttribution": "Aggiungi l'attribuzione dell'app alle revisioni PR",
-    "prReviewAttributionSubtitle": "Aggiungi un footer \"Recensito tramite Kilo\" quando invii una recensione."
+    "prReviewAttributionSubtitle": "Aggiungi un footer \"Recensito tramite Kilo\" quando invii una recensione.",
+    "returnSendsMessage": "Il tasto Invio invia il messaggio",
+    "returnSendsMessageSubtitle": "Se disattivato, Invio inserisce un'interruzione di riga nei campi di inserimento dei messaggi degli agenti."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",
@@ -2353,7 +2374,8 @@
     "busy": "L'input vocale è occupato. Riprova.",
     "stopped": "L'input vocale si è interrotto. Tocca il microfono per riprovare.",
     "unavailableDevice": "L'input vocale non è disponibile su questo dispositivo.",
-    "unavailableLanguage": "L'input vocale non è disponibile per la lingua del dispositivo."
+    "unavailableLanguage": "L'input vocale non è disponibile per la lingua del dispositivo.",
+    "listeningStopped": "Ascolto interrotto."
   },
   "share": {
     "title": "Condividi su Kilo",

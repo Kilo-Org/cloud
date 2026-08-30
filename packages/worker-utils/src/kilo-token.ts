@@ -59,7 +59,13 @@ export type SignKiloTokenExtra = Pick<
 
 export async function signKiloToken(params: {
   userId: string;
-  pepper: string | null;
+  /**
+   * Omit (or pass `undefined`) to mint an internal-service token with no
+   * `apiTokenPepper` claim at all — verifiers treat an absent claim as
+   * "skip pepper comparison", unlike an explicit `null`, which is compared
+   * against the account's current pepper.
+   */
+  pepper?: string | null;
   secret: string;
   expiresInSeconds: number;
   audience?: string;
@@ -83,7 +89,7 @@ export async function signKiloToken(params: {
   const validatedPayload = signKiloTokenPayload.parse(payload);
 
   let signer = new SignJWT(validatedPayload)
-    .setProtectedHeader({ alg: 'HS256' })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuedAt(now)
     .setExpirationTime(exp);
   if (params.audience) signer = signer.setAudience(params.audience);

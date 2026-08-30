@@ -75,7 +75,7 @@ describe('resolveNewSessionPromptControlState', () => {
     expect(state.paperclipDisabled).toBe(true);
   });
 
-  it('disables the text input and paperclip while this owner is voice active', () => {
+  it('disables the paperclip but keeps the prompt editable while this owner is voice active', () => {
     const state = resolveNewSessionPromptControlState({
       attachmentsCount: 0,
       attachmentMax: 5,
@@ -84,8 +84,8 @@ describe('resolveNewSessionPromptControlState', () => {
       voiceInputActive: true,
     });
 
-    expect(state.inputEditable).toBe(false);
-    expect(state.inputAccessibilityDisabled).toBe(true);
+    expect(state.inputEditable).toBe(true);
+    expect(state.inputAccessibilityDisabled).toBe(false);
     expect(state.paperclipDisabled).toBe(true);
     expect(state.voiceDisabled).toBe(false);
     expect(state.hasPrompt).toBe(true);

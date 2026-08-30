@@ -96,7 +96,8 @@ async function run(
   serve: (
     url: URL,
     options: RequestInit
-  ) => Response | undefined | Promise<Response | undefined> = () => undefined
+  ) => Response | undefined | Promise<Response | undefined> = () => undefined,
+  configure?: (octokit: Octokit) => void
 ) {
   const requests: string[] = [];
   let active = 0,
@@ -161,6 +162,7 @@ async function run(
       },
     },
   });
+  configure?.(octokit);
   const context = GitHubPrReviewContextSchema.parse(
     await readPullRequestContext(
       octokit,
@@ -170,6 +172,38 @@ async function run(
   );
   return { context, requests, peak };
 }
+
+it.each([
+  {},
+  { url: undefined },
+  { url: null },
+  { url: '' },
+  { url: false },
+  { url: 0 },
+  { url: true },
+  { url: 42 },
+  { url: {} },
+  { url: [] },
+])('rejects invalid policy page parameters %p without adding ruleset evidence', async params => {
+  const { context } = await run(undefined, octokit => {
+    jest.spyOn(octokit.repos, 'getBranchRules').mockResolvedValue({
+      status: 200,
+      url: nextPage,
+      headers: {},
+      data: [{ ...rule, type: 'required_deployments' }],
+    });
+    jest.spyOn(octokit.paginate, 'iterator').mockImplementation(async function* (requestPage) {
+      yield await requestPage(params);
+    });
+  });
+  expect(context.requirements.items.filter(item => item.policy?.source === 'ruleset')).toEqual([]);
+  expect(context.requirements.items.some(item => item.policy?.source === 'classic')).toBe(true);
+  expect(context.requirements).toMatchObject({
+    completeness: 'partial',
+    source: { availability: 'partial', retryable: true },
+  });
+  expect(context.labels.completeness).toBe('complete');
+});
 
 it('retains exact-base policy evidence while adding named evaluation requirements', async () => {
   const { context, requests } = await run(url =>

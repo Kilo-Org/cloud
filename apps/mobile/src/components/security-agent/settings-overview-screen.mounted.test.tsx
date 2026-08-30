@@ -257,8 +257,8 @@ describe.each([
       });
       await advanceBy(10_000);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
-      const retryButton = host(root, 'Pressable')[0];
-      expect(retryButton?.props).toMatchObject({ role: 'button', accessibilityLabel: 'Retry' });
+      const retryButton = root.findByProps({ role: 'button', accessibilityLabel: 'Retry' });
+      expect(retryButton.props).toMatchObject({ role: 'button', accessibilityLabel: 'Retry' });
       expect(retryButton.props.className).toContain('min-h-11');
       expect(retryButton.props.className).toContain('min-w-11');
       onlineManager.setOnline(false);

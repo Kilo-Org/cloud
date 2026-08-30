@@ -1,5 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts RN trees without a DOM. */
-import { type MobileRouter } from '@kilocode/trpc/mobile';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { onlineManager, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { createElement } from 'react';
@@ -18,7 +18,41 @@ let permissionData = {
   hasPermissions: true,
   reauthorizeUrl: null as string | null,
 };
-let configData: Record<string, unknown> = {};
+type ConfigData = inferRouterOutputs<MobileRouter>['organizations']['securityAgent']['getConfig'];
+const defaultConfigData: ConfigData = {
+  hasConfig: false,
+  configRevision: 1,
+  isEnabled: false,
+  slaCriticalDays: 15,
+  slaHighDays: 30,
+  slaMediumDays: 45,
+  slaLowDays: 90,
+  slaEnabled: false,
+  autoSyncEnabled: true,
+  repositorySelectionMode: 'all',
+  selectedRepositoryIds: [],
+  modelSlug: 'test/model',
+  triageModelSlug: 'test/model',
+  analysisModelSlug: 'test/model',
+  analysisMode: 'auto',
+  autoDismissEnabled: false,
+  autoDismissConfidenceThreshold: 'high',
+  autoAnalysisEnabled: false,
+  autoAnalysisMinSeverity: 'high',
+  autoAnalysisIncludeExisting: false,
+  autoRemediationEnabled: false,
+  autoRemediationMinSeverity: 'high',
+  autoRemediationIncludeExisting: false,
+  autoRemediationRequireApproval: true,
+  autoRemediationEnabledAt: null,
+  remediationModelSlug: 'test/model',
+  slaNotificationsEnabled: false,
+  slaNotificationMinSeverity: 'high',
+  slaNotificationWarningDays: 3,
+  newFindingNotificationsEnabled: false,
+  newFindingNotificationMinSeverity: 'high',
+};
+let configData: ConfigData = structuredClone(defaultConfigData);
 let repositoriesData: { id: number }[] = [];
 let roles: { organizationId: string; role: string }[] = [];
 let queryClient = new QueryClient();
@@ -115,13 +149,7 @@ beforeEach(() => {
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
   permissionData = { hasIntegration: true, hasPermissions: true, reauthorizeUrl: null };
-  configData = {
-    hasConfig: false,
-    isEnabled: false,
-    repositorySelectionMode: 'all',
-    selectedRepositoryIds: [],
-    analysisMode: 'auto',
-  };
+  configData = structuredClone(defaultConfigData);
   repositoriesData = [{ id: 1 }];
   roles = [{ organizationId: 'org_123', role: 'owner' }];
   transport.mockReset().mockImplementation(async input => {
@@ -206,7 +234,7 @@ describe.each([
     'preserves setup controls for %s, selection %j and repositories %j',
     async (mode, selected, expected) => {
       configData.repositorySelectionMode = mode;
-      configData.selectedRepositoryIds = selected;
+      configData.selectedRepositoryIds = [...selected];
       repositoriesData = [...expected.repos];
       onlineManager.setOnline(false);
       const root = await mount('personal', Screen);

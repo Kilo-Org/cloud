@@ -112,8 +112,12 @@ function mount(ui: ReactElement): TestRenderer.ReactTestRenderer {
   return renderer;
 }
 
+function isHost(node: TestRenderer.ReactTestInstance, type: string) {
+  return node.type === type;
+}
+
 function hosts(renderer: TestRenderer.ReactTestRenderer, type: string) {
-  return renderer.root.findAll(node => node.type === type);
+  return renderer.root.findAll(node => isHost(node, type));
 }
 
 function texts(renderer: TestRenderer.ReactTestRenderer) {
@@ -250,7 +254,7 @@ describe('StoredSessionRow live speech', () => {
           onSpawnInstance: () => undefined,
         })
       );
-      const button = renderer.root.find(node => node.type === 'Pressable');
+      const button = renderer.root.find(node => isHost(node, 'Pressable'));
       expect(button.props.accessibilityLabel).toBe(
         'Fix login bug, LIVE, feature/live, CLI, and cost 12 cents, 5 minutes ago'
       );

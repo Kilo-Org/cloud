@@ -1,5 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- Use the repository's DOM-free mounted renderer. */
-import { createElement } from 'react';
+import { createElement, type ElementType } from 'react';
 import { act } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
 import { AppUnlockProvider, useAppUnlock } from '@/lib/app-unlock-context';
@@ -50,7 +50,7 @@ function Probe() {
   return createElement('UnlockState', useAppUnlock());
 }
 export function state() {
-  return view?.renderer.root.findAllByType('UnlockState')[0]?.props as Unlock;
+  return view?.renderer.root.findAllByType('UnlockState' as ElementType)[0]?.props as Unlock;
 }
 async function flush(update?: () => void) {
   await act(async () => {

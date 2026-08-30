@@ -1,23 +1,21 @@
 import { z } from 'zod';
 
-import { type AgentSessionSortBy, parseAgentSessionSortBy } from './agent-session-sort';
-
 /**
- * Pure contract for the persisted agent-session filter set. Intentionally
- * free of any Expo / SecureStore imports so it can be unit-tested in node
- * and re-used by tests/mocks without touching the native bridge.
+ * Pure contract for the persisted session filter set. Intentionally free of
+ * any Expo / SecureStore imports so it can be unit-tested in node and re-used
+ * by tests/mocks without touching the native bridge.
+ *
+ * Both session-list pages persist this shape, under their own storage key.
  */
 export type AgentSessionFilters = {
   platformFilter: string[];
   projectFilter: string[];
-  sortBy: AgentSessionSortBy;
 };
 
 export function createDefaultAgentSessionFilters(): AgentSessionFilters {
   return {
     platformFilter: [],
     projectFilter: [],
-    sortBy: parseAgentSessionSortBy(undefined),
   };
 }
 
@@ -41,15 +39,14 @@ const tolerantStringArraySchema = tolerant(z.array(z.unknown()), []).transform(i
 const storedAgentSessionFiltersSchema = z.object({
   platformFilter: tolerantStringArraySchema,
   projectFilter: tolerantStringArraySchema,
-  sortBy: z.unknown().optional(),
 });
 
 /**
- * Parse the raw SecureStore JSON for the agent-session filter record. Returns
- * `null` only when the JSON itself is malformed or not an object — in every
- * other case the function tolerantly recovers so a partially bad record
- * (e.g. an unknown sortBy or a non-array platformFilter) still produces a
- * usable filter object with the default where applicable.
+ * Parse the raw SecureStore JSON for a session filter record. Returns `null`
+ * only when the JSON itself is malformed or not an object — in every other
+ * case the function tolerantly recovers so a partially bad record (e.g. a
+ * non-array platformFilter, or a legacy record still carrying `sortBy`) still
+ * produces a usable filter object.
  */
 export function parseStoredAgentSessionFilters(raw: string | null): AgentSessionFilters | null {
   if (!raw) {
@@ -71,22 +68,10 @@ export function parseStoredAgentSessionFilters(raw: string | null): AgentSession
   return {
     platformFilter: result.data.platformFilter,
     projectFilter: result.data.projectFilter,
-    sortBy: parseAgentSessionSortBy(result.data.sortBy),
   };
 }
 
-/**
- * Reset the narrowing parts of the filter record (platform + project) while
- * leaving `sortBy` untouched — sort is a persistent preference, not a
- * transient filter, and "Clear filters" / "Clear search" must never
- * silently revert it to the default.
- */
-export function clearAgentSessionNarrowingFilters(
-  filters: AgentSessionFilters
-): AgentSessionFilters {
-  return {
-    platformFilter: [],
-    projectFilter: [],
-    sortBy: filters.sortBy,
-  };
+/** How many narrowing filters are applied — drives the header badge count. */
+export function countActiveSessionFilters(filters: AgentSessionFilters): number {
+  return filters.platformFilter.length + filters.projectFilter.length;
 }

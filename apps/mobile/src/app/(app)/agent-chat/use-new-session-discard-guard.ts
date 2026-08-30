@@ -29,10 +29,13 @@ import { usePreventRemove } from '@/lib/navigation/prevent-remove';
  */
 export function useNewSessionDiscardGuard({
   dirty,
+  hasUnclaimedAttachments = false,
   onDiscard,
   skipNextGuardRef,
 }: Readonly<{
   dirty: boolean;
+  /** True when the composer holds admitted-but-unsent uploads; names them in the copy. */
+  hasUnclaimedAttachments?: boolean;
   onDiscard: () => Promise<void>;
   skipNextGuardRef: RefObject<boolean>;
 }>): void {
@@ -53,7 +56,11 @@ export function useNewSessionDiscardGuard({
     const action = data.action;
     Alert.alert(
       i18n.t('agentChat.newSession.discardDraftTitle'),
-      i18n.t('agentChat.newSession.discardDraftMessage'),
+      i18n.t(
+        hasUnclaimedAttachments
+          ? 'agentChat.newSession.discardWithUploadsMessage'
+          : 'agentChat.newSession.discardDraftMessage'
+      ),
       [
         { text: i18n.t('agentChat.newSession.keepEditing'), style: 'cancel' },
         {

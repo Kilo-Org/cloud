@@ -152,7 +152,9 @@
     "appearanceDark": "డార్క్",
     "account": "ఖాతా",
     "prReviewAttribution": "PR సమీక్షలకు యాప్ ఆపాదనను జోడించండి",
-    "prReviewAttributionSubtitle": "మీరు సమీక్షను సమర్పించినప్పుడు Kilo ద్వారా సమీక్షించబడింది అనే ఫుటర్ను జోడించండి."
+    "prReviewAttributionSubtitle": "మీరు సమీక్షను సమర్పించినప్పుడు Kilo ద్వారా సమీక్షించబడింది అనే ఫుటర్ను జోడించండి.",
+    "returnSendsMessage": "రిటర్న్ కీ సందేశాన్ని పంపుతుంది",
+    "returnSendsMessageSubtitle": "ఆఫ్లో ఉన్నప్పుడు, రిటర్న్ ఏజెంట్ సందేశ ఇన్పుట్లలో కొత్త పంక్తిని చేర్చుతుంది."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -750,7 +752,8 @@
       "networkError": "నెట్‌వర్క్ లోపం",
       "uploadFailed": "అప్‌లోడ్ విఫలమైంది",
       "failedToUploadFile": "ఫైల్ అప్‌లోడ్ చేయడంలో విఫలమైంది: {{reason}}",
-      "nothingToPaste": "పేస్ట్ చేయడానికి ఏమీ లేదు"
+      "nothingToPaste": "పేస్ట్ చేయడానికి ఏమీ లేదు",
+      "metadataStripFailed": "ఫోటో మెటాడేటాను తొలగించలేకపోయాము."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "మునుపటి పని ఇంకా పూర్తవుతోంది. దయచేసి కాసేపు వేచి ఉండండి.",
       "serviceUnavailable": "సేవ ప్రస్తుతం అందుబాటులో లేదు. దయచేసి మళ్లీ ప్రయత్నించండి.",
       "connectionTrouble": "కనెక్షన్ సమస్య. దయచేసి కాసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.",
-      "modelUnavailable": "ఈ మోడల్ Cloud Agent కోసం అందుబాటులో లేదు. మరొక మోడల్ని ఎంచుకుని మళ్లీ ప్రయత్నించండి."
+      "modelUnavailable": "ఈ మోడల్ Cloud Agent కోసం అందుబాటులో లేదు. మరొక మోడల్ని ఎంచుకుని మళ్లీ ప్రయత్నించండి.",
+      "cancelQueuedFailed": "సందేశాన్ని రద్దు చేయలేకపోయాము.",
+      "cancelQueuedRestoreAvailable": "సందేశం రద్దు చేయబడింది. దాన్ని సందేశ ఇన్పుట్లోకి తిరిగి తీసుకురావడానికి పునరుద్ధరించండి నొక్కండి.",
+      "cancelQueuedRestored": "సందేశం రద్దు చేయబడింది. ప్రాంప్ట్ తిరిగి సందేశ ఇన్పుట్లో ఉంది.",
+      "cancelQueuedUpgradeRequired": "వరుసలో ఉన్న సందేశాలను రద్దు చేయడానికి కొత్త Kilo CLI సంస్కరణ అవసరం. Kilo CLIను నవీకరించి మళ్లీ కనెక్ట్ చేయండి."
     },
     "remoteSession": {
       "failedToCreate": "రిమోట్ సెషన్‌ను సృష్టించడంలో విఫలమైంది",
@@ -2213,7 +2220,8 @@
       "continueFrom": "{{title}}ను కొనసాగిస్తోంది",
       "importingSession": "సెషన్ను దిగుమతి చేస్తోంది",
       "cliCannotContinue": "ఈ CLI సెషన్ను కొనసాగించదు. Cloud Agent లేదా మరొక CLIని ఎంచుకోండి.",
-      "importFailed": "ఈ సెషన్ను దిగుమతి చేయలేకపోయాం."
+      "importFailed": "ఈ సెషన్ను దిగుమతి చేయలేకపోయాం.",
+      "discardWithUploadsMessage": "మీ ప్రాంప్ట్ మరియు పంపిన సందేశాలకు జోడించని అప్లోడ్ చేసిన ఫైల్లు తొలగించబడతాయి."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "సందేశం క్యూలో ఉంది",
       "userMessage": "వినియోగదారు సందేశం",
       "assistantMessage": "సహాయక సందేశం",
-      "longPressHint": "సందేశ వివరాల కోసం ఎక్కువసేపు నొక్కండి"
+      "longPressHint": "సందేశ వివరాల కోసం ఎక్కువసేపు నొక్కండి",
+      "cancelQueued": "సందేశాన్ని రద్దు చేయండి",
+      "cancelQueuedAccessibility": "వరుసలో ఉన్న సందేశాన్ని రద్దు చేయండి",
+      "restoreQueued": "పునరుద్ధరించండి",
+      "restoreQueuedAccessibility": "రద్దు చేసిన సందేశాన్ని సందేశ ఇన్పుట్లో పునరుద్ధరించండి"
     },
     "olderMessages": {
       "arrived": "మునుపటి సందేశాలు లోడ్ అయ్యాయి",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "సెషన్లను ఫిల్టర్ చేయండి",
-      "sortBy": "దీని ప్రకారం క్రమబద్ధీకరించండి",
-      "sortLastUpdated": "చివరిగా నవీకరించబడింది",
-      "sortCreated": "సృష్టించబడింది",
       "platform": "ప్లాట్ఫారమ్",
       "platformCloud": "క్లౌడ్",
       "platformExtension": "ఎక్స్టెన్షన్",
@@ -2545,7 +2554,9 @@
       "uploading": "అప్లోడ్ చేస్తోంది…",
       "uploaded": "అప్లోడ్ చేయబడింది",
       "uploadFailedRetry": "అప్లోడ్ విఫలమైంది. మళ్లీ ప్రయత్నించడానికి నొక్కండి.",
-      "uploadFailedTerminal": "ఈ ఫైల్ను అప్లోడ్ చేయలేము."
+      "uploadFailedTerminal": "ఈ ఫైల్ను అప్లోడ్ చేయలేము.",
+      "moveLeft": "{{filename}}ను ఎడమకు తరలించండి",
+      "moveRight": "{{filename}}ను కుడికి తరలించండి"
     },
     "attachmentPasteHint": {
       "accessibility": "క్లిప్బోర్డ్ నుండి చిత్రాన్ని అతికించండి",
@@ -2575,7 +2586,17 @@
       "finalizingPlaceholder": "ముగిస్తోంది...",
       "messagePlaceholder": "సందేశం...",
       "cannotReceiveFiles": "ఈ సెషన్ ఫైల్లను స్వీకరించలేదు. మీ సందేశాన్ని పంపడానికి అటాచ్మెంట్లను తీసివేయండి.",
-      "couldNotAttachFiles": "ఫైల్లను అటాచ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి పంపు నొక్కండి."
+      "couldNotAttachFiles": "ఫైల్లను అటాచ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి పంపు నొక్కండి.",
+      "discardAttachmentsMessage": "పంపిన సందేశాలకు జోడించని అప్లోడ్ చేసిన ఫైల్లు తొలగించబడతాయి.",
+      "discardAttachmentsTitle": "జోడింపులను విస్మరించాలా?",
+      "charactersRemaining": "{{count}} అక్షరాలు మిగిలి ఉన్నాయి",
+      "insertNewline": "కొత్త పంక్తిని చేర్చండి",
+      "starterChipBuild": "ఒక ఫీచర్ను రూపొందించు",
+      "starterChipEmpty": "ఒక ఆలోచనతో ప్రారంభించు",
+      "starterChipFix": "ఒక లోపాన్ని పరిష్కరించు",
+      "starterChipPrepare": "నా వాతావరణాన్ని సిద్ధం చేయి",
+      "starterChipWrapUp": "నా సెషన్ను ముగించు",
+      "starterChipWriteTests": "పరీక్షలు రాయి"
     },
     "chatLink": {
       "linkCopied": "లింక్ కాపీ చేయబడింది",
@@ -2794,7 +2815,8 @@
     "busy": "వాయిస్ ఇన్పుట్ బిజీగా ఉంది. మళ్లీ ప్రయత్నించండి.",
     "stopped": "వాయిస్ ఇన్పుట్ ఆగిపోయింది. మళ్లీ ప్రయత్నించడానికి మైక్రోఫోన్ను తాప్ చేయండి.",
     "unavailableDevice": "ఈ పరికరంలో వాయిస్ ఇన్పుట్ అందుబాటులో లేదు.",
-    "unavailableLanguage": "ఈ పరికర భాషకు వాయిస్ ఇన్పుట్ అందుబాటులో లేదు."
+    "unavailableLanguage": "ఈ పరికర భాషకు వాయిస్ ఇన్పుట్ అందుబాటులో లేదు.",
+    "listeningStopped": "వినడం ఆగిపోయింది."
   },
   "share": {
     "title": "Kiloకి భాగస్వామ్యం చేయండి",

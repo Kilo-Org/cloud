@@ -2,6 +2,7 @@ import { type Href, useRouter } from 'expo-router';
 import {
   Bell,
   Brain,
+  CornerDownLeft,
   Globe,
   type LucideIcon,
   MessageSquare,
@@ -22,6 +23,7 @@ import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-lang
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { cn } from '@/lib/utils';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
@@ -94,6 +96,8 @@ export function PreferencesScreen() {
     hasLoaded: prReviewFooterLoaded,
     setPrReviewFooter,
   } = usePrReviewFooterPreference();
+  const { returnSendsMessage, hasLoaded, setReturnSendsMessage } =
+    useReturnSendsMessagePreference();
   const { t } = useTranslation();
   const { userId } = useCurrentUserId();
   const { preference: languagePreference } = useLanguagePreference();
@@ -135,6 +139,14 @@ export function PreferencesScreen() {
           value={prReviewFooter}
           disabled={!prReviewFooterLoaded}
           onValueChange={setPrReviewFooter}
+        />
+        <PreferenceRow
+          icon={CornerDownLeft}
+          title={t('preferences.returnSendsMessage')}
+          subtitle={t('preferences.returnSendsMessageSubtitle')}
+          value={returnSendsMessage}
+          disabled={!hasLoaded}
+          onValueChange={setReturnSendsMessage}
         />
 
         {/* Appearance */}

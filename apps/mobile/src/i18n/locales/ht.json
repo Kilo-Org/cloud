@@ -2111,7 +2111,9 @@
     "sessionExited": "Sesyon an soti",
     "remoteSpawnRetryable": "Pa t kapab rive jwenn enstans lan — li ka te dekonekte.",
     "remoteSpawnNonRetryable": "Enstans lan echwe pou kòmanse sesyon an — tcheke machin lan oswa mete ajou CLI la.",
-    "remoteSpawnInstanceDisconnected": "Enstans chwazi a dekonekte. Kòmanse yon sesyon sou Cloud Agent oswa chwazi yon lòt enstans."
+    "remoteSpawnInstanceDisconnected": "Enstans chwazi a dekonekte. Kòmanse yon sesyon sou Cloud Agent oswa chwazi yon lòt enstans.",
+    "liveCount_one": "{{count}} AN DIRÈK",
+    "liveCount_other": "{{count}} AN DIRÈK"
   },
   "agentChat": {
     "session": {

@@ -2111,7 +2111,9 @@
     "sessionExited": "Seanss lõpetatud",
     "remoteSpawnRetryable": "Ei õnnestunud instantsini jõuda — see võis ühenduse katkestada.",
     "remoteSpawnNonRetryable": "Instants ei suutnud seanssi alustada — kontrolli masinat või uuenda CLI-d.",
-    "remoteSpawnInstanceDisconnected": "Valitud instants lõpetas ühenduse. Alusta seanss Cloud Agent'is või vali mõni teine instants."
+    "remoteSpawnInstanceDisconnected": "Valitud instants lõpetas ühenduse. Alusta seanss Cloud Agent'is või vali mõni teine instants.",
+    "liveCount_one": "{{count}} OTSE",
+    "liveCount_other": "{{count}} OTSE"
   },
   "agentChat": {
     "session": {

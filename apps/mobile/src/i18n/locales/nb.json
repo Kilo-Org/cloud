@@ -2111,7 +2111,9 @@
     "sessionExited": "Økten ble avsluttet",
     "remoteSpawnRetryable": "Kunne ikke nå forekomsten — den kan ha mistet tilkoblingen.",
     "remoteSpawnNonRetryable": "Forekomsten klarte ikke å starte økten — kontroller maskinen eller oppdater CLI-en.",
-    "remoteSpawnInstanceDisconnected": "Den valgte forekomsten mistet tilkoblingen. Start en økt på Cloud Agent eller velg en annen forekomst."
+    "remoteSpawnInstanceDisconnected": "Den valgte forekomsten mistet tilkoblingen. Start en økt på Cloud Agent eller velg en annen forekomst.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {

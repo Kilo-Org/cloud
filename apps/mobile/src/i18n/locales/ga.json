@@ -2156,7 +2156,12 @@
     "sessionExited": "Scoir an seisiún",
     "remoteSpawnRetryable": "Níorbh fhéidir an t-instance a bhaint amach — seans gur dícheanglaíodh é.",
     "remoteSpawnNonRetryable": "Theip ar an instance an seisiún a thosú — seiceáil an meaisín nó nuashonraigh an CLI.",
-    "remoteSpawnInstanceDisconnected": "Dícheanglaíodh an instance roghnaithe. Tosaigh seisiún ar Cloud Agent nó roghnaigh instance eile."
+    "remoteSpawnInstanceDisconnected": "Dícheanglaíodh an instance roghnaithe. Tosaigh seisiún ar Cloud Agent nó roghnaigh instance eile.",
+    "liveCount_one": "{{count}} BEO",
+    "liveCount_other": "{{count}} BEO",
+    "liveCount_two": "{{count}} BEO",
+    "liveCount_few": "{{count}} BEO",
+    "liveCount_many": "{{count}} BEO"
   },
   "agentChat": {
     "session": {

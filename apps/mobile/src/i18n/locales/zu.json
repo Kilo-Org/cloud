@@ -2111,7 +2111,9 @@
     "sessionExited": "Iseshini iphumile",
     "remoteSpawnRetryable": "Asikwazanga ukufinyelela isibonelo — kungenzeka sinqanyulwe.",
     "remoteSpawnNonRetryable": "Isibonelo sehlulekile ukuqala iseshini — hlola umshini noma ubuyekeze i-CLI.",
-    "remoteSpawnInstanceDisconnected": "Isibonelo esikhethiwe sinqanyulwe. Qala iseshini ku-Cloud Agent noma ukhethe esinye isibonelo."
+    "remoteSpawnInstanceDisconnected": "Isibonelo esikhethiwe sinqanyulwe. Qala iseshini ku-Cloud Agent noma ukhethe esinye isibonelo.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {

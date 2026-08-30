@@ -2126,7 +2126,10 @@
     "sessionExited": "Sessão terminada",
     "remoteSpawnRetryable": "Não foi possível aceder à instância — pode ter sido desligada.",
     "remoteSpawnNonRetryable": "A instância não conseguiu iniciar a sessão — verifique a máquina ou atualize a CLI.",
-    "remoteSpawnInstanceDisconnected": "A instância selecionada foi desligada. Inicie uma sessão no Cloud Agent ou escolha outra instância."
+    "remoteSpawnInstanceDisconnected": "A instância selecionada foi desligada. Inicie uma sessão no Cloud Agent ou escolha outra instância.",
+    "liveCount_one": "{{count}} AO VIVO",
+    "liveCount_other": "{{count}} AO VIVO",
+    "liveCount_many": "{{count}} AO VIVO"
   },
   "agentChat": {
     "session": {

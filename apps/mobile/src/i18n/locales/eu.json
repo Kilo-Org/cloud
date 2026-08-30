@@ -2111,7 +2111,9 @@
     "sessionExited": "Saioa itxi da",
     "remoteSpawnRetryable": "Ezin izan da instantziara iritsi; baliteke deskonektatuta egotea.",
     "remoteSpawnNonRetryable": "Instantziak ezin izan du saioa hasi; egiaztatu makina edo eguneratu CLI-a.",
-    "remoteSpawnInstanceDisconnected": "Hautatutako instantzia deskonektatu da. Hasi saioa Cloud Agent-en edo aukeratu beste instantzia bat."
+    "remoteSpawnInstanceDisconnected": "Hautatutako instantzia deskonektatu da. Hasi saioa Cloud Agent-en edo aukeratu beste instantzia bat.",
+    "liveCount_one": "{{count}} ZUZENEAN",
+    "liveCount_other": "{{count}} ZUZENEAN"
   },
   "agentChat": {
     "session": {

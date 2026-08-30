@@ -2111,7 +2111,9 @@
     "sessionExited": "Kikao kimetoka",
     "remoteSpawnRetryable": "Hatukuweza kufikia kisa — huenda kimekatika.",
     "remoteSpawnNonRetryable": "Kisa kilishindwa kuanzisha kikao — angalia mashine au sasisha CLI.",
-    "remoteSpawnInstanceDisconnected": "Kisa ulichochagua kimekatika. Anzisha kikao kwenye Cloud Agent au chagua kisa kingine."
+    "remoteSpawnInstanceDisconnected": "Kisa ulichochagua kimekatika. Anzisha kikao kwenye Cloud Agent au chagua kisa kingine.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {

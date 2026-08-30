@@ -1673,7 +1673,11 @@
     "sessionExited": "Сеанс завершён",
     "remoteSpawnRetryable": "Не удалось подключиться к экземпляру — возможно, он отключился.",
     "remoteSpawnNonRetryable": "Экземпляр не смог запустить сеанс — проверьте машину или обновите CLI.",
-    "remoteSpawnInstanceDisconnected": "Выбранный экземпляр отключился. Запустите сеанс в Cloud Agent или выберите другой экземпляр."
+    "remoteSpawnInstanceDisconnected": "Выбранный экземпляр отключился. Запустите сеанс в Cloud Agent или выберите другой экземпляр.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE",
+    "liveCount_few": "{{count}} LIVE",
+    "liveCount_many": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {

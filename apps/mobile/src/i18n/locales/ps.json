@@ -2111,7 +2111,9 @@
     "sessionExited": "ناسته پای ته ورسېده",
     "remoteSpawnRetryable": "انسټنس ته رسېدل ممکن نه وو — کېدای شي قطع شوی وي.",
     "remoteSpawnNonRetryable": "انسټنس ناسته پیلولو کې پاتې راغی — ماشین وګورئ یا CLI تازه کړئ.",
-    "remoteSpawnInstanceDisconnected": "ټاکل شوی انسټنس قطع شو. په Cloud Agent کې ناسته پیل کړئ یا بل انسټنس غوره کړئ."
+    "remoteSpawnInstanceDisconnected": "ټاکل شوی انسټنس قطع شو. په Cloud Agent کې ناسته پیل کړئ یا بل انسټنس غوره کړئ.",
+    "liveCount_one": "{{count}} ژوندۍ",
+    "liveCount_other": "{{count}} ژوندۍ"
   },
   "agentChat": {
     "session": {

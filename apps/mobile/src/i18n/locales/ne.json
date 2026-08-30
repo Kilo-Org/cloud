@@ -2111,7 +2111,9 @@
     "sessionExited": "सत्र बाहिरियो",
     "remoteSpawnRetryable": "इन्स्ट्यान्समा पुग्न सकिएन — यो विच्छेद भएको हुन सक्छ।",
     "remoteSpawnNonRetryable": "इन्स्ट्यान्सले सत्र सुरु गर्न असफल भयो — मेसिन जाँच्नुहोस् वा CLI अपडेट गर्नुहोस्।",
-    "remoteSpawnInstanceDisconnected": "चयन गरिएको इन्स्ट्यान्स विच्छेद भयो। Cloud Agent मा सत्र सुरु गर्नुहोस् वा अर्को इन्स्ट्यान्स छान्नुहोस्।"
+    "remoteSpawnInstanceDisconnected": "चयन गरिएको इन्स्ट्यान्स विच्छेद भयो। Cloud Agent मा सत्र सुरु गर्नुहोस् वा अर्को इन्स्ट्यान्स छान्नुहोस्।",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {

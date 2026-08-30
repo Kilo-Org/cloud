@@ -2141,7 +2141,11 @@
     "sessionExited": "Seja je končana",
     "remoteSpawnRetryable": "Instance ni bilo mogoče doseči — morda se je odklopila.",
     "remoteSpawnNonRetryable": "Instance ni uspela zagnati seje — preverite stroj ali posodobite CLI.",
-    "remoteSpawnInstanceDisconnected": "Izbrana instanca se je odklopila. Začnite sejo na Cloud Agent ali izberite drugo instanco."
+    "remoteSpawnInstanceDisconnected": "Izbrana instanca se je odklopila. Začnite sejo na Cloud Agent ali izberite drugo instanco.",
+    "liveCount_one": "{{count}} V ŽIVO",
+    "liveCount_other": "{{count}} V ŽIVO",
+    "liveCount_two": "{{count}} V ŽIVO",
+    "liveCount_few": "{{count}} V ŽIVO"
   },
   "agentChat": {
     "session": {

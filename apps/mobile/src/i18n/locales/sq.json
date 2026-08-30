@@ -2111,7 +2111,9 @@
     "sessionExited": "Seanca u mbyll",
     "remoteSpawnRetryable": "Nuk mund të arrihej instanca — mund të jetë shkëputur.",
     "remoteSpawnNonRetryable": "Instanca nuk arriti të nisë sesionin — kontrolloni makinën ose përditësoni CLI-në.",
-    "remoteSpawnInstanceDisconnected": "Instanca e zgjedhur u shkëput. Nisni një sesion në Cloud Agent ose zgjidhni një instancë tjetër."
+    "remoteSpawnInstanceDisconnected": "Instanca e zgjedhur u shkëput. Nisni një sesion në Cloud Agent ose zgjidhni një instancë tjetër.",
+    "liveCount_one": "{{count}} DREJTPËRDREJT",
+    "liveCount_other": "{{count}} DREJTPËRDREJT"
   },
   "agentChat": {
     "session": {

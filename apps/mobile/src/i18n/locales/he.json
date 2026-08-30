@@ -1665,7 +1665,10 @@
     "sessionExited": "ההפעלה הסתיימה",
     "remoteSpawnRetryable": "לא ניתן היה ליצור קשר עם המופע — ייתכן שהחיבור נותק.",
     "remoteSpawnNonRetryable": "המופע לא הצליח להפעיל את הסשן — בדוק את המחשב או עדכן את ה-CLI.",
-    "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל סשן ב-Cloud Agent או בחר מופע אחר."
+    "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל סשן ב-Cloud Agent או בחר מופע אחר.",
+    "liveCount_one": "{{count}} חי",
+    "liveCount_other": "{{count}} חי",
+    "liveCount_two": "{{count}} חי"
   },
   "agentChat": {
     "session": {

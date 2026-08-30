@@ -2111,7 +2111,9 @@
     "sessionExited": "సెషన్ నిష్క్రమించింది",
     "remoteSpawnRetryable": "ఇన్స్టాన్స్ను చేరుకోలేకపోయాం — అది డిస్కనెక్ట్ అయి ఉండవచ్చు.",
     "remoteSpawnNonRetryable": "ఇన్స్టాన్స్ సెషన్ను ప్రారంభించడంలో విఫలమైంది — యంత్రాన్ని తనిఖీ చేయండి లేదా CLIని నవీకరించండి.",
-    "remoteSpawnInstanceDisconnected": "ఎంచుకున్న ఇన్స్టాన్స్ డిస్కనెక్ట్ అయింది. Cloud Agentలో సెషన్ను ప్రారంభించండి లేదా మరొక ఇన్స్టాన్స్ను ఎంచుకోండి."
+    "remoteSpawnInstanceDisconnected": "ఎంచుకున్న ఇన్స్టాన్స్ డిస్కనెక్ట్ అయింది. Cloud Agentలో సెషన్ను ప్రారంభించండి లేదా మరొక ఇన్స్టాన్స్ను ఎంచుకోండి.",
+    "liveCount_one": "{{count}} ప్రత్యక్ష",
+    "liveCount_other": "{{count}} ప్రత్యక్ష"
   },
   "agentChat": {
     "session": {

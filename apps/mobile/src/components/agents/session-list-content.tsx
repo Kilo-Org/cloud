@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { moveA11yFocus } from '@/lib/a11y/announce';
-import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
+import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -56,7 +56,6 @@ type AgentSessionListContentProps = {
   onClearQuery: () => void;
   /** Optional no-op accepted for the history screen's call-site compatibility. */
   onCreateSession?: () => void;
-  sortBy: AgentSessionSortBy;
 };
 
 export function AgentSessionListContent({
@@ -74,7 +73,6 @@ export function AgentSessionListContent({
   isSearching,
   searchQuery,
   onClearQuery,
-  sortBy,
 }: Readonly<AgentSessionListContentProps>) {
   const listRef = useRef<SectionList<StoredSession, SessionSection>>(null);
   useScrollToTop(listRef);
@@ -146,7 +144,7 @@ export function AgentSessionListContent({
   // (`useSessionAttentionRevision`). Snapshot the attention revision only when
   // the tab (re)gains focus via `useFocusEffect` (fires after unfreeze) and
   // pass it as `extraData` so visible cells re-render without remounting the
-  // list — preserving scroll. Remount only on sort change (`key={sortBy}`).
+  // list — preserving scroll.
   const [attentionFocusRevision, setAttentionFocusRevision] = useState(getRevisionSnapshot);
   useFocusEffect(
     useCallback(() => {
@@ -169,7 +167,7 @@ export function AgentSessionListContent({
     ({ item }: { item: StoredSession }) => (
       <StoredSessionRow
         session={item}
-        sortBy={sortBy}
+        sortBy={SESSION_LIST_SORT}
         onPress={() => {
           onSessionPress(item.session_id, item.organization_id, item.title ?? undefined);
         }}
@@ -186,7 +184,7 @@ export function AgentSessionListContent({
         }}
       />
     ),
-    [onSessionPress, deleteSession, renameSession, sortBy, searchInputRef]
+    [onSessionPress, deleteSession, renameSession, searchInputRef]
   );
 
   const renderSectionHeader = useCallback(
@@ -267,7 +265,6 @@ export function AgentSessionListContent({
     <Animated.View entering={FadeIn.duration(200)} className="flex-1">
       <SectionList<StoredSession, SessionSection>
         ref={listRef}
-        key={sortBy}
         sections={sections}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}

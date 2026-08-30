@@ -582,6 +582,38 @@ describe('delivery callback plumbing', () => {
   });
 });
 
+describe('queued message cancellation replay', () => {
+  it('replays cloud.message.queued then cloud.message.canceled to a net-empty transcript', async () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
+    await connectSession(session);
+
+    const messageId = 'msg_queued_canceled';
+    const deliver = (streamEventType: string, data: unknown) => {
+      mockWs.onmessage?.({
+        data: JSON.stringify({
+          eventId: 1,
+          executionId: null,
+          sessionId: cloudAgentSessionId,
+          streamEventType,
+          timestamp: new Date().toISOString(),
+          data,
+        }),
+      } as MessageEvent);
+    };
+
+    deliver('cloud.message.queued', { messageId, content: 'hello' });
+    expect(session.state.getPendingMessages().has(messageId)).toBe(true);
+    expect(session.storage.getMessageIds()).toContain(messageId);
+
+    deliver('cloud.message.canceled', { messageId });
+    expect(session.state.getPendingMessages().has(messageId)).toBe(false);
+    expect(session.storage.getMessageIds()).not.toContain(messageId);
+
+    session.destroy();
+  });
+});
+
 describe('disconnect during resolution', () => {
   it('disconnect() before resolveSession settles prevents transport from attaching', async () => {
     const api = createMockApi();

@@ -60,14 +60,36 @@ export type BitbucketInteractiveOperation = keyof typeof operations;
 type Protocol<K extends BitbucketInteractiveOperation> = NonNullable<
   paths[(typeof operations)[K][1]][(typeof operations)[K][0]]
 >;
+const canonicalUuid = z.string().refine(value => normalizeBitbucketUuid(value) === value);
+export const BitbucketInteractiveSourceSelectorSchema = z.strictObject({
+  pullRequestId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  workspaceUuid: canonicalUuid,
+  repositoryUuid: canonicalUuid,
+});
+export type BitbucketInteractiveSourceSelector = z.infer<
+  typeof BitbucketInteractiveSourceSelectorSchema
+>;
 export type BitbucketInteractiveRequest<
   K extends BitbucketInteractiveOperation = BitbucketInteractiveOperation,
 > = K extends BitbucketInteractiveOperation
   ? {
       operation: K;
-      params: Protocol<K>['parameters'];
+      // Bitbucket's global fields parameter expands condensed PR repository identities.
+      // https://developer.atlassian.com/cloud/bitbucket/rest/intro/#partial-response
+      params: K extends 'pullRequest'
+        ? Omit<Protocol<K>['parameters'], 'query'> & { query?: { fields?: string } }
+        : Protocol<K>['parameters'];
       next?: string;
     } & RequestBodyOption<Protocol<K>>
+  : never;
+// The broker alone resolves this selector. Paths still identify the authorized destination;
+// path.commit pins the expected full source SHA. Omission retains destination-only behavior.
+export type BitbucketInteractiveBrokerRequest<
+  K extends BitbucketInteractiveOperation = BitbucketInteractiveOperation,
+> = K extends BitbucketInteractiveOperation
+  ? BitbucketInteractiveRequest<K> & {
+      source?: K extends 'file' | 'fileMetadata' ? BitbucketInteractiveSourceSelector : never;
+    }
   : never;
 type ProtocolData<K extends BitbucketInteractiveOperation> = NonNullable<
   FetchResponse<Protocol<K>, object, 'application/json'>['data']
@@ -190,6 +212,18 @@ export const BitbucketInteractiveRequestSchema = z.strictObject({
   body: z.json().optional(),
   next: z.string().min(1).max(4096).optional(),
 });
+export const BitbucketInteractiveBrokerRequestSchema = BitbucketInteractiveRequestSchema.extend({
+  source: BitbucketInteractiveSourceSelectorSchema.optional(),
+}).refine(
+  request =>
+    request.source === undefined ||
+    ((request.operation === 'file' || request.operation === 'fileMetadata') &&
+      request.body === undefined &&
+      request.next === undefined &&
+      request.params.query === undefined &&
+      typeof request.params.path.commit === 'string' &&
+      /^[0-9a-fA-F]{40}$/.test(request.params.path.commit))
+);
 const pageSchema = z
   .object({
     values: z.array(z.unknown()).max(50),

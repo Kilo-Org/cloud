@@ -2111,9 +2111,7 @@
     "sessionExited": "ເຊດຊັນອອກແລ້ວ",
     "remoteSpawnRetryable": "ບໍ່ສາມາດເຂົ້າເຖິງ instance ໄດ້ — ມັນອາດຈະຕັດການເຊື່ອມຕໍ່.",
     "remoteSpawnNonRetryable": "instance ລົ້ມເຫຼວໃນການເລີ່ມເຊດຊັນ — ກວດເຄື່ອງ ຫຼື ອັບເດດ CLI.",
-    "remoteSpawnInstanceDisconnected": "instance ທີ່ເລືອກໄດ້ຕັດການເຊື່ອມຕໍ່. ເລີ່ມເຊດຊັນໃນ Cloud Agent ຫຼື ເລືອກ instance ອື່ນ.",
-    "liveCount_one": "{{count}} LIVE",
-    "liveCount_other": "{{count}} LIVE"
+    "remoteSpawnInstanceDisconnected": "instance ທີ່ເລືອກໄດ້ຕັດການເຊື່ອມຕໍ່. ເລີ່ມເຊດຊັນໃນ Cloud Agent ຫຼື ເລືອກ instance ອື່ນ."
   },
   "agentChat": {
     "session": {
@@ -2273,9 +2271,7 @@
       "noCliInstancesDescription": "ດຳເນີນການ `kilo remote` ໃນໂປຣເຈັກໃນຄອມພິວເຕີຂອງທ່ານ, ຫຼື ອັບເດດ Kilo CLI ຖ້າມີອັນທີ່ກຳລັງດຳເນີນຢູ່.",
       "instanceOnProject": "{{name}} ໃນ {{project}}",
       "instanceOnProjectSuffix": "{{name}} ໃນ {{project}} ({{suffix}})",
-      "runOnCloudAgent": "ດຳເນີນການໃນ Cloud Agent",
-      "terminals": "ເທີມິນັລ",
-      "remotes": "ອິນສະແຕນທາງໄກ"
+      "runOnCloudAgent": "ດຳເນີນການໃນ Cloud Agent"
     },
     "modePicker": {
       "title": "ເລືອກໂໝດ",

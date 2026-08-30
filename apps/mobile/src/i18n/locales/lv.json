@@ -2126,10 +2126,7 @@
     "sessionExited": "Sesija beidzās",
     "remoteSpawnRetryable": "Nevarēja sasniegt instanci — tā, iespējams, ir atvienojusies.",
     "remoteSpawnNonRetryable": "Instancei neizdevās sākt sesiju — pārbaudiet iekārtu vai atjauniniet CLI.",
-    "remoteSpawnInstanceDisconnected": "Atlasītā instance atvienojās. Sāciet sesiju Cloud Agent vai izvēlieties citu instanci.",
-    "liveCount_one": "{{count}} TIŠRAIDĒ",
-    "liveCount_other": "{{count}} TIŠRAIDĒ",
-    "liveCount_zero": "{{count}} TIŠRAIDĒ"
+    "remoteSpawnInstanceDisconnected": "Atlasītā instance atvienojās. Sāciet sesiju Cloud Agent vai izvēlieties citu instanci."
   },
   "agentChat": {
     "session": {
@@ -2290,9 +2287,7 @@
       "noCliInstancesDescription": "Palaid `kilo remote` projektā savā datorā vai atjaunini Kilo CLI, ja tā jau darbojas.",
       "instanceOnProject": "{{name}} uz {{project}}",
       "instanceOnProjectSuffix": "{{name}} uz {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Palaist uz Cloud Agent",
-      "terminals": "Termināļi",
-      "remotes": "Attālinātās instances"
+      "runOnCloudAgent": "Palaist uz Cloud Agent"
     },
     "modePicker": {
       "title": "Izvēlēties režīmu",

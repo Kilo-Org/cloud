@@ -1475,7 +1475,15 @@ describe('browser job limits and retention', () => {
     const last = result.evidence[3];
     if (!last) throw new Error('Missing evidence fixture');
     last.text = 'x'.repeat(65536 - new TextEncoder().encode(JSON.stringify(result)).byteLength);
-    const overflow = { ...result, summary: `${result.summary.slice(1)}é` };
+    const overflow = {
+      ...result,
+      evidence: [...result.evidence.slice(0, -1), { text: `${last.text.slice(1)}é` }],
+    };
+    expect(new TextEncoder().encode(JSON.stringify(result)).byteLength).toBe(65_536);
+    expect(browserResultSchema.safeParse(result).success).toBe(true);
+    expect(new TextEncoder().encode(JSON.stringify(overflow)).byteLength).toBe(65_537);
+    // The success variant validates every field without the aggregate refinement.
+    expect(browserResultSchema.options[0].safeParse(overflow).success).toBe(true);
     const before = f.fake.snapshot();
     await expect(
       f.store.updateProvider(f.panel, resultMessage(job, overflow), NOW)
@@ -3059,13 +3067,18 @@ describe('browser job settlement capacity', () => {
       const last = result.evidence[3];
       if (!last) throw new Error('Missing evidence fixture');
       last.text = 'x'.repeat(65_536 - new TextEncoder().encode(JSON.stringify(result)).byteLength);
+      const overflow = {
+        ...result,
+        evidence: [...result.evidence.slice(0, -1), { text: `${last.text.slice(1)}é` }],
+      };
+      expect(new TextEncoder().encode(JSON.stringify(result)).byteLength).toBe(65_536);
+      expect(browserResultSchema.safeParse(result).success).toBe(true);
+      expect(new TextEncoder().encode(JSON.stringify(overflow)).byteLength).toBe(65_537);
+      // The success variant validates every field without the aggregate refinement.
+      expect(browserResultSchema.options[0].safeParse(overflow).success).toBe(true);
       const before = f.fake.snapshot();
       await expect(
-        f.store.updateProvider(
-          f.panel,
-          resultMessage(job, { ...result, summary: `${result.summary.slice(1)}é` }),
-          NOW
-        )
+        f.store.updateProvider(f.panel, resultMessage(job, overflow), NOW)
       ).rejects.toMatchObject({ code: 'invalid_request' });
       expect(f.fake.snapshot()).toEqual(before);
       const settled = (await f.store.updateProvider(f.panel, resultMessage(job, result), NOW)).value

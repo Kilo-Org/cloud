@@ -41,6 +41,10 @@ export type AndroidBuildDeps = {
   readPackageId: (apkPath: string) => string | undefined;
   install: (serial: string, apkPath: string) => void;
   now: () => Date;
+  // Fetch a prebuilt Kilo.apk for this nativeHash into destDir and return
+  // its path, or undefined on a miss. When set, a cache miss tries this
+  // before compiling locally.
+  fetchRemote?: (args: { nativeHash: string; destDir: string }) => Promise<string | undefined>;
 };
 
 // Repo-root inputs that shape the native build but live outside
@@ -49,12 +53,17 @@ export type AndroidBuildDeps = {
 export function buildAndroidFingerprintOptions(): {
   platforms: ['android'];
   sourceSkips: number;
+  ignorePaths: string[];
   extraSources: HashSourceContents[];
   silent: boolean;
 } {
   return {
     platforms: ['android'],
     sourceSkips: DEFAULT_SOURCE_SKIPS | SourceSkips.ExpoConfigExtraSection,
+    // The generated android/ tree is output, not an input: its bytes differ
+    // per worktree. Pin it out of the hash so no fingerprint version can key
+    // builds on it.
+    ignorePaths: ['android/**'],
     extraSources: [
       {
         type: 'contents',
@@ -128,6 +137,11 @@ export async function runAndroidBuild(serial: string, deps: AndroidBuildDeps): P
   };
   const key = buildAndroidCompatibilityKey(compatibility);
   let entry = await lookup(deps.cacheRoot, key, compatibility, deps.readPackageId);
+  if (!entry && deps.fetchRemote) {
+    // Outside the native-build semaphore: a download (or a wait on a remote
+    // runner) burns no local CPU, so it must not block a local compile.
+    entry = await tryRemotePublish(serial, key, compatibility, deps);
+  }
   if (!entry) {
     entry = await deps.withNativeBuildSlot(async () => {
       const queuedHit = await lookup(deps.cacheRoot, key, compatibility, deps.readPackageId);
@@ -136,6 +150,39 @@ export async function runAndroidBuild(serial: string, deps: AndroidBuildDeps): P
     });
   }
   deps.install(serial, entry.apkPath);
+}
+
+// Publish a cache entry from a remote-built APK instead of a local compile.
+// Reuses publish() unchanged — only the build step is swapped for a fetch
+// into staging — so the package-id check, checksum, manifest, and atomic
+// publish all still apply. Any failure returns undefined and the caller
+// compiles locally.
+async function tryRemotePublish(
+  serial: string,
+  key: string,
+  compatibility: AndroidCompatibility,
+  deps: AndroidBuildDeps
+): Promise<{ apkPath: string; manifest: AndroidManifest } | undefined> {
+  const fetchRemote = deps.fetchRemote;
+  if (!fetchRemote) return undefined;
+  try {
+    return await publish(serial, key, compatibility, {
+      ...deps,
+      build: async staging => {
+        const apkPath = await fetchRemote({
+          nativeHash: compatibility.nativeHash,
+          destDir: staging,
+        });
+        if (!apkPath) throw new Error('remote native artifact unavailable');
+        return apkPath;
+      },
+    });
+  } catch (error) {
+    process.stderr.write(
+      `remote native build unavailable (${error instanceof Error ? error.message : error}); building locally\n`
+    );
+    return undefined;
+  }
 }
 
 async function lookup(

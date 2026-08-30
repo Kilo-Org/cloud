@@ -1,11 +1,13 @@
-import { Plus, SlidersHorizontal } from '@/components/ui/icons';
+import { Plus } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type SessionListHeaderActionsProps = {
-  hasActiveFilter: boolean;
+  /** How many filters are applied; drives the filter button's count badge. */
+  activeFilterCount: number;
   /** Hides the header "New session" button — the empty-state CTA is the only
    * creation affordance while there are no sessions yet. */
   showNewSession: boolean;
@@ -14,7 +16,7 @@ type SessionListHeaderActionsProps = {
 };
 
 export function SessionListHeaderActions({
-  hasActiveFilter,
+  activeFilterCount,
   showNewSession,
   onNewSession,
   onOpenFilters,
@@ -37,19 +39,11 @@ export function SessionListHeaderActions({
           <Plus size={22} color={colors.foreground} />
         </Pressable>
       ) : null}
-      <Pressable
+      <SessionFilterButton
+        activeCount={activeFilterCount}
         onPress={onOpenFilters}
-        // left slop capped against the 16px gap, right slop reaches 44pt wide
-        hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
-        accessibilityRole="button"
-        accessibilityLabel={t('agentChat.sessionFilter.title')}
-        className="active:opacity-70"
-      >
-        <SlidersHorizontal
-          size={20}
-          color={hasActiveFilter ? colors.foreground : colors.mutedForeground}
-        />
-      </Pressable>
+        testID="agents-open-filters"
+      />
     </View>
   );
 }

@@ -16,6 +16,7 @@ import {
   classifyAttachment,
   describeClassificationFailure,
   mimeForExtension,
+  normalizeAttachmentExtension,
 } from '@/lib/agent-attachments/validate';
 import {
   type AgentAttachment,
@@ -25,6 +26,7 @@ import {
   buildWirePayload,
   classifyUploadFailure,
   hasAnyFailedAttachment,
+  hasAnyUnclaimedAttachment,
   isAnyAttachmentUploading,
 } from '@/lib/agent-attachments/agent-attachment-types';
 import {
@@ -35,12 +37,16 @@ import {
   describeTerminalReason,
   measureLocalSize,
   normalizeFilename,
+  releasePendingUploads,
   uploadOne,
 } from '@/lib/agent-attachments/upload-task';
 import { registerTempFile } from '@/lib/temp-file-registry';
 
 // Re-export only the types consumers import from this module.
 export type { AgentAttachment, AgentAttachmentSubmissionPayload, AgentAttachmentWire };
+
+/** One-step chip reorder direction for the strip's accessible Move actions. */
+export type AttachmentMoveDirection = 'left' | 'right';
 
 export type AgentAttachmentCandidate = {
   name: string;
@@ -77,15 +83,103 @@ function deleteCacheOwnedFile(localUri: string): void {
 }
 
 /**
- * Run a cancel handle and swallow its rejection. Cancellation is best-effort
- * and must never surface as an unhandled rejection.
+ * Run an async operation and swallow its rejection. Cancellation and release
+ * are best-effort and must never surface as an unhandled rejection.
  */
-async function runCancellation(handle: () => Promise<void>): Promise<void> {
+async function runBestEffort(task: () => Promise<void>): Promise<void> {
   try {
-    await handle();
+    await task();
   } catch {
-    // Best-effort cancellation.
+    // Best-effort operation: a failure leaves the 24-hour reaper to recover.
   }
+}
+
+// A cloud-agent sandbox URL encodes the R2 key of a stored attachment:
+//   file:///tmp/attachments/<sessionId>/<userId>/<messageUuid>/<filename>
+// whose R2 key is `<userId>/cloud-agent/<messageUuid>/<filename>` (see
+// services/cloud-agent-next/src/utils/attachment-download.ts). The last
+// segment is the wire's remote filename.
+const RESTORED_ATTACHMENT_URL = /^file:\/\/\/tmp\/attachments\/([^/]+)\/([^/]+)\/([^/]+)\/([^/]+)$/;
+
+// The optimistic cloud-agent file part's `url` encodes the original upload
+// path and remote filename as `cloud-agent://<messageUuid>/<filename>`. The
+// SDK has the upload `attachments.path` but not the userId, so the sandbox
+// form above cannot be satisfied; this form is what
+// `buildOptimisticFileParts` can produce and lets a cancel-restore recover
+// both the filename and the messageUuid (the re-send wire's `path`).
+const CLOUD_AGENT_RESTORE_URL = /^cloud-agent:\/\/([^/]+)\/([^/]+)$/;
+
+// A presigned R2 GET URL (remote attachment parts) carries the object key in
+// its path: `<endpoint>/<bucket>/<userId>/cloud-agent/<messageUuid>/<filename>`
+// (see services/cloud-agent-next/src/utils/attachment-download.ts). Recover
+// the message UUID and the remote filename from that path so a cancel-restore
+// re-sends under the original upload path instead of the rotated one, and so
+// the admission marker never carries the signed URL's query credentials.
+const SIGNED_CLOUD_AGENT_URL = /\/cloud-agent\/([^/]+)\/([^/]+)$/;
+
+type ResolvedRestoredAttachmentReference = {
+  remoteKey: string;
+  remoteFilename: string;
+  messageUuid?: string;
+};
+
+/**
+ * Derive the R2 object reference a restored file part points at. Restored
+ * parts are already uploaded and linked, so the chip must be re-admitted on
+ * the next send without a false "ready" chip that sends nothing. The remote
+ * key is only an admission marker for an already-linked object (a release of a
+ * non-pending key is a no-op server-side), so it never needs to be the raw
+ * signed URL; the message UUID and remote filename are recovered from the
+ * key's `/cloud-agent/<uuid>/<filename>` path segment instead.
+ */
+function resolveRestoredAttachmentReference(input: {
+  filename?: string;
+  url: string;
+}): ResolvedRestoredAttachmentReference {
+  const sandbox = RESTORED_ATTACHMENT_URL.exec(input.url);
+  if (sandbox) {
+    const userId = sandbox[2];
+    const messageUuid = sandbox[3];
+    const filename = sandbox[4];
+    if (userId !== undefined && messageUuid !== undefined && filename !== undefined) {
+      return {
+        remoteKey: `${userId}/cloud-agent/${messageUuid}/${filename}`,
+        remoteFilename: filename,
+        messageUuid,
+      };
+    }
+  }
+  const cloudRestore = CLOUD_AGENT_RESTORE_URL.exec(input.url);
+  if (cloudRestore) {
+    const messageUuid = cloudRestore[1];
+    const filename = cloudRestore[2];
+    if (messageUuid !== undefined && filename !== undefined) {
+      return {
+        remoteKey: input.url,
+        remoteFilename: filename,
+        messageUuid,
+      };
+    }
+  }
+  const withoutQueryHash = input.url.split(/[?#]/)[0] ?? input.url;
+  const signed = SIGNED_CLOUD_AGENT_URL.exec(withoutQueryHash);
+  if (signed) {
+    const messageUuid = signed[1];
+    const filename = signed[2];
+    if (messageUuid !== undefined && filename !== undefined) {
+      return {
+        remoteKey: `cloud-agent/${messageUuid}/${filename}`,
+        remoteFilename: filename,
+        messageUuid,
+      };
+    }
+  }
+  const basename = /[^/]+$/.exec(withoutQueryHash)?.[0];
+  const extension = normalizeAttachmentExtension(basename ?? input.filename ?? 'file');
+  const remoteFilename = basename
+    ? normalizeFilename(basename, extension)
+    : normalizeFilename(input.filename ?? 'file', extension);
+  return { remoteKey: input.url, remoteFilename };
 }
 
 type UseAgentAttachmentUploadOptions = {
@@ -105,9 +199,24 @@ type UseAgentAttachmentUploadReturn = {
   addCandidates: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
   removeAttachment: (id: string) => void;
   retryAttachment: (id: string) => void;
+  /** Move a chip one position left or right. No-op at the strip edges. */
+  moveAttachment: (id: string, direction: AttachmentMoveDirection) => void;
+  /** Move a chip from `fromIndex` to `toIndex` (drag reorder). No-op out of range. */
+  reorderAttachments: (fromIndex: number, toIndex: number) => void;
   reset: () => void;
+  /** Release every admitted-but-unsent key (leave/abandon). Never blocks or throws. */
+  releaseUnclaimedUploads: () => void;
+  /** Re-attach recoverable canceled-message file parts as already-uploaded chips. */
+  restoreFileParts: (parts: readonly { filename?: string; mime: string; url: string }[]) => void;
+  /** Clear chips for an optimistic send without deleting their local files. */
+  clearOptimistic: () => void;
+  /** Re-add chips after a failed optimistic send. */
+  restoreChips: (chips: readonly AgentAttachment[]) => void;
+  /** Rotate the upload path and submission messageUuid after a successful send. */
+  commitSent: () => void;
   isUploading: boolean;
   hasFailedAttachments: boolean;
+  hasUnclaimedAttachments: boolean;
   /** Upload every pending/retryable chip and return the payloads, or `{ ok: false }`. */
   uploadPending: () => Promise<UploadPendingResult>;
 };
@@ -146,7 +255,7 @@ export function useAgentAttachmentUpload(
       return;
     }
     cancelHandlesRef.current.delete(id);
-    void runCancellation(handle);
+    void runBestEffort(handle);
   }, []);
 
   useEffect(() => {
@@ -239,6 +348,13 @@ export function useAgentAttachmentUpload(
             },
             onTask: t => {
               task = t;
+            },
+            onAdmitted: admittedKey => {
+              // Record the admitted key the moment the presign returns, so a
+              // remove/leave that races the PUT still releases the pending
+              // ledger row. `remoteFilename` is only set on success, so this
+              // pre-PUT key never leaks into the wire payload.
+              updateAttachment(attachment.id, { remoteKey: admittedKey });
             },
             isCancelled: () => cancelled,
           });
@@ -395,8 +511,12 @@ export function useAgentAttachmentUpload(
             localUri,
             localFileOwned,
             metadataStripFailed: metadataStripFailed || undefined,
-            status: 'pending',
-            progress: 0,
+            // A strip-failed image is a terminal error chip: it never uploads,
+            // hides Retry, and blocks Send/Start.
+            status: metadataStripFailed ? 'error' : 'pending',
+            error: metadataStripFailed ? i18n.t('chat.attachment.metadataStripFailed') : undefined,
+            terminal: metadataStripFailed ? true : undefined,
+            progress: metadataStripFailed ? null : 0,
           });
         }
       }
@@ -410,13 +530,13 @@ export function useAgentAttachmentUpload(
         return;
       }
       commitAttachments(current => [...current, ...additions]);
-      // Step 2: images upload at selection time. Documents stay deferred to
-      // send (`uploadPending`). The upload is fire-and-forget: the chip flips
-      // to `uploading` synchronously in `startUpload`, and success/error
-      // states already exist in that path.
+      // Images and documents both upload at selection time. The upload is
+      // fire-and-forget: the chip flips to `uploading` synchronously in
+      // `startUpload`, and success/error states already exist in that path.
+      // A strip-failed image stays a terminal error chip and never uploads.
       for (const addition of additions) {
         liveIdsRef.current.add(addition.id);
-        if (addition.kind === 'image') {
+        if (addition.metadataStripFailed !== true) {
           void startUpload(addition, pathRef.current);
         }
       }
@@ -432,22 +552,103 @@ export function useAgentAttachmentUpload(
       if (chip?.localFileOwned) {
         deleteCacheOwnedFile(chip.localUri);
       }
+      // Release the admitted pending-ledger row (if the presign already
+      // admitted one) so the removed chip stops consuming the quota.
+      const remoteKey = chip?.remoteKey;
+      if (remoteKey !== undefined) {
+        void runBestEffort(async () => {
+          await releasePendingUploads({ organizationId, objectKeys: [remoteKey] });
+        });
+      }
       commitAttachments(current => current.filter(item => item.id !== id));
     },
-    [cancelUpload, commitAttachments]
+    [cancelUpload, commitAttachments, organizationId]
+  );
+
+  const reorderAttachments = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      commitAttachments(current => {
+        if (
+          fromIndex === toIndex ||
+          fromIndex < 0 ||
+          fromIndex >= current.length ||
+          toIndex < 0 ||
+          toIndex >= current.length
+        ) {
+          // Keep the same array reference on an out-of-range move so a stale
+          // drag continuation cannot replace the attachment list.
+          return current;
+        }
+        const next = [...current];
+        const [moved] = next.splice(fromIndex, 1);
+        if (moved === undefined) {
+          return current;
+        }
+        next.splice(toIndex, 0, moved);
+        return next;
+      });
+    },
+    [commitAttachments]
+  );
+
+  const moveAttachment = useCallback(
+    (id: string, direction: AttachmentMoveDirection) => {
+      commitAttachments(current => {
+        const fromIndex = current.findIndex(item => item.id === id);
+        if (fromIndex === -1) {
+          return current;
+        }
+        const toIndex = direction === 'left' ? fromIndex - 1 : fromIndex + 1;
+        if (toIndex < 0 || toIndex >= current.length) {
+          // Edge clamp: the first/last chip stays put instead of wrapping.
+          return current;
+        }
+        const next = [...current];
+        const [moved] = next.splice(fromIndex, 1);
+        if (moved === undefined) {
+          return current;
+        }
+        next.splice(toIndex, 0, moved);
+        return next;
+      });
+    },
+    [commitAttachments]
   );
 
   const retryAttachment = useCallback(
     (id: string) => {
       const attachment = attachments.find(item => item.id === id);
-      if (!attachment || attachment.terminal) {
-        // Terminal chips have no retry affordance; bail so a stray
-        // tap cannot re-upload a server-rejected file.
+      if (!attachment || attachment.terminal || attachment.status !== 'error') {
+        // Terminal chips have no retry affordance, and only an error chip is
+        // retryable: bailing here makes a second Retry tap during the release
+        // window a no-op, so it can never presign a second key.
         return;
       }
-      void startUpload(attachment, pathRef.current);
+      const priorRemoteKey = attachment.remoteKey;
+      // Release the prior admitted key before re-presigning so a Retry swaps
+      // one pending-ledger row instead of appending a second one (the
+      // per-message cap is 5). A retryable failure itself never releases:
+      // only an explicit Retry releases and re-presigns. The release is
+      // best-effort, matching remove/leave: a failed release leaves the row
+      // for the 24-hour reaper and the retry still proceeds. Transition out
+      // of the error state synchronously so the chip stops advertising Retry.
+      updateAttachment(id, { status: 'uploading', error: undefined, progress: 0 });
+      void (async () => {
+        if (priorRemoteKey !== undefined) {
+          await runBestEffort(async () => {
+            await releasePendingUploads({ organizationId, objectKeys: [priorRemoteKey] });
+          });
+        }
+        // Re-check liveness after the release await: a Remove, reset, or leave
+        // in that window clears the id, and starting the upload then would
+        // presign a key nobody can release.
+        if (!liveIdsRef.current.has(attachment.id)) {
+          return;
+        }
+        void startUpload(attachment, pathRef.current);
+      })();
     },
-    [attachments, startUpload]
+    [attachments, startUpload, organizationId, updateAttachment]
   );
 
   const reset = useCallback(() => {
@@ -469,19 +670,36 @@ export function useAgentAttachmentUpload(
     messageUuidRef.current = Crypto.randomUUID();
   }, [cancelUpload, commitAttachments]);
 
+  // Release every admitted-but-unsent key on leave/abandon. Fire-and-forget:
+  // a failed release just leaves the row for the 24-hour reaper. Deliberately
+  // does NOT clear state or cancel — the screen unmount cleanup owns that — so
+  // a discard whose clear step fails keeps the composer intact for a retry.
+  const releaseUnclaimedUploads = useCallback(() => {
+    const admittedKeys = attachmentsRef.current
+      .map(chip => chip.remoteKey)
+      .filter((key): key is string => key !== undefined);
+    if (admittedKeys.length === 0) {
+      return;
+    }
+    void runBestEffort(async () => {
+      await releasePendingUploads({ organizationId, objectKeys: admittedKeys });
+    });
+  }, [organizationId]);
+
   const uploadPending = useCallback(async (): Promise<UploadPendingResult> => {
     const chips = attachmentsRef.current;
-    // A terminal chip blocks the send.
-    if (chips.some(chip => chip.status === 'error' && chip.terminal === true)) {
+    // A failed chip (retryable or terminal) blocks the send: the user must
+    // retry or remove it through the chip affordance, never re-upload at send.
+    if (chips.some(chip => chip.status === 'error')) {
       return { ok: false };
     }
-    // An in-flight upload (e.g. a retry) blocks too: its outcome is unknown.
+    // An in-flight upload (e.g. a selection-time upload still running) blocks.
     if (chips.some(chip => chip.status === 'uploading')) {
       return { ok: false };
     }
-    const toUpload = chips.filter(
-      chip => chip.status === 'pending' || (chip.status === 'error' && chip.terminal !== true)
-    );
+    // Documents now upload at selection time, so a still-`pending` chip is the
+    // rare one whose fire-and-forget start has not begun; upload it here.
+    const toUpload = chips.filter(chip => chip.status === 'pending');
     // eslint-disable-next-line typescript-eslint/promise-function-async -- map callback returns startUpload's promise directly
     const results = await Promise.all(toUpload.map(chip => startUpload(chip, pathRef.current)));
     if (results.some(result => result.failed)) {
@@ -524,6 +742,104 @@ export function useAgentAttachmentUpload(
 
   const isUploading = isAnyAttachmentUploading(attachments);
   const hasFailedAttachments = hasAnyFailedAttachment(attachments);
+  const hasUnclaimedAttachments = hasAnyUnclaimedAttachment(attachments);
+
+  // Re-attach the recoverable file parts of a canceled queued message as
+  // already-uploaded chips (their remote objects already exist). A file part
+  // without a URL is not recoverable and is skipped.
+  const restoreFileParts = useCallback(
+    (parts: readonly { filename?: string; mime: string; url: string }[]) => {
+      const recoverable = parts.filter(part => part.url !== '');
+      if (recoverable.length === 0) {
+        return;
+      }
+      // All restored parts come from one canceled message, so they share one
+      // message UUID. Point the current upload path at that UUID so the next
+      // send's wire `{path, files}` addresses the existing R2 objects instead
+      // of the rotated path (`commitSent` advanced it after the prior send).
+      const firstPart = recoverable[0];
+      if (firstPart === undefined) {
+        return;
+      }
+      const firstReference = resolveRestoredAttachmentReference(firstPart);
+      if (firstReference.messageUuid !== undefined) {
+        pathRef.current = firstReference.messageUuid;
+        messageUuidRef.current = firstReference.messageUuid;
+      }
+      const additions: AgentAttachment[] = recoverable.map(part => {
+        const extension = normalizeAttachmentExtension(part.filename ?? 'file');
+        const filename = normalizeFilename(part.filename ?? 'file', extension);
+        const kind = part.mime.startsWith('image/') ? 'image' : 'document';
+        const { remoteKey, remoteFilename } = resolveRestoredAttachmentReference(part);
+        return {
+          id: Crypto.randomUUID(),
+          filename,
+          remoteFilename,
+          remoteKey,
+          kind,
+          extension,
+          mimeType:
+            part.mime !== ''
+              ? (part.mime as AgentAttachment['mimeType'])
+              : mimeForExtension(extension),
+          size: 0,
+          localUri: part.url,
+          localFileOwned: false,
+          status: 'uploaded',
+          progress: null,
+        };
+      });
+      // Restore replaces the current chips: the restored set is the canceled
+      // message's own file parts, so it already sits at or under the max-file
+      // cap and a merge with the occupied composer's chips would both overrun
+      // the cap and send the wrong file set. Replacing also discards any
+      // occupied-composer chips still uploading, so invalidate them exactly
+      // like `reset`/`clearOptimistic`: a stale async completion must not
+      // announce/toast or re-append a chip the user no longer sees.
+      generationRef.current += 1;
+      for (const id of liveIdsRef.current) {
+        cancelUpload(id);
+      }
+      liveIdsRef.current.clear();
+      commitAttachments(() => additions);
+    },
+    [cancelUpload, commitAttachments]
+  );
+
+  // Optimistic-send chip clear: like `reset` but keeps the local cache files
+  // so a transport failure can restore the same chips. Orphaned files on a
+  // successful send are reclaimed by the temp-file reaper. The path is NOT
+  // rotated here: the files were already uploaded under the current path, so a
+  // failed-send restore must retry them under that same path. A genuinely new
+  // message starts only on `reset`.
+  const clearOptimistic = useCallback(() => {
+    generationRef.current += 1;
+    for (const id of liveIdsRef.current) {
+      cancelUpload(id);
+    }
+    liveIdsRef.current.clear();
+    commitAttachments(() => []);
+  }, [cancelUpload, commitAttachments]);
+
+  // Re-add chips after a failed optimistic send (restore recoverable attachments).
+  const restoreChips = useCallback(
+    (chips: readonly AgentAttachment[]) => {
+      if (chips.length === 0) {
+        return;
+      }
+      commitAttachments(current => [...current, ...chips]);
+    },
+    [commitAttachments]
+  );
+
+  // Rotate the upload path and submission messageUuid after a successful send.
+  // `clearOptimistic` deliberately does NOT rotate (a failed-send restore must
+  // retry under the original path); only a completed send starts a genuinely
+  // new message, so the next upload presigns fresh UUIDs.
+  const commitSent = useCallback(() => {
+    pathRef.current = Crypto.randomUUID();
+    messageUuidRef.current = Crypto.randomUUID();
+  }, []);
 
   return useMemo(
     () => ({
@@ -531,9 +847,17 @@ export function useAgentAttachmentUpload(
       addCandidates,
       removeAttachment,
       retryAttachment,
+      moveAttachment,
+      reorderAttachments,
       reset,
+      releaseUnclaimedUploads,
+      restoreFileParts,
+      clearOptimistic,
+      restoreChips,
+      commitSent,
       isUploading,
       hasFailedAttachments,
+      hasUnclaimedAttachments,
       uploadPending,
     }),
     [
@@ -541,9 +865,17 @@ export function useAgentAttachmentUpload(
       addCandidates,
       removeAttachment,
       retryAttachment,
+      moveAttachment,
+      reorderAttachments,
       reset,
+      releaseUnclaimedUploads,
+      restoreFileParts,
+      clearOptimistic,
+      restoreChips,
+      commitSent,
       isUploading,
       hasFailedAttachments,
+      hasUnclaimedAttachments,
       uploadPending,
     ]
   );

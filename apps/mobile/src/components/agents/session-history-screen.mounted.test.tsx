@@ -77,7 +77,7 @@ vi.mock('@/components/agents/use-session-search-input', () => ({
     handleSearchInputChange: vi.fn(),
     handleClearSearchInput: vi.fn(),
     clearSearchInput: vi.fn(),
-    searchController: { clearBroadly: vi.fn() },
+    searchController: { clearSearchOnly: vi.fn() },
   }),
 }));
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({

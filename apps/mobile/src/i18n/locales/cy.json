@@ -152,7 +152,9 @@
     "appearanceDark": "Tywyll",
     "account": "Cyfrif",
     "prReviewAttribution": "Ychwanegu priodoli ap at adolygiadau PR",
-    "prReviewAttributionSubtitle": "Atodwch droedyn 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno adolygiad"
+    "prReviewAttributionSubtitle": "Atodwch droedyn 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno adolygiad",
+    "returnSendsMessage": "Mae'r fysell Dychwelyd yn anfon neges",
+    "returnSendsMessageSubtitle": "Pan fydd wedi'i ddiffodd, mae Dychwelyd yn mewnosod llinell newydd ym meysydd mewnbwn neges asiantau."
   },
   "prReview": {
     "pullRequestUnavailable": "Ni ellir cael y cais tynnu",
@@ -778,7 +780,8 @@
       "networkError": "Gwall rhwydwaith",
       "uploadFailed": "Methodd yr uwchlwythiad",
       "failedToUploadFile": "Methwyd uwchlwytho'r ffeil: {{reason}}",
-      "nothingToPaste": "Dim byd i'w ludo"
+      "nothingToPaste": "Dim byd i'w ludo",
+      "metadataStripFailed": "Ni ellid tynnu metadata'r llun."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2201,7 +2204,11 @@
       "previousTaskFinishing": "Mae'r dasg flaenorol yn dal i orffen. Arhoswch funud.",
       "serviceUnavailable": "Nid yw'r gwasanaeth ar gael ar hyn o bryd. Ceisiwch eto.",
       "connectionTrouble": "Problem cysylltiad. Ceisiwch eto ymhen munud.",
-      "modelUnavailable": "Nid yw'r model hwn ar gael ar gyfer Cloud Agent. Dewiswch fodel arall a cheisiwch eto."
+      "modelUnavailable": "Nid yw'r model hwn ar gael ar gyfer Cloud Agent. Dewiswch fodel arall a cheisiwch eto.",
+      "cancelQueuedFailed": "Ni ellid canslo'r neges.",
+      "cancelQueuedRestoreAvailable": "Neges wedi'i chanslo. Tapiwch Adfer i'w dychwelyd i'r maes mewnbwn neges.",
+      "cancelQueuedRestored": "Neges wedi'i chanslo. Mae'r anogiad yn ôl yn y maes mewnbwn neges.",
+      "cancelQueuedUpgradeRequired": "Mae angen Kilo CLI mwy newydd i ganslo negeseuon yn y ciw. Diweddarwch Kilo CLI ac ailgysylltwch."
     },
     "remoteSession": {
       "failedToCreate": "Methodd creu sesiwn o bell",
@@ -2273,7 +2280,8 @@
       "continueFrom": "Parhau gyda {{title}}",
       "importingSession": "Mewnforio sesiwn",
       "cliCannotContinue": "Ni all y CLI hwn barhau sesiwn. Dewiswch Cloud Agent neu CLI arall.",
-      "importFailed": "Ni ellid mewnforio'r sesiwn hon."
+      "importFailed": "Ni ellid mewnforio'r sesiwn hon.",
+      "discardWithUploadsMessage": "Bydd eich anogiad ac unrhyw ffeiliau wedi'u huwchlwytho nad ydynt wedi'u hatodi i negeseuon a anfonwyd yn cael eu dileu."
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil",
@@ -2525,7 +2533,11 @@
       "queuedAccessibility": "Neges mewn ciw",
       "userMessage": "Neges defnyddiwr",
       "assistantMessage": "Neges cynorthwyydd",
-      "longPressHint": "Pwyswch yn hir i weld manylion y neges"
+      "longPressHint": "Pwyswch yn hir i weld manylion y neges",
+      "cancelQueued": "Canslo neges",
+      "cancelQueuedAccessibility": "Canslo neges yn y ciw",
+      "restoreQueued": "Adfer",
+      "restoreQueuedAccessibility": "Adfer neges wedi'i chanslo i'r maes mewnbwn neges"
     },
     "olderMessages": {
       "arrived": "Llwythwyd negeseuon cynharach",
@@ -2565,9 +2577,6 @@
     },
     "sessionFilter": {
       "title": "Hidlo sesiynau",
-      "sortBy": "Trefnu yn ôl",
-      "sortLastUpdated": "Diweddarwyd ddiwethaf",
-      "sortCreated": "Crëwyd",
       "platform": "Platfform",
       "platformCloud": "Cwmwl",
       "platformExtension": "Estyniad",
@@ -2621,7 +2630,9 @@
       "uploading": "Llwytho i fyny…",
       "uploaded": "Llwythwyd i fyny",
       "uploadFailedRetry": "Methodd llwytho i fyny. Tapiwch i ailgynnig.",
-      "uploadFailedTerminal": "Ni ellir uwchlwytho'r ffeil hon."
+      "uploadFailedTerminal": "Ni ellir uwchlwytho'r ffeil hon.",
+      "moveLeft": "Symud {{filename}} i'r chwith",
+      "moveRight": "Symud {{filename}} i'r dde"
     },
     "attachmentPasteHint": {
       "accessibility": "Gludo delwedd o'r clipfwrdd",
@@ -2651,7 +2662,17 @@
       "finalizingPlaceholder": "Dirwyn i ben...",
       "messagePlaceholder": "Neges...",
       "cannotReceiveFiles": "Ni all y sesiwn hon dderbyn ffeiliau. Dileuwch yr atodiadau i anfon eich neges.",
-      "couldNotAttachFiles": "Methwyd atodi ffeiliau. Tapiwch anfon i geisio eto."
+      "couldNotAttachFiles": "Methwyd atodi ffeiliau. Tapiwch anfon i geisio eto.",
+      "discardAttachmentsMessage": "Bydd ffeiliau wedi'u huwchlwytho nad ydynt wedi'u hatodi i negeseuon a anfonwyd yn cael eu dileu.",
+      "discardAttachmentsTitle": "Taflu atodiadau?",
+      "charactersRemaining": "{{count}} nod yn weddill",
+      "insertNewline": "Mewnosod llinell newydd",
+      "starterChipBuild": "Adeilada nodwedd",
+      "starterChipEmpty": "Dechrau gyda syniad",
+      "starterChipFix": "Trwsia nam",
+      "starterChipPrepare": "Gosod fy amgylchedd",
+      "starterChipWrapUp": "Gorffen fy sesiwn",
+      "starterChipWriteTests": "Ysgrifenna brofion"
     },
     "chatLink": {
       "linkCopied": "Copïwyd y ddolen",
@@ -2874,7 +2895,8 @@
     "busy": "Mae mewnbwn llais yn brysur. Rhowch gynnig arall arni.",
     "stopped": "Stopiodd mewnbwn llais. Tapiwch y meic i roi cynnig arall arni.",
     "unavailableDevice": "Nid yw mewnbwn llais ar gael ar y ddyfais hon.",
-    "unavailableLanguage": "Nid yw mewnbwn llais ar gael ar gyfer iaith y ddyfais hon."
+    "unavailableLanguage": "Nid yw mewnbwn llais ar gael ar gyfer iaith y ddyfais hon.",
+    "listeningStopped": "Stopiodd y gwrando."
   },
   "share": {
     "title": "Rhannu i Kilo",

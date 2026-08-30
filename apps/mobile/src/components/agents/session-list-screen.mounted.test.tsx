@@ -29,7 +29,7 @@ const appState = vi.hoisted(() => {
 
 const focusState = vi.hoisted(() => ({ current: true as boolean }));
 const focusCallbacks = vi.hoisted(() => ({
-  current: [] as (() => void)[],
+  current: new Set<() => void>(),
 }));
 const refetchSpy = vi.hoisted(() => vi.fn());
 const routerPushSpy = vi.hoisted(() => vi.fn());
@@ -40,8 +40,16 @@ const orgState = vi.hoisted(() => ({
   organizationId: null as string | null,
   isLoaded: true,
 }));
+type MockActiveSession = {
+  id: string;
+  organizationId: string | null;
+  title?: string;
+  gitUrl?: string | null;
+  createdOnPlatform?: string;
+};
+
 const sessionListState = vi.hoisted(() => ({
-  activeSessions: [] as { id: string; organizationId: string | null }[],
+  activeSessions: [] as MockActiveSession[],
   isLoading: false,
   isError: false,
 }));
@@ -66,7 +74,7 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => focusState.current }),
   useFocusEffect: (effect: () => void) => {
-    focusCallbacks.current.push(effect);
+    focusCallbacks.current.add(effect);
   },
   useRouter: () => ({ push: routerPushSpy, dismissTo: routerDismissToSpy }),
   useScrollToTop: () => undefined,
@@ -77,12 +85,29 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
+vi.mock('@/i18n', () => ({
+  i18n: { t: (key: string) => key, language: 'en' },
+}));
+// The real persisted-filters hook runs; only its native edges are stubbed, so
+// the apply/clear transitions below exercise the actual filter state. The
+// stored record resolves through `filterRecord` so a test can hold it pending.
+const readFilterRecord = vi.hoisted(() => vi.fn<() => Promise<string | null>>());
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: readFilterRecord,
+}));
+vi.mock('@/lib/auth/account-metadata-write', () => ({
+  setAccountMetadata: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('sonner-native', () => ({
+  toast: { error: vi.fn() },
+}));
 
 // Combined-list machinery is mocked as inert string nodes so a regression that
 // re-renders any of it shows up as a tree node the assertions below reject.
 vi.mock('@/components/ui/icons', () => ({
   Plus: 'Plus',
   Bot: 'Bot',
+  SlidersHorizontal: 'SlidersHorizontal',
 }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
@@ -136,7 +161,11 @@ vi.mock('@/lib/organization-context', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ primaryForeground: '#ffffff', foreground: '#000000' }),
+  useThemeColors: () => ({
+    primaryForeground: '#ffffff',
+    foreground: '#000000',
+    mutedForeground: '#888888',
+  }),
 }));
 vi.mock('@/lib/tab-bar-layout', () => ({
   getEffectiveTabBarHeight: () => 0,
@@ -168,11 +197,30 @@ async function renderScreen(): Promise<MountedRenderer> {
   return renderer;
 }
 
+type HeaderElement = { type: string; props: Record<string, unknown> };
+
 function headerRightOf(renderer: MountedRenderer) {
   const header = renderer.root.find(
     node => typeof node.type === 'string' && (node.type as string) === 'ScreenHeader'
   );
-  return header.props.headerRight as { type: string; props: Record<string, unknown> };
+  return header.props.headerRight as HeaderElement;
+}
+
+function headerActionsOf(renderer: MountedRenderer): HeaderElement[] {
+  const { children } = headerRightOf(renderer).props;
+  return (Array.isArray(children) ? children : [children]).filter(Boolean) as HeaderElement[];
+}
+
+function headerActionOf(renderer: MountedRenderer, testID: string): HeaderElement | undefined {
+  return headerActionsOf(renderer).find(action => action.props.testID === testID);
+}
+
+function requireHeaderAction(renderer: MountedRenderer, testID: string): HeaderElement {
+  const action = headerActionOf(renderer, testID);
+  if (!action) {
+    throw new Error(`header action ${testID} was not rendered`);
+  }
+  return action;
 }
 
 function findTypeCount(renderer: MountedRenderer, type: string): number {
@@ -189,12 +237,14 @@ describe('AgentSessionListScreen live tab', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     focusState.current = true;
-    focusCallbacks.current = [];
+    focusCallbacks.current = new Set();
     orgState.organizationId = null;
     orgState.isLoaded = true;
     sessionListState.activeSessions = [];
     sessionListState.isLoading = false;
     sessionListState.isError = false;
+    readFilterRecord.mockReset();
+    readFilterRecord.mockResolvedValue(null);
     refetchSpy.mockClear();
     refetchSpy.mockResolvedValue(true);
     routerPushSpy.mockClear();
@@ -248,28 +298,25 @@ describe('AgentSessionListScreen live tab', () => {
     sessionListState.isError = state.isError;
 
     const renderer = await renderScreen();
-    const headerRight = headerRightOf(renderer);
+    const seeAll = requireHeaderAction(renderer, 'agents-view-history');
 
-    expect(headerRight.props.testID).toBe('agents-view-history');
-    expect(headerRight.props.accessibilityRole).toBe('button');
+    expect(seeAll.props.accessibilityRole).toBe('button');
   });
 
   it('pushes the history route when See-all is pressed', async () => {
     const renderer = await renderScreen();
-    const headerRight = headerRightOf(renderer);
+    const seeAll = requireHeaderAction(renderer, 'agents-view-history');
 
-    const onPress = headerRight.props.onPress as () => void;
+    const onPress = seeAll.props.onPress as () => void;
     onPress();
     expect(routerPushSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/history');
   });
 
-  it('renders no search header, filter chips, animated wrappers, or active-now section', async () => {
+  it('renders no history list, animated wrappers, or active-now section', async () => {
     sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
     const renderer = await renderScreen();
 
     for (const type of [
-      'SessionListSearchHeader',
-      'SessionFilterChips',
       'SessionFilterModal',
       'ActiveNowSection',
       'AgentSessionListContent',
@@ -279,13 +326,176 @@ describe('AgentSessionListScreen live tab', () => {
     }
   });
 
-  it('keeps the header right as a single See-all label with no plus icon', async () => {
-    const renderer = await renderScreen();
-    const headerRight = headerRightOf(renderer);
+  it('shows the search header only once there are live rows', async () => {
+    const empty = await renderScreen();
+    expect(findTypeCount(empty, 'SessionListSearchHeader')).toBe(0);
 
-    expect(headerRight.type).toBe('Pressable');
-    const children = headerRight.props.children as { type: string };
-    expect(children.type).toBe('Text');
+    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
+    const withRows = await renderScreen();
+    expect(findTypeCount(withRows, 'SessionListSearchHeader')).toBe(1);
+  });
+
+  it('holds the skeletons until the persisted filter record resolves', async () => {
+    // A never-settling read stands in for a slow SecureStore: the list must not
+    // paint unfiltered rows that a stored filter would then remove.
+    readFilterRecord.mockReturnValue(new Promise<string | null>(() => undefined));
+    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
+
+    const renderer = await renderScreen();
+
+    expect(findTypeCount(renderer, 'Skeleton')).toBe(8);
+    expect(findTypeCount(renderer, 'FlatList')).toBe(0);
+  });
+
+  it('applies a persisted filter without first painting the unfiltered list', async () => {
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ platformFilter: [], projectFilter: ['https://github.com/kilo/cloud.git'] })
+    );
+    sessionListState.activeSessions = [
+      { id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
+      { id: 'a2', organizationId: null, gitUrl: 'https://github.com/kilo/other.git' },
+    ];
+
+    const renderer = await renderScreen();
+
+    const list = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
+    );
+    expect((list.props.data as { id: string }[]).map(session => session.id)).toEqual(['a1']);
+    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(1);
+  });
+
+  it('clears only the search when the no-match CTA says Clear search', async () => {
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ platformFilter: [], projectFilter: ['https://github.com/kilo/cloud.git'] })
+    );
+    sessionListState.activeSessions = [
+      {
+        id: 'a1',
+        organizationId: null,
+        title: 'Ship it',
+        gitUrl: 'https://github.com/kilo/cloud.git',
+      },
+    ];
+    const renderer = await renderScreen();
+
+    const searchHeader = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'SessionListSearchHeader'
+    );
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+
+    const emptyState = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'EmptyState'
+    );
+    expect(emptyState.props.description).toBe('agents.sessionList.tryDifferentSearch');
+    act(() => {
+      (emptyState.props.action as { props: { onPress: () => void } }).props.onPress();
+    });
+
+    // The row is back, and the persisted repository filter survived.
+    expect(findTypeCount(renderer, 'FlatList')).toBe(1);
+    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(1);
+  });
+
+  it('narrows the live list to the search text', async () => {
+    sessionListState.activeSessions = [
+      { id: 'a1', organizationId: null, title: 'Fix the login redirect' },
+      { id: 'a2', organizationId: null, title: 'Bump deps' },
+    ];
+    const renderer = await renderScreen();
+
+    const searchHeader = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'SessionListSearchHeader'
+    );
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('bump');
+    });
+
+    const list = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
+    );
+    expect((list.props.data as { id: string }[]).map(session => session.id)).toEqual(['a2']);
+  });
+
+  it('keeps the header right to See-all alone while nothing is filterable', async () => {
+    const renderer = await renderScreen();
+
+    expect(headerActionsOf(renderer)).toHaveLength(1);
+    expect(headerActionOf(renderer, 'agents-open-filters')).toBeUndefined();
+  });
+
+  it('offers the filter button once a live row carries a repository', async () => {
+    sessionListState.activeSessions = [
+      { id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
+    ];
+    const renderer = await renderScreen();
+
+    const filterButton = requireHeaderAction(renderer, 'agents-open-filters');
+    expect(filterButton.props.activeCount).toBe(0);
+  });
+
+  it('filters the live list down to the applied repository', async () => {
+    sessionListState.activeSessions = [
+      { id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
+      { id: 'a2', organizationId: null, gitUrl: 'https://github.com/kilo/other.git' },
+    ];
+    const renderer = await renderScreen();
+
+    const filterButton = requireHeaderAction(renderer, 'agents-open-filters');
+    act(() => {
+      (filterButton.props.onPress as () => void)();
+    });
+
+    const modal = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'SessionFilterModal'
+    );
+    expect(modal.props.projectOptions).toHaveLength(2);
+    act(() => {
+      (modal.props.onApply as (filters: unknown) => void)({
+        platformFilter: [],
+        projectFilter: ['https://github.com/kilo/cloud.git'],
+        sortBy: 'updated_at',
+      });
+    });
+
+    const list = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
+    );
+    expect((list.props.data as { id: string }[]).map(session => session.id)).toEqual(['a1']);
+  });
+
+  it('shows a clearable no-match state when every live row is filtered out', async () => {
+    sessionListState.activeSessions = [
+      { id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
+    ];
+    const renderer = await renderScreen();
+
+    act(() => {
+      (requireHeaderAction(renderer, 'agents-open-filters').props.onPress as () => void)();
+    });
+    const modal = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'SessionFilterModal'
+    );
+    act(() => {
+      (modal.props.onApply as (filters: unknown) => void)({
+        platformFilter: ['slack'],
+        projectFilter: [],
+        sortBy: 'updated_at',
+      });
+    });
+
+    const emptyState = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'EmptyState'
+    );
+    expect(emptyState.props.title).toBe('agents.sessionList.noMatches');
+
+    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
+    act(() => {
+      clearAction.props.onPress();
+    });
+    expect(findTypeCount(renderer, 'FlatList')).toBe(1);
   });
 
   it('hides the FAB when there are no live rows', async () => {

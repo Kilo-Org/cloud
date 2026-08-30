@@ -87,6 +87,7 @@ type CloudAgentSessionConfig = {
   onReplayComplete?: () => void;
   onEvent?: (event: NormalizedEvent) => void;
   onMessageQueued?: (messageId: string) => void;
+  onMessageCanceled?: (messageId: string) => void;
   onMessageCompleted?: (messageId: string) => void;
   onMessageFailed?: (
     messageId: string,
@@ -195,6 +196,7 @@ type CloudAgentSession = {
   // Commands
   send: (input: CloudAgentSessionSendInput) => unknown | Promise<unknown>;
   interrupt: () => unknown | Promise<unknown>;
+  cancelQueuedMessage: (messageId: string) => Promise<{ dropped: boolean }>;
   answer: (payload: CloudAgentSessionAnswerInput) => unknown | Promise<unknown>;
   reject: (payload: CloudAgentSessionRejectInput) => unknown | Promise<unknown>;
   respondToPermission: (
@@ -241,6 +243,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     onSessionCreated: config.onSessionCreated,
     onSessionUpdated: config.onSessionUpdated,
     onMessageQueued: config.onMessageQueued,
+    onMessageCanceled: config.onMessageCanceled,
     onMessageCompleted: config.onMessageCompleted,
     onMessageFailed: config.onMessageFailed,
   });
@@ -306,6 +309,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           sessionId: config.kiloSessionId,
           content: event.content,
         });
+      }
+      // `cloud.message.canceled` removes the synthetic (or real) local row the
+      // queued event materialized, so a replay of queued then canceled nets empty.
+      if (event.type === 'cloud.message.canceled') {
+        storage.deleteMessage(event.messageId);
       }
       config.onEvent?.(event);
     },
@@ -446,6 +454,12 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         throw new Error('CloudAgentSession transport.interrupt is not configured');
       }
       return transport.interrupt();
+    },
+    cancelQueuedMessage: messageId => {
+      if (!transport?.dropQueuedMessage) {
+        throw new Error('CloudAgentSession transport.dropQueuedMessage is not configured');
+      }
+      return transport.dropQueuedMessage(messageId);
     },
     answer: payload => {
       if (!transport?.answer) {

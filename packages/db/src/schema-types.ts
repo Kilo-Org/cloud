@@ -2210,9 +2210,11 @@ export type StripeSubscriptionStatus =
 
 /**
  * Valid values for cloud_agent_code_reviews.terminal_reason.
- * KEEP IN SYNC with CloudAgentTerminalReason in
- * packages/worker-utils/src/cloud-agent-next-client.ts — both lists must
- * contain the same literal values.
+ *
+ * Single source of truth for the code review terminal reason enum. Worker-side
+ * consumers re-export this as CLOUD_AGENT_TERMINAL_REASONS in
+ * packages/worker-utils/src/cloud-agent-next-client.ts rather than maintaining
+ * a second copy.
  */
 export const CODE_REVIEW_TERMINAL_REASONS = [
   'billing',

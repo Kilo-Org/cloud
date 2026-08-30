@@ -1,3 +1,4 @@
+import { signKiloToken } from '@kilocode/worker-utils';
 import {
   getWorkerDb,
   findUserForToken,
@@ -5,7 +6,6 @@ import {
   ensureBotUserForOrg,
   type WorkerDb,
 } from '../db/queries.js';
-import { signJwt } from '../util/jwt.js';
 import { logger } from '../util/logger.js';
 
 /**
@@ -137,7 +137,7 @@ export class TokenMintingService {
   }
 
   /**
-   * Sign a JWT token with the given payload.
+   * Sign a Kilo API token (v3) with the given payload.
    */
   private async signToken(payload: {
     kiloUserId: string;
@@ -146,23 +146,20 @@ export class TokenMintingService {
     internalApiUse: boolean;
     createdOnPlatform: string;
   }): Promise<string> {
-    // JWT_TOKEN_VERSION must match kilocode-backend's version (src/lib/tokens.ts)
-    const JWT_TOKEN_VERSION = 3;
     const jwtSecret = await this.getJwtSecret();
 
-    // signJwt is async (uses Web Crypto API)
-    return await signJwt(
-      {
-        env: this.env.ENVIRONMENT === 'production' ? 'production' : 'development',
-        kiloUserId: payload.kiloUserId,
-        apiTokenPepper: payload.apiTokenPepper,
-        version: JWT_TOKEN_VERSION,
+    const { token } = await signKiloToken({
+      userId: payload.kiloUserId,
+      pepper: payload.apiTokenPepper,
+      secret: jwtSecret,
+      expiresInSeconds: 60 * 60,
+      env: this.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+      extra: {
         botId: payload.botId,
         internalApiUse: payload.internalApiUse,
         createdOnPlatform: payload.createdOnPlatform,
       },
-      jwtSecret,
-      { expiresIn: '1h' }
-    );
+    });
+    return token;
   }
 }

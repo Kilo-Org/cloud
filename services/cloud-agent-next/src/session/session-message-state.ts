@@ -46,6 +46,7 @@ export const SessionMessageCompletionSourceSchema = z.enum([
   'wrapper_failure',
   'interrupt',
   'delivery_failure',
+  'canceled',
 ]);
 export type SessionMessageCompletionSource = z.infer<typeof SessionMessageCompletionSourceSchema>;
 

@@ -28,7 +28,10 @@ import {
 } from '../../src/sandbox-control/vercel-provider';
 import { parseVercelSandboxRuntimeConfig } from '../../src/agent-sandbox/vercel/vercel-runtime-config';
 import type { VercelSandboxSession } from '../../src/agent-sandbox/vercel/vercel-sandbox-rest-client';
-import { loadWorktreeDeletionJournal } from '../../src/sandbox-control/worktree-deletion';
+import {
+  loadWorktreeDeletionJournal,
+  WORKTREE_DELETION_PREFIX,
+} from '../../src/sandbox-control/worktree-deletion';
 import { resolveSandboxExclusivity } from '../../src/sandbox-control/worktree-ownership';
 import type { RequestFrame } from '../../src/shared/sandbox-control-protocol';
 
@@ -262,7 +265,7 @@ function nextFrame(socket: WebSocket): Promise<RequestFrame> {
   );
 }
 
-async function connectControl(sandboxId: string, credential: string) {
+async function connectControl(sandboxId: string, credential: string, wrapperInstanceId?: string) {
   const control = env.SANDBOX_CONTROL.getByName(sandboxId);
   const response = await control.fetch(
     new Request('https://worker.test/control', {
@@ -279,7 +282,11 @@ async function connectControl(sandboxId: string, credential: string) {
       type: 'request',
       requestId: 'hello',
       operation: 'sandbox.hello',
-      payload: { protocolVersion: 1, providerInstanceId },
+      payload: {
+        protocolVersion: 1,
+        providerInstanceId,
+        ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
+      },
     })
   );
   await hello;
@@ -1081,6 +1088,284 @@ describe('worktree deletion in Durable Objects', () => {
       }
     });
   });
+
+  it.each([false, true])(
+    'keeps an unrelated accepted root waiting on a question healthy during deletion=%s',
+    async duringDeletion => {
+      const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}` as const;
+      const root = cloudId();
+      const sibling = cloudId();
+      const wrapperInstanceId = crypto.randomUUID();
+      const credential = generateSandboxCredential();
+      const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+      const session = env.SANDBOX_SESSION.getByName(`${userId}:${sibling}`);
+      const siblingIdentity = {
+        sessionId: sibling,
+        kiloSessionId: kiloId(99),
+        directory: otherDirectory,
+      };
+      const question = { id: 'question_sibling', sessionID: kiloId(99), questions: [] };
+      const providerRef = encodeCloudflareProviderRef({
+        sandboxId,
+        instanceId: 'shared-sync',
+        containment: true,
+      });
+      const stop = vi.fn<ProviderAdapter['stop']>(async () => 'terminal');
+      const create = vi.fn<ProviderAdapter['create']>(async () => {
+        throw new Error('Read-only synchronization must not allocate');
+      });
+      const provider: ProviderAdapter = {
+        resumable: false,
+        ensureBillingAdmission: async () => undefined,
+        create,
+        launch: async () => {
+          throw new Error('Read-only synchronization must not launch');
+        },
+        observe: async () => ({
+          status: stop.mock.calls.length ? 'terminal' : 'active',
+          providerRef,
+        }),
+        stop,
+        ensureLeaseAtLeast: async () => undefined,
+        logs: async () => '',
+      };
+      const registered = registration(sibling, sandboxId);
+      await session.registerSession({
+        ...registered,
+        auth: { ...registered.auth, kiloSessionId: siblingIdentity.kiloSessionId },
+        workspace: {
+          ...registered.workspace,
+          worktreeId: otherWorktreeId,
+          workspacePath: otherDirectory,
+        },
+      });
+      await runInDurableObject(session, async (_instance, state) => {
+        const acceptedAt = Date.now() - DEADLINE_MS.acceptedOverdue - 1_000;
+        await state.storage.put('session_messages', [
+          {
+            messageId: 'msg_waiting_for_answer',
+            prompt: 'Wait for my answer',
+            state: 'accepted',
+            acceptedAt,
+            lastActivityAt: acceptedAt,
+            wrapperInstanceId,
+          },
+        ]);
+      });
+      await runInDurableObject(control, async (instance, state) => {
+        Object.assign(instance, { provider, createProviderAdapter: () => provider });
+        await instance.initializeOwner(userId);
+        await seedPhysical(instance, state, 'shared-sync', providerRef);
+        for (const route of [
+          { sessionId: root, kiloSessionId: kiloId(0), directory, worktreeId },
+          { ...siblingIdentity, worktreeId: otherWorktreeId },
+        ]) {
+          await attachGrantedSession(instance, state, { ...route, ownerId: userId }, 'cloudflare');
+        }
+      });
+      await control.setWrapperCredentialHash(await hashSandboxCredential(credential));
+      const socket = await connectControl(sandboxId, credential, wrapperInstanceId);
+      const requests: RequestFrame[] = [];
+      socket.addEventListener('message', event => {
+        const frame = JSON.parse(String(event.data)) as RequestFrame;
+        requests.push(frame);
+        reply(
+          socket,
+          frame,
+          frame.operation === 'session.sync'
+            ? { status: { type: 'idle' }, questions: [question], permissions: [] }
+            : frame.operation === 'worktree.prepareDeletion'
+              ? { prepared: true, sessionIds: [kiloId(0)] }
+              : { deleted: true, sessionIds: [kiloId(0)] }
+        );
+      });
+      socket.send(
+        JSON.stringify({
+          type: 'event',
+          event: 'sandbox.ready',
+          payload: { kiloReady: true, globalFeedAttached: true },
+        })
+      );
+      try {
+        await vi.waitFor(async () => {
+          expect(await control.getStatus()).toMatchObject({
+            connection: 'ready',
+            wrapperInstanceId,
+          });
+        });
+        await runInDurableObject(control, async (instance, state) => {
+          const siblingSession = instance['env'].SANDBOX_SESSION.getByName(`${userId}:${sibling}`);
+          const leaseStarted = Promise.withResolvers<void>();
+          const releaseLease = Promise.withResolvers<void>();
+          provider.ensureLeaseAtLeast = async () => {
+            leaseStarted.resolve();
+            await releaseLease.promise;
+          };
+          let heartbeat: Promise<void> | undefined;
+          let deletion: ReturnType<SandboxControl['deleteWorktreeResources']> | undefined;
+          try {
+            if (duringDeletion) {
+              const wrapper = state.getWebSockets('sandbox-control')[0];
+              if (!wrapper) throw new Error('Missing connected wrapper');
+              heartbeat = instance.webSocketMessage(
+                wrapper,
+                JSON.stringify({
+                  type: 'event',
+                  event: 'sandbox.heartbeat',
+                  payload: {
+                    state: 'active',
+                    kilo: { ready: true },
+                    sessions: [
+                      {
+                        kiloSessionId: kiloId(99),
+                        state: 'active',
+                        idleForMs: 0,
+                        waitingOn: 'input',
+                      },
+                    ],
+                  },
+                })
+              );
+              await leaseStarted.promise;
+              deletion = instance.deleteWorktreeResources({
+                worktreeId,
+                kiloUserId: userId,
+                location: { sandboxId, provider: 'cloudflare' },
+                sessionIds: [kiloId(0)],
+              });
+              await vi.waitFor(async () => {
+                expect(await state.storage.get('exclusive_worktree_deletion')).toBe(worktreeId);
+              });
+              for (const identity of [
+                { sessionId: root, kiloSessionId: kiloId(0), directory },
+                { ...siblingIdentity, sessionId: cloudId(), kiloSessionId: kiloId(100) },
+                { ...siblingIdentity, kiloSessionId: kiloId(0) },
+                { ...siblingIdentity, directory },
+              ]) {
+                await expect(
+                  instance.request({
+                    operation: 'session.sync',
+                    session: identity,
+                    expectedWrapperInstanceId: wrapperInstanceId,
+                    payload: {},
+                  })
+                ).rejects.toThrow('worktree_deleting');
+              }
+              await expect(
+                instance.request({
+                  operation: 'session.sync',
+                  session: siblingIdentity,
+                  expectedWrapperInstanceId: crypto.randomUUID(),
+                  payload: {},
+                })
+              ).rejects.toThrow('Sandbox wrapper runtime changed');
+              for (const operation of ['session.attach', 'session.prompt'] as const) {
+                await expect(
+                  instance.request({
+                    operation,
+                    session: siblingIdentity,
+                    expectedWrapperInstanceId: wrapperInstanceId,
+                    payload: {},
+                  })
+                ).rejects.toThrow('worktree_deleting');
+              }
+              await expect(
+                instance.attachSession({
+                  ...siblingIdentity,
+                  ownerId: userId,
+                  worktreeId: otherWorktreeId,
+                })
+              ).rejects.toThrow('worktree_deleting');
+              await expect(
+                instance.ensureReady({
+                  ownerId: userId,
+                  sessionId: sibling,
+                  worktreeId: otherWorktreeId,
+                  allowCreate: true,
+                })
+              ).rejects.toThrow('worktree_deleting');
+              await expect(instance.claimCreate('blocked-allocation')).rejects.toThrow(
+                'worktree_deleting'
+              );
+              const journal = await loadWorktreeDeletionJournal(state.storage, worktreeId);
+              if (!journal) throw new Error('Missing deletion journal');
+              await state.storage.put(`${WORKTREE_DELETION_PREFIX}${worktreeId}`, {
+                ...journal,
+                exclusiveTeardown: true,
+              });
+              try {
+                await expect(
+                  instance.request({
+                    operation: 'session.sync',
+                    session: siblingIdentity,
+                    expectedWrapperInstanceId: wrapperInstanceId,
+                    payload: {},
+                  })
+                ).rejects.toThrow('worktree_deleting');
+              } finally {
+                await state.storage.put(`${WORKTREE_DELETION_PREFIX}${worktreeId}`, journal);
+              }
+            }
+            const deadlines = await loadDeadlines(state.storage);
+            await runInDurableObject(siblingSession, async (siblingInstance, siblingState) => {
+              await siblingInstance.alarm();
+              expect(await siblingState.storage.get('session_messages')).toMatchObject([
+                { messageId: 'msg_waiting_for_answer', state: 'accepted', wrapperInstanceId },
+              ]);
+              expect(await siblingState.storage.get('session_pending_interactions')).toMatchObject({
+                questions: [question],
+                permissions: [],
+              });
+              expect(await siblingState.storage.get('pending_runtime_cleanup')).toBeUndefined();
+            });
+            expect(requests).toEqual([
+              expect.objectContaining({ operation: 'session.sync', session: siblingIdentity }),
+            ]);
+            expect(await loadDeadlines(state.storage)).toEqual(deadlines);
+            expect(await instance.getStatus()).toMatchObject({
+              physical: 'running',
+              connection: 'ready',
+              wrapperInstanceId,
+            });
+            releaseLease.resolve();
+            await heartbeat;
+            await deletion;
+            if (duringDeletion) {
+              await expect(
+                instance.request({
+                  operation: 'session.sync',
+                  session: { sessionId: root, kiloSessionId: kiloId(0), directory },
+                  expectedWrapperInstanceId: wrapperInstanceId,
+                  payload: {},
+                })
+              ).rejects.toThrow('worktree_deleting');
+            }
+            expect(stop).not.toHaveBeenCalled();
+            expect(create).not.toHaveBeenCalled();
+            expect((await instance.getPhysicalRecord()).providerRef).toBe(providerRef);
+            expect(await instance.listRoutes()).toEqual(
+              duringDeletion
+                ? [expect.objectContaining(siblingIdentity)]
+                : [
+                    expect.objectContaining({ sessionId: root }),
+                    expect.objectContaining(siblingIdentity),
+                  ]
+            );
+          } finally {
+            releaseLease.resolve();
+            await heartbeat;
+            await deletion;
+            await state.storage.deleteAlarm();
+            await runInDurableObject(siblingSession, (_instance, siblingState) =>
+              siblingState.storage.deleteAlarm()
+            );
+          }
+        });
+      } finally {
+        socket.close();
+      }
+    }
+  );
 
   it('journals discovered descendants before cleanup and preserves unrelated shared routes on partial failure and retry', async () => {
     const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;

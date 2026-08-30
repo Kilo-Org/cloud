@@ -444,8 +444,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async request(input: SandboxControlOutboundRequest): Promise<ResponseFrame> {
-    if (input.session)
-      this.assertWorktreeAdmission(this.worktreeIdFromDirectory(input.session.directory));
+    await this.assertRequestWorktreeAdmission(input);
     if (input.operation === 'worktree.delete' || input.operation === 'worktree.prepareDeletion') {
       throw new Error('Worktree cleanup requires the deletion coordinator');
     }
@@ -530,9 +529,8 @@ export class SandboxControl extends DurableObject<Env> {
         if (!isCurrent()) throw new Error('Sandbox wrapper runtime changed');
       });
     }
+    await this.assertRequestWorktreeAdmission(input);
     if (!isCurrent()) throw new Error('Sandbox wrapper runtime changed');
-    if (input.session)
-      this.assertWorktreeAdmission(this.worktreeIdFromDirectory(input.session.directory));
     return this.socketHandler.sendRequest(input);
   }
 
@@ -1439,6 +1437,39 @@ export class SandboxControl extends DurableObject<Env> {
   private worktreeIdFromDirectory(directory: string): string | undefined {
     const parsed = cloudAgentWorktreeIdSchema.safeParse(directory.split('/').at(-1));
     return parsed.success ? parsed.data : undefined;
+  }
+
+  private async assertRequestWorktreeAdmission(
+    input: SandboxControlOutboundRequest
+  ): Promise<void> {
+    const session = input.session;
+    if (!session) return;
+    const worktreeId = this.worktreeIdFromDirectory(session.directory);
+    if (input.operation === 'session.sync' && this.exclusiveDeletionWorktreeId) {
+      const allowed = await this.ctx.storage.transaction(async () => {
+        const exclusiveWorktreeId = this.exclusiveDeletionWorktreeId;
+        if (!exclusiveWorktreeId) return false;
+        const route = (await loadRouteTable(this.ctx.storage)).get(session.sessionId);
+        const routeWorktreeId = route?.worktreeId ?? worktreeId;
+        if (
+          !route ||
+          route.kiloSessionId !== session.kiloSessionId ||
+          route.directory !== session.directory ||
+          routeWorktreeId === exclusiveWorktreeId ||
+          (routeWorktreeId && this.deletingWorktrees.has(routeWorktreeId)) ||
+          (worktreeId && this.deletingWorktrees.has(worktreeId))
+        ) {
+          return false;
+        }
+        const journal = await loadWorktreeDeletionJournal(this.ctx.storage, exclusiveWorktreeId);
+        return (
+          this.exclusiveDeletionWorktreeId === exclusiveWorktreeId &&
+          journal?.exclusiveTeardown === false
+        );
+      });
+      if (allowed) return;
+    }
+    this.assertWorktreeAdmission(worktreeId);
   }
 
   private assertWorktreeAdmission(worktreeId?: string): void {

@@ -55,10 +55,14 @@ const mockGenerateCloudAgentAttachmentDownloadUrl = jest.fn<
 
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
 
+const mockCancelQueuedMessage =
+  jest.fn<(input: { sessionId: string; messageId: string }) => Promise<{ dropped: boolean }>>();
+
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
+  cancelQueuedMessage: mockCancelQueuedMessage,
 }));
 
 const mockCreateCloudAgentNextClientForModel = jest.fn(
@@ -177,6 +181,7 @@ let createCaller: (ctx: { user: User }) => {
     contentLength: number;
   }) => Promise<unknown>;
   getAttachmentDownloadUrl: (input: { messageUuid: string; filename: string }) => Promise<unknown>;
+  cancelQueuedMessage: (input: { sessionId: string; messageId: string }) => Promise<unknown>;
   checkEligibility: () => Promise<{
     balance: number;
     minBalance: number;
@@ -417,6 +422,30 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
       })
     ).rejects.toThrow();
     expect(mockGenerateCloudAgentAttachmentDownloadUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe('cloudAgentNextRouter.cancelQueuedMessage', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    mockCancelQueuedMessage.mockResolvedValue({ dropped: true });
+  });
+
+  it('denies canceling a queued message on a session the user does not own', async () => {
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValueOnce(null);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.cancelQueuedMessage({
+        sessionId: 'agent_123',
+        messageId: 'msg_123456789abc123456789ABCDE',
+      })
+    ).rejects.toThrow('Session not found or access denied');
+
+    expect(mockCancelQueuedMessage).not.toHaveBeenCalled();
   });
 });
 

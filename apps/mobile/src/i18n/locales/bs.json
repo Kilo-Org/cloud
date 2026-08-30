@@ -152,7 +152,9 @@
     "appearanceDark": "Tamno",
     "account": "Nalog",
     "prReviewAttribution": "Dodajte atribuciju aplikacije PR pregledima.",
-    "prReviewAttributionSubtitle": "Dodajte podnožje \"Pregledano putem Kilo-a\" kada pošaljete pregled."
+    "prReviewAttributionSubtitle": "Dodajte podnožje \"Pregledano putem Kilo-a\" kada pošaljete pregled.",
+    "returnSendsMessage": "Tipka za novi red šalje poruku",
+    "returnSendsMessageSubtitle": "Kada je isključeno, tipka za novi red umeće novi red u polja za unos poruke agentima."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nedostupan",
@@ -757,7 +759,8 @@
       "networkError": "Greška u mreži",
       "uploadFailed": "Otpremanje nije uspjelo",
       "failedToUploadFile": "Otpremanje datoteke nije uspjelo: {{reason}}",
-      "nothingToPaste": "Nema ništa za lijepljenje"
+      "nothingToPaste": "Nema ništa za lijepljenje",
+      "metadataStripFailed": "Nije moguće ukloniti metapodatke fotografije."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2156,7 +2159,11 @@
       "previousTaskFinishing": "Prethodni zadatak se još uvijek završava. Pričekajte trenutak.",
       "serviceUnavailable": "Usluga trenutno nije dostupna. Pokušajte ponovo.",
       "connectionTrouble": "Problem s vezom. Pokušajte ponovo za trenutak.",
-      "modelUnavailable": "Ovaj model nije dostupan za Cloud Agent. Odaberite drugi model i pokušajte ponovo."
+      "modelUnavailable": "Ovaj model nije dostupan za Cloud Agent. Odaberite drugi model i pokušajte ponovo.",
+      "cancelQueuedFailed": "Nije moguće otkazati poruku.",
+      "cancelQueuedRestoreAvailable": "Poruka je otkazana. Dodirnite Vratite da je vratite u polje za unos poruke.",
+      "cancelQueuedRestored": "Poruka je otkazana. Upit je ponovo u polju za unos poruke.",
+      "cancelQueuedUpgradeRequired": "Otkazivanje poruka na čekanju zahtijeva noviji Kilo CLI. Ažurirajte Kilo CLI i ponovo se povežite."
     },
     "remoteSession": {
       "failedToCreate": "Nije uspjelo stvaranje daljinske sesije",
@@ -2228,7 +2235,8 @@
       "continueFrom": "Nastavljanje {{title}}",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberite Cloud Agent ili drugi CLI.",
-      "importFailed": "Nije moguće uvesti ovu sesiju."
+      "importFailed": "Nije moguće uvesti ovu sesiju.",
+      "discardWithUploadsMessage": "Vaš upit i sve otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisani."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirano {{displayCount}} datoteka",
@@ -2477,7 +2485,11 @@
       "queuedAccessibility": "Poruka u redu",
       "userMessage": "Korisnička poruka",
       "assistantMessage": "Poruka asistenta",
-      "longPressHint": "Dugo pritisnite za detalje poruke"
+      "longPressHint": "Dugo pritisnite za detalje poruke",
+      "cancelQueued": "Otkažite poruku",
+      "cancelQueuedAccessibility": "Otkažite poruku na čekanju",
+      "restoreQueued": "Vratite",
+      "restoreQueuedAccessibility": "Vratite otkazanu poruku u polje za unos poruke"
     },
     "olderMessages": {
       "arrived": "Ranije poruke su učitane",
@@ -2508,9 +2520,6 @@
     },
     "sessionFilter": {
       "title": "Filtriraj sesije",
-      "sortBy": "Sortiraj po",
-      "sortLastUpdated": "Zadnje ažurirano",
-      "sortCreated": "Kreirano",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Ekstenzija",
@@ -2564,7 +2573,9 @@
       "uploading": "Otpremanje…",
       "uploaded": "Otpremljeno",
       "uploadFailedRetry": "Otpremanje nije uspjelo. Dodirnite za ponovni pokušaj.",
-      "uploadFailedTerminal": "Ova datoteka se ne može otpremiti."
+      "uploadFailedTerminal": "Ova datoteka se ne može otpremiti.",
+      "moveLeft": "Pomaknite {{filename}} lijevo",
+      "moveRight": "Pomaknite {{filename}} desno"
     },
     "attachmentPasteHint": {
       "accessibility": "Zalijepi sliku iz međuspremnika",
@@ -2594,7 +2605,17 @@
       "finalizingPlaceholder": "Završavanje...",
       "messagePlaceholder": "Poruka...",
       "cannotReceiveFiles": "Ova sesija ne može primiti datoteke. Uklonite privitke da pošaljete svoju poruku.",
-      "couldNotAttachFiles": "Datoteke nisu mogle biti priložene. Dodirnite pošalji za ponovni pokušaj."
+      "couldNotAttachFiles": "Datoteke nisu mogle biti priložene. Dodirnite pošalji za ponovni pokušaj.",
+      "discardAttachmentsMessage": "Otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisane.",
+      "discardAttachmentsTitle": "Odbaciti privitke?",
+      "charactersRemaining": "Preostalo znakova: {{count}}",
+      "insertNewline": "Umetnite novi red",
+      "starterChipBuild": "Izradi funkciju",
+      "starterChipEmpty": "Počni s idejom",
+      "starterChipFix": "Ispravi grešku",
+      "starterChipPrepare": "Postavi moje okruženje",
+      "starterChipWrapUp": "Završi moju sesiju",
+      "starterChipWriteTests": "Napiši testove"
     },
     "chatLink": {
       "linkCopied": "Veza kopirana",
@@ -2814,7 +2835,8 @@
     "busy": "Glasovni unos je zauzet. Pokušajte ponovo.",
     "stopped": "Glasovni unos je zaustavljen. Dodirnite mikrofon za ponovni pokušaj.",
     "unavailableDevice": "Glasovni unos nije dostupan na ovom uređaju.",
-    "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja."
+    "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja.",
+    "listeningStopped": "Slušanje je zaustavljeno."
   },
   "share": {
     "title": "Podijeli u Kilo",

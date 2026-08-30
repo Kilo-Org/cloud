@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { repositoryResourceKey } from '@kilocode/app-shared/code-review/repository-identity';
+import { getMissingBitbucketWorkspaceAccessTokenScopes } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import {
   ReviewActionSchema,
   ReviewCapabilitiesSchema,
@@ -743,6 +744,10 @@ export async function getBitbucketChecks(
 function capabilitySet(loaded: Loaded) {
   const { auth, review } = loaded;
   const own = review.participants?.find(value => value.user.uuid === auth.actor.id);
+  // Honor implied pullrequest permission without relaxing action-specific write-grant checks.
+  const hasPullRequestScope = !getMissingBitbucketWorkspaceAccessTokenScopes(auth.scopes).includes(
+    'pullrequest'
+  );
   return ReviewCapabilitiesSchema.parse(
     Object.fromEntries(
       ReviewActionSchema.options.map(action => {
@@ -758,7 +763,9 @@ function capabilitySet(loaded: Loaded) {
           : action === 'deleteBranch'
             ? 'repository:write'
             : 'pullrequest';
-        const allowed = action === 'read' || auth.scopes.includes(grant);
+        const allowed =
+          action === 'read' ||
+          (grant === 'pullrequest' ? hasPullRequestScope : auth.scopes.includes(grant));
         const value: ReviewCapability = {
           support: 'supported',
           version: 'available',

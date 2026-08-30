@@ -152,7 +152,9 @@
     "appearanceDark": "Pōuri",
     "account": "Pūkete",
     "prReviewAttribution": "Tāpiri te tautohu taupānga ki ngā arotake PR",
-    "prReviewAttributionSubtitle": "Tāpiri he hiku 'Kua arotakea mā Kilo' ina tuku koe i tētahi arotake."
+    "prReviewAttributionSubtitle": "Tāpiri he hiku 'Kua arotakea mā Kilo' ina tuku koe i tētahi arotake.",
+    "returnSendsMessage": "Ka tuku karere te pātuhi Whakahoki",
+    "returnSendsMessageSubtitle": "Ina weto, ka whakauru te pātuhi Whakahoki i tētahi rārangi hōu ki ngā kaitito māngai."
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono huna",
@@ -750,7 +752,8 @@
       "networkError": "Hapa whatunga",
       "uploadFailed": "I rahua te tuku ake",
       "failedToUploadFile": "I rahua te tuku ake i te kōnae: {{reason}}",
-      "nothingToPaste": "Kāore he mea hei piri"
+      "nothingToPaste": "Kāore he mea hei piri",
+      "metadataStripFailed": "Kāore i taea te tango i ngā raraunga-ā-whakaahua."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "Kei te oti tonu te mahi o mua. Tatari kia iti.",
       "serviceUnavailable": "Kāore te ratonga e wātea ana ināianei. Whakamātau anō.",
       "connectionTrouble": "He raruraru hononga. Whakamātau anō i muri i tētahi wā poto.",
-      "modelUnavailable": "Kāore tēnei tauira e wātea ana mō Cloud Agent. Kōwhiria tētahi atu tauira, whakamātau anō."
+      "modelUnavailable": "Kāore tēnei tauira e wātea ana mō Cloud Agent. Kōwhiria tētahi atu tauira, whakamātau anō.",
+      "cancelQueuedFailed": "Kāore i taea te whakakore i te karere.",
+      "cancelQueuedRestoreAvailable": "Kua whakakorea te karere. Pāwhiri ki Whakaora kia whakahokia ki te kaitito.",
+      "cancelQueuedRestored": "Kua whakakorea te karere. Kua hoki te pātai ki te kaitito.",
+      "cancelQueuedUpgradeRequired": "E hiahiatia ana he Kilo CLI hōu ake hei whakakore i ngā karere kua rārangi. Whakamohoatia te Kilo CLI ka hono anō."
     },
     "remoteSession": {
       "failedToCreate": "I rahua te hanga wātūtū mamao",
@@ -2213,7 +2220,8 @@
       "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria te Cloud Agent, tētahi atu CLI rānei.",
       "continueFrom": "Kei te haere tonu {{title}}",
       "importFailed": "Kāore i taea te kawemai i tēnei wātū.",
-      "importingSession": "Kei te kawemai i te wātū"
+      "importingSession": "Kei te kawemai i te wātū",
+      "discardWithUploadsMessage": "Ka mukua tō pātai me ngā kōnae kua tukua ake kāore anō kia whakapirihia ki ngā karere kua tukua."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "Kua rārangi te karere",
       "userMessage": "Karere kaiwhakamahi",
       "assistantMessage": "Karere kaiāwhina",
-      "longPressHint": "Pēhi roa mō ngā taipitopito karere"
+      "longPressHint": "Pēhi roa mō ngā taipitopito karere",
+      "cancelQueued": "Whakakore i te karere",
+      "cancelQueuedAccessibility": "Whakakore i te karere kua rārangi",
+      "restoreQueued": "Whakaora",
+      "restoreQueuedAccessibility": "Whakaora i te karere kua whakakorea ki te kaitito"
     },
     "olderMessages": {
       "arrived": "Kua uta ngā karere o mua",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Tātari ngā wātū",
-      "sortBy": "Whakarārangi mā",
-      "sortLastUpdated": "Nō muri whakahou",
-      "sortCreated": "I waihangatia",
       "platform": "Pātengi",
       "platformCloud": "Kapua",
       "platformExtension": "Toronga",
@@ -2545,7 +2554,9 @@
       "uploading": "E tuku ake ana…",
       "uploaded": "Kua tukua ake",
       "uploadFailedRetry": "I rahua te tuku ake. Pāwhiri ki te whakamātau anō.",
-      "uploadFailedTerminal": "Kāore e taea te tuku ake tēnei kōnae."
+      "uploadFailedTerminal": "Kāore e taea te tuku ake tēnei kōnae.",
+      "moveLeft": "Nukuhia {{filename}} ki mauī",
+      "moveRight": "Nukuhia {{filename}} ki matau"
     },
     "attachmentPasteHint": {
       "accessibility": "Whakapiri te whakaahua mai i te papatopu",
@@ -2575,7 +2586,17 @@
       "finalizingPlaceholder": "Kei te whakakapi...",
       "messagePlaceholder": "Karere...",
       "cannotReceiveFiles": "Kāore e taea te whiwhi kōnae i tēnei wātū. Tangohia ngā whakapirihanga kia tukua tō karere.",
-      "couldNotAttachFiles": "Kāore i taea te whakapiri kōnae. Pāwhiri ki te tuku kia whakamātau anō."
+      "couldNotAttachFiles": "Kāore i taea te whakapiri kōnae. Pāwhiri ki te tuku kia whakamātau anō.",
+      "discardAttachmentsMessage": "Ka mukua ngā kōnae kua tukua ake kāore anō kia whakapirihia ki ngā karere kua tukua.",
+      "discardAttachmentsTitle": "Whakarere i ngā whakapirihanga?",
+      "charactersRemaining": "E {{count}} ngā pū e toe ana",
+      "insertNewline": "Whakauru rārangi hōu",
+      "starterChipBuild": "Hangaia he āhuatanga",
+      "starterChipEmpty": "Tīmata ki tētahi whakaaro",
+      "starterChipFix": "Whakatikahia he hapa",
+      "starterChipPrepare": "Whakaritea taku taiao",
+      "starterChipWrapUp": "Whakakapia taku wātū",
+      "starterChipWriteTests": "Tuhia ngā whakamātau"
     },
     "chatLink": {
       "linkCopied": "Kua tāruatia te hononga",
@@ -2794,7 +2815,8 @@
     "busy": "Kei te pukumahi te tāuru reo. Whakamātau anō.",
     "stopped": "Kua mutu te tāuru reo. Pāwhiritia te hopuoro kia whakamātau anō.",
     "unavailableDevice": "Kāore e wātea ana te tāuru reo i tēnei pūrere.",
-    "unavailableLanguage": "Kāore e wātea ana te tāuru reo mō tēnei reo o te pūrere."
+    "unavailableLanguage": "Kāore e wātea ana te tāuru reo mō tēnei reo o te pūrere.",
+    "listeningStopped": "Kua mutu te whakarongo."
   },
   "share": {
     "title": "Tuari ki Kilo",

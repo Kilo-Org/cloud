@@ -1425,15 +1425,15 @@ describe.each([
       { text: 'x'.repeat(8192) },
       { text: '' },
     ];
-    const result = { ...completed, summary: 'x'.repeat(32768), evidence };
+    const result = { ...completed, summary: 'x'.repeat(32767), evidence };
     evidence[3].text = 'x'.repeat(65536 - Buffer.byteLength(JSON.stringify(result), 'utf8'));
+    expect(Buffer.byteLength(JSON.stringify(result), 'utf8')).toBe(65536);
     expect(contract.browserResultSchema.parse(result)).toEqual(result);
-    expect(
-      contract.browserResultSchema.safeParse({
-        ...result,
-        summary: `${result.summary.slice(1)}\u00e9`,
-      }).success
-    ).toBe(false);
+    const oversized = { ...result, summary: `${result.summary.slice(1)}\u00e9` };
+    expect(Buffer.byteLength(JSON.stringify(oversized), 'utf8')).toBe(65537);
+    // The succeeded variant checks every field without the aggregate refinement.
+    expect(contract.browserResultSchema.options[0].parse(oversized)).toEqual(oversized);
+    expect(contract.browserResultSchema.safeParse(oversized).success).toBe(false);
     const snapshot = { ...finishedJob, result };
     expect(
       contract.browserProviderInboundMessageSchema.parse({

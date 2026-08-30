@@ -567,7 +567,10 @@ describe('browser task controls', () => {
   ] as const)('announces %s without a stale owner or a loading queue', (phase, label) => {
     fixture.state = { ...fixture.state, phase };
     renderControls();
-    expect(screen.getByRole('status').textContent).toBe(`CLI tasks: ${label}`);
+    expect(screen.getAllByRole('status').map(status => status.textContent)).toStrictEqual([
+      `CLI tasks: ${label}`,
+      '',
+    ]);
     expect(screen.getByText('Queue empty.')).toBeDefined();
     expect(screen.queryByText(/Owner session:/u)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Stop CLI task' })).toBeNull();
@@ -817,6 +820,76 @@ describe('browser task controls', () => {
     expect(screen.queryByRole('button', { name: 'Refresh affected tabs' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Check recovery readiness' })).toBeNull();
   });
+
+  it.each([
+    {
+      label: 'Refresh status',
+      modal: false,
+      operation: 'refreshStatus',
+      pendingText: 'Retrieving status...',
+    },
+    {
+      label: 'Refresh status',
+      modal: true,
+      operation: 'refreshStatus',
+      pendingText: 'Retrieving status...',
+    },
+    {
+      label: 'Check recovery readiness',
+      modal: false,
+      operation: 'prepareRecovery',
+      pendingText: 'Checking recovery readiness...',
+    },
+    {
+      label: 'Check recovery readiness',
+      modal: true,
+      operation: 'prepareRecovery',
+      pendingText: 'Checking recovery readiness...',
+    },
+  ] as const)(
+    'updates a mounted status for the first $operation request (modal=$modal)',
+    async ({ modal, operation, label, pendingText }) => {
+      fixture.state = { ...fixture.state, phase: 'recovery' };
+      const pending = Promise.withResolvers<void>();
+      const action = vi.spyOn(actions, operation).mockImplementation(async () => {
+        await pending.promise;
+        return fixture.readiness;
+      });
+      renderControls(<SettingsOverlay />);
+      // eslint-disable-next-line jest/no-conditional-in-test -- Select the table's supervision surface.
+      const root = modal
+        ? openSettings()
+        : screen.getByRole('region', { name: 'CLI task supervision' });
+      const controls = within(root);
+      const status = controls.getAllByRole('status').find(region => region.textContent === '');
+      try {
+        expect(status).toBeDefined();
+        expect(status?.className).toBe('sr-only');
+        fireEvent.click(controls.getByRole('button', { name: label }));
+        expect(controls.getByText(pendingText)).toBe(status);
+        expect(status?.classList.contains('sr-only')).toBe(false);
+        expect(controls.getByRole('button', { name: label })).toHaveProperty('disabled', true);
+        await act(async () => {
+          pending.resolve();
+          await pending.promise;
+        });
+        expect(controls.getAllByRole('status')).toContain(status);
+        expect(status?.textContent).toBe(
+          // eslint-disable-next-line jest/no-conditional-in-test -- Each operation has a distinct completion notice.
+          operation === 'refreshStatus'
+            ? 'Status retrieved. This does not approve execution or resubmit work.'
+            : ''
+        );
+        expect(controls.getByRole('button', { name: label })).toHaveProperty('disabled', false);
+      } finally {
+        await act(async () => {
+          pending.resolve();
+          await pending.promise;
+        });
+        action.mockRestore();
+      }
+    }
+  );
 
   it('separates status retrieval, preparation, and explicit recovery and invalidates stale readiness', async () => {
     fixture.state = {

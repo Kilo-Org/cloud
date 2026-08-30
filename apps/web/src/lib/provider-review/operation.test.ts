@@ -1,4 +1,9 @@
 jest.mock('@/lib/drizzle', () => ({ db: { select: jest.fn() } }));
+jest.mock('@/lib/config.server', () => ({}));
+jest.mock('./bitbucket-read', () => ({
+  getBitbucketReview: jest.fn(),
+  listBitbucketFiles: jest.fn(),
+}));
 jest.mock('@kilocode/db/operation-ledger', () => ({
   ...jest.requireActual('@kilocode/db/operation-ledger'),
   admitOperation: jest.fn(),
@@ -9,8 +14,13 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
 }));
 
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { repositoryResourceKey } from '@kilocode/app-shared/code-review/repository-identity';
 import { db } from '@/lib/drizzle';
-import { user_terms_acceptances, type OperationLedgerRow } from '@kilocode/db/schema';
+import {
+  operation_ledgers,
+  user_terms_acceptances,
+  type OperationLedgerRow,
+} from '@kilocode/db/schema';
 import {
   admitOperation,
   recordOperationProgress,
@@ -21,7 +31,17 @@ import {
 } from '@kilocode/db/operation-ledger';
 import { ANALYTICS_EVENT_SCHEMAS } from '@kilocode/app-shared/analytics';
 import { CURRENT_UGC_TERMS_VERSION } from '@kilocode/app-shared/moderation';
-import { providerReviewFixtures } from '@kilocode/app-shared/provider-review/fixtures';
+import {
+  providerReviewFixtures,
+  reviewCapabilityFixtures,
+} from '@kilocode/app-shared/provider-review/fixtures';
+import { BitbucketInteractiveClientError } from '@/lib/integrations/platforms/bitbucket/interactive-client';
+import type { BitbucketReviewAuthorization } from './bitbucket-authorization';
+import { getBitbucketReview } from './bitbucket-read';
+import {
+  runBitbucketReviewOperation,
+  type BitbucketReviewOperationRequest,
+} from './bitbucket-write';
 import {
   confirmedReviewEffect,
   rejectedReviewEffect,
@@ -523,4 +543,443 @@ it('AC6 blocks dispatch when the durable dispatch fence cannot persist', async (
   jest.mocked(recordOperationProgress).mockRejectedValueOnce(new Error('offline'));
   expect(await run()).toMatchObject({ status: 'unresolved', retry: 'reconcile' });
   expect(effects).toEqual([]);
+});
+
+describe('Bitbucket merge evidence through the real operation and JSON ledger boundary', () => {
+  const repository = {
+    provider: 'bitbucket' as const,
+    instanceUrl: 'https://bitbucket.org',
+    repositoryId: '44444444-4444-4444-8444-444444444444',
+    workspaceUuid: '33333333-3333-4333-8333-333333333333',
+    fullName: 'team/repo',
+    defaultBranch: 'trunk',
+  };
+  const authorization = {
+    kind: 'ownerIntegration' as const,
+    owner: { type: 'org' as const, id: '11111111-1111-4111-8111-111111111111' },
+    integrationId: '22222222-2222-4222-8222-222222222222',
+  };
+  const mergeRequest: BitbucketReviewOperationRequest = {
+    userId,
+    distinctId: 'caller',
+    operationKey: '66666666-6666-4666-8666-666666666666',
+    intent: {
+      accountId: userId,
+      actorId: '55555555-5555-4555-8555-555555555555',
+      review: {
+        repository,
+        authorization,
+        reviewId: '7',
+        number: '7',
+        canonicalUrl: 'https://bitbucket.org/team/repo/pull-requests/7',
+      },
+      revision: {
+        headSha: 'a'.repeat(40),
+        targetHeadSha: 'b'.repeat(40),
+        baseSha: null,
+        startSha: null,
+      },
+      input: { action: 'merge', method: 'merge_commit' },
+    },
+  };
+  const evidence = {
+    source: {
+      repositoryId: repository.repositoryId,
+      workspaceUuid: repository.workspaceUuid,
+      fullName: repository.fullName,
+      branch: 'feature',
+    },
+    destination: {
+      repositoryId: repository.repositoryId,
+      workspaceUuid: repository.workspaceUuid,
+      fullName: repository.fullName,
+      branch: 'trunk',
+    },
+  };
+  const taskUrl =
+    'https://api.bitbucket.org/2.0/repositories/team/repo/pullrequests/7/merge/task-status/task-1';
+  const actualLedger = jest.requireActual<{
+    recordOperationProgress: typeof recordOperationProgress;
+    recordOperationAcceptance: typeof recordOperationAcceptance;
+  }>('@kilocode/db/operation-ledger');
+  let auth: BitbucketReviewAuthorization;
+  let pr: any;
+  let acceptedTask: boolean;
+  let taskComplete: boolean;
+  let unavailable: boolean;
+  let loseResponse: boolean;
+  let dispatchSnapshots: unknown[];
+  let recoveredRun: typeof runBitbucketReviewOperation;
+
+  // Keep real progress/acceptance merging and the production JSONB serializer. Only storage I/O is fake.
+  function storage(rowId: string) {
+    return {
+      select: () => ({
+        from: () => ({ where: () => ({ for: async () => [structuredClone(recorded(rowId))] }) }),
+      }),
+      update: () => ({
+        set: (patch: Partial<OperationLedgerRow>) => ({
+          where: () => ({
+            returning: async () => {
+              const value = recorded(rowId);
+              const json = operation_ledgers.canonical_result.mapToDriverValue(
+                patch.canonical_result ?? null
+              );
+              Object.assign(value, {
+                ...patch,
+                canonical_result: operation_ledgers.canonical_result.mapFromDriverValue(json),
+              });
+              return [structuredClone(value)];
+            },
+          }),
+        }),
+      }),
+    } as any;
+  }
+  function restart() {
+    rows = new Map(JSON.parse(JSON.stringify([...rows])) as [string, OperationLedgerRow][]);
+    for (const value of rows.values()) value.lease_expires_at = new Date(0).toISOString();
+    jest.isolateModules(() => {
+      recoveredRun = jest.requireActual<{
+        runBitbucketReviewOperation: typeof runBitbucketReviewOperation;
+      }>('./bitbucket-write').runBitbucketReviewOperation;
+    });
+  }
+  function finishMerge() {
+    pr.state = 'MERGED';
+    pr.merge_commit = { hash: 'c'.repeat(40) };
+  }
+  beforeEach(() => {
+    acceptedTask = false;
+    taskComplete = false;
+    unavailable = false;
+    loseResponse = false;
+    dispatchSnapshots = [];
+    recoveredRun = runBitbucketReviewOperation;
+    const nativeRepository = {
+      uuid: `{${repository.repositoryId}}`,
+      full_name: repository.fullName,
+      workspace: { uuid: `{${repository.workspaceUuid}}` },
+    };
+    pr = {
+      type: 'pullrequest',
+      id: 7,
+      state: 'OPEN',
+      links: { html: { href: mergeRequest.intent.review.canonicalUrl } },
+      source: {
+        repository: structuredClone(nativeRepository),
+        branch: { name: 'feature' },
+        commit: { hash: mergeRequest.intent.revision.headSha },
+      },
+      destination: {
+        repository: structuredClone(nativeRepository),
+        branch: { name: 'trunk' },
+        commit: { hash: mergeRequest.intent.revision.targetHeadSha },
+      },
+    };
+    auth = {
+      userId,
+      repository,
+      authorization,
+      path: {
+        workspace: `{${repository.workspaceUuid}}`,
+        repo_slug: `{${repository.repositoryId}}`,
+      },
+      actor: {
+        provider: 'bitbucket',
+        instanceUrl: repository.instanceUrl,
+        id: mergeRequest.intent.actorId,
+        login: 'reviewer',
+        displayName: null,
+        avatarUrl: null,
+      },
+      credentialKind: 'bitbucketOAuth',
+      scopes: ['pullrequest:write'],
+      client: {
+        execute: async input => {
+          if (input.operation === 'merge') {
+            dispatchSnapshots = structuredClone(
+              [...rows.values()].map(value => value.canonical_result)
+            );
+            effects.push('merge');
+            if (loseResponse) {
+              finishMerge();
+              throw new BitbucketInteractiveClientError('transport_failed');
+            }
+            if (acceptedTask)
+              return { status: 202, data: null, location: taskUrl, metadata: {} } as any;
+            finishMerge();
+          } else if (input.operation === 'mergeTask') {
+            if (unavailable) throw new BitbucketInteractiveClientError('temporarily_unavailable');
+            if (taskComplete) finishMerge();
+            return {
+              status: 200,
+              data: {
+                task_status: taskComplete ? 'SUCCESS' : 'PENDING',
+                links: { self: { href: taskUrl } },
+                ...(taskComplete ? { merge_result: structuredClone(pr) } : {}),
+              },
+              metadata: {},
+            } as any;
+          }
+          return { status: 200, data: structuredClone(pr), metadata: {} } as any;
+        },
+      },
+    };
+    jest.mocked(getBitbucketReview).mockImplementation(
+      async () =>
+        ({
+          identity: mergeRequest.intent.review,
+          revision: mergeRequest.intent.revision,
+          state: 'open',
+          source: { repository, branch: pr.source.branch.name },
+          target: { repository, branch: pr.destination.branch.name },
+          merge: { methods: [{ id: 'merge_commit', label: 'Merge commit' }] },
+          authorization: { capabilities: reviewCapabilityFixtures('bitbucket') },
+        }) as any
+    );
+    jest
+      .mocked(recordOperationProgress)
+      .mockImplementation(async (_db, rowId, patch) =>
+        actualLedger.recordOperationProgress(storage(rowId), rowId, patch)
+      );
+    jest
+      .mocked(recordOperationAcceptance)
+      .mockImplementation(async (_db, input) =>
+        actualLedger.recordOperationAcceptance(storage(input.rowId), input)
+      );
+  });
+
+  it('AC7 stores server preflight identity before dispatch and ignores client evidence', async () => {
+    const forged = {
+      source: { ...evidence.source, branch: 'injected' },
+      destination: evidence.destination,
+    };
+    const result = await recoveredRun(auth, {
+      ...mergeRequest,
+      intent: { ...mergeRequest.intent, bitbucketMergeEvidence: forged },
+      bitbucketMergeEvidence: forged,
+    } as BitbucketReviewOperationRequest);
+    expect(result).toEqual(
+      confirmedReviewEffect({
+        provider: 'bitbucket',
+        kind: 'review',
+        id: '7',
+        url: mergeRequest.intent.review.canonicalUrl,
+      })
+    );
+    expect(dispatchSnapshots).toEqual([
+      { result: unresolvedReviewEffect('dispatching'), bitbucketMergeEvidence: evidence },
+    ]);
+    expect(row().canonical_result).toEqual({ result, bitbucketMergeEvidence: evidence });
+    expect(Buffer.byteLength(JSON.stringify(row().canonical_result))).toBeLessThan(4096);
+    expect(effects).toEqual(['merge']);
+  });
+
+  it('AC7 retains the task and preflight identity through unavailable polling and process restart', async () => {
+    acceptedTask = true;
+    const accepted = await recoveredRun(auth, mergeRequest);
+    expect(accepted).toMatchObject({ status: 'accepted', reference: { id: 'task-1' } });
+    restart();
+    unavailable = true;
+    expect(await recoveredRun(auth, mergeRequest, true)).toMatchObject({
+      status: 'unresolved',
+      retry: 'reconcile',
+    });
+    expect(row().canonical_result).toEqual({ result: accepted, bitbucketMergeEvidence: evidence });
+    expect(row().provider_ref).toBe(
+      JSON.stringify({ provider: 'bitbucket', kind: 'merge-task', id: 'task-1', url: taskUrl })
+    );
+    restart();
+    unavailable = false;
+    taskComplete = true;
+    expect(await recoveredRun(auth, mergeRequest, true)).toMatchObject({ status: 'confirmed' });
+    expect(await recoveredRun(auth, mergeRequest)).toMatchObject({ status: 'confirmed' });
+    expect(row().status).toBe('completed');
+    expect(row().canonical_result?.bitbucketMergeEvidence).toEqual(evidence);
+    expect(effects).toEqual(['merge']);
+  });
+
+  it('AC7 recovers a lost merge response from serialized preflight identity without another write', async () => {
+    loseResponse = true;
+    expect(await recoveredRun(auth, mergeRequest)).toMatchObject({ status: 'unresolved' });
+    restart();
+    loseResponse = false;
+    expect(await recoveredRun(auth, mergeRequest, true)).toMatchObject({ status: 'confirmed' });
+    expect(pr.state).toBe('MERGED');
+    expect(effects).toEqual(['merge']);
+  });
+
+  it.each(
+    (['source', 'destination'] as const).flatMap(endpoint =>
+      (['branch', 'repository', 'workspace'] as const).map(field => ({ endpoint, field }))
+    )
+  )(
+    'AC7 rejects same-SHA $endpoint $field drift after serialized restart',
+    async ({ endpoint, field }) => {
+      loseResponse = true;
+      await recoveredRun(auth, mergeRequest);
+      restart();
+      if (field === 'branch') pr[endpoint].branch.name = 'different';
+      if (field === 'repository')
+        pr[endpoint].repository.uuid = '{77777777-7777-4777-8777-777777777777}';
+      if (field === 'workspace')
+        pr[endpoint].repository.workspace.uuid = '{88888888-8888-4888-8888-888888888888}';
+      expect(await recoveredRun(auth, mergeRequest, true)).toMatchObject({
+        status: 'unresolved',
+        retry: 'reconcile',
+      });
+      restart();
+      expect(await recoveredRun(auth, mergeRequest)).toMatchObject({ status: 'unresolved' });
+      expect(row().canonical_result?.bitbucketMergeEvidence).toEqual(evidence);
+      expect(effects).toEqual(['merge']);
+    }
+  );
+
+  it.each(['absent', 'malformed', 'incomplete', 'legacy accepted', 'legacy confirmed'] as const)(
+    'AC7 never reconstructs %s merge identity from matching postflight objects',
+    async condition => {
+      acceptedTask = condition === 'legacy accepted';
+      loseResponse = condition !== 'legacy accepted' && condition !== 'legacy confirmed';
+      await recoveredRun(auth, mergeRequest);
+      const canonical = row().canonical_result!;
+      if (condition === 'malformed')
+        canonical.bitbucketMergeEvidence = {
+          ...evidence,
+          source: { ...evidence.source, repositoryId: 'not-a-uuid' },
+        };
+      else if (condition === 'incomplete')
+        canonical.bitbucketMergeEvidence = { source: evidence.source };
+      else delete canonical.bitbucketMergeEvidence;
+      finishMerge();
+      restart();
+      expect(await recoveredRun(auth, mergeRequest, true)).toMatchObject({
+        status: 'unresolved',
+        reason: 'merge_identity_unavailable',
+        retry: 'reconcile',
+      });
+      restart();
+      expect(await recoveredRun(auth, mergeRequest)).toMatchObject({ status: 'unresolved' });
+      expect(effects).toEqual(['merge']);
+    }
+  );
+
+  it.each(['valid', 'absent', 'malformed', 'incomplete', 'missing child'] as const)(
+    'AC7 checks serialized child identity beneath a cached aggregate: %s',
+    async condition => {
+      const aggregateRequest: BitbucketReviewOperationRequest = {
+        ...mergeRequest,
+        intent: {
+          ...mergeRequest.intent,
+          input: {
+            ...mergeRequest.intent.input,
+            deletion: {
+              effect: 'delete',
+              branch: 'feature',
+              expectedHeadSha: mergeRequest.intent.revision.headSha,
+              repositoryKey: repositoryResourceKey(userId, { repository, authorization }),
+            },
+          },
+        },
+      };
+      const execute = auth.client.execute;
+      auth.client.execute = async input => {
+        if (input.operation !== 'branch') return execute(input);
+        if (pr.state === 'MERGED') throw new BitbucketInteractiveClientError('not_found');
+        return {
+          status: 200,
+          data: { name: 'feature', target: { hash: mergeRequest.intent.revision.headSha } },
+          metadata: {},
+        } as any;
+      };
+      expect(await recoveredRun(auth, aggregateRequest)).toMatchObject({ status: 'confirmed' });
+      const child = [...rows.values()].find(
+        value => value.intent === 'merge' && value.operation_key !== aggregateRequest.operationKey
+      )!;
+      expect(child.canonical_result).toMatchObject({
+        result: { status: 'confirmed' },
+        bitbucketMergeEvidence: evidence,
+      });
+      const canonical = child.canonical_result!;
+      if (condition === 'missing child') rows.delete(rowKey(userId, child.operation_key));
+      else if (condition === 'absent') delete canonical.bitbucketMergeEvidence;
+      else if (condition === 'malformed')
+        canonical.bitbucketMergeEvidence = {
+          ...evidence,
+          source: { ...evidence.source, repositoryId: 'not-a-uuid' },
+        };
+      else if (condition === 'incomplete')
+        canonical.bitbucketMergeEvidence = { source: evidence.source };
+
+      for (const statusOnly of [true, false]) {
+        restart();
+        expect(await recoveredRun(auth, aggregateRequest, statusOnly)).toMatchObject(
+          condition === 'valid'
+            ? { status: 'confirmed', reference: { kind: 'review', id: '7' } }
+            : {
+                status: 'partial',
+                retry: 'unfinished-only',
+                items: [
+                  {
+                    itemId: 'merge',
+                    effect: 'merge',
+                    result:
+                      condition === 'missing child'
+                        ? { status: 'rejected', code: 'operation_not_admitted', retry: 'same-key' }
+                        : {
+                            status: 'unresolved',
+                            reason: 'merge_identity_unavailable',
+                            retry: 'reconcile',
+                          },
+                  },
+                  {
+                    itemId: 'deleteBranch',
+                    effect: 'deleteBranch',
+                    result: { status: 'confirmed' },
+                  },
+                ],
+              }
+        );
+        expect(effects).toEqual(['merge']);
+        expect(rows.size).toBe(condition === 'missing child' ? 2 : 3);
+      }
+    }
+  );
+
+  it.each(['throw', 'no row'] as const)(
+    'AC7 sends no merge when evidence persistence returns %s',
+    async failure => {
+      const progress = jest.mocked(recordOperationProgress).getMockImplementation()!;
+      jest.mocked(recordOperationProgress).mockImplementation(async (database, rowId, patch) => {
+        if (patch.bitbucketMergeEvidence) {
+          if (failure === 'throw') throw new Error('Storage unavailable');
+          return null;
+        }
+        return progress(database, rowId, patch);
+      });
+      expect(await recoveredRun(auth, mergeRequest)).toMatchObject({
+        status: 'rejected',
+        code: 'preflight_unavailable',
+        retry: 'same-key',
+      });
+      expect(effects).toEqual([]);
+      expect(pr.state).toBe('OPEN');
+      jest.mocked(recordOperationProgress).mockImplementation(progress);
+      expect(await recoveredRun(auth, mergeRequest)).toMatchObject({ status: 'confirmed' });
+      expect(effects).toEqual(['merge']);
+    }
+  );
+
+  it('AC7 rejects evidence that cannot fit the existing ledger before sending a merge', async () => {
+    pr.source.branch.name = 's'.repeat(2000);
+    pr.destination.branch.name = 'd'.repeat(2000);
+    expect(await recoveredRun(auth, mergeRequest)).toMatchObject({
+      status: 'rejected',
+      code: 'preflight_unavailable',
+      retry: 'same-key',
+    });
+    expect(effects).toEqual([]);
+    expect(pr.state).toBe('OPEN');
+    expect(Buffer.byteLength(JSON.stringify(row().canonical_result))).toBeLessThan(4096);
+  });
 });

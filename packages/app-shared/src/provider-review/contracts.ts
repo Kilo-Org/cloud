@@ -213,6 +213,21 @@ export const BitbucketMergeTaskSchema = z.strictObject({
   error: z.string().nullable(),
 });
 export type BitbucketMergeTask = z.infer<typeof BitbucketMergeTaskSchema>;
+
+const bitbucketMergeEndpoint = z.strictObject({
+  repositoryId: z.uuid(),
+  workspaceUuid: z.uuid(),
+  fullName: id.max(511),
+  branch: id.max(4096),
+});
+// Server-observed preflight evidence lives beside the ledger result, never in the write intent.
+// Old ledger rows omit it until their 30-day retention expires; absence cannot confirm a merge.
+export const BitbucketMergeEvidenceSchema = z.strictObject({
+  source: bitbucketMergeEndpoint,
+  destination: bitbucketMergeEndpoint,
+});
+export type BitbucketMergeEvidence = z.infer<typeof BitbucketMergeEvidenceSchema>;
+
 export const ReviewCheckSchema = z.strictObject({
   id,
   name: id,

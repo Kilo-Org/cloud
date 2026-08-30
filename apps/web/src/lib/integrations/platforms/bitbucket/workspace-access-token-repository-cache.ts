@@ -7,6 +7,7 @@ import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES,
   BitbucketWorkspaceAccessTokenCredentialRowSchema,
   getMissingBitbucketWorkspaceAccessTokenScopes,
+  getBitbucketReviewGrantStatus,
   getUnexpectedBitbucketWorkspaceAccessTokenScopes,
   hasRequiredBitbucketWorkspaceAccessTokenScopes,
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
@@ -314,7 +315,21 @@ export async function getBitbucketWorkspaceAccessTokenStatus(organizationId: str
   if (!integration) return notConnectedStatus();
 
   const invalidationReason = InvalidationReasonSchema.safeParse(integration.row.authInvalidReason);
+  // Old optimistic status producers omit this addition until refetch. Remove only after old
+  // clients/records disappear and the 30-day ledger window expires; absence never proves write access.
+  const permissions: {
+    reviewPermissions?: ReturnType<typeof getBitbucketReviewGrantStatus> | null;
+  } = {
+    reviewPermissions:
+      integration.state === 'usable'
+        ? getBitbucketReviewGrantStatus(
+            integration.credentialProfile?.provider_scopes ?? [],
+            'workspace_access_token'
+          )
+        : null,
+  };
   const statusDetails = {
+    ...permissions,
     method: BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE,
     integrationId: integration.row.integrationId,
     integrationStatus: integration.row.integrationStatus,

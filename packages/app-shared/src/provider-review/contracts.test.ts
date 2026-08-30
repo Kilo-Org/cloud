@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { CODE_REVIEW_PLATFORMS } from '../code-review/enums';
 import { normalizeLegacyGitHubReviewRepository } from '../code-review/repository-identity';
 import {
+  BitbucketMergeEvidenceSchema,
   BitbucketMergeTaskSchema,
   ProviderReferenceSchema,
   ProviderReviewStateSchema,
@@ -362,4 +363,59 @@ describe('normalized provider review contracts', () => {
     expect(() => serializeReviewWriteRequest({ body: `${request.body}a` })).toThrow('byte limit');
     expect(() => serializeReviewWriteRequest(undefined)).toThrow();
   });
+});
+
+describe('persisted Bitbucket merge evidence', () => {
+  const destination = {
+    repositoryId: '11111111-1111-4111-8111-111111111111',
+    workspaceUuid: '22222222-2222-4222-8222-222222222222',
+    fullName: 'team/repo',
+    branch: 'trunk',
+  };
+  const evidence = {
+    source: {
+      repositoryId: '33333333-3333-4333-8333-333333333333',
+      workspaceUuid: '44444444-4444-4444-8444-444444444444',
+      fullName: 'contributor/fork',
+      branch: 'feature/review',
+    },
+    destination,
+  };
+  it('retains distinct fork and destination identities after JSON storage', () => {
+    expect(BitbucketMergeEvidenceSchema.parse(JSON.parse(JSON.stringify(evidence)))).toEqual(
+      evidence
+    );
+    expect(
+      ReviewMutationResultSchema.safeParse({ ...confirmed, bitbucketMergeEvidence: evidence })
+        .success
+    ).toBe(false);
+  });
+  it.each(
+    (['source', 'destination'] as const).flatMap(endpoint =>
+      [
+        { repositoryId: undefined },
+        { repositoryId: 'team/repo' },
+        { workspaceUuid: undefined },
+        { workspaceUuid: 'team' },
+        { fullName: '' },
+        { branch: undefined },
+        { branch: null },
+        { branch: '' },
+        { clientSupplied: true },
+      ].map(change => ({ endpoint, change }))
+    )
+  )('rejects malformed $endpoint evidence: $change', ({ endpoint, change }) => {
+    expect(
+      BitbucketMergeEvidenceSchema.safeParse({
+        ...evidence,
+        [endpoint]: { ...evidence[endpoint], ...change },
+      }).success
+    ).toBe(false);
+  });
+  it.each([undefined, null, {}, { source: evidence.source }, { destination }])(
+    'does not invent missing persisted identity: %j',
+    value => {
+      expect(BitbucketMergeEvidenceSchema.safeParse(value).success).toBe(false);
+    }
+  );
 });

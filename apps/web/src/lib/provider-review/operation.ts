@@ -8,9 +8,11 @@ import { z } from 'zod';
 import { CURRENT_UGC_TERMS_VERSION } from '@kilocode/app-shared/moderation';
 import { PR_OPERATION_SETTLED_EVENT } from '@kilocode/app-shared/analytics';
 import {
+  BitbucketMergeEvidenceSchema,
   ReviewEffectResultSchema,
   providerReviewIntentFingerprint,
   serializeReviewWriteRequest,
+  type BitbucketMergeEvidence,
   type ProviderReference,
   type ReviewAction,
   type ReviewIntent,
@@ -28,6 +30,7 @@ import { operation_ledgers, user_terms_acceptances } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 
 export type ReviewEffectResult = z.infer<typeof ReviewEffectResultSchema>;
+export type PersistBitbucketMergeEvidence = (evidence: BitbucketMergeEvidence) => Promise<void>;
 export type ReviewOperationRequest = {
   userId: string;
   distinctId: string;
@@ -81,8 +84,11 @@ export async function runReviewOperation(
   request: ReviewOperationRequest,
   handlers: {
     // Omission selects status-only reconciliation, never a new provider write.
-    execute?: () => Promise<ReviewEffectResult>;
-    reconcile: (stored: ReviewEffectResult | null) => Promise<ReviewEffectResult>;
+    execute?: (persistMergeEvidence?: PersistBitbucketMergeEvidence) => Promise<ReviewEffectResult>;
+    reconcile: (
+      stored: ReviewEffectResult | null,
+      mergeEvidence?: BitbucketMergeEvidence | null
+    ) => Promise<ReviewEffectResult>;
     // Aggregate rows bind batches; only their individual provider effects emit outcomes.
     aggregate?: true;
   }
@@ -157,6 +163,21 @@ export async function runReviewOperation(
     return rejectedReviewEffect('operation_key_reuse_mismatch');
   const parsed = ReviewEffectResultSchema.safeParse(row.canonical_result?.result);
   const stored = parsed.success ? parsed.data : null;
+  const needsMergeEvidence =
+    intent.review.repository.provider === 'bitbucket' && action === 'merge' && !handlers.aggregate;
+  const parsedEvidence = BitbucketMergeEvidenceSchema.safeParse(
+    row.canonical_result?.bitbucketMergeEvidence
+  );
+  let mergeEvidence: BitbucketMergeEvidence | null =
+    needsMergeEvidence && parsedEvidence.success ? parsedEvidence.data : null;
+  // Old Bitbucket rows lack preflight identity. Keep them unresolved until their retention expires;
+  // neither a saved result nor matching postflight heads can reconstruct the intended branches.
+  if (
+    needsMergeEvidence &&
+    !mergeEvidence &&
+    (stored?.status === 'confirmed' || stored?.status === 'accepted')
+  )
+    return unresolvedReviewEffect('merge_identity_unavailable', stored.reference);
   if (admission.admission === 'duplicate_settled')
     return stored &&
       (stored.status === 'confirmed' || (stored.status === 'rejected' && stored.retry === 'never'))
@@ -218,18 +239,43 @@ export async function runReviewOperation(
         (stored?.status === 'rejected' && stored.retry === 'same-key'))
     ) {
       // Retire a previous safe-retry receipt before dispatch. A lost response must not leave it replayable.
+      const dispatchResult = unresolvedReviewEffect('dispatching');
       const dispatching = await recordOperationProgress(db, row.id, {
-        result: unresolvedReviewEffect('dispatching'),
+        result: dispatchResult,
+        ...(needsMergeEvidence ? { bitbucketMergeEvidence: null } : {}),
       });
       if (!dispatching) throw new Error('Dispatch admission did not persist');
-      result = await handlers.execute();
+      mergeEvidence = null;
+      result = await handlers.execute(async evidence => {
+        if (!needsMergeEvidence) throw new Error('Unexpected merge evidence');
+        // Only the server handler supplies evidence, after its authorized preflight and before dispatch.
+        const canonicalResult = {
+          result: dispatchResult,
+          bitbucketMergeEvidence: BitbucketMergeEvidenceSchema.parse(evidence),
+        };
+        if (
+          Buffer.byteLength(JSON.stringify(canonicalResult), 'utf8') >= MAX_CANONICAL_RESULT_BYTES
+        )
+          throw new Error('Merge evidence exceeds the ledger limit');
+        if (!(await recordOperationProgress(db, row.id, canonicalResult)))
+          throw new Error('Merge evidence did not persist');
+        mergeEvidence = canonicalResult.bitbucketMergeEvidence;
+      });
     } else
       result =
         stored?.status === 'rejected' && stored.retry === 'same-key'
           ? stored
-          : await handlers.reconcile(stored);
+          : await handlers.reconcile(stored, mergeEvidence);
     result = ReviewEffectResultSchema.parse(result);
-    if (Buffer.byteLength(JSON.stringify({ result }), 'utf8') >= MAX_CANONICAL_RESULT_BYTES)
+    if (
+      Buffer.byteLength(
+        JSON.stringify({
+          result,
+          ...(mergeEvidence ? { bitbucketMergeEvidence: mergeEvidence } : {}),
+        }),
+        'utf8'
+      ) >= MAX_CANONICAL_RESULT_BYTES
+    )
       result = unresolvedReviewEffect('result_too_large');
   } catch {
     result = unresolvedReviewEffect('provider_outcome_unknown');

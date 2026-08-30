@@ -636,13 +636,15 @@ async function handleCoreInstallFlow(params: {
     });
 
     if (!upsertResult.ok) {
+      const error =
+        upsertResult.reason === 'multiple_installations_disabled'
+          ? 'multiple_installations_disabled'
+          : 'installation_already_claimed';
       if (isAppInitiated) {
-        return NextResponse.redirect(
-          new URL(appFallbackPath('error=installation_already_claimed'), APP_URL)
-        );
+        return NextResponse.redirect(new URL(appFallbackPath(`error=${error}`), APP_URL));
       }
       return NextResponse.redirect(
-        new URL(appendQueryParam(redirectPath, 'error=installation_already_claimed'), APP_URL)
+        new URL(appendQueryParam(redirectPath, `error=${error}`), APP_URL)
       );
     }
   }

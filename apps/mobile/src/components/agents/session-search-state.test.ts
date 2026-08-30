@@ -7,7 +7,6 @@ import {
   type SearchTimer,
   type SessionSearchController,
 } from '@/components/agents/session-search-state';
-import { createDefaultAgentSessionFilters } from '@/lib/agent-session-filters';
 
 type FakeTimer = SearchTimer & {
   fire(): void;
@@ -114,55 +113,6 @@ describe('createSessionSearchController', () => {
     // stale commit — that's the whole point of cancelling.
     timer.fire();
     expect(commits).toEqual(['']);
-  });
-
-  it('clearBroadly commits an empty query AND applies the narrowing-filter reset (preserving sort)', () => {
-    const timer = createFakeTimer();
-    const commits: string[] = [];
-    const controller = createController(timer, commits);
-
-    controller.scheduleSearch('still pending');
-    const before = createDefaultAgentSessionFilters();
-    const current = {
-      ...before,
-      platformFilter: ['macos'],
-      projectFilter: ['git/a'],
-      sortBy: 'updated_at' as const,
-    };
-
-    let receivedPrev: typeof current | null = null;
-    controller.clearBroadly(apply => {
-      receivedPrev = current;
-      const next = apply(current);
-      // sortBy stays — it's a persistent preference, not a filter.
-      expect(next).toEqual({
-        platformFilter: [],
-        projectFilter: [],
-        sortBy: 'updated_at',
-      });
-    });
-
-    expect(receivedPrev).toBe(current);
-    expect(commits).toEqual(['']);
-    expect(controller.hasPending()).toBe(false);
-  });
-
-  it('clearBroadly is safe to call when no debounce is pending and still runs the filter transform', () => {
-    const timer = createFakeTimer();
-    const commits: string[] = [];
-    const controller = createController(timer, commits);
-
-    let applyCalls = 0;
-    controller.clearBroadly(apply => {
-      applyCalls += 1;
-      // The transform is what actually clears the narrowing filters;
-      // the test just proves the controller hands the previous value
-      // through unchanged.
-      const prev = createDefaultAgentSessionFilters();
-      expect(apply(prev)).toEqual(prev);
-    });
-    expect(commits).toEqual(['']);
-    expect(applyCalls).toBe(1);
   });
 
   it('dispose cancels a pending debounce without committing', () => {

@@ -550,6 +550,130 @@ it('does not use an errored revision field to invalidate independent context', a
   expect(context.labels.completeness).toBe('complete');
 });
 
+const writerReview = {
+  id: 'REVIEW',
+  state: 'APPROVED',
+  submittedAt: '2026-08-29T00:00:00Z',
+  commit: { oid: 'head' },
+  author: {
+    __typename: 'User',
+    id: 'USER',
+    login: 'writer',
+    name: null,
+    avatarUrl: null,
+    url: null,
+  },
+  onBehalfOf: empty,
+};
+const approvalPolicy = {
+  required_pull_request_reviews: {
+    required_approving_review_count: 2,
+    dismiss_stale_reviews: false,
+    require_code_owner_reviews: false,
+    require_last_push_approval: false,
+  },
+};
+
+it('uses the writer-only API filter for approval shortfalls', async () => {
+  const otherReview = {
+    ...writerReview,
+    id: 'OTHER_REVIEW',
+    author: { ...writerReview.author, id: 'OTHER_USER', login: 'reader' },
+  };
+  const { context } = await run((url, options) => {
+    if (decodeURIComponent(url.pathname) === protectionPath) return Response.json(approvalPolicy);
+    if (url.pathname !== '/graphql') return;
+    const { query } = JSON.parse(String(options.body));
+    const field = Object.entries({
+      ...PR_CONTEXT_REVIEW_QUERIES,
+      eligibleReviews: PR_CONTEXT_REQUIREMENT_QUERIES.eligibleReviews,
+    }).find(([, document]) => document === query)?.[0];
+    if (!field) return;
+    const nodes = query.includes('writersOnly: true')
+      ? [writerReview]
+      : [writerReview, otherReview];
+    return Response.json({
+      data: {
+        repository: { pullRequest: { [field]: { ...empty, nodes, totalCount: nodes.length } } },
+      },
+    });
+  });
+  expect(context.reviewDecisions.items).toHaveLength(2);
+  expect(context.requirements.items.find(item => item.kind === 'approving-reviews')).toMatchObject({
+    state: 'unmet',
+    evidence: expect.arrayContaining([
+      expect.objectContaining({ observation: 'eligible-approvals:1/2;ids:REVIEW' }),
+    ]),
+  });
+});
+
+it('rejects conflicting eligible review pages without changing independent review decisions', async () => {
+  const { context } = await run((url, options) => {
+    if (decodeURIComponent(url.pathname) === protectionPath) return Response.json(approvalPolicy);
+    if (url.pathname !== '/graphql') return;
+    const { query, variables } = JSON.parse(String(options.body));
+    if (query === PR_CONTEXT_REQUIREMENT_QUERIES.eligibleReviews)
+      return Response.json({
+        data: {
+          repository: {
+            pullRequest: {
+              eligibleReviews: {
+                nodes: [
+                  { ...writerReview, state: variables.after ? 'APPROVED' : 'CHANGES_REQUESTED' },
+                ],
+                totalCount: 1,
+                pageInfo: variables.after
+                  ? empty.pageInfo
+                  : { hasNextPage: true, endCursor: 'next' },
+              },
+            },
+          },
+        },
+      });
+    const field = Object.entries(PR_CONTEXT_REVIEW_QUERIES).find(
+      ([, document]) => document === query
+    )?.[0];
+    if (field)
+      return Response.json({
+        data: {
+          repository: {
+            pullRequest: { [field]: { ...empty, nodes: [writerReview], totalCount: 1 } },
+          },
+        },
+      });
+  });
+  expect(context.requirements.items.find(item => item.kind === 'approving-reviews')?.state).toBe(
+    'unavailable'
+  );
+  expect(context.reviewDecisions).toMatchObject({
+    completeness: 'complete',
+    items: [{ id: 'REVIEW', state: 'APPROVED' }],
+  });
+});
+
+it('keeps conflicting check pages unavailable instead of accepting their last outcome', async () => {
+  const { context } = await run((url, options) => {
+    if (url.pathname !== '/graphql') return;
+    const { query, variables } = JSON.parse(String(options.body));
+    if (query !== PR_CONTEXT_REQUIREMENT_QUERIES.checks) return;
+    return checkPage(
+      [{ ...observedRun, conclusion: variables.after ? 'SUCCESS' : 'FAILURE' }],
+      variables.after ? empty.pageInfo : { hasNextPage: true, endCursor: 'next' },
+      1
+    );
+  });
+  expect(context.checks.items[0]).toMatchObject({
+    id: 'RUN',
+    requiredness: 'unknown',
+    observation: 'unknown',
+  });
+  expect(
+    context.requirements.items
+      .filter(item => item.check)
+      .every(item => item.state === 'unavailable')
+  ).toBe(true);
+});
+
 const observedRun = {
   __typename: 'CheckRun',
   id: 'RUN',
@@ -690,6 +814,99 @@ it.each([true, false])('does not trust an errored isRequired value of %s', async
   ).toBe(true);
   expect(context.labels.completeness).toBe('complete');
 });
+
+it('does not use an errored application binding for a bound policy', async () => {
+  const { context } = await run((url, options) => {
+    if (
+      url.pathname !== '/graphql' ||
+      JSON.parse(String(options.body)).query !== PR_CONTEXT_REQUIREMENT_QUERIES.checks
+    )
+      return;
+    return checkPage([observedRun], empty.pageInfo, 1, [
+      {
+        type: 'FORBIDDEN',
+        path: [
+          'repository',
+          'object',
+          'statusCheckRollup',
+          'contexts',
+          'nodes',
+          0,
+          'checkSuite',
+          'app',
+        ],
+      },
+    ]);
+  });
+  expect(context.checks.items[0]).toMatchObject({
+    application: null,
+    requiredness: 'required',
+    outcome: 'failure',
+  });
+  expect(
+    context.requirements.items.find(item => item.check?.application.kind === 'app')?.state
+  ).toBe('unavailable');
+  expect(
+    context.requirements.items.find(item => item.check?.application.kind === 'any')?.state
+  ).toBe('unmet');
+});
+
+it('retains check pages after a transient failure without inventing missing checks', async () => {
+  const { context } = await run((url, options) => {
+    if (decodeURIComponent(url.pathname) === protectionPath)
+      return Response.json({
+        required_status_checks: {
+          strict: false,
+          contexts: ['ci', 'absent'],
+          checks: [
+            { context: 'ci', app_id: -1 },
+            { context: 'absent', app_id: -1 },
+          ],
+        },
+      });
+    if (url.pathname !== '/graphql') return;
+    const { query, variables } = JSON.parse(String(options.body));
+    if (query !== PR_CONTEXT_REQUIREMENT_QUERIES.checks) return;
+    return variables.after
+      ? failure(503)
+      : checkPage([observedRun], { hasNextPage: true, endCursor: 'next' }, 2);
+  });
+  expect(context.checks).toMatchObject({
+    source: { availability: 'partial', retryable: true },
+    items: [{ id: 'RUN', outcome: 'failure' }],
+  });
+  expect(context.requirements.items.find(item => item.check?.name === 'ci')?.state).toBe('unmet');
+  expect(context.requirements.items.find(item => item.check?.name === 'absent')?.state).toBe(
+    'unavailable'
+  );
+  expect(context.checks.items.some(item => item.observation === 'missing')).toBe(false);
+});
+
+it.each([null, { contexts: null }])(
+  'does not turn a null check source %j into missing requirements',
+  async statusCheckRollup => {
+    const { context } = await run((url, options) => {
+      if (
+        url.pathname !== '/graphql' ||
+        JSON.parse(String(options.body)).query !== PR_CONTEXT_REQUIREMENT_QUERIES.checks
+      )
+        return;
+      return Response.json({
+        data: { repository: { object: { oid: 'head', statusCheckRollup } } },
+      });
+    });
+    expect(context.checks).toMatchObject({
+      items: [],
+      completeness: 'unknown',
+      source: { availability: 'unavailable' },
+    });
+    expect(
+      context.requirements.items
+        .filter(item => item.check)
+        .every(item => item.state === 'unavailable')
+    ).toBe(true);
+  }
+);
 
 it.each(['head', 'base'])(
   'invalidates observed failures when the final %s revision changes',

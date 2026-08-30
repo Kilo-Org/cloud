@@ -269,6 +269,8 @@ export type FilePart = {
   filename?: string;
   url: string;
   source?: FilePartSource;
+  /** Kilo extension: marks a local placeholder part to drop when the authoritative file part arrives. */
+  synthetic?: boolean;
 };
 
 export type ToolStatePending = {

@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Clock } from '@/components/ui/icons';
-import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
+import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Bubble } from '@/components/ui/bubble';
@@ -20,6 +20,13 @@ import { PartRenderer } from './part-renderer';
 import { firstHumanText, isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
 import { type OpenChildSession } from './child-session-section';
+
+/**
+ * Queued Cancel/Restore controls are compact `size="sm"` buttons (36pt +
+ * 4pt hitSlop). The platform minimum touch target is 48dp on Android and
+ * 44pt on iOS, so these two controls raise their min-height accordingly.
+ */
+const QUEUED_CONTROL_MIN_HEIGHT = Platform.OS === 'android' ? 'min-h-12' : 'min-h-11';
 
 type MessageBubbleProps = {
   message: StoredMessage;
@@ -43,6 +50,10 @@ type MessageBubbleProps = {
   onRetryMessage?: (message: StoredMessage) => void;
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
+  /** Cancels a queued (not yet accepted) user message. Rendered only while queued. */
+  onCancelQueued?: (message: StoredMessage) => void | Promise<void>;
+  /** Restores a canceled queued message's prompt back into the composer. */
+  onRestoreQueued?: (message: StoredMessage) => void;
 };
 
 function MessageBubbleImpl({
@@ -58,6 +69,8 @@ function MessageBubbleImpl({
   holdQueuedSlot,
   onRetryMessage,
   onCopyToComposer,
+  onCancelQueued,
+  onRestoreQueued,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
@@ -178,28 +191,58 @@ function MessageBubbleImpl({
                 ))}
               </InMessageBubbleContext.Provider>
             </Bubble>
-            {hasBadgeSlot ? (
+            {hasBadgeSlot || onRestoreQueued ? (
               <View className="flex-row items-center gap-2 self-end pr-1">
-                <View
-                  accessibilityRole={isQueued ? 'text' : undefined}
-                  accessibilityLabel={
-                    isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
-                  }
-                  accessible={isQueued}
-                  {...(!isQueued
-                    ? {
-                        accessibilityElementsHidden: true as const,
-                        importantForAccessibility: 'no-hide-descendants' as const,
-                      }
-                    : {})}
-                  pointerEvents={isQueued ? 'auto' : 'none'}
-                  className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
-                >
-                  <Clock size={12} color={colors.mutedForeground} />
-                  <Text className="text-xs text-muted-foreground">
-                    {t('agentChat.messageBubble.queued')}
-                  </Text>
-                </View>
+                {hasBadgeSlot ? (
+                  <View
+                    accessibilityRole={isQueued ? 'text' : undefined}
+                    accessibilityLabel={
+                      isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
+                    }
+                    accessible={isQueued}
+                    {...(!isQueued
+                      ? {
+                          accessibilityElementsHidden: true as const,
+                          importantForAccessibility: 'no-hide-descendants' as const,
+                        }
+                      : {})}
+                    pointerEvents={isQueued ? 'auto' : 'none'}
+                    className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
+                  >
+                    <Clock size={12} color={colors.mutedForeground} />
+                    <Text className="text-xs text-muted-foreground">
+                      {t('agentChat.messageBubble.queued')}
+                    </Text>
+                  </View>
+                ) : null}
+                {isQueued && onCancelQueued ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={QUEUED_CONTROL_MIN_HEIGHT}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('agentChat.messageBubble.cancelQueuedAccessibility')}
+                    onPress={() => {
+                      void onCancelQueued(message);
+                    }}
+                  >
+                    <Text>{t('agentChat.messageBubble.cancelQueued')}</Text>
+                  </Button>
+                ) : null}
+                {!isQueued && onRestoreQueued ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={QUEUED_CONTROL_MIN_HEIGHT}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('agentChat.messageBubble.restoreQueuedAccessibility')}
+                    onPress={() => {
+                      onRestoreQueued(message);
+                    }}
+                  >
+                    <Text>{t('agentChat.messageBubble.restoreQueued')}</Text>
+                  </Button>
+                ) : null}
               </View>
             ) : null}
           </View>

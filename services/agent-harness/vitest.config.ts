@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { URL } from 'node:url';
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
 

@@ -517,6 +517,12 @@ export const baseInterruptSessionNextSchema = z.object({
   sessionId: z.string(),
 });
 
+// Schema for canceling one queued (not yet accepted) message by id.
+export const baseCancelQueuedMessageNextSchema = z.object({
+  sessionId: z.string(),
+  messageId: messageIdNextSchema,
+});
+
 // Schema for getting session state
 export const baseGetSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),

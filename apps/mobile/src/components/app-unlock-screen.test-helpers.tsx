@@ -4,6 +4,43 @@ import { type AppStateStatus } from 'react-native';
 import { act, type ReactTestInstance } from 'react-test-renderer';
 import { expect, vi } from 'vitest';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+import { AppRootProviders } from '@/components/app-root-providers';
+import KiloClawLayout from '@/app/(app)/(tabs)/(1_kiloclaw)/_layout';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { i18n } from '@/i18n';
+import { renderWithProviders } from '@/test/render-with-providers';
+
+let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
+export function unlockRoot() {
+  if (!view) {
+    throw new Error('Scene not mounted');
+  }
+  return view.renderer.root;
+}
+export async function mount(ui: ReactElement = <KiloClawLayout />, languageReady = true) {
+  view = await renderWithProviders(
+    <AppRootProviders languageReady={languageReady}>{ui}</AppRootProviders>
+  );
+  await flush();
+}
+export function rerender(ui: ReactElement) {
+  view?.renderer.update(
+    <QueryClientProvider client={view.queryClient}>
+      <AppRootProviders languageReady>{ui}</AppRootProviders>
+    </QueryClientProvider>
+  );
+}
+export function retry() {
+  return unlockRoot().findAllByType('Pressable' as ElementType)[0];
+}
+export async function unmountUnlock() {
+  view?.unmount();
+  view = undefined;
+  vi.restoreAllMocks();
+  i18n.removeResourceBundle('fr', 'translation');
+  await i18n.changeLanguage('en');
+  vi.unstubAllGlobals();
+}
 
 const native = vi.hoisted(() => ({
   hasHardwareAsync: vi.fn(),

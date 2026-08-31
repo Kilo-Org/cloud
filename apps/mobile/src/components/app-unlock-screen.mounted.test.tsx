@@ -6,16 +6,24 @@ import {
   expectHidden,
   flush,
   lifecycle,
+  mount,
   native,
   nestedUnlockScenes,
   platform,
+  rerender,
   resetUnlockMocks,
+  retry,
+  unlockRoot as root,
   storage,
   text,
+  unmountUnlock,
 } from '@/components/app-unlock-screen.test-helpers';
+import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+import { PickerSheet } from '@/components/picker-sheet';
 import { PreferencesScreen } from '@/components/preferences-screen';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { type ElementType, type ReactElement } from 'react';
+import { SheetHeader } from '@/components/sheet-header';
+import { type ElementType } from 'react';
+import { ScrollView } from 'react-native';
 import { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
@@ -25,45 +33,13 @@ import KiloClawLayout from '@/app/(app)/(tabs)/(1_kiloclaw)/_layout';
 import OrganizationLayout from '@/app/(app)/(tabs)/(3_profile)/organization/_layout';
 import SecurityAgentScopeLayout from '@/app/(app)/(tabs)/(3_profile)/security-agent/[scope]/_layout';
 import PrReviewNumberLayout from '@/app/(app)/pr-review/[owner]/[repo]/[number]/_layout';
-import { AppRootProviders } from '@/components/app-root-providers';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
-import { renderWithProviders } from '@/test/render-with-providers';
 
-let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
-function root() {
-  if (!view) {
-    throw new Error('Scene not mounted');
-  }
-  return view.renderer.root;
-}
-async function mount(ui: ReactElement = <KiloClawLayout />, languageReady = true) {
-  view = await renderWithProviders(
-    <AppRootProviders languageReady={languageReady}>{ui}</AppRootProviders>
-  );
-  await flush();
-}
-function rerender(ui: ReactElement) {
-  view?.renderer.update(
-    <QueryClientProvider client={view.queryClient}>
-      <AppRootProviders languageReady>{ui}</AppRootProviders>
-    </QueryClientProvider>
-  );
-}
-function retry() {
-  return root().findAllByType('Pressable' as ElementType)[0];
-}
 beforeEach(resetUnlockMocks);
-afterEach(async () => {
-  view?.unmount();
-  view = undefined;
-  vi.restoreAllMocks();
-  i18n.removeResourceBundle('fr', 'translation');
-  await i18n.changeLanguage('en');
-  vi.unstubAllGlobals();
-});
+afterEach(unmountUnlock);
 
 it.each([false, true])(
-  'waits for language across all five layouts; catalog failure=%s',
+  'waits for language across all five layouts and retains the draft on relock; catalog failure=%s',
   async failed => {
     catalogs.fr.mockImplementation(() => {
       if (failed) {
@@ -93,20 +69,16 @@ it.each([false, true])(
     expect(provider.parent?.type).toBe('AuthProvider');
     expectHidden(root(), true);
     for (const Layout of layouts) {
-      expect(
-        root()
-          .findByType(Layout)
-          .findAllByType('Scene' as ElementType)
-      ).toHaveLength(1);
+      const boundary = root().findByType(Layout);
+      expect(boundary.findAllByType('Scene' as ElementType)).toHaveLength(1);
     }
     for (const Layout of [OrganizationLayout, SecurityAgentScopeLayout]) {
       const wrapper = root().findByType(Layout).findByProps({ pointerEvents: 'none' });
       expect(wrapper.findAllByType('PrivacyCover' as ElementType)).toHaveLength(1);
     }
     const observer = root().findByType('SecurityAgentCommandObserver' as ElementType);
-    const draft = root()
-      .findByType(KiloClawLayout)
-      .findByType('Draft' as ElementType);
+    const scene = root().findByType(KiloClawLayout);
+    const draft = scene.findByType('Draft' as ElementType);
     await flush(() => {
       (draft.props.onChange as (value: string) => void)('unsent work');
     });
@@ -125,23 +97,52 @@ it.each([false, true])(
       auth.resolve({ success: true });
     });
     expectHidden(root(), false);
+    native.authenticateAsync.mockResolvedValueOnce({ success: false, error: 'user_cancel' });
+    const now = vi.spyOn(Date, 'now').mockReturnValue(0);
+    await flush(() => {
+      lifecycle.change?.('background');
+      now.mockReturnValue(300_000);
+      lifecycle.change?.('active');
+    });
+    expectHidden(root(), true);
+    await flush(retry()?.props.onPress as () => void);
     await act(async () => {
       await i18n.changeLanguage('en');
     });
     expectHidden(root(), false);
     expect(root().findAllByType('Pressable' as ElementType)).toHaveLength(0);
+    expect(scene.findByType('Draft' as ElementType)).toBe(draft);
     expect(draft.props.value).toBe('unsent work');
     expect(root().findByType('SecurityAgentCommandObserver' as ElementType)).toBe(observer);
     expect(root().findByType(AppUnlockProvider)).toBe(provider);
     expect(root().findAllByType(AppUnlockProvider)).toHaveLength(1);
     expect(announcements).not.toHaveBeenCalled();
-    expect(native.authenticateAsync).toHaveBeenCalledTimes(1);
+    expect(native.authenticateAsync).toHaveBeenCalledTimes(3);
     expect(native.authenticateAsync).toHaveBeenCalledWith({
       promptMessage: failed ? 'Unlock with biometrics' : fr.common.retry,
       disableDeviceFallback: false,
     });
   }
 );
+
+it.each([true, false])('keeps native sheet siblings; scrollable=%s', async scrollable => {
+  const children = (
+    <PickerSheet title="Sheet" onDone={vi.fn<() => void>()} scrollable={scrollable}>
+      {scrollable ? null : <ScrollView />}
+    </PickerSheet>
+  );
+  await mount(appUnlockScreenLayout({ children }));
+  const sheet = root().findByType(PickerSheet);
+  expect(sheet.parent?.props).toEqual({
+    children,
+    className: 'flex-1',
+    pointerEvents: 'auto',
+    accessibilityElementsHidden: false,
+    importantForAccessibility: 'auto',
+  });
+  expect(sheet.parent?.parent?.type).not.toBe('View');
+  expect(sheet.children).toMatchObject([{ type: SheetHeader }, { type: 'ScrollView' }]);
+});
 
 it.each([null, 'disabled'])('shows the scene without a prompt for %s', async raw => {
   storage.getItemAsync.mockResolvedValue(raw);

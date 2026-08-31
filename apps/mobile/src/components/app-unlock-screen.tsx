@@ -80,8 +80,10 @@ function AppUnlockScene({ children }: Readonly<{ children: ReactElement }>) {
   const insets = useSafeAreaInsets();
   const hidden = status !== 'unlocked';
 
+  // Keep the unlocked wrapper layout-only so native sheet headers and scroll views
+  // remain siblings at indices 0 and 1. Never replace the mounted scene to hide it.
   return (
-    <View className="flex-1 bg-background">
+    <>
       <View
         className={cn('flex-1', hidden && 'opacity-0')}
         pointerEvents={hidden ? 'none' : 'auto'}
@@ -121,7 +123,7 @@ function AppUnlockScene({ children }: Readonly<{ children: ReactElement }>) {
           </ScrollView>
         </View>
       ) : null}
-    </View>
+    </>
   );
 }
 

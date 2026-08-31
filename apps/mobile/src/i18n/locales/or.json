@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ସଂଲଗ୍ନ ହୋଇନଥିବା ଅପଲୋଡ୍ ହୋଇଥିବା ଫାଇଲ୍ ଗୁଡ଼ିକ ବିଲୋପ ହେବ।",
       "discardAttachmentsTitle": "ସଂଲଗ୍ନକଗୁଡ଼ିକ ପରିତ୍ୟାଗ କରିବେ?",
       "charactersRemaining": "{{count}}ଟି ଅକ୍ଷର ବାକି ଅଛି",
-      "insertNewline": "ନୂଆ ଧାଡ଼ି ଯୋଡ଼ନ୍ତୁ",
-      "starterChipBuild": "ଏକ ବୈଶିଷ୍ଟ୍ୟ ତିଆରି କର",
-      "starterChipEmpty": "ଏକ ଧାରଣାରୁ ଆରମ୍ଭ କର",
-      "starterChipFix": "ଏକ ତ୍ରୁଟି ଠିକ୍ କର",
-      "starterChipPrepare": "ମୋ ପରିବେଶ ପ୍ରସ୍ତୁତ କର",
-      "starterChipWrapUp": "ମୋ ସେସନ୍ ସମାପ୍ତ କର",
-      "starterChipWriteTests": "ପରୀକ୍ଷା ଲେଖ"
+      "insertNewline": "ନୂଆ ଧାଡ଼ି ଯୋଡ଼ନ୍ତୁ"
     },
     "chatLink": {
       "linkCopied": "ଲିଙ୍କ କପି ହେଲା",

@@ -126,7 +126,6 @@ export function NewSessionPrompt({
   const insets = useSafeAreaInsets();
   const { returnSendsMessage } = useReturnSendsMessagePreference();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [hasPromptText, setHasPromptText] = useState((initialPrompt ?? '').trim().length > 0);
   const [promptCharacterCount, setPromptCharacterCount] = useState(initialPrompt?.length ?? 0);
   const promptRef = useRef(initialPrompt ?? '');
   const initialPromptRef = useRef(initialPrompt ?? '');
@@ -202,7 +201,6 @@ export function NewSessionPrompt({
     (text: string) => {
       promptRef.current = text;
       promptMeasure.setText(text);
-      setHasPromptText(text.trim().length > 0);
       setPromptCharacterCount(text.length);
       onChangeText(text);
     },
@@ -302,23 +300,6 @@ export function NewSessionPrompt({
 
   function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
     promptSelectionRef.current = event.nativeEvent.selection;
-  }
-
-  // Starter chips insert text and focus the input; they never start a session.
-  const starterChips = [
-    t('agentChat.composer.starterChipBuild'),
-    t('agentChat.composer.starterChipFix'),
-    t('agentChat.composer.starterChipWriteTests'),
-  ];
-  const showStarters = !hasPromptText && !isCreating;
-
-  function applyStarter(chip: string) {
-    promptInputRef.current?.setNativeProps({
-      text: chip,
-      selection: { start: chip.length, end: chip.length },
-    });
-    promptInputRef.current?.focus();
-    handlePromptChange(chip);
   }
 
   function handleInsertNewline() {
@@ -427,24 +408,6 @@ export function NewSessionPrompt({
           // arrival hides the attachment strip and the Start button.
           autoFocus={shareId === undefined || shareId === ''}
         />
-        {showStarters ? (
-          <View className="flex-row flex-wrap gap-2 px-1 pb-2">
-            {starterChips.map(chip => (
-              <Pressable
-                key={chip}
-                onPress={() => {
-                  applyStarter(chip);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={chip}
-                hitSlop={{ top: 8, bottom: 8 }}
-                className="items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 active:opacity-70"
-              >
-                <Text className="text-sm font-normal text-muted-foreground">{chip}</Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
         {PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING ? (
           <View className="flex-row justify-end px-1 pb-1">
             <Text

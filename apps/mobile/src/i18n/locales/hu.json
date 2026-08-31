@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
       "discardAttachmentsTitle": "Elveti a csatolmányokat?",
       "charactersRemaining": "{{count}} karakter maradt",
-      "insertNewline": "Új sor beszúrása",
-      "starterChipBuild": "Fejlessz egy funkciót",
-      "starterChipEmpty": "Kezdj egy ötlettel",
-      "starterChipFix": "Javíts ki egy hibát",
-      "starterChipPrepare": "Állítsd be a környezetemet",
-      "starterChipWrapUp": "Zárd le a munkamenetemet",
-      "starterChipWriteTests": "Írj teszteket"
+      "insertNewline": "Új sor beszúrása"
     },
     "chatLink": {
       "linkCopied": "Hivatkozás másolva",

@@ -2160,13 +2160,7 @@
       "discardAttachmentsMessage": "Завантажені файли, не прикріплені до надісланих повідомлень, буде видалено.",
       "discardAttachmentsTitle": "Відкинути вкладення?",
       "charactersRemaining": "Залишилося символів: {{count}}",
-      "insertNewline": "Вставити новий рядок",
-      "starterChipBuild": "Створи функцію",
-      "starterChipEmpty": "Почни з ідеї",
-      "starterChipFix": "Виправ помилку",
-      "starterChipPrepare": "Налаштуй моє середовище",
-      "starterChipWrapUp": "Заверши мій сеанс",
-      "starterChipWriteTests": "Напиши тести"
+      "insertNewline": "Вставити новий рядок"
     },
     "chatLink": {
       "linkCopied": "Посилання скопійовано",

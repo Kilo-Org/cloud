@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Τα μεταφορτωμένα αρχεία που δεν έχουν προσαρτηθεί σε απεσταλμένα μηνύματα θα διαγραφούν.",
       "discardAttachmentsTitle": "Απόρριψη συνημμένων;",
       "charactersRemaining": "Απομένουν {{count}} χαρακτήρες",
-      "insertNewline": "Εισαγωγή νέας γραμμής",
-      "starterChipBuild": "Δημιούργησε μια λειτουργία",
-      "starterChipEmpty": "Ξεκίνα με μια ιδέα",
-      "starterChipFix": "Διόρθωσε ένα σφάλμα",
-      "starterChipPrepare": "Ρύθμισε το περιβάλλον μου",
-      "starterChipWrapUp": "Ολοκλήρωσε τη συνεδρία μου",
-      "starterChipWriteTests": "Γράψε δοκιμές"
+      "insertNewline": "Εισαγωγή νέας γραμμής"
     },
     "chatLink": {
       "linkCopied": "Ο σύνδεσμος αντιγράφηκε",

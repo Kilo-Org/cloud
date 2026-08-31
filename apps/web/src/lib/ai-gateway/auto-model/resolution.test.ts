@@ -7,7 +7,7 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
 
 import { resolveAutoModel } from './resolution';
 import {
-  BALANCED_QWEN_MODEL,
+  BALANCED_FALLBACK_MODEL,
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
@@ -101,51 +101,58 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: { model: 'anthropic/claude-haiku-4' } });
   });
 
-  it('falls back to BALANCED_QWEN_MODEL when no thunk is provided and apiKind=responses', async () => {
+  it('falls back to BALANCED_FALLBACK_MODEL when no thunk is provided and apiKind=responses', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'responses' },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
   });
 
-  it('falls back to BALANCED_QWEN_MODEL when no thunk is provided and apiKind=messages', async () => {
+  it('falls back to BALANCED_FALLBACK_MODEL when no thunk is provided and apiKind=messages', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'messages' },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
   });
 
-  it('falls back to BALANCED_QWEN_MODEL when no thunk is provided and apiKind=chat_completions', async () => {
+  it('falls back to BALANCED_FALLBACK_MODEL when no thunk is provided and apiKind=chat_completions', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'chat_completions' },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
   });
 
-  it('falls back to BALANCED_QWEN_MODEL when thunk returns null and apiKind=chat_completions', async () => {
-    const result = await resolveAutoModel(
-      {
-        ...baseParams,
-        apiKind: 'chat_completions',
-        efficientDecision: async () => null,
-      },
-      nullUserPromise,
-      zeroBalancePromise
-    );
+  it.each([KILO_AUTO_BALANCED_MODEL.id, KILO_AUTO_EFFICIENT_MODEL.id])(
+    'falls back to Kimi K3 with reasoning for %s when the worker returns no decision',
+    async model => {
+      const result = await resolveAutoModel(
+        {
+          ...baseParams,
+          model,
+          apiKind: 'chat_completions',
+          efficientDecision: async () => null,
+        },
+        nullUserPromise,
+        zeroBalancePromise
+      );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
-  });
+      expect(result).toEqual({
+        kind: 'ok',
+        resolved: { model: 'moonshotai/kimi-k3', reasoning: { enabled: true } },
+      });
+    }
+  );
 
-  it('falls back to BALANCED_QWEN_MODEL when the worker returns a virtual auto model', async () => {
+  it('falls back to BALANCED_FALLBACK_MODEL when the worker returns a virtual auto model', async () => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
@@ -159,7 +166,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
   });
 
   it('does not call the thunk more than once', async () => {
@@ -253,7 +260,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     });
   });
 
-  it('falls back to BALANCED_QWEN_MODEL when variant is absent from the model catalog', async () => {
+  it('falls back to BALANCED_FALLBACK_MODEL when variant is absent from the model catalog', async () => {
     // Claude has no "thinking" key — only none/low/medium/high/xhigh/max
     const result = await resolveAutoModel(
       {
@@ -269,10 +276,10 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
   });
 
-  it('falls back to BALANCED_QWEN_MODEL when the model exposes no variants but decision has a variant', async () => {
+  it('falls back to BALANCED_FALLBACK_MODEL when the model exposes no variants but decision has a variant', async () => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
@@ -287,7 +294,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
   });
 
   it('applies exact thinking and instant variant settings', async () => {
@@ -397,7 +404,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
   });
 });
 
@@ -564,7 +571,7 @@ describe('resolveAutoModel — configured efficient fallback pool', () => {
         { model: 'some-provider/model-without-variants', variant: 'high' },
       ],
     },
-  ])('keeps BALANCED_QWEN_MODEL for a $name pool', async ({ fallbackCandidates }) => {
+  ])('keeps BALANCED_FALLBACK_MODEL for a $name pool', async ({ fallbackCandidates }) => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
@@ -576,7 +583,7 @@ describe('resolveAutoModel — configured efficient fallback pool', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
   });
 });
 
@@ -824,7 +831,7 @@ describe('resolveAutoModel — Organization Auto branch', () => {
 
     expect(result).toEqual({
       kind: 'ok',
-      resolved: BALANCED_QWEN_MODEL,
+      resolved: BALANCED_FALLBACK_MODEL,
       routingTarget: 'kilo-auto/balanced',
     });
   });

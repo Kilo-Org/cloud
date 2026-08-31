@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "पठाइएका सन्देशहरूमा संलग्न नभएका अपलोडहरू मेटिनेछन्।",
       "discardAttachmentsTitle": "संलग्नकहरू खारेज गर्ने?",
       "charactersRemaining": "{{count}} अक्षर बाँकी छन्",
-      "insertNewline": "नयाँ पङ्क्ति घुसाउनुहोस्",
-      "starterChipBuild": "सुविधा बनाऊ",
-      "starterChipEmpty": "एउटा विचारबाट सुरु गर",
-      "starterChipFix": "त्रुटि सच्याऊ",
-      "starterChipPrepare": "मेरो वातावरण तयार गर",
-      "starterChipWrapUp": "मेरो सत्र समाप्त गर",
-      "starterChipWriteTests": "परीक्षणहरू लेख"
+      "insertNewline": "नयाँ पङ्क्ति घुसाउनुहोस्"
     },
     "chatLink": {
       "linkCopied": "लिंक प्रतिलिपि गरियो",

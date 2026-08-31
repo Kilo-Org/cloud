@@ -2609,13 +2609,7 @@
       "discardAttachmentsMessage": "S'eliminaran els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
       "discardAttachmentsTitle": "Descartar els adjunts?",
       "charactersRemaining": "Queden {{count}} caràcters",
-      "insertNewline": "Insereix un salt de línia",
-      "starterChipBuild": "Crea una funció",
-      "starterChipEmpty": "Comença amb una idea",
-      "starterChipFix": "Corregeix un error",
-      "starterChipPrepare": "Configura el meu entorn",
-      "starterChipWrapUp": "Finalitza la meva sessió",
-      "starterChipWriteTests": "Escriu proves"
+      "insertNewline": "Insereix un salt de línia"
     },
     "chatLink": {
       "linkCopied": "Enllaç copiat",

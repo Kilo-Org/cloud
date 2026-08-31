@@ -490,6 +490,6 @@ describe('candidateModelIdsFromSources', () => {
       null
     );
     expect(ids).not.toContain('kilo-auto/balanced');
-    expect(ids).not.toContain('qwen/qwen3.7-plus');
+    expect(ids).not.toContain('moonshotai/kimi-k3');
   });
 });

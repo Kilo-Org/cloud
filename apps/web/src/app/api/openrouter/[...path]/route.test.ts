@@ -25,7 +25,7 @@ import {
 } from '@/lib/ai-gateway/auto-routing-denied-models';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { gatewayChatApisForModel } from '@/lib/ai-gateway/model-api-kinds';
-import { BALANCED_QWEN_MODEL } from '@/lib/ai-gateway/auto-model';
+import { BALANCED_FALLBACK_MODEL } from '@/lib/ai-gateway/auto-model';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
@@ -1290,7 +1290,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
 
     it.each(['kilo-auto/efficient', 'kilo-auto/balanced'])(
-      '%s uses the first organization-permitted pool entry and its exact variant instead of Qwen',
+      '%s uses the first organization-permitted pool entry and its exact variant instead of the platform fallback',
       async requestedModel => {
         const pool: PoolEntry[] = [
           { model: 'openai/gpt-4o', variant: null },
@@ -1365,7 +1365,7 @@ describe('kilo-auto/efficient classifier billing', () => {
         expect(upstreamBody.model).toBe('anthropic/claude-sonnet-5');
         expect(upstreamBody).toHaveProperty('reasoning', { enabled: true, effort: 'xhigh' });
         expect(upstreamBody).toHaveProperty('verbosity', 'xhigh');
-        expect(upstreamBody.model).not.toBe(BALANCED_QWEN_MODEL.model);
+        expect(upstreamBody.model).not.toBe(BALANCED_FALLBACK_MODEL.model);
       }
     );
 
@@ -1374,7 +1374,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       { name: 'empty', variants: {} },
       { name: 'blank-only', variants: { '': {}, '  ': {} } },
     ])(
-      'uses GPT-4o with a null variant instead of Qwen when catalog variants are $name',
+      'uses GPT-4o with a null variant instead of the platform fallback when catalog variants are $name',
       async ({ variants }) => {
         mockedLoadEffectiveAutoRoutingPool.mockResolvedValue([
           { model: 'openai/gpt-4o', variant: null },
@@ -1399,7 +1399,7 @@ describe('kilo-auto/efficient classifier billing', () => {
         expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
         const upstreamBody = mockedUpstreamRequest.mock.calls[0]?.[0].body;
         expect(upstreamBody.model).toBe('openai/gpt-4o');
-        expect(upstreamBody.model).not.toBe(BALANCED_QWEN_MODEL.model);
+        expect(upstreamBody.model).not.toBe(BALANCED_FALLBACK_MODEL.model);
         expect(upstreamBody).not.toHaveProperty('reasoning');
         expect(upstreamBody).not.toHaveProperty('verbosity');
       }
@@ -1608,7 +1608,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     it.each([
       { name: 'missing', pool: null },
       { name: 'empty', pool: [] },
-    ])('keeps Qwen when the configured pool is $name', async ({ pool }) => {
+    ])('keeps the platform fallback when the configured pool is $name', async ({ pool }) => {
       mockedLoadEffectiveAutoRoutingPool.mockResolvedValue(pool);
       mockedApplyResolvedAutoModel.mockImplementationOnce(
         jest.requireActual<{ applyResolvedAutoModel: typeof applyResolvedAutoModel }>(
@@ -1623,10 +1623,10 @@ describe('kilo-auto/efficient classifier billing', () => {
       expect(mockedLoadEffectiveAutoRoutingPool).toHaveBeenCalledTimes(1);
       expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
       expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
-      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject(BALANCED_QWEN_MODEL);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject(BALANCED_FALLBACK_MODEL);
     });
 
-    it('keeps Qwen when the fallback catalog cannot be loaded', async () => {
+    it('keeps the platform fallback when the fallback catalog cannot be loaded', async () => {
       mockedLoadEffectiveAutoRoutingPool.mockResolvedValue([
         { model: 'openai/gpt-4o', variant: null },
       ]);
@@ -1641,7 +1641,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
       expect(response.status).toBe(200);
-      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject(BALANCED_QWEN_MODEL);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject(BALANCED_FALLBACK_MODEL);
       expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
         'Unable to load the Efficient fallback model catalog'
       );

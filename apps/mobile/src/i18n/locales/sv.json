@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
       "discardAttachmentsTitle": "Kassera bilagor?",
       "charactersRemaining": "{{count}} tecken kvar",
-      "insertNewline": "Infoga radbrytning",
-      "starterChipBuild": "Bygg en funktion",
-      "starterChipEmpty": "Börja med en idé",
-      "starterChipFix": "Åtgärda ett fel",
-      "starterChipPrepare": "Konfigurera min miljö",
-      "starterChipWrapUp": "Avsluta min session",
-      "starterChipWriteTests": "Skriv tester"
+      "insertNewline": "Infoga radbrytning"
     },
     "chatLink": {
       "linkCopied": "Länk kopierad",

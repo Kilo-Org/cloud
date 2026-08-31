@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",
       "discardAttachmentsTitle": "Forkaste vedlegg?",
       "charactersRemaining": "{{count}} tegn igjen",
-      "insertNewline": "Sett inn linjeskift",
-      "starterChipBuild": "Lag en funksjon",
-      "starterChipEmpty": "Start med en idé",
-      "starterChipFix": "Fiks en feil",
-      "starterChipPrepare": "Sett opp miljøet mitt",
-      "starterChipWrapUp": "Avslutt økten min",
-      "starterChipWriteTests": "Skriv tester"
+      "insertNewline": "Sett inn linjeskift"
     },
     "chatLink": {
       "linkCopied": "Lenke kopiert",

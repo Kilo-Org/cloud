@@ -18,8 +18,6 @@ import { cn } from '@/lib/utils';
 
 export { type ProjectFilterOption };
 
-const chipScrollContentStyle = { paddingHorizontal: 22, paddingVertical: 8, gap: 8 };
-
 type SessionFilterChipsProps = AgentSessionFilters & {
   projectOptions: ProjectFilterOption[];
   onRemovePlatform: (platform: string) => void;
@@ -117,15 +115,16 @@ export function SessionFilterChips({
   return (
     <ScrollView
       horizontal
+      className="grow-0 shrink-0"
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={chipScrollContentStyle}
+      contentContainerClassName="items-center gap-2 px-[22px] py-2"
     >
       {projectFilter.map(gitUrl => {
         const label = projectFilterLabel(gitUrl, projectOptions);
         return (
           <Pressable
             key={`project-${gitUrl}`}
-            className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
+            className="min-h-[48px] min-w-[48px] shrink-0 flex-row items-center self-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
             onPress={() => {
               onRemoveProject(gitUrl);
             }}
@@ -133,7 +132,7 @@ export function SessionFilterChips({
             accessibilityLabel={t('agentChat.sessionFilter.removeProjectFilter', { label })}
           >
             <Text
-              className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
+              className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
               numberOfLines={1}
             >
               {label}
@@ -145,7 +144,7 @@ export function SessionFilterChips({
       {platformFilter.map(platform => (
         <Pressable
           key={`platform-${platform}`}
-          className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
+          className="min-h-[48px] min-w-[48px] shrink-0 flex-row items-center self-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
           onPress={() => {
             onRemovePlatform(platform);
           }}
@@ -154,7 +153,10 @@ export function SessionFilterChips({
             label: platformFilterLabel(platform),
           })}
         >
-          <Text className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground">
+          <Text
+            className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
+            numberOfLines={1}
+          >
             {platformFilterLabel(platform)}
           </Text>
           <X size={12} color={colors.accentSoftForeground} />

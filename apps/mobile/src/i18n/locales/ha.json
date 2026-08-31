@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Za a share fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
       "discardAttachmentsTitle": "Watsi da haɗe-haɗe?",
       "charactersRemaining": "Haruffa {{count}} suka rage",
-      "insertNewline": "Saka sabon layi",
-      "starterChipBuild": "Gina fasali",
-      "starterChipEmpty": "Fara da ra'ayi",
-      "starterChipFix": "Gyara kuskure",
-      "starterChipPrepare": "Shirya muhallina",
-      "starterChipWrapUp": "Kammala zamana",
-      "starterChipWriteTests": "Rubuta gwaje-gwaje"
+      "insertNewline": "Saka sabon layi"
     },
     "chatLink": {
       "linkCopied": "An kwafa hanyar",

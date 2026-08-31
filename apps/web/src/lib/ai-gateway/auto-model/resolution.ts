@@ -24,7 +24,7 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   modeSchema,
-  BALANCED_QWEN_MODEL,
+  BALANCED_FALLBACK_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
@@ -333,7 +333,7 @@ export async function resolveAutoModel(
         return { kind: 'ok', resolved: resolvedFromCandidate };
       }
     }
-    return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
+    return { kind: 'ok', resolved: BALANCED_FALLBACK_MODEL };
   }
   const mode = resolveMode(modeHeader, featureHeader);
   return {

@@ -2628,13 +2628,7 @@
       "discardAttachmentsMessage": "Nahrané súbory nepriložené k odoslaným správam sa odstránia.",
       "discardAttachmentsTitle": "Zahodiť prílohy?",
       "charactersRemaining": "Počet zostávajúcich znakov: {{count}}",
-      "insertNewline": "Vložiť nový riadok",
-      "starterChipBuild": "Vytvor funkciu",
-      "starterChipEmpty": "Začni nápadom",
-      "starterChipFix": "Oprav chybu",
-      "starterChipPrepare": "Nastav moje prostredie",
-      "starterChipWrapUp": "Dokonči moje sedenie",
-      "starterChipWriteTests": "Napíš testy"
+      "insertNewline": "Vložiť nový riadok"
     },
     "chatLink": {
       "linkCopied": "Odkaz skopírovaný",

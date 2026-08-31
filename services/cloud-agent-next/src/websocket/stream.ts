@@ -213,8 +213,12 @@ export function createStreamHandler(
         options?.deriveSessionStatus?.(),
         options?.deriveQueuedMessages?.() ?? [],
       ]);
-      const sendMessageSnapshot = (
-        streamEventType: 'cloud.message.queued' | 'cloud.message.sent' | 'cloud.message.failed',
+      const sendSnapshot = (
+        streamEventType:
+          | 'kilocode'
+          | 'cloud.message.queued'
+          | 'cloud.message.sent'
+          | 'cloud.message.failed',
         data: unknown,
         timestamp: number
       ) => {
@@ -244,13 +248,13 @@ export function createStreamHandler(
       };
       for (const msg of queued) {
         if (!msg.terminalFailure) continue;
-        sendMessageSnapshot(
+        sendSnapshot(
           'cloud.message.queued',
           { messageId: msg.messageId, content: msg.content, delivery: 'queued' },
           msg.timestamp
         );
         const { timestamp, ...failure } = msg.terminalFailure;
-        sendMessageSnapshot('cloud.message.failed', failure, timestamp);
+        sendSnapshot('cloud.message.failed', failure, timestamp);
       }
 
       const connectedData: ConnectedEventData = {};
@@ -270,17 +274,34 @@ export function createStreamHandler(
           data: connectedData,
         })
       );
+      if (pendingInteractions) {
+        const timestamp = Date.now();
+        for (const properties of pendingInteractions.questions) {
+          sendSnapshot(
+            'kilocode',
+            { type: 'question.asked', event: 'question.asked', properties },
+            timestamp
+          );
+        }
+        for (const properties of pendingInteractions.permissions) {
+          sendSnapshot(
+            'kilocode',
+            { type: 'permission.asked', event: 'permission.asked', properties },
+            timestamp
+          );
+        }
+      }
       if (!options?.reconcileMaterializedEvents) await sendPreparationSnapshots();
 
       for (const msg of queued) {
         if (msg.terminalFailure) continue;
-        sendMessageSnapshot(
+        sendSnapshot(
           'cloud.message.queued',
           { messageId: msg.messageId, content: msg.content, delivery: 'queued' },
           msg.timestamp
         );
         if (msg.delivery === 'sent') {
-          sendMessageSnapshot(
+          sendSnapshot(
             'cloud.message.sent',
             { messageId: msg.messageId, delivery: 'sent' },
             msg.timestamp

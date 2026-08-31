@@ -621,6 +621,10 @@ describe('stream handler handleStreamRequest', () => {
     expect(state.getCloudStatus()).toEqual({ type: 'ready' });
     expect(state.getActivity()).toEqual({ type: 'busy' });
     expect(state.getStatus()).toEqual({ type: 'idle' });
+    expect(state.getQuestion()).toEqual({
+      requestId: 'question-child',
+      questions: pendingInteractions.questions[0].questions,
+    });
     expect(state.getPendingMessages().get('old')).toMatchObject({
       status: 'failed',
       error: 'Execution failed',
@@ -644,11 +648,206 @@ describe('stream handler handleStreamRequest', () => {
     });
   });
 
+  it.each(['', 'fromId=20', 'replay=false'])(
+    'restores current root and child interactions only on the reconnecting socket: %s',
+    async query => {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const existingWs = Object.assign(makeFakeWebSocket(), {
+        deserializeAttachment: () => ({ filters: { sessionId: SESSION_ID }, connectedAt: 0 }),
+      });
+      const doState = makeFakeState();
+      vi.spyOn(doState, 'getWebSockets').mockReturnValue([existingWs, serverWs]);
+      const state = createServiceState({ rootSessionId: 'ses_root' });
+      const history = [
+        makeKiloEvent(1, 'question.asked', {
+          id: 'stale-question',
+          sessionID: 'ses_root',
+          questions: [{ question: 'Old question', header: 'Old', options: [] }],
+        }),
+        makeKiloEvent(2, 'permission.asked', {
+          id: 'stale-permission',
+          sessionID: 'ses_child',
+          permission: 'edit',
+          patterns: ['old.txt'],
+          metadata: {},
+          always: [],
+        }),
+      ];
+      for (const event of history) processSdkFrame(state, formatStreamEvent(event, SESSION_ID));
+      expect(state.getQuestion()?.requestId).toBe('stale-question');
+      expect(state.getPermission()?.requestId).toBe('stale-permission');
+
+      const questions = [
+        {
+          id: 'question-root',
+          sessionID: 'ses_root',
+          questions: [
+            {
+              question: 'Which provider?',
+              header: 'Provider',
+              options: [{ label: 'Both', description: 'Cloudflare and Vercel' }],
+              custom: false,
+            },
+            {
+              question: 'Which checks?',
+              header: 'Checks',
+              options: [{ label: 'Reconnect', description: 'Restore pending interactions' }],
+              multiple: true,
+            },
+          ],
+          tool: { messageID: 'message-root', callID: 'call-root' },
+        },
+        {
+          id: 'question-child',
+          sessionID: 'ses_child',
+          questions: [{ question: 'Continue?', header: 'Approval', options: [] }],
+          tool: { messageID: 'message-child', callID: 'call-child' },
+        },
+      ];
+      const permission = {
+        id: 'permission-child',
+        sessionID: 'ses_child',
+        permission: 'bash',
+        patterns: ['pnpm test', 'pnpm lint'],
+        metadata: { command: 'pnpm test', cwd: '/workspace/project' },
+        always: ['pnpm *'],
+        tool: { messageID: 'message-child', callID: 'call-permission' },
+      };
+      const eq = makeFakeEventQueries(history);
+      const insertSpy = vi.spyOn(eq, 'insert');
+      const handler = createStreamHandler(doState, eq, SESSION_ID, {
+        reconcileMaterializedEvents: true,
+        deriveCloudStatus: async () => ({ type: 'ready' }),
+        deriveSessionStatus: async () => ({ type: 'busy' }),
+        derivePendingInteractions: async () => ({ questions, permissions: [permission] }),
+      });
+
+      await handler.handleStreamRequest(
+        new Request(`https://example.com/stream?${query}`, {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+
+      const frames = serverWs.sentMessages.map(message => JSON.parse(message));
+      expect(frames[0].streamEventType).toBe('connected');
+      expect(frames.slice(1)).toEqual(
+        [
+          ...questions.map(properties => ({
+            type: 'question.asked',
+            event: 'question.asked',
+            properties,
+          })),
+          { type: 'permission.asked', event: 'permission.asked', properties: permission },
+        ].map(data => ({
+          eventId: 0,
+          sessionId: SESSION_ID,
+          streamEventType: 'kilocode',
+          timestamp: expect.any(String),
+          data,
+        }))
+      );
+      expect(existingWs.sentMessages).toEqual([]);
+      expect(insertSpy).not.toHaveBeenCalled();
+
+      for (const frame of frames) processSdkFrame(state, frame);
+      expect(state.getPermission()).toEqual({
+        requestId: permission.id,
+        permission: permission.permission,
+        patterns: permission.patterns,
+        metadata: permission.metadata,
+        always: permission.always,
+      });
+      for (const [index, question] of questions.entries()) {
+        expect(state.getQuestion()).toEqual({
+          requestId: question.id,
+          questions: question.questions,
+        });
+        processSdkFrame(
+          state,
+          formatStreamEvent(
+            makeKiloEvent(21 + index, 'question.replied', {
+              requestID: question.id,
+              sessionID: question.sessionID,
+            }),
+            SESSION_ID
+          )
+        );
+      }
+      expect(state.getQuestion()).toBeNull();
+      processSdkFrame(
+        state,
+        formatStreamEvent(
+          makeKiloEvent(23, 'permission.replied', {
+            requestID: permission.id,
+            sessionID: permission.sessionID,
+          }),
+          SESSION_ID
+        )
+      );
+      expect(state.getPermission()).toBeNull();
+    }
+  );
+
+  it.each([
+    { query: 'eventTypes=kilocode', replayed: true },
+    { query: 'eventTypes=output', replayed: false },
+    { query: 'executionIds=exec_1', replayed: false },
+    { query: 'startTime=2001', replayed: false },
+    { query: 'endTime=1999', replayed: false },
+    { query: 'startTime=2000&endTime=2000', replayed: true },
+  ])('filters pending interaction snapshots: $query', async ({ query, replayed }) => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(2000);
+    try {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+        reconcileMaterializedEvents: true,
+        derivePendingInteractions: async () => ({
+          questions: [{ id: 'question-root', sessionID: 'ses_root', questions: [] }],
+          permissions: [{ id: 'permission-child', sessionID: 'ses_child', permission: 'bash' }],
+        }),
+      });
+
+      await handler.handleStreamRequest(
+        new Request(`https://example.com/stream?replay=false&fromId=20&${query}`, {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+
+      const frames = serverWs.sentMessages.map(message => JSON.parse(message));
+      expect(frames[0].streamEventType).toBe('connected');
+      expect(frames.slice(1)).toEqual(
+        replayed
+          ? ['question.asked', 'permission.asked'].map(type => ({
+              eventId: 0,
+              sessionId: SESSION_ID,
+              streamEventType: 'kilocode',
+              timestamp: new Date(2000).toISOString(),
+              data: { type, event: type, properties: expect.any(Object) },
+            }))
+          : []
+      );
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it.each([undefined, { questions: [], permissions: [] }])(
     'distinguishes unknown interactions from an authoritative empty snapshot: %j',
     async pendingInteractions => {
       const serverWs = makeFakeWebSocket();
       mockWebSocketPair(serverWs);
+      const state = createServiceState({ rootSessionId: 'ses_root' });
+      state.process({ type: 'question.asked', requestId: 'stale-question' });
+      state.process({
+        type: 'permission.asked',
+        requestId: 'stale-permission',
+        permission: 'edit',
+        patterns: [],
+        metadata: {},
+        always: [],
+      });
       const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
         reconcileMaterializedEvents: true,
         deriveSessionStatus: async () => ({ type: 'idle' }),
@@ -667,6 +866,10 @@ describe('stream handler handleStreamRequest', () => {
       if (pendingInteractions)
         expect(connected.data.pendingInteractions).toEqual(pendingInteractions);
       else expect(connected.data).not.toHaveProperty('pendingInteractions');
+      expect(frames).toHaveLength(1);
+      for (const frame of frames) processSdkFrame(state, frame);
+      expect(state.getQuestion()).toBeNull();
+      expect(state.getPermission()).toBeNull();
     }
   );
 

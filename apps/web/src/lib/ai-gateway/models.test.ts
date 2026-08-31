@@ -81,11 +81,13 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
     });
 
-    test('registers Tencent Hy3 as an Auto Free model', () => {
-      expect(findKiloExclusiveModel('tencent/hy3:free')).toBe(tencent_hy3_free_model);
-      expect(tencent_hy3_free_model.internal_id).toBe('tencent/hy3');
-      expect(tencent_hy3_free_model.inference_provider_restriction).toEqual(['tencent']);
-      expect(autoFreeModels.map(({ model }) => model)).toContain(tencent_hy3_free_model.public_id);
+    test('disables Tencent Hy3 free and excludes it from Auto Free and preferred models', () => {
+      expect(tencent_hy3_free_model.status).toBe('disabled');
+      expect(findKiloExclusiveModel('tencent/hy3:free')).toBeNull();
+      expect(autoFreeModels.map(({ model }) => model)).not.toContain(
+        tencent_hy3_free_model.public_id
+      );
+      expect(preferredModels).not.toContain(tencent_hy3_free_model.public_id);
     });
 
     test('registers LongCat 2.0 as an Auto Free model', async () => {
@@ -231,18 +233,16 @@ describe('isFreeModel', () => {
         Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
       ).toEqual({
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
-        'tencent/hy3:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'meituan/longcat-2.0-free': { enabled: true, effort: 'high' },
       });
     });
 
-    test('weights Auto Free models at 70% StepFun and 10% each for Hy3, Laguna, and LongCat', () => {
+    test('weights Auto Free models at 7:1:1 for StepFun, Laguna, and LongCat', () => {
       expect(
         Object.fromEntries(autoFreeModels.map(({ model, weight }) => [model, weight]))
       ).toEqual({
         'stepfun/step-3.7-flash:free': 7,
-        'tencent/hy3:free': 1,
         'poolside/laguna-s-2.1:free': 1,
         'meituan/longcat-2.0-free': 1,
       });
@@ -409,12 +409,12 @@ describe('getKiloExclusiveInferenceProviderRestriction', () => {
     expect(
       getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_discounted_model.public_id)
     ).toEqual(new Set(['openai']));
-    expect(getKiloExclusiveInferenceProviderRestriction(tencent_hy3_free_model.public_id)).toEqual(
-      new Set(['tencent'])
-    );
   });
 
-  test('does not treat unrestricted exclusives or unknown ids as restricted', () => {
+  test('does not treat disabled or unrestricted exclusives or unknown ids as restricted', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(tencent_hy3_free_model.public_id)
+    ).toBeUndefined();
     expect(
       getKiloExclusiveInferenceProviderRestriction(gemma_4_26b_a4b_it_free_model.public_id)
     ).toBeUndefined();

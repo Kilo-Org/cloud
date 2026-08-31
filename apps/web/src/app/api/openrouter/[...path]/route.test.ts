@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { NextResponse } from 'next/server';
 import type { PoolEntry } from '@kilocode/auto-routing-contracts';
 import type { User } from '@kilocode/db/schema';
+import type { OpenCodeSettings } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -1258,7 +1259,11 @@ describe('kilo-auto/efficient classifier billing', () => {
   });
 
   describe('configured pool fallback', () => {
-    function catalogModel(id: string, inputModalities = ['text', 'image']): OpenRouterModel {
+    function catalogModel(
+      id: string,
+      inputModalities = ['text', 'image'],
+      variants?: OpenCodeSettings['variants']
+    ): OpenRouterModel {
       return {
         id,
         name: id,
@@ -1272,6 +1277,7 @@ describe('kilo-auto/efficient classifier billing', () => {
         },
         top_provider: { is_moderated: false },
         pricing: { prompt: '0.000001', completion: '0.000002' },
+        ...(variants ? { opencode: { variants } } : {}),
       };
     }
 
@@ -1315,7 +1321,10 @@ describe('kilo-auto/efficient classifier billing', () => {
         mockedGetEnhancedOpenRouterModels.mockResolvedValue({
           data: [
             catalogModel('google/gemini-2.5-flash'),
-            catalogModel('anthropic/claude-sonnet-5'),
+            catalogModel('anthropic/claude-sonnet-5', undefined, {
+              xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
+              max: { reasoning: { enabled: true, effort: 'max' }, verbosity: 'max' },
+            }),
             catalogModel('openai/gpt-4o'),
           ],
         });
@@ -1360,6 +1369,110 @@ describe('kilo-auto/efficient classifier billing', () => {
       }
     );
 
+    it.each<{ name: string; variants?: OpenCodeSettings['variants'] }>([
+      { name: 'absent' },
+      { name: 'empty', variants: {} },
+      { name: 'blank-only', variants: { '': {}, '  ': {} } },
+    ])(
+      'uses GPT-4o with a null variant instead of Qwen when catalog variants are $name',
+      async ({ variants }) => {
+        mockedLoadEffectiveAutoRoutingPool.mockResolvedValue([
+          { model: 'openai/gpt-4o', variant: null },
+        ]);
+        mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+          data: [catalogModel('openai/gpt-4o', undefined, variants)],
+        });
+        mockedApplyResolvedAutoModel.mockImplementationOnce(
+          jest.requireActual<{ applyResolvedAutoModel: typeof applyResolvedAutoModel }>(
+            '@/lib/ai-gateway/auto-model/resolution'
+          ).applyResolvedAutoModel
+        );
+
+        const { POST } = await import('./route');
+        const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedLoadEffectiveAutoRoutingPool).toHaveBeenCalledTimes(1);
+        expect(mockedGetProvider).toHaveBeenCalledWith(
+          expect.objectContaining({ requestedModel: 'openai/gpt-4o' })
+        );
+        expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+        const upstreamBody = mockedUpstreamRequest.mock.calls[0]?.[0].body;
+        expect(upstreamBody.model).toBe('openai/gpt-4o');
+        expect(upstreamBody.model).not.toBe(BALANCED_QWEN_MODEL.model);
+        expect(upstreamBody).not.toHaveProperty('reasoning');
+        expect(upstreamBody).not.toHaveProperty('verbosity');
+      }
+    );
+
+    it.each<{
+      name: string;
+      staleEntry: PoolEntry;
+      variants?: OpenCodeSettings['variants'];
+    }>([
+      {
+        name: 'a null variant on a model now exposing variants',
+        staleEntry: { model: 'anthropic/claude-sonnet-5', variant: null },
+        variants: { xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' } },
+      },
+      {
+        name: 'a named variant on a model no longer exposing variants',
+        staleEntry: { model: 'openai/gpt-4o', variant: 'high' },
+      },
+      {
+        name: 'a family fallback variant absent from the current catalog',
+        staleEntry: { model: 'anthropic/claude-sonnet-5', variant: 'max' },
+        variants: { xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' } },
+      },
+      {
+        name: 'a blank variant key alongside a named catalog variant',
+        staleEntry: { model: 'anthropic/claude-sonnet-5', variant: '  ' },
+        variants: {
+          '  ': {},
+          xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
+        },
+      },
+    ])(
+      'filters $name before selecting the next allowed pool entry',
+      async ({ staleEntry, variants }) => {
+        const allowedEntry: PoolEntry = {
+          model: 'mistralai/mistral-medium-3-5',
+          variant: 'thinking',
+        };
+        mockedLoadEffectiveAutoRoutingPool.mockResolvedValue([staleEntry, allowedEntry]);
+        mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+          data: [
+            catalogModel(staleEntry.model, undefined, variants),
+            catalogModel('mistralai/mistral-medium-3-5', undefined, {
+              thinking: { reasoning: { enabled: true, effort: 'high' } },
+            }),
+          ],
+        });
+        mockedApplyResolvedAutoModel.mockImplementationOnce(
+          jest.requireActual<{ applyResolvedAutoModel: typeof applyResolvedAutoModel }>(
+            '@/lib/ai-gateway/auto-model/resolution'
+          ).applyResolvedAutoModel
+        );
+
+        const { POST } = await import('./route');
+        const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedGetProvider).toHaveBeenCalledWith(
+          expect.objectContaining({ requestedModel: allowedEntry.model })
+        );
+        expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+        expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject({
+          model: allowedEntry.model,
+          reasoning: { enabled: true, effort: 'high' },
+        });
+        const fallbackCandidates =
+          mockedApplyResolvedAutoModel.mock.calls[0]?.[0].efficientFallbackCandidates;
+        expect(fallbackCandidates).toBeDefined();
+        await expect(fallbackCandidates?.()).resolves.toEqual([allowedEntry]);
+      }
+    );
+
     it.each(['chat_completions', 'responses', 'messages'] as const)(
       'filters absent, unavailable, API-incompatible and text-only entries for %s image requests',
       async apiKind => {
@@ -1374,8 +1487,12 @@ describe('kilo-auto/efficient classifier billing', () => {
         mockedLoadEffectiveAutoRoutingPool.mockResolvedValue(pool);
         mockedGetEnhancedOpenRouterModels.mockResolvedValue({
           data: [
-            catalogModel('anthropic/claude-haiku-4', ['text', 'image_url']),
-            catalogModel('google/gemini-2.5-flash'),
+            catalogModel('anthropic/claude-haiku-4', ['text', 'image_url'], {
+              low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+            }),
+            catalogModel('google/gemini-2.5-flash', undefined, {
+              high: { reasoning: { enabled: true, effort: 'high' } },
+            }),
             catalogModel('google/gemma-4-26b-a4b-it:free'),
             catalogModel('qwen/qwen3-coder', ['text']),
             catalogModel('openai/gpt-4o'),
@@ -1440,7 +1557,9 @@ describe('kilo-auto/efficient classifier billing', () => {
       mockedGetEnhancedOpenRouterModels.mockResolvedValue({
         data: [
           { ...catalogModel(pool[0].model), context_length: 8_000 },
-          catalogModel(pool[1].model),
+          catalogModel('anthropic/claude-haiku-4', undefined, {
+            low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+          }),
         ],
       });
       const { POST } = await import('./route');
@@ -1468,7 +1587,12 @@ describe('kilo-auto/efficient classifier billing', () => {
       });
       mockedLoadEffectiveAutoRoutingPool.mockResolvedValue(pool);
       mockedGetEnhancedOpenRouterModels.mockResolvedValue({
-        data: pool.map(entry => catalogModel(entry.model)),
+        data: [
+          catalogModel('openai/gpt-4o'),
+          catalogModel('anthropic/claude-haiku-4', undefined, {
+            low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+          }),
+        ],
       });
 
       const { POST } = await import('./route');

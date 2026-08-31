@@ -425,6 +425,16 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
               ) {
                 return false;
               }
+              const variantKeys = Object.keys(model.opencode?.variants ?? {}).filter(
+                key => key.trim().length > 0
+              );
+              if (
+                variantKeys.length > 0
+                  ? entry.variant === null || !variantKeys.includes(entry.variant)
+                  : entry.variant !== null
+              ) {
+                return false;
+              }
               return policy
                 ? (await getEffectiveModelDecision(policy, entry.model)).allowed
                 : !checkOrganizationModelRestrictions({

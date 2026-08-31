@@ -515,42 +515,22 @@ describe('resolveAutoModel — configured efficient fallback pool', () => {
     }
   );
 
-  it('skips a null pool variant when the model now exposes catalog variants', async () => {
-    const result = await resolveAutoModel(
-      {
-        ...baseParams,
-        apiKind: 'chat_completions',
-        efficientFallbackCandidates: async () => [
-          { model: 'anthropic/claude-sonnet-5', variant: null },
-          ...candidates,
-        ],
-      },
-      nullUserPromise,
-      zeroBalancePromise
-    );
+  it.each(['openai/gpt-4o', 'meta-llama/llama-3.3-70b-instruct'])(
+    'uses a validated null variant for %s regardless of family fallback variants',
+    async model => {
+      const result = await resolveAutoModel(
+        {
+          ...baseParams,
+          apiKind: 'chat_completions',
+          efficientFallbackCandidates: async () => [{ model, variant: null }, ...candidates],
+        },
+        nullUserPromise,
+        zeroBalancePromise
+      );
 
-    expect(result).toEqual({ kind: 'ok', resolved: firstCandidateResolution });
-  });
-
-  it('uses a null variant for a pool model without catalog variants', async () => {
-    const result = await resolveAutoModel(
-      {
-        ...baseParams,
-        apiKind: 'chat_completions',
-        efficientFallbackCandidates: async () => [
-          { model: 'meta-llama/llama-3.3-70b-instruct', variant: null },
-          ...candidates,
-        ],
-      },
-      nullUserPromise,
-      zeroBalancePromise
-    );
-
-    expect(result).toEqual({
-      kind: 'ok',
-      resolved: { model: 'meta-llama/llama-3.3-70b-instruct' },
-    });
-  });
+      expect(result).toEqual({ kind: 'ok', resolved: { model } });
+    }
+  );
 
   it.each<AutoRoutingDecision>([
     sampleDecision,

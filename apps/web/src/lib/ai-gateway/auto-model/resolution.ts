@@ -328,12 +328,6 @@ export async function resolveAutoModel(
       if (isVirtualAutoModelId(candidate.model)) {
         continue;
       }
-      if (candidate.variant === null) {
-        const variants = await getModelVariants(candidate.model, true);
-        if (Object.keys(variants ?? {}).length > 0) {
-          continue;
-        }
-      }
       const resolvedFromCandidate = await resolveEfficientModel(candidate);
       if (resolvedFromCandidate) {
         return { kind: 'ok', resolved: resolvedFromCandidate };

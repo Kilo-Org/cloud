@@ -1100,6 +1100,7 @@ describe('sanitizeApiRequestLogRequest', () => {
                   secretAccessKey: 'bedrock-secret',
                   region: 'us-east-1',
                 },
+                { apiKey: 'bedrock-api-key', region: 'us-west-2' },
               ],
             },
           },
@@ -1116,7 +1117,7 @@ describe('sanitizeApiRequestLogRequest', () => {
           order: ['friendli', 'novita'],
           byok: {
             friendli: [{ apiKey: '[redacted]' }],
-            bedrock: [{ apiKey: '[redacted]' }],
+            bedrock: [{ apiKey: '[redacted]' }, { apiKey: '[redacted]' }],
           },
         },
         anthropic: { effort: 'high' },
@@ -1128,6 +1129,10 @@ describe('sanitizeApiRequestLogRequest', () => {
     expect(request.body.providerOptions.gateway.byok.bedrock[0]).toMatchObject({
       accessKeyId: 'AKIAEXAMPLE',
       secretAccessKey: 'bedrock-secret',
+    });
+    expect(request.body.providerOptions.gateway.byok.bedrock[1]).toEqual({
+      apiKey: 'bedrock-api-key',
+      region: 'us-west-2',
     });
   });
 });

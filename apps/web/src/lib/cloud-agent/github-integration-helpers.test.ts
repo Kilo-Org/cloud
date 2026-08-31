@@ -47,7 +47,9 @@ jest.mock('@/components/cloud-agent/demo-config', () => ({
   DEMO_SOURCE_REPO_NAME: 'demo-repo',
 }));
 
-const cachedRepositories = [{ id: 1, name: 'repo', full_name: 'org/repo', private: false }];
+const cachedRepositories = [
+  { id: 1, name: 'repo', full_name: 'org/repo', private: false, fork: false },
+];
 
 const buildIntegration = (overrides: Partial<PlatformIntegration> = {}): PlatformIntegration =>
   ({
@@ -78,7 +80,7 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 1, name: 'repo', fullName: 'org/repo', private: false },
+        { id: 1, name: 'repo', fullName: 'org/repo', private: false, fork: false },
       ]);
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     });
@@ -137,6 +139,28 @@ describe('github-integration-helpers', () => {
       expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
 
+    it('refetches when the cached repositories predate the fork flag', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(
+        buildIntegration({
+          repositories: [{ id: 1, name: 'repo', full_name: 'org/repo', private: false }],
+        })
+      );
+      mockFetchGitHubRepositories.mockResolvedValue([
+        { id: 1, name: 'repo', full_name: 'org/repo', private: false, fork: true },
+      ]);
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+      const result = await fetchGitHubRepositoriesForUser('user-123');
+
+      expect(mockFetchGitHubRepositories).toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-1', [
+        { id: 1, name: 'repo', full_name: 'org/repo', private: false, fork: true },
+      ]);
+      expect(result.repositories).toEqual([
+        { id: 1, name: 'repo', fullName: 'org/repo', private: false, fork: true },
+      ]);
+    });
+
     it('fetches fresh repositories when forceRefresh is true', async () => {
       mockGetIntegrationForOwner.mockResolvedValue(buildIntegration());
       mockFetchGitHubRepositories.mockResolvedValue([
@@ -171,6 +195,7 @@ describe('github-integration-helpers', () => {
           name: 'repo',
           fullName: 'org/repo',
           private: false,
+          fork: false,
           platformIntegrationId: 'integration-1',
         },
       ]);
@@ -182,14 +207,22 @@ describe('github-integration-helpers', () => {
         buildIntegration({
           id: 'integration-1',
           platform_account_login: 'acme-core',
-          repositories: [{ id: 1, name: 'api', full_name: 'acme-core/api', private: true }],
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme-core/api', private: true, fork: false },
+          ],
         }),
         buildIntegration({
           id: 'integration-2',
           platform_installation_id: 'installation-2',
           platform_account_login: 'acme-security',
           repositories: [
-            { id: 2, name: 'scanner', full_name: 'acme-security/scanner', private: true },
+            {
+              id: 2,
+              name: 'scanner',
+              full_name: 'acme-security/scanner',
+              private: true,
+              fork: false,
+            },
           ],
         }),
       ]);
@@ -216,7 +249,9 @@ describe('github-integration-helpers', () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([
         buildIntegration({
           id: 'integration-1',
-          repositories: [{ id: 1, name: 'api', full_name: 'acme-core/api', private: true }],
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme-core/api', private: true, fork: false },
+          ],
         }),
         buildIntegration({
           id: 'integration-2',

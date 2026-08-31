@@ -10,7 +10,10 @@ import {
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { fetchGitHubRepositories } from '@/lib/integrations/platforms/github/adapter';
-import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
+import {
+  needsForkFlagBackfill,
+  requireNumericPlatformRepositories,
+} from '@/lib/integrations/core/types';
 import {
   getSecurityAgentConfigWithStatus,
   upsertSecurityAgentConfig,
@@ -1304,7 +1307,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
       // Auto-fetch repositories from GitHub if not cached
       let repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
-      if (repos.length === 0 && integration.platform_installation_id) {
+      if (
+        (repos.length === 0 || needsForkFlagBackfill(repos)) &&
+        integration.platform_installation_id
+      ) {
         const appType = integration.github_app_type || 'standard';
         const fetchedRepos = await fetchGitHubRepositories(
           integration.platform_installation_id,
@@ -1319,6 +1325,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         fullName: repo.full_name,
         name: repo.name,
         private: repo.private,
+        fork: repo.fork,
       }));
       const installationId = integration.platform_installation_id;
       if (!installationId || !hasSecurityReviewPermissions(integration)) {

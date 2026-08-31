@@ -18,6 +18,7 @@ import {
   isPlatformIntegrationSuspended,
 } from '@/lib/integrations/core/health';
 import {
+  needsForkFlagBackfill,
   requireNumericPlatformRepositories,
   type PlatformRepository,
 } from '@/lib/integrations/core/types';
@@ -29,6 +30,7 @@ type GitHubRepositoriesResult = {
     name: string;
     fullName: string;
     private: boolean;
+    fork?: boolean;
     platformIntegrationId?: string;
     platformAccountLogin?: string;
   }[];
@@ -45,6 +47,7 @@ const mapRepositories = (
     name: repo.name,
     fullName: repo.full_name,
     private: repo.private,
+    fork: repo.fork,
     ...(integration
       ? {
           platformIntegrationId: integration.id,
@@ -162,7 +165,7 @@ export async function fetchGitHubRepositoriesForOrganization(
 
   try {
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    if (forceRefresh || !cachedRepositories?.length) {
+    if (forceRefresh || !cachedRepositories?.length || needsForkFlagBackfill(cachedRepositories)) {
       const repositories = await fetchGitHubRepositories(
         integration.platform_installation_id,
         integration.github_app_type || 'standard'
@@ -210,7 +213,11 @@ async function fetchRepositoriesForIntegrations(
       integrations.map(async integration => {
         if (!integration.platform_installation_id) return { repositories: [], syncedAt: null };
         const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-        if (forceRefresh || !cachedRepositories?.length) {
+        if (
+          forceRefresh ||
+          !cachedRepositories?.length ||
+          needsForkFlagBackfill(cachedRepositories)
+        ) {
           const repositories = await fetchGitHubRepositories(
             integration.platform_installation_id,
             integration.github_app_type || 'standard'
@@ -271,7 +278,7 @@ export async function fetchGitHubRepositoriesForUser(
   try {
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
     // If forceRefresh or no cached repos, fetch from GitHub and update cache
-    if (forceRefresh || !cachedRepositories?.length) {
+    if (forceRefresh || !cachedRepositories?.length || needsForkFlagBackfill(cachedRepositories)) {
       const appType = integration.github_app_type || 'standard';
       const repositories = await fetchGitHubRepositories(
         integration.platform_installation_id,

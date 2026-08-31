@@ -1265,6 +1265,7 @@ export type PlatformRepository<TId extends number | string = number> = {
   full_name: string;
   private: boolean;
   default_branch?: string;
+  fork?: boolean;
 };
 
 export const REVIEW_MEMORY_PLATFORMS = ['github'] as const;

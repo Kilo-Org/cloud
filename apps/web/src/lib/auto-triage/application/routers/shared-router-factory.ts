@@ -45,6 +45,7 @@ type GitHubRepositoriesResult = {
     name: string;
     fullName: string;
     private: boolean;
+    fork?: boolean;
   }[];
   errorMessage?: string;
 };

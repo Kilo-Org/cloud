@@ -317,6 +317,7 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
                             name: repo.name,
                             full_name: repo.fullName,
                             private: repo.private,
+                            fork: repo.fork,
                           })) as Repository[]
                         }
                         selectedIds={selectedRepositoryIds}

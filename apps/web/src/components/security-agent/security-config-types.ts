@@ -25,6 +25,7 @@ export type SecurityRepository = {
   fullName: string;
   name: string;
   private: boolean;
+  fork?: boolean;
   dependabotAlerts: DependabotAlertsAvailability;
 };
 
@@ -166,5 +167,6 @@ export function toRepositoryOptions(repositories: SecurityRepository[]): Reposit
     name: repository.name,
     full_name: repository.fullName,
     private: repository.private,
+    fork: repository.fork,
   }));
 }

@@ -123,6 +123,7 @@ type GitHubRepository = {
   full_name: string;
   private: boolean;
   created_at: string;
+  fork: boolean;
 };
 
 type GitHubBranch = {
@@ -162,6 +163,7 @@ export async function fetchGitHubRepositories(
           full_name: repo.full_name,
           private: repo.private,
           created_at: repo.created_at ?? new Date().toISOString(),
+          fork: repo.fork,
         }))
     );
 

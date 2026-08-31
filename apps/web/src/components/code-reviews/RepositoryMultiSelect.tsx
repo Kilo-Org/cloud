@@ -6,6 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Lock, Unlock, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import {
+  visibleRepositories,
+  withVisibleSelected,
+  withoutVisibleSelected,
+} from './repository-multi-select-selection';
 
 export type RepositoryId = string | number;
 
@@ -14,6 +20,7 @@ export type Repository<TId extends RepositoryId = number> = {
   name: string;
   full_name: string;
   private: boolean;
+  fork?: boolean;
 };
 
 export type RepositoryMultiSelectProps<TId extends RepositoryId = number> = {
@@ -30,13 +37,22 @@ export function RepositoryMultiSelect<TId extends RepositoryId = number>({
   renderRepositoryAccessory,
 }: RepositoryMultiSelectProps<TId>) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [hideForks, setHideForks] = useLocalStorage<boolean>('repo-picker:hide-forks', false, {
+    initializeWithValue: false,
+  });
+
+  const forkCount = useMemo(() => repositories.filter(repo => repo.fork).length, [repositories]);
+  const visible = useMemo(
+    () => visibleRepositories(repositories, hideForks),
+    [repositories, hideForks]
+  );
 
   const filteredRepositories = useMemo(() => {
-    if (!searchQuery.trim()) return repositories;
+    if (!searchQuery.trim()) return visible;
 
     const query = searchQuery.toLowerCase();
-    return repositories.filter(repo => repo.full_name.toLowerCase().includes(query));
-  }, [repositories, searchQuery]);
+    return visible.filter(repo => repo.full_name.toLowerCase().includes(query));
+  }, [visible, searchQuery]);
 
   const handleToggle = (repoId: TId) => {
     const newSelection = selectedIds.includes(repoId)
@@ -47,15 +63,26 @@ export function RepositoryMultiSelect<TId extends RepositoryId = number>({
   };
 
   const handleSelectAll = () => {
-    onSelectionChange(repositories.map(repo => repo.id));
+    onSelectionChange(
+      withVisibleSelected(
+        selectedIds,
+        visible.map(repo => repo.id)
+      )
+    );
   };
 
   const handleDeselectAll = () => {
-    onSelectionChange([]);
+    onSelectionChange(
+      withoutVisibleSelected(
+        selectedIds,
+        visible.map(repo => repo.id)
+      )
+    );
   };
 
-  const isAllSelected = selectedIds.length === repositories.length && repositories.length > 0;
-  const isNoneSelected = selectedIds.length === 0;
+  const visibleSelectedCount = visible.filter(repo => selectedIds.includes(repo.id)).length;
+  const isAllSelected = visible.length > 0 && visibleSelectedCount === visible.length;
+  const isNoneSelected = visibleSelectedCount === 0;
 
   return (
     <div className="space-y-3">
@@ -91,6 +118,18 @@ export function RepositoryMultiSelect<TId extends RepositoryId = number>({
         >
           Deselect All
         </Button>
+        {forkCount > 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <Checkbox
+              id="hide-forks"
+              checked={hideForks}
+              onCheckedChange={checked => setHideForks(checked === true)}
+            />
+            <label htmlFor="hide-forks" className="text-muted-foreground cursor-pointer text-xs">
+              Hide forks
+            </label>
+          </div>
+        )}
       </div>
 
       <div className="border-border bg-background h-64 overflow-y-auto rounded-md border">
@@ -136,7 +175,10 @@ export function RepositoryMultiSelect<TId extends RepositoryId = number>({
       </div>
 
       <div className="text-muted-foreground text-xs">
-        {selectedIds.length} of {repositories.length} repositories selected
+        {visibleSelectedCount} of {visible.length} repositories selected
+        {hideForks && forkCount > 0
+          ? ` · ${forkCount} ${forkCount === 1 ? 'fork' : 'forks'} hidden`
+          : ''}
       </div>
     </div>
   );

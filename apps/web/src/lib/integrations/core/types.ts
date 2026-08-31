@@ -17,6 +17,11 @@ export function requireNumericPlatformRepositories(
   return repositories;
 }
 
+/** True when a cached GitHub repository list predates the `fork` flag and must be refetched. */
+export function needsForkFlagBackfill(repositories: PlatformRepository[] | null): boolean {
+  return repositories?.some(repository => repository.fork === undefined) ?? false;
+}
+
 /**
  * Represents ownership of an integration
  * Can be either a user or an organization

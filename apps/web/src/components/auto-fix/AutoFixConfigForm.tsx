@@ -356,6 +356,7 @@ export function AutoFixConfigForm({ organizationId }: AutoFixConfigFormProps) {
                             name: repo.name,
                             full_name: repo.fullName,
                             private: repo.private,
+                            fork: repo.fork,
                           })) as Repository[]
                         }
                         selectedIds={selectedRepositoryIds}

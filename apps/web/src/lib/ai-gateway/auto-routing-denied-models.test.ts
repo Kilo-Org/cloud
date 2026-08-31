@@ -1,4 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+
+jest.mock('@/lib/ai-gateway/auto-routing-admin-client', () => ({
+  getAutoRoutingSettings: jest.fn(),
+}));
+
+jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
+  getCachedRoutingTable: jest.fn(),
+}));
+
 import type {
   AutoRoutingModeOwnerQuery,
   AutoRoutingModeResponse,
@@ -21,14 +30,6 @@ import {
   loadEffectiveAutoRoutingPool,
   policyNeedsCandidateEvaluation,
 } from './auto-routing-denied-models';
-
-jest.mock('@/lib/ai-gateway/auto-routing-admin-client', () => ({
-  getAutoRoutingSettings: jest.fn(),
-}));
-
-jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
-  getCachedRoutingTable: jest.fn(),
-}));
 
 const mockGetAutoRoutingSettings =
   jest.mocked<

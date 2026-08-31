@@ -114,6 +114,7 @@ describe('isFreeModel', () => {
         internalId: 'minimax/minimax-m3-free',
         contextLength: 1_048_576,
         vision: true,
+        isAutoFree: true,
       },
       {
         name: 'MiniMax M2.7',
@@ -122,10 +123,11 @@ describe('isFreeModel', () => {
         internalId: 'minimax/minimax-m2.7-free',
         contextLength: 196_608,
         vision: false,
+        isAutoFree: false,
       },
     ])(
       'registers $name as a free Vercel GMI Cloud model',
-      async ({ model, publicId, internalId, contextLength, vision }) => {
+      async ({ model, publicId, internalId, contextLength, vision, isAutoFree }) => {
         expect(findKiloExclusiveModel(model.public_id)).toBe(model);
         expect(await isFreeModel(model.public_id)).toBe(true);
         expect(model).toMatchObject({
@@ -140,7 +142,10 @@ describe('isFreeModel', () => {
         expect(model.flags.includes('reasoning')).toBe(true);
         expect(model.flags.includes('vision')).toBe(vision);
         expect(getInferenceProvider(model)?.slug).toBe('gmicloud');
-        expect(preferredModels).not.toContain(model.public_id);
+        expect(autoFreeModels.some(({ model: modelId }) => modelId === model.public_id)).toBe(
+          isAutoFree
+        );
+        expect(preferredModels.includes(model.public_id)).toBe(isAutoFree);
       }
     );
 
@@ -235,16 +240,18 @@ describe('isFreeModel', () => {
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'meituan/longcat-2.0-free': { enabled: true, effort: 'high' },
+        'minimax/minimax-m3:free': { enabled: true, effort: 'high' },
       });
     });
 
-    test('weights Auto Free models at 7:1:1 for StepFun, Laguna, and LongCat', () => {
+    test('weights every Auto Free model equally', () => {
       expect(
         Object.fromEntries(autoFreeModels.map(({ model, weight }) => [model, weight]))
       ).toEqual({
-        'stepfun/step-3.7-flash:free': 7,
+        'stepfun/step-3.7-flash:free': 1,
         'poolside/laguna-s-2.1:free': 1,
         'meituan/longcat-2.0-free': 1,
+        'minimax/minimax-m3:free': 1,
       });
     });
 

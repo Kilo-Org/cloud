@@ -1505,14 +1505,20 @@ const expectNativeSendPending = async (panel: Page, draft: string): Promise<void
   await expect(panel.getByRole('button', { exact: true, name: 'Send message' })).toBeDisabled();
 };
 
-// Each installation belongs to one Send or Resume action. Restore simultaneous gates in reverse order.
+const nativeWorkflowName = 'Admission fixture';
+// Each installation belongs to one action. Restore simultaneous gates in reverse order.
 const holdNativeSendBoundary = async (
   panel: Page,
-  boundary: 'safety' | 'tab',
-  action: 'send' | 'resume' = 'send'
+  boundary: 'safety' | 'locked-safety' | 'tab',
+  action: 'send' | 'resume' | 'workflow-row' | 'workflow-form' = 'send'
 ) => {
-  const options = { activation: action, kind: boundary };
-  const handle = await panel.evaluateHandle(({ kind, activation }) => {
+  const options = {
+    activation: action,
+    kind: boundary,
+    lockName: executionLock,
+    workflowLabel: `Run workflow "${nativeWorkflowName}"`,
+  };
+  const handle = await panel.evaluateHandle(({ kind, activation, lockName, workflowLabel }) => {
     const scope = globalThis as typeof globalThis & {
       chrome: typeof browser;
     };
@@ -1521,7 +1527,11 @@ const holdNativeSendBoundary = async (
     // eslint-disable-next-line typescript/unbound-method -- Restore the original API; apply below preserves its receiver.
     const originalStorageGet = storage.get;
     const originalTabGet = tabs.get;
+    const { locks } = navigator;
+    // eslint-disable-next-line typescript/unbound-method -- Restore the native method; apply below preserves its receiver.
+    const originalLockRequest = locks.request;
     const gate = Promise.withResolvers<void>();
+    let nativeCallbackEntered = false;
     let rejectRead = false;
     let restored = false;
     const state = {
@@ -1543,7 +1553,10 @@ const holdNativeSendBoundary = async (
         gate.resolve();
         document.removeEventListener('keydown', arm, true);
         document.removeEventListener('click', arm, true);
-        if (kind === 'safety') {
+        if (kind === 'locked-safety') {
+          locks.request = originalLockRequest;
+        }
+        if (kind === 'safety' || kind === 'locked-safety') {
           storage.get = originalStorageGet;
         } else {
           tabs.get = originalTabGet;
@@ -1554,20 +1567,38 @@ const holdNativeSendBoundary = async (
     };
     const arm = (event: Event): void => {
       const input = document.querySelector('#agent-message');
-      if (!(input instanceof HTMLTextAreaElement)) {
+      const workflow = activation === 'workflow-row' || activation === 'workflow-form';
+      if (!workflow && !(input instanceof HTMLTextAreaElement)) {
         return;
       }
-      const control =
-        activation === 'resume'
-          ? [...document.querySelectorAll('button')].find(
-              button => button.textContent?.trim() === 'Resume queued message'
-            )
-          : input.form?.querySelector('button[type="submit"]');
+      let control: Element | null | undefined;
+      if (activation === 'workflow-row') {
+        control = [...document.querySelectorAll('button')].find(
+          button => button.getAttribute('aria-label') === workflowLabel
+        );
+      } else if (activation === 'workflow-form') {
+        const dialog = [...document.querySelectorAll('[role="dialog"]')].find(
+          element => element.getAttribute('aria-label') === workflowLabel
+        );
+        control = [...(dialog?.querySelectorAll('button') ?? [])].find(
+          button => button.textContent?.trim() === 'Run'
+        );
+      } else if (activation === 'resume') {
+        control = [...document.querySelectorAll('button')].find(
+          button => button.textContent?.trim() === 'Resume queued message'
+        );
+      } else if (input instanceof HTMLTextAreaElement) {
+        control = input.form?.querySelector('button[type="submit"]');
+      }
+      const workflowField =
+        activation === 'workflow-form' &&
+        event.target instanceof HTMLInputElement &&
+        event.target.closest('[role="dialog"]')?.getAttribute('aria-label') === workflowLabel;
       const enter =
         event instanceof KeyboardEvent &&
         event.key === 'Enter' &&
         !event.shiftKey &&
-        event.target === (activation === 'resume' ? control : input);
+        (event.target === (activation === 'send' ? input : control) || workflowField);
       const click =
         event.type === 'click' &&
         event.target instanceof Node &&
@@ -1575,12 +1606,14 @@ const holdNativeSendBoundary = async (
       if (!enter && !click) {
         return;
       }
-      const target = document.querySelector('[aria-label="Target tab"]');
-      if (!(target instanceof HTMLSelectElement)) {
-        throw new Error('Send must have a target selector.');
+      if (!workflow) {
+        const target = document.querySelector('[aria-label="Target tab"]');
+        if (!(target instanceof HTMLSelectElement)) {
+          throw new Error('Send must have a target selector.');
+        }
+        state.submittedTabId = Number(target.value);
       }
       state.activated = true;
-      state.submittedTabId = Number(target.value);
       document.removeEventListener('keydown', arm, true);
       document.removeEventListener('click', arm, true);
     };
@@ -1599,7 +1632,32 @@ const holdNativeSendBoundary = async (
         state.settled = true;
       }
     };
-    if (kind === 'safety') {
+    if (kind === 'locked-safety') {
+      locks.request = ((...args: unknown[]) => {
+        const [name, requestOptions, callback] = args;
+        if (
+          state.activated &&
+          name === lockName &&
+          requestOptions !== null &&
+          typeof requestOptions === 'object' &&
+          'mode' in requestOptions &&
+          requestOptions.mode === 'shared' &&
+          typeof callback === 'function'
+        ) {
+          // Observe entry only. The native manager still grants and releases the unchanged lock.
+          const entered: LockGrantedCallback<unknown> = lock => {
+            if (lock !== null) {
+              nativeCallbackEntered = true;
+            }
+            // eslint-disable-next-line promise/prefer-await-to-callbacks -- Preserve the native callback's exact result and scheduling.
+            return (callback as LockGrantedCallback<unknown>)(lock);
+          };
+          args[2] = entered;
+        }
+        return (originalLockRequest as (...nativeArgs: unknown[]) => unknown).apply(locks, args);
+      }) as typeof originalLockRequest;
+    }
+    if (kind === 'safety' || kind === 'locked-safety') {
       storage.get = ((...args: unknown[]) => {
         const [keys, callback] = args;
         // Forward every native overload unchanged, including callback-only callers.
@@ -1613,6 +1671,10 @@ const holdNativeSendBoundary = async (
             Object.hasOwn(keys, 'kiloBrowserExecutionSafety'));
         // Preserve callback callers. The runtime safety read uses the Promise overload.
         if (!state.activated || !includesSafety || callback !== undefined) {
+          return read();
+        }
+        // A pre-callback background read must pass even if the lock becomes held before it resolves.
+        if (kind === 'locked-safety' && !nativeCallbackEntered) {
           return read();
         }
         // A background refresh can share this read; only the UI status proves pending Send.
@@ -1639,6 +1701,7 @@ const holdNativeSendBoundary = async (
     return state;
   }, options);
   return {
+    activated: () => handle.evaluate(state => state.activated),
     dispose: async () => {
       try {
         await handle.evaluate(state => {
@@ -2654,6 +2717,528 @@ for (const outcome of ['success', 'failure'] as const) {
         }
       },
       { gateway: nativeQueueGateway(seenChatBodies, completion.promise) }
+    );
+  });
+}
+
+type NativeWorkflowInput = { name: string; note?: string };
+const nativeWorkflowResult = 'Native workflow admission result';
+const nativeWorkflowStorageBlocker =
+  'Browser safety state is unavailable. No browser work can start. Restore storage access before recovery.';
+const nativeWorkflowForm = (panel: Page) =>
+  panel.getByRole('dialog', { exact: true, name: `Run workflow "${nativeWorkflowName}"` });
+const nativeWorkflowRoot = (panel: Page, parameters: boolean) =>
+  parameters
+    ? nativeWorkflowForm(panel)
+    : panel.getByRole('dialog', { exact: true, name: 'Settings panel' });
+const nativeWorkflowRun = (panel: Page, parameters: boolean) =>
+  parameters
+    ? nativeWorkflowForm(panel).getByRole('button', { exact: true, name: 'Run' })
+    : panel.getByRole('button', { exact: true, name: `Run workflow "${nativeWorkflowName}"` });
+const nativeWorkflowPending = (root: Locator) =>
+  root.getByRole('status').filter({
+    hasText: 'Checking browser control… Your workflow has not started.',
+  });
+const fillNativeWorkflow = async (panel: Page, input: NativeWorkflowInput): Promise<void> => {
+  const form = nativeWorkflowForm(panel);
+  await form.getByRole('textbox', { exact: true, name: 'name — A name' }).fill(input.name);
+  await form
+    .getByRole('textbox', { exact: true, name: 'note (optional) — A note' })
+    .fill(input.note ?? '');
+};
+const prepareNativeWorkflow = async (
+  { panel, target }: Harness,
+  input?: NativeWorkflowInput
+): Promise<void> => {
+  await prepareNativeSend(panel, ['Settings admission']);
+  const script = `await page.click("#effect"); return { done: true, result: { input, marker: "${nativeWorkflowResult}" } };`;
+  await setExtensionStorage(panel, {
+    kiloAgentWorkflows: [
+      {
+        approvedScriptHash: createHash('sha256').update(script).digest('hex'),
+        createdAt: Date.now(),
+        description: 'One native action with the supplied input.',
+        id: randomUUID(),
+        name: nativeWorkflowName,
+        params:
+          input === undefined
+            ? []
+            : [
+                { description: 'A name', name: 'name', required: true },
+                { description: 'A note', name: 'note', required: false },
+              ],
+        scopeOrigin: new URL(target.url()).origin,
+        script,
+        updatedAt: Date.now(),
+      },
+    ],
+    kiloWorkflowSettings: {
+      allowWorkflowsInSafeMode: true,
+      autoApproveWorkflowChanges: false,
+      autoApproveWorkflowRuns: false,
+    },
+  });
+  await panel.getByLabel('Settings', { exact: true }).click();
+  await expect(nativeWorkflowRun(panel, false)).toBeEnabled();
+  if (input !== undefined) {
+    await nativeWorkflowRun(panel, false).click();
+    await fillNativeWorkflow(panel, input);
+  }
+};
+const expectNativeWorkflowFields = async (
+  panel: Page,
+  input: NativeWorkflowInput,
+  readOnly: boolean
+): Promise<void> => {
+  for (const [name, value] of [
+    ['name — A name', input.name],
+    ['note (optional) — A note', input.note ?? ''],
+  ] as const) {
+    const field = nativeWorkflowForm(panel).getByRole('textbox', { exact: true, name });
+    await expect(field).toHaveValue(value);
+    await expect(field).toHaveJSProperty('readOnly', readOnly);
+    await expect(field).toBeEnabled();
+    if (!readOnly) {
+      await expect(field).toBeEditable();
+    }
+  }
+};
+const expectNativeWorkflowPending = async (
+  panel: Page,
+  input?: NativeWorkflowInput
+): Promise<void> => {
+  const root = nativeWorkflowRoot(panel, input !== undefined);
+  const pending = nativeWorkflowPending(root);
+  await expect(root).toBeVisible();
+  await expect(pending).toHaveCount(1);
+  await expect(pending).toBeVisible();
+  await expect(pending).toHaveText('Checking browser control… Your workflow has not started.');
+  await expect(nativeWorkflowRun(panel, input !== undefined)).toBeDisabled();
+  await expect(nativeWorkflowRun(panel, input !== undefined)).toHaveAttribute('aria-busy', 'true');
+  if (input !== undefined) {
+    await expectNativeWorkflowFields(panel, input, true);
+  }
+};
+const expectNativeWorkflowRetained = async (
+  panel: Page,
+  input?: NativeWorkflowInput
+): Promise<void> => {
+  await expect(nativeWorkflowRoot(panel, false)).toBeVisible();
+  await expect(nativeWorkflowRoot(panel, input !== undefined)).toBeVisible();
+  await expect(nativeWorkflowPending(nativeWorkflowRoot(panel, input !== undefined))).toHaveCount(
+    0
+  );
+  await expect(nativeWorkflowRun(panel, input !== undefined)).toBeEnabled();
+  await expect(nativeWorkflowRun(panel, input !== undefined)).toHaveAttribute('aria-busy', 'false');
+  if (input !== undefined) {
+    await expectNativeWorkflowFields(panel, input, false);
+  }
+};
+const expectNativeWorkflowUnpublished = async (
+  { panel, target, other }: Harness,
+  seenChatBodies: unknown[]
+): Promise<void> => {
+  await expect(
+    panel.getByRole('button', { exact: true, includeHidden: true, name: 'Resume workflow' })
+  ).toHaveCount(0);
+  // A published workflow must not add a turn to the seeded conversation before admission.
+  expect(await readExtensionLocalStorage(panel, 'kiloAgentConversations')).toMatchObject({
+    conversations: [
+      {
+        events: [
+          expect.objectContaining({
+            role: 'user',
+            text: 'Prior Settings admission',
+            type: 'message',
+          }),
+        ],
+      },
+    ],
+  });
+  await expect(target.locator('#count')).toHaveText('0');
+  await expect(other.locator('#count')).toHaveText('0');
+  expect(seenChatBodies).toHaveLength(0);
+};
+const expectNativeWorkflowCompletion = async (
+  harness: Harness,
+  input?: NativeWorkflowInput
+): Promise<void> => {
+  const { panel } = harness;
+  await expect(nativeWorkflowRoot(panel, false)).toBeHidden();
+  await expect(nativeWorkflowForm(panel)).toBeHidden();
+  const workflow = panel
+    .getByRole('region', { name: 'Agent conversation' })
+    .locator('details')
+    .filter({ hasText: nativeWorkflowResult });
+  const summary = workflow.locator('summary');
+  await expect(summary).toContainText('completed');
+  await summary.click();
+  const result = workflow.getByText(nativeWorkflowResult, { exact: false });
+  await expect(result).toHaveCount(1);
+  await expect(result).toBeVisible();
+  await (input === undefined
+    ? expect(result).not.toContainText('"name"')
+    : expect(result).toContainText(`"input": ${JSON.stringify(input, null, 2)}`));
+  if (input?.note === undefined) {
+    await expect(result).not.toContainText('"note"');
+  }
+  await expect(panel.getByRole('button', { exact: true, name: 'Resume workflow' })).toHaveCount(0);
+  await expectNativeQueueDrained(harness, 1);
+};
+const closeNativeWorkflowSettings = async (panel: Page): Promise<void> => {
+  const cancel = nativeWorkflowForm(panel).getByRole('button', { exact: true, name: 'Cancel' });
+  if (await cancel.isVisible()) {
+    await cancel.click();
+  }
+  const close = panel.getByRole('button', { exact: true, name: 'Close settings' });
+  if (await close.isVisible()) {
+    await close.click();
+  }
+};
+
+for (const parameters of [false, true]) {
+  for (const outcome of [
+    'success',
+    'native contention',
+    'storage failure',
+    'cancellation',
+  ] as const) {
+    test(`native gap A4: ${parameters ? 'parameters' : 'no parameters'} ${outcome} settles Settings admission`, async () => {
+      const seenChatBodies: unknown[] = [];
+      await withHarness(
+        async harness => {
+          const { panel, openPanel } = harness;
+          const input = parameters
+            ? { name: 'Original A name', note: 'Original A note' }
+            : undefined;
+          if (outcome === 'storage failure') {
+            await enable(panel);
+          }
+          await prepareNativeWorkflow(harness, input);
+          const run = nativeWorkflowRun(panel, parameters);
+          const root = nativeWorkflowRoot(panel, parameters);
+          const gate = await holdNativeSendBoundary(
+            panel,
+            outcome === 'cancellation' ? 'locked-safety' : 'safety',
+            parameters ? 'workflow-form' : 'workflow-row'
+          );
+          let effects = 0;
+          try {
+            await run.click();
+            await expect(run).toBeFocused();
+            await expectNativeWorkflowPending(panel, input);
+            await gate.wait();
+            await expect
+              .poll(() => heldExecutionModes(panel))
+              .toEqual(outcome === 'cancellation' ? ['shared'] : []);
+            await panel.keyboard.press('Enter');
+            await expect(run).toBeFocused();
+            await expectNativeWorkflowPending(panel, input);
+            if (input !== undefined) {
+              for (const name of ['name — A name', 'note (optional) — A note']) {
+                const field = root.getByRole('textbox', { exact: true, name });
+                await field.click();
+                await field.press('End');
+                await panel.keyboard.type(' overwritten while pending');
+              }
+              await expectNativeWorkflowFields(panel, input, true);
+              const cancel = root.getByRole('button', { exact: true, name: 'Cancel' });
+              await keyboardReach(panel, cancel, root);
+              await expect(cancel).toBeFocused();
+              await expect(cancel).toBeEnabled();
+            }
+            await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+
+            if (outcome === 'success') {
+              effects = 1;
+              await gate.release();
+              await expect.poll(gate.outcome).toEqual({ failed: false, settled: true });
+              await gate.restore();
+              await expectNativeWorkflowCompletion(harness, input);
+            } else if (outcome === 'native contention') {
+              const second = await openPanel();
+              try {
+                const contender = await holdNativeQueueContender(second);
+                try {
+                  await expect.poll(() => heldExecutionModes(panel)).toEqual(['exclusive']);
+                  await gate.release();
+                  await expectNativeWorkflowRetained(panel, input);
+                  await expect(root.getByText(/owns browser control/u).first()).toBeVisible();
+                  await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+                  await gate.restore();
+                  await contender.evaluate(held => held.release());
+                  await expectNativeQueueDrained(harness, 0);
+                  await expect(
+                    root.getByText(/Workflow input is retained\./u).first()
+                  ).toBeVisible();
+                  await expectNativeWorkflowRetained(panel, input);
+                  await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+
+                  effects = 1;
+                  await run.click();
+                  await expectNativeWorkflowCompletion(harness, input);
+                } finally {
+                  await contender.evaluate(held => held.release());
+                  await contender.dispose();
+                }
+              } finally {
+                await second.close();
+              }
+            } else if (outcome === 'storage failure') {
+              await gate.reject();
+              await expectNativeWorkflowRetained(panel, input);
+              await expect(
+                root.getByText(nativeWorkflowStorageBlocker, { exact: true }).first()
+              ).toBeVisible();
+              await expect.poll(gate.outcome).toEqual({ failed: true, settled: true });
+              await expectNativeQueueDrained(harness, 0);
+              await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+              await gate.restore();
+              await expectNativeWorkflowRetained(panel, input);
+              await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+
+              const controls = supervision(root);
+              await controls.getByRole('button', { name: 'Check recovery readiness' }).click();
+              const recover = controls.getByRole('button', { name: 'Recover browser control' });
+              await expect(recover).toBeEnabled();
+              await expectNativeWorkflowRetained(panel, input);
+              await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+              await recover.click();
+              await expect(controls).toContainText('Enabled — idle');
+              await expectNativeWorkflowRetained(panel, input);
+              await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+
+              effects = 1;
+              await run.click();
+              await expectNativeWorkflowCompletion(harness, input);
+            } else {
+              if (parameters) {
+                await panel.keyboard.press('Enter');
+                await expect(nativeWorkflowForm(panel)).toBeHidden();
+                await expect(nativeWorkflowRun(panel, false)).toBeEnabled();
+                await expect(nativeWorkflowRun(panel, false)).toHaveAttribute('aria-busy', 'false');
+              } else {
+                await panel.getByRole('button', { exact: true, name: 'Close settings' }).click();
+                await expect(root).toBeHidden();
+              }
+              await expect(nativeWorkflowPending(root)).toHaveCount(0);
+              await gate.release();
+              await expect.poll(gate.outcome).toEqual({ failed: false, settled: true });
+              await gate.restore();
+              // Observe the cancelled continuation's lock release before checking for late work.
+              await expectNativeQueueDrained(harness, 0);
+              await expect(nativeWorkflowForm(panel)).toBeHidden();
+              await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+            }
+          } finally {
+            try {
+              await closeNativeWorkflowSettings(panel);
+            } finally {
+              try {
+                await gate.dispose();
+              } finally {
+                await expectNativeQueueDrained(harness, effects);
+              }
+            }
+          }
+        },
+        { gateway: { seenChatBodies } }
+      );
+    });
+  }
+}
+
+test('native gap A4: blank required name disables Run without admission', async () => {
+  const seenChatBodies: unknown[] = [];
+  await withHarness(
+    async harness => {
+      const { panel } = harness;
+      const input = { name: '', note: 'Retain the optional note without a required name.' };
+      await prepareNativeWorkflow(harness, input);
+      const form = nativeWorkflowForm(panel);
+      const run = nativeWorkflowRun(panel, true);
+      const gate = await holdNativeSendBoundary(panel, 'safety', 'workflow-form');
+      try {
+        for (const name of ['', '   ']) {
+          const field = form.getByRole('textbox', { exact: true, name: 'name — A name' });
+          await field.fill(name);
+          await expect(run).toBeDisabled();
+          await expect(run).toHaveAttribute('aria-busy', 'false');
+          await field.press('Enter');
+          expect(await gate.activated()).toBe(true);
+          // Periodic safety reads can enter without a submission. Observe the armed boundary and UI.
+          await gate.wait();
+          await expect(nativeWorkflowPending(form)).toHaveCount(0);
+          await expect(run).toBeDisabled();
+          await expect(run).toHaveAttribute('aria-busy', 'false');
+          await expectNativeWorkflowFields(panel, { ...input, name }, false);
+          await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+          const cancel = form.getByRole('button', { exact: true, name: 'Cancel' });
+          await keyboardReach(panel, cancel, form);
+          await expect(cancel).toBeFocused();
+          await expect(cancel).toBeEnabled();
+          await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+        }
+        await panel.keyboard.press('Enter');
+        await expect(form).toBeHidden();
+        await expect(nativeWorkflowRun(panel, false)).toBeEnabled();
+        await gate.restore();
+        await expectNativeQueueDrained(harness, 0);
+        await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+      } finally {
+        try {
+          await closeNativeWorkflowSettings(panel);
+        } finally {
+          try {
+            await gate.dispose();
+          } finally {
+            await expectNativeQueueDrained(harness, 0);
+          }
+        }
+      }
+    },
+    { gateway: { seenChatBodies } }
+  );
+});
+
+test('native gap A4: blank optional note stays absent from the returned input', async () => {
+  const seenChatBodies: unknown[] = [];
+  await withHarness(
+    async harness => {
+      const { panel } = harness;
+      const input = { name: 'Required name only' };
+      await prepareNativeWorkflow(harness, input);
+      const gate = await holdNativeSendBoundary(panel, 'safety', 'workflow-form');
+      try {
+        const run = nativeWorkflowRun(panel, true);
+        await run.click();
+        await expect(run).toBeFocused();
+        await expectNativeWorkflowPending(panel, input);
+        await gate.wait();
+        await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+        await gate.release();
+        await expect.poll(gate.outcome).toEqual({ failed: false, settled: true });
+        await gate.restore();
+        await expectNativeWorkflowCompletion(harness, input);
+      } finally {
+        try {
+          await closeNativeWorkflowSettings(panel);
+        } finally {
+          try {
+            await gate.dispose();
+          } finally {
+            await expectNativeQueueDrained(harness, 1);
+          }
+        }
+      }
+    },
+    { gateway: { seenChatBodies } }
+  );
+});
+
+for (const outcome of ['success', 'storage failure'] as const) {
+  test(`native gap A5 Parameters: cancelled A cannot clear B ${outcome}`, async () => {
+    const seenChatBodies: unknown[] = [];
+    await withHarness(
+      async harness => {
+        const { panel } = harness;
+        const oldInput = { name: 'Cancelled A name', note: 'Cancelled A note' };
+        const newInput = { name: 'Current B name', note: 'Current B note' };
+        await prepareNativeWorkflow(harness, oldInput);
+        const older = await holdNativeSendBoundary(panel, 'locked-safety', 'workflow-form');
+        let effects = 0;
+        try {
+          await nativeWorkflowRun(panel, true).click();
+          await expectNativeWorkflowPending(panel, oldInput);
+          await older.wait();
+          await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+          await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+          const form = nativeWorkflowForm(panel);
+          const cancel = form.getByRole('button', { exact: true, name: 'Cancel' });
+          await keyboardReach(panel, cancel, form);
+          await panel.keyboard.press('Enter');
+          await expect(form).toBeHidden();
+          await expect(nativeWorkflowRun(panel, false)).toBeEnabled();
+          await expect(nativeWorkflowRun(panel, false)).toHaveAttribute('aria-busy', 'false');
+          await nativeWorkflowRun(panel, false).click();
+          await fillNativeWorkflow(panel, newInput);
+          const sharedRefresh = await holdNativeSendBoundary(panel, 'safety', 'workflow-form');
+          let newer: Awaited<ReturnType<typeof holdNativeSendBoundary>> | undefined;
+          try {
+            const run = nativeWorkflowRun(panel, true);
+            await run.click();
+            await expect(run).toBeFocused();
+            await expectNativeWorkflowPending(panel, newInput);
+            await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+            await older.release();
+            await expect.poll(older.outcome).toEqual({ failed: false, settled: true });
+            await sharedRefresh.wait();
+            // A has released its native lock; its release tail still shares B's first refresh.
+            await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+            await expectNativeWorkflowPending(panel, newInput);
+            await expect(run).toBeFocused();
+
+            newer = await holdNativeSendBoundary(panel, 'safety', 'workflow-form');
+            // Arm the next read with the still-focused Run, without submitting another attempt.
+            await panel.keyboard.press('Enter');
+            expect(await newer.activated()).toBe(true);
+            await sharedRefresh.release();
+            await expect.poll(sharedRefresh.outcome).toEqual({ failed: false, settled: true });
+            await newer.wait();
+            // The shared refresh lets A finish before B's native callback requests its own refresh.
+            await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+            await expectNativeWorkflowPending(panel, newInput);
+            await expect(run).toBeFocused();
+            expect(await newer.outcome()).toEqual({ failed: false, settled: false });
+            await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+
+            if (outcome === 'success') {
+              effects = 1;
+              await newer.release();
+              await expect.poll(newer.outcome).toEqual({ failed: false, settled: true });
+              await newer.restore();
+              await sharedRefresh.restore();
+              await older.restore();
+              await expectNativeWorkflowCompletion(harness, newInput);
+            } else {
+              await newer.reject();
+              await expectNativeWorkflowRetained(panel, newInput);
+              await expect(
+                form.getByRole('alert').filter({ hasText: nativeWorkflowStorageBlocker })
+              ).toBeVisible();
+              await expect.poll(newer.outcome).toEqual({ failed: true, settled: true });
+              await expectNativeQueueDrained(harness, 0);
+              await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+              await newer.restore();
+              await sharedRefresh.restore();
+              await older.restore();
+              await expectNativeWorkflowRetained(panel, newInput);
+              await expectNativeWorkflowUnpublished(harness, seenChatBodies);
+            }
+          } finally {
+            try {
+              await closeNativeWorkflowSettings(panel);
+            } finally {
+              try {
+                await newer?.dispose();
+              } finally {
+                await sharedRefresh.dispose();
+              }
+            }
+          }
+        } finally {
+          try {
+            await closeNativeWorkflowSettings(panel);
+          } finally {
+            try {
+              await older.dispose();
+            } finally {
+              await expectNativeQueueDrained(harness, effects);
+            }
+          }
+        }
+      },
+      { gateway: { seenChatBodies } }
     );
   });
 }

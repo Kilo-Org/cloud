@@ -698,7 +698,7 @@ export function createGitHubReviewBridge(ctx: TRPCContext) {
         .limit(1);
       // Old ledger addresses retain caller casing, unlike canonical repository metadata.
       // Keep those bytes until old clients/records and the 30-day ledger window expire.
-      const savedAddress = row?.resource_key.match(
+      const savedAddress = row?.resource_key?.match(
         /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)#([1-9]\d*)::[a-f0-9]{16}$/
       );
       if (

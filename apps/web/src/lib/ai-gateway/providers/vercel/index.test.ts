@@ -10,7 +10,10 @@ import {
   passesVercelRoutingPercentage,
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayRequest,
+  OpenRouterProviderConfig,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { minimax_m27_free_model, minimax_m3_free_model } from '@/lib/ai-gateway/providers/minimax';
 
@@ -164,32 +167,35 @@ describe('convertProviderOptions', () => {
     { sort: { by: 'price' }, expected: 'cost' },
     { sort: { by: 'throughput', partition: 'model' }, expected: 'tps' },
     { sort: { by: 'latency', partition: 'none' }, expected: 'ttft' },
-  ])('converts sort $sort to $expected alongside existing preferences', ({ sort, expected }) => {
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: {
-        model: 'anthropic/claude-sonnet-4.5',
-        messages: [{ role: 'user', content: 'hello' }],
-        provider: {
-          sort,
-          only: ['anthropic', 'amazon-bedrock'],
-          order: ['amazon-bedrock'],
-          zdr: true,
-          data_collection: 'deny',
+  ] as const)(
+    'converts sort $sort to $expected alongside existing preferences',
+    ({ sort, expected }) => {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: {
+          model: 'anthropic/claude-sonnet-4.5',
+          messages: [{ role: 'user', content: 'hello' }],
+          provider: {
+            sort,
+            only: ['anthropic', 'amazon-bedrock'],
+            order: ['amazon-bedrock'],
+            zdr: true,
+            data_collection: 'deny',
+          },
         },
-      },
-    };
-    const originalRequest = structuredClone(request);
+      };
+      const originalRequest = structuredClone(request);
 
-    expect(convertProviderOptions(request, null).gateway).toMatchObject({
-      sort: expected,
-      only: ['anthropic', 'bedrock'],
-      order: ['bedrock'],
-      zeroDataRetention: true,
-      disallowPromptTraining: true,
-    });
-    expect(request).toEqual(originalRequest);
-  });
+      expect(convertProviderOptions(request, null).gateway).toMatchObject({
+        sort: expected,
+        only: ['anthropic', 'bedrock'],
+        order: ['bedrock'],
+        zeroDataRetention: true,
+        disallowPromptTraining: true,
+      });
+      expect(request).toEqual(originalRequest);
+    }
+  );
 
   it.each([
     undefined,
@@ -208,7 +214,7 @@ describe('convertProviderOptions', () => {
       body: {
         model: 'anthropic/claude-sonnet-4.5',
         messages: [{ role: 'user', content: 'hello' }],
-        provider: { sort },
+        provider: { sort: sort as OpenRouterProviderConfig['sort'] },
       },
     };
 

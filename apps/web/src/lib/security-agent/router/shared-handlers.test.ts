@@ -203,7 +203,7 @@ function createHandlers() {
         id: 'integration-123',
         integration_status: 'active',
         platform_installation_id: 'installation-123',
-        repositories: [{ id: 1, full_name: 'kilo/repo', name: 'repo', private: true }],
+        repositories: [{ id: 1, full_name: 'kilo/repo', name: 'repo', private: true, fork: false }],
       }) as never,
     trackingExtras: () => ({}),
   });
@@ -365,6 +365,7 @@ describe('getRepositories', () => {
         fullName: 'kilo/repo',
         name: 'repo',
         private: true,
+        fork: false,
         dependabotAlerts: 'disabled',
       },
     ]);
@@ -378,6 +379,7 @@ describe('getRepositories', () => {
           fullName: 'kilo/repo',
           name: 'repo',
           private: true,
+          fork: false,
         },
       ]
     );

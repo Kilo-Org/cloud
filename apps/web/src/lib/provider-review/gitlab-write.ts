@@ -925,7 +925,7 @@ async function reconcile(
       if (
         input.action === 'removeReaction'
           ? !award && ref.id === input.reaction
-          : award?.name === input.reaction && String(award.user.id) === auth.actor.id
+          : award && award.name === input.reaction && String(award.user.id) === auth.actor.id
       )
         return confirmedReviewEffect(ref);
     }
@@ -1093,7 +1093,7 @@ export async function runGitLabReviewOperation(
   async function publish(): Promise<ReviewEffectResult> {
     let stopped = false;
     for (const effect of list) {
-      const result = stopped
+      const result: ReviewEffectResult = stopped
         ? rejectedReviewEffect('previous_effect_unconfirmed', 'same-key')
         : await runReviewOperation(
             { ...request, effect: { id: effect.itemId, action: effect.input.action } },

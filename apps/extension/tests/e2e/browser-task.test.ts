@@ -436,6 +436,17 @@ const approve = async (root: Page | Locator): Promise<void> => {
 };
 const capture = async (panel: Page, name: string): Promise<void> => {
   expect(panel.viewportSize()).toEqual({ height: 720, width: 320 });
+  const viewport = await panel.evaluate(() => ({
+    height: innerHeight,
+    scale: visualViewport?.scale,
+    visibility: document.visibilityState,
+    width: innerWidth,
+  }));
+  await test.info().attach(`${name}-viewport`, {
+    body: JSON.stringify(viewport, null, 2),
+    contentType: 'application/json',
+  });
+  expect(viewport).toMatchObject({ height: 720, scale: 1, width: 320 });
   const dialogs = panel.getByRole('dialog');
   const root = (await dialogs.count()) > 0 ? dialogs.last() : panel;
   const stop = supervision(root).getByRole('button', { name: 'Stop CLI task' });
@@ -798,6 +809,30 @@ for (const profile of ['enabled', 'quarantined'] as const) {
           await expect(second.getByLabel('Message agent')).toHaveValue(draft);
           await expect(target.locator('#count')).toHaveText('0');
           expect(requests).toBe(0);
+          await test.step('Scroll to the footer and activate Send without clearing quarantine', async () => {
+            const send = second.getByRole('button', { name: 'Send message' });
+            const before = await send.boundingBox();
+            // Use native scrolling, then ordinary keyboard navigation and an unforced click.
+            await send.scrollIntoViewIfNeeded();
+            await keyboardReach(second, send);
+            await expect(send).toBeFocused();
+            await expect(send).toBeInViewport({ ratio: 1 });
+            await expect(send).toBeEnabled();
+            await test.info().attach('native-ownership-quarantined-footer-scroll', {
+              body: JSON.stringify({ after: await send.boundingBox(), before }, null, 2),
+              contentType: 'application/json',
+            });
+            await capture(second, 'native-ownership-quarantined-footer-reachable');
+            await send.click();
+            await expect(second.getByLabel('Message agent')).toHaveValue(draft);
+            await expect(supervision(second)).toContainText('Recovery required');
+            await expect(
+              second.getByRole('button', { name: 'Recover browser control' })
+            ).toHaveCount(0);
+            await expect(target.locator('#count')).toHaveText('0');
+            await expect(other.locator('#count')).toHaveText('0');
+            expect(requests).toBe(0);
+          });
         } else {
           await expect(supervision(second)).toContainText('Queue empty.');
           relay.submit('Run only after fresh tab consent in the new owning panel.');
@@ -806,11 +841,61 @@ for (const profile of ['enabled', 'quarantined'] as const) {
           await expect(supervision(second).getByLabel('Tab to approve')).toHaveValue('');
           await expect(target.locator('#count')).toHaveText('0');
           expect(requests).toBe(0);
-          await approve(second);
+          await test.step('Reach and select the consent controls before approving the tab', async () => {
+            const controls = supervision(second);
+            const tab = controls.getByLabel('Tab to approve');
+            const approveTab = controls.getByRole('button', { exact: true, name: 'Approve tab' });
+            await expect(approveTab).toBeDisabled();
+            await tab.scrollIntoViewIfNeeded();
+            await expect(tab).toBeInViewport({ ratio: 1 });
+            await expect(tab).toBeEnabled();
+            await capture(second, 'native-ownership-enabled-tab-consent');
+            await tab.selectOption({ label: 'Approved browser task tab' });
+            await expect(
+              controls.getByText('Tab: Approved browser task tab', { exact: true })
+            ).toBeVisible();
+            for (const control of [
+              approveTab,
+              controls.getByRole('button', { exact: true, name: 'Reject' }),
+              controls.getByRole('button', { exact: true, name: 'Refresh tabs' }),
+            ]) {
+              await control.scrollIntoViewIfNeeded();
+              await expect(control).toBeInViewport({ ratio: 1 });
+              await expect(control).toBeEnabled();
+            }
+            await expect(target.locator('#count')).toHaveText('0');
+            expect(requests).toBe(0);
+            await capture(second, 'native-ownership-enabled-selected-tab-consent');
+            await approveTab.click();
+          });
           await expect(supervision(second)).toContainText('Last outcome: succeeded');
           await expect(target.locator('#count')).toHaveText('1');
           await expect(other.locator('#count')).toHaveText('0');
           expect(requests).toBe(2);
+          await test.step('Reach the final controls and retrieve status without replaying work', async () => {
+            const controls = supervision(second);
+            const refresh = controls.getByRole('button', { name: 'Refresh status' });
+            await refresh.scrollIntoViewIfNeeded();
+            await expect(refresh).toBeInViewport({ ratio: 1 });
+            await refresh.click();
+            await expect(controls).toContainText(
+              'Status retrieved. This does not approve execution or resubmit work.'
+            );
+            const composer = second.getByLabel('Message agent');
+            await composer.scrollIntoViewIfNeeded();
+            await expect(composer).toBeInViewport({ ratio: 1 });
+            await expect(composer).toBeEditable();
+            const outcome = controls.getByText(/Last outcome: succeeded/u);
+            await outcome.scrollIntoViewIfNeeded();
+            await expect(outcome).toBeInViewport({ ratio: 1 });
+            await expect(
+              controls.getByRole('button', { exact: true, name: 'Approve tab' })
+            ).toHaveCount(0);
+            await expect(controls.getByRole('button', { name: 'Stop CLI task' })).toHaveCount(0);
+            await expect(target.locator('#count')).toHaveText('1');
+            await expect(other.locator('#count')).toHaveText('0');
+            expect(requests).toBe(2);
+          });
         }
         await capture(second, `native-ownership-${profile}-consent-and-safety`);
       },

@@ -103,7 +103,8 @@ export const launchExtensionContext = async ({
     ],
     ...(executablePath === undefined ? { channel } : { executablePath }),
     headless: !isHeaded,
-    ignoreDefaultArgs: ['--enable-automation'],
+    // Keep Playwright's native capture defaults without changing unrecorded analytics callers.
+    ignoreDefaultArgs: recordVideo === undefined ? ['--enable-automation'] : [],
     ...(recordVideo === undefined ? {} : { recordVideo, viewport: recordVideo.size }),
     userAgent: EXTENSION_E2E_USER_AGENT,
   });

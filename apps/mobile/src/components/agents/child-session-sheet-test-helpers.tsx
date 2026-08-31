@@ -20,6 +20,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { ChildSessionSheet } from './child-session-sheet';
 
 const reactNativeMock = vi.hoisted(() => ({
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'ios' as string },
   useWindowDimensions: vi.fn(() => ({ width: 390, height: 844 })),
 }));
@@ -34,8 +35,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
   AccessibilityInfo: { announceForAccessibility: vi.fn() },
-  Platform: reactNativeMock.Platform,
-  useWindowDimensions: reactNativeMock.useWindowDimensions,
+  ...reactNativeMock,
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'AnimatedView' },

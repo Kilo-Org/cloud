@@ -27,7 +27,7 @@ import {
   logFreeModelRequest,
 } from '@/lib/free-model-rate-limiter';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
-import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
+import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
 import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
@@ -608,7 +608,9 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
 
     const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody(tencent_hy3_free_model.public_id)) as never);
+    const response = await POST(
+      makeRequest(makeBody(stepfun_37_flash_free_model.public_id)) as never
+    );
 
     expect(response.status).toBe(200);
     expect(mockedCheckFreeModelRateLimit).not.toHaveBeenCalled();

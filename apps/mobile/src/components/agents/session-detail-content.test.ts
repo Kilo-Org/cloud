@@ -80,6 +80,13 @@ vi.mock('expo-router', () => ({
   }),
 }));
 vi.mock('expo-keep-awake', () => ({ useKeepAwake: vi.fn() }));
+vi.mock('expo-haptics', () => ({
+  notificationAsync: vi.fn(),
+  NotificationFeedbackType: { Error: 'error', Success: 'success' },
+}));
+vi.mock('@/components/agents/mobile-session-manager', () => ({
+  isCancelQueuedUpgradeRequired: vi.fn(),
+}));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',

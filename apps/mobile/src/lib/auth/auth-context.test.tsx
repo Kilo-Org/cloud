@@ -275,6 +275,7 @@ vi.mock('@/lib/storage-keys', () => ({
   PENDING_DEEP_LINK_KEY: 'pending-deep-link',
   PICKER_LAUNCH_CONTEXT_KEY: 'picker-launch-context',
   REFRESH_TOKEN_KEY: 'refresh-token',
+  LIVE_SESSION_FILTERS_KEY: 'live-session-filters',
   SESSION_FILTERS_KEY: 'session-filters',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
 }));
@@ -490,6 +491,7 @@ describe('sign-out teardown ordering', () => {
     );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('live-session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('pending-deep-link');
     expect(hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink).toHaveBeenCalled();
@@ -1570,6 +1572,7 @@ describe('auth-transition queue and sign-out failure matrix', () => {
     );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('live-session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
     const { clearAgentModelPreference } = await import('@/lib/hooks/use-persisted-agent-model');
     expect(clearAgentModelPreference).toHaveBeenCalled();

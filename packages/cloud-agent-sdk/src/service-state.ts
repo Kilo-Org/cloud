@@ -54,6 +54,8 @@ type ServiceStateConfig = {
   onPreparationFailed?: ((message: string) => void) | undefined;
   /** Fired when the server acknowledges a user message was queued. */
   onMessageQueued?: ((messageId: string) => void) | undefined;
+  /** Fired when a queued user message is canceled before delivery. */
+  onMessageCanceled?: ((messageId: string) => void) | undefined;
   /** Fired when a queued user message's execution terminates in 'completed'. */
   onMessageCompleted?: ((messageId: string) => void) | undefined;
   /** Fired when a queued user message fails delivery or its execution fails. */
@@ -568,6 +570,14 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     notify();
   }
 
+  function processMessageCanceled(
+    event: Extract<ServiceEvent, { type: 'cloud.message.canceled' }>
+  ): void {
+    pendingMessages.delete(event.messageId);
+    config.onMessageCanceled?.(event.messageId);
+    notify();
+  }
+
   function processMessageSent(event: Extract<ServiceEvent, { type: 'cloud.message.sent' }>): void {
     pendingMessages.delete(event.messageId);
     notify();
@@ -793,6 +803,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         break;
       case 'cloud.message.queued':
         processMessageQueued(event);
+        break;
+      case 'cloud.message.canceled':
+        processMessageCanceled(event);
         break;
       case 'cloud.message.sent':
         processMessageSent(event);

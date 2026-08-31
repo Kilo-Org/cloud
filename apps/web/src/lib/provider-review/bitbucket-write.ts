@@ -788,7 +788,7 @@ export async function runBitbucketReviewOperation(
   const publish = async (reconcileOnly = statusOnly): Promise<ReviewEffectResult> => {
     let stopped = false;
     for (const effect of effects) {
-      const result = stopped
+      const result: ReviewEffectResult = stopped
         ? rejectedReviewEffect('previous_effect_unconfirmed', 'same-key')
         : await execute(effect, true, reconcileOnly);
       items.push({ itemId: effect.itemId, effect: effect.input.action, result });

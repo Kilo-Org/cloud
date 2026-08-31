@@ -1,19 +1,34 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { render } from '@testing-library/react';
+import { LEGACY_CONVERSATION_GREETING } from '@/src/shared/agent-conversation-tabs';
 import {
+  ConversationList,
   decideConversationScroll,
   isAtConversationBottom,
   isDifferentConversation,
 } from './conversation-list';
 
 /*
- * The virtualizer renders no rows under jsdom (see agents-session-view.test.ts),
- * so these tests cover the scroll decision itself, not the DOM scroll.
+ * The virtualizer renders no rows under jsdom (see agents-session-view.test.ts).
+ * These tests cover scroll decisions and DOM boundaries, not browser geometry.
  */
 
 const atBottom = { clientHeight: 400, scrollHeight: 2000, scrollTop: 1600 };
 const scrolledUp = { clientHeight: 400, scrollHeight: 2000, scrollTop: 400 };
+
+describe('conversation viewport boundary', () => {
+  it('keeps the empty greeting inside a clipped, internally scrolling viewport', () => {
+    const view = render(createElement(ConversationList, { items: [] }));
+    const conversation = view.getByRole('region', { name: 'Agent conversation' });
+
+    expect(conversation.closest('.min-h-0.overflow-hidden')).toBe(view.container.firstElementChild);
+    expect(conversation.classList.contains('overflow-y-auto')).toBe(true);
+    expect(view.getByText(LEGACY_CONVERSATION_GREETING).parentElement).toBe(conversation);
+  });
+});
 
 describe('isAtConversationBottom()', () => {
   it('accepts the exact bottom', () => {

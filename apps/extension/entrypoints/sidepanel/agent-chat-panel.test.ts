@@ -82,7 +82,6 @@ vi.mock('./use-agent-workflows', () => ({
 vi.mock('./model-picker', () => ({ ModelPicker: () => null }));
 vi.mock('./context-donut', () => ({ ContextDonut: () => null }));
 vi.mock('./conversation-history-button', () => ({ ConversationHistoryButton: () => null }));
-vi.mock('./conversation-list', () => ({ ConversationList: () => null }));
 
 import {
   AgentChatPanel,
@@ -1502,6 +1501,24 @@ describe('local admission and shared run context', () => {
     });
     expect(store.get(workflowRunRequestAtom)).toBe(request);
     expect({ actions, requests }).toStrictEqual({ actions: [], requests: [] });
+  });
+
+  it('keeps admission feedback and the composer outside the clipped conversation', async () => {
+    const provider = hold(await coordinator().acquireProviderOwner());
+    hold(
+      await coordinator().acquireDelegated(provider, 'layout-owner', new AbortController().signal)
+    );
+    const view = renderApp();
+    await waitFor(() => {
+      expect(view.getByRole('status').textContent).toContain('layout-owner');
+    });
+    const conversation = view.getByRole('region', { name: 'Agent conversation' });
+    const viewport = conversation.parentElement;
+    const status = view.getByRole('status');
+    const textbox = view.getByRole('textbox', { name: 'Message agent' });
+    expect(conversation.closest('.overflow-hidden')).toBe(viewport);
+    expect(viewport?.nextElementSibling).toBe(status);
+    expect(viewport?.contains(textbox)).toBe(false);
   });
 
   it('retains a blocked draft and requires a new Send after delegated control returns', async () => {

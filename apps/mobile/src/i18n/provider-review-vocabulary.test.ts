@@ -1,11 +1,15 @@
 import { CODE_REVIEW_PLATFORMS } from '@kilocode/app-shared/code-review';
-import { createInstance, type ParseKeys } from 'i18next';
+import { createInstance } from 'i18next';
+import { type UseTranslationResponse } from 'react-i18next';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+
+import { REPO_PLATFORM_LABEL_KEYS } from '@/lib/picker-bridge';
 
 import en from './locales/en.json';
 import {
   PROVIDER_REVIEW_REQUEST_KEYS,
   PROVIDER_REVIEW_STATE_KEYS,
+  type ProviderReviewKey,
 } from './provider-review-vocabulary';
 
 const i18n = createInstance();
@@ -66,12 +70,37 @@ function leafEntries(tree: StringTree, prefix = ''): [string, string][] {
 }
 
 describe('provider review vocabulary', () => {
-  it('keeps translator inputs constrained to catalog keys', () => {
-    const key = PROVIDER_REVIEW_REQUEST_KEYS.gitlab.title satisfies ParseKeys;
+  it('keeps vocabulary inputs constrained to catalog leaves', () => {
+    const key = PROVIDER_REVIEW_REQUEST_KEYS.gitlab.title satisfies ProviderReviewKey;
 
-    expectTypeOf<'providerReview.mergeRequest.unknown'>().not.toExtend<ParseKeys>();
-    expectTypeOf<string>().not.toExtend<ParseKeys>();
+    expectTypeOf<ProviderReviewKey>().not.toBeNever();
+    expectTypeOf<'providerReview.title'>().toExtend<ProviderReviewKey>();
+    expectTypeOf<'providerReview.permission.forbidden'>().toExtend<ProviderReviewKey>();
+    expectTypeOf<'providerReview.mergeRequest.unknown'>().not.toExtend<ProviderReviewKey>();
+    expectTypeOf<'providerReview'>().not.toExtend<ProviderReviewKey>();
+    expectTypeOf<'providerReview.mergeRequest'>().not.toExtend<ProviderReviewKey>();
+    expectTypeOf<'providerReview.permission'>().not.toExtend<ProviderReviewKey>();
+    expectTypeOf<'common.cancel'>().not.toExtend<ProviderReviewKey>();
+    expectTypeOf<`providerReview.${string}`>().not.toExtend<ProviderReviewKey>();
+    expectTypeOf<string>().not.toExtend<ProviderReviewKey>();
     expect(i18n.t(key)).toBe('Merge request review');
+  });
+
+  it('keeps legacy string inputs usable with the instance translator', () => {
+    const translate = (key: string) => i18n.t(key);
+    const label = translate('common.cancel');
+
+    expectTypeOf(label).toEqualTypeOf<string>();
+    expect(label).toBe('Cancel');
+  });
+
+  it('keeps widened repository labels usable with the hook translator', () => {
+    const translate = (t: UseTranslationResponse<'translation', undefined>['t']) =>
+      t(REPO_PLATFORM_LABEL_KEYS.gitlab);
+    const label = translate(i18n.t);
+
+    expectTypeOf(label).toEqualTypeOf<string>();
+    expect(`${label}: example/repo`).toBe('GitLab: example/repo');
   });
 
   it.each(CODE_REVIEW_PLATFORMS)('renders the request terminology for %s', provider => {

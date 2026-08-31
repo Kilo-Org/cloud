@@ -473,7 +473,10 @@ const enableProvider = async (panel: Page) => {
     .locator(`button[data-model-id="${model}"]`)
     .click();
   await settings.getByRole('button', { name: /Safe mode/u }).click();
-  await settings.getByRole('button', { exact: true, name: 'Dangerous' }).click();
+  await settings
+    .getByRole('button', { exact: true, name: 'Dangerous Arbitrary webpage control' })
+    .click();
+  await expect(settings.getByRole('button', { name: /Danger mode/u })).toBeVisible();
   await settings.getByRole('switch', { exact: true, name: 'CLI tasks' }).click();
   await expect(settings.getByRole('switch', { exact: true, name: 'CLI tasks' })).toHaveAttribute(
     'aria-checked',

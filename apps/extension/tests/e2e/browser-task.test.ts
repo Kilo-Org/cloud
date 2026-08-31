@@ -413,8 +413,13 @@ const enable = async (
   );
   if (dangerous) {
     await settings.getByRole('button', { name: /Safe mode/u }).click();
-    await settings.getByRole('button', { exact: true, name: 'Dangerous' }).click();
+    await settings
+      .getByRole('button', { exact: true, name: 'Dangerous Arbitrary webpage control' })
+      .click();
   }
+  await expect(
+    settings.getByRole('button', { name: dangerous ? /^Danger mode:/u : /^Safe mode:/u })
+  ).toBeVisible();
   await settings.getByRole('switch', { exact: true, name: 'CLI tasks' }).click();
   await expect(settings.getByRole('switch', { exact: true, name: 'CLI tasks' })).toHaveAttribute(
     'aria-checked',
@@ -783,7 +788,9 @@ for (const loss of ['close', 'reload'] as const) {
           .getByLabel('Target tab')
           .selectOption({ label: 'Approved browser task tab' });
         await localOwner.getByRole('button', { name: /(?:Safe|Dangerous) mode/u }).click();
-        await localOwner.getByRole('button', { exact: true, name: 'Dangerous' }).click();
+        await localOwner
+          .getByRole('button', { exact: true, name: 'Dangerous Arbitrary webpage control' })
+          .click();
         await localOwner.getByLabel('Message agent').fill('Issue the local page action and wait.');
         await localOwner.getByLabel('Message agent').press('Enter');
         await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
@@ -843,7 +850,9 @@ for (const loss of ['close', 'reload'] as const) {
         await expect(panel.getByLabel('Message agent')).toHaveValue(draft);
         await panel.getByLabel('Target tab').selectOption({ label: 'Unapproved tab' });
         await panel.getByRole('button', { name: /(?:Safe|Dangerous) mode/u }).click();
-        await panel.getByRole('button', { exact: true, name: 'Dangerous' }).click();
+        await panel
+          .getByRole('button', { exact: true, name: 'Dangerous Arbitrary webpage control' })
+          .click();
         await panel.getByLabel('Message agent').press('Enter');
         await expect(panel.getByText(recoveredText, { exact: true })).toBeVisible();
         await expect.poll(() => heldExecutionModes(panel)).toEqual([]);

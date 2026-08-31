@@ -328,7 +328,7 @@ export function modelNotAllowedResponse() {
 }
 
 export function efficientPoolBlockedResponse() {
-  const error = 'Your organization blocks every model in the auto-routing pool.';
+  const error = 'Your organization blocks the model selected by auto routing.';
   const message =
     `${error} Configure a custom Efficient model pool with allowed models, ` +
     `or adjust your organization model restrictions.`;

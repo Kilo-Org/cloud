@@ -1,9 +1,13 @@
 import { type CodeReviewPlatform } from '@kilocode/app-shared/code-review';
-import { type ParseKeys } from 'i18next';
 
 import type en from './locales/en.json';
 
-type ProviderReviewKey = Extract<ParseKeys, `providerReview.${string}`>;
+type ProviderReviewCatalog = typeof en.providerReview;
+export type ProviderReviewKey = {
+  [Group in keyof ProviderReviewCatalog]: ProviderReviewCatalog[Group] extends string
+    ? `providerReview.${Group}`
+    : `providerReview.${Group}.${keyof ProviderReviewCatalog[Group] & string}`;
+}[keyof ProviderReviewCatalog];
 type RequestVocabulary = {
   readonly [Key in keyof typeof en.providerReview.pullRequest]: Extract<
     ProviderReviewKey,

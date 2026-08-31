@@ -1505,9 +1505,14 @@ const expectNativeSendPending = async (panel: Page, draft: string): Promise<void
   await expect(panel.getByRole('button', { exact: true, name: 'Send message' })).toBeDisabled();
 };
 
-// Each installation belongs to one Send action. Restore simultaneous gates in reverse order.
-const holdNativeSendBoundary = async (panel: Page, boundary: 'safety' | 'tab') => {
-  const handle = await panel.evaluateHandle(kind => {
+// Each installation belongs to one Send or Resume action. Restore simultaneous gates in reverse order.
+const holdNativeSendBoundary = async (
+  panel: Page,
+  boundary: 'safety' | 'tab',
+  action: 'send' | 'resume' = 'send'
+) => {
+  const options = { activation: action, kind: boundary };
+  const handle = await panel.evaluateHandle(({ kind, activation }) => {
     const scope = globalThis as typeof globalThis & {
       chrome: typeof browser;
     };
@@ -1552,16 +1557,21 @@ const holdNativeSendBoundary = async (panel: Page, boundary: 'safety' | 'tab') =
       if (!(input instanceof HTMLTextAreaElement)) {
         return;
       }
-      const send = input.form?.querySelector('button[type="submit"]');
+      const control =
+        activation === 'resume'
+          ? [...document.querySelectorAll('button')].find(
+              button => button.textContent?.trim() === 'Resume queued message'
+            )
+          : input.form?.querySelector('button[type="submit"]');
       const enter =
         event instanceof KeyboardEvent &&
         event.key === 'Enter' &&
         !event.shiftKey &&
-        event.target === input;
+        event.target === (activation === 'resume' ? control : input);
       const click =
         event.type === 'click' &&
         event.target instanceof Node &&
-        send?.contains(event.target) === true;
+        control?.contains(event.target) === true;
       if (!enter && !click) {
         return;
       }
@@ -1627,7 +1637,7 @@ const holdNativeSendBoundary = async (panel: Page, boundary: 'safety' | 'tab') =
     document.addEventListener('keydown', arm, true);
     document.addEventListener('click', arm, true);
     return state;
-  }, boundary);
+  }, options);
   return {
     dispose: async () => {
       try {
@@ -2170,3 +2180,480 @@ test('native gap A5 Send: conversation switches isolate pending drafts and settl
     }
   );
 });
+
+const nativeQueueRun = 'Finish local run A before resuming Q.';
+const nativeQueueRunResult = 'Local run A completed normally.';
+const nativeQueueResume = (panel: Page) =>
+  panel.getByRole('button', { exact: true, name: 'Resume queued message' });
+const nativeQueueGateway = (seenChatBodies: unknown[], finish: Promise<void>) => {
+  const gateway = nativeSendGateway(seenChatBodies);
+  return {
+    ...gateway,
+    beforeFirstCompletion: () => finish,
+    firstCompletionEvents: content(nativeQueueRunResult),
+    secondCompletionEvents: gateway.firstCompletionEvents,
+    thirdCompletionEvents: gateway.secondCompletionEvents,
+  };
+};
+const holdNativeQueueContender = (panel: Page) =>
+  panel.evaluateHandle(name => {
+    const hold = Promise.withResolvers<void>();
+    const released = navigator.locks.request(name, { mode: 'exclusive' }, () => hold.promise);
+    return {
+      release: async () => {
+        hold.resolve();
+        await released;
+      },
+    };
+  }, executionLock);
+const expectNativeQueueEmpty = async (panel: Page): Promise<void> => {
+  await expect(nativeQueueResume(panel)).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Cancel queued message' })).toHaveCount(0);
+  await expect(panel.getByText(/^Queued:/u)).toHaveCount(0);
+};
+const expectNativeQueueRetained = async (panel: Page, queued: string): Promise<void> => {
+  await expect(panel.getByText(`Queued: ${queued}`, { exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Cancel queued message' })).toBeEnabled();
+  await expect(nativeQueueResume(panel)).toBeEnabled();
+  await expect(nativeQueueResume(panel)).toHaveAttribute('aria-busy', 'false');
+  await expect(nativeSendPending(panel)).toHaveCount(0);
+  await expect(panel.getByLabel('Message agent')).toHaveValue('');
+};
+const expectNativeQueuePending = async (panel: Page, queued: string): Promise<void> => {
+  await expectNativeSendPending(panel, '');
+  await expect(nativeQueueResume(panel)).toHaveAttribute('aria-busy', 'true');
+  await expect(nativeQueueResume(panel)).toBeDisabled();
+  await expect(panel.getByText(`Queued: ${queued}`, { exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Cancel queued message' })).toBeEnabled();
+};
+const expectNativeQueueDrained = async (
+  { panel, target, other }: Harness,
+  effects: number
+): Promise<void> => {
+  await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+  if (!target.isClosed()) {
+    await expect(target.locator('#count')).toHaveText(String(effects));
+  }
+  if (!other.isClosed()) {
+    await expect(other.locator('#count')).toHaveText('0');
+  }
+};
+const expectNativeQueueUnsubmitted = async (
+  { panel, target, other }: Harness,
+  queued: string,
+  seenChatBodies: unknown[]
+): Promise<void> => {
+  const conversation = panel.getByRole('region', { name: 'Agent conversation' });
+  await expect(conversation.getByText(nativeQueueRun, { exact: true })).toHaveCount(1);
+  await expect(conversation.getByText(queued, { exact: true })).toHaveCount(0);
+  if (!target.isClosed()) {
+    await expect(target.locator('#count')).toHaveText('0');
+  }
+  if (!other.isClosed()) {
+    await expect(other.locator('#count')).toHaveText('0');
+  }
+  expect(seenChatBodies.map(body => nativeSendUserTexts(body))).toEqual([[nativeQueueRun]]);
+};
+const expectNativeQueueCompletion = async (
+  harness: Harness,
+  submitted: string,
+  seenChatBodies: unknown[]
+): Promise<void> => {
+  const { panel } = harness;
+  const conversation = panel.getByRole('region', { name: 'Agent conversation' });
+  await expect(conversation.getByText(resultText, { exact: true })).toBeVisible();
+  await expectNativeQueueDrained(harness, 1);
+  await expect(nativeSendPending(panel)).toHaveCount(0);
+  await expectNativeQueueEmpty(panel);
+  await expect(conversation.getByText(nativeQueueRun, { exact: true })).toHaveCount(1);
+  await expect(conversation.getByText(submitted, { exact: true })).toHaveCount(1);
+  expect(seenChatBodies.map(body => nativeSendUserTexts(body))).toEqual([
+    [nativeQueueRun],
+    [nativeQueueRun, submitted],
+    [nativeQueueRun, submitted],
+  ]);
+};
+const prepareNativeQueue = async (
+  harness: Harness,
+  queued: string,
+  { seenChatBodies, finish }: { seenChatBodies: unknown[]; finish: () => void }
+): Promise<void> => {
+  const { panel, openPanel } = harness;
+  const input = panel.getByLabel('Message agent');
+  try {
+    await expectNativeQueueEmpty(panel);
+    await input.fill(nativeQueueRun);
+    await input.press('Enter');
+    await expect(panel.getByRole('button', { exact: true, name: 'Stop' })).toBeVisible();
+    await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+    await expect.poll(() => seenChatBodies.length).toBe(1);
+    await input.fill(queued);
+    await input.press('Enter');
+    await expect(input).toHaveValue('');
+    await expect(panel.getByText(`Queued: ${queued}`, { exact: true })).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Cancel queued message' })).toBeVisible();
+    await expect(nativeQueueResume(panel)).toHaveCount(0);
+    await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+
+    const second = await openPanel();
+    try {
+      const contender = await holdNativeQueueContender(second);
+      try {
+        await expect
+          .poll(() =>
+            panel.evaluate(async name => {
+              const state = await navigator.locks.query();
+              return (state.pending ?? [])
+                .filter(lock => lock.name === name)
+                .map(lock => lock.mode);
+            }, executionLock)
+          )
+          .toEqual(['exclusive']);
+        await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+        // A must finish normally: Stop would discard Q instead of testing the automatic drain.
+        finish();
+        await expect(panel.getByText(nativeQueueRunResult, { exact: true })).toBeVisible();
+        await expect.poll(() => heldExecutionModes(panel)).toEqual(['exclusive']);
+        await expectNativeQueueRetained(panel, queued);
+        await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+        await contender.evaluate(held => held.release());
+      } finally {
+        // Release A before waiting for a contender that can still be queued behind A.
+        finish();
+        try {
+          await contender.evaluate(held => held.release());
+        } finally {
+          await contender.dispose();
+        }
+      }
+    } finally {
+      await second.close();
+    }
+    await expectNativeQueueDrained(harness, 0);
+    await expect(
+      panel.getByRole('status').filter({
+        hasText:
+          'Your queued message is retained. Use Resume queued message when browser control is available.',
+      })
+    ).toBeVisible();
+    await expectNativeQueueRetained(panel, queued);
+    await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+  } finally {
+    finish();
+    await expectNativeQueueDrained(harness, 0);
+  }
+};
+
+test('native gap A2: keyboard Resume retains focus and consumes captured Q once', async () => {
+  const completion = Promise.withResolvers<void>();
+  const seenChatBodies: unknown[] = [];
+  await withHarness(
+    async harness => {
+      const { panel } = harness;
+      const queued = 'Apply queued Q exactly once.';
+      await prepareNativeSend(panel);
+      await prepareNativeQueue(harness, queued, { finish: completion.resolve, seenChatBodies });
+      const resume = nativeQueueResume(panel);
+      const gate = await holdNativeSendBoundary(panel, 'safety', 'resume');
+      try {
+        await keyboardReach(panel, resume);
+        await expect(resume).toBeFocused();
+        await panel.keyboard.press('Enter');
+        await expectNativeQueuePending(panel, queued);
+        await gate.wait();
+        await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+        await expect(resume).toBeFocused();
+        await panel.keyboard.press('Enter');
+        await expect(resume).toBeFocused();
+        await expectNativeQueuePending(panel, queued);
+        await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+
+        await gate.release();
+        await expectNativeQueueCompletion(harness, queued, seenChatBodies);
+        await expect(panel.getByLabel('Message agent')).toHaveValue('');
+      } finally {
+        try {
+          await gate.dispose();
+        } finally {
+          await expectNativeQueueDrained(harness, 1);
+        }
+      }
+    },
+    { gateway: nativeQueueGateway(seenChatBodies, completion.promise) }
+  );
+});
+
+test('native gap A2: native contention retains Q until explicit Resume', async () => {
+  const completion = Promise.withResolvers<void>();
+  const seenChatBodies: unknown[] = [];
+  await withHarness(
+    async harness => {
+      const { panel, openPanel } = harness;
+      const queued = 'Retain Q through fresh native contention.';
+      await prepareNativeSend(panel);
+      await prepareNativeQueue(harness, queued, { finish: completion.resolve, seenChatBodies });
+      const second = await openPanel();
+      const gate = await holdNativeSendBoundary(panel, 'safety', 'resume');
+      try {
+        await nativeQueueResume(panel).click();
+        await expectNativeQueuePending(panel, queued);
+        await gate.wait();
+        const contender = await holdNativeQueueContender(second);
+        try {
+          await expect.poll(() => heldExecutionModes(panel)).toEqual(['exclusive']);
+          await gate.release();
+          await expectNativeQueueRetained(panel, queued);
+          await expect(
+            panel.getByRole('status').filter({ hasText: 'owns browser control' }).first()
+          ).toBeVisible();
+          await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+
+          await contender.evaluate(held => held.release());
+          await gate.restore();
+          await expectNativeQueueDrained(harness, 0);
+          await expect(
+            panel.getByRole('status').filter({
+              hasText:
+                'Your queued message is retained. Use Resume queued message when browser control is available.',
+            })
+          ).toBeVisible();
+          await expectNativeQueueRetained(panel, queued);
+          await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+          await nativeQueueResume(panel).click();
+          await expectNativeQueueCompletion(harness, queued, seenChatBodies);
+          await expect(panel.getByLabel('Message agent')).toHaveValue('');
+        } finally {
+          try {
+            await contender.evaluate(held => held.release());
+          } finally {
+            await contender.dispose();
+          }
+        }
+      } finally {
+        try {
+          await gate.dispose();
+        } finally {
+          await second.close();
+          await expectNativeQueueDrained(harness, 1);
+        }
+      }
+    },
+    { gateway: nativeQueueGateway(seenChatBodies, completion.promise) }
+  );
+});
+
+test('native gap A2: storage failure retains Q until explicit recovery and Resume', async () => {
+  const completion = Promise.withResolvers<void>();
+  const seenChatBodies: unknown[] = [];
+  await withHarness(
+    async harness => {
+      const { panel } = harness;
+      const queued = 'Retain Q through unavailable safety storage.';
+      await enable(panel);
+      await prepareNativeSend(panel);
+      await prepareNativeQueue(harness, queued, { finish: completion.resolve, seenChatBodies });
+      const gate = await holdNativeSendBoundary(panel, 'safety', 'resume');
+      try {
+        await nativeQueueResume(panel).click();
+        await expectNativeQueuePending(panel, queued);
+        await gate.wait();
+        await gate.reject();
+        await expectNativeQueueRetained(panel, queued);
+        await expect(
+          panel
+            .getByRole('status')
+            .filter({
+              hasText:
+                'Browser safety state is unavailable. No browser work can start. Restore storage access before recovery.',
+            })
+            .first()
+        ).toBeVisible();
+        await expectNativeQueueDrained(harness, 0);
+        await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+
+        await gate.restore();
+        await expectNativeQueueRetained(panel, queued);
+        await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+        const controls = supervision(panel);
+        await controls.getByRole('button', { name: 'Check recovery readiness' }).click();
+        const recover = controls.getByRole('button', { name: 'Recover browser control' });
+        await expect(recover).toBeEnabled();
+        await expectNativeQueueRetained(panel, queued);
+        await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+        await recover.click();
+        await expect(controls).toContainText('Enabled — idle');
+        await expectNativeQueueRetained(panel, queued);
+        await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+
+        await nativeQueueResume(panel).click();
+        await expectNativeQueueCompletion(harness, queued, seenChatBodies);
+        await expect(panel.getByLabel('Message agent')).toHaveValue('');
+      } finally {
+        try {
+          await gate.dispose();
+        } finally {
+          await expectNativeQueueDrained(harness, 1);
+        }
+      }
+    },
+    { gateway: nativeQueueGateway(seenChatBodies, completion.promise) }
+  );
+});
+
+for (const change of ['changed', 'closed'] as const) {
+  test(`native gap A2: ${change} target retains Q without retargeting`, async () => {
+    const completion = Promise.withResolvers<void>();
+    const seenChatBodies: unknown[] = [];
+    await withHarness(
+      async harness => {
+        const { panel, target } = harness;
+        const queued = `Retain Q when its target is ${change}.`;
+        await prepareNativeSend(panel);
+        await prepareNativeQueue(harness, queued, { finish: completion.resolve, seenChatBodies });
+        const gate = await holdNativeSendBoundary(panel, 'tab', 'resume');
+        try {
+          await nativeQueueResume(panel).click();
+          await expectNativeQueuePending(panel, queued);
+          await gate.wait();
+          await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+          await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+          await (change === 'changed'
+            ? panel.getByLabel('Target tab').selectOption({ label: 'Unapproved tab' })
+            : target.close());
+          await expectNativeQueuePending(panel, queued);
+          await gate.release();
+          await expect.poll(gate.outcome).toEqual({ failed: change === 'closed', settled: true });
+          await expectNativeQueueDrained(harness, 0);
+          await expectNativeQueueRetained(panel, queued);
+          await expect(
+            panel.getByRole('status').filter({
+              hasText:
+                'The target tab changed or closed. Your queued message is retained. Select a target tab and use Resume queued message.',
+            })
+          ).toBeVisible();
+          await gate.restore();
+          await panel.getByLabel('Target tab').selectOption({ label: 'Unapproved tab' });
+          await expectNativeQueueRetained(panel, queued);
+          await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+        } finally {
+          try {
+            await gate.dispose();
+          } finally {
+            await expectNativeQueueDrained(harness, 0);
+          }
+        }
+      },
+      { gateway: nativeQueueGateway(seenChatBodies, completion.promise) }
+    );
+  });
+}
+
+test('native gap A2: Cancel queued message invalidates a held target lookup', async () => {
+  const completion = Promise.withResolvers<void>();
+  const seenChatBodies: unknown[] = [];
+  await withHarness(
+    async harness => {
+      const { panel } = harness;
+      const queued = 'Never dispatch cancelled Q.';
+      await prepareNativeSend(panel);
+      await prepareNativeQueue(harness, queued, { finish: completion.resolve, seenChatBodies });
+      const gate = await holdNativeSendBoundary(panel, 'tab', 'resume');
+      try {
+        await nativeQueueResume(panel).click();
+        await expectNativeQueuePending(panel, queued);
+        await gate.wait();
+        await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+        await panel.getByRole('button', { name: 'Cancel queued message' }).click();
+        await expectNativeQueueEmpty(panel);
+        await expect(nativeSendPending(panel)).toHaveCount(0);
+        await expect(panel.getByLabel('Message agent')).toHaveValue('');
+        await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+
+        await gate.release();
+        await expect.poll(gate.outcome).toEqual({ failed: false, settled: true });
+        await expectNativeQueueDrained(harness, 0);
+        await expectNativeQueueEmpty(panel);
+        await expect(nativeSendPending(panel)).toHaveCount(0);
+        await expect(panel.getByLabel('Message agent')).toHaveValue('');
+        await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+      } finally {
+        try {
+          await gate.dispose();
+        } finally {
+          await expectNativeQueueDrained(harness, 0);
+        }
+      }
+    },
+    { gateway: nativeQueueGateway(seenChatBodies, completion.promise) }
+  );
+});
+
+for (const outcome of ['success', 'failure'] as const) {
+  test(`native gap A5 Queue: late lookup ${outcome} cannot clear a newer Send`, async () => {
+    const completion = Promise.withResolvers<void>();
+    const seenChatBodies: unknown[] = [];
+    await withHarness(
+      async harness => {
+        const { panel, other } = harness;
+        const queued = 'Never submit Q after its cancellation.';
+        const newDraft = 'Submit only the newer Send B.';
+        const followUp = 'Keep this unsent draft after B.';
+        await prepareNativeSend(panel);
+        await prepareNativeQueue(harness, queued, { finish: completion.resolve, seenChatBodies });
+        await panel.getByLabel('Target tab').selectOption({ label: 'Unapproved tab' });
+        const older = await holdNativeSendBoundary(panel, 'tab', 'resume');
+        try {
+          await nativeQueueResume(panel).click();
+          await expectNativeQueuePending(panel, queued);
+          await older.wait();
+          await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+          await panel.getByRole('button', { name: 'Cancel queued message' }).click();
+          await expectNativeQueueEmpty(panel);
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await expect(panel.getByLabel('Message agent')).toHaveValue('');
+          await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+          if (outcome === 'failure') {
+            await other.close();
+          }
+          await panel.getByLabel('Target tab').selectOption({ label: 'Approved browser task tab' });
+          const newer = await holdNativeSendBoundary(panel, 'tab');
+          try {
+            const input = panel.getByLabel('Message agent');
+            await input.fill(newDraft);
+            await input.press('Enter');
+            await expectNativeSendPending(panel, newDraft);
+            await newer.wait();
+            await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared', 'shared']);
+            await input.fill(followUp);
+            await older.release();
+            await expect
+              .poll(older.outcome)
+              .toEqual({ failed: outcome === 'failure', settled: true });
+            await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+            await expectNativeSendPending(panel, followUp);
+            await expectNativeQueueEmpty(panel);
+            await expectNativeQueueUnsubmitted(harness, queued, seenChatBodies);
+            const conversation = panel.getByRole('region', { name: 'Agent conversation' });
+            await expect(conversation.getByText(newDraft, { exact: true })).toHaveCount(0);
+            await expect(conversation.getByText(followUp, { exact: true })).toHaveCount(0);
+
+            await newer.release();
+            await expectNativeQueueCompletion(harness, newDraft, seenChatBodies);
+            await expect(input).toHaveValue(followUp);
+            await expect(conversation.getByText(queued, { exact: true })).toHaveCount(0);
+            await expect(conversation.getByText(followUp, { exact: true })).toHaveCount(0);
+          } finally {
+            await newer.dispose();
+          }
+        } finally {
+          try {
+            await older.dispose();
+          } finally {
+            await expectNativeQueueDrained(harness, 1);
+          }
+        }
+      },
+      { gateway: nativeQueueGateway(seenChatBodies, completion.promise) }
+    );
+  });
+}

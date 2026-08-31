@@ -7,7 +7,7 @@ Phase 1 defines an **opt-in** token-policy module, `packages/worker-utils/src/ki
 Existing operation-specific audiences remain mandatory and unchanged:
 
 | Existing audience | Current issuer/consumer evidence |
-| --- | --- |
+|---|---|
 | `git-token-service:bitbucket-repositories` | `apps/web/src/lib/integrations/platforms/bitbucket/token-service-client.ts`; `services/git-token-service/src/index.ts` |
 | `git-token-service:bitbucket-code-review:pull-request` | `packages/worker-utils/src/internal-service-token-audiences.ts`; `services/git-token-service/src/index.ts` |
 | `git-token-service:bitbucket-code-review:webhook-ensure` | `packages/worker-utils/src/internal-service-token-audiences.ts`; `services/git-token-service/src/index.ts` |
@@ -24,7 +24,7 @@ The current shared verifier rejects a token with an audience when no audience is
 `generateApiToken` originally used `expiresIn: '5y'` in commit `bc8179c70` (2026-02-04). Commit `c6bf3468f` (2026-02-10) changed the default to `5 * 365 * 24 * 60 * 60` seconds.
 
 | Legacy issuer expression | Exact `exp - iat` | Evidence |
-| --- | ---: | --- |
+|---|---:|---|
 | Current numeric five-year default | `157680000` | `apps/web/src/lib/tokens.ts` |
 | Historical `'5y'` default | `157788000` | `bc8179c70:src/lib/tokens.ts`; installed `ms` parser defines a year as 365.25 days |
 
@@ -53,14 +53,17 @@ It defines boolean `credentialExchange` and two resource audience modes: `requir
 - Verified session: a context obtained by calling the trusted session verifier, not generic bearer-capable user authentication. A bare database user or fabricated session/bearer object is not a policy context.
 - Modern bearer: `tokenPurpose === 'human-api'`, `credentialExchange === true`, and the **sole** audience is `kilo-api` (string or singleton array).
 - Legacy bearer: explicitly select `legacy: 'five-year-api'`, described below; `legacy: 'deny'` disables that fallback.
-- Both bearer classes require a present pepper claim and reject all of the markers listed in the legacy class below, even if false or empty. This is deliberately conservative: a modern exchangeable human issuer must not add these metadata fields without revisiting that policy.
+- Both bearer classes require a present pepper claim and an explicit allowlist of signed claim names: `version`, `kiloUserId`, `apiTokenPepper`, `env`, `iat`, `exp`, `aud`, `tokenPurpose`, `credentialExchange`, and `deviceAuthRequestCode`. Every other name blocks exchange, even when its value is false, null, or empty. Adding a field to the shared schema does not add it to this allowlist.
+- The verifier retains a frozen `claimNames` list from the original signed payload before schema projection. Unknown claim values remain outside the supported claims contract, but their names cannot disappear from exchange classification. Ordinary resource verification is not made strict merely to enforce the narrower exchange policy; unknown claims still block exchange.
 - Bearer expiration is checked again at the issuance decision. Original lifetime uses verified `exp - iat`, never remaining validity.
 
-Policy inputs must be verified, claim-complete token contexts from either a separate signature-verification result or a trusted existing session-verifier callback. Do not accept raw database `User` records, decoded JWTs, or claims that an existing legacy projection has dropped. Signature verification alone is not account authentication: callers still perform their existing user/account, environment, pepper, and session-revocation checks before using a token to issue another credential.
+`isKiloCredentialExchangeEligible` assesses credential shape and purpose only; it does not authorize issuance. A token can be shape-eligible yet revoked, have a stale pepper, or belong to a blocked account. Policy inputs must be verified token contexts from either a separate signature-verification result or a trusted existing session-verifier callback. Do not accept raw database `User` records, decoded JWTs, or claims that an existing legacy projection has dropped. Signature verification alone is not account authentication: callers must independently perform user/account, environment, current-pepper equality, and session-revocation checks before issuance.
 
-Use `verifyKiloTokenForPolicy` on the original signed token, not `verifyKiloToken`'s projected payload. Use `verifyKiloSessionForPolicy` only with a trusted session-only verifier, never a generic function that also authenticates bearer tokens. Pass the returned context object itself to `canIssueKiloCredentials`; cloning or serializing it loses its module-local verified provenance. The context is not a replacement for account authentication and must remain bound to the same authenticated user.
+Use `verifyKiloTokenForPolicy` on the original signed token, not `verifyKiloToken`'s projected payload. Use `verifyKiloSessionForPolicy` only with a trusted session-only verifier, never a generic function that also authenticates bearer tokens. Pass the returned context object itself to `isKiloCredentialExchangeEligible`; cloning or serializing it loses its module-local verified provenance. The context is not a replacement for account authentication and must remain bound to the same authenticated user.
 
-`buildModernKiloTokenPayload` validates a future signer's payload without signing anything. Its strict extras schema rejects reserved identity, pepper, environment, audience, temporal, purpose, exchange, and registered JWT claim overrides, even when their values would otherwise be valid. Authoritative fields must come from the builder parameters. Existing signers are intentionally not routed through it in Phase 1.
+`buildModernKiloTokenPayload` validates a future signer's payload without signing anything. Its strict extras schema rejects reserved identity, pepper, environment, audience, temporal, purpose, exchange, and registered JWT claim overrides, even when their values would otherwise be valid. Exchangeable output additionally requires a pepper claim, the `kilo-api` audience, and only exchange-safe claims; conflicting extras are rejected rather than producing a token the eligibility policy refuses. Known optional extras set to `undefined` are ignored by the builder's exchange-safety check because JWT JSON serialization omits them; false, null, empty, and other defined values do not receive that exemption. Unknown or reserved extras remain rejected even if undefined. The original signed claim-name check remains authoritative at verification. Non-exchangeable output can retain supported workload/scope metadata. The output type preserves the discriminated purpose/exchange relationship. Authoritative fields must come from the builder parameters. Existing signers are intentionally not routed through it in Phase 1.
+
+Verified bearer contexts expose recursively readonly, deeply frozen supported claim values, including the organization-membership array and its entries. This protects the verification snapshot; it does not imply that account state remains current.
 
 No main signer or verifier changes in Phase 1. In particular, this module does not add claims to `apps/web/src/lib/tokens.ts` or `packages/worker-utils/src/kilo-token.ts`.
 
@@ -71,17 +74,19 @@ No main signer or verifier changes in Phase 1. In particular, this module does n
 - no `aud`;
 - no modern policy fields;
 - `apiTokenPepper` is present, whether a string or `null`;
-- no `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceSessionId`, `gastownAccess`, `isAdmin`, `orgMemberships`, `organizationId`, or `organizationRole`;
+- only the exchange-safe claim names listed above; this excludes `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceSessionId`, `gastownAccess`, `isAdmin`, `orgMemberships`, `organizationId`, `organizationRole`, and any future or unknown claim;
 - `deviceAuthRequestCode` is allowed, preserving legacy device authorization output.
 
 Known marked automation and system-style issuers fail this shape. Residual risk remains from historical or current unmarked automation that happens to match it; the class must never be labeled or relied on as definitive human identity.
+
+Future issuance routes should use `legacy: 'deny'` by default. A route requiring proof of human issuance must use trustworthy server-side issuance provenance or fresh session authentication, not enable the shape fallback as a substitute. Any compatibility exception requires an explicit policy decision accepting the documented residual risk. This concerns permission to exchange credentials, not supported ordinary legacy resource access; Phase 1 does not invalidate tokens.
 
 ## Issuer and consumer map
 
 This is a concrete, selective map from the shared Kilo token entry points. It does not claim every consumer path is known.
 
 | Flow | Issuer | Known consumers | Existing audience | Proposed canonical boundary | Unresolved split |
-| --- | --- | --- | --- | --- | --- |
+|---|---|---|---|---|---|
 | Chat fanout | `apps/web/src/lib/kilo-chat/token.ts`; mobile requests through `apps/mobile/src/components/kilo-chat/hooks/use-kilo-chat-token.ts` | Kilo Chat and Event Service via `apps/web/src/contexts/EventServiceContext.tsx`; Notifications badges via `apps/mobile/src/lib/hooks/use-unread-counts.ts` | None | `kilo-chat`, `event-service`, `notifications` | One chat token fans out to three services; decide whether it becomes a single multi-audience read token or separate audience-specific tokens. |
 | Cloud Agent control and downstream Kilo access | `apps/web/src/lib/tokens.ts` (`generateCloudAgentToken`) and Cloud Agent routers | `services/cloud-agent-next/src/validate-kilo-token.ts`; backend balance call; raw runtime bearer or contained capability in `services/cloud-agent-next/src/session-service.ts` | None | `cloud-agent-next`, `kilo-api`, `kilo-gateway`, `session-ingest` | The raw user token can reach multiple downstream routes; contained Kilo capability has separate routing controls. |
 | App Builder | `apps/web/src/routers/app-builder-router.ts`; `apps/web/src/routers/organizations/organization-app-builder-router.ts` | `apps/web/src/lib/app-builder/app-builder-service.ts` forwards to `services/cloud-agent-next/src/middleware/auth.ts` | None; default five-year token, often unmarked | Cloud Agent control and downstream API/gateway boundaries | Unmarked tokens can match the legacy exchange class; separate control assertions from runtime credentials. |
@@ -129,3 +134,5 @@ Before moving any resource from `allow-legacy` to `required`:
 3. Deploy compatible readers first, then migrate issuers and renewal paths, preserving the mandatory operation-specific audiences above. Renewal must retain non-exchangeable workload purpose; migrating issuers first breaks today's unexpected-audience rejection.
 4. Ensure the caller has a verified, non-lossy token context and retains existing account/authentication checks.
 5. Measure or otherwise retire the relevant legacy population before enforcing `required` mode.
+
+Before wiring a real credential-issuance route, use an application-owned authentication adapter that validates current account state and records session-versus-bearer provenance. A narrower session-only callback or account-authenticated capability belongs at that integration boundary; a generic database-user callback is not proof of a session. Add route regressions for revoked/blocked accounts, rotated peppers, wrong environments, and bearer-capable authentication incorrectly classified as a session. None of those account checks or route integrations is introduced in this infrastructure-only PR.

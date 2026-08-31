@@ -141,13 +141,13 @@ export {
   KILO_TOKEN_PURPOSES,
   LEGACY_API_TOKEN_LIFETIMES_SECONDS,
   buildModernKiloTokenPayload,
-  canIssueKiloCredentials,
+  isKiloCredentialExchangeEligible,
   isKiloResourceAudienceAllowed,
   verifyKiloSessionForPolicy,
   verifyKiloTokenForPolicy,
 } from './kilo-token-policy.js';
 export type {
-  KiloCredentialIssuancePolicy,
+  KiloCredentialExchangeEligibilityPolicy,
   KiloResourceAudiencePolicy,
   KiloTokenPolicyClaims,
   ModernKiloTokenClaims,

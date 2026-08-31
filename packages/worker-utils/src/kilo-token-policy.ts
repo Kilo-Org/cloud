@@ -78,11 +78,20 @@ export function isKiloResourceAudienceAllowed(
 
 const verifiedAuth = Symbol('verified-kilo-policy-auth');
 
+type DeepReadonly<T> = { readonly [K in keyof T]: DeepReadonly<T[K]> };
+
+function freezeClaimValue(value: unknown): void {
+  if (value === null || typeof value !== 'object') return;
+  for (const child of Object.values(value)) freezeClaimValue(child);
+  Object.freeze(value);
+}
+
 type VerifiedKiloBearerContext = {
   readonly [verifiedAuth]: true;
   readonly type: 'bearer';
   readonly userId: string;
-  readonly claims: Readonly<KiloTokenPolicyClaims>;
+  readonly claims: DeepReadonly<KiloTokenPolicyClaims>;
+  readonly claimNames: readonly string[];
 };
 
 type VerifiedKiloSessionContext = {
@@ -93,6 +102,8 @@ type VerifiedKiloSessionContext = {
 
 export type VerifiedKiloAuthContext = VerifiedKiloBearerContext | VerifiedKiloSessionContext;
 
+// The private symbol brands the type; WeakSet membership checks verifier-created
+// object identity so copied, serialized, or fabricated contexts cannot qualify.
 const verifiedContexts = new WeakSet<VerifiedKiloAuthContext>();
 
 export async function verifyKiloTokenForPolicy(
@@ -112,12 +123,13 @@ export async function verifyKiloTokenForPolicy(
   if (!isKiloResourceAudienceAllowed(claims.aud, audiencePolicy)) {
     throw new Error('Unexpected token audience');
   }
-  if (Array.isArray(claims.aud)) Object.freeze(claims.aud);
+  freezeClaimValue(claims);
   const auth = Object.freeze({
     [verifiedAuth]: true,
     type: 'bearer',
     userId: claims.kiloUserId,
-    claims: Object.freeze(claims),
+    claims,
+    claimNames: Object.freeze(Object.keys(payload)),
   } satisfies VerifiedKiloBearerContext);
   verifiedContexts.add(auth);
   return auth;
@@ -140,26 +152,30 @@ export async function verifyKiloSessionForPolicy(
 
 export const LEGACY_API_TOKEN_LIFETIMES_SECONDS = [157_680_000, 157_788_000] as const;
 
-export type KiloCredentialIssuancePolicy = {
+export type KiloCredentialExchangeEligibilityPolicy = {
   legacy: 'deny' | 'five-year-api';
 };
 
-const nonExchangeableMarkers = [
-  'tokenSource',
-  'botId',
-  'internalApiUse',
-  'createdOnPlatform',
-  'deviceSessionId',
-  'gastownAccess',
-  'isAdmin',
-  'orgMemberships',
-  'organizationId',
-  'organizationRole',
-] as const satisfies readonly (keyof KiloTokenPolicyClaims)[];
+const exchangeSafeClaimNames: ReadonlySet<string> = new Set([
+  'version',
+  'kiloUserId',
+  'apiTokenPepper',
+  'env',
+  'iat',
+  'exp',
+  'aud',
+  'tokenPurpose',
+  'credentialExchange',
+  'deviceAuthRequestCode',
+] satisfies (keyof KiloTokenPolicyClaims)[]);
 
-export function canIssueKiloCredentials(
+function hasOnlyExchangeSafeClaims(claimNames: readonly string[]): boolean {
+  return claimNames.every(name => exchangeSafeClaimNames.has(name));
+}
+
+export function isKiloCredentialExchangeEligible(
   auth: VerifiedKiloAuthContext,
-  policy: KiloCredentialIssuancePolicy
+  policy: KiloCredentialExchangeEligibilityPolicy
 ): boolean {
   if (!verifiedContexts.has(auth)) return false;
   if (auth.type === 'session') return true;
@@ -167,7 +183,7 @@ export function canIssueKiloCredentials(
   const now = Math.floor(Date.now() / 1000);
   if (claims.iat > now || claims.exp <= now || claims.exp <= claims.iat) return false;
   if (claims.apiTokenPepper === undefined) return false;
-  if (nonExchangeableMarkers.some(marker => claims[marker] !== undefined)) return false;
+  if (!hasOnlyExchangeSafeClaims(auth.claimNames)) return false;
   if (claims.tokenPurpose !== undefined || claims.credentialExchange !== undefined) {
     const soleAudience =
       typeof claims.aud === 'string'
@@ -199,18 +215,40 @@ const modernTokenExtra = kiloTokenPayload
   })
   .strict();
 
-export type ModernKiloTokenPurpose =
-  | { tokenPurpose: 'human-api'; credentialExchange: boolean }
-  | {
-      tokenPurpose: 'device-access' | 'delegated-workload' | 'internal-service';
-      credentialExchange: false;
-    };
+const modernPurpose = z.discriminatedUnion('tokenPurpose', [
+  z.object({ tokenPurpose: z.literal('human-api'), credentialExchange: z.boolean() }),
+  z.object({
+    tokenPurpose: purposeClaim.exclude(['human-api']),
+    credentialExchange: z.literal(false),
+  }),
+]);
 
-const modernClaims = policyClaims.safeExtend({
-  aud: audienceName,
-  tokenPurpose: purposeClaim,
-  credentialExchange: z.boolean(),
-});
+export type ModernKiloTokenPurpose = z.infer<typeof modernPurpose>;
+
+const modernClaims = policyClaims
+  .safeExtend({
+    aud: audienceName,
+    tokenPurpose: purposeClaim,
+    credentialExchange: z.boolean(),
+  })
+  .and(modernPurpose)
+  .superRefine((claims, ctx) => {
+    if (!claims.credentialExchange) return;
+    const serializedClaimNames = Object.entries(claims)
+      .filter(([, value]) => value !== undefined)
+      .map(([name]) => name);
+    if (
+      claims.aud !== KILO_API_AUDIENCE ||
+      claims.apiTokenPepper === undefined ||
+      !hasOnlyExchangeSafeClaims(serializedClaimNames)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'Exchangeable tokens require the Kilo API audience, a pepper claim and only exchange-safe claims',
+      });
+    }
+  });
 
 export type ModernKiloTokenClaims = z.infer<typeof modernClaims>;
 

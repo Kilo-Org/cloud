@@ -44,6 +44,7 @@ import {
   contextTestMergeSchema,
   contextThreadSchema,
   evaluateContextRequirements,
+  type ContextReadResult,
   type RequirementFacts,
 } from './context-requirements';
 
@@ -55,7 +56,7 @@ const collectionQueries = {
 };
 const deadlineError = new Error('PR context deadline');
 type PrInput = { owner: string; repo: string; number: number };
-export type ContextReadResult<T> = { data: T | null; source: GitHubPrReviewSource };
+export type { ContextReadResult } from './context-requirements';
 
 export function createContextReadBudget() {
   const deadline = Date.now() + 10_000;

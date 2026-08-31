@@ -8,8 +8,9 @@ import {
   type GitHubPrReviewRevision,
   type GitHubPrReviewSource,
 } from './context-dtos';
-import type { ContextReadResult } from './context-reader';
 import { contextReviewsAgree } from './context-reviews';
+
+export type ContextReadResult<T> = { data: T | null; source: GitHubPrReviewSource };
 
 type Check = GitHubPrReviewContext['checks']['items'][number];
 type Requirement = GitHubPrReviewContext['requirements']['items'][number];

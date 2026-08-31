@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { AlertCircle, Loader2, Terminal, CheckCircle2, XCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { TRPCClientError } from '@trpc/client';
 import { useTRPC } from '@/lib/trpc/utils';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -66,6 +67,15 @@ function formatStatusLabel(status: string): string {
   return status.slice(0, 1).toUpperCase() + status.slice(1);
 }
 
+function isAccessDeniedError(error: unknown): boolean {
+  return (
+    error instanceof TRPCClientError &&
+    (error.data?.code === 'UNAUTHORIZED' ||
+      error.data?.code === 'FORBIDDEN' ||
+      error.data?.code === 'NOT_FOUND')
+  );
+}
+
 function formatAttemptLabel(attempt: CodeReviewAttemptSummary): string {
   const parts = [`Attempt ${attempt.attempt_number}`, formatStatusLabel(attempt.status)];
   const sessionId = attempt.session_id ?? attempt.cli_session_id;
@@ -93,7 +103,7 @@ export function CodeReviewStreamView({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [events, setEvents] = useState<DisplayEvent[]>([]);
-  const [isComplete, setIsComplete] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>({
     status: 'disconnected',
   });
@@ -101,6 +111,8 @@ export function CodeReviewStreamView({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const wsManagerRef = useRef<ReturnType<typeof createWebSocketManager> | null>(null);
+  const wasRunningRef = useRef(false);
+  const reconcileUntilRef = useRef(0);
 
   const orderedAttempts = [...attempts].sort((a, b) => a.attempt_number - b.attempt_number);
   const attemptIds = orderedAttempts.map(attempt => attempt.id).join('|');
@@ -143,10 +155,12 @@ export function CodeReviewStreamView({
 
   useEffect(() => {
     setEvents([]);
-    setIsComplete(false);
+    setAccessDenied(false);
     setConnectionState({ status: 'disconnected' });
     setWsError(null);
     setAutoScroll(true);
+    wasRunningRef.current = false;
+    reconcileUntilRef.current = 0;
     wsManagerRef.current?.disconnect();
     wsManagerRef.current = null;
   }, [reviewId, effectiveAttemptId]);
@@ -155,56 +169,40 @@ export function CodeReviewStreamView({
   // Step 1: Get stream info to determine which mode to use
   // ---------------------------------------------------------------------------
 
-  const { data: streamInfo } = useQuery({
+  const {
+    data: streamInfo,
+    error: streamInfoError,
+    refetch: refetchStreamInfo,
+  } = useQuery({
     ...trpc.codeReviews.getReviewStreamInfo.queryOptions({
       reviewId,
       attemptId: effectiveAttemptId,
     }),
     refetchInterval: query => {
+      if (isAccessDeniedError(query.state.error)) return false;
       const data = query.state.data;
       if (!data?.success) return 2000;
 
-      const behavior = getCodeReviewDisplayBehavior({
-        agentVersion: data.agentVersion,
-        status: data.status,
-        cloudAgentSessionId: data.cloudAgentSessionId,
-      });
-      return behavior.shouldPollStatus ? 2000 : false;
+      return getCodeReviewDisplayBehavior(data).shouldPollStatus ? 2000 : false;
     },
-    enabled: !!reviewId,
+    retry: (failureCount, error) => !isAccessDeniedError(error) && failureCount < 3,
+    enabled: !!reviewId && !accessDenied,
   });
 
   const cloudAgentSessionId = streamInfo?.success ? streamInfo.cloudAgentSessionId : null;
   const organizationId = streamInfo?.success ? streamInfo.organizationId : undefined;
   const reviewStatus = streamInfo?.success ? streamInfo.status : undefined;
-  const displayBehavior = streamInfo?.success
-    ? getCodeReviewDisplayBehavior({
-        agentVersion: streamInfo.agentVersion,
-        status: streamInfo.status,
-        cloudAgentSessionId: streamInfo.cloudAgentSessionId,
-      })
-    : null;
+  const displayBehavior = streamInfo?.success ? getCodeReviewDisplayBehavior(streamInfo) : null;
   const isHistoricalReview = displayBehavior?.isHistorical ?? false;
-  const isTerminal = displayBehavior?.isTerminal ?? false;
-  const shouldLoadHistory = displayBehavior?.shouldLoadHistory ?? false;
+  const isComplete = displayBehavior?.isTerminal ?? false;
+  const shouldLoadMessages = displayBehavior?.shouldLoadMessages ?? false;
+  const shouldPollMessages = displayBehavior?.shouldPollMessages ?? false;
+  const useWebSocket =
+    !!displayBehavior && !shouldLoadMessages && isSelectedLatestAttempt && !accessDenied;
 
-  // Only current Cloud Agent Next attempts have a live runtime connection.
-  const useWebSocket = streamInfo?.success
-    ? streamInfo.agentVersion === 'v2' && isSelectedLatestAttempt
-    : false;
-
-  // Mark as complete if the review is already in a terminal state
   useEffect(() => {
-    if (
-      reviewStatus === 'completed' ||
-      reviewStatus === 'failed' ||
-      reviewStatus === 'cancelled' ||
-      reviewStatus === 'interrupted'
-    ) {
-      setIsComplete(true);
-      if (reviewStatus === 'completed') {
-        onComplete?.();
-      }
+    if (reviewStatus === 'completed') {
+      onComplete?.();
     }
   }, [reviewStatus, onComplete]);
 
@@ -221,35 +219,32 @@ export function CodeReviewStreamView({
 
   const handleEvent = useCallback(
     (event: CloudAgentEvent) => {
+      setWsError(null);
       const displayEvent = toCodeReviewDisplayEvent(event);
       if (displayEvent) {
         setEvents(prev => appendCodeReviewDisplayEvent(prev, displayEvent));
       }
       if (event.streamEventType === 'complete' || event.streamEventType === 'interrupted') {
-        setIsComplete(true);
-        onComplete?.();
+        void refetchStreamInfo();
       }
     },
-    [onComplete]
+    [refetchStreamInfo]
   );
 
   const handleWsError = useCallback((error: StreamError) => {
     setWsError(`${error.code}: ${error.message}`);
-    if (
-      error.code === 'WS_SESSION_NOT_FOUND' ||
-      error.code === 'WS_EXECUTION_NOT_FOUND' ||
-      error.code === 'WS_AUTH_ERROR'
-    ) {
-      setIsComplete(true);
-    }
   }, []);
 
   // Connect WebSocket when cloudAgentSessionId becomes available
   useEffect(() => {
-    if (!useWebSocket || !cloudAgentSessionId || isComplete) return;
-    if (!CLOUD_AGENT_NEXT_WS_URL) return;
+    if (!useWebSocket || !cloudAgentSessionId) return;
+    if (!CLOUD_AGENT_NEXT_WS_URL) {
+      setWsError('Live stream is unavailable.');
+      return;
+    }
 
     let cancelled = false;
+    setWsError(null);
 
     async function connect() {
       if (cancelled || !cloudAgentSessionId) return;
@@ -263,11 +258,18 @@ export function CodeReviewStreamView({
         const manager = createWebSocketManager({
           url: url.toString(),
           ticket: result.ticket,
-          onEvent: handleEvent,
-          onError: handleWsError,
-          onStateChange: setConnectionState,
+          onEvent: event => {
+            if (!cancelled) handleEvent(event);
+          },
+          onError: error => {
+            if (!cancelled) handleWsError(error);
+          },
+          onStateChange: state => {
+            if (!cancelled) setConnectionState(state);
+          },
           onRefreshTicket: async () => {
             const refreshed = await getTicket(cloudAgentSessionId);
+            if (cancelled) throw new Error('Review stream disconnected');
             return refreshed.ticket;
           },
         });
@@ -288,28 +290,68 @@ export function CodeReviewStreamView({
       wsManagerRef.current?.disconnect();
       wsManagerRef.current = null;
     };
-  }, [useWebSocket, cloudAgentSessionId, isComplete, getTicket, handleEvent, handleWsError]);
+  }, [
+    reviewId,
+    effectiveAttemptId,
+    useWebSocket,
+    cloudAgentSessionId,
+    getTicket,
+    handleEvent,
+    handleWsError,
+  ]);
 
-  // ---------------------------------------------------------------------------
-  // Historical session data
-  // ---------------------------------------------------------------------------
-
-  const { data: sessionMessages, isLoading: isLoadingHistory } = useQuery({
+  const {
+    data: sessionMessages,
+    error: sessionMessagesError,
+    isLoading: isLoadingMessages,
+    refetch: refetchSessionMessages,
+  } = useQuery({
     ...trpc.codeReviews.getSessionMessages.queryOptions({
       reviewId,
       attemptId: effectiveAttemptId,
     }),
-    enabled: !!reviewId && shouldLoadHistory && events.length === 0,
+    enabled: !!reviewId && shouldLoadMessages && !accessDenied,
+    refetchInterval: query => {
+      if (isAccessDeniedError(query.state.error)) return false;
+      return shouldPollMessages || (isComplete && Date.now() < reconcileUntilRef.current)
+        ? 2000
+        : false;
+    },
+    retry: (failureCount, error) => !isAccessDeniedError(error) && failureCount < 3,
   });
 
-  // Populate events from historical session data
   useEffect(() => {
-    if (!shouldLoadHistory || events.length > 0) return;
-    if (!sessionMessages?.success) return;
-    if (sessionMessages.entries.length === 0) return;
+    if (displayBehavior?.shouldPollStatus) {
+      wasRunningRef.current = true;
+    } else if (isComplete && wasRunningRef.current && !accessDenied) {
+      wasRunningRef.current = false;
+      reconcileUntilRef.current = Date.now() + 10_000;
+      void refetchSessionMessages();
+    }
+  }, [
+    reviewId,
+    effectiveAttemptId,
+    displayBehavior?.shouldPollStatus,
+    isComplete,
+    accessDenied,
+    refetchSessionMessages,
+  ]);
 
-    setEvents(sessionMessages.entries);
-  }, [shouldLoadHistory, sessionMessages, events.length]);
+  useEffect(() => {
+    if (isAccessDeniedError(streamInfoError) || isAccessDeniedError(sessionMessagesError)) {
+      setAccessDenied(true);
+    }
+  }, [streamInfoError, sessionMessagesError]);
+
+  const displayEvents: DisplayEvent[] =
+    shouldLoadMessages && sessionMessages?.success ? sessionMessages.entries : events;
+  const displayError =
+    streamInfoError?.message ??
+    (streamInfo && !streamInfo.success ? streamInfo.error : null) ??
+    (shouldLoadMessages
+      ? (sessionMessagesError?.message ??
+        (sessionMessages && !sessionMessages.success ? sessionMessages.error : null))
+      : (wsError ?? (connectionState.status === 'error' ? connectionState.error : null)));
 
   // ---------------------------------------------------------------------------
   // Auto-scroll
@@ -319,14 +361,14 @@ export function CodeReviewStreamView({
     if (autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [events, autoScroll]);
+  }, [displayEvents, autoScroll]);
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
   // Waiting for stream info
-  if (!streamInfo?.success) {
+  if (!streamInfo?.success && !displayError) {
     return (
       <Card className="border-l-4 border-l-blue-500">
         <CardHeader>
@@ -339,8 +381,12 @@ export function CodeReviewStreamView({
     );
   }
 
-  // Error state (WebSocket only)
-  if (wsError && isComplete) {
+  if (
+    displayError &&
+    (accessDenied ||
+      isAccessDeniedError(streamInfoError) ||
+      isAccessDeniedError(sessionMessagesError))
+  ) {
     return (
       <Card className="border-l-4 border-l-red-500">
         <CardHeader className="pb-3">
@@ -350,8 +396,8 @@ export function CodeReviewStreamView({
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="rounded-md bg-slate-950 p-4 font-mono text-xs text-red-400">
-            {wsError}
+          <div role="alert" className="rounded-md bg-slate-950 p-4 font-mono text-xs text-red-400">
+            {displayError}
           </div>
         </CardContent>
       </Card>
@@ -365,7 +411,7 @@ export function CodeReviewStreamView({
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Terminal className="h-4 w-4" />
             <CardTitle className="shrink-0 text-sm font-medium">
-              {shouldLoadHistory ? 'Session Log' : 'Code Review Progress'}
+              {isHistoricalReview || isComplete ? 'Session Log' : 'Code Review Progress'}
             </CardTitle>
             {cloudAgentSessionId && (
               <span
@@ -394,7 +440,7 @@ export function CodeReviewStreamView({
                 </Select>
               </div>
             )}
-            {isHistoricalReview && !isTerminal ? (
+            {isHistoricalReview && !isComplete ? (
               <Badge variant="secondary" className="gap-1.5">
                 <AlertCircle className="h-3 w-3" />
                 Historical
@@ -446,14 +492,18 @@ export function CodeReviewStreamView({
             setAutoScroll(isAtBottom);
           }}
         >
-          {events.length === 0 && !shouldLoadHistory ? (
+          {displayError ? (
+            <div role="alert" className="text-red-400">
+              {displayError}
+            </div>
+          ) : displayEvents.length === 0 && !isHistoricalReview && !isComplete ? (
             <div className="flex items-center gap-2 text-slate-400">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>Waiting for events...</span>
             </div>
-          ) : events.length === 0 ? (
+          ) : displayEvents.length === 0 ? (
             <div className="text-slate-500">
-              {isLoadingHistory ? (
+              {isLoadingMessages ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Loading session log...</span>
@@ -464,7 +514,7 @@ export function CodeReviewStreamView({
             </div>
           ) : (
             <div className="space-y-1">
-              {events.map((event, index) => (
+              {displayEvents.map((event, index) => (
                 <div
                   key={event.key ?? index}
                   className="rounded px-2 py-1 transition-colors hover:bg-slate-900/50"

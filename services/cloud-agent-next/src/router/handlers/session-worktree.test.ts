@@ -266,6 +266,7 @@ function fixture(options?: {
     env: {
       INTERNAL_API_SECRET: INTERNAL_SECRET,
       CONTROL_PLANE_IDS: options?.controlPlaneIds ?? '*',
+      WORKTREE_CREATION_ENABLED_IDS: '',
       HYPERDRIVE: { connectionString: 'postgres://worktree-handler-test' },
       SANDBOX_SESSION: sandboxSessionNamespace,
       CLOUD_AGENT_SESSION: legacySessionNamespace,
@@ -528,7 +529,7 @@ describe('createWorktreeChat request validation and authorization', () => {
 });
 
 describe('createWorktreeChat ownership, metadata, and control-plane routing', () => {
-  it('records canonical IDs first, preserves the source route, and registers an empty control-plane chat', async () => {
+  it('records canonical IDs and source routing while new worktree creation is disabled', async () => {
     const {
       caller,
       input,

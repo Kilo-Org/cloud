@@ -13,6 +13,16 @@ cloud-agent-next refactor.
 
 1. Copy `.dev.vars.example` → `.dev.vars` and fill in local values.
    Leave `KILO_OPENROUTER_BASE` pointed at local Next.js (`@url nextjs/api`).
+   For control-plane scenarios, enroll the E2E user in `CONTROL_PLANE_IDS`.
+   `worktree-shared` additionally requires `WORKTREE_CREATION_ENABLED_IDS`; it creates a fresh
+   personal user per run, so set both flags to `*` for that local scenario.
+   Both accept comma-separated user or org IDs or `*` and default empty/off.
+   Ordinary control-plane scenarios do not require `WORKTREE_CREATION_ENABLED_IDS`.
+   These are Worker settings read by `auth.ts` from this service's `.dev.vars`,
+   not driver environment overrides: prefixing the driver command with either
+   flag does not configure the Worker. The unannotated template entries pass
+   through matching root `.env.local` values during `pnpm dev:env`. Configure
+   the Worker before starting it, or restart it after changing these values.
 2. Ensure local Postgres is up and root `.env.local` defines `POSTGRES_URL`
    (or export `DATABASE_URL`) — the driver inserts a test user row via
    `@kilocode/db`.
@@ -92,6 +102,7 @@ Examples:
 ```bash
 tsx services/cloud-agent-next/test/e2e/run.ts cold echo:hi
 tsx services/cloud-agent-next/test/e2e/run.ts cold-hot echo:hi
+tsx services/cloud-agent-next/test/e2e/run.ts worktree-shared _
 tsx services/cloud-agent-next/test/e2e/run.ts hot echo:hi
 tsx services/cloud-agent-next/test/e2e/run.ts followup echo:continue
 tsx services/cloud-agent-next/test/e2e/run.ts external-kill echo:hi
@@ -220,6 +231,7 @@ These are wrapped by `releaseGate()`, `waitForGateEngaged()`,
 | `hot` | Warmup with `echo:warmup`, then send the real prompt on the same session. Same container. |
 | `followup` | Same as `hot` today; kept distinct for future resume-path splits. |
 | `cold-hot` | One cold turn plus `echo:hot`, `slow:3:50`, and `echo:followup` hot turns on the same session/sandbox. |
+| `worktree-shared` | Creates a new worktree and a sibling chat; verifies idempotent creation, a shared dirty checkout, and chat isolation. Requires both `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS` enrollment and `--api=unified`; pass `_` as the conversation placeholder. |
 | `external-kill` | Warmup, `docker kill` the sandbox, send another prompt, verify recovery/failure. |
 | `kill-mid-flight` | Cold `hang`, kill while pending, verify DO surfaces disconnect/error. |
 | `queue-while-busy` | Block on `gate:<tag>`, enqueue two echoes, release the gate, assert FIFO delivery through `cloud.message.*` events. |

@@ -362,7 +362,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `KILO_BIN_PATH` - Path or name of the `kilo` CLI binary; used by `services/cloud-agent-next/scripts/update-default-slash-commands.mjs`. [SERVER]
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
-- `CONTROL_PLANE_IDS` - Comma-separated user or org IDs admitted to the call-home control plane at session creation. Empty admits nobody. `*` includes personal accounts. [SERVER]
+- `CONTROL_PLANE_IDS` - Comma-separated user or org IDs admitted to the call-home control plane at session creation. Empty admits nobody. `*` includes personal accounts. Does not enable new worktree creation by itself; that also requires `WORKTREE_CREATION_ENABLED_IDS` enrollment. [SERVER]
+- `WORKTREE_CREATION_ENABLED_IDS` - Comma-separated user or org IDs allowed to create new worktrees, or `*` for all, including personal accounts. Defaults to empty/off and also requires enrollment in `CONTROL_PLANE_IDS`. Disabling it does not block existing worktrees or sibling chats in them. [SERVER]
 - `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 

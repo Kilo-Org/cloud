@@ -25,7 +25,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureTestUser, loadDevVars, loadRepoEnvFiles, DRIVER_USER_EMAIL_SUFFIX } from './auth.js';
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
-import { isControlPlaneOwner } from '../../src/session-plane.js';
+import { isControlPlaneOwner, isWorktreeOwner } from '../../src/session-plane.js';
 import { LIFECYCLE_SCENARIOS, type LifecycleResult } from './lifecycle.js';
 
 const SERVICE_PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -156,6 +156,16 @@ async function main(): Promise<void> {
     funded: process.env.E2E_FUNDED === '1',
   });
   const expectControlPlane = Boolean(devVars.CONTROL_PLANE_IDS?.trim());
+  if (
+    lifecycle === 'worktree-shared' &&
+    (!isControlPlaneOwner(devVars, { userId: user.id }) ||
+      !isWorktreeOwner(devVars, { userId: user.id }))
+  ) {
+    throw new Error(
+      'worktree-shared requires the E2E user to be enrolled in CONTROL_PLANE_IDS and WORKTREE_CREATION_ENABLED_IDS ' +
+        'in the Worker .dev.vars; no session was started'
+    );
+  }
   if (expectControlPlane && !isControlPlaneOwner(devVars, { userId: user.id })) {
     throw new Error('The E2E user is not enrolled in CONTROL_PLANE_IDS; no session was started');
   }

@@ -586,7 +586,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         messageId,
         executionId,
         ...(r.data.delivery !== undefined && { delivery: r.data.delivery }),
-        ...(typeof r.data.accepted === 'boolean' && { accepted: r.data.accepted }),
+        ...(typeof r.data['accepted'] === 'boolean' && { accepted: r.data['accepted'] }),
         error,
         reason,
         attempts,

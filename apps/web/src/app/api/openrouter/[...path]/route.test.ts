@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { NextResponse } from 'next/server';
+import type { PoolEntry } from '@kilocode/auto-routing-contracts';
 import type { User } from '@kilocode/db/schema';
+import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
@@ -7,6 +10,7 @@ import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromRedis,
+  getOpenRouterModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
@@ -14,7 +18,13 @@ import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { redisClient } from '@/lib/redis';
 import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
-import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
+import {
+  collectDeniedAutoRoutingModelIds,
+  loadEffectiveAutoRoutingPool,
+} from '@/lib/ai-gateway/auto-routing-denied-models';
+import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
+import { gatewayChatApisForModel } from '@/lib/ai-gateway/model-api-kinds';
+import { BALANCED_QWEN_MODEL } from '@/lib/ai-gateway/auto-model';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
@@ -110,6 +120,15 @@ jest.mock('@/lib/utils.server', () => ({
 }));
 jest.mock('@/lib/ai-gateway/auto-routing-denied-models', () => ({
   collectDeniedAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
+  loadEffectiveAutoRoutingPool: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@/lib/ai-gateway/providers/openrouter'),
+  getEnhancedOpenRouterModels: jest.fn(),
+}));
+jest.mock('@/lib/ai-gateway/model-api-kinds', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@/lib/ai-gateway/model-api-kinds'),
+  gatewayChatApisForModel: jest.fn(),
 }));
 jest.mock('@/lib/ai-gateway/processUsage', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/processUsage');
@@ -139,6 +158,10 @@ const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisSet = jest.mocked(redisClient.set);
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
+const mockedLoadEffectiveAutoRoutingPool = jest.mocked(loadEffectiveAutoRoutingPool);
+const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
+const mockedGatewayChatApisForModel = jest.mocked(gatewayChatApisForModel);
+const mockedGetOpenRouterModelsMetadata = jest.mocked(getOpenRouterModelsMetadataFromDatabase);
 const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
@@ -1232,6 +1255,305 @@ describe('kilo-auto/efficient classifier billing', () => {
       message: expect.stringContaining('custom Efficient model pool'),
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  describe('configured pool fallback', () => {
+    function catalogModel(id: string, inputModalities = ['text', 'image']): OpenRouterModel {
+      return {
+        id,
+        name: id,
+        created: 0,
+        description: '',
+        context_length: 100_000,
+        architecture: {
+          input_modalities: inputModalities,
+          output_modalities: ['text'],
+          tokenizer: 'Other',
+        },
+        top_provider: { is_moderated: false },
+        pricing: { prompt: '0.000001', completion: '0.000002' },
+      };
+    }
+
+    beforeEach(() => {
+      mockedFetchEfficientAutoDecision.mockResolvedValue(null);
+      mockedLoadEffectiveAutoRoutingPool.mockResolvedValue(null);
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [] });
+      mockedGatewayChatApisForModel.mockReturnValue(['chat_completions', 'responses', 'messages']);
+      mockedGetOpenRouterModelsMetadata.mockResolvedValue({});
+    });
+
+    it.each(['kilo-auto/efficient', 'kilo-auto/balanced'])(
+      '%s uses the first organization-permitted pool entry and its exact variant instead of Qwen',
+      async requestedModel => {
+        const pool: PoolEntry[] = [
+          { model: 'openai/gpt-4o', variant: null },
+          { model: 'anthropic/claude-sonnet-5', variant: 'xhigh' },
+          { model: 'anthropic/claude-sonnet-5', variant: 'max' },
+          { model: 'google/gemini-2.5-flash', variant: null },
+        ];
+        mockedGetUserFromAuth.mockResolvedValue({
+          user: {
+            id: 'user-123',
+            google_user_email: 'test@example.com',
+            microdollars_used: 0,
+          } as User,
+          authFailedResponse: null,
+          organizationId: 'org-123',
+        });
+        mockedGetBalanceAndOrgSettings.mockResolvedValue({
+          balance: 1000,
+          settings: {},
+          plan: 'enterprise',
+        });
+        mockedGetEffectiveModelDecision.mockImplementation(async (_policy, modelId) =>
+          modelId === 'openai/gpt-4o'
+            ? { allowed: false, denialSource: 'organization_model' }
+            : { allowed: true }
+        );
+        mockedLoadEffectiveAutoRoutingPool.mockResolvedValue(pool);
+        mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+          data: [
+            catalogModel('google/gemini-2.5-flash'),
+            catalogModel('anthropic/claude-sonnet-5'),
+            catalogModel('openai/gpt-4o'),
+          ],
+        });
+        mockedApplyResolvedAutoModel.mockImplementationOnce(
+          jest.requireActual<{ applyResolvedAutoModel: typeof applyResolvedAutoModel }>(
+            '@/lib/ai-gateway/auto-model/resolution'
+          ).applyResolvedAutoModel
+        );
+
+        const { POST } = await import('./route');
+        const response = await POST(
+          makeRequest({
+            ...makeBody(requestedModel),
+            reasoning: { enabled: false, effort: 'none' },
+            verbosity: 'low',
+          }) as never
+        );
+
+        expect(response.status).toBe(200);
+        expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledTimes(1);
+        expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+          expect.objectContaining({ requestedModel })
+        );
+        expect(mockedLoadEffectiveAutoRoutingPool).toHaveBeenCalledTimes(1);
+        expect(mockedLoadEffectiveAutoRoutingPool).toHaveBeenCalledWith({
+          userId: 'user-123',
+          organizationId: 'org-123',
+        });
+        expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+          expect.anything(),
+          'openai/gpt-4o'
+        );
+        expect(mockedGetProvider).toHaveBeenCalledWith(
+          expect.objectContaining({ requestedModel: 'anthropic/claude-sonnet-5' })
+        );
+        expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+        const upstreamBody = mockedUpstreamRequest.mock.calls[0]?.[0].body;
+        expect(upstreamBody.model).toBe('anthropic/claude-sonnet-5');
+        expect(upstreamBody).toHaveProperty('reasoning', { enabled: true, effort: 'xhigh' });
+        expect(upstreamBody).toHaveProperty('verbosity', 'xhigh');
+        expect(upstreamBody.model).not.toBe(BALANCED_QWEN_MODEL.model);
+      }
+    );
+
+    it.each(['chat_completions', 'responses', 'messages'] as const)(
+      'filters absent, unavailable, API-incompatible and text-only entries for %s image requests',
+      async apiKind => {
+        const pool: PoolEntry[] = [
+          { model: 'missing/model', variant: null },
+          { model: 'openai/gpt-4o', variant: null },
+          { model: 'qwen/qwen3-coder', variant: null },
+          { model: 'google/gemma-4-26b-a4b-it:free', variant: null },
+          { model: 'google/gemini-2.5-flash', variant: 'high' },
+          { model: 'anthropic/claude-haiku-4', variant: 'low' },
+        ];
+        mockedLoadEffectiveAutoRoutingPool.mockResolvedValue(pool);
+        mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+          data: [
+            catalogModel('anthropic/claude-haiku-4', ['text', 'image_url']),
+            catalogModel('google/gemini-2.5-flash'),
+            catalogModel('google/gemma-4-26b-a4b-it:free'),
+            catalogModel('qwen/qwen3-coder', ['text']),
+            catalogModel('openai/gpt-4o'),
+          ],
+        });
+        mockedGatewayChatApisForModel.mockImplementation(modelId =>
+          modelId === 'openai/gpt-4o'
+            ? apiKind === 'messages'
+              ? ['chat_completions']
+              : ['messages']
+            : ['chat_completions', 'responses', 'messages']
+        );
+        const imageUrl = 'data:image/png;base64,aGVsbG8=';
+        const body =
+          apiKind === 'responses'
+            ? {
+                input: [{ role: 'user', content: [{ type: 'input_image', image_url: imageUrl }] }],
+              }
+            : {
+                max_tokens: 1024,
+                messages: [
+                  {
+                    role: 'user',
+                    content: [
+                      apiKind === 'messages'
+                        ? { type: 'image', source: { type: 'url', url: imageUrl } }
+                        : { type: 'image_url', image_url: { url: imageUrl } },
+                    ],
+                  },
+                ],
+              };
+        const path = apiKind === 'chat_completions' ? 'chat/completions' : apiKind;
+        const request = new Request(`http://localhost:3000/api/openrouter/v1/${path}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
+          body: JSON.stringify({ model: 'kilo-auto/efficient', ...body }),
+        });
+
+        const { POST } = await import('./route');
+        const response = await POST(request as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedLoadEffectiveAutoRoutingPool).not.toHaveBeenCalled();
+        const fallbackCandidates =
+          mockedApplyResolvedAutoModel.mock.calls[0]?.[0].efficientFallbackCandidates;
+        expect(fallbackCandidates).toBeDefined();
+        await expect(fallbackCandidates?.()).resolves.toEqual(pool.slice(4));
+        expect(mockedLoadEffectiveAutoRoutingPool).toHaveBeenCalledTimes(1);
+        expect(mockedLoadEffectiveAutoRoutingPool).toHaveBeenCalledWith({
+          userId: 'user-123',
+          organizationId: null,
+        });
+      }
+    );
+
+    it('skips pool entries whose context window is too small for the prompt', async () => {
+      const pool: PoolEntry[] = [
+        { model: 'openai/gpt-4o', variant: null },
+        { model: 'anthropic/claude-haiku-4', variant: 'low' },
+      ];
+      mockedLoadEffectiveAutoRoutingPool.mockResolvedValue(pool);
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+        data: [
+          { ...catalogModel(pool[0].model), context_length: 8_000 },
+          catalogModel(pool[1].model),
+        ],
+      });
+      const { POST } = await import('./route');
+      await POST(
+        makeRequest({
+          ...makeBody('kilo-auto/efficient'),
+          messages: [{ role: 'user', content: 'x'.repeat(80_000) }],
+        }) as never
+      );
+      const fallbackCandidates =
+        mockedApplyResolvedAutoModel.mock.calls[0]?.[0].efficientFallbackCandidates;
+
+      await expect(fallbackCandidates?.()).resolves.toEqual([pool[1]]);
+    });
+
+    it('filters the legacy model deny list when no group policy is available', async () => {
+      const pool: PoolEntry[] = [
+        { model: 'openai/gpt-4o', variant: null },
+        { model: 'anthropic/claude-haiku-4', variant: 'low' },
+      ];
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { model_deny_list: ['openai/gpt-4o:free'] },
+        plan: 'enterprise',
+      });
+      mockedLoadEffectiveAutoRoutingPool.mockResolvedValue(pool);
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+        data: pool.map(entry => catalogModel(entry.model)),
+      });
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+      const fallbackCandidates =
+        mockedApplyResolvedAutoModel.mock.calls[0]?.[0].efficientFallbackCandidates;
+
+      expect(response.status).toBe(200);
+      await expect(fallbackCandidates?.()).resolves.toEqual([pool[1]]);
+      expect(mockedGetEffectiveModelDecision).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { name: 'missing', pool: null },
+      { name: 'empty', pool: [] },
+    ])('keeps Qwen when the configured pool is $name', async ({ pool }) => {
+      mockedLoadEffectiveAutoRoutingPool.mockResolvedValue(pool);
+      mockedApplyResolvedAutoModel.mockImplementationOnce(
+        jest.requireActual<{ applyResolvedAutoModel: typeof applyResolvedAutoModel }>(
+          '@/lib/ai-gateway/auto-model/resolution'
+        ).applyResolvedAutoModel
+      );
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedLoadEffectiveAutoRoutingPool).toHaveBeenCalledTimes(1);
+      expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject(BALANCED_QWEN_MODEL);
+    });
+
+    it('keeps Qwen when the fallback catalog cannot be loaded', async () => {
+      mockedLoadEffectiveAutoRoutingPool.mockResolvedValue([
+        { model: 'openai/gpt-4o', variant: null },
+      ]);
+      mockedGetEnhancedOpenRouterModels.mockRejectedValue(new Error('catalog unavailable'));
+      mockedApplyResolvedAutoModel.mockImplementationOnce(
+        jest.requireActual<{ applyResolvedAutoModel: typeof applyResolvedAutoModel }>(
+          '@/lib/ai-gateway/auto-model/resolution'
+        ).applyResolvedAutoModel
+      );
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body).toMatchObject(BALANCED_QWEN_MODEL);
+      expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+        'Unable to load the Efficient fallback model catalog'
+      );
+    });
+
+    it.each(['kilo-auto/efficient', 'kilo-auto/balanced'])(
+      'does not fetch the configured pool or catalog for unauthorized %s requests',
+      async requestedModel => {
+        mockedGetUserFromAuth.mockResolvedValue({
+          user: null,
+          authFailedResponse: NextResponse.json(
+            { success: false as const, error: 'unauthorized' },
+            { status: 401 }
+          ),
+          organizationId: undefined,
+        });
+        mockedLoadEffectiveAutoRoutingPool.mockResolvedValue([
+          { model: 'openai/gpt-4o', variant: null },
+        ]);
+        mockedApplyResolvedAutoModel.mockImplementationOnce(
+          jest.requireActual<{ applyResolvedAutoModel: typeof applyResolvedAutoModel }>(
+            '@/lib/ai-gateway/auto-model/resolution'
+          ).applyResolvedAutoModel
+        );
+
+        const { POST } = await import('./route');
+        const response = await POST(makeRequest(makeBody(requestedModel)) as never);
+
+        expect(response.status).toBe(401);
+        expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
+        expect(mockedLoadEffectiveAutoRoutingPool).not.toHaveBeenCalled();
+        expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
+        expect(mockedGetProvider).not.toHaveBeenCalled();
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
   });
 });
 

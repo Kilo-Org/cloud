@@ -1,4 +1,4 @@
-import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
+import { isVirtualAutoModelId, type PoolEntry } from '@kilocode/auto-routing-contracts';
 import { getAutoRoutingSettings } from '@/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -63,28 +63,39 @@ export function deniedModelIdsForCandidates(
   return [...denied];
 }
 
-export async function loadEffectivePoolModelIds(owner: AutoRoutingOwner): Promise<string[] | null> {
+export async function loadEffectiveAutoRoutingPool(
+  owner: AutoRoutingOwner
+): Promise<PoolEntry[] | null> {
   const owners = [
     ...(owner.organizationId ? [{ ownerType: 'org' as const, ownerId: owner.organizationId }] : []),
     { ownerType: 'user' as const, ownerId: owner.userId },
   ];
-  const results = await Promise.all(owners.map(getAutoRoutingSettings));
+  const results = await Promise.all(
+    owners.map(async settingsOwner => {
+      try {
+        return await getAutoRoutingSettings(settingsOwner, AbortSignal.timeout(2000));
+      } catch {
+        console.warn('Failed to load auto routing settings');
+        return null;
+      }
+    })
+  );
   for (const result of results) {
-    if (result.status !== 200 || !('configuredPool' in result.body)) continue;
+    if (!result || result.status !== 200 || !('configuredPool' in result.body)) continue;
     const pool = result.body.configuredPool;
     if (pool && pool.length > 0) {
-      return pool.map(entry => entry.model);
+      return pool;
     }
   }
   return null;
 }
 
 export async function loadAutoRoutingCandidateModelIds(owner: AutoRoutingOwner): Promise<string[]> {
-  const [table, poolModelIds] = await Promise.all([
+  const [table, pool] = await Promise.all([
     getCachedRoutingTable(),
-    loadEffectivePoolModelIds(owner),
+    loadEffectiveAutoRoutingPool(owner),
   ]);
-  return candidateModelIdsFromSources(table, poolModelIds);
+  return candidateModelIdsFromSources(table, pool?.map(entry => entry.model) ?? null);
 }
 
 export async function collectDeniedAutoRoutingModelIds(

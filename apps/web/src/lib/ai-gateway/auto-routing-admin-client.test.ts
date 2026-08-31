@@ -147,24 +147,28 @@ describe('auto routing admin client', () => {
     );
   });
 
-  it('gets routing settings using worker bearer auth', async () => {
+  it.each([
+    { name: 'without a signal', signal: undefined },
+    { name: 'with a signal', signal: new AbortController().signal },
+  ])('gets routing settings using worker bearer auth $name', async ({ signal }) => {
     mockFetch.mockResolvedValue({
       status: 200,
       ok: true,
       json: () => Promise.resolve(settingsResponse),
     });
 
-    await expect(getAutoRoutingSettings({ ownerType: 'user', ownerId: 'user-1' })).resolves.toEqual(
-      {
-        status: 200,
-        body: settingsResponse,
-      }
-    );
+    await expect(
+      getAutoRoutingSettings({ ownerType: 'user', ownerId: 'user-1' }, signal)
+    ).resolves.toEqual({
+      status: 200,
+      body: settingsResponse,
+    });
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://auto-routing.example.com/admin/routing-settings?ownerType=user&ownerId=user-1',
       {
         method: 'GET',
+        signal,
         headers: {
           authorization: 'Bearer test-internal-secret',
         },

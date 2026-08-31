@@ -38,6 +38,7 @@ import {
   checkOrganizationModelRestrictions,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
+  efficientPoolBlockedResponse,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
@@ -46,6 +47,20 @@ import {
   parseEditUsageFromResponse,
   parseTranscriptionUsageFromResponse,
 } from './llm-proxy-helpers';
+
+describe('efficientPoolBlockedResponse', () => {
+  it('reports the selected model is blocked without claiming the entire pool is blocked', async () => {
+    const response = efficientPoolBlockedResponse();
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      error: 'Your organization blocks the model selected by auto routing.',
+      error_type: 'model_not_allowed',
+      message:
+        'Your organization blocks the model selected by auto routing. Configure a custom Efficient model pool with allowed models, or adjust your organization model restrictions.',
+    });
+  });
+});
 
 describe('checkOrganizationModelRestrictions', () => {
   describe('enterprise plan - model deny list restrictions', () => {

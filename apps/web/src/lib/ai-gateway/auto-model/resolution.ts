@@ -13,7 +13,11 @@ import type {
   OrganizationPlan,
   OrganizationSettings,
 } from '@/lib/organizations/organization-types';
-import { isVirtualAutoModelId, type AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
+import {
+  isVirtualAutoModelId,
+  type AutoRoutingDecision,
+  type PoolEntry,
+} from '@kilocode/auto-routing-contracts';
 import {
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
@@ -53,6 +57,7 @@ type ResolveAutoModelParams = {
   isAutoFreeCandidateAllowed: ((modelId: string) => Promise<boolean>) | null;
   // Lazily fetches the auto-routing worker's decision (route.ts owns the request-body capture).
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
+  efficientFallbackCandidates?: () => Promise<ReadonlyArray<PoolEntry> | null>;
   organizationContext?: Promise<{
     organizationId?: string;
     settings?: OrganizationSettings;
@@ -230,37 +235,28 @@ async function resolveOrganizationAutoModel(
   };
 }
 
-/**
- * Map an efficient routing decision onto a concrete model + catalog settings.
- *
- * Prefer canonical `variant` (complete OpenCode variant settings). When the
- * variant key is absent from the model's catalog, return null so the caller
- * falls back to balanced rather than serving implicit defaults. When `variant`
- * is absent, preserve legacy effort-only behavior for rolling deploys.
- */
-async function resolveEfficientDecisionModel(
-  decision: AutoRoutingDecision
-): Promise<ResolvedAutoModel | null> {
-  // `variant` is only on the benchmark decision branch of the discriminated
-  // union; coding-plan defaults never carry it.
-  if ('variant' in decision && decision.variant != null) {
-    const variants = await getModelVariants(decision.model, true);
-    const variantSettings: OpenCodeVariant | undefined = variants?.[decision.variant];
+async function resolveEfficientModel(candidate: {
+  model: string;
+  variant?: string | null;
+  reasoningEffort?: AutoRoutingDecision['reasoningEffort'];
+}): Promise<ResolvedAutoModel | null> {
+  if (candidate.variant != null) {
+    const variants = await getModelVariants(candidate.model, true);
+    const variantSettings: OpenCodeVariant | undefined = variants?.[candidate.variant];
     if (!variantSettings) {
       return null;
     }
     return {
-      model: decision.model,
+      model: candidate.model,
       ...(variantSettings.reasoning ? { reasoning: { ...variantSettings.reasoning } } : {}),
       ...(variantSettings.verbosity ? { verbosity: variantSettings.verbosity } : {}),
     };
   }
 
-  // Legacy effort-only decisions (old workers during rolling deploy).
   return {
-    model: decision.model,
-    ...('reasoningEffort' in decision && decision.reasoningEffort
-      ? { reasoning: { enabled: true, effort: decision.reasoningEffort } }
+    model: candidate.model,
+    ...(candidate.reasoningEffort
+      ? { reasoning: { enabled: true, effort: candidate.reasoningEffort } }
       : {}),
   };
 }
@@ -322,15 +318,27 @@ export async function resolveAutoModel(
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
     const decision = params.efficientDecision ? await params.efficientDecision() : null;
     if (decision && !isVirtualAutoModelId(decision.model)) {
-      const resolvedFromDecision = await resolveEfficientDecisionModel(decision);
+      const resolvedFromDecision = await resolveEfficientModel(decision);
       if (resolvedFromDecision) {
         return { kind: 'ok', resolved: resolvedFromDecision };
       }
-      // Exact catalog variant missing or removed: never serve the chosen model
-      // with implicit defaults — same balanced fallback as the no-decision path.
-      return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
     }
-    // Static fallback when the worker is slow or unavailable.
+    const fallbackCandidates = await params.efficientFallbackCandidates?.();
+    for (const candidate of fallbackCandidates ?? []) {
+      if (isVirtualAutoModelId(candidate.model)) {
+        continue;
+      }
+      if (candidate.variant === null) {
+        const variants = await getModelVariants(candidate.model, true);
+        if (Object.keys(variants ?? {}).length > 0) {
+          continue;
+        }
+      }
+      const resolvedFromCandidate = await resolveEfficientModel(candidate);
+      if (resolvedFromCandidate) {
+        return { kind: 'ok', resolved: resolvedFromCandidate };
+      }
+    }
     return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
   }
   const mode = resolveMode(modeHeader, featureHeader);

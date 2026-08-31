@@ -154,13 +154,17 @@ async function fetchAutoRoutingSettingsAdmin(
   };
 }
 
-export function getAutoRoutingSettings(owner: {
-  ownerType: AutoRoutingModeOwnerType;
-  ownerId: string;
-}): Promise<AutoRoutingSettingsWorkerResult> {
+export function getAutoRoutingSettings(
+  owner: {
+    ownerType: AutoRoutingModeOwnerType;
+    ownerId: string;
+  },
+  signal?: AbortSignal
+): Promise<AutoRoutingSettingsWorkerResult> {
   const searchParams = new URLSearchParams(owner);
   return fetchAutoRoutingSettingsAdmin(`/admin/routing-settings?${searchParams}`, {
     method: 'GET',
+    signal,
   });
 }
 

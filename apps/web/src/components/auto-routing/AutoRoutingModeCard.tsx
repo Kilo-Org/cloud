@@ -89,6 +89,9 @@ export const PERSONAL_EMPTY_POOL_COPY = 'No custom pool. Efficient uses the plat
 export const ORGANIZATION_EMPTY_POOL_COPY =
   'No organization override. Members use their personal pool, or the platform model pool if they have none.';
 
+export const POOL_FALLBACK_COPY =
+  'If auto routing cannot select a model, Efficient and Balanced use the first allowed, available model and variant in saved pool order. Organization pools override personal pools. If no pair is usable or no pool is configured, Kilo uses the platform fallback. Organization restrictions still apply.';
+
 export const UNAVAILABLE_ENTRY_EXPLANATION =
   'This model or variant is no longer available in your catalog and cannot be used for routing.';
 
@@ -1033,7 +1036,8 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
               <h3 className="text-sm font-medium">Efficient model pool</h3>
               {poolSupported ? (
                 <p id={poolHelpId} className="text-muted-foreground text-sm">
-                  Up to {MAX_POOL_ENTRIES} exact model and variant pairs. Leave empty to inherit.
+                  Up to {MAX_POOL_ENTRIES} exact model and variant pairs. Leave empty to inherit.{' '}
+                  {POOL_FALLBACK_COPY}
                 </p>
               ) : null}
             </div>

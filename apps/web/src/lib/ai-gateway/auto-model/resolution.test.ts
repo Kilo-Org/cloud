@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsFromRedis: jest.fn(async () => new Set<string>()),
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(async () => ({})),
 }));
 
 import { resolveAutoModel } from './resolution';
@@ -13,7 +14,7 @@ import {
   KILO_AUTO_FREE_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
-import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
+import type { AutoRoutingDecision, PoolEntry } from '@kilocode/auto-routing-contracts';
 
 const baseParams = {
   model: KILO_AUTO_EFFICIENT_MODEL.id,
@@ -391,6 +392,205 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
           model: KILO_AUTO_EFFICIENT_MODEL.id,
           variant: 'high',
         }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+  });
+});
+
+describe('resolveAutoModel — configured efficient fallback pool', () => {
+  const candidates: ReadonlyArray<PoolEntry> = [
+    { model: 'mistralai/mistral-medium-3-5', variant: 'thinking' },
+    { model: 'anthropic/claude-sonnet-5', variant: 'xhigh' },
+  ];
+  const firstCandidateResolution = {
+    model: 'mistralai/mistral-medium-3-5',
+    reasoning: { enabled: true, effort: 'high' },
+  };
+
+  it.each([KILO_AUTO_EFFICIENT_MODEL.id, KILO_AUTO_BALANCED_MODEL.id])(
+    'uses the first pool entry in saved order for %s without a decision callback',
+    async model => {
+      const efficientFallbackCandidates = jest.fn(async () => candidates);
+      const result = await resolveAutoModel(
+        {
+          ...baseParams,
+          model,
+          apiKind: 'chat_completions',
+          efficientFallbackCandidates,
+        },
+        nullUserPromise,
+        zeroBalancePromise
+      );
+
+      expect(result).toEqual({ kind: 'ok', resolved: firstCandidateResolution });
+      expect(efficientFallbackCandidates).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each<{ name: string; decision: AutoRoutingDecision | null }>([
+    { name: 'missing worker decision', decision: null },
+    {
+      name: 'virtual worker decision',
+      decision: { ...sampleDecision, model: KILO_AUTO_EFFICIENT_MODEL.id },
+    },
+    {
+      name: 'missing worker decision variant',
+      decision: { ...sampleDecision, model: 'anthropic/claude-sonnet-5', variant: 'thinking' },
+    },
+  ])('loads the configured pool after a $name', async ({ decision }) => {
+    const efficientDecision = jest.fn(async () => decision);
+    const efficientFallbackCandidates = jest.fn(async () => {
+      expect(efficientDecision).toHaveBeenCalledTimes(1);
+      return candidates;
+    });
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision,
+        efficientFallbackCandidates,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: firstCandidateResolution });
+    expect(efficientFallbackCandidates).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips virtual pool models and missing catalog variants before the first usable entry', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientFallbackCandidates: async () => [
+          { model: KILO_AUTO_EFFICIENT_MODEL.id, variant: null },
+          { model: ORG_AUTO_MODEL.id, variant: null },
+          { model: 'anthropic/claude-sonnet-5', variant: 'thinking' },
+          { model: 'some-provider/model-without-variants', variant: 'high' },
+          { model: 'mistralai/mistral-medium-3-5', variant: 'instant' },
+          { model: 'anthropic/claude-sonnet-5', variant: 'max' },
+        ],
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: {
+        model: 'mistralai/mistral-medium-3-5',
+        reasoning: { enabled: false, effort: 'none' },
+      },
+    });
+  });
+
+  it.each(['xhigh', 'max'])(
+    'applies exact reasoning and verbosity for pool variant %s',
+    async variant => {
+      const result = await resolveAutoModel(
+        {
+          ...baseParams,
+          apiKind: 'chat_completions',
+          efficientFallbackCandidates: async () => [
+            { model: 'anthropic/claude-sonnet-5', variant },
+          ],
+        },
+        nullUserPromise,
+        zeroBalancePromise
+      );
+
+      expect(result).toEqual({
+        kind: 'ok',
+        resolved: {
+          model: 'anthropic/claude-sonnet-5',
+          reasoning: { enabled: true, effort: variant },
+          verbosity: variant,
+        },
+      });
+    }
+  );
+
+  it('skips a null pool variant when the model now exposes catalog variants', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientFallbackCandidates: async () => [
+          { model: 'anthropic/claude-sonnet-5', variant: null },
+          ...candidates,
+        ],
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: firstCandidateResolution });
+  });
+
+  it('uses a null variant for a pool model without catalog variants', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientFallbackCandidates: async () => [
+          { model: 'meta-llama/llama-3.3-70b-instruct', variant: null },
+          ...candidates,
+        ],
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: 'meta-llama/llama-3.3-70b-instruct' },
+    });
+  });
+
+  it.each<AutoRoutingDecision>([
+    sampleDecision,
+    { ...sampleDecision, model: 'anthropic/claude-sonnet-5', variant: null },
+    { ...sampleDecision, model: 'anthropic/claude-sonnet-5', variant: 'xhigh' },
+  ])('does not load the fallback pool for a usable $model decision', async decision => {
+    const efficientFallbackCandidates = jest.fn(async () => candidates);
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => decision,
+        efficientFallbackCandidates,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toMatchObject({ kind: 'ok', resolved: { model: decision.model } });
+    expect(efficientFallbackCandidates).not.toHaveBeenCalled();
+  });
+
+  it.each<{ name: string; fallbackCandidates: ReadonlyArray<PoolEntry> | null }>([
+    { name: 'null', fallbackCandidates: null },
+    { name: 'empty', fallbackCandidates: [] },
+    {
+      name: 'entirely unusable',
+      fallbackCandidates: [
+        { model: KILO_AUTO_BALANCED_MODEL.id, variant: null },
+        { model: 'anthropic/claude-sonnet-5', variant: 'thinking' },
+        { model: 'some-provider/model-without-variants', variant: 'high' },
+      ],
+    },
+  ])('keeps BALANCED_QWEN_MODEL for a $name pool', async ({ fallbackCandidates }) => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => null,
+        efficientFallbackCandidates: async () => fallbackCandidates,
       },
       nullUserPromise,
       zeroBalancePromise

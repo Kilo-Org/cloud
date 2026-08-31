@@ -100,7 +100,12 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
-import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
+import {
+  collectDeniedAutoRoutingModelIds,
+  loadEffectiveAutoRoutingPool,
+} from '@/lib/ai-gateway/auto-routing-denied-models';
+import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
+import { gatewayChatApisForModel } from '@/lib/ai-gateway/model-api-kinds';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -110,7 +115,11 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import { redactProviderHints } from '@kilocode/auto-routing-contracts';
+import {
+  detectRequiredInputModalities,
+  estimateRoutingTokens,
+  redactProviderHints,
+} from '@kilocode/auto-routing-contracts';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import { readDb } from '@/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
@@ -319,10 +328,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // validation after resolution.
   let routingTarget: string | null = null;
   let classifierCostUsd = 0;
-  // Efficient/balanced requests resolve through the auto-routing pool. Kept for
-  // the org policy check below so a team that blocks every pool model gets
-  // guidance to configure a custom Efficient model pool instead of the generic
-  // model-not-allowed error.
   let isAutoEfficientRequest = false;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
@@ -381,6 +386,56 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         apiKind: requestBodyParsed.kind,
         clientIp: ipAddress ?? null,
         efficientDecision,
+        efficientFallbackCandidates: async () => {
+          const { user, authFailedResponse, organizationId } = await authPromise;
+          if (!user || authFailedResponse) return null;
+          const pool = await loadEffectiveAutoRoutingPool({
+            userId: user.id,
+            organizationId: organizationId ?? null,
+          });
+          if (!pool?.length) return null;
+          const [catalog, policy, { settings, plan }] = await Promise.all([
+            getEnhancedOpenRouterModels().catch(() => {
+              warnExceptInTest('Unable to load the Efficient fallback model catalog');
+              return null;
+            }),
+            organizationGroupPolicyPromise,
+            balanceAndSettingsPromise,
+          ]);
+          if (!catalog || !Array.isArray(catalog.data)) return null;
+          const modelsById = new Map(catalog.data.map(model => [model.id, model]));
+          const requiresImages = detectRequiredInputModalities(requestBodyParsed.body).includes(
+            'image'
+          );
+          const promptTokensEstimate = estimateRoutingTokens(requestBodyParsed.body);
+          const allowed = await Promise.all(
+            pool.map(async entry => {
+              const model = modelsById.get(entry.model);
+              if (
+                !model ||
+                (typeof model.context_length === 'number' &&
+                  model.context_length < promptTokensEstimate) ||
+                isUnavailableModel(entry.model) ||
+                isDisabledKiloExclusiveModel(entry.model) ||
+                !gatewayChatApisForModel(entry.model).includes(requestBodyParsed.kind) ||
+                (requiresImages &&
+                  !model.architecture.input_modalities.some(
+                    modality => modality === 'image' || modality === 'image_url'
+                  ))
+              ) {
+                return false;
+              }
+              return policy
+                ? (await getEffectiveModelDecision(policy, entry.model)).allowed
+                : !checkOrganizationModelRestrictions({
+                    modelId: entry.model,
+                    settings,
+                    organizationPlan: plan,
+                  }).error;
+            })
+          );
+          return pool.filter((_, index) => allowed[index]);
+        },
         organizationContext: organizationContextPromise,
         isAutoFreeCandidateAllowed: async modelId => {
           const policy = await organizationGroupPolicyPromise;

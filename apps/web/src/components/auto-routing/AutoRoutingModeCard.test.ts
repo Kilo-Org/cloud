@@ -41,6 +41,7 @@ import {
   NOT_SAVED_ENTRY_LABEL,
   ORGANIZATION_EMPTY_POOL_COPY,
   PERSONAL_EMPTY_POOL_COPY,
+  POOL_FALLBACK_COPY,
   POOL_ROLLOUT_NOTE,
   removePoolEntry,
   resolveEditableChrome,
@@ -268,6 +269,21 @@ describe('settings endpoint and query key', () => {
 // ---------------------------------------------------------------------------
 // Empty state copy (exact strings from the card module)
 // ---------------------------------------------------------------------------
+
+describe('configured pool fallback copy', () => {
+  it('explains saved order, organization precedence, and restricted platform fallback', () => {
+    expect(POOL_FALLBACK_COPY).toBe(
+      'If auto routing cannot select a model, Efficient and Balanced use the first allowed, available model and variant in saved pool order. Organization pools override personal pools. If no pair is usable or no pool is configured, Kilo uses the platform fallback. Organization restrictions still apply.'
+    );
+  });
+
+  it.each([
+    { name: 'empty', configuredPool: null },
+    { name: 'configured', configuredPool: [{ ...entryReady, unavailable: false }] },
+  ])('renders fallback help for a $name pool', ({ configuredPool }) => {
+    expect(mountCardHtml(settings({ configuredPool }))).toContain(POOL_FALLBACK_COPY);
+  });
+});
 
 describe('empty / inherited pool copy', () => {
   it('uses the exact personal empty string', () => {
@@ -1051,6 +1067,7 @@ describe('AutoRoutingModeCard poolSupported=false', () => {
     expect(html).not.toContain('Add model');
     expect(html).not.toContain('Clear pool');
     expect(html).not.toContain(PERSONAL_EMPTY_POOL_COPY);
+    expect(html).not.toContain(POOL_FALLBACK_COPY);
     expect(html).not.toContain('Retry benchmark');
     expect(html).toContain('Routing mode');
     expect(html).toContain('Save auto routing');

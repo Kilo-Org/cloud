@@ -110,19 +110,21 @@ export function ChildSessionSection({
             {taskName}
           </Text>
           {modelLabel ? <ChildSessionModelLabel modelLabel={modelLabel} /> : null}
-          <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
-            {
-              // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ChildSessionActivity has no discriminant field to narrow on, and `'tool' in latestActivity` would throw for the string variant.
-              typeof latestActivity === 'string' ? (
-                latestActivity
-              ) : (
-                <>
-                  <Text className="text-xs leading-4 text-agent-sky">{latestActivity.tool}</Text>
-                  {latestActivity.context ? ` ${latestActivity.context}` : ''}
-                </>
-              )
-            }
-          </Text>
+          {latestActivity ? (
+            <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
+              {
+                // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ChildSessionActivity has no discriminant field to narrow on, and `'tool' in latestActivity` would throw for the string variant.
+                typeof latestActivity === 'string' ? (
+                  latestActivity
+                ) : (
+                  <>
+                    <Text className="text-xs leading-4 text-agent-sky">{latestActivity.tool}</Text>
+                    {latestActivity.context ? ` ${latestActivity.context}` : ''}
+                  </>
+                )
+              }
+            </Text>
+          ) : null}
         </View>
 
         <StatusBadge status={status} />

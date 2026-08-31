@@ -186,8 +186,8 @@ async function renderBubbleWithHandlers(
     deliveryState?: MessageDeliveryState;
     onRetryMessage?: (m: StoredMessage) => void;
     onCopyToComposer?: (text: string) => void;
-    onCancelQueued?: (m: StoredMessage) => void;
     onRestoreQueued?: (m: StoredMessage) => void;
+    onLongPressDetails?: (m: StoredMessage) => void;
   }
 ): Promise<unknown> {
   const { MessageBubble } = await import('./message-bubble');
@@ -325,152 +325,104 @@ describe('MessageBubble failure footer', () => {
   });
 });
 
-describe('MessageBubble cancel queued and restore', () => {
-  it('renders the Cancel button when the message is queued and wired', async () => {
-    const tree = await renderBubbleWithHandlers(userMessage('m-cancel'), {
-      deliveryState: { status: 'queued' },
-      onCancelQueued: vi.fn<(message: StoredMessage) => void>(),
-    });
-    expect(findText(tree, t => t === 'Cancel message')).toBe(true);
-    const cancel = findElementByType(
-      tree,
-      'Button',
-      p => p.accessibilityLabel === 'Cancel queued message'
-    );
-    expect(cancel).not.toBeNull();
-    expect(cancel?.props.accessibilityRole).toBe('button');
-  });
-
-  it('omits the Cancel button when no onCancelQueued is wired', async () => {
-    const tree = await renderBubbleWithHandlers(userMessage('m-cancel-nowired'), {
+describe('MessageBubble queue indicator and restore', () => {
+  it('keeps Queued without a standalone cancellation control', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-queued'), {
       deliveryState: { status: 'queued' },
     });
+    expect(findText(tree, text => text === 'Queued')).toBe(true);
+    expect(findText(tree, text => text === 'Cancel message')).toBe(false);
     expect(
-      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Cancel queued message')
+      findElementByType(
+        tree,
+        'Button',
+        props => props.accessibilityLabel === 'Cancel queued message'
+      )
     ).toBeNull();
   });
 
-  it('omits the Cancel button when the message is dequeued', async () => {
-    const tree = await renderBubbleWithHandlers(userMessage('m-cancel-dequeued'), {
-      onCancelQueued: vi.fn<(message: StoredMessage) => void>(),
-    });
-    expect(
-      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Cancel queued message')
-    ).toBeNull();
-  });
-
-  it('renders the Restore button when wired and the message is not queued', async () => {
-    const tree = await renderBubbleWithHandlers(userMessage('m-restore'), {
-      onRestoreQueued: vi.fn<(message: StoredMessage) => void>(),
-    });
-    expect(findText(tree, t => t === 'Restore')).toBe(true);
-    const restore = findElementByType(
-      tree,
-      'Button',
-      p => p.accessibilityLabel === 'Restore canceled message to the composer'
-    );
-    expect(restore).not.toBeNull();
-    expect(restore?.props.accessibilityRole).toBe('button');
-  });
-
-  it('sizes the Cancel and Restore controls to the platform minimum touch target', async () => {
-    const cancelTree = await renderBubbleWithHandlers(userMessage('m-size-cancel'), {
-      deliveryState: { status: 'queued' },
-      onCancelQueued: vi.fn<(message: StoredMessage) => void>(),
-    });
-    const cancel = findElementByType(
-      cancelTree,
-      'Button',
-      p => p.accessibilityLabel === 'Cancel queued message'
-    );
-    expect(cancel).not.toBeNull();
-    // The Platform mock reports android, so the controls must reach 48dp.
-    expect(cancel?.props.className).toBe('min-h-12');
-    expect(cancel?.props.size).toBe('sm');
-
-    const restoreTree = await renderBubbleWithHandlers(userMessage('m-size-restore'), {
-      onRestoreQueued: vi.fn<(message: StoredMessage) => void>(),
-    });
-    const restore = findElementByType(
-      restoreTree,
-      'Button',
-      p => p.accessibilityLabel === 'Restore canceled message to the composer'
-    );
-    expect(restore).not.toBeNull();
-    expect(restore?.props.className).toBe('min-h-12');
-    expect(restore?.props.size).toBe('sm');
-  });
-
-  it('sizes the controls to the iOS 44pt minimum touch target', async () => {
-    reactNativeMock.Platform.OS = 'ios';
+  it.each([
+    ['android', 'min-h-12'],
+    ['ios', 'min-h-11'],
+  ])('keeps Restore targeting and the minimum target on %s', async (platform, minHeight) => {
+    reactNativeMock.Platform.OS = platform;
     vi.resetModules();
     try {
-      const cancelTree = await renderBubbleWithHandlers(userMessage('m-size-cancel-ios'), {
-        deliveryState: { status: 'queued' },
-        onCancelQueued: vi.fn<(message: StoredMessage) => void>(),
+      const message = userMessage('m-restore');
+      let restored: StoredMessage | undefined = undefined;
+      const tree = await renderBubbleWithHandlers(message, {
+        onRestoreQueued: selected => {
+          restored = selected;
+        },
       });
-      const cancel = findElementByType(
-        cancelTree,
-        'Button',
-        p => p.accessibilityLabel === 'Cancel queued message'
-      );
-      expect(cancel).not.toBeNull();
-      // The Platform mock reports ios, so the controls reach 44pt.
-      expect(cancel?.props.className).toBe('min-h-11');
-      expect(cancel?.props.size).toBe('sm');
-
-      const restoreTree = await renderBubbleWithHandlers(userMessage('m-size-restore-ios'), {
-        onRestoreQueued: vi.fn<(message: StoredMessage) => void>(),
-      });
+      expect(findText(tree, text => text === 'Restore')).toBe(true);
       const restore = findElementByType(
-        restoreTree,
+        tree,
         'Button',
-        p => p.accessibilityLabel === 'Restore canceled message to the composer'
+        props => props.accessibilityLabel === 'Restore canceled message to the composer'
       );
-      expect(restore).not.toBeNull();
-      expect(restore?.props.className).toBe('min-h-11');
+      expect(restore?.props.accessibilityRole).toBe('button');
+      expect(restore?.props.className).toBe(minHeight);
       expect(restore?.props.size).toBe('sm');
+      if (!restore) {
+        throw new Error('Restore control is missing');
+      }
+      (restore.props.onPress as () => void)();
+      expect(restored).toBe(message);
     } finally {
       reactNativeMock.Platform.OS = 'android';
       vi.resetModules();
     }
   });
+});
 
-  it('presses Cancel and Restore to call their handlers with the message', async () => {
-    const message = userMessage('m-press-cancel');
-    const onCancelQueued = vi.fn<(message: StoredMessage) => void>();
-    const onRestoreQueued = vi.fn<(message: StoredMessage) => void>();
+describe('MessageBubble attachment details entry', () => {
+  it.each([false, true])(
+    'selects the whole message from an attachment, with text=%s',
+    async withText => {
+      const actual = await vi.importActual<typeof PartTypes>('./part-types');
+      const { isFilePart, isTextPart } = await import('./part-types');
+      const { FilePartRenderer } = await import('./file-part-renderer');
+      vi.mocked(isFilePart).mockImplementation(actual.isFilePart);
+      vi.mocked(isTextPart).mockImplementation(actual.isTextPart);
+      try {
+        const message = userMessage('attachment-message');
+        const file = {
+          id: 'attachment-part',
+          sessionID: 'ses_1',
+          messageID: message.info.id,
+          type: 'file' as const,
+          mime: 'image/png',
+          url: 'https://example.test/image.png',
+        };
+        message.parts = [...(withText ? message.parts : []), file];
+        const selected: StoredMessage[] = [];
+        const tree = await renderBubbleWithHandlers(message, {
+          deliveryState: { status: 'queued' },
+          onLongPressDetails: value => {
+            selected.push(value);
+          },
+        });
+        const attachment = findElementByTypeFn(tree, FilePartRenderer);
+        if (!attachment) {
+          throw new Error('Attachment control is missing');
+        }
+        expect(attachment.props.part).toBe(file);
+        (attachment.props.onLongPress as () => void)();
+        expect(selected).toEqual([message]);
+        expect(findText(tree, text => text === 'Queued')).toBe(true);
+        expect(findText(tree, text => text === 'Cancel message')).toBe(false);
 
-    const cancelTree = await renderBubbleWithHandlers(message, {
-      deliveryState: { status: 'queued' },
-      onCancelQueued,
-    });
-    const cancel = findElementByType(
-      cancelTree,
-      'Button',
-      p => p.accessibilityLabel === 'Cancel queued message'
-    );
-    expect(cancel).not.toBeNull();
-    if (!cancel) {
-      throw new Error('expected Cancel button');
+        const withoutActions = await renderBubbleWithHandlers(message, {});
+        expect(
+          findElementByTypeFn(withoutActions, FilePartRenderer)?.props.onLongPress
+        ).toBeUndefined();
+      } finally {
+        vi.mocked(isFilePart).mockReturnValue(false);
+        vi.mocked(isTextPart).mockReturnValue(false);
+      }
     }
-    (cancel.props.onPress as () => void)();
-    expect(onCancelQueued).toHaveBeenCalledWith(message);
-
-    const restoreMessage = userMessage('m-press-restore');
-    const restoreTree = await renderBubbleWithHandlers(restoreMessage, { onRestoreQueued });
-    const restore = findElementByType(
-      restoreTree,
-      'Button',
-      p => p.accessibilityLabel === 'Restore canceled message to the composer'
-    );
-    expect(restore).not.toBeNull();
-    if (!restore) {
-      throw new Error('expected Restore button');
-    }
-    (restore.props.onPress as () => void)();
-    expect(onRestoreQueued).toHaveBeenCalledWith(restoreMessage);
-  });
+  );
 });
 
 describe('MessageBubble copy-to-composer human text', () => {
@@ -640,6 +592,15 @@ function findElementByTypeFn(
   node: unknown,
   typeFn: unknown
 ): { type: unknown; props: Record<string, unknown> } | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findElementByTypeFn(child, typeFn);
+      if (hit) {
+        return hit;
+      }
+    }
+    return null;
+  }
   if (node == null || typeof node !== 'object') {
     return null;
   }

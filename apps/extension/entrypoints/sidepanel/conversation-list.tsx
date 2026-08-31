@@ -371,7 +371,7 @@ export const ConversationList = ({
   const virtualItems = virtualizer.getVirtualItems();
 
   return (
-    <div className="relative min-h-0 flex-1">
+    <div className="relative min-h-0 flex-1 overflow-hidden">
       <section
         aria-label="Agent conversation"
         className="agent-conversation-scrollbar h-full overflow-y-auto px-4 py-4"

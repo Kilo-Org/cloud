@@ -243,7 +243,7 @@ async function collect<T>(
   const seen = new Set<string>();
   let cursor: ReviewCursor | null = null;
   do {
-    const result = await page(auth, request, schema, bound, cursor);
+    const result: ReviewPage<T> = await page(auth, request, schema, bound, cursor);
     items.push(...result.items);
     if (items.length > 5000) throw new BitbucketInteractiveClientError('item_limit_exceeded');
     bounded(items);

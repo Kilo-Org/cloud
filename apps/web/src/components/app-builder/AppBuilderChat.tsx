@@ -508,7 +508,14 @@ function SessionMessages({
 export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
-  const { isStreaming, isInterrupting, model: projectModel, sessions, pendingNewSession } = state;
+  const {
+    isStreaming,
+    isInterrupting,
+    model: projectModel,
+    sessions,
+    pendingNewSession,
+    isRecoveringSession,
+  } = state;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -743,7 +750,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
                 variant="ghost"
                 size="icon"
                 onClick={handleNewChatToggle}
-                disabled={isStreaming}
+                disabled={isStreaming || isRecoveringSession}
                 className={pendingNewSession ? 'text-primary bg-primary/10 h-8 w-8' : 'h-8 w-8'}
                 aria-label="New chat"
               >
@@ -751,7 +758,11 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              {pendingNewSession ? 'Cancel new chat' : 'New chat'}
+              {isRecoveringSession
+                ? 'A new chat is required'
+                : pendingNewSession
+                  ? 'Cancel new chat'
+                  : 'New chat'}
             </TooltipContent>
           </Tooltip>
           <FeedbackDialog organizationId={organizationId} />

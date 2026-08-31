@@ -469,7 +469,6 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
     }
 
     logger.log('Connecting to existing V2 session', { sessionId });
-    store.setState({ isStreaming: true });
 
     void (async () => {
       try {

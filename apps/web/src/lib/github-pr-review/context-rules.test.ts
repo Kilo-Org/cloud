@@ -144,8 +144,8 @@ test.each(inherited)('retains inherited $type without evaluating it', rule => {
 
 const unknownBinding = { kind: 'unknown' };
 test.each([
-  [7, { kind: 'app', appId: 7 }, { kind: 'app', appId: 7 }],
-  [-1, { kind: 'any' }, unknownBinding],
+  [7, { kind: 'app', appId: 7 }, { kind: 'app', appId: 7 }] as const,
+  [-1, { kind: 'any' }, unknownBinding] as const,
   ...[null, undefined, 0, -2, 7.5, Number.MAX_SAFE_INTEGER + 1].map(
     id => [id, unknownBinding, unknownBinding] as const
   ),

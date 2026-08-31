@@ -436,9 +436,6 @@ const approve = async (root: Page | Locator): Promise<void> => {
 };
 const capture = async (panel: Page, name: string): Promise<void> => {
   await panel.setViewportSize({ height: 720, width: 320 });
-  await panel.evaluate(() => {
-    document.documentElement.style.fontSize = '200%';
-  });
   const dialogs = panel.getByRole('dialog');
   const root = (await dialogs.count()) > 0 ? dialogs.last() : panel;
   const stop = supervision(root).getByRole('button', { name: 'Stop CLI task' });
@@ -496,10 +493,7 @@ for (const mode of ['Browser', 'Agents'] as const) {
         );
         await expect(supervision(panel)).toContainText('Tab approval required');
         await expect(target.locator('#count')).toHaveText('0');
-        await panel.evaluate(() => {
-          document.documentElement.style.fontSize = '200%';
-        });
-        await capture(panel, `${mode}-approval-320px-200percent`);
+        await capture(panel, `${mode}-approval-320px`);
         await approve(panel);
         await expect(supervision(panel)).toContainText('CLI tasks: Running');
         await other.bringToFront();
@@ -519,7 +513,7 @@ for (const mode of ['Browser', 'Agents'] as const) {
         await expect(panel.getByRole('list', { name: 'Queued CLI tasks' })).toContainText(
           'Queue deadline:'
         );
-        await capture(panel, `${mode}-running-queued-320px-200percent`);
+        await capture(panel, `${mode}-running-queued-320px`);
         await panel
           .getByRole('button', { name: `Cancel queued task ${queued.job.jobId.slice(-8)}` })
           .click();
@@ -691,6 +685,68 @@ for (const profile of ['enabled', 'quarantined'] as const) {
         expect(ownerLocks).toEqual([
           expect.objectContaining({ clientId: expect.any(String), mode: 'exclusive' }),
         ]);
+        if (quarantined) {
+          const name = 'native-ownership-quarantined-original-owner-320px';
+          const conversation = panel.getByRole('region', { name: 'Agent conversation' });
+          await expect(
+            conversation.locator('xpath=../following-sibling::p[@role="status"]')
+          ).toBeVisible();
+          await capture(panel, name);
+          const geometry = await conversation.evaluate(section => {
+            const viewport = section.parentElement;
+            const greeting = section.querySelector(':scope > p');
+            const warning = viewport?.nextElementSibling;
+            if (
+              viewport === null ||
+              greeting === null ||
+              !(warning instanceof HTMLElement) ||
+              !warning.matches('p[role="status"]')
+            ) {
+              throw new Error('The empty conversation must precede the admission warning.');
+            }
+            // eslint-disable-next-line unicorn/consistent-function-scoping -- Playwright serializes this helper with the page callback.
+            const rectangle = (element: Element) => {
+              const { bottom, height, left, right, top, width } = element.getBoundingClientRect();
+              return { bottom, height, left, right, top, width };
+            };
+            const conversationRect = rectangle(section);
+            const greetingRect = rectangle(greeting);
+            const viewportRect = rectangle(viewport);
+            const overflowY = {
+              conversation: getComputedStyle(section).overflowY,
+              viewport: getComputedStyle(viewport).overflowY,
+            };
+            const clippingValues = new Set(['auto', 'clip', 'hidden', 'scroll']);
+            const viewportBottom = clippingValues.has(overflowY.viewport)
+              ? viewportRect.bottom
+              : Number.POSITIVE_INFINITY;
+            const conversationBottom = clippingValues.has(overflowY.conversation)
+              ? conversationRect.bottom
+              : Number.POSITIVE_INFINITY;
+            // Clip each boundary independently; raw greeting bounds can exceed the viewport.
+            return {
+              conversation: conversationRect,
+              greeting: greetingRect,
+              overflowY,
+              paintedConversationBottom: Math.min(conversationRect.bottom, viewportBottom),
+              paintedGreetingBottom: Math.min(
+                greetingRect.bottom,
+                conversationBottom,
+                viewportBottom
+              ),
+              viewport: viewportRect,
+              warning: rectangle(warning),
+            };
+          });
+          await test.info().attach(`${name}-geometry`, {
+            body: JSON.stringify(geometry, null, 2),
+            contentType: 'application/json',
+          });
+          expect(
+            Math.max(geometry.paintedConversationBottom, geometry.paintedGreetingBottom),
+            'The conversation must not paint into the quarantine warning.'
+          ).toBeLessThanOrEqual(geometry.warning.top);
+        }
         const second = await openPanel();
         const reload = supervision(second).getByRole('button', { name: 'Reload panel' });
         await expect(supervision(second)).toContainText('Ownership not acquired');

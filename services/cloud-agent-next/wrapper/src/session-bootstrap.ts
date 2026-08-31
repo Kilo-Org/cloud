@@ -1328,7 +1328,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         ? error
         : workspaceBootstrapError('workspace_setup_unknown', 'Workspace setup failed');
     logToFile(
-      `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'}`
+      `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'} error=${bootstrapError.message}${bootstrapError.detail ? ` detail=${bootstrapError.detail}` : ''}`
     );
     if (workspaceNeedsBootstrap) {
       await cleanupWorkspace(request, deps.beforeFailureCleanup);

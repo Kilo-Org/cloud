@@ -1738,10 +1738,40 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     });
   });
 
-  it('exposes redacted setup command and stderr on failure but redacts secrets', async () => {
+  it('archives sanitized setup failure details before workspace cleanup', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.setupCommands = ['private-tool --token argv-secret'];
+    const cliLogDir = path.join(request.workspace.sessionHome, '.local/share/kilo/log');
+    const cliLogPath = path.join(cliLogDir, 'kilo.log');
+    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    await fsp.mkdir(cliLogDir, { recursive: true });
+    await fsp.writeFile(cliLogPath, 'earlier CLI evidence\n');
+
+    let archivedLogs = '';
+    let uploadCalls = 0;
+    let cliPresentDuringUpload = false;
+    globalThis.fetch = asFetch(async (_input, init) => {
+      uploadCalls++;
+      cliPresentDuringUpload = fs.existsSync(cliLogPath);
+      archivedLogs = gunzipSync(await new Response(init?.body).arrayBuffer()).toString();
+      return new Response(null, { status: 204 });
+    });
+    const uploader = createLogUploader({
+      archiveId: 'wr_test--setup-failure',
+      context: {
+        workerBaseUrl: 'https://worker.example.com',
+        kiloSessionId: request.kiloSessionId,
+        workerAuthToken: request.session.workerAuthToken,
+      },
+      sessionId: request.agentSessionId,
+      userId: request.userId,
+      cliLogDir,
+      wrapperLogPath,
+    });
+    uploaders.push(uploader);
     const deps: WrapperBootstrapDeps = {
+      beforeFailureCleanup: () => uploader.finalize(),
       git: async args => {
         if (args[0] === 'clone') {
           await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
@@ -1754,6 +1784,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       runProcess: async () => ({
         stdout: 'private-file-content',
         stderr: [
+          '\u001b[31mDependency resolution failed\u001b[0m',
           'bare-unlabeled-token',
           'https://user:url-secret@example.com/repo.git',
           'Authorization: Bearer bearer-secret',
@@ -1800,6 +1831,18 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(detail).toContain('SECRET_VALUE=[REDACTED]');
     expect(detail).toContain('private-file-content');
     expect(detail).toContain('bare-unlabeled-token');
+    await uploader.finalize();
+    await uploader.uploadNow();
+    expect(uploadCalls).toBe(1);
+    expect(cliPresentDuringUpload).toBe(true);
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+    expect(archivedLogs).toContain('earlier CLI evidence');
+    expect(archivedLogs).toContain('subtype=setup_command_failed');
+    expect(archivedLogs).toContain(`error=${setupError.message}`);
+    expect(archivedLogs).toContain(`detail=${detail}`);
+    expect(archivedLogs).toContain('Dependency resolution failed');
+    expect(archivedLogs).not.toContain('\u001b');
     const projectedError = JSON.stringify(setupError);
     for (const sensitiveValue of [
       'argv-secret',
@@ -1807,8 +1850,11 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       'bearer-secret',
       'cookie-secret',
       'env-secret',
+      request.session.workerAuthToken,
+      request.materialized.env.KILOCODE_TOKEN,
     ]) {
       expect(projectedError).not.toContain(sensitiveValue);
+      expect(archivedLogs).not.toContain(sensitiveValue);
     }
   });
 

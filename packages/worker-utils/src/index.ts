@@ -53,6 +53,17 @@ export type {
 export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-next-client.js';
 
 export {
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+  GASTOWN_AUDIENCE,
+  WASTELAND_AUDIENCE,
+  KILO_CHAT_AUDIENCE,
+  EVENT_SERVICE_AUDIENCE,
+  NOTIFICATIONS_AUDIENCE,
+  CLOUD_AGENT_NEXT_AUDIENCE,
+  KILOCLAW_AUDIENCE,
+  SESSION_INGEST_AUDIENCE,
+  AI_ATTRIBUTION_AUDIENCE,
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
@@ -126,6 +137,23 @@ export {
   KILO_TOKEN_VERSION,
 } from './kilo-token.js';
 export type { KiloTokenPayload, SignKiloTokenExtra } from './kilo-token.js';
+export {
+  KILO_TOKEN_PURPOSES,
+  LEGACY_API_TOKEN_LIFETIMES_SECONDS,
+  buildModernKiloTokenPayload,
+  canIssueKiloCredentials,
+  isKiloResourceAudienceAllowed,
+  verifyKiloSessionForPolicy,
+  verifyKiloTokenForPolicy,
+} from './kilo-token-policy.js';
+export type {
+  KiloCredentialIssuancePolicy,
+  KiloResourceAudiencePolicy,
+  KiloTokenPolicyClaims,
+  ModernKiloTokenClaims,
+  ModernKiloTokenPurpose,
+  VerifiedKiloAuthContext,
+} from './kilo-token-policy.js';
 
 export { SessionMetricsParamsSchema, TerminationReasons } from './session-metrics-schema.js';
 export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-metrics-schema.js';

@@ -67,9 +67,7 @@ import {
   shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
 import {
-  collectEmptyChildSessionIds,
   countInFlightMessages,
-  hydrateEmptyChildSessions,
   resolveRetryPrompt,
   retryMessageAndClear,
 } from '@/components/agents/session-detail-content-helpers';
@@ -188,7 +186,6 @@ export function SessionDetailContent({
   });
   const childSheetReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerControlRef = useRef<ChatComposerControl | null>(null);
-  const childHydrateAttemptedRef = useRef<Set<string>>(new Set());
 
   const clearChildSheetReleaseTimeout = useCallback(() => {
     if (childSheetReleaseTimeoutRef.current !== null) {
@@ -475,42 +472,6 @@ export function SessionDetailContent({
   }, [sessionId, manager]);
 
   const store = useStore();
-
-  useEffect(() => {
-    childHydrateAttemptedRef.current = new Set();
-  }, [sessionId]);
-
-  // Hydrate child transcripts for task cards that have no messages yet, so a
-  // reopened parent shows each completed child's model on the card without
-  // opening the child sheet. An attempted id is never hydrated again for the
-  // same parent session; a hydrate error retries once.
-  useEffect(() => {
-    if (isLoading) {
-      return;
-    }
-    if (fetchedData?.kiloSessionId !== sessionId) {
-      return;
-    }
-    const liveGetChildMessages = store.get(manager.atoms.childMessages);
-    const readHydrationStatus = (id: KiloSessionId) =>
-      store.get(manager.atoms.childSessionHydrationState)(id).status;
-    const emptyIds = collectEmptyChildSessionIds(messages, liveGetChildMessages).filter(
-      id => !childHydrateAttemptedRef.current.has(id)
-    );
-    if (emptyIds.length === 0) {
-      return;
-    }
-    for (const id of emptyIds) {
-      childHydrateAttemptedRef.current.add(id);
-    }
-    void hydrateEmptyChildSessions(
-      emptyIds,
-      async id => {
-        await manager.hydrateChildSession(id);
-      },
-      readHydrationStatus
-    );
-  }, [isLoading, fetchedData?.kiloSessionId, sessionId, messages, manager, store]);
 
   // Refetch the linked PR on every focus so a link, unlink, or mid-session
   // decision change surfaces without reopening the session. A pending review
@@ -1432,6 +1393,7 @@ export function SessionDetailContent({
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={rename.title}
+          backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={headerRight}
           {...(rename.isTitleInteractive
             ? {

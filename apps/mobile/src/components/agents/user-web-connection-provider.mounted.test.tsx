@@ -99,9 +99,8 @@ function Consumer() {
 }
 
 function confirmationFeedback(renderer: TestRenderer.ReactTestRenderer) {
-  return renderer.root.findByType('ConnectionConsumer').props as ReturnType<
-    typeof useIdentityConfirmation
-  >;
+  return renderer.root.findByType('ConnectionConsumer' as TestRenderer.ReactTestInstance['type'])
+    .props as ReturnType<typeof useIdentityConfirmation>;
 }
 
 function connectionTree() {

@@ -224,7 +224,9 @@ describe('ChildSessionSheet sheet surface', () => {
   });
 
   it('closes the loading child once when Done is pressed', async () => {
-    const props = buildProps({ getChildMessages: () => [], hydrationState: { status: 'loading' } });
+    const props = {
+      ...buildProps({ getChildMessages: () => [], hydrationState: { status: 'loading' } }),
+    };
     let closeCount = 0;
     props.onClose = () => {
       closeCount += 1;

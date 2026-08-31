@@ -7,6 +7,7 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import {
   type ChildSessionHydrationState,
   createSessionManager,
+  createUserWebConnection,
   type KiloSessionId,
   type SessionManager,
   type SessionManagerConfig,
@@ -196,10 +197,10 @@ export async function createRecoverySource(
 ) {
   const store = createStore();
   const rootId = 'root' as KiloSessionId;
-  const userWebConnection = {
-    subscribeToCliSession: vi.fn().mockReturnValue(vi.fn()),
-    onSystemEvent: vi.fn().mockReturnValue(vi.fn()),
-  };
+  const userWebConnection = createUserWebConnection({ websocketUrl: '', getAuthToken: () => '' });
+  // The read-only root uses only the upgrade watcher's subscription methods.
+  vi.spyOn(userWebConnection, 'subscribeToCliSession').mockReturnValue(vi.fn<() => void>());
+  vi.spyOn(userWebConnection, 'onSystemEvent').mockReturnValue(vi.fn<() => void>());
   const api = {};
   const manager = createSessionManager({
     store,
@@ -233,8 +234,7 @@ export async function createRecoverySource(
     getTicket: vi.fn<SessionManagerConfig['getTicket']>(),
     prepare: vi.fn<SessionManagerConfig['prepare']>(),
     initiate: vi.fn<SessionManagerConfig['initiate']>(),
-    // The read-only root uses only the upgrade watcher's subscription methods.
-    userWebConnection: userWebConnection as SessionManagerConfig['userWebConnection'],
+    userWebConnection,
     api: api as SessionManagerConfig['api'],
   });
   managers.push(manager);

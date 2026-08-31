@@ -607,7 +607,7 @@ describe('child transcript requests', () => {
 
       expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(24);
       expect(renderedText(card)).toBe(text);
-      expect(card.findAll(node => node.type === 'Text')).toHaveLength(textRows);
+      expect(card.findAll(node => (node.type as string) === 'Text')).toHaveLength(textRows);
       expect(button).toMatchObject({
         disabled: false,
         accessibilityState: { disabled: false },
@@ -658,7 +658,7 @@ describe('child transcript requests', () => {
       expect(selectedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
       const nestedCard = cardFor(view.renderer, nestedId);
       expect(renderedText(nestedCard)).toBe(`Researcher\nTask ${nestedId}\n${status}`);
-      expect(nestedCard.findAll(node => node.type === 'Text')).toHaveLength(3);
+      expect(nestedCard.findAll(node => (node.type as string) === 'Text')).toHaveLength(3);
       const nestedButton = nestedCard.findByProps({ accessibilityRole: 'button' })
         .props as ComponentProps<typeof Pressable>;
       expect(nestedButton).toMatchObject({

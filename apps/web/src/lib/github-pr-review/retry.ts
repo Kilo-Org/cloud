@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { TRPCError } from '@trpc/server';
 import type { Octokit } from '@octokit/rest';
 
@@ -18,6 +19,23 @@ export type CurrentCredential = Pick<
   GitHubUserAccessTokenConnected,
   'authorizationId' | 'credentialVersion'
 >;
+
+type GitHubReviewIdentity = Readonly<{
+  accountId: string;
+  authorizationId: string;
+  actorId: string;
+}>;
+const reviewIdentity = new AsyncLocalStorage<GitHubReviewIdentity>();
+
+// Only the neutral bridge opts in. Legacy callers keep their existing token retry behavior.
+export function withGitHubReviewIdentity<T>(identity: GitHubReviewIdentity, call: () => T): T {
+  const { accountId, authorizationId, actorId } = identity;
+  return reviewIdentity.run({ accountId, authorizationId, actorId }, call);
+}
+
+export function hasGitHubReviewIdentity(accountId: string): boolean {
+  return reviewIdentity.getStore()?.accountId === accountId;
+}
 
 function throwTrpcFromClassification(classified: ClassifiedGitHubError): never {
   throw new TRPCError({
@@ -60,6 +78,19 @@ export async function withGitHubUserTokenRetry<T>(args: {
   kiloUserId: string;
   call: (octokit: Octokit) => Promise<T>;
 }): Promise<T> {
+  const expected = reviewIdentity.getStore();
+  const conflict = () =>
+    new TRPCError({ code: 'CONFLICT', message: 'review_identity_or_revision_changed' });
+  if (expected && expected.accountId !== args.kiloUserId) throw conflict();
+  const invoke = async (credential: CurrentCredential, octokit: Octokit) => {
+    if (expected) {
+      if (credential.authorizationId !== expected.authorizationId) throw conflict();
+      const { data: actor } = await octokit.users.getAuthenticated();
+      if (!Number.isSafeInteger(actor.id) || actor.id <= 0 || String(actor.id) !== expected.actorId)
+        throw conflict();
+    }
+    return args.call(octokit);
+  };
   const first = await getGitHubUserAccessToken(args.kiloUserId, { op: 'fetch' });
   if (first.status !== 'connected') {
     throwTrpcFromClassification({
@@ -69,7 +100,7 @@ export async function withGitHubUserTokenRetry<T>(args: {
   }
   const firstOctokit = createGitHubPrReviewOctokit(first.credential.token);
   try {
-    return await args.call(firstOctokit);
+    return await invoke(first.credential, firstOctokit);
   } catch (error) {
     // A TRPCError is an already-classified failure (e.g. a GraphQL errors[]
     // entry, or a deliberate BAD_REQUEST) — surface it unchanged.
@@ -91,7 +122,7 @@ export async function withGitHubUserTokenRetry<T>(args: {
     }
     const secondOctokit = createGitHubPrReviewOctokit(rotate.credential.token);
     try {
-      return await args.call(secondOctokit);
+      return await invoke(rotate.credential, secondOctokit);
     } catch (secondError) {
       if (secondError instanceof TRPCError) throw secondError;
       if (isHttp401(secondError)) {

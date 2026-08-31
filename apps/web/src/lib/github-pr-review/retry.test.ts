@@ -4,16 +4,17 @@
 import { TRPCError } from '@trpc/server';
 
 const getGitHubUserAccessToken = jest.fn();
+const createGitHubPrReviewOctokit = jest.fn((token: string) => ({ __token: token }));
 
 jest.mock('@/lib/integrations/platforms/github/user-token-client', () => ({
   getGitHubUserAccessToken: (...args: unknown[]) => getGitHubUserAccessToken(...args),
 }));
 
 jest.mock('./client', () => ({
-  createGitHubPrReviewOctokit: (token: string) => ({ __token: token }),
+  createGitHubPrReviewOctokit: (token: string) => createGitHubPrReviewOctokit(token),
 }));
 
-import { withGitHubUserTokenRetry } from './retry';
+import { withGitHubReviewIdentity, withGitHubUserTokenRetry } from './retry';
 
 function connected(token: string, authorizationId: string, credentialVersion: number) {
   return {
@@ -34,6 +35,7 @@ function http401() {
 
 beforeEach(() => {
   getGitHubUserAccessToken.mockReset();
+  createGitHubPrReviewOctokit.mockReset().mockImplementation(token => ({ __token: token }));
 });
 
 describe('withGitHubUserTokenRetry', () => {
@@ -116,4 +118,139 @@ describe('withGitHubUserTokenRetry', () => {
     });
     expect(call).not.toHaveBeenCalled();
   });
+});
+
+describe('scoped GitHub review identity', () => {
+  const identity = { accountId: 'u1', authorizationId: 'auth_1', actorId: '101' };
+
+  it('rejects another account before its protected call', async () => {
+    getGitHubUserAccessToken.mockResolvedValue(connected('t1', 'auth_1', 1));
+    const effects: string[] = [];
+    await expect(
+      withGitHubReviewIdentity(identity, () =>
+        withGitHubUserTokenRetry({
+          kiloUserId: 'u2',
+          call: async () => {
+            effects.push('wrong-account');
+            return 'sent';
+          },
+        })
+      )
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'review_identity_or_revision_changed' });
+    expect(effects).toEqual([]);
+  });
+
+  it('isolates overlapping scopes across awaits and leaves concurrent direct calls unscoped', async () => {
+    getGitHubUserAccessToken.mockImplementation(async userId =>
+      connected(userId, `auth_${userId}`, 1)
+    );
+    createGitHubPrReviewOctokit.mockImplementation(token => ({
+      __token: token,
+      users: {
+        getAuthenticated: async () => {
+          if (token === 'u3') throw new Error('Direct calls must not query actor identity');
+          return { data: { id: token === 'u1' ? 101 : 102 } };
+        },
+      },
+    }));
+    const effects: string[] = [];
+    const call = async (client: unknown) => {
+      const token = (client as { __token: string }).__token;
+      effects.push(token);
+      return token;
+    };
+    const firstGate = Promise.withResolvers<void>();
+    const secondGate = Promise.withResolvers<void>();
+    const start = (userId: string, actorId: string, gate: Promise<void>) =>
+      withGitHubReviewIdentity(
+        { accountId: userId, authorizationId: `auth_${userId}`, actorId },
+        async () => {
+          await gate;
+          const result = await withGitHubUserTokenRetry({ kiloUserId: userId, call });
+          await expect(
+            withGitHubUserTokenRetry({ kiloUserId: userId === 'u1' ? 'u2' : 'u1', call })
+          ).rejects.toMatchObject({ code: 'CONFLICT' });
+          return result;
+        }
+      );
+    const first = start('u1', '101', firstGate.promise);
+    const second = start('u2', '102', secondGate.promise);
+    expect(await withGitHubUserTokenRetry({ kiloUserId: 'u3', call })).toBe('u3');
+    firstGate.resolve();
+    expect(await first).toBe('u1');
+    secondGate.resolve();
+    expect(await second).toBe('u2');
+    expect(await withGitHubUserTokenRetry({ kiloUserId: 'u3', call })).toBe('u3');
+    expect(effects).toEqual(['u3', 'u1', 'u2', 'u3']);
+  });
+
+  it('retains unscoped rotation to a replacement authorization after a scoped rejection', async () => {
+    getGitHubUserAccessToken.mockResolvedValue(connected('t2', 'auth_2', 2));
+    const effects: string[] = [];
+    await expect(
+      withGitHubReviewIdentity(identity, () =>
+        withGitHubUserTokenRetry({
+          kiloUserId: 'u1',
+          call: async () => {
+            effects.push('scoped');
+            return 'sent';
+          },
+        })
+      )
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    getGitHubUserAccessToken
+      .mockResolvedValueOnce(connected('t1', 'auth_1', 1))
+      .mockResolvedValueOnce(connected('t2', 'auth_2', 2));
+    expect(
+      await withGitHubUserTokenRetry({
+        kiloUserId: 'u1',
+        call: async client => {
+          const token = (client as typeof client & { __token: string }).__token;
+          if (token === 't1') throw http401();
+          effects.push(token);
+          return 'completed';
+        },
+      })
+    ).toBe('completed');
+    expect(effects).toEqual(['t2']);
+  });
+
+  it.each([false, true])(
+    'handles identity lookup 401 through normal rotation: rejected=%s',
+    async rejected => {
+      getGitHubUserAccessToken
+        .mockResolvedValueOnce(connected('t1', 'auth_1', 1))
+        .mockResolvedValueOnce(connected('t2', 'auth_1', 2))
+        .mockResolvedValueOnce({ status: 'disconnected', reason: 'revoked' });
+      createGitHubPrReviewOctokit.mockImplementation(token => ({
+        __token: token,
+        users: {
+          getAuthenticated: async () => {
+            if (token === 't1' || rejected) throw http401();
+            return { data: { id: 101 } };
+          },
+        },
+      }));
+      const effects: string[] = [];
+      const result = withGitHubReviewIdentity(identity, () =>
+        withGitHubUserTokenRetry({
+          kiloUserId: 'u1',
+          call: async () => {
+            effects.push('confirmed-actor');
+            return 'completed';
+          },
+        })
+      );
+      if (rejected) {
+        await expect(result).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+          message: 'GitHub connection is no longer valid — reconnect',
+        });
+        expect(effects).toEqual([]);
+      } else {
+        expect(await result).toBe('completed');
+        expect(effects).toEqual(['confirmed-actor']);
+      }
+    }
+  );
 });

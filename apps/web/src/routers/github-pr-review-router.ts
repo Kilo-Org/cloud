@@ -37,7 +37,11 @@ import {
   INBOX_PAGE_SIZE,
   REVIEW_THREADS_PAGE_SIZE,
 } from '@/lib/github-pr-review/dtos';
-import { throwTrpcFromGraphQlErrors, withGitHubUserTokenRetry } from '@/lib/github-pr-review/retry';
+import {
+  hasGitHubReviewIdentity,
+  throwTrpcFromGraphQlErrors,
+  withGitHubUserTokenRetry,
+} from '@/lib/github-pr-review/retry';
 import { getGitHubUserAccessToken } from '@/lib/integrations/platforms/github/user-token-client';
 import {
   AutoMergeMethodSchema,
@@ -1275,6 +1279,9 @@ async function reconcileMergePrRow<T>(args: {
     | { kind: 'stale_head' }
     | { kind: 'unresolved' };
 
+  // The neutral bridge requires read-only recovery even when admission races its preflight.
+  // Unscoped legacy callers retain their original reconciliation behavior.
+  const readOnly = hasGitHubReviewIdentity(args.userId);
   let reconcile: MergeReconcileState = { kind: 'unresolved' };
   try {
     reconcile = await withGitHubUserTokenRetry({
@@ -1286,6 +1293,12 @@ async function reconcileMergePrRow<T>(args: {
           pull_number: args.number,
         });
         const pr = prResp.data;
+        if (
+          readOnly &&
+          !(pr.state === 'closed' && pr.merged === true && pr.head?.sha === args.expectedHeadSha)
+        ) {
+          return { kind: 'unresolved' } satisfies MergeReconcileState;
+        }
         if (pr.state === 'closed' && pr.merged === true) {
           return {
             kind: 'merged',
@@ -1469,6 +1482,38 @@ async function fetchOverviewGraphQl(
   }
 }
 
+// Keep native identities available to the neutral bridge without changing the legacy DTO.
+export async function fetchGitHubReviewChecks(
+  kiloUserId: string,
+  input: z.infer<typeof ListChecksInput>
+) {
+  return withGitHubUserTokenRetry({
+    kiloUserId,
+    call: async octokit => {
+      const checkRunsPromise = octokit.paginate(octokit.checks.listForRef, {
+        owner: input.owner,
+        repo: input.repo,
+        ref: input.ref,
+        per_page: 100,
+      });
+      const statusesPromise = octokit.paginate(octokit.repos.listCommitStatusesForRef, {
+        owner: input.owner,
+        repo: input.repo,
+        ref: input.ref,
+        per_page: 100,
+      });
+      // Wait for both requests before throwing the first error; neither rejection escapes.
+      const [checkRunsResult, statusesResult] = await Promise.allSettled([
+        checkRunsPromise,
+        statusesPromise,
+      ]);
+      if (checkRunsResult.status === 'rejected') throw checkRunsResult.reason;
+      if (statusesResult.status === 'rejected') throw statusesResult.reason;
+      return { checkRuns: checkRunsResult.value, commitStatuses: statusesResult.value };
+    },
+  });
+}
+
 export const githubPrReviewRouter = createTRPCRouter({
   getPullRequest: baseProcedure.input(GetPullRequestInput).query(async ({ ctx, input }) => {
     const overview = await withGitHubUserTokenRetry({
@@ -1518,41 +1563,7 @@ export const githubPrReviewRouter = createTRPCRouter({
   }),
 
   listChecks: baseProcedure.input(ListChecksInput).query(async ({ ctx, input }) => {
-    return withGitHubUserTokenRetry({
-      kiloUserId: ctx.user.id,
-      call: async octokit => {
-        // Start both paginate calls before awaiting so the checks retrieval
-        // runs in parallel.
-        const checkRunsPromise = octokit.paginate(octokit.checks.listForRef, {
-          owner: input.owner,
-          repo: input.repo,
-          ref: input.ref,
-          per_page: 100,
-        });
-        const statusesPromise = octokit.paginate(octokit.repos.listCommitStatusesForRef, {
-          owner: input.owner,
-          repo: input.repo,
-          ref: input.ref,
-          per_page: 100,
-        });
-
-        const [checkRunsResult, statusesResult] = await Promise.allSettled([
-          checkRunsPromise,
-          statusesPromise,
-        ]);
-
-        // Rethrow the first rejection in order (check runs, then commit
-        // statuses). Promise.allSettled — not Promise.all — is used so a second
-        // rejection after the first never becomes an unhandled rejection.
-        if (checkRunsResult.status === 'rejected') throw checkRunsResult.reason;
-        if (statusesResult.status === 'rejected') throw statusesResult.reason;
-
-        return buildChecksResult({
-          checkRuns: checkRunsResult.value as never,
-          commitStatuses: statusesResult.value as never,
-        });
-      },
-    });
+    return buildChecksResult(await fetchGitHubReviewChecks(ctx.user.id, input));
   }),
 
   listFiles: baseProcedure.input(ListFilesInput).query(async ({ ctx, input }) => {

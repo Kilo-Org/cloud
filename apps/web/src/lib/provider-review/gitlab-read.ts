@@ -394,8 +394,12 @@ export async function listGitLabDiffVersions(
     },
     cursor
   );
+  // Gitbeaker's array helper honors pagination even though this method's type omits it.
   const response = await loaded.client.execute(api =>
-    api.MergeRequests.allDiffVersions(identity.repository.repositoryId, loaded.iid, page.options)
+    api.MergeRequests.allDiffVersions(identity.repository.repositoryId, loaded.iid, {
+      ...page.options,
+      showExpanded: false,
+    })
   );
   return page.finish(
     parseGitLab(z.array(versionSchema).max(pageSize), response.data).map(value => ({
@@ -700,9 +704,13 @@ async function checksFor(
       api.MergeRequests.allPipelines(loaded.repository.repositoryId, loaded.iid, allPages)
     )
   );
+  // This method also uses Gitbeaker's paginated array helper despite its narrower option type.
   const statuses = await optional(() =>
     loaded.client.execute(api =>
-      api.Commits.allStatuses(loaded.repository.repositoryId, loaded.revision.headSha, allPages)
+      api.Commits.allStatuses(loaded.repository.repositoryId, loaded.revision.headSha, {
+        ...allPages,
+        showExpanded: false,
+      })
     )
   );
   if (pipelines === null || statuses === null)

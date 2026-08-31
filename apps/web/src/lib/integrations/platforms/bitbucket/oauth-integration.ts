@@ -313,7 +313,6 @@ export async function listBitbucketRepositoryBranches(input: {
       operation: 'branches',
       params: {
         path: { workspace: workspaceSlug, repo_slug: repositorySlug },
-        query: { pagelen: 50 },
       },
       ...(input.cursor ? { next: input.cursor } : {}),
     });

@@ -261,6 +261,7 @@ test('renders TSX without a React import', () => {
   const config = JSON.stringify({
     ...jestConfig,
     rootDir: directory,
+    roots: [directory],
     globalSetup: undefined,
     setupFilesAfterEnv: [],
   });

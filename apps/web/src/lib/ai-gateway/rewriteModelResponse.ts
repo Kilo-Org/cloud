@@ -53,7 +53,7 @@ export type RewriteResponseParams = {
   removeCost: boolean;
   capture: RequestLogCapture | null;
   vercelRequestId: string | null;
-  reasoningEffort?: string | null;
+  reasoningEffort: string | null;
 };
 
 export type RewriteChatCompletionsResponseParams = RewriteResponseParams & {
@@ -253,7 +253,7 @@ function logTerminalStreamEvent(
 function getResponseReadError(
   error: unknown,
   vercelRequestId: string | null | undefined,
-  reasoningEffort: string | null | undefined
+  reasoningEffort: string | null
 ): ResponseReadError | null {
   if (typeof error !== 'object' || error === null || !('name' in error)) {
     return null;
@@ -289,7 +289,7 @@ async function readResponseText(
   headers: Headers,
   vercelRequestId: string | null | undefined,
   capture: RequestLogCapture | null,
-  reasoningEffort: string | null | undefined
+  reasoningEffort: string | null
 ): Promise<{ text: string } | { error: unknown; errorResponse: NextResponse }> {
   try {
     return { text: await response.text() };
@@ -331,7 +331,7 @@ async function rewriteSseStream(
   vercelRequestId: string | null | undefined,
   capture: RequestLogCapture | null,
   capturedChunks: string[] | null,
-  reasoningEffort: string | null | undefined
+  reasoningEffort: string | null
 ) {
   const decoder = new TextDecoder();
   const settleReadError = (error: unknown) =>

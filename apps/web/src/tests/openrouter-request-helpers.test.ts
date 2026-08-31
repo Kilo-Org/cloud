@@ -78,21 +78,12 @@ describe('getReasoningEffortTimeoutSuggestion', () => {
     );
   });
 
-  test.each([
-    'high',
-    'medium',
-    'low',
-    'minimal',
-    'none',
-    'XHIGH',
-    'MAX',
-    'max ',
-    '',
-    null,
-    undefined,
-  ])('does not suggest lowering %s effort', effort => {
-    expect(getReasoningEffortTimeoutSuggestion(effort)).toBe('');
-  });
+  test.each(['high', 'medium', 'low', 'minimal', 'none', 'XHIGH', 'MAX', 'max ', '', null])(
+    'does not suggest lowering %s effort',
+    effort => {
+      expect(getReasoningEffortTimeoutSuggestion(effort)).toBe('');
+    }
+  );
 });
 
 describe('removeChatCompletionsToolNames', () => {

@@ -174,7 +174,7 @@ function clientDisconnectResponse(vercelRequestId: string | null | undefined) {
 function upstreamFetchFailureResponse(
   failureFamily: UpstreamFetchFailureFamily,
   vercelRequestId: string | null | undefined,
-  reasoningEffort: string | null | undefined
+  reasoningEffort: string | null
 ) {
   const error = withRequestId(
     failureFamily === 'request_timeout' ||
@@ -216,7 +216,7 @@ export async function upstreamRequest({
   signal?: AbortSignal;
   /** Incoming `x-vercel-id`, used to correlate failures with the platform logs. */
   vercelRequestId?: string | null;
-  reasoningEffort?: string | null;
+  reasoningEffort: string | null;
 }): Promise<{ type: 'success'; response: Response } | { type: 'error'; response: NextResponse }> {
   const headers = new Headers();
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {

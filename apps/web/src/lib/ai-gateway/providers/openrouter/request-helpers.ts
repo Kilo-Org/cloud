@@ -29,7 +29,7 @@ export function getReasoningEffort(request: GatewayRequest) {
   return request.body.reasoning?.effort ?? request.body.reasoning_effort ?? null;
 }
 
-export function getReasoningEffortTimeoutSuggestion(effort: string | null | undefined): string {
+export function getReasoningEffortTimeoutSuggestion(effort: string | null): string {
   return effort === 'xhigh' || effort === 'max'
     ? ` Try lowering the reasoning effort from "${effort}" to "high" or lower to reduce the chance of timeouts.`
     : '';

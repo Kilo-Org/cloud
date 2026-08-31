@@ -54,6 +54,7 @@ describe('upstreamRequest timeout', () => {
 
       const result = await upstreamRequest({
         chatApi,
+        reasoningEffort: null,
         search: '?beta=true',
         method: 'POST',
         body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
@@ -76,6 +77,7 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
@@ -123,7 +125,7 @@ describe('upstreamRequest timeout', () => {
     }
   );
 
-  it.each(['high', 'medium', 'low', 'minimal', 'none', null, undefined])(
+  it.each(['high', 'medium', 'low', 'minimal', 'none', null])(
     'reports a gateway timeout without advice for %s effort',
     async reasoningEffort => {
       const timeoutError = new DOMException(
@@ -240,6 +242,7 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -268,6 +271,7 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -303,6 +307,7 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -334,6 +339,7 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -370,6 +376,7 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -401,6 +408,7 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '?trace=search-secret',
       method: 'POST',
       body: {
@@ -450,6 +458,7 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '',
       method: 'POST',
       body: {
@@ -487,6 +496,7 @@ describe('upstreamRequest timeout', () => {
 
     const result = await upstreamRequest({
       chatApi: 'chat_completions',
+      reasoningEffort: null,
       search: '?trace=search-secret',
       method: 'POST',
       body: {

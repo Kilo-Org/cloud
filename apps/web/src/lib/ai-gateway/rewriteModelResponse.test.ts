@@ -142,6 +142,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
 
     expect(result.status).toBe(503);
@@ -152,7 +153,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     });
   });
 
-  test.each(['high', 'medium', 'low', 'none', null, undefined])(
+  test.each(['high', 'medium', 'low', 'none', null])(
     'omits effort advice for effort %s',
     async reasoningEffort => {
       const result = await rewrite({
@@ -177,6 +178,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       removeCost: true,
       capture: null,
       vercelRequestId: 'iad1::iad1::request-id',
+      reasoningEffort: null,
     });
 
     expect(result.status).toBe(503);
@@ -195,6 +197,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       removeCost: true,
       capture: null,
       vercelRequestId: 'iad1::iad1::request-id',
+      reasoningEffort: null,
     });
     const events = dataObjects(await readOutputStream(result)) as {
       error: { message: string };
@@ -213,6 +216,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const events = dataObjects(await readOutputStream(result)) as {
       error: { message: string };
@@ -330,6 +334,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const json = await result.json();
@@ -359,6 +364,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const json = await result.json();
@@ -378,6 +384,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
 
@@ -403,6 +410,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: ReasoningDetailsTransform.ReasoningContent,
       });
       const json = await result.json();
@@ -438,6 +446,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: ReasoningDetailsTransform.ReasoningContent,
       });
       const json = await result.json();
@@ -465,6 +474,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const json = await result.json();
@@ -500,6 +510,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
           removeCost: true,
           capture: null,
           vercelRequestId: null,
+          reasoningEffort: null,
           responseTransforms: null,
         });
         const reader = result.body?.getReader();
@@ -531,6 +542,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -553,6 +565,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -578,6 +591,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: ReasoningDetailsTransform.GeminiThought,
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
@@ -627,6 +641,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: ReasoningDetailsTransform.GeminiThought,
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
@@ -657,6 +672,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: ReasoningDetailsTransform.ReasoningContent,
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
@@ -688,6 +704,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -709,6 +726,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture,
         vercelRequestId: 'iad1::terminal-request',
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -739,6 +757,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -769,6 +788,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -787,6 +807,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
 
@@ -809,6 +830,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
 
@@ -851,6 +873,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const json = await result.json();
 
@@ -872,6 +895,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
 
     expect(result.status).toBe(500);
@@ -890,6 +914,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
     const events = dataObjects(sse) as Array<{
@@ -924,6 +949,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
 
@@ -942,6 +968,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
 
@@ -973,6 +1000,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
 
@@ -998,6 +1026,7 @@ describe('rewriteModelResponse_Responses', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
 
@@ -1040,6 +1069,7 @@ describe('rewriteModelResponse_Responses', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const json = await result.json();
 
@@ -1061,6 +1091,7 @@ describe('rewriteModelResponse_Responses', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
     const [event] = dataObjects(sse) as Array<{
@@ -1097,6 +1128,7 @@ describe('rewriteModelResponse_Responses', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
       const sse = await readOutputStream(result);
 
@@ -1155,6 +1187,7 @@ describe.each([
         removeCost: true,
         capture,
         vercelRequestId: 'iad1::error-request',
+        reasoningEffort: null,
       });
       const sse = await readOutputStream(result);
 
@@ -1420,6 +1453,7 @@ describe('request log capture', () => {
       removeCost: true,
       capture,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
 
     expect(result.status).toBe(200);
@@ -1438,6 +1472,7 @@ describe('request log capture', () => {
       removeCost: true,
       capture,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     await readOutputStream(result);
 
@@ -1456,6 +1491,7 @@ describe('request log capture', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
       await readOutputStream(result);
 
@@ -1475,6 +1511,7 @@ describe('request log capture', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
       await readOutputStream(result);
 
@@ -1494,6 +1531,7 @@ describe('request log capture', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
       await readOutputStream(result);
 
@@ -1513,6 +1551,7 @@ describe('request log capture', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
 
       expect(result.status).toBe(503);
@@ -1532,6 +1571,7 @@ describe('request log capture', () => {
       removeCost: true,
       capture,
       vercelRequestId: null,
+      reasoningEffort: null,
       responseTransforms: null,
     });
     const reader = result.body?.getReader();
@@ -1553,6 +1593,7 @@ describe('request log capture', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
       const reader = result.body?.getReader();
       await reader?.read();

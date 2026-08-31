@@ -350,7 +350,10 @@ describe('shouldRouteToVercel', () => {
 
   it('allows Vercel routing with an unrecognized sort preference', async () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
-    const provider = { sort: 'future-sort', only: ['anthropic'] };
+    const provider = {
+      sort: 'future-sort',
+      only: ['anthropic'],
+    } as OpenRouterProviderConfig;
 
     await expect(
       shouldRouteToVercel(
@@ -412,7 +415,7 @@ describe('applyVercelSettings BYOK pinning', () => {
     { sort: 'future-sort', expected: undefined },
   ])('converts sort $sort without changing BYOK pinning', async ({ sort, expected }) => {
     const request = byokRequest([]);
-    request.body.provider = { sort };
+    request.body.provider = { sort: sort as OpenRouterProviderConfig['sort'] };
 
     await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
       { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },

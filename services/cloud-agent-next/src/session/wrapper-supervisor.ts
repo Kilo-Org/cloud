@@ -74,6 +74,54 @@ const SHARED_SANDBOX_FAILOVER_RETRY_DELAYS_MS = [2_000, 4_000, 8_000] as const;
 const DISCONNECT_GRACE_KEY = 'disconnect_grace';
 const MODEL_NOT_FOUND_SAFE_ERROR_MESSAGE = 'Assistant request failed: model not found';
 
+const kiloEventEnvelopeSchema = z
+  .object({ event: z.string(), properties: z.unknown().optional() })
+  .passthrough();
+const inputSessionIdSchema = z.string().min(1);
+const wrapperInputEventSchema = z.discriminatedUnion('event', [
+  z.object({
+    event: z.enum(['question.asked', 'permission.asked']),
+    properties: z.object({
+      id: z.string().min(1),
+      sessionID: inputSessionIdSchema,
+      tool: z.object({ messageID: z.string().min(1), callID: z.string().min(1) }).optional(),
+    }),
+  }),
+  z.object({
+    event: z.enum(['question.replied', 'question.rejected', 'permission.replied']),
+    properties: z.object({ requestID: z.string().min(1), sessionID: inputSessionIdSchema }),
+  }),
+  z.object({
+    event: z.literal('session.created'),
+    properties: z.object({
+      info: z.object({ id: inputSessionIdSchema, parentID: inputSessionIdSchema }),
+    }),
+  }),
+  z.object({
+    event: z.literal('message.part.updated'),
+    properties: z.object({
+      part: z.object({
+        sessionID: inputSessionIdSchema,
+        messageID: z.string(),
+        callID: z.string(),
+        type: z.literal('tool'),
+        state: z.object({ status: z.enum(['completed', 'error']) }),
+      }),
+    }),
+  }),
+  z.object({
+    event: z.enum(['session.idle', 'session.error', 'session.turn.close']),
+    properties: z.object({ sessionID: inputSessionIdSchema }),
+  }),
+  z.object({
+    event: z.literal('session.status'),
+    properties: z.object({
+      sessionID: inputSessionIdSchema,
+      status: z.object({ type: z.literal('idle') }),
+    }),
+  }),
+]);
+
 const disconnectGraceStateSchema = z.object({
   wrapperRunId: z.string(),
   disconnectedAt: z.number(),
@@ -140,11 +188,13 @@ export type WrapperSupervisor = {
   checkReconnect(input: WrapperReconnectInput): Promise<WrapperReconnectDecision>;
   recordReconnectAccepted(fence: WrapperConnectionFence, now?: number): Promise<void>;
   isCurrentConnection(wrapperGeneration: number, wrapperConnectionId: string): Promise<boolean>;
+  isWaitingForInput(state: WrapperRuntimeState): Promise<boolean>;
   observePong(wrapperGeneration: number, wrapperConnectionId: string, now: number): Promise<void>;
   observeMeaningfulOutput(
     wrapperGeneration: number,
     wrapperConnectionId: string,
-    now: number
+    now: number,
+    kiloEvent?: { wrapperRunId: string; data: unknown }
   ): Promise<void>;
   observeFinalizing(wrapperRunId: string): Promise<void>;
   onDisconnected(input: WrapperDisconnectedInput): Promise<void>;
@@ -575,15 +625,140 @@ export function createWrapperSupervisor(
   async function observeMeaningfulOutput(
     wrapperGeneration: number,
     wrapperConnectionId: string,
-    now: number
+    now: number,
+    kiloEvent?: { wrapperRunId: string; data: unknown }
   ): Promise<void> {
+    let inputState: Pick<WrapperRuntimeState, 'inputRequests' | 'inputSessionOwners'> | undefined;
+    if (kiloEvent) {
+      const state = await getWrapperRuntimeState(storage);
+      if (
+        state.wrapperRunId !== kiloEvent.wrapperRunId ||
+        state.wrapperGeneration !== wrapperGeneration ||
+        state.wrapperConnectionId !== wrapperConnectionId
+      )
+        return;
+      const envelope = kiloEventEnvelopeSchema.safeParse(kiloEvent.data);
+      if (!envelope.success) return;
+      const parsed = wrapperInputEventSchema.safeParse({
+        event: envelope.data.event,
+        properties: envelope.data.properties ?? envelope.data,
+      });
+      if (parsed.success) {
+        const event = parsed.data;
+        const rootSessionId = (await getMetadata())?.auth.kiloSessionId;
+        const accepted = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
+        const acceptedIds = new Set(accepted.map(message => message.messageId));
+        const ownsMessages = (ids: string[]) => ids.every(id => acceptedIds.has(id));
+        const owners = (sessionId: string) =>
+          sessionId === rootSessionId
+            ? [...acceptedIds]
+            : state.inputSessionOwners?.find(
+                owner => owner.kiloSessionId === sessionId && ownsMessages(owner.messageIds)
+              )?.messageIds;
+        const requests = state.inputRequests ?? [];
+        if (event.event === 'session.created') {
+          const { id, parentID } = event.properties.info;
+          const messageIds = owners(parentID);
+          if (!messageIds?.length || isWrapperRunFinalizing(state)) return;
+          const known = state.inputSessionOwners ?? [];
+          if (known.some(owner => owner.kiloSessionId === id)) return;
+          inputState = { inputSessionOwners: [...known, { kiloSessionId: id, messageIds }] };
+        } else {
+          const sourceSessionId =
+            event.event === 'message.part.updated'
+              ? event.properties.part.sessionID
+              : event.properties.sessionID;
+          const messageIds = owners(sourceSessionId);
+          if (!messageIds?.length || isWrapperRunFinalizing(state)) return;
+          if (event.event === 'question.asked' || event.event === 'permission.asked') {
+            const kind = event.event === 'question.asked' ? 'question' : 'permission';
+            const existing = requests.find(
+              request =>
+                request.kind === kind &&
+                request.requestId === event.properties.id &&
+                request.kiloSessionId === sourceSessionId
+            );
+            if (existing && (!existing.pending || !ownsMessages(existing.messageIds))) return;
+            inputState = {
+              inputRequests: existing
+                ? requests
+                : [
+                    ...requests,
+                    {
+                      kind,
+                      requestId: event.properties.id,
+                      kiloSessionId: sourceSessionId,
+                      messageIds,
+                      pending: true,
+                      tool: event.properties.tool,
+                    },
+                  ],
+            };
+          } else {
+            const resolved = requests.map(request => {
+              if (!request.pending || !ownsMessages(request.messageIds)) return request;
+              if (
+                event.event === 'question.replied' ||
+                event.event === 'question.rejected' ||
+                event.event === 'permission.replied'
+              ) {
+                const kind = event.event === 'permission.replied' ? 'permission' : 'question';
+                if (
+                  request.kind !== kind ||
+                  request.requestId !== event.properties.requestID ||
+                  request.kiloSessionId !== sourceSessionId
+                )
+                  return request;
+              } else if (event.event === 'message.part.updated') {
+                const part = event.properties.part;
+                if (
+                  request.kiloSessionId !== sourceSessionId ||
+                  request.tool?.messageID !== part.messageID ||
+                  request.tool.callID !== part.callID
+                )
+                  return request;
+              } else if (
+                sourceSessionId !== rootSessionId &&
+                request.kiloSessionId !== sourceSessionId
+              )
+                return request;
+              return { ...request, pending: false };
+            });
+            if (!resolved.some((request, index) => request !== requests[index])) {
+              if (event.event !== 'message.part.updated') return;
+            } else {
+              inputState = { inputRequests: resolved };
+            }
+          }
+        }
+      } else if (
+        envelope.data.event.startsWith('question.') ||
+        envelope.data.event.startsWith('permission.') ||
+        envelope.data.event === 'session.idle'
+      )
+        return;
+    }
     await recordMeaningfulWrapperOutput(
       storage,
       wrapperGeneration,
       wrapperConnectionId,
       now,
       now + WRAPPER_PING_INTERVAL_MS,
-      now + WRAPPER_NO_OUTPUT_TIMEOUT_MS
+      now + WRAPPER_NO_OUTPUT_TIMEOUT_MS,
+      inputState
+    );
+  }
+
+  async function isWaitingForInput(state: WrapperRuntimeState): Promise<boolean> {
+    if (isWrapperRunFinalizing(state) || !state.inputRequests?.some(request => request.pending))
+      return false;
+    const acceptedIds = new Set(
+      (await listNonTerminalAcceptedMessages(storage, state.wrapperRunId)).map(
+        message => message.messageId
+      )
+    );
+    return state.inputRequests.some(
+      request => request.pending && request.messageIds.every(id => acceptedIds.has(id))
     );
   }
 
@@ -932,7 +1107,10 @@ export function createWrapperSupervisor(
       return undefined;
     }
 
-    const deadlines = [state.pingDeadlineAt, state.nextPingAt, state.noOutputDeadlineAt].filter(
+    const noOutputDeadlineAt = (await isWaitingForInput(state))
+      ? undefined
+      : state.noOutputDeadlineAt;
+    const deadlines = [state.pingDeadlineAt, state.nextPingAt, noOutputDeadlineAt].filter(
       (deadline): deadline is number => deadline !== undefined
     );
     return deadlines.length > 0 ? Math.min(...deadlines) : undefined;
@@ -959,7 +1137,11 @@ export function createWrapperSupervisor(
       return false;
     }
 
-    if (state.noOutputDeadlineAt !== undefined && now >= state.noOutputDeadlineAt) {
+    if (
+      state.noOutputDeadlineAt !== undefined &&
+      now >= state.noOutputDeadlineAt &&
+      !(await isWaitingForInput(state))
+    ) {
       logger
         .withFields({
           sessionId: getSessionIdForLogs(),
@@ -1854,6 +2036,7 @@ export function createWrapperSupervisor(
     checkReconnect,
     recordReconnectAccepted,
     isCurrentConnection,
+    isWaitingForInput,
     observePong,
     observeMeaningfulOutput,
     observeFinalizing,

@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createIngestHandler, type IngestAttachment } from '../websocket/ingest.js';
+import type { EventQueries } from './queries/index.js';
+import type { SessionId } from '../types/ids.js';
 import type { CallbackJob } from '../callbacks/types.js';
 import { WRAPPER_NO_OUTPUT_TIMEOUT_MS } from './agent-runtime.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
@@ -22,6 +25,7 @@ import {
   getWrapperLease,
   getWrapperRuntimeState,
   putWrapperLease,
+  recordWrapperAcceptedMessage,
   WRAPPER_CLEANUP_EXHAUSTED_RECHECK_MS,
   WRAPPER_CLEANUP_EXHAUSTED_RECHECK_WINDOW_MS,
 } from './wrapper-runtime-state.js';
@@ -259,6 +263,455 @@ function disconnectGraceForCurrentConnection(
     },
   ];
 }
+
+describe('WrapperSupervisor pending human input', () => {
+  const messageId = 'msg_018f1e2d3c4bInputMsgAbCdEf';
+  const kiloSessionId = 'ses_018f1e2d3c4bInputWaitAbCdE';
+  const question = {
+    id: 'que_018f1e2d3c4bQuestionAbCdEf',
+    sessionID: kiloSessionId,
+    questions: [
+      {
+        question: 'Which checks should run?',
+        header: 'Checks',
+        options: [
+          { label: 'Chat', description: 'Chat flow' },
+          { label: 'Terminal', description: 'Shell flow' },
+          { label: 'Recovery', description: 'Cold flow' },
+        ],
+        multiple: true,
+      },
+      {
+        question: 'Enter a run marker',
+        header: 'Marker',
+        options: [{ label: 'Default', description: 'Use default' }],
+      },
+    ],
+    tool: {
+      messageID: 'msg_018f1e2d3c4cInputAsstAbCdE',
+      callID: 'call_input_question',
+    },
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-31T04:55:18.412Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function createInputHarness(
+    getAssistantMessageForUserMessage?: () => LatestAssistantMessage | null
+  ) {
+    const metadata = { ...createMetadata(), auth: { kiloSessionId } };
+    const harness = createHarness(
+      [
+        liveRuntimeState({
+          noOutputDeadlineAt: Date.now() + WRAPPER_NO_OUTPUT_TIMEOUT_MS,
+          nextPingAt: Date.now() + 60_000,
+        }),
+        OWNED_WRAPPER_LEASE,
+      ],
+      { metadata, getAssistantMessageForUserMessage }
+    );
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(messageId),
+      createdAt: Date.now(),
+      acceptedAt: Date.now(),
+    });
+    const attachment: IngestAttachment = {
+      wrapperRunId: WRAPPER_RUN_ID,
+      wrapperGeneration: 4,
+      wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      connectedAt: Date.now(),
+      kiloSessionState: { captured: true },
+      lastHeartbeatUpdate: Date.now(),
+      lastEventAtUpdate: Date.now(),
+    };
+    const ws = {
+      deserializeAttachment: () => attachment,
+      serializeAttachment: (updated: IngestAttachment) => Object.assign(attachment, updated),
+      send: vi.fn(),
+      close: vi.fn(),
+    } as unknown as WebSocket;
+    const ingest = createIngestHandler(
+      { getWebSockets: () => [] } as unknown as DurableObjectState,
+      { insert: () => 1, upsert: () => 1 } as unknown as EventQueries,
+      metadata.identity.sessionId as SessionId,
+      () => {},
+      {
+        wrapperSupervisor: harness.supervisor,
+        updateKiloSessionId: async () => {},
+        updateUpstreamBranch: async () => {},
+        setAvailableCommands: async () => {},
+        handleWrapperTerminalEvent: params => harness.supervisor.onTerminalEvent(params),
+        terminalizeSessionMessageOnce: async (id, params) => {
+          await harness.settlementOutbox.terminalizeSessionMessageOnce(id, params);
+        },
+      }
+    );
+    const send = (streamEventType: string, data: unknown, socket = ws) =>
+      ingest.handleIngestMessage(
+        socket,
+        JSON.stringify({ streamEventType, data, timestamp: new Date().toISOString() })
+      );
+    const kilo = (event: string, properties: Record<string, unknown>, socket = ws) =>
+      send('kilocode', { ...properties, event, type: event, properties }, socket);
+    const advance = async (milliseconds: number, respondToPings = true) => {
+      const target = Date.now() + milliseconds;
+      while (Date.now() < target) {
+        await vi.advanceTimersByTimeAsync(Math.min(10_000, target - Date.now()));
+        if ((await getWrapperRuntimeState(harness.storage)).wrapperConnectionId) {
+          await send('heartbeat', { kiloSessionId });
+        }
+        await harness.supervisor.runMaintenance(Date.now());
+        if (
+          respondToPings &&
+          (await getWrapperRuntimeState(harness.storage)).pingDeadlineAt !== undefined
+        ) {
+          await send('pong', {
+            kiloSessionId,
+            wrapperGeneration: 4,
+            wrapperConnectionId: WRAPPER_CONNECTION_ID,
+          });
+        }
+      }
+    };
+    return { ...harness, send, kilo, advance, attachment, ws };
+  }
+
+  it('keeps the recorded unanswered question accepted past 450 seconds with healthy heartbeats', async () => {
+    const harness = await createInputHarness();
+    await harness.advance(5_764);
+    const askedAt = Date.now();
+    await harness.kilo('question.asked', question);
+    await harness.kilo('message.part.updated', {
+      sessionID: kiloSessionId,
+      part: {
+        id: 'prt_018f1e2d3c4bInputPartAbCdE',
+        sessionID: kiloSessionId,
+        messageID: question.tool.messageID,
+        type: 'tool',
+        callID: question.tool.callID,
+        tool: 'question',
+        state: {
+          status: 'running',
+          input: { questions: question.questions },
+          time: { start: askedAt - 10 },
+        },
+      },
+      time: askedAt - 10,
+    });
+    await harness.advance(119_197);
+    await harness.send('kilocode', {
+      event: 'question.asked',
+      type: 'question.asked',
+      properties: { ...question, blocking: null },
+    });
+    await harness.advance(331_000);
+
+    expect(Date.now() - askedAt).toBeGreaterThan(450_000);
+    expect(harness.sentPings.length).toBeGreaterThan(5);
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'accepted',
+    });
+    expect(harness.events).toEqual([]);
+    expect(await getWrapperLease(harness.storage)).toMatchObject({ state: 'owns_wrapper' });
+    const reloaded = createHarness(undefined, {
+      storage: harness.storage,
+      metadata: { ...createMetadata(), auth: { kiloSessionId } },
+    });
+    await reloaded.supervisor.runMaintenance(Date.now());
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'accepted',
+    });
+    expect(
+      (await reloaded.supervisor.nextMaintenanceDeadlines()).every(
+        deadline => deadline > Date.now()
+      )
+    ).toBe(true);
+  });
+
+  it('still fails genuine zero-output work despite healthy heartbeats and pongs past 450 seconds', async () => {
+    const harness = await createInputHarness();
+    await harness.advance(WRAPPER_NO_OUTPUT_TIMEOUT_MS - 1);
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'accepted',
+    });
+    await harness.advance(1);
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_no_output',
+      terminalAt: new Date('2026-08-31T04:55:18.412Z').getTime() + WRAPPER_NO_OUTPUT_TIMEOUT_MS,
+    });
+    await harness.advance(121_000);
+    expect(harness.events).toHaveLength(1);
+  });
+
+  it.each(['question', 'permission'] as const)(
+    'allows a waiting %s to be answered and completed after 450 seconds',
+    async kind => {
+      let assistant: LatestAssistantMessage | null = null;
+      const harness = await createInputHarness(() => assistant);
+      await harness.send('kilocode', { event: `${kind}.asked`, ...question });
+      await harness.advance(451_000);
+      expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+        status: 'accepted',
+      });
+      await harness.kilo(`${kind}.replied`, {
+        sessionID: kiloSessionId,
+        requestID: question.id,
+        answers: [['Chat', 'Terminal'], ['legacy-custom-marker']],
+        reply: 'once',
+      });
+      await harness.advance(30_000);
+      await harness.kilo('message.part.updated', {
+        part: {
+          sessionID: kiloSessionId,
+          messageID: question.tool.messageID,
+          id: 'part-answer',
+          type: 'text',
+          text: 'legacy-custom-marker',
+        },
+      });
+      assistant = {
+        eventId: 1,
+        timestamp: Date.now(),
+        info: {
+          id: question.tool.messageID,
+          role: 'assistant',
+          parentID: messageId,
+          sessionID: kiloSessionId,
+          time: { completed: Date.now() },
+        },
+        parts: [],
+      };
+      await harness.send('complete', { exitCode: 0, messageIds: [messageId] });
+      expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+        status: 'completed',
+      });
+      expect(harness.events.map(event => event.streamEventType)).toEqual([
+        'cloud.message.completed',
+      ]);
+      expect((await getWrapperRuntimeState(harness.storage)).inputRequests).toBeUndefined();
+    }
+  );
+
+  it.each(['question.replied', 'question.rejected', 'permission.replied'])(
+    'restarts the silence deadline on %s and ignores a resolved-request replay',
+    async resolution => {
+      const harness = await createInputHarness();
+      const kind = resolution.startsWith('permission.') ? 'permission' : 'question';
+      await harness.kilo(`${kind}.asked`, question);
+      await harness.advance(451_000);
+      await harness.kilo(resolution, { sessionID: kiloSessionId, requestID: question.id });
+      await harness.advance(WRAPPER_NO_OUTPUT_TIMEOUT_MS - 1);
+      await harness.kilo(`${kind}.asked`, question);
+      expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+        status: 'accepted',
+      });
+      await harness.advance(1);
+      expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+        status: 'failed',
+        failureCode: 'wrapper_no_output',
+      });
+    }
+  );
+
+  it.each([
+    { label: 'stale generation', fence: { wrapperGeneration: 3 } },
+    { label: 'stale connection', fence: { wrapperConnectionId: 'conn_stale' } },
+    { label: 'wrong execution', fence: { wrapperRunId: 'wr_other' } },
+    { label: 'unrelated session', sessionID: 'ses_unrelated' },
+  ])('does not let a $label question mask a real timeout', async testCase => {
+    const harness = await createInputHarness();
+    await harness.advance(WRAPPER_NO_OUTPUT_TIMEOUT_MS - 1);
+    const socket = {
+      ...harness.ws,
+      deserializeAttachment: () => ({ ...harness.attachment, ...testCase.fence }),
+    } as WebSocket;
+    await harness.kilo(
+      'question.asked',
+      { ...question, sessionID: testCase.sessionID ?? kiloSessionId },
+      socket
+    );
+    await harness.advance(1);
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_no_output',
+    });
+    await harness.advance(121_000);
+    expect(harness.events).toHaveLength(1);
+  });
+
+  it('does not transfer an old pending question to newer accepted work on the same wrapper', async () => {
+    const harness = await createInputHarness();
+    await harness.kilo('question.asked', question);
+    await harness.settlementOutbox.terminalizeSessionMessageOnce(messageId, {
+      kind: 'interrupted',
+      completionSource: 'interrupt',
+    });
+    await harness.supervisor.nextMaintenanceDeadlines();
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(NEWER_MESSAGE_ID),
+      createdAt: Date.now(),
+      acceptedAt: Date.now(),
+    });
+    await recordWrapperAcceptedMessage(
+      harness.storage,
+      {
+        wrapperRunId: WRAPPER_RUN_ID,
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      },
+      Date.now() + WRAPPER_NO_OUTPUT_TIMEOUT_MS,
+      Date.now() + 60_000
+    );
+    await harness.advance(WRAPPER_NO_OUTPUT_TIMEOUT_MS - 1);
+    await harness.kilo('question.asked', question);
+    await harness.advance(1);
+    expect(await getSessionMessageState(harness.storage, NEWER_MESSAGE_ID)).toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_no_output',
+    });
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'interrupted',
+    });
+  });
+
+  it.each(['question', 'permission'] as const)(
+    'supervises owned child %s requests without accepting unrelated child requests',
+    async kind => {
+      const harness = await createInputHarness();
+      await harness.kilo('session.created', { info: { id: 'ses_child', parentID: kiloSessionId } });
+      await harness.kilo('session.created', {
+        info: { id: 'ses_grandchild', parentID: 'ses_child' },
+      });
+      await harness.kilo(`${kind}.asked`, { ...question, sessionID: 'ses_grandchild' });
+      await harness.advance(451_000);
+      expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+        status: 'accepted',
+      });
+      await harness.kilo(`${kind}.replied`, {
+        sessionID: 'ses_grandchild',
+        requestID: question.id,
+      });
+      await harness.advance(WRAPPER_NO_OUTPUT_TIMEOUT_MS - 1);
+      await harness.kilo('session.created', {
+        info: { id: 'ses_other_child', parentID: 'ses_unrelated' },
+      });
+      await harness.kilo(`${kind}.asked`, {
+        ...question,
+        id: 'request_other',
+        sessionID: 'ses_other_child',
+      });
+      await harness.advance(1);
+      expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+        status: 'failed',
+        failureCode: 'wrapper_no_output',
+      });
+    }
+  );
+
+  it('requires matching kind, request and session and waits until every pending input resolves', async () => {
+    const harness = await createInputHarness();
+    await harness.kilo('question.asked', question);
+    await harness.kilo('permission.asked', question);
+    await harness.kilo('question.replied', {
+      sessionID: kiloSessionId,
+      requestID: 'request_other',
+    });
+    await harness.kilo('permission.replied', { sessionID: 'ses_other', requestID: question.id });
+    await harness.advance(451_000);
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'accepted',
+    });
+    await harness.kilo('question.replied', { sessionID: kiloSessionId, requestID: question.id });
+    await harness.advance(451_000);
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'accepted',
+    });
+    await harness.kilo('permission.replied', { sessionID: kiloSessionId, requestID: question.id });
+    await harness.advance(WRAPPER_NO_OUTPUT_TIMEOUT_MS);
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_no_output',
+    });
+  });
+
+  it.each(['completed', 'error'] as const)(
+    'restarts no-output supervision when the matching tool is %s',
+    async status => {
+      const harness = await createInputHarness();
+      await harness.kilo('question.asked', question);
+      await harness.advance(451_000);
+      await harness.kilo('message.part.updated', {
+        part: {
+          sessionID: kiloSessionId,
+          messageID: question.tool.messageID,
+          callID: question.tool.callID,
+          type: 'tool',
+          state: { status },
+        },
+      });
+      await harness.advance(WRAPPER_NO_OUTPUT_TIMEOUT_MS);
+      expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+        status: 'failed',
+        failureCode: 'wrapper_no_output',
+      });
+    }
+  );
+
+  it.each(['session.idle', 'session.status', 'session.error', 'session.turn.close'])(
+    'restarts supervision when the waiting source emits %s',
+    async event => {
+      const harness = await createInputHarness();
+      await harness.kilo('question.asked', question);
+      await harness.advance(451_000);
+      await harness.kilo(event, { sessionID: kiloSessionId, status: { type: 'idle' } });
+      await harness.advance(WRAPPER_NO_OUTPUT_TIMEOUT_MS);
+      expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+        status: 'failed',
+        failureCode: 'wrapper_no_output',
+      });
+    }
+  );
+
+  it('does not let a pending question hide a stalled finalizing wrapper', async () => {
+    const harness = await createInputHarness();
+    await harness.kilo('question.asked', question);
+    await harness.advance(451_000);
+    await harness.send('wrapper_finalizing', {});
+    await harness.advance(WRAPPER_NO_OUTPUT_TIMEOUT_MS);
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_no_output',
+    });
+  });
+
+  it('does not suppress a ping timeout while human input is pending', async () => {
+    const harness = await createInputHarness();
+    await harness.kilo('question.asked', question);
+    await harness.advance(90_000, false);
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_ping_timeout',
+    });
+  });
+
+  it('clears pending input on wrapper interruption', async () => {
+    const harness = await createInputHarness();
+    await harness.kilo('question.asked', question);
+    await harness.advance(451_000);
+    await harness.send('interrupted', { reason: 'Session stopped' });
+    expect(await getSessionMessageState(harness.storage, messageId)).toMatchObject({
+      status: 'interrupted',
+    });
+    expect((await getWrapperRuntimeState(harness.storage)).inputRequests).toBeUndefined();
+  });
+});
 
 describe('WrapperSupervisor', () => {
   it('starts disconnect grace for current accepted work and cancels it after an approved fenced reconnect', async () => {

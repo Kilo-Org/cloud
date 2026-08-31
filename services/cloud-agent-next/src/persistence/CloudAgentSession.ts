@@ -3557,7 +3557,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const currentFenceMatches =
       runtime.wrapperRunId === firstAccepted.wrapperRunId && Boolean(runtime.wrapperConnectionId);
     const expired =
-      (runtime.noOutputDeadlineAt !== undefined && now >= runtime.noOutputDeadlineAt) ||
+      (runtime.noOutputDeadlineAt !== undefined &&
+        now >= runtime.noOutputDeadlineAt &&
+        !(await this.getWrapperSupervisor().isWaitingForInput(runtime))) ||
       (runtime.pingDeadlineAt !== undefined && now >= runtime.pingDeadlineAt);
     return {
       messageId: firstAccepted.messageId,

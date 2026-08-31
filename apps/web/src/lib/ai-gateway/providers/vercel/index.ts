@@ -21,6 +21,7 @@ import {
   getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { getRuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
 import { passesRoutingPercentage } from '@/lib/ai-gateway/providers/routing-percentage';
 import { getEnvVariable } from '@/lib/dotenvx';
@@ -135,6 +136,24 @@ export async function shouldRouteToVercel(
   return true;
 }
 
+function convertProviderSort(sort: unknown): GatewayProviderOptions['sort'] {
+  const by =
+    typeof sort === 'object' && sort !== null && !Array.isArray(sort) && 'by' in sort
+      ? sort.by
+      : sort;
+
+  switch (by) {
+    case 'price':
+      return 'cost';
+    case 'throughput':
+      return 'tps';
+    case 'latency':
+      return 'ttft';
+    default:
+      return undefined;
+  }
+}
+
 export function convertProviderOptions(
   requestToMutate: GatewayRequest,
   vercelInferenceProviders: string[] | null
@@ -165,6 +184,7 @@ export function convertProviderOptions(
     gateway: {
       only,
       order: provider?.order?.map(openRouterToVercelInferenceProviderId),
+      sort: convertProviderSort(provider?.sort),
       zeroDataRetention: provider?.zdr,
       disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
       models: requestToMutate.body.models,
@@ -280,6 +300,7 @@ export async function applyVercelSettings(
     requestToMutate.body.providerOptions = {
       gateway: {
         only: Object.keys(byokProviders),
+        sort: convertProviderSort(requestToMutate.body.provider?.sort),
         byok: byokProviders,
         models: requestToMutate.body.models,
       },

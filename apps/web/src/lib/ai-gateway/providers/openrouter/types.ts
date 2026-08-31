@@ -13,6 +13,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 
 export type OpenRouterProviderConfig = {
   order?: string[];
+  sort?: unknown;
   only?: string[];
   ignore?: string[];
   data_collection?: 'allow' | 'deny';

@@ -723,6 +723,70 @@ describe('browser task controls', () => {
     });
   });
 
+  it.each([
+    {
+      label: 'long tab titles',
+      tabs: [
+        {
+          id: 7,
+          title: 'Requested page with a long title '.repeat(20),
+          url: 'https://example.test/requested',
+        },
+      ],
+    },
+    { label: 'no inspectable tabs', tabs: [] },
+  ])('constrains consent tracks with $label without scrolling Stop', async ({ tabs }) => {
+    fixture.tabs = tabs;
+    fixture.state = {
+      ...fixture.state,
+      active: {
+        approval: undefined,
+        goal: 'Read the page',
+        job: job(),
+        ownerLabel: 'ses_12345678',
+      },
+      phase: 'awaiting_approval',
+    };
+    renderControls();
+    const supervision = screen.getByRole('region', { name: 'CLI task supervision' });
+    const select = within(supervision).getByRole<HTMLSelectElement>('combobox', {
+      name: 'Tab to approve',
+    });
+    await waitFor(() => {
+      expect(select.disabled).toBe(false);
+    });
+    // Compile the rendered utilities, not copied CSS. jsdom checks declarations, not geometry.
+    const { compile } = await import('tailwindcss');
+    const utilities = await compile('@tailwind utilities;');
+    const stylesheet = document.createElement('style');
+    const classes: string[] = [];
+    for (const element of [supervision, ...supervision.querySelectorAll<HTMLElement>('[class]')]) {
+      classes.push(...element.classList);
+    }
+    stylesheet.textContent = utilities.build(classes);
+    document.head.append(stylesheet);
+    try {
+      const tracks = [...supervision.querySelectorAll<HTMLElement>('.grid')];
+      expect(tracks.map(track => getComputedStyle(track).gridTemplateColumns)).toStrictEqual([
+        'repeat(1, minmax(0, 1fr))',
+        'repeat(1, minmax(0, 1fr))',
+        'repeat(1, minmax(0, 1fr))',
+      ]);
+      const details = select.closest('.overflow-y-auto');
+      expect(details?.contains(screen.getByRole('button', { name: 'Reject' }))).toBe(true);
+      expect(details?.contains(screen.getByRole('button', { name: 'Refresh tabs' }))).toBe(true);
+      expect(details?.contains(screen.getByRole('button', { name: 'Stop CLI task' }))).toBe(false);
+      expect(getComputedStyle(supervision).position).toBe('sticky');
+      expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Approve tab' }).disabled).toBe(
+        true
+      );
+      select.focus();
+      expect(document.activeElement).toBe(select);
+    } finally {
+      stylesheet.remove();
+    }
+  });
+
   it('requires an explicit candidate and approval while retaining a long goal after tab loss', async () => {
     const goal = `Inspect ${'long goal '.repeat(160)}`;
     fixture.state = {

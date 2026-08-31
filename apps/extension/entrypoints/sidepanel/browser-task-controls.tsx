@@ -107,12 +107,12 @@ const TabConsent = ({
     }
   };
   return (
-    <div className="grid min-w-0 gap-2">
+    <div className="grid min-w-0 grid-cols-1 gap-2">
       <p>
         The Browser target selector does not approve CLI access. Approve a tab for this invocation
         only.
       </p>
-      <label className="grid min-w-0 gap-1">
+      <label className="grid min-w-0 grid-cols-1 gap-1">
         Tab to approve
         <select
           className="type-label min-h-9 w-full min-w-0 rounded-md border border-border-strong bg-input-bg px-2 text-foreground focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
@@ -290,7 +290,7 @@ export const BrowserTaskControls = (): JSX.Element => {
           </button>
         ) : null}
       </div>
-      <div className="agent-conversation-scrollbar type-label grid min-h-0 min-w-0 gap-2 overflow-y-auto px-3 pb-3 [overflow-wrap:anywhere]">
+      <div className="agent-conversation-scrollbar type-label grid min-h-0 min-w-0 grid-cols-1 gap-2 overflow-y-auto px-3 pb-3 [overflow-wrap:anywhere]">
         <p aria-live="polite">
           {ownershipRejected ? 'This panel could not acquire browser ownership.' : state.message}
         </p>

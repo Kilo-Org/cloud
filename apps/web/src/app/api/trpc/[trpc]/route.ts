@@ -18,9 +18,7 @@ const handler = (req: Request) =>
     onError:
       process.env.NODE_ENV === 'development'
         ? ({ path, type, error }) => {
-            console.error(
-              `[trpc] ${type} ${path ?? '<no path>'} failed: ${error.code} ${error.message}`
-            );
+            console.error(`[trpc] ${type} ${path ?? '<no path>'} failed: ${error.code}`);
           }
         : undefined,
   });

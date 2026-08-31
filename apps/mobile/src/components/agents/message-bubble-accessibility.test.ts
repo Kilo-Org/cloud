@@ -53,25 +53,27 @@ describe.each([
   { role: 'assistant', makeMessage: assistantMessage, label: 'Assistant message' },
 ])('MessageBubble accessibility: $role', ({ makeMessage, label }) => {
   it.each([
-    { text: true, callback: true, actions: ['details', 'copy'], copied: 'hi' },
-    { text: false, callback: true, actions: ['details'], copied: 'unchanged' },
-    { text: true, callback: false, actions: ['copy'], copied: 'hi' },
-    { text: false, callback: false, actions: [], copied: 'unchanged' },
+    { kind: 'text', callback: true, actions: ['details', 'copy'], copied: 'hi' },
+    { kind: 'text', callback: false, actions: ['copy'], copied: 'hi' },
+    { kind: 'files', callback: true, actions: ['details'], copied: 'unchanged' },
+    { kind: 'files', callback: false, actions: [], copied: 'unchanged' },
+    { kind: 'text and files', callback: true, actions: ['details', 'copy'], copied: 'hi' },
+    { kind: 'text and files', callback: false, actions: ['copy'], copied: 'hi' },
   ])(
-    'preserves descendants and executes actions with text=$text callback=$callback',
-    async ({ text, callback, actions, copied }) => {
+    'preserves descendants and executes actions with content=$kind callback=$callback',
+    async ({ kind, callback, actions, copied }) => {
       const message = makeMessage('message-1');
-      message.parts = [
-        ...(text ? userMessage('message-1').parts : []),
-        {
+      message.parts = kind === 'files' ? [] : userMessage('message-1').parts;
+      if (kind !== 'text') {
+        message.parts.push({
           id: 'file-1',
           sessionID: 'ses_1',
           messageID: message.info.id,
           type: 'file',
           mime: 'text/plain',
           url: 'file:///attachment.txt',
-        },
-      ];
+        });
+      }
       const selected: StoredMessage[] = [];
       const { MessageBubble } = await import('./message-bubble');
       // eslint-disable-next-line new-cap
@@ -112,11 +114,13 @@ describe.each([
       expect(host?.props.accessibilityLabel).toBe(label);
       expect(host?.props.children).toBeUndefined();
       const exposed = host?.props.accessibilityActions as { name: string; label: string }[];
-      expect(exposed.map(action => action.name)).toEqual(actions);
-      if (callback) {
-        expect(exposed).toContainEqual({ name: 'details', label: 'Message details' });
-        expect(host?.props.accessibilityHint).toBe('Long press for message details');
-      }
+      expect(exposed).toEqual(
+        actions.map(name => ({
+          name,
+          label: name === 'details' ? 'Message details' : 'Copy message',
+        }))
+      );
+      expect(host?.props.accessibilityHint).toBe(callback ? 'Long press for message details' : '');
       const invoke = host?.props.onAccessibilityAction as (
         event: Pick<AccessibilityActionEvent, 'nativeEvent'>
       ) => void;

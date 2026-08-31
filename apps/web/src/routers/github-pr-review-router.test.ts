@@ -1056,6 +1056,7 @@ describe('githubPrReviewRouter.listInbox', () => {
           number: 1,
           title: 'Fix the thing',
           author: { login: 'octocat', avatarUrl: 'https://avatars.example/octocat.png' },
+          authorDisplayName: null,
           isDraft: false,
           updatedAt: '2026-01-01T00:00:00Z',
         },

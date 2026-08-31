@@ -350,10 +350,10 @@ describe('shouldRouteToVercel', () => {
 
   it('allows Vercel routing with an unrecognized sort preference', async () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel();
-    const provider = {
-      sort: 'future-sort',
+    const provider: OpenRouterProviderConfig = {
+      sort: 'future-sort' as OpenRouterProviderConfig['sort'],
       only: ['anthropic'],
-    } as OpenRouterProviderConfig;
+    };
 
     await expect(
       shouldRouteToVercel(

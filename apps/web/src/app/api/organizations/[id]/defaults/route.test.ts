@@ -1,6 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { GET } from './route';
+import { GET as getDefaults } from '@/app/api/defaults/route';
+import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import {
@@ -52,7 +55,37 @@ function makeOpenRouterModel(id: string): OpenRouterModel {
   };
 }
 
-describe('GET /api/organizations/[id]/defaults', () => {
+test('GET /api/defaults without an organization header returns public defaults without authorization', async () => {
+  mockedGetAuthorizedOrgContext.mockReset();
+
+  const response = await getDefaults(new NextRequest('http://localhost:3000/api/defaults'));
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    defaultModel: KILO_AUTO_BALANCED_MODEL.id,
+    defaultFreeModel: KILO_AUTO_FREE_MODEL.id,
+  });
+  expect(mockedGetAuthorizedOrgContext).not.toHaveBeenCalled();
+});
+
+describe.each([
+  {
+    endpoint: '/api/organizations/[id]/defaults',
+    getOrganizationDefaults: (organizationId: string) =>
+      GET(new NextRequest(`http://localhost:3000/api/organizations/${organizationId}/defaults`), {
+        params: Promise.resolve({ id: organizationId }),
+      }),
+  },
+  {
+    endpoint: '/api/defaults with an organization header',
+    getOrganizationDefaults: (organizationId: string) =>
+      getDefaults(
+        new NextRequest('http://localhost:3000/api/defaults', {
+          headers: { [ORGANIZATION_ID_HEADER]: organizationId },
+        })
+      ),
+  },
+])('GET $endpoint', ({ getOrganizationDefaults }) => {
   beforeEach(() => {
     mockedGetAuthorizedOrgContext.mockReset();
     mockedGetEnhancedOpenRouterModels.mockReset();
@@ -72,6 +105,27 @@ describe('GET /api/organizations/[id]/defaults', () => {
     await db.delete(kilocode_users);
   });
 
+  test.each([
+    { organizationId: '', status: 400 },
+    { organizationId: 'invalid-organization-id', status: 400 },
+    { organizationId: 'f86d0c67-52c2-46e9-9583-0c4d520471a9', status: 401 },
+    { organizationId: 'f86d0c67-52c2-46e9-9583-0c4d520471a9', status: 403 },
+    { organizationId: 'f86d0c67-52c2-46e9-9583-0c4d520471a9', status: 404 },
+  ])(
+    'propagates authorization failure $status for "$organizationId"',
+    async ({ organizationId, status }) => {
+      const failure = NextResponse.json({ error: 'Organization authorization failed' }, { status });
+      mockedGetAuthorizedOrgContext.mockResolvedValue({ success: false, nextResponse: failure });
+
+      const response = await getOrganizationDefaults(organizationId);
+
+      expect(mockedGetAuthorizedOrgContext).toHaveBeenCalledWith(organizationId);
+      expect(response).toBe(failure);
+      expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
+      expect(mockedGetModelIdToProviderSlugsIndex).not.toHaveBeenCalled();
+    }
+  );
+
   test('no policy returns PRIMARY_DEFAULT_MODEL without calling OpenRouter', async () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);
@@ -89,13 +143,12 @@ describe('GET /api/organizations/[id]/defaults', () => {
       },
     });
 
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ id: organization.id }),
-    });
+    const response = await getOrganizationDefaults(organization.id);
 
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.defaultModel).toBe(PRIMARY_DEFAULT_MODEL);
+    expect(body.defaultFreeModel).toBe(KILO_AUTO_FREE_MODEL.id);
     expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
   });
 
@@ -118,9 +171,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       },
     });
 
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ id: organization.id }),
-    });
+    const response = await getOrganizationDefaults(organization.id);
 
     expect(response.status).toBe(409);
   });
@@ -151,9 +202,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       },
     });
 
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ id: organization.id }),
-    });
+    const response = await getOrganizationDefaults(organization.id);
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -180,9 +229,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       },
     });
 
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ id: organization.id }),
-    });
+    const response = await getOrganizationDefaults(organization.id);
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -213,9 +260,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       },
     });
 
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ id: organization.id }),
-    });
+    const response = await getOrganizationDefaults(organization.id);
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -237,9 +282,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       },
     });
 
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ id: organization.id }),
-    });
+    const response = await getOrganizationDefaults(organization.id);
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -267,9 +310,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
       },
     });
 
-    const response = await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ id: organization.id }),
-    });
+    const response = await getOrganizationDefaults(organization.id);
 
     expect(response.status).toBe(409);
     const body = await response.json();

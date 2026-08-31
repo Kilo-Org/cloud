@@ -1,7 +1,7 @@
 import { cp, mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { Pool } from 'pg';
+import { Client, Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
@@ -23,7 +23,7 @@ describe('admin permissions migration', () => {
     const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'admin-permissions-migration-'));
     const previousMigrations = path.join(temporaryRoot, 'migrations');
     const adminPool = new Pool({ connectionString: adminUrl.toString() });
-    let testPool: Pool | undefined;
+    let testClient: Client | undefined;
 
     try {
       await adminPool.query(`CREATE DATABASE "${databaseName}"`);
@@ -37,9 +37,10 @@ describe('admin permissions migration', () => {
       journal.entries = journal.entries.filter(entry => entry.tag !== migrationTag);
       await writeFile(journalPath, JSON.stringify(journal, null, 2));
 
-      testPool = new Pool({ connectionString: databaseUrl.toString() });
-      await migrate(drizzle(testPool), { migrationsFolder: previousMigrations });
-      await testPool.query(
+      testClient = new Client({ connectionString: databaseUrl.toString() });
+      await testClient.connect();
+      await migrate(drizzle(testClient), { migrationsFolder: previousMigrations });
+      await testClient.query(
         `INSERT INTO kilocode_users
           (id, google_user_email, google_user_name, google_user_image_url, stripe_customer_id, hosted_domain, is_admin, blocked_reason)
          VALUES
@@ -55,9 +56,9 @@ describe('admin permissions migration', () => {
         path.join(migrationsSource, `${migrationTag}.sql`),
         'utf8'
       );
-      await testPool.query(migrationSql);
+      await testClient.query(migrationSql);
 
-      const migrated = await testPool.query<{
+      const migrated = await testClient.query<{
         id: string;
         is_super_admin: boolean;
         can_view_sessions: boolean;
@@ -83,7 +84,7 @@ describe('admin permissions migration', () => {
         { id: 'wrong-email-admin', is_super_admin: false, can_view_sessions: false },
       ]);
 
-      const inserted = await testPool.query<{
+      const inserted = await testClient.query<{
         is_super_admin: boolean;
         can_view_sessions: boolean;
       }>(
@@ -94,8 +95,8 @@ describe('admin permissions migration', () => {
       );
       expect(inserted.rows).toEqual([{ is_super_admin: false, can_view_sessions: false }]);
     } finally {
-      await testPool?.end();
-      await adminPool.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
+      await testClient?.end();
+      await adminPool.query(`DROP DATABASE IF EXISTS "${databaseName}"`);
       await adminPool.end();
       await rm(temporaryRoot, { recursive: true, force: true });
     }

@@ -2,7 +2,7 @@
 import { expect, test } from '@playwright/test';
 import type { BrowserContext, Locator, Page, WebSocketRoute } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
-import { rm } from 'node:fs/promises';
+import { rm, writeFile } from 'node:fs/promises';
 import {
   browserProviderInboundMessageSchema,
   webOutboundWithBrowserMessageSchema,
@@ -358,7 +358,7 @@ const withHarness = async (
     await other.goto(`${fixture.url}/other`);
     const openPanel = async (): Promise<Page> => {
       const page = await context.newPage();
-      await page.setViewportSize({ height: 720, width: 320 });
+      expect(page.viewportSize()).toEqual({ height: 720, width: 320 });
       await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
       return page;
     };
@@ -435,7 +435,7 @@ const approve = async (root: Page | Locator): Promise<void> => {
   await controls.getByRole('button', { exact: true, name: 'Approve tab' }).click();
 };
 const capture = async (panel: Page, name: string): Promise<void> => {
-  await panel.setViewportSize({ height: 720, width: 320 });
+  expect(panel.viewportSize()).toEqual({ height: 720, width: 320 });
   const dialogs = panel.getByRole('dialog');
   const root = (await dialogs.count()) > 0 ? dialogs.last() : panel;
   const stop = supervision(root).getByRole('button', { name: 'Stop CLI task' });
@@ -738,9 +738,11 @@ for (const profile of ['enabled', 'quarantined'] as const) {
               warning: rectangle(warning),
             };
           });
+          const geometryPath = test.info().outputPath(`${name}-geometry.json`);
+          await writeFile(geometryPath, JSON.stringify(geometry, null, 2), 'utf8');
           await test.info().attach(`${name}-geometry`, {
-            body: JSON.stringify(geometry, null, 2),
             contentType: 'application/json',
+            path: geometryPath,
           });
           expect(
             Math.max(geometry.paintedConversationBottom, geometry.paintedGreetingBottom),

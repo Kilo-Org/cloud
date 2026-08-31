@@ -104,7 +104,7 @@ export const launchExtensionContext = async ({
     ...(executablePath === undefined ? { channel } : { executablePath }),
     headless: !isHeaded,
     ignoreDefaultArgs: ['--enable-automation'],
-    ...(recordVideo === undefined ? {} : { recordVideo }),
+    ...(recordVideo === undefined ? {} : { recordVideo, viewport: recordVideo.size }),
     userAgent: EXTENSION_E2E_USER_AGENT,
   });
 

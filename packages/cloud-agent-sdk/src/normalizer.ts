@@ -162,6 +162,7 @@ export type ServiceEvent =
       type: 'connected';
       sessionStatus?: SessionStatus | undefined;
       cloudStatus?: CloudStatus | undefined;
+      activeMessageId?: string | null | undefined;
     }
   | { type: 'commands.available'; commands: SlashCommandInfo[] }
   | {
@@ -189,6 +190,8 @@ export type ServiceEvent =
       type: 'cloud.message.failed';
       messageId: string;
       executionId?: string | undefined;
+      delivery?: 'queued' | 'sent' | undefined;
+      accepted?: boolean | undefined;
       error: string;
       reason: 'interrupted' | 'exhausted' | 'execution';
       attempts?: number | undefined;
@@ -233,6 +236,10 @@ const sessionModelSchema = z.object({
   providerID: z.string(),
   id: z.string(),
   variant: z.string().optional(),
+});
+
+const connectedServiceDataSchema = connectedDataSchema.extend({
+  activeMessageId: z.string().nullable().optional().catch(undefined),
 });
 
 // `cloud.message.canceled` mirrors the queued payload minus the content field.
@@ -505,12 +512,13 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     }
 
     case 'connected': {
-      const r = connectedDataSchema.safeParse(data);
+      const r = connectedServiceDataSchema.safeParse(data);
       if (!r.success) return null;
       return {
         type: 'connected',
         ...(r.data.sessionStatus !== undefined && { sessionStatus: r.data.sessionStatus }),
         ...(r.data.cloudStatus !== undefined && { cloudStatus: r.data.cloudStatus }),
+        ...(r.data.activeMessageId !== undefined && { activeMessageId: r.data.activeMessageId }),
       };
     }
 
@@ -577,6 +585,8 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         type: 'cloud.message.failed',
         messageId,
         executionId,
+        ...(r.data.delivery !== undefined && { delivery: r.data.delivery }),
+        ...(typeof r.data.accepted === 'boolean' && { accepted: r.data.accepted }),
         error,
         reason,
         attempts,

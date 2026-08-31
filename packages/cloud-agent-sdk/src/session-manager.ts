@@ -1410,7 +1410,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         const sk = sKey(st);
         if (sk !== prevSk || shouldClearCloudIndicator) {
           const ind = indicatorForStatus(st);
-          if (ind !== null || shouldClearCloudIndicator) setIndicator(ind);
+          if (
+            ind !== null ||
+            shouldClearCloudIndicator ||
+            (st.type === 'idle' &&
+              (previousStatus.type === 'error' || previousStatus.type === 'interrupted'))
+          ) {
+            setIndicator(ind);
+          }
           prevSk = sk;
         }
       }

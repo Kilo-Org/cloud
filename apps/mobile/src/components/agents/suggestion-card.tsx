@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Sparkles, X } from '@/components/ui/icons';
@@ -65,6 +65,19 @@ export function SuggestionCard({
     }
   }
 
+  function handleShowDetails() {
+    Alert.alert(
+      t('agentChat.suggestion.title'),
+      [
+        text,
+        ...actions.map(action =>
+          action.description ? `${action.label}\n${action.description}` : action.label
+        ),
+      ].join('\n\n'),
+      [{ text: t('common.done') }]
+    );
+  }
+
   const isPending = pending !== null;
 
   return (
@@ -75,12 +88,19 @@ export function SuggestionCard({
         keyboardShouldPersistTaps="handled"
         contentContainerClassName="items-center gap-2"
       >
-        <View className="max-w-[240px] flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+        <Pressable
+          onPress={handleShowDetails}
+          accessibilityRole="button"
+          accessibilityLabel={text}
+          accessibilityHint={t('agentChat.partDetail.showDetails')}
+          hitSlop={4}
+          className="max-w-[240px] flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 active:opacity-70"
+        >
           <Sparkles size={15} color={colors.mutedForeground} />
           <Text className="shrink text-sm text-foreground" numberOfLines={1}>
             {text}
           </Text>
-        </View>
+        </Pressable>
 
         {actions.map((action: SuggestionAction, index: number) => (
           <Button

@@ -1,6 +1,6 @@
 import { CODE_REVIEW_PLATFORMS } from '@kilocode/app-shared/code-review';
-import { createInstance } from 'i18next';
-import { describe, expect, it } from 'vitest';
+import { createInstance, type ParseKeys } from 'i18next';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import en from './locales/en.json';
 import {
@@ -66,6 +66,14 @@ function leafEntries(tree: StringTree, prefix = ''): [string, string][] {
 }
 
 describe('provider review vocabulary', () => {
+  it('keeps translator inputs constrained to catalog keys', () => {
+    const key = PROVIDER_REVIEW_REQUEST_KEYS.gitlab.title satisfies ParseKeys;
+
+    expectTypeOf<'providerReview.mergeRequest.unknown'>().not.toExtend<ParseKeys>();
+    expectTypeOf<string>().not.toExtend<ParseKeys>();
+    expect(i18n.t(key)).toBe('Merge request review');
+  });
+
   it.each(CODE_REVIEW_PLATFORMS)('renders the request terminology for %s', provider => {
     const rendered = Object.fromEntries(
       Object.entries(PROVIDER_REVIEW_REQUEST_KEYS[provider]).map(([field, key]) => [

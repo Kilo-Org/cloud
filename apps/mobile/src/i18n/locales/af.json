@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal verwyder word.",
       "discardAttachmentsTitle": "Aanhegsels weggooi?",
       "charactersRemaining": "{{count}} karakters oor",
-      "insertNewline": "Voeg nuwe reël in",
-      "starterChipBuild": "Bou 'n funksie",
-      "starterChipEmpty": "Begin met 'n idee",
-      "starterChipFix": "Maak 'n fout reg",
-      "starterChipPrepare": "Stel my omgewing op",
-      "starterChipWrapUp": "Voltooi my sessie",
-      "starterChipWriteTests": "Skryf toetse"
+      "insertNewline": "Voeg nuwe reël in"
     },
     "chatLink": {
       "linkCopied": "Skakel gekopieer",

@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "ပို့ပြီးသော စာများတွင် မပူးတွဲထားသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။",
       "discardAttachmentsTitle": "ပူးတွဲဖိုင်များကို ပယ်ဖျက်မည်လား။",
       "charactersRemaining": "အက္ခရာ {{count}} လုံး ကျန်သည်",
-      "insertNewline": "စာကြောင်းအသစ် ထည့်ပါ",
-      "starterChipBuild": "လုပ်ဆောင်ချက်တစ်ခု တည်ဆောက်",
-      "starterChipEmpty": "စိတ်ကူးတစ်ခုနဲ့ စလိုက်",
-      "starterChipFix": "ချို့ယွင်းချက်တစ်ခု ပြင်",
-      "starterChipPrepare": "ငါ့လုပ်ငန်းပတ်ဝန်းကျင်ကို ပြင်ဆင်",
-      "starterChipWrapUp": "ငါ့ဆက်ရှင်ကို အဆုံးသတ်",
-      "starterChipWriteTests": "စမ်းသပ်မှုတွေ ရေး"
+      "insertNewline": "စာကြောင်းအသစ် ထည့်ပါ"
     },
     "chatLink": {
       "linkCopied": "link ကို ကူးယူပြီးပါပြီ",

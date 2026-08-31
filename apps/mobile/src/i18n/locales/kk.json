@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Жіберілген хабарламаларға қосылмаған жүктелген файлдар жойылады.",
       "discardAttachmentsTitle": "Қосымшаларды жою керек пе?",
       "charactersRemaining": "{{count}} таңба қалды",
-      "insertNewline": "Жаңа жол енгізу",
-      "starterChipBuild": "Мүмкіндік жаса",
-      "starterChipEmpty": "Идеядан баста",
-      "starterChipFix": "Қатені түзет",
-      "starterChipPrepare": "Ортамды бапта",
-      "starterChipWrapUp": "Сессиямды аяқта",
-      "starterChipWriteTests": "Тесттер жаз"
+      "insertNewline": "Жаңа жол енгізу"
     },
     "chatLink": {
       "linkCopied": "Сілтеме көшірілді",

@@ -2136,13 +2136,7 @@
       "discardAttachmentsMessage": "Hochgeladene Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht.",
       "discardAttachmentsTitle": "Anhänge verwerfen?",
       "charactersRemaining": "Noch {{count}} Zeichen",
-      "insertNewline": "Zeilenumbruch einfügen",
-      "starterChipBuild": "Entwickle eine Funktion",
-      "starterChipEmpty": "Beginne mit einer Idee",
-      "starterChipFix": "Behebe einen Fehler",
-      "starterChipPrepare": "Richte meine Umgebung ein",
-      "starterChipWrapUp": "Schließe meine Sitzung ab",
-      "starterChipWriteTests": "Schreibe Tests"
+      "insertNewline": "Zeilenumbruch einfügen"
     },
     "chatLink": {
       "linkCopied": "Link kopiert",

@@ -11,11 +11,9 @@ import type Anthropic from '@anthropic-ai/sdk';
 // Base types for OpenRouter API that don't depend on other lib files
 // This breaks circular dependencies with mistral.ts, minimax.ts, etc.
 
-type OpenRouterProviderSort = 'price' | 'throughput' | 'latency';
-
 export type OpenRouterProviderConfig = {
   order?: string[];
-  sort?: OpenRouterProviderSort | { by: OpenRouterProviderSort; partition?: 'model' | 'none' };
+  sort?: 'price' | 'throughput' | 'latency';
   only?: string[];
   ignore?: string[];
   data_collection?: 'allow' | 'deny';

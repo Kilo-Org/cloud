@@ -164,9 +164,6 @@ describe('convertProviderOptions', () => {
     { sort: 'price', expected: 'cost' },
     { sort: 'throughput', expected: 'tps' },
     { sort: 'latency', expected: 'ttft' },
-    { sort: { by: 'price' }, expected: 'cost' },
-    { sort: { by: 'throughput', partition: 'model' }, expected: 'tps' },
-    { sort: { by: 'latency', partition: 'none' }, expected: 'ttft' },
   ] as const)(
     'converts sort $sort to $expected alongside existing preferences',
     ({ sort, expected }) => {
@@ -206,8 +203,8 @@ describe('convertProviderOptions', () => {
     true,
     ['price'],
     {},
-    { by: 'future-sort' },
-    { by: ['price'] },
+    { by: 'price' },
+    { by: 'latency', partition: 'none' },
   ])('omits unsupported sort %j without rejecting the conversion', sort => {
     const request: GatewayRequest = {
       kind: 'chat_completions',

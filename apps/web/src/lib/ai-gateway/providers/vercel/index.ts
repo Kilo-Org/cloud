@@ -139,12 +139,7 @@ export async function shouldRouteToVercel(
 function convertProviderSort(
   sort: OpenRouterProviderConfig['sort']
 ): GatewayProviderOptions['sort'] {
-  const by =
-    typeof sort === 'object' && sort !== null && !Array.isArray(sort) && 'by' in sort
-      ? sort.by
-      : sort;
-
-  switch (by) {
+  switch (sort) {
     case 'price':
       return 'cost';
     case 'throughput':

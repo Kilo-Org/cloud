@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test';
 import type { BrowserContext, Locator, Page, WebSocketRoute } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
 import { rm, writeFile } from 'node:fs/promises';
+import type { browser } from 'wxt/browser';
+import { z } from 'zod';
 import {
   browserProviderInboundMessageSchema,
   webOutboundWithBrowserMessageSchema,
@@ -1438,3 +1440,733 @@ for (const modal of [
     );
   });
 }
+
+const nativeSendPending = (panel: Page) =>
+  panel.getByRole('status').filter({
+    hasText: 'Checking browser control… Your input is retained.',
+  });
+const nativeSendRequestSchema = z.object({
+  messages: z.array(z.object({ content: z.unknown(), role: z.string() })),
+});
+const nativeSendUserTexts = (body: unknown): string[] =>
+  nativeSendRequestSchema
+    .parse(body)
+    .messages.filter(message => message.role === 'user')
+    .map(message =>
+      z
+        .string()
+        .parse(message.content)
+        .replace(/\n\n<system_environment>[\s\S]*$/u, '')
+    );
+const nativeSendGateway = (seenChatBodies: unknown[]) => ({
+  firstCompletionEvents: toolCall('eval', {
+    code: 'document.querySelector("#effect").click(); return document.querySelector("#count").textContent;',
+  }),
+  secondCompletionEvents: content(resultText),
+  seenChatBodies,
+  toolNames: dangerousToolNames,
+});
+const prepareNativeSend = async (panel: Page, titles: string[] = []): Promise<void> => {
+  await selectModelById(panel, model);
+  await panel.getByLabel('Target tab').selectOption({ label: 'Approved browser task tab' });
+  await panel.getByRole('button', { name: /(?:Safe|Dangerous) mode/u }).click();
+  await panel
+    .getByRole('button', { exact: true, name: 'Dangerous Arbitrary webpage control' })
+    .click();
+  if (titles.length > 0) {
+    const selectedTabId = Number(await panel.getByLabel('Target tab').inputValue());
+    await setExtensionStorage(panel, {
+      kiloAgentConversations: {
+        activeConversationId: 'native-send-0',
+        conversations: titles.map((title, index) => ({
+          events: [{ id: `prior-${index}`, role: 'user', text: `Prior ${title}`, type: 'message' }],
+          id: `native-send-${index}`,
+          mode: 'dangerous',
+          model,
+          selectedTabId,
+          title,
+          updatedAt: new Date().toISOString(),
+        })),
+        openConversationIds: titles.map((_title, index) => `native-send-${index}`),
+      },
+    });
+    await panel.reload();
+  }
+  await expect(panel.getByLabel('Message agent')).toHaveValue('');
+  await expect(panel.getByRole('button', { exact: true, name: 'Send message' })).toBeDisabled();
+};
+const expectNativeSendPending = async (panel: Page, draft: string): Promise<void> => {
+  await expect(nativeSendPending(panel)).toHaveCount(1);
+  await expect(nativeSendPending(panel)).toBeVisible();
+  await expect(nativeSendPending(panel)).toHaveText(
+    'Checking browser control… Your input is retained.'
+  );
+  await expect(panel.getByLabel('Message agent')).toHaveValue(draft);
+  await expect(panel.getByRole('button', { exact: true, name: 'Send message' })).toBeDisabled();
+};
+
+// Each installation belongs to one Send action. Restore simultaneous gates in reverse order.
+const holdNativeSendBoundary = async (panel: Page, boundary: 'safety' | 'tab') => {
+  const handle = await panel.evaluateHandle(kind => {
+    const scope = globalThis as typeof globalThis & {
+      chrome: typeof browser;
+    };
+    const storage = scope.chrome.storage.local;
+    const { tabs } = scope.chrome;
+    // eslint-disable-next-line typescript/unbound-method -- Restore the original API; apply below preserves its receiver.
+    const originalStorageGet = storage.get;
+    const originalTabGet = tabs.get;
+    const gate = Promise.withResolvers<void>();
+    let rejectRead = false;
+    let restored = false;
+    const state = {
+      activated: false,
+      entered: false,
+      failed: false,
+      reject: () => {
+        rejectRead = true;
+        gate.resolve();
+      },
+      release: () => {
+        gate.resolve();
+      },
+      restore: () => {
+        if (restored) {
+          return;
+        }
+        restored = true;
+        gate.resolve();
+        document.removeEventListener('keydown', arm, true);
+        document.removeEventListener('click', arm, true);
+        if (kind === 'safety') {
+          storage.get = originalStorageGet;
+        } else {
+          tabs.get = originalTabGet;
+        }
+      },
+      settled: false,
+      submittedTabId: undefined as number | undefined,
+    };
+    const arm = (event: Event): void => {
+      const input = document.querySelector('#agent-message');
+      if (!(input instanceof HTMLTextAreaElement)) {
+        return;
+      }
+      const send = input.form?.querySelector('button[type="submit"]');
+      const enter =
+        event instanceof KeyboardEvent &&
+        event.key === 'Enter' &&
+        !event.shiftKey &&
+        event.target === input;
+      const click =
+        event.type === 'click' &&
+        event.target instanceof Node &&
+        send?.contains(event.target) === true;
+      if (!enter && !click) {
+        return;
+      }
+      const target = document.querySelector('[aria-label="Target tab"]');
+      if (!(target instanceof HTMLSelectElement)) {
+        throw new Error('Send must have a target selector.');
+      }
+      state.activated = true;
+      state.submittedTabId = Number(target.value);
+      document.removeEventListener('keydown', arm, true);
+      document.removeEventListener('click', arm, true);
+    };
+    const readAfterRelease = async <Value>(read: () => Value): Promise<Awaited<Value>> => {
+      state.entered = true;
+      try {
+        await gate.promise;
+        if (rejectRead) {
+          throw new Error('The native Send test rejects the safety read.');
+        }
+        return await read();
+      } catch (error) {
+        state.failed = true;
+        throw error;
+      } finally {
+        state.settled = true;
+      }
+    };
+    if (kind === 'safety') {
+      storage.get = ((...args: unknown[]) => {
+        const [keys, callback] = args;
+        // Forward every native overload unchanged, including callback-only callers.
+        const read = () =>
+          (originalStorageGet as (...nativeArgs: unknown[]) => unknown).apply(storage, args);
+        const includesSafety =
+          keys === 'kiloBrowserExecutionSafety' ||
+          (Array.isArray(keys) && keys.includes('kiloBrowserExecutionSafety')) ||
+          (keys !== null &&
+            typeof keys === 'object' &&
+            Object.hasOwn(keys, 'kiloBrowserExecutionSafety'));
+        // Preserve callback callers. The runtime safety read uses the Promise overload.
+        if (!state.activated || !includesSafety || callback !== undefined) {
+          return read();
+        }
+        // A background refresh can share this read; only the UI status proves pending Send.
+        return readAfterRelease(read);
+      }) as typeof originalStorageGet;
+    } else {
+      tabs.get = ((...args: unknown[]) => {
+        const [tabId, callback] = args;
+        const read = () =>
+          (originalTabGet as (...nativeArgs: unknown[]) => unknown).apply(tabs, args);
+        if (
+          !state.activated ||
+          state.entered ||
+          tabId !== state.submittedTabId ||
+          callback !== undefined
+        ) {
+          return read();
+        }
+        return readAfterRelease(read);
+      }) as typeof originalTabGet;
+    }
+    document.addEventListener('keydown', arm, true);
+    document.addEventListener('click', arm, true);
+    return state;
+  }, boundary);
+  return {
+    dispose: async () => {
+      try {
+        await handle.evaluate(state => {
+          state.restore();
+        });
+      } finally {
+        await handle.dispose();
+      }
+    },
+    outcome: () => handle.evaluate(state => ({ failed: state.failed, settled: state.settled })),
+    reject: () =>
+      handle.evaluate(state => {
+        state.reject();
+      }),
+    release: () =>
+      handle.evaluate(state => {
+        state.release();
+      }),
+    restore: () =>
+      handle.evaluate(state => {
+        state.restore();
+      }),
+    wait: async () => {
+      await expect.poll(() => handle.evaluate(state => state.entered)).toBe(true);
+    },
+  };
+};
+
+for (const activation of ['Enter', 'Send'] as const) {
+  test(`native gap A1: ${activation} retains focus and submits captured text once`, async () => {
+    const seenChatBodies: unknown[] = [];
+    await withHarness(
+      async ({ panel, target, other }) => {
+        await prepareNativeSend(panel);
+        const input = panel.getByLabel('Message agent');
+        const send = panel.getByRole('button', { exact: true, name: 'Send message' });
+        const conversation = panel.getByRole('region', { name: 'Agent conversation' });
+        const submitted = `Apply the ${activation} action once.`;
+        const draft = `  ${submitted}  `;
+        const newerDraft = 'Keep this newer unsent text.';
+        const gate = await holdNativeSendBoundary(panel, 'safety');
+        try {
+          await input.fill(draft);
+          if (activation === 'Enter') {
+            await input.press('Enter');
+            await expect(input).toBeFocused();
+          } else {
+            await send.click();
+            await expect(send).toBeFocused();
+          }
+          await expectNativeSendPending(panel, draft);
+          await gate.wait();
+          await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+
+          // Retry the focused control without forcing a click on a disabled button.
+          await panel.keyboard.press('Enter');
+          await expect(activation === 'Enter' ? input : send).toBeFocused();
+          await expectNativeSendPending(panel, draft);
+          await expect(conversation.getByText(submitted, { exact: true })).toHaveCount(0);
+          await expect(target.locator('#count')).toHaveText('0');
+          await expect(other.locator('#count')).toHaveText('0');
+          expect(seenChatBodies).toHaveLength(0);
+          if (activation === 'Send') {
+            await input.fill(newerDraft);
+            await expectNativeSendPending(panel, newerDraft);
+          }
+
+          await gate.release();
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await expect(conversation.getByText(resultText, { exact: true })).toBeVisible();
+          await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+          await expect(conversation.getByText(submitted, { exact: true })).toHaveCount(1);
+          await expect(target.locator('#count')).toHaveText('1');
+          await expect(other.locator('#count')).toHaveText('0');
+          await expect(input).toHaveValue(activation === 'Send' ? newerDraft : '');
+          expect(seenChatBodies.map(body => nativeSendUserTexts(body))).toEqual([
+            [submitted],
+            [submitted],
+          ]);
+        } finally {
+          await gate.dispose();
+        }
+      },
+      { gateway: nativeSendGateway(seenChatBodies) }
+    );
+  });
+}
+
+test('native gap A1: native contention rejects Send until an explicit retry', async () => {
+  const seenChatBodies: unknown[] = [];
+  await withHarness(
+    async ({ panel, openPanel, target, other }) => {
+      await prepareNativeSend(panel);
+      const second = await openPanel();
+      const input = panel.getByLabel('Message agent');
+      const draft = 'Keep the draft while another native owner holds control.';
+      const gate = await holdNativeSendBoundary(panel, 'safety');
+      try {
+        await input.fill(draft);
+        await input.press('Enter');
+        await expectNativeSendPending(panel, draft);
+        await gate.wait();
+        const contender = await second.evaluateHandle(name => {
+          const hold = Promise.withResolvers<void>();
+          const released = navigator.locks.request(name, { mode: 'exclusive' }, () => hold.promise);
+          return {
+            release: async () => {
+              hold.resolve();
+              await released;
+            },
+          };
+        }, executionLock);
+        try {
+          await expect.poll(() => heldExecutionModes(panel)).toEqual(['exclusive']);
+          await expectNativeSendPending(panel, draft);
+          await gate.release();
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await expect(
+            panel.getByRole('status').filter({ hasText: 'owns browser control' }).first()
+          ).toBeVisible();
+          await expect(input).toHaveValue(draft);
+          await expect(panel.getByRole('region', { name: 'Agent conversation' })).not.toContainText(
+            draft
+          );
+          await expect(target.locator('#count')).toHaveText('0');
+          await expect(other.locator('#count')).toHaveText('0');
+          expect(seenChatBodies).toHaveLength(0);
+
+          await contender.evaluate(held => held.release());
+          await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+          await expect(
+            panel.getByRole('status').filter({
+              hasText:
+                'Your message is retained. Submit it again when browser control is available.',
+            })
+          ).toBeVisible();
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await expect(input).toHaveValue(draft);
+          await expect(target.locator('#count')).toHaveText('0');
+          await expect(other.locator('#count')).toHaveText('0');
+          expect(seenChatBodies).toHaveLength(0);
+
+          await panel.getByRole('button', { exact: true, name: 'Send message' }).click();
+          await expect(panel.getByText(resultText, { exact: true })).toBeVisible();
+          await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await expect(input).toHaveValue('');
+          await expect(target.locator('#count')).toHaveText('1');
+          await expect(other.locator('#count')).toHaveText('0');
+          expect(seenChatBodies.map(body => nativeSendUserTexts(body))).toEqual([[draft], [draft]]);
+        } finally {
+          try {
+            await contender.evaluate(held => held.release());
+          } finally {
+            await contender.dispose();
+          }
+        }
+      } finally {
+        await gate.dispose();
+      }
+    },
+    { gateway: nativeSendGateway(seenChatBodies) }
+  );
+});
+
+test('native gap A1: storage failure retains Send until explicit recovery and retry', async () => {
+  const seenChatBodies: unknown[] = [];
+  await withHarness(
+    async ({ panel, target, other }) => {
+      await enable(panel);
+      await prepareNativeSend(panel);
+      const input = panel.getByLabel('Message agent');
+      const draft = 'Keep this draft through the safety storage failure.';
+      const gate = await holdNativeSendBoundary(panel, 'safety');
+      try {
+        await input.fill(draft);
+        await input.press('Enter');
+        await expectNativeSendPending(panel, draft);
+        await gate.wait();
+        await gate.reject();
+        await expect(nativeSendPending(panel)).toHaveCount(0);
+        await expect(
+          panel
+            .getByRole('status')
+            .filter({
+              hasText:
+                'Browser safety state is unavailable. No browser work can start. Restore storage access before recovery.',
+            })
+            .first()
+        ).toBeVisible();
+        await expect(input).toHaveValue(draft);
+        await expect(panel.getByRole('region', { name: 'Agent conversation' })).not.toContainText(
+          draft
+        );
+        await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+        await expect(target.locator('#count')).toHaveText('0');
+        await expect(other.locator('#count')).toHaveText('0');
+        expect(seenChatBodies).toHaveLength(0);
+
+        await gate.restore();
+        const controls = supervision(panel);
+        await controls.getByRole('button', { name: 'Check recovery readiness' }).click();
+        const recover = controls.getByRole('button', { name: 'Recover browser control' });
+        await expect(recover).toBeEnabled();
+        await expect(nativeSendPending(panel)).toHaveCount(0);
+        await expect(input).toHaveValue(draft);
+        await expect(target.locator('#count')).toHaveText('0');
+        await expect(other.locator('#count')).toHaveText('0');
+        expect(seenChatBodies).toHaveLength(0);
+        await recover.click();
+        await expect(controls).toContainText('Enabled — idle');
+        await expect(nativeSendPending(panel)).toHaveCount(0);
+        await expect(input).toHaveValue(draft);
+        await expect(target.locator('#count')).toHaveText('0');
+        await expect(other.locator('#count')).toHaveText('0');
+        expect(seenChatBodies).toHaveLength(0);
+
+        await panel.getByRole('button', { exact: true, name: 'Send message' }).click();
+        await expect(panel.getByText(resultText, { exact: true })).toBeVisible();
+        await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+        await expect(nativeSendPending(panel)).toHaveCount(0);
+        await expect(input).toHaveValue('');
+        await expect(target.locator('#count')).toHaveText('1');
+        await expect(other.locator('#count')).toHaveText('0');
+        expect(seenChatBodies.map(body => nativeSendUserTexts(body))).toEqual([[draft], [draft]]);
+      } finally {
+        await gate.dispose();
+      }
+    },
+    { gateway: nativeSendGateway(seenChatBodies) }
+  );
+});
+
+for (const change of ['changed', 'closed'] as const) {
+  test(`native gap A1: ${change} target retains Send without retargeting`, async () => {
+    const seenChatBodies: unknown[] = [];
+    await withHarness(
+      async ({ panel, target, other }) => {
+        await prepareNativeSend(panel);
+        const input = panel.getByLabel('Message agent');
+        const draft = `Retain this message when the target is ${change}.`;
+        const gate = await holdNativeSendBoundary(panel, 'tab');
+        try {
+          await input.fill(draft);
+          await input.press('Enter');
+          await expectNativeSendPending(panel, draft);
+          await gate.wait();
+          await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+          await expect(target.locator('#count')).toHaveText('0');
+          await (change === 'changed'
+            ? panel.getByLabel('Target tab').selectOption({ label: 'Unapproved tab' })
+            : target.close());
+          await expectNativeSendPending(panel, draft);
+          expect(seenChatBodies).toHaveLength(0);
+          await gate.release();
+          await expect.poll(gate.outcome).toEqual({ failed: change === 'closed', settled: true });
+          await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await expect(
+            panel.getByRole('status').filter({
+              hasText:
+                'The target tab changed or closed. Your message is retained. Select a target tab and submit again.',
+            })
+          ).toBeVisible();
+          await expect(input).toHaveValue(draft);
+          await expect(panel.getByRole('region', { name: 'Agent conversation' })).not.toContainText(
+            draft
+          );
+          if (change === 'changed') {
+            await expect(target.locator('#count')).toHaveText('0');
+          }
+          await panel.getByLabel('Target tab').selectOption({ label: 'Unapproved tab' });
+          await expect(
+            panel.getByRole('button', { exact: true, name: 'Send message' })
+          ).toBeEnabled();
+          await expect(input).toHaveValue(draft);
+          await expect(other.locator('#count')).toHaveText('0');
+          expect(seenChatBodies).toHaveLength(0);
+        } finally {
+          await gate.dispose();
+        }
+      },
+      { gateway: nativeSendGateway(seenChatBodies) }
+    );
+  });
+}
+
+test('native gap A1: closing a nonempty conversation cancels Send and History retains its draft', async () => {
+  const seenChatBodies: unknown[] = [];
+  await withHarness(
+    async ({ panel, target, other }) => {
+      const title = 'Cancelled Send';
+      await prepareNativeSend(panel, [title]);
+      const input = panel.getByLabel('Message agent');
+      const draft = 'Retain this cancelled conversation draft.';
+      const tabs = panel.getByRole('tablist', { name: 'Conversation tabs' });
+      const gate = await holdNativeSendBoundary(panel, 'tab');
+      try {
+        await input.fill(draft);
+        await input.press('Enter');
+        await expectNativeSendPending(panel, draft);
+        await gate.wait();
+        await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+        await tabs.getByRole('button', { exact: true, name: `Close Prior ${title}` }).click();
+        await expect(tabs.getByRole('tab', { exact: true, name: `Prior ${title}` })).toHaveCount(0);
+        await expect(nativeSendPending(panel)).toHaveCount(0);
+        await expect(input).toHaveValue('');
+        await gate.release();
+        await expect.poll(gate.outcome).toEqual({ failed: false, settled: true });
+        await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+
+        await panel.getByRole('button', { exact: true, name: 'History' }).click();
+        await panel
+          .getByRole('dialog', { name: 'Conversation history' })
+          .getByRole('button', { exact: true, name: `Open Prior ${title}` })
+          .click();
+        await expect(
+          tabs.getByRole('tab', { exact: true, name: `Prior ${title}` })
+        ).toHaveAttribute('aria-selected', 'true');
+        await expect(input).toHaveValue(draft);
+        await expect(nativeSendPending(panel)).toHaveCount(0);
+        await expect(
+          panel.getByRole('button', { exact: true, name: 'Send message' })
+        ).toBeEnabled();
+        const conversation = panel.getByRole('region', { name: 'Agent conversation' });
+        await expect(conversation.getByText(`Prior ${title}`, { exact: true })).toBeVisible();
+        await expect(conversation.getByText(draft, { exact: true })).toHaveCount(0);
+        await expect(target.locator('#count')).toHaveText('0');
+        await expect(other.locator('#count')).toHaveText('0');
+        expect(seenChatBodies).toHaveLength(0);
+      } finally {
+        await gate.dispose();
+      }
+    },
+    { gateway: nativeSendGateway(seenChatBodies) }
+  );
+});
+
+test('native gap A1: blank and whitespace drafts never start Send admission', async () => {
+  const seenChatBodies: unknown[] = [];
+  await withHarness(
+    async ({ panel, target, other }) => {
+      await prepareNativeSend(panel);
+      const input = panel.getByLabel('Message agent');
+      // A tab gate leaves any accidental admission pending without trapping background safety reads.
+      const gate = await holdNativeSendBoundary(panel, 'tab');
+      try {
+        for (const draft of ['', '   \n  ']) {
+          await input.fill(draft);
+          await expect(
+            panel.getByRole('button', { exact: true, name: 'Send message' })
+          ).toBeDisabled();
+          await input.press('Enter');
+          await expect(input).toBeFocused();
+          await expect(input).toHaveValue(draft);
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+          await expect(target.locator('#count')).toHaveText('0');
+          await expect(other.locator('#count')).toHaveText('0');
+          expect(seenChatBodies).toHaveLength(0);
+        }
+      } finally {
+        await gate.dispose();
+      }
+    },
+    { gateway: nativeSendGateway(seenChatBodies) }
+  );
+});
+
+for (const outcome of ['success', 'failure'] as const) {
+  test(`native gap A5 Send: late lookup ${outcome} cannot clear a newer Send`, async () => {
+    const seenChatBodies: unknown[] = [];
+    await withHarness(
+      async ({ panel, target, other }) => {
+        const title = 'Send race';
+        await prepareNativeSend(panel, [title]);
+        await panel.getByLabel('Target tab').selectOption({ label: 'Unapproved tab' });
+        const input = panel.getByLabel('Message agent');
+        const oldDraft = 'Never submit this cancelled older Send.';
+        const newDraft = 'Submit only this newer Send.';
+        const tabs = panel.getByRole('tablist', { name: 'Conversation tabs' });
+        const older = await holdNativeSendBoundary(panel, 'tab');
+        try {
+          await input.fill(oldDraft);
+          await input.press('Enter');
+          await expectNativeSendPending(panel, oldDraft);
+          await older.wait();
+          await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+          await tabs.getByRole('button', { exact: true, name: `Close Prior ${title}` }).click();
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await expect(tabs.getByRole('tab', { exact: true, name: `Prior ${title}` })).toHaveCount(
+            0
+          );
+          await expect(other.locator('#count')).toHaveText('0');
+          if (outcome === 'failure') {
+            await other.close();
+          }
+          await panel.getByRole('button', { exact: true, name: 'History' }).click();
+          await panel
+            .getByRole('dialog', { name: 'Conversation history' })
+            .getByRole('button', { exact: true, name: `Open Prior ${title}` })
+            .click();
+          await expect(input).toHaveValue(oldDraft);
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await panel.getByLabel('Target tab').selectOption({ label: 'Approved browser task tab' });
+          const newer = await holdNativeSendBoundary(panel, 'tab');
+          try {
+            await input.fill(newDraft);
+            await input.press('Enter');
+            await expectNativeSendPending(panel, newDraft);
+            await newer.wait();
+            await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared', 'shared']);
+            await older.release();
+            await expect
+              .poll(older.outcome)
+              .toEqual({ failed: outcome === 'failure', settled: true });
+            await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+            await expectNativeSendPending(panel, newDraft);
+            const conversation = panel.getByRole('region', { name: 'Agent conversation' });
+            await expect(conversation.getByText(oldDraft, { exact: true })).toHaveCount(0);
+            await expect(conversation.getByText(newDraft, { exact: true })).toHaveCount(0);
+            await expect(target.locator('#count')).toHaveText('0');
+            expect(seenChatBodies).toHaveLength(0);
+
+            await newer.release();
+            await expect(nativeSendPending(panel)).toHaveCount(0);
+            await expect(conversation.getByText(resultText, { exact: true })).toBeVisible();
+            await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+            await expect(conversation.getByText(oldDraft, { exact: true })).toHaveCount(0);
+            await expect(conversation.getByText(newDraft, { exact: true })).toHaveCount(1);
+            await expect(input).toHaveValue('');
+            await expect(target.locator('#count')).toHaveText('1');
+            if (outcome === 'success') {
+              await expect(other.locator('#count')).toHaveText('0');
+            }
+            expect(seenChatBodies.map(body => nativeSendUserTexts(body))).toEqual([
+              [`Prior ${title}`, newDraft],
+              [`Prior ${title}`, newDraft],
+            ]);
+          } finally {
+            await newer.dispose();
+          }
+        } finally {
+          await older.dispose();
+        }
+      },
+      { gateway: nativeSendGateway(seenChatBodies) }
+    );
+  });
+}
+
+test('native gap A5 Send: conversation switches isolate pending drafts and settled results', async () => {
+  const seenChatBodies: unknown[] = [];
+  const secondResult = 'Only the second conversation completed this message.';
+  await withHarness(
+    async ({ panel, target, other }) => {
+      await prepareNativeSend(panel, ['First Send', 'Second Send']);
+      const tabs = panel.getByRole('tablist', { name: 'Conversation tabs' });
+      const firstTab = tabs.getByRole('tab', { exact: true, name: 'Prior First Send' });
+      const secondTab = tabs.getByRole('tab', { exact: true, name: 'Prior Second Send' });
+      const input = panel.getByLabel('Message agent');
+      const firstDraft = 'Apply the first conversation action.';
+      const secondDraft = 'Answer only in the second conversation.';
+      const newerDraft = 'Keep the second conversation draft after both attempts settle.';
+      const first = await holdNativeSendBoundary(panel, 'tab');
+      try {
+        await input.fill(firstDraft);
+        await input.press('Enter');
+        await expectNativeSendPending(panel, firstDraft);
+        await first.wait();
+        await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+        await secondTab.click();
+        await expect(nativeSendPending(panel)).toHaveCount(0);
+        await expect(input).toHaveValue('');
+        await input.fill(secondDraft);
+        await expect(
+          panel.getByRole('button', { exact: true, name: 'Send message' })
+        ).toBeEnabled();
+        await firstTab.click();
+        await expectNativeSendPending(panel, firstDraft);
+        await secondTab.click();
+        await expect(nativeSendPending(panel)).toHaveCount(0);
+        await expect(input).toHaveValue(secondDraft);
+        const second = await holdNativeSendBoundary(panel, 'tab');
+        try {
+          await input.press('Enter');
+          await expectNativeSendPending(panel, secondDraft);
+          await second.wait();
+          await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared', 'shared']);
+          await input.fill(newerDraft);
+          await first.release();
+          await expect.poll(() => heldExecutionModes(panel)).toEqual(['shared']);
+          await expectNativeSendPending(panel, newerDraft);
+          const conversation = panel.getByRole('region', { name: 'Agent conversation' });
+          await expect(conversation.getByText(firstDraft, { exact: true })).toHaveCount(0);
+          await expect(conversation.getByText(resultText, { exact: true })).toHaveCount(0);
+          await expect(target.locator('#count')).toHaveText('1');
+          expect(seenChatBodies.map(body => nativeSendUserTexts(body))).toEqual([
+            ['Prior First Send', firstDraft],
+            ['Prior First Send', firstDraft],
+          ]);
+
+          await second.release();
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await expect(conversation.getByText(secondResult, { exact: true })).toBeVisible();
+          await expect.poll(() => heldExecutionModes(panel)).toEqual([]);
+          await expect(conversation.getByText(secondDraft, { exact: true })).toHaveCount(1);
+          await expect(input).toHaveValue(newerDraft);
+          await firstTab.click();
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await expect(input).toHaveValue('');
+          await expect(conversation.getByText(firstDraft, { exact: true })).toHaveCount(1);
+          await expect(conversation.getByText(resultText, { exact: true })).toBeVisible();
+          await expect(conversation.getByText(secondResult, { exact: true })).toHaveCount(0);
+          await secondTab.click();
+          await expect(nativeSendPending(panel)).toHaveCount(0);
+          await expect(input).toHaveValue(newerDraft);
+          await expect(conversation.getByText(secondResult, { exact: true })).toBeVisible();
+          await expect(conversation.getByText(resultText, { exact: true })).toHaveCount(0);
+          await expect(target.locator('#count')).toHaveText('1');
+          await expect(other.locator('#count')).toHaveText('0');
+          expect(seenChatBodies.map(body => nativeSendUserTexts(body))).toEqual([
+            ['Prior First Send', firstDraft],
+            ['Prior First Send', firstDraft],
+            ['Prior Second Send', secondDraft],
+          ]);
+        } finally {
+          await second.dispose();
+        }
+      } finally {
+        await first.dispose();
+      }
+    },
+    {
+      gateway: {
+        ...nativeSendGateway(seenChatBodies),
+        thirdCompletionEvents: content(secondResult),
+      },
+    }
+  );
+});

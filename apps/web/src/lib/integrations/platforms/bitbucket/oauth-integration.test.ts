@@ -389,16 +389,15 @@ function branchesInput(defaultBranch: string | undefined = 'release/Case') {
 describe('Bitbucket branch boundary through the b1/a3 transport', () => {
   const next =
     'https://api.bitbucket.org/2.0/repositories/acme/API/refs/branches?pagelen=50&page=2';
-  it('uses validated pagination and the selected repository default', async () => {
-    useInteractiveService(
-      jest.fn<typeof fetch>().mockResolvedValue(
-        Response.json({
-          values: [{ name: 'release/Case' }, { name: 'feature/Case' }],
-          pagelen: 50,
-          next,
-        })
-      )
+  it('uses the supported request with transport pagination and the selected default', async () => {
+    const providerFetch = jest.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        values: [{ name: 'release/Case' }, { name: 'feature/Case' }],
+        pagelen: 50,
+        next,
+      })
     );
+    useInteractiveService(providerFetch);
     await expect(oauth.listBitbucketRepositoryBranches(branchesInput())).resolves.toEqual({
       branches: [
         { name: 'release/Case', isDefault: true },
@@ -407,6 +406,20 @@ describe('Bitbucket branch boundary through the b1/a3 transport', () => {
       defaultBranch: 'release/Case',
       nextCursor: next,
     });
+    expect(JSON.parse(String(jest.mocked(global.fetch).mock.calls[0][1]?.body))).toEqual({
+      integrationId: INTEGRATION_ID,
+      workspaceUuid: WORKSPACE_UUID,
+      workspaceSlug: 'acme',
+      repositoryUuid: REPOSITORY_UUID,
+      repositoryFullName: 'acme/API',
+      request: {
+        operation: 'branches',
+        params: { path: { workspace: 'acme', repo_slug: 'API' } },
+      },
+    });
+    expect(providerFetch.mock.calls[0][0]).toBe(
+      'https://api.bitbucket.org/2.0/repositories/acme/API/refs/branches?pagelen=50'
+    );
   });
   it('preserves the first page while a failed page can be retried', async () => {
     let pageCalls = 0;

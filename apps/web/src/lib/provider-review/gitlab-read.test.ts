@@ -253,9 +253,8 @@ beforeEach(() => {
     const page = url.searchParams.get('page') ?? '1';
     const failure = failures.get(`${path}:${page}`) ?? failures.get(path);
     if (failure) return Response.json({ message: 'test-credential' }, { status: failure });
-    let data = rows.get(
-      url.searchParams.has('ref') ? `${path}@${url.searchParams.get('ref')}` : path
-    );
+    const key = url.searchParams.has('ref') ? `${path}@${url.searchParams.get('ref')}` : path;
+    let data = rows.get(`${key}:${page}`) ?? rows.get(key);
     if (data === undefined) return Response.json({}, { status: 404 });
     if (
       path === '/merge_requests' &&
@@ -636,6 +635,119 @@ it('AC6 preserves conversation notes with a deleted author', async () => {
     comments: { items: [{ author: null, bodyMarkdown: 'Review text' }] },
   });
 });
+describe('Gitbeaker read request contracts', () => {
+  it('AC4–AC5 preserves empty version and check results', async () => {
+    rows.set(`${root}/versions`, []);
+    const selected = await auth();
+    expect(await listGitLabDiffVersions(selected, identity)).toEqual({
+      items: [],
+      nextCursor: null,
+    });
+    expect(await getGitLabChecks(selected, identity)).toEqual({ status: 'none', checks: [] });
+  });
+
+  it('AC5 keeps diff-version pages separate with the requested page size', async () => {
+    const path = `${root}/versions`;
+    const versions = Array.from({ length: 26 }, (_, index) => ({
+      id: 91 + index,
+      head_commit_sha: revision.headSha,
+      base_commit_sha: revision.baseSha,
+      start_commit_sha: revision.startSha,
+    }));
+    rows.set(path, versions.slice(0, 25));
+    rows.set(`${path}:2`, versions.slice(25));
+    paged.add(path);
+    const selected = await auth();
+    const first = await listGitLabDiffVersions(selected, identity);
+    expect(first.items).toHaveLength(25);
+    expect(first.items[0]).toEqual({ id: '91', revision });
+    expect(first.items[24]).toEqual({ id: '115', revision });
+    expect(await listGitLabDiffVersions(selected, identity, first.nextCursor)).toEqual({
+      items: [{ id: '116', revision }],
+      nextCursor: null,
+    });
+    const queries = jest
+      .mocked(global.fetch)
+      .mock.calls.map(([destination]) => new URL(String(destination)))
+      .filter(url => url.pathname.endsWith(path))
+      .map(url => Object.fromEntries(url.searchParams));
+    expect(queries).toEqual([
+      { page: '1', per_page: '25' },
+      { page: '2', per_page: '25' },
+    ]);
+  });
+
+  it('AC4 reads every status page without changing the latest-check query', async () => {
+    const path = `/projects/123/repository/commits/${revision.headSha}/statuses`;
+    const status = {
+      id: 55,
+      sha: revision.headSha,
+      status: 'success',
+      name: 'Build',
+      allow_failure: false,
+    };
+    rows.set(
+      path,
+      Array.from({ length: 100 }, (_, index) => ({ ...status, id: 1000 + index }))
+    );
+    rows.set(`${path}:2`, [
+      { ...status, id: 2000, status: 'failed', name: 'Optional', allow_failure: true },
+      { ...status, id: 2001, sha: 'd'.repeat(40), status: 'failed' },
+    ]);
+    paged.add(path);
+    const result = await getGitLabChecks(await auth(), identity);
+    expect(result).toMatchObject({
+      status: 'reported',
+      checks: expect.arrayContaining([
+        { id: 'status:1000', state: 'passed', name: 'Build', required: true, detailsUrl: null },
+        { id: 'status:1099', state: 'passed', name: 'Build', required: true, detailsUrl: null },
+        { id: 'status:2000', state: 'failed', name: 'Optional', required: false, detailsUrl: null },
+      ]),
+    });
+    if (result.status === 'reported') expect(result.checks).toHaveLength(101);
+    const queries = jest
+      .mocked(global.fetch)
+      .mock.calls.map(([destination]) => new URL(String(destination)))
+      .filter(url => url.pathname.endsWith(path))
+      .map(url => Object.fromEntries(url.searchParams));
+    expect(queries).toEqual([{ per_page: '100' }, { per_page: '100', page: '2' }]);
+  });
+
+  it.each([
+    [401, 'reconnect_required'],
+    [403, 'unavailable'],
+    [503, 'temporarily_unavailable'],
+  ] as const)('AC4 never reports partial checks after a later-page %s', async (status, code) => {
+    const path = `/projects/123/repository/commits/${revision.headSha}/statuses`;
+    rows.set(path, [{ id: 55, sha: revision.headSha, status: 'success', name: 'Build' }]);
+    rows.set(`${path}:2`, [{ id: 56, sha: revision.headSha, status: 'failed', name: 'Later' }]);
+    paged.add(path);
+    failures.set(`${path}:2`, status);
+    const selected = await auth();
+    const result = getGitLabChecks(selected, identity);
+    if (status === 403)
+      await expect(result).resolves.toEqual({
+        status: 'unavailable',
+        explanation: 'forbidden_or_unavailable',
+      });
+    else
+      await expect(result).rejects.toMatchObject({
+        code,
+        message: `GitLab interactive request failed: ${code} (${status})`,
+      });
+    if (status === 503) {
+      failures.clear();
+      expect(await getGitLabChecks(selected, identity)).toMatchObject({
+        status: 'reported',
+        checks: [
+          { id: 'status:55', state: 'passed' },
+          { id: 'status:56', state: 'failed' },
+        ],
+      });
+    }
+  });
+});
+
 it.each(['inbox', 'files', 'versions', 'discussions'] as const)(
   'AC4–AC6 retains the loaded %s page across a later-page failure and retry',
   async surface => {
@@ -859,21 +971,33 @@ it('AC6 bounds combined reaction results across separate provider responses', as
     code: 'response_too_large',
   });
 });
-it('AC4 rejects an incomplete aggregate at the SDK page ceiling', async () => {
-  const fetch = global.fetch;
-  global.fetch = jest.fn(async (destination, init) => {
-    const url = new URL(String(destination));
-    if (!url.pathname.endsWith('/pipelines')) return fetch(destination, init);
-    const current = Number(url.searchParams.get('page') ?? 1);
-    url.searchParams.set('page', String(current + 1));
-    return Response.json([{ id: current, sha: revision.headSha, status: 'running' }], {
-      headers: { link: `<${url}>; rel="next"`, 'x-next-page': String(current + 1) },
+it.each(['pipelines', 'statuses'])(
+  'AC4 rejects an incomplete %s aggregate at the SDK page ceiling',
+  async surface => {
+    const fetch = global.fetch;
+    global.fetch = jest.fn(async (destination, init) => {
+      const url = new URL(String(destination));
+      if (!url.pathname.endsWith(`/${surface}`)) return fetch(destination, init);
+      const current = Number(url.searchParams.get('page') ?? 1);
+      url.searchParams.set('page', String(current + 1));
+      return Response.json(
+        [{ id: current, sha: revision.headSha, status: 'running', name: 'Build' }],
+        {
+          headers: { link: `<${url}>; rel="next"`, 'x-next-page': String(current + 1) },
+        }
+      );
     });
-  });
-  await expect(getGitLabChecks(await auth(), identity)).rejects.toMatchObject({
-    code: 'pagination_limit',
-  });
-});
+    await expect(getGitLabChecks(await auth(), identity)).rejects.toMatchObject({
+      code: 'pagination_limit',
+    });
+    const requests = jest
+      .mocked(global.fetch)
+      .mock.calls.filter(([destination]) =>
+        new URL(String(destination)).pathname.endsWith(`/${surface}`)
+      );
+    expect(requests).toHaveLength(100);
+  }
+);
 it('AC6 bounds discussion expansion instead of dropping notes', async () => {
   rows.set(`${root}/discussions`, [
     { id: 'large', notes: Array.from({ length: 101 }, () => note) },

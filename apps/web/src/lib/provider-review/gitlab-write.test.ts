@@ -844,6 +844,24 @@ it.each([
   expect(await run(input)).toMatchObject({ status: 'confirmed' });
   expect(writes).toHaveLength(1);
 });
+it('AC6 keeps an accepted reaction unresolved when its award is missing without replay', async () => {
+  acceptedResponse = `${root}/notes/8/award_emoji`;
+  const input: ReviewIntentInput = {
+    action: 'addReaction',
+    target: { provider: 'gitlab', kind: 'comment', id: '8', url: null },
+    reaction: 'thumbsup',
+  };
+  expect(await run(input)).toMatchObject({ status: 'accepted', reference: { id: '20' } });
+  awards = [];
+  expect(await run(input)).toMatchObject({
+    status: 'unresolved',
+    reason: 'provider_outcome_unknown',
+    reference: { id: '20' },
+    retry: 'reconcile',
+  });
+  expect(awards).toEqual([]);
+  expect(writes).toHaveLength(1);
+});
 it.each(['side', 'line', 'range', 'provider'] as const)(
   'AC6 rejects inconsistent inline %s without dispatch',
   async change => {

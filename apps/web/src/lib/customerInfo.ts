@@ -3,7 +3,6 @@ import { hasPaymentMethodInStripe } from '@/lib/stripe-client';
 import { db } from '@/lib/drizzle';
 import { payment_methods, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { generateApiToken } from './tokens';
 import { userHasOrganizations } from '@/lib/organizations/organizations';
 import { hasReceivedAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
 
@@ -14,7 +13,6 @@ export type CustomerInfo = {
   paymentStatus_untrusted: string;
   hasPaymentMethodEligibleForFreeCredits: boolean;
   user: User;
-  kiloToken: string;
   hasOrganizations: boolean;
   hasReceivedWelcomeCredits: boolean;
 };
@@ -52,7 +50,6 @@ export const getCustomerInfo = async (
     hasPaymentMethodEligibleForFreeCredits: await paymentEligblePromise,
     paymentStatus_untrusted: searchParams.payment_status as string,
     user,
-    kiloToken: generateApiToken(user),
     hasOrganizations: hasOrganizations,
     hasReceivedWelcomeCredits,
   };

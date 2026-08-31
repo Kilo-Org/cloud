@@ -2609,13 +2609,7 @@
       "discardAttachmentsMessage": "Augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
       "discardAttachmentsTitle": "Atmest pielikumus?",
       "charactersRemaining": "Atlikušās rakstzīmes: {{count}}",
-      "insertNewline": "Ievietot jaunu rindu",
-      "starterChipBuild": "Izveido funkciju",
-      "starterChipEmpty": "Sāc ar ideju",
-      "starterChipFix": "Izlabo kļūdu",
-      "starterChipPrepare": "Iestati manu vidi",
-      "starterChipWrapUp": "Pabeidz manu sesiju",
-      "starterChipWriteTests": "Raksti testus"
+      "insertNewline": "Ievietot jaunu rindu"
     },
     "chatLink": {
       "linkCopied": "Saite kopēta",

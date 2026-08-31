@@ -148,6 +148,10 @@ vi.mock('@/components/agents/slash-command-suggestions', () => ({
   SlashCommandSuggestions: () => null,
 }));
 
+vi.mock('@/components/agents/suggestion-card', () => ({
+  SuggestionCard: () => null,
+}));
+
 // Marked so the test can locate the input-row element in the returned tree
 // (plain function calls build element objects; child components are not
 // invoked without a renderer).

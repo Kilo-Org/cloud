@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "بھیجے گئے پیغامات سے غیر منسلک اپ لوڈز حذف ہو جائیں گے۔",
       "discardAttachmentsTitle": "اٹیچمنٹس ضائع کریں؟",
       "charactersRemaining": "{{count}} حروف باقی ہیں",
-      "insertNewline": "نئی سطر داخل کریں",
-      "starterChipBuild": "ایک فیچر بناؤ",
-      "starterChipEmpty": "ایک خیال سے شروع کرو",
-      "starterChipFix": "ایک خرابی درست کرو",
-      "starterChipPrepare": "میرا ماحول ترتیب دو",
-      "starterChipWrapUp": "میرا سیشن مکمل کرو",
-      "starterChipWriteTests": "ٹیسٹ لکھو"
+      "insertNewline": "نئی سطر داخل کریں"
     },
     "chatLink": {
       "linkCopied": "لنک کاپی ہو گیا",

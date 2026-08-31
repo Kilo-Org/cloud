@@ -2609,13 +2609,7 @@
       "discardAttachmentsMessage": "Otpremljeni fajlovi koji nisu priloženi poslatim porukama biće obrisani.",
       "discardAttachmentsTitle": "Odbaciti priloge?",
       "charactersRemaining": "Preostalo znakova: {{count}}",
-      "insertNewline": "Unesite novi red",
-      "starterChipBuild": "Napravi funkciju",
-      "starterChipEmpty": "Počni od ideje",
-      "starterChipFix": "Ispravi grešku",
-      "starterChipPrepare": "Podesi moje okruženje",
-      "starterChipWrapUp": "Završi moju sesiju",
-      "starterChipWriteTests": "Napiši testove"
+      "insertNewline": "Unesite novi red"
     },
     "chatLink": {
       "linkCopied": "Link kopiran",

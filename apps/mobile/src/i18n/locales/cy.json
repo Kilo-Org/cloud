@@ -2666,13 +2666,7 @@
       "discardAttachmentsMessage": "Bydd ffeiliau wedi'u huwchlwytho nad ydynt wedi'u hatodi i negeseuon a anfonwyd yn cael eu dileu.",
       "discardAttachmentsTitle": "Taflu atodiadau?",
       "charactersRemaining": "{{count}} nod yn weddill",
-      "insertNewline": "Mewnosod llinell newydd",
-      "starterChipBuild": "Adeilada nodwedd",
-      "starterChipEmpty": "Dechrau gyda syniad",
-      "starterChipFix": "Trwsia nam",
-      "starterChipPrepare": "Gosod fy amgylchedd",
-      "starterChipWrapUp": "Gorffen fy sesiwn",
-      "starterChipWriteTests": "Ysgrifenna brofion"
+      "insertNewline": "Mewnosod llinell newydd"
     },
     "chatLink": {
       "linkCopied": "Copïwyd y ddolen",

@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Fichye telechaje ki pa atache ak mesaj voye yo pral efase.",
       "discardAttachmentsTitle": "Jete atachman yo?",
       "charactersRemaining": "{{count}} karaktè rete",
-      "insertNewline": "Antre yon nouvo liy",
-      "starterChipBuild": "Kreye yon fonksyon",
-      "starterChipEmpty": "Kòmanse ak yon lide",
-      "starterChipFix": "Korije yon erè",
-      "starterChipPrepare": "Konfigire anviwònman mwen",
-      "starterChipWrapUp": "Fini sesyon mwen",
-      "starterChipWriteTests": "Ekri tès"
+      "insertNewline": "Antre yon nouvo liy"
     },
     "chatLink": {
       "linkCopied": "Lyen kopye",

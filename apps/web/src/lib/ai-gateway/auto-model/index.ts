@@ -9,7 +9,7 @@ import {
   type OpenCodeSettings,
   type Verbosity,
 } from '@kilocode/db/schema-types';
-import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
+import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 
 export type AutoModelPricing = {
   prompt: string;
@@ -87,8 +87,8 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
 // Whoever changes this model constant must re-verify image support
 // (via live OpenRouter data or the `model_stats` table) before
 // swapping it — do not assume parity with the prior value.
-export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
-  model: QWEN37_PLUS_MODEL_ID,
+export const BALANCED_FALLBACK_MODEL: ResolvedAutoModel = {
+  model: KIMI_CURRENT_MODEL_ID,
   reasoning: { enabled: true },
 };
 

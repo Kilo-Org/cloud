@@ -624,10 +624,12 @@ describe('child transcript requests', () => {
 
   it.each([
     [SELECTED_ID, NESTED_ID, 'completed'],
+    [kiloId('ses-sibling-0'), kiloId('ses-nested-sibling'), 'running'],
     [kiloId('ses-sibling-1'), kiloId('ses-nested-failed'), 'error'],
   ] as const)(
     'opens %s and its nested sheet immediately without requesting siblings',
     async (selectedId, nestedId, status) => {
+      const isRunning = status === 'running';
       const view = await mountDetails();
       pressCard(view.renderer, selectedId);
       pressCard(view.renderer, selectedId);
@@ -651,14 +653,19 @@ describe('child transcript requests', () => {
         'Selected child row'
       );
       const selectedCard = cardFor(view.renderer, selectedId);
-      expect(renderedText(selectedCard)).toContain('Writing response');
-      expect(selectedCard.findByProps({ accessibilityRole: 'button' }).props).toMatchObject({
-        accessibilityLabel: expect.stringContaining('Writing response'),
-      });
+      expect(renderedText(selectedCard)).toContain(`Task ${selectedId}`);
+      expect(renderedText(selectedCard).includes('Writing response')).toBe(isRunning);
+      const selectedButton = selectedCard.findByProps({ accessibilityRole: 'button' })
+        .props as ComponentProps<typeof Pressable>;
+      expect(selectedButton.accessibilityLabel?.includes('Writing response')).toBe(isRunning);
       expect(selectedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
       const nestedCard = cardFor(view.renderer, nestedId);
-      expect(renderedText(nestedCard)).toBe(`Researcher\nTask ${nestedId}\n${status}`);
-      expect(nestedCard.findAll(node => (node.type as string) === 'Text')).toHaveLength(3);
+      expect(renderedText(nestedCard)).toBe(
+        `Researcher\nTask ${nestedId}${isRunning ? '\nWaiting for activity' : ''}\n${status}`
+      );
+      expect(nestedCard.findAll(node => (node.type as string) === 'Text')).toHaveLength(
+        isRunning ? 4 : 3
+      );
       const nestedButton = nestedCard.findByProps({ accessibilityRole: 'button' })
         .props as ComponentProps<typeof Pressable>;
       expect(nestedButton).toMatchObject({
@@ -668,7 +675,7 @@ describe('child transcript requests', () => {
       });
       expect(nestedButton.accessibilityLabel).toContain(`Task ${nestedId}`);
       expect(nestedButton.accessibilityLabel).toContain(status);
-      expect(nestedButton.accessibilityLabel).not.toContain('Waiting for activity');
+      expect(nestedButton.accessibilityLabel?.includes('Waiting for activity')).toBe(isRunning);
       expect(view.requestedIds()).toEqual([ROOT_ID, selectedId]);
 
       pressCard(view.renderer, nestedId);
@@ -691,10 +698,13 @@ describe('child transcript requests', () => {
       expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
         'Selected child row'
       );
-      expect(renderedText(cardFor(view.renderer, nestedId))).toContain('Writing response');
-      expect(
-        cardFor(view.renderer, nestedId).findByProps({ accessibilityRole: 'button' }).props
-      ).toMatchObject({ accessibilityLabel: expect.stringContaining('Writing response') });
+      const hydratedNestedCard = cardFor(view.renderer, nestedId);
+      expect(renderedText(hydratedNestedCard)).toContain(`Task ${nestedId}`);
+      expect(renderedText(hydratedNestedCard).includes('Writing response')).toBe(isRunning);
+      expect(hydratedNestedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
+      const hydratedNestedButton = hydratedNestedCard.findByProps({ accessibilityRole: 'button' })
+        .props as ComponentProps<typeof Pressable>;
+      expect(hydratedNestedButton.accessibilityLabel?.includes('Writing response')).toBe(isRunning);
       expect(view.requestedIds()).toEqual([ROOT_ID, selectedId, nestedId]);
     }
   );

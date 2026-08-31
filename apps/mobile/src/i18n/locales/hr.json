@@ -2609,13 +2609,7 @@
       "discardAttachmentsMessage": "Učitane datoteke koje nisu priložene poslanim porukama bit će obrisane.",
       "discardAttachmentsTitle": "Odbaciti privitke?",
       "charactersRemaining": "Preostalo znakova: {{count}}",
-      "insertNewline": "Umetnite novi redak",
-      "starterChipBuild": "Izradi značajku",
-      "starterChipEmpty": "Započni s idejom",
-      "starterChipFix": "Ispravi pogrešku",
-      "starterChipPrepare": "Postavi moje okruženje",
-      "starterChipWrapUp": "Dovrši moju sesiju",
-      "starterChipWriteTests": "Napiši testove"
+      "insertNewline": "Umetnite novi redak"
     },
     "chatLink": {
       "linkCopied": "Poveznica kopirana",

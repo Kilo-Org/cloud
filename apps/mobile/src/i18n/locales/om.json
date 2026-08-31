@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Faayiloonni ol fe'aman kan ergaawwan ergamanitti hin qabachiifamne ni haqamu.",
       "discardAttachmentsTitle": "Faayiloota qabachiifaman haqnaa?",
       "charactersRemaining": "Qubeelaa {{count}} hafe",
-      "insertNewline": "Sarara haaraa galchaa",
-      "starterChipBuild": "Amala haaraa ijaari",
-      "starterChipEmpty": "Yaada tokkoon jalqabi",
-      "starterChipFix": "Dogoggora sirreessi",
-      "starterChipPrepare": "Naannoo koo qopheessi",
-      "starterChipWrapUp": "Turtii koo xumuri",
-      "starterChipWriteTests": "Qormaata barreessi"
+      "insertNewline": "Sarara haaraa galchaa"
     },
     "chatLink": {
       "linkCopied": "Geessituun maxxanameera",

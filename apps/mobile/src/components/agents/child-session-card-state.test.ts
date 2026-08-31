@@ -153,7 +153,7 @@ describe('getChildSessionCardState', () => {
   });
 
   it.each(['running', 'completed', 'error'] as const)(
-    'retains loaded read activity and its label for a %s task',
+    'uses the %s task status to control loaded read activity and its label',
     status => {
       const part = makeTaskPart(status, {
         subagent_type: 'Researcher',
@@ -172,9 +172,11 @@ describe('getChildSessionCardState', () => {
       expect(state).toEqual({
         agentName: 'Researcher',
         taskName: 'Check spec',
-        latestActivity: { tool: 'read', context: 'spec.md' },
+        latestActivity: status === 'running' ? { tool: 'read', context: 'spec.md' } : '',
       });
-      expect(getChildSessionActivityLabel(state.latestActivity)).toBe('read spec.md');
+      expect(getChildSessionActivityLabel(state.latestActivity)).toBe(
+        status === 'running' ? 'read spec.md' : ''
+      );
     }
   );
 
@@ -300,14 +302,14 @@ describe('getChildSessionCardState', () => {
   });
 
   it.each(['running', 'completed', 'error'] as const)(
-    'retains loaded text activity for a %s task',
+    'uses the %s task status to control loaded text activity',
     status => {
       const part = makeTaskPart(status, { subagent_type: 'Writer', description: 'Draft reply' });
       const messages = [makeAssistantMessage([makeTextPart('Here is the answer.')])];
       expect(getChildSessionCardState(part, messages)).toEqual({
         agentName: 'Writer',
         taskName: 'Draft reply',
-        latestActivity: 'Writing response',
+        latestActivity: status === 'running' ? 'Writing response' : '',
       });
     }
   );
@@ -374,6 +376,68 @@ describe('getChildSessionCardState', () => {
       taskName: 'Help',
       latestActivity: 'Waiting for activity',
     });
+  });
+});
+
+describe.each(['completed', 'error'] as const)('terminal %s parent activity', status => {
+  const part = makeTaskPart(status, { subagent_type: 'Researcher', description: 'Check spec' });
+  const histories: [string, StoredMessage[]][] = [
+    ['empty history', []],
+    ['incomplete history', [makeAssistantMessage([])]],
+    ['text', [makeAssistantMessage([makeTextPart('The answer')])]],
+    ['reasoning', [makeAssistantMessage([makeReasoningPart('Still thinking')])]],
+    [
+      'snapshot progress',
+      [
+        makeAssistantMessage([
+          {
+            id: 'snapshot',
+            sessionID: 'ses-1',
+            messageID: 'msg-1',
+            type: 'text',
+            text: 'Initializing snapshot…',
+            synthetic: true,
+          },
+        ]),
+      ],
+    ],
+    [
+      'structural part',
+      [
+        makeAssistantMessage([
+          {
+            id: 'step',
+            sessionID: 'ses-1',
+            messageID: 'msg-1',
+            type: 'step-start',
+          },
+        ]),
+      ],
+    ],
+    [
+      'delayed latest parts',
+      [makeAssistantMessage([makeTextPart('Earlier response')]), makeAssistantMessage([], 'msg-2')],
+    ],
+    ...(['pending', 'running', 'completed', 'error'] as const).map(
+      childStatus =>
+        [
+          `${childStatus} child tool`,
+          [
+            makeAssistantMessage([
+              makeToolPart('read', {
+                ...makeTaskPart(childStatus).state,
+                input: { filePath: '/project/spec.md' },
+              }),
+            ]),
+          ],
+        ] satisfies [string, StoredMessage[]]
+    ),
+  ];
+
+  it.each(histories)('omits activity for %s without removing task metadata', (_name, messages) => {
+    const state = getChildSessionCardState(part, messages);
+    expect(state).toEqual({ agentName: 'Researcher', taskName: 'Check spec', latestActivity: '' });
+    expect(getChildSessionActivityLabel(state.latestActivity)).toBe('');
   });
 });
 

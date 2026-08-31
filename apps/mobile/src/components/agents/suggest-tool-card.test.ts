@@ -16,8 +16,6 @@ const { resolveSuggestionPresentation, manager, activeSuggestion } = vi.hoisted(
     resolveSuggestionPresentation: vi.fn(),
     manager: {
       atoms: { activeSuggestion: {} },
-      acceptSuggestion: vi.fn(),
-      dismissSuggestion: vi.fn(),
     },
     activeSuggestion: suggestion,
   };
@@ -31,7 +29,6 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 vi.mock('./suggestion-card-state', () => ({ resolveSuggestionPresentation }));
-vi.mock('./suggestion-card', () => ({ SuggestionCard: 'SuggestionCard' }));
 vi.mock('./fixed-part-row', () => ({ FixedPartRow: 'FixedPartRow' }));
 vi.mock('@/components/ui/icons', () => ({ Sparkles: 'Sparkles' }));
 vi.mock('jotai', () => ({ useAtomValue: () => activeSuggestion }));
@@ -105,51 +102,18 @@ function findByType(root: React.ReactElement, type: string): React.ReactElement[
   return findAll(root, el => el.type === type);
 }
 
-describe('SuggestToolCard — interactive suggestion stays in the list', () => {
+describe('SuggestToolCard — interactive suggestion moves to the composer', () => {
   beforeEach(() => {
     resolveSuggestionPresentation.mockReset();
-    manager.acceptSuggestion.mockReset();
-    manager.dismissSuggestion.mockReset();
   });
 
-  it('renders SuggestionCard with accept/dismiss wired to the manager', async () => {
+  it('renders no transcript row for the active suggestion', () => {
     resolveSuggestionPresentation.mockReturnValue('interactive');
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = SuggestToolCard({
       part: makeSuggestPart('running'),
-    }) as unknown as React.ReactElement;
-
-    const cards = findByType(root, 'SuggestionCard');
-    expect(cards).toHaveLength(1);
-    const card = cards[0];
-    if (!card) {
-      throw new Error('card not found');
-    }
-    const cardProps = card.props as {
-      text: string;
-      actions: unknown;
-      onAccept: (index: number) => Promise<void>;
-      onDismiss: () => Promise<void>;
-    };
-    expect(cardProps).toMatchObject({
-      text: 'Suggestion text',
-      actions: [{ label: 'Apply', description: 'Apply this change' }],
     });
-
-    await cardProps.onAccept(1);
-    expect(manager.acceptSuggestion).toHaveBeenCalledWith('req-1', 1);
-
-    await cardProps.onDismiss();
-    expect(manager.dismissSuggestion).toHaveBeenCalledWith('req-1');
-  });
-
-  it('never renders a fixed row in the interactive presentation', () => {
-    resolveSuggestionPresentation.mockReturnValue('interactive');
-    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = SuggestToolCard({
-      part: makeSuggestPart('running'),
-    }) as unknown as React.ReactElement;
-    expect(findByType(root, 'FixedPartRow')).toHaveLength(0);
+    expect(root).toBeNull();
   });
 });
 

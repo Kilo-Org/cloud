@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "పంపిన సందేశాలకు జోడించని అప్లోడ్ చేసిన ఫైల్లు తొలగించబడతాయి.",
       "discardAttachmentsTitle": "జోడింపులను విస్మరించాలా?",
       "charactersRemaining": "{{count}} అక్షరాలు మిగిలి ఉన్నాయి",
-      "insertNewline": "కొత్త పంక్తిని చేర్చండి",
-      "starterChipBuild": "ఒక ఫీచర్ను రూపొందించు",
-      "starterChipEmpty": "ఒక ఆలోచనతో ప్రారంభించు",
-      "starterChipFix": "ఒక లోపాన్ని పరిష్కరించు",
-      "starterChipPrepare": "నా వాతావరణాన్ని సిద్ధం చేయి",
-      "starterChipWrapUp": "నా సెషన్ను ముగించు",
-      "starterChipWriteTests": "పరీక్షలు రాయి"
+      "insertNewline": "కొత్త పంక్తిని చేర్చండి"
     },
     "chatLink": {
       "linkCopied": "లింక్ కాపీ చేయబడింది",

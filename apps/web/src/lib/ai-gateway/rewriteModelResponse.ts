@@ -3,6 +3,10 @@ import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import {
+  getReasoningEffort,
+  getReasoningEffortTimeoutSuggestion,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { ProviderId, ProviderResponseTransforms } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
@@ -49,6 +53,7 @@ export type RewriteResponseParams = {
   removeCost: boolean;
   capture: RequestLogCapture | null;
   vercelRequestId: string | null;
+  reasoningEffort?: string | null;
 };
 
 export type RewriteChatCompletionsResponseParams = RewriteResponseParams & {
@@ -247,7 +252,8 @@ function logTerminalStreamEvent(
 
 function getResponseReadError(
   error: unknown,
-  vercelRequestId: string | null | undefined
+  vercelRequestId: string | null | undefined,
+  reasoningEffort: string | null | undefined
 ): ResponseReadError | null {
   if (typeof error !== 'object' || error === null || !('name' in error)) {
     return null;
@@ -257,7 +263,8 @@ function getResponseReadError(
     return {
       errorType: 'upstream_disconnect',
       message: withRequestId(
-        'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.',
+        'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.' +
+          getReasoningEffortTimeoutSuggestion(reasoningEffort),
         vercelRequestId
       ),
     };
@@ -267,7 +274,8 @@ function getResponseReadError(
     return {
       errorType: 'timeout',
       message: withRequestId(
-        'The upstream provider timed out while sending the response.',
+        'The upstream provider timed out while sending the response.' +
+          getReasoningEffortTimeoutSuggestion(reasoningEffort),
         vercelRequestId
       ),
     };
@@ -280,12 +288,13 @@ async function readResponseText(
   response: Response,
   headers: Headers,
   vercelRequestId: string | null | undefined,
-  capture: RequestLogCapture | null
+  capture: RequestLogCapture | null,
+  reasoningEffort: string | null | undefined
 ): Promise<{ text: string } | { error: unknown; errorResponse: NextResponse }> {
   try {
     return { text: await response.text() };
   } catch (error) {
-    const responseReadError = getResponseReadError(error, vercelRequestId);
+    const responseReadError = getResponseReadError(error, vercelRequestId, reasoningEffort);
     if (!responseReadError) {
       // Settle the capture so the after() callback awaiting it does not hang
       // and the request is still logged (without a response body).
@@ -321,7 +330,8 @@ async function rewriteSseStream(
   onFinally: () => void,
   vercelRequestId: string | null | undefined,
   capture: RequestLogCapture | null,
-  capturedChunks: string[] | null
+  capturedChunks: string[] | null,
+  reasoningEffort: string | null | undefined
 ) {
   const decoder = new TextDecoder();
   const settleReadError = (error: unknown) =>
@@ -368,7 +378,7 @@ async function rewriteSseStream(
       }
     }
   } catch (error) {
-    const responseReadError = getResponseReadError(error, vercelRequestId);
+    const responseReadError = getResponseReadError(error, vercelRequestId, reasoningEffort);
     if (!responseReadError) {
       settleReadError(error);
       throw error;
@@ -404,6 +414,7 @@ export async function rewriteModelResponse_ChatCompletions({
   response,
   removeCost,
   capture,
+  reasoningEffort,
   vercelRequestId,
   responseTransforms,
 }: RewriteChatCompletionsResponseParams) {
@@ -412,7 +423,13 @@ export async function rewriteModelResponse_ChatCompletions({
   if (headers.get('content-type')?.includes('application/json')) {
     // Read the body text once to avoid "Response body object should not be
     // disturbed or locked" errors that occur when `.clone().json()` fails.
-    const textResult = await readResponseText(response, headers, vercelRequestId, capture);
+    const textResult = await readResponseText(
+      response,
+      headers,
+      vercelRequestId,
+      capture,
+      reasoningEffort
+    );
     if ('errorResponse' in textResult) {
       capture?.setReadError(textResult.error);
       return textResult.errorResponse;
@@ -539,7 +556,8 @@ export async function rewriteModelResponse_ChatCompletions({
         progress.stop,
         vercelRequestId,
         capture,
-        capturedChunks
+        capturedChunks,
+        reasoningEffort
       );
     },
     cancel() {
@@ -591,12 +609,19 @@ export async function rewriteModelResponse_Messages({
   response,
   removeCost,
   capture,
+  reasoningEffort,
   vercelRequestId,
 }: RewriteResponseParams) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const textResult = await readResponseText(response, headers, vercelRequestId, capture);
+    const textResult = await readResponseText(
+      response,
+      headers,
+      vercelRequestId,
+      capture,
+      reasoningEffort
+    );
     if ('errorResponse' in textResult) {
       capture?.setReadError(textResult.error);
       return textResult.errorResponse;
@@ -719,7 +744,8 @@ export async function rewriteModelResponse_Messages({
         progress.stop,
         vercelRequestId,
         capture,
-        capturedChunks
+        capturedChunks,
+        reasoningEffort
       );
     },
     cancel() {
@@ -747,12 +773,19 @@ export async function rewriteModelResponse_Responses({
   response,
   removeCost,
   capture,
+  reasoningEffort,
   vercelRequestId,
 }: RewriteResponseParams) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const textResult = await readResponseText(response, headers, vercelRequestId, capture);
+    const textResult = await readResponseText(
+      response,
+      headers,
+      vercelRequestId,
+      capture,
+      reasoningEffort
+    );
     if ('errorResponse' in textResult) {
       capture?.setReadError(textResult.error);
       return textResult.errorResponse;
@@ -870,7 +903,8 @@ export async function rewriteModelResponse_Responses({
         progress.stop,
         vercelRequestId,
         capture,
-        capturedChunks
+        capturedChunks,
+        reasoningEffort
       );
     },
     cancel() {
@@ -905,11 +939,13 @@ export async function rewriteModelResponse({
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;
+  const reasoningEffort = getReasoningEffort(logging.request);
   if (kind === 'chat_completions') {
     return rewriteModelResponse_ChatCompletions({
       response,
       removeCost: requiresCostRemoval,
       capture,
+      reasoningEffort,
       vercelRequestId,
       responseTransforms,
     });
@@ -919,6 +955,7 @@ export async function rewriteModelResponse({
       response,
       removeCost: requiresCostRemoval,
       capture,
+      reasoningEffort,
       vercelRequestId,
     });
   }
@@ -927,6 +964,7 @@ export async function rewriteModelResponse({
       response,
       removeCost: requiresCostRemoval,
       capture,
+      reasoningEffort,
       vercelRequestId,
     });
   }

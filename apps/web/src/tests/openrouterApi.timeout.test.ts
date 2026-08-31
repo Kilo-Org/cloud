@@ -89,62 +89,146 @@ describe('upstreamRequest timeout', () => {
     expect(headers.has('authorization')).toBe(false);
   });
 
-  it('reports a client disconnect instead of an upstream disconnect when the caller aborts', async () => {
-    const controller = new AbortController();
-    controller.abort();
+  it.each(['xhigh', 'max'])(
+    'reports a client disconnect without advice for %s effort when the caller aborts',
+    async reasoningEffort => {
+      const controller = new AbortController();
+      controller.abort();
 
-    const result = await upstreamRequest({
-      chatApi: 'chat_completions',
-      search: '',
-      method: 'POST',
-      body: {
-        model: 'test-model',
-        messages: [{ role: 'user', content: 'test' }],
+      const result = await upstreamRequest({
+        chatApi: 'chat_completions',
+        search: '',
+        method: 'POST',
+        body: {
+          model: 'test-model',
+          messages: [{ role: 'user', content: 'test' }],
+        },
+        extraHeaders: {},
+        provider: OPENROUTER,
+        signal: controller.signal,
+        reasoningEffort,
+      });
+
+      expect(result.type).toBe('error');
+      expect(mockCaptureException).not.toHaveBeenCalled();
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(499);
+      await expect(result.response.json()).resolves.toEqual({
+        error:
+          'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.',
+        error_type: 'client_disconnect',
+        message:
+          'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.',
+      });
+    }
+  );
+
+  it.each(['high', 'medium', 'low', 'minimal', 'none', null, undefined])(
+    'reports a gateway timeout without advice for %s effort',
+    async reasoningEffort => {
+      const timeoutError = new DOMException(
+        'The operation was aborted due to timeout',
+        'TimeoutError'
+      );
+      global.fetch = jest.fn().mockRejectedValue(timeoutError);
+
+      const result = await upstreamRequest({
+        chatApi: 'chat_completions',
+        search: '',
+        method: 'POST',
+        body: {
+          model: 'test-model',
+          messages: [{ role: 'user', content: 'test' }],
+        },
+        extraHeaders: {},
+        provider: OPENROUTER,
+        reasoningEffort,
+      });
+
+      expect(result.type).toBe('error');
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(503);
+      await expect(result.response.json()).resolves.toEqual({
+        error: 'The upstream provider did not send response headers before the gateway timeout.',
+        error_type: 'upstream_disconnect',
+        message: 'The upstream provider did not send response headers before the gateway timeout.',
+      });
+    }
+  );
+
+  describe.each(['xhigh', 'max'])('with %s reasoning effort', reasoningEffort => {
+    test.each([
+      { family: 'request_timeout', error: new DOMException('Timed out', 'TimeoutError') },
+      {
+        family: 'headers_timeout',
+        error: new TypeError('fetch failed', { cause: { code: 'UND_ERR_HEADERS_TIMEOUT' } }),
       },
-      extraHeaders: {},
-      provider: OPENROUTER,
-      signal: controller.signal,
-    });
-
-    expect(result.type).toBe('error');
-    expect(mockCaptureException).not.toHaveBeenCalled();
-    if (result.type !== 'error') throw new Error('expected an error result');
-    expect(result.response.status).toBe(499);
-    await expect(result.response.json()).resolves.toEqual({
-      error:
-        'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.',
-      error_type: 'client_disconnect',
-      message:
-        'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.',
-    });
-  });
-
-  it('reports a gateway timeout message when the upstream sends no response headers', async () => {
-    const timeoutError = new DOMException(
-      'The operation was aborted due to timeout',
-      'TimeoutError'
-    );
-    global.fetch = jest.fn().mockRejectedValue(timeoutError);
-
-    const result = await upstreamRequest({
-      chatApi: 'chat_completions',
-      search: '',
-      method: 'POST',
-      body: {
-        model: 'test-model',
-        messages: [{ role: 'user', content: 'test' }],
+      {
+        family: 'connect_timeout',
+        error: new TypeError('fetch failed', { cause: { code: 'UND_ERR_CONNECT_TIMEOUT' } }),
       },
-      extraHeaders: {},
-      provider: OPENROUTER,
+      {
+        family: 'read_timeout',
+        error: new TypeError('fetch failed', { cause: { code: 'UND_ERR_BODY_TIMEOUT' } }),
+      },
+      {
+        family: 'read_timeout',
+        error: new TypeError('fetch failed', { cause: { code: 'ETIMEDOUT' } }),
+      },
+    ])('appends advice for $family before the request id', async ({ error }) => {
+      global.fetch = jest.fn().mockRejectedValue(error);
+
+      const result = await upstreamRequest({
+        chatApi: 'chat_completions',
+        search: '',
+        method: 'POST',
+        body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
+        extraHeaders: {},
+        provider: OPENROUTER,
+        reasoningEffort,
+        vercelRequestId: 'iad1::iad1::request-id',
+      });
+
+      expect(result.type).toBe('error');
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(503);
+      const message = `The upstream provider did not send response headers before the gateway timeout. Try lowering the reasoning effort from "${reasoningEffort}" to "high" or lower to reduce the chance of timeouts. (request id: iad1::iad1::request-id)`;
+      await expect(result.response.json()).resolves.toEqual({
+        error: message,
+        error_type: 'upstream_disconnect',
+        message,
+        vercel_request_id: 'iad1::iad1::request-id',
+      });
     });
 
-    expect(result.type).toBe('error');
-    if (result.type !== 'error') throw new Error('expected an error result');
-    expect(result.response.status).toBe(503);
-    await expect(result.response.json()).resolves.toEqual({
-      error: 'The upstream provider did not send response headers before the gateway timeout.',
-      error_type: 'upstream_disconnect',
-      message: 'The upstream provider did not send response headers before the gateway timeout.',
+    test.each([
+      {
+        family: 'conn_reset',
+        error: new TypeError('fetch failed', { cause: { code: 'ECONNRESET' } }),
+      },
+      { family: 'unknown', error: new TypeError('fetch failed') },
+      { family: 'abort', error: new DOMException('Aborted', 'AbortError') },
+    ])('does not append advice for $family', async ({ error }) => {
+      global.fetch = jest.fn().mockRejectedValue(error);
+
+      const result = await upstreamRequest({
+        chatApi: 'chat_completions',
+        search: '',
+        method: 'POST',
+        body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
+        extraHeaders: {},
+        provider: OPENROUTER,
+        reasoningEffort,
+      });
+
+      expect(result.type).toBe('error');
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(503);
+      await expect(result.response.json()).resolves.toEqual({
+        error: 'The upstream provider closed the connection before sending a response.',
+        error_type: 'upstream_disconnect',
+        message: 'The upstream provider closed the connection before sending a response.',
+      });
     });
   });
 

@@ -1,6 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
 import {
   addCacheBreakpoints,
+  getReasoningEffort,
+  getReasoningEffortTimeoutSuggestion,
   removeChatCompletionsToolNames,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type {
@@ -8,6 +10,90 @@ import type {
   OpenRouterChatCompletionRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
+
+describe('getReasoningEffort', () => {
+  test.each([
+    { options: { output_config: { effort: 'max' } }, expected: 'max' },
+    { options: { output_config: { effort: 'high' } }, expected: 'high' },
+    { options: { output_config: {} }, expected: null },
+    { options: {}, expected: null },
+  ] as const)('reads messages effort from $options as $expected', ({ options, expected }) => {
+    expect(
+      getReasoningEffort({
+        kind: 'messages',
+        body: { model: 'test-model', messages: [], max_tokens: 1024, ...options },
+      })
+    ).toBe(expected);
+  });
+
+  test.each([
+    { options: { reasoning: { effort: 'xhigh' } }, expected: 'xhigh' },
+    { options: { reasoning: { effort: 'high' } }, expected: 'high' },
+    { options: { reasoning: { effort: null } }, expected: null },
+    { options: { reasoning: {} }, expected: null },
+    { options: { reasoning: null }, expected: null },
+    { options: {}, expected: null },
+  ] as const)('reads responses effort from $options as $expected', ({ options, expected }) => {
+    expect(
+      getReasoningEffort({
+        kind: 'responses',
+        body: { model: 'test-model', input: 'test', ...options },
+      })
+    ).toBe(expected);
+  });
+
+  test.each([
+    { options: { reasoning: { effort: 'xhigh' } }, expected: 'xhigh' },
+    { options: { reasoning_effort: 'xhigh' }, expected: 'xhigh' },
+    {
+      options: { reasoning: { effort: 'high' }, reasoning_effort: 'xhigh' },
+      expected: 'high',
+    },
+    {
+      options: { reasoning: { effort: 'none' }, reasoning_effort: 'xhigh' },
+      expected: 'none',
+    },
+    { options: { reasoning: { effort: null }, reasoning_effort: 'xhigh' }, expected: 'xhigh' },
+    { options: { reasoning: {}, reasoning_effort: 'high' }, expected: 'high' },
+    { options: { reasoning: { effort: null }, reasoning_effort: null }, expected: null },
+    { options: { reasoning: {} }, expected: null },
+    { options: {}, expected: null },
+  ] as const)(
+    'reads chat completions effort from $options as $expected',
+    ({ options, expected }) => {
+      expect(
+        getReasoningEffort({
+          kind: 'chat_completions',
+          body: { model: 'test-model', messages: [], ...options },
+        })
+      ).toBe(expected);
+    }
+  );
+});
+
+describe('getReasoningEffortTimeoutSuggestion', () => {
+  test.each(['xhigh', 'max'])('suggests lowering %s effort', effort => {
+    expect(getReasoningEffortTimeoutSuggestion(effort)).toBe(
+      ` Try lowering the reasoning effort from "${effort}" to "high" or lower to reduce the chance of timeouts.`
+    );
+  });
+
+  test.each([
+    'high',
+    'medium',
+    'low',
+    'minimal',
+    'none',
+    'XHIGH',
+    'MAX',
+    'max ',
+    '',
+    null,
+    undefined,
+  ])('does not suggest lowering %s effort', effort => {
+    expect(getReasoningEffortTimeoutSuggestion(effort)).toBe('');
+  });
+});
 
 describe('removeChatCompletionsToolNames', () => {
   test('removes names from tool messages only', () => {

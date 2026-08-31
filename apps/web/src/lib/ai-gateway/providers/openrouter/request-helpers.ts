@@ -19,6 +19,22 @@ export function getMaxTokens(request: GatewayRequest) {
   return request.body.max_completion_tokens ?? request.body.max_tokens ?? null;
 }
 
+export function getReasoningEffort(request: GatewayRequest) {
+  if (request.kind === 'messages') {
+    return request.body.output_config?.effort ?? null;
+  }
+  if (request.kind === 'responses') {
+    return request.body.reasoning?.effort ?? null;
+  }
+  return request.body.reasoning?.effort ?? request.body.reasoning_effort ?? null;
+}
+
+export function getReasoningEffortTimeoutSuggestion(effort: string | null | undefined): string {
+  return effort === 'xhigh' || effort === 'max'
+    ? ` Try lowering the reasoning effort from "${effort}" to "high" or lower to reduce the chance of timeouts.`
+    : '';
+}
+
 export function hasMiddleOutTransform(request: GatewayRequest) {
   return (
     (request.kind === 'chat_completions' && request.body.transforms?.includes('middle-out')) ||

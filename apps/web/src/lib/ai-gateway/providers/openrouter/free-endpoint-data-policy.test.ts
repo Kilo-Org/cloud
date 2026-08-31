@@ -217,14 +217,14 @@ describe('applyFreeEndpointDataPolicy', () => {
   });
 
   test('ignores unavailable OpenRouter and exclusive free models', () => {
-    const freeVariant = offering('openai/gpt-oss-20b', true);
-    const model = offering('openai/gpt-oss-20b');
+    const freeVariant = offering('google/gemma-4-31b-it', true);
+    const model = offering('google/gemma-4-31b-it');
     const providerModelData = [{ provider: { slug: 'darkbloom' }, models: [freeVariant, model] }];
 
     applyFreeEndpointDataPolicy({
       providerModelData,
       openRouterFreeEndpoints: getOpenRouterFreeEndpoints(providerModelData),
-      kiloExclusiveModels: [freeExclusiveModel('openai/gpt-oss-20b:free', [])],
+      kiloExclusiveModels: [freeExclusiveModel('google/gemma-4-31b-it:free', [])],
     });
 
     expect(freeVariant.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });

@@ -89,10 +89,10 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
 
   test('returns 404 for unavailable models without reading cached metadata', async () => {
     mockedGetOpenRouterModelsMetadataFromDatabase.mockClear();
-    const modelId = 'openai/gpt-oss-20b:free';
+    const modelId = 'google/gemma-4-31b-it:free';
 
     const response = await GET(request(modelId), {
-      params: Promise.resolve({ provider: 'openai', model: 'gpt-oss-20b:free' }),
+      params: Promise.resolve({ provider: 'google', model: 'gemma-4-31b-it:free' }),
     });
 
     expect(response.status).toBe(404);

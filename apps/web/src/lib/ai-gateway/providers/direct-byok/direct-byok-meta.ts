@@ -1,6 +1,7 @@
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 // Client-safe display names for direct BYOK providers.
+// Keep the ids in sync with DIRECT_BYOK_PROVIDER_IDS in packages/worker-utils/src/direct-byok-model.ts.
 export const DIRECT_BYOK_PROVIDERS_META = {
   'alibaba-token-plan': 'Alibaba Token Plan (Singapore)',
   'byteplus-coding': 'BytePlus Coding Plan',

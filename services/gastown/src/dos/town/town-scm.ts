@@ -7,6 +7,7 @@ import {
   parseGitUrl,
 } from '../../util/platform-pr.util';
 import { writeEvent } from '../../util/analytics.util';
+import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 
 const TOWN_LOG = '[town-scm]';
 
@@ -298,6 +299,46 @@ export async function checkPRStatus(ctx: SCMContext, prUrl: string): Promise<PRS
 }
 
 /**
+ * Send the review-thread classification to the Kilo LLM gateway on the town's
+ * configured model. Only used when that model is a direct BYOK model, so the
+ * call bills the user's own provider key instead of Kilo credits (#4268).
+ */
+async function classifyThreadsViaKiloGateway(
+  ctx: SCMContext,
+  townConfig: TownConfig,
+  model: string,
+  prompt: string
+): Promise<unknown> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${townConfig.kilocode_token}`,
+    'Content-Type': 'application/json',
+    // Feature attribution for microdollar usage; 'gastown' is in FEATURE_VALUES
+    // (apps/web/src/lib/feature-detection.ts:46).
+    'x-kilocode-feature': 'gastown',
+  };
+  if (townConfig.organization_id) {
+    headers['X-KiloCode-OrganizationId'] = townConfig.organization_id;
+  }
+
+  const response = await fetch(`${ctx.env.KILO_API_URL}/api/openrouter/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 256,
+      temperature: 0,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Kilo gateway returned ${response.status} for model ${model}: ${(await response.text()).slice(0, 300)}`
+    );
+  }
+  return await response.json();
+}
+
+/**
  * Use Workers AI to determine if unresolved PR review threads contain
  * blocking feedback that should prevent auto-merge.
  */
@@ -331,20 +372,29 @@ Important: A comment is only NON-BLOCKING if it expresses approval or is purely 
 
 Respond with ONLY a JSON object (no markdown, no explanation): { "blocking": true/false, "reason": "brief one-sentence explanation" }`;
 
+    const townConfig = await ctx.getTownConfig();
+    // The refinery role owns the review flow, so its model is the one the user
+    // configured for reviews; fall back to the town default.
+    const configuredModel = townConfig.role_models?.refinery ?? townConfig.default_model;
+    const byokModel =
+      townConfig.kilocode_token && isDirectByokModelId(configuredModel) ? configuredModel : null;
+
     const startTime = Date.now();
-    const response: unknown = await ctx.env.AI.run('@cf/google/gemma-4-26b-a4b-it', {
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 256,
-      temperature: 0,
-      chat_template_kwargs: { enable_thinking: false },
-    });
+    const response: unknown = byokModel
+      ? await classifyThreadsViaKiloGateway(ctx, townConfig, byokModel, prompt)
+      : await ctx.env.AI.run('@cf/google/gemma-4-26b-a4b-it', {
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 256,
+          temperature: 0,
+          chat_template_kwargs: { enable_thinking: false },
+        });
     const durationMs = Date.now() - startTime;
 
     // Track the AI call via analytics event
     writeEvent(ctx.env, {
       event: 'api.external_request',
       townId: ctx.townId,
-      label: 'workers_ai_review_threads',
+      label: byokModel ? 'byok_review_threads' : 'workers_ai_review_threads',
       durationMs,
     });
 

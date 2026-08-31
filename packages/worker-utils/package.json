@@ -36,7 +36,8 @@
     "./review-agents": "./src/review-agents.ts",
     "./code-review-council": "./src/code-review-council.ts",
     "./scheduled-job-observability": "./src/scheduled-job-observability.ts",
-    "./r2-client": "./src/r2-client.ts"
+    "./r2-client": "./src/r2-client.ts",
+    "./direct-byok-model": "./src/direct-byok-model.ts"
   },
   "scripts": {
     "test": "vitest run",

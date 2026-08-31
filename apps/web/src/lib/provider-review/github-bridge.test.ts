@@ -942,6 +942,34 @@ it.each([
   expect(writes).toEqual(effects);
 });
 
+it.each(['completed', 'reconcile_pending'])(
+  'AC7–AC10 rejects a %s legacy merge without resource binding',
+  async status => {
+    const input = await actionInput({ action: 'merge', method: 'squash' });
+    row = {
+      id: 'legacy-merge-row',
+      intent: 'merge',
+      resource_key: null,
+      status,
+      canonical_result: { merged: true, branchDeleted: false },
+    };
+    pull.state = 'closed';
+    pull.merged = true;
+    const saved = structuredClone(row);
+
+    await expect(facade.act(input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    await expect(facade.getOperationStatus(input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    expect(row).toEqual(saved);
+    expect(octokit.pulls.merge).not.toHaveBeenCalled();
+  }
+);
+
 it.each([true, false])('AC7 recovers a lost merge response only when merged=%s', async merged => {
   const input = await actionInput({ action: 'merge', method: 'squash' });
   octokit.pulls.merge.mockImplementation(async value => {

@@ -1537,8 +1537,8 @@ describe('database schema', () => {
       await expect(lite).resolves.not.toThrow();
     });
 
-    it('runs migration 0204 against duplicates before creating its unique index', async () => {
-      const migrationPath = path.join(__dirname, 'migrations/0204_brainy_baron_strucker.sql');
+    it('runs migration 0205 against duplicates before creating its unique index', async () => {
+      const migrationPath = path.join(__dirname, 'migrations/0205_device_auth_hardening.sql');
       const fullMigration = fs.readFileSync(migrationPath, 'utf8');
       const statements = fullMigration.split('--> statement-breakpoint');
       // The dedup DO block is its own statement. The COMMIT/CONCURRENTLY/BEGIN
@@ -1551,7 +1551,7 @@ describe('database schema', () => {
         )
       );
       if (migration === undefined || createUniqueIndex === undefined) {
-        throw new Error('migration 0204 backfill or unique index statement not found');
+        throw new Error('migration 0205 backfill or unique index statement not found');
       }
       const rollback = new Error('rollback migration test');
 
@@ -1609,7 +1609,7 @@ describe('database schema', () => {
           expect(loser).toMatchObject({ status: 'suspended', installationId: null });
           expect(loser?.metadata).toMatchObject({
             github_dedup: {
-              reason: 'Duplicate installation resolved by migration 0204',
+              reason: 'Duplicate installation resolved by migration 0205',
               original_installation_id: installationId,
             },
           });

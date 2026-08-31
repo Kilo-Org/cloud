@@ -975,9 +975,6 @@ importers:
       '@types/archiver':
         specifier: 7.0.0
         version: 7.0.0
-      '@types/js-cookie':
-        specifier: 3.0.6
-        version: 3.0.6
       '@types/js-yaml':
         specifier: 4.0.9
         version: 4.0.9
@@ -1080,9 +1077,6 @@ importers:
       jotai-minidb:
         specifier: 0.0.8
         version: 0.0.8(jotai@2.18.1(@babel/core@7.29.7)(@babel/template@7.29.7)(@types/react@19.2.14)(react@19.2.6))
-      js-cookie:
-        specifier: 3.0.8
-        version: 3.0.8
       js-yaml:
         specifier: 4.3.1
         version: 4.3.1
@@ -9828,9 +9822,6 @@ packages:
   '@types/jest@30.0.0':
     resolution: {integrity: sha512-XTYugzhuwqWjws0CVz8QpM36+T+Dz5mTEBKhNs/esGLnCIlGdRy+Dq78NRjd7ls7r8BC8ZRMOrKlkO1hU0JOwA==}
 
-  '@types/js-cookie@3.0.6':
-    resolution: {integrity: sha512-wkw9yd1kEXOPnvEeEV1Go1MmxtBJL0RR79aOTAApecWFVu7w0NNXNqhcWgvw2YgZDYadliXkl14pa3WXw5jlCQ==}
-
   '@types/js-yaml@4.0.9':
     resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
 
@@ -14374,9 +14365,6 @@ packages:
 
   js-base64@3.7.8:
     resolution: {integrity: sha512-hNngCeKxIUQiEUN3GPJOkz4wF/YvdUdbNL9hsBcMQTkKzboD7T/q3OYOuuPZLUE6dBxSGpwhk5mwuDud7JVAow==}
-
-  js-cookie@3.0.8:
-    resolution: {integrity: sha512-yeJd4aNAdYZQjaon2bpD/Gb0B/omw7HQOsynXXcOiWVCacbBcPlgn8S/d1X6blFSaHao7ozqtW7NZW19xpCtIw==}
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
@@ -27017,8 +27005,6 @@ snapshots:
       expect: 30.3.0
       pretty-format: 30.3.0
 
-  '@types/js-cookie@3.0.6': {}
-
   '@types/js-yaml@4.0.9': {}
 
   '@types/json-schema@7.0.15': {}
@@ -32536,8 +32522,6 @@ snapshots:
       react: 19.2.3
 
   js-base64@3.7.8: {}
-
-  js-cookie@3.0.8: {}
 
   js-tokens@10.0.0: {}
 

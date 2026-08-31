@@ -44,21 +44,23 @@ async function mountRecovery(messages = [makeAssistantMessage()]) {
   const childId = 'child-1' as KiloSessionId;
   let pending = manager.hydrateChildSession(childId);
   await pending;
-  const props = buildProps({
-    getChildMessages: store.get(manager.atoms.childMessages),
-    hydrationState: store.get(manager.atoms.childSessionHydrationState)(childId),
-  });
-  props.onRetry = () => {
-    pending = manager.hydrateChildSession(props.sessionId as KiloSessionId);
-  };
-  props.onLoadOlderMessages = () => {
-    pending = manager.loadOlderChildMessages(props.sessionId as KiloSessionId);
-  };
-  props.onClose = () => {
-    props.visible = false;
-  };
-  props.onDismiss = () => {
-    renderer.update(null);
+  const props = {
+    ...buildProps({
+      getChildMessages: store.get(manager.atoms.childMessages),
+      hydrationState: store.get(manager.atoms.childSessionHydrationState)(childId),
+    }),
+    onRetry: () => {
+      pending = manager.hydrateChildSession(props.sessionId as KiloSessionId);
+    },
+    onLoadOlderMessages: () => {
+      pending = manager.loadOlderChildMessages(props.sessionId as KiloSessionId);
+    },
+    onClose: () => {
+      props.visible = false;
+    },
+    onDismiss: () => {
+      renderer.update(null);
+    },
   };
   const renderer = await renderSheet(props);
   async function sync(next: Partial<SheetProps> = {}) {

@@ -763,7 +763,6 @@ export class SandboxControl extends DurableObject<Env> {
 
     const runtime = await this.readTerminalRuntime(input);
     if (!runtime.allowed) return runtime;
-    if (runtime.provider === 'vercel') return { allowed: true };
 
     const deadlines = await loadDeadlines(this.ctx.storage);
     if (!this.isCurrentConnection(runtime.connection)) {

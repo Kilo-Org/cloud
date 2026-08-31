@@ -1139,9 +1139,7 @@ export class SandboxSession extends DurableObject<Env> {
               await control.request({
                 operation: 'session.attach',
                 session,
-                ...(provider === 'cloudflare'
-                  ? { expectedWrapperInstanceId: wrapperInstanceId }
-                  : {}),
+                expectedWrapperInstanceId: wrapperInstanceId,
                 payload: attachPayload,
                 timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
               })
@@ -1171,7 +1169,7 @@ export class SandboxSession extends DurableObject<Env> {
           await control.request({
             operation: 'session.prompt',
             session,
-            ...(provider === 'cloudflare' ? { expectedWrapperInstanceId: wrapperInstanceId } : {}),
+            expectedWrapperInstanceId: wrapperInstanceId,
             payload: {
               messageId,
               turn:

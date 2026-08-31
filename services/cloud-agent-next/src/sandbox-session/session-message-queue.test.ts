@@ -1003,7 +1003,7 @@ describe('SandboxSession orchestration', () => {
   });
 
   it.each(['cloudflare', 'vercel'] as const)(
-    'sends the expected runtime fence only for Cloudflare cold and warm handoffs on %s',
+    'sends the expected runtime fence for cold and warm handoffs on %s',
     async provider => {
       const fixture = sessionFixture({
         workspace: {
@@ -1028,10 +1028,11 @@ describe('SandboxSession orchestration', () => {
         'session.prompt',
         'session.prompt',
       ]);
-      for (const input of handoffs) {
-        if (provider === 'cloudflare') expect(input.expectedWrapperInstanceId).toBe(RUNTIME_ID);
-        else expect(input).not.toHaveProperty('expectedWrapperInstanceId');
-      }
+      expect(handoffs.map(input => input.expectedWrapperInstanceId)).toEqual([
+        RUNTIME_ID,
+        RUNTIME_ID,
+        RUNTIME_ID,
+      ]);
     }
   );
 

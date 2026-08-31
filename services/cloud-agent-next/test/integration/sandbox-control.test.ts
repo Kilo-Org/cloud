@@ -153,7 +153,8 @@ async function completeHello(
 }
 
 type TerminalRuntimeFixture = {
-  sandboxId: `usr-${string}`;
+  sandboxId: `usr-${string}` | `ses-${string}`;
+  sandboxProvider?: 'cloudflare' | 'vercel';
   ownerId: string;
   sessionId: `workspace_${string}`;
   wrapperInstanceId?: string;
@@ -164,7 +165,25 @@ async function initializeTerminalRuntime(fixture: TerminalRuntimeFixture) {
   await seedCredential(credential, fixture.sandboxId);
   const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
   const provider = await installProvider(control, fixture.sandboxId);
-  await runInDurableObject(control, async instance => {
+  await runInDurableObject(control, async (instance, state) => {
+    if (fixture.sandboxProvider === 'vercel') {
+      Object.assign(instance, {
+        providerKind: 'vercel',
+        env: {
+          ...env,
+          VERCEL_TOKEN: 'test-token',
+          VERCEL_TEAM_ID: 'test-team',
+          VERCEL_PROJECT_ID: 'test-project',
+          VERCEL_SANDBOX_SNAPSHOT_ID: 'test-snapshot',
+          VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'test-build',
+          VERCEL_SANDBOX_RUNTIME: 'node24',
+          VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+          VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
+        },
+      });
+      await state.storage.put('provider_kind', 'vercel');
+      await instance.confirmInstance(fixture.sandboxId);
+    }
     await instance.initializeOwner(fixture.ownerId);
     await instance.attachSession({
       sessionId: fixture.sessionId,
@@ -1460,10 +1479,11 @@ describe('SandboxSession control-plane regressions', () => {
   const agentA = { mode: 'code', model: 'kilo/anthropic/claude-sonnet-4', variant: 'high' };
   const modelB = 'kilo/openai/gpt-4.1';
 
-  function messageFixture() {
+  function messageFixture(sandboxProvider: 'cloudflare' | 'vercel' = 'cloudflare') {
     const id = crypto.randomUUID().replaceAll('-', '');
     const fixture = {
-      sandboxId: `usr-${id}`,
+      sandboxId: `${sandboxProvider === 'vercel' ? 'ses' : 'usr'}-${id}`,
+      sandboxProvider,
       ownerId: 'user_admission',
       sessionId: `workspace_admission_${id}`,
       wrapperInstanceId: crypto.randomUUID(),
@@ -1813,10 +1833,15 @@ describe('SandboxSession control-plane regressions', () => {
     }
   });
 
-  it.each(['session.attach', 'session.prompt'] as const)(
-    'rejects delayed cancelled A %s RPCs without reaching or renewing replacement B',
-    async operation => {
-      const { fixture, session } = messageFixture();
+  it.each([
+    { sandboxProvider: 'cloudflare', operation: 'session.attach' },
+    { sandboxProvider: 'cloudflare', operation: 'session.prompt' },
+    { sandboxProvider: 'vercel', operation: 'session.attach' },
+    { sandboxProvider: 'vercel', operation: 'session.prompt' },
+  ] as const)(
+    'rejects delayed cancelled A $operation RPCs without reaching or renewing replacement B on $sandboxProvider',
+    async ({ sandboxProvider, operation }) => {
+      const { fixture, session } = messageFixture(sandboxProvider);
       const { control, socket, provider, allocations } = await initializeTerminalRuntime(fixture);
       const release = Promise.withResolvers<void>();
       let heldRequest: Parameters<typeof control.request>[0] | undefined;
@@ -1858,7 +1883,11 @@ describe('SandboxSession control-plane regressions', () => {
           identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
           auth: { kiloSessionId: 'kilo_terminal' },
           agent: agentA,
-          workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+          workspace: {
+            sandboxId: fixture.sandboxId,
+            workspacePath: '/workspace/terminal',
+            sandboxProvider,
+          },
           message: { initialTurn: { type: 'prompt', messageId: 'msg_delayed_a', prompt: 'A' } },
         });
         await vi.waitFor(() => expect(heldRequest).toBeDefined());
@@ -1919,6 +1948,13 @@ describe('SandboxSession control-plane regressions', () => {
           state: 'stopped',
           providerRef: null,
         });
+        if (sandboxProvider === 'vercel') {
+          await control.ensureReady({
+            ownerId: fixture.ownerId,
+            provider: sandboxProvider,
+            allowCreate: true,
+          });
+        }
         await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
         expect(provider.launch).toHaveBeenCalledTimes(1);
         const launch = provider.launch.mock.calls[0];
@@ -3914,9 +3950,11 @@ describe('SandboxControl terminal runtime coordination', () => {
       await expect(instance.confirmStopped()).resolves.toMatchObject({ state: 'stopped' });
       expect(await instance.getStatus()).not.toHaveProperty('wrapperInstanceId');
     });
-    await runInDurableObject(session, (_instance, state) => {
-      expect(state.storage.kv.get<{ state: string }>('terminal:pty_original')).toMatchObject({
-        state: 'ended',
+    await vi.waitFor(async () => {
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get<{ state: string }>('terminal:pty_original')).toMatchObject({
+          state: 'ended',
+        });
       });
     });
   });
@@ -3944,37 +3982,80 @@ describe('SandboxControl terminal runtime coordination', () => {
     });
   });
 
-  it('extends idle deadlines monotonically for authorized Cloudflare terminal activity', async () => {
-    const fixture: TerminalRuntimeFixture = {
-      sandboxId: 'usr-a007',
-      ownerId: 'owner_terminal_activity',
-      sessionId: 'workspace_terminal_activity',
-      wrapperInstanceId: '5d1e54ed-31db-4646-a478-4864e87162c3',
-    };
-    const { control, socket } = await initializeTerminalRuntime(fixture);
-    signalWrapperReady(socket);
-    await waitForWrapperReady(fixture);
-
-    await runInDurableObject(control, async (instance, state) => {
-      const current = (await state.storage.get<{ idleStop?: number }>('deadlines')) ?? {};
-      const later = Date.now() + 10 * 60_000;
-      await state.storage.put('deadlines', { ...current, idleStop: later });
-      const activity = {
-        sessionId: fixture.sessionId,
-        ownerId: fixture.ownerId,
-        wrapperInstanceId: fixture.wrapperInstanceId ?? '',
+  it.each(['cloudflare', 'vercel'] as const)(
+    'extends idle deadlines monotonically for authorized terminal activity on %s',
+    async sandboxProvider => {
+      const fixture: TerminalRuntimeFixture = {
+        sandboxId: sandboxProvider === 'vercel' ? 'ses-a007' : 'usr-a007',
+        sandboxProvider,
+        ownerId: 'owner_terminal_activity',
+        sessionId: 'workspace_terminal_activity',
+        wrapperInstanceId: '5d1e54ed-31db-4646-a478-4864e87162c3',
       };
-      await expect(
-        instance.recordTerminalActivity({
-          ...activity,
-          wrapperInstanceId: '513ea14b-e0b7-4bd8-b6d3-76a05c509c11',
-        })
-      ).resolves.toEqual({ allowed: false, reason: 'wrapper_instance_mismatch' });
-      expect((await state.storage.get<{ idleStop?: number }>('deadlines'))?.idleStop).toBe(later);
-      await expect(instance.recordTerminalActivity(activity)).resolves.toEqual({ allowed: true });
-      const after = await state.storage.get<{ idleStop?: number }>('deadlines');
-      expect(after?.idleStop).toBeGreaterThanOrEqual(later);
-    });
-    socket.close();
-  });
+      const { control, socket, provider } = await initializeTerminalRuntime(fixture);
+      const clock = vi.spyOn(Date, 'now');
+      try {
+        signalWrapperReady(socket);
+        await waitForWrapperReady(fixture);
+        const now = Date.now();
+        clock.mockReturnValue(now);
+        provider.ensureLeaseAtLeast.mockClear();
+        const activity = {
+          sessionId: fixture.sessionId,
+          ownerId: fixture.ownerId,
+          wrapperInstanceId: fixture.wrapperInstanceId ?? '',
+        };
+        await runInDurableObject(control, async (instance, state) => {
+          const current = await loadDeadlines(state.storage);
+          const idleStop = now + 1_000;
+          const before = { ...current, idleStop };
+          await saveDeadlines(state.storage, before);
+          await state.storage.setAlarm(idleStop);
+          await expect(
+            instance.recordTerminalActivity({
+              ...activity,
+              wrapperInstanceId: '513ea14b-e0b7-4bd8-b6d3-76a05c509c11',
+            })
+          ).resolves.toEqual({ allowed: false, reason: 'wrapper_instance_mismatch' });
+          expect(await loadDeadlines(state.storage)).toEqual(before);
+          expect(await state.storage.getAlarm()).toBe(idleStop);
+          expect(provider.ensureLeaseAtLeast).not.toHaveBeenCalled();
+
+          await expect(instance.recordTerminalActivity(activity)).resolves.toEqual({
+            allowed: true,
+          });
+          expect(await loadDeadlines(state.storage)).toEqual({
+            ...current,
+            idleStop: now + DEADLINE_MS.idleStop,
+          });
+          expect(await state.storage.getAlarm()).toBe(current.heartbeatExpiry);
+          expect(provider.ensureLeaseAtLeast).toHaveBeenCalledExactlyOnceWith(
+            fixture.sandboxId,
+            DEADLINE_MS.idleStop + DEADLINE_MS.idleStopLeaseMargin
+          );
+        });
+
+        clock.mockReturnValue(now + 1_001);
+        await expect(runDurableObjectAlarm(control)).resolves.toBe(true);
+        await expect(control.getPhysicalRecord()).resolves.toMatchObject({ state: 'running' });
+        expect(provider.stop).not.toHaveBeenCalled();
+        expect(provider.create).not.toHaveBeenCalled();
+
+        await runInDurableObject(control, async (instance, state) => {
+          const current = await loadDeadlines(state.storage);
+          const later = now + 2 * DEADLINE_MS.idleStop;
+          await saveDeadlines(state.storage, { ...current, idleStop: later });
+          const alarmAt = await state.storage.getAlarm();
+          await expect(instance.recordTerminalActivity(activity)).resolves.toEqual({
+            allowed: true,
+          });
+          expect(await loadDeadlines(state.storage)).toEqual({ ...current, idleStop: later });
+          expect(await state.storage.getAlarm()).toBe(alarmAt);
+        });
+      } finally {
+        clock.mockRestore();
+        socket.close();
+      }
+    }
+  );
 });

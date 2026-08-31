@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the native tree without a DOM. */
+import { createElement, Fragment } from 'react';
 import { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -59,7 +60,7 @@ async function mountRecovery(messages = [makeAssistantMessage()]) {
       props.visible = false;
     },
     onDismiss: () => {
-      renderer.update(null);
+      renderer.update(createElement(Fragment));
     },
   };
   const renderer = await renderSheet(props);

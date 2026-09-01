@@ -65,12 +65,28 @@ export function diagnosticCause(value: string): string {
   return CAUSES.has(value) ? value.replaceAll(' ', '_') : 'other';
 }
 
+const DELTA_PROGRESS_EVENTS = new Set([
+  'socket_frame_received',
+  'forward_enqueued',
+  'forward_started',
+  'forward_settled',
+]);
+
 export function logControlDiagnostic(
   event: string,
   fields: ControlDiagnosticFields,
   level: 'info' | 'warn' = 'info'
 ): void {
   try {
+    if (
+      level === 'info' &&
+      fields.eventType === 'message.part.delta' &&
+      (DELTA_PROGRESS_EVENTS.has(event) ||
+        (event === 'forward_result' && fields.result === 'delivered' && fields.applied === true) ||
+        (event === 'session_event_result' && fields.applied === true))
+    ) {
+      return;
+    }
     const bounded: ControlDiagnosticFields = {};
     for (const [key, value] of Object.entries(fields).slice(0, 48)) {
       if (!/^[a-zA-Z][a-zA-Z0-9]{0,63}$/.test(key)) continue;

@@ -298,11 +298,22 @@ export function createSandboxControlSocketHandler(
       }
 
       const frame = parsed.frame;
+      let eventType = frame.type === 'event' ? diagnosticEventType(frame.event) : undefined;
+      if (
+        frame.type === 'event' &&
+        frame.event === 'session.event' &&
+        typeof frame.payload === 'object' &&
+        frame.payload !== null &&
+        'type' in frame.payload &&
+        typeof frame.payload.type === 'string'
+      ) {
+        eventType = diagnosticEventType(frame.payload.type);
+      }
       const frameDiagnostic = {
         ...diagnostic,
         frameType: frame.type,
         frameBytes: parsed.bytes,
-        eventType: frame.type === 'event' ? diagnosticEventType(frame.event) : undefined,
+        eventType,
         operation:
           frame.type === 'request' && isControlOperation(frame.operation)
             ? frame.operation

@@ -263,6 +263,9 @@ export class SandboxControl extends DurableObject<Env> {
     dropped: 0,
     notApplied: 0,
     failed: 0,
+    maxQueueWaitMs: 0,
+    maxRpcWaitMs: 0,
+    maxTotalForwardMs: 0,
   };
   private lastAcceptedHeartbeat: { connectionId: string; at: number } | null = null;
   private credentialUpdates: Promise<void> = Promise.resolve();
@@ -2725,9 +2728,11 @@ export class SandboxControl extends DurableObject<Env> {
       .then(async () => {
         this.forwarding.waiting--;
         this.forwarding.inFlight++;
+        const queueWaitMs = Date.now() - queuedAt;
+        this.forwarding.maxQueueWaitMs = Math.max(this.forwarding.maxQueueWaitMs, queueWaitMs);
         this.logDiagnostic('forward_started', {
           ...fields,
-          queueWaitMs: Date.now() - queuedAt,
+          queueWaitMs,
           ...this.forwarding,
         });
         try {
@@ -2736,9 +2741,14 @@ export class SandboxControl extends DurableObject<Env> {
         } finally {
           this.forwarding.inFlight--;
           this.forwarding.settled++;
+          const totalForwardMs = Date.now() - queuedAt;
+          this.forwarding.maxTotalForwardMs = Math.max(
+            this.forwarding.maxTotalForwardMs,
+            totalForwardMs
+          );
           this.logDiagnostic('forward_settled', {
             ...fields,
-            totalForwardMs: Date.now() - queuedAt,
+            totalForwardMs,
             ...this.forwarding,
           });
         }
@@ -2790,6 +2800,8 @@ export class SandboxControl extends DurableObject<Env> {
       }
     ).then(
       result => {
+        const rpcWaitMs = Date.now() - startedAt;
+        this.forwarding.maxRpcWaitMs = Math.max(this.forwarding.maxRpcWaitMs, rpcWaitMs);
         if (!skipped && result?.applied === false) this.forwarding.notApplied++;
         this.logDiagnostic('forward_result', {
           ...diagnostic,
@@ -2797,12 +2809,14 @@ export class SandboxControl extends DurableObject<Env> {
           attempts,
           result: skipped ? 'skipped' : 'delivered',
           applied: skipped ? undefined : result?.applied,
-          rpcWaitMs: Date.now() - startedAt,
+          rpcWaitMs,
           ...this.forwarding,
         });
         return true;
       },
       () => {
+        const rpcWaitMs = Date.now() - startedAt;
+        this.forwarding.maxRpcWaitMs = Math.max(this.forwarding.maxRpcWaitMs, rpcWaitMs);
         this.forwarding.failed++;
         this.logDiagnostic(
           'forward_result',
@@ -2811,7 +2825,7 @@ export class SandboxControl extends DurableObject<Env> {
             operation,
             attempts,
             result: timedOut ? 'timed_out' : 'failed',
-            rpcWaitMs: Date.now() - startedAt,
+            rpcWaitMs,
             ...this.forwarding,
           },
           'warn'

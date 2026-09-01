@@ -24,7 +24,12 @@ export default function SecurityAgentScopeLayout() {
   return (
     <>
       <SecurityAgentCommandObserver scope={scope} />
-      <Stack screenLayout={privacyScreenLayout} screenOptions={{ headerShown: false }}>
+      {/* Anchored entry needs a valid scope root, not a parameterless dismissal route. */}
+      <Stack
+        initialRouteName="index"
+        screenLayout={privacyScreenLayout}
+        screenOptions={{ headerShown: false }}
+      >
         <Stack.Screen
           name="dismiss/[id]"
           options={{

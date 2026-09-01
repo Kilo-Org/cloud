@@ -152,7 +152,9 @@
     "appearanceDark": "ダーク",
     "account": "アカウント",
     "prReviewAttribution": "PRレビューにアプリの帰属を追加",
-    "prReviewAttributionSubtitle": "レビューを送信すると、Reviewed via Kiloフッターが追加されます。"
+    "prReviewAttributionSubtitle": "レビューを送信すると、Reviewed via Kiloフッターが追加されます。",
+    "returnSendsMessage": "リターンキーでメッセージを送信",
+    "returnSendsMessageSubtitle": "オフの場合、リターンキーでエージェントのメッセージ入力欄に改行を挿入します。"
   },
   "notifications": {
     "title": "通知",
@@ -296,7 +298,8 @@
       "networkError": "ネットワークエラー",
       "uploadFailed": "アップロードに失敗しました",
       "failedToUploadFile": "ファイルのアップロードに失敗しました: {{reason}}",
-      "nothingToPaste": "貼り付けるものはありません"
+      "nothingToPaste": "貼り付けるものはありません",
+      "metadataStripFailed": "写真のメタデータを削除できませんでした。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}、{{status}}",
@@ -1687,7 +1690,11 @@
       "previousTaskFinishing": "前のタスクがまだ終わっていません。少々お待ちください。",
       "serviceUnavailable": "サービスは現在利用できません。もう一度お試しください。",
       "connectionTrouble": "接続に問題があります。しばらくしてから再試行してください。",
-      "modelUnavailable": "このモデルはCloud Agentではご利用いただけません。別のモデルを選んで、もう一度お試しください。"
+      "modelUnavailable": "このモデルはCloud Agentではご利用いただけません。別のモデルを選んで、もう一度お試しください。",
+      "cancelQueuedFailed": "メッセージをキャンセルできませんでした。",
+      "cancelQueuedRestoreAvailable": "メッセージをキャンセルしました。「復元」をタップすると、メッセージ入力欄に戻せます。",
+      "cancelQueuedRestored": "メッセージをキャンセルしました。プロンプトがメッセージ入力欄に戻りました。",
+      "cancelQueuedUpgradeRequired": "送信待ちのメッセージをキャンセルするには、新しいKilo CLIが必要です。Kilo CLIを更新して再接続してください。"
     },
     "remoteSession": {
       "failedToCreate": "リモートセッションを作成できませんでした",
@@ -1759,7 +1766,8 @@
       "cliCannotContinue": "このCLIはセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
       "continueFrom": "{{title}}を続行しています",
       "importFailed": "このセッションをインポートできませんでした。",
-      "importingSession": "セッションをインポートしています"
+      "importingSession": "セッションをインポートしています",
+      "discardWithUploadsMessage": "プロンプトと、送信済みメッセージに添付されていないアップロード済みファイルは削除されます。"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました",
@@ -2007,7 +2015,11 @@
       "queuedAccessibility": "メッセージがキューに追加されました",
       "userMessage": "ユーザーメッセージ",
       "assistantMessage": "アシスタントメッセージ",
-      "longPressHint": "メッセージの詳細は長押し"
+      "longPressHint": "メッセージの詳細は長押し",
+      "cancelQueued": "メッセージをキャンセル",
+      "cancelQueuedAccessibility": "送信待ちのメッセージをキャンセル",
+      "restoreQueued": "復元",
+      "restoreQueuedAccessibility": "キャンセルしたメッセージをメッセージ入力欄に復元"
     },
     "olderMessages": {
       "arrived": "以前のメッセージを読み込みました",
@@ -2035,9 +2047,6 @@
     },
     "sessionFilter": {
       "title": "セッションをフィルター",
-      "sortBy": "並べ替え",
-      "sortLastUpdated": "最終更新",
-      "sortCreated": "作成日時",
       "platform": "プラットフォーム",
       "platformCloud": "クラウド",
       "platformExtension": "拡張機能",
@@ -2091,7 +2100,9 @@
       "uploading": "アップロード中…",
       "uploaded": "アップロード済み",
       "uploadFailedRetry": "アップロードに失敗しました。タップして再試行してください。",
-      "uploadFailedTerminal": "このファイルはアップロードできません。"
+      "uploadFailedTerminal": "このファイルはアップロードできません。",
+      "moveLeft": "{{filename}}を左に移動",
+      "moveRight": "{{filename}}を右に移動"
     },
     "attachmentPasteHint": {
       "accessibility": "クリップボードから画像を貼り付け",
@@ -2121,7 +2132,11 @@
       "finalizingPlaceholder": "終了処理中...",
       "messagePlaceholder": "メッセージ...",
       "cannotReceiveFiles": "このセッションはファイルを受信できません。メッセージを送信するには添付ファイルを削除してください。",
-      "couldNotAttachFiles": "ファイルを添付できませんでした。再試行するには送信をタップしてください。"
+      "couldNotAttachFiles": "ファイルを添付できませんでした。再試行するには送信をタップしてください。",
+      "discardAttachmentsMessage": "送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
+      "discardAttachmentsTitle": "添付ファイルを破棄しますか？",
+      "charactersRemaining": "残り{{count}}文字",
+      "insertNewline": "改行を挿入"
     },
     "chatLink": {
       "linkCopied": "リンクをコピーしました",
@@ -2340,7 +2355,8 @@
     "busy": "音声入力は処理中です。もう一度お試しください。",
     "stopped": "音声入力が停止しました。マイクをタップして、もう一度お試しください。",
     "unavailableDevice": "このデバイスでは音声入力は利用できません。",
-    "unavailableLanguage": "このデバイスの言語では音声入力は利用できません。"
+    "unavailableLanguage": "このデバイスの言語では音声入力は利用できません。",
+    "listeningStopped": "聞き取りを停止しました。"
   },
   "share": {
     "title": "Kiloに共有",

@@ -9,6 +9,7 @@ import type {
   GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { getReasoningEffortTimeoutSuggestion } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
 import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
@@ -172,14 +173,15 @@ function clientDisconnectResponse(vercelRequestId: string | null | undefined) {
 
 function upstreamFetchFailureResponse(
   failureFamily: UpstreamFetchFailureFamily,
-  vercelRequestId: string | null | undefined
+  vercelRequestId: string | null | undefined,
+  reasoningEffort: string | null
 ) {
   const error = withRequestId(
     failureFamily === 'request_timeout' ||
       failureFamily === 'headers_timeout' ||
       failureFamily === 'connect_timeout' ||
       failureFamily === 'read_timeout'
-      ? 'The upstream provider did not send response headers before the gateway timeout.'
+      ? `The upstream provider did not send response headers before the gateway timeout.${getReasoningEffortTimeoutSuggestion(reasoningEffort)}`
       : 'The upstream provider closed the connection before sending a response.',
     vercelRequestId
   );
@@ -203,6 +205,7 @@ export async function upstreamRequest({
   provider,
   signal,
   vercelRequestId,
+  reasoningEffort,
 }: {
   chatApi: GatewayChatApiKind;
   search: string;
@@ -213,6 +216,7 @@ export async function upstreamRequest({
   signal?: AbortSignal;
   /** Incoming `x-vercel-id`, used to correlate failures with the platform logs. */
   vercelRequestId?: string | null;
+  reasoningEffort: string | null;
 }): Promise<{ type: 'success'; response: Response } | { type: 'error'; response: NextResponse }> {
   const headers = new Headers();
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
@@ -309,7 +313,11 @@ export async function upstreamRequest({
       type: 'error',
       response: causedByClientDisconnect
         ? clientDisconnectResponse(vercelRequestId)
-        : upstreamFetchFailureResponse(failureFamily ?? 'unknown', vercelRequestId),
+        : upstreamFetchFailureResponse(
+            failureFamily ?? 'unknown',
+            vercelRequestId,
+            reasoningEffort
+          ),
     };
   }
 }

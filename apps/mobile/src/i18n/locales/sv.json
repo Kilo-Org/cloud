@@ -152,7 +152,9 @@
     "appearanceDark": "Mörkt",
     "account": "Konto",
     "prReviewAttribution": "Lägg till appattribution i PR-granskningar",
-    "prReviewAttributionSubtitle": "Lägg till en Reviewed via Kilo-sidfot när du skickar en granskning."
+    "prReviewAttributionSubtitle": "Lägg till en Reviewed via Kilo-sidfot när du skickar en granskning.",
+    "returnSendsMessage": "Returtangenten skickar meddelanden",
+    "returnSendsMessageSubtitle": "När detta är avstängt infogar returtangenten en radbrytning i agenternas meddelandefält."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request inte tillgänglig",
@@ -750,7 +752,8 @@
       "networkError": "Nätverksfel",
       "uploadFailed": "Uppladdningen misslyckades",
       "failedToUploadFile": "Det gick inte att ladda upp filen: {{reason}}",
-      "nothingToPaste": "Ingenting att klistra in"
+      "nothingToPaste": "Ingenting att klistra in",
+      "metadataStripFailed": "Fotots metadata kunde inte tas bort."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "Den föregående uppgiften håller fortfarande på att avslutas. Vänta en stund.",
       "serviceUnavailable": "Tjänsten är inte tillgänglig just nu. Försök igen.",
       "connectionTrouble": "Anslutningsproblem. Försök igen om en liten stund.",
-      "modelUnavailable": "Den här modellen är inte tillgänglig för Cloud Agent. Välj en annan modell och försök igen."
+      "modelUnavailable": "Den här modellen är inte tillgänglig för Cloud Agent. Välj en annan modell och försök igen.",
+      "cancelQueuedFailed": "Kunde inte avbryta meddelandet.",
+      "cancelQueuedRestoreAvailable": "Meddelandet avbröts. Tryck på Återställ för att återföra det till meddelandefältet.",
+      "cancelQueuedRestored": "Meddelandet avbröts. Prompten finns åter i meddelandefältet.",
+      "cancelQueuedUpgradeRequired": "Att avbryta köade meddelanden kräver en nyare Kilo CLI. Uppdatera Kilo CLI och återanslut."
     },
     "remoteSession": {
       "failedToCreate": "Det gick inte att skapa fjärrsession",
@@ -2213,7 +2220,8 @@
       "cliCannotContinue": "Denna CLI kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI.",
       "continueFrom": "Fortsätter {{title}}",
       "importFailed": "Det gick inte att importera denna session.",
-      "importingSession": "Importerar session"
+      "importingSession": "Importerar session",
+      "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppdaterade {{displayCount}} fil",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "Meddelandet är i kö",
       "userMessage": "Användarmeddelande",
       "assistantMessage": "Assistentmeddelande",
-      "longPressHint": "Tryck länge för meddelandedetaljer"
+      "longPressHint": "Tryck länge för meddelandedetaljer",
+      "cancelQueued": "Avbryt meddelande",
+      "cancelQueuedAccessibility": "Avbryt köat meddelande",
+      "restoreQueued": "Återställ",
+      "restoreQueuedAccessibility": "Återställ avbrutet meddelande till meddelandefältet"
     },
     "olderMessages": {
       "arrived": "Tidigare meddelanden lästes in",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Filtrera sessioner",
-      "sortBy": "Sortera efter",
-      "sortLastUpdated": "Senast uppdaterad",
-      "sortCreated": "Skapad",
       "platform": "Plattform",
       "platformCloud": "Cloud",
       "platformExtension": "Tillägg",
@@ -2545,7 +2554,9 @@
       "uploading": "Laddar upp…",
       "uploaded": "Uppladdad",
       "uploadFailedRetry": "Uppladdningen misslyckades. Tryck för att försöka igen.",
-      "uploadFailedTerminal": "Den här filen kan inte laddas upp."
+      "uploadFailedTerminal": "Den här filen kan inte laddas upp.",
+      "moveLeft": "Flytta {{filename}} åt vänster",
+      "moveRight": "Flytta {{filename}} åt höger"
     },
     "attachmentPasteHint": {
       "accessibility": "Klistra in bild från urklipp",
@@ -2575,7 +2586,11 @@
       "finalizingPlaceholder": "Avslutar...",
       "messagePlaceholder": "Meddelande...",
       "cannotReceiveFiles": "Denna session kan inte ta emot filer. Ta bort bilagorna för att skicka ditt meddelande.",
-      "couldNotAttachFiles": "Det gick inte att bifoga filer. Tryck på skicka för att försöka igen."
+      "couldNotAttachFiles": "Det gick inte att bifoga filer. Tryck på skicka för att försöka igen.",
+      "discardAttachmentsMessage": "Uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
+      "discardAttachmentsTitle": "Kassera bilagor?",
+      "charactersRemaining": "{{count}} tecken kvar",
+      "insertNewline": "Infoga radbrytning"
     },
     "chatLink": {
       "linkCopied": "Länk kopierad",
@@ -2794,7 +2809,8 @@
     "busy": "Röstinmatningen är upptagen. Försök igen.",
     "stopped": "Röstinmatningen stoppades. Tryck på mikrofonen för att försöka igen.",
     "unavailableDevice": "Röstinmatning är inte tillgänglig på den här enheten.",
-    "unavailableLanguage": "Röstinmatning är inte tillgänglig för den här enhetens språk."
+    "unavailableLanguage": "Röstinmatning är inte tillgänglig för den här enhetens språk.",
+    "listeningStopped": "Lyssningen stoppades."
   },
   "share": {
     "title": "Dela till Kilo",

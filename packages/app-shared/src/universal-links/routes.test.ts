@@ -227,7 +227,6 @@ describe('deliberately unmapped paths', () => {
     '/openclaw-advisor',
     '/account-verification',
     '/github-app',
-    '/collab',
     '/payments/xyz',
     '/admin/users',
     '/privacy-app',

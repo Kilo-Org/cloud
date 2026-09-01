@@ -8,6 +8,7 @@ import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-pro
 import type { GetProviderProviderResult } from '@/lib/ai-gateway/providers/get-provider';
 import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { getReasoningEffort } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 
@@ -92,6 +93,7 @@ export async function sendUpstreamAttempt({
     provider: providerContext.provider,
     signal,
     vercelRequestId,
+    reasoningEffort: getReasoningEffort(request),
   });
   if (result.type === 'error') return result;
 

@@ -152,7 +152,9 @@
     "appearanceDark": "Tumedas",
     "account": "Konto",
     "prReviewAttribution": "Lisa rakenduse viide PR-ülevaatustesse",
-    "prReviewAttributionSubtitle": "Kui esitad ülevaate, lisa jalusesse 'Reviewed via Kilo'."
+    "prReviewAttributionSubtitle": "Kui esitad ülevaate, lisa jalusesse 'Reviewed via Kilo'.",
+    "returnSendsMessage": "Sisestusklahv saadab sõnumi",
+    "returnSendsMessageSubtitle": "Kui see on välja lülitatud, lisab sisestusklahv agentide sõnumi sisestusväljadel reavahetuse."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole saadaval",
@@ -750,7 +752,8 @@
       "networkError": "Võrguviga",
       "uploadFailed": "Üleslaadimine ebaõnnestus",
       "failedToUploadFile": "Faili üleslaadimine ebaõnnestus: {{reason}}",
-      "nothingToPaste": "Pole midagi kleepida"
+      "nothingToPaste": "Pole midagi kleepida",
+      "metadataStripFailed": "Foto metaandmete eemaldamine ebaõnnestus."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "Eelmine ülesanne on veel lõpetamisel. Palun oota hetk.",
       "serviceUnavailable": "Teenus pole praegu saadaval. Palun proovi uuesti.",
       "connectionTrouble": "Ühenduseprobleem. Palun proovi hetke pärast uuesti.",
-      "modelUnavailable": "See mudel pole Cloud Agenti jaoks saadaval. Vali teine mudel ja proovi uuesti."
+      "modelUnavailable": "See mudel pole Cloud Agenti jaoks saadaval. Vali teine mudel ja proovi uuesti.",
+      "cancelQueuedFailed": "Sõnumi tühistamine ebaõnnestus.",
+      "cancelQueuedRestoreAvailable": "Sõnum on tühistatud. Selle sõnumi sisestusväljale tagasitoomiseks puudutage nuppu „Taastage“.",
+      "cancelQueuedRestored": "Sõnum on tühistatud. Päring on tagasi sõnumi sisestusväljal.",
+      "cancelQueuedUpgradeRequired": "Ootel sõnumite tühistamiseks on vaja uuemat Kilo CLI-d. Uuendage Kilo CLI-d ja ühenduge uuesti."
     },
     "remoteSession": {
       "failedToCreate": "Kaugseansi loomine ebaõnnestus",
@@ -2213,7 +2220,8 @@
       "cliCannotContinue": "See CLI ei saa seanssi jätkata. Valige Cloud Agent või mõni muu CLI.",
       "continueFrom": "Jätkatakse {{title}}",
       "importFailed": "Seda seanssi ei õnnestunud importida.",
-      "importingSession": "Imporditakse seanssi"
+      "importingSession": "Imporditakse seanssi",
+      "discardWithUploadsMessage": "Teie päring ja üles laaditud failid, mida pole saadetud sõnumitele lisatud, kustutatakse."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendatud {{displayCount}} fail",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "Sõnum järjekorras",
       "userMessage": "Kasutaja sõnum",
       "assistantMessage": "Abistaja sõnum",
-      "longPressHint": "Sõnumi üksikasjade jaoks vajuta pikalt"
+      "longPressHint": "Sõnumi üksikasjade jaoks vajuta pikalt",
+      "cancelQueued": "Tühistage sõnum",
+      "cancelQueuedAccessibility": "Tühistage ootel sõnum",
+      "restoreQueued": "Taastage",
+      "restoreQueuedAccessibility": "Taastage tühistatud sõnum sõnumi sisestusväljale"
     },
     "olderMessages": {
       "arrived": "Varasemad sõnumid laaditud",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Filtreeri seansse",
-      "sortBy": "Sorteeri",
-      "sortLastUpdated": "Viimati muudetud",
-      "sortCreated": "Loodud",
       "platform": "Platvorm",
       "platformCloud": "Pilv",
       "platformExtension": "Laiendus",
@@ -2545,7 +2554,9 @@
       "uploading": "Üleslaadimine…",
       "uploaded": "Üles laaditud",
       "uploadFailedRetry": "Üleslaadimine ebaõnnestus. Puudutage uuesti proovimiseks.",
-      "uploadFailedTerminal": "Seda faili ei saa üles laadida."
+      "uploadFailedTerminal": "Seda faili ei saa üles laadida.",
+      "moveLeft": "Liigutage {{filename}} vasakule",
+      "moveRight": "Liigutage {{filename}} paremale"
     },
     "attachmentPasteHint": {
       "accessibility": "Kleebi pilt lõikelaualt",
@@ -2575,7 +2586,11 @@
       "finalizingPlaceholder": "Lõpetamine...",
       "messagePlaceholder": "Sõnum...",
       "cannotReceiveFiles": "See seanss ei saa faile vastu võtta. Sõnumi saatmiseks eemaldage manused.",
-      "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puudutage saatmist."
+      "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puudutage saatmist.",
+      "discardAttachmentsMessage": "Üles laaditud failid, mida pole saadetud sõnumitele lisatud, kustutatakse.",
+      "discardAttachmentsTitle": "Kas loobuda manustest?",
+      "charactersRemaining": "{{count}} tähemärki jäänud",
+      "insertNewline": "Lisage reavahetus"
     },
     "chatLink": {
       "linkCopied": "Link kopeeritud",
@@ -2794,7 +2809,8 @@
     "busy": "Häälsisestus on hõivatud. Proovi uuesti.",
     "stopped": "Häälsisestus peatus. Uuesti proovimiseks puuduta mikrofoni.",
     "unavailableDevice": "Häälsisestus pole sellel seadmel saadaval.",
-    "unavailableLanguage": "Häälsisestus pole selle seadme keele puhul saadaval."
+    "unavailableLanguage": "Häälsisestus pole selle seadme keele puhul saadaval.",
+    "listeningStopped": "Kuulamine peatus."
   },
   "share": {
     "title": "Jaga Kilosse",

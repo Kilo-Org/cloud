@@ -39,6 +39,7 @@ import {
 } from '@/lib/integrations/platforms/github/user-authorization';
 import { seedUserGithubToken } from '@/lib/github-pr-review/dev-seed';
 import { createInstallState } from '@/lib/integrations/github/install-state';
+import { canOrganizationUseMultipleGitHubInstallations } from '@/lib/integrations/github/multiple-installations';
 
 export const githubAppsRouter = createTRPCRouter({
   // List all integrations
@@ -61,7 +62,10 @@ export const githubAppsRouter = createTRPCRouter({
       const primaryId = integrations.find(isPlatformIntegrationHealthy)?.id ?? null;
 
       return {
-        canAdd: canManageOrganization(role),
+        canAdd:
+          canManageOrganization(role) &&
+          (integrations.length === 0 ||
+            canOrganizationUseMultipleGitHubInstallations(input.organizationId)),
         installations: integrations.map(integration => {
           const repositories = requireNumericPlatformRepositories(integration.repositories) ?? [];
           const status: 'connected' | 'pending' | 'suspended' | 'needs_attention' =
@@ -153,6 +157,15 @@ export const githubAppsRouter = createTRPCRouter({
         input.organizationId,
         input.organizationId ? ORGANIZATION_MANAGE_ROLES : undefined
       );
+      if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
+        const integrations = await githubAppsService.listIntegrations(owner);
+        if (integrations.length > 0) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'This organization already has a GitHub installation',
+          });
+        }
+      }
       const appType = await getGitHubAppTypeForOrganization(input.organizationId ?? null);
 
       const token = await createInstallState({

@@ -2,7 +2,14 @@ import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { ChevronDown } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
+import {
+  AccessibilityInfo,
+  Keyboard,
+  Platform,
+  Pressable,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -24,10 +31,13 @@ const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
 // otherwise spam the FlashList event log.
 const ON_START_REACHED_THRESHOLD = 2;
 
+const DRAW_DISTANCE = 1000;
+
 type SessionMessageListProps<T> = {
   sessionId: string;
   items: readonly T[];
   keyExtractor: (item: T) => string;
+  getItemType?: (item: T) => string;
   hasOlderMessages: boolean;
   isLoadingOlderMessages: boolean;
   olderMessagesError: OlderMessagesError | null;
@@ -57,6 +67,7 @@ export function SessionMessageList<T>({
   sessionId,
   items,
   keyExtractor,
+  getItemType,
   hasOlderMessages,
   isLoadingOlderMessages,
   olderMessagesError,
@@ -76,6 +87,7 @@ export function SessionMessageList<T>({
     listRef,
     scrollToLatestAnimated,
     handleContentSizeChange,
+    handleKeyboardShow,
     handleListLayout,
     handleScroll,
     handleScrollBeginDrag,
@@ -122,6 +134,27 @@ export function SessionMessageList<T>({
   useEffect(() => {
     inFlightRef.current = false;
   }, [sessionId]);
+
+  // Keep the newest message visible when the keyboard opens, but only while
+  // the follow guard is true (the user is still at the bottom). On iOS,
+  // `keyboardWillShow` fires before the animation and `keyboardDidShow` fires
+  // after it: the first starts the scroll immediately and the second lands it
+  // once the viewport has actually shrunk. Android has no will-show event, so
+  // `keyboardDidShow` is the only show signal there.
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      const willShow = Keyboard.addListener('keyboardWillShow', handleKeyboardShow);
+      const didShow = Keyboard.addListener('keyboardDidShow', handleKeyboardShow);
+      return () => {
+        willShow.remove();
+        didShow.remove();
+      };
+    }
+    const didShow = Keyboard.addListener('keyboardDidShow', handleKeyboardShow);
+    return () => {
+      didShow.remove();
+    };
+  }, [handleKeyboardShow]);
 
   // Fire `onReachedBottom` only on the false→true transition of
   // `isAtBottom`. The previous-value ref prevents a fire on mount (the list
@@ -190,7 +223,12 @@ export function SessionMessageList<T>({
         contentContainerStyle={resolvedContentContainerStyle}
         data={items}
         keyExtractor={keyExtractor}
+        getItemType={getItemType}
         renderItem={renderItem}
+        // Transcript rows are tall and parse markdown on mount. The 250 dp
+        // default draws under half a screen ahead, so a fast fling shows blank
+        // space until the rows mount. Four screens of lookahead hides that.
+        drawDistance={DRAW_DISTANCE}
         // Android Fabric can race clipped-view reattachment with rapid transcript updates.
         removeClippedSubviews={false}
         onScroll={handleScroll}

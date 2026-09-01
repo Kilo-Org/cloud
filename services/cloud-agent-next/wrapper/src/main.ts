@@ -588,7 +588,8 @@ async function main() {
   }
 
   async function readySession(
-    request: WrapperSessionReadyRequest
+    request: WrapperSessionReadyRequest,
+    logArchiveId: string
   ): Promise<WrapperSessionReadyResponse> {
     if (isShuttingDown) return wrapperFinalizingResponse();
 
@@ -610,7 +611,8 @@ async function main() {
         serverConfig,
         serverDeps,
         'close-until-runtime-ready',
-        request.kiloSessionId
+        request.kiloSessionId,
+        logArchiveId
       );
       if (bindError) {
         const error = (await bindError.json()) as {
@@ -634,6 +636,7 @@ async function main() {
         };
       }
 
+      const bootstrapLogUploader = state.logUploader;
       serverConfig.workspacePath = request.workspace.workspacePath;
       serverConfig.sessionId = request.kiloSessionId;
       serverConfig.platform = request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM;
@@ -785,7 +788,13 @@ async function main() {
       const workspaceBootstrap = prepareWrapperBootstrapWorkspace(
         request,
         emitBootstrapProgress,
-        {},
+        {
+          beforeFailureCleanup: async () => {
+            if (bootstrapLogUploader?.archiveId === logArchiveId) {
+              await bootstrapLogUploader.finalize();
+            }
+          },
+        },
         workspaceBootstrapController.signal
       );
       activeWorkspaceBootstraps.add(workspaceBootstrap);
@@ -986,9 +995,7 @@ async function main() {
     // Best-effort final log upload
     const uploader = state.logUploader;
     if (uploader) {
-      const uploadTimeout = new Promise<void>(resolve => setTimeout(resolve, 5_000));
-      await Promise.race([uploader.uploadNow().catch(() => {}), uploadTimeout]);
-      uploader.stop();
+      await uploader.finalize();
     }
 
     // Close connections
@@ -1028,9 +1035,7 @@ async function main() {
 
     const uploader = state.logUploader;
     if (uploader) {
-      const timeout = new Promise<void>(resolve => setTimeout(resolve, 5_000));
-      void Promise.race([uploader.uploadNow().catch(() => {}), timeout]).finally(() => {
-        uploader.stop();
+      void uploader.finalize().finally(() => {
         process.exit(1);
       });
     } else {

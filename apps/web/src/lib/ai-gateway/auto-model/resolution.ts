@@ -20,7 +20,7 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   modeSchema,
-  BALANCED_QWEN_MODEL,
+  BALANCED_FALLBACK_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
@@ -328,10 +328,10 @@ export async function resolveAutoModel(
       }
       // Exact catalog variant missing or removed: never serve the chosen model
       // with implicit defaults — same balanced fallback as the no-decision path.
-      return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
+      return { kind: 'ok', resolved: BALANCED_FALLBACK_MODEL };
     }
     // Static fallback when the worker is slow or unavailable.
-    return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
+    return { kind: 'ok', resolved: BALANCED_FALLBACK_MODEL };
   }
   const mode = resolveMode(modeHeader, featureHeader);
   return {

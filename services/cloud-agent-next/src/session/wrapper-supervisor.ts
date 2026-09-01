@@ -246,7 +246,8 @@ function getAssistantErrorMessage(error: unknown): string | undefined {
   return 'Assistant message failed';
 }
 
-function assistantErrorTerminalizeParams(assistantError: unknown): TerminalizeParams {
+function assistantErrorTerminalizeParams(info: LatestAssistantMessage['info']): TerminalizeParams {
+  const assistantError = info.error;
   if (isAssistantInterrupt(assistantError)) {
     return {
       kind: 'interrupted',
@@ -268,6 +269,7 @@ function assistantErrorTerminalizeParams(assistantError: unknown): TerminalizePa
     assistantFailureReason: assistantFailure.reason,
     providerOwnership: assistantFailure.providerOwnership,
     safeFailureMessage: assistantFailure.safeMessage,
+    assistantMessageId: info.id,
   };
 }
 
@@ -289,7 +291,7 @@ function projectWrapperDeathReconciliation(
 ): TerminalizeParams | null {
   if (!assistantMessage) return null;
   if (assistantMessage.info.error !== undefined && assistantMessage.info.error !== null) {
-    return assistantErrorTerminalizeParams(assistantMessage.info.error);
+    return assistantErrorTerminalizeParams(assistantMessage.info);
   }
   if (!hasAssistantCompletionMarker(assistantMessage.info)) return null;
   return {
@@ -783,7 +785,7 @@ export function createWrapperSupervisor(
         error,
         completionSource: 'wrapper_failure',
         failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-        failureCode: activityObserved ? 'wrapper_error_after_activity' : failureCode,
+        failureCode,
       };
     });
     await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
@@ -862,7 +864,7 @@ export function createWrapperSupervisor(
         error: 'Wrapper disconnected',
         completionSource: 'wrapper_failure',
         failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-        failureCode: activityObserved ? 'wrapper_error_after_activity' : 'wrapper_disconnected',
+        failureCode: 'wrapper_disconnected',
       };
     });
     await clearWrapperRuntimeIdentity(
@@ -969,7 +971,7 @@ export function createWrapperSupervisor(
         .warn('Wrapper liveness no-output deadline expired');
       await handleUnhealthyWrapper(
         state,
-        'Wrapper accepted the message but produced no output',
+        'Wrapper made no execution progress during the watchdog window',
         'wrapper_no_output'
       );
       return true;
@@ -1104,11 +1106,11 @@ export function createWrapperSupervisor(
         ? getAssistantMessageForUserMessage(metadata.identity.sessionId, kiloSessionId, messageId)
         : null;
       const assistantError = assistantMessage?.info.error;
-      if (assistantError !== undefined && assistantError !== null) {
+      if (assistantMessage && assistantError !== undefined && assistantError !== null) {
         projectedSettlements.push({
           message,
           observeCorrelatedActivity: true,
-          params: assistantErrorTerminalizeParams(assistantError),
+          params: assistantErrorTerminalizeParams(assistantMessage.info),
         });
       } else if (assistantMessage) {
         projectedSettlements.push({

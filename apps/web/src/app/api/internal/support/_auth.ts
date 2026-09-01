@@ -1,10 +1,9 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac } from 'crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import * as serverConfig from '@/lib/config.server';
-
-const SECRET_COMPARE_HMAC_KEY = Buffer.from('support-api-secret-compare');
 
 const KILO_OWNED_DOMAINS = ['kilocode.ai', 'kilo.ai'] as const;
 
@@ -12,9 +11,7 @@ export const RequestIdSchema = z.string().trim().min(1).max(128);
 
 function secretMatches(provided: string | null, expected: string): boolean {
   if (!provided) return false;
-  const a = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(provided).digest();
-  const b = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(expected).digest();
-  return timingSafeEqual(a, b);
+  return timingSafeEqual(provided, expected);
 }
 
 export function emailDomainAfterLastAt(email: string): string {

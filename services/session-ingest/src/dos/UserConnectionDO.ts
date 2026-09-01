@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
+import { hoistedAttentionChanges, hoistedChildAttention } from './child-attention';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import {
   CLIOutboundMessageSchema,
@@ -9,6 +10,7 @@ import {
   type Instance,
   type SessionEventPayload,
   SessionEventPayloadSchema,
+  SessionStatusSchema,
   type WebInboundMessage,
   WebOutboundMessageSchema,
 } from '../types/user-connection-protocol';
@@ -107,6 +109,7 @@ const MAX_MUTATION_ID_LENGTH = 128;
 export const ALLOWED_VIEWER_COMMANDS: ReadonlySet<string> = new Set([
   'send_message',
   'interrupt',
+  'drop_queued_message',
   'question_reply',
   'question_reject',
   'permission_respond',
@@ -128,11 +131,14 @@ const CATALOG_DEDUPE_COMMANDS: ReadonlySet<string> = new Set(['list_models', 'li
 // Operations that older CLIs reject with a precise "unknown command: <op>"
 // string. Only these commands get mapped to a structured CLI_UPGRADE_REQUIRED
 // response; any other CLI error is preserved verbatim.
+// Old remotes return upgrade-required for `drop_queued_message`; remove the
+// upgrade mapping when every remote supports drop.
 const CLI_UPGRADE_REQUIRED_COMMANDS: ReadonlySet<string> = new Set([
   'list_commands',
   'send_command',
   'create_session',
   'exit_cli',
+  'drop_queued_message',
   'list_directories',
 ]);
 
@@ -711,6 +717,27 @@ export class UserConnectionDO extends DurableObject<Env> {
         })),
       },
     });
+
+    // Clients keep a needs-input status sticky until an explicit status event
+    // names the session, so a hoisted child raise must arrive and clear as
+    // `session.status.updated` on the root.
+    const changedAt = new Date(now).toISOString();
+    for (const change of hoistedAttentionChanges(previousSessions, sessions)) {
+      const status = SessionStatusSchema.safeParse(change.status);
+      const previousStatus = SessionStatusSchema.safeParse(change.previousStatus);
+      this.broadcastToWeb({
+        type: 'system',
+        event: 'session.status.updated',
+        data: {
+          source: 'v2',
+          sessionId: change.sessionId,
+          previousStatus: previousStatus.success ? previousStatus.data : null,
+          status: status.success ? status.data : null,
+          statusUpdatedAt: changedAt,
+          changedAt,
+        },
+      });
+    }
 
     this.sendToCli(ws, { type: 'heartbeat_ack' });
   }
@@ -2709,6 +2736,18 @@ export class UserConnectionDO extends DurableObject<Env> {
         capabilities?: ConnectionCapabilities;
       }
     > = [];
+    // A subagent raise arrives on the child row, but only root rows are
+    // emitted. Hoist the child's needs-input status onto its root so the
+    // session list shows NEEDS INPUT. Derived per call, so it clears when
+    // the child resolves.
+    // ponytail: one level deep; iterate to a fixed point if the CLI ever nests deeper.
+    const hoistedStatus = new Map<string, string>();
+    for (const [connectionId, sessions] of this.connectionSessions) {
+      if (!liveConnectionIds.has(connectionId)) continue;
+      for (const [root, status] of hoistedChildAttention(sessions)) {
+        hoistedStatus.set(root, status);
+      }
+    }
     for (const [connectionId, sessions] of this.connectionSessions) {
       if (!liveConnectionIds.has(connectionId)) continue;
       const protocolVersion = this.connectionProtocolVersion.get(connectionId);
@@ -2721,6 +2760,7 @@ export class UserConnectionDO extends DurableObject<Env> {
         if (this.sessionOwners.get(session.id) !== connectionId) continue;
         result.push({
           ...session,
+          status: hoistedStatus.get(session.id) ?? session.status,
           connectionId,
           ...(protocolVersion ? { protocolVersion } : {}),
           ...(capabilities ? { capabilities } : {}),

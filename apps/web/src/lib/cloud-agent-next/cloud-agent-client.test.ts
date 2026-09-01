@@ -12,7 +12,11 @@ import type {
   SendMessageInput,
 } from './cloud-agent-client';
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
-import type { WorktreeChangesSnapshot } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import type {
+  GetWorktreeFileOutput,
+  WorktreeChangesSnapshot,
+  WorktreeFileRecord,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 const mockCreateTRPCClient = jest.fn(() => ({}));
 const mockHttpLink =
@@ -22,6 +26,8 @@ const mockGetWorktreeChanges =
   jest.fn<(input: { cloudAgentSessionId: string }) => Promise<unknown>>();
 const mockRefreshWorktreeChanges =
   jest.fn<(input: { cloudAgentSessionId: string }) => Promise<unknown>>();
+const mockGetWorktreeFile =
+  jest.fn<(input: CloudAgentClientModule.GetWorktreeFileInput) => Promise<unknown>>();
 
 import type * as SentryModule from '@sentry/nextjs';
 import type { SandboxStatusSnapshot } from '@/routers/cloud-agent-next-schemas';
@@ -185,6 +191,115 @@ describe('CloudAgentNextClient worktree changes', () => {
       new CloudAgentNextClient('token').refreshWorktreeChanges(cloudAgentSessionId)
     ).rejects.toThrow();
   });
+});
+
+describe('CloudAgentNextClient saved worktree files', () => {
+  const input = {
+    cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    path: 'src/odd\nfile.ts',
+    expectedRevision: 7,
+  };
+  const file: WorktreeFileRecord = {
+    schemaVersion: 1,
+    revision: 7,
+    path: input.path,
+    diff: {
+      status: 'available',
+      patch: 'diff --git a/file b/file\nold mode 100644\nnew mode 100755\n',
+    },
+    content: { status: 'available', source: 'current', text: '' },
+  };
+  const saved: GetWorktreeFileOutput = {
+    status: 'available',
+    file,
+    capturedAt: '2026-08-28T10:00:00.000Z',
+    comparison: { baseRef: 'origin/main', mergeBase: 'a'.repeat(40), head: 'b'.repeat(40) },
+  };
+
+  beforeEach(() => {
+    mockGetWorktreeFile.mockReset();
+    mockGetWorktreeChanges.mockReset();
+    mockRefreshWorktreeChanges.mockReset();
+    mockCaptureException.mockClear();
+    mockCreateTRPCClient.mockReturnValueOnce({ getWorktreeFile: { query: mockGetWorktreeFile } });
+  });
+
+  it.each([
+    saved,
+    {
+      ...saved,
+      status: 'omitted',
+      file: {
+        ...file,
+        diff: { status: 'omitted', reason: 'binary' },
+        content: { status: 'unavailable', reason: 'binary' },
+      },
+    },
+    { status: 'not_captured' },
+    { status: 'no_longer_listed', currentRevision: 8 },
+    { status: 'stale', currentRevision: 8 },
+  ] satisfies GetWorktreeFileOutput[])(
+    'returns the validated saved state without refreshing',
+    async response => {
+      mockGetWorktreeFile.mockResolvedValue(response);
+      await expect(new CloudAgentNextClient('token').getWorktreeFile(input)).resolves.toEqual(
+        response
+      );
+      expect(mockGetWorktreeFile).toHaveBeenCalledWith(input);
+      expect(mockGetWorktreeChanges).not.toHaveBeenCalled();
+      expect(mockRefreshWorktreeChanges).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { ...saved, file: { ...file, schemaVersion: 2 } },
+    { ...saved, file: { ...file, path: 'other.ts' } },
+    { ...saved, file: { ...file, revision: 6 } },
+    { ...saved, status: 'omitted' },
+    {
+      ...saved,
+      file: {
+        ...file,
+        content: { status: 'available', source: 'current', text: 'x'.repeat(100 * 1024) },
+      },
+    },
+    { ...saved, file: { ...file, diff: { status: 'available', patch: 'x'.repeat(512 * 1024) } } },
+    { status: 'stale', currentRevision: 0 },
+  ])('rejects invalid or mismatched saved responses', async response => {
+    mockGetWorktreeFile.mockResolvedValue(response);
+    await expect(new CloudAgentNextClient('token').getWorktreeFile(input)).rejects.toThrow();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it.each(['validation', 'transport'] as const)(
+    'does not propagate or log content-bearing %s errors',
+    async failure => {
+      const marker = 'private-saved-source-marker';
+      const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        if (failure === 'transport') mockGetWorktreeFile.mockRejectedValue(new Error(marker));
+        else
+          mockGetWorktreeFile.mockResolvedValue({
+            ...saved,
+            file: { ...file, diff: { status: 'omitted', reason: marker } },
+          });
+        const error = await new CloudAgentNextClient('token')
+          .getWorktreeFile(input)
+          .catch((error: unknown) => error);
+        expect(error).toBeInstanceOf(Error);
+        if (!(error instanceof Error)) throw new Error('Expected a safe error');
+        expect(error.message).not.toContain(marker);
+        expect(error.cause).toBeUndefined();
+        expect(log).not.toHaveBeenCalled();
+        expect(warn).not.toHaveBeenCalled();
+        expect(mockCaptureException).not.toHaveBeenCalled();
+      } finally {
+        log.mockRestore();
+        warn.mockRestore();
+      }
+    }
+  );
 });
 
 describe('createCloudAgentNextClientForModel', () => {

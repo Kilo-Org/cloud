@@ -16,6 +16,7 @@ import {
   sessionMessageOutcomeSchema,
   sessionEventPayloadSchema,
   sessionGitSummaryPayloadSchema,
+  sessionGitSummaryResultSchema,
   sessionPermissionResolvePayloadSchema,
   sessionPromptPayloadSchema,
   sessionQuestionResolvePayloadSchema,
@@ -35,6 +36,10 @@ import {
   type SessionPromptPayload,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
+import {
+  sessionGitSnapshotPayloadSchema,
+  sessionGitSnapshotResultSchema,
+} from '../../../src/shared/worktree-changes-wire.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
@@ -67,7 +72,7 @@ import {
   validateWorktreeDirectory,
   type WorktreeKiloCleanupClient,
 } from './delete-worktree';
-import { collectWorktreeChanges } from './worktree-changes';
+import { collectWorktreeChanges, collectWorktreeSnapshot } from './worktree-changes';
 
 export type HandlerSessionSnapshot = {
   kiloSessionId: string;
@@ -230,6 +235,7 @@ export type HandlerDeps = {
   materializeAttachments?: typeof materializeMessageAttachments;
   runAutoCommit?: typeof runAutoCommit;
   collectWorktreeChanges?: typeof collectWorktreeChanges;
+  collectWorktreeSnapshot?: typeof collectWorktreeSnapshot;
 };
 
 export type ControlHandlerResult =
@@ -536,7 +542,10 @@ export async function handleControlRequest(
     return fail('protocol_error', 'session identity is required', false);
   }
   if (
-    (deps.signal?.aborted || (!deps.kiloReady && operation !== 'session.git.summary')) &&
+    (deps.signal?.aborted ||
+      (!deps.kiloReady &&
+        operation !== 'session.git.summary' &&
+        operation !== 'session.git.snapshot')) &&
     operation !== 'session.abort' &&
     operation !== 'session.detach'
   ) {
@@ -644,7 +653,9 @@ async function handleSessionControlRequest(
         (runtime, identity, parsed) => runtime.connect(identity, parsed)
       );
     case 'session.git.summary':
-      return handleGitSummary(session, payload, deps);
+      return handleGitCapture(session, payload, deps, false);
+    case 'session.git.snapshot':
+      return handleGitCapture(session, payload, deps, true);
     default:
       return fail('unknown_operation', 'Unknown operation', false);
   }
@@ -784,12 +795,15 @@ async function handleTerminalOperation<Payload, Result>(
   }
 }
 
-async function handleGitSummary(
+async function handleGitCapture(
   session: SessionRequestIdentity,
   payload: unknown,
-  deps: HandlerDeps
+  deps: HandlerDeps,
+  snapshot: boolean
 ): Promise<ControlHandlerResult> {
-  const parsed = sessionGitSummaryPayloadSchema.safeParse(payload);
+  const parsed = (
+    snapshot ? sessionGitSnapshotPayloadSchema : sessionGitSummaryPayloadSchema
+  ).safeParse(payload);
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
   const directory = session.directory;
   return runDirectoryOperation(directory, async () => {
@@ -797,14 +811,13 @@ async function handleGitSummary(
       return fail('not_ready', 'Session directory is not attached', false);
     }
     if (deps.signal?.aborted) return missingKilo();
-    let result: Awaited<ReturnType<typeof collectWorktreeChanges>>;
+    let captured: unknown;
     try {
-      result = await (deps.collectWorktreeChanges ?? collectWorktreeChanges)(
-        directory,
-        parsed.data,
-        undefined,
-        deps.signal
-      );
+      captured = await (
+        snapshot
+          ? (deps.collectWorktreeSnapshot ?? collectWorktreeSnapshot)
+          : (deps.collectWorktreeChanges ?? collectWorktreeChanges)
+      )(directory, parsed.data, undefined, deps.signal);
     } catch {
       return deps.signal?.aborted
         ? missingKilo()
@@ -815,7 +828,18 @@ async function handleGitSummary(
     if (rootForSession(session.kiloSessionId, directory) !== session.kiloSessionId) {
       return fail('not_ready', 'Session directory is not attached', false);
     }
-    return ok(result);
+    const result = snapshot
+      ? sessionGitSnapshotResultSchema.safeParse(captured)
+      : sessionGitSummaryResultSchema.safeParse(captured);
+    if (!result.success) return fail('protocol_error', 'Invalid worktree result', false);
+    const summary = 'summary' in result.data ? result.data.summary : result.data;
+    if (
+      summary.revision !== parsed.data.revision ||
+      (parsed.data.baseRef !== undefined && summary.comparison.baseRef !== parsed.data.baseRef)
+    ) {
+      return fail('protocol_error', 'Invalid worktree result', false);
+    }
+    return ok(result.data);
   });
 }
 

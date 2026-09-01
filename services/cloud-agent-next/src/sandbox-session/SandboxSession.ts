@@ -1,7 +1,9 @@
 import { DurableObject } from 'cloudflare:workers';
 import type {
   GetWorktreeChangesOutput,
+  GetWorktreeFileOutput,
   RefreshWorktreeChangesOutput,
+  WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import { TRPCError } from '@trpc/server';
 import { withTimeout } from '@kilocode/worker-utils';
@@ -239,27 +241,24 @@ export class SandboxSession extends DurableObject<Env> {
     const db = drizzle(ctx.storage, { logger: false });
     this.eventQueries = createEventQueries(db, ctx.storage.sql);
     this.worktreeChanges = createWorktreeChanges({
-      storage: {
-        get: key => ctx.storage.get(key),
-        put: async (key, snapshot) => {
-          if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked()) {
-            throw new Error('Worktree changes persistence is blocked');
-          }
-          const sessionId = this.requireSessionId();
-          const payload = JSON.stringify({ revision: snapshot.revision });
-          const timestamp = Date.now();
-          const id = ctx.storage.transactionSync(() => {
-            ctx.storage.kv.put(key, snapshot);
-            return this.eventQueries.insertUnique({
-              executionId: '',
-              sessionId,
-              streamEventType: WORKTREE_CHANGES_READY_EVENT,
-              payload,
-              timestamp,
-              entityId: `worktree-changes/${snapshot.revision}`,
-            });
-          });
-          if (id === null) return;
+      storage: ctx.storage,
+      saveSnapshotEvent: snapshot => {
+        if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked()) {
+          throw new Error('Worktree changes persistence is blocked');
+        }
+        const sessionId = this.requireSessionId();
+        const payload = JSON.stringify({ revision: snapshot.revision });
+        const timestamp = Date.now();
+        const id = this.eventQueries.insertUnique({
+          executionId: '',
+          sessionId,
+          streamEventType: WORKTREE_CHANGES_READY_EVENT,
+          payload,
+          timestamp,
+          entityId: `worktree-changes/${snapshot.revision}`,
+        });
+        if (id === null) return;
+        return () => {
           try {
             this.broadcastStoredEvent({
               id,
@@ -274,15 +273,15 @@ export class SandboxSession extends DurableObject<Env> {
               .withFields({ sessionId, eventId: id, revision: snapshot.revision })
               .error('Failed to broadcast saved worktree changes');
           }
-        },
+        };
       },
       readContext: async () => this.worktreeContext(await this.getMetadata()),
-      requestCapture: (context, payload) =>
+      requestCapture: (context, payload, operation) =>
         withDORetry(
           () => getSandboxControlStub(this.env, context.sandboxId),
           control =>
             control.request({
-              operation: 'session.git.summary',
+              operation,
               session: context.session,
               payload,
             }),
@@ -694,6 +693,12 @@ export class SandboxSession extends DurableObject<Env> {
     return this.worktreeChanges.refresh();
   }
 
+  async getWorktreeFile(input: WorktreeFileQuery): Promise<GetWorktreeFileOutput> {
+    if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked())
+      return { status: 'not_captured' };
+    return this.worktreeChanges.getFile(input);
+  }
+
   async validateKiloGlobalFeedProducer(_params: {
     kiloSessionId: string;
     wrapperRunId: string;
@@ -931,6 +936,7 @@ export class SandboxSession extends DurableObject<Env> {
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
       this.terminalLifecycle.beginDeletion(metadata);
+      this.worktreeChanges.purge();
       const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
       const cancelled = messages.map(message =>
         message.state === 'queued' || message.state === 'accepted'
@@ -1032,7 +1038,11 @@ export class SandboxSession extends DurableObject<Env> {
     await this.interruptExecution();
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     const metadata = this.terminalLifecycle.getStoredMetadata();
-    const records = this.terminalLifecycle.beginDeletion(metadata);
+    const records = this.ctx.storage.transactionSync(() => {
+      const records = this.terminalLifecycle.beginDeletion(metadata);
+      this.worktreeChanges.purge();
+      return records;
+    });
     for (const ws of this.ctx.getWebSockets('stream')) {
       ws.close(1000, 'session access revoked');
     }

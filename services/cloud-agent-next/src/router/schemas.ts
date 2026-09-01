@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   sessionIdSchema,
   githubRepoSchema,
@@ -1010,9 +1011,13 @@ export const GetSandboxStatusInput = z
   .strict();
 
 export const WorktreeChangesInput = z.object({ cloudAgentSessionId: sessionIdSchema }).strict();
+export const WorktreeFileInput = worktreeFileQuerySchema.extend({
+  cloudAgentSessionId: sessionIdSchema,
+});
 
 export {
   getWorktreeChangesOutputSchema as GetWorktreeChangesOutput,
+  getWorktreeFileOutputSchema as GetWorktreeFileOutput,
   refreshWorktreeChangesOutputSchema as RefreshWorktreeChangesOutput,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 

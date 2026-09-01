@@ -4,17 +4,33 @@ import { SandboxRuntimeVersionSchema } from './sandbox-status.js';
 export {
   MAX_WORKTREE_CHANGES_BYTES,
   MAX_WORKTREE_CHANGES_FILES,
+  WORKTREE_FILE_SCHEMA_VERSION,
+  MAX_WORKTREE_FILE_BYTES,
+  MAX_WORKTREE_SNAPSHOT_BYTES,
+  MAX_WORKTREE_PATCH_LINES,
+  MAX_WORKTREE_CONTENT_BYTES,
+  MAX_WORKTREE_CONTENT_LINES,
   worktreeChangesFileSchema,
+  worktreeFileOmissionReasonSchema,
+  worktreeFileRecordSchema,
+  worktreeSnapshotCaptureSchema,
   sessionGitSummaryPayloadSchema,
   sessionGitSummaryResultSchema,
+  sessionGitSnapshotPayloadSchema,
+  sessionGitSnapshotResultSchema,
   type WorktreeChangesFile,
+  type WorktreeFileOmissionReason,
+  type WorktreeFileRecord,
+  type WorktreeSnapshotCapture,
   type SessionGitSummaryPayload,
   type SessionGitSummaryResult,
+  type SessionGitSnapshotPayload,
+  type SessionGitSnapshotResult,
 } from './worktree-changes-wire.js';
 
 export const SANDBOX_CONTROL_PROTOCOL_VERSION = 1;
 
-export const MAX_SANDBOX_CONTROL_FRAME_BYTES = 1 * 1024 * 1024;
+export const MAX_SANDBOX_CONTROL_FRAME_BYTES = 12 * 1024 * 1024;
 
 export const SANDBOX_CONTROL_WS_TAG = 'sandbox-control';
 
@@ -46,6 +62,7 @@ export const SESSION_OPERATIONS = [
   'session.abort',
   'session.sync',
   'session.git.summary',
+  'session.git.snapshot',
   'session.detach',
   'session.terminal.create',
   'session.terminal.resize',

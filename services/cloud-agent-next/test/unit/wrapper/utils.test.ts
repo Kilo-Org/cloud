@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
+import { mkdtemp, open, readFile, rename, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -25,6 +25,29 @@ describe('runProcess', () => {
     expect(result.stderr).toBe('');
     expect(result.exitCode).toBe(0);
     expect(result.elapsedMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('reads stdin from the opened file descriptor even when its path is replaced', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'wrapper-open-input-'));
+    const path = join(directory, 'input');
+    const original = Buffer.from([0xff, 0, 1, 2, 10]);
+    await writeFile(path, original);
+    const handle = await open(path, 'r');
+    try {
+      await rename(path, join(directory, 'original'));
+      await writeFile(path, 'replacement bytes');
+      const result = await runProcess(
+        process.execPath,
+        ['-e', 'process.stdin.pipe(process.stdout)'],
+        { stdinFd: handle.fd, rawOutput: true, maxOutputBytes: original.length, timeoutMs: 5_000 }
+      );
+      expect(result.exitCode).toBe(0);
+      expect(result.stdoutBytes).toEqual(original);
+      expect(result.stdoutTruncated).toBeUndefined();
+    } finally {
+      await handle.close();
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('preserves UTF-8 characters split across stdout and stderr chunks', async () => {
@@ -56,6 +79,87 @@ describe('runProcess', () => {
     expect(outputs).toEqual({ stdout: text, stderr: text });
     expect(result.stdoutTruncated).toBeUndefined();
     expect(result.stderrTruncated).toBeUndefined();
+  });
+
+  it('captures raw bytes without replacement decoding or forwarding content to progress callbacks', async () => {
+    const output: string[] = [];
+    const result = await runProcess(
+      process.execPath,
+      [
+        '-e',
+        'const bytes = Buffer.from([0xef, 0xbb, 0xbf, 0xc3, 0x28, 0xff, 0]); process.stdout.write(bytes); process.stderr.write(bytes);',
+      ],
+      { rawOutput: true, timeoutMs: 5_000, onOutput: (_stream, text) => output.push(text) }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdoutBytes).toEqual(Buffer.from([0xef, 0xbb, 0xbf, 0xc3, 0x28, 0xff, 0]));
+    expect(result.stderrBytes).toEqual(result.stdoutBytes);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('');
+    expect(output).toEqual([]);
+    expect(result.stdoutTruncated).toBeUndefined();
+  });
+
+  it.each([0, 1, 7])(
+    'bounds both raw streams exactly at %s bytes and reports overflow',
+    async maxOutputBytes => {
+      const result = await runProcess(
+        process.execPath,
+        [
+          '-e',
+          'const bytes = Buffer.from([0xf0, 0x90, 0x90, 0x80, 1, 2, 3, 4]); process.stdout.write(bytes); process.stderr.write(bytes);',
+        ],
+        { rawOutput: true, timeoutMs: 5_000, maxOutputBytes }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdoutBytes).toEqual(
+        Buffer.from([0xf0, 0x90, 0x90, 0x80, 1, 2, 3, 4]).subarray(0, maxOutputBytes)
+      );
+      expect(result.stderrBytes).toEqual(result.stdoutBytes);
+      expect(result.stdoutTruncated).toBe(true);
+      expect(result.stderrTruncated).toBe(true);
+    }
+  );
+
+  it('retains complete raw multibyte output split across process chunks at the exact bound', async () => {
+    const bytes = Buffer.from('é漢𐐀');
+    const result = await runProcess(
+      process.execPath,
+      [
+        '-e',
+        `const bytes = Buffer.from(${JSON.stringify([...bytes])}); let offset = 0;
+        const timer = setInterval(() => {
+          process.stdout.write(bytes.subarray(offset, ++offset));
+          if (offset === bytes.length) clearInterval(timer);
+        }, 10);`,
+      ],
+      { rawOutput: true, timeoutMs: 5_000, maxOutputBytes: bytes.length }
+    );
+    expect(result.stdoutBytes).toEqual(bytes);
+    expect(result.stdoutTruncated).toBeUndefined();
+  });
+
+  it('reports raw output termination rather than presenting partial bytes as complete', async () => {
+    const result = await runProcess(
+      process.execPath,
+      ['-e', 'process.stdout.write(Buffer.from([0xff])); setTimeout(() => {}, 10_000);'],
+      { rawOutput: true, timeoutMs: 250, terminationGraceMs: 50 }
+    );
+    expect(result.stdoutBytes).toEqual(Buffer.from([0xff]));
+    expect(result.terminationReason).toBe('timeout');
+    expect(result.exitCode).toBe(124);
+  });
+
+  it('returns empty raw buffers for an already aborted process', async () => {
+    const result = await runProcess('must-not-start', [], {
+      rawOutput: true,
+      signal: AbortSignal.abort(),
+    });
+    expect(result.terminationReason).toBe('abort');
+    expect(result.stdoutBytes).toEqual(Buffer.alloc(0));
+    expect(result.stderrBytes).toEqual(Buffer.alloc(0));
   });
 
   it('keeps a valid UTF-8 tail within the byte cap', async () => {

@@ -4,6 +4,7 @@ import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
+import type { SessionGitSnapshotResult } from '../../../src/shared/worktree-changes-wire.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
@@ -5104,3 +5105,322 @@ describe('session.git.summary', () => {
     });
   });
 });
+
+function snapshotResult(): SessionGitSnapshotResult {
+  return {
+    summary: {
+      revision: 12,
+      comparison: {
+        baseRef: 'refs/remotes/origin/main',
+        mergeBase: 'a'.repeat(40),
+        head: 'b'.repeat(40),
+      },
+      files: [
+        {
+          path: 'file.txt',
+          status: 'modified',
+          additions: 1,
+          deletions: 1,
+          tracked: true,
+          binary: false,
+          countsComplete: true,
+        },
+      ],
+      truncated: false,
+    },
+    files: [
+      {
+        schemaVersion: 1,
+        revision: 12,
+        path: 'file.txt',
+        diff: { status: 'available', patch: 'saved-patch\n' },
+        content: { status: 'available', source: 'current', text: 'saved-content\n' },
+      },
+    ],
+  };
+}
+
+describe('session.git.snapshot', () => {
+  beforeEach(() => {
+    resetSessionDirectoryState();
+    resetDirectoryOperationState();
+  });
+  it('captures both sibling roots and fences a pending snapshot before shared directory deletion', async () => {
+    const sibling = { ...session, sessionId: 'ses_2', kiloSessionId: 'kilo_2' };
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    rememberAttachedRoot(sibling.kiloSessionId, sibling.directory);
+    const activity = createSessionActivityRegistry(() => 100);
+    activity.attach(session.kiloSessionId);
+    activity.attach(sibling.kiloSessionId);
+    activity.markActive(sibling.kiloSessionId);
+    const before = activity.snapshots();
+    const handlerDeps = deps({
+      kiloReady: false,
+      kiloClient: undefined,
+      activity,
+      collectWorktreeSnapshot: async () => snapshotResult(),
+    });
+    for (const identity of [session, sibling]) {
+      expect(
+        await handleControlRequest('session.git.snapshot', identity, { revision: 12 }, handlerDeps)
+      ).toEqual({ ok: true, result: snapshotResult() });
+    }
+    expect(activity.snapshots()).toEqual(before);
+    const started = Promise.withResolvers<void>();
+    const capture = Promise.withResolvers<SessionGitSnapshotResult>();
+    handlerDeps.collectWorktreeSnapshot = async () => {
+      started.resolve();
+      return capture.promise;
+    };
+    const pending = handleControlRequest(
+      'session.git.snapshot',
+      session,
+      { revision: 12 },
+      handlerDeps
+    );
+    await started.promise;
+    let drained = false;
+    const deletion = fenceDirectoryOperations(session.directory).then(() => {
+      drained = true;
+    });
+    try {
+      await Promise.resolve();
+      expect(drained).toBe(false);
+      expect(
+        await handleControlRequest('session.git.snapshot', sibling, { revision: 12 }, handlerDeps)
+      ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+      capture.resolve(snapshotResult());
+      expect(await pending).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+      await deletion;
+      expect(drained).toBe(true);
+      expect(activity.snapshots()).toEqual(before);
+    } finally {
+      capture.resolve(snapshotResult());
+      await Promise.allSettled([pending, deletion]);
+    }
+  });
+
+  it('returns validated snapshot objects from the attached root without involving Kilo or the legacy collector', async () => {
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    const snapshot = snapshotResult();
+    const calls: unknown[] = [];
+    const payload = { revision: 12, baseRef: 'refs/remotes/origin/main' };
+    const result = await handleControlRequest(
+      'session.git.snapshot',
+      session,
+      payload,
+      deps({
+        kiloClient: undefined,
+        kiloReady: false,
+        collectWorktreeChanges: async () => {
+          throw new Error('Legacy collector must not run');
+        },
+        collectWorktreeSnapshot: async (directory, request) => {
+          calls.push({ directory, request });
+          return snapshot;
+        },
+      })
+    );
+    expect(result).toEqual({ ok: true, result: snapshot });
+    expect(calls).toEqual([{ directory: session.directory, request: payload }]);
+  });
+
+  it('requires the request envelope identity', async () => {
+    expect(
+      await handleControlRequest('session.git.snapshot', undefined, { revision: 12 }, deps())
+    ).toEqual({
+      ok: false,
+      error: { code: 'protocol_error', message: 'session identity is required', retryable: false },
+    });
+  });
+
+  it.each(['unattached', 'directory-only', 'wrong-directory', 'child', 'unknown-root'])(
+    'does not inspect a %s scope',
+    async scope => {
+      if (scope === 'directory-only')
+        rememberSessionDirectory(session.kiloSessionId, session.directory);
+      if (scope === 'wrong-directory') rememberAttachedRoot(session.kiloSessionId, '/other');
+      if (scope === 'child') {
+        rememberAttachedRoot('root', session.directory);
+        rememberChildSession({
+          childId: session.kiloSessionId,
+          parentId: 'root',
+          directory: session.directory,
+        });
+      }
+      if (scope === 'unknown-root') rememberAttachedRoot('other', session.directory);
+      let called = false;
+      const result = await handleControlRequest(
+        'session.git.snapshot',
+        session,
+        { revision: 12 },
+        deps({
+          collectWorktreeSnapshot: async () => {
+            called = true;
+            return snapshotResult();
+          },
+        })
+      );
+      expect(called).toBe(false);
+      expect(result).toEqual({
+        ok: false,
+        error: {
+          code: 'not_ready',
+          message: 'Session directory is not attached',
+          retryable: false,
+        },
+      });
+    }
+  );
+
+  it.each([
+    { revision: 12, directory: '/outside' },
+    { revision: 12, path: 'file.txt' },
+    { revision: 12, baseRef: '--help' },
+    { revision: 0 },
+  ])('rejects invalid payload %j before capture', async payload => {
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    let called = false;
+    const result = await handleControlRequest(
+      'session.git.snapshot',
+      session,
+      payload,
+      deps({
+        collectWorktreeSnapshot: async () => {
+          called = true;
+          return snapshotResult();
+        },
+      })
+    );
+    expect(called).toBe(false);
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'protocol_error', message: 'Invalid payload', retryable: false },
+    });
+  });
+
+  it.each([
+    'revision',
+    'base',
+    'extra-path',
+    'duplicate',
+    'file-revision',
+    'unsafe-path',
+    'body-field',
+    'source',
+  ])(
+    'rejects an invalid %s result without returning source-bearing validation errors',
+    async invalid => {
+      rememberAttachedRoot(session.kiloSessionId, session.directory);
+      const snapshot = snapshotResult();
+      if (invalid === 'revision') {
+        snapshot.summary.revision = 13;
+        snapshot.files[0].revision = 13;
+      }
+      if (invalid === 'base') snapshot.summary.comparison.baseRef = 'refs/remotes/origin/other';
+      if (invalid === 'extra-path') snapshot.files[0].path = 'other.txt';
+      if (invalid === 'duplicate') snapshot.files.push(snapshot.files[0]);
+      if (invalid === 'file-revision') snapshot.files[0].revision = 13;
+      if (invalid === 'unsafe-path') snapshot.files[0].path = '../outside';
+      if (invalid === 'body-field')
+        Reflect.set(snapshot.files[0], 'private-data', 'private-source');
+      if (invalid === 'source')
+        snapshot.files[0].content = {
+          status: 'available',
+          source: 'deleted-original',
+          text: 'private-source',
+        };
+      const result = await handleControlRequest(
+        'session.git.snapshot',
+        session,
+        { revision: 12, baseRef: 'refs/remotes/origin/main' },
+        deps({
+          collectWorktreeSnapshot: async () => snapshot,
+        })
+      );
+      expect(result).toEqual({
+        ok: false,
+        error: { code: 'protocol_error', message: 'Invalid worktree result', retryable: false },
+      });
+      expect(JSON.stringify(result)).not.toContain('private-source');
+    }
+  );
+
+  it('enforces the aggregate 10 MiB result limit before the 12 MiB transport ceiling', async () => {
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    const snapshot = snapshotResult();
+    snapshot.summary.files = Array.from({ length: 30 }, (_, index) => ({
+      ...snapshot.summary.files[0],
+      path: `file-${index}.txt`,
+    }));
+    snapshot.files = snapshot.summary.files.map(file => ({
+      schemaVersion: 1,
+      revision: 12,
+      path: file.path,
+      diff: { status: 'available', patch: '漢'.repeat(120_000) },
+      content: { status: 'unavailable', reason: 'budget_exhausted' },
+    }));
+    const result = await handleControlRequest(
+      'session.git.snapshot',
+      session,
+      { revision: 12 },
+      deps({ collectWorktreeSnapshot: async () => snapshot })
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'protocol_error', message: 'Invalid worktree result', retryable: false },
+    });
+  });
+
+  it('returns only a safe capture failure', async () => {
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    const result = await handleControlRequest(
+      'session.git.snapshot',
+      session,
+      { revision: 12 },
+      deps({
+        collectWorktreeSnapshot: async () => {
+          throw new Error('private stdout, stderr, file contents, token');
+        },
+      })
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'capture_failed', message: 'Worktree capture failed', retryable: true },
+    });
+  });
+});
+
+describe.each(['session.git.summary', 'session.git.snapshot'])(
+  '%s completion fences',
+  operation => {
+    it('rejects a replaced attached root after capture completes', async () => {
+      rememberAttachedRoot(session.kiloSessionId, session.directory);
+      const result = await handleControlRequest(
+        operation,
+        session,
+        { revision: 12 },
+        deps({
+          collectWorktreeChanges: async () => {
+            forgetAttachedRoot(session.kiloSessionId, session.directory);
+            rememberAttachedRoot('replacement', session.directory);
+            return snapshotResult().summary;
+          },
+          collectWorktreeSnapshot: async () => {
+            forgetAttachedRoot(session.kiloSessionId, session.directory);
+            rememberAttachedRoot('replacement', session.directory);
+            return snapshotResult();
+          },
+        })
+      );
+      expect(result).toEqual({
+        ok: false,
+        error: {
+          code: 'not_ready',
+          message: 'Session directory is not attached',
+          retryable: false,
+        },
+      });
+    });
+  }
+);

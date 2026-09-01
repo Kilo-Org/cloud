@@ -508,7 +508,9 @@ export class SandboxControl extends DurableObject<Env> {
 
   async request(input: SandboxControlOutboundRequest): Promise<ResponseFrame> {
     await this.ensureOperationalInitialized();
-    if (input.operation === 'session.git.summary') return this.requestWorktreeChanges(input);
+    if (input.operation === 'session.git.summary' || input.operation === 'session.git.snapshot') {
+      return this.requestWorktreeChanges(input);
+    }
     await this.assertRequestWorktreeAdmission(input);
     if (input.operation === 'worktree.delete' || input.operation === 'worktree.prepareDeletion') {
       throw new Error('Worktree cleanup requires the deletion coordinator');

@@ -17,7 +17,7 @@ import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sessionPromptPayloadSchema,
-  sessionGitSummaryPayloadSchema,
+  sessionGitSnapshotPayloadSchema,
   type ResponseFrame,
   type SessionAttachPayload,
   type SessionMessageOutcome,
@@ -3186,18 +3186,21 @@ describe('SandboxSession orchestration', () => {
       });
       const captureResponse = (input: SandboxControlOutboundRequest) =>
         controlResponse({
-          revision: sessionGitSummaryPayloadSchema.parse(input.payload).revision,
-          comparison: {
-            baseRef: 'refs/remotes/origin/main',
-            mergeBase: 'a'.repeat(40),
-            head: 'b'.repeat(40),
+          summary: {
+            revision: sessionGitSnapshotPayloadSchema.parse(input.payload).revision,
+            comparison: {
+              baseRef: 'refs/remotes/origin/main',
+              mergeBase: 'a'.repeat(40),
+              head: 'b'.repeat(40),
+            },
+            files: [],
+            truncated: false,
           },
           files: [],
-          truncated: false,
         });
       let heldCapture: ReturnType<typeof deferred<ResponseFrame>> | undefined;
       let heldRequest: SandboxControlOutboundRequest | undefined;
-      delegateRequest(fixture, 'session.git.summary', async input => {
+      delegateRequest(fixture, 'session.git.snapshot', async input => {
         if (!heldCapture) return captureResponse(input);
         heldRequest = input;
         return heldCapture.promise;

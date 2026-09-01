@@ -10,6 +10,12 @@ import {
 } from '../../../src/shared/sandbox-control-protocol';
 import { unfilteredKiloEvents } from './feed';
 import {
+  MAX_WORKTREE_FILE_BYTES,
+  MAX_WORKTREE_SNAPSHOT_BYTES,
+  sessionGitSnapshotResultSchema,
+  type SessionGitSnapshotResult,
+} from '../../../src/shared/worktree-changes-wire.js';
+import {
   createSandboxControlClient,
   type SandboxControlClientOptions,
 } from './sandbox-control-client';
@@ -421,7 +427,11 @@ describe('createSandboxControlClient', () => {
     { ok: true, result: '漢'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES / 2) },
     {
       ok: false,
-      error: { code: 'failure', message: 'private-data'.repeat(100_000), retryable: false },
+      error: {
+        code: 'failure',
+        message: 'private-data'.repeat(Math.ceil(MAX_SANDBOX_CONTROL_FRAME_BYTES / 12)),
+        retryable: false,
+      },
     },
   ])(
     'replaces oversized response envelopes with a small error and preserves the socket',
@@ -481,8 +491,8 @@ describe('createSandboxControlClient', () => {
     }
   );
 
-  it.each([0, 1])(
-    'keeps the full response strictly below the frame limit with %s bytes of headroom',
+  it.each([-1, 0, 1])(
+    'enforces the inclusive frame limit with %s bytes of headroom',
     async headroom => {
       const fake = new FakeWebSocket();
       const requestId = 'quote"漢';
@@ -513,11 +523,119 @@ describe('createSandboxControlClient', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(JSON.parse(fake.sent[2] ?? '{}').ok).toBe(headroom === 1);
-      expect(Buffer.byteLength(fake.sent[2] ?? '')).toBeLessThan(MAX_SANDBOX_CONTROL_FRAME_BYTES);
+      expect(JSON.parse(fake.sent[2] ?? '{}').ok).toBe(headroom >= 0);
+      expect(Buffer.byteLength(fake.sent[2] ?? '')).toBeLessThanOrEqual(
+        MAX_SANDBOX_CONTROL_FRAME_BYTES
+      );
       client.close();
     }
   );
+
+  it('sends a complete 10 MiB snapshot as nested objects inside a bounded frame', async () => {
+    const snapshot: SessionGitSnapshotResult = {
+      summary: {
+        revision: 1,
+        comparison: {
+          baseRef: 'refs/remotes/origin/main',
+          mergeBase: 'a'.repeat(40),
+          head: 'b'.repeat(40),
+        },
+        files: Array.from({ length: 20 }, (_, index) => ({
+          path: `file-${index}.txt`,
+          status: 'modified',
+          additions: 1,
+          deletions: 1,
+          tracked: true,
+          binary: false,
+          countsComplete: true,
+        })),
+        truncated: false,
+      },
+      files: [],
+    };
+    snapshot.files = snapshot.summary.files.map(file => ({
+      schemaVersion: 1,
+      revision: 1,
+      path: file.path,
+      diff: { status: 'available', patch: `diff --git a/${file.path} b/${file.path}\n漢\n` },
+      content: { status: 'unavailable', reason: 'budget_exhausted' },
+    }));
+    for (const file of snapshot.files.slice(0, -1)) {
+      if (file.diff.status !== 'available') throw new Error('Expected patch');
+      file.diff.patch += 'x'.repeat(
+        MAX_WORKTREE_FILE_BYTES - Buffer.byteLength(JSON.stringify(file))
+      );
+    }
+    const last = snapshot.files.at(-1);
+    if (last?.diff.status !== 'available') throw new Error('Expected final patch');
+    last.diff.patch += 'x'.repeat(
+      MAX_WORKTREE_SNAPSHOT_BYTES - Buffer.byteLength(JSON.stringify(snapshot))
+    );
+    expect(Buffer.byteLength(JSON.stringify(snapshot))).toBe(MAX_WORKTREE_SNAPSHOT_BYTES);
+    expect(sessionGitSnapshotResultSchema.safeParse(snapshot).success).toBe(true);
+    const fake = new FakeWebSocket();
+    const client = createSandboxControlClient({
+      url: 'wss://example.test/sandbox-control/sbx_1',
+      credential: 'secret',
+      providerInstanceId: 'inst_1',
+      openWebSocket: () => fake as unknown as WebSocket,
+      onRequest: async () => ({ ok: true, result: snapshot }),
+    });
+    const connecting = client.connect();
+    await handshake(fake);
+    await connecting;
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'snapshot',
+        operation: 'session.git.snapshot',
+        session: { sessionId: 'ses_1', kiloSessionId: 'kilo_1', directory: '/workspace' },
+        payload: { revision: 1 },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    const frame = fake.sent[2] ?? '';
+    expect(Buffer.byteLength(frame)).toBeLessThan(MAX_SANDBOX_CONTROL_FRAME_BYTES);
+    const decoded = JSON.parse(frame);
+    expect(decoded.ok).toBe(true);
+    expect(typeof decoded.result).toBe('object');
+    expect(decoded.result.files).toHaveLength(20);
+    expect(Buffer.byteLength(JSON.stringify(decoded.result))).toBe(MAX_WORKTREE_SNAPSHOT_BYTES);
+    client.close();
+  });
+
+  it('ignores oversized multibyte requests before invoking the handler', async () => {
+    const fake = new FakeWebSocket();
+    let requests = 0;
+    const client = createSandboxControlClient({
+      url: 'wss://example.test/sandbox-control/sbx_1',
+      credential: 'secret',
+      providerInstanceId: 'inst_1',
+      openWebSocket: () => fake as unknown as WebSocket,
+      onRequest: async () => {
+        requests += 1;
+        return { ok: true };
+      },
+    });
+    const connecting = client.connect();
+    await handshake(fake);
+    await connecting;
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'oversized',
+        operation: 'session.git.snapshot',
+        payload: { baseRef: '漢'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES / 2) },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(requests).toBe(0);
+    expect(fake.sent).toHaveLength(2);
+    expect(fake.readyState).toBe(1);
+    client.close();
+  });
 
   it('safely handles unserializable results without closing the shared socket', async () => {
     const fake = new FakeWebSocket();
@@ -658,9 +776,7 @@ describe('createSandboxControlClient', () => {
         },
       },
     };
-    expect(Buffer.byteLength(JSON.stringify(producer))).toBeGreaterThan(
-      MAX_SANDBOX_CONTROL_FRAME_BYTES
-    );
+    expect(Buffer.byteLength(JSON.stringify(producer))).toBeGreaterThan(2 * 1024 * 1024);
     try {
       for await (const event of unfilteredKiloEvents([producer])) {
         expect(

@@ -13,9 +13,12 @@ import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import {
   getWorktreeChangesOutputSchema,
+  getWorktreeFileOutputSchema,
   refreshWorktreeChangesOutputSchema,
   type GetWorktreeChangesOutput,
+  type GetWorktreeFileOutput,
   type RefreshWorktreeChangesOutput,
+  type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
 import {
@@ -303,6 +306,8 @@ export type InitiateSessionOutput = {
 export type GetSessionInput = {
   cloudAgentSessionId: string;
 };
+
+export type GetWorktreeFileInput = GetSessionInput & WorktreeFileQuery;
 
 /** Execution status for getSession response */
 export type ExecutionStatus = {
@@ -597,6 +602,9 @@ type CloudAgentNextTRPCClient = {
   refreshWorktreeChanges: {
     mutate: (input: GetSessionInput) => Promise<unknown>;
   };
+  getWorktreeFile: {
+    query: (input: GetWorktreeFileInput) => Promise<unknown>;
+  };
   getComputeBillingStatus: {
     query: (input: GetSessionInput) => Promise<ComputeBillingStatus>;
   };
@@ -864,6 +872,25 @@ export class CloudAgentNextClient {
     return refreshWorktreeChangesOutputSchema.parse(
       await this.client.refreshWorktreeChanges.mutate({ cloudAgentSessionId })
     );
+  }
+
+  async getWorktreeFile(input: GetWorktreeFileInput): Promise<GetWorktreeFileOutput> {
+    let response: unknown;
+    try {
+      response = await this.client.getWorktreeFile.query(input);
+    } catch {
+      throw new Error('Saved worktree file request failed');
+    }
+    const parsed = getWorktreeFileOutputSchema.safeParse(response);
+    if (!parsed.success) throw new Error('Invalid saved worktree file response');
+    const result = parsed.data;
+    if (
+      (result.status === 'available' || result.status === 'omitted') &&
+      (result.file.path !== input.path || result.file.revision !== input.expectedRevision)
+    ) {
+      throw new Error('Saved worktree file does not match the query');
+    }
+    return result;
   }
 
   async getComputeBillingStatus(cloudAgentSessionId: string): Promise<ComputeBillingStatus> {

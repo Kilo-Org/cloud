@@ -85,21 +85,23 @@ export function getGitHubAppName(appType: GitHubAppType): string {
   return process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
 }
 
+type AdministeredGitHubInstallation = Awaited<
+  ReturnType<Octokit['rest']['apps']['listInstallationsForAuthenticatedUser']>
+>['data']['installations'][number];
+
 /**
- * Asserts that the GitHub user administers the given installation.
+ * Finds a GitHub App installation the authenticated user administers.
  *
  * Calls GET /user/installations with the user access token through Octokit.
- * Paginates through all results. Returns true when installationId appears.
+ * Paginates through all results. Returns the matching installation, or null
+ * when installationId is absent from the list.
  *
- * @param params.accessToken - A user-scoped OAuth access token.
- * @param params.installationId - The GitHub App installation ID to check.
- * @returns true when the user administers the installation.
- * @throws Error for network or API failures — never returns false for those.
+ * @throws Error for network or API failures — never returns null for those.
  */
-export async function assertUserAdministersInstallation(params: {
+export async function findAdministeredInstallation(params: {
   accessToken: string;
   installationId: number | string;
-}): Promise<boolean> {
+}): Promise<AdministeredGitHubInstallation | null> {
   const { accessToken, installationId } = params;
   const targetId =
     typeof installationId === 'string' ? parseInt(installationId, 10) : installationId;
@@ -117,7 +119,7 @@ export async function assertUserAdministersInstallation(params: {
 
     for (const installation of data.installations) {
       if (installation.id === targetId) {
-        return true;
+        return installation;
       }
     }
 
@@ -125,5 +127,18 @@ export async function assertUserAdministersInstallation(params: {
     page++;
   }
 
-  return false;
+  return null;
+}
+
+/**
+ * Asserts that the GitHub user administers the given installation.
+ *
+ * @returns true when the user administers the installation.
+ * @throws Error for network or API failures — never returns false for those.
+ */
+export async function assertUserAdministersInstallation(params: {
+  accessToken: string;
+  installationId: number | string;
+}): Promise<boolean> {
+  return (await findAdministeredInstallation(params)) !== null;
 }

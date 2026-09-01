@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "পাঠানো বার্তায় সংযুক্ত নয় এমন আপলোড করা ফাইলগুলি মুছে ফেলা হবে।",
       "discardAttachmentsTitle": "সংযুক্তিগুলি বাতিল করবেন?",
       "charactersRemaining": "{{count}}টি অক্ষর বাকি",
-      "insertNewline": "নতুন লাইন যোগ করুন",
-      "starterChipBuild": "একটি ফিচার তৈরি করো",
-      "starterChipEmpty": "একটি ধারণা দিয়ে শুরু করো",
-      "starterChipFix": "একটি ত্রুটি ঠিক করো",
-      "starterChipPrepare": "আমার পরিবেশ প্রস্তুত করো",
-      "starterChipWrapUp": "আমার সেশন শেষ করো",
-      "starterChipWriteTests": "পরীক্ষা লেখো"
+      "insertNewline": "নতুন লাইন যোগ করুন"
     },
     "chatLink": {
       "linkCopied": "লিঙ্ক কপি হয়েছে",

@@ -1,22 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => {
-  const platform = { OS: 'android' as string };
-  return {
-    platform,
-    setNotificationChannelAsync: vi.fn(),
-    getPermissionsAsync: vi.fn(),
-    requestPermissionsAsync: vi.fn(),
-    getExpoPushTokenAsync: vi.fn(),
-    captureException: vi.fn(),
-    addNotificationResponseReceivedListener: vi.fn(),
-    clearLastNotificationResponse: vi.fn(),
-    notificationPathForData: vi.fn(),
-    setPendingDeepLink: vi.fn(),
-    safeParse: vi.fn(),
-    captureEvent: vi.fn(),
-  };
-});
+import type * as Notifications from '@kilocode/notifications';
+
+type Response = { notification: { request: { content: { data: unknown } } } };
+type ResponseListener = (response: Response) => void;
+
+const mocks = vi.hoisted(() => ({
+  platform: { OS: 'android' as string },
+  setNotificationChannelAsync: vi.fn(),
+  getPermissionsAsync: vi.fn(),
+  requestPermissionsAsync: vi.fn(),
+  getExpoPushTokenAsync: vi.fn(),
+  captureException: vi.fn(),
+  lastResponse: null as Response | null,
+  listeners: new Set<ResponseListener>(),
+  clearLastNotificationResponse: vi.fn(),
+  captureEvent: vi.fn(),
+}));
 
 vi.mock('react-native', () => ({
   Platform: mocks.platform,
@@ -28,8 +28,11 @@ vi.mock('expo-notifications', () => ({
   requestPermissionsAsync: mocks.requestPermissionsAsync,
   getExpoPushTokenAsync: mocks.getExpoPushTokenAsync,
   setNotificationHandler: vi.fn(),
-  addNotificationResponseReceivedListener: mocks.addNotificationResponseReceivedListener,
-  getLastNotificationResponse: vi.fn(),
+  addNotificationResponseReceivedListener: (listener: ResponseListener) => {
+    mocks.listeners.add(listener);
+    return { remove: () => mocks.listeners.delete(listener) };
+  },
+  getLastNotificationResponse: () => mocks.lastResponse,
   clearLastNotificationResponse: mocks.clearLastNotificationResponse,
   AndroidImportance: { HIGH: 4, DEFAULT: 3 },
   PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
@@ -43,33 +46,30 @@ vi.mock('expo-constants', () => ({
   default: { expoConfig: { extra: { eas: { projectId: 'proj-1' } } } },
 }));
 
-vi.mock('@kilocode/notifications', () => ({
+vi.mock('@kilocode/notifications', async importOriginal => ({
+  ...(await importOriginal<typeof Notifications>()),
   ANDROID_NOTIFICATION_CHANNELS: [
     { id: 'agent', name: 'Agent sessions', importance: 'high' },
     { id: 'chat', name: 'Chat messages', importance: 'high' },
     { id: 'balance', name: 'Balance alerts', importance: 'default' },
   ],
-  pushDataSchema: { safeParse: mocks.safeParse },
-}));
-
-vi.mock('@/lib/deep-link-launch', () => ({
-  setPendingDeepLink: mocks.setPendingDeepLink,
-}));
-
-vi.mock('@/lib/notification-path', () => ({
-  notificationPathForData: mocks.notificationPathForData,
 }));
 
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: mocks.captureEvent,
 }));
 
-// Each test re-imports the module so the module-level single-flight promise
-// (`androidChannelsPromise`) starts fresh.
+// Each test starts with fresh channel and pending-link state. Only native
+// storage is replaced; payload parsing, mapping, and the pending slot are real.
 async function loadNotifications() {
   vi.resetModules();
-  const mod = await import('./notifications');
-  return mod;
+  const pending = await import('./deep-link-launch');
+  pending._setSecureStoreForTests({
+    setItemAsync: vi.fn().mockResolvedValue(undefined),
+    deleteItemAsync: vi.fn().mockResolvedValue(undefined),
+    getItemAsync: vi.fn().mockResolvedValue(null),
+  });
+  return { ...(await import('./notifications')), pending };
 }
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
@@ -98,8 +98,11 @@ beforeEach(() => {
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.requestPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.getExpoPushTokenAsync.mockResolvedValue({ data: 'expo-token' });
-  mocks.safeParse.mockReturnValue({ success: false });
-  mocks.addNotificationResponseReceivedListener.mockReset();
+  mocks.lastResponse = null;
+  mocks.listeners.clear();
+  mocks.clearLastNotificationResponse.mockImplementation(() => {
+    mocks.lastResponse = null;
+  });
 });
 
 describe('ensureAndroidNotificationChannels', () => {
@@ -198,51 +201,102 @@ describe('channel creation ordering', () => {
   });
 });
 
-describe('setupNotificationResponseHandler', () => {
-  type ResponseListener = (response: {
-    notification: { request: { content: { data: unknown } } };
-  }) => void;
+const securityResponses = ['personal', 'org-example'].flatMap(scope =>
+  (
+    [
+      { type: 'security_finding' },
+      { type: 'security_lifecycle', event: 'analysis_completed' },
+    ] as const
+  ).map(payload => ({
+    data: { ...payload, scope, findingId: 'finding-123' } satisfies Notifications.PushData,
+    path: `/(app)/(tabs)/(3_profile)/security-agent/${scope}/findings/finding-123?via=push`,
+  }))
+);
+const responseCases = [
+  {
+    data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+    path: '/(app)/(tabs)/(1_kiloclaw)/chat/s1/c1?via=push',
+  },
+  ...securityResponses,
+];
 
-  it('stashes the destination and does not navigate', async () => {
-    mocks.safeParse.mockReturnValue({ success: true, data: { type: 'chat.message' } });
-    mocks.notificationPathForData.mockReturnValue('/(app)/(tabs)/(1_kiloclaw)/chat/s1/c1?via=push');
-    mocks.addNotificationResponseReceivedListener.mockImplementation(
-      (listener: ResponseListener) => {
-        listener({
-          notification: { request: { content: { data: { type: 'chat.message' } } } },
-        });
-        return { remove: vi.fn() };
+function deliverWarmResponse(response: Response) {
+  for (const listener of mocks.listeners) {
+    listener(response);
+  }
+}
+
+describe.each(['cold', 'warm'])('%s notification responses', mode => {
+  it.each(responseCases)(
+    'stashes $data.type at $path once and removes the listener',
+    async ({ data, path }) => {
+      const { setupNotificationResponseHandler, checkInitialNotification, pending } =
+        await loadNotifications();
+      const response = { notification: { request: { content: { data } } } };
+      mocks.lastResponse = response;
+      const subscription = setupNotificationResponseHandler();
+
+      if (mode === 'cold') {
+        checkInitialNotification();
+      } else {
+        deliverWarmResponse(response);
       }
-    );
 
-    const { setupNotificationResponseHandler } = await loadNotifications();
-    setupNotificationResponseHandler();
+      expect(pending.getPendingDeepLinkSnapshot()).toBe(path);
+      expect(mocks.lastResponse).toBeNull();
+      expect(pending.getPendingDeepLink()).toBe(path);
+      checkInitialNotification();
+      expect(pending.getPendingDeepLinkSnapshot()).toBeNull();
 
-    expect(mocks.setPendingDeepLink).toHaveBeenCalledWith(
-      '/(app)/(tabs)/(1_kiloclaw)/chat/s1/c1?via=push',
-      'notification'
-    );
-    expect(mocks.clearLastNotificationResponse).toHaveBeenCalled();
-  });
+      subscription.remove();
+      deliverWarmResponse(response);
+      expect(pending.getPendingDeepLinkSnapshot()).toBeNull();
+    }
+  );
 
-  it('ignores a response with unparseable data', async () => {
-    mocks.safeParse.mockReturnValue({ success: false });
-    mocks.addNotificationResponseReceivedListener.mockImplementation(
-      (listener: ResponseListener) => {
-        listener({
-          notification: { request: { content: { data: { type: 'chat.message' } } } },
-        });
-        return { remove: vi.fn() };
-      }
-    );
+  it.each([
+    null,
+    { type: 'security_finding', scope: 'personal' },
+    { type: 'security_finding', scope: [], findingId: 'finding-invalid' },
+    {
+      type: 'security_lifecycle',
+      event: 'unknown',
+      scope: 'org-example',
+      findingId: 'finding-invalid',
+    },
+  ])('preserves the pending destination for malformed data %j', async data => {
+    const { setupNotificationResponseHandler, checkInitialNotification, pending } =
+      await loadNotifications();
+    const existing = '/(app)/(tabs)/(3_profile)';
+    pending.setPendingDeepLink(existing, 'notification');
+    const response = { notification: { request: { content: { data } } } };
+    mocks.lastResponse = response;
+    const subscription = setupNotificationResponseHandler();
 
-    const { setupNotificationResponseHandler } = await loadNotifications();
-    setupNotificationResponseHandler();
+    if (mode === 'cold') {
+      checkInitialNotification();
+    } else {
+      deliverWarmResponse(response);
+    }
 
-    expect(mocks.setPendingDeepLink).not.toHaveBeenCalled();
-    expect(mocks.clearLastNotificationResponse).not.toHaveBeenCalled();
+    expect(pending.getPendingDeepLinkSnapshot()).toBe(existing);
+    expect(mocks.lastResponse).toBe(mode === 'cold' ? null : response);
+    subscription.remove();
   });
 });
+
+it.each([null, '/(app)/(tabs)/(3_profile)'])(
+  'leaves pending destination %s unchanged without a last response',
+  async destination => {
+    const { checkInitialNotification, pending } = await loadNotifications();
+    if (destination) {
+      pending.setPendingDeepLink(destination, 'universal-link');
+    }
+    checkInitialNotification();
+    expect(pending.getPendingDeepLinkSnapshot()).toBe(destination);
+    expect(mocks.clearLastNotificationResponse).not.toHaveBeenCalled();
+  }
+);
 
 describe('notification permission and token events', () => {
   it('emits granted when a live permission request is granted', async () => {

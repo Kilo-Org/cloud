@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත.",
       "discardAttachmentsTitle": "ඇමුණුම් ඉවතලන්නද?",
       "charactersRemaining": "අක්ෂර {{count}} ක් ඉතිරිව ඇත",
-      "insertNewline": "නව පේළියක් ඇතුළත් කරන්න",
-      "starterChipBuild": "විශේෂාංගයක් සාදන්න",
-      "starterChipEmpty": "අදහසකින් ආරම්භ කරන්න",
-      "starterChipFix": "දෝෂයක් නිවැරදි කරන්න",
-      "starterChipPrepare": "මගේ පරිසරය සකසන්න",
-      "starterChipWrapUp": "මගේ සැසිය අවසන් කරන්න",
-      "starterChipWriteTests": "පරීක්ෂණ ලියන්න"
+      "insertNewline": "නව පේළියක් ඇතුළත් කරන්න"
     },
     "chatLink": {
       "linkCopied": "සබැඳිය පිටපත් කරන ලදී",

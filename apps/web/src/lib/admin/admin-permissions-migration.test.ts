@@ -23,6 +23,12 @@ describe('admin permissions migration', () => {
     const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'admin-permissions-migration-'));
     const previousMigrations = path.join(temporaryRoot, 'migrations');
     const adminPool = new Pool({ connectionString: adminUrl.toString() });
+    // Every raw `pg.Pool` here needs an 'error' listener, same as the app's pools in
+    // `drizzle.ts`: without one, an error emitted by an idle client crashes Node with
+    // an unhandled error instead of surfacing as a rejected promise.
+    adminPool.on('error', err => {
+      console.error('Unexpected error on idle admin migration test client', err);
+    });
     let testPool: Pool | undefined;
 
     try {
@@ -38,6 +44,17 @@ describe('admin permissions migration', () => {
       await writeFile(journalPath, JSON.stringify(journal, null, 2));
 
       testPool = new Pool({ connectionString: databaseUrl.toString() });
+      // This pool's own database is dropped with `DROP DATABASE ... WITH (FORCE)`
+      // below, which force-terminates any backend still associated with it.
+      // `testPool.end()` resolves once the client sockets are told to close, but the
+      // server's forced-termination FATAL can still arrive after that if the socket
+      // hasn't fully closed yet, and pg-pool re-emits it as an 'error' event on the
+      // pool. Without this listener that surfaces as a Node unhandled error that
+      // fails whichever test happens to be running when it lands, instead of a
+      // deterministic outcome.
+      testPool.on('error', err => {
+        console.error('Unexpected error on idle admin migration test client', err);
+      });
       await migrate(drizzle(testPool), { migrationsFolder: previousMigrations });
       await testPool.query(
         `INSERT INTO kilocode_users

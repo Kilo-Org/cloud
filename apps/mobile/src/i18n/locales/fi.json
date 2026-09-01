@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Ladatut tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
       "discardAttachmentsTitle": "Hylätäänkö liitteet?",
       "charactersRemaining": "{{count}} merkkiä jäljellä",
-      "insertNewline": "Lisää rivinvaihto",
-      "starterChipBuild": "Toteuta ominaisuus",
-      "starterChipEmpty": "Aloita ideasta",
-      "starterChipFix": "Korjaa virhe",
-      "starterChipPrepare": "Määritä ympäristöni",
-      "starterChipWrapUp": "Viimeistele istuntoni",
-      "starterChipWriteTests": "Kirjoita testejä"
+      "insertNewline": "Lisää rivinvaihto"
     },
     "chatLink": {
       "linkCopied": "Linkki kopioitu",

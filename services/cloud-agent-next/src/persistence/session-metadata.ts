@@ -315,6 +315,7 @@ const MetadataLifecycleSchema = z
 const MetadataCloneSchema = z
   .object({
     cloneFromKiloSessionId: kiloSessionIdSchema,
+    reportingCreatedAt: z.string().datetime({ offset: true }).optional(),
   })
   .strip();
 

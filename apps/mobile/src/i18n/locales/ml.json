@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "അയച്ച സന്ദേശങ്ങളിൽ അറ്റാച്ച് ചെയ്യാത്ത അപ്‌ലോഡുകൾ ഇല്ലാതാക്കും.",
       "discardAttachmentsTitle": "അറ്റാച്ച്മെന്റുകൾ ഉപേക്ഷിക്കണോ?",
       "charactersRemaining": "{{count}} അക്ഷരങ്ങൾ ശേഷിക്കുന്നു",
-      "insertNewline": "പുതിയ വരി ചേർക്കുക",
-      "starterChipBuild": "ഒരു ഫീച്ചർ നിർമ്മിക്ക്",
-      "starterChipEmpty": "ഒരു ആശയത്തോടെ ആരംഭിക്ക്",
-      "starterChipFix": "ഒരു ബഗ് പരിഹരിക്ക്",
-      "starterChipPrepare": "എന്റെ എൻവയോൺമെന്റ് സജ്ജീകരിക്ക്",
-      "starterChipWrapUp": "എന്റെ സെഷൻ പൂർത്തിയാക്ക്",
-      "starterChipWriteTests": "ടെസ്റ്റുകൾ എഴുത്"
+      "insertNewline": "പുതിയ വരി ചേർക്കുക"
     },
     "chatLink": {
       "linkCopied": "ലിങ്ക് പകർത്തി",

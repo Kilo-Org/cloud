@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "فایل‌های بارگذاری‌شده‌ای که به پیام‌های ارسال‌شده پیوست نشده‌اند حذف خواهند شد.",
       "discardAttachmentsTitle": "پیوست‌ها دور انداخته شوند؟",
       "charactersRemaining": "{{count}} نویسه باقی مانده",
-      "insertNewline": "درج خط جدید",
-      "starterChipBuild": "یک ویژگی بساز",
-      "starterChipEmpty": "با یک ایده شروع کن",
-      "starterChipFix": "یک اشکال را رفع کن",
-      "starterChipPrepare": "محیط من را راه‌اندازی کن",
-      "starterChipWrapUp": "به نشست من پایان بده",
-      "starterChipWriteTests": "آزمون‌ها را بنویس"
+      "insertNewline": "درج خط جدید"
     },
     "chatLink": {
       "linkCopied": "پیوند کپی شد",

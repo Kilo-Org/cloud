@@ -2114,7 +2114,9 @@
     "sessionExited": "სესია დასრულდა",
     "remoteSpawnRetryable": "ინსტანციასთან დაკავშირება ვერ მოხერხდა — შესაძლოა გათიშული იყოს.",
     "remoteSpawnNonRetryable": "ინსტანციამ ვერ დაიწყო სესია — შეამოწმეთ მანქანა ან განაახლეთ CLI.",
-    "remoteSpawnInstanceDisconnected": "არჩეული ინსტანცია გათიშდა. დაიწყეთ სესია Cloud Agent-ზე ან აირჩიეთ სხვა ინსტანცია."
+    "remoteSpawnInstanceDisconnected": "არჩეული ინსტანცია გათიშდა. დაიწყეთ სესია Cloud Agent-ზე ან აირჩიეთ სხვა ინსტანცია.",
+    "liveCount_one": "{{count}} პირდაპირი",
+    "liveCount_other": "{{count}} პირდაპირი"
   },
   "agentChat": {
     "session": {

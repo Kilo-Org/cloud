@@ -1660,7 +1660,9 @@
     "sessionExited": "セッションが終了しました",
     "remoteSpawnRetryable": "インスタンスに到達できませんでした。接続が切断された可能性があります。",
     "remoteSpawnNonRetryable": "インスタンスがセッションの開始に失敗しました。マシンを確認するか、CLI を更新してください。",
-    "remoteSpawnInstanceDisconnected": "選択したインスタンスが切断されました。Cloud Agent でセッションを開始するか、別のインスタンスを選択してください。"
+    "remoteSpawnInstanceDisconnected": "選択したインスタンスが切断されました。Cloud Agent でセッションを開始するか、別のインスタンスを選択してください。",
+    "liveCount_one": "{{count}} ライブ",
+    "liveCount_other": "{{count}} ライブ"
   },
   "agentChat": {
     "session": {

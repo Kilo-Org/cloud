@@ -1660,7 +1660,9 @@
     "sessionExited": "Phiên đã thoát",
     "remoteSpawnRetryable": "Không thể kết nối tới phiên bản — có thể nó đã ngắt kết nối.",
     "remoteSpawnNonRetryable": "Phiên bản không khởi động được phiên — hãy kiểm tra máy hoặc cập nhật CLI.",
-    "remoteSpawnInstanceDisconnected": "Phiên bản đã chọn bị ngắt kết nối. Hãy bắt đầu phiên trên Cloud Agent hoặc chọn phiên bản khác."
+    "remoteSpawnInstanceDisconnected": "Phiên bản đã chọn bị ngắt kết nối. Hãy bắt đầu phiên trên Cloud Agent hoặc chọn phiên bản khác.",
+    "liveCount_one": "{{count}} TRỰC TIẾP",
+    "liveCount_other": "{{count}} TRỰC TIẾP"
   },
   "agentChat": {
     "session": {

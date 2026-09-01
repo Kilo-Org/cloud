@@ -10,8 +10,10 @@ import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
+import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useOrganization } from '@/lib/organization-context';
 import {
   getEffectiveTabBarHeight,
   getTabBarIconSize,
@@ -75,6 +77,15 @@ export default function TabsLayout() {
   const tabFlags = { showKiloClaw: showKiloClawTab, showQuickChat: showQuickChatTab };
   const tabCount = visibleTabCount(showKiloClawTab, showQuickChatTab);
   const { t } = useTranslation();
+  const { organizationId, isLoaded: orgLoaded } = useOrganization();
+  const { activeSessions, isLoading, isError } = useLiveAgentSessions({
+    organizationId,
+    enabled: orgLoaded,
+  });
+  const liveCount =
+    orgLoaded && !isLoading && !isError && activeSessions.length > 0
+      ? activeSessions.length
+      : undefined;
 
   // If the flag flips off while the Chat tab is focused, its `href` becomes
   // null but the route is still mounted — move to Home instead.
@@ -163,8 +174,11 @@ export default function TabsLayout() {
         name="(2_agents)"
         options={{
           title: t('tabs.agents'),
+          tabBarBadge: liveCount,
           tabBarAccessibilityLabel: tabAccessibilityLabel(
-            t('tabs.agents'),
+            liveCount
+              ? `${t('tabs.agents')}, ${t('agents.liveCount', { count: liveCount })}`
+              : t('tabs.agents'),
             tabBarPosition('agents', tabFlags) ?? 2,
             tabCount
           ),

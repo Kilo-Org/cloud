@@ -2114,7 +2114,9 @@
     "sessionExited": "സെഷൻ പുറത്തുകടന്നു",
     "remoteSpawnRetryable": "ഇൻസ്റ്റൻസിൽ എത്താൻ കഴിഞ്ഞില്ല — ഇത് വിച്ഛേദിക്കപ്പെട്ടിരിക്കാം.",
     "remoteSpawnNonRetryable": "സെഷൻ ആരംഭിക്കുന്നതിൽ ഇൻസ്റ്റൻസ് പരാജയപ്പെട്ടു — മെഷീൻ പരിശോധിക്കുക അല്ലെങ്കിൽ CLI അപ്ഡേറ്റ് ചെയ്യുക.",
-    "remoteSpawnInstanceDisconnected": "തിരഞ്ഞെടുത്ത ഇൻസ്റ്റൻസ് വിച്ഛേദിക്കപ്പെട്ടു. Cloud Agent-ൽ ഒരു സെഷൻ ആരംഭിക്കുക അല്ലെങ്കിൽ മറ്റൊരു ഇൻസ്റ്റൻസ് തിരഞ്ഞെടുക്കുക."
+    "remoteSpawnInstanceDisconnected": "തിരഞ്ഞെടുത്ത ഇൻസ്റ്റൻസ് വിച്ഛേദിക്കപ്പെട്ടു. Cloud Agent-ൽ ഒരു സെഷൻ ആരംഭിക്കുക അല്ലെങ്കിൽ മറ്റൊരു ഇൻസ്റ്റൻസ് തിരഞ്ഞെടുക്കുക.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {

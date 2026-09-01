@@ -2114,7 +2114,9 @@
     "sessionExited": "Sessiya tugadi",
     "remoteSpawnRetryable": "Ishlab chiquvchi muhitga yetib bo‘lmadi — u uzilgan bo‘lishi mumkin.",
     "remoteSpawnNonRetryable": "Ishlab chiquvchi muhit sessiyani ishga tushira olmadi — mashinani tekshiring yoki CLI versiyasini yangilang.",
-    "remoteSpawnInstanceDisconnected": "Tanlangan ishlab chiquvchi muhit uzildi. Cloud Agent-da sessiya boshlang yoki boshqa muhitni tanlang."
+    "remoteSpawnInstanceDisconnected": "Tanlangan ishlab chiquvchi muhit uzildi. Cloud Agent-da sessiya boshlang yoki boshqa muhitni tanlang.",
+    "liveCount_one": "{{count}} JO'N",
+    "liveCount_other": "{{count}} JO'N"
   },
   "agentChat": {
     "session": {

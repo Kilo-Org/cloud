@@ -2114,7 +2114,9 @@
     "sessionExited": "Kua puta te wātū",
     "remoteSpawnRetryable": "Kāore i taea te tae ki te wātū — kua motu pea tana hononga.",
     "remoteSpawnNonRetryable": "Kāore i tīmata te wātū i te wātū — tirohia te mīhini, ka whakahōu rānei i te CLI.",
-    "remoteSpawnInstanceDisconnected": "Kua motu te hononga o te wātū kua tīpakona. Tīmatahia he wātū ki runga i te Cloud Agent, tīpakoa rānei tētahi atu wātū."
+    "remoteSpawnInstanceDisconnected": "Kua motu te hononga o te wātū kua tīpakona. Tīmatahia he wātū ki runga i te Cloud Agent, tīpakoa rānei tētahi atu wātū.",
+    "liveCount_one": "{{count}} ORA",
+    "liveCount_other": "{{count}} ORA"
   },
   "agentChat": {
     "session": {

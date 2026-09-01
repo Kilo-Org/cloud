@@ -2114,7 +2114,9 @@
     "sessionExited": "ເຊດຊັນອອກແລ້ວ",
     "remoteSpawnRetryable": "ບໍ່ສາມາດເຂົ້າເຖິງ instance ໄດ້ — ມັນອາດຈະຕັດການເຊື່ອມຕໍ່.",
     "remoteSpawnNonRetryable": "instance ລົ້ມເຫຼວໃນການເລີ່ມເຊດຊັນ — ກວດເຄື່ອງ ຫຼື ອັບເດດ CLI.",
-    "remoteSpawnInstanceDisconnected": "instance ທີ່ເລືອກໄດ້ຕັດການເຊື່ອມຕໍ່. ເລີ່ມເຊດຊັນໃນ Cloud Agent ຫຼື ເລືອກ instance ອື່ນ."
+    "remoteSpawnInstanceDisconnected": "instance ທີ່ເລືອກໄດ້ຕັດການເຊື່ອມຕໍ່. ເລີ່ມເຊດຊັນໃນ Cloud Agent ຫຼື ເລືອກ instance ອື່ນ.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {

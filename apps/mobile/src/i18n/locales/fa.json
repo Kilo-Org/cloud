@@ -2114,7 +2114,9 @@
     "sessionExited": "جلسه خاتمه یافت",
     "remoteSpawnRetryable": "امکان دسترسی به نمونه وجود نداشت — شاید قطع شده باشد.",
     "remoteSpawnNonRetryable": "نمونه نتوانست جلسه را شروع کند — دستگاه را بررسی کنید یا CLI را بهروزرسانی کنید.",
-    "remoteSpawnInstanceDisconnected": "نمونه انتخابی قطع شد. یک جلسه در Cloud Agent شروع کنید یا نمونه دیگری انتخاب کنید."
+    "remoteSpawnInstanceDisconnected": "نمونه انتخابی قطع شد. یک جلسه در Cloud Agent شروع کنید یا نمونه دیگری انتخاب کنید.",
+    "liveCount_one": "{{count}} زنده",
+    "liveCount_other": "{{count}} زنده"
   },
   "agentChat": {
     "session": {

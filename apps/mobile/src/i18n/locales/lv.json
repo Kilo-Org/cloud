@@ -2129,7 +2129,10 @@
     "sessionExited": "Sesija beidzās",
     "remoteSpawnRetryable": "Nevarēja sasniegt instanci — tā, iespējams, ir atvienojusies.",
     "remoteSpawnNonRetryable": "Instancei neizdevās sākt sesiju — pārbaudiet iekārtu vai atjauniniet CLI.",
-    "remoteSpawnInstanceDisconnected": "Atlasītā instance atvienojās. Sāciet sesiju Cloud Agent vai izvēlieties citu instanci."
+    "remoteSpawnInstanceDisconnected": "Atlasītā instance atvienojās. Sāciet sesiju Cloud Agent vai izvēlieties citu instanci.",
+    "liveCount_one": "{{count}} TIŠRAIDĒ",
+    "liveCount_other": "{{count}} TIŠRAIDĒ",
+    "liveCount_zero": "{{count}} TIŠRAIDĒ"
   },
   "agentChat": {
     "session": {

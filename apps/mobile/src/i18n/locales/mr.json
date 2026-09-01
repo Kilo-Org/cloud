@@ -156,7 +156,7 @@
     "returnSendsMessage": "रिटर्न कळ संदेश पाठवते",
     "returnSendsMessageSubtitle": "बंद असताना, रिटर्न कळ एजंट कंपोझरमध्ये नवीन ओळ घालते.",
     "biometricUnlock": "बायोमेट्रिक्स वापरून अनलॉक करा",
-    "biometricUnlockSubtitle": "अ‍ॅप सुरू करताना आणि पाच मिनिटे पार्श्वभूमीत राहिल्यानंतर अनलॉक करणे आवश्यक आहे. डिव्हाइसच्या सेटिंग्जमध्ये बायोमेट्रिक्स किंवा डिव्हाइसचा पासकोड सेट करा. पर्यायी पद्धत म्हणून तुमच्या डिव्हाइसचा पासकोड उपलब्ध आहे."
+    "biometricUnlockSubtitle": "अ‍ॅप सुरू करताना आणि पाच मिनिटे पार्श्वभूमीत राहिल्यानंतर अनलॉक करणे आवश्यक आहे."
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "पुनरावलोकन उताराची वाट पाहत आहे.",
       "transcriptEmpty": "या पुनरावलोकनासाठी उतारा नाही.",
       "transcriptRetry": "पुनरावलोकन उतारा लोड करता आला नाही.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "एजंट निष्क्रिय",
       "agentWorking": "एजंट काम करत आहे...",
       "anErrorOccurred": "एक त्रुटी आली",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "इतर",
-      "project": "प्रकल्प",
-      "removeProjectFilter": "{{label}} प्रकल्प फिल्टर काढा",
-      "removePlatformFilter": "{{label}} प्लॅटफॉर्म फिल्टर काढा"
+      "project": "प्रकल्प"
     },
     "suggestion": {
       "title": "सूचना",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "नवीन कोडिंग कार्य",
     "explore": "एक्सप्लोर करा",
     "seeAll": "सर्व पहा",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "सध्या काहीही चालू नाही"
   },
   "imageViewer": {
     "close": "{{filename}} बंद करा",

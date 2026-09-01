@@ -156,7 +156,7 @@
     "returnSendsMessage": "ปุ่มขึ้นบรรทัดใหม่ใช้ส่งข้อความ",
     "returnSendsMessageSubtitle": "เมื่อปิด ปุ่มขึ้นบรรทัดใหม่จะแทรกบรรทัดใหม่ในช่องป้อนข้อความของเอเจนต์",
     "biometricUnlock": "ปลดล็อกด้วยข้อมูลชีวมิติ",
-    "biometricUnlockSubtitle": "ต้องปลดล็อกเมื่อเปิดแอปและเมื่อกลับมาใช้งานหลังจากแอปอยู่เบื้องหลังครบห้านาที ตั้งค่าข้อมูลชีวมิติหรือรหัสปลดล็อกอุปกรณ์ในการตั้งค่าอุปกรณ์ คุณยังสามารถใช้รหัสปลดล็อกอุปกรณ์เป็นวิธีสำรองได้."
+    "biometricUnlockSubtitle": "ต้องปลดล็อกเมื่อเปิดแอปและเมื่อกลับมาใช้งานหลังจากแอปอยู่เบื้องหลังครบห้านาที"
   },
   "prReview": {
     "pullRequestUnavailable": "ไม่สามารถใช้ pull request ได้",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "กำลังรอใบถอดความการตรวจสอบ",
       "transcriptEmpty": "ไม่มีใบถอดความสำหรับการตรวจสอบนี้",
       "transcriptRetry": "ไม่สามารถโหลดใบถอดความการตรวจสอบได้",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "เอเจนต์ว่าง",
       "agentWorking": "เอเจนต์กำลังทำงาน...",
       "anErrorOccurred": "เกิดข้อผิดพลาด",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "อื่น ๆ",
-      "project": "โปรเจกต์",
-      "removeProjectFilter": "ลบตัวกรองโปรเจกต์ {{label}} ออก",
-      "removePlatformFilter": "ลบตัวกรองแพลตฟอร์ม {{label}} ออก"
+      "project": "โปรเจกต์"
     },
     "suggestion": {
       "title": "คำแนะนำ",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "งานการเขียนโค้ดใหม่",
     "explore": "สำรวจ",
     "seeAll": "ดูทั้งหมด",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ตอนนี้ไม่มีอะไรทำงานอยู่"
   },
   "imageViewer": {
     "close": "ปิด {{filename}}",

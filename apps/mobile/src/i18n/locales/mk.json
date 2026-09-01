@@ -156,7 +156,7 @@
     "returnSendsMessage": "Копчето за нов ред испраќа порака",
     "returnSendsMessageSubtitle": "Кога е исклучено, копчето за нов ред вметнува нов ред во полињата за внес на пораки на агентите.",
     "biometricUnlock": "Отклучување со биометрија",
-    "biometricUnlockSubtitle": "Потребно е отклучување при стартување на апликацијата и откако ќе помине пет минути во заднина. Поставете биометрија или код за пристап до уредот во поставките на уредот. Кодот за пристап до вашиот уред е достапен како резервна опција."
+    "biometricUnlockSubtitle": "Потребно е отклучување при стартување на апликацијата и откако ќе помине пет минути во заднина."
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за повлекување е недостапно",
@@ -1135,9 +1135,9 @@
       "destroying": "СЕ УНИШТУВА",
       "provisioned": "ОБЕЗБЕДЕН",
       "restarting": "СЕ РЕСТАРТИРА",
-      "running": "Во тек",
+      "running": "ВО ТЕК",
       "shuttingDown": "СЕ ИСКЛУЧУВА",
-      "starting": "Започнува",
+      "starting": "ЗАПОЧНУВА",
       "stopped": "ЗАПРЕН",
       "stopping": "СЕ ЗАПИРА",
       "unknown": "НЕПОЗНАТО",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Чекање на записот од прегледот.",
       "transcriptEmpty": "Нема запис за овој преглед.",
       "transcriptRetry": "Не можев да го вчитам записот од прегледот.",
-      "transcriptLive": "ВОЖИВО",
+      "transcriptLive": "Воживо",
       "agentIdle": "Агентот е неактивен",
       "agentWorking": "Агентот работи...",
       "anErrorOccurred": "Се појави грешка",
@@ -1662,7 +1662,7 @@
       "reasonNoBandwidth": "Нема достапен капацитет",
       "reasonTolerableRisk": "Ризикот е поднослив",
       "reasonInaccurate": "Наодот е неточен",
-      "reasonNotUsed": "ранливиот код не се користи",
+      "reasonNotUsed": "Ранливиот код не се користи",
       "commentLabel": "Коментар (опционално)",
       "commentAccessibility": "Коментар за отфрлање",
       "commentPlaceholder": "Додај контекст за ова отфрлање…",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Друго",
-      "project": "Проект",
-      "removeProjectFilter": "Отстрани го филтерот за проект {{label}}",
-      "removePlatformFilter": "Отстрани го филтерот за платформа {{label}}"
+      "project": "Проект"
     },
     "suggestion": {
       "title": "Предлог",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Нова задача за кодирање",
     "explore": "Истражувај",
     "seeAll": "Види ги сите",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Моментално ништо не се извршува"
   },
   "imageViewer": {
     "close": "Затвори {{filename}}",

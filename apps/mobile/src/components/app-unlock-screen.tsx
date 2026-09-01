@@ -67,6 +67,8 @@ export function AppUnlockFeedback({ outcome }: Readonly<{ outcome: UnlockOutcome
 
 function contentPadding({ top, bottom, left, right }: EdgeInsets) {
   return {
+    flexGrow: 1,
+    justifyContent: 'center' as const,
     paddingTop: top + 24,
     paddingBottom: bottom + 24,
     paddingLeft: left + 24,
@@ -94,32 +96,32 @@ function AppUnlockScene({ children }: Readonly<{ children: ReactElement }>) {
       </View>
       {hidden ? (
         <View className="absolute inset-0 bg-background" accessibilityViewIsModal>
-          <ScrollView
-            className="flex-1"
-            contentContainerClassName="grow justify-center gap-4"
-            contentContainerStyle={contentPadding(insets)}
-          >
-            <Text accessibilityRole="header" className="text-center text-xl font-semibold">
-              {t('preferences.biometricUnlock')}
-            </Text>
-            <UnlockStatusText
-              message={status === 'preference-error' ? t('common.somethingWentWrong') : null}
-            />
-            <AppUnlockFeedback outcome={outcome} />
-            {status === 'preference-loading' ? (
-              <View
-                accessible
-                accessibilityRole="progressbar"
-                accessibilityLabel={t('preferences.biometricUnlock')}
-                accessibilityState={{ busy: true }}
-              >
-                <Skeleton className="h-11 w-full rounded-md" />
+          <ScrollView className="flex-1" contentContainerStyle={contentPadding(insets)}>
+            <View className="w-full gap-8">
+              <View className="gap-3">
+                <Text accessibilityRole="header" className="text-center text-xl font-semibold">
+                  {t('preferences.biometricUnlock')}
+                </Text>
+                <UnlockStatusText
+                  message={status === 'preference-error' ? t('common.somethingWentWrong') : null}
+                />
+                <AppUnlockFeedback outcome={outcome} />
               </View>
-            ) : (
-              <Button onPress={retry} loading={busy} accessibilityLabel={t('common.retry')}>
-                <Text>{t('common.retry')}</Text>
-              </Button>
-            )}
+              {status === 'preference-loading' ? (
+                <View
+                  accessible
+                  accessibilityRole="progressbar"
+                  accessibilityLabel={t('preferences.biometricUnlock')}
+                  accessibilityState={{ busy: true }}
+                >
+                  <Skeleton className="h-11 w-full rounded-md" />
+                </View>
+              ) : (
+                <Button onPress={retry} loading={busy} accessibilityLabel={t('common.retry')}>
+                  <Text>{t('common.retry')}</Text>
+                </Button>
+              )}
+            </View>
           </ScrollView>
         </View>
       ) : null}

@@ -19,7 +19,8 @@ import {
   LiveSessionFeedback,
   useLiveSessionContext,
 } from '@/components/home/agent-sessions-section';
-import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
+import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
@@ -30,7 +31,6 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
@@ -111,7 +111,7 @@ export function AgentSessionListScreen() {
 
   const seeAllLabel = t('home.seeAll');
   const headerRight = (
-    <View className="flex-row items-center gap-4">
+    <View className="min-h-11 min-w-0 flex-row items-center gap-4">
       <Pressable
         onPress={() => {
           router.push('/(app)/(tabs)/(2_agents)/history' as Href);
@@ -121,9 +121,9 @@ export function AgentSessionListScreen() {
         accessibilityRole="button"
         accessibilityLabel={seeAllLabel}
         testID="agents-view-history"
-        className="active:opacity-70"
+        className="min-w-0 shrink justify-center active:opacity-70"
       >
-        <Text className="shrink font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
+        <Text className="shrink text-center font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
           {seeAllLabel}
         </Text>
       </Pressable>
@@ -168,11 +168,10 @@ export function AgentSessionListScreen() {
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it. The FAB adds its own inset when it shows so the last row
-  // scrolls clear of the button too. paddingTop merges here (not a className)
-  // to match the historical first-row inset without a separate wrapper.
+  // scrolls clear of the button too.
   const listPadding = useMemo(
     () => ({
-      paddingTop: 18,
+      paddingTop: 0,
       paddingBottom: tabBarHeight + (hasLiveRows ? FAB_SIZE + FAB_MARGIN : 0),
     }),
     [tabBarHeight, hasLiveRows]
@@ -223,23 +222,7 @@ export function AgentSessionListScreen() {
     );
   } else if (content === 'empty') {
     body = (
-      <EmptyState
-        icon={Bot}
-        title={t('home.noLiveSessions')}
-        description={t('agents.sessionList.noSessionsYetDescription')}
-        action={
-          <Button
-            variant="outline"
-            accessibilityLabel={t('home.newCodingTask')}
-            onPress={() => {
-              router.push(getNewAgentSessionPath(organizationId) as Href);
-            }}
-          >
-            <Plus size={16} color={colors.foreground} />
-            <Text>{t('home.newCodingTask')}</Text>
-          </Button>
-        }
-      />
+      <LiveSessionListEmptyState organizationId={organizationId} tabBarHeight={tabBarHeight} />
     );
   } else if (hasLiveRows) {
     body = (
@@ -261,19 +244,15 @@ export function AgentSessionListScreen() {
       <ScreenHeader
         title={t('tabs.agents')}
         eyebrow={
-          !sessions.isLoading && !sessions.isError && hasLiveRows
+          !sessions.isLoading && !sessions.isError && (hasLiveRows || content === 'empty')
             ? t('agents.liveCount', { count: activeSessions.length })
             : undefined
         }
+        reserveEyebrow
         size="large"
         showBackButton={false}
-        className="px-[22px]"
+        className="px-[22px] pb-1"
         headerRight={headerRight}
-        context={
-          <ContextControl
-            scope={context.accountReady ? undefined : { organizationId: null, isResolved: false }}
-          />
-        }
       />
       <View className="px-[22px]">
         <LiveSessionFeedback
@@ -292,13 +271,6 @@ export function AgentSessionListScreen() {
           onClearSearch={query.handleClearSearch}
         />
       ) : null}
-      <SessionFilterChips
-        platformFilter={query.platformFilter}
-        projectFilter={query.projectFilter}
-        projectOptions={query.options.projectOptions}
-        onRemovePlatform={query.handleRemovePlatform}
-        onRemoveProject={query.handleRemoveProject}
-      />
       {body}
       {/* Empty content owns its creation action; other admitted states keep the FAB. */}
       {context.isReady && content !== 'empty' && (

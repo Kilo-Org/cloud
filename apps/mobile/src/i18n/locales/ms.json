@@ -156,7 +156,7 @@
     "returnSendsMessage": "Kekunci Kembali menghantar mesej",
     "returnSendsMessageSubtitle": "Apabila dimatikan, kekunci Kembali menyisipkan baris baharu dalam komposer ejen.",
     "biometricUnlock": "Buka kunci dengan biometrik",
-    "biometricUnlockSubtitle": "Buka kunci apabila aplikasi dilancarkan dan selepas lima minit di latar belakang. Sediakan biometrik atau kod laluan peranti dalam tetapan peranti. Kod laluan peranti anda tersedia sebagai pilihan sandaran."
+    "biometricUnlockSubtitle": "Buka kunci apabila aplikasi dilancarkan dan selepas lima minit di latar belakang."
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",
@@ -201,7 +201,7 @@
       "diffTooLarge": "Diff terlalu besar untuk dipaparkan",
       "openOnGitHub": "Buka di GitHub",
       "openDiffOnGitHub": "Buka diff fail ini di GitHub",
-      "githubDiff": "diff GitHub"
+      "githubDiff": "Diff GitHub"
     },
     "floatingActions": {
       "clearSelection": "Kosongkan pilihan",
@@ -786,7 +786,7 @@
       "retrySend": "Cuba hantar semula",
       "moreReactions": "Lebih banyak reaksi",
       "reply": "Balas",
-      "edit": "sunting",
+      "edit": "Sunting",
       "sendFailed": "Gagal menghantar mesej",
       "retrySendFailed": "Gagal mencuba hantar semula",
       "editFailed": "Gagal mengedit mesej",
@@ -1135,9 +1135,9 @@
       "destroying": "MEMUSNAHKAN",
       "provisioned": "DISEDIAKAN",
       "restarting": "MEMULAKAN SEMULA",
-      "running": "Sedang berjalan",
+      "running": "SEDANG BERJALAN",
       "shuttingDown": "MENUTUP",
-      "starting": "Sedang dimulakan",
+      "starting": "SEDANG DIMULAKAN",
       "stopped": "DIHENTIKAN",
       "stopping": "MENGHENTIKAN",
       "unknown": "TIDAK DIKETAHUI",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Menunggu transkrip semakan.",
       "transcriptEmpty": "Tiada transkrip untuk semakan ini.",
       "transcriptRetry": "Tidak dapat memuatkan transkrip semakan.",
-      "transcriptLive": "LANGSUNG",
+      "transcriptLive": "Langsung",
       "agentIdle": "Ejen melahu",
       "agentWorking": "Ejen bekerja...",
       "anErrorOccurred": "Ralat berlaku",
@@ -1701,11 +1701,11 @@
       "statusFixed": "Diperbaiki",
       "statusOpen": "Terbuka",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Pembetulan telah dimulakan",
-      "reasonNoBandwidth": "Tiada kapasiti yang tersedia",
-      "reasonTolerableRisk": "Risiko boleh diterima",
-      "reasonInaccurate": "Penemuan itu tidak tepat",
-      "reasonNotUsed": "Kod terdedah tidak digunakan",
+      "reasonFixStarted": "pembetulan telah dimulakan",
+      "reasonNoBandwidth": "tiada kapasiti yang tersedia",
+      "reasonTolerableRisk": "risiko boleh diterima",
+      "reasonInaccurate": "penemuan itu tidak tepat",
+      "reasonNotUsed": "kod terdedah tidak digunakan",
       "reasonAfterReview": "selepas semakan"
     },
     "settingsOverview": {
@@ -2457,7 +2457,7 @@
       "modelAccessibility": "Model: {{modelLabel}}",
       "openHint": "Buka sesi subejen",
       "subagent": "Subejen",
-      "task": "tugasan",
+      "task": "Tugasan",
       "waitingForActivity": "Menunggu aktiviti"
     },
     "childSessionSheet": {
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Lain-lain",
-      "project": "Projek",
-      "removeProjectFilter": "Buang penapis projek {{label}}",
-      "removePlatformFilter": "Buang penapis platform {{label}}"
+      "project": "Projek"
     },
     "suggestion": {
       "title": "Cadangan",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Tugas pengekodan baharu",
     "explore": "Teroka",
     "seeAll": "Lihat semua",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Tiada apa-apa yang sedang berjalan sekarang"
   },
   "imageViewer": {
     "close": "Tutup {{filename}}",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Kembali dan buka semula pemilih ini daripada skrin sebelumnya."
   },
   "sessionRow": {
-    "needsInput": "perlu input"
+    "needsInput": "PERLU INPUT"
   },
   "voiceInput": {
     "listening": "Mendengar...",

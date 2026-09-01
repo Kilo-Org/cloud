@@ -145,6 +145,8 @@ describe('SheetHeader', () => {
     expect(row?.props.className).toContain('flex-row');
     expect(row?.props.className).not.toContain('flex-row-reverse');
     expect(row?.children[0]).toBe(cancels[0]);
+    expect(row?.parent?.children[0]).not.toBe(row);
+    expect(row?.parent?.children.at(-1)).toBe(row);
     expect(row?.children.at(-1)).toBe(dones[0]);
     expect(dones[0]?.props.className).toContain('ms-auto');
 
@@ -169,14 +171,15 @@ describe('SheetHeader', () => {
     const renderer = await mount({ title: 'Run on', onDone: () => undefined });
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
     const done = pressablesByLabel(renderer.root, 'Done')[0];
-    const row = title.parent?.parent;
+    const titleRow = title.parent;
+    const controls = done?.parent;
 
-    // The mounted renderer checks layout constraints, not native text geometry.
-    expect(row?.props.className).toContain('flex-wrap');
-    expect(row?.props.className).not.toMatch(/(?:^|\s)(?:h|max-h)-/);
-    expect(title.parent?.props.className).not.toMatch(/\bpx-/);
-    expect(title.parent?.props.className).toContain('max-w-full');
-    expect(done?.parent).toBe(row);
+    expect(controls?.props.className).toContain('flex-wrap');
+    expect(titleRow?.props.className).not.toMatch(/(?:^|\s)(?:h|max-h)-/);
+    expect(title.props.className).toContain('w-full');
+    expect(title.props.className).toContain('text-center');
+    expect(titleRow?.parent).toBe(controls?.parent);
+    expect(titleRow?.children).not.toContain(done);
     expect(done?.props.className).not.toContain('absolute');
     expect(done?.props.className).toContain('max-w-full');
 

@@ -156,7 +156,7 @@
     "returnSendsMessage": "回车键发送消息",
     "returnSendsMessageSubtitle": "关闭后，回车键会在代理编辑器中插入换行。",
     "biometricUnlock": "使用生物识别解锁",
-    "biometricUnlockSubtitle": "启动应用时以及应用在后台停留五分钟后，均需解锁。请在设备设置中设置生物识别或设备密码。您仍可使用设备密码作为备用解锁方式。"
+    "biometricUnlockSubtitle": "启动应用时以及应用在后台停留五分钟后，均需解锁。"
   },
   "notifications": {
     "title": "通知",
@@ -2062,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "其他",
-      "project": "项目",
-      "removeProjectFilter": "移除 {{label}} 项目筛选",
-      "removePlatformFilter": "移除 {{label}} 平台筛选"
+      "project": "项目"
     },
     "suggestion": {
       "title": "建议",
@@ -2298,7 +2296,7 @@
     "newCodingTask": "新编程任务",
     "explore": "探索",
     "seeAll": "查看全部",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "目前没有正在运行的内容"
   },
   "imageViewer": {
     "close": "关闭 {{filename}}",

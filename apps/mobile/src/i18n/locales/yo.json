@@ -156,7 +156,7 @@
     "returnSendsMessage": "Bọtini ipadabọ n fi ifiranṣẹ ranṣẹ",
     "returnSendsMessageSubtitle": "Nigbati o ba wa ni pipa, bọtini ipadabọ n fi ila tuntun sii ni awọn aaye kikọ ifiranṣẹ aṣoju.",
     "biometricUnlock": "Ṣii titiipa pẹ̀lú ìdánimọ̀ àbùdá ara",
-    "biometricUnlockSubtitle": "A nílò ṣíṣí titiipa nígbà tí ìṣàfilọ́lẹ̀ bá bẹ̀rẹ̀ àti lẹ́yìn tí ó bá ti wà ní ẹ̀hìn fún ìṣẹ́jú márùn-ún. Ṣètò ìdánimọ̀ àbùdá ara tàbí kóòdù ìwọlé ẹ̀rọ nínú eto ẹ̀rọ. Kóòdù ìwọlé ẹ̀rọ rẹ wà gẹ́gẹ́ bí ọ̀nà àfidípò."
+    "biometricUnlockSubtitle": "A nílò ṣíṣí titiipa nígbà tí ìṣàfilọ́lẹ̀ bá bẹ̀rẹ̀ àti lẹ́yìn tí ó bá ti wà ní ẹ̀hìn fún ìṣẹ́jú márùn-ún."
   },
   "prReview": {
     "pullRequestUnavailable": "Ibeere fifa ko si",
@@ -201,7 +201,7 @@
       "diffTooLarge": "Diff tobi ju lati ṣafihan",
       "openOnGitHub": "Ṣii lori GitHub",
       "openDiffOnGitHub": "Ṣii diff ti faili yii lori GitHub",
-      "githubDiff": "diff GitHub"
+      "githubDiff": "Diff GitHub"
     },
     "floatingActions": {
       "clearSelection": "Nu yiyan kuro",
@@ -549,8 +549,8 @@
       "commit": "awọn iṣẹ",
       "commit_other": "awọn iṣẹ",
       "file_one": "faili",
-      "file": "Àwọn fáìlì",
-      "file_other": "Àwọn fáìlì"
+      "file": "àwọn fáìlì",
+      "file_other": "àwọn fáìlì"
     },
     "pendingComment": {
       "editOutdatedA11y": "Ṣatunkọ asọye idaduro atijọ lori {{location}}",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Ndúró fún ìkọwe àtúnyẹ̀wò náà.",
       "transcriptEmpty": "Kò sí ìkọwe fún àtúnyẹ̀wò yìí.",
       "transcriptRetry": "Kò lè gbé ìkọwe àtúnyẹ̀wò náà.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Aṣoju ń sinmi",
       "agentWorking": "Aṣoju ń ṣiṣẹ́...",
       "anErrorOccurred": "Àṣìṣe kan ṣẹlẹ̀",
@@ -1437,7 +1437,7 @@
     "status": {
       "pending": "Ti nduro",
       "queued": "Ti wa ni ila",
-      "running": "ǸJẸ́ ṢÍṢIṢẸ́",
+      "running": "Ǹjẹ́ ṣíṣiṣẹ́",
       "completed": "Tí a parí",
       "failed": "Kuna",
       "cancelled": "Ti fagilee",
@@ -1701,11 +1701,11 @@
       "statusFixed": "Ti ṣatunṣe",
       "statusOpen": "Ṣí",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Atunṣe kan ti bẹrẹ tẹlẹ",
-      "reasonNoBandwidth": "Ko si agbara to wa",
-      "reasonTolerableRisk": "Ewu naa le farada",
-      "reasonInaccurate": "Abawọn naa ko pe",
-      "reasonNotUsed": "Koodu alailagbara ko ni lilo",
+      "reasonFixStarted": "atunṣe kan ti bẹrẹ tẹlẹ",
+      "reasonNoBandwidth": "ko si agbara to wa",
+      "reasonTolerableRisk": "ewu naa le farada",
+      "reasonInaccurate": "abawọn naa ko pe",
+      "reasonNotUsed": "koodu alailagbara ko ni lilo",
       "reasonAfterReview": "lẹhin atunyẹwo"
     },
     "settingsOverview": {
@@ -2246,14 +2246,14 @@
       "contentTruncated": "Akoonu ti ge kuru",
       "truncated": "Ti ge kuru",
       "toolRead": "ka",
-      "toolEdit": "Ṣàtúnṣe",
+      "toolEdit": "ṣàtúnṣe",
       "toolWrite": "kọ",
       "toolBash": "bash",
       "toolGlob": "glob",
       "toolGrep": "grep",
       "toolList": "akojọ",
       "toolPatch": "patch",
-      "toolTask": "Iṣẹ-ṣiṣe",
+      "toolTask": "iṣẹ-ṣiṣe",
       "readTodos": "Ka awọn todos",
       "updateTodos": "Ṣe imudojuiwọn awọn todos",
       "linesBadge": "{{displayCount}} awọn ila",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Omiiran",
-      "project": "Iṣẹ-ọna",
-      "removeProjectFilter": "Yọ àlẹmọ iṣẹ-ọna {{label}}",
-      "removePlatformFilter": "Yọ àlẹmọ pẹpẹ {{label}}"
+      "project": "Iṣẹ-ọna"
     },
     "suggestion": {
       "title": "Imọran",
@@ -2662,7 +2660,7 @@
       "olderActivity": "Iṣẹ-ṣiṣe atijọ",
       "olderActivityDescription": "Idiyele ti a ko ṣe afihan si itan-akọọlẹ ti a gbewọ",
       "ofWindowTokens": "ninu {{window}} tokens",
-      "tokens": "Àwọn tókẹ̀n",
+      "tokens": "àwọn tókẹ̀n",
       "tokensWithPercentage": "tokens ({{percentage}})",
       "stepsCount_one": "{{steps}} igbese",
       "stepsCount": "{{steps}} awọn igbese",
@@ -2670,10 +2668,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Ṣí ìbéèrè ìfa",
+      "open": "ṣí ìbéèrè ìfa",
       "closed": "ibeere-fa ti pa",
       "merged": "ibeere-fa ti dapọ",
-      "draft": "Ibeere fifa yàrá",
+      "draft": "ibeere fifa yàrá",
       "updating": "Nṣe igbesoke, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "ìbéèrè ìfa"
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Iṣẹ-ṣiṣe koodu tuntun",
     "explore": "Ṣàwárí",
     "seeAll": "Wo gbogbo",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Kò sí ohun tó ń ṣiṣẹ́ lọ́wọ́lọ́wọ́"
   },
   "imageViewer": {
     "close": "Pa {{filename}}",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Padà sẹhin ki o si tun ṣii oluyan yii lati iboju iṣaaju."
   },
   "sessionRow": {
-    "needsInput": "nilo igbewọle"
+    "needsInput": "NILO IGBEWỌLE"
   },
   "voiceInput": {
     "listening": "Nṣe gbọrọ...",

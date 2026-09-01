@@ -156,7 +156,7 @@
     "returnSendsMessage": "Kláves Enter odošle správu",
     "returnSendsMessageSubtitle": "Keď je táto možnosť vypnutá, kláves Enter vloží nový riadok do polí na zadávanie správy agentom.",
     "biometricUnlock": "Odomknúť pomocou biometrie",
-    "biometricUnlockSubtitle": "Odomknutie sa vyžaduje pri spustení aplikácie a po piatich minútach na pozadí. V nastaveniach zariadenia si nastavte biometriu alebo prístupový kód zariadenia. Prístupový kód zariadenia môžete použiť ako náhradnú možnosť."
+    "biometricUnlockSubtitle": "Odomknutie sa vyžaduje pri spustení aplikácie a po piatich minútach na pozadí."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nie je dostupný",
@@ -1151,7 +1151,7 @@
       "destroying": "NIČÍ SA",
       "provisioned": "POSKYTNUTÉ",
       "restarting": "REŠTARTUJE SA",
-      "running": "Prebieha",
+      "running": "PREBIEHA",
       "shuttingDown": "VYPÍNA SA",
       "starting": "SPÚŠŤA SA",
       "stopped": "ZASTAVENÉ",
@@ -1327,7 +1327,7 @@
       "transcriptWaiting": "Čaká sa na prepis kontroly.",
       "transcriptEmpty": "Žiadny prepis pre túto kontrolu.",
       "transcriptRetry": "Prepis kontroly sa nepodarilo načítať.",
-      "transcriptLive": "NAŽIVO",
+      "transcriptLive": "Naživo",
       "agentIdle": "Agent nečinný",
       "agentWorking": "Agent pracuje...",
       "anErrorOccurred": "Vyskytla sa chyba",
@@ -2556,9 +2556,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Iné",
-      "project": "Projekt",
-      "removeProjectFilter": "Odstrániť filter projektu {{label}}",
-      "removePlatformFilter": "Odstrániť filter platformy {{label}}"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Návrh",
@@ -2715,7 +2713,7 @@
       "open": "otvorený pull request",
       "closed": "zatvorený pull request",
       "merged": "zlúčený pull request",
-      "draft": "Koncept pull request",
+      "draft": "koncept pull request",
       "updating": "Aktualizuje sa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2794,7 +2792,7 @@
     "newCodingTask": "Nová programovacia úloha",
     "explore": "Preskúmať",
     "seeAll": "Zobraziť všetko",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Práve nič nebeží"
   },
   "imageViewer": {
     "close": "Zavrieť {{filename}}",

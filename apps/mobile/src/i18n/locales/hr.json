@@ -156,7 +156,7 @@
     "returnSendsMessage": "Tipka za novi redak šalje poruku",
     "returnSendsMessageSubtitle": "Kad je isključeno, tipka za novi redak umeće novi redak u polja za unos poruke agentima.",
     "biometricUnlock": "Otključavanje biometrijom",
-    "biometricUnlockSubtitle": "Otključavanje je potrebno pri pokretanju aplikacije i nakon pet minuta u pozadini. Postavite biometriju ili šifru uređaja u postavkama uređaja. Šifra uređaja dostupna je kao zamjenski način otključavanja."
+    "biometricUnlockSubtitle": "Otključavanje je potrebno pri pokretanju aplikacije i nakon pet minuta u pozadini."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nedostupan",
@@ -307,7 +307,7 @@
         "failingChecksDetail": "Potrebne provjere statusa ne uspijevaju.",
         "unstableTitle": "Neke provjere ne uspijevaju",
         "unstableDetail": "Neobavezne provjere ne uspijevaju. One neće blokirati spajanje.",
-        "draftTitle": "nacrt pull requesta",
+        "draftTitle": "Nacrt pull requesta",
         "draftDetail": "Označite pull request kao spreman za recenziju prije spajanja.",
         "behindTitle": "Grana je zastarjela",
         "behindDetailUpdatable": "Ažurirajte granu s osnovne ili je rebase-ajte prije spajanja.",
@@ -1318,15 +1318,15 @@
       "transcriptWaiting": "Čekanje na transkript pregleda.",
       "transcriptEmpty": "Nema transkripta za ovaj pregled.",
       "transcriptRetry": "Učitavanje transkripta pregleda nije uspjelo.",
-      "transcriptLive": "UŽIVO",
+      "transcriptLive": "Uživo",
       "agentIdle": "Agent ne radi",
       "agentWorking": "Agent radi...",
       "anErrorOccurred": "Došlo je do pogreške",
-      "errorWithMessage": "greška: {{message}}",
+      "errorWithMessage": "Greška: {{message}}",
       "executionStarted": "Izvršavanje pokrenuto",
       "reviewCompleted": "Pregled dovršen",
       "reviewInterrupted": "Pregled prekinut",
-      "sessionError": "greška sesije: {{error}}",
+      "sessionError": "Greška sesije: {{error}}",
       "statusWithValue": "Status: {{status}}",
       "toolName": "Alat: {{name}}",
       "toolNameError": "Alat: {{name}} — greška",
@@ -1446,7 +1446,7 @@
     "status": {
       "pending": "Na čekanju",
       "queued": "U redu čekanja",
-      "running": "RADI",
+      "running": "Radi",
       "completed": "Dovršeno",
       "failed": "Nije uspjelo",
       "cancelled": "Otkazano",
@@ -2011,7 +2011,7 @@
       "cancellationRequested": "Zatraženo otkazivanje",
       "notStarted": "Nije započeto",
       "queued": "U redu čekanja",
-      "starting": "POKRETANJE",
+      "starting": "Pokretanje",
       "inProgress": "U tijeku",
       "draftPrOpened": "Otvoren nacrt PR-a",
       "prOpened": "PR otvoren",
@@ -2110,8 +2110,8 @@
       "dollar_other": "dolara",
       "cent_few": "centa",
       "dollar_few": "dolara",
-      "costSpoken": "Trošak {{cost}}",
-      "costSpokenWithTime": "Trošak {{cost}}, {{time}}",
+      "costSpoken": "trošak {{cost}}",
+      "costSpokenWithTime": "trošak {{cost}}, {{time}}",
       "pullRequest": "zahtjev za povlačenje {{number}}"
     },
     "githubInstall": {
@@ -2287,7 +2287,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[unserializabilni unos]",
-      "errorPrefix": "greška: {{error}}"
+      "errorPrefix": "Greška: {{error}}"
     },
     "instancePicker": {
       "runOn": "Pokreni na",
@@ -2536,9 +2536,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Ostalo",
-      "project": "Projekt",
-      "removeProjectFilter": "Ukloni {{label}} filtar projekta",
-      "removePlatformFilter": "Ukloni {{label}} filtar platforme"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Prijedlog",
@@ -2773,7 +2771,7 @@
     "newCodingTask": "Novi zadatak kodiranja",
     "explore": "Istraži",
     "seeAll": "Prikaži sve",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Trenutačno ništa nije pokrenuto"
   },
   "imageViewer": {
     "close": "Zatvori {{filename}}",

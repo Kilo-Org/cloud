@@ -156,7 +156,7 @@
     "returnSendsMessage": "စာကြောင်းပြန်ခလုတ်က စာပို့သည်",
     "returnSendsMessageSubtitle": "ပိတ်ထားပါက စာကြောင်းပြန်ခလုတ်သည် အေးဂျင့်၏ စာထည့်သွင်းရာအကွက်များတွင် စာကြောင်းအသစ် ထည့်သည်။",
     "biometricUnlock": "စက်ပစ္စည်း၏ ဇီဝအချက်အလက်ဖြင့် သော့ဖွင့်ပါ",
-    "biometricUnlockSubtitle": "အက်ပ်ကို စတင်ဖွင့်သည့်အခါနှင့် နောက်ခံတွင် ငါးမိနစ်ကြာ ရှိနေပြီးနောက် သော့ဖွင့်ရန် လိုအပ်ပါသည်။ စက်ပစ္စည်း၏ ဆက်တင်များတွင် ဇီဝအချက်အလက် သို့မဟုတ် စက်ပစ္စည်း၏ လျှို့ဝှက်ကုဒ်ကို သတ်မှတ်ပါ။ အစားထိုးနည်းလမ်းအဖြစ် သင့်စက်ပစ္စည်း၏ လျှို့ဝှက်ကုဒ်ကို အသုံးပြုနိုင်ပါသည်။"
+    "biometricUnlockSubtitle": "အက်ပ်ကို စတင်ဖွင့်သည့်အခါနှင့် နောက်ခံတွင် ငါးမိနစ်ကြာ ရှိနေပြီးနောက် သော့ဖွင့်ရန် လိုအပ်ပါသည်။"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request မရနိုင်ပါ",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "သုံးသပ်ချက် မှတ်တမ်းကို စောင့်နေသည်။",
       "transcriptEmpty": "ဤသုံးသပ်ချက်အတွက် မှတ်တမ်း မရှိပါ။",
       "transcriptRetry": "သုံးသပ်ချက် မှတ်တမ်းကို တင်မရပါ။",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Agent လှုပ်ရှားမှုမရှိ",
       "agentWorking": "Agent လုပ်ဆောင်နေသည်…",
       "anErrorOccurred": "အမှားတစ်ခု ဖြစ်ပွားခဲ့သည်",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "အခြား",
-      "project": "Project",
-      "removeProjectFilter": "{{label}} project စစ်ထုတ်မှုကို ဖယ်ရှားပါ",
-      "removePlatformFilter": "{{label}} platform စစ်ထုတ်မှုကို ဖယ်ရှားပါ"
+      "project": "Project"
     },
     "suggestion": {
       "title": "အကြံပြုချက်",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "coding အလုပ်အသစ်",
     "explore": "ရှာဖွေပါ",
     "seeAll": "အားလုံး ကြည့်ရန်",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ယခု ဘာမှ လုပ်ဆောင်နေခြင်း မရှိပါ"
   },
   "imageViewer": {
     "close": "{{filename}} ပိတ်ရန်",

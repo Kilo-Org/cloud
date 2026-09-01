@@ -156,7 +156,7 @@
     "returnSendsMessage": "Το πλήκτρο επιστροφής στέλνει το μήνυμα",
     "returnSendsMessageSubtitle": "Όταν είναι απενεργοποιημένο, το πλήκτρο επιστροφής εισάγει νέα γραμμή στα πεδία εισαγωγής μηνύματος των πρακτόρων.",
     "biometricUnlock": "Ξεκλείδωμα με βιομετρικά στοιχεία",
-    "biometricUnlockSubtitle": "Απαιτείται ξεκλείδωμα κατά την εκκίνηση της εφαρμογής και αφού παραμείνει στο παρασκήνιο για πέντε λεπτά. Ρυθμίστε βιομετρικά στοιχεία ή έναν κωδικό της συσκευής στις ρυθμίσεις της συσκευής. Ο κωδικός της συσκευής σας παραμένει διαθέσιμος ως εναλλακτική επιλογή."
+    "biometricUnlockSubtitle": "Απαιτείται ξεκλείδωμα κατά την εκκίνηση της εφαρμογής και αφού παραμείνει στο παρασκήνιο για πέντε λεπτά."
   },
   "prReview": {
     "pullRequestUnavailable": "Το pull request δεν είναι διαθέσιμο",
@@ -1135,12 +1135,12 @@
       "destroying": "ΚΑΤΑΣΤΡΟΦΗ",
       "provisioned": "ΠΑΡΕΧΕΤΑΙ",
       "restarting": "ΕΠΑΝΕΚΚΙΝΗΣΗ",
-      "running": "Σε εξέλιξη",
+      "running": "ΣΕ ΕΞΕΛΙΞΗ",
       "shuttingDown": "ΤΕΡΜΑΤΙΣΜΟΣ",
-      "starting": "Έναρξη",
+      "starting": "ΕΝΑΡΞΗ",
       "stopped": "ΣΤΑΜΑΤΗΜΕΝΟ",
       "stopping": "ΔΙΑΚΟΠΗ",
-      "unknown": "Άγνωστο",
+      "unknown": "ΑΓΝΩΣΤΟ",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1294,7 +1294,7 @@
       "started": "Ξεκίνησε",
       "completed": "Ολοκληρώθηκε",
       "cost": "Κόστος",
-      "tokens": "διακριτικά",
+      "tokens": "Διακριτικά",
       "tokensInOut": "{{input}} εισερχόμενα / {{output}} εξερχόμενα",
       "openPullRequest": "Άνοιγμα αιτήματος έλξης",
       "council": "Συμβούλιο",
@@ -1307,7 +1307,7 @@
       "threshold": "Κατώφλι",
       "pullRequest": "αίτημα έλξης",
       "transcriptEmpty": "Δεν υπάρχει απομαγνητοφώνηση για αυτή την αναθεώρηση.",
-      "transcriptLive": "ΖΩΝΤΑΝΑ",
+      "transcriptLive": "Ζωντανά",
       "transcriptRetry": "Δεν ήταν δυνατή η φόρτωση της απομαγνητοφώνησης της αναθεώρησης.",
       "transcriptWaiting": "Αναμονή για την απομαγνητοφώνηση της αναθεώρησης.",
       "agentIdle": "Πράκτορας σε αναμονή",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Άλλο",
-      "project": "Έργο",
-      "removeProjectFilter": "Αφαίρεση φίλτρου έργου {{label}}",
-      "removePlatformFilter": "Αφαίρεση φίλτρου πλατφόρμας {{label}}"
+      "project": "Έργο"
     },
     "suggestion": {
       "title": "Πρόταση",
@@ -2673,7 +2671,7 @@
       "open": "ανοιχτό αίτημα έλξης",
       "closed": "κλειστό αίτημα έλξης",
       "merged": "συγχωνευμένο αίτημα έλξης",
-      "draft": "Πρόχειρο pull request",
+      "draft": "πρόχειρο pull request",
       "updating": "Ενημέρωση, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "αίτημα έλξης"
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Νέα εργασία προγραμματισμού",
     "explore": "Εξερεύνηση",
     "seeAll": "Προβολή όλων",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Δεν εκτελείται τίποτα αυτή τη στιγμή"
   },
   "imageViewer": {
     "close": "Κλείσιμο {{filename}}",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Επιστρέψτε και ανοίξτε ξανά αυτόν τον επιλογέα από την προηγούμενη οθόνη."
   },
   "sessionRow": {
-    "needsInput": "χρειάζεται είσοδο"
+    "needsInput": "ΧΡΕΙΑΖΕΤΑΙ ΕΙΣΟΔΟ"
   },
   "voiceInput": {
     "listening": "Ακρόαση...",

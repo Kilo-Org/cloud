@@ -156,7 +156,7 @@
     "returnSendsMessage": "مفتاح الإدخال يرسل الرسالة",
     "returnSendsMessageSubtitle": "عند إيقاف هذا الخيار، يُدرج مفتاح الإدخال سطرًا جديدًا في حقول إدخال رسائل الوكلاء.",
     "biometricUnlock": "إلغاء القفل باستخدام القياسات الحيوية",
-    "biometricUnlockSubtitle": "يلزم إلغاء القفل عند تشغيل التطبيق وبعد بقائه في الخلفية لمدة خمس دقائق. يرجى إعداد القياسات الحيوية أو رمز دخول الجهاز في إعدادات الجهاز. يظل رمز دخول جهازك متاحًا كخيار بديل."
+    "biometricUnlockSubtitle": "يلزم إلغاء القفل عند تشغيل التطبيق وبعد بقائه في الخلفية لمدة خمس دقائق."
   },
   "notifications": {
     "title": "الإشعارات",
@@ -2114,9 +2114,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "أخرى",
-      "project": "المشروع",
-      "removeProjectFilter": "إزالة عامل تصفية المشروع {{label}}",
-      "removePlatformFilter": "إزالة عامل تصفية المنصة {{label}}"
+      "project": "المشروع"
     },
     "suggestion": {
       "title": "اقتراح",
@@ -2354,7 +2352,7 @@
     "newCodingTask": "مهمة برمجة جديدة",
     "explore": "استكشف",
     "seeAll": "عرض الكل",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "لا شيء قيد التشغيل الآن"
   },
   "imageViewer": {
     "close": "إغلاق {{filename}}",

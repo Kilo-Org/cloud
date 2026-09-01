@@ -156,7 +156,7 @@
     "returnSendsMessage": "Returtangenten skickar meddelanden",
     "returnSendsMessageSubtitle": "När detta är avstängt infogar returtangenten en radbrytning i agenternas meddelandefält.",
     "biometricUnlock": "Lås upp med biometri",
-    "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden. Ställ in biometri eller en lösenkod för enheten i enhetens inställningar. Du kan använda enhetens lösenkod som reservmetod."
+    "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request inte tillgänglig",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Väntar på granskningstranskriptet.",
       "transcriptEmpty": "Inget transkript för denna granskning.",
       "transcriptRetry": "Det gick inte att läsa in granskningstranskriptet.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Agenten är inaktiv",
       "agentWorking": "Agenten arbetar...",
       "anErrorOccurred": "Ett fel uppstod",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Annat",
-      "project": "Projekt",
-      "removeProjectFilter": "Ta bort {{label}} projektfilter",
-      "removePlatformFilter": "Ta bort {{label}} plattformsfilter"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Förslag",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Ny kodningsuppgift",
     "explore": "Utforska",
     "seeAll": "Visa alla",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Inget körs just nu"
   },
   "imageViewer": {
     "close": "Stäng {{filename}}",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Gå tillbaka och öppna denna väljare igen från föregående skärm."
   },
   "sessionRow": {
-    "needsInput": "kräver indata"
+    "needsInput": "KRÄVER INDATA"
   },
   "voiceInput": {
     "listening": "Lyssnar...",

@@ -156,7 +156,7 @@
     "returnSendsMessage": "Sətirsonu düyməsi mesaj göndərir",
     "returnSendsMessageSubtitle": "Söndürüldükdə sətirsonu düyməsi agent kompozitorlarında yeni sətir daxil edir.",
     "biometricUnlock": "Biometrika ilə kilidi açın",
-    "biometricUnlockSubtitle": "Tətbiq başladıqda və arxa planda beş dəqiqə qaldıqdan sonra kilidi açmaq tələb olunur. Cihazın parametrlərində biometrikanı və ya cihazın giriş kodunu qurun. Cihazınızın giriş kodundan ehtiyat üsul kimi istifadə edə bilərsiniz."
+    "biometricUnlockSubtitle": "Tətbiq başladıqda və arxa planda beş dəqiqə qaldıqdan sonra kilidi açmaq tələb olunur."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request əlçatan deyil",
@@ -1137,7 +1137,7 @@
       "restarting": "YENİDƏN BAŞLADILIR",
       "running": "İŞLƏYİR",
       "shuttingDown": "SÖNDÜRÜLÜR",
-      "starting": "Başladılır",
+      "starting": "BAŞLADILIR",
       "stopped": "DAYANDIRILIB",
       "stopping": "DAYANDIRILIR",
       "unknown": "NAMƏLUM",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "İcmal transkripti gözlənilir.",
       "transcriptEmpty": "Bu icmal üçün transkript yoxdur.",
       "transcriptRetry": "İcmal transkripti yüklənə bilmədi.",
-      "transcriptLive": "CANLI",
+      "transcriptLive": "Canlı",
       "agentIdle": "Agent boşda",
       "agentWorking": "Agent işləyir...",
       "anErrorOccurred": "Xəta baş verdi",
@@ -1437,7 +1437,7 @@
     "status": {
       "pending": "Gözlənilir",
       "queued": "Növbəyə alınıb",
-      "running": "İŞLƏYİR",
+      "running": "İşləyir",
       "completed": "Tamamlanıb",
       "failed": "Uğursuz",
       "cancelled": "Ləğv edildi",
@@ -2087,7 +2087,7 @@
       "couldNotCopyId": "Sessiya ID kopyalana bilmədi",
       "untitled": "Adsız sessiya",
       "sessionDeleted": "Sessiya silindi",
-      "needsInput": "GİRİŞ TƏLƏB OLUNUR",
+      "needsInput": "giriş tələb olunur",
       "fromPlatform": "{{platform}} platformasından",
       "cent_one": "sent",
       "cent": "sent",
@@ -2270,7 +2270,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[seriyalaşdırıla bilməyən giriş]",
-      "errorPrefix": "xəta: {{error}}"
+      "errorPrefix": "Xəta: {{error}}"
     },
     "instancePicker": {
       "runOn": "İşə salın",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Digər",
-      "project": "Layihə",
-      "removeProjectFilter": "{{label}} layihə filtrini sil",
-      "removePlatformFilter": "{{label}} platforma filtrini sil"
+      "project": "Layihə"
     },
     "suggestion": {
       "title": "Təklif",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Yeni kodlaşdırma tapşırığı",
     "explore": "Kəşf et",
     "seeAll": "Hamısına bax",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Hazırda heç nə işləmir"
   },
   "imageViewer": {
     "close": "{{filename}} bağla",

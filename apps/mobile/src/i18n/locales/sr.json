@@ -156,7 +156,7 @@
     "returnSendsMessage": "Taster za novi red šalje poruku",
     "returnSendsMessageSubtitle": "Kada je isključeno, taster za novi red unosi novi red u kompozitore agenata.",
     "biometricUnlock": "Otključavanje biometrijom",
-    "biometricUnlockSubtitle": "Otključavanje je obavezno pri pokretanju aplikacije i nakon pet minuta u pozadini. Podesite biometriju ili šifru uređaja u podešavanjima uređaja. Šifra uređaja ostaje dostupna kao rezervna opcija."
+    "biometricUnlockSubtitle": "Otključavanje je obavezno pri pokretanju aplikacije i nakon pet minuta u pozadini."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nije dostupan",
@@ -847,7 +847,7 @@
       "managedByAdmin": "Naplatom upravlja administrator tvoje organizacije.",
       "couldNotLoad": "Nije moguće učitati informacije o naplati",
       "manageOnWeb": "Upravljaj naplatom na webu",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Rana ptica",
       "finalCommitTermEndsOn": "Tvoj konačni rok obaveze završava se {{date}}. Nastavi kao Standard po ceni {{price}}, ili se hosting završava.",
       "freeTrial": "Besplatno probno razdoblje",
@@ -864,7 +864,7 @@
       "trialDaysRemaining": "Probno razdoblje: preostalo {{remaining}} dana",
       "trialEndingSoon": "Probno razdoblje se uskoro završava: {{remaining}}",
       "planName": {
-        "commit": "commit",
+        "commit": "Commit",
         "standard": "Standard"
       }
     },
@@ -1143,9 +1143,9 @@
       "destroying": "UNIŠTAVANJE",
       "provisioned": "DODEĐENO",
       "restarting": "PONOVNO POKRETANJE",
-      "running": "U toku",
+      "running": "U TOKU",
       "shuttingDown": "GAŠENJE",
-      "starting": "Započinje",
+      "starting": "ZAPOČINJE",
       "stopped": "ZAUSTAVLJENO",
       "stopping": "ZAUSTAVLJANJE",
       "unknown": "NEPOZNATO",
@@ -1318,7 +1318,7 @@
       "transcriptWaiting": "Čekanje na transkript pregleda.",
       "transcriptEmpty": "Nema transkripta za ovaj pregled.",
       "transcriptRetry": "Učitavanje transkripta pregleda nije uspelo.",
-      "transcriptLive": "UŽIVO",
+      "transcriptLive": "Uživo",
       "agentIdle": "Agent je neaktivan",
       "agentWorking": "Agent radi...",
       "anErrorOccurred": "Došlo je do greške",
@@ -1715,7 +1715,7 @@
       "reasonNoBandwidth": "nema dostupnog kapaciteta",
       "reasonTolerableRisk": "rizik je prihvatljiv",
       "reasonInaccurate": "nalaz nije tačan",
-      "reasonNotUsed": "Ranljivi kod se ne koristi",
+      "reasonNotUsed": "ranljivi kod se ne koristi",
       "reasonAfterReview": "nakon pregleda"
     },
     "settingsOverview": {
@@ -2536,9 +2536,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Ostalo",
-      "project": "Projekat",
-      "removeProjectFilter": "Ukloni {{label}} filter projekta",
-      "removePlatformFilter": "Ukloni {{label}} filter platforme"
+      "project": "Projekat"
     },
     "suggestion": {
       "title": "Predlog",
@@ -2773,7 +2771,7 @@
     "newCodingTask": "Novi zadatak kodiranja",
     "explore": "Istraži",
     "seeAll": "Vidi sve",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Trenutno ništa nije pokrenuto"
   },
   "imageViewer": {
     "close": "Zatvori {{filename}}",
@@ -2818,7 +2816,7 @@
     "optionsExpiredDescription": "Vratite se i ponovo otvorite ovaj birač sa prethodnog ekrana."
   },
   "sessionRow": {
-    "needsInput": "zahteva unos"
+    "needsInput": "ZAHTEVA UNOS"
   },
   "voiceInput": {
     "listening": "Slušanje...",

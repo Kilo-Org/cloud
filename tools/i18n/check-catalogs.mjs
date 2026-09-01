@@ -70,7 +70,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'agentChat.repoPicker.platformGithub',
   'agentChat.repoPicker.platformGitlab',
   'agentChat.prBadge.label',
-  'home.noLiveSessions',
   'share.reviewPrSubtitle',
   // Format-only strings with no translatable words: a placeholder-only screen
   // title and a placeholder-plus-UTC time-range label.
@@ -319,10 +318,11 @@ function scriptCounts(values) {
 }
 
 /** Fold a value for wording comparison: case, edge space and end punctuation. */
-function wording(value) {
+function wording(value, language = 'en') {
   return value
     .trim()
-    .toLowerCase()
+    .toLocaleUpperCase(language)
+    .toLocaleLowerCase(language)
     .replace(/[.!:。！：]+$/u, '');
 }
 
@@ -460,6 +460,9 @@ for (const catalog of CATALOGS) {
         fail(`${label}: "${key}" is empty`);
       }
       const englishValue = english.get(key);
+      if (catalog.name === 'mobile' && key === 'home.noLiveSessions' && value === englishValue) {
+        fail(`${label}: "${key}" must be translated`);
+      }
       const expected = placeholders(englishValue);
       if (placeholders(value) !== expected) {
         fail(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
@@ -526,7 +529,7 @@ for (const catalog of CATALOGS) {
         if (value === undefined) {
           continue;
         }
-        const folded = wording(value);
+        const folded = wording(value, tag);
         if (!variants.has(folded)) {
           variants.set(folded, key);
         }

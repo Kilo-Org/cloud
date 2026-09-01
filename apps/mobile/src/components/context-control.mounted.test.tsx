@@ -136,6 +136,7 @@ describe('ContextControl', () => {
     await waitFor(() => !picker(ui).props.disabled);
     expect(texts(ui)).toContain(label);
     expect(picker(ui).props.accessibilityLabel).toBe(label);
+    expect(picker(ui).findByType(Text).props.numberOfLines).toBe(1);
     expect(picker(ui).props.accessibilityRole).toBe('button');
     expect(picker(ui).props.accessibilityState).toEqual({ busy: false, disabled: false });
     expect(picker(ui).findAllByType('ActivityIndicator' as ElementType)).toHaveLength(0);

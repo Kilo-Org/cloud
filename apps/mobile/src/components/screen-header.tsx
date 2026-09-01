@@ -13,8 +13,12 @@ import { cn } from '@/lib/utils';
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
+  titleContent?: React.ReactNode;
+  titleNumberOfLines?: number;
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
+  reserveEyebrow?: boolean;
+  centerTitle?: boolean;
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
   size?: 'default' | 'large';
   headerRight?: React.ReactNode;
@@ -41,11 +45,15 @@ type ScreenHeaderProps = {
 
 export function ScreenHeader({
   title,
+  titleContent,
+  titleNumberOfLines = 2,
   eyebrow,
+  reserveEyebrow = false,
   size = 'default',
   headerRight,
   context,
   modal,
+  centerTitle = modal ?? false,
   showBackButton,
   onBack,
   backFallback,
@@ -74,8 +82,22 @@ export function ScreenHeader({
 
   let titleNode: React.ReactNode = null;
   if (title != null) {
-    const titleText = (
-      <Text className={titleClass} numberOfLines={2} accessibilityRole="header">
+    const titleText = titleContent ? (
+      <View
+        accessible
+        accessibilityRole="header"
+        accessibilityLabel={title}
+        className={cn('shrink-0', centerTitle && 'items-center')}
+      >
+        {titleContent}
+      </View>
+    ) : (
+      <Text
+        className={cn(titleClass, centerTitle && 'text-center')}
+        numberOfLines={titleNumberOfLines}
+        ellipsizeMode="tail"
+        accessibilityRole="header"
+      >
         {title}
       </Text>
     );
@@ -100,10 +122,29 @@ export function ScreenHeader({
     );
   }
 
+  const heading = (
+    <View className="min-w-0 flex-1">
+      {eyebrow || reserveEyebrow ? (
+        <Eyebrow
+          className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
+          accessible={Boolean(eyebrow)}
+          accessibilityElementsHidden={!eyebrow}
+          importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}
+        >
+          {eyebrow ?? '\u00A0'}
+        </Eyebrow>
+      ) : null}
+      {titleNode}
+      {context}
+    </View>
+  );
+  const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
+
   return (
     <View className={cn('bg-background px-4 pb-3', className)} style={{ paddingTop }}>
+      {separateHeading && <View className="min-h-11 flex-row items-center">{heading}</View>}
       <View className="flex-row items-center">
-        <View className="flex-1 flex-row items-center gap-1">
+        <View className="min-w-0 flex-1 flex-row items-center gap-1">
           {canGoBack && (
             <Pressable
               onPress={() => {
@@ -128,14 +169,12 @@ export function ScreenHeader({
               )}
             </Pressable>
           )}
-          <View className="min-w-0 flex-1">
-            {eyebrow ? <Eyebrow className="mb-0.5">{eyebrow}</Eyebrow> : null}
-            {titleNode}
-            {context}
-          </View>
+          {!separateHeading && heading}
         </View>
         {headerRight ? (
-          <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} shrink-0`}>{headerRight}</View>
+          <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>
+            {headerRight}
+          </View>
         ) : null}
       </View>
     </View>

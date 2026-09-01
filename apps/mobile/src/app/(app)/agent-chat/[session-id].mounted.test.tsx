@@ -504,7 +504,7 @@ describe('SessionDetailScreen display scope', () => {
   });
 
   it.each(['pending', 'INTERNAL_SERVER_ERROR', 'NOT_FOUND', 'UNAUTHORIZED'])(
-    'keeps the %s header unresolved and read-only',
+    'omits context labels from the %s header and preserves recovery actions',
     async state => {
       useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
       queryState.data = null;
@@ -512,10 +512,8 @@ describe('SessionDetailScreen display scope', () => {
       queryState.isError = state !== 'pending';
       queryState.error = { data: { code: state } };
       const renderer = await mountRoute();
-      const label = renderer.root.find(
-        node => (node.type as string) === 'View' && propOf(node, 'accessibilityRole') === 'text'
-      );
-      expect(propOf(label, 'accessibilityState')).toEqual({ busy: true });
+      const header = renderer.root.findByType(ScreenHeader);
+      expect(propOf(header, 'context')).toBeUndefined();
       expect(findByType(renderer.root, 'Text').flatMap(node => node.children)).not.toContain(
         'Personal'
       );
@@ -991,7 +989,11 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     expect(findByType(renderer.root, code ? 'QueryError' : 'SessionSkeletonMessages')).toHaveLength(
       1
     );
-    const back = findByType(renderer.root.findByType(ScreenHeader), 'Pressable').find(
+    const header = renderer.root.findByType(ScreenHeader);
+    const title = header.findByProps({ accessibilityRole: 'header' });
+    expect(propOf(title, 'numberOfLines')).toBe(1);
+    expect(propOf(title, 'ellipsizeMode')).toBe('tail');
+    const back = findByType(header, 'Pressable').find(
       node => propOf(node, 'accessibilityLabel') === 'Go back'
     );
     act(() => {

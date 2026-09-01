@@ -156,7 +156,7 @@
     "returnSendsMessage": "ປຸ່ມຂຶ້ນແຖວໃໝ່ສົ່ງຂໍ້ຄວາມ",
     "returnSendsMessageSubtitle": "ເມື່ອປິດ, ປຸ່ມຂຶ້ນແຖວໃໝ່ຈະແຊກແຖວໃໝ່ໃນຊ່ອງປ້ອນຂໍ້ຄວາມຂອງຕົວແທນ.",
     "biometricUnlock": "ປົດລັອກດ້ວຍຂໍ້ມູນຊີວະມິຕິ",
-    "biometricUnlockSubtitle": "ຕ້ອງປົດລັອກເມື່ອເປີດແອັບ ແລະ ຫຼັງຈາກແອັບຢູ່ໃນພື້ນຫຼັງເປັນເວລາຫ້ານາທີ. ກະລຸນາຕັ້ງຄ່າຂໍ້ມູນຊີວະມິຕິ ຫຼື ລະຫັດຜ່ານຂອງອຸປະກອນໃນການຕັ້ງຄ່າອຸປະກອນ. ທ່ານຍັງສາມາດໃຊ້ລະຫັດຜ່ານຂອງອຸປະກອນເປັນວິທີສຳຮອງໄດ້."
+    "biometricUnlockSubtitle": "ຕ້ອງປົດລັອກເມື່ອເປີດແອັບ ແລະ ຫຼັງຈາກແອັບຢູ່ໃນພື້ນຫຼັງເປັນເວລາຫ້ານາທີ."
   },
   "prReview": {
     "pullRequestUnavailable": "pull request ບໍ່ພ້ອມໃຊ້",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "ກຳລັງລໍຖ້າການຖອດຄວາມຂອງການທົບທວນ.",
       "transcriptEmpty": "ບໍ່ມີການຖອດຄວາມຂອງການທົບທວນນີ້.",
       "transcriptRetry": "ບໍ່ສາມາດໂຫຼດການຖອດຄວາມຂອງການທົບທວນ.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "ເອເຈນວ່າງ",
       "agentWorking": "ເອເຈນກຳລັງເຮັດວຽກ...",
       "anErrorOccurred": "ເກີດຂໍ້ຜິດພາດ",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ອື່ນໆ",
-      "project": "ໂຄງການ",
-      "removeProjectFilter": "ລຶບຕົວກັ່ນຕອງໂຄງການ {{label}}",
-      "removePlatformFilter": "ລຶບຕົວກັ່ນຕອງເວທີ {{label}}"
+      "project": "ໂຄງການ"
     },
     "suggestion": {
       "title": "ຄຳແນະນຳ",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "ວຽກການຂຽນໂຄ້ດໃໝ່",
     "explore": "ສຳຫຼວດ",
     "seeAll": "ເບິ່ງທັງໝົດ",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ຕອນນີ້ບໍ່ມີຫຍັງກຳລັງເຮັດວຽກ"
   },
   "imageViewer": {
     "close": "ປິດ {{filename}}",

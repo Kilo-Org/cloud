@@ -16,7 +16,10 @@ import { NewSessionStartButton } from '@/components/agents/new-session-start-but
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { type ModeOption } from '@/components/agents/mode-normalize';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { Text } from '@/components/ui/text';
 import {
   type AgentAttachment,
@@ -63,6 +66,8 @@ type NewSessionConfigureFormProps = {
   runOnInstance: InstancePickerInstance | null;
   instanceList: InstancePickerInstance[];
   isLoadingInstances: boolean;
+  isFetchingInstances: boolean;
+  onRefreshInstances: () => void;
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   showInstanceDisconnectedNote: boolean;
   // Launch folder (remote CLI only). `""` means the launch directory.
@@ -132,6 +137,8 @@ export function NewSessionConfigureForm({
   runOnInstance,
   instanceList,
   isLoadingInstances,
+  isFetchingInstances,
+  onRefreshInstances,
   onChangeRunOnInstance,
   showInstanceDisconnectedNote,
   folderPath,
@@ -157,6 +164,7 @@ export function NewSessionConfigureForm({
   onStartSession,
 }: Readonly<NewSessionConfigureFormProps>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const runOnNote =
@@ -170,13 +178,27 @@ export function NewSessionConfigureForm({
         <Text className="mb-2 text-sm font-medium text-muted-foreground">
           {t('agentChat.instancePicker.runOn')}
         </Text>
-        <InstanceSelector
-          value={runOnInstance}
-          instances={instanceList}
-          isLoading={isLoadingInstances}
-          onChange={onChangeRunOnInstance}
-          disabled={isStarting}
-        />
+        <View className="flex-row items-center gap-2">
+          <View className="flex-1">
+            <InstanceSelector
+              value={runOnInstance}
+              instances={instanceList}
+              isLoading={isLoadingInstances}
+              onChange={onChangeRunOnInstance}
+              disabled={isStarting}
+            />
+          </View>
+          <Button
+            variant="outline"
+            size="icon"
+            onPress={onRefreshInstances}
+            disabled={isStarting || isFetchingInstances}
+            loading={isFetchingInstances}
+            accessibilityLabel={t('common.refresh')}
+          >
+            {!isFetchingInstances ? <RefreshCw size={18} color={colors.foreground} /> : null}
+          </Button>
+        </View>
       </View>
     );
   } else if (targetLabel) {

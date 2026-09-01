@@ -109,7 +109,7 @@ import {
 import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
-import { ContextControl, type ContextDisplayScope } from '@/components/context-control';
+import { type ContextDisplayScope } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
@@ -121,7 +121,7 @@ import {
   MESSAGE_SENT_EVENT,
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
@@ -173,7 +173,6 @@ const EMPTY_IDS: ReadonlySet<string> = new Set();
 
 export function SessionDetailContent({
   sessionId,
-  displayScope,
   openedVia = 'app',
   shareId,
   autoSend,
@@ -993,14 +992,12 @@ export function SessionDetailContent({
         if (detailsMessageIdRef.current === messageId) {
           handleCloseDetails();
         }
-        setCancelQueuedStatus({
-          messageId,
-          tone: 'status',
-          message: composerHasContent
+        setCancelQueuedStatus(null);
+        announceForA11y(
+          composerHasContent
             ? t('agentChat.session.cancelQueuedRestoreAvailable')
-            : t('agentChat.session.cancelQueuedRestored'),
-          attempt,
-        });
+            : t('agentChat.session.cancelQueuedRestored')
+        );
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } finally {
         inFlight.delete(messageId);
@@ -1026,13 +1023,8 @@ export function SessionDetailContent({
         next.delete(message.info.id);
         return next;
       });
-      cancelQueuedAttemptRef.current += 1;
-      setCancelQueuedStatus({
-        messageId: message.info.id,
-        tone: 'status',
-        message: t('agentChat.session.cancelQueuedRestored'),
-        attempt: cancelQueuedAttemptRef.current,
-      });
+      setCancelQueuedStatus(null);
+      announceForA11y(t('agentChat.session.cancelQueuedRestored'));
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
     [canceledQueuedMessages, t]
@@ -1396,7 +1388,7 @@ export function SessionDetailContent({
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={rename.title}
-          context={<ContextControl scope={displayScope} />}
+          titleNumberOfLines={1}
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={headerRight}
           {...(rename.isTitleInteractive

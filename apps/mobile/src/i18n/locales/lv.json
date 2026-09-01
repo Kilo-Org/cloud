@@ -156,7 +156,7 @@
     "returnSendsMessage": "Ievades taustiņš nosūta ziņojumu",
     "returnSendsMessageSubtitle": "Ja izslēgts, ievades taustiņš ievieto jaunu rindu aģenta ziņojuma ievades laukā.",
     "biometricUnlock": "Atbloķēt ar biometriju",
-    "biometricUnlockSubtitle": "Atbloķēšana ir nepieciešama, palaižot lietotni un pēc piecām fonā pavadītām minūtēm. Ierīces iestatījumos iestatiet biometriju vai ierīces piekļuves kodu. Jūsu ierīces piekļuves kods ir pieejams kā rezerves iespēja."
+    "biometricUnlockSubtitle": "Atbloķēšana ir nepieciešama, palaižot lietotni un pēc piecām fonā pavadītām minūtēm."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nav pieejams",
@@ -1145,7 +1145,7 @@
       "restarting": "RESTARTĒ",
       "running": "DARBOJAS",
       "shuttingDown": "IZSLĒDZAS",
-      "starting": "Sākas",
+      "starting": "SĀKAS",
       "stopped": "APTURĒTS",
       "stopping": "APTUR",
       "unknown": "NEZINĀMS",
@@ -1303,7 +1303,7 @@
       "started": "Sākts",
       "completed": "Pabeigts",
       "cost": "Izmaksas",
-      "tokens": "tokeni",
+      "tokens": "Tokeni",
       "tokensInOut": "{{input}} iekšā / {{output}} ārā",
       "openPullRequest": "Atvērt pull request",
       "council": "Padome",
@@ -1318,7 +1318,7 @@
       "transcriptWaiting": "Gaida pārskata stenogrammu.",
       "transcriptEmpty": "Šim pārskatam nav stenogrammas.",
       "transcriptRetry": "Neizdevās ielādēt pārskata stenogrammu.",
-      "transcriptLive": "TIŠRAIDĒ",
+      "transcriptLive": "Tišraidē",
       "agentIdle": "Aģents dīkstāvē",
       "agentWorking": "Aģents strādā...",
       "anErrorOccurred": "Radās kļūda",
@@ -2536,9 +2536,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Cits",
-      "project": "Projekts",
-      "removeProjectFilter": "Noņemt {{label}} projekta filtru",
-      "removePlatformFilter": "Noņemt {{label}} platformas filtru"
+      "project": "Projekts"
     },
     "suggestion": {
       "title": "Ieteikums",
@@ -2694,7 +2692,7 @@
       "open": "atvērts pull request",
       "closed": "aizvērts pull request",
       "merged": "apvienots pull request",
-      "draft": "Melnraksta pull request",
+      "draft": "melnraksta pull request",
       "updating": "Atjaunina, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2773,7 +2771,7 @@
     "newCodingTask": "Jauns kodēšanas uzdevums",
     "explore": "Izpētīt",
     "seeAll": "Skatīt visus",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Pašlaik nekas nedarbojas"
   },
   "imageViewer": {
     "close": "Aizvērt {{filename}}",

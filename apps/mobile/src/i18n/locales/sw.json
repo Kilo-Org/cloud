@@ -156,7 +156,7 @@
     "returnSendsMessage": "Kitufe cha kurudi hutuma ujumbe",
     "returnSendsMessageSubtitle": "Kikiwa kimezimwa, kitufe cha kurudi huingiza mstari mpya kwenye sehemu za kuandika ujumbe kwa mawakala.",
     "biometricUnlock": "Fungua kwa bayometriki",
-    "biometricUnlockSubtitle": "Kufungua kunahitajika unapoanzisha programu na baada ya programu kukaa chinichini kwa dakika tano. Sanidi bayometriki au nambari ya siri ya kifaa katika mipangilio ya kifaa. Nambari ya siri ya kifaa chako inapatikana kama njia mbadala."
+    "biometricUnlockSubtitle": "Kufungua kunahitajika unapoanzisha programu na baada ya programu kukaa chinichini kwa dakika tano."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request haipatikani",
@@ -465,7 +465,7 @@
     },
     "inbox": {
       "title": "Kikasha",
-      "recent": "za karibu",
+      "recent": "Za karibu",
       "draft": "Rasimu",
       "loading": "Inapakia kikasha",
       "noReviewRequests": "Hakuna maombi ya ukaguzi",
@@ -708,7 +708,7 @@
     "reactions": {
       "title": "Miitikio",
       "close": "Funga miitikio",
-      "recent": "za karibu",
+      "recent": "Za karibu",
       "common": "Kawaida",
       "reactWith": "Itikia na {{reaction}}",
       "accessibility": "{{emoji}} mwitikio, {{displayCount}}"
@@ -839,7 +839,7 @@
       "managedByAdmin": "Malipo yanasimamiwa na msimamizi wa shirika lako.",
       "couldNotLoad": "Imeshindwa kupakia taarifa za malipo",
       "manageOnWeb": "Simamia Malipo kwenye Wavuti",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Muda wako wa mwisho wa Commit unaisha {{date}}. Endelea kama Standard kwa {{price}}, au upangaji unaisha.",
       "freeTrial": "Jaribio Bure",
@@ -1135,9 +1135,9 @@
       "destroying": "INAHARIBU",
       "provisioned": "IMETAYARISHWA",
       "restarting": "INANZISHA UPYA",
-      "running": "Inaendelea",
+      "running": "INAENDELEA",
       "shuttingDown": "INAZIMA",
-      "starting": "Inaanza",
+      "starting": "INAANZA",
       "stopped": "IMESIMAMA",
       "stopping": "INASIMAMISHA",
       "unknown": "ISIYOJULIKANA",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Inasubiri nakala ya ukaguzi.",
       "transcriptEmpty": "Hakuna nakala ya ukaguzi huu.",
       "transcriptRetry": "Haikuweza kupakia nakala ya ukaguzi.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Wakala hakikazi",
       "agentWorking": "Wakala anafanya kazi...",
       "anErrorOccurred": "Hitilafu imetokea",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Nyingine",
-      "project": "Mradi",
-      "removeProjectFilter": "Ondoa kichujio cha mradi {{label}}",
-      "removePlatformFilter": "Ondoa kichujio cha jukwaa {{label}}"
+      "project": "Mradi"
     },
     "suggestion": {
       "title": "Pendekezo",
@@ -2670,10 +2668,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Fungua pull request",
+      "open": "fungua pull request",
       "closed": "funga ombi la kubadilisha msimbo",
       "merged": "unganisha ombi la kubadilisha msimbo",
-      "draft": "Pull request ya rasimu",
+      "draft": "pull request ya rasimu",
       "updating": "Inasasisha, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Kazi mpya ya kuandika msimbo",
     "explore": "Chunguza",
     "seeAll": "Ona zote",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Hakuna kinachoendelea kwa sasa"
   },
   "imageViewer": {
     "close": "Funga {{filename}}",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Rudi nyuma na ufungue kichagua hiki tena kutoka kwenye skrini iliyopita."
   },
   "sessionRow": {
-    "needsInput": "inahitaji mchango"
+    "needsInput": "INAHITAJI MCHANGO"
   },
   "voiceInput": {
     "listening": "Inasikiliza...",

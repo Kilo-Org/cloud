@@ -156,7 +156,7 @@
     "returnSendsMessage": "Мөр шилжүүлэх товч мессеж илгээнэ",
     "returnSendsMessageSubtitle": "Унтраалттай үед мөр шилжүүлэх товч агентын мессеж оруулах талбарт шинэ мөр оруулна.",
     "biometricUnlock": "Биометрээр түгжээ тайлах",
-    "biometricUnlockSubtitle": "Аппыг эхлүүлэхэд болон арын горимд таван минут байсны дараа түгжээг тайлах шаардлагатай. Төхөөрөмжийн тохиргоонд биометр эсвэл төхөөрөмжийн нууц кодыг тохируулна уу. Та төхөөрөмжийн нууц кодоо нөөц арга болгон ашиглах боломжтой."
+    "biometricUnlockSubtitle": "Аппыг эхлүүлэхэд болон арын горимд таван минут байсны дараа түгжээг тайлах шаардлагатай."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request боломжгүй",
@@ -416,7 +416,7 @@
         "outdatedOnLines": "{{lines}} дээрх хуучирсан",
         "outdatedOnPath": "{{path}} дээрх хуучирсан"
       },
-      "deletedUser": "Устгагдсан хэрэглэгч"
+      "deletedUser": "устгагдсан хэрэглэгч"
     },
     "couldNotOpenGitHubAppSettings": "GitHub App тохиргоог нээх боломжгүй",
     "installKiloGitHubApp": "Kilo GitHub App суулгах",
@@ -1137,7 +1137,7 @@
       "restarting": "ДАХИН ЭХЛҮҮЛЖ БАЙНА",
       "running": "АЖИЛЛАЖ БАЙНА",
       "shuttingDown": "УНТРААЖ БАЙНА",
-      "starting": "Эхэлж байна",
+      "starting": "ЭХЭЛЖ БАЙНА",
       "stopped": "ЗОГССОН",
       "stopping": "ЗОГСООЖ БАЙНА",
       "unknown": "ТОДОРХОЙГҮЙ",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Шалгалтын бичлэгийг хүлээж байна.",
       "transcriptEmpty": "Энэ шалгалтын бичлэг байхгүй.",
       "transcriptRetry": "Шалгалтын бичлэгийг ачаалж чадсангүй.",
-      "transcriptLive": "ШУУД",
+      "transcriptLive": "Шууд",
       "agentIdle": "Агент идэвхгүй",
       "agentWorking": "Агент ажиллаж байна...",
       "anErrorOccurred": "Алдаа гарлаа",
@@ -1513,7 +1513,7 @@
       "all": "Бүгд",
       "statusOpen": "Нээлттэй",
       "fixed": "Засагдсан",
-      "statusIgnored": "үл тоомсорлосон",
+      "statusIgnored": "Үл тоомсорлосон",
       "statusClosed": "Хаалттай",
       "severityCritical": "Чухал",
       "severityHigh": "Өндөр",
@@ -1701,11 +1701,11 @@
       "statusFixed": "Засагдсан",
       "statusOpen": "Нээлттэй",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Засвар аль хэдийн эхэлсэн",
-      "reasonNoBandwidth": "Хүчин чадал боломжгүй",
-      "reasonTolerableRisk": "Эрсдэл хүлээх боломжтой",
-      "reasonInaccurate": "Олдвор буруу байна",
-      "reasonNotUsed": "Эмзэг код ашиглагдахгүй",
+      "reasonFixStarted": "засвар аль хэдийн эхэлсэн",
+      "reasonNoBandwidth": "хүчин чадал боломжгүй",
+      "reasonTolerableRisk": "эрсдэл хүлээх боломжтой",
+      "reasonInaccurate": "олдвор буруу байна",
+      "reasonNotUsed": "эмзэг код ашиглагдахгүй",
       "reasonAfterReview": "шалгалтын дараа"
     },
     "settingsOverview": {
@@ -1750,8 +1750,8 @@
       "cancelMessage": "Security Agent нь явагдаж буй засварын оролдлогыг зогсооно.",
       "keepRunning": "Үргэлжлүүлэн ажиллуулах",
       "cancelRemediation": "Засварыг цуцлах",
-      "openPullRequest": "pull request нээх{{number}}",
-      "openDraftPullRequest": "draft pull request нээх{{number}}",
+      "openPullRequest": "Pull request нээх{{number}}",
+      "openDraftPullRequest": "Draft pull request нээх{{number}}",
       "progress": "Явц",
       "attemptHistory": "Оролдлогын түүх ({{displayCount}})",
       "attemptNumber": "Оролдлого #{{number}}",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Бусад",
-      "project": "Төсөл",
-      "removeProjectFilter": "{{label}} төслийн шүүлтийг арилгах",
-      "removePlatformFilter": "{{label}} платформын шүүлтийг арилгах"
+      "project": "Төсөл"
     },
     "suggestion": {
       "title": "Санал",
@@ -2743,7 +2741,7 @@
     "description": "Kilo-ийн шинэ хувилбар гарлаа. Үргэлжлүүлэхийн тулд шинэчлэнэ үү.",
     "title": "Шинэчлэлт шаардлагатай",
     "updateNow": "Одоо шинэчлэх",
-    "appStorePage": "Апп дэлгүүрийн хуудас"
+    "appStorePage": "апп дэлгүүрийн хуудас"
   },
   "home": {
     "couldNotLoadSessions": "Сессийг ачаалж чадсангүй",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Шинэ кодчилолын даалгавар",
     "explore": "Судлах",
     "seeAll": "Бүгдийг үзэх",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Одоогоор юу ч ажиллаагүй байна"
   },
   "imageViewer": {
     "close": "{{filename}} хаах",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Буцаж, өмнөх дэлгэцээс энэ сонгогчийг дахин нээнэ үү."
   },
   "sessionRow": {
-    "needsInput": "оролт шаардлагатай"
+    "needsInput": "ОРОЛТ ШААРДЛАГАТАЙ"
   },
   "voiceInput": {
     "listening": "Сонсож байна...",

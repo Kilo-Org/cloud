@@ -156,7 +156,7 @@
     "returnSendsMessage": "It-tast tar-ritorn jibgħat il-messaġġ",
     "returnSendsMessageSubtitle": "Meta jkun mitfi, it-tast tar-ritorn idaħħal linja ġdida fl-oqsma tad-dħul tal-messaġġi tal-aġenti.",
     "biometricUnlock": "Żblokka bil-bijometrija",
-    "biometricUnlockSubtitle": "L-app teħtieġ li tiżblokkaha meta titnieda u wara ħames minuti fl-isfond. Ikkonfigura l-bijometrija jew kodiċi tal-aċċess tal-apparat fis-Settings tal-apparat. Il-kodiċi tal-aċċess tal-apparat tiegħek jibqa' disponibbli bħala alternattiva."
+    "biometricUnlockSubtitle": "L-app teħtieġ li tiżblokkaha meta titnieda u wara ħames minuti fl-isfond."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mhux disponibbli",
@@ -1159,7 +1159,7 @@
       "destroying": "QED TINQERED",
       "provisioned": "PROVVISTA",
       "restarting": "QED JIBDA MILL-ĠDID",
-      "running": "Għaddej",
+      "running": "GĦADDEJ",
       "shuttingDown": "QED JINGĦALAQ",
       "starting": "QED JIBDA",
       "stopped": "MISTOQQA",
@@ -1336,7 +1336,7 @@
       "transcriptWaiting": "Qed nistenna t-traskrizzjoni tar-reviżjoni.",
       "transcriptEmpty": "L-ebda traskrizzjoni għal din ir-reviżjoni.",
       "transcriptRetry": "Ma setgħetx titgħabba t-traskrizzjoni tar-reviżjoni.",
-      "transcriptLive": "DIRETT",
+      "transcriptLive": "Dirett",
       "agentIdle": "Aġent idle",
       "agentWorking": "Aġent qed jaħdem...",
       "anErrorOccurred": "Ġara żball",
@@ -2304,7 +2304,7 @@
       "toolGrep": "grep",
       "toolList": "elenka",
       "toolPatch": "patch",
-      "toolTask": "Kompitu",
+      "toolTask": "kompitu",
       "readTodos": "Aqra t-todos",
       "updateTodos": "Aġġorna t-todos",
       "linesBadge": "{{displayCount}} linji",
@@ -2576,9 +2576,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Oħra",
-      "project": "Proġett",
-      "removeProjectFilter": "Neħħi l-filtru tal-proġett {{label}}",
-      "removePlatformFilter": "Neħħi l-filtru tal-pjattaforma {{label}}"
+      "project": "Proġett"
     },
     "suggestion": {
       "title": "Suġġeriment",
@@ -2815,7 +2813,7 @@
     "newCodingTask": "Kompitu ġdid ta' kodifikazzjoni",
     "explore": "Esplora",
     "seeAll": "Ara kollha",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "M'hemm xejn għaddej bħalissa"
   },
   "imageViewer": {
     "close": "Agħlaq {{filename}}",
@@ -2860,7 +2858,7 @@
     "optionsExpiredDescription": "Mur lura u erġa' iftaħ dan il-picker mill-iskrin ta' qabel."
   },
   "sessionRow": {
-    "needsInput": "jeħtieġ input"
+    "needsInput": "JEĦTIEĠ INPUT"
   },
   "voiceInput": {
     "listening": "Qed jisma'...",

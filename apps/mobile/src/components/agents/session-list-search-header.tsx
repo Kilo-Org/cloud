@@ -35,7 +35,7 @@ export function SessionListSearchHeader({
   const { t } = useTranslation();
   return (
     <View>
-      <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
+      <View className="mx-[22px] my-2 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
           {showSearchBusy ? (

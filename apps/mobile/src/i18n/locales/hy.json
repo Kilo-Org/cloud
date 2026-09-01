@@ -156,7 +156,7 @@
     "returnSendsMessage": "Վերադարձի ստեղնն ուղարկում է հաղորդագրությունը",
     "returnSendsMessageSubtitle": "Երբ անջատված է, վերադարձի ստեղնը նոր տող է տեղադրում գործակալների հաղորդագրության մուտքագրման դաշտերում։",
     "biometricUnlock": "Ապակողպել կենսաչափական տվյալներով",
-    "biometricUnlockSubtitle": "Հավելվածը գործարկելիս և ֆոնային ռեժիմում հինգ րոպե մնալուց հետո պահանջվում է ապակողպել այն։ Սարքի կարգավորումներում կարգավորեք կենսաչափական տվյալները կամ սարքի անցակոդը։ Ձեր սարքի անցակոդը հասանելի է որպես պահուստային տարբերակ։"
+    "biometricUnlockSubtitle": "Հավելվածը գործարկելիս և ֆոնային ռեժիմում հինգ րոպե մնալուց հետո պահանջվում է ապակողպել այն։"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-ը հասանելի չէ",
@@ -1135,7 +1135,7 @@
       "destroying": "ՈՉՆՉԱՑՎՈՒՄ Է",
       "provisioned": "ՏՐԱՄԱԴՐՎԱԾ Է",
       "restarting": "ՎԵՐԱԳՈՐԾԱՌԿՎՈՒՄ Է",
-      "running": "Ընթացքի մեջ է",
+      "running": "ԸՆԹԱՑՔԻ ՄԵՋ Է",
       "shuttingDown": "ԱՆՋԱՏՎՈՒՄ Է",
       "starting": "ՍԿՍՎՈՒՄ Է",
       "stopped": "ԿԱՆԳՆԵՑՎԱԾ Է",
@@ -1703,7 +1703,7 @@
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "ուղղումն արդեն սկսվել է",
       "reasonNoBandwidth": "հասանելի հզորություն չկա",
-      "reasonTolerableRisk": "Ռիսկը ընդունելի է",
+      "reasonTolerableRisk": "ռիսկը ընդունելի է",
       "reasonInaccurate": "գտածոն անճշտ է",
       "reasonNotUsed": "խոցելի կոդը չի օգտագործվում",
       "reasonAfterReview": "ստուգումից հետո"
@@ -2095,8 +2095,8 @@
       "dollar_one": "դոլար",
       "dollar": "դոլար",
       "dollar_other": "դոլար",
-      "costSpoken": "Արժեք {{cost}}",
-      "costSpokenWithTime": "Արժեք {{cost}}, {{time}}",
+      "costSpoken": "արժեք {{cost}}",
+      "costSpokenWithTime": "արժեք {{cost}}, {{time}}",
       "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
@@ -2270,7 +2270,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[չսերիականացվող մուտք]",
-      "errorPrefix": "սխալ: {{error}}"
+      "errorPrefix": "Սխալ: {{error}}"
     },
     "instancePicker": {
       "runOn": "Գործարկել՝",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Այլ",
-      "project": "Նախագիծ",
-      "removeProjectFilter": "Հեռացնել {{label}} նախագծի զտիչը",
-      "removePlatformFilter": "Հեռացնել {{label}} հարթակի զտիչը"
+      "project": "Նախագիծ"
     },
     "suggestion": {
       "title": "Առաջարկ",
@@ -2643,7 +2641,7 @@
     "contextUsage": {
       "windowUnavailable": "Կոնտեքստի պատուհանի չափը հասանելի չէ",
       "tapToViewDetails": "Հպեք՝ կոնտեքստի մանրամասները տեսնելու համար:",
-      "costPrefix": "Արժեք {{cost}}",
+      "costPrefix": "արժեք {{cost}}",
       "costSuffix": ", արժեքը {{cost}}",
       "tokensWindowUnavailable": "Կոնտեքստ {{used}} նշան, պատուհանը հասանելի չէ",
       "tokensUsage": "Կոնտեքստ {{used}}-ը {{window}} նշաններից, {{percentage}}-ն օգտագործված",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Նոր ծրագրավորման առաջադրանք",
     "explore": "Ուսումնասիրել",
     "seeAll": "Տեսնել բոլորը",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Այս պահին ոչինչ չի աշխատում"
   },
   "imageViewer": {
     "close": "Փակել {{filename}}-ը",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Գնացեք հետ և վերաբացեք այս ընտրիչը նախորդ էկրանից:"
   },
   "sessionRow": {
-    "needsInput": "մուտքագրման կարիք ունի"
+    "needsInput": "ՄՈՒՏՔԱԳՐՄԱՆ ԿԱՐԻՔ ՈՒՆԻ"
   },
   "voiceInput": {
     "listening": "Լսում է...",

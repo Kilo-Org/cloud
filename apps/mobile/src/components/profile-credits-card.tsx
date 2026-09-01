@@ -119,20 +119,26 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   return (
     <View className="gap-3">
-      <View className="flex-row items-center justify-between">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+      <View className="min-h-11 flex-row items-center justify-between gap-3">
+        <Text variant="small" className="shrink uppercase tracking-wide text-muted-foreground">
           {t('profile.credits')}
         </Text>
         {canPickContext && (
           <Pressable
-            className="flex-row items-center gap-1 active:opacity-70"
+            className="min-h-11 min-w-0 max-w-[65%] shrink flex-row items-center justify-end gap-1 active:opacity-70"
             onPress={openPicker}
             accessibilityRole="button"
             accessibilityLabel={selectedLabel}
             accessibilityHint={t('profile.selectAccount')}
             hitSlop={8}
           >
-            <Text className="text-xs font-medium text-muted-foreground">{selectedLabel}</Text>
+            <Text
+              className="min-w-0 shrink text-xs font-medium text-muted-foreground"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {selectedLabel}
+            </Text>
             <ChevronDown size={14} color={colors.mutedForeground} />
           </Pressable>
         )}

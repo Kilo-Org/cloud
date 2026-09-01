@@ -145,7 +145,7 @@ describe('SheetHeader', () => {
     expect(row?.props.className).toContain('flex-row');
     expect(row?.props.className).not.toContain('flex-row-reverse');
     expect(row?.children[0]).toBe(cancels[0]);
-    expect(row?.parent?.children[0]).not.toBe(row);
+    expect(row?.parent?.children).toHaveLength(1);
     expect(row?.parent?.children.at(-1)).toBe(row);
     expect(row?.children.at(-1)).toBe(dones[0]);
     expect(dones[0]?.props.className).toContain('ms-auto');
@@ -167,21 +167,19 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
-  it('lets the title and Done wrap in flow without a fixed-height overlay', async () => {
+  it('keeps the left-aligned title and Done on one row', async () => {
     const renderer = await mount({ title: 'Run on', onDone: () => undefined });
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
     const done = pressablesByLabel(renderer.root, 'Done')[0];
-    const titleRow = title.parent;
-    const controls = done?.parent;
+    const titleRegion = title.parent;
+    const row = done?.parent;
 
-    expect(controls?.props.className).toContain('flex-wrap');
-    expect(titleRow?.props.className).not.toMatch(/(?:^|\s)(?:h|max-h)-/);
-    expect(title.props.className).toContain('w-full');
-    expect(title.props.className).toContain('text-center');
-    expect(titleRow?.parent).toBe(controls?.parent);
-    expect(titleRow?.children).not.toContain(done);
-    expect(done?.props.className).not.toContain('absolute');
-    expect(done?.props.className).toContain('max-w-full');
+    expect(row?.props.className).toContain('flex-row');
+    expect(row?.props.className).not.toContain('flex-wrap');
+    expect(title.props.className).not.toContain('text-center');
+    expect(titleRegion?.props.className).toContain('min-w-0');
+    expect(titleRegion?.parent).toBe(row);
+    expect(done?.props.className).toContain('shrink-0');
 
     renderer.unmount();
   });
@@ -225,7 +223,7 @@ describe('SheetHeader', () => {
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
 
       // Native props bound the title; this renderer cannot prove visibility at large text sizes.
-      expect(title.props.numberOfLines).toBe(2);
+      expect(title.props.numberOfLines).toBe(1);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.props.accessibilityLabel).toBe(filename);
       expect(title.children).toEqual([filename]);

@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Okunye",
-      "project": "Iphrojekthi",
-      "removeProjectFilter": "Susa isihlungi sephrojekthi {{label}}",
-      "removePlatformFilter": "Susa isihlungi sephatifomu {{label}}"
+      "project": "Iphrojekthi"
     },
     "suggestion": {
       "title": "Isiphakamiso",

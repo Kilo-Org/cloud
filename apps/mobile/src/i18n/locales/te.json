@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ఇతర",
-      "project": "ప్రాజెక్ట్",
-      "removeProjectFilter": "{{label}} ప్రాజెక్ట్ ఫిల్టర్ను తీసివేయండి",
-      "removePlatformFilter": "{{label}} ప్లాట్ఫారమ్ ఫిల్టర్ను తీసివేయండి"
+      "project": "ప్రాజెక్ట్"
     },
     "suggestion": {
       "title": "సూచన",

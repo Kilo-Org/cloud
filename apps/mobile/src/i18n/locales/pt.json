@@ -2536,9 +2536,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Outra",
-      "project": "Projeto",
-      "removeProjectFilter": "Remover filtro de projeto {{label}}",
-      "removePlatformFilter": "Remover filtro de plataforma {{label}}"
+      "project": "Projeto"
     },
     "suggestion": {
       "title": "Sugestão",

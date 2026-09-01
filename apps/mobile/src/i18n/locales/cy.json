@@ -2596,9 +2596,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Arall",
-      "project": "Prosiect",
-      "removeProjectFilter": "Dileu hidlydd prosiect {{label}}",
-      "removePlatformFilter": "Dileu hidlydd llwyfan {{label}}"
+      "project": "Prosiect"
     },
     "suggestion": {
       "title": "Awgrym",

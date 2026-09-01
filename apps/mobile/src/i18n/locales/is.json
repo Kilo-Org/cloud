@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Annað",
-      "project": "Verkefni",
-      "removeProjectFilter": "Fjarlægja {{label}} verkefnasíu",
-      "removePlatformFilter": "Fjarlægja {{label}} vettvangssíu"
+      "project": "Verkefni"
     },
     "suggestion": {
       "title": "Tillaga",

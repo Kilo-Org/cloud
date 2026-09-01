@@ -2035,9 +2035,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "अन्य",
-      "project": "प्रोजेक्ट",
-      "removeProjectFilter": "{{label}} प्रोजेक्ट फ़िल्टर हटाएँ",
-      "removePlatformFilter": "{{label}} प्लेटफ़ॉर्म फ़िल्टर हटाएँ"
+      "project": "प्रोजेक्ट"
     },
     "modelPicker": {
       "title": "मॉडल चुनें",

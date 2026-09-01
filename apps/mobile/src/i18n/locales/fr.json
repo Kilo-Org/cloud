@@ -1985,9 +1985,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Autre",
-      "project": "Projet",
-      "removeProjectFilter": "Supprimer le filtre de projet {{label}}",
-      "removePlatformFilter": "Supprimer le filtre de plateforme {{label}}"
+      "project": "Projet"
     },
     "suggestion": {
       "title": "Suggestion",

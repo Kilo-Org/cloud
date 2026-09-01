@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Iba pa",
-      "project": "Proyekto",
-      "removeProjectFilter": "Alisin ang {{label}} na filter ng proyekto",
-      "removePlatformFilter": "Alisin ang {{label}} na filter ng platform"
+      "project": "Proyekto"
     },
     "suggestion": {
       "title": "Mungkahi",

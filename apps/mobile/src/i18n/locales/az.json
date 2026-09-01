@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Digər",
-      "project": "Layihə",
-      "removeProjectFilter": "{{label}} layihə filtrini sil",
-      "removePlatformFilter": "{{label}} platforma filtrini sil"
+      "project": "Layihə"
     },
     "suggestion": {
       "title": "Təklif",

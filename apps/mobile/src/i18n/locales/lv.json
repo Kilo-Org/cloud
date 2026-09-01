@@ -2536,9 +2536,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Cits",
-      "project": "Projekts",
-      "removeProjectFilter": "Noņemt {{label}} projekta filtru",
-      "removePlatformFilter": "Noņemt {{label}} platformas filtru"
+      "project": "Projekts"
     },
     "suggestion": {
       "title": "Ieteikums",

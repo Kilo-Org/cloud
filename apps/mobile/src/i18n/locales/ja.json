@@ -2062,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "その他",
-      "project": "プロジェクト",
-      "removeProjectFilter": "{{label}}プロジェクトフィルターを削除",
-      "removePlatformFilter": "{{label}}プラットフォームフィルターを削除"
+      "project": "プロジェクト"
     },
     "suggestion": {
       "title": "提案",

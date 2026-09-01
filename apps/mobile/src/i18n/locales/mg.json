@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Hafa",
-      "project": "Tetikasa",
-      "removeProjectFilter": "Esory ny filtrera tetikasa {{label}}",
-      "removePlatformFilter": "Esory ny filtrera fitaovana {{label}}"
+      "project": "Tetikasa"
     },
     "suggestion": {
       "title": "Soso-kevitra",

@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "වෙනත්",
-      "project": "ව්‍යාපෘතිය",
-      "removeProjectFilter": "{{label}} ව්‍යාපෘති පෙරහන ඉවත් කරන්න",
-      "removePlatformFilter": "{{label}} වේදිකා පෙරහන ඉවත් කරන්න"
+      "project": "ව්‍යාපෘතිය"
     },
     "suggestion": {
       "title": "යෝජනාව",

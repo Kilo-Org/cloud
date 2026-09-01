@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Бусад",
-      "project": "Төсөл",
-      "removeProjectFilter": "{{label}} төслийн шүүлтийг арилгах",
-      "removePlatformFilter": "{{label}} платформын шүүлтийг арилгах"
+      "project": "Төсөл"
     },
     "suggestion": {
       "title": "Санал",

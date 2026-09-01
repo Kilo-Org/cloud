@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "هی تر",
-      "project": "پرۆژە",
-      "removeProjectFilter": "لابردنی پاڵاوتی پرۆژەی {{label}}",
-      "removePlatformFilter": "لابردنی پاڵاوتی پلاتفۆرمی {{label}}"
+      "project": "پرۆژە"
     },
     "suggestion": {
       "title": "پێشنیار",

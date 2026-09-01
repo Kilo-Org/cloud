@@ -2114,9 +2114,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "أخرى",
-      "project": "المشروع",
-      "removeProjectFilter": "إزالة عامل تصفية المشروع {{label}}",
-      "removePlatformFilter": "إزالة عامل تصفية المنصة {{label}}"
+      "project": "المشروع"
     },
     "suggestion": {
       "title": "اقتراح",

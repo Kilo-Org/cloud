@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ផ្សេងទៀត",
-      "project": "គម្រោង",
-      "removeProjectFilter": "ដកតម្រងគម្រោង {{label}} ចេញ",
-      "removePlatformFilter": "ដកតម្រងវេទិកា {{label}} ចេញ"
+      "project": "គម្រោង"
     },
     "suggestion": {
       "title": "ការណែនាំ",

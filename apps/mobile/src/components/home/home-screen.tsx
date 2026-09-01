@@ -12,7 +12,6 @@ import {
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { ProductChoices } from '@/components/home/product-choices';
-import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 
@@ -53,13 +52,6 @@ export function HomeScreen() {
         size="large"
         showBackButton={false}
         className="px-[22px]"
-        contextPosition="right"
-        context={
-          <ContextControl
-            showOrganizationName={context.isReady}
-            scope={context.accountReady ? undefined : { organizationId: null, isResolved: false }}
-          />
-        }
       />
       <TabScreenScrollView
         className="flex-1"

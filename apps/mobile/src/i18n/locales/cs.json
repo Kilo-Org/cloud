@@ -2556,9 +2556,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Jiné",
-      "project": "Projekt",
-      "removeProjectFilter": "Odebrat filtr projektu {{label}}",
-      "removePlatformFilter": "Odebrat filtr platformy {{label}}"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Návrh",

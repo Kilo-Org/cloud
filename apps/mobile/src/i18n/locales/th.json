@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "อื่น ๆ",
-      "project": "โปรเจกต์",
-      "removeProjectFilter": "ลบตัวกรองโปรเจกต์ {{label}} ออก",
-      "removePlatformFilter": "ลบตัวกรองแพลตฟอร์ม {{label}} ออก"
+      "project": "โปรเจกต์"
     },
     "suggestion": {
       "title": "คำแนะนำ",

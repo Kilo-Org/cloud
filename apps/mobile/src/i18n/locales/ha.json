@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Sauran",
-      "project": "Aiki",
-      "removeProjectFilter": "Cire tace aikin {{label}}",
-      "removePlatformFilter": "Cire tace dandamalin {{label}}"
+      "project": "Aiki"
     },
     "suggestion": {
       "title": "Shawara",

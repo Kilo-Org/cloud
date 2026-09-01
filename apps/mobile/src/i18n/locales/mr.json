@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "इतर",
-      "project": "प्रकल्प",
-      "removeProjectFilter": "{{label}} प्रकल्प फिल्टर काढा",
-      "removePlatformFilter": "{{label}} प्लॅटफॉर्म फिल्टर काढा"
+      "project": "प्रकल्प"
     },
     "suggestion": {
       "title": "सूचना",

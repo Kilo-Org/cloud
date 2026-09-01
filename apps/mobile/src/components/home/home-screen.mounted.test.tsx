@@ -38,6 +38,7 @@ const state = vi.hoisted(() => ({
   announcements: [] as string[],
   destination: '',
   owners: 0,
+  liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
 }));
 const queryClient = new ReactQuery.QueryClient();
 vi.mock('@tanstack/react-query', async importOriginal => ({
@@ -141,7 +142,8 @@ vi.mock('@/lib/a11y/announce', () => ({
 vi.mock('@/lib/hooks/use-agent-sessions', async () => {
   const { useEffect } = await import('react');
   return {
-    useLiveAgentSessions: () => {
+    useLiveAgentSessions: (options: Parameters<typeof useLiveAgentSessions>[0]) => {
+      state.liveQuery(options);
       useEffect(() => {
         state.owners += 1;
         return () => {
@@ -229,6 +231,7 @@ beforeEach(() => {
   state.refetch.mockReset().mockResolvedValue(true);
   state.boundaryRefetch.mockReset();
   state.socketRetry.mockReset();
+  state.liveQuery.mockReset();
 });
 afterEach(async () => {
   act(() => renderer?.unmount());
@@ -255,69 +258,63 @@ describe('HomeScreen composition', () => {
     expect(text()).not.toContain(i18n.t('login.welcome'));
   });
 
-  it('keeps one bounded context picker beside the title', async () => {
-    state.organization.organizationId = 'org-1';
-    state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
-    state.boundary.org = state.boundary.orgs[0];
-    await renderHome();
-    const control = action('Home organization');
-    const contextSlot = control.parent?.parent?.parent;
-    expect(contextSlot?.props.className).toContain('flex-1');
-    expect(contextSlot?.props.className).toContain('min-w-0');
-    expect(contextSlot?.props.className).toContain('ms-6');
-    expect(contextSlot?.props.className).toContain('items-end');
-    expect(contextSlot?.props.className).not.toContain('w-2/5');
-    const title = nodes('View').find(node => node.props.accessibilityRole === 'header');
-    expect(title?.props.className).toContain('shrink-0');
-    expect(title?.parent?.props.className).toContain('flex-none');
-    expect(title?.parent?.parent?.props.className).toContain('flex-none');
-    const labels = nodes('Text').filter(node => node.children.includes('Home organization'));
-    expect(labels).toHaveLength(1);
-    expect(labels[0]?.props.className).toContain('leading-[normal]');
-    expect(control.props.className).toContain('items-center');
-    const loading = nodes('Text').find(node => node.children.includes('Loading…'));
-    expect(loading?.props.className).toContain('absolute');
-  });
+  it.each([null, 'org-1'])(
+    'keeps the selected query scope without a context control for %s',
+    async organizationId => {
+      state.organization.organizationId = organizationId;
+      state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+      state.boundary.org = state.boundary.orgs[0];
+      state.live.activeSessions = [row];
+      await renderHome();
+      expect(
+        nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
+      ).toHaveLength(0);
+      expect(text()).not.toContain('Home organization');
+      expect(text()).not.toContain('Personal');
+      expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId, enabled: true });
+      expect(nodes('RemoteSessionRow')[0]?.props.session).toBe(row);
+      expect(nodes('NewTaskButton')[0]?.props.organizationId).toBe(organizationId);
+    }
+  );
 
   it.each([
     { name: 'account pending', patch: { isLoading: true } },
     { name: 'signed out', patch: { token: undefined } },
     { name: 'signing out', patch: { isSigningOut: true } },
-  ])('hides the cached header context while $name', async ({ patch }) => {
+  ])('revokes cached rows and actions while $name', async ({ patch }) => {
     state.organization.organizationId = 'org-1';
     state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
     state.boundary.org = state.boundary.orgs[0];
+    state.live.activeSessions = [row];
     await renderHome();
-    expect(action('Home organization').props.accessibilityHint).toBe('Select account');
+    expect(nodes('RemoteSessionRow')).toHaveLength(1);
+    expect(nodes('NewTaskButton')).toHaveLength(1);
     Object.assign(state.auth, patch);
     await renderHome();
-    expect(text()).not.toContain('Home organization');
-    expect(
-      nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
-    ).toHaveLength(0);
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: false });
     expect(nodes('RemoteSessionRow')).toHaveLength(0);
+    expect(nodes('NewTaskButton')).toHaveLength(0);
+    for (const label of ['Code Reviewer', 'Security Agent', 'PR Review']) {
+      expect(text()).not.toContain(label);
+    }
   });
 
-  it.each([false, true])('keeps an accessible context control with readiness=%s', async loaded => {
+  it.each([false, true])('admits rows and actions with organization readiness=%s', async loaded => {
     state.organization.organizationId = 'org-1';
     state.organization.isLoaded = loaded;
     state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
     state.boundary.org = state.boundary.orgs[0];
+    state.live.activeSessions = [row];
     state.live.hasAcceptedSuccess = true;
     await renderHome();
-    const controls = nodes('Pressable').filter(
-      node => node.props.accessibilityHint === 'Select account'
-    );
-    expect(controls).toHaveLength(1);
-    const control = controls[0];
-    expect(control?.props.accessibilityRole).toBe('button');
-    expect(control?.props.accessibilityState).toEqual({ busy: !loaded, disabled: !loaded });
-    expect(control?.props.accessibilityLabel).toBe(loaded ? 'Home organization' : 'Select account');
-    expect(text()).not.toContain('Personal');
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: loaded });
+    expect(nodes('RemoteSessionRow')).toHaveLength(loaded ? 1 : 0);
+    expect(nodes('NewTaskButton')).toHaveLength(loaded ? 1 : 0);
+    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 1);
   });
 
   it.each([false, true])(
-    'keeps the context control during a live error with retained rows=%s',
+    'keeps admitted actions during a live error with retained rows=%s',
     async retained => {
       state.organization.organizationId = 'org-1';
       state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
@@ -326,13 +323,7 @@ describe('HomeScreen composition', () => {
       state.live.isError = true;
       state.live.terminalError = failure;
       await renderHome();
-      expect(text()).toContain('Home organization');
-      expect(action('Home organization').props.accessibilityHint).toBe('Select account');
-      expect(action('Home organization').props.accessibilityState).toEqual({
-        busy: false,
-        disabled: false,
-      });
-      expect(text()).not.toContain('Personal');
+      expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
       expect(text()).toContain("Couldn't load active sessions");
       expect(typeof action('Retry').props.onPress).toBe('function');
       expect(nodes('RemoteSessionRow')).toHaveLength(retained ? 1 : 0);
@@ -401,7 +392,7 @@ describe('Home live presentation', () => {
     expect(text()).toContain('Security Agent');
     expect(text()).toContain('PR Review');
     expect(state.owners).toBe(1);
-    expect(text()).toContain('Personal');
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
   });
 
   it.each(['offline', 'unknown', 'reconnecting', 'exhausted'] as const)(
@@ -609,7 +600,7 @@ describe('Home live presentation', () => {
 });
 
 describe('Home admission', () => {
-  it('hides cached names during membership resolution and restores one label after admission', async () => {
+  it('withholds cached rows and actions until membership admission', async () => {
     state.organization.organizationId = 'org-1';
     state.memberships = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
     state.boundary.orgs = state.memberships;
@@ -617,15 +608,14 @@ describe('Home admission', () => {
     state.boundary.isResolving = true;
     state.live.activeSessions = [row];
     await renderHome();
-    expect(text()).not.toContain('Engineering');
-    expect(action('Organization').props.accessibilityHint).toBe('Select account');
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: false });
     expect(nodes('RemoteSessionRow')).toHaveLength(0);
     expect(nodes('NewTaskButton')).toHaveLength(0);
     state.boundary.isResolving = false;
     await renderHome();
-    expect(nodes('Text').filter(node => node.children.includes('Engineering'))).toHaveLength(1);
-    expect(action('Engineering').props.accessibilityHint).toBe('Select account');
-    expect(nodes('RemoteSessionRow')).toHaveLength(1);
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
+    expect(nodes('RemoteSessionRow')[0]?.props.session).toBe(row);
+    expect(nodes('NewTaskButton')[0]?.props.organizationId).toBe('org-1');
   });
 
   it.each(['unresolved', 'failed', 'missing'] as const)(
@@ -658,7 +648,7 @@ describe('Home admission', () => {
       expect(text()).toContain('Code Reviewer');
       expect(text()).toContain('Security Agent');
       expect(text()).toContain('PR Review');
-      expect(text()).toContain('Personal');
+      expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
       expect(text()).not.toContain("Couldn't load your organizations");
     }
   );
@@ -705,6 +695,10 @@ describe('Home admission', () => {
       state.live.terminalError = { kind: 'non-retryable', error: { data: { code: 'FORBIDDEN' } } };
     }
     await renderHome();
+    expect(state.liveQuery).toHaveBeenLastCalledWith({
+      organizationId: 'org-1',
+      enabled: mode === 'permission denied',
+    });
     expect(nodes('RemoteSessionRow')).toHaveLength(0);
     expect(text()).not.toContain('Nothing running right now');
     expect(text()).not.toContain('Old organization');
@@ -737,7 +731,7 @@ describe('Home admission', () => {
     }
   });
 
-  it('recovers membership errors through boundary Retry and shows only the resolved context label', async () => {
+  it('recovers membership through boundary Retry and revokes admission on an unresolved organization change', async () => {
     state.organization.organizationId = 'org-1';
     state.boundary.isError = true;
     state.live.hasAcceptedSuccess = true;
@@ -755,14 +749,17 @@ describe('Home admission', () => {
       await Promise.resolve();
     });
     await renderHome();
-    expect(text()).toContain('Engineering');
-    expect(text()).not.toContain('Personal');
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
     expect(text()).toContain('Nothing running right now');
-    expect(nodes('NewTaskButton')).toHaveLength(1);
+    expect(nodes('NewTaskButton')[0]?.props.organizationId).toBe('org-1');
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(1);
     expect(state.refetch).not.toHaveBeenCalled();
     state.organization.organizationId = 'org-2';
+    state.live.activeSessions = [row];
     await renderHome();
-    expect(text()).not.toContain('Engineering');
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-2', enabled: false });
+    expect(nodes('RemoteSessionRow')).toHaveLength(0);
     expect(nodes('NewTaskButton')).toHaveLength(0);
+    expect(text()).not.toContain('Nothing running right now');
   });
 });

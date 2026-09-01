@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Ētahi atu",
-      "project": "Kaupapa",
-      "removeProjectFilter": "Tangohia te tātari kaupapa {{label}}",
-      "removePlatformFilter": "Tangohia te tātari paepae {{label}}"
+      "project": "Kaupapa"
     },
     "suggestion": {
       "title": "Whakaaro",

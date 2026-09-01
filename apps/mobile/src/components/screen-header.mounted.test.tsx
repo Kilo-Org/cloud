@@ -309,7 +309,7 @@ describe('ScreenHeader mounted', () => {
     const variants: ScreenHeaderProps[] = [
       { title: 'Sessions' },
       { title: 'Agents', size: 'large' },
-      { title: 'Home', size: 'large', contextPosition: 'right', context: 'ACCOUNT' },
+      { title: 'Quick Chat', size: 'large', context: 'ACCOUNT' },
       { title: 'Sessions', modal: true },
       { title: 'A long sheet title', centerTitle: true },
       { title: 'Sessions', eyebrow: 'Agents' },
@@ -328,6 +328,9 @@ describe('ScreenHeader mounted', () => {
       expect(title.props.numberOfLines).toBe(props.titleNumberOfLines ?? 2);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
+      if (props.context) {
+        expect(title.parent?.children).toEqual([title, props.context]);
+      }
       if (props.modal || props.centerTitle) {
         expect(title.props.className).toContain('text-center');
         expect(title.parent?.parent).not.toBe(back.parent);

@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ሌላ",
-      "project": "ፕሮጀክት",
-      "removeProjectFilter": "የ{{label}} ፕሮጀክት ማጣሪያ ያስወግዱ",
-      "removePlatformFilter": "የ{{label}} መድረክ ማጣሪያ ያስወግዱ"
+      "project": "ፕሮጀክት"
     },
     "suggestion": {
       "title": "ሐሳብ",

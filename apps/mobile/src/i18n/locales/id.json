@@ -2062,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Lainnya",
-      "project": "Proyek",
-      "removeProjectFilter": "Hapus filter proyek {{label}}",
-      "removePlatformFilter": "Hapus filter platform {{label}}"
+      "project": "Proyek"
     },
     "suggestion": {
       "title": "Saran",

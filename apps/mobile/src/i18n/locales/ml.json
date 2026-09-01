@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "മറ്റുള്ളവ",
-      "project": "പ്രോജക്റ്റ്",
-      "removeProjectFilter": "{{label}} പ്രോജക്റ്റ് ഫിൽട്ടർ നീക്കം ചെയ്യുക",
-      "removePlatformFilter": "{{label}} പ്ലാറ്റ്ഫോം ഫിൽട്ടർ നീക്കം ചെയ്യുക"
+      "project": "പ്രോജക്റ്റ്"
     },
     "suggestion": {
       "title": "നിർദ്ദേശം",

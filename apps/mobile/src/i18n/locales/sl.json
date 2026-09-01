@@ -2556,9 +2556,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Drugo",
-      "project": "Projekt",
-      "removeProjectFilter": "Odstrani filter projekta {{label}}",
-      "removePlatformFilter": "Odstrani filter platforme {{label}}"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Predlog",

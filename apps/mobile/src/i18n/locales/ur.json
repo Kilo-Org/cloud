@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "دیگر",
-      "project": "پروجیکٹ",
-      "removeProjectFilter": "{{label}} پروجیکٹ فلٹر ہٹائیں",
-      "removePlatformFilter": "{{label}} پلیٹ فارم فلٹر ہٹائیں"
+      "project": "پروجیکٹ"
     },
     "suggestion": {
       "title": "تجویز",

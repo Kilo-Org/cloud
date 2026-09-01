@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Egyéb",
-      "project": "Projekt",
-      "removeProjectFilter": "{{label}} projekt szűrő eltávolítása",
-      "removePlatformFilter": "{{label}} platform szűrő eltávolítása"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Javaslat",

@@ -6,7 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
-import { type StoredSession, type useAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import {
+  type StoredSession,
+  type useAgentSessions,
+  type useAgentSessionSearch,
+  type useRecentAgentRepositories,
+} from '@/lib/hooks/use-agent-sessions';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { SessionHistoryScreen } from './session-history-screen';
@@ -18,6 +23,10 @@ const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
   isSearching: false,
   isError: false,
+  organization: { organizationId: null as string | null, isLoaded: true },
+  storedQuery: vi.fn<(options: Parameters<typeof useAgentSessions>[0]) => void>(),
+  searchQuery: vi.fn<(options: Parameters<typeof useAgentSessionSearch>[0]) => void>(),
+  repositoryQuery: vi.fn<(options: Parameters<typeof useRecentAgentRepositories>[0]) => void>(),
 }));
 
 const appState = vi.hoisted(() => {
@@ -107,10 +116,9 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
 vi.mock('@/lib/hooks/use-agent-sessions', async () => {
   const { useQuery } = await import('@tanstack/react-query');
   return {
-    useAgentSessions: ({
-      gitUrl,
-      createdOnPlatform,
-    }: Parameters<typeof useAgentSessions>[0] = {}) => {
+    useAgentSessions: (options: Parameters<typeof useAgentSessions>[0] = {}) => {
+      listState.storedQuery(options);
+      const { gitUrl, createdOnPlatform } = options;
       const active = useQuery({
         queryKey: ['existing-active-sessions'],
         queryFn: () => new Set<string>(),
@@ -135,24 +143,30 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         refetch: handleRefetchSpy,
       };
     },
-    useAgentSessionSearch: () => ({
-      dateGroups: [],
-      isError: listState.isError,
-      isFetching: false,
-      isPending: false,
-      hasNextPage: false,
-      isFetchingNextPage: false,
-      isPlaceholderData: false,
-      fetchNextPage: vi.fn(),
-      refetch: handleRefetchSpy,
-    }),
-    useRecentAgentRepositories: () => ({
-      data: {
-        repositories: listState.storedSessions.flatMap(session =>
-          session.git_url ? [{ gitUrl: session.git_url }] : []
-        ),
-      },
-    }),
+    useAgentSessionSearch: (options: Parameters<typeof useAgentSessionSearch>[0]) => {
+      listState.searchQuery(options);
+      return {
+        dateGroups: [],
+        isError: listState.isError,
+        isFetching: false,
+        isPending: false,
+        hasNextPage: false,
+        isFetchingNextPage: false,
+        isPlaceholderData: false,
+        fetchNextPage: vi.fn(),
+        refetch: handleRefetchSpy,
+      };
+    },
+    useRecentAgentRepositories: (options: Parameters<typeof useRecentAgentRepositories>[0]) => {
+      listState.repositoryQuery(options);
+      return {
+        data: {
+          repositories: listState.storedSessions.flatMap(session =>
+            session.git_url ? [{ gitUrl: session.git_url }] : []
+          ),
+        },
+      };
+    },
   };
 });
 vi.mock('expo-secure-store', () => ({ getItemAsync: readFilterRecord }));
@@ -170,7 +184,7 @@ vi.mock('@/lib/persist/drafts', () => ({
   SESSION_SEARCH_DRAFT_KEY: 'session-search-query',
 }));
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: null, isLoaded: true }),
+  useOrganization: () => listState.organization,
 }));
 
 const mountedRenderers: TestRenderer.ReactTestRenderer[] = [];
@@ -212,6 +226,7 @@ function applyFilters(
     (modal.props.onApply as (filters: unknown) => void)({ projectFilter, platformFilter });
     (modal.props.onClose as () => void)();
   });
+  expect(findNodesByType(renderer, 'SessionFilterModal')).toHaveLength(0);
 }
 
 function storedSessionIds(renderer: TestRenderer.ReactTestRenderer) {
@@ -243,6 +258,10 @@ describe('SessionHistoryScreen', () => {
     listState.storedSessions = [];
     listState.isSearching = false;
     listState.isError = false;
+    Object.assign(listState.organization, { organizationId: null, isLoaded: true });
+    listState.storedQuery.mockClear();
+    listState.searchQuery.mockClear();
+    listState.repositoryQuery.mockClear();
     readFilterRecord.mockReset();
     readFilterRecord.mockResolvedValue(null);
     focusState.current = true;
@@ -286,61 +305,46 @@ describe('SessionHistoryScreen', () => {
     },
   ];
 
-  it('keeps real pills, counts, query results, and search placement in sync through removal', async () => {
+  it('updates filters and counts through the modal without pills or moving search', async () => {
     listState.storedSessions = sessions;
     const renderer = await renderScreen();
-    expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
-    applyFilters(renderer, [workflow, code], ['cloud-agent']);
-    expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud']);
-    expect(historyHeaderActions(renderer).activeFilterCount).toBe(3);
-    const strip = findNodeByType(renderer, 'ScrollView');
-    expect((strip.props.className as string | undefined)?.split(' ')).toEqual(
-      expect.arrayContaining(['grow-0', 'shrink-0'])
-    );
-    const selectedTree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
-    expect(
-      selectedTree.children
-        ?.slice(0, 3)
-        .map(child => (typeof child === 'string' ? child : child.type))
-    ).toEqual(['ScreenHeader', 'ScrollView', 'SessionListSearchHeader']);
-
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
     for (const step of [
       {
-        label: i18n.t('agentChat.sessionFilter.removeProjectFilter', {
-          label: 'iscekic/kilo-workflow',
-        }),
+        projects: [workflow, code],
+        platforms: ['cloud-agent'],
+        count: 3,
+        ids: ['workflow', 'code-cloud'],
+      },
+      {
+        projects: [code],
+        platforms: ['cloud-agent'],
         count: 2,
         ids: ['code-cloud'],
       },
       {
-        label: i18n.t('agentChat.sessionFilter.removePlatformFilter', {
-          label: i18n.t('agentChat.sessionFilter.platformCloud'),
-        }),
+        projects: [code],
+        platforms: [],
         count: 1,
         ids: ['code-cloud', 'code-cli'],
       },
       {
-        label: i18n.t('agentChat.sessionFilter.removeProjectFilter', {
-          label: 'Kilo-Org/kilocode',
-        }),
+        projects: [],
+        platforms: [],
         count: 0,
         ids: ['workflow', 'code-cloud', 'code-cli', 'other'],
       },
     ]) {
-      act(() => {
-        const pill = renderer.root.findByProps({ accessibilityLabel: step.label });
-        (pill.props.onPress as () => void)();
-      });
+      applyFilters(renderer, step.projects, step.platforms);
       expect(historyHeaderActions(renderer).activeFilterCount).toBe(step.count);
       expect(storedSessionIds(renderer)).toEqual(step.ids);
+      expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
+      expect(findNodeByType(renderer, 'SessionListSearchHeader')).toBe(searchHeader);
+      const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
+      expect(
+        tree.children?.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
+      ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'View']);
     }
-    expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
-    const clearedTree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
-    expect(
-      clearedTree.children
-        ?.slice(0, 3)
-        .map(child => (typeof child === 'string' ? child : child.type))
-    ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'View']);
   });
 
   it('keeps saved repository and platform selections after a successful history retry', async () => {
@@ -375,14 +379,17 @@ describe('SessionHistoryScreen', () => {
     expect(findNodeByType(renderer, 'AgentSessionListContent').props.isError).toBe(false);
     expect(storedSessionIds(renderer)).toEqual(['code-cloud']);
     expect(historyHeaderActions(renderer).activeFilterCount).toBe(2);
-    expect(
-      findNodeByType(renderer, 'ScrollView').findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
-      )
-    ).toHaveLength(2);
+    expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+    expect(findNodeByType(renderer, 'SessionFilterModal').props).toMatchObject({
+      selectedProjects: [code],
+      selectedPlatforms: ['cloud-agent'],
+    });
   });
 
-  it('clears no-result filters without a strip gap and keeps platform-only filtering usable', async () => {
+  it('clears no-result filters and resets platform-only filtering through the modal', async () => {
     listState.storedSessions = sessions;
     const renderer = await renderScreen();
     applyFilters(renderer, [workflow], ['slack']);
@@ -401,14 +408,7 @@ describe('SessionHistoryScreen', () => {
     applyFilters(renderer, [], ['cloud-agent']);
     expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'other']);
     expect(historyHeaderActions(renderer).activeFilterCount).toBe(1);
-    act(() => {
-      const pill = renderer.root.findByProps({
-        accessibilityLabel: i18n.t('agentChat.sessionFilter.removePlatformFilter', {
-          label: i18n.t('agentChat.sessionFilter.platformCloud'),
-        }),
-      });
-      (pill.props.onPress as () => void)();
-    });
+    applyFilters(renderer, [], []);
     expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'code-cli', 'other']);
     expect(historyHeaderActions(renderer).activeFilterCount).toBe(0);
     expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
@@ -438,8 +438,27 @@ describe('SessionHistoryScreen', () => {
     expect(findNodeByType(renderer, 'AgentSessionListContent').props.isSearching).toBe(false);
     expect(storedSessionIds(renderer)).toEqual(['code-cloud']);
     expect(historyHeaderActions(renderer).activeFilterCount).toBe(2);
-    expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(1);
+    expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
   });
+
+  it.each([false, true])(
+    'scopes history queries to the selected organization with readiness=%s',
+    async loaded => {
+      listState.organization = { organizationId: 'org-1', isLoaded: loaded };
+      listState.isSearching = true;
+      const renderer = await renderScreen();
+      for (const query of [
+        listState.storedQuery,
+        listState.searchQuery,
+        listState.repositoryQuery,
+      ]) {
+        expect(query).toHaveBeenLastCalledWith(
+          expect.objectContaining({ organizationId: 'org-1', enabled: loaded })
+        );
+      }
+      expect(findNodeByType(renderer, 'AgentSessionListContent').props.isLoading).toBe(!loaded);
+    }
+  );
 
   it('renders the agents title with a back button and default header size', async () => {
     const renderer = await renderScreen();

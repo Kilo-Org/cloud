@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Այլ",
-      "project": "Նախագիծ",
-      "removeProjectFilter": "Հեռացնել {{label}} նախագծի զտիչը",
-      "removePlatformFilter": "Հեռացնել {{label}} հարթակի զտիչը"
+      "project": "Նախագիծ"
     },
     "suggestion": {
       "title": "Առաջարկ",

@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "மற்றவை",
-      "project": "திட்டம்",
-      "removeProjectFilter": "{{label}} திட்ட வடிகட்டியை அகற்று",
-      "removePlatformFilter": "{{label}} தள வடிகட்டியை அகற்று"
+      "project": "திட்டம்"
     },
     "suggestion": {
       "title": "பரிந்துரை",

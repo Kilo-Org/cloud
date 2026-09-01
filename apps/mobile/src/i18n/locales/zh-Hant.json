@@ -2062,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "其他",
-      "project": "專案",
-      "removeProjectFilter": "移除 {{label}} 專案篩選條件",
-      "removePlatformFilter": "移除 {{label}} 平台篩選條件"
+      "project": "專案"
     },
     "suggestion": {
       "title": "建議",

@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Ander",
-      "project": "Projek",
-      "removeProjectFilter": "Verwyder {{label}} projekfilter",
-      "removePlatformFilter": "Verwyder {{label}} platformfilter"
+      "project": "Projek"
     },
     "suggestion": {
       "title": "Voorstel",

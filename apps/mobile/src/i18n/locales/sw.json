@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Nyingine",
-      "project": "Mradi",
-      "removeProjectFilter": "Ondoa kichujio cha mradi {{label}}",
-      "removePlatformFilter": "Ondoa kichujio cha jukwaa {{label}}"
+      "project": "Mradi"
     },
     "suggestion": {
       "title": "Pendekezo",

@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Друго",
-      "project": "Проект",
-      "removeProjectFilter": "Отстрани го филтерот за проект {{label}}",
-      "removePlatformFilter": "Отстрани го филтерот за платформа {{label}}"
+      "project": "Проект"
     },
     "suggestion": {
       "title": "Предлог",

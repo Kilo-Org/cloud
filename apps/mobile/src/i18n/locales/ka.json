@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "სხვა",
-      "project": "პროექტი",
-      "removeProjectFilter": "{{label}} პროექტის ფილტრის მოხსნა",
-      "removePlatformFilter": "{{label}} პლატფორმის ფილტრის მოხსნა"
+      "project": "პროექტი"
     },
     "suggestion": {
       "title": "წინადადება",

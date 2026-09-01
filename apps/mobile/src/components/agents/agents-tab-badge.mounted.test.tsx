@@ -1,127 +1,32 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the React Native tree without a DOM. */
-import { createElement, Fragment, type ReactNode } from 'react';
+import { createElement } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance } from 'react-test-renderer';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { organization } from './agents-tab-badge.test-helpers';
-import TabsLayout from '@/app/(app)/(tabs)/_layout';
-import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
-import { makeTestQueryClient } from '@/lib/active-sessions-live-sync.test-helpers';
+import {
+  attentionKv,
+  CountSurfaces,
+  fetchSessions,
+  key,
+  organization,
+  sessions,
+} from './agents-tab-badge.test-helpers';
+import { makeQueryFn, makeTestQueryClient } from '@/lib/active-sessions-live-sync.test-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import {
+  __flushSessionAttentionWritesForTests,
+  __hydrateSessionAttentionForTests,
+  __peekSessionAttentionForTests,
+  __resetSessionAttentionForTests,
+  ackSessionAttention,
+  isAttentionAcked,
+  SESSION_ATTENTION_EXPIRY_MS,
+} from '@/lib/session-attention';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
-import { AgentSessionListScreen } from './session-list-screen';
-
-const fetchSessions = vi.hoisted(() => vi.fn<() => Promise<{ sessions: ActiveSession[] }>>());
-
-vi.mock('@/lib/trpc', () => {
-  const trpc = {
-    activeSessions: {
-      list: {
-        queryKey: (input: unknown) => [['activeSessions', 'list'], { input, type: 'query' }],
-        queryOptions: (input: unknown, options: object) => ({
-          queryKey: [['activeSessions', 'list'], { input, type: 'query' }],
-          queryFn: fetchSessions,
-          ...options,
-        }),
-      },
-    },
-  };
-  return { useTRPC: () => trpc };
-});
-vi.mock('@/lib/active-sessions-live-sync', () => ({
-  refreshActiveSessionsNow: vi.fn().mockResolvedValue(false),
-}));
-vi.mock('expo-router', () => ({
-  Tabs: Object.assign((props: { children: ReactNode }) => createElement('Tabs', props), {
-    Screen: 'TabScreen',
-  }),
-  usePathname: () => '/',
-  useSegments: () => ['(app)', '(tabs)', '(0_home)'],
-  useRouter: () => ({ replace: vi.fn() }),
-  useNavigation: () => ({ isFocused: () => false }),
-  useFocusEffect: () => undefined,
-  useScrollToTop: () => undefined,
-}));
-vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
-vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn().mockResolvedValue(null) }));
-vi.mock('@/lib/auth/account-metadata-write', () => ({
-  setAccountMetadata: vi.fn().mockResolvedValue(undefined),
-}));
-vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
-vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
-  AppState: { addEventListener: () => ({ remove: () => undefined }) },
-  InteractionManager: { runAfterInteractions: vi.fn() },
-  View: 'View',
-  FlatList: 'FlatList',
-  Pressable: 'Pressable',
-  RefreshControl: 'RefreshControl',
-  TextInput: 'TextInput',
-  useWindowDimensions: () => ({ fontScale: 1 }),
-}));
-vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
-vi.mock('@/components/ui/icons', () => ({
-  Bot: 'Bot',
-  Plus: 'Plus',
-  House: 'House',
-  MessageCircle: 'MessageCircle',
-  MessageSquare: 'MessageSquare',
-  UserRound: 'UserRound',
-  Search: 'Search',
-  SlidersHorizontal: 'SlidersHorizontal',
-}));
-vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
-vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
-vi.mock('@/components/agents/session-list-content', () => ({ FAB_MARGIN: 0, FAB_SIZE: 0 }));
-vi.mock('@/components/agents/use-agent-session-navigator', () => ({
-  useAgentSessionNavigator: () => vi.fn(),
-}));
-vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn() } }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#666666' }),
-}));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_QUICK_CHAT: 'quick-chat',
-  useFeatureFlag: () => false,
-}));
-vi.mock('@/lib/hooks/use-kiloclaw-tab-visible', () => ({ useKiloClawTabVisible: () => false }));
 
 type Mount = Awaited<ReturnType<typeof renderWithProviders>>;
 const mounts: Mount[] = [];
-
-function key(organizationId: string | null = null) {
-  return [
-    ['activeSessions', 'list'],
-    { input: buildActiveSessionsTrayInput(organizationId), type: 'query' },
-  ];
-}
-
-function sessions(count: number, organizationId: string | null = null): ActiveSession[] {
-  return Array.from({ length: count }, (_, index) => ({
-    id: `${organizationId ?? 'personal'}-${index}`,
-    connectionId: 'cli',
-    title: `Session ${index}`,
-    status: 'busy',
-    organizationId,
-  }));
-}
-
-function CountSurfaces() {
-  return createElement(
-    Fragment,
-    null,
-    createElement(TabsLayout),
-    createElement(AgentSessionListScreen)
-  );
-}
 
 async function mount(queryClient = makeTestQueryClient()) {
   const result = await renderWithProviders(createElement(CountSurfaces), { queryClient });
@@ -133,28 +38,21 @@ function isHostType(item: ReactTestInstance, type: string) {
   return typeof item.type === 'string' && item.type === type;
 }
 
-function node(renderer: Mount['renderer'], type: string) {
-  return renderer.root.find(item => isHostType(item, type));
-}
-
 function agentsOptions(renderer: Mount['renderer']) {
   return renderer.root.find(
     item => isHostType(item, 'TabScreen') && item.props.name === '(2_agents)'
   ).props.options as { title: string; tabBarBadge?: number; tabBarAccessibilityLabel: string };
 }
 
-function expectCounts(renderer: Mount['renderer'], count?: number, label?: string) {
-  expect(node(renderer, 'ScreenHeader').props.eyebrow).toBe(label);
+function expectCounts(renderer: Mount['renderer'], count?: number, liveCount?: number) {
+  const header = renderer.root.find(item => isHostType(item, 'ScreenHeader'));
+  expect(header.props.eyebrow).toBe(liveCount === undefined ? undefined : `${liveCount} LIVE`);
   const options = agentsOptions(renderer);
   expect(options.tabBarBadge).toBe(count);
   expect(options.title).toBe('Agents');
-  expect(options.tabBarAccessibilityLabel).toContain('Agents');
-  expect(options.tabBarAccessibilityLabel).toContain('2 of 3');
-  if (label) {
-    expect(options.tabBarAccessibilityLabel).toContain(label);
-  } else {
-    expect(options.tabBarAccessibilityLabel).not.toContain('LIVE');
-  }
+  expect(options.tabBarAccessibilityLabel).toBe(
+    count ? `Agents, ${count} needs input, tab, 2 of 3` : 'Agents, tab, 2 of 3'
+  );
 }
 
 function rerender({ renderer, queryClient }: Mount) {
@@ -165,54 +63,137 @@ function rerender({ renderer, queryClient }: Mount) {
   });
 }
 
-describe('Agents live count surfaces', () => {
+async function updateSessions(result: Mount, rows: ActiveSession[]) {
+  await act(async () => {
+    result.queryClient.setQueryData(key(organization.organizationId), { sessions: rows });
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+  });
+}
+
+describe('Agents needs-input badge and shared live count', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     organization.organizationId = null;
     organization.isLoaded = true;
     fetchSessions.mockReset();
     fetchSessions.mockReturnValue(new Promise(() => undefined));
+    attentionKv.getItem.mockReset().mockResolvedValue(null);
+    __resetSessionAttentionForTests();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     for (const result of mounts) {
       result.unmount();
     }
     mounts.length = 0;
+    await __flushSessionAttentionWritesForTests();
   });
 
-  it.each([
-    { count: 1, label: '1 LIVE' },
-    { count: 3, label: '3 LIVE' },
-    { count: 4, label: '4 LIVE' },
-    { count: 12, label: '12 LIVE' },
-  ])(
-    'shares the active cache and updates to $count while Home has focus',
-    async ({ count, label }) => {
+  it.each([1, 3, 4, 12])(
+    'updates to %i from the shared cache while Home has focus',
+    async count => {
       const queryClient = makeTestQueryClient();
-      queryClient.setQueryData(key(), { sessions: [] });
-      const { renderer } = await mount(queryClient);
-      expectCounts(renderer);
+      await queryClient.fetchQuery({
+        queryKey: key(),
+        queryFn: makeQueryFn(),
+      });
+      const result = await mount(queryClient);
+      expectCounts(result.renderer, undefined, 0);
       expect(queryClient.getQueryCache().getAll()).toHaveLength(1);
       expect(queryClient.getQueryCache().find({ queryKey: key() })?.getObserversCount()).toBe(2);
+      await updateSessions(result, [
+        ...sessions(Array.from({ length: count }, () => 'question')),
+        ...sessions(['question', 'permission'], 'other-org'),
+        { id: 'unenriched', connectionId: 'cli', title: 'Unknown owner', status: 'question' },
+      ]);
+      expectCounts(result.renderer, count, count);
+      await updateSessions(result, []);
+      expectCounts(result.renderer, undefined, 0);
+    }
+  );
 
-      act(() => {
-        queryClient.setQueryData(key(), {
-          sessions: [
-            ...sessions(count),
-            ...sessions(2, 'other-org'),
-            { id: 'unenriched', connectionId: 'cli', title: 'Unknown owner', status: 'busy' },
-          ],
-        });
-      });
-      await waitFor(() => agentsOptions(renderer).tabBarBadge === count);
-      expectCounts(renderer, count, label);
+  it('counts only questions and permissions while the live header counts every status', async () => {
+    const result = await mount();
+    await updateSessions(result, sessions(['busy', 'idle', 'retry', 'question', 'permission']));
+    expectCounts(result.renderer, 2, 5);
+    await updateSessions(result, sessions(['busy', 'idle', 'retry']));
+    expectCounts(result.renderer, undefined, 3);
+  });
 
+  it.each(['question', 'permission'] as const)(
+    'reduces the badge immediately after a %s acknowledgment',
+    async status => {
+      const result = await mount();
+      await updateSessions(result, sessions([status, status, 'busy']));
+      expectCounts(result.renderer, 2, 3);
+      const cached = result.queryClient.getQueryData(key());
+      const fetchCount = fetchSessions.mock.calls.length;
       act(() => {
-        queryClient.setQueryData(key(), { sessions: [] });
+        ackSessionAttention('personal-0');
       });
-      await waitFor(() => agentsOptions(renderer).tabBarBadge === undefined);
-      expectCounts(renderer);
+      expectCounts(result.renderer, 1, 3);
+      expect(__peekSessionAttentionForTests('personal-0')).toEqual({ raiseId: status });
+      act(() => {
+        ackSessionAttention('personal-1');
+      });
+      expectCounts(result.renderer, undefined, 3);
+      expect(result.queryClient.getQueryData(key())).toBe(cached);
+      expect(fetchSessions).toHaveBeenCalledTimes(fetchCount);
+    }
+  );
+
+  it.each(['busy', 'permission'] as const)(
+    'reconciles question -> %s -> question without mounted rows',
+    async status => {
+      const result = await mount();
+      await updateSessions(result, sessions(['question']));
+      act(() => {
+        ackSessionAttention('personal-0');
+      });
+      expectCounts(result.renderer, undefined, 1);
+      await updateSessions(result, sessions([status]));
+      expect(isAttentionAcked('personal-0', 'question')).toBe(false);
+      expectCounts(result.renderer, status === 'permission' ? 1 : undefined, 1);
+      await updateSessions(result, sessions(['question']));
+      expectCounts(result.renderer, 1, 1);
+    }
+  );
+
+  it.each([
+    { status: 'question', raiseId: 'question' },
+    { status: 'question', raiseId: null },
+    { status: 'busy', raiseId: 'question' },
+  ] as const)(
+    'reconciles hydrated $raiseId acknowledgments against $status',
+    async ({ status, raiseId }) => {
+      const pending = Promise.withResolvers<string | null>();
+      attentionKv.getItem.mockReturnValueOnce(pending.promise);
+      const hydration = __hydrateSessionAttentionForTests();
+      const result = await mount();
+      await updateSessions(result, sessions([status, 'permission']));
+      expectCounts(result.renderer, status === 'question' ? 2 : 1, 2);
+      await act(async () => {
+        pending.resolve(
+          JSON.stringify([
+            {
+              sessionId: 'personal-0',
+              raiseId,
+              status: 'question',
+              ackedAt: Date.now(),
+              expiresAt: Date.now() + SESSION_ATTENTION_EXPIRY_MS,
+            },
+          ])
+        );
+        await hydration;
+      });
+      expectCounts(result.renderer, 1, 2);
+      expect(__peekSessionAttentionForTests('personal-0')).toEqual(
+        status === 'question' ? { raiseId: 'question' } : undefined
+      );
+      await updateSessions(result, sessions(['question', 'permission']));
+      expectCounts(result.renderer, status === 'question' ? 1 : 2, 2);
     }
   );
 
@@ -225,65 +206,73 @@ describe('Agents live count surfaces', () => {
   it('hides cached counts and disables fetching until the organization loads', async () => {
     organization.isLoaded = false;
     const queryClient = makeTestQueryClient();
-    queryClient.setQueryData(key(), { sessions: sessions(3) }, { updatedAt: 0 });
+    queryClient.setQueryData(
+      key(),
+      { sessions: sessions(['question', 'permission', 'busy']) },
+      { updatedAt: 0 }
+    );
     const result = await mount(queryClient);
     expectCounts(result.renderer);
     expect(queryClient.getQueryState(key())?.fetchStatus).toBe('idle');
-
-    fetchSessions.mockResolvedValue({ sessions: sessions(4) });
+    fetchSessions.mockResolvedValue({
+      sessions: sessions(['question', 'permission', 'busy', 'idle']),
+    });
     organization.isLoaded = true;
     rerender(result);
-    await waitFor(() => agentsOptions(result.renderer).tabBarBadge === 4);
-    expectCounts(result.renderer, 4, '4 LIVE');
+    await waitFor(
+      () =>
+        result.renderer.root.find(item => isHostType(item, 'ScreenHeader')).props.eyebrow ===
+        '4 LIVE'
+    );
+    expectCounts(result.renderer, 2, 4);
   });
 
-  it('hides counts after a fetch failure and restores them through Retry', async () => {
+  it('hides counts after a fetch failure and restores them after refetch', async () => {
     fetchSessions.mockRejectedValue(new TypeError('Network request failed'));
-    const { renderer } = await mount();
-    await waitFor(() => renderer.root.findAll(item => isHostType(item, 'QueryError')).length === 1);
+    const { renderer, queryClient } = await mount();
+    await waitFor(() => queryClient.getQueryState(key())?.status === 'error');
     expectCounts(renderer);
-
-    fetchSessions.mockResolvedValue({ sessions: sessions(1) });
-    const retry = renderer.root.find(
-      item => isHostType(item, 'Button') && item.props.accessibilityLabel === 'Retry'
-    ).props.onPress as () => void;
-    act(retry);
+    fetchSessions.mockResolvedValue({ sessions: sessions(['question', 'busy']) });
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: key() });
+    });
     await waitFor(() => agentsOptions(renderer).tabBarBadge === 1);
-    expectCounts(renderer, 1, '1 LIVE');
+    expectCounts(renderer, 1, 2);
   });
 
-  it('hides counts but retains cached rows after refetch failure, then recovers through refresh', async () => {
+  it('hides counts without removing cached sessions after a refetch failure', async () => {
     const queryClient = makeTestQueryClient();
-    const cachedRows = sessions(3);
+    const cachedRows = sessions(['question', 'permission', 'busy']);
     queryClient.setQueryData(key(), { sessions: cachedRows });
     const { renderer } = await mount(queryClient);
-    expectCounts(renderer, 3, '3 LIVE');
+    expectCounts(renderer, 2, 3);
     fetchSessions.mockRejectedValue(new TypeError('Network request failed'));
     await act(async () => {
       await queryClient.refetchQueries({ queryKey: key() });
     });
     await waitFor(() => agentsOptions(renderer).tabBarBadge === undefined);
     expectCounts(renderer);
-    expect(node(renderer, 'FlatList').props.data).toEqual(expect.arrayContaining(cachedRows));
-    expect(node(renderer, 'FlatList').props.data).toHaveLength(3);
-    expect(renderer.root.findAll(item => isHostType(item, 'QueryError'))).toHaveLength(0);
-
-    fetchSessions.mockResolvedValue({ sessions: sessions(4) });
-    const refreshControl = node(renderer, 'FlatList').props.refreshControl as {
-      props: { onRefresh: () => void };
-    };
-    act(refreshControl.props.onRefresh);
-    await waitFor(() => agentsOptions(renderer).tabBarBadge === 4);
-    expectCounts(renderer, 4, '4 LIVE');
+    expect(queryClient.getQueryData(key())).toEqual({ sessions: cachedRows });
+    fetchSessions.mockResolvedValue({ sessions: sessions(['question', 'busy', 'idle', 'retry']) });
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: key() });
+    });
+    await waitFor(() => agentsOptions(renderer).tabBarBadge === 1);
+    expectCounts(renderer, 1, 4);
   });
 
-  it('never carries the previous organization count through loading or authorization failure', async () => {
+  it('never carries counts or acknowledgments across organization loading or authorization failure', async () => {
     organization.organizationId = 'org-a';
     const queryClient = makeTestQueryClient();
-    queryClient.setQueryData(key('org-a'), { sessions: sessions(4, 'org-a') });
+    queryClient.setQueryData(key('org-a'), {
+      sessions: sessions(['question', 'permission', 'busy'], 'org-a'),
+    });
     const result = await mount(queryClient);
-    expectCounts(result.renderer, 4, '4 LIVE');
-
+    expectCounts(result.renderer, 2, 3);
+    act(() => {
+      ackSessionAttention('org-a-0');
+    });
+    expectCounts(result.renderer, 1, 3);
     const pending = Promise.withResolvers<{ sessions: ActiveSession[] }>();
     fetchSessions.mockReturnValue(pending.promise);
     organization.organizationId = 'org-b';
@@ -293,23 +282,26 @@ describe('Agents live count surfaces', () => {
     act(() => {
       pending.reject(Object.assign(new Error('Unauthorized'), { data: { code: 'UNAUTHORIZED' } }));
     });
-    await waitFor(
-      () => result.renderer.root.findAll(item => isHostType(item, 'QueryError')).length === 1
-    );
+    await waitFor(() => queryClient.getQueryState(key('org-b'))?.status === 'error');
     expectCounts(result.renderer);
-
     act(() => {
-      queryClient.setQueryData(key('org-a'), { sessions: sessions(12, 'org-a') });
+      queryClient.setQueryData(key('org-a'), { sessions: sessions(['busy'], 'org-a') });
     });
     expectCounts(result.renderer);
+    expect(isAttentionAcked('org-a-0', 'question')).toBe(true);
     fetchSessions.mockResolvedValue({
-      sessions: [...sessions(1, 'org-b'), ...sessions(4, 'org-a')],
+      sessions: [
+        ...sessions(['question', 'busy'], 'org-b'),
+        ...sessions(['busy'], 'org-a'),
+        ...sessions(['permission']),
+      ],
     });
     await act(async () => {
       await queryClient.refetchQueries({ queryKey: key('org-b') });
     });
     await waitFor(() => agentsOptions(result.renderer).tabBarBadge === 1);
-    expectCounts(result.renderer, 1, '1 LIVE');
+    expectCounts(result.renderer, 1, 2);
+    expect(isAttentionAcked('org-a-0', 'question')).toBe(true);
     expect(
       queryClient
         .getQueryCache()

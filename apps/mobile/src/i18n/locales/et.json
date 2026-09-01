@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Muu",
-      "project": "Projekt",
-      "removeProjectFilter": "Eemalda {{label}} projektifilter",
-      "removePlatformFilter": "Eemalda {{label}} platvormifilter"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Soovitus",

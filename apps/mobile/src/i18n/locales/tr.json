@@ -2062,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Diğer",
-      "project": "Proje",
-      "removeProjectFilter": "{{label}} proje filtresini kaldır",
-      "removePlatformFilter": "{{label}} platform filtresini kaldır"
+      "project": "Proje"
     },
     "suggestion": {
       "title": "Öneri",

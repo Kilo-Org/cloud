@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "سایر",
-      "project": "پروژه",
-      "removeProjectFilter": "حذف فیلتر پروژه {{label}}",
-      "removePlatformFilter": "حذف فیلتر پلتفرم {{label}}"
+      "project": "پروژه"
     },
     "suggestion": {
       "title": "پیشنهاد",

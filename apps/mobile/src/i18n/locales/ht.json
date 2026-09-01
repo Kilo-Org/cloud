@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Lòt",
-      "project": "Pwojè",
-      "removeProjectFilter": "Retire filtre pwojè {{label}}",
-      "removePlatformFilter": "Retire filtre platfòm {{label}}"
+      "project": "Pwojè"
     },
     "suggestion": {
       "title": "Sijesyon",

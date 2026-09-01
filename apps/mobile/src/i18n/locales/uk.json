@@ -2088,9 +2088,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Інше",
-      "project": "Проєкт",
-      "removeProjectFilter": "Видалити фільтр проєкту {{label}}",
-      "removePlatformFilter": "Видалити фільтр платформи {{label}}"
+      "project": "Проєкт"
     },
     "suggestion": {
       "title": "Пропозиція",

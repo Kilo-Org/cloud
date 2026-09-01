@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Muu",
-      "project": "Projekti",
-      "removeProjectFilter": "Poista {{label}} projektisuodatin",
-      "removePlatformFilter": "Poista {{label}} alustasuodatin"
+      "project": "Projekti"
     },
     "suggestion": {
       "title": "Ehdotus",

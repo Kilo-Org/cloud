@@ -2536,9 +2536,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Ostalo",
-      "project": "Projekat",
-      "removeProjectFilter": "Ukloni {{label}} filter projekta",
-      "removePlatformFilter": "Ukloni {{label}} filter platforme"
+      "project": "Projekat"
     },
     "suggestion": {
       "title": "Predlog",

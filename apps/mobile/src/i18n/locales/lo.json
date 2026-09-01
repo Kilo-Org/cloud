@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ອື່ນໆ",
-      "project": "ໂຄງການ",
-      "removeProjectFilter": "ລຶບຕົວກັ່ນຕອງໂຄງການ {{label}}",
-      "removePlatformFilter": "ລຶບຕົວກັ່ນຕອງເວທີ {{label}}"
+      "project": "ໂຄງການ"
     },
     "suggestion": {
       "title": "ຄຳແນະນຳ",

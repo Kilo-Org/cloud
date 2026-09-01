@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "نور",
-      "project": "پروژه",
-      "removeProjectFilter": "د {{label}} پروژې فلټر لرې کړئ",
-      "removePlatformFilter": "د {{label}} پلیټ فارم فلټر لرې کړئ"
+      "project": "پروژه"
     },
     "suggestion": {
       "title": "وړاندیز",

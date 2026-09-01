@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Tjetër",
-      "project": "Projekti",
-      "removeProjectFilter": "Hiq filtrin e projektit {{label}}",
-      "removePlatformFilter": "Hiq filtrin e platformës {{label}}"
+      "project": "Projekti"
     },
     "suggestion": {
       "title": "Sugjerim",

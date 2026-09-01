@@ -2576,9 +2576,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Eile",
-      "project": "Tionscadal",
-      "removeProjectFilter": "Bain scagaire tionscadail {{label}}",
-      "removePlatformFilter": "Bain scagaire ardáin {{label}}"
+      "project": "Tionscadal"
     },
     "suggestion": {
       "title": "Moladh",

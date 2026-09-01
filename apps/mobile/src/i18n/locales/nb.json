@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Annet",
-      "project": "Prosjekt",
-      "removeProjectFilter": "Fjern {{label}}-prosjektfilteret",
-      "removePlatformFilter": "Fjern {{label}}-plattformfilteret"
+      "project": "Prosjekt"
     },
     "suggestion": {
       "title": "Forslag",

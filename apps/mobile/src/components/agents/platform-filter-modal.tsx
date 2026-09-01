@@ -1,4 +1,4 @@
-import { Check, X } from '@/components/ui/icons';
+import { Check } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -17,12 +17,6 @@ import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 import { cn } from '@/lib/utils';
 
 export { type ProjectFilterOption };
-
-type SessionFilterChipsProps = AgentSessionFilters & {
-  projectOptions: ProjectFilterOption[];
-  onRemovePlatform: (platform: string) => void;
-  onRemoveProject: (gitUrl: string) => void;
-};
 
 type SessionFilterModalProps = {
   selectedPlatforms: string[];
@@ -69,10 +63,6 @@ function platformFilterLabel(p: string): string {
   }
 }
 
-function projectFilterLabel(gitUrl: string, projectOptions: ProjectFilterOption[]): string {
-  return projectOptions.find(project => project.gitUrl === gitUrl)?.displayName ?? gitUrl;
-}
-
 function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckboxRowProps>) {
   const colors = useThemeColors();
 
@@ -95,80 +85,6 @@ function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckbo
         {label}
       </Text>
     </Pressable>
-  );
-}
-
-export function SessionFilterChips({
-  platformFilter,
-  projectFilter,
-  projectOptions,
-  onRemovePlatform,
-  onRemoveProject,
-}: Readonly<SessionFilterChipsProps>) {
-  const colors = useThemeColors();
-  const { t } = useTranslation();
-
-  if (platformFilter.length === 0 && projectFilter.length === 0) {
-    return null;
-  }
-
-  return (
-    <ScrollView
-      horizontal
-      className="grow-0 shrink-0"
-      showsHorizontalScrollIndicator={false}
-      contentContainerClassName="items-center gap-2 px-[22px]"
-    >
-      {projectFilter.map(gitUrl => {
-        const label = projectFilterLabel(gitUrl, projectOptions);
-        return (
-          <Pressable
-            key={`project-${gitUrl}`}
-            className="min-h-[44px] min-w-[44px] shrink-0 justify-center self-center active:opacity-70"
-            onPress={() => {
-              onRemoveProject(gitUrl);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={t('agentChat.sessionFilter.removeProjectFilter', { label })}
-          >
-            <View className="flex-row items-center gap-1 rounded-full bg-accent-soft px-2 py-1">
-              <Text
-                className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {label}
-              </Text>
-              <X size={12} color={colors.accentSoftForeground} />
-            </View>
-          </Pressable>
-        );
-      })}
-      {platformFilter.map(platform => (
-        <Pressable
-          key={`platform-${platform}`}
-          className="min-h-[44px] min-w-[44px] shrink-0 justify-center self-center active:opacity-70"
-          onPress={() => {
-            onRemovePlatform(platform);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.sessionFilter.removePlatformFilter', {
-            label: platformFilterLabel(platform),
-          })}
-        >
-          <View className="flex-row items-center gap-1 rounded-full bg-accent-soft px-2 py-1">
-            <Text
-              className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {platformFilterLabel(platform)}
-            </Text>
-            <X size={12} color={colors.accentSoftForeground} />
-          </View>
-        </Pressable>
-      ))}
-    </ScrollView>
   );
 }
 

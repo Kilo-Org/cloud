@@ -2576,9 +2576,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Oħra",
-      "project": "Proġett",
-      "removeProjectFilter": "Neħħi l-filtru tal-proġett {{label}}",
-      "removePlatformFilter": "Neħħi l-filtru tal-pjattaforma {{label}}"
+      "project": "Proġett"
     },
     "suggestion": {
       "title": "Suġġeriment",

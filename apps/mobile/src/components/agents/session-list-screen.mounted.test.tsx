@@ -41,6 +41,7 @@ const state = vi.hoisted(() => ({
   announcements: [] as string[],
   destination: '',
   sessionId: '',
+  liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
 }));
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 vi.mock('expo-secure-store', () => ({
@@ -202,7 +203,10 @@ vi.mock('@/lib/a11y/announce', () => ({
 }));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => state.tabBarHeight }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useLiveAgentSessions: () => ({ ...state.live, refetch: state.refetch }),
+  useLiveAgentSessions: (options: Parameters<typeof useLiveAgentSessions>[0]) => {
+    state.liveQuery(options);
+    return { ...state.live, refetch: state.refetch };
+  },
   useAgentSessions: () => {
     throw new Error('Live list must not mount stored history');
   },
@@ -230,14 +234,6 @@ function header() {
 function listSkeletons() {
   return nodes('Skeleton').filter(
     node => typeof node.props.className === 'string' && node.props.className.includes('h-[76px]')
-  );
-}
-function contextControl() {
-  return root().find(
-    node =>
-      typeof node.type === 'string' &&
-      (node.type as string) === 'Pressable' &&
-      node.props.accessibilityHint === 'Select account'
   );
 }
 function requireNode(type: string) {
@@ -285,6 +281,17 @@ function headerAction(testID = 'agents-view-history') {
     throw new Error(`Missing header action: ${testID}`);
   }
   return button;
+}
+function applyFilters(projectFilter: string[], platformFilter: string[]) {
+  act(() => {
+    headerAction('agents-open-filters').props.onPress();
+  });
+  const modal = requireNode('SessionFilterModal');
+  act(() => {
+    (modal.props.onApply as (filters: unknown) => void)({ projectFilter, platformFilter });
+    (modal.props.onClose as () => void)();
+  });
+  expect(nodes('SessionFilterModal')).toHaveLength(0);
 }
 async function renderScreen() {
   await act(async () => {
@@ -334,6 +341,7 @@ beforeEach(() => {
   state.boundaryRefetch.mockReset();
   state.socketRetry.mockReset();
   state.invalidate.mockReset();
+  state.liveQuery.mockReset();
   readFilterRecord.mockReset().mockResolvedValue(null);
 });
 afterEach(async () => {
@@ -404,7 +412,7 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(text().includes('Loading…')).toBe(Boolean(test.skeleton));
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
     expect(nodes('ScrollView')).toHaveLength(test.empty ? 1 : 0);
-    expect(text()).toContain('Personal');
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
     headerAction().props.onPress();
@@ -432,8 +440,8 @@ describe('AgentSessionListScreen live presentation', () => {
 
     expect(scroll.parent?.parent).toBe(header().parent);
     expect(header().parent?.children[0]).toBe(header());
-    expect(header().props.className).toBe('px-[22px] pb-0.5');
-    expect(scroll.findAll(node => node === contextControl())).toHaveLength(0);
+    expect(header().props.className).toContain('px-[22px]');
+    expect(header().props.context).toBeUndefined();
     expect(scroll.props.className).toBe('flex-1');
     expect(scroll.props.contentContainerClassName).toBe('grow justify-center py-4');
     expect(scroll.props.contentContainerStyle).toBeUndefined();
@@ -727,7 +735,7 @@ describe('AgentSessionListScreen live presentation', () => {
   });
 });
 
-describe('AgentSessionListScreen context control', () => {
+describe('AgentSessionListScreen header and admission', () => {
   it.each([
     { fontScale: 1, filterable: false },
     { fontScale: 1, filterable: true },
@@ -760,9 +768,11 @@ describe('AgentSessionListScreen context control', () => {
     expect(title.parent?.parent?.parent).toBe(actionSlot?.parent);
     expect(header().props.reserveEyebrow).toBe(true);
     expect(header().props.eyebrow).toBe(i18n.t('agents.liveCount', { count: 1 }));
-    const context = action(organizationName);
-    expect(context.findByType(Text).props.numberOfLines).toBe(1);
-    expect(nodes('Text').filter(node => node.children.includes(organizationName))).toHaveLength(1);
+    expect(text()).not.toContain(organizationName);
+    expect(
+      nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
+    ).toHaveLength(0);
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
     expect(
       nodes('Pressable').filter(node => node.props.testID === 'agents-open-filters')
     ).toHaveLength(test.filterable ? 1 : 0);
@@ -770,30 +780,30 @@ describe('AgentSessionListScreen context control', () => {
     expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
   });
 
-  it('hides cached names and rows until membership resolves', async () => {
+  it('withholds cached rows and the live count until membership resolves', async () => {
     state.organization.organizationId = 'org-1';
     state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
     state.boundary.isResolving = true;
     state.live.activeSessions = [row];
     await renderScreen();
-    expect(text()).not.toContain('Engineering');
-    expect(contextControl().props.accessibilityLabel).toBe('Organization');
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: false });
     expect(nodes('FlatList')).toHaveLength(0);
     expect(header().props.eyebrow).toBeUndefined();
     state.boundary.isResolving = false;
     await renderScreen();
-    expect(nodes('Text').filter(node => node.children.includes('Engineering'))).toHaveLength(1);
-    expect(contextControl().props.accessibilityLabel).toBe('Engineering');
-    expect(nodes('FlatList')).toHaveLength(1);
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
+    expect(nodes('RemoteSessionRow')[0]?.props.session).toBe(row);
+    expect(header().props.eyebrow).toBe('1 LIVE');
   });
 
-  it('right-aligns one context picker above search and centers the header controls', async () => {
+  it('centers the header controls without a context control above search', async () => {
     state.live.activeSessions = [{ ...row, gitUrl: 'https://github.com/kilo/cloud.git' }];
     await renderScreen();
     expect(header().props.context).toBeUndefined();
-    expect(header().props.className).toContain('pb-0.5');
-    expect(contextControl().parent?.parent?.parent?.props.className).toContain('items-end');
-    expect(nodes('Text').filter(node => node.children.includes('Personal'))).toHaveLength(1);
+    expect(
+      nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
+    ).toHaveLength(0);
+    expect(text()).not.toContain('Personal');
     expect(nodes('SessionListSearchHeader')).toHaveLength(1);
     const history = nodes('Pressable').find(node => node.props.testID === 'agents-view-history');
     const filters = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
@@ -809,29 +819,23 @@ describe('AgentSessionListScreen context control', () => {
     ).toContain('absolute');
   });
 
-  it('keeps the context picker and history action mounted', async () => {
-    await renderScreen();
-    expect(header().parent?.children[0]).toBe(header());
-    expect(contextControl().props.accessibilityRole).toBe('button');
-    expect(contextControl().props.accessibilityLabel).toBe('Personal');
-    expect(contextControl().props.accessibilityState).toEqual({ busy: false, disabled: false });
-    expect(headerAction().props.accessibilityRole).toBe('button');
-  });
-
-  it('keeps the context and list unresolved until the organization restores', async () => {
+  it('keeps the list unresolved until the organization restores', async () => {
     state.organization.isLoaded = false;
     state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Agents organization' }];
+    state.live.activeSessions = [row];
     await renderScreen();
-    expect(contextControl().props.accessibilityState).toEqual({ busy: true, disabled: true });
-    expect(contextControl().props.accessibilityLabel).toBe('Select account');
-    expect(nodes('Skeleton')).toHaveLength(9);
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: false });
+    expect(listSkeletons()).toHaveLength(8);
     expect(nodes('FlatList')).toHaveLength(0);
-    expect(text()).not.toContain('Personal');
+    expect(header().props.eyebrow).toBeUndefined();
+    expect(headerAction().props.accessibilityRole).toBe('button');
     state.organization.organizationId = 'org-1';
     state.organization.isLoaded = true;
     await renderScreen();
-    expect(contextControl().props.accessibilityLabel).toBe('Agents organization');
-    expect(contextControl().props.accessibilityState).toEqual({ busy: false, disabled: false });
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
+    expect(listSkeletons()).toHaveLength(0);
+    expect(nodes('RemoteSessionRow')[0]?.props.session).toBe(row);
+    expect(header().props.eyebrow).toBe('1 LIVE');
     expect(headerAction().props.accessibilityRole).toBe('button');
   });
 });
@@ -952,6 +956,7 @@ describe('AgentSessionListScreen live filtering', () => {
 
     const list = requireNode('FlatList');
     expect((list.props.data as ActiveSession[]).map(session => session.id)).toEqual(['a2']);
+    expect(header().props.eyebrow).toBe('2 LIVE');
   });
 
   it('keeps the header right to See-all alone while nothing is filterable', async () => {
@@ -972,7 +977,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(headerAction('agents-open-filters').props.activeCount).toBe(0);
   });
 
-  it('keeps real pills, counts, results, and search placement in sync through removal', async () => {
+  it('updates filters through the modal without pills or changing the all-live count', async () => {
     const workflow = 'https://github.com/iscekic/kilo-workflow.git';
     const code = 'https://github.com/Kilo-Org/kilocode.git';
     state.live.activeSessions = [
@@ -1000,64 +1005,47 @@ describe('AgentSessionListScreen live filtering', () => {
       },
     ];
     const renderer = await renderScreen();
-    expect(nodes('ScrollView')).toHaveLength(0);
-    act(() => {
-      headerAction('agents-open-filters').props.onPress();
-    });
-    const modal = requireNode('SessionFilterModal');
-    act(() => {
-      (modal.props.onApply as (filters: unknown) => void)({
-        projectFilter: [workflow, code],
-        platformFilter: ['cloud-agent'],
-      });
-      (modal.props.onClose as () => void)();
-    });
-    const visibleIds = () =>
-      (requireNode('FlatList').props.data as ActiveSession[]).map(session => session.id);
-    expect(visibleIds()).toEqual(['workflow', 'code-cloud']);
-    expect(headerAction('agents-open-filters').props.activeCount).toBe(3);
-    const strip = nodes('ScrollView')[0];
-    expect((strip?.props.className as string | undefined)?.split(' ')).toEqual(
-      expect.arrayContaining(['grow-0', 'shrink-0'])
-    );
-    expect(header().parent?.children[0]).toBe(header());
-    const selectedTree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
-    expect(
-      selectedTree.children
-        ?.slice(0, 4)
-        .map(child => (typeof child === 'string' ? child : child.type))
-    ).toEqual(['View', 'View', 'SessionListSearchHeader', 'ScrollView']);
-
+    const searchHeader = requireNode('SessionListSearchHeader');
     for (const step of [
       {
-        label: 'Remove iscekic/kilo-workflow project filter',
+        projects: [workflow, code],
+        platforms: ['cloud-agent'],
+        count: 3,
+        ids: ['workflow', 'code-cloud'],
+      },
+      {
+        projects: [code],
+        platforms: ['cloud-agent'],
         count: 2,
         ids: ['code-cloud'],
       },
       {
-        label: 'Remove Cloud platform filter',
+        projects: [code],
+        platforms: [],
         count: 1,
         ids: ['code-cloud', 'code-cli'],
       },
       {
-        label: 'Remove Kilo-Org/kilocode project filter',
+        projects: [],
+        platforms: [],
         count: 0,
         ids: ['workflow', 'code-cloud', 'code-cli', 'other'],
       },
     ]) {
-      act(() => {
-        press(step.label);
-      });
+      applyFilters(step.projects, step.platforms);
       expect(headerAction('agents-open-filters').props.activeCount).toBe(step.count);
-      expect(visibleIds()).toEqual(step.ids);
+      expect(
+        (requireNode('FlatList').props.data as ActiveSession[]).map(session => session.id)
+      ).toEqual(step.ids);
+      expect(header().props.eyebrow).toBe('4 LIVE');
+      expect(nodes('ScrollView')).toHaveLength(0);
+      expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
+      expect(header().parent?.children[0]).toBe(header());
+      const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
+      expect(
+        tree.children?.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
+      ).toEqual(['View', 'View', 'SessionListSearchHeader', 'FlatList']);
     }
-    expect(nodes('ScrollView')).toHaveLength(0);
-    const clearedTree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
-    expect(
-      clearedTree.children
-        ?.slice(0, 4)
-        .map(child => (typeof child === 'string' ? child : child.type))
-    ).toEqual(['View', 'View', 'SessionListSearchHeader', 'FlatList']);
   });
 
   it('keeps saved repository and platform selections after a successful list retry', async () => {
@@ -1107,11 +1095,14 @@ describe('AgentSessionListScreen live filtering', () => {
     const rows = requireNode('FlatList').props.data as ActiveSession[];
     expect(rows.map(session => session.id)).toEqual(['matching']);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(2);
-    expect(
-      requireNode('ScrollView').findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
-      )
-    ).toHaveLength(2);
+    expect(nodes('ScrollView')).toHaveLength(0);
+    act(() => {
+      headerAction('agents-open-filters').props.onPress();
+    });
+    expect(requireNode('SessionFilterModal').props).toMatchObject({
+      selectedProjects: [gitUrl],
+      selectedPlatforms: ['cloud-agent'],
+    });
   });
 
   it('filters the live list down to the applied repository', async () => {
@@ -1160,7 +1151,8 @@ describe('AgentSessionListScreen live filtering', () => {
     const emptyState = renderer.root.findByType(EmptyState);
     expect(emptyState.props.title).toBe('No sessions match');
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
-    expect(nodes('ScrollView')).toHaveLength(1);
+    expect(nodes('ScrollView')).toHaveLength(0);
+    expect(header().props.eyebrow).toBe('1 LIVE');
 
     const clearAction = emptyState.props.action as { props: { onPress: () => void } };
     act(() => {
@@ -1183,7 +1175,7 @@ describe('Live list admission and lifecycle', () => {
       await renderScreen();
       press('New session');
       expect(state.destination).toBe('/(app)/agent-chat/new');
-      expect(text()).toContain('Personal');
+      expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     }
   );
 
@@ -1221,7 +1213,12 @@ describe('Live list admission and lifecycle', () => {
       state.live.terminalError = { kind: 'non-retryable', error: { data: { code: 'FORBIDDEN' } } };
     }
     await renderScreen();
+    expect(state.liveQuery).toHaveBeenLastCalledWith({
+      organizationId: 'org-1',
+      enabled: mode === 'permission denied',
+    });
     expect(nodes('FlatList')).toHaveLength(0);
+    expect(header().props.eyebrow).toBeUndefined();
     expect(text()).not.toContain('Nothing running right now');
     if (mode !== 'permission denied') {
       expect(nodes('Pressable').some(node => node.props.testID === 'agents-new-session-fab')).toBe(
@@ -1245,7 +1242,7 @@ describe('Live list admission and lifecycle', () => {
     expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
   });
 
-  it('recovers membership through boundary Retry, scopes empty content, and drops old labels on a context change', async () => {
+  it('recovers membership through boundary Retry and revokes admission on an unresolved organization change', async () => {
     state.organization.organizationId = 'org-1';
     state.boundary.isError = true;
     state.boundary.orgs = undefined;
@@ -1261,16 +1258,18 @@ describe('Live list admission and lifecycle', () => {
       await Promise.resolve();
     });
     await renderScreen();
-    expect(text()).toContain('Engineering');
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
     expect(text()).toContain('Nothing running right now');
     press('New coding task');
     expect(state.destination).toBe('/(app)/agent-chat/new?organizationId=org-1');
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(1);
     expect(state.refetch).not.toHaveBeenCalled();
     state.organization.organizationId = 'org-2';
     state.live.activeSessions = [row];
     await renderScreen();
-    expect(text()).not.toContain('Engineering');
+    expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-2', enabled: false });
     expect(nodes('FlatList')).toHaveLength(0);
+    expect(header().props.eyebrow).toBeUndefined();
   });
 
   it('refreshes live sessions on focus and preserves foreground tray invalidation', async () => {

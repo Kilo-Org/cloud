@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Beste bat",
-      "project": "Proiektua",
-      "removeProjectFilter": "Kendu {{label}} proiektuaren iragazkia",
-      "removePlatformFilter": "Kendu {{label}} plataformaren iragazkia"
+      "project": "Proiektua"
     },
     "suggestion": {
       "title": "Iradokizuna",

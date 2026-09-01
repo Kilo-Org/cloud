@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Omiiran",
-      "project": "Iṣẹ-ọna",
-      "removeProjectFilter": "Yọ àlẹmọ iṣẹ-ọna {{label}}",
-      "removePlatformFilter": "Yọ àlẹmọ pẹpẹ {{label}}"
+      "project": "Iṣẹ-ọna"
     },
     "suggestion": {
       "title": "Imọran",

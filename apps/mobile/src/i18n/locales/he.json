@@ -2075,9 +2075,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "אחר",
-      "project": "פרויקט",
-      "removeProjectFilter": "הסר מסנן פרויקט {{label}}",
-      "removePlatformFilter": "הסר מסנן פלטפורמה {{label}}"
+      "project": "פרויקט"
     },
     "suggestion": {
       "title": "הצעה",

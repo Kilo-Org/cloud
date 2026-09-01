@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ಇತರೆ",
-      "project": "ಪ್ರಾಜೆಕ್ಟ್",
-      "removeProjectFilter": "{{label}} ಪ್ರಾಜೆಕ್ಟ್ ಫಿಲ್ಟರ್ ತೆಗೆದುಹಾಕಿ",
-      "removePlatformFilter": "{{label}} ಪ್ಲಾಟ್‌ಫಾರ್ಮ್ ಫಿಲ್ಟರ್ ತೆಗೆದುಹಾಕಿ"
+      "project": "ಪ್ರಾಜೆಕ್ಟ್"
     },
     "suggestion": {
       "title": "ಸಲಹೆ",

@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Ọzọ",
-      "project": "Ọrụ",
-      "removeProjectFilter": "Wepụ nyocha ọrụ {{label}}",
-      "removePlatformFilter": "Wepụ nyocha ikpo okwu {{label}}"
+      "project": "Ọrụ"
     },
     "suggestion": {
       "title": "Aro",

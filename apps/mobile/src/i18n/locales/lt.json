@@ -2556,9 +2556,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Kita",
-      "project": "Projektas",
-      "removeProjectFilter": "Pašalinti {{label}} projekto filtrą",
-      "removePlatformFilter": "Pašalinti {{label}} platformos filtrą"
+      "project": "Projektas"
     },
     "suggestion": {
       "title": "Pasiūlymas",

@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Басқа",
-      "project": "Жоба",
-      "removeProjectFilter": "{{label}} жоба сүзгісін алып тастау",
-      "removePlatformFilter": "{{label}} платформа сүзгісін алып тастау"
+      "project": "Жоба"
     },
     "suggestion": {
       "title": "Ұсыныс",

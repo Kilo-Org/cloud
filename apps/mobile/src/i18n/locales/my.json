@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "အခြား",
-      "project": "Project",
-      "removeProjectFilter": "{{label}} project စစ်ထုတ်မှုကို ဖယ်ရှားပါ",
-      "removePlatformFilter": "{{label}} platform စစ်ထုတ်မှုကို ဖယ်ရှားပါ"
+      "project": "Project"
     },
     "suggestion": {
       "title": "အကြံပြုချက်",

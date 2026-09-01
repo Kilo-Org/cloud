@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Boshqa",
-      "project": "Loyiha",
-      "removeProjectFilter": "{{label}} loyiha filtrini olib tashlash",
-      "removePlatformFilter": "{{label}} platforma filtrini olib tashlash"
+      "project": "Loyiha"
     },
     "suggestion": {
       "title": "Taklif",

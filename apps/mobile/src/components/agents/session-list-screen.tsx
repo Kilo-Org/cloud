@@ -20,7 +20,7 @@ import {
   useLiveSessionContext,
 } from '@/components/home/agent-sessions-section';
 import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
-import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
@@ -31,7 +31,6 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
@@ -169,11 +168,10 @@ export function AgentSessionListScreen() {
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it. The FAB adds its own inset when it shows so the last row
-  // scrolls clear of the button too. paddingTop merges here (not a className)
-  // to match the historical first-row inset without a separate wrapper.
+  // scrolls clear of the button too.
   const listPadding = useMemo(
     () => ({
-      paddingTop: 18,
+      paddingTop: 0,
       paddingBottom: tabBarHeight + (hasLiveRows ? FAB_SIZE + FAB_MARGIN : 0),
     }),
     [tabBarHeight, hasLiveRows]
@@ -253,16 +251,10 @@ export function AgentSessionListScreen() {
         reserveEyebrow
         size="large"
         showBackButton={false}
-        className="px-[22px] pb-0.5"
+        className="px-[22px] pb-1"
         headerRight={headerRight}
       />
       <View className="px-[22px]">
-        <View className="min-h-11 items-end">
-          <ContextControl
-            showOrganizationName={context.isReady}
-            scope={context.accountReady ? undefined : { organizationId: null, isResolved: false }}
-          />
-        </View>
         <LiveSessionFeedback
           context={context}
           sessions={sessions}
@@ -279,13 +271,6 @@ export function AgentSessionListScreen() {
           onClearSearch={query.handleClearSearch}
         />
       ) : null}
-      <SessionFilterChips
-        platformFilter={query.platformFilter}
-        projectFilter={query.projectFilter}
-        projectOptions={query.options.projectOptions}
-        onRemovePlatform={query.handleRemovePlatform}
-        onRemoveProject={query.handleRemoveProject}
-      />
       {body}
       {/* Empty content owns its creation action; other admitted states keep the FAB. */}
       {context.isReady && content !== 'empty' && (

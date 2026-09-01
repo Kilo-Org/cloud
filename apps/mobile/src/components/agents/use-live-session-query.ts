@@ -15,16 +15,8 @@ import { LIVE_SESSION_FILTERS_KEY } from '@/lib/storage-keys';
  * loaded, so this filters locally — no refetch, and search needs no debounce.
  */
 export function useLiveSessionQuery<T extends LiveFilterSession>(sessions: T[]) {
-  const {
-    platformFilter,
-    projectFilter,
-    activeFilterCount,
-    hasLoaded,
-    setFilters,
-    clearFilters,
-    setPlatformFilter,
-    setProjectFilter,
-  } = usePersistedAgentSessionFilters(LIVE_SESSION_FILTERS_KEY);
+  const { platformFilter, projectFilter, activeFilterCount, hasLoaded, setFilters, clearFilters } =
+    usePersistedAgentSessionFilters(LIVE_SESSION_FILTERS_KEY);
 
   // Uncontrolled search input (iOS TextInput rule): the text lives in the
   // input, this state only drives the match and the in-field X.
@@ -41,19 +33,6 @@ export function useLiveSessionQuery<T extends LiveFilterSession>(sessions: T[]) 
   const visibleSessions = useMemo(
     () => filterLiveSessions(sessions, { platformFilter, projectFilter, searchQuery }),
     [sessions, platformFilter, projectFilter, searchQuery]
-  );
-
-  const handleRemovePlatform = useCallback(
-    (platform: string) => {
-      setPlatformFilter(prev => prev.filter(value => value !== platform));
-    },
-    [setPlatformFilter]
-  );
-  const handleRemoveProject = useCallback(
-    (gitUrl: string) => {
-      setProjectFilter(prev => prev.filter(value => value !== gitUrl));
-    },
-    [setProjectFilter]
   );
 
   return {
@@ -75,7 +54,5 @@ export function useLiveSessionQuery<T extends LiveFilterSession>(sessions: T[]) 
     handleApplyFilters: setFilters,
     handleClearSearch,
     handleClearFilters: clearFilters,
-    handleRemovePlatform,
-    handleRemoveProject,
   };
 }

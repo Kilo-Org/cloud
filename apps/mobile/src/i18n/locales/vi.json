@@ -2062,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Khác",
-      "project": "Dự án",
-      "removeProjectFilter": "Xóa bộ lọc dự án {{label}}",
-      "removePlatformFilter": "Xóa bộ lọc nền tảng {{label}}"
+      "project": "Dự án"
     },
     "suggestion": {
       "title": "Gợi ý",

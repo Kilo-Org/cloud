@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Kan biroo",
-      "project": "Pirojekti",
-      "removeProjectFilter": "Waraabtoo pirojektii {{label}} baasi",
-      "removePlatformFilter": "Waraabtoo falaasamaa {{label}} baasi"
+      "project": "Pirojekti"
     },
     "suggestion": {
       "title": "Yaada",

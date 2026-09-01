@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Kale",
-      "project": "Mashruuc",
-      "removeProjectFilter": "Ka saar shaandhada mashruuca {{label}}",
-      "removePlatformFilter": "Ka saar shaandhada platform-ka {{label}}"
+      "project": "Mashruuc"
     },
     "suggestion": {
       "title": "Soo jeedin",

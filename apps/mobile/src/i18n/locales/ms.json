@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Lain-lain",
-      "project": "Projek",
-      "removeProjectFilter": "Buang penapis projek {{label}}",
-      "removePlatformFilter": "Buang penapis platform {{label}}"
+      "project": "Projek"
     },
     "suggestion": {
       "title": "Cadangan",

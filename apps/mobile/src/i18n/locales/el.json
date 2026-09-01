@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Άλλο",
-      "project": "Έργο",
-      "removeProjectFilter": "Αφαίρεση φίλτρου έργου {{label}}",
-      "removePlatformFilter": "Αφαίρεση φίλτρου πλατφόρμας {{label}}"
+      "project": "Έργο"
     },
     "suggestion": {
       "title": "Πρόταση",

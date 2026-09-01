@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
 import {
+  formatGitUrlProject,
   PLATFORM_FILTERS,
   type ProjectFilterOption,
 } from '@/components/agents/session-list-helpers';
@@ -99,6 +100,13 @@ export function SessionFilterModal({
   const { t } = useTranslation();
   const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
+  const platforms = [...new Set([...platformOptions, ...selectedPlatforms])];
+  const projectsByUrl = new Map(projectOptions.map(project => [project.gitUrl, project]));
+  for (const gitUrl of selectedProjects) {
+    if (!projectsByUrl.has(gitUrl)) {
+      projectsByUrl.set(gitUrl, { gitUrl, displayName: formatGitUrlProject(gitUrl) });
+    }
+  }
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>
@@ -145,7 +153,7 @@ export function SessionFilterModal({
                 <Text variant="eyebrow" className="px-3">
                   {t('agentChat.sessionFilter.platform')}
                 </Text>
-                {platformOptions.map(platform => (
+                {platforms.map(platform => (
                   <FilterCheckboxRow
                     key={platform}
                     label={platformFilterLabel(platform)}
@@ -156,12 +164,12 @@ export function SessionFilterModal({
                   />
                 ))}
               </View>
-              {projectOptions.length > 0 && (
+              {projectsByUrl.size > 0 && (
                 <View className="gap-1">
                   <Text variant="eyebrow" className="px-3">
                     {t('agentChat.sessionFilter.project')}
                   </Text>
-                  {projectOptions.map(project => (
+                  {[...projectsByUrl.values()].map(project => (
                     <FilterCheckboxRow
                       key={project.gitUrl}
                       label={project.displayName}

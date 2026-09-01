@@ -164,6 +164,40 @@ describe('SessionFilterModal', () => {
     expect(props.onClose).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    { name: 'other live sessions', platformOptions: ['cli'], projectOptions: [firstProject] },
+    { name: 'no live sessions', platformOptions: [], projectOptions: [] },
+  ])('lets users remove unavailable saved filters with $name', async options => {
+    const { renderer, props } = await renderModal({
+      platformOptions: options.platformOptions,
+      projectOptions: options.projectOptions,
+      selectedPlatforms: ['cli', 'cloud-agent'],
+      selectedProjects: [firstProject.gitUrl, unavailable],
+    });
+    const checkboxes = renderer.root.findAllByProps({ accessibilityRole: 'checkbox' });
+    expect(checkboxes).toHaveLength(4);
+    expect(new Set(checkboxes.map(row => row.findByType(Text).props.children)).size).toBe(4);
+
+    for (const label of [
+      i18n.t('agentChat.sessionFilter.platformCloud'),
+      'unavailable/saved-repository',
+    ]) {
+      expect(findCheckbox(renderer, label).props.accessibilityState).toEqual({ checked: true });
+      act(() => {
+        (findCheckbox(renderer, label).props.onPress as () => void)();
+      });
+      expect(findCheckbox(renderer, label).props.accessibilityState).toEqual({ checked: false });
+    }
+
+    expect(props.onApply).not.toHaveBeenCalled();
+    pressButton(renderer, i18n.t('common.apply'));
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: ['cli'],
+      projectFilter: [firstProject.gitUrl],
+    });
+    expect(props.onClose).toHaveBeenCalledOnce();
+  });
+
   it('applies empty filters after deselecting both dimensions', async () => {
     const { renderer, props } = await renderModal({
       selectedPlatforms: ['cli'],

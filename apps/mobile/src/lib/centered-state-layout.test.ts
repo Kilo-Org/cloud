@@ -48,7 +48,7 @@ describe('getCenteredStateLayout', () => {
       viewport: { top: 450, bottom: 800 },
       contentHeight: 200,
     });
-    expect(layout.paddingTop).toBe(16);
+    expect(layout.paddingTop).toBe(0);
   });
 
   it('keeps content above an overlay without counting its inset twice', () => {

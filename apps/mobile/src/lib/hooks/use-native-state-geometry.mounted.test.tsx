@@ -96,6 +96,11 @@ async function mount() {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('requestAnimationFrame', (onFrame: FrameRequestCallback) => {
+    onFrame(0);
+    return 1;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
   vi.clearAllMocks();
   native.available = true;
   native.pending.clear();
@@ -106,6 +111,38 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('useNativeStateGeometry', () => {
+  it('waits for the native mounting frame before observing', async () => {
+    let frame: FrameRequestCallback | undefined = undefined;
+    vi.stubGlobal('requestAnimationFrame', (onFrame: FrameRequestCallback) => {
+      frame = onFrame;
+      return 7;
+    });
+    const mounted = await mount();
+    expect(native.observe).not.toHaveBeenCalled();
+    act(() => {
+      frame?.(0);
+    });
+    expect(native.observe).toHaveBeenCalledWith(41);
+    await mounted.resolve(41);
+    expect(mounted.read()?.status).toBe('ready');
+    mounted.unmount();
+  });
+
+  it('cancels observation when the state disappears before its mounting frame', async () => {
+    let frame: FrameRequestCallback | undefined = undefined;
+    vi.stubGlobal('requestAnimationFrame', (onFrame: FrameRequestCallback) => {
+      frame = onFrame;
+      return 8;
+    });
+    const mounted = await mount();
+    mounted.unmount();
+    act(() => {
+      frame?.(0);
+    });
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(8);
+    expect(native.observe).not.toHaveBeenCalled();
+  });
+
   it('reports an old client without pretending native measurements exist', async () => {
     native.available = false;
     const mounted = await mount();

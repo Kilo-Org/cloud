@@ -14,6 +14,7 @@ type Observation = {
   node: View | null;
   status: 'pending' | 'ready' | 'failed';
   geometry: NativeSurfaceGeometry | null;
+  failure?: string;
 };
 
 function sameGeometry(left: NativeSurfaceGeometry | null, right: NativeSurfaceGeometry) {
@@ -41,7 +42,12 @@ export function useNativeStateGeometry(node: View | null) {
     }
     const tag = findNodeHandle(node);
     if (tag === null) {
-      setObservation({ node, status: 'failed', geometry: null });
+      setObservation({
+        node,
+        status: 'failed',
+        geometry: null,
+        failure: 'Native view tag unavailable',
+      });
       return undefined;
     }
     let active = true;
@@ -58,7 +64,12 @@ export function useNativeStateGeometry(node: View | null) {
         geometry.visibleBottom >= geometry.visibleTop &&
         geometry.boundsHeight >= 0;
       if (!valid) {
-        setObservation({ node, status: 'failed', geometry: null });
+        setObservation({
+          node,
+          status: 'failed',
+          geometry: null,
+          failure: 'Invalid native surface geometry',
+        });
         return;
       }
       setObservation(previous =>
@@ -72,9 +83,14 @@ export function useNativeStateGeometry(node: View | null) {
     const start = async () => {
       try {
         publish(await observeSurface(tag));
-      } catch {
+      } catch (error) {
         if (active) {
-          setObservation({ node, status: 'failed', geometry: null });
+          setObservation({
+            node,
+            status: 'failed',
+            geometry: null,
+            failure: error instanceof Error ? error.message : 'Native observation failed',
+          });
         }
       }
     };
@@ -87,9 +103,14 @@ export function useNativeStateGeometry(node: View | null) {
         });
       }
     };
-    void start();
+    const startFrame = requestAnimationFrame(() => {
+      if (active) {
+        void start();
+      }
+    });
     return () => {
       active = false;
+      cancelAnimationFrame(startFrame);
       listener?.remove();
       void stop();
     };

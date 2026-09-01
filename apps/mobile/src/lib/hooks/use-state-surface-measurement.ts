@@ -10,6 +10,7 @@ export type SurfaceMeasurement = {
   safeAreaTop: number;
   safeAreaBottom: number;
   source: 'native' | 'layout' | 'pending';
+  failure?: string;
 };
 
 export function useStateSurfaceMeasurement(androidSheet: boolean, nativeActive = true) {
@@ -69,6 +70,7 @@ export function useStateSurfaceMeasurement(androidSheet: boolean, nativeActive =
     };
   }, [measure, width, height]);
 
+  const failure = native.status === 'failed' ? native.failure : undefined;
   const measurement = useMemo<SurfaceMeasurement>(() => {
     if (!frame || native.status === 'pending') {
       return { frame: null, bounds: null, safeAreaTop: 0, safeAreaBottom: 0, source: 'pending' };
@@ -94,8 +96,9 @@ export function useStateSurfaceMeasurement(androidSheet: boolean, nativeActive =
       safeAreaTop: 0,
       safeAreaBottom: 0,
       source: 'layout',
+      failure,
     };
-  }, [frame, native.geometry, native.status, androidSheet, height]);
+  }, [frame, native.geometry, native.status, androidSheet, height, failure]);
 
   return useMemo(
     () => ({ ...measurement, node: nativeNode, capture, measure }),

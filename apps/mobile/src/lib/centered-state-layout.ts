@@ -48,15 +48,15 @@ export function getCenteredStateLayout({
   const top = Math.max(visible.top, surface.top + topInset);
   const bottom = Math.min(visible.bottom, surface.bottom - bottomInset);
   const idealTop = (surface.top + surface.bottom - contentHeight) / 2;
-  const centered = idealTop >= top && idealTop + contentHeight <= bottom;
-  const contentTop = centered
-    ? idealTop
-    : Math.max(top + STATE_GAP, Math.min(idealTop, bottom - STATE_GAP - contentHeight));
+  const fits = contentHeight <= bottom - top;
+  const contentTop = fits
+    ? Math.max(top, Math.min(idealTop, bottom - contentHeight))
+    : top + STATE_GAP;
 
   return {
     minHeight: Math.max(0, viewportBottom - viewport.top),
     paddingTop: Math.max(0, contentTop - viewport.top),
-    paddingBottom: centered
+    paddingBottom: fits
       ? Math.max(0, viewportBottom - contentTop - contentHeight)
       : Math.max(STATE_GAP, viewportBottom - bottom + STATE_GAP),
   };

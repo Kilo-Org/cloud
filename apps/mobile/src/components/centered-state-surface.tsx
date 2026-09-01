@@ -73,6 +73,7 @@ function resolveSurfaceGeometry(
     safeAreaTop,
     safeAreaBottom,
     source: measurement.source,
+    failure: measurement.failure,
     ...insets,
     topReservation: reservations.top,
     bottomReservation: reservations.bottom,

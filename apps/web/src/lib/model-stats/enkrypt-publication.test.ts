@@ -2,13 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ModelStats } from '@kilocode/db/schema';
 import { ENKRYPT_STALE_AFTER_MS, type EnkryptBenchmark } from '@kilocode/db/schema-types';
 import { publishEnkryptBenchmark, publishEnkryptModelStats } from './enkrypt-publication';
-
-import type * as Config from '@/lib/config.server';
+import { fingerprintEnkryptScore } from './enkrypt-fingerprint';
 
 let mockPublicationEnabled = true;
 
 jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual<typeof Config>('@/lib/config.server'),
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
   },
@@ -25,7 +23,12 @@ const benchmark: EnkryptBenchmark = {
 };
 const ingestedAt = Date.parse(benchmark.ingestedAt);
 const staleAfter = '2026-08-28T02:00:00.000Z';
-const published = { ...benchmark, staleAfter, freshness: 'fresh' };
+const published = {
+  ...benchmark,
+  lastCheckedAt: benchmark.ingestedAt,
+  staleAfter,
+  freshness: 'fresh',
+};
 const siblings = {
   kiloBench: { overallScore: 0.6, evals: {} },
   artificialAnalysis: { codingIndex: 70 },
@@ -80,6 +83,97 @@ describe('publishEnkryptBenchmark', () => {
       });
     }
   );
+
+  it.each([1, 2, 30])(
+    'refreshes unchanged content after %s daily checks without implying evaluation',
+    days => {
+      const checkedAt = new Date(ingestedAt + days * 24 * 60 * 60 * 1000).toISOString();
+      const verification = Object.freeze({
+        checkedAt,
+        scoreHash: fingerprintEnkryptScore(benchmark),
+      });
+      const stored = Object.freeze({ ...benchmark });
+      const result = publishEnkryptBenchmark(stored, Date.parse(checkedAt), verification);
+      expect(result).toEqual({
+        ...published,
+        lastCheckedAt: checkedAt,
+        staleAfter: new Date(Date.parse(checkedAt) + ENKRYPT_STALE_AFTER_MS).toISOString(),
+      });
+      expect(result?.ingestedAt).toBe(benchmark.ingestedAt);
+      expect(result?.evaluatedAt).toBeNull();
+      expect(result).not.toHaveProperty('scoreHash');
+      expect(result).not.toHaveProperty('verification');
+      expect(stored).toEqual(benchmark);
+      expect(verification).toEqual({ checkedAt, scoreHash: fingerprintEnkryptScore(benchmark) });
+    }
+  );
+
+  it.each([
+    [ENKRYPT_STALE_AFTER_MS - 1, 'fresh'],
+    [ENKRYPT_STALE_AFTER_MS, 'stale'],
+    [ENKRYPT_STALE_AFTER_MS + 1, 'stale'],
+  ])('uses check age %s at the exact stale boundary', (age, freshness) => {
+    const checkedAt = '2026-08-30T00:00:00.000Z';
+    expect(
+      publishEnkryptBenchmark(benchmark, Date.parse(checkedAt) + age, {
+        checkedAt,
+        scoreHash: fingerprintEnkryptScore(benchmark),
+      })
+    ).toEqual({
+      ...published,
+      lastCheckedAt: checkedAt,
+      staleAfter: '2026-08-31T02:00:00.000Z',
+      freshness,
+    });
+  });
+
+  it.each([
+    undefined,
+    null,
+    {},
+    { checkedAt: '2026-08-30T00:00:00.000Z' },
+    { checkedAt: '2026-08-30T00:00:00.000Z', scoreHash: '0'.repeat(64) },
+    { checkedAt: '2026-08-30T00:00:00.000Z', scoreHash: 'invalid' },
+    { checkedAt: 'invalid', scoreHash: fingerprintEnkryptScore(benchmark) },
+    { checkedAt: '2026-08-30 00:00:00+00', scoreHash: fingerprintEnkryptScore(benchmark) },
+    { checkedAt: '2026-08-31T00:00:00.000Z', scoreHash: fingerprintEnkryptScore(benchmark) },
+    { checkedAt: '2026-08-26T23:59:59.999Z', scoreHash: fingerprintEnkryptScore(benchmark) },
+  ])('falls back to content time for missing or untrusted verification %j', verification => {
+    expect(
+      publishEnkryptBenchmark(benchmark, Date.parse('2026-08-30T00:00:00.000Z'), verification)
+    ).toEqual({ ...published, freshness: 'stale' });
+  });
+
+  it('accepts a check at ingestion and binds verification to parsed score content', () => {
+    const verification = {
+      checkedAt: benchmark.ingestedAt,
+      scoreHash: fingerprintEnkryptScore(benchmark),
+    };
+    expect(publishEnkryptBenchmark(benchmark, ingestedAt, verification)).toEqual(published);
+    const checkedAt = '2026-08-30T00:00:00.000Z';
+    const refreshed = { ...verification, checkedAt };
+    expect(
+      publishEnkryptBenchmark(
+        { ...benchmark, unknownField: 'ignored' },
+        Date.parse(checkedAt),
+        refreshed
+      )
+    ).toMatchObject({ lastCheckedAt: checkedAt, freshness: 'fresh' });
+    expect(
+      publishEnkryptBenchmark({ ...benchmark, risk_score: 1 }, Date.parse(checkedAt), refreshed)
+    ).toEqual({ ...published, risk_score: 1, freshness: 'stale' });
+  });
+
+  it('does not let a valid verification rescue an invalid snapshot', () => {
+    const verification = {
+      checkedAt: benchmark.ingestedAt,
+      scoreHash: fingerprintEnkryptScore(benchmark),
+    };
+    expect(
+      publishEnkryptBenchmark({ ...benchmark, risk_score: '0' }, ingestedAt, verification)
+    ).toBeUndefined();
+    expect(publishEnkryptBenchmark(benchmark, ingestedAt - 1, verification)).toBeUndefined();
+  });
 
   it('withholds valid stored data when publication is disabled', () => {
     mockPublicationEnabled = false;
@@ -150,6 +244,27 @@ describe('publishEnkryptModelStats', () => {
       freshness: 'stale',
     });
     expect(result.benchmarks.enkrypt).toEqual(published);
+  });
+
+  it('uses only the supplied model verification while preserving sibling namespaces', () => {
+    const checkedAt = '2026-08-30T00:00:00.000Z';
+    jest.mocked(Date.now).mockReturnValue(Date.parse(checkedAt));
+    const verification = Object.freeze({
+      checkedAt,
+      scoreHash: fingerprintEnkryptScore(benchmark),
+    });
+    const stored = stat();
+    expect(publishEnkryptModelStats(stored, verification).benchmarks).toEqual({
+      ...siblings,
+      enkrypt: { ...published, lastCheckedAt: checkedAt, staleAfter: '2026-08-31T02:00:00.000Z' },
+    });
+    expect(publishEnkryptModelStats(stored).benchmarks.enkrypt).toEqual({
+      ...published,
+      freshness: 'stale',
+    });
+    expect(stored.benchmarks.enkrypt).toEqual(benchmark);
+    mockPublicationEnabled = false;
+    expect(publishEnkryptModelStats(stored, verification).benchmarks).toEqual(siblings);
   });
 
   it('strips stored and raw Enkrypt values while retaining all siblings when disabled', () => {

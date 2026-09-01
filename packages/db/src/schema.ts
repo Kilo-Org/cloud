@@ -125,6 +125,7 @@ import {
 import type {
   EnkryptFailureCategory,
   EnkryptSyncCounts,
+  EnkryptVerifications,
   UserDeletionTaskProgress,
   UserDeletionManualEvidence,
   UserDeletionAuditDetails,
@@ -5241,6 +5242,7 @@ export const enkrypt_sync_state = pgTable(
     last_failure_category: text('last_failure_category').$type<EnkryptFailureCategory>(),
     last_counts: jsonb('last_counts').$type<EnkryptSyncCounts>(),
     last_success_counts: jsonb('last_success_counts').$type<EnkryptSyncCounts>(),
+    verified_models: jsonb('verified_models').$type<EnkryptVerifications>().notNull().default({}),
     baseline_matched_count: integer('baseline_matched_count'),
     last_alert_at: timestamp('last_alert_at', { withTimezone: true, mode: 'string' }),
     last_alert_reason: text('last_alert_reason').$type<EnkryptSyncAlertReason>(),

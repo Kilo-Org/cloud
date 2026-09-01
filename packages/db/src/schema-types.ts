@@ -2007,9 +2007,21 @@ export const EnkryptBenchmarkSchema = EnkryptScoreSchema.extend({
 
 export type EnkryptBenchmark = z.infer<typeof EnkryptBenchmarkSchema>;
 
+export const EnkryptVerificationSchema = z.object({
+  checkedAt: z.string().datetime(),
+  scoreHash: z.string().regex(/^[0-9a-f]{64}$/),
+});
+
+export type EnkryptVerification = z.infer<typeof EnkryptVerificationSchema>;
+
+export const EnkryptVerificationsSchema = z.record(z.string().min(1), EnkryptVerificationSchema);
+
+export type EnkryptVerifications = z.infer<typeof EnkryptVerificationsSchema>;
+
 export const ENKRYPT_STALE_AFTER_MS = 26 * 60 * 60 * 1000;
 
 export const EnkryptPublishedBenchmarkSchema = EnkryptBenchmarkSchema.extend({
+  lastCheckedAt: z.string().datetime(),
   staleAfter: z.string().datetime(),
   freshness: z.enum(['fresh', 'stale']),
 });

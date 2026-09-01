@@ -127,6 +127,24 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
     });
   });
 
+  it.each([0, 1, 2, 3])(
+    'reports %s changed rows as healthy when all matched scores were checked',
+    async updatedCount => {
+      const checkedCounts = { ...counts, updatedCount };
+      await seed({ last_counts: checkedCounts, last_success_counts: checkedCounts });
+      expect(await getEnkryptSyncHealth()).toMatchObject({
+        status: 'healthy',
+        reason: null,
+        counts: checkedCounts,
+        lastSuccessCounts: checkedCounts,
+        lastSuccessAt: iso(now - hour),
+        shouldAlert: false,
+      });
+      jest.spyOn(Date, 'now').mockReturnValue(now - hour + ENKRYPT_STALE_AFTER_MS);
+      expect(await getEnkryptSyncHealth()).toMatchObject({ status: 'stale', shouldAlert: true });
+    }
+  );
+
   it.each([
     { age: ENKRYPT_STALE_AFTER_MS - 1, status: 'healthy', reason: null, shouldAlert: false },
     { age: ENKRYPT_STALE_AFTER_MS, status: 'stale', reason: 'stale', shouldAlert: true },
@@ -354,8 +372,12 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
     { baseline_matched_count: null },
     { baseline_matched_count: 2 },
     { last_success_at: null },
-    { last_success_counts: { ...counts, updatedCount: 0 } },
+    { last_success_counts: { ...counts, matchedCount: 0, updatedCount: 0 } },
     { last_success_counts: { ...counts, matchedCount: 2 } },
+    { last_success_counts: { ...counts, updatedCount: -1 } },
+    { last_success_counts: { ...counts, fetchedCount: 8 } },
+    { last_success_counts: { ...counts, rejectedCount: 1 } },
+    { last_success_counts: { ...counts, ambiguousCount: 1 } },
   ])('fails closed for inconsistent success or failure state %#', async overrides => {
     await seed(overrides);
     expect(await getEnkryptSyncHealth()).toMatchObject({

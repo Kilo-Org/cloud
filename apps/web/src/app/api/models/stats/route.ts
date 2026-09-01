@@ -5,6 +5,7 @@ import { modelStats } from '@kilocode/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { publishEnkryptModelStats } from '@/lib/model-stats/enkrypt-publication';
+import { getEnkryptVerifications } from '@/lib/model-stats/enkrypt-verifications';
 
 export const revalidate = 0;
 export const dynamic = 'force-dynamic';
@@ -23,8 +24,9 @@ export async function GET(_request: NextRequest) {
       .where(eq(modelStats.isActive, true))
       .orderBy(desc(modelStats.codingIndex));
 
+    const verifications = await getEnkryptVerifications();
     return NextResponse.json(
-      stats.map(stat => publishEnkryptModelStats(stat)),
+      stats.map(stat => publishEnkryptModelStats(stat, verifications[stat.openrouterId])),
       { headers }
     );
   } catch (error) {

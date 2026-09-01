@@ -46,7 +46,7 @@ const countMetadata = {
   ambiguous_count: 1,
   updated_count: 2,
 };
-const ingestedAt = '2026-08-27T04:00:00.000Z';
+const checkedAt = '2026-08-27T04:00:00.000Z';
 const sensitive = 'sensitive-header-body-SQL-parameters';
 
 function request(authorization: string | undefined = 'Bearer cron-secret') {
@@ -130,7 +130,7 @@ describe('GET /api/cron/sync-enkrypt', () => {
       })
     );
     const event = jest.mocked(emitScheduledJobEvent).mock.calls[0]?.[0];
-    expect(event).not.toHaveProperty('ingested_at');
+    expect(event).not.toHaveProperty('checked_at');
     expect(event).not.toHaveProperty('last_success_at');
     expect(event).not.toHaveProperty('updated_count');
     expect(captureException).not.toHaveBeenCalled();
@@ -140,7 +140,7 @@ describe('GET /api/cron/sync-enkrypt', () => {
     const result = {
       status: 'succeeded' as const,
       ...counts,
-      ingestedAt,
+      checkedAt,
       unmatchedModelNames: [sensitive],
       upstreamMetadata: sensitive,
     };
@@ -148,7 +148,12 @@ describe('GET /api/cron/sync-enkrypt', () => {
     const response = await GET(request());
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: 'succeeded', ...counts, ingestedAt });
+    expect(await response.json()).toEqual({
+      status: 'succeeded',
+      ...counts,
+      checkedAt,
+      unchangedCount: 0,
+    });
     expect(maxDuration).toBe(120);
     expect(mockSync).toHaveBeenCalledTimes(1);
     expect(mockSync).toHaveBeenCalledWith();
@@ -161,12 +166,46 @@ describe('GET /api/cron/sync-enkrypt', () => {
       expect.objectContaining({
         outcome: 'succeeded',
         status: 'succeeded',
-        ingested_at: ingestedAt,
+        checked_at: checkedAt,
+        unchanged_count: 0,
         ...countMetadata,
       })
     );
     expect(JSON.stringify(jest.mocked(emitScheduledJobEvent).mock.calls)).not.toContain(sensitive);
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 1])('reports a healthy poll with %i changed models', async updatedCount => {
+    const result = { status: 'succeeded' as const, ...counts, updatedCount, checkedAt };
+    mockSync.mockResolvedValue(result);
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ...result, unchangedCount: 2 - updatedCount });
+    expect(emitScheduledJobEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: 'succeeded',
+        checked_at: checkedAt,
+        matched_count: 2,
+        updated_count: updatedCount,
+        unchanged_count: 2 - updatedCount,
+      })
+    );
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { ...counts, matchedCount: 0, updatedCount: 0 },
+    { ...counts, updatedCount: 3 },
+    { ...counts, fetchedCount: 7 },
+  ])('rejects inconsistent successful counters: %p', async invalidCounts => {
+    mockSync.mockResolvedValue({ status: 'succeeded', ...invalidCounts, checkedAt });
+    const response = await GET(request());
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ status: 'failed', category: 'unexpected' });
+    expect(jest.mocked(emitScheduledJobEvent).mock.calls[0]?.[0]).not.toHaveProperty(
+      'unchanged_count'
+    );
   });
 
   it.each(EnkryptFailureCategorySchema.options)(
@@ -275,8 +314,8 @@ describe('GET /api/cron/sync-enkrypt', () => {
   );
 
   it.each([
-    { ...counts, rejectedCount: -1, ingestedAt },
-    { ...counts, ingestedAt: sensitive },
+    { ...counts, rejectedCount: -1, checkedAt },
+    { ...counts, checkedAt: sensitive },
   ])('does not publish invalid success data: %p', async result => {
     mockSync.mockResolvedValue({ status: 'succeeded', ...result });
     const response = await GET(request());

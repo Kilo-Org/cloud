@@ -7,6 +7,8 @@ import { db } from '@/lib/drizzle';
 import { modelStats, type ModelStats } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { EnkryptBenchmark } from '@kilocode/db/schema-types';
+import { getEnkryptVerifications } from '@/lib/model-stats/enkrypt-verifications';
+import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
 
 import type * as Config from '@/lib/config.server';
 
@@ -19,6 +21,14 @@ jest.mock('@/lib/config.server', () => ({
   },
   ENKRYPT_SYNC_ENABLED: false,
 }));
+
+jest.mock('@/lib/model-stats/enkrypt-verifications', () => ({
+  getEnkryptVerifications: jest.fn(),
+}));
+
+beforeEach(() => {
+  jest.mocked(getEnkryptVerifications).mockReset().mockResolvedValue({});
+});
 
 describe('GET /api/models/stats', () => {
   beforeAll(async () => {
@@ -134,7 +144,12 @@ describe('GET /api/models/stats Enkrypt publication', () => {
     ingestedAt: '2026-08-27T00:00:00.000Z',
     evaluatedAt: null,
   };
-  const published = { ...benchmark, staleAfter: '2026-08-28T02:00:00.000Z', freshness: 'fresh' };
+  const published = {
+    ...benchmark,
+    lastCheckedAt: benchmark.ingestedAt,
+    staleAfter: '2026-08-28T02:00:00.000Z',
+    freshness: 'fresh',
+  };
   const siblings = {
     artificialAnalysis: { codingIndex: 75 },
     kiloBench: { overallScore: 0.7, evals: {} },
@@ -201,6 +216,47 @@ describe('GET /api/models/stats Enkrypt publication', () => {
     });
     mockPublicationEnabled = false;
     expect((await responseFor(stored))?.benchmarks).toEqual(siblings);
+  });
+
+  test('loads checks once for the list, binds each model, and never publishes verification hashes', async () => {
+    const stored = await insertSnapshot();
+    const missing = await insertSnapshot();
+    const checkedAt = '2026-08-30T00:00:00.000Z';
+    const verification = { checkedAt, scoreHash: fingerprintEnkryptScore(benchmark) };
+    jest.mocked(getEnkryptVerifications).mockResolvedValue({ [stored.openrouterId]: verification });
+    jest.mocked(Date.now).mockReturnValue(Date.parse(checkedAt));
+    const response = await GET(new NextRequest('http://localhost:3000/api/models/stats'));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const data: ModelStats[] = await response.json();
+    const checked = {
+      ...published,
+      lastCheckedAt: checkedAt,
+      staleAfter: '2026-08-31T02:00:00.000Z',
+    };
+    expect(data.find(row => row.id === stored.id)?.benchmarks).toEqual({
+      ...siblings,
+      enkrypt: checked,
+    });
+    expect(data.find(row => row.id === missing.id)?.benchmarks?.enkrypt).toEqual({
+      ...published,
+      freshness: 'stale',
+    });
+    expect(getEnkryptVerifications).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(data)).not.toContain(verification.scoreHash);
+    expect(data.find(row => row.id === stored.id)?.openrouterData).not.toHaveProperty('enkrypt');
+
+    jest.mocked(Date.now).mockReturnValue(Date.parse(checked.staleAfter) - 1);
+    expect((await responseFor(stored))?.benchmarks?.enkrypt).toEqual(checked);
+    jest.mocked(Date.now).mockReturnValue(Date.parse(checked.staleAfter));
+    expect((await responseFor(stored))?.benchmarks?.enkrypt).toEqual({
+      ...checked,
+      freshness: 'stale',
+    });
+    mockPublicationEnabled = false;
+    expect((await responseFor(stored))?.benchmarks).toEqual(siblings);
+    const [unchanged] = await db.select().from(modelStats).where(eq(modelStats.id, stored.id));
+    expect(unchanged).toEqual(stored);
   });
 
   test.each([

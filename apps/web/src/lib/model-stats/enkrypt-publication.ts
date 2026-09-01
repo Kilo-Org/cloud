@@ -4,21 +4,37 @@ import type { ModelStats } from '@kilocode/db/schema';
 import {
   ENKRYPT_STALE_AFTER_MS,
   EnkryptBenchmarkSchema,
+  EnkryptVerificationSchema,
   type EnkryptPublishedBenchmark,
 } from '@kilocode/db/schema-types';
+import { fingerprintEnkryptScore } from './enkrypt-fingerprint';
 
 export function publishEnkryptBenchmark(
   value: unknown,
-  now = Date.now()
+  now = Date.now(),
+  verification?: unknown
 ): EnkryptPublishedBenchmark | undefined {
   if (!ENKRYPT_PUBLICATION_ENABLED) return undefined;
   const result = EnkryptBenchmarkSchema.safeParse(value);
   if (!result.success) return undefined;
   const ingestedAt = Date.parse(result.data.ingestedAt);
   if (!Number.isFinite(now) || !Number.isFinite(ingestedAt) || ingestedAt > now) return undefined;
-  const staleAfter = ingestedAt + ENKRYPT_STALE_AFTER_MS;
+  const verified = EnkryptVerificationSchema.safeParse(verification);
+  let lastCheckedAt = ingestedAt;
+  if (verified.success) {
+    const checkedAt = Date.parse(verified.data.checkedAt);
+    if (
+      checkedAt >= ingestedAt &&
+      checkedAt <= now &&
+      verified.data.scoreHash === fingerprintEnkryptScore(result.data)
+    ) {
+      lastCheckedAt = checkedAt;
+    }
+  }
+  const staleAfter = lastCheckedAt + ENKRYPT_STALE_AFTER_MS;
   return {
     ...result.data,
+    lastCheckedAt: new Date(lastCheckedAt).toISOString(),
     staleAfter: new Date(staleAfter).toISOString(),
     freshness: now < staleAfter ? 'fresh' : 'stale',
   };
@@ -36,7 +52,7 @@ export function isEnkryptPublicModel(model: PublicModel): boolean {
 
 export function publishEnkryptModelStats<
   T extends PublicModel & Pick<ModelStats, 'benchmarks' | 'openrouterData'>,
->(stat: T) {
+>(stat: T, verification?: unknown) {
   const openrouterData = { ...stat.openrouterData };
   if ('enkrypt' in openrouterData) delete openrouterData.enkrypt;
   const publishedStat = { ...stat, openrouterData };
@@ -44,7 +60,7 @@ export function publishEnkryptModelStats<
   const benchmarks = { ...stat.benchmarks };
   delete benchmarks.enkrypt;
   const enkrypt = isEnkryptPublicModel(stat)
-    ? publishEnkryptBenchmark(stat.benchmarks.enkrypt)
+    ? publishEnkryptBenchmark(stat.benchmarks.enkrypt, Date.now(), verification)
     : undefined;
   return { ...publishedStat, benchmarks: { ...benchmarks, ...(enkrypt && { enkrypt }) } };
 }

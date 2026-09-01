@@ -38,13 +38,15 @@ export type SyncOpenRouterResult = {
  */
 export async function syncOpenRouterModels(
   allModels: OpenRouterModel[],
-  preferredModelIds: string[]
+  preferredModelIds: string[],
+  additionalModelIds: string[] = []
 ): Promise<SyncOpenRouterResult> {
   // Create a map for quick lookup
   const allModelsMap = new Map(allModels.map(model => [model.id, model]));
-
-  // Get preferred models data
-  const preferredModelData = allModels.filter(model => preferredModelIds.includes(model.id));
+  const additionalModelIdSet = new Set(additionalModelIds);
+  const targetModelData = [...allModelsMap.values()].filter(
+    model => preferredModelIds.includes(model.id) || additionalModelIdSet.has(model.id)
+  );
 
   // Get ALL existing model stats from database (not just preferred ones)
   const existingStats = await db.select().from(modelStats);
@@ -55,10 +57,10 @@ export async function syncOpenRouterModels(
   const modelsToInsert: Array<typeof modelStats.$inferInsert> = [];
   const modelsToUpdate: Array<{ id: string; data: Partial<typeof modelStats.$inferInsert> }> = [];
 
-  // Step 1: Process preferred models (ensure they exist and are active)
-  for (const model of preferredModelData) {
+  for (const model of targetModelData) {
     const existing = existingStatsMap.get(model.id);
     const isRecommended = preferredModelIds.includes(model.id);
+    if (existing && !isRecommended) continue;
 
     if (existing) {
       // Update existing preferred model - set isActive=true and update data
@@ -80,7 +82,6 @@ export async function syncOpenRouterModels(
       });
       updatedModels.push(model.id);
     } else {
-      // Insert new preferred model
       modelsToInsert.push({
         isActive: true,
         isRecommended,
@@ -113,7 +114,7 @@ export async function syncOpenRouterModels(
         id: existingStat.id,
         data: {
           // Note: NOT updating isActive - preserve user's setting
-          isRecommended,
+          ...(additionalModelIdSet.has(updatedModelData.id) ? {} : { isRecommended }),
           ...deriveModelStatsIdentity(updatedModelData.id),
           name: updatedModelData.name,
           description: updatedModelData.description,

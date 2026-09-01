@@ -7,6 +7,7 @@ import { getRawOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { NextRequest } from 'next/server';
 import { OpenRouterModelsResponseSchema } from '@/lib/organizations/organization-types';
 import { getEnkryptBenchmarks } from '@/lib/model-stats/enkrypt';
+import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
 import type * as Enkrypt from '@/lib/model-stats/enkrypt';
 import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type * as Byok from '@/lib/ai-gateway/byok';
@@ -90,6 +91,7 @@ const enkryptBenchmark: EnkryptBenchmark = {
 };
 const publishedEnkryptBenchmark = {
   ...enkryptBenchmark,
+  lastCheckedAt: enkryptBenchmark.ingestedAt,
   staleAfter: '2026-08-28T02:00:00.000Z',
   freshness: 'fresh',
 };
@@ -421,6 +423,58 @@ describe('Enkrypt catalog publication boundaries', () => {
     for (const model of disabled.data) expect(model).not.toHaveProperty('enkrypt');
     expect(cached.get('some-other-model')).toEqual(enkryptBenchmark);
   });
+
+  test.each([
+    ['/api/openrouter/models', GET],
+    ['/api/gateway/v1/models', gatewayV1ModelsGET],
+  ])(
+    'retains verified lastCheckedAt in the %s schema without leaking server metadata',
+    async (path, handler) => {
+      const checkedAt = '2026-08-30T00:00:00.000Z';
+      const verification = { checkedAt, scoreHash: fingerprintEnkryptScore(enkryptBenchmark) };
+      const snapshot = Object.freeze({ ...enkryptBenchmark, verification });
+      jest
+        .mocked(getEnkryptBenchmarks)
+        .mockResolvedValue(new Map([['some-other-model', snapshot]]));
+      global.fetch = jest
+        .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+        .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+      const checked = {
+        ...publishedEnkryptBenchmark,
+        lastCheckedAt: checkedAt,
+        staleAfter: '2026-08-31T02:00:00.000Z',
+      };
+      jest.mocked(Date.now).mockReturnValue(Date.parse(checked.staleAfter) - 1);
+      const response = await handler(createTestRequest(path));
+      expect(response.status).toBe(200);
+      const raw = await response.json();
+      expect(JSON.stringify(raw)).not.toContain(verification.scoreHash);
+      const model = OpenRouterModelsResponseSchema.parse(raw).data.find(
+        item => item.id === 'some-other-model'
+      );
+      expect(model?.enkrypt).toEqual(checked);
+      expect(model?.enkrypt).not.toHaveProperty('verification');
+      expect(model?.terminalBench).toEqual({ overallScore: 0.551, avgAttemptCostUsd: 53.37 });
+      expect(getEnkryptBenchmarks).toHaveBeenCalledTimes(1);
+
+      jest.mocked(Date.now).mockReturnValue(Date.parse(checked.staleAfter));
+      const stale = OpenRouterModelsResponseSchema.parse(
+        await (await handler(createTestRequest(path))).json()
+      );
+      expect(stale.data.find(item => item.id === 'some-other-model')?.enkrypt).toEqual({
+        ...checked,
+        freshness: 'stale',
+      });
+      mockPublicationEnabled = false;
+      const disabled = OpenRouterModelsResponseSchema.parse(
+        await (await handler(createTestRequest(path))).json()
+      );
+      expect(disabled.data.find(item => item.id === 'some-other-model')).not.toHaveProperty(
+        'enkrypt'
+      );
+      expect(snapshot).toEqual({ ...enkryptBenchmark, verification });
+    }
+  );
 
   test('withholds future snapshots and preserves missing upstream source', async () => {
     const withoutSource = { ...enkryptBenchmark };

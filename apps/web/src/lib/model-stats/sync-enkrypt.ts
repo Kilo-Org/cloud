@@ -5,21 +5,26 @@ import { setTimeout } from 'node:timers/promises';
 import { ENKRYPT_API_KEY, ENKRYPT_SYNC_ENABLED } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import { enkrypt_sync_state, modelStats } from '@kilocode/db/schema';
-import { EnkryptSyncCountsSchema } from '@kilocode/db/schema-types';
+import {
+  EnkryptBenchmarkSchema,
+  EnkryptSyncCountsSchema,
+  EnkryptVerificationsSchema,
+} from '@kilocode/db/schema-types';
 import type {
   EnkryptBenchmark,
   EnkryptFailureCategory,
   EnkryptSyncCounts,
 } from '@kilocode/db/schema-types';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { EnkryptSyncError } from './enkrypt-errors';
-import { matchEnkryptScores, parseEnkryptScores } from './enkrypt-identity';
+import { fingerprintEnkryptScore } from './enkrypt-fingerprint';
+import { ENKRYPT_MODEL_MAPPINGS, matchEnkryptScores, parseEnkryptScores } from './enkrypt-identity';
 
 export { matchEnkryptScores, parseEnkryptScores } from './enkrypt-identity';
 
 export type SyncEnkryptResult =
   | { status: 'disabled' }
-  | ({ status: 'succeeded'; ingestedAt: string } & EnkryptSyncCounts);
+  | ({ status: 'succeeded'; checkedAt: string } & EnkryptSyncCounts);
 
 async function fetchScores(apiKey: string): Promise<unknown> {
   const signal = AbortSignal.timeout(30_000);
@@ -28,7 +33,7 @@ async function fetchScores(apiKey: string): Promise<unknown> {
     try {
       response = await fetch('https://api.enkryptai.com/leaderboard/v2/scores', {
         method: 'GET',
-        headers: { apikey: apiKey },
+        headers: { apikey: apiKey, 'X-Enkrypt-Leaderboard-Mode': 'public' },
         signal,
         redirect: 'error',
         cache: 'no-store',
@@ -129,7 +134,16 @@ export async function syncEnkryptBenchmarks(): Promise<SyncEnkryptResult> {
         isStealth: modelStats.isStealth,
       })
       .from(modelStats)
-      .where(and(eq(modelStats.isActive, true), eq(modelStats.isStealth, false)));
+      .where(
+        and(
+          eq(modelStats.isActive, true),
+          eq(modelStats.isStealth, false),
+          inArray(
+            modelStats.openrouterId,
+            ENKRYPT_MODEL_MAPPINGS.map(mapping => mapping.modelId)
+          )
+        )
+      );
     stage = 'unexpected';
     const matched = matchEnkryptScores(parsed.scores, models);
     counts.matchedCount = matched.matches.length;
@@ -157,27 +171,86 @@ export async function syncEnkryptBenchmarks(): Promise<SyncEnkryptResult> {
         throw new EnkryptSyncError('coverage', { counts: acceptedCounts });
       }
 
-      const ingestedAt = new Date().toISOString();
-      let updatedCount = 0;
+      const checkedAt = new Date().toISOString();
+      const checkedAtMs = Date.parse(checkedAt);
+      const verifications = EnkryptVerificationsSchema.safeParse(state.verified_models);
+      if (
+        !verifications.success ||
+        Object.values(verifications.data).some(entry => Date.parse(entry.checkedAt) > checkedAtMs)
+      ) {
+        throw new EnkryptSyncError('database', { counts: acceptedCounts });
+      }
+      const currentModels = await tx
+        .select({
+          id: modelStats.id,
+          openrouterId: modelStats.openrouterId,
+          snapshot: sql<unknown>`${modelStats.benchmarks}->'enkrypt'`,
+        })
+        .from(modelStats)
+        .where(
+          and(
+            inArray(
+              modelStats.id,
+              matched.matches.map(({ model }) => model.id)
+            ),
+            eq(modelStats.isActive, true),
+            eq(modelStats.isStealth, false)
+          )
+        );
+      const currentById = new Map(currentModels.map(model => [model.id, model]));
+      const changes: {
+        id: string;
+        openrouter_id: string;
+        previous_snapshot: unknown;
+        snapshot: EnkryptBenchmark;
+      }[] = [];
       for (const { model, score } of matched.matches) {
-        const snapshot: EnkryptBenchmark = { ...score, ingestedAt, evaluatedAt: null };
+        const current = currentById.get(model.id);
+        if (!current || current.openrouterId !== model.openrouterId) {
+          throw new EnkryptSyncError('coverage', { counts: acceptedCounts });
+        }
+        const previous = EnkryptBenchmarkSchema.safeParse(current.snapshot);
+        if (
+          current.snapshot !== null &&
+          (!previous.success || Date.parse(previous.data.ingestedAt) > checkedAtMs)
+        ) {
+          throw new EnkryptSyncError('coverage', { counts: acceptedCounts });
+        }
+        const scoreHash = fingerprintEnkryptScore(score);
+        verifications.data[model.openrouterId] = { checkedAt, scoreHash };
+        if (!previous.success || fingerprintEnkryptScore(previous.data) !== scoreHash) {
+          changes.push({
+            id: model.id,
+            openrouter_id: model.openrouterId,
+            previous_snapshot: current.snapshot,
+            snapshot: { ...score, ingestedAt: checkedAt, evaluatedAt: null },
+          });
+        }
+      }
+      let updatedCount = 0;
+      if (changes.length > 0) {
         const updated = await tx
           .update(modelStats)
           .set({
-            benchmarks: sql`COALESCE(${modelStats.benchmarks}, '{}'::jsonb) || ${JSON.stringify({ enkrypt: snapshot })}::jsonb`,
+            benchmarks: sql`COALESCE(${modelStats.benchmarks}, '{}'::jsonb) || jsonb_build_object('enkrypt', changes.snapshot)`,
           })
+          .from(
+            sql`jsonb_to_recordset(${JSON.stringify(changes)}::jsonb) AS changes(id uuid, openrouter_id text, previous_snapshot jsonb, snapshot jsonb)`
+          )
           .where(
             and(
-              eq(modelStats.id, model.id),
-              eq(modelStats.openrouterId, model.openrouterId),
+              eq(modelStats.id, sql`changes.id`),
+              eq(modelStats.openrouterId, sql`changes.openrouter_id`),
               eq(modelStats.isActive, true),
-              eq(modelStats.isStealth, false)
+              eq(modelStats.isStealth, false),
+              sql`(${modelStats.benchmarks} IS NULL OR jsonb_typeof(${modelStats.benchmarks}) = 'object')`,
+              sql`NULLIF(${modelStats.benchmarks}->'enkrypt', 'null'::jsonb) IS NOT DISTINCT FROM changes.previous_snapshot`
             )
           )
           .returning({ id: modelStats.id });
-        updatedCount += updated.length;
+        updatedCount = updated.length;
       }
-      if (updatedCount !== acceptedCounts.matchedCount) {
+      if (updatedCount !== changes.length) {
         throw new EnkryptSyncError('coverage', { counts: acceptedCounts });
       }
       const successCounts: EnkryptSyncCounts = { ...acceptedCounts, updatedCount };
@@ -185,11 +258,12 @@ export async function syncEnkryptBenchmarks(): Promise<SyncEnkryptResult> {
         .update(enkrypt_sync_state)
         .set({
           last_outcome: 'succeeded',
-          last_completed_at: ingestedAt,
-          last_success_at: ingestedAt,
+          last_completed_at: checkedAt,
+          last_success_at: checkedAt,
           last_failure_category: null,
           last_counts: successCounts,
           last_success_counts: successCounts,
+          verified_models: verifications.data,
           baseline_matched_count: Math.max(
             state.baseline_matched_count ?? 0,
             acceptedCounts.matchedCount
@@ -198,7 +272,7 @@ export async function syncEnkryptBenchmarks(): Promise<SyncEnkryptResult> {
           last_alert_reason: null,
         })
         .where(eq(enkrypt_sync_state.job_name, 'enkrypt'));
-      return { status: 'succeeded', ...successCounts, ingestedAt };
+      return { status: 'succeeded', ...successCounts, checkedAt };
     });
   } catch (error) {
     const failure =
@@ -229,7 +303,7 @@ export async function syncEnkryptBenchmarks(): Promise<SyncEnkryptResult> {
         const [completed] = await db
           .select({
             counts: enkrypt_sync_state.last_success_counts,
-            ingestedAt: enkrypt_sync_state.last_success_at,
+            checkedAt: enkrypt_sync_state.last_success_at,
           })
           .from(enkrypt_sync_state)
           .where(
@@ -242,15 +316,20 @@ export async function syncEnkryptBenchmarks(): Promise<SyncEnkryptResult> {
         const committedCounts = EnkryptSyncCountsSchema.safeParse(completed?.counts);
         if (
           committedCounts.success &&
-          committedCounts.data.updatedCount > 0 &&
-          committedCounts.data.updatedCount === committedCounts.data.matchedCount &&
-          completed?.ingestedAt &&
-          Number.isFinite(Date.parse(completed.ingestedAt))
+          committedCounts.data.matchedCount > 0 &&
+          committedCounts.data.updatedCount <= committedCounts.data.matchedCount &&
+          committedCounts.data.fetchedCount ===
+            committedCounts.data.rejectedCount +
+              committedCounts.data.matchedCount +
+              committedCounts.data.unmatchedCount +
+              committedCounts.data.ambiguousCount &&
+          completed?.checkedAt &&
+          Number.isFinite(Date.parse(completed.checkedAt))
         ) {
           return {
             status: 'succeeded',
             ...committedCounts.data,
-            ingestedAt: new Date(completed.ingestedAt).toISOString(),
+            checkedAt: new Date(completed.checkedAt).toISOString(),
           };
         }
       }

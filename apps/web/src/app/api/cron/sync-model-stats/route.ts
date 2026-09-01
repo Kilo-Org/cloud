@@ -14,7 +14,8 @@ import {
 import { syncArtificialAnalysisBenchmarks } from '@/lib/model-stats/sync-artificial-analysis';
 import { syncOpenRouterModels } from '@/lib/model-stats/sync-openrouter';
 import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET, ENKRYPT_SYNC_ENABLED } from '@/lib/config.server';
+import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
 
@@ -75,8 +76,24 @@ export async function GET(request: NextRequest) {
       `[sync-model-stats] Found ${preferredModelData.length} preferred models out of ${allModels.length} total`
     );
 
-    // Sync OpenRouter model data to database
-    const syncResult = await syncOpenRouterModels(allModels, monitoredModels);
+    const additionalModelIds = ENKRYPT_SYNC_ENABLED
+      ? [...new Set(ENKRYPT_MODEL_MAPPINGS.map(({ modelId }) => modelId))].filter(modelId =>
+          enhancedModelsMap.has(modelId)
+        )
+      : [];
+    if (additionalModelIds.length > 0) {
+      const rawModelIds = new Set(allModels.map(model => model.id));
+      for (const modelId of additionalModelIds) {
+        const enhancedModel = enhancedModelsMap.get(modelId);
+        if (!rawModelIds.has(modelId) && enhancedModel) {
+          allModels.push(enhancedModel);
+        }
+      }
+    }
+
+    const syncResult = ENKRYPT_SYNC_ENABLED
+      ? await syncOpenRouterModels(allModels, monitoredModels, additionalModelIds)
+      : await syncOpenRouterModels(allModels, monitoredModels);
     const { newModels, updatedModels, totalProcessed } = syncResult;
 
     console.log(

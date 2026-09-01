@@ -18,8 +18,14 @@ export const maxDuration = 120;
 
 const SuccessSchema = EnkryptSyncCountsSchema.extend({
   status: z.literal('succeeded'),
-  ingestedAt: z.string().datetime(),
-});
+  checkedAt: z.string().datetime(),
+}).refine(
+  counts =>
+    counts.matchedCount > 0 &&
+    counts.updatedCount <= counts.matchedCount &&
+    counts.fetchedCount ===
+      counts.rejectedCount + counts.matchedCount + counts.unmatchedCount + counts.ambiguousCount
+);
 const HttpStatusSchema = z.number().int().min(100).max(599);
 
 function countMetadata(counts: EnkryptSyncCounts | undefined) {
@@ -56,15 +62,17 @@ export async function GET(request: NextRequest) {
     const parsed = SuccessSchema.safeParse(result);
     if (!parsed.success) throw new EnkryptSyncError('unexpected');
     const summary = parsed.data;
+    const unchangedCount = summary.matchedCount - summary.updatedCount;
     emitScheduledJobEvent(
       buildScheduledJobSuccessEvent(run, {
         status: summary.status,
-        ingested_at: summary.ingestedAt,
+        checked_at: summary.checkedAt,
+        unchanged_count: unchangedCount,
         ...countMetadata(summary),
       })
     );
 
-    return NextResponse.json(summary);
+    return NextResponse.json({ ...summary, unchangedCount });
   } catch (caught) {
     const category = EnkryptFailureCategorySchema.safeParse(
       caught instanceof EnkryptSyncError ? caught.category : undefined

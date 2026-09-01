@@ -5,6 +5,7 @@ import { modelStats } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { publishEnkryptModelStats } from '@/lib/model-stats/enkrypt-publication';
+import { getEnkryptVerifications } from '@/lib/model-stats/enkrypt-verifications';
 
 export const revalidate = 0;
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(publishEnkryptModelStats(stat), { headers });
+    const verifications = await getEnkryptVerifications();
+    return NextResponse.json(publishEnkryptModelStats(stat, verifications[stat.openrouterId]), {
+      headers,
+    });
   } catch (error) {
     console.error('Error fetching model stat by slug:', error);
     captureException(error, {

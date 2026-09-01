@@ -4,7 +4,12 @@ import { isEnkryptPublicModel, publishEnkryptBenchmark } from './enkrypt-publica
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { readDb } from '@/lib/drizzle';
 import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
-import type { EnkryptBenchmark, EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
+import type {
+  EnkryptBenchmark,
+  EnkryptPublishedBenchmark,
+  EnkryptVerification,
+} from '@kilocode/db/schema-types';
+import { getEnkryptVerifications } from './enkrypt-verifications';
 import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
 import { and, eq, notLike } from 'drizzle-orm';
 
@@ -16,7 +21,10 @@ const EnkryptNamespaceSchema = ModelStatsBenchmarksSchema.unwrap()
 
 const TTL = 5 * 60 * 1000;
 
-export type EnkryptBenchmarks = ReadonlyMap<string, EnkryptBenchmark>;
+export type EnkryptBenchmarks = ReadonlyMap<
+  string,
+  EnkryptBenchmark & { verification?: EnkryptVerification }
+>;
 
 type Row = {
   openrouterId: string;
@@ -44,9 +52,12 @@ export function enkryptFor(
 ): EnkryptPublishedBenchmark | undefined {
   if (!ENKRYPT_PUBLICATION_ENABLED) return undefined;
   const exact = benchmarks.get(id);
-  if (exact) return publishEnkryptBenchmark(exact);
+  if (exact) return publishEnkryptBenchmark(exact, Date.now(), exact.verification);
   const unprefixed = unprefixKiloGatewayModelId(id);
-  return unprefixed ? publishEnkryptBenchmark(benchmarks.get(unprefixed)) : undefined;
+  const fallback = unprefixed ? benchmarks.get(unprefixed) : undefined;
+  return fallback
+    ? publishEnkryptBenchmark(fallback, Date.now(), fallback.verification)
+    : undefined;
 }
 
 async function loadEnkrypt(): Promise<EnkryptBenchmarks> {
@@ -80,5 +91,14 @@ const getCachedEnkryptBenchmarks = createCachedFetch(
 
 export async function getEnkryptBenchmarks(): Promise<EnkryptBenchmarks> {
   if (!ENKRYPT_PUBLICATION_ENABLED) return new Map();
-  return getCachedEnkryptBenchmarks();
+  const [benchmarks, verifications] = await Promise.all([
+    getCachedEnkryptBenchmarks(),
+    getEnkryptVerifications(),
+  ]);
+  return new Map(
+    [...benchmarks].map(([id, benchmark]) => [
+      id,
+      { ...benchmark, ...(verifications[id] && { verification: verifications[id] }) },
+    ])
+  );
 }

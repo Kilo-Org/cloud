@@ -6,16 +6,14 @@ import {
   EnkryptScoreSchema,
 } from '@kilocode/db/schema-types';
 import { ModelStatsBenchmarksSchema } from '@kilocode/db/schema';
-import { readDb } from '@/lib/drizzle';
+import { db, readDb } from '@/lib/drizzle';
 import { enkryptFor, getEnkryptBenchmarks, summarizeEnkrypt } from './enkrypt';
-
-import type * as Config from '@/lib/config.server';
+import { fingerprintEnkryptScore } from './enkrypt-fingerprint';
 
 let mockPublicationEnabled = true;
 let mockSyncEnabled = false;
 
 jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual<typeof Config>('@/lib/config.server'),
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
   },
@@ -25,6 +23,11 @@ jest.mock('@/lib/config.server', () => ({
 }));
 
 jest.mock('@/lib/drizzle', () => ({
+  db: {
+    select: jest.fn(() => ({
+      from: jest.fn(() => ({ where: mockVerificationWhere })),
+    })),
+  },
   readDb: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({ where: mockWhere })),
@@ -50,7 +53,12 @@ const score = {
   owasp_score: 1000,
 };
 const benchmark = { ...score, ingestedAt: '2026-08-27T00:00:00.000Z', evaluatedAt: null };
-const published = { ...benchmark, staleAfter: '2026-08-28T02:00:00.000Z', freshness: 'fresh' };
+const published = {
+  ...benchmark,
+  lastCheckedAt: benchmark.ingestedAt,
+  staleAfter: '2026-08-28T02:00:00.000Z',
+  freshness: 'fresh',
+};
 const scoreFields = [
   'risk_score',
   'bias_score',
@@ -82,6 +90,7 @@ function row(overrides: Partial<Parameters<typeof summarizeEnkrypt>[0][number]> 
 }
 
 const mockWhere = jest.fn<Promise<Parameters<typeof summarizeEnkrypt>[0]>, []>();
+const mockVerificationWhere = jest.fn<Promise<{ verified_models: unknown }[]>, []>();
 
 beforeEach(() => {
   mockPublicationEnabled = true;
@@ -166,6 +175,9 @@ describe('Enkrypt schemas', () => {
     ).toBe(false);
     expect(
       EnkryptPublishedBenchmarkSchema.safeParse({ ...published, staleAfter: 'invalid' }).success
+    ).toBe(false);
+    expect(
+      EnkryptPublishedBenchmarkSchema.safeParse({ ...published, lastCheckedAt: 'invalid' }).success
     ).toBe(false);
   });
 });
@@ -269,50 +281,95 @@ describe('getEnkryptBenchmarks', () => {
       mockSyncEnabled = enabled;
       await expect(getEnkryptBenchmarks()).resolves.toEqual(new Map());
       expect(readDb.select).not.toHaveBeenCalled();
+      expect(db.select).not.toHaveBeenCalled();
     }
   );
 
-  it('caches storage for five minutes, recomputes freshness, and withholds warm cache on disable', async () => {
+  it('joins five-minute raw caches per call and ages checks outside the caches without per-model queries', async () => {
     jest.useFakeTimers();
-    const staleAfter = Date.parse(benchmark.ingestedAt) + ENKRYPT_STALE_AFTER_MS;
+    const checkedAt = '2026-08-30T00:00:00.000Z';
+    const verification = { checkedAt, scoreHash: fingerprintEnkryptScore(benchmark) };
+    const staleAfter = Date.parse(checkedAt) + ENKRYPT_STALE_AFTER_MS;
+    const checkedPublication = {
+      ...published,
+      lastCheckedAt: checkedAt,
+      staleAfter: new Date(staleAfter).toISOString(),
+    };
     jest.setSystemTime(staleAfter - 1);
     jest.spyOn(console, 'error').mockImplementation(() => {});
     mockWhere.mockRejectedValueOnce(new Error('unavailable'));
+    mockVerificationWhere.mockResolvedValueOnce([
+      { verified_models: { 'openai/model': verification } },
+    ]);
     await expect(getEnkryptBenchmarks()).resolves.toEqual(new Map());
 
-    mockWhere.mockResolvedValueOnce([row()]);
-    const expected = new Map([['openai/model', benchmark]]);
+    const stored = [row(), row({ openrouterId: 'openai/missing' })];
+    mockWhere.mockResolvedValueOnce(stored);
     const cached = await getEnkryptBenchmarks();
-    expect(cached).toEqual(expected);
-    expect(enkryptFor(cached, 'openai/model')).toEqual(published);
+    expect([...cached]).toEqual([
+      ['openai/model', { ...benchmark, verification }],
+      ['openai/missing', benchmark],
+    ]);
+    expect(enkryptFor(cached, 'openai/model')).toEqual(checkedPublication);
+    expect(enkryptFor(cached, 'kilo/openai/model')).toEqual(checkedPublication);
+    expect(enkryptFor(cached, 'openai/missing')).toEqual({ ...published, freshness: 'stale' });
+    expect(mockVerificationWhere).toHaveBeenCalledTimes(1);
 
     jest.advanceTimersByTime(1);
     expect(enkryptFor(await getEnkryptBenchmarks(), 'openai/model')).toEqual({
-      ...published,
+      ...checkedPublication,
       freshness: 'stale',
     });
     expect(mockWhere).toHaveBeenCalledTimes(2);
-    expect(cached.get('openai/model')).toEqual(benchmark);
+    expect(mockVerificationWhere).toHaveBeenCalledTimes(1);
+    expect(cached.get('openai/model')).toEqual({ ...benchmark, verification });
+    expect(stored[0].benchmarks).toEqual({ enkrypt: benchmark });
 
     mockPublicationEnabled = false;
     await expect(getEnkryptBenchmarks()).resolves.toEqual(new Map());
     expect(enkryptFor(cached, 'openai/model')).toBeUndefined();
     expect(readDb.select).toHaveBeenCalledTimes(2);
+    expect(db.select).toHaveBeenCalledTimes(1);
     mockPublicationEnabled = true;
 
     jest.advanceTimersByTime(5 * 60 * 1000 - 2);
-    await expect(getEnkryptBenchmarks()).resolves.toBe(cached);
+    await expect(getEnkryptBenchmarks()).resolves.toEqual(cached);
     expect(mockWhere).toHaveBeenCalledTimes(2);
+    expect(mockVerificationWhere).toHaveBeenCalledTimes(1);
 
     jest.advanceTimersByTime(1);
     mockWhere.mockRejectedValueOnce(new Error('unavailable'));
+    mockVerificationWhere.mockRejectedValueOnce(new Error('unavailable'));
     const fallback = await getEnkryptBenchmarks();
-    expect(fallback).toBe(cached);
+    expect(fallback).toEqual(cached);
     expect(enkryptFor(fallback, 'openai/model')?.freshness).toBe('stale');
     expect(mockWhere).toHaveBeenCalledTimes(3);
+    expect(mockVerificationWhere).toHaveBeenCalledTimes(2);
+
+    const nextCheck = new Date(Date.now()).toISOString();
+    mockWhere.mockRejectedValueOnce(new Error('unavailable'));
+    mockVerificationWhere.mockResolvedValueOnce([
+      {
+        verified_models: {
+          'openai/model': { ...verification, checkedAt: nextCheck },
+          'openai/missing': { checkedAt: nextCheck, scoreHash: '0'.repeat(64) },
+        },
+      },
+    ]);
+    const rechecked = await getEnkryptBenchmarks();
+    expect(enkryptFor(rechecked, 'openai/model')).toMatchObject({
+      ingestedAt: benchmark.ingestedAt,
+      lastCheckedAt: nextCheck,
+      freshness: 'fresh',
+      evaluatedAt: null,
+    });
+    expect(enkryptFor(rechecked, 'openai/missing')).toEqual({ ...published, freshness: 'stale' });
+    expect(enkryptFor(cached, 'openai/model')?.lastCheckedAt).toBe(checkedAt);
+    expect(mockVerificationWhere).toHaveBeenCalledTimes(3);
 
     mockWhere.mockResolvedValueOnce([]);
     await expect(getEnkryptBenchmarks()).resolves.toEqual(new Map());
-    expect(mockWhere).toHaveBeenCalledTimes(4);
+    expect(mockWhere).toHaveBeenCalledTimes(5);
+    expect(mockVerificationWhere).toHaveBeenCalledTimes(3);
   });
 });

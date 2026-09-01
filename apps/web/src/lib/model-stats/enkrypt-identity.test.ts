@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import type { EnkryptScore } from '@kilocode/db/schema-types';
 import { parseCoverageArguments, runEnkryptCoverage } from '@/scripts/enkrypt-coverage';
-import { ENKRYPT_SCORE_EXAMPLES } from '@/tests/fixtures/enkrypt-scores';
+import { ENKRYPT_REVIEWED_CASES, ENKRYPT_SCORE_EXAMPLES } from '@/tests/fixtures/enkrypt-scores';
 import { EnkryptSyncError } from './enkrypt-errors';
 import {
   buildEnkryptCoverageReport,
@@ -223,9 +223,13 @@ describe('parseEnkryptScores', () => {
 });
 
 describe('matchEnkryptScores', () => {
-  it('contains exactly the three explicitly reviewed mappings and required gate targets', () => {
-    expect(ENKRYPT_MODEL_MAPPINGS).toStrictEqual(reviewedMappings);
-    expect(ENKRYPT_REQUIRED_MODEL_IDS).toEqual(reviewedMappings.map(({ modelId }) => modelId));
+  it('keeps the first three mappings, required gate, and original seven examples unchanged', () => {
+    expect(ENKRYPT_MODEL_MAPPINGS.slice(0, 3)).toStrictEqual(reviewedMappings);
+    expect(ENKRYPT_REQUIRED_MODEL_IDS).toStrictEqual([
+      'openai/gpt-oss-120b',
+      'z-ai/glm-4.5',
+      'qwen/qwen3-8b',
+    ]);
     const result = matchEnkryptScores(examples().scores, publicModels);
     expect(
       result.matches.map(({ score, model }) => ({
@@ -493,6 +497,263 @@ describe('matchEnkryptScores', () => {
     ]);
     expect(models.map(({ id }) => id)).toEqual(['catalog-2', 'catalog-1', 'catalog-0']);
   });
+});
+
+describe('expanded reviewed Enkrypt identities', () => {
+  const catalog = ENKRYPT_REVIEWED_CASES.map(({ modelId }) =>
+    model({ id: modelId, openrouterId: modelId })
+  );
+  const records = ENKRYPT_REVIEWED_CASES.map(({ score }) => score);
+  const expectedMappings = ENKRYPT_REVIEWED_CASES.map(
+    ({ modelId, score: { model_name, provider, source } }) => ({
+      identity: { model_name, provider, source },
+      modelId,
+    })
+  );
+
+  it('contains exactly all 70 independently enumerated identities and canonical targets', () => {
+    expect(ENKRYPT_REVIEWED_CASES).toHaveLength(70);
+    expect(ENKRYPT_MODEL_MAPPINGS).toStrictEqual(expectedMappings);
+    expect(new Set(expectedMappings.map(({ identity }) => JSON.stringify(identity))).size).toBe(70);
+    expect(new Set(expectedMappings.map(({ modelId }) => modelId)).size).toBe(70);
+    expect(records.every(record => record.risk_score === 0 && record.safety_score === null)).toBe(
+      true
+    );
+  });
+
+  it.each(ENKRYPT_REVIEWED_CASES)(
+    'preserves exact provenance and matches only the canonical $modelId by default',
+    ({ modelId, score: record }) => {
+      const parsed = parseEnkryptScores(envelope([record]));
+      expect(parsed).toStrictEqual({
+        scores: [record],
+        fetchedCount: 1,
+        rejectedCount: 0,
+        rejectedRecords: [],
+      });
+      const result = matchEnkryptScores(parsed.scores, catalog);
+      expect(result.matches).toStrictEqual([
+        { model: model({ id: modelId, openrouterId: modelId }), score: record },
+      ]);
+      expect(result.unmatchedRecords).toEqual([]);
+      expect(result.ambiguousRecords).toEqual([]);
+    }
+  );
+
+  it.each(ENKRYPT_REVIEWED_CASES)(
+    'rejects case, whitespace, provider, source, and variant near misses for $modelId',
+    ({ score: record }) => {
+      const { model_name, provider, source } = record;
+      const identity = { model_name, provider, source };
+      const nearMisses: EnkryptIdentity[] = [
+        { ...identity, provider: 'fixture-provider' },
+        { ...identity, source: 'unreviewed-source' },
+        { ...identity, source: null },
+        { ...identity, source: undefined },
+        { model_name, provider },
+        { ...identity, model_name: `${model_name}:free` },
+        { ...identity, model_name: `${model_name}:exacto` },
+        { ...identity, model_name: `${model_name}-thinking` },
+        { ...identity, model_name: `${model_name}-2026-03-05` },
+      ];
+      if (source !== '') nearMisses.push({ ...identity, source: '' });
+      for (const field of ['model_name', 'provider', 'source'] as const) {
+        const value = identity[field];
+        for (const changed of [
+          ` ${value}`,
+          `${value} `,
+          value.toLowerCase(),
+          value.toUpperCase(),
+        ]) {
+          if (changed !== value) nearMisses.push({ ...identity, [field]: changed });
+        }
+      }
+      const parsed = parseEnkryptScores(
+        envelope(nearMisses.map(identity => ({ ...identity, risk_score: 0, safety_score: null })))
+      );
+      expect(parsed.rejectedCount).toBe(0);
+      const result = matchEnkryptScores(parsed.scores, catalog);
+      expect(result.matches).toEqual([]);
+      expect(result.ambiguousRecords).toEqual([]);
+      expect(result.unmatchedRecords).toStrictEqual(
+        nearMisses.map(identity => ({ identity, reason: 'unreviewed_identity' }))
+      );
+    }
+  );
+
+  it.each(ENKRYPT_REVIEWED_CASES)(
+    'does not substitute catalog case, whitespace, provider, or variants for $modelId',
+    ({ modelId, score: record }) => {
+      const variants = [
+        modelId.toUpperCase(),
+        ` ${modelId}`,
+        `${modelId} `,
+        `fixture-provider/${modelId.split('/')[1]}`,
+        `${modelId}:free`,
+        `${modelId}:exacto`,
+        `${modelId}-thinking`,
+        `${modelId}-2026-03-05`,
+      ].map(id => model({ id, openrouterId: id }));
+      const result = matchEnkryptScores([record], variants);
+      expect(result.matches).toEqual([]);
+      expect(result.ambiguousRecords).toEqual([]);
+      expect(result.unmatchedRecords).toStrictEqual([
+        {
+          identity: {
+            model_name: record.model_name,
+            provider: record.provider,
+            source: record.source,
+          },
+          reason: 'unavailable_model',
+        },
+      ]);
+    }
+  );
+
+  it.each([
+    [false, false],
+    [true, false],
+    [false, true],
+    [true, true],
+  ])(
+    'matches all 70 without collisions with reversed scores %s and catalog %s',
+    (scores, models) => {
+      const result = matchEnkryptScores(
+        scores ? records.toReversed() : records,
+        models ? catalog.toReversed() : catalog
+      );
+      expect(result).toStrictEqual({
+        matches: ENKRYPT_REVIEWED_CASES.map(({ modelId, score }) => ({
+          model: model({ id: modelId, openrouterId: modelId }),
+          score,
+        })).sort((left, right) => left.model.id.localeCompare(right.model.id)),
+        unmatchedRecords: [],
+        ambiguousRecords: [],
+        unmatchedModelNames: [],
+        ambiguousCount: 0,
+        missingRequiredModelIds: [],
+      });
+      expect(
+        matchEnkryptScores(records, catalog, ENKRYPT_MODEL_MAPPINGS.toReversed())
+      ).toStrictEqual(result);
+    }
+  );
+
+  describe.each(['scores', 'catalog'] as const)(
+    'duplicate %s in the expanded registry',
+    duplicate => {
+      it.each(ENKRYPT_REVIEWED_CASES)(
+        'rejects every colliding $modelId candidate without affecting other identities',
+        ({ modelId, score: record }) => {
+          const duplicateScores = duplicate === 'scores' ? [...records, record] : records;
+          const duplicateCatalog =
+            duplicate === 'catalog'
+              ? [...catalog, model({ id: `duplicate-${modelId}`, openrouterId: modelId })]
+              : catalog;
+          const result = matchEnkryptScores(duplicateScores, duplicateCatalog);
+          const { model_name, provider, source } = record;
+          const ambiguous = { identity: { model_name, provider, source }, modelIds: [modelId] };
+          expect(result).toStrictEqual({
+            matches: ENKRYPT_REVIEWED_CASES.filter(record => record.modelId !== modelId)
+              .map(({ modelId, score }) => ({
+                model: model({ id: modelId, openrouterId: modelId }),
+                score,
+              }))
+              .sort((left, right) => left.model.id.localeCompare(right.model.id)),
+            unmatchedRecords: [],
+            unmatchedModelNames: [],
+            ambiguousRecords: duplicate === 'scores' ? [ambiguous, ambiguous] : [ambiguous],
+            ambiguousCount: duplicate === 'scores' ? 2 : 1,
+            missingRequiredModelIds: ENKRYPT_REQUIRED_MODEL_IDS.filter(id => id === modelId),
+          });
+          expect(
+            matchEnkryptScores(duplicateScores.toReversed(), duplicateCatalog.toReversed())
+          ).toStrictEqual(result);
+        }
+      );
+    }
+  );
+
+  it('rejects all 70 canonical targets if they share a storage ID', () => {
+    const result = matchEnkryptScores(
+      records,
+      catalog.map(record => ({ ...record, id: 'same-storage-id' }))
+    );
+    expect(result).toStrictEqual({
+      matches: [],
+      unmatchedRecords: [],
+      unmatchedModelNames: [],
+      ambiguousRecords: expectedMappings.map(({ identity, modelId }) => ({
+        identity,
+        modelIds: [modelId],
+      })),
+      ambiguousCount: 70,
+      missingRequiredModelIds: ENKRYPT_REQUIRED_MODEL_IDS,
+    });
+  });
+
+  it('reports all 70 exact identities without exposing synthetic metrics or expanding the required gate', () => {
+    const report = buildEnkryptCoverageReport(
+      parseEnkryptScores(envelope(records)),
+      catalog,
+      'fullinput'
+    );
+    expect(report.counters).toStrictEqual({
+      fetchedCount: 70,
+      acceptedCount: 70,
+      matchedCount: 70,
+      unmatchedCount: 0,
+      ambiguousCount: 0,
+      rejectedCount: 0,
+    });
+    expect(report.matchedRecords).toStrictEqual(
+      expectedMappings.toSorted((left, right) => left.modelId.localeCompare(right.modelId))
+    );
+    expect(report.requiredGate).toStrictEqual({
+      passed: true,
+      requiredModelIds: ['openai/gpt-oss-120b', 'z-ai/glm-4.5', 'qwen/qwen3-8b'],
+      missingRequiredModelIds: [],
+    });
+    expect(report.evidence.scope).toBe(
+      'supplied sanitized input; completeness not independently verified'
+    );
+  });
+
+  it.each(['scores', 'catalog'] as const)(
+    'does not require the 67 optional mappings when their %s are absent',
+    absent => {
+      const result = matchEnkryptScores(
+        absent === 'scores' ? records.slice(0, 3) : records,
+        absent === 'catalog' ? publicModels : catalog
+      );
+      expect(result.matches).toHaveLength(3);
+      expect(result.missingRequiredModelIds).toEqual([]);
+      expect(result.ambiguousCount).toBe(0);
+      expect(result.unmatchedRecords).toStrictEqual(
+        absent === 'catalog'
+          ? expectedMappings.slice(3).map(({ identity }) => ({
+              identity,
+              reason: 'unavailable_model',
+            }))
+          : []
+      );
+    }
+  );
+
+  it.each(reviewedMappings)(
+    'still fails the required $modelId gate with all 67 optional identities present',
+    ({ modelId }) => {
+      const result = matchEnkryptScores(
+        ENKRYPT_REVIEWED_CASES.filter(record => record.modelId !== modelId).map(
+          ({ score }) => score
+        ),
+        catalog
+      );
+      expect(result.matches).toHaveLength(69);
+      expect(result.missingRequiredModelIds).toEqual([modelId]);
+      expect(result.ambiguousCount).toBe(0);
+    }
+  );
 });
 
 describe('buildEnkryptCoverageReport', () => {

@@ -110,8 +110,13 @@ export async function getEnkryptSyncHealth(): Promise<EnkryptSyncHealth> {
       ].some(value => value !== null && Date.parse(value) > now) ||
       (state.last_success_at !== null &&
         (state.last_success_counts === null ||
-          state.last_success_counts.updatedCount === 0 ||
-          state.last_success_counts.updatedCount !== state.last_success_counts.matchedCount ||
+          state.last_success_counts.matchedCount === 0 ||
+          state.last_success_counts.updatedCount > state.last_success_counts.matchedCount ||
+          state.last_success_counts.fetchedCount !==
+            state.last_success_counts.rejectedCount +
+              state.last_success_counts.matchedCount +
+              state.last_success_counts.unmatchedCount +
+              state.last_success_counts.ambiguousCount ||
           state.baseline_matched_count === null ||
           state.baseline_matched_count < state.last_success_counts.matchedCount)) ||
       (state.last_outcome === 'succeeded' && state.last_success_at === null) ||

@@ -11,9 +11,31 @@ import {
   deliveryErrorLogFields,
   isRetryableDeliveryError,
   observeControlAfterStopping,
+  safeErrorFromQueueReason,
   SESSION_DELIVERY_TIMEOUT_MS,
   withDeliveryDeadline,
 } from './control-dispatch.js';
+import { acceptedAlarmDecision } from './accepted-overdue.js';
+import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
+
+describe('acceptedAlarmDecision', () => {
+  it('checks liveness instead of directly failing overdue work', () => {
+    expect(acceptedAlarmDecision(100, 100 + DEADLINE_MS.acceptedOverdue)).toEqual({
+      action: 'check',
+    });
+  });
+
+  it('does not move the activity deadline before acceptance and caps each alarm interval', () => {
+    expect(acceptedAlarmDecision(100, 100, 50)).toEqual({
+      action: 'rearm',
+      at: Math.min(100 + DEADLINE_MS.acceptedOverdue, 100 + DEADLINE_MS.acceptedAlarmCap),
+    });
+    expect(acceptedAlarmDecision(100, 100 + DEADLINE_MS.acceptedOverdue - 1, 50)).toEqual({
+      action: 'rearm',
+      at: 100 + DEADLINE_MS.acceptedOverdue,
+    });
+  });
+});
 
 describe('controlDispatchDisposition', () => {
   it.each([
@@ -243,5 +265,78 @@ describe('observeControlAfterStopping', () => {
     expect(status).toBeUndefined();
     expect(observations).toBe(3);
     expect(now).toBe(12_000);
+  });
+
+  it('preserves provider-specific terminal errors for queued work', () => {
+    expect(
+      controlDispatchDisposition({
+        physical: 'failed',
+        connection: 'disconnected',
+        failureReason: 'byoc_vercel_forbidden',
+      })
+    ).toEqual({ action: 'fail', reason: 'byoc_vercel_forbidden' });
+    expect(safeErrorFromQueueReason('byoc_vercel_capacity')).toContain('spend limits');
+  });
+
+  it('stops observing cleanup when the provider reports a terminal credential failure', async () => {
+    const getStatus = vi.fn(async () => ({
+      physical: 'stopping' as const,
+      connection: 'disconnected' as const,
+      failureReason: 'byoc_credential_missing' as const,
+    }));
+    let now = 0;
+    const status = await observeControlAfterStopping(
+      { physical: 'stopping', connection: 'disconnected' },
+      getStatus,
+      {
+        retryMs: 5_000,
+        deadline: 120_000,
+        now: () => now,
+        sleep: async milliseconds => {
+          now += milliseconds;
+        },
+      }
+    );
+    expect(status?.failureReason).toBe('byoc_credential_missing');
+    expect(getStatus).toHaveBeenCalledOnce();
+    expect(now).toBe(5_000);
+  });
+
+  it.each([
+    'byoc_credential_missing',
+    'byoc_vercel_not_ready',
+    'byoc_vercel_forbidden',
+    'byoc_vercel_capacity',
+  ] as const)('terminalizes the serialized %s status even while the instance exists', reason => {
+    expect(
+      controlDispatchDisposition({
+        connection: 'ready',
+        physical: 'running',
+        failureReason: reason,
+      })
+    ).toEqual({ action: 'fail', reason });
+    expect(
+      controlDispatchDisposition({
+        connection: 'disconnected',
+        physical: 'stopping',
+        failureReason: reason,
+      })
+    ).toEqual({ action: 'fail', reason });
+    expect(
+      controlDispatchDisposition({
+        connection: 'disconnected',
+        physical: 'unknown',
+        failureReason: reason,
+      })
+    ).toEqual({ action: 'fail', reason });
+  });
+
+  it.each([
+    ['byoc_credential_missing', 'credentials were removed'],
+    ['byoc_vercel_not_ready', 'setup is not ready'],
+    ['byoc_vercel_forbidden', 'access was denied'],
+    ['byoc_vercel_capacity', 'spend limits'],
+  ] as const)('exposes a safe actionable message for %s', (reason, expectedMessage) => {
+    expect(safeErrorFromQueueReason(reason)).toContain(expectedMessage);
   });
 });

@@ -30,8 +30,9 @@ import {
 import type * as cloudflareProvider from './cloudflare-provider.js';
 import type * as SocketModule from './socket.js';
 import { decodeCloudflareProviderRef } from './cloudflare-provider.js';
-import { WORKTREE_CREDENTIAL_CONTAINMENT } from './physical-lifecycle.js';
+import { WORKTREE_CREDENTIAL_CONTAINMENT, type PhysicalRecord } from './physical-lifecycle.js';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
+import * as byocCredentialResolver from '../byoc/vercel-credential-resolver.js';
 import { logger } from '../logger.js';
 import { validateControlLogUploadGrant } from './log-upload-grant.js';
 import { summarizeHeartbeatIdle } from './status-projection.js';
@@ -437,6 +438,199 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+describe('SandboxControl failed-instance recovery', () => {
+  const failedPhysical: PhysicalRecord = {
+    state: 'failed',
+    providerRef: 'provider_legacy',
+    createIntent: null,
+    stopTombstone: null,
+    resumable: false,
+  };
+
+  it.each([
+    { name: 'Cloudflare', binding: { kind: 'cloudflare' } },
+    { name: 'platform Vercel', binding: { kind: 'vercel', source: { kind: 'platform' } } },
+  ] as const)(
+    'quarantines a failed $name allocation even when it is active',
+    async ({ binding }) => {
+      const h = await harness();
+      await h.storage.put({ physical_record: failedPhysical, provider_binding: binding });
+      await h.evict();
+
+      await expect(h.control.observeProvider('active')).resolves.toMatchObject({
+        state: 'unknown',
+        providerRef: failedPhysical.providerRef,
+        stopTombstone: { reason: 'provider_unknown', attempts: 0 },
+      });
+      expect(h.allocations.size).toBe(0);
+    }
+  );
+
+  it('retains BYOC recovery when no cleanup is pending', async () => {
+    const h = await harness();
+    await h.storage.put({
+      physical_record: failedPhysical,
+      provider_binding: {
+        kind: 'vercel',
+        source: {
+          kind: 'byoc',
+          organizationId: '11111111-1111-4111-8111-111111111111',
+          credentialId: '22222222-2222-4222-8222-222222222222',
+        },
+      },
+    });
+    await h.evict();
+
+    await expect(h.control.observeProvider('active')).resolves.toMatchObject({
+      state: 'running',
+      providerRef: failedPhysical.providerRef,
+      stopTombstone: null,
+    });
+    expect(h.allocations.size).toBe(0);
+  });
+
+  it.each(['missing reference', 'pending cleanup'] as const)(
+    'does not recover BYOC with %s from an active observation',
+    async reason => {
+      const h = await harness();
+      const physical: PhysicalRecord = {
+        ...failedPhysical,
+        providerRef: reason === 'missing reference' ? null : failedPhysical.providerRef,
+        createIntent: { intentId: 'byoc_intent', createdAt: Date.now() },
+        stopTombstone:
+          reason === 'pending cleanup'
+            ? { reason: 'worktree_deleted', attempts: 2, createdAt: Date.now() }
+            : null,
+      };
+      await h.storage.put({
+        physical_record: physical,
+        provider_binding: {
+          kind: 'vercel',
+          source: {
+            kind: 'byoc',
+            organizationId: '11111111-1111-4111-8111-111111111111',
+            credentialId: '22222222-2222-4222-8222-222222222222',
+          },
+        },
+      });
+      await h.evict();
+
+      const quarantined = await h.control.observeProvider('active');
+      expect(quarantined).toEqual({
+        ...physical,
+        state: 'unknown',
+        stopTombstone: physical.stopTombstone ?? {
+          reason: 'provider_unknown',
+          attempts: 0,
+          createdAt: Date.now(),
+        },
+      });
+      await expect(h.control.observeProvider('active')).resolves.toEqual(quarantined);
+      expect(h.allocations.size).toBe(0);
+    }
+  );
+
+  it('retains the BYOC locator across eviction while resolving fresh credentials for observation and stop', async () => {
+    const binding = {
+      kind: 'vercel',
+      source: {
+        kind: 'byoc',
+        organizationId: '11111111-1111-4111-8111-111111111111',
+        credentialId: '22222222-2222-4222-8222-222222222222',
+      },
+    } as const;
+    const locator = {
+      teamId: 'byoc-team',
+      projectId: 'byoc-project',
+      snapshotId: 'byoc-snapshot',
+      runtimeBuildId: 'byoc-build',
+      runtime: 'node24',
+    } as const;
+    const config = {
+      ...locator,
+      accessToken: 'test-initial-byoc-token',
+      initialTimeoutMs: 300_000,
+      extendDurationMs: 600_000,
+    };
+    const runtimeResolution = vi
+      .spyOn(byocCredentialResolver, 'resolveByocVercelRuntimeConfig')
+      .mockResolvedValue(config);
+    const credentialResolution = vi
+      .spyOn(byocCredentialResolver, 'resolveByocVercelCredentials')
+      .mockResolvedValueOnce({ accessToken: 'test-observe-byoc-token', teamId: 'changed-team' })
+      .mockResolvedValueOnce({ accessToken: 'test-stop-byoc-token', teamId: 'changed-team' });
+    const requests: Request[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push(new Request(input, init));
+      return new Response(null, { status: 404 });
+    });
+    try {
+      const h = await harness({
+        env: {
+          VERCEL_SANDBOX_RUNTIME: 'node24',
+          VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+          VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
+        },
+      });
+      await h.control['pinProvider'](binding);
+      const creating = await h.control.claimCreate(
+        'byoc_intent',
+        false,
+        SANDBOX_ID,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
+      await h.control['createProviderAdapter'](binding, creating);
+      expect(h.records.get('provider_locator')).toEqual(locator);
+      const providerRef = JSON.stringify({ sandboxName: SANDBOX_ID, sessionId: 'byoc_instance' });
+      await h.control.confirmInstance(providerRef);
+      await h.storage.put('physical_record', {
+        ...(await h.control.getPhysicalRecord()),
+        createIntent: null,
+      });
+      await h.evict();
+      runtimeResolution.mockRejectedValue(
+        new byocCredentialResolver.ByocVercelNotReadyError('building')
+      );
+
+      await expect(
+        h.control['observeCurrentProvider'](await h.control.getPhysicalRecord())
+      ).resolves.toMatchObject({ state: 'failed', providerRef });
+      await expect(h.control.recordStopAttempt()).resolves.toMatchObject({
+        state: 'stopped',
+        providerRef: null,
+        stopTombstone: null,
+      });
+      expect(h.records.get('provider_binding')).toEqual(binding);
+      expect(h.records.get('provider_locator')).toEqual(locator);
+      expect(runtimeResolution).toHaveBeenCalledTimes(1);
+      expect(credentialResolution.mock.calls.map(([, source]) => source)).toEqual([
+        binding.source,
+        binding.source,
+      ]);
+      expect(requests.map(request => new URL(request.url).searchParams.get('teamId'))).toEqual([
+        locator.teamId,
+        locator.teamId,
+      ]);
+      expect(requests.map(request => request.headers.get('Authorization'))).toEqual([
+        'Bearer test-observe-byoc-token',
+        'Bearer test-stop-byoc-token',
+      ]);
+      expect(h.allocations.size).toBe(0);
+
+      runtimeResolution.mockResolvedValue({ ...config, snapshotId: 'byoc-next-snapshot' });
+      const replacement = await h.control.claimCreate('next_intent', false, SANDBOX_ID);
+      await h.control['createProviderAdapter'](binding, replacement);
+      expect(h.records.get('provider_locator')).toEqual({
+        ...locator,
+        snapshotId: 'byoc-next-snapshot',
+      });
+    } finally {
+      runtimeResolution.mockRestore();
+      credentialResolution.mockRestore();
+    }
+  });
 });
 
 describe('SandboxControl lifecycle boundaries', () => {
@@ -1200,11 +1394,18 @@ describe('SandboxControl lifecycle boundaries', () => {
     const h = await harness();
     const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
     const transaction = h.storage.transaction.bind(h.storage);
-    vi.spyOn(h.storage, 'transaction').mockImplementationOnce(operation =>
+    const transactionSpy = vi.spyOn(h.storage, 'transaction');
+    transactionSpy.mockImplementation(operation =>
       transaction(async storage => {
-        await operation(storage);
-        expect(h.records.has('acquisition_receipts')).toBe(true);
-        throw new Error('acquisition transaction failed');
+        const result = await operation(storage);
+        if (h.records.has('acquisition_receipts')) {
+          transactionSpy.mockRestore();
+          expect(h.transactionActive).toBe(true);
+          expect((await h.control.getPhysicalRecord()).state).toBe('creating');
+          expect(h.alarmAt).not.toBeNull();
+          throw new Error('acquisition transaction failed');
+        }
+        return result;
       })
     );
     await expect(h.acquire(acquisition)).rejects.toThrow('acquisition transaction failed');
@@ -1220,9 +1421,14 @@ describe('SandboxControl lifecycle boundaries', () => {
     const h = await harness();
     const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
     const transaction = h.storage.transaction.bind(h.storage);
-    vi.spyOn(h.storage, 'transaction').mockImplementationOnce(async operation => {
-      await transaction(operation);
-      throw new Error('reset after acquisition commit');
+    const transactionSpy = vi.spyOn(h.storage, 'transaction');
+    transactionSpy.mockImplementation(async operation => {
+      const result = await transaction(operation);
+      if (h.records.has('acquisition_receipts')) {
+        transactionSpy.mockRestore();
+        throw new Error('reset after acquisition commit');
+      }
+      return result;
     });
     await expect(h.acquire(acquisition)).rejects.toThrow('reset after acquisition commit');
     const claimed = await h.control.getPhysicalRecord();
@@ -2153,6 +2359,11 @@ describe('SandboxControl lifecycle boundaries', () => {
 
   it('rejects missing provider configuration and mismatched billing without an illegal transition', async () => {
     const h = await harness();
+    const metadata = await h.session.getCredentialMetadata();
+    h.session.getCredentialMetadata.mockResolvedValueOnce({
+      ...metadata,
+      workspace: { ...metadata.workspace, sandboxProvider: 'vercel' },
+    });
     await expect(
       h.control.ensureReady({
         ownerId: OWNER,
@@ -4477,6 +4688,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     await expect(first).resolves.toBe(false);
     await expect(joined).resolves.toBe(false);
     const next = control.stopCurrentProvider(physical);
+    await vi.advanceTimersByTimeAsync(0);
     expect(runtime.destroy).toHaveBeenCalledTimes(2);
     oldStop.resolve();
     await vi.advanceTimersByTimeAsync(0);

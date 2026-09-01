@@ -132,6 +132,10 @@ type MockEnv = {
   WS_ALLOWED_ORIGINS?: string;
   HYPERDRIVE: { connectionString: string };
   INTERNAL_API_SECRET?: string;
+  BYOC_VERCEL_ORG_IDS?: string;
+  VERCEL_SNAPSHOT_BUILD: {
+    getByName: ReturnType<typeof vi.fn>;
+  };
   CLOUD_AGENT_SESSION: {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
@@ -160,6 +164,9 @@ function createEnv(): MockEnv {
     SandboxSmall: {},
     HYPERDRIVE: { connectionString: 'postgres://test' },
     INTERNAL_API_SECRET: 'test-internal-secret',
+    VERCEL_SNAPSHOT_BUILD: {
+      getByName: vi.fn(),
+    },
     CLOUD_AGENT_SESSION: {
       idFromName: vi.fn(),
       get: vi.fn(),
@@ -1567,6 +1574,183 @@ describe('server /internal/streams/close', () => {
     expect(response.status).toBe(204);
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(closeOrgStreams).not.toHaveBeenCalled();
+  });
+});
+
+describe('server /internal/byoc/vercel-enrollment/:organizationId', () => {
+  const organizationId = '11111111-1111-4111-8111-111111111111';
+
+  it('rejects enrollment requests without the internal API key', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request(`http://worker.test/internal/byoc/vercel-enrollment/${organizationId}`),
+      env
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects invalid organization IDs', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-enrollment/not-an-organization-id', {
+        headers: { 'x-internal-api-key': 'test-internal-secret' },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it.each([
+    { enrolledOrganizations: undefined, enrolled: false },
+    { enrolledOrganizations: '22222222-2222-4222-8222-222222222222', enrolled: false },
+    { enrolledOrganizations: organizationId, enrolled: true },
+    { enrolledOrganizations: '*', enrolled: true },
+  ])('returns Worker-configured enrollment for $enrolledOrganizations', async value => {
+    const env = createEnv();
+    env.BYOC_VERCEL_ORG_IDS = value.enrolledOrganizations;
+
+    const response = await fetchWorker(
+      new Request(`http://worker.test/internal/byoc/vercel-enrollment/${organizationId}`, {
+        headers: { 'x-internal-api-key': 'test-internal-secret' },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({ enrolled: value.enrolled });
+  });
+});
+
+describe('server /internal/byoc/vercel-snapshot-build/start', () => {
+  const buildInput = {
+    organizationId: '11111111-1111-4111-8111-111111111111',
+    credentialId: '22222222-2222-4222-8222-222222222222',
+    buildGeneration: '33333333-3333-4333-8333-333333333333',
+  };
+
+  function buildRequest(): Request {
+    return new Request('http://worker.test/internal/byoc/vercel-snapshot-build/start', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': 'test-internal-secret',
+      },
+      body: JSON.stringify(buildInput),
+    });
+  }
+
+  it('rejects snapshot builds for organizations outside the Worker enrollment list', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(buildRequest(), env);
+
+    expect(response.status).toBe(403);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).not.toHaveBeenCalled();
+  });
+
+  it('starts snapshot builds for enrolled organizations', async () => {
+    const env = createEnv();
+    env.BYOC_VERCEL_ORG_IDS = buildInput.organizationId;
+    const start = vi.fn().mockResolvedValue(undefined);
+    env.VERCEL_SNAPSHOT_BUILD.getByName.mockReturnValue({ start });
+
+    const response = await fetchWorker(buildRequest(), env);
+
+    expect(response.status).toBe(202);
+    expect(start).toHaveBeenCalledWith(buildInput);
+  });
+});
+
+describe('server /internal/byoc/vercel-snapshot-build/cleanup', () => {
+  const cleanupInput = {
+    organizationId: '11111111-1111-4111-8111-111111111111',
+    credentialId: '22222222-2222-4222-8222-222222222222',
+    buildGeneration: '33333333-3333-4333-8333-333333333333',
+    snapshotId: 'snap_persisted',
+  };
+
+  it('rejects cleanup requests without the internal API key', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(cleanupInput),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid cleanup identity before calling the Durable Object', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ ...cleanupInput, credentialId: 'invalid' }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).not.toHaveBeenCalled();
+  });
+
+  it('passes the persisted runtime snapshot to the organization Durable Object', async () => {
+    const env = createEnv();
+    const cleanup = vi.fn().mockResolvedValue(undefined);
+    env.VERCEL_SNAPSHOT_BUILD.getByName.mockReturnValue({ cleanup });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(cleanupInput),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).toHaveBeenCalledWith(cleanupInput.organizationId);
+    expect(cleanup).toHaveBeenCalledWith(cleanupInput);
+  });
+
+  it('returns a safe error when cleanup cannot be completed', async () => {
+    const env = createEnv();
+    env.VERCEL_SNAPSHOT_BUILD.getByName.mockReturnValue({
+      cleanup: vi.fn().mockRejectedValue(new Error('provider request details')),
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(cleanupInput),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.text()).resolves.toBe('Snapshot build resources could not be cleaned up');
   });
 });
 

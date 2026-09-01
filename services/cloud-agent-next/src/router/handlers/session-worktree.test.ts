@@ -86,6 +86,14 @@ const LEDGER_ROW_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const SHARED_SANDBOX_ID = 'usr-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const INTERNAL_SECRET = 'test-internal-secret';
 const CURRENT_AUTH_TOKEN = 'current-customer-token';
+const BYOC_PROVIDER_BINDING = {
+  kind: 'vercel',
+  source: {
+    kind: 'byoc',
+    organizationId: ORGANIZATION_ID,
+    credentialId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+  },
+} as const;
 
 const router = t.router(createSessionWorktreeHandlers());
 
@@ -642,43 +650,52 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     expect(destinationStub.registerSession).not.toHaveBeenCalled();
   });
 
-  it('preserves an organization-scoped isolated Vercel route without copying provider runtime', async () => {
-    const metadata = sourceMetadata({ organizationId: ORGANIZATION_ID });
-    metadata.workspace = {
-      ...metadata.workspace,
-      sandboxId: 'ses-0123456789abcdef',
-      sandboxProvider: 'vercel',
-      sandboxRoute: undefined,
-      providerRuntime: { provider: 'vercel', sessionId: 'vercel-instance' },
-    };
-    const { caller, input, destinationStub } = fixture({
-      organizationId: ORGANIZATION_ID,
-      metadata,
-    });
+  it.each([
+    undefined,
+    { kind: 'vercel', source: { kind: 'platform' } },
+    BYOC_PROVIDER_BINDING,
+  ] as const)(
+    'inherits the isolated Vercel provider binding %j without copying provider runtime',
+    async sandboxProviderBinding => {
+      const metadata = sourceMetadata({ organizationId: ORGANIZATION_ID });
+      metadata.workspace = {
+        ...metadata.workspace,
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'vercel',
+        sandboxProviderBinding,
+        sandboxRoute: undefined,
+        providerRuntime: { provider: 'vercel', sessionId: 'vercel-instance' },
+      };
+      const { caller, input, destinationStub } = fixture({
+        organizationId: ORGANIZATION_ID,
+        metadata,
+      });
 
-    await caller.createWorktreeChat(input);
+      await caller.createWorktreeChat(input);
 
-    expect(assertOrganizationMembershipMock).toHaveBeenCalledWith(
-      expect.anything(),
-      USER_ID,
-      ORGANIZATION_ID
-    );
-    expect(destinationStub.registerSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        identity: expect.objectContaining({ orgId: ORGANIZATION_ID }),
-        workspace: expect.objectContaining({
-          sandboxId: 'ses-0123456789abcdef',
-          sandboxProvider: 'vercel',
-          worktreeId: WORKTREE_ID,
-          workspacePath: getWorktreeWorkspacePath(ORGANIZATION_ID, USER_ID, WORKTREE_ID),
-        }),
-      })
-    );
-    const registration = destinationStub.registerSession.mock.calls[0]?.[0];
-    expect(registration?.workspace).not.toHaveProperty('providerRuntime');
-    expect(registration?.repository).not.toHaveProperty('token');
-    expect(registration?.auth.kilocodeToken).toBe(CURRENT_AUTH_TOKEN);
-  });
+      expect(assertOrganizationMembershipMock).toHaveBeenCalledWith(
+        expect.anything(),
+        USER_ID,
+        ORGANIZATION_ID
+      );
+      expect(destinationStub.registerSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({ orgId: ORGANIZATION_ID }),
+          workspace: expect.objectContaining({
+            sandboxId: 'ses-0123456789abcdef',
+            sandboxProvider: 'vercel',
+            sandboxProviderBinding,
+            worktreeId: WORKTREE_ID,
+            workspacePath: getWorktreeWorkspacePath(ORGANIZATION_ID, USER_ID, WORKTREE_ID),
+          }),
+        })
+      );
+      const registration = destinationStub.registerSession.mock.calls[0]?.[0];
+      expect(registration?.workspace).not.toHaveProperty('providerRuntime');
+      expect(registration?.repository).not.toHaveProperty('token');
+      expect(registration?.auth.kilocodeToken).toBe(CURRENT_AUTH_TOKEN);
+    }
+  );
 });
 
 describe('createWorktreeChat operation-ledger replay and conflict handling', () => {
@@ -925,6 +942,62 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
     await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'CONFLICT' });
     expect(destinationStub.registerSession).not.toHaveBeenCalled();
     expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+  });
+
+  describe.each(['transport retry', 'reconciliation'] as const)('%s BYOC inheritance', path => {
+    it.each([
+      undefined,
+      { kind: 'vercel', source: { kind: 'platform' } },
+      {
+        ...BYOC_PROVIDER_BINDING,
+        source: { ...BYOC_PROVIDER_BINDING.source, organizationId: OTHER_ORGANIZATION_ID },
+      },
+      {
+        ...BYOC_PROVIDER_BINDING,
+        source: { ...BYOC_PROVIDER_BINDING.source, credentialId: OPERATION_KEY },
+      },
+    ] as const)('rejects a lost or changed provider binding %j', async sandboxProviderBinding => {
+      const metadata = sourceMetadata({ organizationId: ORGANIZATION_ID });
+      metadata.workspace = {
+        ...metadata.workspace,
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'vercel',
+        sandboxProviderBinding: BYOC_PROVIDER_BINDING,
+        sandboxRoute: undefined,
+      };
+      const { caller, input, destinationStub } = fixture({
+        organizationId: ORGANIZATION_ID,
+        metadata,
+      });
+      const destination = destinationMetadata(metadata);
+      destination.workspace = { ...destination.workspace, sandboxProviderBinding };
+      destinationStub.getMetadata.mockResolvedValueOnce(destination);
+      if (path === 'transport retry') {
+        destinationStub.registerSession.mockRejectedValueOnce(
+          Object.assign(new Error('registration outcome unknown'), { retryable: true })
+        );
+      } else {
+        admitOperationMock.mockResolvedValueOnce({
+          admission: 'duplicate_reconcile_pending',
+          row: ledgerRow({
+            organization_id: ORGANIZATION_ID,
+            status: 'reconcile_pending',
+            canonical_result: await progressFor(input),
+          }),
+        });
+      }
+
+      await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'CONFLICT' });
+
+      expect(destinationStub.registerSession).toHaveBeenCalledTimes(
+        path === 'transport retry' ? 1 : 0
+      );
+      expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(
+        path === 'transport retry' ? 1 : 0
+      );
+      expect(deleteSessionForCloudAgentMock).not.toHaveBeenCalled();
+      expect(settleOperationMock).not.toHaveBeenCalled();
+    });
   });
 
   it('does not report success when the completed ledger settlement is not recorded', async () => {

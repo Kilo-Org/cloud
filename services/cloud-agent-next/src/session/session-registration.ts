@@ -41,6 +41,15 @@ import {
   type CredentialContainment,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
+import {
+  bindingFromLegacyProvider,
+  SandboxProviderBindingSchema,
+  type SandboxProviderBinding,
+} from '../sandbox-provider-binding.js';
+import {
+  fetchByocVercelEnrollment,
+  ByocCredentialMissingError,
+} from '../byoc/vercel-credential-resolver.js';
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
@@ -55,6 +64,7 @@ import {
 } from '../telemetry/session-reports.js';
 import {
   generateSandboxRoutingTarget,
+  isOrgInList,
   selectSandboxProvider,
   type SandboxSelection,
 } from '../sandbox-id.js';
@@ -93,10 +103,12 @@ function assertSupportedSandboxAllocation(
   }
   if (
     input.runtime?.sandboxAllocation === 'isolated-standard' &&
-    sessionPlaneForNewOwner(ctx.env, {
+    (sessionPlaneForNewOwner(ctx.env, {
       userId: ctx.userId,
       orgId: input.options?.kilocodeOrganizationId,
-    }) === 'control'
+    }) === 'control' ||
+      (input.options?.kilocodeOrganizationId !== undefined &&
+        isOrgInList(ctx.env.BYOC_VERCEL_ORG_IDS, input.options.kilocodeOrganizationId)))
   ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -119,6 +131,7 @@ export type SessionRegistrationResult = {
   sandboxRoute?: SharedSandboxRouteMetadata;
   sandboxProvider: SandboxSelection['provider'];
   worktreeId?: CloudAgentWorktreeId;
+  sandboxProviderBinding: SandboxProviderBinding;
   /**
    * Canonical initial turn reserved for a later legacy initiation request.
    * Omitted for a clone-only create, which has no synthetic initial turn.
@@ -532,8 +545,13 @@ async function allocateNewSession(
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
   const orgId = input.options?.kilocodeOrganizationId;
+  const isCodeReviewSession = options?.billingOrigin === 'code-review';
+  // BYOC enrollment is organization-only. A wildcard must not redirect
+  // personal sessions into a credentialed provider path.
+  const byocEnrolled =
+    !isCodeReviewSession && orgId !== undefined && isOrgInList(ctx.env.BYOC_VERCEL_ORG_IDS, orgId);
   const cloudAgentSessionId = generateSessionId(
-    sessionPlaneForNewOwner(ctx.env, { userId: ctx.userId, orgId })
+    byocEnrolled ? 'control' : sessionPlaneForNewOwner(ctx.env, { userId: ctx.userId, orgId })
   );
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
@@ -583,18 +601,42 @@ async function allocateNewSession(
   let sandboxId: SandboxId;
   let sandboxRoute: SharedSandboxRouteMetadata | undefined;
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
+  let sandboxProviderBinding: SandboxProviderBinding = { kind: 'cloudflare' };
+  let byocEnrollment: Awaited<ReturnType<typeof fetchByocVercelEnrollment>> | undefined;
   try {
+    if (byocEnrolled) {
+      if (!orgId || input.runtime?.devcontainer) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'byoc_vercel_not_ready',
+        });
+      }
+      const enrolledOrganizationId = orgId;
+      try {
+        byocEnrollment = await fetchByocVercelEnrollment(ctx.env, enrolledOrganizationId);
+      } catch (error) {
+        if (error instanceof ByocCredentialMissingError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
+        }
+        throw error;
+      }
+      if (byocEnrollment.setupStatus !== 'ready') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
+      }
+    }
+    const routingOptions = {
+      devcontainer: input.runtime?.devcontainer,
+      createdOnPlatform: isCodeReviewSession ? 'code-review' : undefined,
+      sandboxAllocation: input.runtime?.sandboxAllocation,
+      ...(byocEnrolled ? { byoc: true } : {}),
+    };
     const target = await generateSandboxRoutingTarget(
       ctx.env.PER_SESSION_SANDBOX_ORG_IDS,
       orgId,
       ctx.userId,
       cloudAgentSessionId,
       ctx.botId,
-      {
-        devcontainer: input.runtime?.devcontainer,
-        createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
-        sandboxAllocation: input.runtime?.sandboxAllocation,
-      }
+      routingOptions
     );
     if (target.kind === 'shared') {
       const assignment = await resolveSharedSandboxAssignment(
@@ -609,13 +651,26 @@ async function allocateNewSession(
       };
     } else {
       sandboxId = target.sandboxId;
-      sandboxProvider = selectSandboxProvider({
-        env: ctx.env,
-        orgId,
-        sandboxId,
-        sessionId: cloudAgentSessionId,
-        devcontainer: input.runtime?.devcontainer,
-      });
+      if (byocEnrollment) {
+        sandboxProvider = 'vercel';
+        sandboxProviderBinding = {
+          kind: 'vercel',
+          source: {
+            kind: 'byoc',
+            organizationId: byocEnrollment.organizationId,
+            credentialId: byocEnrollment.credentialId,
+          },
+        };
+      } else {
+        sandboxProvider = selectSandboxProvider({
+          env: ctx.env,
+          orgId,
+          sandboxId,
+          sessionId: cloudAgentSessionId,
+          devcontainer: input.runtime?.devcontainer,
+        });
+        sandboxProviderBinding = bindingFromLegacyProvider(sandboxProvider);
+      }
     }
   } catch (error) {
     await recordPostSetupFailure(() =>
@@ -645,6 +700,7 @@ async function allocateNewSession(
       await recordOperationProgress(ledger.db, ledger.rowId, {
         sandboxId,
         sandboxProvider,
+        sandboxProviderBinding,
         ...(sandboxRoute ? { sandboxRoute } : {}),
       });
     } catch (error) {
@@ -751,6 +807,7 @@ async function allocateNewSession(
     sandboxRoute,
     sandboxProvider,
     ...(worktreeId ? { worktreeId } : {}),
+    sandboxProviderBinding,
     initialTurn,
     reportingCreatedAt,
     credentialContainment,
@@ -796,6 +853,7 @@ function rebuildRecordedSessionAllocation(
   const initialMessageId = canonical.initialMessageId;
   const sandboxId = canonical.sandboxId;
   const sandboxProvider = canonical.sandboxProvider;
+  const sandboxProviderBinding = canonical.sandboxProviderBinding;
   const sandboxRoute = canonical.sandboxRoute;
   const reportingCreatedAt = z
     .string()
@@ -856,6 +914,16 @@ function rebuildRecordedSessionAllocation(
   const sessionService = new SessionService();
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
 
+  const parsedBinding = SandboxProviderBindingSchema.safeParse(
+    sandboxProviderBinding === undefined
+      ? bindingFromLegacyProvider(sandboxProvider)
+      : sandboxProviderBinding
+  );
+  if (!parsedBinding.success || parsedBinding.data.kind !== sandboxProvider) {
+    throw creationInProgressError();
+  }
+  const normalizedBinding = parsedBinding.data;
+
   return {
     cloudAgentSessionId,
     kiloSessionId,
@@ -863,6 +931,7 @@ function rebuildRecordedSessionAllocation(
     sandboxRoute: route,
     sandboxProvider,
     ...(worktreeId ? { worktreeId } : {}),
+    sandboxProviderBinding: normalizedBinding,
     initialTurn,
     reportingCreatedAt:
       !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -937,6 +1006,7 @@ function buildSessionRegistrationCommand(
     workspace: {
       sandboxId: allocation.sandboxId,
       sandboxProvider: allocation.sandboxProvider,
+      sandboxProviderBinding: allocation.sandboxProviderBinding,
       shallow: input.options?.shallow,
       ...(allocation.worktreeId
         ? {
@@ -1096,6 +1166,7 @@ async function registerAndAdmitInitialTurn(
     kiloSessionId: allocation.kiloSessionId,
     sandboxId: allocation.sandboxId,
     sandboxProvider: allocation.sandboxProvider,
+    sandboxProviderBinding: allocation.sandboxProviderBinding,
     admission,
   };
   if (ledger) {

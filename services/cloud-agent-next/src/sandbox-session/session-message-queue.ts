@@ -1,3 +1,4 @@
+import type { CallbackTarget } from '../callbacks/index.js';
 import {
   renderExecutionTurnContent,
   type AcceptedCommandTurn,
@@ -19,6 +20,7 @@ import {
   type SessionOperationAuthorization,
   type SessionOperationDelivery,
 } from '../shared/sandbox-control-protocol.js';
+import { classifyAssistantFailureMessage } from '../shared/assistant-failure.js';
 
 export type SessionMessageState = 'queued' | 'accepted' | 'completed' | 'failed' | 'cancelled';
 export type SessionMessageTerminalSource = 'coordinator' | 'wrapper_outcome' | 'operation_result';
@@ -59,6 +61,13 @@ type SessionMessageLifecycle = {
   wrapperInstanceId?: string;
   terminalAt?: number;
   terminalSource?: SessionMessageTerminalSource;
+  error?: string;
+  callback?: {
+    target: CallbackTarget;
+    status: 'pending' | 'enqueued' | 'abandoned';
+    attempts: number;
+    retryAt?: number;
+  };
   failedReason?: string;
   attachFailures?: number;
   promptFailures?: number;
@@ -253,7 +262,8 @@ export function failWaitingMessages(
   messages: readonly SessionMessageRecord[],
   reason: string,
   wrapperInstanceId?: string,
-  includeUnassigned = true
+  includeUnassigned = true,
+  terminal?: { timestamp: number; error: string }
 ): { messages: SessionMessageRecord[]; failedIds: string[] } {
   const head =
     messages.find(message => message.state === 'accepted') ??
@@ -273,7 +283,12 @@ export function failWaitingMessages(
         return message;
       }
       failedIds.push(message.messageId);
-      return { ...message, state: 'failed', failedReason: reason };
+      return {
+        ...message,
+        state: 'failed',
+        failedReason: reason,
+        ...(terminal ? { terminalAt: terminal.timestamp, error: terminal.error } : {}),
+      };
     }),
     failedIds,
   };
@@ -328,6 +343,9 @@ export function applyMessageOutcome(
           terminalAt: now,
           terminalSource,
           ...(outcome.reason ? { failedReason: outcome.reason } : {}),
+          ...(outcome.status === 'failed' && outcome.reason
+            ? { error: classifyAssistantFailureMessage(outcome.reason) }
+            : {}),
         }
       : item
   );
@@ -377,7 +395,9 @@ export function recordAcceptedMessageActivity(
 ): SessionMessageRecord[] | undefined {
   if (!hasAcceptedMessage(messages)) return undefined;
   return messages.map(message =>
-    message.state === 'accepted' ? { ...message, lastActivityAt } : message
+    message.state === 'accepted'
+      ? { ...message, lastActivityAt: Math.max(message.lastActivityAt ?? 0, lastActivityAt) }
+      : message
   );
 }
 
@@ -401,7 +421,11 @@ export function failedMessageSnapshot(
     delivery: accepted ? 'sent' : 'queued',
     accepted,
     reason: cancelled ? 'interrupted' : message.failedReason,
-    ...(cancelled ? { error: 'The message was interrupted' } : {}),
+    ...(cancelled
+      ? { error: 'The message was interrupted' }
+      : message.error
+        ? { error: message.error }
+        : {}),
     timestamp: message.acceptedAt ?? now,
   };
 }

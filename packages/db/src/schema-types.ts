@@ -1217,6 +1217,39 @@ export type EncryptedData = {
   authTag: string;
 };
 
+/**
+ * RSA + AES envelope stored for secrets that are encrypted by the web app
+ * and decrypted by a Worker. Kept structural here so the schema package does
+ * not need to depend on the runtime encryption implementation.
+ */
+export type VercelComputeCredentialEnvelope = {
+  scheme: 'byoc-vercel-credential-rsa-aes-256-gcm';
+  version: 1;
+  keyId: string;
+  ciphertext: {
+    encryptedData: string;
+    encryptedDEK: string;
+    algorithm: 'rsa-aes-256-gcm';
+    version: 1;
+  };
+};
+
+export type VercelComputeSetupStatus = 'pending' | 'building' | 'ready' | 'failed';
+
+export type VercelComputeSetupStep =
+  | 'validating_access'
+  | 'create_builder'
+  | 'install_system_dependencies'
+  | 'install_node_dependencies'
+  | 'upload_runtime_artifacts'
+  | 'verify_runtime_artifacts'
+  | 'snapshot_builder'
+  | 'create_validator'
+  | 'launch_validator_wrapper'
+  | 'verify_validator_call_home'
+  | 'stop_validator'
+  | 'confirm_terminal';
+
 // --- AuthProviderId ---
 
 export type AuthProviderId =

@@ -149,7 +149,7 @@ async function main(): Promise<void> {
     name: sandboxId,
     operationId: `wss-smoke-${sandboxId}`,
     runtimeBuildId: runtime.runtimeBuildId,
-    snapshotId: runtime.snapshotId,
+    source: { type: 'snapshot', snapshotId: runtime.snapshotId },
     runtime: runtime.runtime,
     timeoutMs: Math.min(runtime.initialTimeoutMs, SMOKE_TIMEOUT_MS),
   });

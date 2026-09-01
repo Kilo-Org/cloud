@@ -52,6 +52,7 @@ const wrapperManifestSchema = z
 
 export type VercelAgentSandboxDependencies = {
   restClient?: VercelSandboxRestClient;
+  resolveConfig?: () => Promise<VercelSandboxRuntimeConfig>;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
 };
@@ -70,8 +71,10 @@ function observedWrapper(command: VercelSandboxCommand, instance?: WrapperInstan
 }
 
 export class VercelAgentSandbox implements AgentSandbox {
-  private readonly restClient: VercelSandboxRestClient;
+  private restClient?: VercelSandboxRestClient;
   private readonly injectedRestClient?: VercelSandboxRestClient;
+  private readonly resolveConfig?: () => Promise<VercelSandboxRuntimeConfig>;
+  private config?: VercelSandboxRuntimeConfig;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly now: () => number;
   private runtimeSessionId?: string;
@@ -81,23 +84,52 @@ export class VercelAgentSandbox implements AgentSandbox {
 
   constructor(
     private readonly metadata: SessionMetadata,
-    private readonly config: VercelSandboxRuntimeConfig,
+    config: VercelSandboxRuntimeConfig | undefined,
     private readonly runtimeContext?: AgentSandboxRuntimeContext,
     dependencies: VercelAgentSandboxDependencies = {}
   ) {
     this.injectedRestClient = dependencies.restClient;
-    this.restClient =
-      this.injectedRestClient ??
-      new VercelSandboxRestClient({
+    this.resolveConfig = dependencies.resolveConfig;
+    this.config = config;
+    this.restClient = this.injectedRestClient;
+    this.sleep = dependencies.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
+    this.now = dependencies.now ?? Date.now;
+    this.runtimeSessionId = metadata.workspace?.providerRuntime?.sessionId;
+    this.wrapperProcess = metadata.workspace?.providerRuntime?.wrapper;
+  }
+
+  private get currentConfig(): VercelSandboxRuntimeConfig {
+    if (!this.config) {
+      throw new AgentSandboxUnavailableError(
+        'Vercel sandbox operational configuration is incomplete',
+        'provider_not_configured'
+      );
+    }
+    return this.config;
+  }
+
+  private get client(): VercelSandboxRestClient {
+    if (!this.restClient) {
+      throw new AgentSandboxUnavailableError(
+        'Vercel sandbox operational configuration is incomplete',
+        'provider_not_configured'
+      );
+    }
+    return this.restClient;
+  }
+
+  private async refreshProvider(): Promise<VercelSandboxRuntimeConfig> {
+    if (this.resolveConfig) this.config = await this.resolveConfig();
+    const config = this.currentConfig;
+    if (!this.injectedRestClient) {
+      this.restClient = new VercelSandboxRestClient({
         accessToken: config.accessToken,
         teamId: config.teamId,
         projectId: config.projectId,
         fetch,
       });
-    this.sleep = dependencies.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
-    this.now = dependencies.now ?? Date.now;
-    this.runtimeSessionId = metadata.workspace?.providerRuntime?.sessionId;
-    this.wrapperProcess = metadata.workspace?.providerRuntime?.wrapper;
+    }
+    return config;
   }
 
   async ensureBillingAdmission(): Promise<SandboxBillingAdmissionResult> {
@@ -145,8 +177,8 @@ export class VercelAgentSandbox implements AgentSandbox {
     return (
       this.injectedRestClient ??
       new VercelSandboxRestClient({
-        accessToken: this.config.accessToken,
-        teamId: this.config.teamId,
+        accessToken: this.currentConfig.accessToken,
+        teamId: this.currentConfig.teamId,
         projectId,
         fetch,
       })
@@ -158,9 +190,9 @@ export class VercelAgentSandbox implements AgentSandbox {
       name: intent.sandboxName,
       operationId: intent.operationId,
       runtimeBuildId: intent.runtimeBuildId,
-      snapshotId: intent.snapshotId,
+      source: { type: 'snapshot' as const, snapshotId: intent.snapshotId },
       runtime: intent.runtime,
-      timeoutMs: this.config.initialTimeoutMs,
+      timeoutMs: this.currentConfig.initialTimeoutMs,
     };
   }
 
@@ -179,10 +211,10 @@ export class VercelAgentSandbox implements AgentSandbox {
       (await context.beginCreate({
         provider: 'vercel',
         sandboxName: this.sandboxName,
-        projectId: this.config.projectId,
-        snapshotId: this.config.snapshotId,
-        runtimeBuildId: this.config.runtimeBuildId,
-        runtime: this.config.runtime,
+        projectId: this.currentConfig.projectId,
+        snapshotId: this.currentConfig.snapshotId,
+        runtimeBuildId: this.currentConfig.runtimeBuildId,
+        runtime: this.currentConfig.runtime,
       }));
     const createClient = this.createRestClient(intent.projectId);
 
@@ -224,11 +256,7 @@ export class VercelAgentSandbox implements AgentSandbox {
   }
 
   private async validateRuntimeManifest(sessionId: string): Promise<void> {
-    const bytes = await this.restClient.readFile(
-      sessionId,
-      RUNTIME_MANIFEST_PATH,
-      MANIFEST_MAX_BYTES
-    );
+    const bytes = await this.client.readFile(sessionId, RUNTIME_MANIFEST_PATH, MANIFEST_MAX_BYTES);
     let manifest: unknown;
     try {
       manifest = JSON.parse(new TextDecoder().decode(bytes));
@@ -241,9 +269,9 @@ export class VercelAgentSandbox implements AgentSandbox {
     const parsed = wrapperManifestSchema.safeParse(manifest);
     if (
       !parsed.success ||
-      parsed.data.runtimeBuildId !== this.config.runtimeBuildId ||
+      parsed.data.runtimeBuildId !== this.currentConfig.runtimeBuildId ||
       parsed.data.wrapperVersion !== WRAPPER_VERSION ||
-      parsed.data.runtime !== this.config.runtime
+      parsed.data.runtime !== this.currentConfig.runtime
     ) {
       throw new AgentSandboxUnavailableError(
         'Vercel runtime manifest does not match the pinned runtime',
@@ -253,7 +281,7 @@ export class VercelAgentSandbox implements AgentSandbox {
 
     const verificationPath = `/tmp/kilo-runtime-verification-${crypto.randomUUID()}.txt`;
     try {
-      await this.restClient.executeCommand(sessionId, {
+      await this.client.executeCommand(sessionId, {
         command: 'sh',
         args: [
           '-lc',
@@ -265,7 +293,7 @@ export class VercelAgentSandbox implements AgentSandbox {
         wait: true,
       });
       const verification = new TextDecoder()
-        .decode(await this.restClient.readFile(sessionId, verificationPath, 256))
+        .decode(await this.client.readFile(sessionId, verificationPath, 256))
         .trim()
         .split('\n');
       if (
@@ -279,7 +307,7 @@ export class VercelAgentSandbox implements AgentSandbox {
         );
       }
     } finally {
-      await this.restClient
+      await this.client
         .executeCommand(sessionId, {
           command: 'rm',
           args: ['-f', '--', verificationPath],
@@ -295,7 +323,7 @@ export class VercelAgentSandbox implements AgentSandbox {
   private wrapperClient(sessionId: string): WrapperClient {
     return new WrapperClient({
       transport: new VercelWrapperTransport({
-        restClient: this.restClient,
+        restClient: this.client,
         sessionId,
         port: WRAPPER_PORT,
       }),
@@ -307,7 +335,7 @@ export class VercelAgentSandbox implements AgentSandbox {
   }
 
   private async recoverLaunchCommand(sessionId: string, launchId: string) {
-    const matches = (await this.restClient.listCommands(sessionId)).filter(
+    const matches = (await this.client.listCommands(sessionId)).filter(
       command => command.exitCode === null && this.commandMatchesLaunch(command, launchId)
     );
     if (matches.length !== 1) {
@@ -365,7 +393,7 @@ export class VercelAgentSandbox implements AgentSandbox {
 
     const command = existingIntent
       ? await this.recoverLaunchCommand(sessionId, intent.launchId)
-      : await this.restClient.executeCommand(sessionId, {
+      : await this.client.executeCommand(sessionId, {
           command: 'sh',
           args: [
             '-lc',
@@ -425,6 +453,7 @@ export class VercelAgentSandbox implements AgentSandbox {
   }
 
   async ensureWrapper(request: EnsureWrapperRequest) {
+    await this.refreshProvider();
     const instance = request.leasedInstance;
     if (!instance) throw new Error('Vercel wrapper startup requires a physical wrapper lease');
     const sessionId = await this.ensureRuntimeSession();
@@ -440,7 +469,8 @@ export class VercelAgentSandbox implements AgentSandbox {
     if (!runtime?.wrapper) return { status: 'absent' };
 
     try {
-      const session = await this.restClient.getSession(runtime.sessionId, this.sandboxName);
+      await this.refreshProvider();
+      const session = await this.client.getSession(runtime.sessionId, this.sandboxName);
       if (classifyVercelSession(session.session.status) === 'terminal') {
         return { status: 'absent' };
       }
@@ -471,6 +501,7 @@ export class VercelAgentSandbox implements AgentSandbox {
   }
 
   async discoverSessionWrappers(): Promise<WrapperObservation> {
+    await this.refreshProvider();
     const runtime = this.persistedRuntime;
     if (!runtime) return { status: 'absent' };
     try {
@@ -480,7 +511,7 @@ export class VercelAgentSandbox implements AgentSandbox {
         if (intent.sessionId !== runtime.sessionId) {
           throw new Error('Vercel wrapper launch intent targets a different session');
         }
-        const matches = (await this.restClient.listCommands(runtime.sessionId)).filter(
+        const matches = (await this.client.listCommands(runtime.sessionId)).filter(
           command =>
             command.exitCode === null && this.commandMatchesLaunch(command, intent.launchId)
         );
@@ -533,7 +564,7 @@ export class VercelAgentSandbox implements AgentSandbox {
     commandId: string
   ): Promise<VercelSandboxCommand | null> {
     try {
-      const command = await this.restClient.getCommand(sessionId, commandId);
+      const command = await this.client.getCommand(sessionId, commandId);
       return command.exitCode === null ? command : null;
     } catch (error) {
       if (error instanceof VercelSandboxRestError && error.status === 404) return null;
@@ -556,7 +587,7 @@ export class VercelAgentSandbox implements AgentSandbox {
     if (intent.sessionId !== runtime.sessionId) {
       throw new Error('Vercel wrapper launch intent targets a different session');
     }
-    const matches = (await this.restClient.listCommands(runtime.sessionId)).filter(
+    const matches = (await this.client.listCommands(runtime.sessionId)).filter(
       command => command.exitCode === null && this.commandMatchesLaunch(command, intent.launchId)
     );
     if (matches.length > 1) {
@@ -592,6 +623,7 @@ export class VercelAgentSandbox implements AgentSandbox {
     attemptId: string;
     reason: WrapperStopReason;
   }): Promise<StopWrappersResult> {
+    await this.refreshProvider();
     try {
       await this.reconcileWrapperForStop(request.target);
     } catch (error) {
@@ -613,7 +645,7 @@ export class VercelAgentSandbox implements AgentSandbox {
       this.wrapperProcess = undefined;
       return { status: 'absent', stoppedInstanceIds: [runtime.wrapper.instanceId] };
     }
-    await this.restClient.killCommand(runtime.sessionId, commandId, 15);
+    await this.client.killCommand(runtime.sessionId, commandId, 15);
     for (const delay of STOP_OBSERVATION_DELAYS_MS) {
       await this.sleep(delay);
       if (!(await this.observeCommand(runtime.sessionId, commandId))) {
@@ -622,7 +654,7 @@ export class VercelAgentSandbox implements AgentSandbox {
         return { status: 'absent', stoppedInstanceIds: [runtime.wrapper.instanceId] };
       }
     }
-    await this.restClient.killCommand(runtime.sessionId, commandId, 9);
+    await this.client.killCommand(runtime.sessionId, commandId, 9);
     const final = await this.observeCommand(runtime.sessionId, commandId);
     if (final) {
       return {
@@ -641,13 +673,14 @@ export class VercelAgentSandbox implements AgentSandbox {
   }
 
   async probeHealth(): Promise<void> {
+    await this.refreshProvider();
     const runtime = this.persistedRuntime;
     if (!runtime)
       throw new AgentSandboxUnavailableError(
         'Vercel runtime is not running',
         'runtime_not_running'
       );
-    const session = await this.restClient.getSession(runtime.sessionId, this.sandboxName);
+    const session = await this.client.getSession(runtime.sessionId, this.sandboxName);
     if (session.session.status !== 'running') {
       throw new AgentSandboxUnavailableError(
         'Vercel runtime is not running',
@@ -657,6 +690,7 @@ export class VercelAgentSandbox implements AgentSandbox {
   }
 
   async getRunningWrapper(): Promise<WrapperClient | null> {
+    await this.refreshProvider();
     const runtime = this.persistedRuntime;
     if (!runtime?.wrapper) return null;
     const command = await this.observeCommand(runtime.sessionId, runtime.wrapper.commandId);
@@ -671,15 +705,12 @@ export class VercelAgentSandbox implements AgentSandbox {
   }
 
   async readWrapperLogs(): Promise<WrapperLogs | null> {
+    await this.refreshProvider();
     const runtime = this.persistedRuntime;
     if (!runtime?.wrapper) return null;
     const path = `/tmp/kilocode-wrapper-${this.metadata.identity.sessionId}.log`;
     try {
-      const content = await this.restClient.readFile(
-        runtime.sessionId,
-        path,
-        WRAPPER_LOG_MAX_BYTES
-      );
+      const content = await this.client.readFile(runtime.sessionId, path, WRAPPER_LOG_MAX_BYTES);
       return { files: { [path]: new TextDecoder().decode(content) } };
     } catch {
       return { files: {} };
@@ -687,18 +718,22 @@ export class VercelAgentSandbox implements AgentSandbox {
   }
 
   async keepAlive(): Promise<void> {
+    await this.refreshProvider();
     const runtime = this.persistedRuntime;
     if (!runtime) return;
-    const inspected = await this.restClient.getSession(runtime.sessionId, this.sandboxName);
+    const inspected = await this.client.getSession(runtime.sessionId, this.sandboxName);
     if (inspected.session.status !== 'running') return;
     const startedAt = inspected.session.startedAt ?? inspected.session.requestedAt;
     const expiresAt = startedAt + inspected.session.timeout;
-    const extensionWatermarkMs = Math.max(60_000, Math.floor(this.config.extendDurationMs / 2));
+    const extensionWatermarkMs = Math.max(
+      60_000,
+      Math.floor(this.currentConfig.extendDurationMs / 2)
+    );
     if (expiresAt - this.now() > extensionWatermarkMs) return;
-    await this.restClient.extendSessionTimeout(
+    await this.client.extendSessionTimeout(
       runtime.sessionId,
       this.sandboxName,
-      this.config.extendDurationMs
+      this.currentConfig.extendDurationMs
     );
   }
 

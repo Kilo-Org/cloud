@@ -1176,3 +1176,102 @@ export async function closeCloudAgentOrgStreams(
     );
   }
 }
+
+export type VercelSnapshotBuildStartInput = {
+  organizationId: string;
+  credentialId: string;
+  buildGeneration: string;
+};
+
+/**
+ * Start an organization-scoped BYOC Vercel snapshot build through the
+ * authenticated Cloud Agent internal API. This is intentionally not part of
+ * the browser-facing tRPC client.
+ */
+export async function startVercelSnapshotBuild(
+  input: VercelSnapshotBuildStartInput
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-snapshot-build/start`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': INTERNAL_API_SECRET,
+        },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+  } catch {
+    throw new Error('Cloud Agent snapshot build request failed');
+  }
+
+  if (!response.ok) {
+    throw new Error('Cloud Agent snapshot build request was rejected');
+  }
+}
+
+export async function getVercelComputeEnrollment(organizationId: string): Promise<boolean> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-enrollment/${encodeURIComponent(organizationId)}`,
+      {
+        headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+  } catch {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  if (!response.ok) {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  const body: unknown = await response.json().catch(() => null);
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('enrolled' in body) ||
+    typeof body.enrolled !== 'boolean'
+  ) {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  return body.enrolled;
+}
+
+export type VercelSnapshotBuildCleanupInput = VercelSnapshotBuildStartInput & {
+  snapshotId?: string;
+};
+
+export async function cleanupVercelSnapshotBuild(
+  input: VercelSnapshotBuildCleanupInput
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-snapshot-build/cleanup`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': INTERNAL_API_SECRET,
+        },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+  } catch {
+    throw new Error('Cloud Agent Vercel compute cleanup could not be completed');
+  }
+
+  if (!response.ok) {
+    throw new Error('Cloud Agent Vercel compute cleanup could not be completed');
+  }
+}

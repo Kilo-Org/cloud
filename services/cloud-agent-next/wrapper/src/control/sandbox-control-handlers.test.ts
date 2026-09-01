@@ -8,6 +8,7 @@ import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+  sessionPromptPayloadSchema,
   sessionSyncResultSchema,
   type SessionEventPayload,
   type SessionGitSummaryResult,
@@ -425,6 +426,213 @@ describe('handleControlRequest', () => {
       error: { code: 'protocol_error', message: 'Invalid payload', retryable: false },
     });
     expect(calls).toEqual([]);
+  });
+
+  it('forwards command identity and arguments while applying agent and finalization policy', async () => {
+    const calls: unknown[] = [];
+    const finalized: unknown[] = [];
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendCommand: async opts => {
+          calls.push(opts);
+          return completion();
+        },
+      }),
+      runAutoCommit: async opts => {
+        finalized.push({ messageId: opts.messageId, workspacePath: opts.workspacePath });
+        return { success: true };
+      },
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+
+    const result = await handleControlRequest(
+      'session.prompt',
+      session,
+      {
+        messageId: 'msg_command',
+        turn: { type: 'command', command: 'review', arguments: '--all changes' },
+        agent: { mode: 'plan', model: 'command-model', variant: 'thinking' },
+        finalization: { autoCommit: true, condenseOnComplete: false },
+      },
+      handlerDeps
+    );
+
+    expect(result).toEqual({ ok: true, result: { messageId: 'msg_command', status: 'accepted' } });
+    await waitForTasks(handlerDeps);
+    expect(calls).toEqual([
+      {
+        sessionId: 'kilo_1',
+        directory: session.directory,
+        signal: expect.any(AbortSignal),
+        command: 'review',
+        args: '--all changes',
+        messageId: 'msg_command',
+        agent: 'plan',
+        model: { providerID: 'kilo', modelID: 'command-model' },
+        variant: 'thinking',
+      },
+    ]);
+    expect(finalized).toEqual([{ messageId: 'assistant_1', workspacePath: session.directory }]);
+    expect(events).toEqual([
+      {
+        type: 'session.message.outcome',
+        properties: { messageId: 'msg_command', status: 'completed' },
+      },
+    ]);
+  });
+
+  it('materializes signed attachments into local prompt parts with per-message agent overrides', async () => {
+    const identity = { ...session, sessionId: `attachments-${crypto.randomUUID()}` };
+    const directory = path.join('/tmp/attachments', identity.sessionId);
+    const localPath = path.join(directory, 'nested', 'diagram.png');
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch: () => new Response('image-bytes'),
+    });
+    const calls: unknown[] = [];
+    const summaries: unknown[] = [];
+    const events: SessionEventPayload[] = [];
+    let autoCommits = 0;
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async opts => {
+          calls.push(opts);
+          return completion();
+        },
+        summarizeSession: async opts => {
+          summaries.push(opts);
+          return true;
+        },
+      }),
+      runAutoCommit: async () => {
+        autoCommits += 1;
+        return { success: true };
+      },
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+
+    try {
+      const result = await handleControlRequest(
+        'session.prompt',
+        identity,
+        {
+          messageId: 'msg_attachment',
+          turn: { type: 'prompt', prompt: 'Inspect this diagram' },
+          attachments: [
+            {
+              filename: 'diagram.png',
+              mime: 'image/png',
+              signedUrl: new URL('/signed/diagram.png', server.url).toString(),
+              localPath,
+            },
+          ],
+          agent: { mode: 'plan', model: 'override-model', variant: 'thinking' },
+          finalization: { autoCommit: true, condenseOnComplete: true },
+        },
+        handlerDeps
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        result: { messageId: 'msg_attachment', status: 'accepted' },
+      });
+      await waitForTasks(handlerDeps);
+      expect(calls).toEqual([
+        {
+          sessionId: 'kilo_1',
+          directory: session.directory,
+          signal: expect.any(AbortSignal),
+          messageId: 'msg_attachment',
+          prompt: undefined,
+          parts: [
+            { type: 'text', text: 'Inspect this diagram' },
+            {
+              type: 'file',
+              mime: 'image/png',
+              url: `file://${localPath}`,
+              filename: 'diagram.png',
+            },
+          ],
+          agent: 'plan',
+          model: { providerID: 'kilo', modelID: 'override-model' },
+          variant: 'thinking',
+        },
+      ]);
+      expect(fs.readFileSync(localPath, 'utf8')).toBe('image-bytes');
+      expect(autoCommits).toBe(1);
+      expect(summaries).toEqual([
+        {
+          sessionId: 'kilo_1',
+          directory: session.directory,
+          signal: expect.any(AbortSignal),
+          model: { providerID: 'kilo', modelID: 'override-model' },
+          auto: true,
+        },
+      ]);
+      expect(events.at(-1)).toEqual({
+        type: 'session.message.outcome',
+        properties: { messageId: 'msg_attachment', status: 'completed' },
+      });
+    } finally {
+      await cancelControlTasks(handlerDeps, 'Test finished');
+      await server.stop(true);
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects more than five signed attachment descriptors', async () => {
+    const attachment = {
+      filename: 'diagram.png',
+      mime: 'image/png',
+      signedUrl: 'https://signed.example/diagram.png',
+      localPath: `/tmp/attachments/${session.sessionId}/diagram.png`,
+    };
+    let materialized = false;
+    const handlerDeps = deps({
+      materializeAttachments: async message => {
+        materialized = true;
+        return message;
+      },
+    });
+
+    const result = await handleControlRequest(
+      'session.prompt',
+      session,
+      {
+        messageId: 'msg_too_many_attachments',
+        turn: { type: 'prompt', prompt: 'Inspect these diagrams' },
+        attachments: Array.from({ length: 6 }, () => attachment),
+        agent: { mode: 'code', model: 'kilo-model' },
+      },
+      handlerDeps
+    );
+
+    await waitForTasks(handlerDeps);
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'protocol_error', message: 'Invalid payload', retryable: false },
+    });
+    expect(materialized).toBe(false);
+  });
+
+  it('accepts five signed attachments only at the top level', () => {
+    const attachments = Array.from({ length: 5 }, (_, index) => ({
+      filename: `diagram-${index}.png`,
+      mime: 'image/png',
+      signedUrl: `https://signed.example/diagram-${index}.png`,
+      localPath: `/tmp/attachments/${session.sessionId}/diagram-${index}.png`,
+    }));
+    const payload = { ...promptPayload, attachments };
+
+    expect(sessionPromptPayloadSchema.parse(payload)).toEqual(payload);
+    expect(
+      sessionPromptPayloadSchema.safeParse({
+        ...promptPayload,
+        turn: { ...promptPayload.turn, attachments },
+      }).success
+    ).toBe(false);
   });
 
   it('returns protocol_error for session.prompt without session', async () => {

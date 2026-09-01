@@ -30,4 +30,28 @@ describe('accepted watchdog scheduling', () => {
       action: 'check',
     });
   });
+
+  it('keeps accepted work alive when meaningful activity occurs after admission', () => {
+    const acceptedAt = 1_000;
+    const activityAt = acceptedAt + 80_000;
+    const now = acceptedAt + 120_000;
+
+    expect(acceptedAlarmDecision(acceptedAt, now, activityAt)).toEqual({
+      action: 'rearm',
+      at: now + DEADLINE_MS.acceptedAlarmCap,
+    });
+    expect(
+      acceptedAlarmDecision(acceptedAt, activityAt + DEADLINE_MS.acceptedOverdue, activityAt)
+    ).toEqual({ action: 'check' });
+  });
+
+  it('never moves the accepted deadline backwards for older activity timestamps', () => {
+    const acceptedAt = 10_000;
+    const now = acceptedAt + DEADLINE_MS.acceptedOverdue - 1_000;
+
+    expect(acceptedAlarmDecision(acceptedAt, now, acceptedAt - 5_000)).toEqual({
+      action: 'rearm',
+      at: acceptedAt + DEADLINE_MS.acceptedOverdue,
+    });
+  });
 });

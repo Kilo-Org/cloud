@@ -515,6 +515,65 @@ describe('generateSandboxId', () => {
       expect(id).toBe('dind-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
     });
   });
+
+  describe('BYOC Vercel ephemeral sandbox', () => {
+    it('always routes BYOC sessions to a per-session ses sandbox', async () => {
+      await expect(
+        generateSandboxRoutingTarget(
+          undefined,
+          'org-review',
+          'user-id',
+          'workspace_abc123',
+          undefined,
+          {
+            byoc: true,
+          }
+        )
+      ).resolves.toEqual({
+        kind: 'isolated',
+        sandboxId: expect.stringMatching(/^ses-[0-9a-f]{48}$/),
+      });
+    });
+
+    it('keeps Code Reviewer ephemeral routing ahead of BYOC routing', async () => {
+      await expect(
+        generateSandboxRoutingTarget(
+          undefined,
+          'org-review',
+          'user-id',
+          'workspace_abc123',
+          undefined,
+          {
+            byoc: true,
+            createdOnPlatform: 'code-review',
+          }
+        )
+      ).resolves.toMatchObject({
+        kind: 'isolated',
+        sandboxId: expect.stringMatching(/^crv-[0-9a-f]{48}$/),
+      });
+    });
+
+    it('keeps devcontainer routing ahead of Code Reviewer and BYOC routing', async () => {
+      await expect(
+        generateSandboxRoutingTarget(
+          undefined,
+          'org-review',
+          'user-id',
+          'workspace_abc123',
+          undefined,
+          {
+            byoc: true,
+            createdOnPlatform: 'code-review',
+            devcontainer: true,
+          }
+        )
+      ).resolves.toMatchObject({
+        kind: 'isolated',
+        sandboxId: expect.stringMatching(/^dind-[0-9a-f]{48}$/),
+      });
+    });
+  });
 });
 
 describe('selectSandboxForNewSession', () => {

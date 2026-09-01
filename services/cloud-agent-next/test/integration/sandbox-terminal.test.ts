@@ -187,7 +187,7 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
     } satisfies Pick<GitTokenService, 'issueKiloSessionCapability'>;
     Object.assign(instance, {
       provider,
-      createProviderAdapter: () => provider,
+      createProviderAdapter: async () => provider,
       env: {
         ...env,
         KILOCODE_BACKEND_BASE_URL: targets.targets.backendBaseUrl,
@@ -204,16 +204,6 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
     await state.storage.put('worktree_credential_grants', [grant]);
     await instance.confirmInstance(providerInstanceId);
     await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
-  });
-
-  await runInDurableObject(sessionStub, async instance => {
-    const result = await instance.registerSession({
-      identity: sessionIdentity,
-      auth: { kiloSessionId, kilocodeToken: kiloToken },
-      agent: { mode: 'code', model: 'test-model' },
-      workspace: { sandboxId, sandboxProvider: 'cloudflare' },
-    });
-    expect(result.success).toBe(true);
   });
 
   const upgraded = await SELF.fetch(`http://worker.test/sandbox-control/${sandboxId}`, {

@@ -45,6 +45,8 @@ export type SandboxRoutingOptions = {
   devcontainer?: boolean;
   createdOnPlatform?: string;
   sandboxAllocation?: 'isolated-standard';
+  /** BYOC Vercel is intrinsically isolated and never uses a shared owner route. */
+  byoc?: boolean;
 };
 
 export type SandboxIdClass =
@@ -288,6 +290,9 @@ export async function generateSandboxRoutingTarget(
   }
   if (routingOptions.sandboxAllocation === 'isolated-standard') {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'istd') };
+  }
+  if (routingOptions.byoc) {
+    return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };
   }
   if (perSessionOrgs.has('*') || (orgId !== undefined && perSessionOrgs.has(orgId))) {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };

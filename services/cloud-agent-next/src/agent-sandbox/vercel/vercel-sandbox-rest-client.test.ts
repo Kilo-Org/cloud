@@ -9,6 +9,7 @@ import {
   type VercelSandboxNetworkPolicy,
   type VercelSandboxResource,
   type VercelSandboxSession,
+  type VercelSandboxSnapshot,
 } from './vercel-sandbox-rest-client.js';
 
 const sandboxName = 'ses-exact-runtime';
@@ -66,6 +67,15 @@ function command(overrides: Partial<VercelSandboxCommand> = {}): VercelSandboxCo
   };
 }
 
+function snapshot(overrides: Partial<VercelSandboxSnapshot> = {}): VercelSandboxSnapshot {
+  return {
+    id: 'snap_base',
+    sourceSessionId: sessionId,
+    status: 'created',
+    ...overrides,
+  };
+}
+
 function clientFor(providerFetch: typeof fetch) {
   return new VercelSandboxRestClient({
     accessToken: 'secret-access-token',
@@ -109,6 +119,17 @@ function networkPolicy(): VercelSandboxNetworkPolicy {
         },
       },
     ],
+  };
+}
+
+function runtimeCreateInput() {
+  return {
+    name: sandboxName,
+    operationId: 'operation-123',
+    runtimeBuildId: 'runtime-build-123',
+    source: { type: 'runtime' as const },
+    runtime: 'node24' as const,
+    timeoutMs: 300_000,
   };
 }
 
@@ -176,6 +197,103 @@ describe('VercelSandboxRestClient', () => {
     });
   });
 
+  it('omits source entirely when creating a sandbox directly from its runtime', async () => {
+    const providerFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        sandbox: sandbox(),
+        session: session({ sourceSnapshotId: undefined }),
+        routes: [],
+      })
+    );
+
+    const result = await clientFor(providerFetch).createSandbox(runtimeCreateInput());
+
+    expect(result.runtime).toEqual({ sandboxName, sessionId });
+    const body = JSON.parse(providerFetch.mock.calls[0][1].body as string);
+    expect(body).toEqual({
+      projectId: 'prj_test',
+      name: sandboxName,
+      runtime: 'node24',
+      timeout: 300_000,
+      persistent: false,
+      tags: {
+        [VERCEL_CLOUD_AGENT_RESOURCE_TAG]: VERCEL_CLOUD_AGENT_RESOURCE_TAG_VALUE,
+        [VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG]: 'operation-123',
+        [VERCEL_CLOUD_AGENT_RUNTIME_BUILD_TAG]: 'runtime-build-123',
+      },
+    });
+    expect(body).not.toHaveProperty('source');
+  });
+
+  it('preserves an explicitly discriminated snapshot source in sandbox requests', async () => {
+    const providerFetch = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ sandbox: sandbox(), session: session(), routes: [] }));
+    const { snapshotId, ...input } = createInput();
+
+    await clientFor(providerFetch).createSandbox({
+      ...input,
+      source: { type: 'snapshot', snapshotId },
+    });
+
+    expect(JSON.parse(providerFetch.mock.calls[0][1].body as string)).toMatchObject({
+      source: { type: 'snapshot', snapshotId: 'snap_base' },
+    });
+  });
+
+  it('rejects a runtime-created sandbox response that contains a snapshot source', async () => {
+    const client = clientFor(
+      vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ sandbox: sandbox(), session: session(), routes: [] }))
+    );
+
+    await expect(client.createSandbox(runtimeCreateInput())).rejects.toMatchObject({
+      kind: 'correlation_mismatch',
+      operation: 'create',
+    });
+  });
+
+  it.each(['create', 'inspect'] as const)(
+    'rejects invalid legacy and explicit snapshot identifiers before %s',
+    async operation => {
+      const providerFetch = vi.fn();
+      const client = clientFor(providerFetch);
+      for (const snapshotId of ['', 's'.repeat(257)]) {
+        for (const request of [
+          { ...createInput(), snapshotId },
+          { ...runtimeCreateInput(), source: { type: 'snapshot' as const, snapshotId } },
+        ]) {
+          await expect(
+            operation === 'create' ? client.createSandbox(request) : client.inspectByName(request)
+          ).rejects.toMatchObject({ kind: 'invalid_request', operation });
+        }
+      }
+      expect(providerFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps the creation network policy when using an explicit runtime source', async () => {
+    const providerFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        sandbox: sandbox(),
+        session: session({ sourceSnapshotId: undefined }),
+        routes: [],
+      })
+    );
+    const policy = networkPolicy();
+
+    await clientFor(providerFetch).createSandbox({
+      ...runtimeCreateInput(),
+      networkPolicy: policy,
+    });
+
+    const init = providerFetch.mock.calls[0][1];
+    expect(init.redirect).toBe('manual');
+    expect(JSON.parse(init.body as string)).toMatchObject({ networkPolicy: policy });
+    expect(JSON.parse(init.body as string)).not.toHaveProperty('source');
+  });
+
   it('invokes the injected fetch as a free function', async () => {
     function providerFetch(this: unknown, _input: RequestInfo | URL, _init?: RequestInit) {
       if (this !== undefined && this !== globalThis) {
@@ -241,6 +359,102 @@ describe('VercelSandboxRestClient', () => {
   it('returns null for absent non-resuming create reconciliation', async () => {
     const client = clientFor(vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
     await expect(client.inspectByName(createInput())).resolves.toBeNull();
+  });
+
+  it('defaults newly created snapshots to a finite 30-day retention period', async () => {
+    const providerFetch = vi.fn().mockResolvedValue(jsonResponse({ snapshot: snapshot() }));
+
+    await expect(clientFor(providerFetch).createSnapshot(sessionId)).resolves.toEqual(snapshot());
+
+    const [url, init] = providerFetch.mock.calls[0];
+    expect(url).toBe(
+      'https://api.vercel.com/v2/sandboxes/sessions/sbox_session_exact/snapshot?teamId=team_test'
+    );
+    expect(JSON.parse(init.body as string)).toEqual({ expiration: 30 * 24 * 60 * 60 * 1000 });
+  });
+
+  it('preserves explicitly configured finite snapshot retention', async () => {
+    const providerFetch = vi.fn().mockResolvedValue(jsonResponse({ snapshot: snapshot() }));
+    const expiration = 7 * 24 * 60 * 60 * 1000;
+
+    await clientFor(providerFetch).createSnapshot(sessionId, expiration);
+
+    expect(JSON.parse(providerFetch.mock.calls[0][1].body as string)).toEqual({ expiration });
+  });
+
+  it('deletes the exact snapshot with authenticated team-scoped provider access', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    const providerFetch = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ snapshot: snapshot({ status: 'deleted' }) }));
+
+    await expect(clientFor(providerFetch).deleteSnapshot('snap_base')).resolves.toBeUndefined();
+
+    const [url, init] = providerFetch.mock.calls[0];
+    expect(url).toBe('https://api.vercel.com/v2/sandboxes/snapshots/snap_base?teamId=team_test');
+    expect(init.method).toBe('DELETE');
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer secret-access-token');
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(timeout).toHaveBeenCalledWith(30_000);
+    timeout.mockRestore();
+  });
+
+  it.each([404, 410])('treats snapshot deletion status %s as already deleted', async status => {
+    const providerFetch = vi.fn().mockResolvedValue(new Response('already deleted', { status }));
+
+    await expect(clientFor(providerFetch).deleteSnapshot('snap_base')).resolves.toBeUndefined();
+  });
+
+  it.each([
+    ['snapshot ID', snapshot({ id: 'snap_other', status: 'deleted' })],
+    ['snapshot status', snapshot({ status: 'created' })],
+  ])('rejects a deleted snapshot response with mismatched %s', async (_field, deletedSnapshot) => {
+    const client = clientFor(
+      vi.fn().mockResolvedValue(jsonResponse({ snapshot: deletedSnapshot }))
+    );
+
+    await expect(client.deleteSnapshot('snap_base')).rejects.toMatchObject({
+      kind: 'correlation_mismatch',
+      operation: 'delete-snapshot',
+    });
+  });
+
+  it('rejects an invalid snapshot deletion response envelope', async () => {
+    const client = clientFor(
+      vi.fn().mockResolvedValue(jsonResponse({ snapshot: { id: 'snap_base' } }))
+    );
+
+    await expect(client.deleteSnapshot('snap_base')).rejects.toMatchObject({
+      kind: 'invalid_response',
+      operation: 'delete-snapshot',
+    });
+  });
+
+  it('classifies snapshot deletion failures without exposing provider response contents', async () => {
+    const reflectedSecret = 'secret-access-token reflected-provider-body';
+    const client = clientFor(
+      vi.fn().mockResolvedValue(new Response(reflectedSecret, { status: 403 }))
+    );
+
+    const error = await client.deleteSnapshot('snap_base').catch(cause => cause);
+
+    expect(error).toMatchObject({
+      kind: 'request_failed',
+      operation: 'delete-snapshot',
+      status: 403,
+      message: 'Vercel Sandbox delete-snapshot failed (request_failed, status 403)',
+    });
+    expect(String(error)).not.toContain(reflectedSecret);
+  });
+
+  it('rejects an invalid snapshot deletion target before calling the provider', async () => {
+    const providerFetch = vi.fn();
+
+    await expect(clientFor(providerFetch).deleteSnapshot('')).rejects.toMatchObject({
+      kind: 'invalid_request',
+      operation: 'delete-snapshot',
+    });
+    expect(providerFetch).not.toHaveBeenCalled();
   });
 
   it('gets and correlates an exact session', async () => {

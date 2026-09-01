@@ -1,4 +1,8 @@
-import { getSandboxProvider, type SessionMetadata } from '../persistence/session-metadata.js';
+import {
+  getSandboxProvider,
+  getSandboxProviderBinding,
+  type SessionMetadata,
+} from '../persistence/session-metadata.js';
 import type { Env } from '../types.js';
 import {
   AgentSandboxUnavailableError,
@@ -11,6 +15,7 @@ import { CloudflareAgentSandbox } from './cloudflare/cloudflare-agent-sandbox.js
 import { VercelAgentSandbox } from './vercel/vercel-agent-sandbox.js';
 import { VercelSandboxLifecycle } from './vercel/vercel-lifecycle.js';
 import { resolveVercelSandboxRuntimeConfig } from './vercel/vercel-runtime-config.js';
+import { resolveByocVercelRuntimeConfig } from '../byoc/vercel-credential-resolver.js';
 
 export function createAgentSandbox(
   env: Env,
@@ -18,6 +23,17 @@ export function createAgentSandbox(
   runtimeContext?: AgentSandboxRuntimeContext
 ): AgentSandbox {
   if (getSandboxProvider(metadata) === 'vercel') {
+    const binding = getSandboxProviderBinding(metadata);
+    const source = binding.kind === 'vercel' ? binding.source : undefined;
+    if (source?.kind === 'byoc') {
+      return new VercelAgentSandbox(metadata, undefined, runtimeContext, {
+        resolveConfig: () =>
+          resolveByocVercelRuntimeConfig(env, {
+            organizationId: source.organizationId,
+            credentialId: source.credentialId,
+          }),
+      });
+    }
     const config = resolveVercelSandboxRuntimeConfig(env, metadata.workspace?.providerRuntime);
     if (!config) {
       throw new AgentSandboxUnavailableError(

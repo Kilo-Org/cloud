@@ -172,6 +172,9 @@ export function observe(record: PhysicalRecord, result: ObserveResult): Physical
       return record;
     case 'failed':
       if (result === 'terminal') return toStopped(record);
+      if (result === 'active' && record.stopTombstone === null && record.providerRef !== null) {
+        return toRunning(record, record.providerRef);
+      }
       return toUnknown(record);
     case 'unknown':
       if (result === 'terminal') return toStopped(record);

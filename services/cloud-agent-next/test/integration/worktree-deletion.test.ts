@@ -22,6 +22,7 @@ import {
 import { DEADLINE_MS } from '../../src/sandbox-control/deadlines';
 import { WORKTREE_CREDENTIAL_CONTAINMENT } from '../../src/sandbox-control/physical-lifecycle';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider';
+import { bindingFromLegacyProvider } from '../../src/sandbox-provider-binding';
 import {
   createVercelProviderAdapter,
   type VercelControlRestClient,
@@ -172,10 +173,9 @@ async function installDeletionProvider(instance: SandboxControl, provider: Provi
         }),
       },
     },
-    provider,
-    createProviderAdapter: () => provider,
-    providerKind: 'vercel',
+    createProviderAdapter: async () => provider,
   });
+  await instance['pinProvider'](bindingFromLegacyProvider('vercel'));
 }
 
 async function seedPhysical(
@@ -184,6 +184,7 @@ async function seedPhysical(
   intentId: string,
   providerRef: string
 ) {
+  await instance['pinProvider']();
   await instance.claimCreate(intentId, false, instance.sandboxId, WORKTREE_CREDENTIAL_CONTAINMENT);
   await instance.confirmInstance(providerRef);
   const physical = await instance.getPhysicalRecord();
@@ -494,7 +495,7 @@ describe('worktree deletion in Durable Objects', () => {
         const create = vi.fn(memory.create.bind(memory));
         const stop = vi.fn(memory.stop.bind(memory));
         const provider = { ...memory, create, stop };
-        Object.assign(instance, { provider, createProviderAdapter: () => provider });
+        Object.assign(instance, { createProviderAdapter: async () => provider });
         const original = instance['env'].SESSION_INGEST;
         const token = instance['env'].VERCEL_TOKEN;
         Object.assign(instance['env'], {
@@ -570,7 +571,7 @@ describe('worktree deletion in Durable Objects', () => {
         ensureLeaseAtLeast: async () => undefined,
         logs: async () => '',
       };
-      Object.assign(instance, { provider, createProviderAdapter: () => provider });
+      Object.assign(instance, { createProviderAdapter: async () => provider });
       const original = instance['env'].SESSION_INGEST;
       Object.assign(instance['env'], {
         SESSION_INGEST: {
@@ -744,7 +745,7 @@ describe('worktree deletion in Durable Objects', () => {
       };
       const originalIngest = instance['env'].SESSION_INGEST;
       const originalLegacy = instance['env'].CLOUD_AGENT_SESSION;
-      Object.assign(instance, { provider, createProviderAdapter: () => provider });
+      Object.assign(instance, { createProviderAdapter: async () => provider });
       Object.assign(instance['env'], {
         SESSION_INGEST: {
           canDestroyCloudAgentWorktreeSandbox: async () => ({
@@ -1188,7 +1189,7 @@ describe('worktree deletion in Durable Objects', () => {
         ]);
       });
       await runInDurableObject(control, async (instance, state) => {
-        Object.assign(instance, { provider, createProviderAdapter: () => provider });
+        Object.assign(instance, { createProviderAdapter: async () => provider });
         await instance.initializeOwner(userId);
         await seedPhysical(instance, state, 'shared-sync', providerRef);
         for (const route of [
@@ -1431,7 +1432,7 @@ describe('worktree deletion in Durable Objects', () => {
         ensureLeaseAtLeast: async () => undefined,
         logs: async () => '',
       };
-      Object.assign(instance, { provider, createProviderAdapter: () => provider });
+      Object.assign(instance, { createProviderAdapter: async () => provider });
       await seedPhysical(instance, state, 'shared-test', providerRef);
       await attachGrantedSession(
         instance,

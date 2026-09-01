@@ -12,12 +12,14 @@ import {
 import { createMemoryEventQueries, readStep } from '../session/preparation-test-helpers.js';
 import { getPreparationSnapshots, readPreparationAttempt } from '../session/preparation-history.js';
 import type { Env } from '../types.js';
+import type { CallbackJob } from '../callbacks/index.js';
 import type { UserId } from '../types/ids.js';
 import type { sandboxControlRpc } from './control-rpc.js';
 import type { SandboxControlOutboundRequest } from '../sandbox-control/socket.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
+  SANDBOX_CONTROL_ATTACHMENT_DOWNLOAD_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sessionOperationExpiresAt,
   sessionOperationResultHash,
@@ -58,6 +60,12 @@ import {
   type ControlSessionMessageIntent,
   type SessionMessageRecord,
 } from './session-message-queue.js';
+
+const MESSAGE_A = 'msg_000000000001AAAAAAAAAAAAAA';
+const MESSAGE_B = 'msg_000000000002BBBBBBBBBBBBBB';
+const MESSAGE_C = 'msg_000000000003CCCCCCCCCCCCCC';
+const MESSAGE_D = 'msg_000000000004DDDDDDDDDDDDDD';
+const MESSAGE_E = 'msg_000000000005EEEEEEEEEEEEEE';
 
 const orchestrationMocks = vi.hoisted(() => ({
   eventQueries: vi.fn(),
@@ -117,13 +125,13 @@ function msg(messageId: string, state: SessionMessageRecord['state']): SessionMe
 
 const promptTurn: AcceptedPromptTurn = {
   type: 'prompt',
-  messageId: 'a',
+  messageId: MESSAGE_A,
   prompt: 'inspect attachment',
   attachments: { path: 'attachment-path', files: ['document.pdf', 'image.png'] },
 };
 const commandTurn: AcceptedCommandTurn = {
   type: 'command',
-  messageId: 'b',
+  messageId: MESSAGE_B,
   command: 'review',
   arguments: '--all changes',
 };
@@ -272,7 +280,7 @@ describe('matchesSessionMessageReplay', () => {
             turn: {
               attachments: { files: ['document.pdf', 'image.png'], path: 'attachment-path' },
               prompt: promptTurn.prompt,
-              messageId: 'a',
+              messageId: MESSAGE_A,
               type: 'prompt',
             },
           }
@@ -307,7 +315,7 @@ describe('matchesSessionMessageReplay', () => {
   it.each([
     ['message ID', { ...promptTurn, messageId: 'other' }],
     ['prompt', { ...promptTurn, prompt: 'different request' }],
-    ['removed attachments', { type: 'prompt', messageId: 'a', prompt: promptTurn.prompt }],
+    ['removed attachments', { type: 'prompt', messageId: MESSAGE_A, prompt: promptTurn.prompt }],
     [
       'attachment path',
       { ...promptTurn, attachments: { path: 'other-path', files: ['document.pdf', 'image.png'] } },
@@ -391,13 +399,13 @@ describe('matchesSessionMessageReplay', () => {
 
   it('checks legacy prompt-only content without reconstructing a command', () => {
     const record: SessionMessageRecord = {
-      messageId: 'b',
+      messageId: MESSAGE_B,
       state: 'accepted',
       prompt: '/review --all changes',
     };
     expect(
       matchesSessionMessageReplay(record, {
-        turn: { type: 'prompt', messageId: 'b', prompt: '/review --all changes' },
+        turn: { type: 'prompt', messageId: MESSAGE_B, prompt: '/review --all changes' },
       })
     ).toBe(true);
     expect(matchesSessionMessageReplay(record, { turn: commandTurn })).toBe(false);
@@ -471,7 +479,7 @@ describe('freezeLegacyQueuedMessages', () => {
     'keeps legacy queued prompts fail-able when the pre-update model is %j',
     model => {
       const messages: SessionMessageRecord[] = [
-        { messageId: 'a', state: 'queued', turn: promptTurn },
+        { messageId: MESSAGE_A, state: 'queued', turn: promptTurn },
         { messageId: 'old', state: 'queued', prompt: 'old prompt' },
       ];
       const frozen = freezeLegacyQueuedMessages(messages, { model });
@@ -479,7 +487,7 @@ describe('freezeLegacyQueuedMessages', () => {
       expect(freezeLegacyQueuedMessages(structuredClone(frozen), defaultAgent)).toEqual(frozen);
       expect(getSessionMessageTurn(frozen[0])).toEqual(promptTurn);
       expect(matchesSessionMessageReplay(frozen[0], { turn: promptTurn })).toBe(false);
-      expect(failQueuedMessage(frozen, 'a')?.[0]).toEqual({ ...frozen[0], state: 'failed' });
+      expect(failQueuedMessage(frozen, MESSAGE_A)?.[0]).toEqual({ ...frozen[0], state: 'failed' });
     }
   );
 
@@ -528,96 +536,109 @@ describe('freezeLegacyQueuedMessages', () => {
 describe('nextQueuedMessageId', () => {
   it('returns the oldest queued message when none are accepted', () => {
     expect(
-      nextQueuedMessageId([msg('a', 'completed'), msg('b', 'queued'), msg('c', 'queued')])
-    ).toBe('b');
+      nextQueuedMessageId([
+        msg(MESSAGE_A, 'completed'),
+        msg(MESSAGE_B, 'queued'),
+        msg(MESSAGE_C, 'queued'),
+      ])
+    ).toBe(MESSAGE_B);
   });
 
   it('returns undefined while a message is accepted', () => {
-    expect(nextQueuedMessageId([msg('a', 'accepted'), msg('b', 'queued')])).toBeUndefined();
+    expect(
+      nextQueuedMessageId([msg(MESSAGE_A, 'accepted'), msg(MESSAGE_B, 'queued')])
+    ).toBeUndefined();
   });
 
   it('returns undefined when the queue is empty', () => {
-    expect(nextQueuedMessageId([msg('a', 'completed')])).toBeUndefined();
+    expect(nextQueuedMessageId([msg(MESSAGE_A, 'completed')])).toBeUndefined();
   });
 });
 
 describe('assignPreparationAttemptId', () => {
   it('returns undefined when the message is missing', () => {
-    expect(assignPreparationAttemptId([msg('a', 'queued')], 'missing', () => 'attempt-1')).toBe(
-      undefined
-    );
+    expect(
+      assignPreparationAttemptId([msg(MESSAGE_A, 'queued')], 'missing', () => 'attempt-1')
+    ).toBe(undefined);
   });
 
   it('reuses an existing id and preserves the array identity', () => {
-    const messages = [{ ...msg('a', 'queued'), preparationAttemptId: 'attempt-1' }];
+    const messages = [{ ...msg(MESSAGE_A, 'queued'), preparationAttemptId: 'attempt-1' }];
 
-    const assigned = assignPreparationAttemptId(messages, 'a', () => 'attempt-2');
+    const assigned = assignPreparationAttemptId(messages, MESSAGE_A, () => 'attempt-2');
 
     expect(assigned?.attemptId).toBe('attempt-1');
     expect(assigned?.messages).toBe(messages);
   });
 
   it('mints an id and stores it only on the matching message', () => {
-    const messages = [msg('a', 'queued'), msg('b', 'queued')];
+    const messages = [msg(MESSAGE_A, 'queued'), msg(MESSAGE_B, 'queued')];
 
-    const assigned = assignPreparationAttemptId(messages, 'b', () => 'attempt-1');
+    const assigned = assignPreparationAttemptId(messages, MESSAGE_B, () => 'attempt-1');
 
     expect(assigned?.attemptId).toBe('attempt-1');
     expect(assigned?.messages).not.toBe(messages);
     expect(assigned?.messages).toEqual([
-      msg('a', 'queued'),
-      { ...msg('b', 'queued'), preparationAttemptId: 'attempt-1' },
+      msg(MESSAGE_A, 'queued'),
+      { ...msg(MESSAGE_B, 'queued'), preparationAttemptId: 'attempt-1' },
     ]);
   });
 });
 
 describe('applyMessageOutcome', () => {
   it('settles only the message identified by the matching runtime', () => {
-    const before = [{ ...msg('a', 'accepted'), wrapperInstanceId: 'runtime' }, msg('b', 'queued')];
+    const before = [
+      { ...msg(MESSAGE_A, 'accepted'), wrapperInstanceId: 'runtime' },
+      msg(MESSAGE_B, 'queued'),
+    ];
     const next = applyMessageOutcome(
       before,
-      { messageId: 'a', status: 'completed' },
+      { messageId: MESSAGE_A, status: 'completed' },
       'runtime',
       30
     );
     expect(next?.map(message => [message.messageId, message.state])).toEqual([
-      ['a', 'completed'],
-      ['b', 'queued'],
+      [MESSAGE_A, 'completed'],
+      [MESSAGE_B, 'queued'],
     ]);
     expect(hasAcceptedMessage(next ?? [])).toBe(false);
     expect(
-      applyMessageOutcome(before, { messageId: 'a', status: 'completed' }, 'old-runtime', 30)
+      applyMessageOutcome(before, { messageId: MESSAGE_A, status: 'completed' }, 'old-runtime', 30)
     ).toBeUndefined();
     expect(
-      applyMessageOutcome(next ?? [], { messageId: 'a', status: 'failed' }, 'runtime', 40)
+      applyMessageOutcome(next ?? [], { messageId: MESSAGE_A, status: 'failed' }, 'runtime', 40)
     ).toBeUndefined();
   });
 });
 
 describe('failQueuedMessage', () => {
   it('fails only the matching queued message', () => {
-    const next = failQueuedMessage([msg('a', 'queued'), msg('b', 'queued')], 'a');
+    const next = failQueuedMessage([msg(MESSAGE_A, 'queued'), msg(MESSAGE_B, 'queued')], MESSAGE_A);
     expect(next?.map(message => [message.messageId, message.state])).toEqual([
-      ['a', 'failed'],
-      ['b', 'queued'],
+      [MESSAGE_A, 'failed'],
+      [MESSAGE_B, 'queued'],
     ]);
   });
 
   it('does not change an already terminal message', () => {
-    expect(failQueuedMessage([msg('a', 'completed')], 'a')).toBeUndefined();
-    expect(failQueuedMessage([msg('a', 'accepted')], 'a')).toBeUndefined();
+    expect(failQueuedMessage([msg(MESSAGE_A, 'completed')], MESSAGE_A)).toBeUndefined();
+    expect(failQueuedMessage([msg(MESSAGE_A, 'accepted')], MESSAGE_A)).toBeUndefined();
   });
 });
 
 describe('acceptQueuedMessage', () => {
   it('accepts only the next queued message', () => {
-    const accepted = acceptQueuedMessage([msg('a', 'queued'), msg('b', 'queued')], 'a', 10);
+    const accepted = acceptQueuedMessage(
+      [msg(MESSAGE_A, 'queued'), msg(MESSAGE_B, 'queued')],
+      MESSAGE_A,
+      10
+    );
     expect(accepted?.map(message => [message.messageId, message.state])).toEqual([
-      ['a', 'accepted'],
-      ['b', 'queued'],
+      [MESSAGE_A, 'accepted'],
+      [MESSAGE_B, 'queued'],
     ]);
-    expect(accepted?.find(message => message.messageId === 'a')).toEqual({
-      messageId: 'a',
+    expect(accepted?.find(message => message.messageId === MESSAGE_A)).toEqual({
+      messageId: MESSAGE_A,
       state: 'accepted',
       acceptedAt: 10,
       lastActivityAt: 10,
@@ -627,13 +648,13 @@ describe('acceptQueuedMessage', () => {
   it('preserves upstream turns and durable intents with attachments, commands, and finalization', () => {
     const prompt = {
       type: 'prompt' as const,
-      messageId: 'a',
+      messageId: MESSAGE_A,
       prompt: 'inspect attachment',
       attachments: { path: 'attachment-path', files: ['document.pdf'] },
     };
     const command = {
       type: 'command' as const,
-      messageId: 'b',
+      messageId: MESSAGE_B,
       command: 'review',
       arguments: '--all changes',
     };
@@ -672,13 +693,13 @@ describe('acceptQueuedMessage', () => {
 
   it('does not resurrect a cancelled message after interrupt', () => {
     expect(
-      acceptQueuedMessage([msg('a', 'cancelled'), msg('b', 'queued')], 'a', 10)
+      acceptQueuedMessage([msg(MESSAGE_A, 'cancelled'), msg(MESSAGE_B, 'queued')], MESSAGE_A, 10)
     ).toBeUndefined();
   });
 
   it('does not accept while another message is accepted', () => {
     expect(
-      acceptQueuedMessage([msg('a', 'accepted'), msg('b', 'queued')], 'b', 10)
+      acceptQueuedMessage([msg(MESSAGE_A, 'accepted'), msg(MESSAGE_B, 'queued')], MESSAGE_B, 10)
     ).toBeUndefined();
   });
 });
@@ -686,21 +707,83 @@ describe('acceptQueuedMessage', () => {
 describe('recordAcceptedMessageActivity', () => {
   it('updates only the accepted message activity timestamp', () => {
     const messages: SessionMessageRecord[] = [
-      { messageId: 'a', state: 'accepted', acceptedAt: 10, lastActivityAt: 20 },
-      { messageId: 'b', state: 'queued' },
-      { messageId: 'c', state: 'completed' },
+      { messageId: MESSAGE_A, state: 'accepted', acceptedAt: 10, lastActivityAt: 20 },
+      { messageId: MESSAGE_B, state: 'queued' },
+      { messageId: MESSAGE_C, state: 'completed' },
     ];
     expect(recordAcceptedMessageActivity(messages, 30)).toEqual([
-      { messageId: 'a', state: 'accepted', acceptedAt: 10, lastActivityAt: 30 },
-      { messageId: 'b', state: 'queued' },
-      { messageId: 'c', state: 'completed' },
+      { messageId: MESSAGE_A, state: 'accepted', acceptedAt: 10, lastActivityAt: 30 },
+      { messageId: MESSAGE_B, state: 'queued' },
+      { messageId: MESSAGE_C, state: 'completed' },
     ]);
   });
 
   it('does not update messages when no turn is accepted', () => {
     expect(
-      recordAcceptedMessageActivity([msg('a', 'queued'), msg('b', 'completed')], 30)
+      recordAcceptedMessageActivity([msg(MESSAGE_A, 'queued'), msg(MESSAGE_B, 'completed')], 30)
     ).toBeUndefined();
+  });
+});
+
+describe('recordAcceptedMessageActivity monotonicity', () => {
+  it('refreshes only accepted messages without moving observed activity backwards', () => {
+    const messages: SessionMessageRecord[] = [
+      { messageId: 'accepted', state: 'accepted', acceptedAt: 10, lastActivityAt: 20 },
+      { messageId: 'queued', state: 'queued' },
+    ];
+    expect(recordAcceptedMessageActivity(messages, 30)).toEqual([
+      { messageId: 'accepted', state: 'accepted', acceptedAt: 10, lastActivityAt: 30 },
+      { messageId: 'queued', state: 'queued' },
+    ]);
+    expect(recordAcceptedMessageActivity(messages, 15)?.[0]?.lastActivityAt).toBe(20);
+  });
+});
+
+describe('matchesSessionMessageReplay canonical intent', () => {
+  it('rejects changes to canonical turns, agent selection, and finalization', () => {
+    const intent = {
+      turn: { type: 'prompt' as const, messageId: MESSAGE_A, prompt: 'hello' },
+      agent: { mode: 'code', model: 'first-model', variant: 'thinking' },
+      finalization: { autoCommit: true, condenseOnComplete: false },
+    };
+    const message = createSessionMessageRecord(intent);
+
+    expect(matchesSessionMessageReplay(message, intent)).toBe(true);
+    expect(
+      matchesSessionMessageReplay(message, {
+        ...intent,
+        turn: { ...intent.turn, prompt: 'different' },
+      })
+    ).toBe(false);
+    expect(
+      matchesSessionMessageReplay(message, {
+        ...intent,
+        agent: { ...intent.agent, model: 'different-model' },
+      })
+    ).toBe(false);
+    expect(
+      matchesSessionMessageReplay(message, {
+        ...intent,
+        finalization: { ...intent.finalization, autoCommit: false },
+      })
+    ).toBe(false);
+  });
+
+  it('validates only the persisted prompt on legacy flat records', () => {
+    const legacy: SessionMessageRecord = { messageId: MESSAGE_A, state: 'queued', prompt: 'hello' };
+
+    expect(
+      matchesSessionMessageReplay(legacy, {
+        turn: { type: 'prompt', messageId: MESSAGE_A, prompt: 'hello' },
+        agent: { mode: 'plan', model: 'current-default' },
+      })
+    ).toBe(true);
+    expect(
+      matchesSessionMessageReplay(legacy, {
+        turn: { type: 'command', messageId: MESSAGE_A, command: 'compact', arguments: '' },
+        agent: { mode: 'plan', model: 'current-default' },
+      })
+    ).toBe(false);
   });
 });
 
@@ -757,19 +840,38 @@ describe('streamQueuedSnapshots', () => {
     ]);
   });
 
+  it('renders canonical slash commands without breaking legacy flat prompts', () => {
+    expect(
+      streamQueuedSnapshots(
+        [
+          createSessionMessageRecord({
+            turn: {
+              type: 'command',
+              messageId: MESSAGE_A,
+              command: 'compact',
+              arguments: '--aggressive',
+            },
+            agent: { mode: 'code', model: 'model' },
+          }),
+        ],
+        99
+      )
+    ).toEqual([{ messageId: MESSAGE_A, content: '/compact --aggressive', timestamp: 99 }]);
+  });
+
   it('marks accepted legacy prompts as sent without changing genuinely queued snapshots', () => {
     expect(
       streamQueuedSnapshots(
         [
-          { messageId: 'a', state: 'queued', prompt: 'hello' },
-          { messageId: 'b', state: 'accepted', prompt: 'world', acceptedAt: 20 },
-          { messageId: 'c', state: 'completed', prompt: 'done' },
+          { messageId: MESSAGE_A, state: 'queued', prompt: 'hello' },
+          { messageId: MESSAGE_B, state: 'accepted', prompt: 'world', acceptedAt: 20 },
+          { messageId: MESSAGE_C, state: 'completed', prompt: 'done' },
         ],
         99
       )
     ).toEqual([
-      { messageId: 'a', content: 'hello', timestamp: 99 },
-      { messageId: 'b', content: 'world', timestamp: 20, delivery: 'sent' },
+      { messageId: MESSAGE_A, content: 'hello', timestamp: 99 },
+      { messageId: MESSAGE_B, content: 'world', timestamp: 20, delivery: 'sent' },
     ]);
   });
 
@@ -778,20 +880,20 @@ describe('streamQueuedSnapshots', () => {
       streamQueuedSnapshots(
         [
           {
-            messageId: 'a',
+            messageId: MESSAGE_A,
             state: 'accepted',
             acceptedAt: 20,
-            turn: { type: 'prompt', messageId: 'a', prompt: 'hello' },
+            turn: { type: 'prompt', messageId: MESSAGE_A, prompt: 'hello' },
           },
           {
-            messageId: 'b',
+            messageId: MESSAGE_B,
             state: 'queued',
-            turn: { type: 'command', messageId: 'b', command: 'review', arguments: '--all' },
+            turn: { type: 'command', messageId: MESSAGE_B, command: 'review', arguments: '--all' },
           },
           {
-            messageId: 'c',
+            messageId: MESSAGE_C,
             state: 'queued',
-            turn: { type: 'command', messageId: 'c', command: 'status', arguments: '' },
+            turn: { type: 'command', messageId: MESSAGE_C, command: 'status', arguments: '' },
           },
           {
             messageId: 'command',
@@ -824,9 +926,9 @@ describe('streamQueuedSnapshots', () => {
         99
       )
     ).toEqual([
-      { messageId: 'a', content: 'hello', timestamp: 20, delivery: 'sent' },
-      { messageId: 'b', content: '/review --all', timestamp: 99 },
-      { messageId: 'c', content: '/status', timestamp: 99 },
+      { messageId: MESSAGE_A, content: 'hello', timestamp: 20, delivery: 'sent' },
+      { messageId: MESSAGE_B, content: '/review --all', timestamp: 99 },
+      { messageId: MESSAGE_C, content: '/status', timestamp: 99 },
       { messageId: 'command', content: '/compact --aggressive', timestamp: 99 },
       { messageId: 'attachment', content: 'inspect attachment', timestamp: 99 },
     ]);
@@ -1012,6 +1114,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
   eventQueries.getLatestEventId = () =>
     Math.max(0, ...eventQueries.findByEntityPrefix('').map(row => row.id));
   eventQueries.deleteOlderThan = vi.fn();
+  eventQueries.getAssistantMessageForUserMessage = vi.fn(() => null);
   orchestrationMocks.eventQueries.mockReturnValue(eventQueries);
   orchestrationMocks.signedAttachments.mockResolvedValue([]);
   const storage = {
@@ -1079,8 +1182,15 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
     updateNetworkPolicy: vi.fn(async () => undefined),
     request,
   } satisfies Control;
+  const callbacks: CallbackJob[] = [];
+  const callbackQueue = {
+    send: vi.fn(async (job: CallbackJob) => {
+      callbacks.push(job);
+    }),
+  };
   const env = {
     SANDBOX_CONTROL: { getByName: () => sharedControl ?? control },
+    CALLBACK_QUEUE: callbackQueue,
     CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
     CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_1',
     CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: 'user_1',
@@ -1091,6 +1201,8 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
       return session;
     },
     control,
+    callbackQueue,
+    callbacks,
     metadata,
     storage,
     values,
@@ -1137,7 +1249,8 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
       } = {}
     ) =>
       session.admitSubmittedMessage({
-        userId: 'user_1' as UserId,
+        userId: metadata.identity.userId as UserId,
+        botId: metadata.identity.botId,
         turn: {
           type: 'prompt',
           id: messageId,
@@ -1192,39 +1305,483 @@ describe('SandboxSession orchestration', () => {
     vi.useRealTimers();
   });
 
+  it('routes BYOC ownership through trusted credential preparation without forwarding the original token', async () => {
+    const providerBinding = {
+      kind: 'vercel',
+      source: { kind: 'byoc', organizationId: 'org_1', credentialId: 'credential_1' },
+    } as const;
+    const fixture = sessionFixture({
+      identity: { sessionId: SESSION_ID, userId: 'user_1', orgId: 'org_1' },
+      workspace: {
+        sandboxId: SANDBOX_ID,
+        workspacePath: DIRECTORY,
+        sandboxProvider: 'vercel',
+        sandboxProviderBinding: providerBinding,
+      },
+    });
+    await fixture.admit(MESSAGE_A);
+    await fixture.flush();
+    expect(fixture.control.ensureReady).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerId: 'user_1',
+        sessionId: SESSION_ID,
+        provider: 'vercel',
+        providerBinding,
+        allowCreate: true,
+      })
+    );
+    expect(fixture.control.ensureReady.mock.calls[0]?.[0]).not.toHaveProperty('kiloToken');
+    const attach = fixture.control.request.mock.calls.find(
+      ([input]) => input.operation === 'session.attach'
+    )?.[0];
+    expect(attach).toMatchObject({
+      expectedWrapperInstanceId: RUNTIME_ID,
+      payload: { kilo: ATTACHMENT.kilo, env: { KILOCODE_TOKEN: KILO_CREDENTIAL } },
+    });
+    expect(JSON.stringify(attach)).not.toContain('test-token');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
+  });
+
+  it.each([
+    'byoc_credential_missing',
+    'byoc_vercel_not_ready',
+    'byoc_vercel_forbidden',
+    'byoc_vercel_capacity',
+  ] as const)('retains %s while failing the waiting queue before prompt delivery', async reason => {
+    const fixture = sessionFixture({
+      workspace: { sandboxId: SANDBOX_ID, sandboxProvider: 'vercel', workspacePath: DIRECTORY },
+    });
+    const ready = deferred<ControlStatus>();
+    fixture.control.ensureReady.mockImplementation(() => ready.promise);
+    await fixture.admit(MESSAGE_A);
+    await fixture.admit(MESSAGE_B);
+    await fixture.flush();
+    ready.resolve({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      failureReason: reason,
+    });
+    await fixture.flush();
+    for (const id of [MESSAGE_A, MESSAGE_B]) {
+      expect(fixture.record(id)).toMatchObject({ state: 'failed', failedReason: reason });
+      expect(fixture.record(id)?.acceptedAt).toBeUndefined();
+    }
+    expect(fixture.control.request).not.toHaveBeenCalled();
+    expect(fixture.terminalEvents()).toHaveLength(2);
+  });
+
+  it.each([
+    {
+      ...promptTurn,
+      attachments: {
+        path: '44444444-4444-4444-8444-444444444444',
+        files: [
+          '55555555-5555-4555-8555-555555555555.pdf',
+          '66666666-6666-4666-8666-666666666666.png',
+        ],
+      },
+    },
+    commandTurn,
+  ])(
+    'preserves prepared $type intent and ownership across replay and changing defaults',
+    async turn => {
+      const fixture = sessionFixture();
+      fixture.values.delete('session_metadata');
+      const registration = {
+        identity: fixture.metadata.identity,
+        auth: fixture.metadata.auth,
+        agent: defaultAgent,
+        workspace: fixture.metadata.workspace,
+        repository: { type: 'github' as const, repo: 'owner/repo', branch: 'feature' },
+        finalization: { autoCommit: true, condenseOnComplete: false },
+        message: {
+          initialMessageId: turn.messageId,
+          turn:
+            turn.type === 'prompt'
+              ? { type: 'prompt' as const, prompt: turn.prompt, attachments: turn.attachments }
+              : { type: 'command' as const, command: turn.command, arguments: turn.arguments },
+        },
+      };
+      await expect(fixture.session.registerSession(registration)).resolves.toEqual({
+        success: true,
+      });
+      expect(await fixture.session.getMetadata()).toMatchObject({
+        metadataSchemaVersion: 2,
+        initialMessage: { id: turn.messageId, turn: registration.message.turn },
+        repository: { type: 'github', repo: 'owner/repo', upstreamBranch: 'feature' },
+      });
+      await expect(
+        fixture.session.replayPreparedInitialMessage({ userId: 'user_1' as UserId })
+      ).resolves.toBeUndefined();
+      await expect(
+        fixture.session.admitPreparedInitialMessage({ userId: 'different-owner' as UserId })
+      ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+      expect(fixture.control.ensureReady).not.toHaveBeenCalled();
+      await expect(
+        fixture.session.admitPreparedInitialMessage({ userId: 'user_1' as UserId })
+      ).resolves.toMatchObject({ success: true, messageId: turn.messageId });
+      await fixture.flush();
+      const original = fixture.record(turn.messageId)?.intent;
+      expect(original).toEqual({
+        turn,
+        agent: defaultAgent,
+        finalization: registration.finalization,
+      });
+      const metadata = await fixture.session.getMetadata();
+      if (!metadata) throw new Error('Missing registered metadata');
+      fixture.storage.kv.put(
+        'session_metadata',
+        serializeSessionMetadata({
+          ...metadata,
+          agent: { mode: 'architect', model: 'openai/gpt-4.1' },
+          finalization: { autoCommit: false, condenseOnComplete: true },
+        })
+      );
+      fixture.reload();
+      await expect(
+        fixture.session.replayPreparedInitialMessage({ userId: 'user_1' as UserId })
+      ).resolves.toMatchObject({ success: true, compatibilityDelivery: 'sent' });
+      expect(fixture.record(turn.messageId)?.intent).toEqual(original);
+      await fixture.outcome(turn.messageId, 'completed');
+      await fixture.flush();
+      await expect(
+        fixture.session.replayPreparedInitialMessage({ userId: 'user_1' as UserId })
+      ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+    }
+  );
+
+  it('replays grouped initial intent after a follow-up changes the stored model but rejects changed configuration', async () => {
+    const fixture = sessionFixture();
+    fixture.values.delete('session_metadata');
+    const input = {
+      identity: fixture.metadata.identity,
+      auth: fixture.metadata.auth,
+      agent: defaultAgent,
+      workspace: fixture.metadata.workspace,
+      message: {
+        initialTurn: { type: 'prompt' as const, messageId: MESSAGE_A, prompt: 'Initial' },
+      },
+    };
+    await expect(fixture.session.createSessionWithInitialAdmission(input)).resolves.toMatchObject({
+      success: true,
+    });
+    await fixture.flush();
+    const original = fixture.record(MESSAGE_A)?.intent;
+    await fixture.session.admitSubmittedMessage({
+      userId: 'user_1' as UserId,
+      turn: { type: 'prompt', id: MESSAGE_B, prompt: 'Follow up' },
+      agent: { model: 'openai/gpt-4.1' },
+    });
+    await fixture.flush();
+    expect((await fixture.session.getMetadata())?.agent?.model).toBe('openai/gpt-4.1');
+    await expect(fixture.session.createSessionWithInitialAdmission(input)).resolves.toMatchObject({
+      success: true,
+      compatibilityDelivery: 'sent',
+    });
+    expect(fixture.record(MESSAGE_A)?.intent).toEqual(original);
+    await expect(
+      fixture.session.createSessionWithInitialAdmission({
+        ...input,
+        workspace: {
+          ...input.workspace,
+          sandboxProvider: 'cloudflare',
+          sandboxProviderBinding: { kind: 'cloudflare' },
+        },
+      })
+    ).resolves.toMatchObject({ success: true, compatibilityDelivery: 'sent' });
+    await expect(
+      fixture.session.createSessionWithInitialAdmission({
+        ...input,
+        workspace: {
+          ...input.workspace,
+          sandboxProvider: 'vercel',
+          sandboxProviderBinding: {
+            kind: 'vercel',
+            source: { kind: 'byoc', organizationId: 'org_1', credentialId: 'credential_1' },
+          },
+        },
+      })
+    ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+    await expect(
+      fixture.session.createSessionWithInitialAdmission({
+        ...input,
+        profile: { setupCommands: ['changed-command'] },
+      })
+    ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+    await expect(
+      fixture.session.createSessionWithInitialAdmission({
+        ...input,
+        agent: { ...defaultAgent, model: 'openai/gpt-4.1' },
+      })
+    ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+  });
+
+  it('rejects noncanonical IDs and mismatched owners or bots without allocating a runtime', async () => {
+    const fixture = sessionFixture();
+    await expect(fixture.admit('not-a-canonical-id')).resolves.toMatchObject({
+      success: false,
+      code: 'BAD_REQUEST',
+    });
+    for (const owner of [
+      { userId: 'different-owner' as UserId },
+      { userId: 'user_1' as UserId, botId: 'different-bot' },
+    ]) {
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          ...owner,
+          turn: { type: 'prompt', id: MESSAGE_A, prompt: 'Not authorized' },
+        })
+      ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+    }
+    expect(fixture.control.ensureReady).not.toHaveBeenCalled();
+    expect(fixture.record(MESSAGE_A)).toBeUndefined();
+  });
+
+  it('snapshots callback targets and sends one assistant-aware completion without rewriting terminal intent', async () => {
+    const originalTarget = { url: 'https://callbacks.example.test/original' };
+    const fixture = sessionFixture({ callback: { target: originalTarget } });
+    const assistant = {
+      eventId: 1,
+      timestamp: Date.now(),
+      info: { id: 'assistant_1', role: 'assistant' as const, parentID: MESSAGE_A },
+      parts: [
+        { id: 'part_1', messageID: 'assistant_1', type: 'text', text: 'Finished the request' },
+      ],
+    };
+    const assistantForMessage = vi.fn(() => assistant);
+    fixture.eventQueries.getAssistantMessageForUserMessage = assistantForMessage;
+    await fixture.admit(MESSAGE_A);
+    await fixture.flush();
+    const intent = fixture.record(MESSAGE_A)?.intent;
+    const replacementTarget = { url: 'https://callbacks.example.test/replacement' };
+    await fixture.session.tryUpdate({ callbackTarget: replacementTarget });
+    await fixture.admit(MESSAGE_B);
+    await fixture.outcome(MESSAGE_A, 'completed');
+    await fixture.flush();
+    expect(fixture.callbacks).toHaveLength(1);
+    expect(fixture.callbacks[0]).toMatchObject({
+      target: originalTarget,
+      payload: {
+        messageId: MESSAGE_A,
+        executionId: MESSAGE_A,
+        idempotencyKey: MESSAGE_A,
+        status: 'completed',
+        lastAssistantMessageText: 'Finished the request',
+      },
+    });
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
+      state: 'completed',
+      intent,
+      callback: { status: 'enqueued', attempts: 1 },
+    });
+    expect(fixture.record(MESSAGE_B)?.callback?.target).toEqual(replacementTarget);
+    await fixture.outcome(MESSAGE_A, 'completed');
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.callbacks).toHaveLength(1);
+    expect(fixture.terminalEvents()).toHaveLength(1);
+    expect(
+      fixture.eventQueries.findByEntityId(`accepted-message/${MESSAGE_A}`)?.stream_event_type
+    ).toBe('cloud.message.sent');
+    expect(assistantForMessage).toHaveBeenCalledWith(SESSION_ID, 'kilo_root', MESSAGE_A);
+  });
+
+  it('sanitizes assistant errors while requiring a matching fenced outcome before sending a failure callback', async () => {
+    const fixture = sessionFixture({
+      callback: { target: { url: 'https://callbacks.example.test/failure' } },
+    });
+    await fixture.admit(MESSAGE_A);
+    await fixture.flush();
+    await fixture.rawEvent('message.updated', {
+      info: {
+        id: 'assistant_1',
+        role: 'assistant',
+        sessionID: 'kilo_root',
+        parentID: MESSAGE_A,
+        error: { data: { message: 'Payment Required private-provider-detail' } },
+      },
+    });
+    await fixture.rawEvent('session.error', {
+      error: { data: { message: 'Payment Required private-provider-detail' } },
+    });
+    expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
+    expect(fixture.callbacks).toHaveLength(0);
+    expect(JSON.stringify(fixture.eventQueries.findByEntityPrefix(''))).not.toContain(
+      'private-provider-detail'
+    );
+    await expect(fixture.outcome(MESSAGE_A, 'failed', NEXT_RUNTIME_ID)).resolves.toEqual({
+      applied: false,
+    });
+    await fixture.rawEvent('session.message.outcome', {
+      messageId: MESSAGE_A,
+      status: 'failed',
+      reason: 'Payment Required',
+    });
+    await fixture.flush();
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
+      state: 'failed',
+      error: 'Assistant request failed: insufficient credits',
+    });
+    expect(fixture.callbacks).toHaveLength(1);
+    expect(fixture.callbacks[0]?.payload).toMatchObject({
+      status: 'failed',
+      messageId: MESSAGE_A,
+      errorMessage: 'Assistant request failed: insufficient credits',
+    });
+    expect(fixture.terminalEvents()).toHaveLength(1);
+  });
+
+  it('durably retries callbacks across reset without duplicating terminal events or reviving the message', async () => {
+    const fixture = sessionFixture({
+      callback: { target: { url: 'https://callbacks.example.test/retry' } },
+    });
+    fixture.callbackQueue.send.mockRejectedValueOnce(new Error('Queue temporarily unavailable'));
+    await fixture.admit(MESSAGE_A);
+    await fixture.flush();
+    await fixture.outcome(MESSAGE_A, 'completed');
+    await fixture.flush();
+    const terminal = fixture.record(MESSAGE_A);
+    const events = structuredClone(fixture.terminalEvents());
+    const retryAt = terminal?.callback?.retryAt;
+    if (retryAt === undefined) throw new Error('Missing durable callback retry');
+    expect(terminal?.callback).toMatchObject({ status: 'pending', attempts: 1 });
+    expect(fixture.callbacks).toHaveLength(0);
+    fixture.reload();
+    vi.setSystemTime(retryAt);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
+      state: 'completed',
+      intent: terminal?.intent,
+      terminalAt: terminal?.terminalAt,
+      callback: { status: 'enqueued', attempts: 2 },
+    });
+    expect(fixture.terminalEvents()).toEqual(events);
+    expect(fixture.callbacks).toHaveLength(1);
+    expect(fixture.callbacks[0]?.payload.idempotencyKey).toBe(MESSAGE_A);
+  });
+
+  it('does not add a callback to a V2 message that was admitted without a target', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit(MESSAGE_A);
+    await fixture.flush();
+    await fixture.session.tryUpdate({
+      callbackTarget: { url: 'https://callbacks.example.test/later' },
+    });
+    await fixture.outcome(MESSAGE_A, 'completed');
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record(MESSAGE_A)?.callback).toBeUndefined();
+    expect(fixture.callbackQueue.send).not.toHaveBeenCalled();
+  });
+
+  it('keeps liveness checks independent of a stuck callback and fences its late completion after deletion', async () => {
+    const fixture = sessionFixture({
+      callback: { target: { url: 'https://callbacks.example.test/slow' } },
+    });
+    const delivery = deferred<void>();
+    fixture.callbackQueue.send.mockImplementation(() => delivery.promise);
+    await fixture.admit(MESSAGE_A);
+    await fixture.admit(MESSAGE_B);
+    await fixture.flush();
+    await fixture.outcome(MESSAGE_A, 'completed');
+    await fixture.flush();
+    vi.setSystemTime(Date.now() + DEADLINE_MS.acceptedOverdue);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record(MESSAGE_B)).toMatchObject({
+      state: 'accepted',
+      lastActivityAt: Date.now(),
+    });
+    expect(fixture.control.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'session.sync',
+        expectedWrapperInstanceId: RUNTIME_ID,
+      })
+    );
+    await fixture.session.deleteSession();
+    delivery.resolve();
+    await fixture.flush();
+    expect(await fixture.session.getMetadata()).toBeNull();
+    expect(fixture.values.has('session_messages')).toBe(false);
+  });
+
+  it('allows five bounded attachment downloads while retaining the original head deadline and runtime fence', async () => {
+    const fixture = sessionFixture();
+    const signed = Array.from({ length: 5 }, (_, index) => ({
+      filename: `file-${index}.txt`,
+      mime: 'text/plain',
+      signedUrl: `https://attachments.example.test/file-${index}`,
+      localPath: `/tmp/file-${index}.txt`,
+    }));
+    orchestrationMocks.signedAttachments.mockResolvedValue(signed);
+    delegateRequest(
+      fixture,
+      'session.prompt',
+      async () => new Promise<ResponseFrame>(() => undefined)
+    );
+    await fixture.admit(MESSAGE_A, {
+      attachments: { path: 'attachments', files: signed.map(item => item.filename) },
+    });
+    await fixture.flush();
+    const deadlineAt = fixture.record(MESSAGE_A)?.deliveryDeadlineAt;
+    const timeoutMs =
+      SANDBOX_CONTROL_REQUEST_TIMEOUT_MS + 5 * SANDBOX_CONTROL_ATTACHMENT_DOWNLOAD_TIMEOUT_MS;
+    expect(fixture.control.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'session.prompt',
+        expectedWrapperInstanceId: RUNTIME_ID,
+        timeoutMs,
+        payload: expect.objectContaining({ attachments: signed }),
+      })
+    );
+    await vi.advanceTimersByTimeAsync(timeoutMs - 1);
+    expect(fixture.record(MESSAGE_A)?.state).toBe('queued');
+    await vi.advanceTimersByTimeAsync(1);
+    await fixture.flush();
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
+      state: 'failed',
+      failedReason: 'prompt_exhausted',
+      deliveryDeadlineAt: deadlineAt,
+    });
+  });
+
   it('persists the alarm and head budget before the first RPC and wakes the head on a fresh ID after reset', async () => {
     const fixture = sessionFixture();
     const firstReady = deferred<ControlStatus>();
     fixture.control.ensureReady.mockImplementationOnce(() => {
       expect(fixture.alarmAt()).not.toBeNull();
-      expect(fixture.record('a')?.deliveryDeadlineAt).toBe(
+      expect(fixture.record(MESSAGE_A)?.deliveryDeadlineAt).toBe(
         Date.now() + SESSION_DELIVERY_TIMEOUT_MS
       );
       expect(fixture.control.getStatus).not.toHaveBeenCalled();
       return firstReady.promise;
     });
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
-    const deadlineAt = fixture.record('a')?.deliveryDeadlineAt;
-    expect(fixture.record('a')?.state).toBe('queued');
+    const deadlineAt = fixture.record(MESSAGE_A)?.deliveryDeadlineAt;
+    expect(fixture.record(MESSAGE_A)?.state).toBe('queued');
     fixture.reload();
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
 
-    expect(fixture.record('a')?.failedReason).toBeUndefined();
-    expect(fixture.record('a')).toMatchObject({
+    expect(fixture.record(MESSAGE_A)?.failedReason).toBeUndefined();
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
       state: 'accepted',
       deliveryDeadlineAt: deadlineAt,
     });
-    expect(fixture.record('b')).toMatchObject({ state: 'queued' });
-    expect(fixture.record('b')?.deliveryDeadlineAt).toBeUndefined();
+    expect(fixture.record(MESSAGE_B)).toMatchObject({ state: 'queued' });
+    expect(fixture.record(MESSAGE_B)?.deliveryDeadlineAt).toBeUndefined();
     expect(fixture.control.ensureReady).toHaveBeenCalledWith(
-      expect.objectContaining({ acquisition: fixture.acquisition('a') })
+      expect.objectContaining({ acquisition: fixture.acquisition(MESSAGE_A) })
     );
-    await fixture.outcome('a', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     await fixture.flush();
-    expect(fixture.record('b')?.state).toBe('accepted');
-    expect(fixture.record('b')?.deliveryDeadlineAt).toBe(Date.now() + SESSION_DELIVERY_TIMEOUT_MS);
+    expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_B)?.deliveryDeadlineAt).toBe(
+      Date.now() + SESSION_DELIVERY_TIMEOUT_MS
+    );
   });
 
   it('commits one canonical outcome with its receipt and replays it after a lost response', async () => {
@@ -1288,13 +1845,13 @@ describe('SandboxSession orchestration', () => {
         wrapperInstanceId: RUNTIME_ID,
         operationResults: true,
       });
-      await fixture.admit('a');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
       const event = receiptedEvent(1, payload);
       await expect(fixture.session.receiveSandboxControlEvent(event)).resolves.toEqual({
         applied: true,
       });
-      const authorization = fixture.record('a')?.operations?.prompt?.authorization;
+      const authorization = fixture.record(MESSAGE_A)?.operations?.prompt?.authorization;
       if (!authorization) throw new Error('Missing prompt operation authorization');
       await expect(
         fixture.session.receiveSandboxOperationResult({
@@ -1311,7 +1868,7 @@ describe('SandboxSession orchestration', () => {
           },
         })
       ).resolves.toMatchObject({ disposition: 'applied' });
-      expect(fixture.record('a')?.state).toBe('completed');
+      expect(fixture.record(MESSAGE_A)?.state).toBe('completed');
       const events = fixture.eventQueries.findByEntityPrefix('');
       fixture.reload();
       await expect(fixture.session.receiveSandboxControlEvent(event)).resolves.toEqual({
@@ -1341,9 +1898,9 @@ describe('SandboxSession orchestration', () => {
 
   it('receipts ignored trailing interactions without reviving them for the next message', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
-    await fixture.outcome('a', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     const event = receiptedEvent(1, {
       type: 'question.asked',
       properties: { id: 'late-question', sessionID: 'kilo_root', questions: [] },
@@ -1356,7 +1913,7 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.values.get('control_event_receipts')).toMatchObject({
       highWater: { [RUNTIME_ID]: 1 },
     });
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
     fixture.reload();
     const beforeReplay = fixture.eventQueries.findByEntityPrefix('');
@@ -1367,15 +1924,15 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.values.get('session_pending_interactions')).not.toMatchObject({
       questions: [expect.objectContaining({ id: 'late-question' })],
     });
-    expect(fixture.record('b')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
     expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
   });
 
   it('accepts valid trailing native status after A completes without runtime cleanup', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
-    await fixture.outcome('a', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     const event = receiptedEvent(1, {
       type: 'session.updated',
       properties: { info: { id: 'kilo_root', title: 'Completed turn' } },
@@ -1388,7 +1945,7 @@ describe('SandboxSession orchestration', () => {
       applied: true,
     });
     expect(fixture.eventQueries.findByEntityPrefix('')).toEqual(events);
-    expect(fixture.record('a')?.state).toBe('completed');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('completed');
     expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
   });
 
@@ -1401,14 +1958,14 @@ describe('SandboxSession orchestration', () => {
       operationResults: true,
     });
 
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
 
     const operations = fixture.control.request.mock.calls
       .map(([input]) => input.operation)
       .filter(operation => operation.startsWith('session.'));
     expect(operations).toEqual(['session.attach', 'session.prompt']);
-    expect(fixture.record('a')).toMatchObject({
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
       state: 'accepted',
       operations: {
         attach: { dispatched: true },
@@ -1427,9 +1984,9 @@ describe('SandboxSession orchestration', () => {
         wrapperInstanceId: RUNTIME_ID,
         operationResults: true,
       });
-      await fixture.admit('a');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
-      const authorization = fixture.record('a')?.operations?.prompt?.authorization;
+      const authorization = fixture.record(MESSAGE_A)?.operations?.prompt?.authorization;
       if (!authorization) throw new Error('Missing prompt operation authorization');
       const completedAt = authorization.dispatchDeadlineAt + 1;
       const delivery: SessionOperationDelivery = {
@@ -1486,7 +2043,9 @@ describe('SandboxSession orchestration', () => {
           ([input]) => input.operation === 'session.operation.ack'
         )
       ).toHaveLength(state === 'completed' ? 1 : 0);
-      expect(fixture.record('a')?.state).toBe(state === 'completed' ? 'completed' : 'accepted');
+      expect(fixture.record(MESSAGE_A)?.state).toBe(
+        state === 'completed' ? 'completed' : 'accepted'
+      );
     }
   );
 
@@ -1502,9 +2061,9 @@ describe('SandboxSession orchestration', () => {
         operationResults: true,
       });
       delegateRequest(fixture, 'session.attach', () => attach.promise);
-      await fixture.admit('a');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
-      const authorization = fixture.record('a')?.operations?.attach?.authorization;
+      const authorization = fixture.record(MESSAGE_A)?.operations?.attach?.authorization;
       if (!authorization) throw new Error('Missing attach authorization');
       const event = receiptedEvent(
         1,
@@ -1524,11 +2083,11 @@ describe('SandboxSession orchestration', () => {
       expect(fixture.values.has('native_runtime_fence')).toBe(false);
       expect(fixture.values.get('control_event_receipts')).toEqual(receipts);
       expect(fixture.eventQueries.findByEntityPrefix('')).toEqual(before);
-      expect(fixture.record('a')).toMatchObject({
+      expect(fixture.record(MESSAGE_A)).toMatchObject({
         state: 'queued',
         operations: { attach: { dispatched: true, authorization } },
       });
-      expect(fixture.record('a')?.operations?.attach?.completedAt).toBeUndefined();
+      expect(fixture.record(MESSAGE_A)?.operations?.attach?.completedAt).toBeUndefined();
       expect(
         fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
       ).toHaveLength(0);
@@ -1540,10 +2099,10 @@ describe('SandboxSession orchestration', () => {
         wrapperInstanceId: RUNTIME_ID,
         nativeRuntimeId,
         authorization,
-        attachmentEpoch: fixture.record('a')?.operations?.attach?.attachmentEpoch,
+        attachmentEpoch: fixture.record(MESSAGE_A)?.operations?.attach?.attachmentEpoch,
       });
-      expect(fixture.record('a')?.operations?.attach?.completedAt).toBeDefined();
-      expect(fixture.record('a')?.state).toBe('accepted');
+      expect(fixture.record(MESSAGE_A)?.operations?.attach?.completedAt).toBeDefined();
+      expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
       const beforeApply = fixture.eventQueries.findByEntityPrefix('');
       await expect(fixture.session.receiveSandboxControlEvent(event)).resolves.toEqual({
         applied: true,
@@ -1556,7 +2115,7 @@ describe('SandboxSession orchestration', () => {
       });
       expect(fixture.eventQueries.findByEntityPrefix('')).toEqual(applied);
       expect(orchestrationMocks.broadcast).toHaveBeenCalledTimes(broadcasts);
-      const promptAuthorization = fixture.record('a')?.operations?.prompt?.authorization;
+      const promptAuthorization = fixture.record(MESSAGE_A)?.operations?.prompt?.authorization;
       if (!promptAuthorization) throw new Error('Missing prompt authorization');
       await expect(
         fixture.session.receiveSandboxOperationResult({
@@ -1578,7 +2137,7 @@ describe('SandboxSession orchestration', () => {
       await expect(fixture.session.receiveSandboxControlEvent(event)).resolves.toEqual({
         applied: true,
       });
-      expect(fixture.record('a')?.state).toBe('completed');
+      expect(fixture.record(MESSAGE_A)?.state).toBe('completed');
       expect(fixture.terminalEvents()).toHaveLength(1);
       expect(
         fixture.control.request.mock.calls
@@ -1600,9 +2159,9 @@ describe('SandboxSession orchestration', () => {
           operationResults: true,
         });
         delegateRequest(fixture, 'session.attach', () => attach.promise);
-        await fixture.admit('a');
+        await fixture.admit(MESSAGE_A);
         await fixture.flush();
-        const authorization = fixture.record('a')?.operations?.attach?.authorization;
+        const authorization = fixture.record(MESSAGE_A)?.operations?.attach?.authorization;
         if (!authorization) throw new Error('Missing attach authorization');
         const event = receiptedEvent(
           1,
@@ -1654,7 +2213,7 @@ describe('SandboxSession orchestration', () => {
         await fixture.fireAlarm();
         await fixture.flush();
         expect(fenceAtAcknowledgement).toMatchObject(expectedFence);
-        expect(fixture.record('a')).toMatchObject({
+        expect(fixture.record(MESSAGE_A)).toMatchObject({
           state: 'accepted',
           operations: { attach: { resultHash: await sessionOperationResultHash(delivery) } },
         });
@@ -1743,9 +2302,9 @@ describe('SandboxSession orchestration', () => {
           operationResults: true,
         });
         delegateRequest(fixture, 'session.attach', () => attach.promise);
-        await fixture.admit('a');
+        await fixture.admit(MESSAGE_A);
         await fixture.flush();
-        const authorization = fixture.record('a')?.operations?.attach?.authorization;
+        const authorization = fixture.record(MESSAGE_A)?.operations?.attach?.authorization;
         if (!authorization) throw new Error('Missing attach authorization');
         delegateRequest(fixture, 'session.prompt', () => prompt.promise);
         const payload = {
@@ -1777,7 +2336,7 @@ describe('SandboxSession orchestration', () => {
           authorization,
         });
         expect(fixture.values.get('native_runtime_fence')).toEqual(fence);
-        expect(fixture.record('a')?.state).toBe('queued');
+        expect(fixture.record(MESSAGE_A)?.state).toBe('queued');
         const before = fixture.eventQueries.findByEntityPrefix('');
         await expect(fixture.session.receiveSandboxControlEvent(stale)).resolves.toEqual({
           applied: false,
@@ -1794,7 +2353,7 @@ describe('SandboxSession orchestration', () => {
         await expect(fixture.session.receiveSandboxControlEvent(stale)).resolves.toEqual({
           applied: false,
         });
-        expect(fixture.record('a')?.state).toBe('accepted');
+        expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
         expect(fixture.values.get('native_runtime_fence')).toEqual(fence);
         expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
       }
@@ -1812,9 +2371,9 @@ describe('SandboxSession orchestration', () => {
           operationResults: true,
         });
         delegateRequest(fixture, 'session.attach', () => attach.promise);
-        await fixture.admit('b');
+        await fixture.admit(MESSAGE_B);
         await fixture.flush();
-        const current = fixture.record('b');
+        const current = fixture.record(MESSAGE_B);
         const proof = current?.operations?.attach;
         if (!current || !proof) throw new Error('Missing B attach proof');
         const previousAuthorization = {
@@ -1867,7 +2426,7 @@ describe('SandboxSession orchestration', () => {
             })
           ).resolves.toMatchObject({ disposition: 'applied' });
           registration.mockRestore();
-          expect(fixture.record('b')?.operations?.attach).toMatchObject({
+          expect(fixture.record(MESSAGE_B)?.operations?.attach).toMatchObject({
             attachmentEpoch: 2,
             result: { ok: true, result: { attached: true, nativeRuntimeId: NEXT_RUNTIME_ID } },
           });
@@ -1913,9 +2472,9 @@ describe('SandboxSession orchestration', () => {
         operationResults: true,
       });
       delegateRequest(fixture, 'session.attach', () => attach.promise);
-      await fixture.admit('a');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
-      const authorization = fixture.record('a')?.operations?.attach?.authorization;
+      const authorization = fixture.record(MESSAGE_A)?.operations?.attach?.authorization;
       if (!authorization) throw new Error('Missing attach authorization');
       const event = receiptedEvent(
         1,
@@ -1954,9 +2513,9 @@ describe('SandboxSession orchestration', () => {
       wrapperInstanceId: RUNTIME_ID,
       operationResults: true,
     });
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
-    const authorization = fixture.record('a')?.operations?.attach?.authorization;
+    const authorization = fixture.record(MESSAGE_A)?.operations?.attach?.authorization;
     if (!authorization) throw new Error('Missing attach operation authorization');
     await fixture.session.recordNativeRuntime({
       sandboxId: fixture.metadata.workspace?.sandboxId ?? '',
@@ -2013,14 +2572,17 @@ describe('SandboxSession orchestration', () => {
 
     await fixture.fireAlarm();
     await fixture.flush();
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
 
-    expect(fixture.record('a')).toMatchObject({
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
       state: 'failed',
       failedReason: 'runtime_unhealthy',
     });
-    expect(fixture.record('b')).toMatchObject({ state: 'accepted', wrapperInstanceId: RUNTIME_ID });
+    expect(fixture.record(MESSAGE_B)).toMatchObject({
+      state: 'accepted',
+      wrapperInstanceId: RUNTIME_ID,
+    });
     expect(
       fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
     ).toHaveLength(2);
@@ -2028,7 +2590,7 @@ describe('SandboxSession orchestration', () => {
       fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
     ).toHaveLength(2);
     expect(await fixture.session.isSandboxCleanupScheduled()).toBe(false);
-    const nextAuthorization = fixture.record('b')?.operations?.attach?.authorization;
+    const nextAuthorization = fixture.record(MESSAGE_B)?.operations?.attach?.authorization;
     if (!nextAuthorization) throw new Error('Missing B attach authorization');
     await fixture.session.recordNativeRuntime({
       sandboxId: SANDBOX_ID,
@@ -2038,7 +2600,7 @@ describe('SandboxSession orchestration', () => {
     });
     fixture.reload();
     const beforeReplay = fixture.eventQueries.findByEntityPrefix('');
-    const beforeMessage = fixture.record('b');
+    const beforeMessage = fixture.record(MESSAGE_B);
     await expect(fixture.session.receiveSandboxControlEvent(bufferedEvent)).resolves.toEqual({
       applied: false,
     });
@@ -2052,7 +2614,7 @@ describe('SandboxSession orchestration', () => {
         )
       )
     ).resolves.toEqual({ applied: false });
-    expect(fixture.record('b')).toEqual(beforeMessage);
+    expect(fixture.record(MESSAGE_B)).toEqual(beforeMessage);
     expect(fixture.eventQueries.findByEntityPrefix('')).toEqual(beforeReplay);
     expect(fixture.control.quarantineRuntime).toHaveBeenCalledTimes(1);
     expect(fixture.values.get('control_event_receipts')).toMatchObject({
@@ -2092,7 +2654,7 @@ describe('SandboxSession orchestration', () => {
       nativeRuntimeId,
       confirmed: true,
     });
-    expect(fixture.record('b')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
     expect(fixture.eventQueries.findByEntityPrefix('')).toEqual(events);
     expect(fixture.values.get('control_event_receipts')).toMatchObject({
       activeWrapperInstanceId: RUNTIME_ID,
@@ -2103,7 +2665,7 @@ describe('SandboxSession orchestration', () => {
 
   it('binds a new wrapper receipt lifetime when B starts unbound after idle recycle', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     const originalEvent = receiptedEvent(1, {
       type: 'session.message.outcome',
@@ -2114,10 +2676,10 @@ describe('SandboxSession orchestration', () => {
     });
     const ready = deferred<ControlStatus>();
     fixture.control.ensureReady.mockImplementationOnce(() => ready.promise);
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    expect(fixture.record('b')).toMatchObject({ state: 'queued' });
-    expect(fixture.record('b')?.wrapperInstanceId).toBeUndefined();
+    expect(fixture.record(MESSAGE_B)).toMatchObject({ state: 'queued' });
+    expect(fixture.record(MESSAGE_B)?.wrapperInstanceId).toBeUndefined();
     fixture.setStatus({
       physical: 'running',
       connection: 'ready',
@@ -2130,7 +2692,7 @@ describe('SandboxSession orchestration', () => {
       attachment: ATTACHMENT,
     });
     await fixture.flush();
-    expect(fixture.record('b')).toMatchObject({
+    expect(fixture.record(MESSAGE_B)).toMatchObject({
       state: 'accepted',
       wrapperInstanceId: NEXT_RUNTIME_ID,
     });
@@ -2168,7 +2730,7 @@ describe('SandboxSession orchestration', () => {
         })
       )
     ).resolves.toEqual({ applied: false });
-    expect(fixture.record('b')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
     expect(fixture.eventQueries.findByEntityPrefix('')).toEqual(events);
     expect(fixture.values.get('control_event_receipts')).toMatchObject({
       activeWrapperInstanceId: NEXT_RUNTIME_ID,
@@ -2225,12 +2787,12 @@ describe('SandboxSession orchestration', () => {
       quarantined: false,
       disposition: 'unconfirmed',
     });
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
 
     await expect(fixture.session.interruptExecution()).resolves.toEqual({ success: true });
-    expect(fixture.record('a')?.state).toBe('cancelled');
-    expect(fixture.record('b')).toBeUndefined();
+    expect(fixture.record(MESSAGE_A)?.state).toBe('cancelled');
+    expect(fixture.record(MESSAGE_B)).toBeUndefined();
     expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
 
     attach.resolve(controlResponse({ attached: true }));
@@ -2250,12 +2812,12 @@ describe('SandboxSession orchestration', () => {
           sandboxProvider: provider,
         },
       });
-      await fixture.admit('a');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
-      await fixture.admit('b');
-      await fixture.outcome('a', 'completed');
+      await fixture.admit(MESSAGE_B);
+      await fixture.outcome(MESSAGE_A, 'completed');
       await fixture.flush();
-      expect(fixture.record('b')?.state).toBe('accepted');
+      expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
       const handoffs = fixture.control.request.mock.calls
         .map(([input]) => input)
         .filter(
@@ -2278,10 +2840,10 @@ describe('SandboxSession orchestration', () => {
     const fixture = sessionFixture();
     const signing = deferred<[]>();
     orchestrationMocks.signedAttachments.mockImplementationOnce(() => signing.promise);
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
-    const acquisition = fixture.acquisition('a');
-    const intent = fixture.record('a')?.intent;
+    const acquisition = fixture.acquisition(MESSAGE_A);
+    const intent = fixture.record(MESSAGE_A)?.intent;
     expect(fixture.control.ensureReady).not.toHaveBeenCalled();
     expect(fixture.alarmAt()).not.toBeNull();
     fixture.reload();
@@ -2289,7 +2851,7 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.control.ensureReady).toHaveBeenCalledWith(
       expect.objectContaining({ acquisition })
     );
-    expect(fixture.record('a')).toMatchObject({
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
       state: 'accepted',
       intent,
       preparationAttemptId: acquisition.id,
@@ -2298,7 +2860,7 @@ describe('SandboxSession orchestration', () => {
     signing.resolve([]);
     await fixture.flush();
     expect(fixture.control.ensureReady).toHaveBeenCalledOnce();
-    expect(fixture.record('a')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
   });
 
   it.each(['unmarked', 'permanent', 'overloaded', 'hangs'] as const)(
@@ -2307,8 +2869,8 @@ describe('SandboxSession orchestration', () => {
       const fixture = sessionFixture();
       const ready = deferred<ControlStatus>();
       fixture.control.ensureReady.mockImplementation(() => ready.promise);
-      await fixture.admit('a');
-      await fixture.admit('b');
+      await fixture.admit(MESSAGE_A);
+      await fixture.admit(MESSAGE_B);
       await fixture.flush();
       if (failure === 'hangs') {
         await vi.advanceTimersByTimeAsync(DEADLINE_MS.startup);
@@ -2325,11 +2887,11 @@ describe('SandboxSession orchestration', () => {
         );
       }
       await fixture.flush();
-      expect(fixture.record('a')).toMatchObject({
+      expect(fixture.record(MESSAGE_A)).toMatchObject({
         state: 'failed',
         failedReason: 'environment_failed',
       });
-      expect(fixture.record('b')?.state).toBe('failed');
+      expect(fixture.record(MESSAGE_B)?.state).toBe('failed');
       expect(fixture.terminalEvents()).toHaveLength(2);
       await fixture.fireAlarm();
       expect(fixture.control.ensureReady).toHaveBeenCalledOnce();
@@ -2347,9 +2909,9 @@ describe('SandboxSession orchestration', () => {
         connection: 'ready',
         wrapperInstanceId: NEXT_RUNTIME_ID,
       });
-      await fixture.admit('c');
+      await fixture.admit(MESSAGE_C);
       await fixture.flush();
-      expect(fixture.record('c')?.state).toBe('accepted');
+      expect(fixture.record(MESSAGE_C)?.state).toBe('accepted');
     }
   );
 
@@ -2361,34 +2923,37 @@ describe('SandboxSession orchestration', () => {
         overloaded: false,
       })
     );
-    await fixture.admit('a');
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_A);
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    const deadlineAt = fixture.record('a')?.deliveryDeadlineAt;
+    const deadlineAt = fixture.record(MESSAGE_A)?.deliveryDeadlineAt;
     if (deadlineAt === undefined) throw new Error('Missing head delivery deadline');
     expect(deadlineAt).toBe(Date.now() + SESSION_DELIVERY_TIMEOUT_MS);
-    const acquisition = fixture.acquisition('a');
+    const acquisition = fixture.acquisition(MESSAGE_A);
     const initialCalls = fixture.control.ensureReady.mock.calls.length;
     fixture.reload();
     const retryAt = fixture.alarmAt();
     if (retryAt === null) throw new Error('Missing queue retry alarm');
     vi.setSystemTime(retryAt);
     await fixture.fireAlarm();
-    expect(fixture.record('a')).toMatchObject({ state: 'queued', deliveryDeadlineAt: deadlineAt });
-    expect(fixture.record('b')?.deliveryDeadlineAt).toBeUndefined();
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
+      state: 'queued',
+      deliveryDeadlineAt: deadlineAt,
+    });
+    expect(fixture.record(MESSAGE_B)?.deliveryDeadlineAt).toBeUndefined();
     vi.setSystemTime(deadlineAt - 1);
     await fixture.fireAlarm();
-    expect(fixture.record('a')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('queued');
     expect(fixture.alarmAt()).toBe(deadlineAt);
     const callsBeforeDeadline = fixture.control.ensureReady.mock.calls.length;
     vi.setSystemTime(deadlineAt);
     await fixture.fireAlarm();
-    expect(fixture.record('a')).toMatchObject({
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
       state: 'failed',
       failedReason: 'preparation_timeout',
       terminalAt: deadlineAt,
     });
-    expect(fixture.record('b')?.state).toBe('failed');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('failed');
     expect(fixture.terminalEvents()).toHaveLength(2);
     expect(fixture.control.ensureReady).toHaveBeenCalledTimes(callsBeforeDeadline);
     for (const [input] of fixture.control.ensureReady.mock.calls.slice(initialCalls)) {
@@ -2411,7 +2976,7 @@ describe('SandboxSession orchestration', () => {
           ok: false,
           error: { code: 'not_ready', message: 'Retry attachment', retryable: true },
         });
-        await fixture.admit('a');
+        await fixture.admit(MESSAGE_A);
         await fixture.flush();
         fixture.control.ensureReady.mockImplementation(
           () => new Promise<ControlStatus>(() => undefined)
@@ -2420,16 +2985,19 @@ describe('SandboxSession orchestration', () => {
         fixture.control.attachSession.mockImplementation(
           () => new Promise<Record<string, never>>(() => undefined)
         );
-        await fixture.admit('a');
+        await fixture.admit(MESSAGE_A);
       }
-      await fixture.admit('b');
+      await fixture.admit(MESSAGE_B);
       await fixture.flush();
-      expect(fixture.record('a')).toMatchObject({ state: 'queued', wrapperInstanceId: RUNTIME_ID });
+      expect(fixture.record(MESSAGE_A)).toMatchObject({
+        state: 'queued',
+        wrapperInstanceId: RUNTIME_ID,
+      });
       await vi.advanceTimersByTimeAsync(
         operation === 'ensureReady' ? DEADLINE_MS.startup : SANDBOX_CONTROL_REQUEST_TIMEOUT_MS
       );
-      expect(fixture.record('a')?.state).toBe('failed');
-      expect(fixture.record('b')?.state).toBe('queued');
+      expect(fixture.record(MESSAGE_A)?.state).toBe('failed');
+      expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
       expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
         expect.objectContaining({ wrapperInstanceId: RUNTIME_ID })
       );
@@ -2444,12 +3012,12 @@ describe('SandboxSession orchestration', () => {
     fixture.control.ensureReady.mockRejectedValueOnce(
       Object.assign(new Error('Transient admission failure'), { retryable: true })
     );
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
-    const acquisition = fixture.acquisition('a');
+    const acquisition = fixture.acquisition(MESSAGE_A);
     fixture.setStatus({ physical: 'stopping', connection: 'disconnected' });
     await fixture.fireAlarm();
-    expect(fixture.record('a')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('queued');
     expect(fixture.alarmAt()).toBeGreaterThan(Date.now());
     expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
       expect.objectContaining({ acquisition })
@@ -2464,7 +3032,7 @@ describe('SandboxSession orchestration', () => {
       return { ...ready, attachment: ATTACHMENT };
     });
     await fixture.fireAlarm();
-    expect(fixture.record('a')).toMatchObject({
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
       state: 'accepted',
       wrapperInstanceId: NEXT_RUNTIME_ID,
     });
@@ -2480,14 +3048,14 @@ describe('SandboxSession orchestration', () => {
     fixture.control.ensureReady.mockRejectedValueOnce(
       Object.assign(new Error('Transient admission failure'), { retryable: true })
     );
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
       expect.objectContaining({ provider: 'vercel', allowCreate: true })
     );
     fixture.setStatus({ physical: 'stopping', connection: 'disconnected' });
     await fixture.fireAlarm();
-    expect(fixture.record('a')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('queued');
     expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
       expect.objectContaining({ provider: 'vercel', allowCreate: false })
     );
@@ -2496,7 +3064,7 @@ describe('SandboxSession orchestration', () => {
     ).toBe(true);
     fixture.setStatus({ physical: 'stopped', connection: 'disconnected' });
     await fixture.fireAlarm();
-    expect(fixture.record('a')?.state).toBe('failed');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('failed');
     expect(fixture.control.request).not.toHaveBeenCalled();
   });
 
@@ -2538,21 +3106,21 @@ describe('SandboxSession orchestration', () => {
           if (source === 'exception') throw transient;
           return controlFailure(true);
         });
-        await fixture.admit('a');
-        await fixture.admit('b');
+        await fixture.admit(MESSAGE_A);
+        await fixture.admit(MESSAGE_B);
         await fixture.flush();
-        const intent = fixture.record('a')?.intent;
-        const deadlineAt = fixture.record('a')?.deliveryDeadlineAt;
+        const intent = fixture.record(MESSAGE_A)?.intent;
+        const deadlineAt = fixture.record(MESSAGE_A)?.deliveryDeadlineAt;
         if (source === 'exception') first.reject(transient);
         else first.resolve(controlFailure(true));
         await fixture.flush();
         for (let attempt = 2; attempt <= limit; attempt++) {
-          expect(fixture.record('a')).toMatchObject({
+          expect(fixture.record(MESSAGE_A)).toMatchObject({
             state: 'queued',
             intent,
             deliveryDeadlineAt: deadlineAt,
           });
-          expect(fixture.record('b')?.state).toBe('queued');
+          expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
           expect(fixture.terminalEvents()).toHaveLength(0);
           expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
           fixture.reload();
@@ -2562,28 +3130,28 @@ describe('SandboxSession orchestration', () => {
           await fixture.fireAlarm();
         }
         expect(requests).toEqual(Array.from({ length: limit }, () => requests[0]));
-        expect(fixture.record('a')).toMatchObject({
+        expect(fixture.record(MESSAGE_A)).toMatchObject({
           state: outcome,
           intent,
           deliveryDeadlineAt: deadlineAt,
         });
         if (outcome === 'accepted') {
-          expect(fixture.record('b')?.state).toBe('queued');
-          await fixture.outcome('a', 'completed');
+          expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
+          await fixture.outcome(MESSAGE_A, 'completed');
           await fixture.flush();
-          expect(fixture.record('b')?.state).toBe('accepted');
+          expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
           expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
         } else if (source === 'response') {
-          expect(fixture.record('a')?.failedReason).toBe(reason);
-          expect(fixture.record('b')?.state).toBe('queued');
+          expect(fixture.record(MESSAGE_A)?.failedReason).toBe(reason);
+          expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
           expect(fixture.terminalEvents()).toHaveLength(1);
           expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
           fixture.control.request.mockImplementation(original);
           await fixture.fireAlarm();
-          expect(fixture.record('b')?.state).toBe('accepted');
+          expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
         } else {
-          expect(fixture.record('a')?.failedReason).toBe(reason);
-          expect(fixture.record('b')?.state).toBe('queued');
+          expect(fixture.record(MESSAGE_A)?.failedReason).toBe(reason);
+          expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
           expect(fixture.terminalEvents()).toHaveLength(1);
           expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
             expect.objectContaining({ wrapperInstanceId: RUNTIME_ID, reason })
@@ -2602,8 +3170,8 @@ describe('SandboxSession orchestration', () => {
       const fixture = sessionFixture();
       const response = deferred<ResponseFrame>();
       delegateRequest(fixture, operation, () => response.promise);
-      await fixture.admit('a');
-      await fixture.admit('b');
+      await fixture.admit(MESSAGE_A);
+      await fixture.admit(MESSAGE_B);
       await fixture.flush();
       if (failure === 'permanent response') response.resolve(controlFailure(false));
       else if (failure === 'unhealthy response')
@@ -2619,14 +3187,14 @@ describe('SandboxSession orchestration', () => {
         );
       }
       await fixture.flush();
-      expect(fixture.record('a')).toMatchObject({ state: 'failed', failedReason: reason });
+      expect(fixture.record(MESSAGE_A)).toMatchObject({ state: 'failed', failedReason: reason });
       if (failure === 'permanent response') {
-        expect(fixture.record('b')?.state).toBe('queued');
+        expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
         expect(fixture.terminalEvents()).toHaveLength(1);
         expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
         return;
       }
-      expect(fixture.record('b')?.state).toBe('queued');
+      expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
       expect(fixture.terminalEvents()).toHaveLength(1);
       expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
         expect.objectContaining({ wrapperInstanceId: RUNTIME_ID, reason })
@@ -2653,26 +3221,26 @@ describe('SandboxSession orchestration', () => {
               }, timeoutMs);
             })
         );
-        await fixture.admit('a');
-        await fixture.admit('b');
+        await fixture.admit(MESSAGE_A);
+        await fixture.admit(MESSAGE_B);
         await fixture.flush();
         await vi.advanceTimersByTimeAsync(timeoutMs - 1);
-        expect(fixture.record('a')?.state).toBe('queued');
+        expect(fixture.record(MESSAGE_A)?.state).toBe('queued');
         expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(1);
         await fixture.flush();
         if (source === 'response') {
-          expect(fixture.record('a')).toMatchObject({
+          expect(fixture.record(MESSAGE_A)).toMatchObject({
             state: 'queued',
             deliveryRetryScope: 'message',
           });
-          expect(fixture.record('b')?.state).toBe('queued');
+          expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
           expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
           expect(fixture.terminalEvents()).toHaveLength(0);
           return;
         }
-        expect(fixture.record('a')).toMatchObject({ state: 'failed', failedReason: reason });
-        expect(fixture.record('b')?.state).toBe('queued');
+        expect(fixture.record(MESSAGE_A)).toMatchObject({ state: 'failed', failedReason: reason });
+        expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
         expect(fixture.terminalEvents()).toHaveLength(1);
         expect(fixture.control.quarantineRuntime).toHaveBeenCalledOnce();
         await fixture.fireAlarm();
@@ -2710,9 +3278,9 @@ describe('SandboxSession orchestration', () => {
         'keeps an accepted sibling alive while contention retries become %s across resets',
         async outcome => {
           const { writer, sibling } = sharedSessions();
-          await writer.admit('writer');
+          await writer.admit(MESSAGE_A);
           await writer.flush();
-          expect(writer.record('writer')?.state).toBe('accepted');
+          expect(writer.record(MESSAGE_A)?.state).toBe('accepted');
           let busy = true;
           const requests: SandboxControlOutboundRequest[] = [];
           const original = writer.control.request.getMockImplementation();
@@ -2723,24 +3291,24 @@ describe('SandboxSession orchestration', () => {
             requests.push(structuredClone(input));
             return busy ? controlFailure(true, 'session_busy') : original(input);
           });
-          await sibling.admit('waiting');
+          await sibling.admit(MESSAGE_B);
           await sibling.flush();
-          const acquisition = sibling.acquisition('waiting');
+          const acquisition = sibling.acquisition(MESSAGE_B);
           for (let attempt = 0; attempt < 6; attempt++) {
             sibling.reload();
             const retryAt = sibling.alarmAt();
             if (retryAt === null) throw new Error('Missing contention retry alarm');
             vi.setSystemTime(retryAt);
             await sibling.fireAlarm();
-            expect(sibling.record('waiting')).toMatchObject({
+            expect(sibling.record(MESSAGE_B)).toMatchObject({
               state: 'queued',
               deliveryRetryScope: 'message',
               deliveryDeadlineAt: acquisition.deadlineAt,
               preparationAttemptId: acquisition.id,
             });
-            expect(sibling.record('waiting')?.attachFailures).toBeUndefined();
-            expect(sibling.record('waiting')?.promptFailures).toBeUndefined();
-            expect(writer.record('writer')?.state).toBe('accepted');
+            expect(sibling.record(MESSAGE_B)?.attachFailures).toBeUndefined();
+            expect(sibling.record(MESSAGE_B)?.promptFailures).toBeUndefined();
+            expect(writer.record(MESSAGE_A)?.state).toBe('accepted');
             expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
           }
           expect(requests).toEqual(Array.from({ length: 7 }, () => requests[0]));
@@ -2748,7 +3316,7 @@ describe('SandboxSession orchestration', () => {
             sibling.reload();
             vi.setSystemTime(acquisition.deadlineAt);
             await sibling.fireAlarm();
-            expect(sibling.record('waiting')).toMatchObject({
+            expect(sibling.record(MESSAGE_B)).toMatchObject({
               state: 'failed',
               failedReason: 'preparation_timeout',
               terminalAt: acquisition.deadlineAt,
@@ -2762,69 +3330,69 @@ describe('SandboxSession orchestration', () => {
               pendingInteractions: { questions: [], permissions: [] },
               queuedMessages: [
                 {
-                  messageId: 'waiting',
+                  messageId: MESSAGE_B,
                   terminalFailure: { accepted: false, reason: 'preparation_timeout' },
                 },
               ],
             });
             expect(await writer.session.getCurrentMessageWork()).toMatchObject({
-              messageId: 'writer',
+              messageId: MESSAGE_A,
               status: 'running',
             });
             await sibling.fireAlarm();
             expect(requests).toHaveLength(7);
             expect(sibling.alarmAt()).toBeNull();
             busy = false;
-            await sibling.admit('follow-up');
+            await sibling.admit(MESSAGE_C);
             await sibling.flush();
-            expect(sibling.record('follow-up')?.state).toBe('accepted');
+            expect(sibling.record(MESSAGE_C)?.state).toBe('accepted');
           } else {
             busy = false;
             await sibling.fireAlarm();
-            expect(sibling.record('waiting')).toMatchObject({
+            expect(sibling.record(MESSAGE_B)).toMatchObject({
               state: 'accepted',
               deliveryDeadlineAt: acquisition.deadlineAt,
               wrapperInstanceId: RUNTIME_ID,
             });
-            await sibling.outcome('waiting', 'completed');
+            await sibling.outcome(MESSAGE_B, 'completed');
           }
           await writer.fireAlarm();
-          expect(writer.record('writer')?.state).toBe('accepted');
+          expect(writer.record(MESSAGE_A)?.state).toBe('accepted');
           expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
           expect(writer.terminalEvents()).toHaveLength(0);
-          await writer.outcome('writer', 'completed');
-          expect(writer.record('writer')?.state).toBe('completed');
+          await writer.outcome(MESSAGE_A, 'completed');
+          expect(writer.record(MESSAGE_A)?.state).toBe('completed');
         }
       );
 
       it('expires only the contending head and preserves its queued follow-up', async () => {
         const { writer, sibling } = sharedSessions();
-        await writer.admit('writer');
+        await writer.admit(MESSAGE_A);
         await writer.flush();
         const original = writer.control.request.getMockImplementation();
         if (!original) throw new Error('Missing control fixture');
         delegateRequest(writer, operation, async () => controlFailure(true, 'session_busy'));
-        await sibling.admit('waiting');
-        await sibling.admit('next');
+        await sibling.admit(MESSAGE_B);
+        await sibling.admit(MESSAGE_C);
         await sibling.flush();
-        const deadlineAt = sibling.acquisition('waiting').deadlineAt;
+        const deadlineAt = sibling.acquisition(MESSAGE_B).deadlineAt;
         sibling.reload();
         vi.setSystemTime(deadlineAt);
         await sibling.fireAlarm();
-        expect(sibling.record('waiting')).toMatchObject({
+        expect(sibling.record(MESSAGE_B)).toMatchObject({
           state: 'failed',
           failedReason: 'preparation_timeout',
         });
-        expect(sibling.record('next')?.state).toBe('queued');
-        expect(sibling.record('next')?.deliveryDeadlineAt).toBeUndefined();
+        expect(sibling.record(MESSAGE_C)?.state).toBe('queued');
+        expect(sibling.record(MESSAGE_C)?.deliveryDeadlineAt).toBeUndefined();
         expect(await sibling.session.getCurrentMessageWork()).toMatchObject({
-          messageId: 'next',
+          messageId: MESSAGE_C,
           status: 'pending',
         });
-        expect(writer.record('writer')?.state).toBe('accepted');
+        expect(writer.record(MESSAGE_A)?.state).toBe('accepted');
         writer.control.request.mockImplementation(original);
         await sibling.fireAlarm();
-        expect(sibling.record('next')).toMatchObject({
+        expect(sibling.record(MESSAGE_C)).toMatchObject({
           state: 'accepted',
           deliveryDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
           wrapperInstanceId: RUNTIME_ID,
@@ -2837,49 +3405,49 @@ describe('SandboxSession orchestration', () => {
         'isolates application rejection with retryable=%s from a running sibling',
         async retryable => {
           const { writer, sibling } = sharedSessions();
-          await writer.admit('writer');
+          await writer.admit(MESSAGE_A);
           await writer.flush();
           delegateRequest(writer, operation, async () => controlFailure(retryable));
-          await sibling.admit('rejected');
+          await sibling.admit(MESSAGE_B);
           await sibling.flush();
           for (let attempt = 1; attempt < (operation === 'session.attach' ? 2 : 5); attempt++) {
             sibling.reload();
             await sibling.fireAlarm();
           }
-          expect(sibling.record('rejected')).toMatchObject({
+          expect(sibling.record(MESSAGE_B)).toMatchObject({
             state: 'failed',
             failedReason: operation === 'session.attach' ? 'attach_exhausted' : 'prompt_exhausted',
           });
           expect(sibling.terminalEvents()).toHaveLength(1);
           expect(await sibling.session.isSandboxCleanupScheduled()).toBe(false);
           expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
-          await writer.outcome('writer', 'completed');
-          expect(writer.record('writer')?.state).toBe('completed');
+          await writer.outcome(MESSAGE_A, 'completed');
+          expect(writer.record(MESSAGE_A)?.state).toBe('completed');
         }
       );
 
       it('cancels a busy retry without quarantining the accepted sibling', async () => {
         const { writer, sibling } = sharedSessions();
-        await writer.admit('writer');
+        await writer.admit(MESSAGE_A);
         await writer.flush();
         delegateRequest(writer, operation, async () => controlFailure(true, 'session_busy'));
-        await sibling.admit('waiting');
+        await sibling.admit(MESSAGE_B);
         await sibling.flush();
         sibling.reload();
         await expect(sibling.session.interruptExecution()).resolves.toEqual({ success: true });
         await sibling.fireAlarm();
-        expect(sibling.record('waiting')?.state).toBe('cancelled');
+        expect(sibling.record(MESSAGE_B)?.state).toBe('cancelled');
         expect(sibling.terminalEvents()).toHaveLength(1);
         expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
-        await writer.outcome('writer', 'completed');
-        expect(writer.record('writer')?.state).toBe('completed');
+        await writer.outcome(MESSAGE_A, 'completed');
+        expect(writer.record(MESSAGE_A)?.state).toBe('completed');
       });
 
       it.each(['ensureReady', 'attachSession'] as const)(
         'preserves the accepted sibling when a busy retry is cancelled during %s',
         async stage => {
           const { writer, sibling } = sharedSessions();
-          await writer.admit('writer');
+          await writer.admit(MESSAGE_A);
           await writer.flush();
           const ready = {
             physical: 'running',
@@ -2892,14 +3460,14 @@ describe('SandboxSession orchestration', () => {
           } satisfies ControlStatus;
           writer.control.ensureReady.mockResolvedValue(ready);
           delegateRequest(writer, operation, async () => controlFailure(true, 'session_busy'));
-          await sibling.admit('waiting');
+          await sibling.admit(MESSAGE_B);
           await sibling.flush();
-          expect(sibling.record('waiting')).toMatchObject({
+          expect(sibling.record(MESSAGE_B)).toMatchObject({
             state: 'queued',
             deliveryRetryScope: 'message',
             wrapperInstanceId: RUNTIME_ID,
           });
-          expect(sibling.record('waiting')?.unresolvedDispatch).toBeUndefined();
+          expect(sibling.record(MESSAGE_B)?.unresolvedDispatch).toBeUndefined();
           sibling.reload();
           writer.control.ensureReady.mockClear();
           writer.control.attachSession.mockClear();
@@ -2924,12 +3492,12 @@ describe('SandboxSession orchestration', () => {
               stage === 'attachSession' ? 1 : 0
             );
             expect(writer.control.request).not.toHaveBeenCalled();
-            expect(sibling.record('waiting')?.unresolvedDispatch).toBeUndefined();
+            expect(sibling.record(MESSAGE_B)?.unresolvedDispatch).toBeUndefined();
             await expect(sibling.session.interruptExecution()).resolves.toEqual({ success: true });
             expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
-            expect(writer.record('writer')?.state).toBe('accepted');
+            expect(writer.record(MESSAGE_A)?.state).toBe('accepted');
             expect(writer.terminalEvents()).toHaveLength(0);
-            expect(sibling.record('waiting')?.state).toBe('cancelled');
+            expect(sibling.record(MESSAGE_B)?.state).toBe('cancelled');
             expect(sibling.terminalEvents()).toHaveLength(1);
             expect(await sibling.session.isSandboxCleanupScheduled()).toBe(false);
           } finally {
@@ -2940,22 +3508,22 @@ describe('SandboxSession orchestration', () => {
           await sibling.fireAlarm();
           expect(writer.control.request).not.toHaveBeenCalled();
           expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
-          expect(sibling.record('waiting')?.state).toBe('cancelled');
+          expect(sibling.record(MESSAGE_B)?.state).toBe('cancelled');
           expect(sibling.terminalEvents()).toHaveLength(1);
-          expect(writer.record('writer')?.state).toBe('accepted');
-          await writer.outcome('writer', 'completed');
-          expect(writer.record('writer')?.state).toBe('completed');
+          expect(writer.record(MESSAGE_A)?.state).toBe('accepted');
+          await writer.outcome(MESSAGE_A, 'completed');
+          expect(writer.record(MESSAGE_A)?.state).toBe('completed');
         }
       );
 
       it('quarantines a busy retry interrupted during wrapper dispatch', async () => {
         const { writer, sibling } = sharedSessions();
-        await writer.admit('writer');
+        await writer.admit(MESSAGE_A);
         await writer.flush();
         delegateRequest(writer, operation, async () => controlFailure(true, 'session_busy'));
-        await sibling.admit('waiting');
+        await sibling.admit(MESSAGE_B);
         await sibling.flush();
-        expect(sibling.record('waiting')?.deliveryRetryScope).toBe('message');
+        expect(sibling.record(MESSAGE_B)?.deliveryRetryScope).toBe('message');
         const pending = deferred<ResponseFrame>();
         delegateRequest(writer, operation, () => pending.promise);
         writer.control.request.mockClear();
@@ -2966,12 +3534,12 @@ describe('SandboxSession orchestration', () => {
           expect(writer.control.request).toHaveBeenCalledExactlyOnceWith(
             expect.objectContaining({ operation, expectedWrapperInstanceId: RUNTIME_ID })
           );
-          expect(sibling.record('waiting')).toMatchObject({
+          expect(sibling.record(MESSAGE_B)).toMatchObject({
             state: 'queued',
             unresolvedDispatch: true,
             wrapperInstanceId: RUNTIME_ID,
           });
-          expect(sibling.record('waiting')?.deliveryRetryScope).toBeUndefined();
+          expect(sibling.record(MESSAGE_B)?.deliveryRetryScope).toBeUndefined();
           await expect(sibling.session.interruptExecution()).resolves.toEqual({ success: true });
           expect(writer.control.quarantineRuntime).toHaveBeenCalledExactlyOnceWith({
             ownerId: writer.metadata.identity.userId,
@@ -2979,14 +3547,14 @@ describe('SandboxSession orchestration', () => {
             wrapperInstanceId: RUNTIME_ID,
             reason: 'preparation_interrupted',
           });
-          expect(sibling.record('waiting')?.state).toBe('cancelled');
-          expect(writer.record('writer')?.state).toBe('failed');
+          expect(sibling.record(MESSAGE_B)?.state).toBe('cancelled');
+          expect(writer.record(MESSAGE_A)?.state).toBe('failed');
         } finally {
           pending.resolve(
             controlResponse(
               operation === 'session.attach'
                 ? { attached: true }
-                : { messageId: 'waiting', status: 'accepted' }
+                : { messageId: MESSAGE_B, status: 'accepted' }
             )
           );
           await retry;
@@ -2994,7 +3562,7 @@ describe('SandboxSession orchestration', () => {
         }
         await sibling.fireAlarm();
         expect(writer.control.request).toHaveBeenCalledOnce();
-        expect(sibling.record('waiting')?.state).toBe('cancelled');
+        expect(sibling.record(MESSAGE_B)?.state).toBe('cancelled');
         expect(sibling.terminalEvents()).toHaveLength(1);
       });
 
@@ -3017,14 +3585,14 @@ describe('SandboxSession orchestration', () => {
             remoteWorkRunning = false;
             return { quarantined: true, disposition: 'physical_stopping' };
           });
-          await fixture.admit('waiting');
+          await fixture.admit(MESSAGE_B);
           await fixture.flush();
-          const acquisition = fixture.acquisition('waiting');
-          expect(fixture.record('waiting')?.unresolvedDispatch).toBe(true);
+          const acquisition = fixture.acquisition(MESSAGE_B);
+          expect(fixture.record(MESSAGE_B)?.unresolvedDispatch).toBe(true);
           for (let attempt = 0; attempt < 3; attempt++) {
             fixture.reload();
             await fixture.fireAlarm();
-            expect(fixture.record('waiting')).toMatchObject({
+            expect(fixture.record(MESSAGE_B)).toMatchObject({
               state: 'queued',
               unresolvedDispatch: true,
               deliveryRetryScope: 'runtime',
@@ -3047,16 +3615,16 @@ describe('SandboxSession orchestration', () => {
             wrapperInstanceId: RUNTIME_ID,
             reason: action === 'stop' ? 'preparation_interrupted' : 'preparation_timeout',
           });
-          expect(fixture.record('waiting')?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
+          expect(fixture.record(MESSAGE_B)?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
           lostAcknowledgement.resolve(
             controlResponse(
               operation === 'session.attach'
                 ? { attached: true }
-                : { messageId: 'waiting', status: 'accepted' }
+                : { messageId: MESSAGE_B, status: 'accepted' }
             )
           );
           await fixture.flush();
-          expect(fixture.record('waiting')?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
+          expect(fixture.record(MESSAGE_B)?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
           expect(fixture.terminalEvents()).toHaveLength(1);
           expect(await fixture.session.getCurrentMessageWork()).toBeNull();
         }
@@ -3064,21 +3632,21 @@ describe('SandboxSession orchestration', () => {
 
       it('quarantines a transport failure after a busy retry rather than retaining the previous isolation scope', async () => {
         const { writer, sibling } = sharedSessions();
-        await writer.admit('writer');
+        await writer.admit(MESSAGE_A);
         await writer.flush();
         let busy = true;
         delegateRequest(writer, operation, async () => {
           if (busy) return controlFailure(true, 'session_busy');
           throw new Error('Control transport disconnected');
         });
-        await sibling.admit('waiting');
+        await sibling.admit(MESSAGE_B);
         await sibling.flush();
         expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
         busy = false;
         sibling.reload();
         await sibling.fireAlarm();
-        expect(sibling.record('waiting')?.state).toBe('failed');
-        expect(writer.record('writer')?.state).toBe('failed');
+        expect(sibling.record(MESSAGE_B)?.state).toBe('failed');
+        expect(writer.record(MESSAGE_A)?.state).toBe('failed');
         expect(writer.control.quarantineRuntime).toHaveBeenCalledWith(
           expect.objectContaining({
             sessionId: sibling.metadata.identity.sessionId,
@@ -3094,7 +3662,7 @@ describe('SandboxSession orchestration', () => {
     let acknowledged = false;
     delegateRequest(fixture, 'session.prompt', async () => {
       acknowledged = true;
-      return controlResponse({ messageId: 'waiting', status: 'accepted' });
+      return controlResponse({ messageId: MESSAGE_B, status: 'accepted' });
     });
     const writes: SessionMessageRecord[] = [];
     const put = fixture.storage.kv.put.bind(fixture.storage.kv);
@@ -3104,7 +3672,7 @@ describe('SandboxSession orchestration', () => {
       }
       put(key, value);
     });
-    await fixture.admit('waiting');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
     expect(writes.some(message => message.state === 'accepted')).toBe(true);
     expect(
@@ -3112,7 +3680,7 @@ describe('SandboxSession orchestration', () => {
         .filter(message => message.state === 'queued')
         .every(message => message.unresolvedDispatch)
     ).toBe(true);
-    expect(fixture.record('waiting')?.unresolvedDispatch).toBeUndefined();
+    expect(fixture.record(MESSAGE_B)?.unresolvedDispatch).toBeUndefined();
   });
 
   it('clears acknowledged attachment ownership before a fresh prompt contention rejection', async () => {
@@ -3127,24 +3695,24 @@ describe('SandboxSession orchestration', () => {
         : controlResponse({ attached: true });
     });
     delegateRequest(fixture, 'session.prompt', async () => controlFailure(true, 'session_busy'));
-    await fixture.admit('waiting');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
     fixture.reload();
     await fixture.fireAlarm();
-    expect(fixture.record('waiting')?.unresolvedDispatch).toBe(true);
+    expect(fixture.record(MESSAGE_B)?.unresolvedDispatch).toBe(true);
     await fixture.fireAlarm();
-    expect(fixture.record('waiting')).toMatchObject({
+    expect(fixture.record(MESSAGE_B)).toMatchObject({
       state: 'queued',
       deliveryRetryScope: 'message',
     });
-    expect(fixture.record('waiting')?.unresolvedDispatch).toBeUndefined();
+    expect(fixture.record(MESSAGE_B)?.unresolvedDispatch).toBeUndefined();
     fixture.reload();
     await expect(fixture.session.interruptExecution()).resolves.toEqual({ success: true });
     expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
-    expect(fixture.record('waiting')?.state).toBe('cancelled');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('cancelled');
     lostAcknowledgement.resolve(controlResponse({ attached: true }));
     await fixture.flush();
-    expect(fixture.record('waiting')?.state).toBe('cancelled');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('cancelled');
   });
 
   it.each(['acknowledged', 'rejected'] as const)(
@@ -3153,7 +3721,7 @@ describe('SandboxSession orchestration', () => {
       const fixture = sessionFixture();
       const route = deferred<Record<string, never>>();
       fixture.control.attachSession.mockImplementation(() => route.promise);
-      await fixture.admit('a');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
       await fixture.session.deleteSession();
       const detachCount = fixture.control.detachSession.mock.calls.length;
@@ -3162,12 +3730,12 @@ describe('SandboxSession orchestration', () => {
       await fixture.flush();
       expect(fixture.control.detachSession.mock.calls.length).toBeGreaterThan(detachCount);
       expect(await fixture.session.getMetadata()).toBeNull();
-      expect(fixture.record('a')).toBeUndefined();
-      expect(fixture.eventQueries.findByEntityId('accepted-message/a')).toBeNull();
+      expect(fixture.record(MESSAGE_A)).toBeUndefined();
+      expect(fixture.eventQueries.findByEntityId(`accepted-message/${MESSAGE_A}`)).toBeNull();
       expect(
         fixture.control.request.mock.calls.some(([input]) => input.operation === 'session.prompt')
       ).toBe(false);
-      await expect(fixture.admit('b')).resolves.toMatchObject({
+      await expect(fixture.admit(MESSAGE_B)).resolves.toMatchObject({
         success: false,
         code: 'NOT_FOUND',
       });
@@ -3183,55 +3751,57 @@ describe('SandboxSession orchestration', () => {
       if (!original) throw new Error('Missing control fixture');
       delegateRequest(fixture, 'session.prompt', input => {
         const parsed = sessionPromptPayloadSchema.parse(input.payload);
-        if (parsed.messageId !== 'a') return original(input);
-        expect(fixture.record('a')).toMatchObject({
+        if (parsed.messageId !== MESSAGE_A) return original(input);
+        expect(fixture.record(MESSAGE_A)).toMatchObject({
           state: 'queued',
           wrapperInstanceId: RUNTIME_ID,
         });
         return prompt.promise;
       });
-      await fixture.admit('a');
-      await fixture.admit('b');
+      await fixture.admit(MESSAGE_A);
+      await fixture.admit(MESSAGE_B);
       await fixture.flush();
-      expect(fixture.record('a')?.state).toBe('queued');
-      await expect(fixture.outcome('a', status)).resolves.toEqual({ applied: true });
+      expect(fixture.record(MESSAGE_A)?.state).toBe('queued');
+      await expect(fixture.outcome(MESSAGE_A, status)).resolves.toEqual({ applied: true });
       await fixture.flush();
-      expect(fixture.record('b')?.state).toBe('accepted');
-      const terminal = fixture.eventQueries.findByEntityId('terminal-message/a');
+      expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
+      const terminal = fixture.eventQueries.findByEntityId(`terminal-message/${MESSAGE_A}`);
       expect(terminal).not.toBeNull();
-      prompt.resolve(controlResponse({ messageId: 'a', status: 'accepted' }));
+      prompt.resolve(controlResponse({ messageId: MESSAGE_A, status: 'accepted' }));
       await fixture.flush();
-      await expect(fixture.outcome('a', status)).resolves.toEqual({ applied: true });
-      await fixture.outcome('a', status === 'failed' ? 'completed' : 'failed');
-      expect(fixture.record('a')?.state).toBe(status);
-      expect(fixture.record('b')?.state).toBe('accepted');
-      expect(fixture.eventQueries.findByEntityId('terminal-message/a')).toEqual(terminal);
-      expect(fixture.terminalEvents()).toHaveLength(1);
-      expect(fixture.eventQueries.findByEntityId('accepted-message/a')).toBeNull();
-      expect(fixture.eventQueries.findByEntityId('accepted-message/b')?.stream_event_type).toBe(
-        'cloud.message.sent'
+      await expect(fixture.outcome(MESSAGE_A, status)).resolves.toEqual({ applied: true });
+      await fixture.outcome(MESSAGE_A, status === 'failed' ? 'completed' : 'failed');
+      expect(fixture.record(MESSAGE_A)?.state).toBe(status);
+      expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
+      expect(fixture.eventQueries.findByEntityId(`terminal-message/${MESSAGE_A}`)).toEqual(
+        terminal
       );
+      expect(fixture.terminalEvents()).toHaveLength(1);
+      expect(fixture.eventQueries.findByEntityId(`accepted-message/${MESSAGE_A}`)).toBeNull();
+      expect(
+        fixture.eventQueries.findByEntityId(`accepted-message/${MESSAGE_B}`)?.stream_event_type
+      ).toBe('cloud.message.sent');
       expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
       const payload = JSON.parse(terminal?.payload ?? '{}');
-      expect(payload).toMatchObject({ messageId: 'a', accepted: true, delivery: 'sent' });
+      expect(payload).toMatchObject({ messageId: MESSAGE_A, accepted: true, delivery: 'sent' });
       expect(payload.status).toBe(status === 'cancelled' ? 'interrupted' : status);
     }
   );
 
   it('acknowledges an old outcome and late preparing progress without changing the next accepted turn', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_A);
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    await fixture.outcome('a', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     await fixture.flush();
     const messages = fixture.storage.kv.get('session_messages');
     const events = fixture.eventQueries.findByEntityPrefix('');
     const alarmAt = fixture.alarmAt();
-    const attemptId = fixture.record('a')?.preparationAttemptId;
+    const attemptId = fixture.record(MESSAGE_A)?.preparationAttemptId;
     if (!attemptId) throw new Error('Missing preparation attempt');
-    await expect(fixture.outcome('a', 'completed')).resolves.toEqual({ applied: true });
-    await expect(fixture.outcome('a', 'completed')).resolves.toEqual({ applied: true });
+    await expect(fixture.outcome(MESSAGE_A, 'completed')).resolves.toEqual({ applied: true });
+    await expect(fixture.outcome(MESSAGE_A, 'completed')).resolves.toEqual({ applied: true });
     await expect(
       fixture.session.receiveSandboxControlPreparing({
         identity: {
@@ -3243,7 +3813,7 @@ describe('SandboxSession orchestration', () => {
         payload: {
           version: 2,
           attemptId,
-          triggerMessageId: 'a',
+          triggerMessageId: MESSAGE_A,
           revision: 999,
           timestamp: Date.now(),
           step: 'cloning',
@@ -3258,7 +3828,7 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.eventQueries.findByEntityPrefix('')).toEqual(events);
     expect(fixture.alarmAt()).toBe(alarmAt);
     await expect(fixture.session.getCurrentMessageWork()).resolves.toEqual({
-      messageId: 'b',
+      messageId: MESSAGE_B,
       status: 'running',
       health: 'healthy',
     });
@@ -3270,23 +3840,23 @@ describe('SandboxSession orchestration', () => {
     const prompt = deferred<ResponseFrame>();
     fixture.control.request.mockImplementationOnce(async () => controlResponse({ attached: true }));
     fixture.control.request.mockImplementationOnce(() => prompt.promise);
-    await fixture.admit('a');
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_A);
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    await fixture.outcome('a', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     await fixture.flush();
-    expect(fixture.record('b')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
     prompt.reject(new Error('Lost acknowledgement'));
     await fixture.flush();
-    expect(fixture.record('a')?.state).toBe('completed');
-    expect(fixture.record('b')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('completed');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
     expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
   });
 
   it('does not infer message settlement from raw parent-session closes, errors, or untrusted outcomes', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_A);
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
     await fixture.rawEvent('session.turn.close', {
       sessionID: 'kilo_root',
@@ -3302,33 +3872,33 @@ describe('SandboxSession orchestration', () => {
       { sessionID: 'kilo_child', parentID: 'kilo_root', reason: 'completed' },
       'kilo_child'
     );
-    await fixture.outcome('a', 'completed', NEXT_RUNTIME_ID);
-    await fixture.outcome('b', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed', NEXT_RUNTIME_ID);
+    await fixture.outcome(MESSAGE_B, 'completed');
     await fixture.session.receiveSandboxControlEvent({
       identity: { directory: DIRECTORY, rootKiloSessionId: 'kilo_root' },
       payload: {
         type: 'session.message.outcome',
-        properties: { messageId: 'a', status: 'completed' },
+        properties: { messageId: MESSAGE_A, status: 'completed' },
       },
     });
-    await fixture.rawEvent('session.message.outcome', { messageId: 'a', status: 'idle' });
-    expect(fixture.record('a')?.state).toBe('accepted');
-    expect(fixture.record('b')?.state).toBe('queued');
+    await fixture.rawEvent('session.message.outcome', { messageId: MESSAGE_A, status: 'idle' });
+    expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
     expect(fixture.terminalEvents()).toHaveLength(0);
   });
 
   it.each([
     { messageId: 'other', status: 'accepted' },
-    { messageId: 'a', status: 'completed' },
+    { messageId: MESSAGE_A, status: 'completed' },
     {},
   ])('rejects an invalid prompt result %j instead of accepting it', async result => {
     const fixture = sessionFixture();
     delegateRequest(fixture, 'session.prompt', async () => controlResponse(result));
-    await fixture.admit('a');
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_A);
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    expect(fixture.record('a')?.state).toBe('failed');
-    expect(fixture.record('b')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('failed');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
     expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith({
       ownerId: 'user_1',
       sessionId: SESSION_ID,
@@ -3344,33 +3914,33 @@ describe('SandboxSession orchestration', () => {
     fixture.control.quarantineRuntime.mockRejectedValue(
       new Error('Control temporarily unavailable')
     );
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_ATTACH_TIMEOUT_MS - 1);
-    expect(fixture.record('a')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('queued');
     await vi.advanceTimersByTimeAsync(1);
     await fixture.flush();
-    expect(fixture.record('a')?.state).toBe('failed');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('failed');
     expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
     const calls = fixture.control.ensureReady.mock.calls.length;
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    expect(fixture.record('b')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
     expect(fixture.control.ensureReady).toHaveBeenCalledTimes(calls);
     expect(
       fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
     ).toHaveLength(0);
     attach.resolve(controlResponse({ attached: true }));
     await fixture.flush();
-    expect(fixture.record('a')?.state).toBe('failed');
-    expect(fixture.record('b')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('failed');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
   });
 
   it.each([undefined, 'Session aborted'])(
     'projects a cancelled outcome with reason %j as an SDK interruption',
     async reason => {
       const fixture = sessionFixture();
-      await fixture.admit('a');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
       const state = createServiceState({ rootSessionId: 'kilo_root' });
       state.process({
@@ -3378,10 +3948,10 @@ describe('SandboxSession orchestration', () => {
         sessionStatus: { type: 'busy' },
         cloudStatus: { type: 'ready' },
       });
-      state.process({ type: 'cloud.message.sent', messageId: 'a' });
+      state.process({ type: 'cloud.message.sent', messageId: MESSAGE_A });
 
       await fixture.rawEvent('session.message.outcome', {
-        messageId: 'a',
+        messageId: MESSAGE_A,
         status: 'cancelled',
         ...(reason ? { reason } : {}),
       });
@@ -3393,7 +3963,7 @@ describe('SandboxSession orchestration', () => {
       const event = normalizeCliEvent(terminal.stream_event_type, payload);
       expect(event).toMatchObject({
         type: 'cloud.message.failed',
-        messageId: 'a',
+        messageId: MESSAGE_A,
         reason: 'interrupted',
         error: 'The message was interrupted',
       });
@@ -3401,8 +3971,8 @@ describe('SandboxSession orchestration', () => {
       state.process(event);
       expect(state.getActivity()).toEqual({ type: 'idle' });
       expect(state.getStatus()).toEqual({ type: 'interrupted' });
-      expect(state.getPendingMessages().get('a')).toMatchObject({ reason: 'interrupted' });
-      expect(fixture.record('a')?.failedReason).toBe(reason);
+      expect(state.getPendingMessages().get(MESSAGE_A)).toMatchObject({ reason: 'interrupted' });
+      expect(fixture.record(MESSAGE_A)?.failedReason).toBe(reason);
     }
   );
 
@@ -3416,21 +3986,21 @@ describe('SandboxSession orchestration', () => {
       if (phase === 'preparing') delegateRequest(fixture, 'session.attach', () => attach.promise);
       delegateRequest(fixture, 'session.abort', () => abort.promise);
       fixture.control.quarantineRuntime.mockImplementation(() => quarantine.promise);
-      await fixture.admit('a');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
-      const owned = fixture.record('a');
+      const owned = fixture.record(MESSAGE_A);
       await fixture.session.markAsInterrupted();
-      expect(fixture.record('a')).toEqual(owned);
+      expect(fixture.record(MESSAGE_A)).toEqual(owned);
       fixture.reload();
       const interruption = fixture.session.interruptExecution();
       await fixture.flush();
       if (phase === 'accepted') {
-        expect(fixture.record('a')?.state).toBe('accepted');
+        expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
         expect(fixture.control.request).toHaveBeenCalledWith(
           expect.objectContaining({
             operation: 'session.abort',
             session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
-            payload: { messageId: 'a' },
+            payload: { messageId: MESSAGE_A },
           })
         );
         abort.resolve(controlResponse({ status: 'aborted' }));
@@ -3447,7 +4017,7 @@ describe('SandboxSession orchestration', () => {
       }
       await expect(interruption).resolves.toEqual({ success: true });
       await fixture.flush();
-      expect(fixture.record('a')?.state).toBe('cancelled');
+      expect(fixture.record(MESSAGE_A)?.state).toBe('cancelled');
       expect(fixture.terminalEvents()).toHaveLength(1);
       if (phase === 'preparing') {
         expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
@@ -3464,14 +4034,14 @@ describe('SandboxSession orchestration', () => {
     delegateRequest(fixture, 'session.attach', () => attach.promise);
     const cleanup = deferred<RuntimeQuarantineResult>();
     fixture.control.quarantineRuntime.mockImplementation(() => cleanup.promise);
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     const interrupt = fixture.session.interruptExecution();
     await fixture.flush();
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    expect(fixture.record('a')?.state).toBe('cancelled');
-    expect(fixture.record('b')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('cancelled');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
     expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
     attach.resolve(controlResponse({ attached: true }));
     cleanup.resolve({ quarantined: true, disposition: 'physical_stopping' });
@@ -3486,9 +4056,9 @@ describe('SandboxSession orchestration', () => {
     const fixture = sessionFixture();
     const attach = deferred<ResponseFrame>();
     delegateRequest(fixture, 'session.attach', () => attach.promise);
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
-    const attemptId = fixture.record('a')?.preparationAttemptId;
+    const attemptId = fixture.record(MESSAGE_A)?.preparationAttemptId;
     if (!attemptId) throw new Error('Missing preparation attempt');
     expect(readPreparationAttempt(fixture.eventQueries, attemptId)?.status).toBe('running');
     expect(readStep(fixture.eventQueries, attemptId, 'phase:workspace_setup').status).toBe(
@@ -3496,11 +4066,11 @@ describe('SandboxSession orchestration', () => {
     );
 
     await expect(fixture.session.interruptExecution()).resolves.toEqual({ success: true });
-    expect(fixture.record('a')?.state).toBe('cancelled');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('cancelled');
     expect(readPreparationAttempt(fixture.eventQueries, attemptId)).toMatchObject({
       status: 'failed',
       safeError: 'The message was interrupted',
-      completedAt: fixture.record('a')?.terminalAt,
+      completedAt: fixture.record(MESSAGE_A)?.terminalAt,
     });
     expect(readStep(fixture.eventQueries, attemptId, 'phase:workspace_setup')).toMatchObject({
       status: 'failed',
@@ -3525,7 +4095,7 @@ describe('SandboxSession orchestration', () => {
           payload: {
             version: 2,
             attemptId,
-            triggerMessageId: 'a',
+            triggerMessageId: MESSAGE_A,
             revision: 1_000,
             timestamp: Date.now(),
             message: 'Late wrapper preparation',
@@ -3539,7 +4109,7 @@ describe('SandboxSession orchestration', () => {
     vi.setSystemTime(Date.now() + 16 * 60_000);
     fixture.reload();
     expect(await fixture.snapshot()).toMatchObject({ preparationSnapshots: snapshots });
-    expect(fixture.record('a')?.state).toBe('cancelled');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('cancelled');
     expect(fixture.terminalEvents()).toHaveLength(1);
     expect(
       fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
@@ -3598,7 +4168,7 @@ describe('SandboxSession orchestration', () => {
         },
       })
     ).resolves.toMatchObject({ disposition: 'applied' });
-    expect(fixture.record('a')?.state).toBe('completed');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('completed');
   });
 
   it('delivers a follow-up after awaited cancel, failed quarantine transfer, reset, and old-runtime cleanup', async () => {
@@ -3613,16 +4183,16 @@ describe('SandboxSession orchestration', () => {
       return controlResponse({ attached: true });
     });
     fixture.control.quarantineRuntime.mockRejectedValue(new Error('Quarantine unavailable'));
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
-    const oldAcquisition = fixture.acquisition('a');
+    const oldAcquisition = fixture.acquisition(MESSAGE_A);
     await expect(fixture.session.interruptExecution()).resolves.toEqual({ success: true });
-    expect(fixture.record('a')?.state).toBe('cancelled');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('cancelled');
     expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    const acquisition = fixture.acquisition('b');
-    const intent = fixture.record('b')?.intent;
+    const acquisition = fixture.acquisition(MESSAGE_B);
+    const intent = fixture.record(MESSAGE_B)?.intent;
     expect(acquisition.id).not.toBe(oldAcquisition.id);
     expect(fixture.control.ensureReady).toHaveBeenCalledOnce();
     fixture.reload();
@@ -3632,7 +4202,7 @@ describe('SandboxSession orchestration', () => {
     });
     await fixture.fireAlarm();
     expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
-    expect(fixture.record('b')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
     fixture.setStatus({ physical: 'stopped', connection: 'disconnected' });
     fixture.control.quarantineRuntime.mockResolvedValueOnce({
       quarantined: false,
@@ -3652,27 +4222,27 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
       expect.objectContaining({ acquisition })
     );
-    expect(fixture.record('b')).toMatchObject({
+    expect(fixture.record(MESSAGE_B)).toMatchObject({
       state: 'accepted',
       intent,
       wrapperInstanceId: NEXT_RUNTIME_ID,
       preparationAttemptId: acquisition.id,
       deliveryDeadlineAt: acquisition.deadlineAt,
     });
-    await fixture.admit('c');
+    await fixture.admit(MESSAGE_C);
     attach.resolve(controlResponse({ attached: true }));
     await fixture.flush();
-    await expect(fixture.outcome('a', 'completed')).resolves.toEqual({ applied: false });
+    await expect(fixture.outcome(MESSAGE_A, 'completed')).resolves.toEqual({ applied: false });
     await fixture.session.failWaitingMessages('late_old_failure', RUNTIME_ID);
-    expect(fixture.record('a')?.state).toBe('cancelled');
-    expect(fixture.record('b')?.state).toBe('accepted');
-    expect(fixture.record('c')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('cancelled');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_C)?.state).toBe('queued');
     expect(fixture.control.ensureReady).toHaveBeenCalledTimes(2);
     expect(
       fixture.control.request.mock.calls
         .filter(([input]) => input.operation === 'session.prompt')
         .map(([input]) => sessionPromptPayloadSchema.parse(input.payload).messageId)
-    ).toEqual(['b']);
+    ).toEqual([MESSAGE_B]);
   });
 
   it('persists a retained operation result without nested transactionSync', async () => {
@@ -3727,7 +4297,7 @@ describe('SandboxSession orchestration', () => {
         },
       })
     ).resolves.toMatchObject({ disposition: 'applied' });
-    expect(fixture.record('a')?.state).toBe('completed');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('completed');
   });
 
   it('records the native runtime fence after attach completion is persisted', async () => {
@@ -3872,12 +4442,12 @@ describe('SandboxSession orchestration', () => {
     const attach = deferred<ResponseFrame>();
     delegateRequest(fixture, 'session.attach', () => attach.promise);
     fixture.control.quarantineRuntime.mockRejectedValue(new Error('Quarantine unavailable'));
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     await expect(fixture.session.interruptExecution()).resolves.toEqual({ success: true });
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    const pending = fixture.record('b');
+    const pending = fixture.record(MESSAGE_B);
     if (!pending?.deliveryDeadlineAt) throw new Error('Missing pending head deadline');
     const deadlineAt = pending.deliveryDeadlineAt;
     attach.resolve(controlResponse({ attached: true }));
@@ -3885,8 +4455,8 @@ describe('SandboxSession orchestration', () => {
     fixture.reload();
     vi.setSystemTime(deadlineAt);
     await fixture.fireAlarm();
-    expect(fixture.record('a')?.state).toBe('cancelled');
-    expect(fixture.record('b')).toMatchObject({
+    expect(fixture.record(MESSAGE_A)?.state).toBe('cancelled');
+    expect(fixture.record(MESSAGE_B)).toMatchObject({
       state: 'failed',
       failedReason: 'preparation_timeout',
       deliveryDeadlineAt: deadlineAt,
@@ -3929,14 +4499,14 @@ describe('SandboxSession orchestration', () => {
       expect(fixture.alarmAt()).not.toBeNull();
       return controlResponse(result);
     });
-    await fixture.admit('a');
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_A);
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
     for (let check = 0; check < 4; check++) {
       vi.setSystemTime(Date.now() + DEADLINE_MS.acceptedOverdue);
       await fixture.fireAlarm();
-      expect(fixture.record('a')?.state).toBe('accepted');
-      expect(fixture.record('b')?.state).toBe('queued');
+      expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
+      expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
       expect(fixture.alarmAt()).not.toBeNull();
     }
     expect(fixture.terminalEvents()).toHaveLength(0);
@@ -3947,8 +4517,8 @@ describe('SandboxSession orchestration', () => {
     'fails lost accepted execution on %s health and fences cleanup across reset',
     async health => {
       const fixture = sessionFixture();
-      await fixture.admit('a');
-      await fixture.admit('b');
+      await fixture.admit(MESSAGE_A);
+      await fixture.admit(MESSAGE_B);
       await fixture.flush();
       delegateRequest(fixture, 'session.sync', async () => {
         if (health === 'error') throw new Error('Kilo status failed');
@@ -3960,14 +4530,14 @@ describe('SandboxSession orchestration', () => {
       vi.setSystemTime(Date.now() + DEADLINE_MS.acceptedOverdue);
       const alarm = fixture.fireAlarm();
       await vi.advanceTimersByTimeAsync(health === 'hang' ? SANDBOX_CONTROL_REQUEST_TIMEOUT_MS : 0);
-      expect(fixture.record('a')?.state).toBe('failed');
-      expect(fixture.record('b')?.state).toBe('queued');
+      expect(fixture.record(MESSAGE_A)?.state).toBe('failed');
+      expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
       expect(fixture.terminalEvents()).toHaveLength(1);
       expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
-      await fixture.admit('c');
+      await fixture.admit(MESSAGE_C);
       await fixture.flush();
-      expect(fixture.record('c')?.state).toBe('queued');
-      const acquisition = fixture.acquisition('b');
+      expect(fixture.record(MESSAGE_C)?.state).toBe('queued');
+      const acquisition = fixture.acquisition(MESSAGE_B);
       const ensureCount = fixture.control.ensureReady.mock.calls.length;
       await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
       await alarm;
@@ -3988,7 +4558,7 @@ describe('SandboxSession orchestration', () => {
       });
       await fixture.fireAlarm();
       expect(await fixture.session.isSandboxCleanupScheduled()).toBe(false);
-      expect(fixture.record('b')).toMatchObject({
+      expect(fixture.record(MESSAGE_B)).toMatchObject({
         state: 'accepted',
         wrapperInstanceId: NEXT_RUNTIME_ID,
       });
@@ -3996,26 +4566,26 @@ describe('SandboxSession orchestration', () => {
       expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
         expect.objectContaining({ acquisition })
       );
-      await fixture.outcome('b', 'completed', NEXT_RUNTIME_ID);
+      await fixture.outcome(MESSAGE_B, 'completed', NEXT_RUNTIME_ID);
       await fixture.flush();
-      expect(fixture.record('c')?.state).toBe('accepted');
-      await fixture.outcome('c', 'completed', NEXT_RUNTIME_ID);
+      expect(fixture.record(MESSAGE_C)?.state).toBe('accepted');
+      await fixture.outcome(MESSAGE_C, 'completed', NEXT_RUNTIME_ID);
       await fixture.flush();
-      await fixture.admit('d');
-      await fixture.admit('e');
+      await fixture.admit(MESSAGE_D);
+      await fixture.admit(MESSAGE_E);
       await fixture.flush();
       await fixture.session.failWaitingMessages('delayed_old_failure', RUNTIME_ID);
-      expect(fixture.record('d')?.state).toBe('accepted');
-      expect(fixture.record('e')?.state).toBe('queued');
+      expect(fixture.record(MESSAGE_D)?.state).toBe('accepted');
+      expect(fixture.record(MESSAGE_E)?.state).toBe('queued');
       cleanup.resolve({ quarantined: true, disposition: 'physical_stopping' });
       await fixture.flush();
-      expect(fixture.record('d')?.state).toBe('accepted');
+      expect(fixture.record(MESSAGE_D)?.state).toBe('accepted');
     }
   );
 
   it('ignores delayed old-runtime failures during a new runtime handoff and for its followers', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     await fixture.session.failWaitingMessages('old_runtime_failed', RUNTIME_ID);
     fixture.setStatus({
@@ -4025,19 +4595,19 @@ describe('SandboxSession orchestration', () => {
     });
     const prompt = deferred<ResponseFrame>();
     delegateRequest(fixture, 'session.prompt', () => prompt.promise);
-    await fixture.admit('b');
-    await fixture.admit('c');
+    await fixture.admit(MESSAGE_B);
+    await fixture.admit(MESSAGE_C);
     await fixture.flush();
-    expect(fixture.record('b')).toMatchObject({
+    expect(fixture.record(MESSAGE_B)).toMatchObject({
       state: 'queued',
       wrapperInstanceId: NEXT_RUNTIME_ID,
     });
     await fixture.session.failWaitingMessages('late_old_runtime_failure', RUNTIME_ID);
-    expect(fixture.record('b')?.state).toBe('queued');
-    expect(fixture.record('c')?.state).toBe('queued');
-    prompt.resolve(controlResponse({ messageId: 'b', status: 'accepted' }));
+    expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_C)?.state).toBe('queued');
+    prompt.resolve(controlResponse({ messageId: MESSAGE_B, status: 'accepted' }));
     await fixture.flush();
-    expect(fixture.record('b')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
     expect(fixture.terminalEvents()).toHaveLength(1);
   });
 
@@ -4055,18 +4625,18 @@ describe('SandboxSession orchestration', () => {
       });
       return controlResponse({ attached: true });
     });
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
-    expect(fixture.record('a')?.state).toBe('failed');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('failed');
     expect(
       fixture.control.request.mock.calls.some(([input]) => input.operation === 'session.prompt')
     ).toBe(false);
     expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
       expect.objectContaining({ wrapperInstanceId: RUNTIME_ID })
     );
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    expect(fixture.record('b')).toMatchObject({
+    expect(fixture.record(MESSAGE_B)).toMatchObject({
       state: 'accepted',
       wrapperInstanceId: NEXT_RUNTIME_ID,
     });
@@ -4074,21 +4644,21 @@ describe('SandboxSession orchestration', () => {
 
   it('bounds an accepted runtime status RPC that never responds', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     fixture.control.getStatus.mockImplementation(() => new Promise<ControlStatus>(() => undefined));
     vi.setSystemTime(Date.now() + DEADLINE_MS.acceptedOverdue);
     const alarm = fixture.fireAlarm();
     await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
     await alarm;
-    expect(fixture.record('a')?.state).toBe('failed');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('failed');
     expect(fixture.control.quarantineRuntime).toHaveBeenCalledOnce();
   });
 
   it('keeps the original client-started sync deadline when the watchdog joins later', async () => {
     const fixture = sessionFixture();
     const sync = deferred<ResponseFrame>();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     delegateRequest(fixture, 'session.sync', () => sync.promise);
     vi.setSystemTime(Date.now() + DEADLINE_MS.acceptedOverdue);
@@ -4101,10 +4671,10 @@ describe('SandboxSession orchestration', () => {
       fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.sync')
     ).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS / 2 - 1);
-    expect(fixture.record('a')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
     await vi.advanceTimersByTimeAsync(1);
     await alarm;
-    expect(fixture.record('a')).toMatchObject({
+    expect(fixture.record(MESSAGE_A)).toMatchObject({
       state: 'failed',
       failedReason: 'runtime_unhealthy',
     });
@@ -4121,24 +4691,24 @@ describe('SandboxSession orchestration', () => {
     const fixture = sessionFixture();
     const sync = deferred<ResponseFrame>();
     delegateRequest(fixture, 'session.sync', () => sync.promise);
-    await fixture.admit('a');
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_A);
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
     vi.setSystemTime(Date.now() + DEADLINE_MS.acceptedOverdue);
     const alarm = fixture.fireAlarm();
     await fixture.flush();
-    await fixture.outcome('a', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     await fixture.flush();
     sync.reject(new Error('Late health failure'));
     await alarm;
-    expect(fixture.record('a')?.state).toBe('completed');
-    expect(fixture.record('b')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('completed');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
     expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
   });
 
   it('keeps a new head bounded even while a prior quarantine cannot be transferred', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     delegateRequest(fixture, 'session.sync', async () => {
       throw new Error('Unhealthy runtime');
@@ -4146,20 +4716,20 @@ describe('SandboxSession orchestration', () => {
     fixture.control.quarantineRuntime.mockRejectedValue(new Error('Quarantine unavailable'));
     vi.setSystemTime(Date.now() + DEADLINE_MS.acceptedOverdue);
     await fixture.fireAlarm();
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    const deadlineAt = fixture.record('b')?.deliveryDeadlineAt;
+    const deadlineAt = fixture.record(MESSAGE_B)?.deliveryDeadlineAt;
     if (!deadlineAt) throw new Error('Missing pending head deadline');
     vi.setSystemTime(deadlineAt);
     await fixture.fireAlarm();
-    expect(fixture.record('b')?.state).toBe('failed');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('failed');
     expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
     expect(fixture.control.ensureReady).toHaveBeenCalledOnce();
   });
 
   it('restores pending interactions from KV after reset and projects accepted work as ready and busy', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     const question = {
       id: 'question_1',
@@ -4178,14 +4748,14 @@ describe('SandboxSession orchestration', () => {
       cloudStatus: { type: 'ready' },
       sessionStatus: { type: 'busy' },
       pendingInteractions: { questions: [question], permissions: [permission] },
-      queuedMessages: [expect.objectContaining({ messageId: 'a', delivery: 'sent' })],
+      queuedMessages: [expect.objectContaining({ messageId: MESSAGE_A, delivery: 'sent' })],
       preparationSnapshots: expect.any(Array),
     });
     await fixture.session.answerQuestion({ questionId: 'question_1', answers: [['Yes']] });
     expect(await fixture.snapshot()).toMatchObject({
       pendingInteractions: { questions: [], permissions: [permission] },
     });
-    await fixture.outcome('a', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     expect(await fixture.snapshot()).toMatchObject({
       pendingInteractions: { questions: [], permissions: [] },
     });
@@ -4193,7 +4763,7 @@ describe('SandboxSession orchestration', () => {
 
   it('persists root-routed descendant interactions and reconciles their original session identities', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     const childQuestion = {
       id: 'child_q',
@@ -4250,7 +4820,7 @@ describe('SandboxSession orchestration', () => {
       questions: [rootQuestion],
       permissions: [],
     });
-    await fixture.outcome('a', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     expect(fixture.storage.kv.get('session_pending_interactions')).toMatchObject({
       questions: [],
       permissions: [],
@@ -4265,7 +4835,7 @@ describe('SandboxSession orchestration', () => {
     'rejects descendant interaction identity outside the owning root/runtime: %j',
     async identity => {
       const fixture = sessionFixture();
-      await fixture.admit('a');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
       const before = fixture.eventQueries.findByEntityPrefix('');
       await expect(
@@ -4281,13 +4851,13 @@ describe('SandboxSession orchestration', () => {
       ).resolves.toEqual({ applied: false });
       expect(fixture.storage.kv.get('session_pending_interactions')).toBeUndefined();
       expect(fixture.eventQueries.findByEntityPrefix('')).toEqual(before);
-      expect(fixture.record('a')?.state).toBe('accepted');
+      expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
     }
   );
 
   it('keeps unknown pending state unknown when session.sync fails, then reconciles a successful directory-scoped snapshot', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     delegateRequest(fixture, 'session.sync', async () => ({
       type: 'response',
@@ -4327,7 +4897,7 @@ describe('SandboxSession orchestration', () => {
 
   it('does not restore a resolved question from an older in-flight sync response', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     const question = { id: 'question_1', sessionID: 'kilo_root' };
     await fixture.rawEvent('question.asked', question);
@@ -4351,7 +4921,7 @@ describe('SandboxSession orchestration', () => {
 
   it('keeps failed question replies pending and validates success payloads', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     await fixture.rawEvent('question.asked', { id: 'q', sessionID: 'kilo_root' });
     delegateRequest(fixture, 'session.question.resolve', async () =>
@@ -4370,19 +4940,19 @@ describe('SandboxSession orchestration', () => {
 
   it('reuses a persisted healthy attachment without warm preparation or a new preparation snapshot', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('cold');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     const coldPreparation = fixture.eventQueries.findByEntityPrefix('preparation/attempt/');
     expect(coldPreparation.length).toBeGreaterThan(0);
-    await fixture.outcome('cold', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     await fixture.flush();
     fixture.reload();
     orchestrationMocks.broadcast.mockClear();
     const ready = deferred<ControlStatus>();
     fixture.control.ensureReady.mockImplementationOnce(() => ready.promise);
-    await fixture.admit('warm');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    expect(fixture.record('warm')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
     expect(fixture.eventQueries.findByEntityPrefix('preparation/attempt/')).toEqual(
       coldPreparation
     );
@@ -4391,7 +4961,7 @@ describe('SandboxSession orchestration', () => {
     );
     ready.resolve({ physical: 'running', connection: 'ready', wrapperInstanceId: RUNTIME_ID });
     await fixture.flush();
-    expect(fixture.record('warm')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
     expect(fixture.control.ensureReady).toHaveBeenCalledTimes(2);
     expect(fixture.control.attachSession).toHaveBeenCalledOnce();
     expect(
@@ -4423,7 +4993,7 @@ describe('SandboxSession orchestration', () => {
         attachment: initial,
       };
       fixture.control.ensureReady.mockResolvedValue(ready);
-      await fixture.admit('cold');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
       const coldPreparation = fixture.eventQueries.findByEntityPrefix('preparation/attempt/');
       expect(coldPreparation.length).toBeGreaterThan(0);
@@ -4433,13 +5003,13 @@ describe('SandboxSession orchestration', () => {
           payload: {
             ...initial,
             preparation: {
-              attemptId: fixture.record('cold')?.preparationAttemptId,
-              triggerMessageId: 'cold',
+              attemptId: fixture.record(MESSAGE_A)?.preparationAttemptId,
+              triggerMessageId: MESSAGE_A,
             },
           },
         })
       );
-      await fixture.outcome('cold', 'completed');
+      await fixture.outcome(MESSAGE_A, 'completed');
       await fixture.flush();
       fixture.reload();
       const refreshed = {
@@ -4453,7 +5023,7 @@ describe('SandboxSession orchestration', () => {
       orchestrationMocks.broadcast.mockClear();
       const attached = deferred<ResponseFrame>();
       delegateRequest(fixture, 'session.attach', () => attached.promise);
-      await fixture.admit('warm');
+      await fixture.admit(MESSAGE_B);
       await fixture.flush();
       expect(orchestrationMocks.broadcast).not.toHaveBeenCalledWith(
         expect.objectContaining({ stream_event_type: 'preparing' })
@@ -4468,18 +5038,21 @@ describe('SandboxSession orchestration', () => {
           payload: refreshed,
         })
       );
-      expect(fixture.record('warm')).toMatchObject({ state: 'queued', unresolvedDispatch: true });
+      expect(fixture.record(MESSAGE_B)).toMatchObject({
+        state: 'queued',
+        unresolvedDispatch: true,
+      });
       attached.resolve(controlResponse({ attached: true }));
       await fixture.flush();
       expect(fixture.control.request.mock.calls.map(([input]) => input.operation)).toEqual([
         'session.attach',
         'session.prompt',
       ]);
-      expect(fixture.record('warm')).toMatchObject({
+      expect(fixture.record(MESSAGE_B)).toMatchObject({
         state: 'accepted',
         wrapperInstanceId: RUNTIME_ID,
       });
-      expect(fixture.record('warm')?.unresolvedDispatch).toBeUndefined();
+      expect(fixture.record(MESSAGE_B)?.unresolvedDispatch).toBeUndefined();
       expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
       expect(orchestrationMocks.broadcast).not.toHaveBeenCalledWith(
         expect.objectContaining({ stream_event_type: 'preparing' })
@@ -4502,18 +5075,18 @@ describe('SandboxSession orchestration', () => {
         kilo: { ...ATTACHMENT.kilo, containmentEnabled: false },
       },
     });
-    await fixture.admit('cold');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
-    await fixture.outcome('cold', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     await fixture.flush();
     const coldPreparation = fixture.eventQueries.findByEntityPrefix('preparation/attempt/');
     fixture.reload();
     fixture.control.request.mockClear();
     orchestrationMocks.broadcast.mockClear();
     delegateRequest(fixture, 'session.attach', async () => controlFailure(false));
-    await fixture.admit('warm');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    expect(fixture.record('warm')).toMatchObject({
+    expect(fixture.record(MESSAGE_B)).toMatchObject({
       state: 'failed',
       failedReason: 'attach_exhausted',
     });
@@ -4636,9 +5209,9 @@ describe('SandboxSession orchestration', () => {
           kilo: { ...ATTACHMENT.kilo, containmentEnabled: false },
         },
       });
-      await fixture.admit('cold');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
-      await fixture.outcome('cold', 'completed');
+      await fixture.outcome(MESSAGE_A, 'completed');
       await fixture.flush();
       const lostPrompt = deferred<ResponseFrame>();
       let prompts = 0;
@@ -4646,13 +5219,13 @@ describe('SandboxSession orchestration', () => {
         prompts++;
         return prompts === 1 ? lostPrompt.promise : controlFailure(true, 'session_busy');
       });
-      await fixture.admit('warm');
+      await fixture.admit(MESSAGE_B);
       await fixture.flush();
-      const acquisition = fixture.acquisition('warm');
-      expect(fixture.record('warm')?.unresolvedDispatch).toBe(true);
+      const acquisition = fixture.acquisition(MESSAGE_B);
+      expect(fixture.record(MESSAGE_B)?.unresolvedDispatch).toBe(true);
       fixture.reload();
       await fixture.fireAlarm();
-      expect(fixture.record('warm')).toMatchObject({
+      expect(fixture.record(MESSAGE_B)).toMatchObject({
         state: 'queued',
         unresolvedDispatch: true,
         deliveryRetryScope: 'runtime',
@@ -4668,10 +5241,10 @@ describe('SandboxSession orchestration', () => {
       expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
         expect.objectContaining({ wrapperInstanceId: RUNTIME_ID })
       );
-      expect(fixture.record('warm')?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
-      lostPrompt.resolve(controlResponse({ messageId: 'warm', status: 'accepted' }));
+      expect(fixture.record(MESSAGE_B)?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
+      lostPrompt.resolve(controlResponse({ messageId: MESSAGE_B, status: 'accepted' }));
       await fixture.flush();
-      expect(fixture.record('warm')?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
+      expect(fixture.record(MESSAGE_B)?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
       expect(fixture.terminalEvents()).toHaveLength(2);
     }
   );
@@ -4680,9 +5253,9 @@ describe('SandboxSession orchestration', () => {
     'performs real preparation for a %s instead of assuming warmth from prior messages',
     async reason => {
       const fixture = sessionFixture();
-      await fixture.admit('cold');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
-      await fixture.outcome('cold', 'completed');
+      await fixture.outcome(MESSAGE_A, 'completed');
       await fixture.flush();
       fixture.reload();
       const wrapperInstanceId = reason === 'replacement runtime' ? NEXT_RUNTIME_ID : RUNTIME_ID;
@@ -4690,9 +5263,9 @@ describe('SandboxSession orchestration', () => {
       if (reason === 'missing legacy attachment')
         fixture.values.delete('terminal_attached_session');
       orchestrationMocks.broadcast.mockClear();
-      await fixture.admit('rebuild');
+      await fixture.admit(MESSAGE_C);
       await fixture.flush();
-      expect(fixture.record('rebuild')).toMatchObject({ state: 'accepted', wrapperInstanceId });
+      expect(fixture.record(MESSAGE_C)).toMatchObject({ state: 'accepted', wrapperInstanceId });
       expect(fixture.control.ensureReady).toHaveBeenCalledTimes(2);
       expect(fixture.control.attachSession).toHaveBeenCalledTimes(2);
       expect(
@@ -4701,10 +5274,10 @@ describe('SandboxSession orchestration', () => {
       expect(orchestrationMocks.broadcast).toHaveBeenCalledWith(
         expect.objectContaining({ stream_event_type: 'preparing' })
       );
-      const attemptId = fixture.record('rebuild')?.preparationAttemptId;
+      const attemptId = fixture.record(MESSAGE_C)?.preparationAttemptId;
       const snapshot = fixture.eventQueries.findByEntityId(`preparation/attempt/${attemptId}`);
       expect(JSON.parse(snapshot?.payload ?? '{}')).toMatchObject({
-        triggerMessageId: 'rebuild',
+        triggerMessageId: MESSAGE_C,
         attempt: { status: 'completed' },
       });
     }
@@ -4712,9 +5285,9 @@ describe('SandboxSession orchestration', () => {
 
   it('keeps invalid custom options visibly rejected even when an attachment is warm', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('cold');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
-    await fixture.outcome('cold', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     fixture.storage.kv.put(
       'session_metadata',
       serializeSessionMetadata({
@@ -4722,14 +5295,14 @@ describe('SandboxSession orchestration', () => {
         profile: { envVars: { SANDBOX_CONTROL_CREDENTIAL: 'raw-secret-must-not-leak' } },
       })
     );
-    const admission = await fixture.admit('warm');
+    const admission = await fixture.admit(MESSAGE_B);
     expect(admission).toMatchObject({
       success: false,
       code: 'BAD_REQUEST',
       error: expect.stringContaining('Reserved control runtime environment variable'),
     });
     expect(JSON.stringify(admission)).not.toContain('raw-secret-must-not-leak');
-    expect(fixture.record('warm')).toBeUndefined();
+    expect(fixture.record(MESSAGE_B)).toBeUndefined();
     expect(fixture.control.ensureReady).toHaveBeenCalledOnce();
   });
 
@@ -4755,21 +5328,21 @@ describe('SandboxSession orchestration', () => {
         attachment: ATTACHMENT,
       };
     });
-    await fixture.admit('a');
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_A);
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    expect(fixture.record('a')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
     expect(fixture.control.ensureReady).toHaveBeenCalledOnce();
     allowed = false;
-    await fixture.outcome('a', 'completed');
+    await fixture.outcome(MESSAGE_A, 'completed');
     await fixture.flush();
-    expect(fixture.record('b')).toMatchObject({
+    expect(fixture.record(MESSAGE_B)).toMatchObject({
       state: 'failed',
       failedReason: 'environment_failed',
     });
     expect(fixture.control.ensureReady).toHaveBeenCalledTimes(2);
     expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
-      expect.objectContaining({ acquisition: fixture.acquisition('b') })
+      expect.objectContaining({ acquisition: fixture.acquisition(MESSAGE_B) })
     );
     expect(fixture.control.getStatus).toHaveBeenCalledOnce();
     await fixture.fireAlarm();
@@ -4778,12 +5351,12 @@ describe('SandboxSession orchestration', () => {
       fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
     ).toHaveLength(1);
     allowed = true;
-    await fixture.admit('c');
+    await fixture.admit(MESSAGE_C);
     await fixture.flush();
-    expect(fixture.record('c')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_C)?.state).toBe('accepted');
     expect(fixture.control.ensureReady).toHaveBeenCalledTimes(3);
     expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
-      expect.objectContaining({ acquisition: fixture.acquisition('c') })
+      expect.objectContaining({ acquisition: fixture.acquisition(MESSAGE_C) })
     );
   });
 
@@ -4807,7 +5380,7 @@ describe('SandboxSession orchestration', () => {
       },
     ];
     orchestrationMocks.signedAttachments.mockResolvedValue(signed);
-    await fixture.admit('a', { prompt: '', attachments });
+    await fixture.admit(MESSAGE_A, { prompt: '', attachments });
     attachments.files.push('later.txt');
     await fixture.flush();
     expect(orchestrationMocks.signedAttachments).toHaveBeenCalledWith(
@@ -4821,7 +5394,7 @@ describe('SandboxSession orchestration', () => {
       ([input]) => input.operation === 'session.prompt'
     )?.[0];
     expect(prompt?.payload).toMatchObject({
-      messageId: 'a',
+      messageId: MESSAGE_A,
       turn: { type: 'prompt', prompt: '' },
       attachments: signed,
     });
@@ -4844,9 +5417,14 @@ describe('SandboxSession orchestration', () => {
     'preserves supported follow-up finalization %j through prompt handoff',
     async finalization => {
       const fixture = sessionFixture();
-      await expect(fixture.admit('a', { finalization })).resolves.toMatchObject({ success: true });
+      await expect(fixture.admit(MESSAGE_A, { finalization })).resolves.toMatchObject({
+        success: true,
+      });
       await fixture.flush();
-      expect(fixture.record('a')).toMatchObject({ state: 'accepted', intent: { finalization } });
+      expect(fixture.record(MESSAGE_A)).toMatchObject({
+        state: 'accepted',
+        intent: { finalization },
+      });
       expect(fixture.control.request).toHaveBeenCalledWith(
         expect.objectContaining({
           operation: 'session.prompt',
@@ -4865,7 +5443,7 @@ describe('SandboxSession orchestration', () => {
       fixture.session.createSessionWithInitialAdmission({
         identity: fixture.metadata.identity,
         auth: fixture.metadata.auth,
-        agent: fixture.metadata.agent,
+        agent: defaultAgent,
         workspace: fixture.metadata.workspace,
         finalization,
         message: { initialTurn: { type: 'prompt', messageId, prompt: 'Initial web prompt' } },
@@ -4899,7 +5477,7 @@ describe('SandboxSession orchestration', () => {
     },
   ])('rejects reserved profile environment without rejecting contained auth', async profile => {
     const fixture = sessionFixture({ profile });
-    await expect(fixture.admit('a')).resolves.toMatchObject({
+    await expect(fixture.admit(MESSAGE_A)).resolves.toMatchObject({
       success: false,
       code: 'BAD_REQUEST',
       error: expect.stringContaining('Reserved control runtime environment variable'),
@@ -4907,10 +5485,10 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.control.ensureReady).not.toHaveBeenCalled();
     const supported = sessionFixture({ profile: { envVars: {}, setupCommands: ['pnpm install'] } });
     await expect(
-      supported.admit('b', { finalization: { autoCommit: false, condenseOnComplete: false } })
+      supported.admit(MESSAGE_B, { finalization: { autoCommit: false, condenseOnComplete: false } })
     ).resolves.toMatchObject({ success: true });
     await supported.flush();
-    expect(supported.record('b')?.state).toBe('accepted');
+    expect(supported.record(MESSAGE_B)?.state).toBe('accepted');
     const attach = supported.control.request.mock.calls.find(
       ([input]) => input.operation === 'session.attach'
     )?.[0];
@@ -4930,14 +5508,14 @@ describe('SandboxSession orchestration', () => {
       const cleanup = deferred<RuntimeQuarantineResult>();
       delegateRequest(fixture, 'session.abort', () => abort.promise);
       fixture.control.quarantineRuntime.mockImplementation(() => cleanup.promise);
-      await fixture.admit('a');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
       const interruption = fixture.session.interruptExecution();
       await fixture.flush();
-      await fixture.admit('b');
+      await fixture.admit(MESSAGE_B);
       await fixture.flush();
-      expect(fixture.record('a')?.state).toBe('accepted');
-      expect(fixture.record('b')?.state).toBe('queued');
+      expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
+      expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
       if (failure === 'timeout') {
         await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
       } else {
@@ -4948,11 +5526,11 @@ describe('SandboxSession orchestration', () => {
           );
         await fixture.flush();
       }
-      expect(fixture.record('a')).toMatchObject({
+      expect(fixture.record(MESSAGE_A)).toMatchObject({
         state: 'failed',
         failedReason: 'runtime_unhealthy',
       });
-      expect(fixture.record('b')).toMatchObject({
+      expect(fixture.record(MESSAGE_B)).toMatchObject({
         state: 'queued',
       });
       expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
@@ -4974,16 +5552,16 @@ describe('SandboxSession orchestration', () => {
         quarantined: false,
         disposition: 'wrapper_replaced',
       });
-      await fixture.admit('c');
+      await fixture.admit(MESSAGE_C);
       await fixture.flush();
       abort.resolve(controlResponse({ status: 'aborted' }));
       await fixture.flush();
-      expect(fixture.record('a')?.state).toBe('failed');
-      expect(fixture.record('b')).toMatchObject({
+      expect(fixture.record(MESSAGE_A)?.state).toBe('failed');
+      expect(fixture.record(MESSAGE_B)).toMatchObject({
         state: 'accepted',
         wrapperInstanceId: NEXT_RUNTIME_ID,
       });
-      expect(fixture.record('c')?.state).toBe('queued');
+      expect(fixture.record(MESSAGE_C)?.state).toBe('queued');
     }
   );
 
@@ -4993,23 +5571,23 @@ describe('SandboxSession orchestration', () => {
       const fixture = sessionFixture();
       const abort = deferred<ResponseFrame>();
       delegateRequest(fixture, 'session.abort', () => abort.promise);
-      await fixture.admit('a');
+      await fixture.admit(MESSAGE_A);
       await fixture.flush();
       const interruption = fixture.session.interruptExecution();
       await fixture.flush();
-      await fixture.admit('b');
+      await fixture.admit(MESSAGE_B);
       await fixture.flush();
-      await fixture.outcome('a', 'cancelled');
+      await fixture.outcome(MESSAGE_A, 'cancelled');
       await fixture.flush();
-      expect(fixture.record('b')?.state).toBe('accepted');
+      expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
       if (failure === 'timeout') {
         await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
       } else {
         abort.reject(new Error('Late abort transport failure'));
       }
       await expect(interruption).resolves.toEqual({ success: true });
-      expect(fixture.record('a')?.state).toBe('cancelled');
-      expect(fixture.record('b')?.state).toBe('accepted');
+      expect(fixture.record(MESSAGE_A)?.state).toBe('cancelled');
+      expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
       expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
       expect(fixture.terminalEvents()).toHaveLength(1);
     }
@@ -5019,19 +5597,19 @@ describe('SandboxSession orchestration', () => {
     const fixture = sessionFixture();
     const abort = deferred<ResponseFrame>();
     delegateRequest(fixture, 'session.abort', () => abort.promise);
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     const interruption = fixture.session.interruptExecution();
     await fixture.flush();
-    await fixture.admit('b');
+    await fixture.admit(MESSAGE_B);
     await fixture.flush();
-    expect(fixture.record('a')?.state).toBe('accepted');
-    expect(fixture.record('b')?.state).toBe('queued');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('queued');
     abort.resolve(controlResponse({ status: 'aborted' }));
     await interruption;
     await fixture.fireAlarm();
-    expect(fixture.record('a')?.state).toBe('cancelled');
-    expect(fixture.record('b')?.state).toBe('accepted');
+    expect(fixture.record(MESSAGE_A)?.state).toBe('cancelled');
+    expect(fixture.record(MESSAGE_B)?.state).toBe('accepted');
   });
 });
 
@@ -5063,23 +5641,23 @@ describe('SandboxSession durable Stop wiring', () => {
 
   it('keeps the Stop receipt absent when the paired message transaction fails', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     const request = await stopRequest(fixture, '33333333-3333-4333-8333-333333333333');
-    const before = fixture.record('a');
+    const before = fixture.record(MESSAGE_A);
     vi.spyOn(fixture.storage, 'transactionSync').mockImplementationOnce(() => {
       throw new Error('transaction failed');
     });
 
     await expect(fixture.session.interruptExecution(request)).rejects.toThrow('transaction failed');
 
-    expect(fixture.record('a')).toEqual(before);
+    expect(fixture.record(MESSAGE_A)).toEqual(before);
     expect(fixture.values.get(`session_stop/${request.operationId}`)).toBeUndefined();
   });
 
   it('repairs an admitted receipt with its original cleanup bound after alarm scheduling fails and reloads', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     const request = await stopRequest(fixture, '33333333-3333-4333-8333-333333333334');
     await fixture.storage.deleteAlarm();
@@ -5112,7 +5690,7 @@ describe('SandboxSession durable Stop wiring', () => {
 
   it('retains the immutable pending Stop receipt after A leaves active recovery targets', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     const request = await stopRequest(fixture, '33333333-3333-4333-8333-333333333336');
 
@@ -5143,7 +5721,7 @@ describe('SandboxSession durable Stop wiring', () => {
 
   it('marks an unrecoverable Stop unconfirmed after its bound when the terminal epoch disappears', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('a');
+    await fixture.admit(MESSAGE_A);
     await fixture.flush();
     const request = await stopRequest(fixture, '33333333-3333-4333-8333-333333333335');
 
@@ -5165,17 +5743,17 @@ describe('SandboxSession durable Stop wiring', () => {
 
 describe('streamCloudStatus', () => {
   it('is ready for accepted work even with queued followers', () => {
-    expect(streamCloudStatus([msg('a', 'queued')])).toEqual({ type: 'preparing' });
-    expect(streamCloudStatus([msg('a', 'completed'), msg('b', 'queued')])).toEqual({
+    expect(streamCloudStatus([msg(MESSAGE_A, 'queued')])).toEqual({ type: 'preparing' });
+    expect(streamCloudStatus([msg(MESSAGE_A, 'completed'), msg(MESSAGE_B, 'queued')])).toEqual({
       type: 'preparing',
     });
-    expect(streamCloudStatus([msg('a', 'accepted'), msg('b', 'queued')])).toEqual({
+    expect(streamCloudStatus([msg(MESSAGE_A, 'accepted'), msg(MESSAGE_B, 'queued')])).toEqual({
       type: 'ready',
     });
   });
 
   it('is ready after a turn and null before any messages', () => {
-    expect(streamCloudStatus([msg('a', 'completed')])).toEqual({ type: 'ready' });
+    expect(streamCloudStatus([msg(MESSAGE_A, 'completed')])).toEqual({ type: 'ready' });
     expect(streamCloudStatus([])).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-q
 import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControl } from './persistence/SandboxControl.js';
+import type { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 import type { SandboxSession } from './sandbox-session/SandboxSession.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 import type { CallbackJob } from './callbacks/index.js';
@@ -532,6 +533,8 @@ export type Env = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
+  /** Durable Object namespace for organization-scoped BYOC runtime snapshot builds. */
+  VERCEL_SNAPSHOT_BUILD?: DurableObjectNamespace<VercelSnapshotBuild>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
@@ -595,6 +598,8 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** Comma-separated organization IDs explicitly enrolled in customer-paid Vercel. */
+  BYOC_VERCEL_ORG_IDS?: string;
   /** Comma-separated user or org IDs admitted to the call-home control plane. `*` includes personal. */
   CONTROL_PLANE_IDS?: string;
   WORKTREE_CREATION_ENABLED_IDS?: string;

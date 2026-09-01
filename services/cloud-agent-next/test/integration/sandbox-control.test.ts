@@ -19,15 +19,21 @@ import {
   SANDBOX_USAGE_SKUS,
   type SandboxBillingInput,
 } from '../../src/container-usage-context.js';
-import type {
-  VercelSandboxNetworkPolicy,
-  VercelSandboxSession,
+import {
+  VercelSandboxRestError,
+  type VercelSandboxNetworkPolicy,
+  type VercelSandboxSession,
 } from '../../src/agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { parseVercelSandboxRuntimeConfig } from '../../src/agent-sandbox/vercel/vercel-runtime-config.js';
 import { TRPCError } from '@trpc/server';
 import { router } from '../../src/router/auth.js';
 import { createSessionManagementHandlers } from '../../src/router/handlers/session-management.js';
 import { requireCurrentSessionAccess } from '../../src/session-access.js';
+import {
+  ByocCredentialMissingError,
+  ByocCredentialResolverError,
+  ByocVercelNotReadyError,
+} from '../../src/byoc/vercel-credential-resolver.js';
 import type {
   AgentSelectionOverride,
   SubmittedSessionMessageRequest,
@@ -53,6 +59,10 @@ import { findMatchingCredentialInjectionRule } from '../../src/sandbox-control/v
 import { MANAGED_SCM_OUTBOUND_HANDLER } from '../../src/sandbox-id.js';
 import { SandboxSession } from '../../src/sandbox-session/SandboxSession.js';
 import {
+  bindingFromLegacyProvider,
+  type SandboxProviderBinding,
+} from '../../src/sandbox-provider-binding.js';
+import {
   SANDBOX_SESSION_LIFECYCLE_KEY,
   SANDBOX_SESSION_METADATA_KEY,
 } from '../../src/sandbox-session/terminal-lifecycle.js';
@@ -63,6 +73,7 @@ import {
 } from '../../src/sandbox-control/credential.js';
 import {
   DEADLINE_MS,
+  leaseAtLeastMs,
   type DeadlineId,
   type DeadlineTable,
 } from '../../src/sandbox-control/deadlines.js';
@@ -101,6 +112,7 @@ import {
   createSessionMessageRecord,
   type SessionMessageRecord,
 } from '../../src/sandbox-session/session-message-queue.js';
+import { createMessageId } from '../../src/session/message-id.js';
 import { getPreparationSnapshots } from '../../src/session/preparation-history.js';
 import { createEventQueries } from '../../src/session/queries/index.js';
 import { throwAdmissionError } from '../../src/session/queue-message.js';
@@ -152,6 +164,15 @@ const KILO_TOKEN = 'fixture-real-kilo-token';
 const GITHUB_TOKEN = 'fixture-real-github-token';
 const HOUR = 60 * 60 * 1000;
 const INITIAL_MESSAGE_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+const fixtureMessageIds = new Map<string, string>();
+
+function fixtureMessageId(label: string): string {
+  const existing = fixtureMessageIds.get(label);
+  if (existing) return existing;
+  const id = createMessageId();
+  fixtureMessageIds.set(label, id);
+  return id;
+}
 
 function cloudflareRef(id: string, instanceId = 'inst_1'): string {
   return encodeCloudflareProviderRef({ sandboxId: id, containment: true, instanceId });
@@ -178,7 +199,7 @@ async function seedRunningCloudflare(instance: SandboxControl): Promise<string> 
       createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
     },
   });
-  Object.assign(instance, { provider: fakeProvider() });
+  Object.assign(instance, { createProviderAdapter: async () => fakeProvider() });
   return providerRef;
 }
 
@@ -232,6 +253,57 @@ async function attachGrantedSession(
 ) {
   await seedGrant(instance, state, input);
   return instance.attachSession(input);
+}
+
+const byocBinding = {
+  kind: 'vercel',
+  source: {
+    kind: 'byoc',
+    organizationId: 'organization-1',
+    credentialId: 'credential-1',
+  },
+} as const;
+const byocSnapshotBinding = {
+  kind: 'vercel',
+  source: {
+    kind: 'byoc',
+    organizationId: '11111111-1111-4111-8111-111111111111',
+    credentialId: '22222222-2222-4222-8222-222222222222',
+  },
+} as const;
+const byocSnapshot = {
+  organizationId: byocSnapshotBinding.source.organizationId,
+  credentialId: byocSnapshotBinding.source.credentialId,
+  buildGeneration: '33333333-3333-4333-8333-333333333333',
+  runtimeSnapshotId: 'snapshot-expired',
+};
+
+function readyByocSnapshotCredential(overrides: Record<string, unknown> = {}) {
+  return {
+    ...byocSnapshot,
+    tokenEncrypted: {
+      scheme: 'byoc-vercel-credential-rsa-aes-256-gcm',
+      version: 1,
+      keyId: 'agent-env-vars-v1',
+      ciphertext: {
+        encryptedData: 'encrypted-token',
+        encryptedDEK: 'encrypted-key',
+        algorithm: 'rsa-aes-256-gcm',
+        version: 1,
+      },
+    },
+    teamId: 'team-1',
+    projectId: 'project-1',
+    teamSlug: 'team-slug',
+    projectSlug: 'project-slug',
+    setupStatus: 'ready',
+    setupStep: null,
+    setupError: null,
+    runtimeBuildId: 'runtime-build-1',
+    setupStartedAt: '2026-04-29 01:16:12.945+00',
+    setupCompletedAt: '2026-04-29 01:20:12.945+00',
+    ...overrides,
+  };
 }
 
 async function seedCredential(credential: string, id = sandboxId): Promise<void> {
@@ -447,7 +519,7 @@ async function initializeTerminalRuntime(
       : cloudflareRef(fixture.sandboxId);
   const provider = await installProvider(control, providerRef, sandboxProvider);
   await runInDurableObject(control, async (instance, state) => {
-    Object.assign(instance, { providerKind: sandboxProvider });
+    Object.assign(instance, { providerBinding: bindingFromLegacyProvider(sandboxProvider) });
     await state.storage.put('provider_kind', sandboxProvider);
     await instance.initializeOwner(fixture.ownerId);
     await instance.confirmInstance(providerRef);
@@ -492,14 +564,13 @@ async function waitForWrapperReady(fixture: TerminalRuntimeFixture): Promise<voi
 
 async function seedTerminalSession(fixture: TerminalRuntimeFixture, ptyId = 'pty_original') {
   if (!fixture.wrapperInstanceId) throw new Error('Terminal fixture requires wrapper identity');
-  const session = env.SANDBOX_SESSION.getByName(`${fixture.ownerId}:${fixture.sessionId}`);
-  await runInDurableObject(session, async (instance, state) => {
-    await instance.registerSession({
-      identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
-      auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
-      agent: {},
-      workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
-    });
+  const session = await registerCredentialSession({
+    identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+    auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+    agent: { mode: 'code', model: 'test' },
+    workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+  });
+  await runInDurableObject(session, (_instance, state) => {
     const attachment = {
       ownerId: fixture.ownerId,
       sessionId: fixture.sessionId,
@@ -595,9 +666,9 @@ async function installProvider(
       async () => undefined
     ),
   } satisfies ProviderAdapter;
-  await runInDurableObject(control, instance => {
+  const environment = await runInDurableObject(control, instance => {
     const prototype = Object.getPrototypeOf(instance) as {
-      createProviderAdapter: () => ProviderAdapter;
+      createProviderAdapter: () => Promise<ProviderAdapter>;
     };
     const environment = {
       ...env,
@@ -616,14 +687,18 @@ async function installProvider(
       KILO_SESSION_INGEST_URL: CONTAINMENT_TARGETS.sessionIngestBaseUrl,
     };
     vi.spyOn(prototype, 'createProviderAdapter').mockImplementation(
-      function (this: SandboxControl) {
+      async function (this: SandboxControl) {
         Object.assign(this, { env: environment });
         return provider;
       }
     );
-    Object.assign(instance, { provider, env: environment });
+    Object.assign(instance, {
+      createProviderAdapter: prototype.createProviderAdapter,
+      env: environment,
+    });
+    return environment;
   });
-  return { provider, allocations };
+  return { provider, allocations, environment };
 }
 
 async function fireControlDeadline(
@@ -641,6 +716,7 @@ async function fireControlDeadline(
 afterEach(async () => {
   await reset();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 async function rejectHello(
@@ -777,7 +853,6 @@ async function seedRunningVercel(
     ownerId?: string;
     providerKind?: 'vercel' | 'cloudflare';
     physical?: PhysicalRecord;
-    bypassPin?: boolean;
   }
 ): Promise<string> {
   const providerRef = encodeVercelProviderRef({
@@ -791,10 +866,9 @@ async function seedRunningVercel(
     options?.physical ?? containedRunningRecord(providerRef)
   );
   Object.assign(instance, {
-    provider,
-    createProviderAdapter: () => provider,
-    providerKind: options?.providerKind ?? 'vercel',
-    ...(options?.bypassPin ? { pinProvider: async () => true } : {}),
+    createProviderAdapter: async () => provider,
+    providerBinding: bindingFromLegacyProvider(options?.providerKind ?? 'vercel'),
+    env: { ...instance['env'], ...VERCEL_ENV },
   });
   return providerRef;
 }
@@ -811,9 +885,18 @@ function policyUpdateInput(ownerId = CONTAINMENT_OWNER): {
   };
 }
 
-type CredentialRegistration = Parameters<SandboxSession['registerSession']>[0];
+type SessionRegistration = Parameters<SandboxSession['registerSession']>[0];
+type CredentialWorkspace = NonNullable<SessionRegistration['workspace']> &
+  Pick<NonNullable<SessionMetadata['workspace']>, 'workspacePath' | 'worktreeId'>;
+type CredentialRegistration = Omit<SessionRegistration, 'workspace'> & {
+  workspace?: CredentialWorkspace;
+};
 type KiloSubject = Parameters<GitTokenService['issueKiloSessionCapability']>[0];
 type GitHubSubject = Parameters<GitTokenService['issueGitHubSessionCapability']>[0];
+
+const REVIEWER_PROFILE = {
+  runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
+} satisfies NonNullable<SessionRegistration['profile']>;
 
 const VERCEL_ENV = {
   VERCEL_TOKEN: 'fixture-vercel-token',
@@ -1078,9 +1161,24 @@ async function registerCredentialSession(registration: CredentialRegistration) {
   return session;
 }
 
+async function createFixtureSessionWithInitialAdmission(
+  session: DurableObjectStub<SandboxSession>,
+  input: Omit<Parameters<SandboxSession['createSessionWithInitialAdmission']>[0], 'workspace'> & {
+    workspace?: CredentialWorkspace;
+  }
+) {
+  const result = await session.createSessionWithInitialAdmission({
+    ...input,
+    profile: input.profile ?? REVIEWER_PROFILE,
+  });
+  expect(result, result.success ? undefined : result.error).toMatchObject({ success: true });
+  return result;
+}
+
 async function credentialFixture(
   provider: AgentSandboxProvider = 'cloudflare',
-  id: SandboxId = `${provider === 'vercel' ? 'ses' : 'usr'}-${crypto.randomUUID().replaceAll('-', '')}`
+  id: SandboxId = `${provider === 'vercel' ? 'ses' : 'usr'}-${crypto.randomUUID().replaceAll('-', '')}`,
+  providerBinding?: SandboxProviderBinding
 ) {
   const control = env.SANDBOX_CONTROL.getByName(id);
   const broker = fakeCredentialBroker();
@@ -1103,8 +1201,10 @@ async function credentialFixture(
     if (provider === 'vercel') {
       const runtime = vercel;
       Object.assign(instance, {
-        createProviderAdapter: (_kind: AgentSandboxProvider, physical?: PhysicalRecord) =>
-          runtime.createAdapter(physical?.createIntent?.allocationName ?? id),
+        createProviderAdapter: async (
+          _binding: SandboxProviderBinding,
+          physical?: PhysicalRecord
+        ) => runtime.createAdapter(physical?.createIntent?.allocationName ?? id),
       });
     }
   });
@@ -1113,7 +1213,10 @@ async function credentialFixture(
     identity: {
       sessionId: `workspace_${crypto.randomUUID()}`,
       userId: CONTAINMENT_OWNER,
-      orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      orgId:
+        providerBinding?.kind === 'vercel' && providerBinding.source.kind === 'byoc'
+          ? providerBinding.source.organizationId
+          : 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       createdOnPlatform: 'cloud-agent-web',
     },
     auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
@@ -1126,6 +1229,7 @@ async function credentialFixture(
     workspace: {
       sandboxId: id,
       sandboxProvider: provider,
+      ...(providerBinding ? { sandboxProviderBinding: providerBinding } : {}),
       worktreeId: WORKTREE_ID,
       workspacePath: '/workspace/joined',
     },
@@ -1891,6 +1995,7 @@ describe('SandboxControl Vercel network policy updates', () => {
       const replacementProvider = fakeProvider();
       const provider = fakeProvider({
         async updateNetworkPolicy() {
+          Object.assign(instance, { createProviderAdapter: async () => replacementProvider });
           await expect(
             instance.ensureReady({
               ownerId: CONTAINMENT_OWNER,
@@ -1902,12 +2007,6 @@ describe('SandboxControl Vercel network policy updates', () => {
         },
       });
       await seedRunningVercel(instance, state, requestedSandboxId, provider);
-      Object.assign(instance, {
-        pinProvider: async () => {
-          Object.assign(instance, { provider: replacementProvider });
-          return true;
-        },
-      });
 
       await expect(instance.updateNetworkPolicy(policyUpdateInput())).resolves.toBeUndefined();
     });
@@ -1966,7 +2065,11 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       await runInDurableObject(stub, async (instance, state) => {
         await instance.initializeOwner(CONTAINMENT_OWNER);
         await state.storage.put('provider_kind', 'vercel');
-        Object.assign(instance, { provider: fakeProvider(), providerKind: 'vercel' });
+        Object.assign(instance, {
+          createProviderAdapter: async () => fakeProvider(),
+          providerBinding: bindingFromLegacyProvider('vercel'),
+          env: { ...instance['env'], ...VERCEL_ENV },
+        });
         await instance.claimCreate('intent_rejected', false, undefined, CONTAINMENT_REQUIREMENTS);
         await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
       });
@@ -2003,7 +2106,11 @@ describe('SandboxControl contained Vercel lifecycle', () => {
           ...containedRunningRecord(providerRef),
           state: physicalState,
         });
-        Object.assign(instance, { provider: fakeProvider(), providerKind: 'vercel' });
+        Object.assign(instance, {
+          createProviderAdapter: async () => fakeProvider(),
+          providerBinding: bindingFromLegacyProvider('vercel'),
+          env: { ...instance['env'], ...VERCEL_ENV },
+        });
         await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
       });
 
@@ -2094,10 +2201,9 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       await instance.initializeOwner(CONTAINMENT_OWNER);
       await state.storage.put('provider_kind', 'vercel');
       Object.assign(instance, {
-        provider,
-        createProviderAdapter: () => provider,
-        providerKind: 'vercel',
-        pinProvider: async () => true,
+        createProviderAdapter: async () => provider,
+        providerBinding: bindingFromLegacyProvider('vercel'),
+        env: { ...instance['env'], ...VERCEL_ENV },
       });
 
       await expect(
@@ -2145,7 +2251,11 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       await runInDurableObject(stub, async (instance, state) => {
         await instance.initializeOwner(CONTAINMENT_OWNER);
         await state.storage.put('provider_kind', 'vercel');
-        Object.assign(instance, { provider: fakeProvider(), providerKind: 'vercel' });
+        Object.assign(instance, {
+          createProviderAdapter: async () => fakeProvider(),
+          providerBinding: bindingFromLegacyProvider('vercel'),
+          env: { ...instance['env'], ...VERCEL_ENV },
+        });
         await instance.claimCreate('intent_race', false, undefined, CONTAINMENT_REQUIREMENTS);
         await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
         if (order === 'provider-first') {
@@ -2203,10 +2313,9 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       });
       const claim = instance.claimCreate.bind(instance);
       Object.assign(instance, {
-        provider,
-        createProviderAdapter: () => provider,
-        providerKind: 'vercel',
-        pinProvider: async () => true,
+        createProviderAdapter: async () => provider,
+        providerBinding: bindingFromLegacyProvider('vercel'),
+        env: { ...instance['env'], ...VERCEL_ENV },
         claimCreate: async (
           intentId: string,
           resumable = false,
@@ -2282,7 +2391,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
             return vercel.provider.observe(ref, intent);
           },
         });
-        Object.assign(instance, { createProviderAdapter: () => provider });
+        Object.assign(instance, { createProviderAdapter: async () => provider });
         await expect(
           instance.ensureReady({
             ...credentialInput(registration),
@@ -2340,7 +2449,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
           return { status: 'unknown' };
         },
       });
-      Object.assign(instance, { createProviderAdapter: () => provider });
+      Object.assign(instance, { createProviderAdapter: async () => provider });
       await instance.ensureReady({
         ...credentialInput(registration),
         provider: 'vercel',
@@ -2389,10 +2498,10 @@ describe('SandboxControl contained Vercel lifecycle', () => {
         const stoppedRefs: Array<string | null> = [];
         let connectionAtCreate = '';
         let hadReadyMarkerAtCreate = true;
-        const createProviderAdapter = (
-          _kind: AgentSandboxProvider,
-          physical?: PhysicalRecord
-        ): ProviderAdapter => {
+        const createProviderAdapter = async (
+          _binding: SandboxProviderBinding,
+          physical: PhysicalRecord
+        ): Promise<ProviderAdapter> => {
           const adapter = vercel.createAdapter(physical?.createIntent?.allocationName ?? sandboxId);
           return {
             ...adapter,
@@ -2564,7 +2673,6 @@ describe('SandboxControl contained Vercel lifecycle', () => {
         });
         await seedRunningVercel(instance, state, requestedSandboxId, provider, {
           physical,
-          bypassPin: true,
         });
 
         const status = await instance.ensureReady({
@@ -2617,7 +2725,6 @@ describe('SandboxControl contained Vercel lifecycle', () => {
         },
       });
       await seedRunningVercel(instance, state, requestedSandboxId, provider, {
-        bypassPin: true,
         physical: { ...containedRunningRecord(previousRef), state: 'failed' },
       });
 
@@ -2655,7 +2762,6 @@ describe('SandboxControl contained Vercel lifecycle', () => {
         },
       });
       await seedRunningVercel(instance, state, requestedSandboxId, provider, {
-        bypassPin: true,
         physical: {
           state: 'running',
           providerRef,
@@ -2688,7 +2794,6 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       const nativeCalls: string[] = [];
       const provider = unresolvableVercelProvider(requestedSandboxId, nativeCalls);
       await seedRunningVercel(instance, state, requestedSandboxId, provider, {
-        bypassPin: true,
         physical: {
           state: 'running',
           providerRef: requestedSandboxId,
@@ -2724,7 +2829,6 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       });
       await seedRunningVercel(instance, state, requestedSandboxId, fakeProvider(), {
         physical,
-        bypassPin: true,
       });
 
       const status = await instance.ensureReady({
@@ -2759,10 +2863,9 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       await instance.initializeOwner(CONTAINMENT_OWNER);
       await state.storage.put('provider_kind', 'vercel');
       Object.assign(instance, {
-        provider,
-        createProviderAdapter: () => provider,
-        providerKind: 'vercel',
-        pinProvider: async () => true,
+        createProviderAdapter: async () => provider,
+        providerBinding: bindingFromLegacyProvider('vercel'),
+        env: { ...instance['env'], ...VERCEL_ENV },
       });
       const grant = await seedGrant(instance, state, undefined, 'vercel');
 
@@ -2823,10 +2926,9 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       await instance.initializeOwner(CONTAINMENT_OWNER);
       await state.storage.put('provider_kind', 'vercel');
       Object.assign(instance, {
-        provider,
-        createProviderAdapter: () => provider,
-        providerKind: 'vercel',
-        pinProvider: async () => true,
+        createProviderAdapter: async () => provider,
+        providerBinding: bindingFromLegacyProvider('vercel'),
+        env: { ...instance['env'], ...VERCEL_ENV },
       });
 
       const status = await instance.ensureReady({
@@ -2894,10 +2996,9 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       await instance.initializeOwner(CONTAINMENT_OWNER);
       await state.storage.put('provider_kind', 'vercel');
       Object.assign(instance, {
-        provider,
-        createProviderAdapter: () => provider,
-        providerKind: 'vercel',
-        pinProvider: async () => true,
+        createProviderAdapter: async () => provider,
+        providerBinding: bindingFromLegacyProvider('vercel'),
+        env: { ...instance['env'], ...VERCEL_ENV },
       });
 
       const status = await instance.ensureReady({
@@ -2945,10 +3046,9 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       await instance.initializeOwner(CONTAINMENT_OWNER);
       await state.storage.put('provider_kind', 'vercel');
       Object.assign(instance, {
-        provider,
-        createProviderAdapter: () => provider,
-        providerKind: 'vercel',
-        pinProvider: async () => true,
+        createProviderAdapter: async () => provider,
+        providerBinding: bindingFromLegacyProvider('vercel'),
+        env: { ...instance['env'], ...VERCEL_ENV },
       });
 
       const status = await instance.ensureReady({
@@ -2999,9 +3099,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       await instance.initializeOwner(CONTAINMENT_OWNER);
       await state.storage.put('provider_kind', 'cloudflare');
       Object.assign(instance, {
-        provider,
-        createProviderAdapter: () => provider,
-        pinProvider: async () => true,
+        createProviderAdapter: async () => provider,
       });
 
       const status = await instance.ensureReady({
@@ -3593,13 +3691,13 @@ describe('SandboxControl mandatory worktree credentials', () => {
     await readyAttachment(fixture.control, input);
     await expect(async () =>
       fixture.control.ensureReady({ ...input, provider: 'vercel', allowCreate: true })
-    ).rejects.toThrow('Sandbox provider mismatch');
+    ).rejects.toThrow('Sandbox provider binding mismatch');
     await updateCredentialMetadata(fixture.session, metadata => ({
       ...metadata,
       workspace: { ...metadata.workspace, sandboxProvider: 'vercel' },
     }));
     await expect(async () => fixture.control.prepareSessionCredentials(input)).rejects.toThrow(
-      'Sandbox provider mismatch'
+      'Sandbox provider binding mismatch'
     );
     expect(fixture.containers.launches).toHaveLength(1);
     const vercel = await credentialFixture('vercel');
@@ -4366,7 +4464,7 @@ describe('SandboxControl native worktree containment', () => {
           observe: vi.fn<ProviderAdapter['observe']>(async () => ({ status: 'terminal' })),
           stop: vi.fn<ProviderAdapter['stop']>(async () => 'retryable'),
         };
-        Object.assign(instance, { provider });
+        Object.assign(instance, { createProviderAdapter: async () => provider });
         clock.mockReturnValue(expiry);
         await instance.alarm();
         expect(await instance.getPhysicalRecord()).toMatchObject({
@@ -4423,7 +4521,7 @@ describe('SandboxControl native worktree containment', () => {
             stop: vi.fn<ProviderAdapter['stop']>(async () => 'terminal'),
             updateNetworkPolicy: vi.fn(async () => undefined),
           };
-          Object.assign(instance, { provider });
+          Object.assign(instance, { createProviderAdapter: async () => provider });
           clock.mockReturnValue(expiry);
           await instance.alarm();
           expect(await instance.getPhysicalRecord()).toEqual(retired);
@@ -4491,7 +4589,7 @@ describe('SandboxControl native worktree containment', () => {
             }),
             stop: vi.fn<ProviderAdapter['stop']>(async () => 'terminal'),
           };
-          Object.assign(instance, { provider });
+          Object.assign(instance, { createProviderAdapter: async () => provider });
           clock.mockReturnValue(expiry);
           await instance.alarm();
           expect(replacement).toMatchObject({ state: 'creating', stopTombstone: null });
@@ -4559,19 +4657,13 @@ describe('SandboxControl native worktree containment', () => {
       let firstIntentId: string | undefined;
       let native: ProviderAdapter | undefined;
       await runInDurableObject(control, instance => {
-        const factory = instance as unknown as {
-          createProviderAdapter(
-            kind: AgentSandboxProvider,
-            physical?: PhysicalRecord
-          ): ProviderAdapter;
-        };
-        const createAdapter = factory.createProviderAdapter.bind(instance);
+        const createAdapter = instance['createProviderAdapter'].bind(instance);
         Object.assign(instance, {
-          createProviderAdapter: (
-            kind: AgentSandboxProvider,
-            physical?: PhysicalRecord
-          ): ProviderAdapter => {
-            const adapter = createAdapter(kind, physical);
+          createProviderAdapter: async (
+            binding: SandboxProviderBinding,
+            physical: PhysicalRecord
+          ): Promise<ProviderAdapter> => {
+            const adapter = await createAdapter(binding, physical);
             native = adapter;
             return {
               ...adapter,
@@ -5248,7 +5340,7 @@ describe('SandboxControl recovery watchdogs', () => {
       await registerCredentialSession({
         identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
-        agent: {},
+        agent: { mode: 'code', model: 'test' },
         workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
       });
       await seedCredential(credential, fixture.sandboxId);
@@ -5351,7 +5443,7 @@ describe('SandboxControl acquisition receipts', () => {
   it('does not allocate twice after a lost acquisition response, reaping, and reset', async () => {
     const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}` as const;
     let control = env.SANDBOX_CONTROL.getByName(sandboxId);
-    const { provider, allocations } = await installProvider(control);
+    const { provider, allocations, environment } = await installProvider(control);
     let responseHeld = false;
     const releaseResponse = Promise.withResolvers<void>();
     const acquisition = {
@@ -5362,7 +5454,7 @@ describe('SandboxControl acquisition receipts', () => {
     await registerCredentialSession({
       identity: { sessionId: input.sessionId, userId: input.ownerId },
       auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
-      agent: {},
+      agent: { mode: 'code', model: 'test' },
       workspace: { sandboxId, workspacePath: '/workspace/receipts' },
     });
     const responseSpy = await runInDurableObject(control, instance => {
@@ -5415,7 +5507,8 @@ describe('SandboxControl acquisition receipts', () => {
       responseSpy.mockRestore();
       releaseResponse.resolve();
       control = env.SANDBOX_CONTROL.getByName(sandboxId);
-      await runInDurableObject(control, async (_instance, state) => {
+      await runInDurableObject(control, async (instance, state) => {
+        Object.assign(instance, { env: environment });
         expect(await state.storage.get('acquisition_receipts')).toEqual(receipts);
         expect(await state.storage.getAlarm()).toBeNull();
       });
@@ -5805,7 +5898,7 @@ describe('SandboxControl durable remainder', () => {
               operation === 'session.attach'
                 ? { directory: '/workspace/terminal' }
                 : {
-                    messageId: 'msg_idle_boundary',
+                    messageId: fixtureMessageId('msg_idle_boundary'),
                     turn: { type: 'prompt', prompt: 'continue before idle expiry' },
                     agent: { mode: 'code', model: 'test' },
                   },
@@ -5908,7 +6001,7 @@ describe('SandboxControl durable remainder', () => {
           type: 'event',
           event: 'session.event',
           session: { directory: '/workspace/other', rootKiloSessionId },
-          payload: { type: 'message.updated', properties: { id: 'msg_1' } },
+          payload: { type: 'message.updated', properties: { id: fixtureMessageId('msg_1') } },
         })
       );
       await runInDurableObject(stub, async instance => {
@@ -5963,7 +6056,7 @@ describe('SandboxControl durable remainder', () => {
     });
 
     const promptPayload = {
-      messageId: INITIAL_MESSAGE_ID,
+      messageId: fixtureMessageId('msg_a'),
       turn: { type: 'prompt', prompt: 'from a' },
       agent: { mode: 'code', model: 'test' },
     };
@@ -6007,8 +6100,13 @@ describe('SandboxControl durable remainder', () => {
       });
     }
 
-    await prompt(GRANT_SESSION_ID, ROOT_ID, '/workspace/a', 'msg_a');
-    await prompt(SECOND_GRANT_SESSION_ID, SECOND_ROOT_ID, '/workspace/b', 'msg_b');
+    await prompt(GRANT_SESSION_ID, ROOT_ID, '/workspace/a', fixtureMessageId('msg_a'));
+    await prompt(
+      SECOND_GRANT_SESSION_ID,
+      SECOND_ROOT_ID,
+      '/workspace/b',
+      fixtureMessageId('msg_b')
+    );
     response.webSocket.close();
   });
 });
@@ -8123,7 +8221,7 @@ describe('SandboxSession control-plane regressions', () => {
 
   async function seedBlockedAdmission(agent: AgentSelectionOverride = agentA) {
     const { fixture, session } = messageFixture();
-    await session.registerSession({
+    await registerCredentialSession({
       identity: {
         sessionId: fixture.sessionId,
         userId: fixture.ownerId,
@@ -8131,11 +8229,13 @@ describe('SandboxSession control-plane regressions', () => {
         createdOnPlatform: 'stored-platform',
       },
       auth: { kiloSessionId: ROOT_ID, kilocodeToken: 'stored-test-token' },
-      agent,
+      agent: { ...agent, mode: agent.mode ?? 'code', model: agent.model ?? 'test' },
+      profile: REVIEWER_PROFILE,
     });
+    await updateCredentialMetadata(session, metadata => ({ ...metadata, agent }));
     await runInDurableObject(session, (_instance, state) => {
       state.storage.kv.put('session_messages', [
-        { messageId: 'msg_blocker', state: 'accepted', acceptedAt: Date.now() },
+        { messageId: fixtureMessageId('msg_blocker'), state: 'accepted', acceptedAt: Date.now() },
       ] satisfies SessionMessageRecord[]);
     });
     return { fixture, session };
@@ -8235,13 +8335,17 @@ describe('SandboxSession control-plane regressions', () => {
     try {
       signalWrapperReady(socket);
       await waitForWrapperReady(fixture);
-      await session.createSessionWithInitialAdmission({
+      await createFixtureSessionWithInitialAdmission(session, {
         identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
         agent: agentA,
         workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
         message: {
-          initialTurn: { type: 'prompt', messageId: 'msg_ffffffffffff00000000000001', prompt: 'A' },
+          initialTurn: {
+            type: 'prompt',
+            messageId: fixtureMessageId('msg_cancelled_a'),
+            prompt: 'A',
+          },
         },
       });
       const attachment = await attach.promise;
@@ -8306,7 +8410,7 @@ describe('SandboxSession control-plane regressions', () => {
       await expect(
         session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'prompt', id: 'msg_after_cancel_b', prompt: 'B' },
+          turn: { type: 'prompt', id: fixtureMessageId('msg_after_cancel_b'), prompt: 'B' },
         })
       ).resolves.toMatchObject({ success: true, compatibilityDelivery: 'queued' });
       await vi.waitFor(async () => {
@@ -8329,7 +8433,7 @@ describe('SandboxSession control-plane regressions', () => {
         preparing.preparationAttemptId,
       ]);
       expect(beforeReset.messages[0]).toMatchObject({
-        messageId: 'msg_ffffffffffff00000000000001',
+        messageId: fixtureMessageId('msg_cancelled_a'),
         state: 'cancelled',
       });
       expect(requests.filter(request => request.operation === 'session.prompt')).toEqual([]);
@@ -8351,7 +8455,7 @@ describe('SandboxSession control-plane regressions', () => {
         payload: {
           version: 2,
           attemptId: preparing.preparationAttemptId,
-          triggerMessageId: 'msg_ffffffffffff00000000000001',
+          triggerMessageId: fixtureMessageId('msg_cancelled_a'),
           revision: 1000,
           timestamp: Date.now(),
           step: 'ready',
@@ -8423,7 +8527,7 @@ describe('SandboxSession control-plane regressions', () => {
       signalWrapperReady(replacement);
       await waitForWrapperReady(replacementFixture);
       await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
-      await waitForAccepted(session, 'msg_after_cancel_b');
+      await waitForAccepted(session, fixtureMessageId('msg_after_cancel_b'));
       await session.failWaitingMessages(
         'late_cancelled_runtime_failure',
         fixture.wrapperInstanceId
@@ -8437,7 +8541,7 @@ describe('SandboxSession control-plane regressions', () => {
         })
       ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
       expect((await admissionState(session)).messages).toMatchObject([
-        { messageId: 'msg_ffffffffffff00000000000001', state: 'cancelled' },
+        { messageId: fixtureMessageId('msg_cancelled_a'), state: 'cancelled' },
         {
           ...b,
           state: 'accepted',
@@ -8452,7 +8556,7 @@ describe('SandboxSession control-plane regressions', () => {
         replacementRequests
           .filter(request => request.operation === 'session.prompt')
           .map(request => sessionPromptPayloadSchema.parse(request.payload).messageId)
-      ).toEqual(['msg_after_cancel_b']);
+      ).toEqual([fixtureMessageId('msg_after_cancel_b')]);
       expect(requests.filter(request => request.operation === 'session.prompt')).toEqual([]);
       expect(provider.create).toHaveBeenCalledTimes(1);
       expect(provider.stop).toHaveBeenCalledTimes(2);
@@ -8701,7 +8805,7 @@ describe('SandboxSession control-plane regressions', () => {
       try {
         signalWrapperReady(socket);
         await waitForWrapperReady(fixture);
-        await session.createSessionWithInitialAdmission({
+        await createFixtureSessionWithInitialAdmission(session, {
           identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
           auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
           agent: agentA,
@@ -8713,7 +8817,7 @@ describe('SandboxSession control-plane regressions', () => {
           message: {
             initialTurn: {
               type: 'prompt',
-              messageId: 'msg_ffffffffffff00000000000002',
+              messageId: fixtureMessageId('msg_delayed_a'),
               prompt: 'A',
             },
           },
@@ -8736,7 +8840,7 @@ describe('SandboxSession control-plane regressions', () => {
         await vi.waitFor(() => expect(joined).toBe(true));
         await expect(session.interruptExecution()).resolves.toEqual({ success: true });
         await expect(
-          session.getMessageResult('msg_ffffffffffff00000000000002')
+          session.getMessageResult(fixtureMessageId('msg_delayed_a'))
         ).resolves.toMatchObject({
           type: 'found',
           result: { status: 'interrupted' },
@@ -8750,7 +8854,7 @@ describe('SandboxSession control-plane regressions', () => {
         await expect(
           session.admitSubmittedMessage({
             userId: fixture.ownerId,
-            turn: { type: 'prompt', id: 'msg_replacement_b', prompt: 'B' },
+            turn: { type: 'prompt', id: fixtureMessageId('msg_replacement_b'), prompt: 'B' },
           })
         ).resolves.toMatchObject({ success: true, compatibilityDelivery: 'queued' });
         await vi.waitFor(async () => {
@@ -8809,13 +8913,13 @@ describe('SandboxSession control-plane regressions', () => {
         if (!replacementAttachment) throw new Error('Expected B attachment before its prompt');
         expect(replacementAttachment).toMatchObject({
           operation: 'session.attach',
-          payload: { preparation: { triggerMessageId: 'msg_replacement_b' } },
+          payload: { preparation: { triggerMessageId: fixtureMessageId('msg_replacement_b') } },
         });
         const beforeDelivery = await admissionState(session);
         expect(beforeDelivery.messages).toMatchObject([
-          { messageId: 'msg_ffffffffffff00000000000002', state: 'cancelled' },
+          { messageId: fixtureMessageId('msg_delayed_a'), state: 'cancelled' },
           {
-            messageId: 'msg_replacement_b',
+            messageId: fixtureMessageId('msg_replacement_b'),
             state: 'queued',
             wrapperInstanceId: replacementFixture.wrapperInstanceId,
           },
@@ -8841,7 +8945,7 @@ describe('SandboxSession control-plane regressions', () => {
         acceptControlRequest(replacement, replacementAttachment);
         replacementAttachment = undefined;
         await expect(dispatchB).resolves.toBe(true);
-        await waitForAccepted(session, 'msg_replacement_b');
+        await waitForAccepted(session, fixtureMessageId('msg_replacement_b'));
         expect(replacementRequests.map(request => request.operation)).toEqual([
           'session.attach',
           'session.prompt',
@@ -8850,10 +8954,10 @@ describe('SandboxSession control-plane regressions', () => {
           replacementRequests
             .filter(request => request.operation === 'session.prompt')
             .map(request => sessionPromptPayloadSchema.parse(request.payload).messageId)
-        ).toEqual(['msg_replacement_b']);
+        ).toEqual([fixtureMessageId('msg_replacement_b')]);
         expect(oldRequests.filter(request => request.operation === operation)).toEqual([]);
         expect((await admissionState(session)).messages).toMatchObject([
-          { messageId: 'msg_ffffffffffff00000000000002', state: 'cancelled' },
+          { messageId: fixtureMessageId('msg_delayed_a'), state: 'cancelled' },
           {
             ...beforeDelivery.messages[1],
             state: 'accepted',
@@ -8905,7 +9009,7 @@ describe('SandboxSession control-plane regressions', () => {
     try {
       const admittedAt = Date.now();
       await expect(
-        session.createSessionWithInitialAdmission({
+        createFixtureSessionWithInitialAdmission(session, {
           identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
           auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
           agent: agentA,
@@ -8913,7 +9017,7 @@ describe('SandboxSession control-plane regressions', () => {
           message: {
             initialTurn: {
               type: 'prompt',
-              messageId: 'msg_ffffffffffff00000000000003',
+              messageId: fixtureMessageId('msg_stranded'),
               prompt: 'head A',
             },
           },
@@ -8927,7 +9031,7 @@ describe('SandboxSession control-plane regressions', () => {
       expect(alarmAt).toBeGreaterThanOrEqual(admittedAt);
       expect(before.messages).toMatchObject([
         {
-          messageId: 'msg_ffffffffffff00000000000003',
+          messageId: fixtureMessageId('msg_stranded'),
           state: 'queued',
           deliveryDeadlineAt: expect.any(Number),
           preparationAttemptId: expect.any(String),
@@ -8950,10 +9054,15 @@ describe('SandboxSession control-plane regressions', () => {
       await expect(
         session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'command', id: 'msg_fresh', command: 'status', arguments: '' },
+          turn: {
+            type: 'command',
+            id: fixtureMessageId('msg_fresh'),
+            command: 'status',
+            arguments: '',
+          },
         })
       ).resolves.toMatchObject({ success: true });
-      await waitForAccepted(session, 'msg_ffffffffffff00000000000003');
+      await waitForAccepted(session, fixtureMessageId('msg_stranded'));
       const recovered = await admissionState(session);
       expect(recovered.messages).toMatchObject([
         {
@@ -8961,16 +9070,16 @@ describe('SandboxSession control-plane regressions', () => {
           state: 'accepted',
           wrapperInstanceId: fixture.wrapperInstanceId,
         },
-        { messageId: 'msg_fresh', state: 'queued' },
+        { messageId: fixtureMessageId('msg_fresh'), state: 'queued' },
       ]);
       expect(requests.filter(request => request.operation === 'session.prompt')).toHaveLength(1);
-      sendOutcome(socket, 'msg_ffffffffffff00000000000003');
-      await waitForAccepted(session, 'msg_fresh');
+      sendOutcome(socket, fixtureMessageId('msg_stranded'));
+      await waitForAccepted(session, fixtureMessageId('msg_fresh'));
       expect(
         requests
           .filter(request => request.operation === 'session.prompt')
           .map(request => sessionPromptPayloadSchema.parse(request.payload).messageId)
-      ).toEqual(['msg_ffffffffffff00000000000003', 'msg_fresh']);
+      ).toEqual([fixtureMessageId('msg_stranded'), fixtureMessageId('msg_fresh')]);
       expect(provider.create).not.toHaveBeenCalled();
       expect(provider.launch).not.toHaveBeenCalled();
     } finally {
@@ -8995,14 +9104,14 @@ describe('SandboxSession control-plane regressions', () => {
           if (
             request.operation !== 'session.prompt' ||
             sessionPromptPayloadSchema.parse(request.payload).messageId !==
-              'msg_ffffffffffff00000000000004'
+              fixtureMessageId('msg_early')
           )
             return false;
           held = request;
           prompt.resolve(request);
           return true;
         });
-        await session.createSessionWithInitialAdmission({
+        await createFixtureSessionWithInitialAdmission(session, {
           identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
           auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
           agent: agentA,
@@ -9010,7 +9119,7 @@ describe('SandboxSession control-plane regressions', () => {
           message: {
             initialTurn: {
               type: 'command',
-              messageId: 'msg_ffffffffffff00000000000004',
+              messageId: fixtureMessageId('msg_early'),
               command: 'review',
               arguments: '--all',
             },
@@ -9019,7 +9128,12 @@ describe('SandboxSession control-plane regressions', () => {
         const request = await prompt.promise;
         await session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'command', id: 'msg_after_early', command: 'status', arguments: '' },
+          turn: {
+            type: 'command',
+            id: fixtureMessageId('msg_after_early'),
+            command: 'status',
+            arguments: '',
+          },
         });
         let joined = false;
         dispatch = runInDurableObject(session, instance => {
@@ -9027,25 +9141,25 @@ describe('SandboxSession control-plane regressions', () => {
           return instance.alarm();
         });
         await vi.waitFor(() => expect(joined).toBe(true));
-        sendOutcome(socket, 'msg_ffffffffffff00000000000004', status);
+        sendOutcome(socket, fixtureMessageId('msg_early'), status);
         await vi.waitFor(async () => {
           await expect(
-            session.getMessageResult('msg_ffffffffffff00000000000004')
+            session.getMessageResult(fixtureMessageId('msg_early'))
           ).resolves.toMatchObject({
             type: 'found',
             result: { status: status === 'cancelled' ? 'interrupted' : status },
           });
         });
-        await waitForAccepted(session, 'msg_after_early');
+        await waitForAccepted(session, fixtureMessageId('msg_after_early'));
         const terminal = await admissionState(session);
         const events = await lifecycleEvents(session);
         expect(
-          events.filter(event => event.data.messageId === 'msg_ffffffffffff00000000000004')
+          events.filter(event => event.data.messageId === fixtureMessageId('msg_early'))
         ).toMatchObject([
           {
             type: status === 'completed' ? 'cloud.message.completed' : 'cloud.message.failed',
             data: {
-              messageId: 'msg_ffffffffffff00000000000004',
+              messageId: fixtureMessageId('msg_early'),
               status: status === 'cancelled' ? 'interrupted' : status,
               delivery: 'sent',
               accepted: true,
@@ -9062,7 +9176,7 @@ describe('SandboxSession control-plane regressions', () => {
             userId: fixture.ownerId,
             turn: {
               type: 'command',
-              id: 'msg_ffffffffffff00000000000004',
+              id: fixtureMessageId('msg_early'),
               command: 'review',
               arguments: '--all',
             },
@@ -9090,26 +9204,31 @@ describe('SandboxSession control-plane regressions', () => {
       signalWrapperReady(socket);
       await waitForWrapperReady(fixture);
       captureAndAcceptControlRequests(socket);
-      await session.createSessionWithInitialAdmission({
+      await createFixtureSessionWithInitialAdmission(session, {
         identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
         agent: agentA,
         workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
         message: {
-          initialTurn: { type: 'prompt', messageId: 'msg_ffffffffffff00000000000005', prompt: 'A' },
+          initialTurn: { type: 'prompt', messageId: fixtureMessageId('msg_old_a'), prompt: 'A' },
         },
       });
-      await waitForAccepted(session, 'msg_ffffffffffff00000000000005');
+      await waitForAccepted(session, fixtureMessageId('msg_old_a'));
       const attemptId = (await admissionState(session)).messages[0]?.preparationAttemptId;
       expect(attemptId).toEqual(expect.any(String));
       await session.admitSubmittedMessage({
         userId: fixture.ownerId,
-        turn: { type: 'command', id: 'msg_current_b', command: 'status', arguments: '' },
+        turn: {
+          type: 'command',
+          id: fixtureMessageId('msg_current_b'),
+          command: 'status',
+          arguments: '',
+        },
       });
-      sendOutcome(socket, 'msg_ffffffffffff00000000000005');
-      await waitForAccepted(session, 'msg_current_b');
+      sendOutcome(socket, fixtureMessageId('msg_old_a'));
+      await waitForAccepted(session, fixtureMessageId('msg_current_b'));
       const events = await lifecycleEvents(session);
-      sendOutcome(socket, 'msg_ffffffffffff00000000000005');
+      sendOutcome(socket, fixtureMessageId('msg_old_a'));
       socket.send(
         JSON.stringify({
           type: 'event',
@@ -9118,7 +9237,7 @@ describe('SandboxSession control-plane regressions', () => {
           payload: {
             version: 2,
             attemptId,
-            triggerMessageId: 'msg_ffffffffffff00000000000005',
+            triggerMessageId: fixtureMessageId('msg_old_a'),
             revision: 100,
             timestamp: Date.now(),
             step: 'workspace_setup',
@@ -9150,9 +9269,9 @@ describe('SandboxSession control-plane regressions', () => {
         });
       });
       expect((await admissionState(session)).messages).toMatchObject([
-        { messageId: 'msg_ffffffffffff00000000000005', state: 'completed' },
+        { messageId: fixtureMessageId('msg_old_a'), state: 'completed' },
         {
-          messageId: 'msg_current_b',
+          messageId: fixtureMessageId('msg_current_b'),
           state: 'accepted',
           wrapperInstanceId: fixture.wrapperInstanceId,
         },
@@ -9164,9 +9283,11 @@ describe('SandboxSession control-plane regressions', () => {
         wrapperInstanceId: fixture.wrapperInstanceId,
       });
       expect(provider.stop).not.toHaveBeenCalled();
-      sendOutcome(socket, 'msg_current_b');
+      sendOutcome(socket, fixtureMessageId('msg_current_b'));
       await vi.waitFor(async () => {
-        await expect(session.getMessageResult('msg_current_b')).resolves.toMatchObject({
+        await expect(
+          session.getMessageResult(fixtureMessageId('msg_current_b'))
+        ).resolves.toMatchObject({
           type: 'found',
           result: { status: 'completed' },
         });
@@ -9207,7 +9328,7 @@ describe('SandboxSession control-plane regressions', () => {
       try {
         signalWrapperReady(socket);
         await waitForWrapperReady(fixture);
-        await session.createSessionWithInitialAdmission({
+        await createFixtureSessionWithInitialAdmission(session, {
           identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
           auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
           agent: agentA,
@@ -9215,16 +9336,22 @@ describe('SandboxSession control-plane regressions', () => {
           message: {
             initialTurn: {
               type: 'prompt',
-              messageId: 'msg_ffffffffffff00000000000006',
+              messageId: fixtureMessageId('msg_interrupt'),
               prompt: 'interrupt me',
             },
           },
         });
         await entered.promise;
-        if (phase === 'execution') await waitForAccepted(session, 'msg_ffffffffffff00000000000006');
+        if (phase === 'execution')
+          await waitForAccepted(session, fixtureMessageId('msg_interrupt'));
         await session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'command', id: 'msg_cancel_follower', command: 'status', arguments: '' },
+          turn: {
+            type: 'command',
+            id: fixtureMessageId('msg_cancel_follower'),
+            command: 'status',
+            arguments: '',
+          },
         });
         expect(activeWork).toBe(true);
         if (phase === 'setup') {
@@ -9236,8 +9363,8 @@ describe('SandboxSession control-plane regressions', () => {
         await expect(session.interruptExecution()).resolves.toMatchObject({ success: true });
         await vi.waitFor(() => expect(activeWork).toBe(false));
         expect((await admissionState(session)).messages).toMatchObject([
-          { messageId: 'msg_ffffffffffff00000000000006', state: 'cancelled' },
-          { messageId: 'msg_cancel_follower', state: 'cancelled' },
+          { messageId: fixtureMessageId('msg_interrupt'), state: 'cancelled' },
+          { messageId: fixtureMessageId('msg_cancel_follower'), state: 'cancelled' },
         ]);
         if (phase === 'execution') {
           expect(requests.filter(request => request.operation === 'session.abort')).toMatchObject([
@@ -9247,7 +9374,7 @@ describe('SandboxSession control-plane regressions', () => {
                 kiloSessionId: ROOT_ID,
                 directory: '/workspace/terminal',
               },
-              payload: { messageId: 'msg_ffffffffffff00000000000006' },
+              payload: { messageId: fixtureMessageId('msg_interrupt') },
             },
           ]);
           expect(provider.stop).not.toHaveBeenCalled();
@@ -9264,18 +9391,18 @@ describe('SandboxSession control-plane regressions', () => {
         }
         const events = await lifecycleEvents(session);
         const failures = events.filter(event => event.type === 'cloud.message.failed');
-        expect(failures.map(event => event.data.messageId).sort()).toEqual([
-          'msg_cancel_follower',
-          'msg_ffffffffffff00000000000006',
-        ]);
+        expect(failures.map(event => event.data.messageId).sort()).toEqual(
+          [fixtureMessageId('msg_cancel_follower'), fixtureMessageId('msg_interrupt')].sort()
+        );
         expect(
-          failures.find(event => event.data.messageId === 'msg_ffffffffffff00000000000006')?.data
+          failures.find(event => event.data.messageId === fixtureMessageId('msg_interrupt'))?.data
         ).toMatchObject({
           status: 'interrupted',
           accepted: phase === 'execution',
         });
         expect(
-          failures.find(event => event.data.messageId === 'msg_cancel_follower')?.data
+          failures.find(event => event.data.messageId === fixtureMessageId('msg_cancel_follower'))
+            ?.data
         ).toMatchObject({
           status: 'interrupted',
           accepted: false,
@@ -9299,16 +9426,20 @@ describe('SandboxSession control-plane regressions', () => {
       signalWrapperReady(socket);
       await waitForWrapperReady(fixture);
       captureAndAcceptControlRequests(socket);
-      await session.createSessionWithInitialAdmission({
+      await createFixtureSessionWithInitialAdmission(session, {
         identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
         agent: agentA,
         workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
         message: {
-          initialTurn: { type: 'prompt', messageId: 'msg_ffffffffffff00000000000007', prompt: 'A' },
+          initialTurn: {
+            type: 'prompt',
+            messageId: fixtureMessageId('msg_unhealthy'),
+            prompt: 'A',
+          },
         },
       });
-      await waitForAccepted(session, 'msg_ffffffffffff00000000000007');
+      await waitForAccepted(session, fixtureMessageId('msg_unhealthy'));
       socket.send(
         JSON.stringify({
           type: 'event',
@@ -9318,7 +9449,7 @@ describe('SandboxSession control-plane regressions', () => {
       );
       await vi.waitFor(async () => {
         await expect(
-          session.getMessageResult('msg_ffffffffffff00000000000007')
+          session.getMessageResult(fixtureMessageId('msg_unhealthy'))
         ).resolves.toMatchObject({
           type: 'found',
           result: { status: 'failed' },
@@ -9335,7 +9466,7 @@ describe('SandboxSession control-plane regressions', () => {
       ).toMatchObject([
         {
           data: {
-            messageId: 'msg_ffffffffffff00000000000007',
+            messageId: fixtureMessageId('msg_unhealthy'),
             accepted: true,
             delivery: 'sent',
             reason: 'kilo_unhealthy',
@@ -9381,7 +9512,7 @@ describe('SandboxSession control-plane regressions', () => {
       await expect(
         session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'prompt', id: 'msg_recovered', prompt: 'try again' },
+          turn: { type: 'prompt', id: fixtureMessageId('msg_recovered'), prompt: 'try again' },
         })
       ).resolves.toMatchObject({ success: true });
       await vi.waitFor(() => expect(provider.launch).toHaveBeenCalledTimes(1));
@@ -9398,16 +9529,16 @@ describe('SandboxSession control-plane regressions', () => {
       signalWrapperReady(replacement);
       await waitForWrapperReady(nextFixture);
       await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
-      await waitForAccepted(session, 'msg_recovered');
+      await waitForAccepted(session, fixtureMessageId('msg_recovered'));
       await session.failWaitingMessages('late_old_runtime_failure', fixture.wrapperInstanceId);
       expect((await admissionState(session)).messages).toMatchObject([
         {
-          messageId: 'msg_ffffffffffff00000000000007',
+          messageId: fixtureMessageId('msg_unhealthy'),
           state: 'failed',
           failedReason: 'kilo_unhealthy',
         },
         {
-          messageId: 'msg_recovered',
+          messageId: fixtureMessageId('msg_recovered'),
           state: 'accepted',
           wrapperInstanceId: nextFixture.wrapperInstanceId,
         },
@@ -9439,7 +9570,7 @@ describe('SandboxSession control-plane regressions', () => {
       await waitForWrapperReady(fixture);
       const requests = captureAndAcceptControlRequests(socket);
       await expect(
-        session.createSessionWithInitialAdmission({
+        createFixtureSessionWithInitialAdmission(session, {
           identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
           auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
           agent: { mode: 'architect', model: 'kilo/fake-deterministic', variant: 'high' },
@@ -9448,35 +9579,40 @@ describe('SandboxSession control-plane regressions', () => {
           message: {
             initialTurn: {
               type: 'prompt',
-              messageId: INITIAL_MESSAGE_ID,
+              messageId: fixtureMessageId('msg_initial_model'),
               prompt: 'initial prompt',
             },
           },
         })
       ).resolves.toMatchObject({ success: true });
-      await waitForAccepted(session, INITIAL_MESSAGE_ID);
-      await completeTurn(session, INITIAL_MESSAGE_ID, fixture.wrapperInstanceId);
+      await waitForAccepted(session, fixtureMessageId('msg_initial_model'));
+      await completeTurn(session, fixtureMessageId('msg_initial_model'), fixture.wrapperInstanceId);
       await expect(
         session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'command', id: 'msg_command_model', command: 'review', arguments: '--all' },
+          turn: {
+            type: 'command',
+            id: fixtureMessageId('msg_command_model'),
+            command: 'review',
+            arguments: '--all',
+          },
           agent: { mode: 'reviewer', model: ' kilo/kilo/example ', variant: 'low' },
         })
       ).resolves.toMatchObject({ success: true });
-      await waitForAccepted(session, 'msg_command_model');
+      await waitForAccepted(session, fixtureMessageId('msg_command_model'));
       expect(
         requests
           .filter(request => request.operation === 'session.prompt')
           .map(request => request.payload)
       ).toEqual([
         {
-          messageId: INITIAL_MESSAGE_ID,
+          messageId: fixtureMessageId('msg_initial_model'),
           turn: { type: 'prompt', prompt: 'initial prompt' },
           agent: { mode: 'architect', model: 'fake-deterministic', variant: 'high' },
           finalization: { autoCommit: true, condenseOnComplete: true },
         },
         {
-          messageId: 'msg_command_model',
+          messageId: fixtureMessageId('msg_command_model'),
           turn: { type: 'command', command: 'review', arguments: '--all' },
           agent: { mode: 'reviewer', model: 'kilo/example', variant: 'low' },
         },
@@ -9507,33 +9643,35 @@ describe('SandboxSession control-plane regressions', () => {
     try {
       const waitingRequests = captureAndAcceptControlRequests(socket);
       await expect(
-        session.createSessionWithInitialAdmission({
+        createFixtureSessionWithInitialAdmission(session, {
           identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
           auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
           agent: agentA,
           workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
-          message: { initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'A' } },
+          message: {
+            initialTurn: { type: 'prompt', messageId: fixtureMessageId('msg_a'), prompt: 'A' },
+          },
         })
       ).resolves.toMatchObject({ success: true, compatibilityDelivery: 'queued' });
       await runInDurableObject(session, instance => instance.alarm());
       await expect(
         session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'prompt', id: 'msg_b', prompt: 'B' },
+          turn: { type: 'prompt', id: fixtureMessageId('msg_b'), prompt: 'B' },
           agent: { model: modelB, mode: 'reviewer' },
         })
       ).resolves.toMatchObject({ success: true });
       await expect(
         session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'prompt', id: 'msg_c', prompt: 'inherits B' },
+          turn: { type: 'prompt', id: fixtureMessageId('msg_c'), prompt: 'inherits B' },
         })
       ).resolves.toMatchObject({ success: true });
       const beforeReplay = await admissionState(session);
       expect(beforeReplay.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       const replay: SubmittedSessionMessageRequest = {
         userId: fixture.ownerId,
-        turn: { type: 'prompt', id: INITIAL_MESSAGE_ID, prompt: 'A' },
+        turn: { type: 'prompt', id: fixtureMessageId('msg_a'), prompt: 'A' },
         agent: { model: 'anthropic/claude-sonnet-4' },
       };
       await expect(session.admitSubmittedMessage(replay)).resolves.toMatchObject({
@@ -9564,34 +9702,34 @@ describe('SandboxSession control-plane regressions', () => {
       signalWrapperReady(replacement);
       await waitForWrapperReady(fixture);
       await runInDurableObject(session, instance => instance.alarm());
-      await waitForAccepted(session, INITIAL_MESSAGE_ID);
+      await waitForAccepted(session, fixtureMessageId('msg_a'));
       const accepted = await admissionState(session);
       await expect(session.admitSubmittedMessage(replay)).resolves.toMatchObject({
         success: true,
         compatibilityDelivery: 'sent',
       });
       expect(await admissionState(session)).toEqual(accepted);
-      await completeTurn(session, INITIAL_MESSAGE_ID, fixture.wrapperInstanceId);
-      await waitForAccepted(session, 'msg_b');
-      await completeTurn(session, 'msg_b', fixture.wrapperInstanceId);
-      await waitForAccepted(session, 'msg_c');
+      await completeTurn(session, fixtureMessageId('msg_a'), fixture.wrapperInstanceId);
+      await waitForAccepted(session, fixtureMessageId('msg_b'));
+      await completeTurn(session, fixtureMessageId('msg_b'), fixture.wrapperInstanceId);
+      await waitForAccepted(session, fixtureMessageId('msg_c'));
       expect(
         requests
           .filter(request => request.operation === 'session.prompt')
           .map(request => request.payload)
       ).toEqual([
         {
-          messageId: INITIAL_MESSAGE_ID,
+          messageId: fixtureMessageId('msg_a'),
           turn: { type: 'prompt', prompt: 'A' },
           agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
         },
         {
-          messageId: 'msg_b',
+          messageId: fixtureMessageId('msg_b'),
           turn: { type: 'prompt', prompt: 'B' },
           agent: { mode: 'reviewer', model: 'openai/gpt-4.1' },
         },
         {
-          messageId: 'msg_c',
+          messageId: fixtureMessageId('msg_c'),
           turn: { type: 'prompt', prompt: 'inherits B' },
           agent: { mode: 'code', model: 'openai/gpt-4.1' },
         },
@@ -9611,26 +9749,41 @@ describe('SandboxSession control-plane regressions', () => {
   });
 
   it('uses only the preflighted initial agent even when registered defaults have changed', async () => {
-    const { fixture, session } = await seedBlockedAdmission({
-      mode: 'architect',
-      model: modelB,
-      variant: 'low',
+    const { fixture, session } = messageFixture();
+    await registerCredentialSession({
+      identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+      auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+      agent: { mode: 'architect', model: modelB, variant: 'low' },
+      profile: REVIEWER_PROFILE,
+    });
+    const { metadata: registered } = await admissionState(session);
+    if (!registered) throw new Error('Expected registered session');
+    await runInDurableObject(session, instance => {
+      Object.assign(instance, { dispatchQueued: async () => {} });
     });
     await expect(
-      session.createSessionWithInitialAdmission({
-        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
-        auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+      createFixtureSessionWithInitialAdmission(session, {
+        identity: registered.identity,
+        auth: registered.auth,
+        profile: registered.profile,
+        workspace: registered.workspace,
         agent: { mode: 'reviewer', model: agentA.model },
         message: {
-          initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'initial' },
+          initialTurn: {
+            type: 'prompt',
+            messageId: fixtureMessageId('msg_initial'),
+            prompt: 'initial',
+          },
         },
       })
     ).resolves.toMatchObject({ success: true });
     const state = await admissionState(session);
-    expect(state.messages[1]?.intent).toEqual({
-      turn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'initial' },
-      agent: { mode: 'reviewer', model: agentA.model },
-    });
+    expect(state.messages.map(message => message.intent)).toEqual([
+      {
+        turn: { type: 'prompt', messageId: fixtureMessageId('msg_initial'), prompt: 'initial' },
+        agent: { mode: 'reviewer', model: agentA.model },
+      },
+    ]);
     expect(state.metadata?.agent).toEqual({ mode: 'architect', model: agentA.model });
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
@@ -9639,7 +9792,7 @@ describe('SandboxSession control-plane regressions', () => {
     const { fixture, session } = messageFixture();
     const { socket } = await initializeTerminalRuntime(fixture);
     const legacy: SessionMessageRecord = {
-      messageId: 'msg_invalid_model',
+      messageId: fixtureMessageId('msg_invalid_model'),
       state: 'queued',
       prompt: 'never deliver',
       attachFailures: 1,
@@ -9647,33 +9800,47 @@ describe('SandboxSession control-plane regressions', () => {
     };
     try {
       const requests = captureAndAcceptControlRequests(socket);
-      await session.registerSession({
+      await registerCredentialSession({
         identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
-        agent: { mode: 'code' },
+        agent: { mode: 'code', model: 'test' },
+        profile: REVIEWER_PROFILE,
         workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
       });
+      await updateCredentialMetadata(session, metadata => ({
+        ...metadata,
+        agent: { mode: 'code' },
+      }));
       await runInDurableObject(session, (_instance, state) => {
         state.storage.kv.put('session_messages', [legacy]);
       });
       await expect(
         session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'command', id: 'msg_model_less', command: 'status', arguments: '--all' },
+          turn: {
+            type: 'command',
+            id: fixtureMessageId('msg_model_less'),
+            command: 'status',
+            arguments: '--all',
+          },
           agent: { mode: 'reviewer' },
         })
       ).resolves.toMatchObject({ success: true });
       await expect(
         session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'prompt', id: 'msg_selected', prompt: 'new B cannot rescue old input' },
+          turn: {
+            type: 'prompt',
+            id: fixtureMessageId('msg_selected'),
+            prompt: 'new B cannot rescue old input',
+          },
           agent: { model: modelB },
         })
       ).resolves.toMatchObject({ success: true });
       signalWrapperReady(socket);
       await waitForWrapperReady(fixture);
       await runInDurableObject(session, instance => instance.alarm());
-      await waitForAccepted(session, 'msg_model_less');
+      await waitForAccepted(session, fixtureMessageId('msg_model_less'));
       const delivered = await admissionState(session);
       expect(delivered.messages[0]).toEqual({
         ...legacy,
@@ -9686,8 +9853,12 @@ describe('SandboxSession control-plane regressions', () => {
         terminalSource: 'coordinator',
       });
       expect(delivered.messages.slice(1)).toMatchObject([
-        { messageId: 'msg_model_less', state: 'accepted' },
-        { messageId: 'msg_selected', state: 'queued', intent: { agent: { model: modelB } } },
+        { messageId: fixtureMessageId('msg_model_less'), state: 'accepted' },
+        {
+          messageId: fixtureMessageId('msg_selected'),
+          state: 'queued',
+          intent: { agent: { model: modelB } },
+        },
       ]);
       expect(delivered.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       await runInDurableObject(session, instance => instance.alarm());
@@ -9703,7 +9874,7 @@ describe('SandboxSession control-plane regressions', () => {
           .map(request => request.payload)
       ).toEqual([
         {
-          messageId: 'msg_model_less',
+          messageId: fixtureMessageId('msg_model_less'),
           turn: { type: 'command', command: 'status', arguments: '--all' },
           agent: { mode: 'reviewer' },
         },
@@ -9714,7 +9885,11 @@ describe('SandboxSession control-plane regressions', () => {
           state.storage.sql
         ).findByFilters({ eventTypes: ['cloud.message.failed'] });
         expect(events.map(event => JSON.parse(event.payload))).toMatchObject([
-          { messageId: 'msg_invalid_model', reason: 'invalid_model', accepted: false },
+          {
+            messageId: fixtureMessageId('msg_invalid_model'),
+            reason: 'invalid_model',
+            accepted: false,
+          },
         ]);
       });
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
@@ -9757,7 +9932,11 @@ describe('SandboxSession control-plane regressions', () => {
         const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
         state.storage.kv.put('session_messages', [
           ...messages,
-          { messageId: 'msg_legacy', state: 'queued', prompt: 'retain old format on rejection' },
+          {
+            messageId: fixtureMessageId('msg_legacy'),
+            state: 'queued',
+            prompt: 'retain old format on rejection',
+          },
         ] satisfies SessionMessageRecord[]);
       });
       const before = await admissionState(session);
@@ -9766,7 +9945,7 @@ describe('SandboxSession control-plane regressions', () => {
       );
       const result = await session.admitSubmittedMessage({
         userId: fixture.ownerId,
-        turn: { type: 'prompt', id: 'msg_rejected', prompt: 'B' },
+        turn: { type: 'prompt', id: fixtureMessageId('msg_rejected'), prompt: 'B' },
         agent: { model: modelB, mode: 'reviewer', variant: 'low' },
       });
       expect(result).toEqual({ success: false, code: outcome.code, error: outcome.error });
@@ -9795,7 +9974,7 @@ describe('SandboxSession control-plane regressions', () => {
     await expect(
       session.admitSubmittedMessage({
         userId: fixture.ownerId,
-        turn: { type: 'prompt', id: 'msg_missing', prompt: 'missing selection' },
+        turn: { type: 'prompt', id: fixtureMessageId('msg_missing'), prompt: 'missing selection' },
       })
     ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
     expect(await admissionState(session)).toEqual(before);
@@ -9829,13 +10008,22 @@ describe('SandboxSession control-plane regressions', () => {
     const validation = pauseNextValidation();
     const pending = session.admitSubmittedMessage({
       userId: fixture.ownerId,
-      turn: { type: 'prompt', id: 'msg_slow_a', prompt: 'resolved A before validation' },
+      turn: {
+        type: 'prompt',
+        id: fixtureMessageId('msg_slow_a'),
+        prompt: 'resolved A before validation',
+      },
     });
     try {
       expect(await validation.entered()).toEqual({ modelId: 'anthropic/claude-sonnet-4' });
       await session.admitSubmittedMessage({
         userId: fixture.ownerId,
-        turn: { type: 'command', id: 'msg_fast_b', command: 'review', arguments: '' },
+        turn: {
+          type: 'command',
+          id: fixtureMessageId('msg_fast_b'),
+          command: 'review',
+          arguments: '',
+        },
         agent: { model: modelB, mode: 'reviewer', variant: 'low' },
       });
       await session.tryUpdate({ callbackTarget: { url: 'https://example.com/updated-callback' } });
@@ -9876,14 +10064,23 @@ describe('SandboxSession control-plane regressions', () => {
       const validation = pauseNextValidation();
       const input: SubmittedSessionMessageRequest = {
         userId: fixture.ownerId,
-        turn: { type: 'prompt', id: 'msg_concurrent', prompt: 'same submitted content' },
+        turn: {
+          type: 'prompt',
+          id: fixtureMessageId('msg_concurrent'),
+          prompt: 'same submitted content',
+        },
       };
       const pending = session.admitSubmittedMessage(input);
       try {
         await validation.entered();
         await session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'command', id: 'msg_change_default', command: 'review', arguments: '' },
+          turn: {
+            type: 'command',
+            id: fixtureMessageId('msg_change_default'),
+            command: 'review',
+            arguments: '',
+          },
           agent: nextAgent,
         });
         await expect(session.admitSubmittedMessage(input)).resolves.toMatchObject({
@@ -9894,7 +10091,9 @@ describe('SandboxSession control-plane regressions', () => {
         await expect(pending).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
         expect(await admissionState(session)).toEqual(winner);
         expect(
-          winner.messages.filter(message => message.messageId === 'msg_concurrent')
+          winner.messages.filter(
+            message => message.messageId === fixtureMessageId('msg_concurrent')
+          )
         ).toMatchObject([{ intent: { agent: nextAgent } }]);
       } finally {
         validation.release();
@@ -9912,7 +10111,7 @@ describe('SandboxSession control-plane regressions', () => {
       const requests = captureAndAcceptControlRequests(socket);
       signalWrapperReady(socket);
       await waitForWrapperReady(fixture);
-      await session.registerSession({
+      await registerCredentialSession({
         identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
         agent: agentA,
@@ -9920,15 +10119,24 @@ describe('SandboxSession control-plane regressions', () => {
       });
       const input: SubmittedSessionMessageRequest = {
         userId: fixture.ownerId,
-        turn: { type: 'prompt', id: 'msg_winner', prompt: 'accepted concurrent winner' },
+        turn: {
+          type: 'prompt',
+          id: fixtureMessageId('msg_winner'),
+          prompt: 'accepted concurrent winner',
+        },
       };
       pending = session.admitSubmittedMessage(input);
       await validation.entered();
       await session.admitSubmittedMessage(input);
-      await waitForAccepted(session, 'msg_winner');
+      await waitForAccepted(session, fixtureMessageId('msg_winner'));
       await session.admitSubmittedMessage({
         userId: fixture.ownerId,
-        turn: { type: 'command', id: 'msg_new_defaults', command: 'review', arguments: '' },
+        turn: {
+          type: 'command',
+          id: fixtureMessageId('msg_new_defaults'),
+          command: 'review',
+          arguments: '',
+        },
         agent: { model: modelB },
       });
       const winner = await admissionState(session);
@@ -9953,7 +10161,11 @@ describe('SandboxSession control-plane regressions', () => {
     const validation = pauseNextValidation();
     const input: SubmittedSessionMessageRequest = {
       userId: fixture.ownerId,
-      turn: { type: 'prompt', id: 'msg_terminal', prompt: 'cancel before validation returns' },
+      turn: {
+        type: 'prompt',
+        id: fixtureMessageId('msg_terminal'),
+        prompt: 'cancel before validation returns',
+      },
     };
     const pending = session.admitSubmittedMessage(input);
     try {
@@ -9965,9 +10177,10 @@ describe('SandboxSession control-plane regressions', () => {
       validation.release();
       await expect(pending).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
       expect(await admissionState(session)).toEqual(terminal);
-      expect(terminal.messages.find(message => message.messageId === 'msg_terminal')?.state).toBe(
-        'cancelled'
-      );
+      expect(
+        terminal.messages.find(message => message.messageId === fixtureMessageId('msg_terminal'))
+          ?.state
+      ).toBe('cancelled');
     } finally {
       validation.release();
       await pending;
@@ -9979,7 +10192,11 @@ describe('SandboxSession control-plane regressions', () => {
     const validation = pauseNextValidation();
     const pending = session.admitSubmittedMessage({
       userId: fixture.ownerId,
-      turn: { type: 'prompt', id: 'msg_deleted_validation', prompt: 'do not recreate state' },
+      turn: {
+        type: 'prompt',
+        id: fixtureMessageId('msg_deleted_validation'),
+        prompt: 'do not recreate state',
+      },
       agent: { model: modelB },
     });
     try {
@@ -10003,18 +10220,22 @@ describe('SandboxSession control-plane regressions', () => {
     const { fixture, session } = await seedBlockedAdmission();
     const history: SessionMessageRecord[] = [
       ...(await admissionState(session)).messages,
-      { messageId: 'msg_old_failed', state: 'failed', prompt: 'failed old content' },
+      {
+        messageId: fixtureMessageId('msg_old_failed'),
+        state: 'failed',
+        prompt: 'failed old content',
+      },
     ];
     const legacy: SessionMessageRecord[] = [
       {
-        messageId: 'msg_old_turn',
+        messageId: fixtureMessageId('msg_old_turn'),
         state: 'queued',
-        turn: { type: 'prompt', messageId: 'msg_old_turn', prompt: 'old turn A' },
+        turn: { type: 'prompt', messageId: fixtureMessageId('msg_old_turn'), prompt: 'old turn A' },
         attachFailures: 1,
         promptFailures: 2,
         preparationAttemptId: 'attempt_old_turn',
       },
-      { messageId: 'msg_old_prompt', state: 'queued', prompt: 'old prompt A' },
+      { messageId: fixtureMessageId('msg_old_prompt'), state: 'queued', prompt: 'old prompt A' },
     ];
     await runInDurableObject(session, (_instance, state) => {
       state.storage.kv.put('session_messages', [...history, ...legacy]);
@@ -10022,20 +10243,27 @@ describe('SandboxSession control-plane regressions', () => {
     await expect(
       session.admitSubmittedMessage({
         userId: fixture.ownerId,
-        turn: { type: 'prompt', id: 'msg_new_b', prompt: 'new B' },
+        turn: { type: 'prompt', id: fixtureMessageId('msg_new_b'), prompt: 'new B' },
         agent: { model: modelB },
       })
     ).resolves.toMatchObject({ success: true });
     const frozen = await admissionState(session);
     expect(frozen.messages.slice(0, 2)).toEqual(history);
     expect(frozen.messages.slice(2).map(message => message.intent)).toEqual([
-      { turn: { type: 'prompt', messageId: 'msg_old_turn', prompt: 'old turn A' }, agent: agentA },
       {
-        turn: { type: 'prompt', messageId: 'msg_old_prompt', prompt: 'old prompt A' },
+        turn: { type: 'prompt', messageId: fixtureMessageId('msg_old_turn'), prompt: 'old turn A' },
         agent: agentA,
       },
       {
-        turn: { type: 'prompt', messageId: 'msg_new_b', prompt: 'new B' },
+        turn: {
+          type: 'prompt',
+          messageId: fixtureMessageId('msg_old_prompt'),
+          prompt: 'old prompt A',
+        },
+        agent: agentA,
+      },
+      {
+        turn: { type: 'prompt', messageId: fixtureMessageId('msg_new_b'), prompt: 'new B' },
         agent: { mode: 'code', model: modelB },
       },
     ]);
@@ -10057,7 +10285,7 @@ describe('SandboxSession control-plane regressions', () => {
       const requests = captureAndAcceptControlRequests(socket);
       signalWrapperReady(socket);
       await waitForWrapperReady(fixture);
-      await session.registerSession({
+      await registerCredentialSession({
         identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
         agent: agentA,
@@ -10065,7 +10293,7 @@ describe('SandboxSession control-plane regressions', () => {
       });
       await runInDurableObject(session, (_instance, state) => {
         state.storage.kv.put('session_messages', [
-          { messageId: 'msg_upgrade_a', state: 'queued', prompt: 'old A' },
+          { messageId: fixtureMessageId('msg_upgrade_a'), state: 'queued', prompt: 'old A' },
         ] satisfies SessionMessageRecord[]);
       });
       await runInDurableObject(control, instance => {
@@ -10090,14 +10318,14 @@ describe('SandboxSession control-plane regressions', () => {
       });
       released = true;
       await dispatch;
-      await waitForAccepted(session, 'msg_upgrade_a');
+      await waitForAccepted(session, fixtureMessageId('msg_upgrade_a'));
       expect(
         requests
           .filter(request => request.operation === 'session.prompt')
           .map(request => request.payload)
       ).toEqual([
         {
-          messageId: 'msg_upgrade_a',
+          messageId: fixtureMessageId('msg_upgrade_a'),
           turn: { type: 'prompt', prompt: 'old A' },
           agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
         },
@@ -10132,13 +10360,17 @@ describe('SandboxSession control-plane regressions', () => {
         }
         acceptControlRequest(socket, request);
       });
-      await session.createSessionWithInitialAdmission({
+      await createFixtureSessionWithInitialAdmission(session, {
         identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
         agent: agentA,
         workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
         message: {
-          initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'retry A' },
+          initialTurn: {
+            type: 'prompt',
+            messageId: fixtureMessageId('msg_retry_a'),
+            prompt: 'retry A',
+          },
         },
       });
       const firstRequest = await entered.promise;
@@ -10151,7 +10383,7 @@ describe('SandboxSession control-plane regressions', () => {
       await vi.waitFor(() => expect(alarmStarted).toBe(true));
       const replay: SubmittedSessionMessageRequest = {
         userId: fixture.ownerId,
-        turn: { type: 'prompt', id: INITIAL_MESSAGE_ID, prompt: 'retry A' },
+        turn: { type: 'prompt', id: fixtureMessageId('msg_retry_a'), prompt: 'retry A' },
       };
       await expect(
         Promise.all([session.admitSubmittedMessage(replay), session.admitSubmittedMessage(replay)])
@@ -10181,25 +10413,30 @@ describe('SandboxSession control-plane regressions', () => {
       await expect(
         session.admitSubmittedMessage({
           userId: fixture.ownerId,
-          turn: { type: 'prompt', id: 'msg_retry_b', prompt: 'new B' },
+          turn: { type: 'prompt', id: fixtureMessageId('msg_retry_b'), prompt: 'new B' },
           agent: { model: modelB },
         })
       ).resolves.toMatchObject({ success: true });
       await runInDurableObject(session, instance => instance.alarm());
-      await waitForAccepted(session, INITIAL_MESSAGE_ID);
+      await waitForAccepted(session, fixtureMessageId('msg_retry_a'));
       await runInDurableObject(session, instance => instance.alarm());
       const delivered = requests.filter(request => request.operation === 'session.prompt');
       expect(delivered).toHaveLength(2);
       expect(delivered[0]?.payload).toEqual(delivered[1]?.payload);
       expect(delivered[1]?.payload).toEqual({
-        messageId: INITIAL_MESSAGE_ID,
+        messageId: fixtureMessageId('msg_retry_a'),
         turn: { type: 'prompt', prompt: 'retry A' },
         agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
       });
       const accepted = await admissionState(session);
       expect(accepted.messages).toMatchObject([
-        { messageId: INITIAL_MESSAGE_ID, state: 'accepted', promptFailures: 1, intent: original },
-        { messageId: 'msg_retry_b', state: 'queued' },
+        {
+          messageId: fixtureMessageId('msg_retry_a'),
+          state: 'accepted',
+          promptFailures: 1,
+          intent: original,
+        },
+        { messageId: fixtureMessageId('msg_retry_b'), state: 'queued' },
       ]);
       expect(accepted.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
@@ -10215,13 +10452,17 @@ describe('SandboxSession control-plane regressions', () => {
     const { fixture, session } = await seedBlockedAdmission();
     const records: SessionMessageRecord[] = [
       createSessionMessageRecord({
-        turn: { type: 'prompt', messageId: 'msg_v2_prompt', prompt: 'nested prompt' },
+        turn: {
+          type: 'prompt',
+          messageId: fixtureMessageId('msg_v2_prompt'),
+          prompt: 'nested prompt',
+        },
         agent: agentA,
       }),
       createSessionMessageRecord({
         turn: {
           type: 'command',
-          messageId: 'msg_v2_command',
+          messageId: fixtureMessageId('msg_v2_command'),
           command: 'review',
           arguments: '--all',
         },
@@ -10249,8 +10490,16 @@ describe('SandboxSession control-plane regressions', () => {
             .filter(event => event.streamEventType === 'cloud.message.queued')
             .map(event => event.data)
         ).toEqual([
-          { messageId: 'msg_v2_prompt', content: 'nested prompt', delivery: 'queued' },
-          { messageId: 'msg_v2_command', content: '/review --all', delivery: 'queued' },
+          {
+            messageId: fixtureMessageId('msg_v2_prompt'),
+            content: 'nested prompt',
+            delivery: 'queued',
+          },
+          {
+            messageId: fixtureMessageId('msg_v2_command'),
+            content: '/review --all',
+            delivery: 'queued',
+          },
         ]);
       });
       expect((await admissionState(session)).messages).toEqual(records);
@@ -10411,7 +10660,7 @@ describe('SandboxSession control-plane regressions', () => {
     const stub = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
     await runInDurableObject(stub, async (instance, state) => {
       const blocker = {
-        messageId: 'msg_blocker',
+        messageId: fixtureMessageId('msg_blocker'),
         state: 'accepted',
         acceptedAt: 1,
         lastActivityAt: 1,
@@ -10448,7 +10697,7 @@ describe('SandboxSession control-plane regressions', () => {
 
       const followUpTurn = {
         type: 'command',
-        id: 'msg_followup_command',
+        id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMo',
         command: 'compact',
         arguments: '--aggressive',
       } as const;
@@ -10479,27 +10728,35 @@ describe('SandboxSession control-plane regressions', () => {
     async eventType => {
       const userId = 'user_control_child';
       const sessionId = `workspace_control_child_${eventType.replaceAll('.', '_')}`;
-      const stub = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+      const stub = await registerCredentialSession({
+        identity: { sessionId, userId },
+        auth: { kiloSessionId: 'kilo_root' },
+        agent: { mode: 'code', model: 'test' },
+        workspace: { workspacePath: '/workspace/root' },
+      });
       const wrapperInstanceId = crypto.randomUUID();
       await runInDurableObject(stub, async (instance, state) => {
-        await instance.registerSession({
-          identity: { sessionId, userId },
-          auth: { kiloSessionId: 'kilo_root' },
-          agent: { mode: 'code', model: 'test' },
-          workspace: { workspacePath: '/workspace/root' },
-        });
         const accepted = {
-          messageId: 'msg_parent',
+          messageId: fixtureMessageId('msg_parent'),
           state: 'accepted',
           wrapperInstanceId,
           acceptedAt: 1,
           lastActivityAt: 2,
-          turn: { type: 'prompt', messageId: 'msg_parent', prompt: 'parent turn' },
+          turn: {
+            type: 'prompt',
+            messageId: fixtureMessageId('msg_parent'),
+            prompt: 'parent turn',
+          },
         } satisfies SessionMessageRecord;
         const queued = {
-          messageId: 'msg_next',
+          messageId: fixtureMessageId('msg_next'),
           state: 'queued',
-          turn: { type: 'command', messageId: 'msg_next', command: 'status', arguments: '' },
+          turn: {
+            type: 'command',
+            messageId: fixtureMessageId('msg_next'),
+            command: 'status',
+            arguments: '',
+          },
         } satisfies SessionMessageRecord;
         await state.storage.put('session_messages', [accepted, queued]);
 
@@ -10529,7 +10786,7 @@ describe('SandboxSession control-plane regressions', () => {
           drizzle(state.storage, { logger: false }),
           state.storage.sql
         ).findByFilters({ eventTypes: ['kilocode'] });
-        expect(events.map(event => JSON.parse(event.payload))).toEqual([
+        expect(events.map(event => JSON.parse(event.payload))).toMatchObject([
           {
             type: eventType,
             event: eventType,
@@ -12446,7 +12703,7 @@ describe('SandboxSession worktree admission', () => {
         ];
         const expectedMessages: SessionMessageRecord[] = [blocker];
         for (const [index, submission] of submissions.entries()) {
-          const messageId = `msg_grouped_followup_${index}`;
+          const messageId = fixtureMessageId(`msg_grouped_followup_${index}`);
           await expect(
             instance.admitSubmittedMessage({
               userId: ownerId,
@@ -12494,7 +12751,7 @@ describe('SandboxSession worktree admission', () => {
           finalization: { autoCommit: !autoCommit, condenseOnComplete: false },
         });
         const metadata = await instance.getMetadata();
-        const messageId = 'msg_grouped_replay';
+        const messageId = fixtureMessageId('msg_grouped_replay');
         const messages: SessionMessageRecord[] = [
           ...(messageState === 'queued'
             ? [{ messageId: 'msg_blocker', state: 'accepted' as const, acceptedAt: Date.now() }]
@@ -13600,7 +13857,10 @@ describe('SandboxControl Vercel runtime identity', () => {
           expect(await state.storage.get('provider_locator')).toEqual(originalLocator);
           if (physicalState === 'creating') {
             const physical = await instance.getPhysicalRecord();
-            const provider = instance['provider'];
+            const provider = await instance['createProviderAdapter'](
+              bindingFromLegacyProvider('vercel'),
+              physical
+            );
             if (!physical.createIntent) throw new Error('Missing create recovery');
             const resolved = await provider.observe(physical.providerRef, physical.createIntent);
             if (!resolved.providerRef) throw new Error('Original creation was not recovered');
@@ -13883,6 +14143,930 @@ describe('SandboxSession targeted deletion', () => {
     } finally {
       wrapper.close();
       authorization.mockReset();
+    }
+  });
+});
+
+async function connectCredentialWrapper(fixture: Awaited<ReturnType<typeof credentialFixture>>) {
+  const launch =
+    fixture.registration.workspace?.sandboxProvider === 'vercel'
+      ? fixture.vercel.runtime.launches.at(-1)
+      : fixture.containers.launches.at(-1);
+  if (!launch) throw new Error('Missing contained wrapper launch');
+  const wrapperInstanceId = crypto.randomUUID();
+  const socket = await connect(launch.env.SANDBOX_CONTROL_CREDENTIAL, fixture.sandboxId);
+  await completeHello(socket, 'hello-byoc-credentials', {
+    providerInstanceId: launch.env.PROVIDER_INSTANCE_ID,
+    wrapperInstanceId,
+  });
+  signalWrapperReady(socket);
+  await vi.waitFor(async () => {
+    await expect(fixture.control.getStatus()).resolves.toMatchObject({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId,
+    });
+  });
+  const identity = await runInDurableObject(fixture.control, instance =>
+    instance['readyWrapperRuntime']()
+  );
+  if (!identity) throw new Error('Missing authenticated ready wrapper identity');
+  return { socket, identity };
+}
+
+function replaceCurrentConnection(instance: SandboxControl) {
+  const current = instance['socketHandler'].getConnectionIdentity();
+  if (!current) throw new Error('Missing current wrapper connection');
+  const replacement = { ...current, connectionId: crypto.randomUUID() };
+  instance['activeConnection'] = replacement;
+  instance['socketHandler'].getConnectionIdentity = () => replacement;
+  return replacement;
+}
+
+describe('SandboxControl BYOC worktree ownership', () => {
+  it('retains the immutable binding through failed kind-only worktree cleanup and retry', async () => {
+    const { control, registration, vercel, sandboxId } = await credentialFixture(
+      'vercel',
+      undefined,
+      byocSnapshotBinding
+    );
+    await control.ensureReady({
+      ...credentialInput(registration),
+      provider: 'vercel',
+      allowCreate: true,
+    });
+    await control.detachSession(registration.identity.sessionId);
+    await runInDurableObject(control, async (instance, state) => {
+      const physical = await instance.getPhysicalRecord();
+      if (!physical.createIntent) throw new Error('Missing BYOC allocation intent');
+      await savePhysicalRecord(state.storage, {
+        ...physical,
+        createIntent: {
+          ...physical.createIntent,
+          createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
+        },
+      });
+      Object.assign(instance['env'], {
+        SESSION_INGEST: {
+          canDestroyCloudAgentWorktreeSandbox: async () => ({ kind: 'exclusive' }),
+        },
+      });
+      const createProvider = instance['createProviderAdapter'].bind(instance);
+      instance['createProviderAdapter'] = async (...args) => {
+        expect(args[0]).toEqual(byocSnapshotBinding);
+        return createProvider(...args);
+      };
+    });
+    const input = {
+      worktreeId: WORKTREE_ID,
+      kiloUserId: registration.identity.userId,
+      organizationId: byocSnapshotBinding.source.organizationId,
+      location: { sandboxId, provider: 'vercel' as const },
+      sessionIds: [ROOT_ID],
+    };
+    vercel.runtime.failStop = true;
+    await runInDurableObject(control, async instance => {
+      await expect(instance.deleteWorktreeResources(input)).rejects.toThrow(
+        'Worktree provider stop is unconfirmed'
+      );
+    });
+    const retained = await control.getPhysicalRecord();
+    expect(retained).toMatchObject({
+      state: 'stopping',
+      stopTombstone: { reason: 'worktree_deleted', attempts: 1 },
+    });
+    expect(retained.providerRef).not.toBeNull();
+    await runInDurableObject(control, async (_instance, state) => {
+      expect(await state.storage.get('provider_binding')).toEqual(byocSnapshotBinding);
+      expect(await state.storage.get(`worktree_deletion/${WORKTREE_ID}`)).toMatchObject({
+        completed: false,
+        destroyed: false,
+        exclusiveTeardown: true,
+      });
+    });
+
+    vercel.runtime.failStop = false;
+    await expect(control.deleteWorktreeResources(input)).resolves.toEqual({
+      deleted: true,
+      sessionIds: [ROOT_ID],
+    });
+    await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'stopped',
+      providerRef: null,
+      stopTombstone: null,
+    });
+    await runInDurableObject(control, async (_instance, state) => {
+      expect(await state.storage.get(`worktree_deletion/${WORKTREE_ID}`)).toMatchObject({
+        completed: true,
+        destroyed: true,
+        resourcesCleaned: true,
+      });
+      expect(await state.storage.get('provider_binding')).toBeUndefined();
+      expect(await state.storage.get('next_lease_check_at')).toBeUndefined();
+    });
+    expect(vercel.runtime.creates).toBe(1);
+    expect(vercel.runtime.stoppedSessions).toEqual(['vsess_joined_1']);
+  });
+
+  it('rejects a changed credential pointer before allocating or preparing credentials', async () => {
+    const { control, registration, vercel } = await credentialFixture(
+      'vercel',
+      undefined,
+      byocSnapshotBinding
+    );
+    await runInDurableObject(control, async instance => {
+      await expect(
+        instance.ensureReady({
+          ...credentialInput(registration),
+          providerBinding: {
+            ...byocSnapshotBinding,
+            source: { ...byocSnapshotBinding.source, credentialId: crypto.randomUUID() },
+          },
+          allowCreate: true,
+        })
+      ).rejects.toThrow('Sandbox provider binding mismatch');
+    });
+    await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'stopped',
+      createIntent: null,
+    });
+    expect(await storedGrants(control)).toEqual([]);
+    expect(vercel.runtime.creates).toBe(0);
+  });
+});
+
+describe('SandboxControl BYOC provider failures', () => {
+  it.each([
+    {
+      name: 'removed credentials',
+      reason: 'byoc_credential_missing',
+      error: () => new ByocCredentialMissingError(byocBinding.source.credentialId),
+    },
+    {
+      name: 'unfinished setup',
+      reason: 'byoc_vercel_not_ready',
+      error: () => new ByocVercelNotReadyError('building'),
+    },
+  ] as const)('returns serialized $reason for $name across Durable Object RPC', async scenario => {
+    const {
+      control: stub,
+      registration,
+      vercel,
+      sandboxId,
+    } = await credentialFixture('vercel', undefined, byocBinding);
+    await runInDurableObject(stub, instance => {
+      instance['createProviderAdapter'] = async () => {
+        throw scenario.error();
+      };
+    });
+
+    const status = await stub.ensureReady({
+      ...credentialInput(registration),
+      providerBinding: byocBinding,
+      allowCreate: true,
+    });
+    expect(status).toMatchObject({ physical: 'failed', failureReason: scenario.reason });
+    expect(await stub.getStatus()).toMatchObject({
+      physical: 'failed',
+      failureReason: scenario.reason,
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      expect(await state.storage.get('failure_reason')).toBe(scenario.reason);
+      expect(await state.storage.get('provider_resolution_retry')).toBeUndefined();
+      instance['createProviderAdapter'] = async (_binding, physical) =>
+        vercel.createAdapter(physical.createIntent?.allocationName ?? sandboxId);
+    });
+    await finishFailedCreation(stub);
+  });
+
+  it.each([
+    { status: 401, reason: 'byoc_vercel_forbidden' },
+    { status: 403, reason: 'byoc_vercel_forbidden' },
+    { status: 429, reason: 'byoc_vercel_capacity' },
+  ] as const)('serializes permanent provider HTTP $status as $reason', async scenario => {
+    const { control: stub, registration } = await credentialFixture(
+      'vercel',
+      undefined,
+      byocBinding
+    );
+    await runInDurableObject(stub, instance => {
+      instance['createProviderAdapter'] = async () => ({
+        ...fakeProvider({ observe: async () => ({ status: 'terminal' }) }),
+        create: async () => {
+          throw new VercelSandboxRestError('request_failed', 'create', scenario.status);
+        },
+      });
+    });
+
+    const status = await stub.ensureReady({
+      ...credentialInput(registration),
+      providerBinding: byocBinding,
+      allowCreate: true,
+    });
+    expect(status).toMatchObject({ physical: 'failed', failureReason: scenario.reason });
+    await finishFailedCreation(stub);
+  });
+
+  it.each([
+    { status: 404, reason: undefined, projections: 0 },
+    { status: 410, reason: 'byoc_vercel_not_ready', projections: 1 },
+  ] as const)('only projects an authoritative snapshot-create HTTP $status', async scenario => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
+      init?.method === 'PATCH'
+        ? Response.json({ updated: true })
+        : Response.json(readyByocSnapshotCredential())
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { control: stub, registration } = await credentialFixture(
+      'vercel',
+      undefined,
+      byocSnapshotBinding
+    );
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance['env'], {
+        KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
+        INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+      });
+      instance['createProviderAdapter'] = async (_binding, _physical, onSnapshotResolved) => {
+        onSnapshotResolved?.(byocSnapshot);
+        return {
+          ...fakeProvider({ observe: async () => ({ status: 'terminal' }) }),
+          create: async () => {
+            throw new VercelSandboxRestError('request_failed', 'create', scenario.status);
+          },
+        };
+      };
+    });
+
+    await expect(
+      stub.ensureReady({
+        ...credentialInput(registration),
+        providerBinding: byocSnapshotBinding,
+        allowCreate: true,
+      })
+    ).resolves.toMatchObject({ physical: 'failed', failureReason: scenario.reason });
+
+    const projections = fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH');
+    expect(projections).toHaveLength(scenario.projections);
+    if (scenario.projections > 0) {
+      const body = projections[0]?.[1]?.body;
+      if (typeof body !== 'string') throw new Error('Expected missing snapshot projection');
+      expect(JSON.parse(body)).toMatchObject({
+        organizationId: byocSnapshot.organizationId,
+        credentialId: byocSnapshot.credentialId,
+        buildGeneration: byocSnapshot.buildGeneration,
+        setupStatus: 'failed',
+        setupError: 'byoc_vercel_snapshot_missing',
+        setupStartedAt: '2026-04-29T01:16:12.945Z',
+      });
+    }
+    await finishFailedCreation(stub);
+  });
+
+  it.each([
+    { name: 'platform Vercel', binding: { kind: 'vercel', source: { kind: 'platform' } } },
+    { name: 'Cloudflare', binding: { kind: 'cloudflare' } },
+  ] as const)('does not apply BYOC snapshot recovery to $name', async scenario => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { control: stub, registration } = await credentialFixture(
+      scenario.binding.kind,
+      undefined,
+      scenario.binding
+    );
+    await runInDurableObject(stub, instance => {
+      instance['createProviderAdapter'] = async () => ({
+        ...fakeProvider({ observe: async () => ({ status: 'terminal' }) }),
+        create: async () => {
+          throw new VercelSandboxRestError('request_failed', 'create', 410);
+        },
+      });
+    });
+
+    await expect(
+      stub.ensureReady({
+        ...credentialInput(registration),
+        providerBinding: scenario.binding,
+        allowCreate: true,
+      })
+    ).resolves.toMatchObject({ physical: 'failed', failureReason: undefined });
+    expect(fetchMock).not.toHaveBeenCalled();
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.get('byoc_snapshot_recovery')).toBeUndefined();
+    });
+    await finishFailedCreation(stub);
+  });
+
+  it('does not treat HTTP 410 from a different Vercel operation as a missing snapshot', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { control: stub, registration } = await credentialFixture(
+      'vercel',
+      undefined,
+      byocSnapshotBinding
+    );
+    await runInDurableObject(stub, instance => {
+      instance['createProviderAdapter'] = async (_binding, _physical, onSnapshotResolved) => {
+        onSnapshotResolved?.(byocSnapshot);
+        return {
+          ...fakeProvider({ observe: async () => ({ status: 'terminal' }) }),
+          create: async () => {
+            throw new VercelSandboxRestError('request_failed', 'get-project', 410);
+          },
+        };
+      };
+    });
+
+    await expect(
+      stub.ensureReady({
+        ...credentialInput(registration),
+        providerBinding: byocSnapshotBinding,
+        allowCreate: true,
+      })
+    ).resolves.toMatchObject({ physical: 'failed', failureReason: undefined });
+    expect(fetchMock).not.toHaveBeenCalled();
+    await finishFailedCreation(stub);
+  });
+
+  it('does not overwrite a newer generation after an expired snapshot create fails', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json(
+        readyByocSnapshotCredential({
+          buildGeneration: '44444444-4444-4444-8444-444444444444',
+        })
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { control: stub, registration } = await credentialFixture(
+      'vercel',
+      undefined,
+      byocSnapshotBinding
+    );
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance['env'], {
+        KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
+        INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+      });
+      instance['createProviderAdapter'] = async (_binding, _physical, onSnapshotResolved) => {
+        onSnapshotResolved?.(byocSnapshot);
+        return {
+          ...fakeProvider({ observe: async () => ({ status: 'terminal' }) }),
+          create: async () => {
+            throw new VercelSandboxRestError('request_failed', 'create', 410);
+          },
+        };
+      };
+    });
+
+    await expect(
+      stub.ensureReady({
+        ...credentialInput(registration),
+        providerBinding: byocSnapshotBinding,
+        allowCreate: true,
+      })
+    ).resolves.toMatchObject({ physical: 'failed', failureReason: 'byoc_vercel_not_ready' });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.get('byoc_snapshot_recovery')).toBeUndefined();
+    });
+    await finishFailedCreation(stub);
+  });
+
+  it('durably retries a temporarily unavailable snapshot recovery projection', async () => {
+    let projectionAvailable = false;
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') {
+        return projectionAvailable
+          ? Response.json({ updated: true })
+          : new Response(null, { status: 503 });
+      }
+      return Response.json(readyByocSnapshotCredential());
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { control: stub, registration } = await credentialFixture(
+      'vercel',
+      undefined,
+      byocSnapshotBinding
+    );
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance['env'], {
+        KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
+        INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+      });
+      instance['createProviderAdapter'] = async (_binding, _physical, onSnapshotResolved) => {
+        onSnapshotResolved?.(byocSnapshot);
+        return {
+          ...fakeProvider({ observe: async () => ({ status: 'terminal' }) }),
+          create: async () => {
+            throw new VercelSandboxRestError('request_failed', 'create', 410);
+          },
+        };
+      };
+    });
+
+    await expect(
+      stub.ensureReady({
+        ...credentialInput(registration),
+        providerBinding: byocSnapshotBinding,
+        allowCreate: true,
+      })
+    ).resolves.toMatchObject({ physical: 'failed', failureReason: 'byoc_vercel_not_ready' });
+
+    await runInDurableObject(stub, async (instance, state) => {
+      expect(await state.storage.get('byoc_snapshot_recovery')).toEqual(byocSnapshot);
+      expect(await state.storage.getAlarm()).not.toBeNull();
+
+      await instance['handleDeadline']('reconciliation');
+      expect(await state.storage.get('byoc_snapshot_recovery')).toEqual(byocSnapshot);
+      expect(await state.storage.getAlarm()).not.toBeNull();
+
+      projectionAvailable = true;
+      await instance['handleDeadline']('reconciliation');
+      expect(await state.storage.get('byoc_snapshot_recovery')).toBeUndefined();
+      await expect(instance.getPhysicalRecord()).resolves.toMatchObject({ state: 'stopped' });
+    });
+
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(3);
+  });
+
+  it.each(['success', 'failure'] as const)(
+    'ignores stale provider observation %s after a connection replacement',
+    async outcome => {
+      const fixture = await credentialFixture('vercel', undefined, byocBinding);
+      const { control, registration, vercel } = fixture;
+      const input = {
+        ...credentialInput(registration),
+        providerBinding: byocBinding,
+        allowCreate: true,
+      };
+      await control.ensureReady(input);
+      const { socket } = await connectCredentialWrapper(fixture);
+      let replacementSocket: WebSocket | undefined;
+      try {
+        await runInDurableObject(control, async (instance, state) => {
+          const physical = await instance.getPhysicalRecord();
+          const createProvider = instance['createProviderAdapter'].bind(instance);
+          let replacement: PhysicalRecord | undefined;
+          instance['createProviderAdapter'] = async () => {
+            instance['createProviderAdapter'] = createProvider;
+            await instance.beginStop('control_replaced');
+            await expect(instance.recordStopAttempt()).resolves.toMatchObject({ state: 'stopped' });
+            await instance.ensureReady(input);
+            replacement = await instance.getPhysicalRecord();
+            expect(replacement.providerRef).not.toBe(physical.providerRef);
+            await state.storage.put('failure_reason', 'byoc_vercel_capacity');
+            if (outcome === 'failure') {
+              throw new ByocCredentialMissingError(byocBinding.source.credentialId);
+            }
+            return fakeProvider({ observe: async () => ({ status: 'terminal' }) });
+          };
+
+          const observed = await instance['observeCurrentProvider'](physical);
+          expect(replacement).toBeDefined();
+          expect(observed).toEqual(replacement);
+          await expect(instance.getPhysicalRecord()).resolves.toEqual(replacement);
+          expect(await state.storage.get('failure_reason')).toBe('byoc_vercel_capacity');
+        });
+        replacementSocket = (await connectCredentialWrapper(fixture)).socket;
+        expect(vercel.runtime.creates).toBe(2);
+      } finally {
+        replacementSocket?.close();
+        socket.close();
+      }
+    }
+  );
+
+  it('retains the physical instance when credential removal blocks failed-sandbox recovery', async () => {
+    const { control: stub, registration } = await credentialFixture(
+      'vercel',
+      undefined,
+      byocBinding
+    );
+    await runInDurableObject(stub, async instance => {
+      await instance.ensureReady({
+        ...credentialInput(registration),
+        providerBinding: byocBinding,
+        allowCreate: true,
+      });
+      const providerRef = (await instance.getPhysicalRecord()).providerRef;
+      expect(providerRef).not.toBeNull();
+      await instance.markFailed();
+      instance['createProviderAdapter'] = async () => {
+        throw new ByocCredentialMissingError(byocBinding.source.credentialId);
+      };
+
+      await expect(
+        instance.ensureReady({
+          ...credentialInput(registration),
+          providerBinding: byocBinding,
+          allowCreate: true,
+        })
+      ).resolves.toMatchObject({ physical: 'stopping', failureReason: 'byoc_credential_missing' });
+      await expect(instance.getPhysicalRecord()).resolves.toMatchObject({
+        providerRef,
+        stopTombstone: { reason: 'environment_failed', attempts: 1 },
+      });
+    });
+  });
+
+  it('retries transient resolution using the existing user-approved create intent', async () => {
+    const {
+      control: stub,
+      registration,
+      vercel,
+    } = await credentialFixture('vercel', undefined, byocBinding);
+    await runInDurableObject(stub, async (instance, state) => {
+      let attempts = 0;
+      const createProvider = instance['createProviderAdapter'].bind(instance);
+      instance['createProviderAdapter'] = async (...args) => {
+        attempts += 1;
+        if (attempts === 1) throw new ByocCredentialResolverError();
+        return createProvider(...args);
+      };
+
+      await expect(
+        instance.ensureReady({
+          ...credentialInput(registration),
+          providerBinding: byocBinding,
+          allowCreate: true,
+        })
+      ).rejects.toThrow('BYOC credential lookup failed');
+
+      const intent = (await instance.getPhysicalRecord()).createIntent;
+      expect(intent?.intentId).toBeDefined();
+      if (!intent?.allocationName) throw new Error('Missing retained allocation intent');
+      await expect(instance.getStatus()).resolves.toMatchObject({ physical: 'creating' });
+      expect(await state.storage.get('failure_reason')).toBeUndefined();
+      expect(await state.storage.get('provider_resolution_retry')).toBe(true);
+
+      await expect(
+        instance.ensureReady({
+          ...credentialInput(registration),
+          providerBinding: byocBinding,
+          allowCreate: false,
+        })
+      ).resolves.toMatchObject({ physical: 'running' });
+      await expect(instance.getPhysicalRecord()).resolves.toMatchObject({
+        providerRef: encodeVercelProviderRef({
+          sandboxName: intent.allocationName,
+          sessionId: 'vsess_joined_1',
+        }),
+        createIntent: intent,
+      });
+      expect(vercel.runtime.creates).toBe(1);
+      expect(attempts).toBe(3);
+      expect(await state.storage.get('provider_resolution_retry')).toBeUndefined();
+    });
+  });
+
+  it('retains a providerless failed create until cleanup can confirm absence', async () => {
+    const {
+      control: stub,
+      registration,
+      vercel,
+    } = await credentialFixture('vercel', undefined, byocBinding);
+    await runInDurableObject(stub, async instance => {
+      let resolutions = 0;
+      const createProvider = instance['createProviderAdapter'].bind(instance);
+      instance['createProviderAdapter'] = async () => {
+        resolutions += 1;
+        throw new ByocCredentialMissingError(byocBinding.source.credentialId);
+      };
+
+      await instance.ensureReady({
+        ...credentialInput(registration),
+        providerBinding: byocBinding,
+        allowCreate: true,
+      });
+      expect(resolutions).toBe(1);
+      const failed = await instance.getPhysicalRecord();
+      await instance.beginStop('cleanup');
+      await instance.recordStopAttempt();
+
+      expect(resolutions).toBe(2);
+      await expect(instance.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'stopping',
+        providerRef: null,
+        createIntent: failed.createIntent,
+        stopTombstone: { reason: 'environment_failed', attempts: 1 },
+      });
+      expect(vercel.runtime.creates).toBe(0);
+      instance['createProviderAdapter'] = createProvider;
+    });
+    await finishFailedCreation(stub);
+    await expect(stub.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'stopped',
+      providerRef: null,
+      createIntent: null,
+      stopTombstone: null,
+    });
+  });
+
+  it('terminalizes queued session messages using the serialized owner status', async () => {
+    const { control, session } = await credentialFixture('vercel', undefined, byocBinding);
+    const messageId = fixtureMessageId('msg_byoc_missing');
+    await runInDurableObject(control, instance => {
+      instance['createProviderAdapter'] = async () => {
+        throw new ByocCredentialMissingError(byocBinding.source.credentialId);
+      };
+    });
+
+    const failedMessages = await runInDurableObject(session, async (instance, state) => {
+      state.storage.kv.put('session_messages', [
+        createSessionMessageRecord({
+          turn: { type: 'prompt', messageId, prompt: 'hello' },
+          agent: { mode: 'code', model: 'test' },
+        }),
+      ]);
+
+      await instance['dispatchQueued'](messageId, { allowCreate: true });
+
+      await expect(instance.getMessageResult(messageId)).resolves.toMatchObject({
+        type: 'found',
+        result: { status: 'failed' },
+      });
+      const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages');
+      expect(messages).toMatchObject([
+        { messageId, state: 'failed', failedReason: 'byoc_credential_missing' },
+      ]);
+      expect(await state.storage.getAlarm()).not.toBeNull();
+      return messages;
+    });
+    await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+    await runInDurableObject(session, async (_instance, state) => {
+      expect(state.storage.kv.get('session_messages')).toEqual(failedMessages);
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+  });
+
+  it('terminalizes the current message while retaining an unavailable snapshot recovery projection', async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
+      init?.method === 'PATCH'
+        ? new Response(null, { status: 503 })
+        : Response.json(readyByocSnapshotCredential())
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { control, session } = await credentialFixture('vercel', undefined, byocSnapshotBinding);
+    const messageId = fixtureMessageId('msg_byoc_snapshot_missing');
+    await runInDurableObject(control, instance => {
+      Object.assign(instance['env'], {
+        KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
+        INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+      });
+      instance['createProviderAdapter'] = async (_binding, _physical, onSnapshotResolved) => {
+        onSnapshotResolved?.(byocSnapshot);
+        return {
+          ...fakeProvider({ observe: async () => ({ status: 'terminal' }) }),
+          create: async () => {
+            throw new VercelSandboxRestError('request_failed', 'create', 410);
+          },
+        };
+      };
+    });
+
+    const failedMessages = await runInDurableObject(session, async (instance, state) => {
+      state.storage.kv.put('session_messages', [
+        createSessionMessageRecord({
+          turn: { type: 'prompt', messageId, prompt: 'hello' },
+          agent: { mode: 'code', model: 'test' },
+        }),
+      ]);
+
+      await instance['dispatchQueued'](messageId, { allowCreate: true });
+
+      await expect(instance.getMessageResult(messageId)).resolves.toMatchObject({
+        type: 'found',
+        result: { status: 'failed' },
+      });
+      const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages');
+      expect(messages).toMatchObject([
+        { messageId, state: 'failed', failedReason: 'byoc_vercel_not_ready' },
+      ]);
+      expect(await state.storage.getAlarm()).not.toBeNull();
+      return messages;
+    });
+    await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+    await runInDurableObject(session, async (_instance, state) => {
+      expect(state.storage.kv.get('session_messages')).toEqual(failedMessages);
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+    await runInDurableObject(control, async (_instance, state) => {
+      expect(await state.storage.get('byoc_snapshot_recovery')).toEqual(byocSnapshot);
+      expect(await state.storage.getAlarm()).not.toBeNull();
+    });
+  });
+});
+
+describe('SandboxControl BYOC lease checks', () => {
+  it.each(['resolution', 'renewal', 'failure'] as const)(
+    'fences a replaced connection during provider %s',
+    async phase => {
+      const fixture = await credentialFixture('vercel', undefined, byocBinding);
+      const { control, registration, environment, vercel } = fixture;
+      environment.VERCEL_SANDBOX_EXTEND_DURATION_MS = '600000';
+      await control.ensureReady({
+        ...credentialInput(registration),
+        providerBinding: byocBinding,
+        allowCreate: true,
+      });
+      const { socket, identity } = await connectCredentialWrapper(fixture);
+      try {
+        await runInDurableObject(control, async (instance, state) => {
+          const dueAt = await state.storage.get<number>('next_lease_check_at');
+          expect(dueAt).toBeDefined();
+          if (dueAt === undefined) throw new Error('Missing initial lease check');
+          await state.storage.put('failure_reason', 'byoc_vercel_capacity');
+
+          let renewals = 0;
+          instance['createProviderAdapter'] = async () => {
+            if (phase === 'resolution') replaceCurrentConnection(instance);
+            return {
+              ...vercel.provider,
+              ensureLeaseAtLeast: async () => {
+                renewals += 1;
+                replaceCurrentConnection(instance);
+                if (phase === 'failure') {
+                  throw new ByocCredentialMissingError(byocBinding.source.credentialId);
+                }
+              },
+            };
+          };
+
+          await instance['renewProviderLease'](identity, dueAt);
+
+          expect(renewals).toBe(phase === 'resolution' ? 0 : 1);
+          expect(await state.storage.get('next_lease_check_at')).toBe(dueAt);
+          expect(await state.storage.get('failure_reason')).toBe('byoc_vercel_capacity');
+        });
+      } finally {
+        socket.close();
+      }
+    }
+  );
+
+  it('durably skips heartbeat credential resolution until lease renewal is necessary', async () => {
+    const fixture = await credentialFixture('vercel', undefined, byocBinding);
+    const { control, registration, environment } = fixture;
+    environment.VERCEL_SANDBOX_EXTEND_DURATION_MS = '600000';
+    let resolutions = 0;
+    let renewals = 0;
+    await runInDurableObject(control, instance => {
+      const createProvider = instance['createProviderAdapter'].bind(instance);
+      instance['createProviderAdapter'] = async (...args) => {
+        resolutions += 1;
+        return {
+          ...(await createProvider(...args)),
+          ensureLeaseAtLeast: async (ref, minimumMs) => {
+            renewals += 1;
+            expect(ref).toBe((await instance.getPhysicalRecord()).providerRef);
+            expect(minimumMs).toBe(leaseAtLeastMs());
+          },
+        };
+      };
+    });
+    await control.ensureReady({
+      ...credentialInput(registration),
+      providerBinding: byocBinding,
+      allowCreate: true,
+    });
+    await control.ensureReady({
+      ...credentialInput(registration),
+      providerBinding: byocBinding,
+      allowCreate: false,
+    });
+    expect(resolutions).toBe(3);
+    const { socket, identity } = await connectCredentialWrapper(fixture);
+    try {
+      await runInDurableObject(control, async (instance, state) => {
+        const now = Date.now();
+        await instance['renewProviderLease'](identity, now);
+        expect(resolutions).toBe(4);
+        expect(renewals).toBe(1);
+        const nextCheckAt = await state.storage.get<number>('next_lease_check_at');
+        expect(nextCheckAt).toBe(now + 240_000);
+
+        for (const elapsed of [30_000, 60_000, 90_000, 120_000, 180_000, 239_999]) {
+          await instance['renewProviderLease'](identity, now + elapsed);
+        }
+        expect(resolutions).toBe(4);
+        expect(renewals).toBe(1);
+
+        await instance['renewProviderLease'](identity, now + 240_000);
+        expect(resolutions).toBe(5);
+        expect(renewals).toBe(2);
+        expect(await state.storage.get('next_lease_check_at')).toBe(now + 480_000);
+
+        await instance.beginStop('idle');
+        expect(await state.storage.get('next_lease_check_at')).toBeUndefined();
+        await instance['renewProviderLease'](identity, now + 480_000);
+        expect(resolutions).toBe(5);
+        await instance.confirmStopped();
+      });
+    } finally {
+      socket.close();
+    }
+  });
+
+  it('defers the first credential lookup until a long initial lease approaches its floor', async () => {
+    const fixture = await credentialFixture('vercel', undefined, byocBinding);
+    const { control, registration, environment } = fixture;
+    environment.VERCEL_SANDBOX_INITIAL_TIMEOUT_MS = '900000';
+    environment.VERCEL_SANDBOX_EXTEND_DURATION_MS = '600000';
+    let resolutions = 0;
+    await runInDurableObject(control, instance => {
+      const createProvider = instance['createProviderAdapter'].bind(instance);
+      instance['createProviderAdapter'] = async (...args) => {
+        resolutions += 1;
+        return createProvider(...args);
+      };
+    });
+    const beforeCreate = Date.now();
+    await control.ensureReady({
+      ...credentialInput(registration),
+      providerBinding: byocBinding,
+      allowCreate: true,
+    });
+    const { socket, identity } = await connectCredentialWrapper(fixture);
+    try {
+      await runInDurableObject(control, async (instance, state) => {
+        const nextCheckAt = await state.storage.get<number>('next_lease_check_at');
+        expect(nextCheckAt).toBeGreaterThanOrEqual(beforeCreate + 540_000);
+        expect(resolutions).toBe(2);
+        if (nextCheckAt === undefined) throw new Error('Missing initial lease check');
+
+        await instance['renewProviderLease'](identity, nextCheckAt - 1);
+        expect(resolutions).toBe(2);
+
+        await instance['renewProviderLease'](identity, nextCheckAt);
+        expect(resolutions).toBe(3);
+      });
+    } finally {
+      socket.close();
+    }
+  });
+
+  it('retains the due lease check after a transient renewal failure', async () => {
+    const fixture = await credentialFixture('vercel', undefined, byocBinding);
+    const { control, registration, environment } = fixture;
+    environment.VERCEL_SANDBOX_EXTEND_DURATION_MS = '600000';
+    await control.ensureReady({
+      ...credentialInput(registration),
+      providerBinding: byocBinding,
+      allowCreate: true,
+    });
+    const { socket, identity } = await connectCredentialWrapper(fixture);
+    try {
+      await runInDurableObject(control, async (instance, state) => {
+        let resolutions = 0;
+        const createProvider = instance['createProviderAdapter'].bind(instance);
+        instance['createProviderAdapter'] = async (...args) => {
+          resolutions += 1;
+          if (resolutions === 1) throw new ByocCredentialResolverError();
+          return createProvider(...args);
+        };
+        const dueAt = await state.storage.get<number>('next_lease_check_at');
+        expect(dueAt).toBeDefined();
+        if (dueAt === undefined) throw new Error('Missing initial lease check');
+
+        await instance['renewProviderLease'](identity, dueAt);
+        expect(resolutions).toBe(1);
+        expect(await state.storage.get('next_lease_check_at')).toBe(dueAt);
+        expect(await state.storage.get('failure_reason')).toBeUndefined();
+
+        await instance['renewProviderLease'](identity, dueAt + 30_000);
+        expect(resolutions).toBe(2);
+        expect(await state.storage.get('next_lease_check_at')).toBe(dueAt + 270_000);
+      });
+    } finally {
+      socket.close();
+    }
+  });
+
+  it('keeps Cloudflare activity renewals on every heartbeat', async () => {
+    const fixture = await credentialFixture();
+    const { control, registration } = fixture;
+    await control.ensureReady({ ...credentialInput(registration), allowCreate: true });
+    const { socket, identity } = await connectCredentialWrapper(fixture);
+    try {
+      await runInDurableObject(control, async (instance, state) => {
+        let renewals = 0;
+        const createProvider = instance['createProviderAdapter'].bind(instance);
+        instance['createProviderAdapter'] = async (...args) => ({
+          ...(await createProvider(...args)),
+          ensureLeaseAtLeast: async () => {
+            renewals += 1;
+          },
+        });
+        const now = Date.now();
+        await instance['renewProviderLease'](identity, now);
+        await instance['renewProviderLease'](identity, now + 30_000);
+        await instance['renewProviderLease'](identity, now + 60_000);
+
+        expect(renewals).toBe(3);
+        expect(await state.storage.get('next_lease_check_at')).toBeUndefined();
+      });
+    } finally {
+      socket.close();
     }
   });
 });

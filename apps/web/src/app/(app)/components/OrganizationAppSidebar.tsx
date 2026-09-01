@@ -29,6 +29,7 @@ import {
   ChevronRight,
   UsersRound,
   Network,
+  Cpu,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -203,6 +204,15 @@ export default function OrganizationAppSidebar({
       icon: Webhook,
       url: `/organizations/${organizationId}/cloud/triggers`,
     },
+    ...(currentRole === 'owner' || currentRole === 'admin'
+      ? [
+          {
+            title: 'Compute',
+            icon: Cpu,
+            url: `/organizations/${organizationId}/cloud/compute`,
+          },
+        ]
+      : []),
     // Gastown requires non-billing_manager role; hide for billing-only users
     ...(currentRole !== 'billing_manager'
       ? [

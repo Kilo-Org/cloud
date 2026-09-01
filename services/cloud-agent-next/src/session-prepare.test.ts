@@ -559,6 +559,7 @@ describe('prepareSession endpoint', () => {
         workspace: {
           sandboxId: 'crv-abcdef',
           sandboxProvider: 'cloudflare',
+          sandboxProviderBinding: { kind: 'cloudflare' },
           shallow: true,
           credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
         },
@@ -811,6 +812,7 @@ describe('prepareSession endpoint', () => {
         workspace: {
           sandboxId: failoverSandboxId,
           sandboxProvider: 'cloudflare',
+          sandboxProviderBinding: { kind: 'cloudflare' },
           shallow: undefined,
           credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
           sandboxRoute: {
@@ -888,6 +890,7 @@ describe('prepareSession endpoint', () => {
         workspace: {
           sandboxId: 'dind-abcdef',
           sandboxProvider: 'cloudflare',
+          sandboxProviderBinding: { kind: 'cloudflare' },
           shallow: false,
           credentialContainment: {
             github: false,

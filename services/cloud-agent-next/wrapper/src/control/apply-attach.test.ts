@@ -451,6 +451,136 @@ describe('applySessionAttach', () => {
     ]);
   });
 
+  it('checks out a slash-containing feature branch from its remote revision', async () => {
+    const gitCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const result = await applySessionAttach(
+      session,
+      {
+        kilo,
+        branch: 'feature/customer-fix',
+        git: { url: 'https://github.com/acme/demo.git' },
+      },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        ...noFs,
+        sessionExists: async () => true,
+        mkdir: async () => undefined,
+        hasGit: async () => false,
+        runGit: async (args, cwd) => {
+          gitCalls.push(cwd ? { args, cwd } : { args });
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+      }
+    );
+
+    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(gitCalls).toEqual([
+      { args: ['clone', 'https://github.com/acme/demo.git', '/workspace/a'] },
+      {
+        args: ['checkout', '-B', 'feature/customer-fix', 'origin/feature/customer-fix'],
+        cwd: '/workspace/a',
+      },
+      { args: ['config', 'user.name', 'Kilo Code Cloud'], cwd: '/workspace/a' },
+      { args: ['config', 'user.email', 'agent@kilocode.ai'], cwd: '/workspace/a' },
+    ]);
+  });
+
+  it('creates a stable worktree branch from the cloned default branch when no branch is requested', async () => {
+    const gitCalls: string[][] = [];
+    const result = await applySessionAttach(
+      session,
+      { kilo, git: { url: 'https://github.com/acme/demo.git' } },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        ...noFs,
+        sessionExists: async () => true,
+        mkdir: async () => undefined,
+        hasGit: async () => false,
+        runGit: async args => {
+          gitCalls.push(args);
+          return { stdout: '', stderr: '', exitCode: args[0] === 'show-ref' ? 1 : 0 };
+        },
+      }
+    );
+
+    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(gitCalls).toEqual([
+      ['clone', 'https://github.com/acme/demo.git', '/workspace/a'],
+      ['show-ref', '--verify', '--quiet', 'refs/heads/session/worktree_a'],
+      ['show-ref', '--verify', '--quiet', 'refs/remotes/origin/session/worktree_a'],
+      ['checkout', '-b', 'session/worktree_a'],
+      ['config', 'user.name', 'Kilo Code Cloud'],
+      ['config', 'user.email', 'agent@kilocode.ai'],
+    ]);
+  });
+
+  it('fails safely when the requested remote branch does not exist', async () => {
+    const gitCalls: string[][] = [];
+    const events: PreparingEventDataV2[] = [];
+    let markerWritten = false;
+    let setupRan = false;
+    let sessionChecked = false;
+    const result = await applySessionAttach(
+      session,
+      {
+        kilo,
+        branch: 'feature/missing',
+        git: {
+          url: 'https://github.com/acme/demo.git',
+          token: 'branch-secret',
+          platform: 'github',
+        },
+        setupCommands: ['pnpm install'],
+        preparation: { attemptId: 'att_missing', triggerMessageId: 'msg_missing' },
+      },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        sessionExists: async () => {
+          sessionChecked = true;
+          return true;
+        },
+        hasBootstrapMarker: async () => false,
+        writeBootstrapMarker: async () => {
+          markerWritten = true;
+        },
+        mkdir: async () => undefined,
+        hasGit: async () => false,
+        runGit: async args => {
+          gitCalls.push(args);
+          if (args[0] === 'checkout') {
+            return {
+              stdout: '',
+              stderr: 'fatal: origin/feature/missing does not exist: branch-secret',
+              exitCode: 1,
+            };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        runSetup: async () => {
+          setupRan = true;
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        emitPreparing: event => {
+          events.push(event);
+        },
+      }
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'not_ready', message: 'git checkout failed', retryable: true },
+    });
+    expect(gitCalls[1]).toEqual(['checkout', '-B', 'feature/missing', 'origin/feature/missing']);
+    expect(markerWritten).toBe(false);
+    expect(setupRan).toBe(false);
+    expect(sessionChecked).toBe(false);
+    expect(events.find(event => event.action === 'step_failed')).toMatchObject({
+      step: 'cloning',
+      safeError: 'git checkout failed',
+    });
+    expect(JSON.stringify({ result, events })).not.toContain('branch-secret');
+  });
+
   it('skips clone when the directory already has git metadata', async () => {
     const gitCalls: string[][] = [];
     const result = await applySessionAttach(

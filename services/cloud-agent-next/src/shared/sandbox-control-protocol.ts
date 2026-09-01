@@ -26,6 +26,8 @@ export const SANDBOX_HELLO_DEADLINE_MS = 10_000;
 
 export const SANDBOX_CONTROL_REQUEST_TIMEOUT_MS = 30_000;
 
+export const SANDBOX_CONTROL_ATTACHMENT_DOWNLOAD_TIMEOUT_MS = 120_000;
+
 export const SANDBOX_CONTROL_ATTACH_TIMEOUT_MS = 8 * 60_000;
 
 export const SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS = 60 * 60_000;
@@ -371,6 +373,15 @@ export const sessionAttachResultSchema = z
   })
   .strict();
 
+export const sessionPromptAttachmentSchema = z
+  .object({
+    filename: z.string().min(1).max(256),
+    mime: z.string().min(1).max(256),
+    signedUrl: z.string().min(1).max(8192),
+    localPath: z.string().min(1).max(2048),
+  })
+  .strict();
+
 export const sessionPromptTurnSchema = z.discriminatedUnion('type', [
   z
     .object({
@@ -413,18 +424,7 @@ const sessionPromptAgentSchema = z
 const sessionPromptPayloadBaseSchema = z
   .object({
     messageId: z.string().min(1).max(128),
-    attachments: z
-      .array(
-        z
-          .object({
-            filename: z.string().min(1),
-            mime: z.string().min(1),
-            signedUrl: z.string().min(1),
-            localPath: z.string().min(1),
-          })
-          .strict()
-      )
-      .optional(),
+    attachments: z.array(sessionPromptAttachmentSchema).max(5).optional(),
     finalization: z
       .object({
         autoCommit: z.boolean().optional(),
@@ -689,6 +689,7 @@ export type SandboxShutdownPayload = z.infer<typeof sandboxShutdownPayloadSchema
 export type SandboxShutdownResult = z.infer<typeof sandboxShutdownResultSchema>;
 export type SessionAttachPayload = z.infer<typeof sessionAttachPayloadSchema>;
 export type SessionAttachResult = z.infer<typeof sessionAttachResultSchema>;
+export type SessionPromptAttachment = z.infer<typeof sessionPromptAttachmentSchema>;
 export type SessionPromptPayload = z.infer<typeof sessionPromptPayloadSchema>;
 export type SessionPromptResult = z.infer<typeof sessionPromptResultSchema>;
 export type SessionNativeRuntimeRetirementPayload = z.infer<

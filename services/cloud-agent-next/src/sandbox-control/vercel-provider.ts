@@ -141,7 +141,7 @@ export function createVercelProviderAdapter(deps: {
         name: intent.allocationName ?? deps.sandboxName,
         operationId: intent.intentId,
         runtimeBuildId: config.runtimeBuildId,
-        snapshotId: config.snapshotId,
+        source: { type: 'snapshot', snapshotId: config.snapshotId },
         runtime: config.runtime,
         timeoutMs: config.initialTimeoutMs,
         ...(intent.networkPolicy === undefined ? {} : { networkPolicy: intent.networkPolicy }),

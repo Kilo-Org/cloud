@@ -1,5 +1,15 @@
 import { logger } from '../../logger.js';
-import { getSandboxProvider, type SessionMetadata } from '../../persistence/session-metadata.js';
+import {
+  getSandboxProvider,
+  getSandboxProviderBinding,
+  type SessionMetadata,
+} from '../../persistence/session-metadata.js';
+import type { SandboxProviderBinding } from '../../sandbox-provider-binding.js';
+import {
+  ByocCredentialMissingError,
+  resolveByocVercelCredentials,
+} from '../../byoc/vercel-credential-resolver.js';
+import type { Env } from '../../types.js';
 import type {
   AgentSandboxLifecycle,
   AgentSandboxLifecycleHost,
@@ -9,7 +19,6 @@ import type {
 import {
   parseVercelSandboxCredentials,
   type VercelSandboxCredentials,
-  type VercelSandboxRuntimeConfigEnv,
 } from './vercel-runtime-config.js';
 import {
   claimVercelStopAttempt,
@@ -37,7 +46,7 @@ const MANUAL_REMEDIATION_RETRY_INTERVAL_MS = 60 * 60 * 1000;
  */
 export class VercelSandboxLifecycle implements AgentSandboxLifecycle {
   constructor(
-    private readonly env: VercelSandboxRuntimeConfigEnv,
+    private readonly env: Env,
     private readonly host: AgentSandboxLifecycleHost
   ) {}
 
@@ -67,6 +76,7 @@ export class VercelSandboxLifecycle implements AgentSandboxLifecycle {
     const tombstone = parseVercelStopTombstone({
       version: 2,
       provider: 'vercel',
+      sandboxProviderBinding: getSandboxProviderBinding(metadata),
       sandboxName,
       sessionId,
       unresolvedCreate: createIntent
@@ -120,7 +130,15 @@ export class VercelSandboxLifecycle implements AgentSandboxLifecycle {
 
   private async reconcileDeletion(tombstone: VercelStopTombstone, now: number): Promise<void> {
     await this.host.purgeDeletedSessionPayload();
-    const credentials = parseVercelSandboxCredentials(this.env);
+    let credentials: VercelSandboxCredentials | undefined;
+    try {
+      credentials = await this.resolveCredentials(tombstone.sandboxProviderBinding);
+    } catch (error) {
+      if (error instanceof ByocCredentialMissingError) {
+        await this.host.eraseDurableObjectState();
+        return;
+      }
+    }
     if (!credentials) {
       await this.host.scheduleAlarmAtOrBefore(now + RECONCILE_RETRY_INTERVAL_MS);
       return;
@@ -135,7 +153,7 @@ export class VercelSandboxLifecycle implements AgentSandboxLifecycle {
           name: current.sandboxName,
           operationId: unresolved.operationId,
           runtimeBuildId: unresolved.runtimeBuildId,
-          snapshotId: unresolved.snapshotId,
+          source: { type: 'snapshot', snapshotId: unresolved.snapshotId },
           runtime: unresolved.runtime,
         });
         if (observation) {
@@ -214,7 +232,12 @@ export class VercelSandboxLifecycle implements AgentSandboxLifecycle {
       await this.host.scheduleAlarmAtOrBefore(intent.nextRetryAt);
       return;
     }
-    const credentials = parseVercelSandboxCredentials(this.env);
+    let credentials: VercelSandboxCredentials | undefined;
+    try {
+      credentials = await this.resolveCredentials(await this.host.getProviderBinding());
+    } catch {
+      credentials = undefined;
+    }
     if (!credentials) {
       await this.host.scheduleAlarmAtOrBefore(now + RECONCILE_RETRY_INTERVAL_MS);
       return;
@@ -230,7 +253,7 @@ export class VercelSandboxLifecycle implements AgentSandboxLifecycle {
         name: intent.sandboxName,
         operationId: intent.operationId,
         runtimeBuildId: intent.runtimeBuildId,
-        snapshotId: intent.snapshotId,
+        source: { type: 'snapshot', snapshotId: intent.snapshotId },
         runtime: intent.runtime,
       });
       if (observation) {
@@ -260,5 +283,17 @@ export class VercelSandboxLifecycle implements AgentSandboxLifecycle {
         .warn('Vercel create intent remains unresolved');
     }
     await this.host.scheduleAlarmAtOrBefore(retrying.nextRetryAt);
+  }
+
+  private async resolveCredentials(
+    binding: SandboxProviderBinding | undefined
+  ): Promise<VercelSandboxCredentials | undefined> {
+    if (binding?.kind === 'vercel' && binding.source.kind === 'byoc') {
+      return resolveByocVercelCredentials(this.env, {
+        organizationId: binding.source.organizationId,
+        credentialId: binding.source.credentialId,
+      });
+    }
+    return parseVercelSandboxCredentials(this.env);
   }
 }

@@ -67,6 +67,7 @@ VERCEL_SANDBOX_EXTEND_DURATION_MS=600000
 # IDs, or `*` for every organization and personal accounts. Organizations must
 # also be isolated by PER_SESSION_SANDBOX_ORG_IDS.
 VERCEL_SANDBOX_ORG_IDS=
+BYOC_VERCEL_ORG_IDS=
 
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App

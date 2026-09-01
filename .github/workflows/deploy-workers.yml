@@ -60,6 +60,12 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      - name: Setup Bun
+        if: inputs.worker == 'services/cloud-agent-next'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
+
       - name: Install dependencies
         working-directory: ${{ inputs.worker }}
         run: pnpm install --frozen-lockfile
@@ -234,6 +240,12 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
+
+      - name: Setup Bun
+        if: matrix.worker == 'services/cloud-agent-next'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
 
       - name: Install dependencies
         working-directory: ${{ matrix.worker }}

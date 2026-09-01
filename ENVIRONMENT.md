@@ -380,6 +380,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `CONTROL_PLANE_IDS` - Comma-separated user or org IDs admitted to the call-home control plane at session creation. Empty admits nobody. `*` includes personal accounts. Production defaults to empty. Wrangler `dev` defaults to `*`. Does not enable new worktree creation by itself; that also requires `WORKTREE_CREATION_ENABLED_IDS` enrollment. [SERVER]
 - `WORKTREE_CREATION_ENABLED_IDS` - Comma-separated user or org IDs allowed to create new worktrees, or `*` for all, including personal accounts. Production defaults to empty/off. Wrangler `dev` defaults to `*`. Also requires enrollment in `CONTROL_PLANE_IDS`. Disabling it does not block existing worktrees or sibling chats in them. [SERVER]
 - `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
+- `BYOC_VERCEL_ORG_IDS` - Comma-separated organization IDs enrolled in customer-paid Vercel compute. Empty is off; unlike `VERCEL_SANDBOX_ORG_IDS`, an enrolled organization fails closed when its ready credential is absent. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 
 ### Gastown

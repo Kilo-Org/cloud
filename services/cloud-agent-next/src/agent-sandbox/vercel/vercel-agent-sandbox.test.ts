@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AgentSandboxRuntimeContext } from '../protocol.js';
 import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
+import { ByocCredentialMissingError } from '../../byoc/vercel-credential-resolver.js';
 import { VercelAgentSandbox } from './vercel-agent-sandbox.js';
 import type { VercelSandboxRuntimeConfig } from './vercel-runtime-config.js';
 import {
@@ -181,20 +182,23 @@ describe('VercelAgentSandbox', () => {
   it('observes absent persisted runtimes and wrappers without provider calls or reconciliation', async () => {
     const context = runtimeContext();
     const client = restClient();
-    const uncreated = new VercelAgentSandbox(metadata(), config, context, {
+    const resolveConfig = vi.fn().mockRejectedValue(new ByocCredentialMissingError('credential-1'));
+    const uncreated = new VercelAgentSandbox(metadata(), undefined, context, {
       restClient: asRestClient(client),
+      resolveConfig,
     });
     const withoutWrapper = new VercelAgentSandbox(
       metadata({ provider: 'vercel', sessionId: 'session-1' }),
-      config,
+      undefined,
       context,
-      { restClient: asRestClient(client) }
+      { restClient: asRestClient(client), resolveConfig }
     );
 
     await expect(uncreated.observeWrappersWithoutWaking()).resolves.toEqual({ status: 'absent' });
     await expect(withoutWrapper.observeWrappersWithoutWaking()).resolves.toEqual({
       status: 'absent',
     });
+    expect(resolveConfig).not.toHaveBeenCalled();
     expect(context.beginCreate).not.toHaveBeenCalled();
     expect(context.getWrapperLaunchIntent).not.toHaveBeenCalled();
     expect(client.getSession).not.toHaveBeenCalled();
@@ -258,6 +262,89 @@ describe('VercelAgentSandbox', () => {
     });
     expect(client.getSession).toHaveBeenCalledWith('session-1', 'ses-abcdef');
     expect(client.getCommand).toHaveBeenCalledWith('session-1', 'command-1');
+    expect(context.clearWrapperProcess).not.toHaveBeenCalled();
+  });
+
+  it('refreshes lazy credentials for no-wake observation without falling back to a stale client', async () => {
+    const context = runtimeContext();
+    const resolveConfig = vi.fn().mockResolvedValue({
+      ...config,
+      accessToken: 'byoc-token',
+      teamId: 'byoc-team',
+    } satisfies VercelSandboxRuntimeConfig);
+    const providerFetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Unexpected provider request'))
+      .mockResolvedValueOnce(
+        Response.json({
+          session: {
+            id: 'session-1',
+            sourceSandboxName: 'ses-abcdef',
+            projectId: 'project',
+            runtime: 'node24',
+            status: 'running',
+            memory: 2048,
+            vcpus: 2,
+            region: 'iad1',
+            timeout: 300_000,
+            requestedAt: 1,
+            cwd: '/',
+            createdAt: 1,
+            updatedAt: 1,
+          },
+          routes: [],
+        })
+      )
+      .mockResolvedValueOnce(Response.json({ command: command() }));
+    const sandbox = new VercelAgentSandbox(
+      metadata(persistedWrapperRuntime()),
+      undefined,
+      context,
+      { resolveConfig }
+    );
+
+    expect(resolveConfig).not.toHaveBeenCalled();
+    await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({
+      status: 'present',
+      observed: [
+        {
+          representation: 'process',
+          id: 'command-1',
+          instanceId: 'instance-1',
+          instanceGeneration: 2,
+        },
+      ],
+    });
+    expect(resolveConfig).toHaveBeenCalledOnce();
+    expect(
+      providerFetch.mock.calls.map(([url, init]) => ({
+        url,
+        method: init?.method,
+        authorization: new Headers(init?.headers).get('authorization'),
+      }))
+    ).toEqual([
+      {
+        url: 'https://api.vercel.com/v2/sandboxes/sessions/session-1?teamId=byoc-team',
+        method: 'GET',
+        authorization: 'Bearer byoc-token',
+      },
+      {
+        url: 'https://api.vercel.com/v2/sandboxes/sessions/session-1/cmd/command-1?teamId=byoc-team',
+        method: 'GET',
+        authorization: 'Bearer byoc-token',
+      },
+    ]);
+
+    resolveConfig.mockRejectedValueOnce(new ByocCredentialMissingError('credential-1'));
+    await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({
+      status: 'inspection-failed',
+      error: 'ByocCredentialMissingError: BYOC credential credential-1 is no longer available',
+    });
+    expect(resolveConfig).toHaveBeenCalledTimes(2);
+    expect(providerFetch).toHaveBeenCalledTimes(2);
+    expect(context.beginCreate).not.toHaveBeenCalled();
+    expect(context.beginWrapperLaunch).not.toHaveBeenCalled();
+    expect(context.getWrapperLaunchIntent).not.toHaveBeenCalled();
     expect(context.clearWrapperProcess).not.toHaveBeenCalled();
   });
 

@@ -10,7 +10,13 @@
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
-  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "rules": [
+    { "type": "Text", "globs": ["**/*.sql"], "fallthrough": true },
+    {
+      "type": "Data",
+      "globs": ["**/wrapper/dist/wrapper.js", "**/wrapper/dist/control-wrapper.js"],
+    },
+  ],
   "workers_dev": true,
   "dev": {
     "port": 8794,
@@ -66,14 +72,15 @@
     "CONTAINER_BILLING_HEARTBEAT_SECONDS": "300",
     "CONTROL_PLANE_IDS": "",
     "WORKTREE_CREATION_ENABLED_IDS": "",
+    "BYOC_VERCEL_ORG_IDS": "",
     "VERCEL_SANDBOX_ORG_IDS": "",
     "VERCEL_PROJECT_ID": "",
     "VERCEL_TEAM_ID": "",
     "VERCEL_SANDBOX_SNAPSHOT_ID": "",
     "VERCEL_SANDBOX_RUNTIME_BUILD_ID": "",
     "VERCEL_SANDBOX_RUNTIME": "node24",
-    "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "",
-    "VERCEL_SANDBOX_EXTEND_DURATION_MS": "",
+    "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "300000",
+    "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
   },
   "placement": { "mode": "smart" },
   /**
@@ -319,6 +326,10 @@
         "class_name": "SandboxSession",
         "name": "SANDBOX_SESSION",
       },
+      {
+        "class_name": "VercelSnapshotBuild",
+        "name": "VERCEL_SNAPSHOT_BUILD",
+      },
     ],
   },
   "migrations": [
@@ -365,6 +376,10 @@
     {
       "new_sqlite_classes": ["SandboxSession"],
       "tag": "v10",
+    },
+    {
+      "new_sqlite_classes": ["VercelSnapshotBuild"],
+      "tag": "v11",
     },
   ],
   /**
@@ -457,14 +472,15 @@
         "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
         "CONTROL_PLANE_IDS": "*",
         "WORKTREE_CREATION_ENABLED_IDS": "*",
+        "BYOC_VERCEL_ORG_IDS": "",
         "VERCEL_SANDBOX_ORG_IDS": "",
         "VERCEL_PROJECT_ID": "",
         "VERCEL_TEAM_ID": "",
         "VERCEL_SANDBOX_SNAPSHOT_ID": "",
         "VERCEL_SANDBOX_RUNTIME_BUILD_ID": "",
         "VERCEL_SANDBOX_RUNTIME": "node24",
-        "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "",
-        "VERCEL_SANDBOX_EXTEND_DURATION_MS": "",
+        "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "300000",
+        "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
       },
       "services": [
         {
@@ -634,6 +650,10 @@
           {
             "class_name": "SandboxSession",
             "name": "SANDBOX_SESSION",
+          },
+          {
+            "class_name": "VercelSnapshotBuild",
+            "name": "VERCEL_SNAPSHOT_BUILD",
           },
         ],
       },

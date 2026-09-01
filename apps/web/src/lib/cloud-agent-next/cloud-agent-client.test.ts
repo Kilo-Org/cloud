@@ -93,8 +93,13 @@ beforeEach(() => {
 // expose it) so the test exercises the actual fetch call, not a stub.
 const realCloudAgentClientModule =
   jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
-const { closeCloudAgentOrgStreams, CloudAgentNextClient, createAppBuilderCloudAgentNextClient } =
-  realCloudAgentClientModule;
+const {
+  closeCloudAgentOrgStreams,
+  CloudAgentNextClient,
+  createAppBuilderCloudAgentNextClient,
+  getVercelComputeEnrollment,
+  cleanupVercelSnapshotBuild,
+} = realCloudAgentClientModule;
 
 describe('CloudAgentNextClient worktree changes', () => {
   const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
@@ -873,5 +878,101 @@ describe('closeCloudAgentOrgStreams', () => {
     await expect(closeCloudAgentOrgStreams('usr_1', 'org_1')).rejects.toThrow(
       'Cloud Agent stream close failed: 500 Internal Server Error - boom'
     );
+  });
+});
+
+describe('getVercelComputeEnrollment', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it.each([true, false])('returns the authenticated Worker enrollment value %s', async enrolled => {
+    const fetchMock = jest
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(Response.json({ enrolled }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(getVercelComputeEnrollment('org/with-path')).resolves.toBe(enrolled);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://cloud-agent-next/internal/byoc/vercel-enrollment/org%2Fwith-path',
+      expect.objectContaining({
+        headers: { 'x-internal-api-key': 'test-secret' },
+        cache: 'no-store',
+      })
+    );
+  });
+
+  it('fails closed when the Worker response is malformed', async () => {
+    const fetchMock = jest
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(Response.json({ enrolled: 'true' }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(getVercelComputeEnrollment('org_1')).rejects.toThrow(
+      'Cloud Agent Vercel compute enrollment could not be verified'
+    );
+  });
+
+  it('does not expose upstream response details when enrollment cannot be verified', async () => {
+    const fetchMock = jest
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(new Response('sensitive upstream details', { status: 502 }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(getVercelComputeEnrollment('org_1')).rejects.toThrow(
+      'Cloud Agent Vercel compute enrollment could not be verified'
+    );
+  });
+});
+
+describe('cleanupVercelSnapshotBuild', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('sends the persisted snapshot identifier to the authenticated cleanup endpoint', async () => {
+    const fetchMock = jest
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const input = {
+      organizationId: 'org_1',
+      credentialId: 'credential_1',
+      buildGeneration: 'generation_1',
+      snapshotId: 'snap_existing',
+    };
+
+    await cleanupVercelSnapshotBuild(input);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://cloud-agent-next/internal/byoc/vercel-snapshot-build/cleanup',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-secret',
+        },
+        body: JSON.stringify(input),
+      })
+    );
+  });
+
+  it('fails safely when cleanup is rejected', async () => {
+    const fetchMock = jest
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(new Response('sensitive provider details', { status: 502 }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      cleanupVercelSnapshotBuild({
+        organizationId: 'org_1',
+        credentialId: 'credential_1',
+        buildGeneration: 'generation_1',
+      })
+    ).rejects.toThrow('Cloud Agent Vercel compute cleanup could not be completed');
   });
 });

@@ -12,5 +12,6 @@ export {
 export { CloudAgentSession } from './persistence/CloudAgentSession.js';
 export { SandboxControl } from './persistence/SandboxControl.js';
 export { SandboxSession } from './sandbox-session/SandboxSession.js';
+export { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

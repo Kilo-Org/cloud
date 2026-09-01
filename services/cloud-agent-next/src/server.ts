@@ -48,6 +48,10 @@ import {
 } from './sandbox-control/credential.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
+import { getVercelSnapshotBuildStub } from './byoc/vercel-snapshot-build-stub.js';
+import { withDORetry } from './utils/do-retry.js';
+import { z } from 'zod';
+import { isOrgInList } from './sandbox-id.js';
 
 const app = new Hono<HonoContext>();
 
@@ -241,6 +245,73 @@ app.post('/internal/sandbox-control/seed', async (c: Context<HonoContext>) => {
   const stub = getSandboxControlStub(c.env, sandboxId);
   await stub.setWrapperCredentialHash(await hashSandboxCredential(credential));
   return c.json({ sandboxId, credential });
+});
+
+app.get('/internal/byoc/vercel-enrollment/:organizationId', (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const organizationId = z.uuid().safeParse(c.req.param('organizationId'));
+  if (!organizationId.success) return c.text('Invalid organization ID', 400);
+
+  return c.json({ enrolled: isOrgInList(c.env.BYOC_VERCEL_ORG_IDS, organizationId.data) }, 200, {
+    'Cache-Control': 'no-store',
+  });
+});
+
+app.post('/internal/byoc/vercel-snapshot-build/start', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const input = z
+    .object({
+      organizationId: z.uuid(),
+      credentialId: z.uuid(),
+      buildGeneration: z.uuid(),
+    })
+    .safeParse(await c.req.json().catch(() => null));
+  if (!input.success) return c.text('Invalid request', 400);
+  if (!isOrgInList(c.env.BYOC_VERCEL_ORG_IDS, input.data.organizationId)) {
+    return c.text('Organization is not enrolled in Vercel compute', 403);
+  }
+
+  try {
+    await withDORetry(
+      () => getVercelSnapshotBuildStub(c.env, input.data.organizationId),
+      stub => stub.start(input.data),
+      'startVercelSnapshotBuild'
+    );
+  } catch {
+    return c.text('Snapshot build could not be started', 502);
+  }
+  return c.json({ accepted: true }, 202);
+});
+
+app.post('/internal/byoc/vercel-snapshot-build/cleanup', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const input = z
+    .object({
+      organizationId: z.uuid(),
+      credentialId: z.uuid(),
+      buildGeneration: z.uuid(),
+      snapshotId: z.string().min(1).max(256).optional(),
+    })
+    .safeParse(await c.req.json().catch(() => null));
+  if (!input.success) return c.text('Invalid request', 400);
+
+  try {
+    await withDORetry(
+      () => getVercelSnapshotBuildStub(c.env, input.data.organizationId),
+      stub => stub.cleanup(input.data),
+      'cleanupVercelSnapshotBuild'
+    );
+  } catch {
+    return c.text('Snapshot build resources could not be cleaned up', 502);
+  }
+
+  return c.body(null, 204);
 });
 
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {

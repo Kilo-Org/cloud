@@ -19,9 +19,11 @@ import { z } from 'zod';
 import { getPgDb } from '../../db/pg.js';
 import {
   CurrentSessionMetadataSchema,
+  getSandboxProviderBinding,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import { sameSandboxProviderBinding } from '../../sandbox-provider-binding.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { generateSessionId, isControlPlaneOwner } from '../../session-plane.js';
 import {
@@ -340,6 +342,10 @@ function assertRegisteredMetadata(
     workspace.workspacePath !== source.workspace.workspacePath ||
     workspace.sandboxId !== source.workspace.sandboxId ||
     workspace.sandboxProvider !== source.workspace.sandboxProvider ||
+    !sameSandboxProviderBinding(
+      getSandboxProviderBinding(metadata),
+      getSandboxProviderBinding(source.metadata)
+    ) ||
     workspace.branchName !== source.workspace.branchName ||
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
     !metadata.repository ||

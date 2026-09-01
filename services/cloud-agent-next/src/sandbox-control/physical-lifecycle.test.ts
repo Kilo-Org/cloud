@@ -208,13 +208,26 @@ describe('physical sandbox lifecycle', () => {
     expect(observe(observe(running(), 'unknown'), 'unknown').state).toBe('unknown');
   });
 
-  it('failed does not go to creating', () => {
+  it('failed allocations retain cleanup fences until a terminal observation', () => {
     const failed = fail(running(), NOW);
     expect(failed.state).toBe('failed');
     expect(() => claimCreate(failed, INTENT_ID, NOW)).toThrow('claimCreate from failed');
-    expect(observe(failed, 'active').state).toBe('unknown');
-    expect(observe(failed, 'unknown').state).toBe('unknown');
-    expect(observe(failed, 'terminal').state).toBe('stopped');
+
+    const unknown = observe(failed, 'active');
+    expect(unknown).toEqual({ ...failed, state: 'unknown' });
+    expect(observe(unknown, 'active')).toEqual(unknown);
+    expect(() => claimCreate(unknown, 'intent_2', NOW)).toThrow('claimCreate from unknown');
+
+    const terminal = observe(unknown, 'terminal');
+    expect(terminal).toEqual(stopped());
+    expect(claimCreate(terminal, 'intent_2', NOW).state).toBe('creating');
+  });
+
+  it('failed + active recovers a known allocation without pending cleanup', () => {
+    const failed = observe(running(), 'terminal');
+    expect(failed.state).toBe('failed');
+    expect(failed.stopTombstone).toBeNull();
+    expect(observe(failed, 'active')).toEqual(running());
   });
 
   it('confirmStopped from failed clears the ref so create can run', () => {

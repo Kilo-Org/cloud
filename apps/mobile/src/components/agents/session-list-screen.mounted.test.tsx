@@ -224,11 +224,16 @@ function header() {
   return root().findByType(ScreenHeader);
 }
 function listSkeletons() {
-  return nodes('Skeleton').filter(node => node.props.className.includes('h-[76px]'));
+  return nodes('Skeleton').filter(
+    node => typeof node.props.className === 'string' && node.props.className.includes('h-[76px]')
+  );
 }
 function contextControl() {
   return header().find(
-    node => node.type === 'Pressable' && node.props.accessibilityHint === 'Select account'
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Pressable' &&
+      node.props.accessibilityHint === 'Select account'
   );
 }
 function requireNode(type: string) {

@@ -292,7 +292,9 @@ describe('HomeScreen composition', () => {
       expect(typeof action('Retry').props.onPress).toBe('function');
       expect(nodes('RemoteSessionRow')).toHaveLength(retained ? 1 : 0);
       expect(nodes('NewTaskButton')).toHaveLength(1);
-      expect(nodes('ProductChoices')).toHaveLength(1);
+      for (const label of ['Code Reviewer', 'Security Agent', 'PR Review']) {
+        expect(typeof action(label).props.onPress).toBe('function');
+      }
     }
   );
 });

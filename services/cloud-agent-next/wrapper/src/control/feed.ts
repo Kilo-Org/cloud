@@ -1,5 +1,5 @@
 import type { HandlerSessionSnapshot } from './sandbox-control-handlers';
-import { directoryForSession, rootForSession } from './session-directories';
+import { directoryForSession, rememberChildSession, rootForSession } from './session-directories';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -39,14 +39,40 @@ export function childFromSessionCreated(
 export function sessionEventIdentity(input: {
   sessionId?: string;
   directory?: string;
+  runtimeDirectory?: string;
+  type?: string;
+  properties?: Record<string, unknown>;
 }): { directory: string; kiloSessionId?: string; rootKiloSessionId?: string } | undefined {
-  const directory = input.directory ?? directoryForSession(input.sessionId);
+  let directory = input.directory;
+  if ((input.type === 'session.created' || input.type === 'session.updated') && input.properties) {
+    const info = input.properties.info;
+    if (isRecord(info) && typeof info.directory === 'string') {
+      if (directory !== undefined && directory !== info.directory) return undefined;
+      directory = info.directory;
+    }
+    const child = childFromSessionCreated(input.properties);
+    if (child) {
+      if (child.childId !== input.sessionId) return undefined;
+      const parentRoot = rootForSession(child.parentId);
+      if (!parentRoot) return undefined;
+      if (
+        input.runtimeDirectory !== undefined &&
+        directoryForSession(parentRoot) !== input.runtimeDirectory
+      )
+        return undefined;
+      rememberChildSession({ ...child, directory });
+      if (rootForSession(child.childId) !== parentRoot) return undefined;
+    }
+  }
+  directory ??= directoryForSession(input.sessionId);
   const root = rootForSession(input.sessionId, directory);
-  if (!directory) return undefined;
+  if (!directory || !root) return undefined;
+  if (input.runtimeDirectory !== undefined && directoryForSession(root) !== input.runtimeDirectory)
+    return undefined;
   return {
     directory,
     ...(input.sessionId ? { kiloSessionId: input.sessionId } : {}),
-    ...(root ? { rootKiloSessionId: root } : {}),
+    rootKiloSessionId: root,
   };
 }
 
@@ -56,8 +82,9 @@ export function updateSessionSnapshots(
   now = Date.now()
 ): void {
   const sessionId = eventKiloSessionId(event.properties);
-  const kiloSessionId = rootForSession(sessionId, event.directory);
-  if (!kiloSessionId || !sessionId) return;
+  if (!sessionId) return;
+  const kiloSessionId = sessionEventIdentity({ ...event, sessionId })?.rootKiloSessionId;
+  if (!kiloSessionId) return;
   const snapshot = sessions.find(session => session.kiloSessionId === kiloSessionId);
   if (!snapshot) return;
   snapshot.lastActivityAt = now;

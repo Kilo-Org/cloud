@@ -30,6 +30,16 @@ export function isControlPlaneOwner(
   );
 }
 
+export function isWorktreeOwner(
+  env: { WORKTREE_CREATION_ENABLED_IDS?: string },
+  owner: { userId: string; orgId?: string }
+): boolean {
+  return (
+    ownerIdInList(env.WORKTREE_CREATION_ENABLED_IDS, owner.userId) ||
+    ownerIdInList(env.WORKTREE_CREATION_ENABLED_IDS, owner.orgId)
+  );
+}
+
 export function sessionPlaneForNewOwner(
   env: ControlPlaneOwnerEnv,
   owner: { userId: string; orgId?: string }

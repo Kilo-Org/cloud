@@ -34,6 +34,17 @@ const providerRefSchema = z
 
 export type VercelProviderRef = z.infer<typeof providerRefSchema>;
 
+export const vercelProviderLocatorSchema = z
+  .object({
+    teamId: z.string().min(1),
+    projectId: z.string().min(1),
+    snapshotId: z.string().min(1),
+    runtimeBuildId: z.string().min(1),
+    runtime: z.literal('node24'),
+  })
+  .strict();
+export type VercelProviderLocator = z.infer<typeof vercelProviderLocatorSchema>;
+
 export type VercelControlRestClient = {
   createSandbox: VercelSandboxRestClient['createSandbox'];
   inspectByName: VercelSandboxRestClient['inspectByName'];

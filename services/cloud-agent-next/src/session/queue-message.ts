@@ -14,7 +14,7 @@ import type {
   SubmittedSessionMessageRequest,
   RetryableResultCode,
 } from '../execution/types.js';
-import type { SessionId, UserId } from '../types/ids.js';
+import type { SessionId } from '../types/ids.js';
 import type { Env } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { QueueAckResponse } from '../router/schemas.js';
@@ -160,7 +160,7 @@ export async function queueMessage(
 ): Promise<QueueAckResponse> {
   const sessionId = input.cloudAgentSessionId as SessionId;
   const request: SubmittedSessionMessageRequest = {
-    userId: ctx.userId as UserId,
+    userId: ctx.userId,
     botId: ctx.botId,
     turn: {
       ...input.turn,

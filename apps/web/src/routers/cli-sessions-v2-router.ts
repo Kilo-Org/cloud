@@ -6,6 +6,7 @@ import {
   eq,
   and,
   or,
+  asc,
   desc,
   lt,
   isNull,
@@ -17,15 +18,18 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import { TRPC_ERROR_CODES_BY_KEY } from '@trpc/server/rpc';
 import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
 import {
   cli_sessions_v2,
+  cloud_agent_worktrees,
   github_branch_pull_requests,
   organization_memberships,
+  type CliSessionV2,
 } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken, generateCloudAgentToken } from '@/lib/tokens';
 import {
   fetchSessionSnapshot,
   fetchSessionMessagesPage,
@@ -36,6 +40,9 @@ import {
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  cloudAgentWorktreeIdSchema,
+  isDefaultSessionTitle,
+  projectPrivateWorktreePaths,
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
@@ -75,6 +82,75 @@ function isSessionNotFoundError(err: unknown): boolean {
     }
   }
   return false;
+}
+
+const privateTranscriptPathFields = new Set([
+  'path',
+  'file',
+  'activeFile',
+  'pattern',
+  'absolutePath',
+  'filePath',
+  'filepath',
+]);
+const privateTranscriptPathArrays = new Set(['files', 'visibleFiles', 'openTabs']);
+
+function isAbsoluteTranscriptPath(value: string): boolean {
+  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value);
+}
+
+function projectGroupedTranscriptPaths(value: unknown, directory: string): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      projectGroupedTranscriptPaths(item, directory);
+    }
+    return;
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    return;
+  }
+
+  for (const [key, current] of Object.entries(value)) {
+    if (typeof current === 'string') {
+      if (
+        key === 'directory' ||
+        key === 'cwd' ||
+        key === 'root' ||
+        (privateTranscriptPathFields.has(key) && isAbsoluteTranscriptPath(current))
+      ) {
+        Reflect.set(value, key, directory);
+      } else if ((key === 'url' || key === 'uri') && /^file:/i.test(current)) {
+        Reflect.set(value, key, '');
+      }
+      continue;
+    }
+
+    if (Array.isArray(current) && privateTranscriptPathArrays.has(key)) {
+      for (let index = 0; index < current.length; index += 1) {
+        const path = current[index];
+        if (typeof path === 'string' && isAbsoluteTranscriptPath(path)) {
+          current[index] = directory;
+        } else {
+          projectGroupedTranscriptPaths(path, directory);
+        }
+      }
+      continue;
+    }
+
+    projectGroupedTranscriptPaths(current, directory);
+  }
+}
+
+function projectGroupedSessionTranscript<T extends object>(
+  value: T,
+  kiloSessionId: string,
+  metadata: readonly unknown[]
+): T {
+  const directory = `/cloud-agent/sessions/${kiloSessionId}`;
+  const projected = projectPrivateWorktreePaths(value, metadata, directory);
+  projectGroupedTranscriptPaths(projected, directory);
+  return projected;
 }
 
 const PAGE_SIZE = 10;
@@ -344,6 +420,7 @@ const commonSessionFields = {
   session_id: cli_sessions_v2.session_id,
   title: cli_sessions_v2.title,
   cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
+  cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
   parent_session_id: cli_sessions_v2.parent_session_id,
   organization_id: cli_sessions_v2.organization_id,
   created_on_platform: cli_sessions_v2.created_on_platform,
@@ -455,6 +532,44 @@ function projectAssociatedPr<
   };
 }
 
+type WorktreeDetail = {
+  name: string | null;
+  defaultTitle: string | null;
+  sessions: {
+    sessionId: string;
+    sessionStatus: string | null;
+    sessionStatusUpdatedAt: string | null;
+  }[];
+  prSession:
+    | (Pick<CliSessionV2, keyof typeof commonSessionFields | 'total_cost_microdollars'> & {
+        associatedPr: z.infer<typeof associatedPrSchema> | null;
+      })
+    | null;
+};
+
+const WorktreeInputSchema = z.object({
+  worktreeId: cloudAgentWorktreeIdSchema,
+  organizationId: z.uuid().nullable(),
+});
+
+const WorktreeDetailsInputSchema = z.object({
+  worktreeIds: z
+    .array(cloudAgentWorktreeIdSchema)
+    .max(200)
+    .transform(ids => [...new Set(ids)]),
+  organizationId: z.uuid().nullable(),
+});
+
+function worktreeMembershipCondition(userId: string, organizationId: string | null) {
+  return organizationId === null
+    ? undefined
+    : sql`EXISTS (
+        SELECT 1 FROM ${organization_memberships}
+        WHERE ${organization_memberships.kilo_user_id} = ${userId}
+          AND ${organization_memberships.organization_id} = ${organizationId}
+      )`;
+}
+
 const sessionIdField = z.string().min(1);
 const cloudAgentSessionIdField = z.string().min(1).max(255);
 
@@ -526,6 +641,7 @@ const ListSessionsInputSchema = z.object({
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
     .optional(),
   organizationId: z.uuid().nullable().optional(),
+  worktreeId: cloudAgentWorktreeIdSchema.optional(),
   gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
   updatedSince: z.iso.datetime().optional(),
   version: z.number().optional(),
@@ -547,6 +663,7 @@ const SearchInputSchema = z.object({
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
     .optional(),
   organizationId: z.uuid().nullable().optional(),
+  worktreeId: cloudAgentWorktreeIdSchema.optional(),
   includeChildren: z.boolean().optional().default(false),
   sharedOnly: z.boolean().optional().default(false),
   gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
@@ -714,6 +831,242 @@ function joinWithAnd(fragments: SQL[]): SQL {
  * This router only queries the data.
  */
 export const cliSessionsV2Router = createTRPCRouter({
+  worktreeDetails: baseProcedure.input(WorktreeDetailsInputSchema).query(async ({ ctx, input }) => {
+    const worktrees: Record<string, WorktreeDetail> = {};
+    if (input.worktreeIds.length === 0) {
+      return { worktrees };
+    }
+
+    const scopeCondition = and(
+      eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+      input.organizationId === null
+        ? isNull(cli_sessions_v2.organization_id)
+        : eq(cli_sessions_v2.organization_id, input.organizationId),
+      worktreeMembershipCondition(ctx.user.id, input.organizationId),
+      inArray(cli_sessions_v2.cloud_agent_worktree_id, input.worktreeIds),
+      isNull(cli_sessions_v2.parent_session_id),
+      or(
+        isNull(cloud_agent_worktrees.worktree_id),
+        and(
+          eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id),
+          sql`${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${cli_sessions_v2.organization_id}`
+        )
+      ),
+      isNull(cloud_agent_worktrees.deletion_started_at),
+      isNull(cloud_agent_worktrees.deletion_completed_at)
+    );
+    const metadataJoin = eq(
+      cloud_agent_worktrees.worktree_id,
+      cli_sessions_v2.cloud_agent_worktree_id
+    );
+
+    const [firstSessions, prRows, activityRows] = await Promise.all([
+      db
+        .selectDistinctOn([cli_sessions_v2.cloud_agent_worktree_id], {
+          worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+          title: cli_sessions_v2.title,
+          name: cloud_agent_worktrees.name,
+        })
+        .from(cli_sessions_v2)
+        .leftJoin(cloud_agent_worktrees, metadataJoin)
+        .where(scopeCondition)
+        .orderBy(
+          asc(cli_sessions_v2.cloud_agent_worktree_id),
+          asc(cli_sessions_v2.created_at),
+          asc(cli_sessions_v2.session_id)
+        ),
+      db
+        .selectDistinctOn([cli_sessions_v2.cloud_agent_worktree_id], commonSessionFieldsWithPr)
+        .from(cli_sessions_v2)
+        .leftJoin(cloud_agent_worktrees, metadataJoin)
+        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+        .where(
+          and(
+            scopeCondition,
+            or(
+              sql`COALESCE(${cli_sessions_v2.pr_url}, '') <> ''`,
+              and(
+                isNotNull(github_branch_pull_requests.pr_url),
+                isNotNull(github_branch_pull_requests.pr_number),
+                isNotNull(github_branch_pull_requests.pr_state),
+                isNotNull(github_branch_pull_requests.pr_last_synced_at)
+              )
+            )
+          )
+        )
+        .orderBy(
+          asc(cli_sessions_v2.cloud_agent_worktree_id),
+          desc(cli_sessions_v2.updated_at),
+          asc(cli_sessions_v2.session_id)
+        ),
+      db
+        .select({
+          worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+          sessions: sql<WorktreeDetail['sessions']>`json_agg(json_build_object(
+            'sessionId', ${cli_sessions_v2.session_id},
+            'sessionStatus', ${cli_sessions_v2.status},
+            'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at}
+          ) ORDER BY ${cli_sessions_v2.session_id})`,
+        })
+        .from(cli_sessions_v2)
+        .leftJoin(cloud_agent_worktrees, metadataJoin)
+        .where(scopeCondition)
+        .groupBy(cli_sessions_v2.cloud_agent_worktree_id),
+    ]);
+
+    const activityByWorktree = new Map(
+      activityRows.map(row => [
+        row.worktreeId,
+        row.sessions.map(session => ({
+          ...session,
+          sessionStatusUpdatedAt: session.sessionStatusUpdatedAt
+            ? new Date(session.sessionStatusUpdatedAt).toISOString()
+            : null,
+        })),
+      ])
+    );
+    const prSessions = new Map<string, NonNullable<WorktreeDetail['prSession']>>();
+    for (const row of prRows) {
+      const session = projectAssociatedPr(row);
+      if (session.cloud_agent_worktree_id === null || session.associatedPr === null) {
+        continue;
+      }
+      prSessions.set(session.cloud_agent_worktree_id, {
+        ...session,
+        created_at: new Date(session.created_at).toISOString(),
+        updated_at: new Date(session.updated_at).toISOString(),
+        status_updated_at: session.status_updated_at
+          ? new Date(session.status_updated_at).toISOString()
+          : null,
+        associatedPr: {
+          ...session.associatedPr,
+          lastSyncedAt: new Date(session.associatedPr.lastSyncedAt).toISOString(),
+        },
+      });
+    }
+
+    for (const session of firstSessions) {
+      if (session.worktreeId === null) {
+        continue;
+      }
+      worktrees[session.worktreeId] = {
+        name: session.name,
+        defaultTitle:
+          session.title?.trim() && !isDefaultSessionTitle(session.title) ? session.title : null,
+        sessions: activityByWorktree.get(session.worktreeId) ?? [],
+        prSession: prSessions.get(session.worktreeId) ?? null,
+      };
+    }
+    const hasPendingPrRows = Object.values(worktrees).some(
+      worktree => worktree.prSession?.associatedPr?.reviewDecisionPending === true
+    );
+    if (hasPendingPrRows) {
+      after(() =>
+        triggerBatchReviewDecisionFetchIfNeeded(hasPendingPrRows, {
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+        })
+      );
+    }
+    return { worktrees };
+  }),
+
+  renameWorktree: baseProcedure
+    .input(WorktreeInputSchema.extend({ name: z.string().trim().min(1).max(200) }))
+    .mutation(async ({ ctx, input }) =>
+      db.transaction(async tx => {
+        const membershipCondition = worktreeMembershipCondition(ctx.user.id, input.organizationId);
+        const [session] = await tx
+          .select({ createdAt: cli_sessions_v2.created_at })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.cloud_agent_worktree_id, input.worktreeId),
+              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+              input.organizationId === null
+                ? isNull(cli_sessions_v2.organization_id)
+                : eq(cli_sessions_v2.organization_id, input.organizationId),
+              membershipCondition
+            )
+          )
+          .orderBy(asc(cli_sessions_v2.created_at))
+          .limit(1);
+
+        if (session) {
+          await tx
+            .insert(cloud_agent_worktrees)
+            .values({
+              worktree_id: input.worktreeId,
+              kilo_user_id: ctx.user.id,
+              organization_id: input.organizationId,
+              created_at: session.createdAt,
+            })
+            .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
+        }
+
+        const scopeCondition = and(
+          eq(cloud_agent_worktrees.worktree_id, input.worktreeId),
+          eq(cloud_agent_worktrees.kilo_user_id, ctx.user.id),
+          input.organizationId === null
+            ? isNull(cloud_agent_worktrees.organization_id)
+            : eq(cloud_agent_worktrees.organization_id, input.organizationId),
+          membershipCondition
+        );
+        const [worktree] = await tx
+          .select({
+            deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
+            deletionCompletedAt: cloud_agent_worktrees.deletion_completed_at,
+          })
+          .from(cloud_agent_worktrees)
+          .where(scopeCondition)
+          .for('update');
+
+        if (!worktree) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
+        }
+        if (worktree.deletionStartedAt !== null || worktree.deletionCompletedAt !== null) {
+          throw new TRPCError({ code: 'CONFLICT', message: 'Worktree is being deleted' });
+        }
+
+        const [updated] = await tx
+          .update(cloud_agent_worktrees)
+          .set({ name: input.name, updated_at: sql`now()` })
+          .where(scopeCondition)
+          .returning({ worktreeId: cloud_agent_worktrees.worktree_id });
+        if (!updated) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
+        }
+        return { name: input.name };
+      })
+    ),
+
+  deleteWorktree: baseProcedure
+    .input(WorktreeInputSchema)
+    .output(z.object({ success: z.literal(true), deletedSessionIds: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      try {
+        return await client.deleteWorktree({
+          worktreeId: input.worktreeId,
+          ...(input.organizationId === null
+            ? {}
+            : { kilocodeOrganizationId: input.organizationId }),
+        });
+      } catch (error) {
+        if (error instanceof TRPCClientError) {
+          const code: unknown = error.data?.code ?? error.shape?.data?.code;
+          if (typeof code === 'string' && Object.hasOwn(TRPC_ERROR_CODES_BY_KEY, code)) {
+            throw new TRPCError({
+              code: code as keyof typeof TRPC_ERROR_CODES_BY_KEY,
+              message: error.message,
+              cause: error,
+            });
+          }
+        }
+        throw error;
+      }
+    }),
+
   /**
    * List sessions for the current user with cursor-based pagination.
    */
@@ -726,6 +1079,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       sharedOnly,
       createdOnPlatform,
       organizationId,
+      worktreeId,
       gitUrl,
       updatedSince,
       version,
@@ -737,6 +1091,9 @@ export const cliSessionsV2Router = createTRPCRouter({
     const whereConditions: SQL[] = [eq(cli_sessions_v2.kilo_user_id, ctx.user.id)];
 
     await addOrganizationCondition(whereConditions, ctx, organizationId);
+    if (worktreeId) {
+      whereConditions.push(eq(cli_sessions_v2.cloud_agent_worktree_id, worktreeId));
+    }
     addCreatedOnPlatformConditions(whereConditions, createdOnPlatform);
     addGitUrlConditions(whereConditions, gitUrl);
     addHideUningestedPlaceholderCondition(whereConditions);
@@ -813,6 +1170,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       orderBy,
       createdOnPlatform,
       organizationId,
+      worktreeId,
       includeChildren,
       sharedOnly,
       gitUrl,
@@ -826,6 +1184,9 @@ export const cliSessionsV2Router = createTRPCRouter({
     const whereConditions: SQL[] = [eq(cli_sessions_v2.kilo_user_id, ctx.user.id)];
 
     await addOrganizationCondition(whereConditions, ctx, organizationId);
+    if (worktreeId) {
+      whereConditions.push(eq(cli_sessions_v2.cloud_agent_worktree_id, worktreeId));
+    }
     addCreatedOnPlatformConditions(whereConditions, createdOnPlatform);
     addGitUrlConditions(whereConditions, gitUrl);
     addHideUningestedPlaceholderCondition(whereConditions);
@@ -856,6 +1217,15 @@ export const cliSessionsV2Router = createTRPCRouter({
         sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_url}, ''))) > 0`,
         sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_branch}, ''))) > 0`,
         sql`position(${needle} in lower(COALESCE(${github_branch_pull_requests.pr_title}, ''))) > 0`,
+        sql`EXISTS (
+          SELECT 1 FROM ${cloud_agent_worktrees}
+          WHERE ${cloud_agent_worktrees.worktree_id} = ${cli_sessions_v2.cloud_agent_worktree_id}
+            AND ${cloud_agent_worktrees.kilo_user_id} = ${cli_sessions_v2.kilo_user_id}
+            AND ${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${cli_sessions_v2.organization_id}
+            AND ${cloud_agent_worktrees.deletion_started_at} IS NULL
+            AND ${cloud_agent_worktrees.deletion_completed_at} IS NULL
+            AND position(${needle} in lower(COALESCE(${cloud_agent_worktrees.name}, ''))) > 0
+        )`,
       ];
       // `#1234` and a bare `1234` name one pull request; they are not a
       // substring search over every stored number. An equality test on the
@@ -1005,11 +1375,19 @@ export const cliSessionsV2Router = createTRPCRouter({
   getSessionMessages: baseProcedure
     .input(z.object({ session_id: sessionIdField }))
     .query(async ({ ctx, input }) => {
-      await getSessionWithAccessCheck(input.session_id, ctx);
+      const session = await getSessionWithAccessCheck(input.session_id, ctx);
 
       try {
         const snapshot = await fetchSessionSnapshot(input.session_id, ctx.user.id);
-        return snapshot ?? { info: {}, messages: [] };
+        if (!snapshot) {
+          return { info: {}, messages: [] };
+        }
+        return session.cloud_agent_worktree_id
+          ? projectGroupedSessionTranscript(snapshot, input.session_id, [
+              snapshot.info,
+              ...snapshot.messages.map(message => message.info),
+            ])
+          : snapshot;
       } catch (error) {
         console.error(
           `Failed to fetch messages for session ${input.session_id}:`,
@@ -1092,7 +1470,18 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      return { ...result, watermarkEventId };
+      return {
+        ...(session.cloud_agent_worktree_id
+          ? projectGroupedSessionTranscript(
+              result,
+              input.session_id,
+              result.history && 'messages' in result.history
+                ? result.history.messages.map(message => message.info)
+                : []
+            )
+          : result),
+        watermarkEventId,
+      };
     }),
 
   /**
@@ -1113,6 +1502,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         session_id: z.string(),
         title: z.string().nullable(),
         cloud_agent_session_id: z.string().nullable(),
+        cloud_agent_worktree_id: cloudAgentWorktreeIdSchema.nullable(),
         organization_id: z.string().nullable(),
         git_url: z.string().nullable(),
         git_branch: z.string().nullable(),
@@ -1228,6 +1618,9 @@ export const cliSessionsV2Router = createTRPCRouter({
         session_id: session.session_id,
         title: session.title,
         cloud_agent_session_id: session.cloud_agent_session_id,
+        cloud_agent_worktree_id: session.cloud_agent_worktree_id
+          ? cloudAgentWorktreeIdSchema.parse(session.cloud_agent_worktree_id)
+          : null,
         organization_id: session.organization_id ?? null,
         git_url: session.git_url ?? null,
         git_branch: session.git_branch ?? null,
@@ -1585,7 +1978,10 @@ export const cliSessionsV2Router = createTRPCRouter({
       const authToken = generateApiToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       try {
-        await client.deleteSession(session.cloud_agent_session_id);
+        const result = await client.deleteSession(session.cloud_agent_session_id);
+        if (!result.success) {
+          throw new Error('Cloud-agent session deletion was not confirmed');
+        }
       } catch (err) {
         if (!isSessionNotFoundError(err)) {
           captureException(err, {

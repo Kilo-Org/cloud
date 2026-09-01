@@ -13,6 +13,10 @@ import {
   serializeSessionMetadata,
   type SessionMetadata,
 } from './session-metadata.js';
+import {
+  sessionRuntimeLocator,
+  type SessionRuntimeLocator,
+} from '../sandbox-control/worktree-ownership.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
@@ -38,7 +42,6 @@ import {
   type EventSourceId,
   type EventId,
   type SessionId,
-  type UserId,
 } from '../types/ids.js';
 import type {
   ExecutionMetadata,
@@ -1115,7 +1118,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     return {
       sessionId: metadata.identity.sessionId as SessionId,
-      userId: metadata.identity.userId as UserId,
+      userId: metadata.identity.userId,
       orgId: metadata.identity.orgId,
       sandboxId,
       kiloSessionId: metadata.auth.kiloSessionId,
@@ -1661,6 +1664,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async getMetadata(): Promise<SessionMetadata | null> {
     if (await this.hasDeletionIntent()) return null;
     return this.getStoredMetadata();
+  }
+
+  async getRuntimeLocation(): Promise<SessionRuntimeLocator | null> {
+    const metadata = await this.getStoredMetadata();
+    return metadata ? sessionRuntimeLocator(metadata) : null;
   }
 
   async validateKiloGlobalFeedProducer(params: {
@@ -2599,7 +2607,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const initialTurn = input.message.initialTurn;
     const admitInitialTurn = () =>
       this.getSessionMessageQueue().admitAcceptedMessage({
-        userId: input.identity.userId as UserId,
+        userId: input.identity.userId,
         botId: input.identity.botId,
         turn: initialTurn,
         agent: input.agent,

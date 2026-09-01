@@ -119,6 +119,7 @@ function session(id: string): StoredSession {
     title: `${id} title`,
     organization_id: 'org-1',
     cloud_agent_session_id: null,
+    cloud_agent_worktree_id: null,
     parent_session_id: null,
     created_on_platform: 'cli',
     git_url: null,

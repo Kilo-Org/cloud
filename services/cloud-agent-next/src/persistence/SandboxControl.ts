@@ -1,9 +1,30 @@
 import { DurableObject } from 'cloudflare:workers';
+import {
+  cloudAgentWorktreeIdSchema,
+  WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
+} from '@kilocode/session-ingest-contracts';
+import { resolveSandboxExclusivity } from '../sandbox-control/worktree-ownership.js';
+import { getWorktreeWorkspacePath } from '../workspace.js';
+import {
+  cleanWorktreeRuntime,
+  isUnallocatedControlRuntime,
+  loadWorktreeDeletionJournal,
+  loadWorktreeDeletionJournals,
+  sandboxWorktreeCleanupInputSchema,
+  WORKTREE_DELETION_PREFIX,
+  EXCLUSIVE_DELETION_KEY,
+  RUNTIME_DELETED_KEY,
+  type SandboxWorktreeCleanupInput,
+} from '../sandbox-control/worktree-deletion.js';
 import { getSandbox } from '@cloudflare/sandbox';
 import { withTimeout } from '@kilocode/worker-utils';
 import { z } from 'zod';
 import type { Env } from '../types.js';
-import { getSandboxProvider, type SessionMetadata } from './session-metadata.js';
+import {
+  getSandboxProvider,
+  requiresContainmentSandbox,
+  type SessionMetadata,
+} from './session-metadata.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import { logger } from '../logger.js';
 import {
@@ -52,6 +73,7 @@ import {
   observe,
   recordStopAttempt,
   sameAllocation,
+  getWorktreeCredentialContainment,
   WORKTREE_CREDENTIAL_CONTAINMENT,
   type CredentialContainmentRequirements,
   type ObserveResult,
@@ -121,6 +143,8 @@ import {
 import {
   createVercelProviderAdapter,
   decodeVercelProviderRef,
+  vercelProviderLocatorSchema,
+  type VercelProviderLocator,
 } from '../sandbox-control/vercel-provider.js';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
@@ -153,6 +177,7 @@ const WRAPPER_READY_AT_KEY = 'wrapper_ready_at';
 const ACTIVE_WRAPPER_RUNTIME_KEY = 'active_wrapper_runtime';
 const DIAGNOSTIC_BUNDLE_KEY = 'diagnostic_bundle';
 const PROVIDER_KIND_KEY = 'provider_kind';
+const PROVIDER_LOCATOR_KEY = 'provider_locator';
 const BILLING_INPUT_KEY = 'billing_input';
 const ACQUISITION_RECEIPTS_KEY = 'acquisition_receipts';
 const CREDENTIAL_POLICY_DIRTY_KEY = 'credential_policy_dirty';
@@ -232,6 +257,13 @@ export class SandboxControl extends DurableObject<Env> {
     physical: PhysicalRecord;
     promise: Promise<StopResult>;
   } | null = null;
+  private vercelLocator: VercelProviderLocator | undefined;
+  private readonly deletingWorktrees = new Set<string>();
+  private exclusiveDeletionWorktreeId: string | undefined;
+  private runtimeDeleted = false;
+  private readonly readinessOperations = new Set<Promise<unknown>>();
+  private readonly lifecycleOperations = new Set<Promise<unknown>>();
+  private worktreeDeletionChain: Promise<unknown> = Promise.resolve();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -259,8 +291,20 @@ export class SandboxControl extends DurableObject<Env> {
         ctx.storage.get<AgentSandboxProvider>(PROVIDER_KIND_KEY),
         loadPhysicalRecord(ctx.storage),
       ]);
+      this.vercelLocator = vercelProviderLocatorSchema
+        .optional()
+        .parse(await ctx.storage.get(PROVIDER_LOCATOR_KEY));
       this.providerKind = kind ?? 'cloudflare';
       this.provider = this.createProviderAdapter(this.providerKind, physical);
+      this.runtimeDeleted = (await ctx.storage.get(RUNTIME_DELETED_KEY)) === true;
+      this.exclusiveDeletionWorktreeId = cloudAgentWorktreeIdSchema
+        .optional()
+        .parse(await ctx.storage.get(EXCLUSIVE_DELETION_KEY));
+      for (const key of (await ctx.storage.list({ prefix: WORKTREE_DELETION_PREFIX })).keys()) {
+        this.deletingWorktrees.add(
+          cloudAgentWorktreeIdSchema.parse(key.slice(WORKTREE_DELETION_PREFIX.length))
+        );
+      }
       await this.repairLifecycleScheduling(physical);
       if (
         physical.stopTombstone ||
@@ -304,18 +348,32 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    await this.socketHandler.handleMessage(ws, message);
+    if (this.runtimeDeleted) return;
+    await this.trackLifecycleOperation(
+      Promise.resolve(this.socketHandler.handleMessage(ws, message))
+    );
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
-    await this.socketHandler.handleClose(ws);
+    if (this.runtimeDeleted) return;
+    await this.trackLifecycleOperation(Promise.resolve(this.socketHandler.handleClose(ws)));
   }
 
   async webSocketError(ws: WebSocket): Promise<void> {
-    await this.socketHandler.handleClose(ws);
+    await this.webSocketClose(ws);
   }
 
   async alarm(): Promise<void> {
+    if (this.runtimeDeleted) return;
+    await this.trackLifecycleOperation(this.runAlarm());
+  }
+
+  private trackLifecycleOperation<T>(operation: Promise<T>): Promise<T> {
+    this.lifecycleOperations.add(operation);
+    return operation.finally(() => this.lifecycleOperations.delete(operation));
+  }
+
+  private async runAlarm(): Promise<void> {
     const now = Date.now();
     const deadlines = await loadDeadlines(this.ctx.storage);
     for (const id of dueDeadlines(deadlines, now)) {
@@ -391,6 +449,10 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async request(input: SandboxControlOutboundRequest): Promise<ResponseFrame> {
+    await this.assertRequestWorktreeAdmission(input);
+    if (input.operation === 'worktree.delete' || input.operation === 'worktree.prepareDeletion') {
+      throw new Error('Worktree cleanup requires the deletion coordinator');
+    }
     const expectedWrapperInstanceId =
       input.expectedWrapperInstanceId === undefined
         ? undefined
@@ -423,7 +485,8 @@ export class SandboxControl extends DurableObject<Env> {
       if (!identity.success) throw new Error('session identity is required');
       await this.ctx.storage.transaction(async () => {
         const current = await loadPhysicalRecord(this.ctx.storage);
-        const route = (await loadRouteTable(this.ctx.storage)).get(identity.data.sessionId);
+        const table = await loadRouteTable(this.ctx.storage);
+        const route = table.get(identity.data.sessionId);
         if (
           current.state !== 'running' ||
           current.stopTombstone ||
@@ -440,20 +503,38 @@ export class SandboxControl extends DurableObject<Env> {
         ) {
           throw new Error('Session is not attached to this sandbox runtime');
         }
+        this.assertWorktreeAdmission(route.worktreeId);
+        const now = Date.now();
+        if (input.operation === 'session.prompt') {
+          const previous = route.lastState;
+          applyReportedSessionState(
+            table,
+            route.kiloSessionId,
+            { state: 'active', idleForMs: 0, waitingOn: 'model' },
+            now
+          );
+          await saveRouteTable(this.ctx.storage, table);
+          if (previous !== 'active') {
+            await this.appendLog(
+              sessionStateTransition(now, route.kiloSessionId, previous, 'active')
+            );
+          }
+        }
         const deadlines = await loadDeadlines(this.ctx.storage);
         const next = armDeadline(
           deadlines,
           'idleStop',
-          Math.max(deadlines.idleStop ?? 0, Date.now() + DEADLINE_MS.idleStop)
+          Math.max(deadlines.idleStop ?? 0, now + DEADLINE_MS.idleStop)
         );
         await saveDeadlines(this.ctx.storage, next);
         if (deadlines.idleStop === undefined) {
-          await this.appendLog(deadlineTransition(Date.now(), 'idleStop', 'armed'));
+          await this.appendLog(deadlineTransition(now, 'idleStop', 'armed'));
         }
         await this.scheduleAlarm(next);
         if (!isCurrent()) throw new Error('Sandbox wrapper runtime changed');
       });
     }
+    await this.assertRequestWorktreeAdmission(input);
     if (!isCurrent()) throw new Error('Sandbox wrapper runtime changed');
     return this.socketHandler.sendRequest(input);
   }
@@ -516,17 +597,20 @@ export class SandboxControl extends DurableObject<Env> {
     const provider = getSandboxProvider(metadata);
     await this.pinProvider(provider);
     const physical = await loadPhysicalRecord(this.ctx.storage);
-    if (!this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)) {
+    const requiredContainment = getWorktreeCredentialContainment(
+      requiresContainmentSandbox(metadata)
+    );
+    if (!this.matchesContainment(physical, requiredContainment)) {
       throw new Error('Sandbox credential containment is unavailable');
     }
     const outboundContainerId =
-      provider === 'cloudflare'
+      provider === 'cloudflare' && requiredContainment.kilocode
         ? getOutboundContainerId(
             this.env,
             decodeCloudflareProviderRef(physical.providerRef)?.sandboxId ??
               physical.createIntent?.allocationName ??
               this.sandboxId,
-            { managedScmContainment: true }
+            { managedScmContainment: requiredContainment.kilocode }
           )
         : undefined;
     const grants = await loadSessionCredentialGrants(this.ctx.storage);
@@ -565,7 +649,7 @@ export class SandboxControl extends DurableObject<Env> {
       if (
         (deadlineAt !== undefined && Date.now() >= deadlineAt) ||
         !sameAllocation(physical, currentPhysical) ||
-        !this.matchesContainment(currentPhysical, WORKTREE_CREDENTIAL_CONTAINMENT)
+        !this.matchesContainment(currentPhysical, requiredContainment)
       ) {
         throw new Error('Sandbox changed during credential preparation');
       }
@@ -575,15 +659,20 @@ export class SandboxControl extends DurableObject<Env> {
           !currentRuntime.allowed ||
           !this.sameTerminalRuntime(currentRuntime, terminal.runtime) ||
           prepared.grant.scopeId !== terminal.runtime.grant.scopeId ||
+          (prepared.grant.containmentEnabled !== false) !==
+            (terminal.runtime.grant.containmentEnabled !== false) ||
           prepared.grant.kilo.alias !== terminal.runtime.grant.kilo.alias
         ) {
           throw new Error('Terminal runtime changed during credential preparation');
         }
       }
+      this.assertWorktreeAdmission(metadata.workspace?.worktreeId);
       const updated = [...grants.filter(grant => grant.scopeId !== scopeId), prepared.grant];
-      if (provider === 'vercel') await this.ctx.storage.put(CREDENTIAL_POLICY_DIRTY_KEY, true);
+      if (provider === 'vercel' && requiredContainment.kilocode) {
+        await this.ctx.storage.put(CREDENTIAL_POLICY_DIRTY_KEY, true);
+      }
       await saveSessionCredentialGrants(this.ctx.storage, updated);
-      if (provider === 'vercel') {
+      if (provider === 'vercel' && requiredContainment.kilocode) {
         const deadlines = await loadDeadlines(this.ctx.storage);
         const next = armDeadline(
           deadlines,
@@ -628,6 +717,7 @@ export class SandboxControl extends DurableObject<Env> {
           const expected = alias.purpose === 'kilo' ? grant.kilo.alias : grant.scm?.alias;
           if (
             grant.userId !== ownerId ||
+            this.deletingWorktrees.has(grant.scopeId) ||
             !expected ||
             !(await sandboxCredentialMatchesHash(
               input.credential,
@@ -644,7 +734,8 @@ export class SandboxControl extends DurableObject<Env> {
               current.providerRef !== physical.providerRef ||
               !sameAllocation(current, physical) ||
               !this.matchesContainment(current, WORKTREE_CREDENTIAL_CONTAINMENT) ||
-              Date.now() >= resolved.grant.expiresAt
+              Date.now() >= resolved.grant.expiresAt ||
+              this.deletingWorktrees.has(grant.scopeId)
             ) {
               return null;
             }
@@ -667,37 +758,67 @@ export class SandboxControl extends DurableObject<Env> {
     });
   }
 
-  async ensureReady(input: {
+  ensureReady(input: {
     ownerId: string;
     sessionId: string;
     provider?: AgentSandboxProvider;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;
+    worktreeId?: string;
   }): Promise<SandboxControlStatus & { attachment?: SessionAttachPayload }> {
+    const operation = this.runEnsureReady(input);
+    this.readinessOperations.add(operation);
+    return operation.finally(() => this.readinessOperations.delete(operation));
+  }
+
+  private async runEnsureReady(
+    input: Parameters<SandboxControl['ensureReady']>[0]
+  ): Promise<SandboxControlStatus & { attachment?: SessionAttachPayload }> {
+    this.assertWorktreeAdmission(input.worktreeId);
     const acquisition =
       input.acquisition === undefined
         ? undefined
         : sandboxAcquisitionSchema.parse(input.acquisition);
     if (acquisition) assertAcquisitionDeadline(acquisition);
     const { ownerId } = await this.initializeOwner(input.ownerId);
+    const metadata = await withTimeout(
+      this.readCredentialMetadata(input),
+      Math.max(
+        1,
+        Math.min(DEADLINE_MS.startup, (acquisition?.deadlineAt ?? Infinity) - Date.now())
+      ),
+      'Sandbox credential metadata timed out'
+    );
+    const worktreeId = metadata.workspace?.worktreeId;
+    const requiredContainment = getWorktreeCredentialContainment(
+      requiresContainmentSandbox(metadata)
+    );
+    if (input.worktreeId !== undefined && input.worktreeId !== worktreeId) {
+      throw new Error('Worktree identity conflict');
+    }
+    this.assertWorktreeAdmission(worktreeId);
+    if (this.runtimeDeleted) {
+      await this.ctx.storage.delete(RUNTIME_DELETED_KEY);
+      this.runtimeDeleted = false;
+    }
     await this.pinProvider(input.provider);
     if (acquisition && this.providerKind !== 'cloudflare') {
       throw new Error('Sandbox acquisition is only supported for Cloudflare');
     }
-    const billing = await this.billingInput(ownerId, input.billing);
+    const billing = await this.billingInput(ownerId, input.billing, worktreeId);
     let physical: PhysicalRecord;
     let creating = false;
     if (acquisition) {
-      let selected = await this.acquirePhysical(acquisition);
+      let selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
       if (selected.action === 'wait') {
         const step = nextEnsureReadyStep(selected.physical.state, true);
         if (step === 'release-failed') {
           await this.releaseIfAuthoritativelyDead(selected.physical);
-          selected = await this.acquirePhysical(acquisition);
+          selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
         } else if (step === 'observe-unknown') {
           await this.observeCurrentProvider(selected.physical);
-          selected = await this.acquirePhysical(acquisition);
+          selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
         }
       }
       if (selected.action === 'wait') return this.statusForPhysical(selected.physical);
@@ -718,11 +839,12 @@ export class SandboxControl extends DurableObject<Env> {
           if (nextEnsureReadyStep(current.state, allowCreate) !== 'create') return current;
           const intentId = crypto.randomUUID();
           const allocationName = await deriveSandboxAllocationId(this.sandboxId, intentId);
+          this.assertWorktreeAdmission(worktreeId);
           const claimed = await this.claimCreate(
             intentId,
             this.provider.resumable,
             allocationName,
-            WORKTREE_CREDENTIAL_CONTAINMENT
+            requiredContainment
           );
           creating = true;
           return claimed;
@@ -735,7 +857,10 @@ export class SandboxControl extends DurableObject<Env> {
     if (physical.stopTombstone || (physical.state !== 'creating' && physical.state !== 'running')) {
       return currentStatus();
     }
-    if (!this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)) {
+    if (!this.matchesContainment(physical, requiredContainment)) {
+      if (this.matchesWorktreeContainment(physical)) {
+        throw new Error('Sandbox containment mode conflicts with the session');
+      }
       await this.beginStop('credential_containment_unavailable');
       await this.recordStopAttempt();
       return currentStatus();
@@ -794,7 +919,7 @@ export class SandboxControl extends DurableObject<Env> {
       const intent = physical.createIntent;
       if (!intent) throw new Error('Sandbox create intent is unavailable');
       const networkPolicy =
-        this.providerKind === 'vercel'
+        this.providerKind === 'vercel' && requiredContainment.kilocode
           ? await this.withCredentialUpdate(async () =>
               buildControlNetworkPolicy(
                 (await loadSessionCredentialGrants(this.ctx.storage)).filter(
@@ -813,6 +938,7 @@ export class SandboxControl extends DurableObject<Env> {
       await this.appendLog(credentialTransition(Date.now(), 'issued'));
       const provider = this.provider;
       try {
+        this.assertWorktreeAdmission(worktreeId);
         if (acquisition) assertAcquisitionDeadline(acquisition);
         const created = await withTimeout(
           provider.create({
@@ -838,6 +964,7 @@ export class SandboxControl extends DurableObject<Env> {
           if (!sameAllocation(allocated, physical) || allocated.stopTombstone) {
             return currentStatus();
           }
+          this.assertWorktreeAdmission(worktreeId);
           if (acquisition) assertAcquisitionDeadline(acquisition);
           await withTimeout(
             provider.launch(created.providerRef, this.wrapperLaunchEnv(credential)),
@@ -880,7 +1007,11 @@ export class SandboxControl extends DurableObject<Env> {
     return { ...status, attachment };
   }
 
-  private async acquirePhysical(acquisition: SandboxAcquisition): Promise<{
+  private async acquirePhysical(
+    acquisition: SandboxAcquisition,
+    requiredContainment: CredentialContainmentRequirements,
+    worktreeId?: string
+  ): Promise<{
     physical: PhysicalRecord;
     action: 'create' | 'reuse' | 'wait';
   }> {
@@ -888,17 +1019,18 @@ export class SandboxControl extends DurableObject<Env> {
     const allocationName = await deriveSandboxAllocationId(this.sandboxId, intentId);
     return this.ctx.storage.transaction(async () => {
       const physical = await loadPhysicalRecord(this.ctx.storage, this.provider.resumable);
+      this.assertWorktreeAdmission(worktreeId);
+      if (
+        this.matchesWorktreeContainment(physical) &&
+        !this.matchesContainment(physical, requiredContainment)
+      ) {
+        throw new Error('Sandbox containment mode conflicts with the session');
+      }
       if (await this.bindAcquisition(acquisition, physical)) return { physical, action: 'reuse' };
       if (physical.state !== 'stopped' || physical.stopTombstone) {
         return { physical, action: 'wait' };
       }
-      const next = claimCreate(
-        physical,
-        intentId,
-        Date.now(),
-        allocationName,
-        WORKTREE_CREDENTIAL_CONTAINMENT
-      );
+      const next = claimCreate(physical, intentId, Date.now(), allocationName, requiredContainment);
       await this.persistPhysicalState(physical, next, 'demand');
       await this.bindAcquisition(acquisition, next);
       return { physical: next, action: 'create' };
@@ -1024,9 +1156,19 @@ export class SandboxControl extends DurableObject<Env> {
       if (!grant || worktreeId !== input.worktreeId) {
         throw new Error('Session has no matching worktree credential grant');
       }
-      const table = await loadRouteTable(this.ctx.storage);
-      const result = attachRoute(table, input, ownerId);
-      await saveRouteTable(this.ctx.storage, result.table);
+      if (
+        !this.matchesContainment(
+          await loadPhysicalRecord(this.ctx.storage),
+          getWorktreeCredentialContainment(grant.containmentEnabled !== false)
+        )
+      ) {
+        throw new Error('Sandbox credential containment mismatch');
+      }
+      const result = await this.mutateRoutes(table => {
+        this.assertWorktreeAdmission(worktreeId);
+        const attached = attachRoute(table, input, ownerId);
+        return { value: attached, changed: attached.changed };
+      });
       if (result.changed) {
         await this.appendLog(
           routeTransition(Date.now(), 'attach', input.sessionId, input.kiloSessionId)
@@ -1037,41 +1179,333 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async detachSession(sessionId: string): Promise<{ existed: boolean }> {
-    const result = await this.withCredentialUpdate(async () => {
-      const table = await loadRouteTable(this.ctx.storage);
-      const detached = detachRoute(table, sessionId);
-      await saveRouteTable(this.ctx.storage, detached.table);
-      const grants = await loadSessionCredentialGrants(this.ctx.storage);
-      const credentialsChanged = grants.some(grant =>
-        grant.members.some(member => member.sessionId === sessionId)
+    const route = (await loadRouteTable(this.ctx.storage)).get(sessionId);
+    let runtimeDetached = false;
+    let existed = false;
+    try {
+      if (route && this.socketHandler.hasHandshakenSocket()) {
+        const response = await this.socketHandler.sendRequest({
+          operation: 'session.detach',
+          session: {
+            sessionId: route.sessionId,
+            kiloSessionId: route.kiloSessionId,
+            directory: route.directory,
+          },
+          payload: {},
+        });
+        if (!response.ok) throw new Error(response.error?.message ?? 'session.detach failed');
+      }
+      runtimeDetached = true;
+    } finally {
+      const result = await this.withCredentialUpdate(() =>
+        this.ctx.storage.transaction(async () => {
+          const table = await loadRouteTable(this.ctx.storage);
+          const detached = runtimeDetached
+            ? detachRoute(table, sessionId)
+            : { table, existed: false };
+          await saveRouteTable(this.ctx.storage, detached.table);
+          const grants = await loadSessionCredentialGrants(this.ctx.storage);
+          if (grants.some(grant => grant.members.some(member => member.sessionId === sessionId))) {
+            if (this.providerKind === 'vercel') {
+              await this.ctx.storage.put(CREDENTIAL_POLICY_DIRTY_KEY, true);
+            }
+            await saveSessionCredentialGrants(
+              this.ctx.storage,
+              removeSessionCredentialMembership(grants, sessionId)
+            );
+          }
+          return detached;
+        })
       );
-      if (credentialsChanged) {
+      if (
+        this.providerKind === 'vercel' &&
+        (await this.ctx.storage.get<boolean>(CREDENTIAL_POLICY_DIRTY_KEY))
+      ) {
+        await this.enforceWorktreeNetworkPolicy(await this.requireOwner());
+      }
+      existed = result.existed;
+      if (existed) {
+        this.sessionForwardChains.delete(sessionId);
+        await this.appendLog(routeTransition(Date.now(), 'detach', sessionId));
+      }
+      if (!hasActiveWork(result.table)) {
+        const physical = await loadPhysicalRecord(this.ctx.storage);
+        if (physical.state === 'running' && !physical.stopTombstone) {
+          await this.armDeadlineIfAbsent('idleStop', Date.now() + DEADLINE_MS.idleStop);
+        }
+      }
+    }
+    return { existed };
+  }
+
+  deleteWorktreeResources(
+    raw: SandboxWorktreeCleanupInput
+  ): Promise<{ deleted: true; sessionIds: string[] }> {
+    const input = sandboxWorktreeCleanupInputSchema.parse(raw);
+    const operation = this.worktreeDeletionChain
+      .catch(() => undefined)
+      .then(() => this.runWorktreeDeletion(input));
+    this.worktreeDeletionChain = operation;
+    return operation;
+  }
+
+  private async runWorktreeDeletion(
+    input: SandboxWorktreeCleanupInput
+  ): Promise<{ deleted: true; sessionIds: string[] }> {
+    if (input.location.sandboxId !== this.sandboxId) throw new Error('Sandbox identity conflict');
+    await this.initializeOwner(input.kiloUserId);
+    const previous = await loadWorktreeDeletionJournal(this.ctx.storage, input.worktreeId);
+    if (previous?.completed && previous.destroyed) {
+      await this.releaseWorktreeAdmission(input.worktreeId);
+      return {
+        deleted: true,
+        sessionIds: [...new Set([...previous.sessionIds, ...input.sessionIds])],
+      };
+    }
+    if (this.exclusiveDeletionWorktreeId && this.exclusiveDeletionWorktreeId !== input.worktreeId) {
+      throw new Error('worktree_teardown_in_progress');
+    }
+    if (previous?.exclusiveTeardown && this.exclusiveDeletionWorktreeId !== input.worktreeId) {
+      throw new Error(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE);
+    }
+    const getProvider = async () => {
+      await this.pinProvider(input.location.provider);
+      return this.provider;
+    };
+    this.deletingWorktrees.add(input.worktreeId);
+    await this.ctx.storage.put(
+      `${WORKTREE_DELETION_PREFIX}${input.worktreeId}`,
+      previous ?? {
+        sessionIds: input.sessionIds,
+        resourcesCleaned: false,
+        destroyed: false,
+      }
+    );
+    const directory = getWorktreeWorkspacePath(
+      input.organizationId,
+      input.kiloUserId,
+      input.worktreeId
+    );
+    let journal: Awaited<ReturnType<typeof cleanWorktreeRuntime>>;
+    try {
+      const admittedTeardown =
+        previous?.exclusiveTeardown === true &&
+        this.exclusiveDeletionWorktreeId === input.worktreeId;
+      const exclusive =
+        previous?.destroyed === true ||
+        admittedTeardown ||
+        (await this.fenceAndCheckWorktreeExclusivity(input, directory));
+      if (!exclusive) {
+        if ((await loadPhysicalRecord(this.ctx.storage)).state !== 'stopped') await getProvider();
+        await this.revokeWorktreeCredentials(input.worktreeId);
+      }
+      journal = await cleanWorktreeRuntime({
+        request: input,
+        directory,
+        storage: this.ctx.storage,
+        getProvider,
+        stopRuntime: () => this.stopDeletedWorktreeRuntime(),
+        hasConnection: () => this.socketHandler.hasHandshakenSocket(),
+        sendRequest: request => this.socketHandler.sendRequest(request),
+        exclusive,
+      });
+    } finally {
+      await this.revokeWorktreeCredentials(input.worktreeId);
+    }
+    const deletedIds = new Set(journal.sessionIds);
+    const detached = await this.mutateRoutes(table => {
+      const sessionIds: string[] = [];
+      for (const [sessionId, route] of table) {
+        if (
+          route.worktreeId === input.worktreeId ||
+          (route.directory === directory && deletedIds.has(route.kiloSessionId))
+        ) {
+          table.delete(sessionId);
+          sessionIds.push(sessionId);
+        }
+      }
+      return { value: sessionIds, changed: sessionIds.length > 0 };
+    });
+    await Promise.allSettled(detached.flatMap(id => this.sessionForwardChains.get(id) ?? []));
+    for (const id of detached) this.sessionForwardChains.delete(id);
+    if (
+      !journal.destroyed &&
+      (await this.fenceAndCheckWorktreeExclusivity(
+        { ...input, sessionIds: journal.sessionIds },
+        directory
+      ))
+    ) {
+      journal = await cleanWorktreeRuntime({
+        request: { ...input, sessionIds: journal.sessionIds },
+        directory,
+        storage: this.ctx.storage,
+        getProvider,
+        stopRuntime: () => this.stopDeletedWorktreeRuntime(),
+        hasConnection: () => this.socketHandler.hasHandshakenSocket(),
+        sendRequest: request => this.socketHandler.sendRequest(request),
+        exclusive: true,
+      });
+    }
+    if (journal.destroyed) {
+      this.runtimeDeleted = true;
+      this.kiloReady = false;
+      await this.ctx.storage.put(RUNTIME_DELETED_KEY, true);
+      this.socketHandler.closeAll('Worktree deleted');
+      await Promise.allSettled([...this.lifecycleOperations]);
+      await this.eraseRecord({ preserveAcquisitionReceipts: true });
+      await this.ctx.storage.deleteAlarm();
+      for (const [worktreeId, receipt] of await loadWorktreeDeletionJournals(this.ctx.storage)) {
+        if (receipt.resourcesCleaned) {
+          await this.ctx.storage.put(`${WORKTREE_DELETION_PREFIX}${worktreeId}`, {
+            ...receipt,
+            completed: true,
+            destroyed: true,
+          });
+        }
+      }
+    }
+    await this.ctx.storage.put(`${WORKTREE_DELETION_PREFIX}${input.worktreeId}`, {
+      ...journal,
+      completed: true,
+    });
+    await this.releaseWorktreeAdmission(input.worktreeId);
+    return { deleted: true, sessionIds: journal.sessionIds };
+  }
+
+  private async stopDeletedWorktreeRuntime(): Promise<PhysicalRecord> {
+    const physical = await this.beginStop('worktree_deleted');
+    if (physical.state === 'stopped') return physical;
+    if ((physical.stopTombstone?.attempts ?? 0) >= DEADLINE_MS.stopAttemptLadder.length) {
+      return this.observeCurrentProvider(physical);
+    }
+    return this.recordStopAttempt();
+  }
+
+  private async revokeWorktreeCredentials(worktreeId: string): Promise<void> {
+    await this.withCredentialUpdate(() =>
+      this.ctx.storage.transaction(async () => {
+        const grants = await loadSessionCredentialGrants(this.ctx.storage);
+        if (!grants.some(grant => grant.scopeId === worktreeId)) return;
         if (this.providerKind === 'vercel') {
           await this.ctx.storage.put(CREDENTIAL_POLICY_DIRTY_KEY, true);
         }
         await saveSessionCredentialGrants(
           this.ctx.storage,
-          removeSessionCredentialMembership(grants, sessionId)
+          grants.filter(grant => grant.scopeId !== worktreeId)
         );
-      }
-      return detached;
-    });
+      })
+    );
     if (
       this.providerKind === 'vercel' &&
       (await this.ctx.storage.get<boolean>(CREDENTIAL_POLICY_DIRTY_KEY))
     ) {
       await this.enforceWorktreeNetworkPolicy(await this.requireOwner());
     }
-    if (result.existed) {
-      await this.appendLog(routeTransition(Date.now(), 'detach', sessionId));
+  }
+
+  private async fenceAndCheckWorktreeExclusivity(
+    input: SandboxWorktreeCleanupInput,
+    directory: string
+  ): Promise<boolean> {
+    this.exclusiveDeletionWorktreeId = input.worktreeId;
+    await this.ctx.storage.put(EXCLUSIVE_DELETION_KEY, input.worktreeId);
+    try {
+      await Promise.allSettled([...this.readinessOperations, ...this.lifecycleOperations]);
+      if (
+        await isUnallocatedControlRuntime(this.ctx.storage, () =>
+          this.socketHandler.hasHandshakenSocket()
+        )
+      )
+        return true;
+      const receipts = await loadWorktreeDeletionJournals(this.ctx.storage);
+      const releasedWorktreeIds = [...receipts]
+        .filter(([, receipt]) => receipt.resourcesCleaned)
+        .map(([id]) => id);
+      const released = new Set<string>(releasedWorktreeIds);
+      const requestedIds = new Set(input.sessionIds);
+      const otherRoutes = [...(await loadRouteTable(this.ctx.storage)).values()].some(route => {
+        const worktreeId = route.worktreeId ?? this.worktreeIdFromDirectory(route.directory);
+        if (worktreeId && released.has(worktreeId)) return false;
+        return (
+          route.directory !== directory ||
+          !requestedIds.has(route.kiloSessionId) ||
+          (worktreeId !== undefined && worktreeId !== input.worktreeId)
+        );
+      });
+      const exclusive =
+        !otherRoutes &&
+        (await withTimeout(
+          resolveSandboxExclusivity(this.env, {
+            worktreeId: input.worktreeId,
+            kiloUserId: input.kiloUserId,
+            organizationId: input.organizationId,
+            location: input.location,
+            releasedWorktreeIds,
+          }),
+          DEADLINE_MS.stopAttempt,
+          'Worktree ownership lookup timed out'
+        ));
+      if (exclusive) return true;
+    } catch (error) {
+      await this.releaseWorktreeAdmission(input.worktreeId);
+      throw error;
     }
-    if (!hasActiveWork(result.table)) {
-      const physical = await loadPhysicalRecord(this.ctx.storage);
-      if (physical.state === 'running') {
-        await this.armDeadlineIfAbsent('idleStop', Date.now() + DEADLINE_MS.idleStop);
-      }
+    await this.releaseWorktreeAdmission(input.worktreeId);
+    return false;
+  }
+
+  private async releaseWorktreeAdmission(worktreeId: string): Promise<void> {
+    if (this.exclusiveDeletionWorktreeId !== worktreeId) return;
+    await this.ctx.storage.delete(EXCLUSIVE_DELETION_KEY);
+    this.exclusiveDeletionWorktreeId = undefined;
+    if (!this.runtimeDeleted) await this.scheduleAlarm(await loadDeadlines(this.ctx.storage));
+  }
+
+  private worktreeIdFromDirectory(directory: string): string | undefined {
+    const parsed = cloudAgentWorktreeIdSchema.safeParse(directory.split('/').at(-1));
+    return parsed.success ? parsed.data : undefined;
+  }
+
+  private async assertRequestWorktreeAdmission(
+    input: SandboxControlOutboundRequest
+  ): Promise<void> {
+    const session = input.session;
+    if (!session) return;
+    const worktreeId = this.worktreeIdFromDirectory(session.directory);
+    if (input.operation === 'session.sync' && this.exclusiveDeletionWorktreeId) {
+      const allowed = await this.ctx.storage.transaction(async () => {
+        const exclusiveWorktreeId = this.exclusiveDeletionWorktreeId;
+        if (!exclusiveWorktreeId) return false;
+        const route = (await loadRouteTable(this.ctx.storage)).get(session.sessionId);
+        const routeWorktreeId = route?.worktreeId ?? worktreeId;
+        if (
+          !route ||
+          route.kiloSessionId !== session.kiloSessionId ||
+          route.directory !== session.directory ||
+          routeWorktreeId === exclusiveWorktreeId ||
+          (routeWorktreeId && this.deletingWorktrees.has(routeWorktreeId)) ||
+          (worktreeId && this.deletingWorktrees.has(worktreeId))
+        ) {
+          return false;
+        }
+        const journal = await loadWorktreeDeletionJournal(this.ctx.storage, exclusiveWorktreeId);
+        return (
+          this.exclusiveDeletionWorktreeId === exclusiveWorktreeId &&
+          journal?.exclusiveTeardown === false
+        );
+      });
+      if (allowed) return;
     }
-    return { existed: result.existed };
+    this.assertWorktreeAdmission(worktreeId);
+  }
+
+  private assertWorktreeAdmission(worktreeId?: string): void {
+    if (
+      this.exclusiveDeletionWorktreeId ||
+      (worktreeId && this.deletingWorktrees.has(worktreeId))
+    ) {
+      throw new Error('worktree_deleting');
+    }
   }
 
   async listRoutes(): Promise<SessionRoute[]> {
@@ -1096,14 +1530,20 @@ export class SandboxControl extends DurableObject<Env> {
 
     let billing: SandboxTerminalAccessResult;
     try {
-      const allocationId = decodeCloudflareProviderRef(runtime.physical.providerRef)?.sandboxId;
-      if (!allocationId) return { allowed: false, reason: 'runtime_not_running' };
+      const providerRef = decodeCloudflareProviderRef(runtime.physical.providerRef);
+      if (!providerRef) return { allowed: false, reason: 'runtime_not_running' };
+      const allocationId = providerRef.sandboxId;
       const namespace = getSandboxNamespace(this.env, allocationId, {
-        managedScmContainment: true,
+        managedScmContainment: providerRef.containment,
       });
       const sandbox = getSandbox(namespace, allocationId);
       billing = validateTerminalBillingRuntime({
-        access: input,
+        access: runtime.route.worktreeId
+          ? {
+              ...input,
+              sessionId: `workspace_${runtime.route.worktreeId.slice('worktree_'.length)}`,
+            }
+          : input,
         sandboxId: allocationId,
         providerInstanceId: runtime.connection.providerInstanceId,
         sandboxDurableObjectId: namespace.idFromName(allocationId).toString(),
@@ -1137,6 +1577,7 @@ export class SandboxControl extends DurableObject<Env> {
       left.route.kiloSessionId === right.route.kiloSessionId &&
       left.route.directory === right.route.directory &&
       left.grant.scopeId === right.grant.scopeId &&
+      (left.grant.containmentEnabled !== false) === (right.grant.containmentEnabled !== false) &&
       left.grant.kilo.alias === right.grant.kilo.alias
     );
   }
@@ -1145,6 +1586,11 @@ export class SandboxControl extends DurableObject<Env> {
     input: SandboxTerminalAccessInput,
     runtime: TerminalRuntimeSnapshot
   ): Promise<SandboxTerminalAccessResult> {
+    if (runtime.grant.containmentEnabled === false) {
+      return runtime.grant.expiresAt > Date.now()
+        ? { allowed: true }
+        : { allowed: false, reason: 'credential_reattach_required' };
+    }
     if (runtime.grant.expiresAt > Date.now() + TERMINAL_CREDENTIAL_RENEWAL_WINDOW_MS) {
       return { allowed: true };
     }
@@ -1232,6 +1678,7 @@ export class SandboxControl extends DurableObject<Env> {
   ): Promise<PhysicalRecord> {
     return this.ctx.storage.transaction(async () => {
       const current = await loadPhysicalRecord(this.ctx.storage, resumable);
+      this.assertWorktreeAdmission();
       const next = claimCreate(current, intentId, Date.now(), allocationName, containment);
       const vercel =
         this.providerKind === 'vercel' ? parseVercelSandboxRuntimeConfig(this.env) : undefined;
@@ -1241,6 +1688,15 @@ export class SandboxControl extends DurableObject<Env> {
           ...next.createIntent,
           vercel: { projectId, snapshotId, runtimeBuildId, runtime },
         };
+        this.vercelLocator = vercelProviderLocatorSchema.parse({
+          teamId: vercel.teamId,
+          projectId,
+          snapshotId,
+          runtimeBuildId,
+          runtime,
+        });
+        await this.ctx.storage.put(PROVIDER_LOCATOR_KEY, this.vercelLocator);
+        this.provider = this.createProviderAdapter('vercel', next);
       }
       await this.persistPhysicalState(current, next, 'demand');
       return next;
@@ -1427,7 +1883,7 @@ export class SandboxControl extends DurableObject<Env> {
     return next;
   }
 
-  async eraseRecord(): Promise<void> {
+  async eraseRecord(options?: { preserveAcquisitionReceipts: true }): Promise<void> {
     await eraseSandboxRecord(this.ctx.storage);
     await this.ctx.storage.delete([
       OWNER_ID_KEY,
@@ -1437,9 +1893,14 @@ export class SandboxControl extends DurableObject<Env> {
       DIAGNOSTIC_BUNDLE_KEY,
       PROVIDER_KIND_KEY,
       BILLING_INPUT_KEY,
-      ACQUISITION_RECEIPTS_KEY,
       CREDENTIAL_POLICY_DIRTY_KEY,
+      PROVIDER_LOCATOR_KEY,
+      ...(options?.preserveAcquisitionReceipts ? [] : [ACQUISITION_RECEIPTS_KEY]),
     ]);
+    this.vercelLocator = undefined;
+    this.activeConnection = null;
+    this.readyConnectionId = null;
+    this.kiloReady = false;
   }
 
   private withCredentialUpdate<T>(operation: () => Promise<T>): Promise<T> {
@@ -1474,6 +1935,7 @@ export class SandboxControl extends DurableObject<Env> {
     ) {
       throw new Error('Session credential ownership mismatch');
     }
+    this.assertWorktreeAdmission(metadata.workspace?.worktreeId);
     return metadata;
   }
 
@@ -1493,6 +1955,14 @@ export class SandboxControl extends DurableObject<Env> {
       const physical = await loadPhysicalRecord(this.ctx.storage);
       if (physical.state === 'stopped') {
         await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
+        return;
+      }
+      if (
+        this.matchesWorktreeContainment(physical) &&
+        !(physical.createIntent?.containment ?? physical.containment)?.kilocode
+      ) {
+        await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
+        await this.cancelDeadlineAndAlarm('credentialExpiry');
         return;
       }
       if (physical.state !== 'running') {
@@ -1552,9 +2022,14 @@ export class SandboxControl extends DurableObject<Env> {
   ): ProviderAdapter {
     const allocationName = physical?.createIntent?.allocationName ?? this.sandboxId;
     if (kind === 'vercel') {
+      const locator = physical?.state === 'stopped' ? undefined : this.vercelLocator;
+      const config = resolveVercelSandboxRuntimeConfig(
+        this.env,
+        physical?.createIntent?.vercel ?? locator
+      );
       return createVercelProviderAdapter({
         sandboxName: allocationName,
-        config: resolveVercelSandboxRuntimeConfig(this.env, physical?.createIntent?.vercel),
+        config: config && locator ? { ...config, teamId: locator.teamId } : config,
       });
     }
     return createCloudflareProviderAdapter({
@@ -1591,11 +2066,15 @@ export class SandboxControl extends DurableObject<Env> {
 
   private async billingInput(
     ownerId: string,
-    supplied?: SandboxBillingInput
+    supplied?: SandboxBillingInput,
+    worktreeId?: string
   ): Promise<SandboxBillingInput | undefined> {
     const raw = await this.ctx.storage.get<unknown>(BILLING_INPUT_KEY);
     const stored = raw === undefined ? undefined : parseSandboxBillingInput(raw);
-    const input = supplied === undefined ? stored : parseSandboxBillingInput(supplied);
+    let input = supplied === undefined ? stored : parseSandboxBillingInput(supplied);
+    if (input?.sessionId !== undefined && worktreeId) {
+      input = { ...input, sessionId: `workspace_${worktreeId.slice('worktree_'.length)}` };
+    }
     const enforced = isCloudAgentContainerBillingEnabled(this.env, {
       userId: ownerId,
       ...(input?.subject.type === 'org' ? { orgId: input.subject.id } : {}),
@@ -1644,9 +2123,22 @@ export class SandboxControl extends DurableObject<Env> {
       return decodeVercelProviderRef(providerRef)?.sandboxName === allocationName;
     }
     const native = decodeCloudflareProviderRef(providerRef);
+    const containment = physical.createIntent?.containment ?? physical.containment;
     return (
       native?.sandboxId === allocationName &&
+      containment !== undefined &&
+      native.containment === (containment.kilocode || containment.github) &&
       (!physical.createIntent || native.instanceId === physical.createIntent.intentId)
+    );
+  }
+
+  private matchesWorktreeContainment(physical: PhysicalRecord): boolean {
+    const containment =
+      physical.state === 'creating' ? physical.createIntent?.containment : physical.containment;
+    return (
+      containment?.worktreeScoped === true &&
+      containment.kilocode === containment.github &&
+      this.matchesContainment(physical, containment)
     );
   }
 
@@ -1738,7 +2230,7 @@ export class SandboxControl extends DurableObject<Env> {
     return (
       (this.providerKind !== 'vercel' || physical.state === 'running') &&
       this.matchesProviderReference(physical, providerInstanceId) &&
-      this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)
+      this.matchesWorktreeContainment(physical)
     );
   }
 
@@ -1752,7 +2244,7 @@ export class SandboxControl extends DurableObject<Env> {
       (physical.state !== 'running' && physical.state !== 'creating') ||
       (this.providerKind === 'vercel' && physical.state !== 'running') ||
       !this.matchesProviderReference(physical, identity.providerInstanceId) ||
-      !this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)
+      !this.matchesWorktreeContainment(physical)
     ) {
       this.socketHandler.closeAll('Sandbox runtime unavailable');
       return;
@@ -1834,6 +2326,14 @@ export class SandboxControl extends DurableObject<Env> {
   ): Promise<void> {
     if (!this.isCurrentConnection(identity)) return;
     if (!payload.kilo.ready) {
+      logger
+        .withFields({
+          sandboxId: this.sandboxId,
+          wrapperInstanceId: identity.wrapperInstanceId,
+          connectionId: identity.connectionId,
+          reason: payload.kilo.reason ?? 'unknown',
+        })
+        .warn('Sandbox control received unhealthy heartbeat');
       await this.quarantineConnection(identity, 'kilo_unhealthy');
       return;
     }
@@ -2172,10 +2672,18 @@ export class SandboxControl extends DurableObject<Env> {
     if (!route || route.ownerId !== input.ownerId) {
       return { allowed: false, reason: 'session_not_attached' };
     }
+    const worktreeId = route.worktreeId ?? this.worktreeIdFromDirectory(route.directory);
+    if (
+      this.runtimeDeleted ||
+      this.exclusiveDeletionWorktreeId ||
+      (worktreeId && this.deletingWorktrees.has(worktreeId))
+    ) {
+      return { allowed: false, reason: 'worktree_deleting' };
+    }
     if (physical.state !== 'running' || physical.stopTombstone || physical.providerRef === null) {
       return { allowed: false, reason: 'runtime_not_running' };
     }
-    if (!this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)) {
+    if (!this.matchesWorktreeContainment(physical)) {
       return { allowed: false, reason: 'credential_containment_unavailable' };
     }
     const grant = grants.find(
@@ -2192,7 +2700,15 @@ export class SandboxControl extends DurableObject<Env> {
             member.sessionId === input.sessionId && member.kiloSessionId === route.kiloSessionId
         )
     );
-    if (!grant) return { allowed: false, reason: 'credential_scope_unavailable' };
+    if (
+      !grant ||
+      !this.matchesContainment(
+        physical,
+        getWorktreeCredentialContainment(grant.containmentEnabled !== false)
+      )
+    ) {
+      return { allowed: false, reason: 'credential_scope_unavailable' };
+    }
 
     const connection = this.readyWrapperRuntime();
     if (!connection) return { allowed: false, reason: 'runtime_not_ready' };
@@ -2418,6 +2934,17 @@ export class SandboxControl extends DurableObject<Env> {
         ).catch(() => undefined)
       )
     );
+  }
+
+  private mutateRoutes<T>(
+    mutation: (table: Map<string, SessionRoute>) => { value: T; changed: boolean }
+  ): Promise<T> {
+    return this.ctx.storage.transaction(async () => {
+      const table = await loadRouteTable(this.ctx.storage);
+      const updated = mutation(table);
+      if (updated.changed) await saveRouteTable(this.ctx.storage, table);
+      return updated.value;
+    });
   }
 
   private async armDeadlineIfAbsent(id: DeadlineId, at: number): Promise<void> {

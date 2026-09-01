@@ -7,7 +7,10 @@
  * files are driver-invoked, not picked up by `pnpm run test`.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import path from 'node:path';
+import { runInNewContext } from 'node:vm';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { streamEventSchema } from '../e2e/client.js';
 import {
   extractLastUserMessageText,
   parseDirective,
@@ -15,6 +18,11 @@ import {
   stripKiloPromptWrapping,
   type FakeLlmServerHandle,
 } from '../e2e/fake-llm-server.js';
+import {
+  findControlPlaneKiloRuntime,
+  stopOwnedControlPlaneSandbox,
+  type DockerCommandExecutor,
+} from '../e2e/sandbox-control.js';
 
 // ---------------------------------------------------------------------------
 // Pure-helper tests
@@ -181,6 +189,108 @@ async function postChat(url: string, prompt: string): Promise<Response> {
       stream: true,
     }),
   });
+}
+
+const advertisedFileTools = [
+  {
+    type: 'function',
+    function: {
+      name: 'write',
+      parameters: {
+        type: 'object',
+        properties: { filePath: { type: 'string' }, content: { type: 'string' } },
+        required: ['filePath', 'content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'read',
+      parameters: {
+        type: 'object',
+        properties: { filePath: { type: 'string' } },
+        required: ['filePath'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'edit',
+      parameters: {
+        type: 'object',
+        properties: {
+          filePath: { type: 'string' },
+          oldString: { type: 'string' },
+          newString: { type: 'string' },
+        },
+        required: ['filePath', 'oldString', 'newString'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'question',
+      parameters: {
+        type: 'object',
+        properties: { questions: { type: 'array' } },
+        required: ['questions'],
+      },
+    },
+  },
+];
+
+async function postToolChat(
+  url: string,
+  prompt: string,
+  history: Array<Record<string, unknown>> = [],
+  tools: unknown[] = advertisedFileTools
+): Promise<Response> {
+  return fetch(`${url}/api/openrouter/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'kilo/fake-deterministic',
+      messages: [{ role: 'user', content: prompt }, ...history],
+      tools,
+      stream: true,
+    }),
+  });
+}
+
+async function parseSse(response: Response): Promise<Array<Record<string, unknown>>> {
+  if (!response.body) throw new Error('Expected a streamed response body');
+  const chunks = await readAllSse(response.body);
+  expect(chunks.at(-1)?.data).toBe('[DONE]');
+  return chunks.slice(0, -1).map(chunk => JSON.parse(chunk.data));
+}
+
+function extractToolCall(chunks: Array<Record<string, unknown>>): {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+} {
+  const firstChoice = chunks[0]?.choices;
+  const secondChoice = chunks[1]?.choices;
+  if (!Array.isArray(firstChoice) || !Array.isArray(secondChoice)) {
+    throw new Error('Expected streamed tool-call choices');
+  }
+  const opening = firstChoice[0]?.delta?.tool_calls?.[0];
+  const continuation = secondChoice[0]?.delta?.tool_calls?.[0];
+  if (
+    typeof opening?.id !== 'string' ||
+    typeof opening?.function?.name !== 'string' ||
+    typeof continuation?.function?.arguments !== 'string'
+  ) {
+    throw new Error('Expected streamed tool-call identity and arguments');
+  }
+  return {
+    id: opening.id,
+    name: opening.function.name,
+    arguments: JSON.parse(continuation.function.arguments),
+  };
 }
 
 async function postModelValidation(
@@ -401,6 +511,260 @@ describe('fake-llm-server HTTP', () => {
       .map(p => p.choices[0].delta.content)
       .filter((c): c is string => typeof c === 'string');
     expect(contentPieces.join('')).toBe('done');
+  });
+
+  it('gate emits an attributable completion marker without changing legacy defaults', async () => {
+    const h = await start();
+    const response = await postChat(
+      h.url,
+      '__fake__:gate:attributed:root_a_complete<environment_details>private context</environment_details>'
+    );
+    expect(response.status).toBe(200);
+    const release = await fetch(`${h.url}/test/release?tag=attributed`, { method: 'POST' });
+    expect(release.status).toBe(204);
+    const chunks = await parseSse(response);
+    expect(chunks[0]?.choices).toEqual([
+      expect.objectContaining({
+        delta: { role: 'assistant', content: 'root_a_complete' },
+      }),
+    ]);
+  });
+
+  it('keeps distinct completion markers isolated while both gates are engaged', async () => {
+    const h = await start();
+    const [rootA, rootB] = await Promise.all([
+      postChat(h.url, '__fake__:gate:root_a:only_root_a'),
+      postChat(h.url, '__fake__:gate:root_b:only_root_b'),
+    ]);
+    const [statusA, statusB] = await Promise.all([
+      fetch(`${h.url}/test/gate-status?tag=root_a`),
+      fetch(`${h.url}/test/gate-status?tag=root_b`),
+    ]);
+    await expect(statusA.json()).resolves.toMatchObject({ engaged: true });
+    await expect(statusB.json()).resolves.toMatchObject({ engaged: true });
+
+    expect((await fetch(`${h.url}/test/release?tag=root_b`, { method: 'POST' })).status).toBe(204);
+    const completedB = await parseSse(rootB);
+    expect(completedB[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'only_root_b' } }),
+    ]);
+    const stillGatedA = await fetch(`${h.url}/test/gate-status?tag=root_a`);
+    await expect(stillGatedA.json()).resolves.toMatchObject({ engaged: true });
+
+    expect((await fetch(`${h.url}/test/release?tag=root_a`, { method: 'POST' })).status).toBe(204);
+    const completedA = await parseSse(rootA);
+    expect(completedA[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'only_root_a' } }),
+    ]);
+  });
+
+  it('streams a real write call and gates only after its tool result', async () => {
+    const h = await start();
+    const prompt = '__fake__:write-then-gate:writer:shared.txt:private-content';
+    const initial = await parseSse(await postToolChat(h.url, prompt));
+    const call = extractToolCall(initial);
+    expect(call).toMatchObject({
+      name: 'write',
+      arguments: { filePath: 'shared.txt', content: 'private-content' },
+    });
+    const finishChoices = initial.at(-1)?.choices;
+    expect(finishChoices).toEqual([expect.objectContaining({ finish_reason: 'tool_calls' })]);
+
+    const followup = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      { role: 'tool', tool_call_id: call.id, content: 'File written successfully' },
+    ]);
+    const statusResponse = await fetch(`${h.url}/test/scenario-status?tag=writer`);
+    const status = await statusResponse.json();
+    expect(status).toEqual({
+      tag: 'writer',
+      requests: 2,
+      toolCalls: { write: 1, read: 0, edit: 0, question: 0 },
+      toolResults: { write: 1, read: 0, edit: 0, question: 0 },
+      unsupportedToolSchema: false,
+    });
+    expect(JSON.stringify(status)).not.toContain('private-content');
+
+    const gate = await fetch(`${h.url}/test/gate-status?tag=writer`);
+    await expect(gate.json()).resolves.toEqual({ tag: 'writer', engaged: true });
+    expect((await fetch(`${h.url}/test/release?tag=writer`, { method: 'POST' })).status).toBe(204);
+    const completed = await parseSse(followup);
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-writer' } }),
+    ]);
+  });
+
+  it('derives alternate write arguments from the advertised tool schema', async () => {
+    const h = await start();
+    const response = await postToolChat(
+      h.url,
+      '__fake__:write-then-gate:alternate:shared.txt:private-content',
+      [],
+      [
+        {
+          type: 'function',
+          function: {
+            name: 'write_file',
+            parameters: {
+              type: 'object',
+              properties: { path: { type: 'string' }, contents: { type: 'string' } },
+              required: ['path', 'contents'],
+            },
+          },
+        },
+      ]
+    );
+    expect(extractToolCall(await parseSse(response))).toMatchObject({
+      name: 'write_file',
+      arguments: { path: 'shared.txt', contents: 'private-content' },
+    });
+  });
+
+  it('reads through one real tool, edits through another, then gates', async () => {
+    const h = await start();
+    const prompt = '__fake__:read-edit-then-gate:reader:shared.txt:replacement';
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(readCall).toMatchObject({ name: 'read', arguments: { filePath: 'shared.txt' } });
+
+    const readHistory = [
+      { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+      {
+        role: 'tool',
+        tool_call_id: readCall.id,
+        content:
+          '<path>/private/shared.txt</path>\n<content>\n1: original-value\n\n(End of file - total 1 lines)\n</content>',
+      },
+    ];
+    const editCall = extractToolCall(
+      await parseSse(await postToolChat(h.url, prompt, readHistory))
+    );
+    expect(editCall).toMatchObject({
+      name: 'edit',
+      arguments: {
+        filePath: 'shared.txt',
+        oldString: 'original-value',
+        newString: 'replacement',
+      },
+    });
+
+    const gated = await postToolChat(h.url, prompt, [
+      ...readHistory,
+      { role: 'assistant', tool_calls: [{ id: editCall.id }] },
+      { role: 'tool', tool_call_id: editCall.id, content: 'Edited successfully' },
+    ]);
+    const status = await fetch(`${h.url}/test/scenario-status?tag=reader`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 0, read: 1, edit: 1, question: 0 },
+      toolResults: { write: 0, read: 1, edit: 1, question: 0 },
+    });
+    expect((await fetch(`${h.url}/test/release?tag=reader`, { method: 'POST' })).status).toBe(204);
+    const completed = await parseSse(gated);
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-reader' } }),
+    ]);
+  });
+
+  it('streams a real question and finishes only after its answered tool result', async () => {
+    const h = await start();
+    const prompt = '__fake__:question:asker:Choose a safe option: now';
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(call).toMatchObject({
+      name: 'question',
+      arguments: {
+        questions: [
+          {
+            question: 'Choose a safe option: now',
+            header: 'E2E',
+            options: [{ label: 'Continue', description: 'Continue the E2E scenario' }],
+          },
+        ],
+      },
+    });
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        { role: 'tool', tool_call_id: call.id, content: 'Continue' },
+      ])
+    );
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-asker' } }),
+    ]);
+    const status = await fetch(`${h.url}/test/scenario-status?tag=asker`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 0, read: 0, edit: 0, question: 1 },
+      toolResults: { write: 0, read: 0, edit: 0, question: 1 },
+      unsupportedToolSchema: false,
+    });
+  });
+
+  it('finishes title-model requests without advertising or inventing a tool schema', async () => {
+    const h = await start();
+    const chunks = await parseSse(
+      await postChat(h.url, '__fake__:write-then-gate:title:shared.txt:secret')
+    );
+    expect(chunks[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-title' } }),
+    ]);
+    const status = await fetch(`${h.url}/test/scenario-status?tag=title`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 0, read: 0, edit: 0, question: 0 },
+      unsupportedToolSchema: false,
+    });
+  });
+
+  it('reports unsupported advertised tool schemas instead of inventing tool calls', async () => {
+    const h = await start();
+    const response = await postToolChat(
+      h.url,
+      '__fake__:write-then-gate:unsupported:shared.txt:secret',
+      [],
+      [
+        {
+          type: 'function',
+          function: {
+            name: 'write',
+            parameters: {
+              type: 'object',
+              properties: { unexpected: { type: 'string' } },
+              required: ['unexpected'],
+            },
+          },
+        },
+      ]
+    );
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { message: 'unsupported write tool schema', type: 'unsupported_tool_schema' },
+    });
+    const status = await fetch(`${h.url}/test/scenario-status?tag=unsupported`);
+    await expect(status.json()).resolves.toMatchObject({ unsupportedToolSchema: true });
+  });
+
+  it('never logs directive contents, raw request bodies, or authorization headers', async () => {
+    const h = await start();
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const response = await fetch(`${h.url}/api/openrouter/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer secret-authorization-value',
+        },
+        body: JSON.stringify({
+          model: 'kilo/fake-deterministic',
+          messages: [{ role: 'user', content: '__fake__:echo:secret-prompt-value' }],
+          stream: true,
+        }),
+      });
+      await parseSse(response);
+      const logged = spy.mock.calls.flat().join(' ');
+      expect(logged).not.toContain('secret-prompt-value');
+      expect(logged).not.toContain('secret-authorization-value');
+      expect(logged).not.toContain('messages":');
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('gate normalizes contaminated tags so concurrent kilo calls share one waiter', async () => {
@@ -711,5 +1075,338 @@ describe('fake-llm-server HTTP', () => {
     handle = null;
     await hangPromise.catch(() => undefined);
     ac.abort();
+  });
+});
+
+type ProcFixture = {
+  pid: number;
+  port: number;
+  inode: string;
+  directory: string;
+  roots: string[];
+  address?: string;
+  state?: string;
+  fdInode?: string;
+  command?: string[];
+  executable?: string;
+  canonicalDirectory?: string;
+  rootOverride?: Record<string, unknown>;
+  bootstrapped?: boolean;
+};
+
+function discoveryFixture(processes: ProcFixture[], log?: string) {
+  const requests: URL[] = [];
+  const killed: string[] = [];
+  const forbiddenReads: string[] = [];
+  let afterFetch: (() => void) | undefined;
+  const containers = new Map([
+    ['owned', processes],
+    ['unrelated', [] as ProcFixture[]],
+  ]);
+  const execute: DockerCommandExecutor = async args => {
+    if (args[0] === 'ps') {
+      return {
+        stdout: [...containers.keys()]
+          .map(id => `${id}\tcloud-agent-next-dev-Sandbox-${id}\timage`)
+          .concat('proxy\tcloud-agent-next-dev-Sandbox-owned-proxy\timage')
+          .join('\n'),
+      };
+    }
+    if (args[0] === 'kill') {
+      killed.push(args[1]);
+      return { stdout: '' };
+    }
+    const entries = containers.get(args[1]);
+    if (args[0] !== 'exec' || !entries) throw new Error('Unexpected container operation');
+    const fs = {
+      readFileSync(filename: string): string {
+        if (filename === '/proc/net/tcp' || filename === '/proc/net/tcp6') {
+          return (
+            'header\n' +
+            entries
+              .filter(entry => (entry.address?.length ?? 8) > 8 === filename.endsWith('tcp6'))
+              .map(
+                entry =>
+                  `0: ${entry.address ?? '0100007F'}:${entry.port.toString(16)} 00000000:0000 ${entry.state ?? '0A'} 0 0 0 0 0 ${entry.inode}`
+              )
+              .join('\n')
+          );
+        }
+        const entry = entries.find(item => filename === `/proc/${item.pid}/cmdline`);
+        if (entry)
+          return (
+            (
+              entry.command ?? ['/usr/local/bin/kilo', 'serve', '--hostname=127.0.0.1', '--port=0']
+            ).join('\0') + '\0'
+          );
+        if (filename === '/tmp/kilocode-control-wrapper.log' && log !== undefined) return log;
+        forbiddenReads.push(filename);
+        throw new Error('Unexpected filesystem read');
+      },
+      readdirSync(directory: string): string[] {
+        if (directory === '/proc') return entries.map(entry => String(entry.pid));
+        if (directory === '/tmp') return log === undefined ? [] : ['kilocode-control-wrapper.log'];
+        if (directory === '/workspace/worktrees')
+          return entries.map(entry => path.basename(entry.directory));
+        if (entries.some(entry => directory === `/proc/${entry.pid}/fd`)) return ['3', '4'];
+        throw new Error('Unexpected directory read');
+      },
+      readlinkSync(filename: string): string {
+        for (const entry of entries) {
+          if (filename === `/proc/${entry.pid}/cwd`) return entry.directory;
+          if (filename === `/proc/${entry.pid}/exe`)
+            return entry.executable ?? '/opt/cli-linux-x64/bin/kilo';
+          if (filename === `/proc/${entry.pid}/fd/3` || filename === `/proc/${entry.pid}/fd/4`) {
+            return `socket:[${entry.fdInode ?? entry.inode}]`;
+          }
+        }
+        throw new Error('Missing process');
+      },
+      realpathSync(directory: string): string {
+        return (
+          entries.find(entry => entry.directory === directory)?.canonicalDirectory ?? directory
+        );
+      },
+      existsSync(filename: string): boolean {
+        return entries.some(
+          entry =>
+            entry.bootstrapped !== false &&
+            filename === `${entry.directory}/.kilo-bootstrap-complete`
+        );
+      },
+      statSync: () => ({ isDirectory: () => true }),
+    };
+    const fetch = async (url: URL) => {
+      requests.push(url);
+      const entry = entries.find(item => String(item.port) === url.port);
+      const rootId = decodeURIComponent(url.pathname.slice('/session/'.length));
+      const matched =
+        entry &&
+        entry.roots.includes(rootId) &&
+        url.searchParams.get('directory') === entry.directory;
+      const root = matched
+        ? { id: rootId, directory: entry.directory, ...entry.rootOverride }
+        : null;
+      afterFetch?.();
+      return { ok: root !== null, json: async () => root };
+    };
+    let stdout = '';
+    await runInNewContext(args[4].replace(/^import .*;\n/gm, ''), {
+      fs,
+      path: path.posix,
+      fetch,
+      URL,
+      AbortSignal,
+      process: {
+        argv: ['bun', args[5]],
+        stdout: {
+          write: (text: string) => {
+            stdout += text;
+          },
+        },
+      },
+      execFileSync: () => {
+        throw new Error('Process execution is forbidden in discovery tests');
+      },
+    });
+    return { stdout };
+  };
+  return {
+    execute,
+    requests,
+    killed,
+    forbiddenReads,
+    containers,
+    onFetch: (callback: () => void) => {
+      afterFetch = callback;
+    },
+  };
+}
+
+function directoryProcesses(): ProcFixture[] {
+  return [
+    {
+      pid: 101,
+      port: 41001,
+      inode: '501',
+      directory: '/workspace/worktrees/worktree-a',
+      roots: ['ses_a', 'ses_sibling'],
+    },
+    {
+      pid: 202,
+      port: 41002,
+      inode: '502',
+      directory: '/workspace/worktrees/worktree-b',
+      roots: ['ses_b'],
+      address: '00000000000000000000000001000000',
+    },
+  ];
+}
+
+describe('per-directory Kilo discovery', () => {
+  it('discovers exact roots in distinct PID/cwd listeners without any server log', async () => {
+    const fixture = discoveryFixture(directoryProcesses());
+    const owner = vi.fn();
+    const first = await findControlPlaneKiloRuntime('ses_a', fixture.execute, owner);
+    const sibling = await findControlPlaneKiloRuntime('ses_sibling', fixture.execute);
+    const second = await findControlPlaneKiloRuntime('ses_b', fixture.execute);
+    expect(first).toMatchObject({
+      container: { id: 'owned' },
+      processId: 101,
+      directory: '/workspace/worktrees/worktree-a',
+      serverUrl: 'http://127.0.0.1:41001',
+    });
+    expect(sibling).toMatchObject({ processId: first?.processId, directory: first?.directory });
+    expect(second).toMatchObject({
+      container: { id: 'owned' },
+      processId: 202,
+      directory: '/workspace/worktrees/worktree-b',
+      serverUrl: 'http://[::1]:41002',
+    });
+    expect(first?.logPath).toBeUndefined();
+    expect(owner.mock.calls.map(([container]) => container.id)).toEqual(['owned']);
+    expect(fixture.requests.every(url => url.searchParams.has('directory'))).toBe(true);
+    expect(fixture.forbiddenReads).toEqual([]);
+  });
+
+  it('uses an existing exact-root attach log only as optional evidence', async () => {
+    const fixture = discoveryFixture(
+      directoryProcesses(),
+      'snapshot metadata validated status=valid expectedKiloSessionId=ses_a\nsession.attach ready directory=/workspace/worktrees/worktree-a\n'
+    );
+    expect((await findControlPlaneKiloRuntime('ses_a', fixture.execute))?.logPath).toBe(
+      '/tmp/kilocode-control-wrapper.log'
+    );
+    expect(
+      (await findControlPlaneKiloRuntime('ses_sibling', fixture.execute))?.logPath
+    ).toBeUndefined();
+  });
+
+  it.each([
+    { label: 'wrong root ID', rootOverride: { id: 'ses_other' } },
+    { label: 'other directory', rootOverride: { directory: '/workspace/worktrees/worktree-b' } },
+    {
+      label: 'descendant directory',
+      rootOverride: { directory: '/workspace/worktrees/worktree-a/nested' },
+    },
+    { label: 'child session', rootOverride: { parentID: 'ses_parent' } },
+    { label: 'noncanonical cwd', canonicalDirectory: '/canonical/worktree-a' },
+    { label: 'wrong inode', fdInode: '999' },
+    { label: 'non-listening socket', state: '01' },
+    { label: 'public listener', address: '00000000' },
+    { label: 'other executable', executable: '/usr/bin/node' },
+    { label: 'wrong command', command: ['/usr/bin/node', 'serve'] },
+    { label: 'not Kilo serve', command: ['/usr/local/bin/kilo', 'run'] },
+    { label: 'unprepared directory', bootstrapped: false },
+  ])(
+    'rejects $label instead of claiming container ownership',
+    async ({ label: _label, ...override }) => {
+      const entry = { ...directoryProcesses()[0], ...override };
+      const fixture = discoveryFixture([entry]);
+      const owner = vi.fn();
+      expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute, owner)).toBeNull();
+      expect(owner).not.toHaveBeenCalled();
+      expect(fixture.forbiddenReads).toEqual([]);
+    }
+  );
+
+  it.each(['cwd', 'pid'])(
+    'rejects ownership if the listener %s changes during the root query',
+    async field => {
+      const entries = directoryProcesses();
+      const fixture = discoveryFixture(entries);
+      fixture.onFetch(() => {
+        if (field === 'cwd') entries[0].directory = '/workspace/worktrees/replacement';
+        else entries[0].pid += 1;
+      });
+      expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute)).toBeNull();
+    }
+  );
+
+  it('rejects a socket inode held by multiple processes', async () => {
+    const entries = directoryProcesses();
+    entries[1].fdInode = entries[0].inode;
+    const fixture = discoveryFixture(entries);
+    expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute)).toBeNull();
+    expect(fixture.requests).toEqual([]);
+  });
+
+  it('discovers IPv4-mapped loopback sockets in tcp6', async () => {
+    const entry = directoryProcesses()[0];
+    entry.address = '0000000000000000FFFF00000100007F';
+    const fixture = discoveryFixture([entry]);
+    expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute)).toMatchObject({
+      serverUrl: 'http://127.0.0.1:41001',
+      processId: 101,
+    });
+  });
+
+  it('rejects ambiguous root ownership across listeners and containers', async () => {
+    const entries = directoryProcesses();
+    entries[1].roots = ['ses_a'];
+    const fixture = discoveryFixture(entries);
+    const owner = vi.fn();
+    await expect(findControlPlaneKiloRuntime('ses_a', fixture.execute, owner)).rejects.toThrow(
+      'Ambiguous Kilo root listener ownership'
+    );
+    const duplicate = discoveryFixture([directoryProcesses()[0]]);
+    duplicate.containers.set('unrelated', [directoryProcesses()[0]]);
+    await expect(findControlPlaneKiloRuntime('ses_a', duplicate.execute, owner)).rejects.toThrow(
+      'Ambiguous Kilo root container ownership'
+    );
+    expect(owner).not.toHaveBeenCalled();
+  });
+
+  it('does not let stale log evidence establish ownership without a root listener', async () => {
+    const fixture = discoveryFixture(
+      [],
+      'kilo server started at http://127.0.0.1:41001\nsnapshot metadata validated status=missing expectedKiloSessionId=ses_a\nsnapshot missing info.id — likely an error response'
+    );
+    const owner = vi.fn();
+    expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute, owner)).toBeNull();
+    expect(owner).not.toHaveBeenCalled();
+    expect(fixture.requests).toEqual([]);
+  });
+
+  it('refuses container cleanup when another worktree shares that container', async () => {
+    const fixture = discoveryFixture(directoryProcesses());
+    const runtime = await findControlPlaneKiloRuntime('ses_a', fixture.execute);
+    if (!runtime) throw new Error('Expected owned runtime');
+    await expect(
+      stopOwnedControlPlaneSandbox(runtime.container, 'ses_a', fixture.execute)
+    ).rejects.toThrow('other worktrees');
+    expect(fixture.killed).toEqual([]);
+  });
+
+  it('cleans only the proven exclusive container and its proxy', async () => {
+    const fixture = discoveryFixture([directoryProcesses()[0]]);
+    const runtime = await findControlPlaneKiloRuntime('ses_a', fixture.execute);
+    if (!runtime) throw new Error('Expected owned runtime');
+    await stopOwnedControlPlaneSandbox(runtime.container, 'ses_a', fixture.execute);
+    expect(fixture.killed).toEqual(['owned', 'proxy']);
+  });
+});
+
+describe('strict harness stream events', () => {
+  const event = {
+    eventId: 1,
+    sessionId: 'workspace_a',
+    streamEventType: 'kilocode',
+    timestamp: '2026-08-29T00:00:00Z',
+    data: { type: 'question.asked', properties: { id: 'question_b', sessionID: 'ses_b' } },
+  };
+
+  it('preserves sibling event fields and the inherited executionId default', () => {
+    expect(streamEventSchema.parse(event)).toEqual({ ...event, executionId: null });
+  });
+
+  it.each([
+    { ...event, eventId: '1' },
+    { ...event, sessionId: undefined },
+    { ...event, timestamp: undefined },
+    { ...event, executionId: 1 },
+    { ...event, data: [] },
+  ])('rejects malformed stream envelopes', invalid => {
+    expect(streamEventSchema.safeParse(invalid).success).toBe(false);
   });
 });

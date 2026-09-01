@@ -113,7 +113,18 @@ function writeSignalTerminatedMockKilo(binDir: string): void {
 
 function writeSignalIgnoringDescendantMockKilo(binDir: string, descendantMarker: string): void {
   const readyMarker = `${descendantMarker}.ready`;
-  const script = `#!/bin/sh\ntrap 'exit 0' TERM\nnode -e 'const fs = require("node:fs"); process.on("SIGTERM", () => {}); fs.writeFileSync(process.argv[1], "ready"); setTimeout(() => fs.writeFileSync(process.argv[2], "alive"), 800); setInterval(() => {}, 1000);' "${readyMarker}" "${descendantMarker}" </dev/null >/dev/null 2>&1 &\nwhile [ ! -f "${readyMarker}" ]; do sleep 0.01; done\nsleep 2\n`;
+  const script = `#!/bin/sh
+trap '' TERM
+sh -c '
+  trap "" TERM
+  printf ready > "$1"
+  sleep 0.8
+  printf alive > "$2"
+  exec sleep 30
+' sh "${readyMarker}" "${descendantMarker}" </dev/null >/dev/null 2>&1 &
+trap 'exit 0' TERM
+wait
+`;
   const kiloPath = path.join(binDir, 'kilo');
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
@@ -672,23 +683,87 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     }
   });
 
-  it('returns 404 when session-ingest returns a valid empty session export', async () => {
-    mockFetchOk(JSON.stringify({ info: {}, messages: [], sessionDiff: [] }));
+  it.each([
+    JSON.stringify({ info: {}, messages: [], sessionDiff: [] }),
+    JSON.stringify({ info: {}, messages: [], sessionDiff: [], subagents: [] }),
+    ' {\n "sessionDiff": [], "info": {}, "messages": []\n } ',
+  ])('returns 404 for a canonical empty fresh-session export: %j', async snapshot => {
+    mockFetchOk(snapshot);
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
 
     const result = await restoreSession(SESSION_ID, workspace);
 
     expect(result).toEqual({
       ok: false,
-      error: 'snapshot not found (empty export)',
+      error: 'snapshot not found (404)',
       code: 404,
       step: 'download',
     });
+    expect(fs.existsSync(capturePath)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it.each([
+    { bytes: 1_024, code: 404 },
+    { bytes: 1_025, code: null },
+  ])('enforces the canonical empty-snapshot boundary at $bytes bytes', async ({ bytes, code }) => {
+    const snapshot = JSON.stringify({ info: {}, messages: [], sessionDiff: [] });
+    mockFetchOk(`${' '.repeat(bytes - snapshot.length)}${snapshot}`);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe(code);
+      expect(result.step).toBe('download');
+      expect(result.error).toContain(code === 404 ? 'snapshot not found (404)' : 'missing info.id');
+    }
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it.each([
+    '{"info":{},"messages":[],"sessionDiff":[],"messages":[]}',
+    '{"info":{},"messages":[],"sessionDiff":[]} trailing',
+    '{"info":{},"messages":[],"sessionDiff":[',
+  ])('keeps duplicate fields and malformed empty exports fail-closed: %j', async snapshot => {
+    mockFetchOk(snapshot);
+    const capturePath = path.join(tmpDir, 'import-input.json');
+    writeCapturingMockKilo(binDir, capturePath);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBeNull();
+      expect(result.step).toBe('download');
+    }
+    expect(fs.existsSync(capturePath)).toBe(false);
+    expect(snapshotDirectories()).toEqual([]);
+  });
+
+  it('does not treat a mismatched session ID as an empty snapshot', async () => {
+    mockFetchOk(
+      JSON.stringify({ info: { id: 'ses_different_session' }, messages: [], sessionDiff: [] })
+    );
+    writeMockKilo(binDir, 1);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBeNull();
+      expect(result.step).toBe('import');
+    }
   });
 
   for (const [description, snapshot] of [
     ['null session metadata', { info: null, messages: [], sessionDiff: [] }],
     ['same-size malformed session diffs', { info: {}, messages: [], sessionDiff: {} }],
     ['missing session diffs', { info: {}, messages: [] }],
+    ['non-array messages', { info: {}, messages: {}, sessionDiff: [] }],
+    ['nonempty subagents', { info: {}, messages: [], sessionDiff: [], subagents: [{}] }],
+    ['non-array subagents', { info: {}, messages: [], sessionDiff: [], subagents: null }],
     [
       'session metadata without an id',
       { info: { title: 'Existing session' }, messages: [], sessionDiff: [] },
@@ -875,6 +950,7 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
       expect(result.step).toBe('import');
       expect(result.error).toContain('kilo import timed out');
     }
+    expect(fs.readFileSync(`${descendantMarker}.ready`, 'utf8')).toBe('ready');
     expect(elapsedMs).toBeGreaterThanOrEqual(600);
     expect(fs.existsSync(descendantMarker)).toBe(false);
   });

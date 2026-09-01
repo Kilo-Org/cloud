@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -130,6 +130,8 @@ function createKiloStub() {
       if (request.method === 'GET' && url.pathname === '/permission') {
         return Response.json(permissions);
       }
+      if (request.method === 'GET' && url.pathname === '/session/status') return Response.json({});
+      if (request.method === 'GET' && url.pathname === '/pty') return Response.json([]);
       if (request.method === 'POST' && url.pathname.startsWith('/permission/')) {
         const id = decodeURIComponent(url.pathname.split('/')[2]);
         const index = permissions.findIndex(permission => permission.id === id);
@@ -281,6 +283,28 @@ afterEach(async () => {
 });
 
 describe('worktree Kilo environments', () => {
+  it.each([undefined, 'org-trusted'])(
+    'uses only trusted organization attribution: %s',
+    organizationId => {
+      const env = buildWorktreeKiloEnvironment(
+        '/workspace/a',
+        '/home/a',
+        { ...auth, token: 'real-kilo-token', organizationId },
+        { KILOCODE_ORGANIZATION_ID: 'profile-org' },
+        { KILOCODE_ORGANIZATION_ID: 'inherited-org' }
+      );
+      if (organizationId) expect(env.KILOCODE_ORGANIZATION_ID).toBe(organizationId);
+      else expect(env).not.toHaveProperty('KILOCODE_ORGANIZATION_ID');
+      expect(JSON.parse(env.KILO_CONFIG_CONTENT).provider.kilo.options).toEqual({
+        apiKey: 'real-kilo-token',
+        kilocodeToken: 'real-kilo-token',
+        baseURL: auth.targets.providerBaseUrl,
+        ...(organizationId ? { kilocodeOrganizationId: organizationId } : {}),
+      });
+      expect(env.KILO_CONFIG_CONTENT).toBe(env.OPENCODE_CONFIG_CONTENT);
+    }
+  );
+
   it('retains only the four trusted Bitbucket metadata keys from the attachment', () => {
     const env = buildWorktreeKiloEnvironment(
       '/workspace/a',
@@ -428,6 +452,130 @@ describe('worktree Kilo runtime registry', () => {
         expect.objectContaining({ messageID: 'message_root_two' }),
       ])
     );
+  });
+
+  it('uses the real SDK timeout-free fetch for global SSE with runtime-owned cancellation', async () => {
+    const fetchSpy = spyOn(globalThis, 'fetch');
+    const harness = createRegistry();
+    try {
+      const runtime = await harness.registry.ensure(path.join(tmpDir, 'worktree-sse'), auth);
+      const sseCalls = fetchSpy.mock.calls.filter(
+        ([request]) =>
+          request instanceof Request && new URL(request.url).pathname === '/global/event'
+      );
+      expect(sseCalls).toHaveLength(1);
+      const [request, init] = sseCalls[0];
+      if (!(request instanceof Request)) throw new Error('Expected SDK SSE request');
+      expect(init).toMatchObject({ duplex: 'half', timeout: false });
+      expect(new URL(request.url).searchParams.get('directory')).toBe(runtime.directory);
+      expect(request.signal.aborted).toBe(false);
+      expect(runtime.signal.aborted).toBe(false);
+      expect(harness.registry.isHealthy()).toBe(true);
+      harness.registry.shutdown();
+      expect(request.signal.aborted).toBe(true);
+      expect(runtime.signal.aborted).toBe(true);
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(harness.unexpectedCloses).toBe(0);
+    } finally {
+      harness.registry.shutdown();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it.each(['stream-error', 'feed-end', 'reconnect'] as const)(
+    'classifies real SDK SSE %s without exposing private errors or reconnecting',
+    async failure => {
+      const connected = 'data: {"payload":{"type":"server.connected","properties":{}}}\n\n';
+      const encoder = new TextEncoder();
+      const opened = Promise.withResolvers<ReadableStreamDefaultController<Uint8Array>>();
+      const response = new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(encoder.encode(connected));
+            opened.resolve(controller);
+          },
+        }),
+        { headers: { 'Content-Type': 'text/event-stream' } }
+      );
+      const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(response);
+      const failures: unknown[] = [];
+      const harness = createRegistry({ onUnexpectedClose: error => failures.push(error) });
+      try {
+        const runtime = await harness.registry.ensure(path.join(tmpDir, 'worktree-sse'), auth);
+        const stream = await opened.promise;
+        if (failure === 'stream-error') stream.error(new Error('private-stream-credential'));
+        else if (failure === 'feed-end') stream.close();
+        else stream.enqueue(encoder.encode(connected));
+        await waitUntil(() => failures.length > 0);
+        expect(failures).toEqual([
+          {
+            directory: runtime.directory,
+            reason:
+              failure === 'stream-error'
+                ? 'feed_failed'
+                : failure === 'feed-end'
+                  ? 'feed_ended'
+                  : 'feed_reconnected',
+          },
+        ]);
+        expect(runtime.signal.aborted).toBe(true);
+        expect(harness.registry.isHealthy()).toBe(false);
+        expect(harness.registry.get(runtime.directory)).toBeUndefined();
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        harness.registry.shutdown();
+        fetchSpy.mockRestore();
+      }
+    }
+  );
+
+  it('keeps the refreshed SDK event feed healthy after intentional old-process shutdown', async () => {
+    const received: string[] = [];
+    const harness = createRegistry({
+      startServer: async () => {
+        const server = createKiloStub();
+        servers.push(server);
+        const stopped = Promise.withResolvers<void>();
+        return {
+          url: server.url,
+          stopped: stopped.promise,
+          close: () => {
+            server.endFeeds();
+            stopped.resolve();
+          },
+        };
+      },
+      onEvent: (_runtime, event) => received.push(event.type),
+    });
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(path.join(tmpDir, 'shared'));
+    const first = harness.registry.attach(identity, directAuth);
+    const runtime = await first.ready;
+    first.commit();
+    first.release();
+    const originalClient = runtime.kiloClient;
+    const refresh = harness.registry.attach(
+      identity,
+      { ...directAuth, token: 'rotated-token' },
+      undefined,
+      () => true
+    );
+    expect(await refresh.ready).toBe(runtime);
+    refresh.commit();
+    refresh.release();
+    expect(runtime.kiloClient).not.toBe(originalClient);
+    expect(servers).toHaveLength(2);
+    servers[1]?.emit({ payload: { type: 'server.heartbeat', properties: {} } });
+    servers[1]?.emit({ payload: { type: 'session.updated', properties: {} } });
+    await waitUntil(() => received.includes('session.updated'));
+    expect(runtime.signal.aborted).toBe(false);
+    expect(harness.registry.isHealthy()).toBe(true);
+    expect(harness.registry.get(identity.directory)).toBe(runtime);
+    expect(harness.unexpectedCloses).toBe(0);
+    servers[1]?.endFeeds();
+    await waitUntil(() => harness.unexpectedCloses === 1);
+    expect(runtime.signal.aborted).toBe(true);
+    expect(harness.registry.isHealthy()).toBe(false);
   });
 
   it('isolates different worktrees with separate servers, homes, auth files, and event clients', async () => {
@@ -864,6 +1012,28 @@ describe('worktree Kilo runtime registry', () => {
     expect(runtime.signal.aborted).toBe(true);
   });
 
+  it('maps pending roots and children before startup and removes them only after the final failed attempt', async () => {
+    const harness = createRegistry();
+    const identity = rootIdentity(path.join(tmpDir, 'shared'));
+    const first = harness.registry.attach(identity, auth);
+    const duplicate = harness.registry.attach(identity, auth);
+    expect(rootForSession(identity.kiloSessionId, identity.directory)).toBe(identity.kiloSessionId);
+    rememberChildSession({ childId: 'pending_child', parentId: identity.kiloSessionId });
+    expect(rootForSession('pending_child', identity.directory)).toBe(identity.kiloSessionId);
+    first.release();
+    expect(rootForSession(identity.kiloSessionId)).toBe(identity.kiloSessionId);
+    expect(rootForSession('pending_child')).toBe(identity.kiloSessionId);
+    const runtime = await duplicate.ready;
+    await first.ready;
+    duplicate.release();
+    expect(rootForSession(identity.kiloSessionId)).toBeUndefined();
+    expect(rootForSession('pending_child')).toBeUndefined();
+    expect(directoryForSession(identity.kiloSessionId)).toBeUndefined();
+    expect(directoryForSession('pending_child')).toBeUndefined();
+    expect(runtime.signal.aborted).toBe(true);
+    expect(harness.closes).toBe(1);
+  });
+
   it('rejects mismatched root identities while startup is pending without disturbing ownership', async () => {
     const harness = createRegistry();
     const identity = rootIdentity(path.join(tmpDir, 'shared'));
@@ -930,6 +1100,7 @@ describe('worktree Kilo runtime registry', () => {
   it('fences late startup and cleanup from a replacement lifetime and its auth files', async () => {
     const launched = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
+    const stopped = Promise.withResolvers<void>();
     const oldServer = createKiloStub();
     const newServer = createKiloStub();
     servers.push(oldServer, newServer);
@@ -944,6 +1115,7 @@ describe('worktree Kilo runtime registry', () => {
         }
         return {
           url: old ? oldServer.url : newServer.url,
+          ...(old ? { stopped: stopped.promise } : {}),
           close: () => {
             steps.push(old ? 'close-old' : 'close-new');
           },
@@ -957,14 +1129,26 @@ describe('worktree Kilo runtime registry', () => {
       await launched.promise;
       expect(harness.registry.detach(identity)).toBe(true);
       const replacement = harness.registry.attach(identity, { ...auth, token: 'replacement' });
+      rememberChildSession({
+        childId: 'replacement_startup_child',
+        parentId: identity.kiloSessionId,
+      });
       old.release();
+      expect(rootForSession(identity.kiloSessionId)).toBe(identity.kiloSessionId);
+      expect(rootForSession('replacement_startup_child')).toBe(identity.kiloSessionId);
       await Promise.resolve();
       expect(steps).toEqual(['start-old']);
       release.resolve();
       expect(await oldResult).toMatchObject({ code: 'not_ready' });
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(steps).toEqual(['start-old', 'close-old']);
+      expect(newServer.feedConnections).toBe(0);
+      stopped.resolve();
       const runtime = await replacement.ready;
       replacement.commit();
       old.release();
+      expect(rootForSession(identity.kiloSessionId)).toBe(identity.kiloSessionId);
+      expect(rootForSession('replacement_startup_child')).toBe(identity.kiloSessionId);
       expect(steps).toEqual(['start-old', 'close-old', 'start-new']);
       expect(oldServer.feedConnections).toBe(0);
       expect(newServer.feedConnections).toBe(1);
@@ -985,6 +1169,7 @@ describe('worktree Kilo runtime registry', () => {
       expect(harness.unexpectedCloses).toBe(0);
     } finally {
       release.resolve();
+      stopped.resolve();
       await oldResult;
     }
   });
@@ -996,6 +1181,7 @@ describe('worktree Kilo runtime registry', () => {
     const conflicts = [
       { ...auth, scopeId: 'different-scope' },
       { ...auth, token: 'different-token' },
+      { ...auth, organizationId: 'different-organization' },
       ...Object.keys(auth.targets).map(key => ({
         ...auth,
         targets: { ...auth.targets, [key]: 'https://different.example.test' },
@@ -1043,8 +1229,15 @@ describe('worktree Kilo runtime registry', () => {
       ...auth,
       scopeId: 'worktree_b',
     });
+    rememberChildSession({
+      childId: 'shutdown_child',
+      parentId: rootIdentity(first.directory).kiloSessionId,
+    });
     harness.registry.shutdown();
     harness.registry.shutdown();
+    expect(rootForSession(rootIdentity(first.directory).kiloSessionId)).toBeUndefined();
+    expect(rootForSession(rootIdentity(second.directory).kiloSessionId)).toBeUndefined();
+    expect(rootForSession('shutdown_child')).toBeUndefined();
     expect(first.signal.aborted).toBe(true);
     expect(second.signal.aborted).toBe(true);
     expect(harness.closes).toBe(2);
@@ -1096,6 +1289,293 @@ describe('worktree Kilo runtime registry', () => {
     expect(harness.registry.get(runtime.directory)).toBeUndefined();
     expect(harness.closes).toBe(1);
   });
+});
+
+describe('worktree directory deletion', () => {
+  it('waits for confirmed child exit before removing HOME while another directory stays live', async () => {
+    const stopped = Promise.withResolvers<void>();
+    const directory = path.join(tmpDir, 'stopping');
+    const closed: string[] = [];
+    const harness = createRegistry({
+      startServer: async options => {
+        const stub = createKiloStub();
+        servers.push(stub);
+        return {
+          url: stub.url,
+          close: () => {
+            closed.push(options.directory);
+          },
+          ...(options.directory === directory ? { stopped: stopped.promise } : {}),
+        };
+      },
+    });
+    const runtime = await harness.registry.ensure(directory, auth);
+    const other = await harness.registry.ensure(path.join(tmpDir, 'other'), {
+      ...auth,
+      scopeId: 'other',
+    });
+    const authFile = path.join(runtime.env.XDG_DATA_HOME, 'kilo', 'auth.json');
+    let deleted = false;
+    const deletion = harness.registry.deleteDirectory(directory).then(() => {
+      deleted = true;
+    });
+    try {
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(runtime.signal.aborted).toBe(true);
+      expect(closed).toEqual([directory]);
+      expect(deleted).toBe(false);
+      expect(fs.existsSync(authFile)).toBe(true);
+      expect(harness.registry.get(other.directory)).toBe(other);
+      expect(fs.existsSync(other.env.HOME)).toBe(true);
+      expect(other.signal.aborted).toBe(false);
+      fs.writeFileSync(path.join(runtime.env.HOME, 'last-write-before-exit'), 'stopping');
+      stopped.resolve();
+      await deletion;
+      expect(deleted).toBe(true);
+      expect(fs.existsSync(runtime.env.HOME)).toBe(false);
+      expect(fs.existsSync(other.env.HOME)).toBe(true);
+    } finally {
+      stopped.resolve();
+      await deletion;
+    }
+  });
+
+  it('fails deletion closed on an exit deadline and retries the same retirement after the child stops', async () => {
+    const stopped = Promise.withResolvers<void>();
+    const stub = createKiloStub();
+    servers.push(stub);
+    let closes = 0;
+    const harness = createRegistry({
+      startServer: async () => ({
+        url: stub.url,
+        close: () => {
+          closes++;
+        },
+        stopped: stopped.promise,
+      }),
+    });
+    const directory = path.join(tmpDir, 'stuck-exit');
+    const runtime = await harness.registry.ensure(directory, auth);
+    const checkoutFile = path.join(directory, 'checkout');
+    fs.writeFileSync(checkoutFile, 'keep checkout');
+    harness.registry.detach(rootIdentity(directory));
+    const timers = spyOn(globalThis, 'setTimeout');
+    let retry: Promise<void> | undefined;
+    try {
+      const failure = rejected(harness.registry.deleteDirectory(directory));
+      const deadline = timers.mock.calls.find(([, ms]) => ms === 30_000)?.[0];
+      if (typeof deadline !== 'function') throw new Error('Missing retirement deadline');
+      deadline();
+      expect(await failure).toEqual(new Error('Kilo worktree retirement timed out'));
+      expect(fs.existsSync(runtime.env.HOME)).toBe(true);
+      expect(fs.readFileSync(checkoutFile, 'utf8')).toBe('keep checkout');
+      expect(closes).toBe(1);
+      let deleted = false;
+      retry = harness.registry.deleteDirectory(directory).then(() => {
+        deleted = true;
+      });
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(deleted).toBe(false);
+      expect(fs.existsSync(runtime.env.HOME)).toBe(true);
+      stopped.resolve();
+      await retry;
+      expect(fs.existsSync(runtime.env.HOME)).toBe(false);
+      expect(fs.readFileSync(checkoutFile, 'utf8')).toBe('keep checkout');
+      expect(closes).toBe(1);
+    } finally {
+      stopped.resolve();
+      await retry;
+      timers.mockRestore();
+    }
+  });
+
+  it('removes live and retired generated homes and roots without touching another directory', async () => {
+    const harness = createRegistry();
+    const directory = path.join(tmpDir, 'deleted');
+    const identity = rootIdentity(directory);
+    const retired = await harness.registry.ensure(directory, auth);
+    const retiredHome = retired.env.HOME;
+    const savedSession = path.join(retiredHome, 'saved-session');
+    fs.writeFileSync(savedSession, 'restore state');
+    expect(harness.registry.detach(identity)).toBe(true);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(fs.readFileSync(savedSession, 'utf8')).toBe('restore state');
+    const restored = await harness.registry.ensure(directory, auth);
+    expect(restored.env.HOME).toBe(retiredHome);
+    expect(fs.readFileSync(savedSession, 'utf8')).toBe('restore state');
+    expect(harness.registry.detach(identity)).toBe(true);
+    const liveAuth = { ...auth, scopeId: 'new_scope', token: 'new_guest' };
+    const live = await harness.registry.ensure(directory, liveAuth);
+    const liveHome = live.env.HOME;
+    expect(liveHome).not.toBe(retiredHome);
+    const siblingIdentity = rootIdentity(directory, 'sibling');
+    const sibling = harness.registry.attach(siblingIdentity, liveAuth);
+    await sibling.ready;
+    sibling.commit();
+    rememberChildSession({ childId: 'deleted_child', parentId: siblingIdentity.kiloSessionId });
+    const other = await harness.registry.ensure(path.join(tmpDir, 'other'), {
+      ...auth,
+      scopeId: 'other_scope',
+    });
+    const otherIdentity = rootIdentity(other.directory);
+    rememberChildSession({ childId: 'surviving_child', parentId: otherIdentity.kiloSessionId });
+    const otherAuthFile = path.join(other.env.XDG_DATA_HOME, 'kilo', 'auth.json');
+    const otherAuthBefore = fs.readFileSync(otherAuthFile, 'utf8');
+    const checkoutFile = path.join(directory, 'checkout-file');
+    fs.writeFileSync(checkoutFile, 'owned by checkout cleanup');
+    live.env.HOME = other.env.HOME;
+
+    expect(harness.registry.get(directory)).toBe(live);
+    await harness.registry.deleteDirectory(directory);
+    expect(fs.existsSync(retiredHome)).toBe(false);
+    expect(fs.existsSync(liveHome)).toBe(false);
+    expect(fs.readFileSync(checkoutFile, 'utf8')).toBe('owned by checkout cleanup');
+    expect(fs.readFileSync(otherAuthFile, 'utf8')).toBe(otherAuthBefore);
+    expect(live.signal.aborted).toBe(true);
+    expect(sibling.signal.aborted).toBe(true);
+    expect(harness.registry.get(directory)).toBeUndefined();
+    for (const id of [identity.kiloSessionId, siblingIdentity.kiloSessionId, 'deleted_child']) {
+      expect(rootForSession(id)).toBeUndefined();
+      expect(directoryForSession(id)).toBeUndefined();
+    }
+    expect(harness.registry.get(other.directory)).toBe(other);
+    expect(other.signal.aborted).toBe(false);
+    expect(rootForSession('surviving_child')).toBe(otherIdentity.kiloSessionId);
+    expect(await other.kiloClient.abortSession({ sessionId: otherIdentity.kiloSessionId })).toBe(
+      true
+    );
+    expect(harness.closes).toBe(3);
+    expect(harness.registry.isHealthy()).toBe(true);
+    expect(() => harness.registry.attach(rootIdentity(directory, 'new_root'), liveAuth)).toThrow(
+      'Kilo worktree is deleted'
+    );
+    await harness.registry.deleteDirectory(directory);
+    expect(harness.launches).toHaveLength(4);
+    expect(harness.closes).toBe(3);
+    expect(harness.unexpectedCloses).toBe(0);
+  });
+
+  it('deletes already-retired homes idempotently after runtime entries are gone', async () => {
+    const harness = createRegistry();
+    const directory = path.join(tmpDir, 'retired');
+    const homes: string[] = [];
+    for (const scopeId of ['first_scope', 'second_scope']) {
+      const runtime = await harness.registry.ensure(directory, { ...auth, scopeId });
+      homes.push(runtime.env.HOME);
+      expect(harness.registry.detach(rootIdentity(directory))).toBe(true);
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(harness.registry.get(directory)).toBeUndefined();
+      expect(fs.existsSync(runtime.env.HOME)).toBe(true);
+    }
+    await Promise.all([
+      harness.registry.deleteDirectory(directory),
+      harness.registry.deleteDirectory(directory),
+    ]);
+    for (const home of homes) expect(fs.existsSync(home)).toBe(false);
+    await harness.registry.deleteDirectory(directory);
+    expect(() => harness.registry.attach(rootIdentity(directory), auth)).toThrow(
+      'Kilo worktree is deleted'
+    );
+    expect(harness.launches).toHaveLength(2);
+    expect(harness.closes).toBe(2);
+  });
+
+  it('permanently fences a never-started directory without launching Kilo or deleting checkout content', async () => {
+    const harness = createRegistry();
+    const directory = path.join(tmpDir, 'never-started');
+    fs.mkdirSync(directory);
+    fs.writeFileSync(path.join(directory, 'keep'), 'checkout');
+    const deletion = harness.registry.deleteDirectory(directory);
+    expect(() => harness.registry.attach(rootIdentity(directory), auth)).toThrow(
+      'Kilo worktree is deleted'
+    );
+    await deletion;
+    await harness.registry.deleteDirectory(directory);
+    expect(harness.registry.get(directory)).toBeUndefined();
+    expect(harness.registry.detach(rootIdentity(directory))).toBe(false);
+    expect(fs.readFileSync(path.join(directory, 'keep'), 'utf8')).toBe('checkout');
+    expect(fs.existsSync(path.join(tmpDir, 'homes'))).toBe(false);
+    expect(harness.launches).toEqual([]);
+    expect(harness.closes).toBe(0);
+    expect(harness.registry.isHealthy()).toBe(true);
+  });
+
+  it.each(['active', 'retiring', 'replacement', 'shutdown'] as const)(
+    'drains %s startup before deleting generated HOME state',
+    async state => {
+      const launched = Promise.withResolvers<Parameters<typeof startWorktreeKiloServer>[0]>();
+      const release = Promise.withResolvers<void>();
+      const steps: string[] = [];
+      let launches = 0;
+      const stub = createKiloStub();
+      servers.push(stub);
+      const harness = createRegistry({
+        startServer: async options => {
+          launches++;
+          launched.resolve(options);
+          await release.promise;
+          fs.writeFileSync(path.join(options.env.HOME, 'late-startup-state'), 'pending startup');
+          steps.push('late-write');
+          return {
+            url: stub.url,
+            close: () => {
+              steps.push('close');
+            },
+          };
+        },
+      });
+      const directory = path.join(tmpDir, 'pending');
+      const identity = rootIdentity(directory);
+      const attachment = harness.registry.attach(identity, auth);
+      const result = rejected(attachment.ready);
+      const replacements: ReturnType<WorktreeKiloRuntimes['attach']>[] = [];
+      const results = [result];
+      const deletions: Promise<void>[] = [];
+      try {
+        const options = await launched.promise;
+        if (state === 'retiring' || state === 'replacement') harness.registry.detach(identity);
+        if (state === 'replacement') {
+          const replacement = harness.registry.attach(identity, {
+            ...auth,
+            scopeId: 'replacement_scope',
+          });
+          replacements.push(replacement);
+          results.push(rejected(replacement.ready));
+        }
+        if (state === 'shutdown') harness.registry.shutdown();
+        let settled = false;
+        const deletion = harness.registry.deleteDirectory(directory).then(() => {
+          settled = true;
+          steps.push('deleted');
+        });
+        deletions.push(deletion, harness.registry.deleteDirectory(directory));
+        expect(attachment.signal.aborted).toBe(true);
+        for (const replacement of replacements) expect(replacement.signal.aborted).toBe(true);
+        expect(rootForSession(identity.kiloSessionId)).toBeUndefined();
+        expect(() => harness.registry.attach(identity, auth)).toThrow();
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(settled).toBe(false);
+        expect(fs.existsSync(options.env.HOME)).toBe(true);
+        expect(steps).toEqual([]);
+        release.resolve();
+        for (const pending of results) expect(await pending).toMatchObject({ code: 'not_ready' });
+        await Promise.all(deletions);
+        expect(steps).toEqual(['late-write', 'close', 'deleted']);
+        expect(fs.existsSync(options.env.HOME)).toBe(false);
+        expect(fs.readdirSync(path.join(tmpDir, 'homes'))).toEqual([]);
+        expect(harness.registry.get(directory)).toBeUndefined();
+        attachment.release();
+        for (const replacement of replacements) replacement.release();
+        expect(launches).toBe(1);
+        expect(stub.feedConnections).toBe(0);
+        expect(harness.unexpectedCloses).toBe(0);
+        await harness.registry.deleteDirectory(directory);
+      } finally {
+        release.resolve();
+        await Promise.allSettled([...results, ...deletions]);
+      }
+    }
+  );
 });
 
 describe('worktree attachment lifecycle', () => {
@@ -1286,17 +1766,24 @@ describe('worktree attachment lifecycle', () => {
     );
     try {
       const signal = await restoring.promise;
-      expect(rootForSession(identity.kiloSessionId)).toBeUndefined();
+      expect(rootForSession(identity.kiloSessionId)).toBe(identity.kiloSessionId);
+      rememberChildSession({ childId: 'old_child', parentId: identity.kiloSessionId });
+      expect(rootForSession('old_child')).toBe(identity.kiloSessionId);
       expect((await handleControlRequest('session.detach', identity, {}, deps)).ok).toBe(true);
+      expect(rootForSession(identity.kiloSessionId)).toBeUndefined();
+      expect(rootForSession('old_child')).toBeUndefined();
       expect(signal.aborted).toBe(true);
       expect(runtime?.signal.aborted).toBe(false);
       expect(
         (await handleControlRequest('session.attach', identity, { kilo: auth }, deps)).ok
       ).toBe(true);
+      rememberChildSession({ childId: 'replacement_child', parentId: identity.kiloSessionId });
       release.resolve();
       expect((await pending).ok).toBe(false);
       expect(harness.registry.get(identity.directory)).toBe(runtime);
       expect(rootForSession(identity.kiloSessionId)).toBe(identity.kiloSessionId);
+      expect(rootForSession('replacement_child')).toBe(identity.kiloSessionId);
+      expect(rootForSession('old_child')).toBeUndefined();
       expect(rootForSession(sibling.kiloSessionId)).toBe(sibling.kiloSessionId);
       expect(
         (
@@ -1437,6 +1924,39 @@ setTimeout(() => process.stdout.write(line.slice(-3)), 25);
         return true;
       }
     });
+  });
+
+  it('exposes actual child exit rather than treating SIGTERM delivery as stopped', async () => {
+    const options = launchEnvironment(`
+import fs from 'node:fs';
+fs.writeFileSync(process.env.PID_PATH, String(process.pid));
+process.on('SIGTERM', () => fs.writeFileSync(process.env.PID_PATH + '.sigterm', 'received'));
+setInterval(() => {
+  if (fs.existsSync(process.env.PID_PATH + '.exit')) process.exit(0);
+}, 10);
+console.log('kilo server listening on http://127.0.0.1:12345');
+`);
+    const handle = await startWorktreeKiloServer(options);
+    const pid = Number(fs.readFileSync(options.env.PID_PATH, 'utf8'));
+    let exited = false;
+    const stopped = handle.stopped.then(() => {
+      exited = true;
+    });
+    try {
+      handle.close();
+      handle.close();
+      await waitUntil(() => fs.existsSync(`${options.env.PID_PATH}.sigterm`));
+      expect(exited).toBe(false);
+      expect(() => process.kill(pid, 0)).not.toThrow();
+      fs.writeFileSync(`${options.env.PID_PATH}.exit`, 'exit');
+      await stopped;
+      expect(exited).toBe(true);
+      expect(() => process.kill(pid, 0)).toThrow();
+    } finally {
+      fs.writeFileSync(`${options.env.PID_PATH}.exit`, 'exit');
+      handle.close();
+      await stopped;
+    }
   });
 
   it('terminates a startup timeout and does not expose child output in errors', async () => {

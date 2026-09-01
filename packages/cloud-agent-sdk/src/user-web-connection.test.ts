@@ -1318,6 +1318,7 @@ describe('createUserWebConnection', () => {
           gitUrl: null,
           gitBranch: null,
           parentSessionId: null,
+          worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
           status: null,
           statusUpdatedAt: null,
         },
@@ -1340,6 +1341,7 @@ describe('createUserWebConnection', () => {
           gitUrl: null,
           gitBranch: null,
           parentSessionId: null,
+          worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
           status: null,
           statusUpdatedAt: null,
         },
@@ -1373,6 +1375,7 @@ describe('createUserWebConnection', () => {
           gitUrl: null,
           gitBranch: null,
           parentSessionId: null,
+          worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
           status: 'idle',
           statusUpdatedAt: 'now',
         },
@@ -1398,8 +1401,30 @@ describe('createUserWebConnection', () => {
     });
 
     expect(created).toHaveBeenCalledTimes(1);
+    expect(created).toHaveBeenCalledWith(
+      expect.objectContaining({
+        session: expect.objectContaining({
+          worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+        }),
+      })
+    );
     expect(updated).toHaveBeenCalledTimes(1);
+    expect(updated).toHaveBeenCalledWith(
+      expect.objectContaining({
+        session: expect.objectContaining({
+          worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+        }),
+      })
+    );
     expect(status).toHaveBeenCalledTimes(2);
+    expect(status).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        session: expect.objectContaining({
+          worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+        }),
+      })
+    );
     expect(deleted).toHaveBeenCalledTimes(1);
     client.destroy();
   });

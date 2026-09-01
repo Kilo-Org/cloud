@@ -1,8 +1,15 @@
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import { kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
+import jwt from 'jsonwebtoken';
 import { z } from 'zod';
+import { resolveSecret } from '../auth.js';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targets.js';
-import { getSandboxProvider, type SessionMetadata } from '../persistence/session-metadata.js';
+import {
+  getSandboxProvider,
+  requiresContainmentSandbox,
+  type SessionMetadata,
+} from '../persistence/session-metadata.js';
 import { type getOutboundContainerId, isValidSandboxId } from '../sandbox-id.js';
 import { buildSessionAttachPayload } from '../sandbox-session/attach-payload.js';
 import {
@@ -11,6 +18,9 @@ import {
   issueCloudAgentGitLabSessionCapability,
   issueCloudAgentKiloSessionCapability,
   resolveGitHubTokenForRepo,
+  resolveCloudAgentGitHubAuthForRepo,
+  resolveManagedGitLabToken,
+  resolveManagedBitbucketToken,
 } from '../services/git-token-service-client.js';
 import { readProfileBundle } from '../session-profile.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
@@ -25,6 +35,16 @@ import {
 const WORKTREE_LEASE_MS = 4 * 60 * 60 * 1000;
 const CAPABILITY_CACHE_MS = 3 * 60 * 60 * 1000;
 const timestampSchema = z.number().int().nonnegative();
+const KILO_TOKEN_REFRESH_MARGIN_MS = 60 * 1000;
+const cloudAgentTokenSchema = kiloTokenPayload
+  .pick({ version: true, kiloUserId: true, env: true })
+  .extend({
+    apiTokenPepper: z.string().nullable(),
+    tokenSource: z.literal('cloud-agent'),
+    iat: timestampSchema,
+    exp: timestampSchema,
+  })
+  .strict();
 const tokenSchema = z
   .string()
   .min(1)
@@ -98,7 +118,7 @@ const repositorySchema = z.discriminatedUnion('type', [
 const scmSchema = z
   .object({
     purpose: z.enum(['github', 'gitlab', 'bitbucket']),
-    alias: tokenSchema,
+    alias: tokenSchema.optional(),
     gitUrl: z.string().url(),
     capability: capabilitySchema.optional(),
     nativeToken: realTokenSchema.optional(),
@@ -106,12 +126,13 @@ const scmSchema = z
       .object({
         instanceOrigin: z.string().url(),
         instanceHost: z.string().min(1),
-        projectPath: z.string().min(1),
-        integrationId: z.string().min(1),
-        authType: z.enum(['oauth', 'pat']),
+        projectPath: z.string().min(1).optional(),
+        integrationId: z.string().min(1).optional(),
+        authType: z.enum(['oauth', 'pat']).optional(),
         identity: z
           .object({ accountId: z.string().nullable(), accountLogin: z.string().nullable() })
-          .strict(),
+          .strict()
+          .optional(),
         glabIsOAuth2: z.boolean(),
       })
       .strict()
@@ -122,6 +143,7 @@ const scmSchema = z
 export const sessionCredentialGrantSchema = z
   .object({
     version: z.literal(1),
+    containmentEnabled: z.boolean().optional(),
     scopeId: scopeIdSchema,
     sandboxId: z
       .string()
@@ -149,8 +171,9 @@ export const sessionCredentialGrantSchema = z
     repository: repositorySchema.optional(),
     kilo: z
       .object({
-        alias: tokenSchema,
+        alias: tokenSchema.optional(),
         token: realTokenSchema,
+        tokenSelectedAt: timestampSchema.optional(),
         targets: targetsSchema,
         capabilities: z.record(z.string(), capabilitySchema),
       })
@@ -165,14 +188,24 @@ export const sessionCredentialGrantSchema = z
     if (
       grant.expiresAt <= grant.preparedAt ||
       grant.expiresAt - grant.preparedAt > WORKTREE_LEASE_MS ||
+      (grant.kilo.tokenSelectedAt !== undefined && grant.kilo.tokenSelectedAt > grant.preparedAt) ||
       new Set(grant.members.map(member => member.sessionId)).size !== grant.members.length ||
       new Set(grant.members.map(member => member.kiloSessionId)).size !== grant.members.length ||
-      (grant.provider === 'cloudflare' && !grant.outboundContainerId)
+      (grant.containmentEnabled !== false &&
+        grant.provider === 'cloudflare' &&
+        !grant.outboundContainerId)
     ) {
       reject();
     }
-    const kiloAlias = parseControlPlaneCredential(grant.kilo.alias);
-    if (kiloAlias?.sandboxId !== grant.sandboxId || kiloAlias.purpose !== 'kilo') reject();
+    if (grant.containmentEnabled === false) {
+      if (grant.kilo.alias !== undefined || Object.keys(grant.kilo.capabilities).length > 0)
+        reject();
+    } else {
+      const kiloAlias = grant.kilo.alias && parseControlPlaneCredential(grant.kilo.alias);
+      if (!kiloAlias || kiloAlias.sandboxId !== grant.sandboxId || kiloAlias.purpose !== 'kilo') {
+        reject();
+      }
+    }
     const targets = deriveKiloSandboxTargets(
       {
         KILOCODE_BACKEND_BASE_URL: grant.kilo.targets.backendBaseUrl,
@@ -203,8 +236,21 @@ export const sessionCredentialGrantSchema = z
       reject();
     }
     if (!grant.scm) return;
-    const alias = parseControlPlaneCredential(grant.scm.alias);
-    if (alias?.sandboxId !== grant.sandboxId || alias.purpose !== grant.scm.purpose) reject();
+    if (grant.containmentEnabled === false) {
+      if (
+        grant.scm.alias !== undefined ||
+        grant.scm.capability !== undefined ||
+        !grant.scm.nativeToken ||
+        (grant.scm.purpose === 'gitlab') !== (grant.scm.gitlab !== undefined)
+      ) {
+        reject();
+      }
+      return;
+    }
+    const alias = grant.scm.alias && parseControlPlaneCredential(grant.scm.alias);
+    if (!alias || alias.sandboxId !== grant.sandboxId || alias.purpose !== grant.scm.purpose) {
+      reject();
+    }
     if (grant.provider === 'vercel') {
       if (
         grant.scm.purpose !== 'github' ||
@@ -219,7 +265,12 @@ export const sessionCredentialGrantSchema = z
       if (
         grant.scm.nativeToken ||
         !grant.scm.capability?.credential.startsWith(prefixes[grant.scm.purpose]) ||
-        (grant.scm.purpose === 'gitlab') !== (grant.scm.gitlab !== undefined)
+        (grant.scm.purpose === 'gitlab') !== (grant.scm.gitlab !== undefined) ||
+        (grant.scm.gitlab !== undefined &&
+          (!grant.scm.gitlab.projectPath ||
+            !grant.scm.gitlab.integrationId ||
+            !grant.scm.gitlab.authType ||
+            !grant.scm.gitlab.identity))
       ) {
         reject();
       }
@@ -231,8 +282,19 @@ type CredentialMember = z.infer<typeof memberSchema>;
 type CredentialRepository = z.infer<typeof repositorySchema>;
 type ScmGrant = z.infer<typeof scmSchema>;
 type CachedCapability = z.infer<typeof capabilitySchema>;
+type ContainedSessionCredentialGrant = SessionCredentialGrant & {
+  kilo: SessionCredentialGrant['kilo'] & { alias: string };
+  scm?: ScmGrant & { alias: string };
+};
+
+export function isContainedSessionCredentialGrant(
+  grant: SessionCredentialGrant
+): grant is ContainedSessionCredentialGrant {
+  return grant.containmentEnabled !== false;
+}
+
 type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
-  Partial<Pick<Env, 'GIT_TOKEN_SERVICE'>> &
+  Partial<Pick<Env, 'GIT_TOKEN_SERVICE' | 'NEXTAUTH_SECRET'>> &
   KiloTargetEnv;
 
 type PreparedSessionAttachPayload = SessionAttachPayload & {
@@ -311,7 +373,9 @@ function repositoryFromMetadata(
     }
     const explicit =
       Boolean(repository.token) && !isKnownScmCredential(repository.token, existing?.scm);
-    if (provider === 'cloudflare' && explicit) invalidCredentials();
+    if (requiresContainmentSandbox(metadata) && provider === 'cloudflare' && explicit) {
+      invalidCredentials();
+    }
     return {
       type: 'github',
       repo: repository.repo,
@@ -335,7 +399,7 @@ function repositoryFromMetadata(
     if (repository.token) invalidCredentials();
     return { type: 'git', url, ...(repository.platform ? { platform: repository.platform } : {}) };
   }
-  if (provider === 'vercel') invalidCredentials();
+  if (requiresContainmentSandbox(metadata) && provider === 'vercel') invalidCredentials();
   if (repository.type === 'gitlab') {
     if (
       repository.token &&
@@ -505,18 +569,63 @@ async function refreshScmCapability(
   return { ...grant, scm };
 }
 
-function sanitizedPayload(
+async function selectDirectKiloToken(
+  env: CredentialEnv,
+  token: string,
+  existing: SessionCredentialGrant | undefined,
+  now: number
+): Promise<string> {
+  if (
+    !existing ||
+    existing.kilo.token === token ||
+    existing.expiresAt <= now ||
+    now >= (existing.kilo.tokenSelectedAt ?? existing.preparedAt) + WORKTREE_LEASE_MS
+  ) {
+    return token;
+  }
+  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  if (!secret) return token;
+  try {
+    const options: jwt.VerifyOptions = { algorithms: ['HS256'], clockTimestamp: now / 1000 };
+    const current = cloudAgentTokenSchema.parse(jwt.verify(existing.kilo.token, secret, options));
+    const incoming = cloudAgentTokenSchema.parse(jwt.verify(token, secret, options));
+    if (
+      current.kiloUserId !== existing.userId ||
+      current.iat * 1000 > now ||
+      incoming.iat * 1000 > now ||
+      current.exp <= current.iat ||
+      incoming.exp <= incoming.iat ||
+      current.exp * 1000 <= now + KILO_TOKEN_REFRESH_MARGIN_MS
+    ) {
+      return token;
+    }
+    const authorization = cloudAgentTokenSchema.omit({ iat: true, exp: true }).strip();
+    return JSON.stringify(authorization.parse(current)) ===
+      JSON.stringify(authorization.parse(incoming))
+      ? existing.kilo.token
+      : token;
+  } catch {
+    return token;
+  }
+}
+
+function preparedPayload(
   metadata: SessionMetadata,
   payload: SessionAttachPayload,
   grant: SessionCredentialGrant,
   existing: SessionCredentialGrant | undefined
 ): PreparedSessionAttachPayload {
-  const replacements: Array<[string, string]> = [[grant.kilo.token, grant.kilo.alias]];
-  if (existing) replacements.push([existing.kilo.token, grant.kilo.alias]);
+  const contained = isContainedSessionCredentialGrant(grant);
+  const kiloToken = contained ? grant.kilo.alias : grant.kilo.token;
+  const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
+  const replacements: Array<[string, string]> = [[grant.kilo.token, kiloToken]];
+  if (metadata.auth.kilocodeToken) replacements.push([metadata.auth.kilocodeToken, kiloToken]);
+  if (existing) replacements.push([existing.kilo.token, kiloToken]);
   for (const capability of Object.values(grant.kilo.capabilities)) {
-    replacements.push([capability.credential, grant.kilo.alias]);
+    replacements.push([capability.credential, kiloToken]);
   }
   if (grant.scm) {
+    if (!scmToken) invalidCredentials();
     const repositoryToken =
       metadata.repository && 'token' in metadata.repository ? metadata.repository.token : undefined;
     for (const token of [
@@ -526,7 +635,7 @@ function sanitizedPayload(
       existing?.scm?.nativeToken,
       existing?.scm?.capability?.credential,
     ]) {
-      if (token) replacements.push([token, grant.scm.alias]);
+      if (token) replacements.push([token, scmToken]);
     }
   }
   const sanitize = (value: string) =>
@@ -540,24 +649,28 @@ function sanitizedPayload(
         : sanitize(value),
     ])
   );
-  env.KILOCODE_TOKEN = grant.kilo.alias;
-  if (grant.scm?.purpose === 'github') {
+  env.KILOCODE_TOKEN = kiloToken;
+  if (!contained) {
+    delete env.KILOCODE_ORGANIZATION_ID;
+    if (grant.orgId) env.KILOCODE_ORGANIZATION_ID = grant.orgId;
+  }
+  if (grant.scm?.purpose === 'github' && scmToken) {
     if (env.GITHUB_TOKEN && env.GH_TOKEN === undefined) env.GH_TOKEN = env.GITHUB_TOKEN;
-    env.GH_TOKEN ??= grant.scm.alias;
-  } else if (grant.scm?.purpose === 'gitlab') {
+    env.GH_TOKEN ??= scmToken;
+  } else if (grant.scm?.purpose === 'gitlab' && scmToken) {
     const gitlab = grant.scm.gitlab;
     if (!gitlab) invalidCredentials();
-    env.GITLAB_TOKEN ??= grant.scm.alias;
-    if (env.GITLAB_TOKEN === grant.scm.alias) {
+    env.GITLAB_TOKEN ??= scmToken;
+    if (env.GITLAB_TOKEN === scmToken) {
       env.GLAB_IS_OAUTH2 = gitlab.glabIsOAuth2 ? 'true' : 'false';
       env.GITLAB_HOST = gitlab.instanceHost;
       env.GITLAB_SUBFOLDER = new URL(gitlab.instanceOrigin).pathname.replace(/^\/+|\/+$/g, '');
     }
-  } else if (grant.scm?.purpose === 'bitbucket') {
+  } else if (grant.scm?.purpose === 'bitbucket' && scmToken) {
     const repository = grant.repository;
     const canonical = parseCanonicalBitbucketCloneUrl(grant.scm.gitUrl);
     if (repository?.type !== 'bitbucket' || !canonical) invalidCredentials();
-    env.BITBUCKET_TOKEN = grant.scm.alias;
+    env.BITBUCKET_TOKEN = scmToken;
     env.KILO_BITBUCKET_WORKSPACE_SLUG = canonical.workspaceSlug;
     env.KILO_BITBUCKET_REPOSITORY_SLUG = canonical.repositorySlug;
     env.KILO_BITBUCKET_WORKSPACE_UUID = `{${repository.workspaceUuid}}`;
@@ -568,7 +681,7 @@ function sanitizedPayload(
     directory: grant.directory,
     env,
     ...(grant.scm
-      ? { git: { url: grant.scm.gitUrl, platform: grant.scm.purpose, token: grant.scm.alias } }
+      ? { git: { url: grant.scm.gitUrl, platform: grant.scm.purpose, token: scmToken } }
       : grant.repository?.type === 'git'
         ? {
             git: {
@@ -578,7 +691,91 @@ function sanitizedPayload(
           }
         : {}),
     ...(payload.setupCommands ? { setupCommands: payload.setupCommands.map(sanitize) } : {}),
-    kilo: { scopeId: grant.scopeId, token: grant.kilo.alias, targets: grant.kilo.targets },
+    kilo: {
+      scopeId: grant.scopeId,
+      token: kiloToken,
+      targets: grant.kilo.targets,
+      ...(!contained ? { containmentEnabled: false } : {}),
+      ...(!contained && grant.orgId ? { organizationId: grant.orgId } : {}),
+    },
+  };
+}
+
+async function resolveDirectScmCredentials(
+  env: CredentialEnv,
+  grant: SessionCredentialGrant,
+  payload: SessionAttachPayload
+): Promise<SessionCredentialGrant> {
+  const repository = grant.repository;
+  if (!repository || repository.type === 'git') return grant;
+  const common = { userId: grant.userId, ...(grant.orgId ? { orgId: grant.orgId } : {}) };
+  if (repository.type === 'github') {
+    let nativeToken = payload.git?.token;
+    if (repository.authentication === 'managed') {
+      const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
+        ...common,
+        githubRepo: repository.repo,
+        allowUserAuthorization: repository.allowUserAuthorization,
+        ...(repository.expectedIntegrationId
+          ? { expectedIntegrationId: repository.expectedIntegrationId }
+          : {}),
+      });
+      if (!resolved.success) throw new Error('GitHub credential is unavailable');
+      nativeToken = resolved.value.githubToken;
+    }
+    if (!nativeToken) invalidCredentials();
+    return {
+      ...grant,
+      scm: { purpose: 'github', gitUrl: `https://github.com/${repository.repo}.git`, nativeToken },
+    };
+  }
+  if (repository.type === 'gitlab') {
+    const resolved = await resolveManagedGitLabToken(env, {
+      ...common,
+      repositoryUrl: repository.url,
+      ...(repository.createdOnPlatform ? { createdOnPlatform: repository.createdOnPlatform } : {}),
+    });
+    if (!resolved.success) throw new Error('GitLab credential is unavailable');
+    const instance = safeUrl(resolved.instanceUrl);
+    const repositoryUrl = new URL(repository.url);
+    if (
+      !instance ||
+      instance.protocol !== 'https:' ||
+      instance.search ||
+      instance.origin !== repositoryUrl.origin ||
+      !repositoryUrl.pathname.startsWith(`${instance.pathname.replace(/\/+$/, '')}/`)
+    ) {
+      invalidCredentials();
+    }
+    return {
+      ...grant,
+      scm: {
+        purpose: 'gitlab',
+        gitUrl: repository.url,
+        nativeToken: resolved.token,
+        gitlab: {
+          instanceOrigin: instance.toString().replace(/\/+$/, ''),
+          instanceHost: instance.host,
+          glabIsOAuth2: resolved.glabIsOAuth2,
+        },
+      },
+    };
+  }
+  if (!grant.orgId) invalidCredentials();
+  const resolved = await resolveManagedBitbucketToken(env, {
+    ...common,
+    orgId: grant.orgId,
+    repositoryUrl: repository.url,
+    workspaceUuid: repository.workspaceUuid,
+    repositoryUuid: repository.repositoryUuid,
+    ...(repository.expectedIntegrationId
+      ? { expectedIntegrationId: repository.expectedIntegrationId }
+      : {}),
+  });
+  if (!resolved.success) throw new Error('Bitbucket credential is unavailable');
+  return {
+    ...grant,
+    scm: { purpose: 'bitbucket', gitUrl: repository.url, nativeToken: resolved.token },
   };
 }
 
@@ -608,6 +805,7 @@ export async function prepareSessionCredentials(input: {
   const token = realTokenSchema.safeParse(metadata.auth.kilocodeToken);
   if (!member.success || !token.success) invalidCredentials();
   const provider = getSandboxProvider(metadata);
+  const containmentEnabled = requiresContainmentSandbox(metadata);
   const targets = deriveKiloSandboxTargets(env, token.data, {
     requireHttps: provider === 'vercel',
   });
@@ -621,7 +819,8 @@ export async function prepareSessionCredentials(input: {
   const repository = repositoryFromMetadata(metadata, provider, existing);
   if (
     existing &&
-    (existing.scopeId !== scopeId.data ||
+    (isContainedSessionCredentialGrant(existing) !== containmentEnabled ||
+      existing.scopeId !== scopeId.data ||
       existing.directory !== payload.directory ||
       existing.sandboxId !== sandboxId ||
       existing.userId !== metadata.identity.userId ||
@@ -646,8 +845,12 @@ export async function prepareSessionCredentials(input: {
   ) {
     invalidCredentials();
   }
+  const kiloToken = containmentEnabled
+    ? token.data
+    : await selectDirectKiloToken(env, token.data, existing, now);
   let grant: SessionCredentialGrant = {
     version: 1,
+    ...(!containmentEnabled ? { containmentEnabled: false as const } : {}),
     scopeId: scopeId.data,
     directory: payload.directory,
     sandboxId,
@@ -660,16 +863,28 @@ export async function prepareSessionCredentials(input: {
       : [...members, member.data],
     ...(repository ? { repository } : {}),
     kilo: {
-      alias: existing?.kilo.alias ?? createControlPlaneCredential(sandboxId, 'kilo'),
-      token: token.data,
+      ...(containmentEnabled
+        ? { alias: existing?.kilo.alias ?? createControlPlaneCredential(sandboxId, 'kilo') }
+        : {}),
+      token: kiloToken,
+      ...(!containmentEnabled
+        ? {
+            tokenSelectedAt:
+              existing?.kilo.token === kiloToken
+                ? (existing.kilo.tokenSelectedAt ?? existing.preparedAt)
+                : now,
+          }
+        : {}),
       targets: targets.targets,
-      capabilities: existing?.kilo.token === token.data ? existing.kilo.capabilities : {},
+      capabilities: existing?.kilo.token === kiloToken ? existing.kilo.capabilities : {},
     },
     ...(existing?.scm ? { scm: existing.scm } : {}),
     preparedAt: now,
     expiresAt: now + WORKTREE_LEASE_MS,
   };
-  if (provider === 'cloudflare') {
+  if (!containmentEnabled) {
+    grant = await resolveDirectScmCredentials(env, grant, payload);
+  } else if (provider === 'cloudflare') {
     const outboundContainerId = input.outboundContainerId;
     if (!outboundContainerId) invalidCredentials();
     grant = await refreshKiloCapability(env, grant, member.data, outboundContainerId, now);
@@ -700,6 +915,9 @@ export async function prepareSessionCredentials(input: {
     };
   }
   grant = validateGrant(grant);
+  if (!isContainedSessionCredentialGrant(grant)) {
+    return { grant, payload: preparedPayload(metadata, payload, grant, existing) };
+  }
   if (provider === 'vercel') buildControlNetworkPolicy([grant]);
   else {
     buildKiloCredentialInjectionRules(
@@ -713,7 +931,7 @@ export async function prepareSessionCredentials(input: {
       { requireHttps: false }
     );
   }
-  return { grant, payload: sanitizedPayload(metadata, payload, grant, existing) };
+  return { grant, payload: preparedPayload(metadata, payload, grant, existing) };
 }
 
 export function removeSessionCredentialMembership(
@@ -744,8 +962,13 @@ export function buildControlNetworkPolicy(
 ): VercelSandboxNetworkPolicy {
   const policies = grants.map(value => {
     const grant = validateGrant(value);
-    if (grant.provider !== 'vercel' || grant.sandboxId !== grants[0]?.sandboxId)
+    if (
+      !isContainedSessionCredentialGrant(grant) ||
+      grant.provider !== 'vercel' ||
+      grant.sandboxId !== grants[0]?.sandboxId
+    ) {
       invalidCredentials();
+    }
     return buildVercelCredentialNetworkPolicy({
       kilo: {
         token: grant.kilo.token,
@@ -793,6 +1016,7 @@ export async function resolveSessionCredential(input: {
   let grant = parsed.data;
   const alias = parseControlPlaneCredential(input.credential);
   if (
+    !isContainedSessionCredentialGrant(grant) ||
     grant.provider !== 'cloudflare' ||
     now < grant.preparedAt ||
     now >= grant.expiresAt ||

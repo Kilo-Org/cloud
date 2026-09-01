@@ -8,9 +8,11 @@
  * in the prompt (`__fake__:<scenario>[:<args>]`) and interpreted by that fake.
  */
 
+import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { z } from 'zod';
 import { mintApiToken, mintStreamTicket, type TestUser } from './auth.js';
+import type { FakeScenarioStatus } from './fake-llm-server.js';
 
 /**
  * Which tRPC surface the driver exercises.
@@ -81,6 +83,44 @@ export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
  * The web client uses `httpLink` (see apps/web/src/lib/cloud-agent/
  * cloud-agent-client.ts) so we match that exact wire format.
  */
+function summarizeTrpcError(text: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return 'unparseable error response';
+  }
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    !('error' in parsed) ||
+    typeof parsed.error !== 'object' ||
+    parsed.error === null
+  ) {
+    return 'invalid error response';
+  }
+  const message =
+    'message' in parsed.error && typeof parsed.error.message === 'string'
+      ? parsed.error.message
+          .replace(
+            /(?:file:\/\/)?\/(?:Users|home|workspace|private|var|tmp)\/[^\s"')]+/g,
+            '[redacted-path]'
+          )
+          .replace(/Bearer\s+[^\s,;]+/gi, 'Bearer [redacted]')
+          .slice(0, 240)
+      : 'request rejected';
+  if (
+    'data' in parsed.error &&
+    typeof parsed.error.data === 'object' &&
+    parsed.error.data !== null &&
+    'code' in parsed.error.data &&
+    typeof parsed.error.data.code === 'string'
+  ) {
+    return `${parsed.error.data.code}: ${message}`;
+  }
+  return message;
+}
+
 export async function trpcCall<T>(
   config: DriverConfig,
   procedure: string,
@@ -109,7 +149,7 @@ export async function trpcCall<T>(
   const text = await response.text();
   if (!response.ok) {
     throw new Error(
-      `tRPC ${procedure} failed: ${response.status} ${response.statusText} — ${text}`
+      `tRPC ${procedure} failed: ${response.status} ${response.statusText} — ${summarizeTrpcError(text)}`
     );
   }
   const parsed: unknown = JSON.parse(text);
@@ -252,6 +292,100 @@ async function startSessionLegacy(
   };
 }
 
+export type WorktreeSessionResult = {
+  cloudAgentSessionId: string;
+  kiloSessionId: string;
+  worktreeId?: string;
+  cloudAgentWorktreeId?: string;
+  replayed?: boolean;
+};
+
+export async function prepareBrowserSession(
+  config: DriverConfig,
+  input: { prompt: string; operationKey?: string; autoCommit?: boolean }
+): Promise<WorktreeSessionResult> {
+  if (!config.internalApiSecret) {
+    throw new Error('browser-equivalent prepareSession requires INTERNAL_API_SECRET');
+  }
+  return trpcCall<WorktreeSessionResult>(
+    config,
+    'prepareSession',
+    {
+      prompt: input.prompt,
+      mode: 'code',
+      model: config.model,
+      gitUrl: config.gitUrl,
+      shallow: true,
+      createdOnPlatform: 'cloud-agent-web',
+      clientProvenance: 'browser',
+      autoInitiate: true,
+      operationKey: input.operationKey ?? randomUUID(),
+      autoCommit: input.autoCommit ?? true,
+      ...(config.kilocodeOrganizationId
+        ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+        : {}),
+    },
+    { internalApiSecret: config.internalApiSecret }
+  );
+}
+
+export async function createWorktreeChat(
+  config: DriverConfig,
+  input: {
+    sourceKiloSessionId: string;
+    sourceCloudAgentSessionId: string;
+    operationKey?: string;
+  }
+): Promise<WorktreeSessionResult> {
+  if (!config.internalApiSecret) {
+    throw new Error('createWorktreeChat requires INTERNAL_API_SECRET');
+  }
+  return trpcCall<WorktreeSessionResult>(
+    config,
+    'createWorktreeChat',
+    {
+      sourceKiloSessionId: input.sourceKiloSessionId,
+      sourceCloudAgentSessionId: input.sourceCloudAgentSessionId,
+      operationKey: input.operationKey ?? randomUUID(),
+      clientProvenance: 'browser',
+      ...(config.kilocodeOrganizationId
+        ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+        : {}),
+    },
+    { internalApiSecret: config.internalApiSecret }
+  );
+}
+
+export type SessionSnapshot = {
+  sessionId: string;
+  kiloSessionId?: string;
+  userId: string;
+  orgId?: string;
+  sandboxId?: string;
+  githubRepo?: string;
+  gitUrl?: string;
+  platform?: string;
+  upstreamBranch?: string;
+  autoCommit?: boolean;
+  worktreeId?: string;
+  cloudAgentWorktreeId?: string;
+  initialMessageId?: string;
+  latestEventId?: number | null;
+  execution: { id: string; status: string } | null;
+};
+
+export async function getSessionSnapshot(
+  config: DriverConfig,
+  cloudAgentSessionId: string
+): Promise<SessionSnapshot> {
+  return trpcCall<SessionSnapshot>(
+    config,
+    'getSession',
+    { cloudAgentSessionId },
+    { method: 'GET' }
+  );
+}
+
 export type SendMessageResult = {
   executionId?: string;
   messageId: string;
@@ -343,6 +477,26 @@ export async function answerPermission(
   });
 }
 
+export async function answerQuestion(
+  config: DriverConfig,
+  sessionId: string,
+  questionId: string,
+  answers: string[][]
+): Promise<{ success: boolean }> {
+  return trpcCall<{ success: boolean }>(config, 'answerQuestion', {
+    sessionId,
+    questionId,
+    answers,
+  });
+}
+
+export async function deleteSession(
+  config: DriverConfig,
+  sessionId: string
+): Promise<{ success: boolean }> {
+  return trpcCall<{ success: boolean }>(config, 'deleteSession', { sessionId });
+}
+
 // ---------------------------------------------------------------------------
 // Fake-LLM gate helpers
 // ---------------------------------------------------------------------------
@@ -391,6 +545,18 @@ export async function fetchFakeRequests(fakeLlmUrl: string): Promise<FakeRequest
   return (await res.json()) as FakeRequestSnapshot;
 }
 
+export async function fetchFakeScenarioStatus(
+  fakeLlmUrl: string,
+  tag: string
+): Promise<FakeScenarioStatus> {
+  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/scenario-status?tag=${encodeURIComponent(tag)}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`fetchFakeScenarioStatus(${tag}) failed: ${response.status}`);
+  }
+  return (await response.json()) as FakeScenarioStatus;
+}
+
 /**
  * Poll the fake LLM server until a `gate:<tag>` scenario is actively parked —
  * meaning kilo has dialed the fake and the turn is blocked mid-stream.
@@ -424,7 +590,7 @@ export async function waitForGateEngaged(
 // WebSocket stream
 // ---------------------------------------------------------------------------
 
-const streamEventSchema = z.object({
+export const streamEventSchema = z.object({
   eventId: z.number(),
   executionId: z.string().nullable().default(null),
   sessionId: z.string(),
@@ -521,8 +687,8 @@ export function openStream(
           : Array.isArray(raw)
             ? Buffer.concat(raw).toString('utf8')
             : raw.toString('utf8');
-      const data: unknown = JSON.parse(text);
-      parsed = streamEventSchema.parse(data);
+      const decoded: unknown = JSON.parse(text);
+      parsed = streamEventSchema.parse(decoded);
     } catch {
       return;
     }

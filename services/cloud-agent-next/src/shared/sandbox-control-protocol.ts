@@ -18,7 +18,13 @@ export const SANDBOX_CONTROL_ATTACH_TIMEOUT_MS = 8 * 60_000;
 
 export const SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS = 60 * 60_000;
 
-export const SANDBOX_OPERATIONS = ['sandbox.hello', 'sandbox.status', 'sandbox.shutdown'] as const;
+export const SANDBOX_OPERATIONS = [
+  'sandbox.hello',
+  'sandbox.status',
+  'sandbox.shutdown',
+  'worktree.prepareDeletion',
+  'worktree.delete',
+] as const;
 
 export const SESSION_OPERATIONS = [
   'session.attach',
@@ -55,6 +61,8 @@ export const controlErrorCodes = [
   'unknown_operation',
   'handshake_required',
   'not_ready',
+  'session_busy',
+  'runtime_unhealthy',
   'idempotency_conflict',
 ] as const;
 
@@ -155,6 +163,18 @@ export const sandboxHeartbeatPayloadSchema = z
     kilo: z
       .object({
         ready: z.boolean(),
+        reason: z
+          .enum([
+            'feed_stale',
+            'feed_reconnected',
+            'feed_ended',
+            'feed_failed',
+            'process_exited',
+            'credential_refresh_failed',
+            'control_disconnected',
+            'shutdown',
+          ])
+          .optional(),
       })
       .strict(),
     sessions: z.array(
@@ -193,6 +213,31 @@ export const sandboxShutdownResultSchema = z
   })
   .strict();
 
+export const worktreeDeletePayloadSchema = z
+  .object({
+    worktreeId: z.templateLiteral(['worktree_', z.uuid()]),
+    directory: z.string().min(1).max(1024),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
+export const worktreePrepareDeletionResultSchema = z
+  .object({
+    prepared: z.literal(true),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
+export const worktreeDeleteResultSchema = z
+  .object({
+    deleted: z.literal(true),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
+export type WorktreeDeletePayload = z.infer<typeof worktreeDeletePayloadSchema>;
+export type WorktreeDeleteResult = z.infer<typeof worktreeDeleteResultSchema>;
+
 export const sessionAttachPayloadSchema = z
   .object({
     snapshotIdentity: z.string().min(1).max(512).optional(),
@@ -202,6 +247,11 @@ export const sessionAttachPayloadSchema = z
       .object({
         scopeId: z.string().min(1).max(256),
         token: z.string().min(1).max(4096),
+        containmentEnabled: z.boolean().optional(),
+        organizationId: z
+          .string()
+          .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
+          .optional(),
         targets: z
           .object({
             backendBaseUrl: z.string().url(),

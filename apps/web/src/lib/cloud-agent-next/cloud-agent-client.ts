@@ -1,6 +1,7 @@
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
+import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
 import type { EncryptedEnvelope } from '@/lib/encryption';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
@@ -9,6 +10,7 @@ import { getEnvVariable } from '@/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import type { SendMessagePayload } from './types.js';
 export type { SendMessagePayload } from './types.js';
 
@@ -137,6 +139,7 @@ type PrepareSessionSharedFields = {
   callbackTarget?: CallbackTarget;
   /** Platform that created this session (e.g. 'security-agent', 'slack', 'app-builder') */
   createdOnPlatform?: string;
+  clientProvenance?: 'browser' | 'mobile';
   /** PR gate threshold — when not 'off', the agent reports gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
@@ -173,6 +176,33 @@ export type PrepareSessionOutput = {
   /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed?: boolean;
 };
+
+export type CreateWorktreeChatInput = {
+  sourceKiloSessionId: string;
+  sourceCloudAgentSessionId: string;
+  operationKey: string;
+  kilocodeOrganizationId?: string;
+  clientProvenance: 'browser';
+};
+
+export type CreateWorktreeChatOutput = {
+  kiloSessionId: string;
+  cloudAgentSessionId: `workspace_${string}`;
+  worktreeId: CloudAgentWorktreeId;
+  replayed?: boolean;
+};
+
+export type DeleteWorktreeInput = {
+  worktreeId: CloudAgentWorktreeId;
+  kilocodeOrganizationId?: string;
+};
+
+const deleteWorktreeOutputSchema = z.object({
+  success: z.literal(true),
+  deletedSessionIds: z.array(z.string()),
+});
+
+export type DeleteWorktreeOutput = z.infer<typeof deleteWorktreeOutputSchema>;
 
 /** Input for initiating from a prepared session */
 export type InitiateFromPreparedSessionInput = {
@@ -521,6 +551,9 @@ type CloudAgentNextTRPCClient = {
   deleteSession: {
     mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
   };
+  deleteWorktree: {
+    mutate: (input: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>;
+  };
   cleanupSession: {
     mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
   };
@@ -538,6 +571,9 @@ type CloudAgentNextTRPCClient = {
   };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
+  };
+  createWorktreeChat: {
+    mutate: (input: CreateWorktreeChatInput) => Promise<CreateWorktreeChatOutput>;
   };
   updateSession: {
     mutate: (input: UpdateSessionInput) => Promise<UpdateSessionOutput>;
@@ -646,12 +682,34 @@ export class CloudAgentNextClient {
       const result = await this.client.deleteSession.mutate({ sessionId });
       return { success: result.success };
     } catch (error) {
+      if (
+        error instanceof TRPCClientError &&
+        (error.data?.code === 'NOT_FOUND' ||
+          error.shape?.data?.code === 'NOT_FOUND' ||
+          error.data?.httpStatus === 404 ||
+          error.shape?.data?.httpStatus === 404)
+      ) {
+        throw error;
+      }
+
       console.error(`Error deleting session ${sessionId}:`, error);
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'deleteSession' },
         extra: { sessionId },
       });
       return { success: false };
+    }
+  }
+
+  async deleteWorktree(input: DeleteWorktreeInput): Promise<DeleteWorktreeOutput> {
+    try {
+      return deleteWorktreeOutputSchema.parse(await this.client.deleteWorktree.mutate(input));
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'deleteWorktree' },
+        extra: { worktreeId: input.worktreeId },
+      });
+      throw error;
     }
   }
 
@@ -731,6 +789,21 @@ export class CloudAgentNextClient {
     return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
   }
 
+  async createWorktreeChat(input: CreateWorktreeChatInput): Promise<CreateWorktreeChatOutput> {
+    try {
+      return await this.client.createWorktreeChat.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'createWorktreeChat' },
+        extra: {
+          sourceKiloSessionId: input.sourceKiloSessionId,
+          sourceCloudAgentSessionId: input.sourceCloudAgentSessionId,
+        },
+      });
+      throw error;
+    }
+  }
+
   /**
    * Prepare a new cloud agent session.
    */
@@ -767,7 +840,15 @@ export class CloudAgentNextClient {
 
       captureException(normalizedError, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'prepareSession' },
-        extra: { input },
+        extra: {
+          kilocodeOrganizationId: input.kilocodeOrganizationId,
+          cloneFromKiloSessionId: input.cloneFromKiloSessionId,
+          operationKey: input.operationKey,
+          createdOnPlatform: input.createdOnPlatform,
+          clientProvenance: input.clientProvenance,
+          model: input.model,
+          mode: input.mode,
+        },
       });
       throw normalizedError;
     }
@@ -818,7 +899,7 @@ export class CloudAgentNextClient {
           source: 'cloud-agent-next-client',
           endpoint: 'initiateFromPreparedSession',
         },
-        extra: { input },
+        extra: { cloudAgentSessionId: input.cloudAgentSessionId },
       });
       throw normalizedError;
     }
@@ -844,7 +925,11 @@ export class CloudAgentNextClient {
 
       captureException(normalizedError, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'sendMessage' },
-        extra: { input },
+        extra: {
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          messageId: input.messageId,
+          payloadType: input.payload.type,
+        },
       });
       throw normalizedError;
     }

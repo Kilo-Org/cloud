@@ -121,17 +121,11 @@ describe('session metadata boundary', () => {
           expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
         },
       ])(
-        'requires only Kilo and the typed $name repository despite false metadata',
+        'defaults missing policy to Kilo and the typed $name repository',
         ({ repository, expected }) => {
           const workspace = {
             sandboxId: 'ses-abcdef',
             sandboxProvider,
-            credentialContainment: {
-              github: false,
-              gitlab: false,
-              bitbucket: false,
-              kilocode: false,
-            },
             managedScmContainment: true,
           };
           const metadata = parseSessionMetadata({
@@ -150,22 +144,38 @@ describe('session metadata boundary', () => {
       );
 
       it.each([
+        { github: false, gitlab: false, bitbucket: false, kilocode: false },
+        { github: true, gitlab: true, bitbucket: true, kilocode: true },
+        { github: false, gitlab: true, bitbucket: true, kilocode: false },
+      ])('honors historical explicit flags without rewriting them: %j', credentialContainment => {
+        const metadata = parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'workspace_containment', userId: 'user_containment' },
+          auth: {},
+          repository: { type: 'github', repo: 'acme/repo' },
+          workspace: {
+            sandboxId: 'ses-abcdef',
+            sandboxProvider,
+            credentialContainment,
+            managedScmContainment: true,
+          },
+          lifecycle: { version: 1, timestamp: 1 },
+        });
+
+        expect(getEffectiveCredentialContainment(metadata)).toEqual(credentialContainment);
+        expect(requiresContainmentSandbox(metadata)).toBe(
+          Object.values(credentialContainment).some(Boolean)
+        );
+        expect(serializeSessionMetadata(metadata).workspace?.credentialContainment).toEqual(
+          credentialContainment
+        );
+      });
+
+      it.each([
         { name: 'missing policy', fields: {} },
         { name: 'disabled legacy alias', fields: { managedScmContainment: false } },
         { name: 'enabled legacy alias', fields: { managedScmContainment: true } },
-        {
-          name: 'mixed policy',
-          fields: {
-            credentialContainment: {
-              github: false,
-              gitlab: true,
-              bitbucket: true,
-              kilocode: false,
-            },
-            managedScmContainment: false,
-          },
-        },
-      ])('ignores $name without rewriting stored fields', ({ fields }) => {
+      ])('defaults $name without rewriting stored fields', ({ fields }) => {
         const workspace = { sandboxId: 'ses-abcdef', sandboxProvider, ...fields };
         const metadata = parseSessionMetadata({
           metadataSchemaVersion: 2,
@@ -311,6 +321,42 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(serializeSessionMetadata(current)).toEqual(current);
     expect(parseSessionMetadata(current).repository).not.toHaveProperty('githubIntegrationId');
+  });
+
+  it('preserves a validated worktree ID and its canonical workspace path', () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+        userId: 'oauth/google:1234',
+      },
+      auth: {},
+      workspace: {
+        worktreeId,
+        workspacePath: `/workspace/oauth-google-1234/worktrees/${worktreeId}`,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
+  });
+
+  it.each([
+    'worktree_invalid',
+    'worktree_../outside',
+    'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+  ])('rejects malformed persisted worktree ID %s', worktreeId => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user_test' },
+        auth: {},
+        workspace: { worktreeId },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
   });
 
   it.each([undefined, '2026-08-29T10:00:00.000Z'])(

@@ -6,6 +6,7 @@ import {
   type AgentSelection,
   type AgentSelectionOverride,
   type SessionMessageIntent,
+  type TurnFinalization,
 } from '../execution/types.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
@@ -32,6 +33,8 @@ type SessionMessageLifecycle = {
   acceptedAt?: number;
   lastActivityAt?: number;
   deliveryDeadlineAt?: number;
+  deliveryRetryScope?: 'message' | 'runtime';
+  unresolvedDispatch?: true;
   wrapperInstanceId?: string;
   terminalAt?: number;
   failedReason?: string;
@@ -45,14 +48,16 @@ export type SessionMessageRecordV2 = SessionMessageLifecycle & {
   readonly intent: ControlSessionMessageIntent;
   turn?: never;
   prompt?: never;
+  finalization?: never;
   legacyIntentInvalid?: never;
 };
 
 type LegacySessionMessageRecord = SessionMessageLifecycle & {
   version?: undefined;
-  intent?: undefined;
+  intent?: ControlSessionMessageIntent;
   turn?: AcceptedExecutionTurn;
   prompt?: string;
+  finalization?: TurnFinalization;
   legacyIntentInvalid?: true;
 };
 
@@ -165,11 +170,12 @@ export function matchesSessionMessageReplay(
 
 export function freezeLegacyQueuedMessages(
   messages: readonly SessionMessageRecord[],
-  defaults?: AgentSelectionOverride
+  defaults?: AgentSelectionOverride,
+  defaultFinalization?: TurnFinalization
 ): SessionMessageRecord[] {
   return messages.map((message): SessionMessageRecord => {
-    if (message.state !== 'queued' || message.intent) return message;
-    const { turn, prompt, legacyIntentInvalid, ...record } = message;
+    if (message.version === 2 || message.state !== 'queued' || message.intent) return message;
+    const { turn, prompt, finalization, legacyIntentInvalid, ...record } = message;
     if (legacyIntentInvalid) return message;
     const legacyTurn =
       turn ??
@@ -177,7 +183,15 @@ export function freezeLegacyQueuedMessages(
         ? { type: 'prompt' as const, messageId: message.messageId, prompt }
         : undefined);
     const intent = legacyTurn
-      ? resolveSessionMessageIntent({ turn: legacyTurn }, defaults)
+      ? resolveSessionMessageIntent(
+          {
+            turn: legacyTurn,
+            ...(finalization || defaultFinalization
+              ? { finalization: { ...defaultFinalization, ...finalization } }
+              : {}),
+          },
+          defaults
+        )
       : undefined;
     return intent
       ? { ...record, ...createSessionMessageRecord(intent) }
@@ -278,6 +292,7 @@ export function applyMessageOutcome(
       ? {
           ...item,
           state: outcome.status,
+          unresolvedDispatch: undefined,
           acceptedAt: item.acceptedAt ?? now,
           terminalAt: now,
           ...(outcome.reason ? { failedReason: outcome.reason } : {}),
@@ -292,14 +307,15 @@ export function hasAcceptedMessage(messages: readonly SessionMessageRecord[]): b
 
 export function failQueuedMessage(
   messages: readonly SessionMessageRecord[],
-  messageId: string
+  messageId: string,
+  reason?: string
 ): SessionMessageRecord[] | undefined {
   if (!messages.some(message => message.messageId === messageId && message.state === 'queued')) {
     return undefined;
   }
   return messages.map(message =>
     message.messageId === messageId && message.state === 'queued'
-      ? { ...message, state: 'failed' }
+      ? { ...message, state: 'failed', ...(reason ? { failedReason: reason } : {}) }
       : message
   );
 }
@@ -312,7 +328,13 @@ export function acceptQueuedMessage(
   if (nextQueuedMessageId(messages) !== messageId) return undefined;
   return messages.map(message =>
     message.messageId === messageId
-      ? { ...message, state: 'accepted', acceptedAt, lastActivityAt: acceptedAt }
+      ? {
+          ...message,
+          state: 'accepted',
+          acceptedAt,
+          lastActivityAt: acceptedAt,
+          unresolvedDispatch: undefined,
+        }
       : message
   );
 }

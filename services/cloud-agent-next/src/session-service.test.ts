@@ -1094,6 +1094,47 @@ describe('SessionService.prepareWorkspace', () => {
     });
   });
 
+  it('prepares the persisted shared worktree path instead of a per-chat checkout', async () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const sessionId = 'workspace_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const workspacePath = `/workspace/user_test/worktrees/${worktreeId}`;
+    const base = createMetadata({ upstreamBranch: 'main' });
+    const metadata = {
+      ...base,
+      identity: { ...base.identity, sessionId },
+      workspace: { ...base.workspace, worktreeId, workspacePath },
+    } satisfies CloudAgentSessionState;
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+
+    const result = await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(workspaceMocks.setupWorkspace).toHaveBeenCalledWith(
+      sandbox,
+      'user_test',
+      undefined,
+      sessionId,
+      worktreeId
+    );
+    expect(workspaceMocks.cloneGitRepo).toHaveBeenCalledWith(
+      session,
+      workspacePath,
+      'https://gitlab.com/acme/repo.git',
+      undefined,
+      { platform: 'gitlab' }
+    );
+    expect(result.context.workspacePath).toBe(workspacePath);
+    expect(result.ready.workspacePath).toBe(workspacePath);
+  });
+
   it('restores the destination snapshot for clone metadata on first preparation', async () => {
     const session = createSession(false);
     const sandbox = createSandbox(session);
@@ -2377,6 +2418,21 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       } satisfies FencedWrapperDispatchRequest,
     });
   }
+
+  it('uses the persisted shared checkout when constructing wrapper requests', async () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const workspacePath = `/workspace/user_test/worktrees/${worktreeId}`;
+    const metadata = createMetadata();
+
+    const result = await buildPromptWrapperRequests({
+      ...metadata,
+      workspace: { ...metadata.workspace, worktreeId, workspacePath },
+    });
+
+    expect(result.context.workspacePath).toBe(workspacePath);
+    expect(result.ready.workspacePath).toBe(workspacePath);
+    expect(result.readyRequest.workspace.workspacePath).toBe(workspacePath);
+  });
 
   it('prefers and requires snapshot restore in wrapper readiness for clone metadata', async () => {
     const result = await buildPromptWrapperRequests(createCloneMetadata());
@@ -4023,6 +4079,32 @@ describe('SessionService session-ingest compatibility', () => {
     // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
       expect.not.objectContaining({ requireFullSessionReport: expect.anything() })
+    );
+  });
+
+  it('forwards the validated worktree ID when creating grouped ownership', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+
+    await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+      'oauth/google:1234',
+      env,
+      undefined,
+      'cloud-agent-web',
+      undefined,
+      undefined,
+      undefined,
+      worktreeId
+    );
+
+    expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kiloUserId: 'oauth/google:1234',
+        cloudAgentWorktreeId: worktreeId,
+      })
     );
   });
 

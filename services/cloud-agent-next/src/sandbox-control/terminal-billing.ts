@@ -32,16 +32,19 @@ type TerminalBillingRuntimeInput = {
   runtime: SandboxBillingRuntimeStatus | undefined;
 };
 
-function expectedSandboxClassName(sandboxId: string): SandboxClassName | undefined {
+function expectedSandboxClassName(
+  sandboxId: string,
+  containment: boolean
+): SandboxClassName | undefined {
   switch (classifySandboxId(sandboxId)) {
     case 'isolated-small':
-      return 'SandboxSmallContainment';
+      return containment ? 'SandboxSmallContainment' : 'SandboxSmall';
     case 'code-review':
-      return 'SandboxCodeReviewContainment';
+      return containment ? 'SandboxCodeReviewContainment' : 'SandboxCodeReview';
     case 'isolated-standard':
     case 'shared':
     case 'legacy-shared':
-      return 'SandboxContainment';
+      return containment ? 'SandboxContainment' : 'Sandbox';
     default:
       return undefined;
   }
@@ -72,11 +75,13 @@ export function validateTerminalBillingRuntime(
     return { allowed: false, reason: 'billing_generation_inactive' };
   }
 
-  const sandboxClassName = expectedSandboxClassName(input.sandboxId);
   const providerRef = decodeCloudflareProviderRef(input.providerInstanceId);
+  if (providerRef?.sandboxId !== input.sandboxId) {
+    return { allowed: false, reason: 'billing_runtime_mismatch' };
+  }
+  const sandboxClassName = expectedSandboxClassName(input.sandboxId, providerRef.containment);
   if (
     sandboxClassName === undefined ||
-    providerRef?.sandboxId !== input.sandboxId ||
     runtime.sandboxClassName !== sandboxClassName ||
     context.instanceId !== input.sandboxId ||
     context.service !== expectedUsageService(sandboxClassName) ||

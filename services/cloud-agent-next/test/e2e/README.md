@@ -13,6 +13,16 @@ cloud-agent-next refactor.
 
 1. Copy `.dev.vars.example` → `.dev.vars` and fill in local values.
    Leave `KILO_OPENROUTER_BASE` pointed at local Next.js (`@url nextjs/api`).
+   For control-plane scenarios, enroll the E2E user in `CONTROL_PLANE_IDS`.
+   `worktree-shared` additionally requires `WORKTREE_CREATION_ENABLED_IDS`; it creates a fresh
+   personal user per run, so set both flags to `*` for that local scenario.
+   Both accept comma-separated user or org IDs or `*` and default empty/off.
+   Ordinary control-plane scenarios do not require `WORKTREE_CREATION_ENABLED_IDS`.
+   These are Worker settings read by `auth.ts` from this service's `.dev.vars`,
+   not driver environment overrides: prefixing the driver command with either
+   flag does not configure the Worker. The unannotated template entries pass
+   through matching root `.env.local` values during `pnpm dev:env`. Configure
+   the Worker before starting it, or restart it after changing these values.
 2. Ensure local Postgres is up and root `.env.local` defines `POSTGRES_URL`
    (or export `DATABASE_URL`) — the driver inserts a test user row via
    `@kilocode/db`.
@@ -28,21 +38,29 @@ cloud-agent-next refactor.
 
 ## Credential containment
 
-Control-plane sessions (`workspace_*`) always contain managed Kilo and repository
-credentials, including sessions whose older metadata disabled containment.
-`CREDENTIAL_CONTAINMENT_ENABLED` cannot disable control-plane containment.
-Cloudflare uses contained sandbox classes and the existing credential broker;
-Vercel uses native network policies. Each worktree has stable credential aliases
-shared by its registered Kilo roots, while different worktrees have separate Kilo
-authentication contexts. Unsupported credential configurations fail closed rather
-than exposing raw tokens.
+Control-plane sessions (`workspace_*`) respect `CREDENTIAL_CONTAINMENT_ENABLED`.
+Only the literal `false` disables containment; local dev defaults to `false`.
+The choice is persisted when a worktree is created and inherited by sibling chats.
+Changing the environment does not switch an existing worktree or running sandbox
+between contained and direct credentials.
 
-Cloudflare's native outbound handler intercepts ports 80 and 443. Local targets
-such as `http://host.docker.internal:<offset-port>` can bypass interception and
-reject the aliases with HTTP 401. A control-plane E2E run needs sandbox-facing
-endpoints that actually traverse the native handler, plus the running
-`cloudflare-git-token-service` and its capability-encryption configuration. Do not
-disable containment to work around a local transport limitation.
+When enabled, Cloudflare uses contained sandbox classes and the existing credential
+broker; Vercel uses native network policies. Each worktree has stable credential
+aliases shared by its registered Kilo roots, while different worktrees have
+separate Kilo authentication contexts. Containment failures never fall back to
+raw credentials. When disabled, authorized Kilo and repository credentials are
+provided directly to the sandbox without alias redemption or credential injection.
+Control-plane ownership, attachment scope, terminal authorization, and billing
+checks still apply; direct API credentials retain their underlying access scope.
+Expired direct-credential terminal leases require a session reattachment rather
+than renewing only the server-side grant.
+
+Cloudflare's native outbound handler intercepts ports 80 and 443. With containment
+enabled, local targets such as `http://host.docker.internal:<offset-port>` can
+bypass interception and reject aliases with HTTP 401. Contained E2E runs therefore
+need sandbox-facing endpoints that traverse the native handler, plus the running
+`cloudflare-git-token-service` and its capability-encryption configuration. The
+local-dev direct-credential mode supports the generated high-port HTTP endpoints.
 
 For new legacy sessions (`agent_*`), `CREDENTIAL_CONTAINMENT_ENABLED` controls
 GitHub, GitLab, Bitbucket, and Kilo credential containment together. Containment
@@ -56,14 +74,32 @@ variable affects new legacy sessions, not existing ones.
 
 ## Running
 
-> **Non-zero port offset:** the commands below use the default ports
-> (`8794`/`8811`), which only match a zero-offset session. For any other
+> **Non-zero port offset:** except for `multichat-real.ts`, the drivers below use
+> the default ports (`8794`/`8811`), which only match a zero-offset session. For any other
 > session, first read the offset from `pnpm dev:status --json`
 > (`portOffset` field), then prefix every driver invocation with
 > `WORKER_URL=http://localhost:<8794 + portOffset>` and
 > `FAKE_LLM_URL=http://localhost:<8811 + portOffset>`. Without these the
 > driver silently hits the wrong Worker/fake-LLM and every scenario fails
 > at connection. See the env-var table below for the full list.
+
+Real-model multichat acceptance (`kilo-auto/efficient`):
+
+```bash
+pnpm exec tsx services/cloud-agent-next/test/e2e/multichat-real.ts \
+  --auth /path/to/private-auth.json \
+  --out dev/logs/multichat-new-run \
+  --rounds 3
+```
+
+This driver discovers the existing local stack's ports and requires an already
+funded test user enrolled for control-plane and worktree creation. Pass credentials
+only through an owned mode-600 auth file, never as a command-line token. The output
+directory must not already exist. Bootstrap is API-assisted; sibling creation,
+sends, and Stop use the real web endpoints. Three chats exercise repeated shared
+file writes/reads, native tool overlap, Stop isolation, and post-Stop follow-ups.
+Private reports and transcripts are retained; chats and sandboxes are not deleted
+automatically. See the known CLI 7.4.20 limitation under Troubleshooting.
 
 Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.4.20`):
 
@@ -92,6 +128,7 @@ Examples:
 ```bash
 tsx services/cloud-agent-next/test/e2e/run.ts cold echo:hi
 tsx services/cloud-agent-next/test/e2e/run.ts cold-hot echo:hi
+tsx services/cloud-agent-next/test/e2e/run.ts worktree-shared _
 tsx services/cloud-agent-next/test/e2e/run.ts hot echo:hi
 tsx services/cloud-agent-next/test/e2e/run.ts followup echo:continue
 tsx services/cloud-agent-next/test/e2e/run.ts external-kill echo:hi
@@ -220,6 +257,7 @@ These are wrapped by `releaseGate()`, `waitForGateEngaged()`,
 | `hot` | Warmup with `echo:warmup`, then send the real prompt on the same session. Same container. |
 | `followup` | Same as `hot` today; kept distinct for future resume-path splits. |
 | `cold-hot` | One cold turn plus `echo:hot`, `slow:3:50`, and `echo:followup` hot turns on the same session/sandbox. |
+| `worktree-shared` | Creates a new worktree and a sibling chat; verifies idempotent creation, a shared dirty checkout, and chat isolation. Requires both `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS` enrollment and `--api=unified`; pass `_` as the conversation placeholder. |
 | `external-kill` | Warmup, `docker kill` the sandbox, send another prompt, verify recovery/failure. |
 | `kill-mid-flight` | Cold `hang`, kill while pending, verify DO surfaces disconnect/error. |
 | `queue-while-busy` | Block on `gate:<tag>`, enqueue two echoes, release the gate, assert FIFO delivery through `cloud.message.*` events. |
@@ -246,6 +284,15 @@ the newer `start` / `send` procedures. `prepareSession` requires
 
 ## Troubleshooting
 
+- **Known CLI 7.4.20 stall during snapshot initialization** — Local real-model
+  multichat runs have stopped receiving native HTTP responses and global event
+  heartbeats after snapshot initialization began, while the Kilo process remained
+  alive. Captured container memory was about 1 GB with zero OOM events. The wrapper
+  correctly reports `feed_stale` and retires the shared runtime as `kilo_unhealthy`,
+  which can fail sibling turns. The underlying native cause is not established;
+  snapshot activity is a correlation, not a proven cause. This remains a known
+  limitation: keep snapshots and health deadlines unchanged, preserve failed-run
+  evidence, and distinguish failed cases from downstream checks that were not run.
 - **`Must provide either githubRepo or gitUrl`** — The driver defaults to
   a public HTTPS repo. Override with `E2E_GIT_URL=...` if your network
   blocks GitHub or you prefer a different test repo.

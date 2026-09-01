@@ -131,12 +131,21 @@ export function resolveSessionEventRoute(
   const sessionRoute = identity.kiloSessionId
     ? getRouteByKiloSessionId(table, identity.kiloSessionId)
     : undefined;
-  if (identity.rootKiloSessionId !== undefined) {
-    const rootRoute = getRouteByKiloSessionId(table, identity.rootKiloSessionId);
-    if (!rootRoute || (sessionRoute && sessionRoute !== rootRoute)) return null;
-    return rootRoute;
+  const rootRoute = identity.rootKiloSessionId
+    ? getRouteByKiloSessionId(table, identity.rootKiloSessionId)
+    : undefined;
+  if (identity.rootKiloSessionId !== undefined && !rootRoute) return null;
+  if (rootRoute && sessionRoute && rootRoute !== sessionRoute) return null;
+  const exactRoute = rootRoute ?? sessionRoute;
+  if (exactRoute) {
+    for (const route of table.values()) {
+      if (route.directory === identity.directory && route.directory !== exactRoute.directory) {
+        return null;
+      }
+    }
+    return exactRoute;
   }
-  if (identity.kiloSessionId !== undefined) return sessionRoute ?? null;
+  if (identity.kiloSessionId !== undefined) return null;
   return getRouteByDirectory(table, identity.directory) ?? null;
 }
 

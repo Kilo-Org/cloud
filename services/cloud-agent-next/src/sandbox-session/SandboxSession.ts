@@ -2,12 +2,25 @@ import { DurableObject } from 'cloudflare:workers';
 import { TRPCError } from '@trpc/server';
 import { withTimeout } from '@kilocode/worker-utils';
 import { z } from 'zod';
+import {
+  cloudAgentWorktreeIdSchema,
+  cloudAgentWorktreeLocationSchema,
+  type CloudAgentWorktreeId,
+  type CloudAgentWorktreeLocation,
+  type CloudAgentChildSessionLineage,
+} from '@kilocode/session-ingest-contracts';
+import {
+  sessionRuntimeLocator,
+  type SessionRuntimeLocator,
+} from '../sandbox-control/worktree-ownership.js';
+import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { buildSandboxBillingInput } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
+import { events, commandQueue, executionLeases } from '../db/sqlite-schema.js';
 import type { Env } from '../types.js';
 import type { SessionId } from '../types/ids.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
@@ -24,6 +37,7 @@ import type { CallbackTarget } from '../callbacks/index.js';
 import {
   renderExecutionTurnContent,
   type AcceptedExecutionTurn,
+  type ExecutionTurnSubmission,
   type LegacyRegisteredInitialAdmissionRequest,
   type SessionMessageAdmissionResult,
   type SubmittedSessionMessageRequest,
@@ -40,8 +54,9 @@ import {
   type PendingInteractions,
 } from './sandbox-control-event.js';
 import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
-import { getSessionWorkspacePath } from '../workspace.js';
+import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../workspace.js';
 import {
+  childSessionLineage,
   controlEventToIngestItems,
   ingestKiloSessionId,
   publishControlPlaneSessionIngest,
@@ -75,8 +90,10 @@ import {
 } from '../shared/sandbox-control-protocol.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
 import {
+  ControlRequestError,
   controlDispatchDisposition,
   controlRequestResult,
+  deliveryErrorLogFields,
   isRetryableDeliveryError,
   observeControlAfterStopping,
   safeErrorFromQueueReason,
@@ -113,6 +130,13 @@ import {
 
 const METADATA_KEY = SANDBOX_SESSION_METADATA_KEY;
 const MESSAGES_KEY = 'session_messages';
+const DELETED_WORKTREE_KEY = 'deleted_worktree';
+const DELETION_COMPLETED_KEY = 'deletion_completed';
+
+type SandboxControlEventInput = {
+  identity: { directory: string; kiloSessionId?: string; rootKiloSessionId?: string };
+  payload: { type: string; properties: Record<string, unknown>; timestamp?: string };
+};
 const QUEUE_RETRY_MS = 5_000;
 const PENDING_RUNTIME_CLEANUP_KEY = 'pending_runtime_cleanup';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
@@ -127,12 +151,32 @@ const pendingRuntimeCleanupSchema = z.object({
 type MessageRecord = SessionMessageRecord;
 type DispatchPhase = 'preparing' | 'attach' | 'prompt';
 
+type SandboxSessionRegistrationInput = {
+  identity: SessionMetadata['identity'];
+  auth: SessionMetadata['auth'];
+  agent: SessionMetadata['agent'];
+  repository?: SessionMetadata['repository'];
+  workspace?: SessionMetadata['workspace'];
+  callback?: SessionMetadata['callback'];
+  profile?: SessionMetadata['profile'];
+  finalization?: SessionMetadata['finalization'];
+  message?: { initialMessageId?: string; turn: ExecutionTurnSubmission };
+};
+
+type SandboxSessionInitialAdmissionInput = Omit<SandboxSessionRegistrationInput, 'message'> & {
+  message: { initialTurn: AcceptedExecutionTurn };
+};
+
 export class SandboxSession extends DurableObject<Env> {
   private readonly sessionId: SessionId | undefined;
   private readonly eventQueries: EventQueries;
   private readonly terminalLifecycle: ReturnType<typeof createSandboxTerminalLifecycle>;
   private readonly terminalBridge: ReturnType<typeof createSandboxTerminalBridge>;
   private readonly dispatches = new Map<string, Promise<void>>();
+  private ingestPublicationChain: Promise<void> = Promise.resolve();
+  private deletedWorktreeId: CloudAgentWorktreeId | undefined;
+  private readonly activeOperations = new Set<Promise<unknown>>();
+  private deletionCompletion: Promise<void> | undefined;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -167,10 +211,17 @@ export class SandboxSession extends DurableObject<Env> {
     this.eventQueries = createEventQueries(db, ctx.storage.sql);
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(db, migrations);
+      this.deletedWorktreeId = cloudAgentWorktreeIdSchema
+        .optional()
+        .parse(ctx.storage.kv.get(DELETED_WORKTREE_KEY));
+      if (this.deletedWorktreeId) {
+        this.terminalLifecycle.beginDeletion(this.terminalLifecycle.getStoredMetadata());
+      }
     });
   }
 
   async fetch(request: Request): Promise<Response> {
+    if (this.deletedWorktreeId) return new Response('Session deleted', { status: 410 });
     const pathname = new URL(request.url).pathname;
     if (pathname === '/terminal/browser') {
       return this.terminalBridge.handleBrowserUpgrade(request);
@@ -213,11 +264,15 @@ export class SandboxSession extends DurableObject<Env> {
     await this.terminalBridge.handleError(ws, error);
   }
 
-  async receiveSandboxControlEvent(input: {
-    identity: { directory: string; kiloSessionId?: string; rootKiloSessionId?: string };
-    payload: { type: string; properties: Record<string, unknown>; timestamp?: string };
-    wrapperInstanceId?: string;
-  }): Promise<{ applied: boolean }> {
+  receiveSandboxControlEvent(
+    input: SandboxControlEventInput & { wrapperInstanceId?: string }
+  ): Promise<{ applied: boolean }> {
+    return this.trackOperation(this.applySandboxControlEvent(input));
+  }
+
+  private async applySandboxControlEvent(
+    input: SandboxControlEventInput & { wrapperInstanceId?: string }
+  ): Promise<{ applied: boolean }> {
     const metadata = await this.getMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
     if (!metadata || epoch === null) {
@@ -231,10 +286,21 @@ export class SandboxSession extends DurableObject<Env> {
     }
     const root = metadata.auth.kiloSessionId;
     if (input.identity.directory !== this.directory(metadata)) return { applied: false };
+    const payloadKiloSessionId = ingestKiloSessionId(input.payload.type, input.payload.properties);
+    const identityKiloSessionId = input.identity.kiloSessionId;
+    const eventKiloSessionId = identityKiloSessionId ?? payloadKiloSessionId;
     if (
-      input.identity.rootKiloSessionId !== undefined &&
-      root !== undefined &&
-      input.identity.rootKiloSessionId !== root
+      (input.identity.rootKiloSessionId !== undefined &&
+        root !== undefined &&
+        input.identity.rootKiloSessionId !== root) ||
+      (identityKiloSessionId !== undefined &&
+        payloadKiloSessionId !== undefined &&
+        identityKiloSessionId !== payloadKiloSessionId) ||
+      (metadata.workspace?.worktreeId !== undefined &&
+        root !== undefined &&
+        input.identity.rootKiloSessionId !== root &&
+        identityKiloSessionId !== root &&
+        payloadKiloSessionId !== root)
     ) {
       logger
         .withFields({
@@ -246,10 +312,23 @@ export class SandboxSession extends DurableObject<Env> {
         .warn('receiveSandboxControlEvent rejected; kilo session mismatch');
       return { applied: false };
     }
+    if (input.payload.type === 'session.created' || input.payload.type === 'session.updated') {
+      const info = input.payload.properties.info;
+      if (typeof info === 'object' && info !== null) {
+        if ('id' in info && info.id !== eventKiloSessionId) return { applied: false };
+        if (eventKiloSessionId !== root && ('parentID' in info || 'directory' in info)) {
+          const directory = this.directory(metadata);
+          const child = childSessionLineage(info, directory);
+          if (
+            !child ||
+            child.sessionId !== eventKiloSessionId ||
+            input.identity.directory !== directory
+          )
+            return { applied: false };
+        }
+      }
+    }
     const sessionId = this.requireSessionId();
-    const eventKiloSessionId =
-      input.identity.kiloSessionId ??
-      ingestKiloSessionId(input.payload.type, input.payload.properties);
     if (input.payload.type === 'session.message.outcome') {
       const outcome = sessionMessageOutcomeSchema.safeParse(input.payload.properties);
       if (
@@ -326,18 +405,27 @@ export class SandboxSession extends DurableObject<Env> {
             .warn('Control-plane child session ingest skipped; internal secret unavailable');
         }
       }
-      if ((!isChild || internalSecret) && this.terminalLifecycle.isCurrent(epoch)) {
-        this.ctx.waitUntil(
-          publishControlPlaneSessionIngest({
-            fetchIngest: request => this.env.SESSION_INGEST.fetch(request),
-            token,
-            rootKiloSessionId,
-            eventKiloSessionId,
-            cloudAgentSessionId: metadata.identity.sessionId,
-            ...(internalSecret ? { internalSecret } : {}),
-            items: ingestItems,
-          })
-        );
+      if (this.deletedWorktreeId || !this.terminalLifecycle.isCurrent(epoch)) {
+        return { applied: false };
+      }
+      if (!isChild || internalSecret) {
+        const publication = this.ingestPublicationChain
+          .catch(() => undefined)
+          .then(() => {
+            if (!this.terminalLifecycle.isCurrent(epoch)) return;
+            return publishControlPlaneSessionIngest({
+              fetchIngest: request => this.env.SESSION_INGEST.fetch(request),
+              token,
+              rootKiloSessionId,
+              eventKiloSessionId,
+              cloudAgentSessionId: metadata.identity.sessionId,
+              directory: this.directory(metadata),
+              ...(internalSecret ? { internalSecret } : {}),
+              items: ingestItems,
+            });
+          });
+        this.ingestPublicationChain = publication;
+        this.ctx.waitUntil(publication);
       }
     }
     return { applied: this.terminalLifecycle.isCurrent(epoch) };
@@ -393,11 +481,19 @@ export class SandboxSession extends DurableObject<Env> {
     return sockets.length;
   }
 
+  async getRuntimeLocation(): Promise<SessionRuntimeLocator | null> {
+    const raw = await this.ctx.storage.get<unknown>(METADATA_KEY);
+    return raw === undefined ? null : sessionRuntimeLocator(parseSessionMetadata(raw));
+  }
+
   async getMetadata(): Promise<SessionMetadata | null> {
-    return this.terminalLifecycle.isDeleted() ? null : this.terminalLifecycle.getStoredMetadata();
+    return this.deletedWorktreeId || this.terminalLifecycle.isDeleted()
+      ? null
+      : this.terminalLifecycle.getStoredMetadata();
   }
 
   async getCredentialMetadata(): Promise<SessionMetadata | null> {
+    if (this.deletedWorktreeId) return null;
     return this.terminalLifecycle.isBlocked() ? null : this.terminalLifecycle.getStoredMetadata();
   }
 
@@ -462,7 +558,7 @@ export class SandboxSession extends DurableObject<Env> {
     const accepted = active.find(message => message.state === 'accepted');
     const preparing = accepted ? undefined : active[0];
     const metadata = this.terminalLifecycle.getStoredMetadata();
-    if (preparing?.wrapperInstanceId && metadata) {
+    if (preparing?.wrapperInstanceId && preparing.deliveryRetryScope !== 'message' && metadata) {
       this.retainRuntimeCleanup(metadata, preparing.wrapperInstanceId, 'preparation_interrupted');
     }
     this.saveMessages(
@@ -563,7 +659,7 @@ export class SandboxSession extends DurableObject<Env> {
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
     if (this.pendingRuntimeCleanup())
       return { success: false, error: 'Runtime cleanup is pending' };
-    return this.terminalLifecycle.createTerminal(input);
+    return this.trackOperation(this.terminalLifecycle.createTerminal(input));
   }
 
   async resizeTerminal(input?: {
@@ -571,11 +667,11 @@ export class SandboxSession extends DurableObject<Env> {
     cols?: number;
     rows?: number;
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
-    return this.terminalLifecycle.resizeTerminal(input);
+    return this.trackOperation(this.terminalLifecycle.resizeTerminal(input));
   }
 
   async closeTerminal(input?: { ptyId?: string }): Promise<OperationResult<{ success: boolean }>> {
-    return this.terminalLifecycle.closeTerminal(input);
+    return this.trackOperation(this.terminalLifecycle.closeTerminal(input));
   }
 
   async invalidateTerminalRuntime(input: {
@@ -590,16 +686,147 @@ export class SandboxSession extends DurableObject<Env> {
     return this.pendingRuntimeCleanup() !== undefined;
   }
 
+  async beginWorktreeDeletion(input: {
+    worktreeId: CloudAgentWorktreeId;
+    kiloSessionId: string;
+    ownerId: string;
+    organizationId?: string;
+  }): Promise<CloudAgentWorktreeLocation | null> {
+    const worktreeId = cloudAgentWorktreeIdSchema.parse(input.worktreeId);
+    if (this.deletedWorktreeId && this.deletedWorktreeId !== worktreeId) {
+      throw new Error('Worktree identity conflict');
+    }
+    const raw = await this.ctx.storage.get<unknown>(METADATA_KEY);
+    const metadata = raw === undefined ? null : parseSessionMetadata(raw);
+    if (
+      metadata &&
+      (metadata.workspace?.worktreeId !== worktreeId ||
+        metadata.auth.kiloSessionId !== input.kiloSessionId ||
+        metadata.identity.userId !== input.ownerId ||
+        metadata.identity.orgId !== input.organizationId ||
+        metadata.workspace.workspacePath !==
+          getWorktreeWorkspacePath(input.organizationId, input.ownerId, worktreeId))
+    ) {
+      throw new Error('Worktree identity conflict');
+    }
+    if (
+      this.deletedWorktreeId === worktreeId &&
+      (await this.ctx.storage.get(DELETION_COMPLETED_KEY))
+    )
+      return null;
+    this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
+      this.terminalLifecycle.beginDeletion(metadata);
+      const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
+      const cancelled = messages.map(message =>
+        message.state === 'queued' || message.state === 'accepted'
+          ? { ...message, state: 'cancelled' as const }
+          : message
+      );
+      this.ctx.storage.kv.put(MESSAGES_KEY, cancelled);
+    });
+    this.deletedWorktreeId = worktreeId;
+    for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
+    await this.ctx.storage.deleteAlarm();
+    if (!metadata) return null;
+    return cloudAgentWorktreeLocationSchema.parse({
+      sandboxId: metadata.workspace?.sandboxId,
+      provider: metadata.workspace?.sandboxProvider,
+    });
+  }
+
+  async getWorktreeChildSessions(
+    worktreeId: CloudAgentWorktreeId
+  ): Promise<CloudAgentChildSessionLineage[]> {
+    if (this.deletedWorktreeId !== worktreeId) throw new Error('Worktree deletion not started');
+    await Promise.allSettled([...this.activeOperations]);
+    const raw = await this.ctx.storage.get<unknown>(METADATA_KEY);
+    if (raw === undefined) return [];
+    const metadata = parseSessionMetadata(raw);
+    if (metadata.workspace?.worktreeId !== worktreeId)
+      throw new Error('Worktree identity conflict');
+    const directory = this.directory(metadata);
+    const rows = drizzle(this.ctx.storage)
+      .select({
+        id: sql<unknown>`json_extract(${events.payload}, '$.properties.info.id')`,
+        parentID: sql<unknown>`json_extract(${events.payload}, '$.properties.info.parentID')`,
+        directory: sql<unknown>`json_extract(${events.payload}, '$.properties.info.directory')`,
+      })
+      .from(events)
+      .where(
+        and(
+          eq(events.session_id, this.requireSessionId()),
+          eq(events.stream_event_type, 'kilocode'),
+          inArray(sql<string>`json_extract(${events.payload}, '$.type')`, [
+            'session.created',
+            'session.updated',
+          ])
+        )
+      )
+      .orderBy(events.id)
+      .all();
+    const children = new Map<string, CloudAgentChildSessionLineage>();
+    for (const row of rows) {
+      const child = childSessionLineage(row, directory);
+      if (!child || child.sessionId === metadata.auth.kiloSessionId) continue;
+      const existing = children.get(child.sessionId);
+      if (existing && existing.parentSessionId !== child.parentSessionId)
+        throw new Error('worktree_child_lineage_conflict');
+      children.set(child.sessionId, child);
+    }
+    return [...children.values()];
+  }
+
+  async finishWorktreeDeletion(worktreeId: CloudAgentWorktreeId): Promise<void> {
+    if (this.deletedWorktreeId !== worktreeId) throw new Error('Worktree deletion not started');
+    if (!this.deletionCompletion) {
+      this.deletionCompletion = this.clearDeletedWorktree(worktreeId).catch(error => {
+        this.deletionCompletion = undefined;
+        throw error;
+      });
+    }
+    await this.deletionCompletion;
+  }
+
+  private async clearDeletedWorktree(worktreeId: CloudAgentWorktreeId): Promise<void> {
+    while (this.activeOperations.size > 0) {
+      await Promise.allSettled([...this.activeOperations]);
+    }
+    await this.ingestPublicationChain.catch(() => undefined);
+    if (await this.ctx.storage.get(DELETION_COMPLETED_KEY)) return;
+    for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
+    await this.ctx.storage.deleteAlarm();
+    const db = drizzle(this.ctx.storage, { logger: false });
+    this.ctx.storage.transactionSync(() => {
+      db.delete(events).where(eq(events.session_id, this.requireSessionId())).run();
+      db.delete(commandQueue).where(eq(commandQueue.session_id, this.requireSessionId())).run();
+      db.delete(executionLeases).where(isNotNull(executionLeases.execution_id)).run();
+      this.terminalLifecycle.purgeDeletedState();
+      this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
+      this.ctx.storage.kv.put(DELETION_COMPLETED_KEY, true);
+    });
+  }
+
+  private trackOperation<T>(operation: Promise<T>): Promise<T> {
+    this.activeOperations.add(operation);
+    return operation.finally(() => this.activeOperations.delete(operation));
+  }
+
   async deleteSession(): Promise<void> {
+    if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     await this.interruptExecution();
+    if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     const metadata = this.terminalLifecycle.getStoredMetadata();
     const records = this.terminalLifecycle.beginDeletion(metadata);
     for (const ws of this.ctx.getWebSockets('stream')) {
       ws.close(1000, 'session access revoked');
     }
     await this.terminalLifecycle.cleanupSession(metadata, records);
+    await this.ingestPublicationChain.catch(() => undefined);
+    if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     await this.ctx.storage.deleteAlarm();
     this.ctx.storage.transactionSync(() => {
+      if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const pendingCleanup = this.pendingRuntimeCleanup();
       this.eventQueries.deleteOlderThan(Number.MAX_SAFE_INTEGER);
       this.terminalLifecycle.purgeDeletedState();
@@ -608,18 +835,30 @@ export class SandboxSession extends DurableObject<Env> {
     if (this.pendingRuntimeCleanup()) await this.armQueueRetry();
   }
 
-  async registerSession(input: {
-    identity: SessionMetadata['identity'];
-    auth: SessionMetadata['auth'];
-    agent: SessionMetadata['agent'];
-    repository?: SessionMetadata['repository'];
-    workspace?: SessionMetadata['workspace'];
-    callback?: SessionMetadata['callback'];
-    profile?: SessionMetadata['profile'];
-    finalization?: SessionMetadata['finalization'];
-  }): Promise<OperationResult> {
+  async registerSession(input: SandboxSessionRegistrationInput): Promise<OperationResult> {
+    if (this.deletedWorktreeId) return { success: false, error: 'worktree_deleting' };
     if (this.terminalLifecycle.isBlocked()) return { success: false, error: 'Session not found' };
-    if (this.terminalLifecycle.getStoredMetadata()) return { success: true };
+    const initialMessage = input.message
+      ? this.initialMessageFromRegistration(input.message)
+      : undefined;
+    const existing = this.terminalLifecycle.getStoredMetadata();
+    if (existing) {
+      try {
+        validateControlSessionOptions(existing);
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unsupported session options',
+        };
+      }
+      if (initialMessage && !existing.initialMessage) {
+        this.ctx.storage.kv.put(
+          METADATA_KEY,
+          serializeSessionMetadata({ ...existing, initialMessage })
+        );
+      }
+      return { success: true };
+    }
     try {
       validateControlSessionOptions(input);
     } catch (error) {
@@ -643,12 +882,14 @@ export class SandboxSession extends DurableObject<Env> {
       auth: input.auth,
       agent: input.agent,
       ...(repository ? { repository } : {}),
+      ...(initialMessage ? { initialMessage } : {}),
       workspace: input.workspace ?? {},
       ...(input.callback ? { callback: input.callback } : {}),
       ...(input.profile ? { profile: input.profile } : {}),
       ...(input.finalization ? { finalization: input.finalization } : {}),
       lifecycle: { version: 1, timestamp: Date.now() },
     });
+    if (this.deletedWorktreeId) return { success: false, error: 'worktree_deleting' };
     if (this.terminalLifecycle.isBlocked()) return { success: false, error: 'Session not found' };
     this.ctx.storage.kv.put(METADATA_KEY, serializeSessionMetadata(metadata));
     this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
@@ -659,17 +900,9 @@ export class SandboxSession extends DurableObject<Env> {
     return { success: true };
   }
 
-  async createSessionWithInitialAdmission(input: {
-    identity: SessionMetadata['identity'];
-    auth: SessionMetadata['auth'];
-    agent: SessionMetadata['agent'];
-    repository?: SessionMetadata['repository'];
-    workspace?: SessionMetadata['workspace'];
-    callback?: SessionMetadata['callback'];
-    profile?: SessionMetadata['profile'];
-    finalization?: SessionMetadata['finalization'];
-    message: { initialTurn: AcceptedExecutionTurn };
-  }): Promise<SessionMessageAdmissionResult> {
+  async createSessionWithInitialAdmission(
+    input: SandboxSessionInitialAdmissionInput
+  ): Promise<SessionMessageAdmissionResult> {
     try {
       validateControlSessionOptions(input);
     } catch (error) {
@@ -679,7 +912,38 @@ export class SandboxSession extends DurableObject<Env> {
         error: error instanceof Error ? error.message : 'Unsupported session options',
       };
     }
-    const registered = await this.registerSession(input);
+    const initialTurn = input.message.initialTurn;
+    const existing = await this.getMetadata();
+    if (
+      existing?.initialMessage &&
+      !this.initialMessageMatches(existing.initialMessage, initialTurn)
+    ) {
+      return {
+        success: false,
+        code: 'BAD_REQUEST',
+        error: 'Initial turn does not match registered session intent',
+      };
+    }
+    const registered = await this.registerSession({
+      ...input,
+      message: {
+        initialMessageId: initialTurn.messageId,
+        turn:
+          initialTurn.type === 'prompt'
+            ? {
+                type: 'prompt',
+                id: initialTurn.messageId,
+                prompt: initialTurn.prompt,
+                ...(initialTurn.attachments ? { attachments: initialTurn.attachments } : {}),
+              }
+            : {
+                type: 'command',
+                id: initialTurn.messageId,
+                command: initialTurn.command,
+                arguments: initialTurn.arguments,
+              },
+      },
+    });
     if (!registered.success) {
       return {
         success: false,
@@ -689,7 +953,7 @@ export class SandboxSession extends DurableObject<Env> {
     }
     return this.queueAndDispatch(
       {
-        turn: input.message.initialTurn,
+        turn: initialTurn,
         agent: input.agent,
         finalization: input.finalization,
       },
@@ -738,6 +1002,13 @@ export class SandboxSession extends DurableObject<Env> {
     request: SubmittedSessionMessageRequest
   ): Promise<SessionMessageAdmissionResult> {
     const messageId = request.turn.id ?? createMessageId();
+    if (request.turn.type === 'command' && request.turn.attachments !== undefined) {
+      return {
+        success: false,
+        code: 'BAD_REQUEST',
+        error: 'Attachments cannot be attached to slash commands',
+      };
+    }
     const turn: AcceptedExecutionTurn =
       request.turn.type === 'prompt'
         ? {
@@ -773,7 +1044,7 @@ export class SandboxSession extends DurableObject<Env> {
   async alarm(): Promise<void> {
     if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
     const epoch = this.terminalLifecycle.captureEpoch();
-    if (epoch === null) return;
+    if (epoch === null || this.deletedWorktreeId) return;
     const now = Date.now();
     const messages = this.loadMessages();
     if (!this.terminalLifecycle.isCurrent(epoch)) return;
@@ -821,15 +1092,28 @@ export class SandboxSession extends DurableObject<Env> {
   ): Promise<SessionMessageAdmissionResult> {
     const epoch = this.terminalLifecycle.captureEpoch();
     const metadata = this.terminalLifecycle.getStoredMetadata();
-    if (epoch === null || !metadata) {
+    if (epoch === null || !metadata || this.deletedWorktreeId) {
       return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
     }
+    const admissionInput = metadata.workspace?.worktreeId
+      ? {
+          ...input,
+          finalization: {
+            ...metadata.finalization,
+            ...input.finalization,
+            autoCommit: input.finalization?.autoCommit ?? metadata.finalization?.autoCommit ?? true,
+          },
+        }
+      : input;
     const messageId = input.turn.messageId;
     const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
     const existing = messages.find(message => message.messageId === messageId);
     const intent = existing
       ? undefined
-      : resolveSessionMessageIntent(input, origin === 'followup' ? metadata.agent : undefined);
+      : resolveSessionMessageIntent(
+          admissionInput,
+          origin === 'followup' ? metadata.agent : undefined
+        );
     if (!existing && !intent) {
       return { success: false, code: 'BAD_REQUEST', error: 'Session is missing a valid model' };
     }
@@ -879,7 +1163,11 @@ export class SandboxSession extends DurableObject<Env> {
       const latestMessages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
       const duplicate = latestMessages.find(message => message.messageId === messageId);
       if (duplicate) {
-        const [frozen] = freezeLegacyQueuedMessages([duplicate], latestMetadata.agent);
+        const [frozen] = freezeLegacyQueuedMessages(
+          [duplicate],
+          latestMetadata.agent,
+          latestMetadata.workspace?.worktreeId ? latestMetadata.finalization : undefined
+        );
         if (
           !matchesSessionMessageReplay(frozen, intent ?? input) ||
           (intent &&
@@ -904,7 +1192,11 @@ export class SandboxSession extends DurableObject<Env> {
       }
       if (validationFailure) return validationFailure;
       if (!intent) return { success: false, code: 'NOT_FOUND', error: 'Message not found' };
-      const nextMessages = freezeLegacyQueuedMessages(latestMessages, latestMetadata.agent);
+      const nextMessages = freezeLegacyQueuedMessages(
+        latestMessages,
+        latestMetadata.agent,
+        latestMetadata.workspace?.worktreeId ? latestMetadata.finalization : undefined
+      );
       nextMessages.push(createSessionMessageRecord(intent));
       const nextMetadata =
         intent.agent.model === undefined
@@ -930,7 +1222,11 @@ export class SandboxSession extends DurableObject<Env> {
     return result;
   }
 
-  private async dispatchQueued(
+  private dispatchQueued(messageId: string, options?: { allowCreate?: boolean }): Promise<void> {
+    return this.trackOperation(this.runDispatchQueued(messageId, options));
+  }
+
+  private async runDispatchQueued(
     messageId: string,
     options?: { allowCreate?: boolean }
   ): Promise<void> {
@@ -949,6 +1245,7 @@ export class SandboxSession extends DurableObject<Env> {
     messageId: string,
     options?: { allowCreate?: boolean }
   ): Promise<void> {
+    if (this.deletedWorktreeId) return;
     const metadata = this.terminalLifecycle.getStoredMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
     const sandboxId = metadata?.workspace?.sandboxId;
@@ -963,7 +1260,11 @@ export class SandboxSession extends DurableObject<Env> {
       if (!this.terminalLifecycle.isCurrent(epoch) || nextQueuedMessageId(messages) !== messageId) {
         return undefined;
       }
-      const frozen = freezeLegacyQueuedMessages(messages, metadata.agent).map(message =>
+      const frozen = freezeLegacyQueuedMessages(
+        messages,
+        metadata.agent,
+        metadata.workspace?.worktreeId ? metadata.finalization : undefined
+      ).map(message =>
         message.messageId === messageId && message.deliveryDeadlineAt === undefined
           ? { ...message, deliveryDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS }
           : message
@@ -990,15 +1291,61 @@ export class SandboxSession extends DurableObject<Env> {
       wrapperInstanceId = runtime.data;
       this.saveMessages(
         this.loadMessages().map(message =>
-          message.messageId === messageId ? { ...message, wrapperInstanceId } : message
+          message.messageId === messageId
+            ? {
+                ...message,
+                wrapperInstanceId,
+                unresolvedDispatch:
+                  message.wrapperInstanceId === wrapperInstanceId
+                    ? message.unresolvedDispatch
+                    : undefined,
+              }
+            : message
         ),
         epoch
       );
     };
+    const dispatch = async <T>(
+      kind: 'attach' | 'prompt',
+      operation: () => Promise<T>
+    ): Promise<T> => {
+      const unresolved = this.queuedMessage(
+        messageId,
+        epoch,
+        wrapperInstanceId
+      )?.unresolvedDispatch;
+      const unresolvedPrompt =
+        unresolved && this.terminalLifecycle.getAttachedWrapperInstanceId() === wrapperInstanceId;
+      const recordUnresolved = (unresolvedDispatch: true | undefined) => {
+        if (!isCurrent()) return;
+        this.saveMessages(
+          this.loadMessages().map(message =>
+            message.messageId === messageId
+              ? { ...message, unresolvedDispatch, deliveryRetryScope: undefined }
+              : message
+          ),
+          epoch
+        );
+      };
+      recordUnresolved(true);
+      try {
+        const result = await operation();
+        if (kind === 'attach' && !unresolvedPrompt) recordUnresolved(undefined);
+        return result;
+      } catch (error) {
+        if (error instanceof ControlRequestError && !unresolved) recordUnresolved(undefined);
+        throw error;
+      }
+    };
     await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
     if (!isCurrent()) return;
     if (Date.now() >= deadlineAt) {
-      await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId);
+      await this.failDelivery(
+        messageId,
+        'preparation_timeout',
+        wrapperInstanceId,
+        queued.deliveryRetryScope
+      );
       return;
     }
     if (this.pendingRuntimeCleanup()) return;
@@ -1061,6 +1408,9 @@ export class SandboxSession extends DurableObject<Env> {
               sessionId,
               provider,
               ...(acquisition ? { acquisition } : { allowCreate }),
+              ...(metadata.workspace?.worktreeId
+                ? { worktreeId: metadata.workspace.worktreeId }
+                : {}),
               billing: buildSandboxBillingInput(
                 metadata,
                 sandboxId,
@@ -1117,7 +1467,10 @@ export class SandboxSession extends DurableObject<Env> {
         return;
       }
       if (!wrapperInstanceId) throw new Error('Wrapper identity is missing');
-      if (this.terminalLifecycle.getAttachedWrapperInstanceId() !== wrapperInstanceId) {
+      if (
+        this.terminalLifecycle.getAttachedWrapperInstanceId() !== wrapperInstanceId ||
+        status.attachment?.kilo?.containmentEnabled === false
+      ) {
         recorder.onProgress('workspace_setup', 'Setting up workspace…');
         if (!status.attachment?.kilo)
           throw new Error('Contained session attachment is unavailable');
@@ -1142,25 +1495,28 @@ export class SandboxSession extends DurableObject<Env> {
             await this.compensateSessionAttachment(metadata);
           return;
         }
-        const attached = await wait(
-          async () =>
-            controlRequestResult(
-              await control.request({
-                operation: 'session.attach',
-                session,
-                expectedWrapperInstanceId: wrapperInstanceId,
-                payload: attachPayload,
-                timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
-              })
-            ),
-          SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
+        await dispatch('attach', () =>
+          wait(
+            async () =>
+              sessionAttachResultSchema.parse(
+                controlRequestResult(
+                  await control.request({
+                    operation: 'session.attach',
+                    session,
+                    expectedWrapperInstanceId: wrapperInstanceId,
+                    payload: attachPayload,
+                    timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+                  })
+                )
+              ),
+            SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
+          )
         );
         if (!isCurrent()) {
           if (!this.terminalLifecycle.isCurrent(epoch))
             await this.compensateSessionAttachment(metadata);
           return;
         }
-        sessionAttachResultSchema.parse(attached);
       }
       const attachedRuntime = await wait(() => control.getStatus());
       if (!isCurrent()) return;
@@ -1173,41 +1529,43 @@ export class SandboxSession extends DurableObject<Env> {
       this.terminalLifecycle.recordAttachment({ metadata, sandboxId, wrapperInstanceId, epoch });
       recorder.finalize({ status: 'completed' });
       phase = 'prompt';
-      const prompt = await wait(async () =>
-        controlRequestResult(
-          await control.request({
-            operation: 'session.prompt',
-            session,
-            expectedWrapperInstanceId: wrapperInstanceId,
-            payload: {
-              messageId,
-              turn:
-                intent.turn.type === 'command'
-                  ? {
-                      type: 'command',
-                      command: intent.turn.command,
-                      arguments: intent.turn.arguments,
-                    }
-                  : { type: 'prompt', prompt: intent.turn.prompt },
-              agent: {
-                mode: intent.agent.mode,
-                ...(model !== undefined ? { model } : {}),
-                ...(intent.agent.variant !== undefined ? { variant: intent.agent.variant } : {}),
+      await dispatch('prompt', async () => {
+        const prompt = await wait(async () =>
+          controlRequestResult(
+            await control.request({
+              operation: 'session.prompt',
+              session,
+              expectedWrapperInstanceId: wrapperInstanceId,
+              payload: {
+                messageId,
+                turn:
+                  intent.turn.type === 'command'
+                    ? {
+                        type: 'command',
+                        command: intent.turn.command,
+                        arguments: intent.turn.arguments,
+                      }
+                    : { type: 'prompt', prompt: intent.turn.prompt },
+                agent: {
+                  mode: intent.agent.mode,
+                  ...(model !== undefined ? { model } : {}),
+                  ...(intent.agent.variant !== undefined ? { variant: intent.agent.variant } : {}),
+                },
+                ...(intent.finalization ? { finalization: intent.finalization } : {}),
+                ...(attachments.length ? { attachments } : {}),
               },
-              ...(intent.finalization ? { finalization: intent.finalization } : {}),
-              ...(attachments.length ? { attachments } : {}),
-            },
-          })
-        )
-      );
+            })
+          )
+        );
+        const result = sessionPromptResultSchema.parse(prompt);
+        if (result.messageId !== messageId)
+          throw new Error('Prompt response message identity mismatch');
+      });
       if (!isCurrent()) {
         if (!this.terminalLifecycle.isCurrent(epoch))
           await this.compensateSessionAttachment(metadata);
         return;
       }
-      const result = sessionPromptResultSchema.parse(prompt);
-      if (result.messageId !== messageId)
-        throw new Error('Prompt response message identity mismatch');
       const accepted = acceptQueuedMessage(this.loadMessages(), messageId, Date.now());
       if (!accepted || !this.saveMessages(accepted, epoch)) return;
       await this.armQueueRetry(Date.now() + DEADLINE_MS.acceptedAlarmCap);
@@ -1221,7 +1579,9 @@ export class SandboxSession extends DurableObject<Env> {
         }
         return;
       }
-      logger.withFields({ sessionId, messageId, phase }).warn('Control-plane dispatch failed');
+      logger
+        .withFields({ sessionId, messageId, phase, ...deliveryErrorLogFields(error) })
+        .warn('Control-plane dispatch failed');
       await this.recordDeliveryFailure({
         messageId,
         epoch,
@@ -1234,6 +1594,7 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   private async compensateSessionAttachment(metadata: SessionMetadata): Promise<void> {
+    if (this.deletedWorktreeId) return;
     try {
       await withTimeout(
         this.terminalLifecycle.cleanupSession(metadata, []),
@@ -1268,16 +1629,24 @@ export class SandboxSession extends DurableObject<Env> {
     error: unknown;
   }): Promise<void> {
     const { messageId, epoch, phase, wrapperInstanceId, deadlineAt, error } = input;
-    if (!this.queuedMessage(messageId, epoch, wrapperInstanceId)) return;
+    const message = this.queuedMessage(messageId, epoch, wrapperInstanceId);
+    if (!message) return;
+    const rejection = error instanceof ControlRequestError && error.code !== 'runtime_unhealthy';
+    const scope = rejection && !message.unresolvedDispatch ? 'message' : 'runtime';
     if (Date.now() >= deadlineAt) {
-      await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId);
+      await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId, scope);
       return;
     }
+    const busy = rejection && error.code === 'session_busy';
     const updated =
-      phase === 'preparing'
+      phase === 'preparing' || busy
         ? undefined
         : incrementDeliveryFailure(this.loadMessages(), messageId, phase);
-    if (updated && !this.saveMessages(updated.messages, epoch)) return;
+    const messages = (updated?.messages ?? this.loadMessages()).map(
+      (message): MessageRecord =>
+        message.messageId === messageId ? { ...message, deliveryRetryScope: scope } : message
+    );
+    if (!this.saveMessages(messages, epoch)) return;
     if (isRetryableDeliveryError(error) && !updated?.exhausted) {
       await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
       return;
@@ -1289,7 +1658,8 @@ export class SandboxSession extends DurableObject<Env> {
         : phase === 'attach'
           ? 'attach_exhausted'
           : 'environment_failed',
-      wrapperInstanceId
+      wrapperInstanceId,
+      scope
     );
   }
 
@@ -1353,7 +1723,8 @@ export class SandboxSession extends DurableObject<Env> {
   private async failDelivery(
     messageId: string,
     reason: string,
-    wrapperInstanceId?: string
+    wrapperInstanceId?: string,
+    scope: 'message' | 'runtime' = 'runtime'
   ): Promise<void> {
     const epoch = this.terminalLifecycle.captureEpoch();
     const metadata = this.terminalLifecycle.getStoredMetadata();
@@ -1366,6 +1737,12 @@ export class SandboxSession extends DurableObject<Env> {
       message.wrapperInstanceId !== wrapperInstanceId
     )
       return;
+    if (scope === 'message') {
+      const messages = failQueuedMessage(this.loadMessages(), messageId, reason);
+      if (!messages || !this.saveMessages(messages, epoch)) return;
+      if (nextQueuedMessageId(messages)) await this.armQueueRetry();
+      return;
+    }
     if (wrapperInstanceId) this.retainRuntimeCleanup(metadata, wrapperInstanceId, reason);
     await this.failWaitingMessages(reason, wrapperInstanceId);
     if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
@@ -1456,6 +1833,7 @@ export class SandboxSession extends DurableObject<Env> {
     const response = await withTimeout(
       control.request({
         operation: 'session.sync',
+        expectedWrapperInstanceId: message.wrapperInstanceId,
         session: {
           sessionId: metadata.identity.sessionId,
           kiloSessionId,
@@ -1468,7 +1846,30 @@ export class SandboxSession extends DurableObject<Env> {
     );
     if (!this.isCurrentAcceptedMessage(message, epoch)) return undefined;
     if (!response.ok) throw new Error('Session sync failed');
-    const result = sessionSyncResultSchema.parse(response.result);
+    const parsed = sessionSyncResultSchema.parse(response.result);
+    const belongsToRoot = (request: unknown): boolean => {
+      if (
+        typeof request !== 'object' ||
+        request === null ||
+        Array.isArray(request) ||
+        !('id' in request) ||
+        typeof request.id !== 'string' ||
+        request.id.length === 0 ||
+        !('sessionID' in request) ||
+        typeof request.sessionID !== 'string' ||
+        request.sessionID.length === 0
+      )
+        return false;
+      const root = 'rootKiloSessionId' in request ? request.rootKiloSessionId : undefined;
+      return root === undefined ? request.sessionID === kiloSessionId : root === kiloSessionId;
+    };
+    const result = metadata.workspace?.worktreeId
+      ? {
+          ...parsed,
+          questions: parsed.questions.filter(belongsToRoot),
+          permissions: parsed.permissions.filter(belongsToRoot),
+        }
+      : parsed;
     if (this.readPendingInteractions()?.revision === revision) {
       this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
         revision: (revision ?? 0) + 1,
@@ -1516,6 +1917,51 @@ export class SandboxSession extends DurableObject<Env> {
 
   private async deriveCloudStatus() {
     return streamCloudStatus(this.loadMessages());
+  }
+
+  private initialMessageFromRegistration(
+    message: NonNullable<SandboxSessionRegistrationInput['message']>
+  ): NonNullable<SessionMetadata['initialMessage']> {
+    const turn = message.turn;
+    if (turn.type === 'command') {
+      return {
+        id: message.initialMessageId ?? turn.id ?? undefined,
+        prompt:
+          turn.arguments.length > 0 ? `/${turn.command} ${turn.arguments}` : `/${turn.command}`,
+        turn: { type: 'command', command: turn.command, arguments: turn.arguments },
+      };
+    }
+    return {
+      id: message.initialMessageId ?? turn.id ?? undefined,
+      prompt: turn.prompt,
+      ...(turn.attachments ? { attachments: turn.attachments } : {}),
+      turn: {
+        type: 'prompt',
+        prompt: turn.prompt,
+        ...(turn.attachments ? { attachments: turn.attachments } : {}),
+      },
+    };
+  }
+
+  private initialMessageMatches(
+    initialMessage: NonNullable<SessionMetadata['initialMessage']>,
+    turn: AcceptedExecutionTurn
+  ): boolean {
+    if (initialMessage.id !== turn.messageId || initialMessage.turn?.type !== turn.type) {
+      return false;
+    }
+    if (turn.type === 'command') {
+      return (
+        initialMessage.turn.type === 'command' &&
+        initialMessage.turn.command === turn.command &&
+        initialMessage.turn.arguments === turn.arguments
+      );
+    }
+    return (
+      initialMessage.turn.type === 'prompt' &&
+      initialMessage.turn.prompt === turn.prompt &&
+      JSON.stringify(initialMessage.turn.attachments) === JSON.stringify(turn.attachments)
+    );
   }
 
   private async requestSessionOperation(
@@ -1596,13 +2042,18 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   private loadMessages(): MessageRecord[] {
-    if (this.terminalLifecycle.isBlocked()) return [];
+    if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked()) return [];
     return this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
   }
 
   private saveMessages(messages: MessageRecord[], epoch?: number): boolean {
     const currentEpoch = epoch ?? this.terminalLifecycle.captureEpoch();
-    if (currentEpoch === null || !this.terminalLifecycle.isCurrent(currentEpoch)) return false;
+    if (
+      this.deletedWorktreeId ||
+      currentEpoch === null ||
+      !this.terminalLifecycle.isCurrent(currentEpoch)
+    )
+      return false;
     const events: StoredEvent[] = [];
     this.ctx.storage.transactionSync(() => {
       const before = this.loadMessages();

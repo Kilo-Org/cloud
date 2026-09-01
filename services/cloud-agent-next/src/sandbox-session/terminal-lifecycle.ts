@@ -772,21 +772,6 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
           record.ptyId
         );
       }
-      if (metadata?.auth.kiloSessionId) {
-        try {
-          await control.request({
-            operation: 'session.detach',
-            session: {
-              sessionId,
-              kiloSessionId: metadata.auth.kiloSessionId,
-              directory: deps.getDirectory(metadata),
-            },
-            payload: {},
-          });
-        } catch {
-          return;
-        }
-      }
     } finally {
       await control.detachSession(sessionId);
     }

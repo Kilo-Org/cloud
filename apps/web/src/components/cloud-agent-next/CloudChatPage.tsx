@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -29,12 +29,10 @@ import {
   getSessionTotalCostUsd,
   isRenderableSessionCost,
 } from './session-cost-breakdown';
-import { MessageErrorBoundary } from './MessageErrorBoundary';
-import { MessageBubble } from './MessageBubble';
+import { ConversationMessages } from './ConversationMessages';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
-import type { ChildSessionDrawerEntry, OpenChildSession } from './ChildSessionSection';
+import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
-import { PreparationRow } from './PreparationRow';
 import { isNoOpCompletedPreparationAttempt } from './preparation-summary';
 import { PreparationDrawer } from './PreparationDrawer';
 import { WorkingIndicator } from './WorkingIndicator';
@@ -64,7 +62,6 @@ import {
   selectWorkspaceTab,
   terminalTabId,
 } from './terminal-tabs';
-import { isMessageStreaming } from './types';
 import {
   createRemoteModelOverride,
   useSessionModels,
@@ -80,122 +77,9 @@ import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import type { AgentMode } from './types';
-import type {
-  MessageDeliveryState,
-  PreparationAttempt,
-  StoredMessage,
-} from '@kilocode/cloud-agent-sdk';
+import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import type { WorkspaceTabId } from './terminal-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
-
-// ---------------------------------------------------------------------------
-// Static messages — memoized, never re-renders during streaming
-// ---------------------------------------------------------------------------
-const StaticMessages = memo(
-  ({
-    messages,
-    pendingMessages,
-    preparationByMessageId,
-    getChildMessages,
-    onOpenChildSession,
-    onOpenPreparationDetails,
-  }: {
-    messages: StoredMessage[];
-    pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
-    preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>;
-    getChildMessages?: (sessionId: string) => StoredMessage[];
-    onOpenChildSession?: OpenChildSession;
-    onOpenPreparationDetails: (attemptId: string) => void;
-  }) => (
-    <>
-      {messages.map(msg => (
-        <MessageErrorBoundary key={msg.info.id}>
-          <MessageBubble
-            message={msg}
-            deliveryState={pendingMessages.get(msg.info.id)}
-            getChildMessages={getChildMessages}
-            onOpenChildSession={onOpenChildSession}
-          />
-          {preparationByMessageId.get(msg.info.id)?.map(attempt => (
-            <PreparationRow
-              key={attempt.id}
-              attempt={attempt}
-              onOpenDetails={onOpenPreparationDetails}
-            />
-          ))}
-        </MessageErrorBoundary>
-      ))}
-    </>
-  )
-);
-StaticMessages.displayName = 'StaticMessages';
-
-// ---------------------------------------------------------------------------
-// Dynamic messages — re-renders as streaming progresses while chat is visible
-// ---------------------------------------------------------------------------
-type DynamicMessagesProps = {
-  active: boolean;
-  isStreaming: boolean;
-  messages: StoredMessage[];
-  pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
-  preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>;
-  getChildMessages?: (sessionId: string) => StoredMessage[];
-  onOpenChildSession?: OpenChildSession;
-  onOpenPreparationDetails: (attemptId: string) => void;
-};
-
-const DynamicMessages = memo(
-  function DynamicMessages({
-    isStreaming,
-    messages,
-    pendingMessages,
-    preparationByMessageId,
-    getChildMessages,
-    onOpenChildSession,
-    onOpenPreparationDetails,
-  }: DynamicMessagesProps) {
-    return (
-      <>
-        {messages.map(msg => {
-          const streaming = isStreaming && isMessageStreaming(msg);
-          return (
-            <MessageErrorBoundary key={msg.info.id}>
-              <MessageBubble
-                message={msg}
-                isStreaming={streaming}
-                deliveryState={pendingMessages.get(msg.info.id)}
-                getChildMessages={getChildMessages}
-                onOpenChildSession={onOpenChildSession}
-              />
-              {preparationByMessageId.get(msg.info.id)?.map(attempt => (
-                <PreparationRow
-                  key={attempt.id}
-                  attempt={attempt}
-                  onOpenDetails={onOpenPreparationDetails}
-                />
-              ))}
-            </MessageErrorBoundary>
-          );
-        })}
-      </>
-    );
-  },
-  (previous, next) => {
-    if (!previous.active && !next.active) return true;
-
-    return (
-      previous.active === next.active &&
-      previous.isStreaming === next.isStreaming &&
-      previous.messages === next.messages &&
-      previous.pendingMessages === next.pendingMessages &&
-      previous.preparationByMessageId === next.preparationByMessageId &&
-      previous.getChildMessages === next.getChildMessages &&
-      previous.onOpenChildSession === next.onOpenChildSession &&
-      previous.onOpenPreparationDetails === next.onOpenPreparationDetails
-    );
-  }
-);
-DynamicMessages.displayName = 'DynamicMessages';
 
 // ---------------------------------------------------------------------------
 // CloudChatPage
@@ -1194,7 +1078,7 @@ export default function CloudChatPage({
                         <div
                           ref={scrollContainerRef}
                           hidden={!chatTabActive}
-                          className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                          className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                           onScroll={handleScroll}
                         >
                           <div ref={messagesContentRef}>
@@ -1207,18 +1091,11 @@ export default function CloudChatPage({
                               olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
                               onRetry={requestOlderMessages}
                             />
-                            <StaticMessages
-                              messages={staticMessages}
-                              pendingMessages={pendingMessages}
-                              preparationByMessageId={preparationByMessageId}
-                              getChildMessages={getChildMessages}
-                              onOpenChildSession={handleOpenTopLevelChildSession}
-                              onOpenPreparationDetails={handleOpenPreparationDetails}
-                            />
-                            <DynamicMessages
+                            <ConversationMessages
                               active={chatTabActive}
                               isStreaming={isStreaming}
-                              messages={dynamicMessages}
+                              staticMessages={staticMessages}
+                              dynamicMessages={dynamicMessages}
                               pendingMessages={pendingMessages}
                               preparationByMessageId={preparationByMessageId}
                               getChildMessages={getChildMessages}

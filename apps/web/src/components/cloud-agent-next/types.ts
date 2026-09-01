@@ -171,7 +171,14 @@ export function isReasoningPart(part: Part): part is ReasoningPart {
 
 /** Whether the reasoning expander has content worth showing. */
 export function shouldRenderReasoningPart(part: Part): boolean {
-  return isReasoningPart(part) && part.text.trim() !== '';
+  return (
+    isReasoningPart(part) &&
+    part.text
+      .replaceAll('[REDACTED]', '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace('<!--', '')
+      .trim() !== ''
+  );
 }
 
 /** Check if a part is a StepStartPart */

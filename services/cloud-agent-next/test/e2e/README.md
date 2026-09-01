@@ -16,7 +16,8 @@ cloud-agent-next refactor.
    For control-plane scenarios, enroll the E2E user in `CONTROL_PLANE_IDS`.
    `worktree-shared` additionally requires `WORKTREE_CREATION_ENABLED_IDS`; it creates a fresh
    personal user per run, so set both flags to `*` for that local scenario.
-   Both accept comma-separated user or org IDs or `*` and default empty/off.
+   Both accept comma-separated user or org IDs or `*`. Production defaults to empty/off;
+   wrangler `dev` and `.dev.vars.example` default to `*`.
    Ordinary control-plane scenarios do not require `WORKTREE_CREATION_ENABLED_IDS`.
    These are Worker settings read by `auth.ts` from this service's `.dev.vars`,
    not driver environment overrides: prefixing the driver command with either

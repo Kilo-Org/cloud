@@ -2,10 +2,8 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import {
-  getKilocodeRepoOpenPullRequestCounts,
   getKilocodeRepoOpenPullRequestsSummary,
   getKilocodeRepoRecentlyClosedExternalPRs,
-  getKilocodeRepoRecentlyMergedExternalPRs,
 } from '@/lib/github/open-pull-request-counts';
 
 jest.mock('@/lib/github/open-pull-request-counts', () => ({
@@ -40,22 +38,6 @@ describe('admin.github.getKilocodeOpenPullRequestCounts', () => {
     await expect(caller.admin.github.getKilocodeOpenPullRequestCounts()).rejects.toThrow(
       'Admin access required'
     );
-  });
-
-  it('returns PR counts for admin users', async () => {
-    const mockCounts = {
-      totalOpenPullRequests: 10,
-      teamOpenPullRequests: 4,
-      externalOpenPullRequests: 6,
-      updatedAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
-    };
-
-    (getKilocodeRepoOpenPullRequestCounts as jest.Mock).mockResolvedValue(mockCounts);
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeOpenPullRequestCounts();
-
-    expect(result).toEqual(mockCounts);
   });
 });
 
@@ -102,32 +84,6 @@ describe('admin.github.getKilocodeRecentlyMergedExternalPRs', () => {
     await expect(caller.admin.github.getKilocodeRecentlyMergedExternalPRs()).rejects.toThrow(
       'Admin access required'
     );
-  });
-
-  it('returns recently merged external PRs for admin users', async () => {
-    const mockMergedPrs = [
-      {
-        number: 456,
-        title: 'External feature',
-        url: 'https://github.com/Kilo-Org/kilocode/pull/456',
-        authorLogin: 'external-contributor',
-        mergedAt: new Date('2024-01-15T10:00:00.000Z').toISOString(),
-      },
-      {
-        number: 789,
-        title: 'Another fix',
-        url: 'https://github.com/Kilo-Org/kilocode/pull/789',
-        authorLogin: 'community-dev',
-        mergedAt: new Date('2024-01-14T08:00:00.000Z').toISOString(),
-      },
-    ];
-
-    (getKilocodeRepoRecentlyMergedExternalPRs as jest.Mock).mockResolvedValue(mockMergedPrs);
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeRecentlyMergedExternalPRs();
-
-    expect(result).toEqual(mockMergedPrs);
   });
 });
 

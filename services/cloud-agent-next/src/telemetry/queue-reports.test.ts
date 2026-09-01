@@ -79,7 +79,35 @@ describe('Cloud Agent report emitter', () => {
       },
     ]);
     expect(JSON.stringify(reports)).not.toContain('never report');
+    expect(JSON.stringify(reports)).not.toContain('secret');
     expect(JSON.stringify(reports)).not.toContain('model/test');
+  });
+
+  it('keeps diagnostic expiry tied to terminal time when a failed run is reported again later', async () => {
+    const reports: CloudAgentQueueReport[] = [];
+    for (const occurredAt of [6, 60 * 24 * 60 * 60 * 1000]) {
+      await emitRunStateReport({
+        queue: { send: async report => void reports.push(report) },
+        cloudAgentSessionId: 'agent_report',
+        state: {
+          ...state,
+          failureCode: 'assistant_error',
+          assistantFailureReason: 'timeout',
+          providerOwnership: 'managed',
+        },
+        occurredAt,
+      });
+    }
+
+    expect(reports).toHaveLength(2);
+    expect(reports[1].run).toEqual(reports[0].run);
+    expect(reports[1].run).toMatchObject({
+      failureReason: 'request_timeout',
+      diagnostic: {
+        errorMessageRedacted: 'Assistant request timed out',
+        errorExpiresAt: new Date(5 + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    });
   });
 
   it.each([
@@ -105,6 +133,176 @@ describe('Cloud Agent report emitter', () => {
       });
     }
   );
+
+  it('reports pre-dispatch payment_required without acceptance or activity timestamps', async () => {
+    const reports: CloudAgentQueueReport[] = [];
+    await emitRunStateReport({
+      queue: { send: async report => void reports.push(report) },
+      cloudAgentSessionId: 'agent_report',
+      state: {
+        ...state,
+        acceptedAt: undefined,
+        dispatchAcceptanceKind: undefined,
+        agentActivityObservedAt: undefined,
+        wrapperRunId: undefined,
+        completionSource: 'delivery_failure',
+        failureStage: 'pre_dispatch',
+        failureCode: 'payment_required',
+      },
+    });
+
+    expect(reports).toHaveLength(1);
+    expect(reports[0].run).toMatchObject({
+      status: 'failed',
+      failureStage: 'pre_dispatch',
+      failureCode: 'payment_required',
+      failureResponsibility: 'user',
+      failureReason: 'insufficient_credits',
+      diagnostic: { errorMessageRedacted: 'Model request failed: insufficient credits' },
+    });
+    expect(reports[0].run).not.toHaveProperty('dispatchAcceptedAt');
+    expect(reports[0].run).not.toHaveProperty('agentActivityObservedAt');
+  });
+
+  it.each([
+    ['wrapper_ping_timeout', 'Wrapper health check timed out'],
+    ['wrapper_no_output', 'Wrapper made no execution progress during the watchdog window'],
+    ['wrapper_disconnected', 'Wrapper disconnected before completion'],
+  ] as const)('reports %s before and after activity', async (failureCode, expectedDiagnostic) => {
+    for (const failureStage of ['post_dispatch_no_activity', 'agent_activity'] as const) {
+      const reports: CloudAgentQueueReport[] = [];
+      await emitRunStateReport({
+        queue: { send: async report => void reports.push(report) },
+        cloudAgentSessionId: 'agent_report',
+        state: {
+          ...state,
+          failureStage,
+          failureCode,
+          agentActivityObservedAt: failureStage === 'agent_activity' ? 4 : undefined,
+        },
+      });
+
+      expect(reports).toHaveLength(1);
+      expect(reports[0].run).toMatchObject({
+        failureStage,
+        failureCode,
+        failureResponsibility: 'platform',
+        failureReason: 'wrapper_liveness',
+        diagnostic: { errorMessageRedacted: expectedDiagnostic },
+      });
+      if (failureStage === 'agent_activity') {
+        expect(reports[0].run.agentActivityObservedAt).toBe(new Date(4).toISOString());
+      } else {
+        expect(reports[0].run).not.toHaveProperty('agentActivityObservedAt');
+      }
+    }
+  });
+
+  it.each([
+    [
+      'insufficient_credits',
+      'Assistant request failed: insufficient credits',
+      'insufficient_credits',
+    ],
+    ['rate_limited', 'Assistant request was rate limited', 'rate_limited'],
+    ['model_unavailable', 'Assistant request failed: model not found', 'model_unavailable'],
+    [
+      'provider_authentication',
+      'Assistant request was not authorized',
+      'managed_provider_authentication',
+    ],
+    ['provider_unavailable', 'Assistant service is unavailable', 'managed_provider_unavailable'],
+    ['timeout', 'Assistant request timed out', 'request_timeout'],
+    ['invalid_request', 'Assistant request was invalid', 'invalid_request'],
+    ['context_limit', 'The model context limit was exceeded', 'context_limit'],
+    ['output_limit', 'The model output limit was reached', 'output_limit'],
+    [
+      'content_filter',
+      'The model provider blocked the response under its content policy',
+      'content_filter',
+    ],
+    [
+      'structured_output',
+      'The model response did not match the required format',
+      'structured_output',
+    ],
+    ['unknown', 'Assistant request failed', 'assistant_unknown'],
+    [undefined, 'Assistant request failed', 'assistant_unknown'],
+  ] as const)(
+    'uses only fixed diagnostic wording for assistant reason %s',
+    async (assistantFailureReason, expectedDiagnostic, expectedFailureReason) => {
+      const reports: CloudAgentQueueReport[] = [];
+      await emitRunStateReport({
+        queue: { send: async report => void reports.push(report) },
+        cloudAgentSessionId: 'agent_report',
+        state: {
+          ...state,
+          failureCode: 'assistant_error',
+          assistantFailureReason,
+          providerOwnership: 'managed',
+          error: 'Payment Required: Authorization: Bearer raw-secret-token',
+          safeFailureMessage: 'model not found: api_key=safe-message-secret',
+        },
+      });
+
+      expect(reports).toHaveLength(1);
+      expect(reports[0].run.diagnostic).toEqual({
+        errorMessageRedacted: expectedDiagnostic,
+        errorExpiresAt: new Date(5 + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+      expect(reports[0].run.failureReason).toBe(expectedFailureReason);
+      expect(JSON.stringify(reports)).not.toContain('raw-secret-token');
+      expect(JSON.stringify(reports)).not.toContain('safe-message-secret');
+      expect(JSON.stringify(reports)).not.toContain('model/test');
+    }
+  );
+
+  it.each([
+    ['payment_required', 'Model request failed: insufficient credits'],
+    ['model_missing', 'No model is available for this run'],
+    ['wrapper_error_after_activity', 'Wrapper failed after agent activity'],
+  ] as const)(
+    'keeps the %s diagnostic ahead of assistant reason wording',
+    async (failureCode, expectedDiagnostic) => {
+      const reports: CloudAgentQueueReport[] = [];
+      await emitRunStateReport({
+        queue: { send: async report => void reports.push(report) },
+        cloudAgentSessionId: 'agent_report',
+        state: {
+          ...state,
+          failureCode,
+          assistantFailureReason: 'timeout',
+          safeFailureMessage: 'Authorization: Bearer safe-message-secret',
+        },
+      });
+
+      expect(reports[0]?.run.diagnostic?.errorMessageRedacted).toBe(expectedDiagnostic);
+      expect(JSON.stringify(reports)).not.toContain('safe-message-secret');
+    }
+  );
+
+  it.each([
+    'Insufficient credits',
+    '  Insufficient credits: PAYMENT_REQUIRED  ',
+    'Insufficient credits: insufficient_funds',
+    'Payment Required',
+  ])('keeps the exact legacy credit fallback ahead of assistant reasons: %s', async error => {
+    const reports: CloudAgentQueueReport[] = [];
+    await emitRunStateReport({
+      queue: { send: async report => void reports.push(report) },
+      cloudAgentSessionId: 'agent_report',
+      state: {
+        ...state,
+        failureCode: 'assistant_error',
+        assistantFailureReason: 'timeout',
+        error,
+      },
+    });
+
+    expect(reports[0]?.run.diagnostic?.errorMessageRedacted).toBe(
+      'Model request failed: insufficient credits'
+    );
+  });
 
   it('attributes an absent model chosen by managed auto-routing to platform configuration', async () => {
     const reports: CloudAgentQueueReport[] = [];

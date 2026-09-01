@@ -13,7 +13,9 @@ import {
 import type { SeedResult } from '../index';
 import {
   buildChildIngestItems,
+  buildChildPerformanceFixtures,
   buildEmptyIngestItems,
+  buildMobileSheetFixtureResult,
   buildRootIngestItems,
   buildUnsupportedIngestItems,
   CHILD_SESSION_ID,
@@ -21,8 +23,10 @@ import {
   EMPTY_SESSION_ID,
   EMPTY_SESSION_TITLE,
   expectedPartIdsFor,
+  fixtureCleanupSessionIds,
   fixtureSessionIds,
   parseSessionIngestServiceStatus,
+  pollForChildPerformanceFixture,
   ROOT_SESSION_ID,
   ROOT_SESSION_TITLE,
   UNSUPPORTED_SESSION_ID,
@@ -42,10 +46,15 @@ function printUsage(): void {
   console.log('Seeds deterministic mobile transcripts for sheet hit-area E2E.');
   console.log('Resets only the four fixture session IDs, then ingests history');
   console.log('through the local cloudflare-session-ingest worker.');
+  console.log('Use --child-performance to also reset and seed a separate tree');
+  console.log('with 24 direct children, paged history, and one nested child.');
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed app:mobile-sheet-fixtures ada@example.com');
   console.log('  pnpm -s dev:seed app:mobile-sheet-fixtures ada@example.com --json');
+  console.log(
+    '  pnpm -s dev:seed app:mobile-sheet-fixtures ada@example.com --child-performance --json'
+  );
 }
 
 function isValidEmail(email: string): boolean {
@@ -167,7 +176,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     return;
   }
 
-  const email = parseArgs(args);
+  const childPerformance = args.includes('--child-performance');
+  const email = parseArgs(args.filter(arg => arg !== '--child-performance'));
+  const performanceFixtures = childPerformance ? buildChildPerformanceFixtures() : [];
 
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret) {
@@ -229,41 +240,17 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
   const sessionIngestUrl = `http://localhost:${serviceStatus.port}`;
 
-  // Reset only the four fixture sessions (child first, then root, then the
-  // parentless unsupported and empty sessions) so reruns are idempotent and
-  // the parent FK is never violated.
-  await db
-    .delete(cli_sessions_v2)
-    .where(
-      and(
-        eq(cli_sessions_v2.kilo_user_id, user.userId),
-        eq(cli_sessions_v2.session_id, CHILD_SESSION_ID)
-      )
-    );
-  await db
-    .delete(cli_sessions_v2)
-    .where(
-      and(
-        eq(cli_sessions_v2.kilo_user_id, user.userId),
-        eq(cli_sessions_v2.session_id, ROOT_SESSION_ID)
-      )
-    );
-  await db
-    .delete(cli_sessions_v2)
-    .where(
-      and(
-        eq(cli_sessions_v2.kilo_user_id, user.userId),
-        eq(cli_sessions_v2.session_id, UNSUPPORTED_SESSION_ID)
-      )
-    );
-  await db
-    .delete(cli_sessions_v2)
-    .where(
-      and(
-        eq(cli_sessions_v2.kilo_user_id, user.userId),
-        eq(cli_sessions_v2.session_id, EMPTY_SESSION_ID)
-      )
-    );
+  // Reset only fixture IDs, with every descendant before its parent.
+  for (const sessionId of fixtureCleanupSessionIds(childPerformance)) {
+    await db
+      .delete(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.kilo_user_id, user.userId),
+          eq(cli_sessions_v2.session_id, sessionId)
+        )
+      );
+  }
 
   const remaining = await db
     .select({ sessionId: cli_sessions_v2.session_id })
@@ -271,7 +258,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     .where(
       and(
         eq(cli_sessions_v2.kilo_user_id, user.userId),
-        inArray(cli_sessions_v2.session_id, fixtureSessionIds())
+        inArray(cli_sessions_v2.session_id, fixtureSessionIds(childPerformance))
       )
     );
   if (remaining.length > 0) {
@@ -308,6 +295,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       title: EMPTY_SESSION_TITLE,
       created_on_platform: 'cli',
     },
+    ...performanceFixtures.map(fixture => ({
+      session_id: fixture.sessionId,
+      kilo_user_id: user.userId,
+      title: fixture.title,
+      parent_session_id: fixture.parentId,
+      created_on_platform: 'cli',
+      git_url: fixture.parentId === undefined ? rootGitUrl : undefined,
+    })),
   ] satisfies Array<typeof cli_sessions_v2.$inferInsert>;
 
   await db.insert(cli_sessions_v2).values(rows);
@@ -321,23 +316,31 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     buildUnsupportedIngestItems()
   );
   await ingestSession(sessionIngestUrl, EMPTY_SESSION_ID, token, buildEmptyIngestItems());
+  for (const fixture of performanceFixtures) {
+    await ingestSession(sessionIngestUrl, fixture.sessionId, token, fixture.items);
+  }
 
   await pollForParts(sessionIngestUrl, ROOT_SESSION_ID, token);
   await pollForParts(sessionIngestUrl, CHILD_SESSION_ID, token);
+  for (const fixture of performanceFixtures) {
+    await pollForChildPerformanceFixture(sessionIngestUrl, token, fixture);
+  }
 
   console.log('');
   console.log('Seeded four mobile transcripts for sheet hit-area E2E.');
+  if (childPerformance) {
+    console.log('Also seeded a performance tree with 24 direct children and one nested child.');
+  }
   console.log('All fixtures are read-only history: no cloud-agent session ID is set.');
 
-  return {
-    userId: user.userId,
-    email: user.email,
-    rootSessionId: ROOT_SESSION_ID,
-    childSessionId: CHILD_SESSION_ID,
-    unsupportedSessionId: UNSUPPORTED_SESSION_ID,
-    emptySessionId: EMPTY_SESSION_ID,
-    usedRepository,
-    sessionIngestPort: serviceStatus.port,
-    sessionIngestUrl,
-  };
+  return buildMobileSheetFixtureResult(
+    {
+      userId: user.userId,
+      email: user.email,
+      usedRepository,
+      sessionIngestPort: serviceStatus.port,
+      sessionIngestUrl,
+    },
+    childPerformance
+  );
 }

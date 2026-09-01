@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "Прикачените датотеки што не се приложени кон испратени пораки ќе бидат избришани.",
       "discardAttachmentsTitle": "Да се отфрлат прилозите?",
       "charactersRemaining": "Преостануваат {{count}} знаци",
-      "insertNewline": "Вметнете нов ред",
-      "starterChipBuild": "Изгради функционалност",
-      "starterChipEmpty": "Започни со идеја",
-      "starterChipFix": "Поправи грешка",
-      "starterChipPrepare": "Постави ја мојата околина",
-      "starterChipWrapUp": "Заврши ја мојата сесија",
-      "starterChipWriteTests": "Напиши тестови"
+      "insertNewline": "Вметнете нов ред"
     },
     "chatLink": {
       "linkCopied": "Линкот е копиран",

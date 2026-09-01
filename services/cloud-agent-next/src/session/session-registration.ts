@@ -16,6 +16,7 @@
  */
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
+import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
 import {
@@ -165,6 +166,7 @@ type SessionEstablishmentFailure =
   | { stage: 'transport'; code: 'do_rpc_outcome_unknown' };
 
 type NewSessionAllocation = SessionRegistrationResult & {
+  reportingCreatedAt?: string;
   credentialContainment: CredentialContainment;
   sessionService: SessionService;
   rollbackCliSession: () => Promise<void>;
@@ -449,6 +451,10 @@ async function allocateNewSession(
     sessionPlaneForNewOwner(ctx.env, { userId: ctx.userId, orgId })
   );
   const kiloSessionId = generateKiloSessionId();
+  const reportingCreatedAt =
+    input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
+      ? new Date().toISOString()
+      : undefined;
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
 
   try {
@@ -465,6 +471,7 @@ async function allocateNewSession(
         cloudAgentSessionId,
         kiloSessionId,
         ...(initialTurn ? { initialMessageId: initialTurn.messageId } : {}),
+        ...(reportingCreatedAt ? { reportingCreatedAt } : {}),
         [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
       });
     }
@@ -643,6 +650,7 @@ async function allocateNewSession(
     sandboxRoute,
     sandboxProvider,
     initialTurn,
+    reportingCreatedAt,
     credentialContainment,
     sessionService,
     rollbackCliSession: async () => {
@@ -687,8 +695,14 @@ function rebuildCloneAllocation(
   const sandboxId = canonical.sandboxId;
   const sandboxProvider = canonical.sandboxProvider;
   const sandboxRoute = canonical.sandboxRoute;
+  const reportingCreatedAt = z
+    .string()
+    .datetime({ offset: true })
+    .optional()
+    .safeParse(canonical.reportingCreatedAt);
 
   if (
+    !reportingCreatedAt.success ||
     typeof cloudAgentSessionId !== 'string' ||
     cloudAgentSessionId.length === 0 ||
     typeof kiloSessionId !== 'string' ||
@@ -732,6 +746,10 @@ function rebuildCloneAllocation(
     sandboxRoute: route,
     sandboxProvider,
     initialTurn,
+    reportingCreatedAt:
+      !initialTurn && cloudAgentSessionId.startsWith('agent_')
+        ? reportingCreatedAt.data
+        : undefined,
     credentialContainment: computeCredentialContainment(input, ctx),
     sessionService,
     rollbackCliSession: async () => {
@@ -774,7 +792,14 @@ function buildSessionRegistrationCommand(
       kiloSessionId: allocation.kiloSessionId,
       kilocodeToken: ctx.authToken,
     },
-    clone: input.clone,
+    clone: input.clone
+      ? {
+          cloneFromKiloSessionId: input.clone.cloneFromKiloSessionId,
+          ...(allocation.reportingCreatedAt
+            ? { reportingCreatedAt: allocation.reportingCreatedAt }
+            : {}),
+        }
+      : undefined,
     ...(allocation.initialTurn
       ? {
           message: {

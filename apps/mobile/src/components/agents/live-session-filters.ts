@@ -7,15 +7,18 @@ import {
 
 /** The part of an active session the live filters read. */
 export type LiveFilterSession = {
+  id?: string;
   title?: string;
   gitUrl?: string | null;
+  gitBranch?: string;
   createdOnPlatform?: string;
+  associatedPr?: { number?: number; title?: string | null } | null;
 };
 
 export type LiveSessionQuery = {
   platformFilter: readonly string[];
   projectFilter: readonly string[];
-  /** Free text, matched against the session title and its repository. */
+  /** Free text, matched against the session title and metadata. */
   searchQuery: string;
 };
 
@@ -74,12 +77,15 @@ export function buildLiveFilterOptions(sessions: readonly LiveFilterSession[]): 
 }
 
 function matchesSearch(session: LiveFilterSession, needle: string): boolean {
-  if (session.title?.toLowerCase().includes(needle)) {
-    return true;
-  }
-  return session.gitUrl
-    ? formatGitUrlProject(session.gitUrl).toLowerCase().includes(needle)
-    : false;
+  return [
+    session.title,
+    session.id,
+    session.gitUrl,
+    session.gitUrl ? formatGitUrlProject(session.gitUrl) : undefined,
+    session.gitBranch,
+    session.associatedPr?.title,
+    session.associatedPr?.number?.toString(),
+  ].some(value => value?.toLowerCase().includes(needle));
 }
 
 /**

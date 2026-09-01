@@ -266,48 +266,12 @@ describe('NewSessionPrompt initialPrompt seed', () => {
   });
 
   it.each(TEXT_DIRECTIONS)(
-    'preserves starter text and insertion in $direction',
-    async ({ isRTL, style }) => {
-      const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
-      layoutDirection.isRTL = isRTL;
-      let draft = '';
-      let started = false;
-      const element = renderPrompt({
-        ...defaultProps(),
-        onChangeText: text => {
-          draft = text;
-        },
-        onStartSession: () => {
-          started = true;
-        },
-      });
-      const chip = findElementByType(element, 'Pressable', 'Build a feature');
-      if (chip === null) {
-        throw new Error('starter chip not found');
-      }
-      expect(findElementByType(chip.children as Node, 'Text')).toMatchObject({
-        children: 'Build a feature',
-        className: 'text-sm font-normal text-muted-foreground',
-        style,
-      });
-      expect(findElementByType(element, 'Text', '100000 characters remaining')).toBeNull();
-
-      const onPress = chip.onPress as () => void;
-      onPress();
-
-      expect(draft).toBe('Build a feature');
-      expect(started).toBe(false);
-    }
-  );
-
-  it.each(TEXT_DIRECTIONS)(
     'shows the seeded counter and its accessible label only near the limit in $direction',
     async ({ isRTL, style }) => {
       const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
       layoutDirection.isRTL = isRTL;
       const shortSeed = renderPrompt({ ...defaultProps(), initialPrompt: 'hello' });
       expect(findElementByType(shortSeed, 'Text', '99995 characters remaining')).toBeNull();
-      expect(findElementByType(shortSeed, 'Pressable', 'Build a feature')).toBeNull();
 
       const element = renderPrompt({
         ...defaultProps(),
@@ -318,7 +282,6 @@ describe('NewSessionPrompt initialPrompt seed', () => {
         className: 'text-xs font-normal text-muted-foreground',
         style,
       });
-      expect(findElementByType(element, 'Pressable', 'Build a feature')).toBeNull();
     }
   );
 

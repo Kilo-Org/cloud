@@ -1,6 +1,11 @@
-// Pure fixture builders and status parsing for the mobile sheet transcript
-// seed. This module has no database or network side effects: the node test
-// imports it without a live stack.
+// Fixture builders, status parsing, and opt-in materialization polling.
+// Importing this module has no database or network side effects.
+import {
+  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+  kiloSdkMessageHistorySchema,
+} from '@kilocode/session-ingest-contracts';
+
+import type { SeedResult } from '../index';
 
 export const ROOT_SESSION_ID = 'ses_000000000001RootFixture001';
 export const CHILD_SESSION_ID = 'ses_000000000002ChildFixture01';
@@ -99,8 +104,14 @@ const CHILD_ASSISTANT_TOKENS: FixtureTokens = {
 };
 
 /** The exact session IDs this seed resets. Nothing else is touched. */
-export function fixtureSessionIds(): string[] {
-  return [ROOT_SESSION_ID, CHILD_SESSION_ID, UNSUPPORTED_SESSION_ID, EMPTY_SESSION_ID];
+export function fixtureSessionIds(childPerformance = false): string[] {
+  return [
+    ROOT_SESSION_ID,
+    CHILD_SESSION_ID,
+    UNSUPPORTED_SESSION_ID,
+    EMPTY_SESSION_ID,
+    ...(childPerformance ? PERFORMANCE_SESSION_IDS : []),
+  ];
 }
 
 /** Part IDs that must appear in the materialized history for a fixture session. */
@@ -190,6 +201,7 @@ export function buildToolPartItem(params: {
   messageId: string;
   callId: string;
   tool: string;
+  status?: 'completed' | 'running' | 'error';
   input: Record<string, unknown>;
   output: string;
   title: string;
@@ -206,14 +218,31 @@ export function buildToolPartItem(params: {
       type: 'tool',
       callID: params.callId,
       tool: params.tool,
-      state: {
-        status: 'completed',
-        input: params.input,
-        output: params.output,
-        title: params.title,
-        metadata: params.metadata,
-        time: { start: params.start, end: params.end },
-      },
+      state:
+        params.status === 'running'
+          ? {
+              status: 'running',
+              input: params.input,
+              title: params.title,
+              metadata: params.metadata,
+              time: { start: params.start },
+            }
+          : params.status === 'error'
+            ? {
+                status: 'error',
+                input: params.input,
+                error: params.output,
+                metadata: params.metadata,
+                time: { start: params.start, end: params.end },
+              }
+            : {
+                status: 'completed',
+                input: params.input,
+                output: params.output,
+                title: params.title,
+                metadata: params.metadata,
+                time: { start: params.start, end: params.end },
+              },
     },
   };
 }
@@ -363,6 +392,299 @@ export function buildEmptyIngestItems(): SessionIngestItem[] {
       title: EMPTY_SESSION_TITLE,
     }),
   ];
+}
+
+export const PERFORMANCE_ROOT_SESSION_ID = 'ses_000000000006ChildPerfRoot1';
+export const SELECTED_CHILD_SESSION_ID = 'ses_000000000007ChildPerf00001';
+export const EMPTY_CHILD_SESSION_ID = 'ses_000000000007ChildPerf00024';
+export const NESTED_CHILD_SESSION_ID = 'ses_000000000008ChildPerfNest1';
+
+const PERFORMANCE_CHILD_IDS = Array.from(
+  { length: 24 },
+  (_, index) => `ses_000000000007ChildPerf${String(index + 1).padStart(5, '0')}`
+);
+const PERFORMANCE_SESSION_IDS = [
+  PERFORMANCE_ROOT_SESSION_ID,
+  ...PERFORMANCE_CHILD_IDS,
+  NESTED_CHILD_SESSION_ID,
+];
+
+export type ChildPerformanceFixture = {
+  sessionId: string;
+  parentId?: string;
+  title: string;
+  messageCount: number;
+  items: SessionIngestItem[];
+};
+
+/** Children precede their parents; the default reset order stays unchanged. */
+export function fixtureCleanupSessionIds(childPerformance = false): string[] {
+  return [
+    ...(childPerformance ? [...PERFORMANCE_SESSION_IDS].reverse() : []),
+    CHILD_SESSION_ID,
+    ROOT_SESSION_ID,
+    UNSUPPORTED_SESSION_ID,
+    EMPTY_SESSION_ID,
+  ];
+}
+
+export function buildMobileSheetFixtureResult(
+  context: {
+    userId: string;
+    email: string;
+    usedRepository: string;
+    sessionIngestPort: number;
+    sessionIngestUrl: string;
+  },
+  childPerformance = false
+): SeedResult {
+  return {
+    userId: context.userId,
+    email: context.email,
+    rootSessionId: ROOT_SESSION_ID,
+    childSessionId: CHILD_SESSION_ID,
+    unsupportedSessionId: UNSUPPORTED_SESSION_ID,
+    emptySessionId: EMPTY_SESSION_ID,
+    usedRepository: context.usedRepository,
+    sessionIngestPort: context.sessionIngestPort,
+    sessionIngestUrl: context.sessionIngestUrl,
+    ...(childPerformance
+      ? {
+          performanceRootSessionId: PERFORMANCE_ROOT_SESSION_ID,
+          performanceChildSessionIds: PERFORMANCE_CHILD_IDS.join(','),
+          selectedChildSessionId: SELECTED_CHILD_SESSION_ID,
+          nestedChildSessionId: NESTED_CHILD_SESSION_ID,
+          emptyChildSessionId: EMPTY_CHILD_SESSION_ID,
+          performanceChildCount: PERFORMANCE_CHILD_IDS.length,
+          ordinaryChildMessageCount: 12,
+          pagedChildMessageCount: 120,
+        }
+      : {}),
+  };
+}
+
+/** A separate tree keeps default fixtures unchanged, even after an opt-in run. */
+export function buildChildPerformanceFixtures(): ChildPerformanceFixture[] {
+  const sessions = [
+    {
+      sessionId: PERFORMANCE_ROOT_SESSION_ID,
+      parentId: undefined,
+      title: 'Child performance fixtures',
+      messageCount: 2,
+    },
+    ...PERFORMANCE_CHILD_IDS.map((sessionId, index) => ({
+      sessionId,
+      parentId: PERFORMANCE_ROOT_SESSION_ID,
+      title:
+        sessionId === EMPTY_CHILD_SESSION_ID
+          ? 'Empty child performance fixture'
+          : `Inspect performance child ${String(index + 1).padStart(2, '0')}`,
+      messageCount:
+        sessionId === EMPTY_CHILD_SESSION_ID
+          ? 0
+          : sessionId === SELECTED_CHILD_SESSION_ID
+            ? 120
+            : 12,
+    })),
+    {
+      sessionId: NESTED_CHILD_SESSION_ID,
+      parentId: SELECTED_CHILD_SESSION_ID,
+      title: 'Inspect nested performance child',
+      messageCount: 120,
+    },
+  ];
+
+  return sessions.map((session, sessionIndex) => {
+    const messageIdFor = (index: number) =>
+      `msg${session.sessionId.slice(4)}${String(index).padStart(4, '0')}`;
+    const messages: SessionIngestItem[] = [];
+    const parts: SessionIngestItem[] = [];
+    for (let index = 1; index <= session.messageCount; index += 1) {
+      const createdAt = FIXTURE_TIME_CREATED + index * 1_000;
+      const messageId = messageIdFor(index);
+      messages.push(
+        index % 2 === 1
+          ? buildUserMessageItem({ messageId, sessionId: session.sessionId, createdAt })
+          : buildAssistantMessageItem({
+              messageId,
+              sessionId: session.sessionId,
+              parentId: messageIdFor(index - 1),
+              createdAt,
+              completedAt: createdAt + 200,
+              cost: CHILD_ASSISTANT_COST,
+              tokens: CHILD_ASSISTANT_TOKENS,
+            })
+      );
+      parts.push({
+        type: 'part',
+        data: {
+          id: `prt${session.sessionId.slice(4)}${String(index).padStart(4, '0')}`,
+          sessionID: session.sessionId,
+          messageID: messageId,
+          type: 'text',
+          text: [
+            session.title,
+            '',
+            `Synthetic ${index % 2 === 1 ? 'user' : 'assistant'} message ${index} of ${session.messageCount}.`,
+            'This deterministic transcript contains no repository or user data.',
+            `Read-only fixture marker A: ${index}.`,
+            `Read-only fixture marker B: ${index}.`,
+            `Read-only fixture marker C: ${index}.`,
+          ].join('\n'),
+        },
+      });
+    }
+
+    const children = sessions.filter(child => child.parentId === session.sessionId);
+    for (const [index, child] of children.entries()) {
+      const status =
+        child.sessionId === EMPTY_CHILD_SESSION_ID || index % 3 === 0
+          ? 'completed'
+          : index % 3 === 1
+            ? 'running'
+            : 'error';
+      parts.push(
+        buildToolPartItem({
+          partId: `prtTask${child.sessionId.slice(4)}`,
+          sessionId: session.sessionId,
+          messageId: messageIdFor(session.messageCount),
+          callId: `callTask${child.sessionId.slice(4)}`,
+          tool: 'task',
+          status,
+          input: {
+            subagent_type: 'Explorer',
+            description: child.title,
+            prompt: `Inspect synthetic fixture ${child.sessionId}.`,
+          },
+          output: status === 'error' ? 'Synthetic task failure.' : 'Synthetic task completed.',
+          title: child.title,
+          metadata: { sessionId: child.sessionId },
+          start: FIXTURE_TIME_CREATED + session.messageCount * 1_000,
+          end: FIXTURE_TIME_CREATED + session.messageCount * 1_000 + 200,
+        })
+      );
+    }
+
+    return {
+      ...session,
+      items: [
+        buildSessionItem({
+          sessionId: session.sessionId,
+          parentId: session.parentId,
+          title: session.title,
+          slug: `child-performance-${sessionIndex}`,
+        }),
+        ...messages,
+        ...parts,
+      ],
+    };
+  });
+}
+
+/** Walk each real cursor; a successful empty page is distinct from pending history. */
+export async function pollForChildPerformanceFixture(
+  baseUrl: string,
+  token: string,
+  fixture: ChildPerformanceFixture
+): Promise<void> {
+  const expectedMessages = fixture.items.flatMap(item =>
+    item.type === 'message' && typeof item.data.id === 'string' ? [item.data.id] : []
+  );
+  const expectedParts = fixture.items.flatMap(item =>
+    item.type === 'part' && typeof item.data.id === 'string' ? [item.data.id] : []
+  );
+  const deadline = Date.now() + 30_000;
+
+  for (;;) {
+    const seenMessages = new Set<string>();
+    const seenParts = new Set<string>();
+    const cursors = new Set<string>();
+    let before: string | undefined;
+    let hasHistory = true;
+    let hasOlder = false;
+    do {
+      const query = new URLSearchParams({ limit: String(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE) });
+      if (before !== undefined) query.set('before', before);
+      const response = await fetch(
+        `${baseUrl}/api/session/${fixture.sessionId}/messages?${query}`,
+        {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`Messages read of ${fixture.sessionId} failed (${response.status})`);
+      }
+      if (response.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') {
+        throw new Error(`Messages read of ${fixture.sessionId} did not return application/json`);
+      }
+      const payload: unknown = await response.json();
+      if (
+        !isRecord(payload) ||
+        payload.success !== true ||
+        payload.kiloSessionId !== fixture.sessionId
+      ) {
+        throw new Error(`Messages read of ${fixture.sessionId} returned an unexpected shape`);
+      }
+      if (payload.history === null) {
+        hasHistory = false;
+        break;
+      }
+      const parsed = kiloSdkMessageHistorySchema.safeParse(payload.history);
+      if (!parsed.success) {
+        throw new Error(
+          `Messages read of ${fixture.sessionId} returned an unexpected history shape`
+        );
+      }
+      const page = parsed.data;
+      if ('kind' in page) {
+        if (page.kind === 'retryable_failure') {
+          hasHistory = false;
+          break;
+        }
+        throw new Error(`session-ingest reported ${page.kind} for ${fixture.sessionId}`);
+      }
+      if (page.omittedItemCount !== 0) {
+        throw new Error(`session-ingest omitted fixture items for ${fixture.sessionId}`);
+      }
+      if (before === undefined) hasOlder = page.nextCursor !== null;
+      for (const message of page.messages) {
+        if (message.info.sessionID !== fixture.sessionId || seenMessages.has(message.info.id)) {
+          throw new Error(`Unexpected or duplicate message in ${fixture.sessionId}`);
+        }
+        seenMessages.add(message.info.id);
+        for (const part of message.parts) {
+          if (part.sessionID !== fixture.sessionId || part.messageID !== message.info.id) {
+            throw new Error(`Unexpected part relationship in ${fixture.sessionId}`);
+          }
+          seenParts.add(part.id);
+        }
+      }
+      before = page.nextCursor ?? undefined;
+      if (before !== undefined) {
+        if (!before || cursors.has(before)) {
+          throw new Error(`Invalid or repeated history cursor for ${fixture.sessionId}`);
+        }
+        cursors.add(before);
+      }
+    } while (before !== undefined);
+
+    if (
+      hasHistory &&
+      (expectedMessages.length <= DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE || hasOlder) &&
+      seenMessages.size === expectedMessages.length &&
+      expectedMessages.every(id => seenMessages.has(id)) &&
+      seenParts.size === expectedParts.length &&
+      expectedParts.every(id => seenParts.has(id))
+    ) {
+      return;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out waiting for complete child performance history of ${fixture.sessionId}`
+      );
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

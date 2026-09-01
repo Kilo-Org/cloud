@@ -2136,13 +2136,7 @@
       "discardAttachmentsMessage": "未附加到已发送消息的上传文件将被删除。",
       "discardAttachmentsTitle": "丢弃附件？",
       "charactersRemaining": "还可输入 {{count}} 个字符",
-      "insertNewline": "插入换行",
-      "starterChipBuild": "开发功能",
-      "starterChipEmpty": "从一个想法开始",
-      "starterChipFix": "修复错误",
-      "starterChipPrepare": "设置我的环境",
-      "starterChipWrapUp": "为我的会话收尾",
-      "starterChipWriteTests": "编写测试"
+      "insertNewline": "插入换行"
     },
     "chatLink": {
       "linkCopied": "链接已复制",

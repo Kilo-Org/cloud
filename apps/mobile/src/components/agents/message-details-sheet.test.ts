@@ -245,12 +245,30 @@ describe('getMessageDetailsContent — empty', () => {
     expect(content.copyableText).toBe('aborted');
   });
 
-  it('hides Copy when there is no copyable text', () => {
-    const message = storedMessage(userInfo(), []);
-    const content = getMessageDetailsContent(message, catalogOptions);
-    expect(content.copyableText).toBeNull();
-    expect(content.roleLabel).toBe('User');
-  });
+  it.each([
+    { name: 'empty', parts: [] },
+    {
+      name: 'file-only',
+      parts: [
+        {
+          id: 'file-1',
+          sessionID: 'ses-1',
+          messageID: 'u-1',
+          type: 'file',
+          mime: 'text/plain',
+          url: 'file:///attachment.txt',
+        },
+      ],
+    },
+  ] satisfies { name: string; parts: Part[] }[])(
+    'keeps user details without Copy for $name parts',
+    ({ parts }) => {
+      const message = storedMessage(userInfo(), parts);
+      const content = getMessageDetailsContent(message, catalogOptions);
+      expect(content.copyableText).toBeNull();
+      expect(content.roleLabel).toBe('User');
+    }
+  );
 
   it('hides Sent when the created timestamp is missing', () => {
     const info = userInfo({

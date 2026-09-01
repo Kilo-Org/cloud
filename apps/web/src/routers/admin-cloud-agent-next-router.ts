@@ -1,7 +1,7 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
-import { and, desc, eq, gte, isNotNull, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, lt, sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   CloudAgentFailureReasonSchema,
@@ -87,6 +87,9 @@ type HealthError = {
   responsibility: CloudAgentFailureResponsibility;
   reason: z.infer<typeof CloudAgentFailureReasonSchema>;
   count: number;
+  affectedSessions: number;
+  knownSandboxes: number;
+  sessionsWithoutSandbox: number;
 };
 
 function failureRate(failures: number, completed: number): number | null {
@@ -138,6 +141,8 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
           responsibility: sessionResponsibility,
           reason: sessionReason,
           count: sql<number>`COUNT(*)`,
+          knownSandboxes: sql<number>`COUNT(DISTINCT ${cloud_agent_sessions.sandbox_id})`,
+          sessionsWithoutSandbox: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_sessions.sandbox_id} IS NULL)`,
         })
         .from(cloud_agent_sessions)
         .where(
@@ -157,6 +162,9 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
           responsibility: runResponsibility,
           reason: runReason,
           count: sql<number>`COUNT(*)`,
+          affectedSessions: sql<number>`COUNT(DISTINCT ${cloud_agent_session_runs.cloud_agent_session_id})`,
+          knownSandboxes: sql<number>`COUNT(DISTINCT ${cloud_agent_sessions.sandbox_id})`,
+          sessionsWithoutSandbox: sql<number>`COUNT(DISTINCT ${cloud_agent_session_runs.cloud_agent_session_id}) FILTER (WHERE ${cloud_agent_sessions.sandbox_id} IS NULL)`,
         })
         .from(cloud_agent_session_runs)
         .innerJoin(
@@ -187,7 +195,7 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
       platformFailureRate: null as number | null,
       allFailureRate: null as number | null,
     };
-    const setupErrorsByCode = new Map<string, HealthError>();
+    const setupErrors: HealthError[] = [];
     for (const setupRow of setupRows) {
       const occurrences = count(setupRow.count);
       summary.setupFailures += occurrences;
@@ -197,23 +205,20 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
       if (input.responsibility !== 'all' && setupRow.responsibility !== input.responsibility) {
         continue;
       }
-      const key = `${setupRow.responsibility}:${setupRow.reason}:${setupRow.stage}:${setupRow.code}`;
-      const existingError = setupErrorsByCode.get(key);
-      if (existingError) {
-        existingError.count += occurrences;
-      } else {
-        setupErrorsByCode.set(key, {
-          source: 'setup',
-          stage: setupRow.stage,
-          code: setupRow.code,
-          responsibility: setupRow.responsibility,
-          reason: setupRow.reason,
-          count: occurrences,
-        });
-      }
+      setupErrors.push({
+        source: 'setup',
+        stage: setupRow.stage,
+        code: setupRow.code,
+        responsibility: setupRow.responsibility,
+        reason: setupRow.reason,
+        count: occurrences,
+        affectedSessions: occurrences,
+        knownSandboxes: count(setupRow.knownSandboxes),
+        sessionsWithoutSandbox: count(setupRow.sessionsWithoutSandbox),
+      });
     }
-    const topErrors = [
-      ...setupErrorsByCode.values(),
+    const errors = [
+      ...setupErrors,
       ...runErrorRows.map(
         runRow =>
           ({
@@ -223,24 +228,30 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
             responsibility: runRow.responsibility,
             reason: runRow.reason,
             count: count(runRow.count),
+            affectedSessions: count(runRow.affectedSessions),
+            knownSandboxes: count(runRow.knownSandboxes),
+            sessionsWithoutSandbox: count(runRow.sessionsWithoutSandbox),
           }) satisfies HealthError
       ),
-    ]
-      .sort(
-        (left, right) =>
-          right.count - left.count ||
-          left.source.localeCompare(right.source) ||
-          left.stage.localeCompare(right.stage) ||
-          left.code.localeCompare(right.code) ||
-          left.reason.localeCompare(right.reason)
-      )
-      .slice(0, 10);
+    ].sort(
+      (left, right) =>
+        right.count - left.count ||
+        left.source.localeCompare(right.source) ||
+        left.stage.localeCompare(right.stage) ||
+        left.code.localeCompare(right.code) ||
+        left.reason.localeCompare(right.reason)
+    );
+    const topErrors = errors.slice(0, 10);
+    const errorTotals = {
+      groups: errors.length,
+      events: errors.reduce((total, error) => total + error.count, 0),
+    };
     summary.platformFailureRate = failureRate(summary.platformFailures, summary.completedRuns);
     summary.allFailureRate = failureRate(
       summary.failedRuns + summary.setupFailures,
       summary.completedRuns
     );
-    return { summary, topErrors };
+    return { summary, topErrors, errorTotals };
   }),
 
   listHealthErrorSessions: adminProcedure
@@ -266,6 +277,12 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
             .select({
               cloudAgentSessionId: cloud_agent_sessions.cloud_agent_session_id,
               kiloSessionId: cloud_agent_sessions.kilo_session_id,
+              sandboxId: cloud_agent_sessions.sandbox_id,
+              messageId: cloud_agent_sessions.initial_message_id,
+              diagnostic: sql<
+                string | null
+              >`CASE WHEN ${cloud_agent_sessions.error_expires_at} > now() THEN ${cloud_agent_sessions.error_message_redacted} ELSE NULL END`,
+              diagnosticExpiresAt: cloud_agent_sessions.error_expires_at,
               occurredAt: cloud_agent_sessions.failure_at,
             })
             .from(cloud_agent_sessions)
@@ -282,35 +299,60 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
           rows: rows.map(row => ({
             cloudAgentSessionId: row.cloudAgentSessionId,
             kiloSessionId: row.kiloSessionId,
+            sandboxId: row.sandboxId,
+            messageId: row.messageId,
+            wrapperRunId: null,
+            diagnostic: row.diagnostic,
+            diagnosticExpiresAt: nullableIso(row.diagnosticExpiresAt),
             occurredAt: nullableIso(row.occurredAt),
+            lastSeen: nullableIso(row.occurredAt),
             matchingEvents: 1,
           })),
         };
       }
 
-      const classifiedFailureCondition =
-        and(
-          sql`${cloud_agent_session_runs.failure_stage} = ${input.stage}`,
-          sql`${cloud_agent_session_runs.failure_code} = ${input.code}`
-        ) ?? sql`false`;
-      const selectedFailureCondition =
-        input.stage === 'unknown' && input.code === 'unclassified'
-          ? (or(
-              and(
-                isNull(cloud_agent_session_runs.failure_stage),
-                isNull(cloud_agent_session_runs.failure_code)
-              ),
-              classifiedFailureCondition
-            ) ?? sql`false`)
-          : classifiedFailureCondition;
       const where = and(
         eq(cloud_agent_session_runs.status, 'failed'),
-        selectedFailureCondition,
+        sql`COALESCE(${cloud_agent_session_runs.failure_stage}, 'unknown') = ${input.stage}`,
+        sql`COALESCE(${cloud_agent_session_runs.failure_code}, 'unclassified') = ${input.code}`,
         sql`COALESCE(${cloud_agent_session_runs.failure_responsibility}, 'unknown') = ${input.responsibility}`,
         sql`COALESCE(${cloud_agent_session_runs.failure_reason}, 'unclassified') = ${input.reason}`,
         ...terminalRunIntervalConditions(input)
       );
-      const latestOccurredAt = sql<string>`MAX(${cloud_agent_session_runs.terminal_at})`;
+      const latestMatchingRuns = db
+        .selectDistinctOn([cloud_agent_session_runs.cloud_agent_session_id], {
+          cloudAgentSessionId: cloud_agent_session_runs.cloud_agent_session_id,
+          kiloSessionId: cloud_agent_sessions.kilo_session_id,
+          sandboxId: cloud_agent_sessions.sandbox_id,
+          messageId: cloud_agent_session_runs.message_id,
+          wrapperRunId: cloud_agent_session_runs.wrapper_run_id,
+          diagnostic: sql<
+            string | null
+          >`CASE WHEN ${cloud_agent_session_runs.error_expires_at} > now() THEN ${cloud_agent_session_runs.error_message_redacted} ELSE NULL END`.as(
+            'diagnostic'
+          ),
+          diagnosticExpiresAt: cloud_agent_session_runs.error_expires_at,
+          occurredAt: cloud_agent_session_runs.terminal_at,
+          matchingEvents:
+            sql<number>`COUNT(*) OVER (PARTITION BY ${cloud_agent_session_runs.cloud_agent_session_id})`.as(
+              'matching_events'
+            ),
+        })
+        .from(cloud_agent_session_runs)
+        .innerJoin(
+          cloud_agent_sessions,
+          eq(
+            cloud_agent_session_runs.cloud_agent_session_id,
+            cloud_agent_sessions.cloud_agent_session_id
+          )
+        )
+        .where(where)
+        .orderBy(
+          cloud_agent_session_runs.cloud_agent_session_id,
+          desc(cloud_agent_session_runs.terminal_at),
+          desc(cloud_agent_session_runs.message_id)
+        )
+        .as('latest_matching_runs');
       const [totals, rows] = await Promise.all([
         db
           .select({
@@ -326,26 +368,12 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
           )
           .where(where),
         db
-          .select({
-            cloudAgentSessionId: cloud_agent_sessions.cloud_agent_session_id,
-            kiloSessionId: cloud_agent_sessions.kilo_session_id,
-            occurredAt: latestOccurredAt,
-            matchingEvents: sql<number>`COUNT(*)`,
-          })
-          .from(cloud_agent_session_runs)
-          .innerJoin(
-            cloud_agent_sessions,
-            eq(
-              cloud_agent_session_runs.cloud_agent_session_id,
-              cloud_agent_sessions.cloud_agent_session_id
-            )
+          .select()
+          .from(latestMatchingRuns)
+          .orderBy(
+            desc(latestMatchingRuns.occurredAt),
+            desc(latestMatchingRuns.cloudAgentSessionId)
           )
-          .where(where)
-          .groupBy(
-            cloud_agent_sessions.cloud_agent_session_id,
-            cloud_agent_sessions.kilo_session_id
-          )
-          .orderBy(desc(latestOccurredAt), desc(cloud_agent_sessions.cloud_agent_session_id))
           .limit(HEALTH_ERROR_SESSION_LIMIT),
       ]);
       return {
@@ -354,7 +382,13 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
         rows: rows.map(row => ({
           cloudAgentSessionId: row.cloudAgentSessionId,
           kiloSessionId: row.kiloSessionId,
+          sandboxId: row.sandboxId,
+          messageId: row.messageId,
+          wrapperRunId: row.wrapperRunId,
+          diagnostic: row.diagnostic,
+          diagnosticExpiresAt: nullableIso(row.diagnosticExpiresAt),
           occurredAt: nullableIso(row.occurredAt),
+          lastSeen: nullableIso(row.occurredAt),
           matchingEvents: count(row.matchingEvents),
         })),
       };

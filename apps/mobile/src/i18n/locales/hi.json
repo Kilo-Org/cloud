@@ -2102,13 +2102,7 @@
       "discardAttachmentsMessage": "भेजे गए संदेशों से न जुड़ी अपलोड की गई फ़ाइलें हटा दी जाएँगी।",
       "discardAttachmentsTitle": "संलग्नक ख़ारिज करें?",
       "charactersRemaining": "{{count}} अक्षर शेष",
-      "insertNewline": "नई पंक्ति डालें",
-      "starterChipBuild": "एक सुविधा बनाओ",
-      "starterChipEmpty": "एक विचार से शुरू करो",
-      "starterChipFix": "एक त्रुटि ठीक करो",
-      "starterChipPrepare": "मेरा परिवेश तैयार करो",
-      "starterChipWrapUp": "मेरा सत्र समाप्त करो",
-      "starterChipWriteTests": "परीक्षण लिखो"
+      "insertNewline": "नई पंक्ति डालें"
     },
     "chatLink": {
       "linkCopied": "लिंक कॉपी किया गया",

@@ -38,6 +38,7 @@ import {
   classifyAssistantFailure,
   classifyAssistantFailureMessage,
   isAssistantInterrupt,
+  projectSafeAssistantError,
 } from '../session/safe-failure-projection.js';
 import { parseModelNotFoundRuntimeDiagnostics } from '../shared/runtime-model-diagnostics.js';
 import {
@@ -135,7 +136,7 @@ function sanitizeKilocodeEventData(data: unknown): unknown {
         ...properties,
         info: {
           ...info,
-          error: classifyAssistantFailureMessage(info.error),
+          error: projectSafeAssistantError(info.error),
         },
       },
     };
@@ -796,27 +797,28 @@ export function createIngestHandler(
           if (eventName === 'message.updated') {
             const properties = data.properties as Record<string, unknown> | undefined;
             const info = properties?.info as Record<string, unknown> | undefined;
-            const assistantError = getAssistantErrorMessage(info?.error);
+            const assistantError = info?.error;
+            const assistantErrorMessage = getAssistantErrorMessage(assistantError);
             const parentMessageId =
               info?.role === 'assistant' && typeof info.parentID === 'string'
                 ? info.parentID
                 : undefined;
             if (parentMessageId !== undefined) {
               await doContext.observeCorrelatedAgentActivity?.(parentMessageId);
-              if (info?.error !== undefined && isAssistantInterrupt(info.error)) {
+              if (assistantError !== undefined && isAssistantInterrupt(assistantError)) {
                 await doContext.terminalizeSessionMessageOnce(
                   parentMessageId,
                   {
                     kind: 'interrupted',
                     assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
-                    error: assistantError ?? 'The message was interrupted by the user',
+                    error: assistantErrorMessage ?? 'The message was interrupted by the user',
                     failureStage: 'interruption',
                     failureCode: 'user_interrupt',
                     completionSource: 'interrupt',
                   },
                   wrapperRunId
                 );
-              } else if (assistantError !== undefined) {
+              } else if (assistantErrorMessage !== undefined) {
                 const assistantFailure = classifyAssistantFailure(assistantError);
                 await doContext.terminalizeSessionMessageOnce(
                   parentMessageId,
@@ -824,7 +826,7 @@ export function createIngestHandler(
                     kind: 'failed',
                     assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
                     reason: 'assistant_error',
-                    error: assistantError,
+                    error: assistantErrorMessage,
                     failureStage: 'agent_activity',
                     failureCode: assistantFailure.terminalCode ?? 'assistant_error',
                     assistantFailureReason: assistantFailure.reason,

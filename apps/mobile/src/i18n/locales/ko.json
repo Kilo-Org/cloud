@@ -2136,13 +2136,7 @@
       "discardAttachmentsMessage": "보낸 메시지에 첨부되지 않은 업로드 파일이 삭제됩니다.",
       "discardAttachmentsTitle": "첨부 파일을 삭제할까요?",
       "charactersRemaining": "{{count}}자 남음",
-      "insertNewline": "줄바꿈 삽입",
-      "starterChipBuild": "기능을 구현해",
-      "starterChipEmpty": "아이디어로 시작해",
-      "starterChipFix": "버그를 고쳐",
-      "starterChipPrepare": "내 환경을 설정해",
-      "starterChipWrapUp": "내 세션을 마무리해",
-      "starterChipWriteTests": "테스트를 작성해"
+      "insertNewline": "줄바꿈 삽입"
     },
     "chatLink": {
       "linkCopied": "링크 복사됨",

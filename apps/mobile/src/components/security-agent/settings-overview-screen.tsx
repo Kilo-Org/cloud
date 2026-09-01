@@ -8,6 +8,7 @@ import { Switch, View } from 'react-native';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -15,6 +16,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import {
+  useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
   useSecurityAgentRepositories,
@@ -49,8 +51,6 @@ function SettingsOverviewSkeleton() {
   );
 }
 
-type SettingsOverviewPresentation = 'inline' | 'route';
-
 function getDisabledCopy(canManage: boolean, hasEffectiveRepo: boolean): string {
   if (!canManage) {
     return i18n.t('securityAgent.settingsOverview.disabledNoManage');
@@ -64,15 +64,21 @@ function getDisabledCopy(canManage: boolean, hasEffectiveRepo: boolean): string 
 export function SettingsOverviewScreen({
   scope,
   presentation = 'inline',
-}: Readonly<{ scope: string; presentation?: SettingsOverviewPresentation }>) {
+  permissionError = false,
+}: Readonly<{
+  scope: string;
+  presentation?: 'inline' | 'route';
+  permissionError?: boolean;
+}>) {
   const router = useRouter();
   const { t } = useTranslation();
   const config = useSecurityAgentConfig(scope);
   const capability = useSecurityAgentCapability(scope);
-  const committedConnectivity = useCommittedConnectivityStatus();
+  const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
   const setEnabled = useSetSecurityAgentEnabled(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const repositories = useSecurityAgentRepositories(scope);
+  const recovery = useRetrySecurityAgentSettings(scope);
 
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
@@ -89,25 +95,36 @@ export function SettingsOverviewScreen({
     trackRef.current({ interaction: 'settings_config_viewed' });
   }, []);
 
-  if (
+  // A successful probe can confirm online while NetInfo still pauses queries.
+  const configUnavailable =
     !config.data &&
-    (config.isError || (config.fetchStatus === 'paused' && committedConnectivity === 'offline'))
-  ) {
-    return (
-      <PlatformErrorScreen
-        title={t('securityAgent.settingsOverview.title')}
-        variant="offline"
-        message={t('securityAgent.settingsOverview.couldNotLoadSettings')}
-        onRetry={() => void config.refetch()}
-      />
-    );
+    (recovery.isRetrying ||
+      config.isError ||
+      (config.fetchStatus === 'paused' && isConnectivityKnown));
+  const capabilityUnavailable =
+    capability.status === 'error' ||
+    (capability.status === 'loading' &&
+      (recovery.isRetrying || (capability.fetchStatus === 'paused' && isConnectivityKnown)));
+  const repositoriesLoading = repositories.isLoading || recovery.isRetrying;
+  const repositoriesError =
+    repositories.isError ||
+    (!repositories.data && repositories.fetchStatus === 'paused' && isConnectivityKnown);
+  let recoveryError: string | undefined = undefined;
+  if (configUnavailable || config.isError) {
+    recoveryError = t('securityAgent.settingsOverview.couldNotLoadSettings');
+  } else if (capabilityUnavailable || permissionError || capability.isError) {
+    recoveryError = t('securityAgent.settingsOverview.couldNotLoadPermissions');
+  } else if (repositoriesError) {
+    recoveryError = t('securityAgent.settingsOverview.couldNotLoadRepositories');
   }
-  if (capability.status === 'error') {
+  if (configUnavailable || capabilityUnavailable) {
     return (
       <PlatformErrorScreen
         title={t('securityAgent.settingsOverview.title')}
-        message={t('securityAgent.settingsOverview.couldNotLoadPermissions')}
-        onRetry={() => void capability.refetch()}
+        variant={configUnavailable ? 'offline' : 'server'}
+        message={recoveryError}
+        onRetry={() => void recovery.retry()}
+        isRetrying={recovery.isRetrying}
       />
     );
   }
@@ -116,11 +133,8 @@ export function SettingsOverviewScreen({
   }
 
   const data = config.data;
-  // Distinguish a settled-empty repo set from a still-loading or failed one:
-  // a loading or failed query must not read as "zero repositories".
+  // A loading or failed repository query must not read as zero repositories.
   const repositoriesEmpty = repositories.data?.length === 0;
-  const repositoriesLoading = repositories.isLoading;
-  const repositoriesError = repositories.isError;
   // An enable attempt with no effective repository would be refused by the
   // server, so the switch is disabled up front under the same rule: `selected`
   // mode with zero selected ids, or `all` mode with zero integration repos.
@@ -192,26 +206,20 @@ export function SettingsOverviewScreen({
   // needs to be reachable here too.
   const auditAction = capability.canManage ? <AuditReportButton scope={scope} /> : null;
 
-  // Render the disabled-agent copy in three states: a still-loading repo set
-  // (skeleton), a failed repo set (error + Retry), or a settled set (copy).
+  // Keep progress and Retry visible without hiding cached settings when any
+  // settings query fails, even if repositories recover during that attempt.
   const renderRepositoryStatus = () => {
-    if (data.repositorySelectionMode === 'all' && repositoriesLoading) {
-      return <Skeleton className="h-4 w-56 rounded" />;
-    }
-    if (data.repositorySelectionMode === 'all' && repositoriesError) {
+    if (recoveryError || recovery.isRetrying) {
       return (
-        <View className="flex-row items-center gap-2">
-          <Text variant="muted" className="text-xs">
-            {t('securityAgent.settingsOverview.couldNotLoadRepositories')}
-          </Text>
-          <Text
-            className="text-xs font-medium text-primary"
-            onPress={() => void repositories.refetch()}
-          >
-            {t('common.retry')}
-          </Text>
-        </View>
+        <SettingsRecoveryStatus
+          message={recoveryError}
+          isRetrying={recovery.isRetrying}
+          onRetry={() => void recovery.retry()}
+        />
       );
+    }
+    if (repositoriesLoading) {
+      return <Skeleton className="h-4 w-56 rounded" />;
     }
     return (
       <Text variant="muted" className="text-xs">
@@ -249,7 +257,7 @@ export function SettingsOverviewScreen({
           )}
         </View>
 
-        {!data.isEnabled && (
+        {(!data.isEnabled || repositoriesLoading || recoveryError) && (
           <View className="gap-3">
             {renderRepositoryStatus()}
             {showRepoCta ? (

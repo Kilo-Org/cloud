@@ -2114,7 +2114,9 @@
     "sessionExited": "सत्र बाहेर पडले",
     "remoteSpawnRetryable": "उदाहरणापर्यंत पोहोचता आले नाही — ते डिस्कनेक्ट झाले असावे.",
     "remoteSpawnNonRetryable": "उदाहरण सत्र सुरू करू शकले नाही — मशीन तपासा किंवा CLI अद्यतनित करा.",
-    "remoteSpawnInstanceDisconnected": "निवडलेले उदाहरण डिस्कनेक्ट झाले. Cloud Agent वर सत्र सुरू करा किंवा दुसरे उदाहरण निवडा."
+    "remoteSpawnInstanceDisconnected": "निवडलेले उदाहरण डिस्कनेक्ट झाले. Cloud Agent वर सत्र सुरू करा किंवा दुसरे उदाहरण निवडा.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "तुमच्या संगणकावरील प्रकल्पात `kilo remote` चालवा, किंवा एक आधीच चालू असल्यास Kilo CLI अद्ययावत करा.",
       "instanceOnProject": "{{name}} {{project}} वर",
       "instanceOnProjectSuffix": "{{name}} {{project}} वर ({{suffix}})",
-      "runOnCloudAgent": "क्लाउड एजंटवर चालवा"
+      "runOnCloudAgent": "क्लाउड एजंटवर चालवा",
+      "terminals": "टर्मिनल्स",
+      "remotes": "रिमोट उदाहरणे"
     },
     "modePicker": {
       "title": "मोड निवडा",

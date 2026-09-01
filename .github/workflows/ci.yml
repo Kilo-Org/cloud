@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 # Cancel in-progress runs when a new commit is pushed to the same PR
 concurrency:
@@ -380,6 +379,10 @@ jobs:
 
       - name: Run tests
         run: pnpm --filter ${{ matrix.workspace.name }} test
+
+      - name: Test native heartbeat attachment compatibility
+        if: matrix.workspace.name == 'cloudflare-session-ingest'
+        run: pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts
 
   notify-main-failure:
     if: ${{ always() && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure') }}

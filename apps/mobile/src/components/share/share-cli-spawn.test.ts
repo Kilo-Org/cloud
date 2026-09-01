@@ -21,6 +21,9 @@ function instance(
   return {
     name: 'laptop',
     projectName: 'kilo',
+    kind: 'cli',
+    startedAt: null,
+    gitBranch: null,
     ...overrides,
   };
 }
@@ -31,7 +34,10 @@ const ROWS: readonly ShareCliSpawnRow[] = [
     connectionId: 'conn-2',
     name: 'Studio',
     projectName: 'mobile',
-    capabilities: { attachments: true },
+    kind: 'remote',
+    startedAt: '2026-08-28T19:30:00.123Z',
+    gitBranch: 'feature/share',
+    capabilities: { attachments: true, sessionClone: true },
   }),
 ];
 

@@ -277,6 +277,11 @@ export function AgentSessionListScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('tabs.agents')}
+        eyebrow={
+          !loading && !isError && hasLiveRows
+            ? t('agents.liveCount', { count: activeSessions.length })
+            : undefined
+        }
         size="large"
         showBackButton={false}
         className="px-[22px]"

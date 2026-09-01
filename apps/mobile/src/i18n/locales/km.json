@@ -2114,7 +2114,9 @@
     "sessionExited": "វគ្គបានចាកចេញ",
     "remoteSpawnRetryable": "មិនអាចទៅដល់ instance បានទេ — វាអាចត្រូវបានផ្ដាច់។",
     "remoteSpawnNonRetryable": "instance បរាជ័យក្នុងការចាប់ផ្ដើមវគ្គ — ពិនិត្យម៉ាស៊ីន ឬធ្វើបច្ចុប្បន្នភាព CLI។",
-    "remoteSpawnInstanceDisconnected": "instance ដែលបានជ្រើសរើសត្រូវបានផ្ដាច់។ ចាប់ផ្ដើមវគ្គនៅលើ Cloud Agent ឬជ្រើសរើស instance ផ្សេងទៀត។"
+    "remoteSpawnInstanceDisconnected": "instance ដែលបានជ្រើសរើសត្រូវបានផ្ដាច់។ ចាប់ផ្ដើមវគ្គនៅលើ Cloud Agent ឬជ្រើសរើស instance ផ្សេងទៀត។",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "ដំណើរការ `kilo remote` ក្នុងគម្រោងមួយនៅលើកុំព្យូទ័ររបស់អ្នក ឬធ្វើបច្ចុប្បន្នភាព Kilo CLI ប្រសិនបើមានមួយកំពុងដំណើរការរួចហើយ។",
       "instanceOnProject": "{{name}} នៅលើ {{project}}",
       "instanceOnProjectSuffix": "{{name}} នៅលើ {{project}} ({{suffix}})",
-      "runOnCloudAgent": "ដំណើរការលើ Cloud Agent"
+      "runOnCloudAgent": "ដំណើរការលើ Cloud Agent",
+      "terminals": "ស្ថានីយបញ្ជា",
+      "remotes": "ឧទាហរណ៍ពីចម្ងាយ"
     },
     "modePicker": {
       "title": "ជ្រើសរើសរបៀប",

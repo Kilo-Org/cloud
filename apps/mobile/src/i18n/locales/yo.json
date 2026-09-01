@@ -2114,7 +2114,9 @@
     "sessionExited": "Sẹ́ṣiọ́n ti jáde",
     "remoteSpawnRetryable": "Kò lè dé ọ̀dọ̀ instance — ó lè ti já kúrò ní ọ̀nà.",
     "remoteSpawnNonRetryable": "Instance kùnà láti bẹ̀rẹ̀ sẹ́ṣiọ́n — ṣàyẹ̀wò ẹ̀rọ náà tàbí mú CLI ṣòfin.",
-    "remoteSpawnInstanceDisconnected": "Instance tí wọ́n yàn ti já kúrò ní ọ̀nà. Bẹ̀rẹ̀ sẹ́ṣiọ́n kan lórí Cloud Agent tàbí yan instance mìíràn."
+    "remoteSpawnInstanceDisconnected": "Instance tí wọ́n yàn ti já kúrò ní ọ̀nà. Bẹ̀rẹ̀ sẹ́ṣiọ́n kan lórí Cloud Agent tàbí yan instance mìíràn.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "Ṣiṣẹ `kilo remote` ninu iṣẹ akanṣe lori kọnputa rẹ, tabi ṣe imudojuiwọn Kilo CLI ti o ba ti n ṣiṣẹ tẹlẹ.",
       "instanceOnProject": "{{name}} lori {{project}}",
       "instanceOnProjectSuffix": "{{name}} lori {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Ṣiṣẹ lori Cloud Agent"
+      "runOnCloudAgent": "Ṣiṣẹ lori Cloud Agent",
+      "terminals": "Awọn tẹ́mínà",
+      "remotes": "Awọn ayeye latọna jijin"
     },
     "modePicker": {
       "title": "Yan ipo",

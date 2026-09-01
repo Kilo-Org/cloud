@@ -2114,7 +2114,9 @@
     "sessionExited": "Сессия аяқталды",
     "remoteSpawnRetryable": "Инстансқа жете алмадық — ол ажыраған болуы мүмкін.",
     "remoteSpawnNonRetryable": "Инстанс сессияны бастай алмады — машинаны тексеріңіз немесе CLI жаңартыңыз.",
-    "remoteSpawnInstanceDisconnected": "Таңдалған инстанс ажырады. Cloud Agent сайтында сессияны бастаңыз немесе басқа инстансты таңдаңыз."
+    "remoteSpawnInstanceDisconnected": "Таңдалған инстанс ажырады. Cloud Agent сайтында сессияны бастаңыз немесе басқа инстансты таңдаңыз.",
+    "liveCount_one": "{{count}} ТІКІ",
+    "liveCount_other": "{{count}} ТІКІ"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "Компьютеріңіздегі жобада `kilo remote` іске қосыңыз немесе Kilo CLI жаңартылғанын тексеріңіз.",
       "instanceOnProject": "{{project}} жобасындағы {{name}}",
       "instanceOnProjectSuffix": "{{project}} жобасындағы {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent ішінде іске қосу"
+      "runOnCloudAgent": "Cloud Agent ішінде іске қосу",
+      "terminals": "Терминалдар",
+      "remotes": "Қашықтағы инстанстар"
     },
     "modePicker": {
       "title": "Режимді таңдау",

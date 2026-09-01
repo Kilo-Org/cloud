@@ -2114,7 +2114,9 @@
     "sessionExited": "Kikao kimetoka",
     "remoteSpawnRetryable": "Hatukuweza kufikia kisa — huenda kimekatika.",
     "remoteSpawnNonRetryable": "Kisa kilishindwa kuanzisha kikao — angalia mashine au sasisha CLI.",
-    "remoteSpawnInstanceDisconnected": "Kisa ulichochagua kimekatika. Anzisha kikao kwenye Cloud Agent au chagua kisa kingine."
+    "remoteSpawnInstanceDisconnected": "Kisa ulichochagua kimekatika. Anzisha kikao kwenye Cloud Agent au chagua kisa kingine.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "Endesha `kilo remote` kwenye mradi wa kompyuta yako, au sasisha Kilo CLI ikiwa moja tayari inaendelea.",
       "instanceOnProject": "{{name}} kwenye {{project}}",
       "instanceOnProjectSuffix": "{{name}} kwenye {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Endesha kwenye Cloud Agent"
+      "runOnCloudAgent": "Endesha kwenye Cloud Agent",
+      "terminals": "Terminali",
+      "remotes": "Mifano ya mbali"
     },
     "modePicker": {
       "title": "Chagua hali",

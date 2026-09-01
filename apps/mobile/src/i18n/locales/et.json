@@ -2114,7 +2114,9 @@
     "sessionExited": "Seanss lõpetatud",
     "remoteSpawnRetryable": "Ei õnnestunud instantsini jõuda — see võis ühenduse katkestada.",
     "remoteSpawnNonRetryable": "Instants ei suutnud seanssi alustada — kontrolli masinat või uuenda CLI-d.",
-    "remoteSpawnInstanceDisconnected": "Valitud instants lõpetas ühenduse. Alusta seanss Cloud Agent'is või vali mõni teine instants."
+    "remoteSpawnInstanceDisconnected": "Valitud instants lõpetas ühenduse. Alusta seanss Cloud Agent'is või vali mõni teine instants.",
+    "liveCount_one": "{{count}} OTSE",
+    "liveCount_other": "{{count}} OTSE"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "Käivita projektis arvutis käsk `kilo remote` või uuenda Kilo CLI-d, kui see juba töötab.",
       "instanceOnProject": "{{name}} saidil {{project}}",
       "instanceOnProjectSuffix": "{{name}} saidil {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Käita Cloud Agent'is"
+      "runOnCloudAgent": "Käita Cloud Agent'is",
+      "terminals": "Terminalid",
+      "remotes": "Kauginstantsid"
     },
     "modePicker": {
       "title": "Vali režiim",

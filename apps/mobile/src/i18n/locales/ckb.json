@@ -2114,7 +2114,9 @@
     "sessionExited": "سێشن دەرچوو",
     "remoteSpawnRetryable": "نەگەیشتینە نموونەکە — لەوانەیە پەیوەندییەکە پچڕابێت.",
     "remoteSpawnNonRetryable": "نموونەکە نەیتوانی دانیشتنەکە دەستپێبکات — ئامێرەکە بپشکنە یان CLI نوێ بکەرەوە.",
-    "remoteSpawnInstanceDisconnected": "نموونەی هەڵبژێردراو پەیوەندییەکەی پچڕا. لە Cloud Agent دانیشتنێک دەستپێبکە یان نموونەیەکی دیکە هەڵبژێرە."
+    "remoteSpawnInstanceDisconnected": "نموونەی هەڵبژێردراو پەیوەندییەکەی پچڕا. لە Cloud Agent دانیشتنێک دەستپێبکە یان نموونەیەکی دیکە هەڵبژێرە.",
+    "liveCount_one": "{{count}} ڕاستەوخۆ",
+    "liveCount_other": "{{count}} ڕاستەوخۆ"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "لە پڕۆژەیەک لە کۆمپیوتەرەکەتدا `kilo remote` جێبەجێ بکە، یان ئەگەر یەکێک پێشتر کاردەکات Kilo CLI نوێ بکە.",
       "instanceOnProject": "{{name}} لەسەر {{project}}",
       "instanceOnProjectSuffix": "{{name}} لەسەر {{project}} ({{suffix}})",
-      "runOnCloudAgent": "جێبەجێ بکە لەسەر ئەرکى هەور"
+      "runOnCloudAgent": "جێبەجێ بکە لەسەر ئەرکى هەور",
+      "terminals": "تێرمیناڵەکان",
+      "remotes": "نموونە دوورەکان"
     },
     "modePicker": {
       "title": "هەڵبژاردنی مۆد",

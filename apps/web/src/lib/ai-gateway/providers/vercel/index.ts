@@ -2,7 +2,7 @@ import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
 import type { VercelUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   DirectUserByokInferenceProviderIdSchema,
-  AwsCredentialsSchema,
+  BedrockCredentialsSchema,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   VertexCredentialsSchema,
@@ -189,9 +189,9 @@ export function convertProviderOptions(
   };
 }
 
-function parseAwsCredentials(input: string) {
+function parseBedrockCredentials(input: string) {
   try {
-    return AwsCredentialsSchema.parse(JSON.parse(input));
+    return BedrockCredentialsSchema.parse(JSON.parse(input));
   } catch {
     throw new Error('Failed to parse AWS credentials');
   }
@@ -245,7 +245,7 @@ export function getVercelInferenceProviderConfigForUserByok(
   }
 
   if (key === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
-    list.push(parseAwsCredentials(provider.decryptedAPIKey));
+    list.push(parseBedrockCredentials(provider.decryptedAPIKey));
   } else if (key === VercelUserByokInferenceProviderIdSchema.enum.vertex) {
     list.push(parseVertexCredentials(provider.decryptedAPIKey));
   } else {

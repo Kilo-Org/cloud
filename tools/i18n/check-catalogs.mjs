@@ -567,7 +567,7 @@ for (const catalog of CATALOGS) {
   if (catalog.checkUsage) {
     const { called, referenced } = scanSource();
     for (const key of called) {
-      if (!english.has(key)) {
+      if (!english.has(key) && !englishFamilies.has(key)) {
         fail(`${catalog.name}: source uses "${key}", which en.json does not define`);
       }
     }

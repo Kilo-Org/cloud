@@ -1624,7 +1624,8 @@
       "couldNotSearch": "לא ניתן היה לחפש הפעלות",
       "completedWillAppear": "הפעלות שהושלמו יופיעו כאן.",
       "noPastSessions": "אין הפעלות עבר",
-      "live": "חי"
+      "live": "חי",
+      "updating": "מעדכן"
     },
     "sessionRow": {
       "deleteTitle": "למחוק הפעלה?",

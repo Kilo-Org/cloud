@@ -2072,7 +2072,8 @@
       "couldNotSearch": "ناستې پلټل نشو",
       "completedWillAppear": "بشپړې شوې ناستې به دلته ښکاره شي.",
       "noPastSessions": "هیڅ تېرې ناستې نشته",
-      "live": "ژوندۍ"
+      "live": "ژوندۍ",
+      "updating": "تازه کېږي"
     },
     "sessionRow": {
       "deleteTitle": "ناسته حذف کړم؟",

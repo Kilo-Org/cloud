@@ -2072,7 +2072,8 @@
       "couldNotSearch": "ไม่สามารถค้นหา sessions ได้",
       "completedWillAppear": "sessions ที่เสร็จแล้วจะปรากฏที่นี่",
       "noPastSessions": "ไม่มี sessions ในอดีต",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "กำลังอัปเดต"
     },
     "sessionRow": {
       "deleteTitle": "ลบ session?",

@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Xalayyii barbaaduu hin dandeenye",
       "completedWillAppear": "Xalayyiin xumuraman as ni mul'atu.",
       "noPastSessions": "Xalayyiin darbe hin jiru",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Fooyyachaa jira"
     },
     "sessionRow": {
       "deleteTitle": "Xalayyii haqaa?",

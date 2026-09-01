@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Kunne ikke søke i økter",
       "completedWillAppear": "Fullførte økter vises her.",
       "noPastSessions": "Ingen tidligere økter",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Oppdaterer"
     },
     "sessionRow": {
       "deleteTitle": "Slette økt?",

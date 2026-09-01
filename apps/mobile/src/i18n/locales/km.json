@@ -2072,7 +2072,8 @@
       "couldNotSearch": "មិនអាចស្វែងរកវគ្គ",
       "completedWillAppear": "វគ្គដែលបានបញ្ចប់នឹងបង្ហាញនៅទីនេះ។",
       "noPastSessions": "គ្មានវគ្គកន្លងមក",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "កំពុងធ្វើបច្ចុប្បន្នភាព"
     },
     "sessionRow": {
       "deleteTitle": "លុបវគ្គ?",

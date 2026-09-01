@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Hindi ma-search ang mga session",
       "completedWillAppear": "Lalabas dito ang mga natapos na session.",
       "noPastSessions": "Walang nakaraang session",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Ina-update"
     },
     "sessionRow": {
       "deleteTitle": "Burahin ang session?",

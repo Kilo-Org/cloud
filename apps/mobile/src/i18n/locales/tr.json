@@ -1618,7 +1618,8 @@
       "couldNotSearch": "Oturumlar aranamadı",
       "completedWillAppear": "Tamamlanan oturumlar burada görünecek.",
       "noPastSessions": "Geçmiş oturum yok",
-      "live": "CANLI"
+      "live": "CANLI",
+      "updating": "Güncelleniyor"
     },
     "sessionRow": {
       "deleteTitle": "Oturum silinsin mi?",

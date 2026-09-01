@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Kāore i taea te rapu ngā wātūtū",
       "completedWillAppear": "Ka puta ngā wātūtū kua oti ki konei.",
       "noPastSessions": "Kāore he wātūtū o mua",
-      "live": "ORA"
+      "live": "ORA",
+      "updating": "Kei te whakahou"
     },
     "sessionRow": {
       "deleteTitle": "Whakakore i te wātūtū?",

@@ -2072,7 +2072,8 @@
       "couldNotSearch": "စက်ရှင်များကို ရှာဖွေ၍မရခဲ့ပါ",
       "completedWillAppear": "ပြီးဆုံးသော စက်ရှင်များ ဤနေရာတွင် ပေါ်လာမည်။",
       "noPastSessions": "ယခင်စက်ရှင်များ မရှိပါ",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "မွမ်းမံနေသည်"
     },
     "sessionRow": {
       "deleteTitle": "စက်ရှင်ကို ဖျက်မလား?",

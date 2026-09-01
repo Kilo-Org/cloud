@@ -1,181 +1,220 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount the section in the node vitest environment (same pattern as the mounted tests) */
-import { createElement } from 'react';
+/* eslint-disable typescript-eslint/no-deprecated -- DOM-free React Native section tests */
+import { type ComponentProps, createElement } from 'react';
+import * as ReactQuery from '@tanstack/react-query';
 import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AgentSessionsSection, buildRows } from '@/components/home/agent-sessions-section';
-import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
+import '@/i18n';
+import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
+import { RemoteSessionRow } from '@/components/agents/remote-session-row';
+import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
 const navigateSpy = vi.hoisted(() => vi.fn());
 const dismissToSpy = vi.hoisted(() => vi.fn());
-
+const sessionDestination = vi.hoisted(() => ({ id: '' }));
+const connectivity = vi.hoisted(() => ({ offline: false }));
+const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
   useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
-  useFocusEffect: vi.fn(),
 }));
-
-vi.mock('react-native', () => ({
-  View: 'View',
+vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', Platform: { OS: 'ios' } }));
+vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
-
-vi.mock('@/components/home/section-header', () => ({
-  SectionHeader: 'SectionHeader',
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn(),
+  ImpactFeedbackStyle: { Medium: 'medium' },
 }));
-
-vi.mock('@/components/agents/remote-session-row', () => ({
-  RemoteSessionRow: () => null,
+vi.mock('@tanstack/react-query', async importOriginal => ({
+  ...(await importOriginal<typeof ReactQuery>()),
+  useQueryClient: () => queryClient,
 }));
-
-vi.mock('@/components/ui/text', () => ({
-  Text: () => null,
-}));
-
-vi.mock('@/components/agents/session-row', () => ({
-  StoredSessionRow: () => null,
-}));
-
-vi.mock('@/components/agents/use-agent-session-navigator', () => ({
-  useAgentSessionNavigator: () => vi.fn(),
-}));
-
-vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useAgentSessions: () => ({
-    activeSessions: [],
-    storedSessions: [],
-    activeSessionIds: new Set(),
-    activeIsError: false,
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    activeSessions: {
+      list: {
+        queryKey: (input: unknown) => [['activeSessions', 'list'], { input, type: 'query' }],
+      },
+    },
   }),
 }));
+vi.mock('@/lib/hooks/use-session-mutations', () => ({
+  useSessionMutations: () => ({ renameSession: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedSoft: '#777777' }),
+}));
+vi.mock('@/components/rename-modal', () => ({ RenameModal: () => null }));
+vi.mock('@/components/agents/session-platform-icon', () => ({
+  selectRowPlatformPresentation: () => ({ iconKind: null, spokenPlatform: null }),
+  SessionPlatformIcon: () => null,
+}));
+vi.mock('@/components/agents/session-row-actions', () => ({
+  copySessionId: vi.fn(),
+  showRenamePrompt: vi.fn(),
+  showSessionActionMenu: vi.fn(),
+}));
+vi.mock('@/components/agents/remote-session-exit-alert', () => ({
+  showRemoteSessionExitConfirmation: vi.fn(),
+}));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { error: vi.fn(), success: vi.fn() },
+}));
+vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
+vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: () => null }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organization-queries', () => ({ useOrgBoundary: vi.fn() }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => (connectivity.offline ? 'offline' : 'online'),
+}));
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionHealth: () => ({
+    isConnected: !connectivity.offline,
+    reconnectExhausted: false,
+  }),
+}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({}),
+}));
+vi.mock('@/components/agents/use-agent-session-navigator', () => ({
+  useAgentSessionNavigator: () => (id: string) => {
+    sessionDestination.id = id;
+  },
+}));
+vi.mock('@/lib/hooks/use-agent-sessions', () => ({
+  useAgentSessions: () => {
+    throw new Error('Home must not mount stored history');
+  },
+  useLiveAgentSessions: () => {
+    throw new Error('The section must not mount another live query');
+  },
+}));
 
-function makeActive(over: Partial<ActiveSession> = {}): ActiveSession {
-  return {
-    id: 'a1',
-    status: 'running',
-    title: 'test',
-    connectionId: 'c1',
-    ...over,
-  };
+type Props = ComponentProps<typeof AgentSessionsSection>;
+const context: Props['context'] = {
+  organizationId: 'org-1',
+  isReady: true,
+  isResolving: false,
+  isError: false,
+  label: 'Engineering',
+  refetch: vi.fn(),
+};
+const settled: Props['sessions'] = {
+  activeSessions: [],
+  hasAcceptedSuccess: true,
+  terminalError: null,
+  isLoading: false,
+  isError: false,
+  isFetching: false,
+  isPaused: false,
+  refetch: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
+};
+function session(id: string): ActiveSession {
+  return { id, status: 'running', title: id, connectionId: 'c1' };
 }
-
-function makeStored(over: Partial<StoredSession> = {}): StoredSession {
-  return {
-    session_id: 's1',
-    title: 'Untitled',
-    cloud_agent_session_id: null,
-    parent_session_id: null,
-    organization_id: null,
-    created_on_platform: 'cli',
-    git_url: null,
-    git_branch: null,
-    status: null,
-    status_updated_at: null,
-    total_cost_microdollars: null,
-    created_at: '2026-07-01 00:00:00+00',
-    updated_at: '2026-07-01 00:00:00+00',
-    version: 0,
-    associatedPr: null,
-    ...over,
-  };
+let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+function nodes(type: string) {
+  if (!renderer) {
+    throw new Error('Missing renderer');
+  }
+  return renderer.root.findAll(
+    candidate =>
+      (type === 'RemoteSessionRow' && candidate.type === RemoteSessionRow) ||
+      (typeof candidate.type === 'string' && candidate.type === type)
+  );
 }
-
-describe('buildRows', () => {
-  it('yields no rows when there are no live sessions', () => {
-    const rows = buildRows({
-      activeSessions: [],
-      storedSessions: [],
-      activeSessionIds: new Set(),
-    });
-    expect(rows).toEqual([]);
+function node(type: string, index = 0) {
+  const result = nodes(type)[index];
+  if (!result) {
+    throw new Error(`Missing ${type}`);
+  }
+  return result;
+}
+async function render(sessions = settled) {
+  await act(async () => {
+    const tree = createElement(AgentSessionsSection, { context, sessions });
+    if (renderer) {
+      renderer.update(tree);
+    } else {
+      renderer = TestRenderer.create(tree);
+    }
+    await Promise.resolve();
   });
-
-  it('yields one row for one active session', () => {
-    const active = makeActive();
-    const rows = buildRows({
-      activeSessions: [active],
-      storedSessions: [],
-      activeSessionIds: new Set([active.id]),
-    });
-    expect(rows.map(row => row.key)).toEqual(['active:a1']);
-  });
-
-  it('caps the rows at three live sessions', () => {
-    const activeSessions = [
-      makeActive({ id: 'a1' }),
-      makeActive({ id: 'a2' }),
-      makeActive({ id: 'a3' }),
-      makeActive({ id: 'a4' }),
-    ];
-    const rows = buildRows({
-      activeSessions,
-      storedSessions: [],
-      activeSessionIds: new Set(['a1', 'a2', 'a3', 'a4']),
-    });
-    expect(rows).toHaveLength(3);
-    expect(rows.every(row => row.kind === 'active')).toBe(true);
-  });
-
-  it('drops an offline stored session', () => {
-    const offline = makeStored({ session_id: 'off1', created_on_platform: 'cloud-agent' });
-    const rows = buildRows({
-      activeSessions: [],
-      storedSessions: [offline],
-      activeSessionIds: new Set(),
-    });
-    expect(rows).toEqual([]);
-  });
-
-  it('keeps a live cloud-agent stored session', () => {
-    const live = makeStored({ session_id: 'on1', created_on_platform: 'cloud-agent' });
-    const rows = buildRows({
-      activeSessions: [],
-      storedSessions: [live],
-      activeSessionIds: new Set(['on1']),
-    });
-    expect(rows.map(row => row.key)).toEqual(['stored:on1']);
-  });
+}
+beforeEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  navigateSpy.mockClear();
+  dismissToSpy.mockClear();
+  sessionDestination.id = '';
+  connectivity.offline = false;
+});
+afterEach(() => {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+  queryClient.clear();
 });
 
-describe('Home See-all navigation', () => {
-  beforeEach(() => {
-    navigateSpy.mockClear();
-    dismissToSpy.mockClear();
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+describe('Home live section', () => {
+  it('preserves incoming live order and caps rendered rows at three without stored queries', async () => {
+    await render({ ...settled, activeSessions: ['a3', 'a1', 'a4', 'a2'].map(id => session(id)) });
+    expect(nodes('RemoteSessionRow').map(row => (row.props.session as ActiveSession).id)).toEqual([
+      'a3',
+      'a1',
+      'a4',
+    ]);
+    (node('RemoteSessionRow', 1).props.onPress as () => void)();
+    expect(sessionDestination.id).toBe('a1');
   });
 
-  it('switches to the Agents index and dismisses the history subpage', async () => {
-    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
-      current: undefined,
-    };
-    await act(async () => {
-      await Promise.resolve();
-      rendererRef.current = TestRenderer.create(
-        createElement(AgentSessionsSection, { organizationId: 'org-1' })
+  it('keeps row identity and navigation while refreshing cached content', async () => {
+    const sessions = { ...settled, activeSessions: [session('a1')] };
+    await render(sessions);
+    const row = node('RemoteSessionRow');
+    await render({ ...sessions, isFetching: true });
+    expect(node('RemoteSessionRow')).toBe(row);
+    expect(nodes('Skeleton')).toHaveLength(0);
+    (row.props.onPress as () => void)();
+    expect(sessionDestination.id).toBe('a1');
+  });
+
+  it.each([
+    ['running', 'good', false],
+    ['question', 'warn', true],
+  ] as const)(
+    'keeps the real %s badge when the phone disconnects',
+    async (status, tone, needsInput) => {
+      const sessions = { ...settled, activeSessions: [{ ...session('a1'), status }] };
+      await render(sessions);
+      const row = node('RemoteSessionRow');
+      connectivity.offline = true;
+      await render(sessions);
+      expect(node('RemoteSessionRow')).toBe(row);
+      expect(node('StatusDot').props.tone).toBe(tone);
+      expect(nodes('Text').some(text => text.children.includes('NEEDS INPUT'))).toBe(needsInput);
+      expect(nodes('Text').some(text => text.children.includes('No internet connection'))).toBe(
+        true
       );
-    });
-    const renderer = rendererRef.current;
-    if (!renderer) {
-      throw new Error('renderer was not created');
     }
+  );
 
-    const header = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'SectionHeader'
-    );
-    const onActionPress = header.props.onActionPress as () => void;
-    expect(onActionPress).toBeTypeOf('function');
-
-    onActionPress();
-    expect(navigateSpy).toHaveBeenCalledTimes(1);
-    expect(dismissToSpy).toHaveBeenCalledTimes(1);
-    const href = navigateSpy.mock.calls[0]?.[0] as string;
-    const dismissHref = dismissToSpy.mock.calls[0]?.[0] as string;
-    expect(href).toBe('/(app)/(tabs)/(2_agents)/');
-    expect(href).not.toContain('history');
-    expect(dismissHref).toBe('/(app)/(tabs)/(2_agents)/');
-    expect(dismissHref).not.toContain('history');
+  it('switches to the Agents index and dismisses the history subpage', async () => {
+    await render();
+    (node('SectionHeader').props.onActionPress as () => void)();
+    expect(navigateSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
+    expect(dismissToSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
     expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
       dismissToSpy.mock.invocationCallOrder[0] ?? 0
     );
-
-    renderer.unmount();
   });
 });

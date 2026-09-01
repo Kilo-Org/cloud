@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Tsy afaka nanao fikarohana sessions",
       "completedWillAppear": "Hiseho eto ny sessions vita.",
       "noPastSessions": "Tsy misy sessions taloha",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Manavao"
     },
     "sessionRow": {
       "deleteTitle": "Hofafana ve ny session?",

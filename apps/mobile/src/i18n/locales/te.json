@@ -2072,7 +2072,8 @@
       "couldNotSearch": "సెషన్‌లను శోధించలేకపోయింది",
       "completedWillAppear": "పూర్తయిన సెషన్‌లు ఇక్కడ కనిపిస్తాయి.",
       "noPastSessions": "గత సెషన్‌లు లేవు",
-      "live": "ప్రత్యక్ష"
+      "live": "ప్రత్యక్ష",
+      "updating": "నవీకరిస్తోంది"
     },
     "sessionRow": {
       "deleteTitle": "సెషన్‌ను తొలగించాలా?",

@@ -2072,7 +2072,8 @@
       "couldNotSearch": "სესიების ძიება ვერ მოხერხდა",
       "completedWillAppear": "დასრულებული სესიები აქ გამოჩნდება.",
       "noPastSessions": "წარსული სესიები არ არის",
-      "live": "პირდაპირი"
+      "live": "პირდაპირი",
+      "updating": "ახლდება"
     },
     "sessionRow": {
       "deleteTitle": "სესიის წაშლა?",

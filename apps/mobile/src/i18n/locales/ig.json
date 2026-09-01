@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Enweghị ike ịchọ nzukọ",
       "completedWillAppear": "Nzukọ ndị emechara ga-apụta ebe a.",
       "noPastSessions": "Enweghị nzukọ gara aga",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Na-emelite"
     },
     "sessionRow": {
       "deleteTitle": "Hichapụ nzukọ?",

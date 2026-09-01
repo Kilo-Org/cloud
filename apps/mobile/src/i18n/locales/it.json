@@ -1604,7 +1604,8 @@
       "couldNotSearch": "Impossibile cercare le sessioni",
       "completedWillAppear": "Le sessioni completate appariranno qui.",
       "noPastSessions": "Nessuna sessione passata",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Aggiornamento"
     },
     "sessionRow": {
       "deleteTitle": "Eliminare la sessione?",

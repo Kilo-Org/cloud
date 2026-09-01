@@ -1624,7 +1624,8 @@
       "couldNotSearch": "No se pudieron buscar las sesiones",
       "completedWillAppear": "Las sesiones completadas aparecerán aquí.",
       "noPastSessions": "No hay sesiones pasadas",
-      "live": "EN VIVO"
+      "live": "EN VIVO",
+      "updating": "Actualizando"
     },
     "sessionRow": {
       "deleteTitle": "¿Eliminar sesión?",

@@ -2072,7 +2072,8 @@
       "couldNotSearch": "ክፍለ ጊዜዎችን መፈለግ አልተቻለም",
       "completedWillAppear": "የተጠናቀቁ ክፍለ ጊዜዎች እዚህ ይታያሉ።",
       "noPastSessions": "ምንም ያለፉ ክፍለ ጊዜዎች የሉም",
-      "live": "ቀጥታ"
+      "live": "ቀጥታ",
+      "updating": "በማዘመን ላይ"
     },
     "sessionRow": {
       "deleteTitle": "ክፍለ ጊዜውን መሰረዝ?",

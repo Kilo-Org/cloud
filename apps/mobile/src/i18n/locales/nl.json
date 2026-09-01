@@ -1618,7 +1618,8 @@
       "couldNotSearch": "Kon sessies niet doorzoeken",
       "completedWillAppear": "Voltooide sessies verschijnen hier.",
       "noPastSessions": "Geen eerdere sessies",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Bijwerken"
     },
     "sessionRow": {
       "deleteTitle": "Sessie verwijderen?",

@@ -2098,7 +2098,8 @@
       "couldNotSearch": "Не атрымалася выканаць пошук па сеансах",
       "completedWillAppear": "Завершаныя сеансы з'явяцца тут.",
       "noPastSessions": "Няма мінулых сеансаў",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Абнаўленне"
     },
     "sessionRow": {
       "deleteTitle": "Выдаліць сеанс?",

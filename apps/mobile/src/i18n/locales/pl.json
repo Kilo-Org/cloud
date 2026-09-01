@@ -1630,7 +1630,8 @@
       "couldNotSearch": "Nie udało się wyszukać sesji",
       "completedWillAppear": "Ukończone sesje pojawią się tutaj.",
       "noPastSessions": "Brak poprzednich sesji",
-      "live": "NA ŻYWO"
+      "live": "NA ŻYWO",
+      "updating": "Aktualizowanie"
     },
     "sessionRow": {
       "deleteTitle": "Usunąć sesję?",

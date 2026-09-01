@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Kunde inte söka i sessioner",
       "completedWillAppear": "Slutförda sessioner visas här.",
       "noPastSessions": "Inga tidigare sessioner",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Uppdaterar"
     },
     "sessionRow": {
       "deleteTitle": "Ta bort session?",

@@ -1618,7 +1618,8 @@
       "couldNotSearch": "Không thể tìm kiếm phiên",
       "completedWillAppear": "Các phiên đã hoàn tất sẽ xuất hiện tại đây.",
       "noPastSessions": "Không có phiên trước đây",
-      "live": "TRỰC TIẾP"
+      "live": "TRỰC TIẾP",
+      "updating": "Đang cập nhật"
     },
     "sessionRow": {
       "deleteTitle": "Xóa phiên?",

@@ -2072,7 +2072,8 @@
       "couldNotSearch": "A munkamenetek keresése nem sikerült",
       "completedWillAppear": "A befejezett munkamenetek itt jelennek meg.",
       "noPastSessions": "Nincs korábbi munkamenet",
-      "live": "ÉLŐ"
+      "live": "ÉLŐ",
+      "updating": "Frissítés"
     },
     "sessionRow": {
       "deleteTitle": "Munkamenet törlése?",

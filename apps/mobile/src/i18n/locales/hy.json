@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Չհաջողվեց որոնել նիստերը",
       "completedWillAppear": "Ավարտված նիստերը կհայտնվեն այստեղ։",
       "noPastSessions": "Անցյալի նիստեր չկան",
-      "live": "ՈՒՂԻՂ"
+      "live": "ՈՒՂԻՂ",
+      "updating": "Թարմացվում է"
     },
     "sessionRow": {
       "deleteTitle": "Ջնջե՞լ նիստը",

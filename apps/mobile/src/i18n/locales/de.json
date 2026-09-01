@@ -1618,7 +1618,8 @@
       "couldNotSearch": "Sitzungen konnten nicht durchsucht werden",
       "completedWillAppear": "Abgeschlossene Sitzungen erscheinen hier.",
       "noPastSessions": "Keine vergangenen Sitzungen",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Wird aktualisiert"
     },
     "sessionRow": {
       "deleteTitle": "Sitzung löschen?",

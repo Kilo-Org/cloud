@@ -1,112 +1,43 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; the file holds the four-state live-tab render branches plus the combined-list regression mocks in one mount test. */
-import { createElement } from 'react';
+/* eslint-disable max-lines, typescript-eslint/no-deprecated -- DOM-free live-list matrix and focus/navigation regressions share one mounted fixture. */
+import { createElement, Fragment, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AgentSessionListScreen } from './session-list-screen';
+import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
+import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { type BannerState } from '@/lib/offline-banner-state';
 
-type MountedRenderer = TestRenderer.ReactTestRenderer;
-
-const appState = vi.hoisted(() => {
-  const listeners = new Set<(state: string) => void>();
-  return {
-    listeners,
-    addEventListener: (_event: string, listener: (state: string) => void) => {
-      listeners.add(listener);
-      return {
-        remove: () => {
-          listeners.delete(listener);
-        },
-      };
-    },
-    emit: (state: string): void => {
-      for (const listener of listeners) {
-        listener(state);
-      }
-    },
-  };
-});
-
-const focusState = vi.hoisted(() => ({ current: true as boolean }));
-const focusCallbacks = vi.hoisted(() => ({
-  current: new Set<() => void>(),
-}));
-const refetchSpy = vi.hoisted(() => vi.fn());
-const routerPushSpy = vi.hoisted(() => vi.fn());
-const routerDismissToSpy = vi.hoisted(() => vi.fn());
-const invalidateQueries = vi.hoisted(() => vi.fn());
-const toastErrorSpy = vi.hoisted(() => vi.fn());
-const orgState = vi.hoisted(() => ({
-  organizationId: null as string | null,
-  isLoaded: true,
-}));
-type MockActiveSession = {
-  id: string;
-  organizationId: string | null;
-  title?: string;
-  gitUrl?: string | null;
-  createdOnPlatform?: string;
-};
-
-const sessionListState = vi.hoisted(() => ({
-  activeSessions: [] as MockActiveSession[],
-  isLoading: false,
-  isError: false,
-}));
-
-vi.mock('react-native', () => ({
-  ActivityIndicator: 'ActivityIndicator',
-  I18nManager: { isRTL: false },
-  Platform: { OS: 'ios' },
-  AppState: { addEventListener: appState.addEventListener },
-  FlatList: 'FlatList',
-  Modal: 'Modal',
-  Pressable: 'Pressable',
-  RefreshControl: 'RefreshControl',
-  ScrollView: 'ScrollView',
-  View: 'View',
-  useWindowDimensions: () => ({ fontScale: 1 }),
-}));
-vi.mock('react-native-reanimated', () => ({
-  __esModule: true,
-  default: { View: 'AnimatedView' },
-  LinearTransition: 'LinearTransition',
-}));
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
-}));
-vi.mock('expo-router', () => ({
-  useNavigation: () => ({ isFocused: () => focusState.current }),
-  useFocusEffect: (effect: () => void) => {
-    focusCallbacks.current.add(effect);
+type Org = { organizationId: string; organizationName: string };
+const state = vi.hoisted(() => ({
+  focused: true,
+  focusCallbacks: new Set<() => void>(),
+  listeners: new Set<(state: string) => void>(),
+  auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
+  organization: { organizationId: null as string | null, isLoaded: true },
+  boundary: { orgs: [] as Org[] | undefined, isResolving: false, isError: false },
+  live: {
+    activeSessions: [] as ActiveSession[],
+    isLoading: false,
+    isError: false,
+    hasAcceptedSuccess: true,
+    isFetching: false,
+    isPaused: false,
+    terminalError: null as ReturnType<typeof useLiveAgentSessions>['terminalError'],
   },
-  useRouter: () => ({ push: routerPushSpy, dismissTo: routerDismissToSpy, canGoBack: () => false }),
-  useScrollToTop: () => undefined,
+  internet: 'online' as BannerState,
+  connection: { isConnected: true, reconnectExhausted: false },
+  refetch: vi.fn<() => Promise<boolean>>(),
+  boundaryRefetch: vi.fn(),
+  socketRetry: vi.fn(),
+  invalidate: vi.fn(),
+  announcements: [] as string[],
+  destination: '',
+  sessionId: '',
 }));
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries }),
-  useQuery: () => ({
-    data: [{ organizationId: 'org-1', organizationName: 'Agents organization' }],
-  }),
-}));
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: { count?: number; label?: string }) => {
-      if (key === 'agents.liveCount' && options?.count !== undefined) {
-        return `${options.count} LIVE`;
-      }
-      return options?.label !== undefined ? `${key}: ${options.label}` : key;
-    },
-  }),
-}));
-vi.mock('@/i18n', () => ({
-  i18n: { t: (key: string) => key, language: 'en' },
-}));
-// The real persisted-filters hook runs; only its native edges are stubbed, so
-// the apply/clear transitions below exercise the actual filter state. The
-// stored record resolves through `readFilterRecord` so a test can hold it pending.
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 vi.mock('expo-secure-store', () => ({
   getItemAsync: readFilterRecord,
@@ -117,30 +48,97 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },
 }));
-
-// Combined-list machinery is mocked as inert string nodes so a regression that
-// re-renders any of it shows up as a tree node the assertions below reject.
+vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
+  Modal: 'Modal',
+  Pressable: 'Pressable',
+  RefreshControl: 'RefreshControl',
+  ScrollView: 'ScrollView',
+  View: 'View',
+  ActivityIndicator: 'ActivityIndicator',
+  useWindowDimensions: () => ({ fontScale: 1 }),
+  AppState: {
+    addEventListener: (_event: string, listener: (next: string) => void) => {
+      state.listeners.add(listener);
+      return {
+        remove: () => {
+          state.listeners.delete(listener);
+        },
+      };
+    },
+  },
+  FlatList: (props: {
+    data: ActiveSession[];
+    renderItem: (entry: { item: ActiveSession }) => ReactNode;
+    keyExtractor: (item: ActiveSession) => string;
+  }) =>
+    createElement(
+      'FlatList',
+      props,
+      props.data.map(item =>
+        createElement(Fragment, { key: props.keyExtractor(item) }, props.renderItem({ item }))
+      )
+    ),
+}));
+vi.mock('react-native-reanimated', () => ({
+  __esModule: true,
+  default: { View: 'AnimatedView' },
+  LinearTransition: 'LinearTransition',
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+}));
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ isFocused: () => state.focused }),
+  useFocusEffect: (effect: () => void) => {
+    state.focusCallbacks.add(effect);
+  },
+  useRouter: () => ({
+    canGoBack: () => false,
+    push: (path: string) => {
+      state.destination = path;
+    },
+    replace: (path: string) => {
+      state.destination = path;
+    },
+  }),
+  useScrollToTop: () => undefined,
+}));
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: state.invalidate }),
+  useQuery: () => ({
+    data: state.boundary.orgs,
+    isError: state.boundary.isError,
+    isFetching: state.boundary.isResolving,
+    isPending: !state.boundary.isError && state.boundary.orgs === undefined,
+    refetch: state.boundaryRefetch,
+  }),
+}));
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
+}));
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
   Plus: 'Plus',
   Bot: 'Bot',
+  AlertCircle: 'AlertCircle',
+  Lock: 'Lock',
+  SearchX: 'SearchX',
+  ServerCrash: 'ServerCrash',
+  WifiOff: 'WifiOff',
   Check: 'Check',
   X: 'X',
   SlidersHorizontal: 'SlidersHorizontal',
 }));
-vi.mock('@/components/empty-state', () => ({
-  EmptyState: 'EmptyState',
-}));
-vi.mock('@/components/query-error', () => ({
-  QueryError: 'QueryError',
-}));
-vi.mock('@/components/agents/remote-session-row', () => ({
-  RemoteSessionRow: 'RemoteSessionRow',
-}));
+vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
 vi.mock('@/components/agents/session-list-content', () => ({
   AgentSessionListContent: 'AgentSessionListContent',
-  FAB_MARGIN: 0,
-  FAB_SIZE: 0,
+  FAB_MARGIN: 16,
+  FAB_SIZE: 48,
 }));
 vi.mock('@/components/agents/session-list-search-header', () => ({
   SessionListSearchHeader: 'SessionListSearchHeader',
@@ -149,264 +147,625 @@ vi.mock('@/components/agents/platform-filter-modal', async importOriginal => ({
   ...(await importOriginal<typeof PlatformFilterModule>()),
   SessionFilterModal: 'SessionFilterModal',
 }));
-vi.mock('@/components/agents/active-now-section', () => ({
-  ActiveNowSection: 'ActiveNowSection',
-}));
-vi.mock('@/components/agents/session-list-routes', () => ({
-  getNewAgentSessionPath: () => '/(app)/agent-chat/new',
-}));
+vi.mock('@/components/agents/active-now-section', () => ({ ActiveNowSection: 'ActiveNowSection' }));
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({
-  useAgentSessionNavigator: () => vi.fn(),
+  useAgentSessionNavigator: () => (id: string) => {
+    state.sessionId = id;
+  },
 }));
-vi.mock('@/components/ui/button', () => ({
-  Button: 'Button',
-}));
-vi.mock('@/components/ui/skeleton', () => ({
-  Skeleton: 'Skeleton',
-}));
-vi.mock('@/components/ui/text', () => ({
-  Text: 'Text',
-}));
-vi.mock('@expo/react-native-action-sheet', () => ({
-  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
-}));
-vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
-}));
-vi.mock('@/lib/a11y/announcing-toast', () => ({
-  announcingToast: { error: toastErrorSpy },
-}));
+vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/text', async () => {
+  const { createContext } = await import('react');
+  return { Text: 'Text', TextClassContext: createContext('') };
+});
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => state.auth }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({
-    organizationId: orgState.organizationId,
-    isLoaded: orgState.isLoaded,
+    ...state.organization,
     error: null,
     retry: vi.fn(),
     setOrganizationId: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: () => ({
+    ...state.boundary,
+    org: state.boundary.orgs?.find(org => org.organizationId === state.organization.organizationId),
+    refetch: state.boundaryRefetch,
   }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     primaryForeground: '#ffffff',
     foreground: '#000000',
-    mutedForeground: '#888888',
+    mutedForeground: '#777777',
   }),
 }));
-vi.mock('@/lib/tab-bar-layout', () => ({
-  getEffectiveTabBarHeight: () => 0,
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => state.internet,
 }));
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionHealth: () => state.connection,
+}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({ retryConnection: state.socketRetry }),
+}));
+vi.mock('@/lib/a11y/announce', () => ({
+  announceForA11y: (message: string) => {
+    state.announcements.push(message);
+  },
+}));
+vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 60 }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useLiveAgentSessions: () => ({
-    activeSessions: sessionListState.activeSessions,
-    isLoading: sessionListState.isLoading,
-    isError: sessionListState.isError,
-    refetch: refetchSpy,
-  }),
+  useLiveAgentSessions: () => ({ ...state.live, refetch: state.refetch }),
+  useAgentSessions: () => {
+    throw new Error('Live list must not mount stored history');
+  },
 }));
-
-const mountedRenderers: MountedRenderer[] = [];
-
-async function renderScreen(): Promise<MountedRenderer> {
-  const rendererRef: { current: MountedRenderer | undefined } = {
-    current: undefined,
+const row: ActiveSession = {
+  id: 'live-1',
+  status: 'running',
+  title: 'Live task',
+  connectionId: 'connection-1',
+};
+const failure = { kind: 'retryable', error: new Error('temporary') } as const;
+let mountedRenderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+function root() {
+  if (!mountedRenderer) {
+    throw new Error('Missing live list');
+  }
+  return mountedRenderer.root;
+}
+function nodes(type: string) {
+  return root().findAll(node => typeof node.type === 'string' && node.type === type);
+}
+function header() {
+  return root().findByType(ScreenHeader);
+}
+function listSkeletons() {
+  return nodes('Skeleton').filter(
+    node => typeof node.props.className === 'string' && node.props.className.includes('h-[76px]')
+  );
+}
+function contextControl() {
+  return header().find(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Pressable' &&
+      node.props.accessibilityHint === 'Select account'
+  );
+}
+function requireNode(type: string) {
+  const result = nodes(type)[0];
+  if (!result) {
+    throw new Error(`Missing node: ${type}`);
+  }
+  return result;
+}
+function text() {
+  return nodes('Text')
+    .map(node => node.children.filter(child => typeof child === 'string').join(''))
+    .join('\n');
+}
+function action(label: string) {
+  const button = nodes('Pressable').find(node => node.props.accessibilityLabel === label);
+  if (!button) {
+    throw new Error(`Missing action: ${label}`);
+  }
+  return button;
+}
+function press(label: string) {
+  (action(label).props.onPress as () => void)();
+}
+type HeaderElement = {
+  type: string;
+  props: {
+    onPress: () => void;
+    testID: string;
+    accessibilityRole: string;
+    activeCount?: number;
+    children: { type: string };
   };
+};
+function headerActions() {
+  const right = header().props.headerRight as {
+    props: { children: (HeaderElement | null)[] };
+  };
+  return right.props.children.filter((child): child is HeaderElement => child !== null);
+}
+function headerAction(testID = 'agents-view-history') {
+  const button = headerActions().find(child => child.props.testID === testID);
+  const isMounted = nodes('Pressable').some(node => node.props.testID === testID);
+  if (!button || !isMounted) {
+    throw new Error(`Missing header action: ${testID}`);
+  }
+  return button;
+}
+async function renderScreen() {
   await act(async () => {
+    const tree = createElement(AgentSessionListScreen);
+    if (mountedRenderer) {
+      mountedRenderer.update(tree);
+    } else {
+      mountedRenderer = TestRenderer.create(tree);
+    }
     await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(AgentSessionListScreen));
   });
-  const renderer = rendererRef.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
+  if (!mountedRenderer) {
+    throw new Error('Missing live list');
   }
-  mountedRenderers.push(renderer);
-  return renderer;
+  return mountedRenderer;
 }
-
-type HeaderElement = { type: string; props: Record<string, unknown> };
-
-function headerOf(renderer: MountedRenderer) {
-  return renderer.root.findByType(ScreenHeader);
-}
-
-function headerRightOf(renderer: MountedRenderer) {
-  return headerOf(renderer).props.headerRight as HeaderElement;
-}
-
-function headerActionsOf(renderer: MountedRenderer): HeaderElement[] {
-  const { children } = headerRightOf(renderer).props;
-  return (Array.isArray(children) ? children : [children]).filter(Boolean) as HeaderElement[];
-}
-
-function headerActionOf(renderer: MountedRenderer, testID: string): HeaderElement | undefined {
-  return headerActionsOf(renderer).find(action => action.props.testID === testID);
-}
-
-function requireHeaderAction(renderer: MountedRenderer, testID: string): HeaderElement {
-  const action = headerActionOf(renderer, testID);
-  const isMounted = renderer.root.findAll(node => node.props.testID === testID).length > 0;
-  if (!action || !isMounted) {
-    throw new Error(`header action ${testID} was not rendered`);
-  }
-  return action;
-}
-
-function findTypeCount(renderer: MountedRenderer, type: string): number {
-  return renderer.root.findAll(node => typeof node.type === 'string' && node.type === type).length;
-}
-
-function fireFocus(): void {
-  for (const effect of focusCallbacks.current) {
-    effect();
+function foreground() {
+  for (const listener of state.listeners) {
+    listener('active');
   }
 }
+beforeEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  state.focused = true;
+  state.focusCallbacks.clear();
+  state.destination = '';
+  state.sessionId = '';
+  state.announcements = [];
+  Object.assign(state.auth, { token: 'account', isLoading: false, isSigningOut: false });
+  Object.assign(state.organization, { organizationId: null, isLoaded: true });
+  Object.assign(state.boundary, { orgs: [], isResolving: false, isError: false });
+  Object.assign(state.live, {
+    activeSessions: [],
+    isLoading: false,
+    isError: false,
+    hasAcceptedSuccess: true,
+    isFetching: false,
+    isPaused: false,
+    terminalError: null,
+  });
+  Object.assign(state.connection, { isConnected: true, reconnectExhausted: false });
+  state.internet = 'online';
+  state.refetch.mockReset().mockResolvedValue(true);
+  state.boundaryRefetch.mockReset();
+  state.socketRetry.mockReset();
+  state.invalidate.mockReset();
+  readFilterRecord.mockReset().mockResolvedValue(null);
+});
+afterEach(() => {
+  act(() => mountedRenderer?.unmount());
+  mountedRenderer = undefined;
+  state.listeners.clear();
+});
 
-describe('AgentSessionListScreen live tab', () => {
-  beforeEach(() => {
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    focusState.current = true;
-    focusCallbacks.current = new Set();
-    orgState.organizationId = null;
-    orgState.isLoaded = true;
-    sessionListState.activeSessions = [];
-    sessionListState.isLoading = false;
-    sessionListState.isError = false;
-    readFilterRecord.mockReset();
-    readFilterRecord.mockResolvedValue(null);
-    refetchSpy.mockClear();
-    refetchSpy.mockResolvedValue(true);
-    routerPushSpy.mockClear();
-    routerDismissToSpy.mockClear();
-    invalidateQueries.mockClear();
-    toastErrorSpy.mockClear();
+describe('AgentSessionListScreen live presentation', () => {
+  it.each<{
+    name: string;
+    patch: Partial<typeof state.live>;
+    skeleton?: boolean;
+    empty?: boolean;
+    rows?: boolean;
+    error?: boolean;
+    updating?: boolean;
+  }>([
+    {
+      name: 'pending',
+      patch: { hasAcceptedSuccess: false, isLoading: true, isFetching: true },
+      skeleton: true,
+    },
+    { name: 'paused', patch: { hasAcceptedSuccess: false, isPaused: true }, skeleton: true },
+    { name: 'socket-only empty', patch: { hasAcceptedSuccess: false }, skeleton: true },
+    { name: 'canceled without provenance', patch: { hasAcceptedSuccess: false }, skeleton: true },
+    { name: 'accepted empty', patch: {}, empty: true },
+    {
+      name: 'initial failure',
+      patch: { hasAcceptedSuccess: false, terminalError: failure, isError: true },
+      error: true,
+    },
+    {
+      name: 'retained cache after a socket write',
+      patch: { activeSessions: [row], terminalError: failure },
+      rows: true,
+      error: true,
+    },
+    {
+      name: 'updating',
+      patch: { activeSessions: [row], isFetching: true },
+      rows: true,
+      updating: true,
+    },
+    {
+      name: 'updating after a terminal failure',
+      patch: { activeSessions: [row], terminalError: failure, isFetching: true },
+      rows: true,
+      error: true,
+      updating: true,
+    },
+    {
+      name: 'paused cache',
+      patch: { activeSessions: [row], isPaused: true, isFetching: true },
+      rows: true,
+    },
+  ])('keeps creation, history, and truthful content during $name', async test => {
+    Object.assign(state.live, test.patch);
+    await renderScreen();
+    expect(listSkeletons()).toHaveLength(test.skeleton ? 8 : 0);
+    if (test.skeleton) {
+      expect(listSkeletons()[0]?.props.className).toContain('h-[76px]');
+    }
+    expect(text().includes('Nothing running right now')).toBe(Boolean(test.empty));
+    expect(text().includes('Could not load active sessions')).toBe(Boolean(test.error));
+    expect(text().includes('Updating')).toBe(Boolean(test.updating));
+    expect(text().includes('Loading…')).toBe(Boolean(test.skeleton));
+    expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
+    expect(text()).toContain('Personal');
+    expect(headerAction().props.testID).toBe('agents-view-history');
+    expect(headerAction().props.accessibilityRole).toBe('button');
+    headerAction().props.onPress();
+    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
+    if (test.empty) {
+      expect(nodes('Pressable').some(node => node.props.testID === 'agents-new-session-fab')).toBe(
+        false
+      );
+      press('New coding task');
+    } else {
+      press('New session');
+    }
+    expect(state.destination).toBe('/(app)/agent-chat/new');
   });
 
-  afterEach(() => {
-    act(() => {
-      for (const renderer of mountedRenderers) {
-        renderer.unmount();
-      }
+  it('keeps cold-loading feedback stable until an accepted result', async () => {
+    state.live.hasAcceptedSuccess = false;
+    state.live.isLoading = true;
+    state.live.isFetching = true;
+    await renderScreen();
+    const loading = nodes('Text').find(node => node.children.includes('Loading…'));
+    const skeletons = nodes('Skeleton');
+    expect(loading).toBeDefined();
+    expect(skeletons).toHaveLength(8);
+    expect(text()).not.toContain('Updating');
+    expect(text()).not.toContain('Nothing running right now');
+    expect(state.announcements).toEqual(['Loading…']);
+
+    await renderScreen();
+    state.live.isLoading = false;
+    state.live.isFetching = false;
+    await renderScreen();
+    expect(nodes('Text').find(node => node.children.includes('Loading…'))).toBe(loading);
+    for (const [index, skeleton] of skeletons.entries()) {
+      expect(nodes('Skeleton')[index]).toBe(skeleton);
+    }
+    expect(state.announcements).toEqual(['Loading…']);
+    expect(text()).not.toContain('Nothing running right now');
+
+    state.live.hasAcceptedSuccess = true;
+    await renderScreen();
+    expect(text()).not.toContain('Loading…');
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(text()).toContain('Nothing running right now');
+    expect(state.announcements).toEqual(['Loading…']);
+  });
+
+  it('keeps list identity, row identity, navigation, run state, and scroll policy through reconnect and refresh failure', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const list = nodes('FlatList')[0];
+    const originalRow = nodes('RemoteSessionRow')[0];
+    if (!originalRow) {
+      throw new Error('Missing live row');
+    }
+    state.live.isFetching = true;
+    state.connection.isConnected = false;
+    await renderScreen();
+    expect(text()).toContain('Reconnecting…');
+    expect(text()).toContain('Updating');
+    state.live.isFetching = false;
+    state.live.terminalError = failure;
+    state.internet = 'offline';
+    await renderScreen();
+    expect(nodes('FlatList')[0]).toBe(list);
+    expect(nodes('RemoteSessionRow')[0]).toBe(originalRow);
+    expect(nodes('FlatList')[0]?.props.maintainVisibleContentPosition).toEqual({
+      minIndexForVisible: 0,
+      autoscrollToTopThreshold: 10,
     });
-    mountedRenderers.length = 0;
-    appState.listeners.clear();
-    vi.restoreAllMocks();
+    expect(nodes('RemoteSessionRow')[0]?.props.session).toMatchObject({ status: 'running' });
+    expect(text()).toContain('No internet connection');
+    expect(text()).not.toContain('Reconnecting…');
+    (originalRow.props.onPress as () => void)();
+    expect(state.sessionId).toBe('live-1');
   });
 
   it.each([
-    {
-      label: 'loading',
-      activeSessions: [] as { id: string; organizationId: string | null }[],
-      isLoading: true,
-      isError: false,
-    },
-    {
-      label: 'empty',
-      activeSessions: [] as { id: string; organizationId: string | null }[],
-      isLoading: false,
-      isError: false,
-    },
-    {
-      label: 'cold error',
-      activeSessions: [] as { id: string; organizationId: string | null }[],
-      isLoading: false,
-      isError: true,
-    },
-    {
-      label: 'happy',
-      activeSessions: [{ id: 'a1', organizationId: null }] as {
-        id: string;
-        organizationId: string | null;
-      }[],
-      isLoading: false,
-      isError: false,
-    },
-  ])('keeps See-all mounted in the $label state', async state => {
-    sessionListState.activeSessions = state.activeSessions;
-    sessionListState.isLoading = state.isLoading;
-    sessionListState.isError = state.isError;
+    ['offline', 'No internet connection'],
+    ['unknown', 'Connecting…'],
+    ['connecting', 'Connecting…'],
+    ['exhausted', 'Connection lost'],
+  ] as const)(
+    'keeps %s connection facts beside empty and error content',
+    async (mode, expected) => {
+      state.connection.isConnected = false;
+      state.connection.reconnectExhausted = mode === 'exhausted';
+      state.internet = mode === 'offline' || mode === 'unknown' ? mode : 'online';
+      await renderScreen();
+      expect(text()).toContain(expected);
+      expect(text()).toContain('Nothing running right now');
+      state.live.terminalError = failure;
+      await renderScreen();
+      expect(text()).toContain(expected);
+      expect(text()).toContain('Could not load active sessions');
+      expect(text()).not.toContain('Nothing running right now');
+      expect(text()).not.toContain('Internet connection restored');
+      if (mode === 'offline') {
+        expect(text()).not.toContain('Connecting…');
+      }
+      if (mode === 'exhausted') {
+        expect(text()).not.toContain('Connecting…');
+        expect(text()).not.toContain('Reconnecting…');
+      }
+    }
+  );
 
-    const renderer = await renderScreen();
-    const seeAll = requireHeaderAction(renderer, 'agents-view-history');
+  it.each([false, true])(
+    'keeps a failed query Retry recoverable with cached rows=%s',
+    async cached => {
+      state.live.activeSessions = cached ? [row] : [];
+      state.live.terminalError = failure;
+      state.connection.isConnected = false;
+      state.connection.reconnectExhausted = true;
+      const pending = Promise.withResolvers<boolean>();
+      state.refetch.mockReturnValue(pending.promise);
+      await renderScreen();
+      act(() => {
+        press('Retry');
+        press('Retry');
+      });
+      expect(action('Retry').props.disabled).toBe(true);
+      expect(action('Retry').props.accessibilityState).toMatchObject({
+        busy: true,
+        disabled: true,
+      });
+      expect(action('Retry connection').props.disabled).toBe(false);
+      const queryRetry = action('Retry');
+      const socketRetry = action('Retry connection');
+      expect(
+        nodes('View').filter(
+          view =>
+            view.props.accessible === true &&
+            view.findAll(node => node === queryRetry || node === socketRetry).length > 0
+        )
+      ).toHaveLength(0);
+      expect(state.refetch).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        pending.resolve(false);
+        await pending.promise;
+      });
+      expect(action('Retry').props.disabled).toBe(false);
+      expect(text()).toContain('Could not load active sessions');
+      state.refetch.mockImplementation(async () => {
+        await Promise.resolve();
+        state.live.terminalError = null;
+        return true;
+      });
+      await act(async () => {
+        press('Retry');
+        await Promise.resolve();
+      });
+      await renderScreen();
+      expect(text()).not.toContain('Could not load active sessions');
+      expect(nodes('FlatList')).toHaveLength(cached ? 1 : 0);
+      state.socketRetry.mockImplementation(() => {
+        state.connection.reconnectExhausted = false;
+      });
+      act(() => {
+        press('Retry connection');
+      });
+      await renderScreen();
+      expect(text()).toContain('Connecting…');
+      expect(text()).not.toContain('Connection lost');
+      expect(state.refetch).toHaveBeenCalledTimes(2);
+    }
+  );
 
-    expect(seeAll.props.accessibilityRole).toBe('button');
-    const control = renderer.root.find(
-      node =>
-        (node.type as string) === 'Pressable' &&
-        node.props.accessibilityHint === 'profile.selectAccount'
-    );
-    expect(control.props.accessibilityRole).toBe('button');
-    expect(control.props.accessibilityLabel).toBe('profile.personal');
-    expect(control.props.accessibilityState).toEqual({ busy: false, disabled: false });
+  it('keeps the retained error and Retry mounted as socket rows appear and disappear', async () => {
+    state.live.hasAcceptedSuccess = false;
+    state.live.terminalError = failure;
+    await renderScreen();
+    const message = 'Could not load active sessions';
+    const retry = action('Retry');
+    const status = nodes('Text').find(node => node.children.includes(message));
+    expect(status).toBeDefined();
+    expect(nodes('AlertCircle')).toHaveLength(1);
+
+    async function updateSocketRows(activeSessions: ActiveSession[]) {
+      state.live.activeSessions = activeSessions;
+      await renderScreen();
+      expect(nodes('RemoteSessionRow')).toHaveLength(activeSessions.length);
+      expect.soft(action('Retry') === retry).toBe(true);
+      expect
+        .soft(nodes('Text').find(node => node.children.includes(message)) === status)
+        .toBe(true);
+      expect.soft(state.announcements).toEqual([message]);
+      expect(nodes('AlertCircle')).toHaveLength(activeSessions.length === 0 ? 1 : 0);
+    }
+    await updateSocketRows([row]);
+    await updateSocketRows([]);
   });
 
-  it('pushes the history route when See-all is pressed', async () => {
-    const renderer = await renderScreen();
-    const seeAll = requireHeaderAction(renderer, 'agents-view-history');
-
-    const onPress = seeAll.props.onPress as () => void;
-    onPress();
-    expect(routerPushSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/history');
+  it('does not invent internet or retry activity for an unknown paused connection', async () => {
+    state.internet = 'unknown';
+    state.connection.isConnected = false;
+    state.live.isPaused = true;
+    state.live.hasAcceptedSuccess = false;
+    await renderScreen();
+    expect(listSkeletons()).toHaveLength(8);
+    expect(text()).not.toContain('Nothing running right now');
+    expect(text()).not.toContain('Connecting…');
+    expect(text()).not.toContain('Reconnecting…');
+    expect(text()).not.toContain('No internet connection');
+    expect(text()).not.toContain('Updating');
   });
 
-  it('renders no history list, animated wrappers, or active-now section', async () => {
-    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
-    const renderer = await renderScreen();
+  it('retains one error announcement after a failed pull and waits for coordinated completion', async () => {
+    state.live.activeSessions = [row];
+    const pending = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(pending.promise);
+    await renderScreen();
+    const refresh = () =>
+      nodes('FlatList')[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
+      };
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(refresh().props.refreshing).toBe(true);
+    state.live.terminalError = failure;
+    await act(async () => {
+      pending.resolve(false);
+      await pending.promise;
+    });
+    expect(refresh().props.refreshing).toBe(false);
+    expect(text()).toContain('Could not load active sessions');
+    expect(
+      state.announcements.filter(message => message === 'Could not load active sessions')
+    ).toHaveLength(1);
+  });
 
+  it('does not announce on a successful pull with cached rows', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const refresh = nodes('FlatList')[0]?.props.refreshControl as {
+      props: { onRefresh: () => void };
+    };
+    await act(async () => {
+      refresh.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(state.refetch).toHaveBeenCalledTimes(1);
+    expect(state.announcements).toEqual([]);
+  });
+
+  it('passes a numeric attention revision as extraData to the live FlatList', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    expect(typeof nodes('FlatList')[0]?.props.extraData).toBe('number');
+  });
+
+  it('renders no history list, animated wrappers, or active-now section and keeps one history label without a plus icon', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
     for (const type of [
       'SessionFilterModal',
       'ActiveNowSection',
       'AgentSessionListContent',
       'AnimatedView',
     ]) {
-      expect(findTypeCount(renderer, type)).toBe(0);
+      expect(nodes(type)).toHaveLength(0);
     }
+    expect(headerAction().type).toBe('Pressable');
+    expect(headerAction().props.children.type).toBe('Text');
+  });
+});
+
+describe('AgentSessionListScreen context control', () => {
+  it('keeps the context picker and history action mounted', async () => {
+    await renderScreen();
+    expect(header().parent?.children[0]).toBe(header());
+    expect(contextControl().props.accessibilityRole).toBe('button');
+    expect(contextControl().props.accessibilityLabel).toBe('Personal');
+    expect(contextControl().props.accessibilityState).toEqual({ busy: false, disabled: false });
+    expect(headerAction().props.accessibilityRole).toBe('button');
   });
 
-  it('shows the search header only once there are live rows', async () => {
-    const empty = await renderScreen();
-    expect(findTypeCount(empty, 'SessionListSearchHeader')).toBe(0);
+  it('keeps the context and list unresolved until the organization restores', async () => {
+    state.organization.isLoaded = false;
+    state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Agents organization' }];
+    await renderScreen();
+    expect(contextControl().props.accessibilityState).toEqual({ busy: true, disabled: true });
+    expect(contextControl().props.accessibilityLabel).toBe('Select account');
+    expect(nodes('Skeleton')).toHaveLength(9);
+    expect(nodes('FlatList')).toHaveLength(0);
+    expect(text()).not.toContain('Personal');
+    state.organization.organizationId = 'org-1';
+    state.organization.isLoaded = true;
+    await renderScreen();
+    expect(contextControl().props.accessibilityLabel).toBe('Agents organization');
+    expect(contextControl().props.accessibilityState).toEqual({ busy: false, disabled: false });
+    expect(headerAction().props.accessibilityRole).toBe('button');
+  });
+});
 
-    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
-    const withRows = await renderScreen();
-    expect(findTypeCount(withRows, 'SessionListSearchHeader')).toBe(1);
+describe('AgentSessionListScreen live counts', () => {
+  it.each([
+    { count: 1, label: '1 LIVE' },
+    { count: 3, label: '3 LIVE' },
+    { count: 4, label: '4 LIVE' },
+    { count: 12, label: '12 LIVE' },
+  ])('shows $label above Agents for the full live list', async ({ count, label }) => {
+    state.live.activeSessions = Array.from({ length: count }, (_, index) => ({
+      ...row,
+      id: `session-${index}`,
+    }));
+    await renderScreen();
+
+    expect(header().props.eyebrow).toBe(label);
+    expect(header().props.title).toBe('Agents');
+  });
+
+  it.each([
+    { name: 'loading', isLoading: true, orgLoaded: true },
+    { name: 'unknown organization', isLoading: false, orgLoaded: false },
+  ])('hides a cached count during $name', async ({ isLoading, orgLoaded }) => {
+    state.live.activeSessions = [row];
+    state.live.isLoading = isLoading;
+    state.organization.isLoaded = orgLoaded;
+    await renderScreen();
+
+    expect(header().props.eyebrow).toBeUndefined();
+    expect(nodes('FlatList')).toHaveLength(orgLoaded ? 1 : 0);
+  });
+});
+
+describe('AgentSessionListScreen live filtering', () => {
+  it('shows the search header only once there are live rows', async () => {
+    await renderScreen();
+    expect(nodes('SessionListSearchHeader')).toHaveLength(0);
+
+    state.live.activeSessions = [row];
+    await renderScreen();
+    expect(nodes('SessionListSearchHeader')).toHaveLength(1);
   });
 
   it('holds the skeletons until the persisted filter record resolves', async () => {
-    // A never-settling read stands in for a slow SecureStore: the list must not
-    // paint unfiltered rows that a stored filter would then remove.
     readFilterRecord.mockReturnValue(new Promise<string | null>(() => undefined));
-    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
+    state.live.activeSessions = [row];
 
-    const renderer = await renderScreen();
+    await renderScreen();
 
-    expect(findTypeCount(renderer, 'Skeleton')).toBe(8);
-    expect(findTypeCount(renderer, 'FlatList')).toBe(0);
+    expect(listSkeletons()).toHaveLength(8);
+    expect(nodes('FlatList')).toHaveLength(0);
   });
 
   it('applies a persisted filter without first painting the unfiltered list', async () => {
     readFilterRecord.mockResolvedValue(
       JSON.stringify({ platformFilter: [], projectFilter: ['https://github.com/kilo/cloud.git'] })
     );
-    sessionListState.activeSessions = [
-      { id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
-      { id: 'a2', organizationId: null, gitUrl: 'https://github.com/kilo/other.git' },
+    state.live.activeSessions = [
+      { ...row, id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
+      { ...row, id: 'a2', organizationId: null, gitUrl: 'https://github.com/kilo/other.git' },
     ];
 
-    const renderer = await renderScreen();
+    await renderScreen();
 
-    const list = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
-    );
-    expect((list.props.data as { id: string }[]).map(session => session.id)).toEqual(['a1']);
-    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(1);
+    const list = requireNode('FlatList');
+    expect((list.props.data as ActiveSession[]).map(session => session.id)).toEqual(['a1']);
+    expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
   });
 
   it('clears only the search when the no-match CTA says Clear search', async () => {
     readFilterRecord.mockResolvedValue(
       JSON.stringify({ platformFilter: [], projectFilter: ['https://github.com/kilo/cloud.git'] })
     );
-    sessionListState.activeSessions = [
+    state.live.activeSessions = [
       {
+        ...row,
         id: 'a1',
         organizationId: null,
         title: 'Ship it',
@@ -415,76 +774,76 @@ describe('AgentSessionListScreen live tab', () => {
     ];
     const renderer = await renderScreen();
 
-    const searchHeader = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'SessionListSearchHeader'
-    );
+    const searchHeader = requireNode('SessionListSearchHeader');
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
 
-    const emptyState = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'EmptyState'
-    );
-    expect(emptyState.props.description).toBe('agents.sessionList.tryDifferentSearch');
+    const emptyState = renderer.root.findByType(EmptyState);
+    expect(emptyState.props.description).toBe('Try a different search term.');
     act(() => {
       (emptyState.props.action as { props: { onPress: () => void } }).props.onPress();
     });
 
-    // The row is back, and the persisted repository filter survived.
-    expect(findTypeCount(renderer, 'FlatList')).toBe(1);
-    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(1);
+    expect(nodes('FlatList')).toHaveLength(1);
+    expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
   });
 
   it('narrows the live list to the search text', async () => {
-    sessionListState.activeSessions = [
-      { id: 'a1', organizationId: null, title: 'Fix the login redirect' },
-      { id: 'a2', organizationId: null, title: 'Bump deps' },
+    state.live.activeSessions = [
+      { ...row, id: 'a1', organizationId: null, title: 'Fix the login redirect' },
+      { ...row, id: 'a2', organizationId: null, title: 'Bump deps' },
     ];
-    const renderer = await renderScreen();
+    await renderScreen();
 
-    const searchHeader = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'SessionListSearchHeader'
-    );
+    const searchHeader = requireNode('SessionListSearchHeader');
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('bump');
     });
 
-    const list = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
-    );
-    expect((list.props.data as { id: string }[]).map(session => session.id)).toEqual(['a2']);
+    const list = requireNode('FlatList');
+    expect((list.props.data as ActiveSession[]).map(session => session.id)).toEqual(['a2']);
   });
 
   it('keeps the header right to See-all alone while nothing is filterable', async () => {
-    const renderer = await renderScreen();
+    await renderScreen();
 
-    expect(headerActionsOf(renderer)).toHaveLength(1);
-    expect(headerActionOf(renderer, 'agents-open-filters')).toBeUndefined();
+    expect(headerActions()).toHaveLength(1);
+    expect(
+      headerActions().find(button => button.props.testID === 'agents-open-filters')
+    ).toBeUndefined();
   });
 
   it('offers the filter button once a live row carries a repository', async () => {
-    sessionListState.activeSessions = [
-      { id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
+    state.live.activeSessions = [
+      { ...row, id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
     ];
-    const renderer = await renderScreen();
+    await renderScreen();
 
-    const filterButton = requireHeaderAction(renderer, 'agents-open-filters');
-    expect(filterButton.props.activeCount).toBe(0);
+    expect(headerAction('agents-open-filters').props.activeCount).toBe(0);
   });
 
   it('keeps real pills, counts, results, and search placement in sync through removal', async () => {
     const workflow = 'https://github.com/iscekic/kilo-workflow.git';
     const code = 'https://github.com/Kilo-Org/kilocode.git';
-    sessionListState.activeSessions = [
+    state.live.activeSessions = [
       {
+        ...row,
         id: 'workflow',
         organizationId: null,
         gitUrl: workflow,
         createdOnPlatform: 'cloud-agent-web',
       },
-      { id: 'code-cloud', organizationId: null, gitUrl: code, createdOnPlatform: 'cloud-agent' },
-      { id: 'code-cli', organizationId: null, gitUrl: code, createdOnPlatform: 'cli' },
       {
+        ...row,
+        id: 'code-cloud',
+        organizationId: null,
+        gitUrl: code,
+        createdOnPlatform: 'cloud-agent',
+      },
+      { ...row, id: 'code-cli', organizationId: null, gitUrl: code, createdOnPlatform: 'cli' },
+      {
+        ...row,
         id: 'other',
         organizationId: null,
         gitUrl: 'https://github.com/example/other.git',
@@ -492,13 +851,11 @@ describe('AgentSessionListScreen live tab', () => {
       },
     ];
     const renderer = await renderScreen();
-    expect(findTypeCount(renderer, 'ScrollView')).toBe(0);
+    expect(nodes('ScrollView')).toHaveLength(0);
     act(() => {
-      (requireHeaderAction(renderer, 'agents-open-filters').props.onPress as () => void)();
+      headerAction('agents-open-filters').props.onPress();
     });
-    const modal = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'SessionFilterModal'
-    );
+    const modal = requireNode('SessionFilterModal');
     act(() => {
       (modal.props.onApply as (filters: unknown) => void)({
         projectFilter: [workflow, code],
@@ -506,63 +863,52 @@ describe('AgentSessionListScreen live tab', () => {
       });
       (modal.props.onClose as () => void)();
     });
-    const visibleIds = () => {
-      const rows = renderer.root.find(
-        node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
-      ).props.data as MockActiveSession[];
-      return rows.map(row => row.id);
-    };
+    const visibleIds = () =>
+      (requireNode('FlatList').props.data as ActiveSession[]).map(session => session.id);
     expect(visibleIds()).toEqual(['workflow', 'code-cloud']);
-    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(3);
-    const strip = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'ScrollView'
-    );
-    expect((strip.props.className as string | undefined)?.split(' ')).toEqual(
+    expect(headerAction('agents-open-filters').props.activeCount).toBe(3);
+    const strip = nodes('ScrollView')[0];
+    expect((strip?.props.className as string | undefined)?.split(' ')).toEqual(
       expect.arrayContaining(['grow-0', 'shrink-0'])
     );
-    const header = renderer.root.findByType(ScreenHeader);
-    expect(header.parent?.children[0]).toBe(header);
+    expect(header().parent?.children[0]).toBe(header());
     const selectedTree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
     expect(
       selectedTree.children
-        ?.slice(0, 3)
+        ?.slice(0, 4)
         .map(child => (typeof child === 'string' ? child : child.type))
-    ).toEqual(['View', 'SessionListSearchHeader', 'ScrollView']);
+    ).toEqual(['View', 'View', 'SessionListSearchHeader', 'ScrollView']);
 
     for (const step of [
       {
-        label: 'agentChat.sessionFilter.removeProjectFilter: iscekic/kilo-workflow',
+        label: 'Remove iscekic/kilo-workflow project filter',
         count: 2,
         ids: ['code-cloud'],
       },
       {
-        label:
-          'agentChat.sessionFilter.removePlatformFilter: agentChat.sessionFilter.platformCloud',
+        label: 'Remove Cloud platform filter',
         count: 1,
         ids: ['code-cloud', 'code-cli'],
       },
       {
-        label: 'agentChat.sessionFilter.removeProjectFilter: Kilo-Org/kilocode',
+        label: 'Remove Kilo-Org/kilocode project filter',
         count: 0,
         ids: ['workflow', 'code-cloud', 'code-cli', 'other'],
       },
     ]) {
       act(() => {
-        const pill = renderer.root.findByProps({ accessibilityLabel: step.label });
-        (pill.props.onPress as () => void)();
+        press(step.label);
       });
-      expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(
-        step.count
-      );
+      expect(headerAction('agents-open-filters').props.activeCount).toBe(step.count);
       expect(visibleIds()).toEqual(step.ids);
     }
-    expect(findTypeCount(renderer, 'ScrollView')).toBe(0);
+    expect(nodes('ScrollView')).toHaveLength(0);
     const clearedTree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
     expect(
       clearedTree.children
-        ?.slice(0, 3)
+        ?.slice(0, 4)
         .map(child => (typeof child === 'string' ? child : child.type))
-    ).toEqual(['View', 'SessionListSearchHeader', 'FlatList']);
+    ).toEqual(['View', 'View', 'SessionListSearchHeader', 'FlatList']);
   });
 
   it('keeps saved repository and platform selections after a successful list retry', async () => {
@@ -573,20 +919,28 @@ describe('AgentSessionListScreen live tab', () => {
         ? JSON.stringify({ projectFilter: [gitUrl], platformFilter: ['cloud-agent'] })
         : null;
     });
-    sessionListState.isError = true;
-    const renderer = await renderScreen();
-    const error = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'QueryError'
-    );
-    expect(error.props.message).toBe('agents.sessionList.couldNotLoadActive');
-    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(2);
-    refetchSpy.mockImplementationOnce(async () => {
+    state.live.hasAcceptedSuccess = false;
+    state.live.isError = true;
+    state.live.terminalError = failure;
+    await renderScreen();
+    expect(text()).toContain('Could not load active sessions');
+    expect(headerAction('agents-open-filters').props.activeCount).toBe(2);
+    state.refetch.mockImplementationOnce(async () => {
       await Promise.resolve();
-      sessionListState.isError = false;
-      sessionListState.activeSessions = [
-        { id: 'matching', organizationId: null, gitUrl, createdOnPlatform: 'cloud-agent-web' },
-        { id: 'wrong-platform', organizationId: null, gitUrl, createdOnPlatform: 'cli' },
+      state.live.isError = false;
+      state.live.terminalError = null;
+      state.live.hasAcceptedSuccess = true;
+      state.live.activeSessions = [
         {
+          ...row,
+          id: 'matching',
+          organizationId: null,
+          gitUrl,
+          createdOnPlatform: 'cloud-agent-web',
+        },
+        { ...row, id: 'wrong-platform', organizationId: null, gitUrl, createdOnPlatform: 'cli' },
+        {
+          ...row,
           id: 'wrong-repository',
           organizationId: null,
           gitUrl: 'https://github.com/example/other.git',
@@ -596,38 +950,33 @@ describe('AgentSessionListScreen live tab', () => {
       return true;
     });
     await act(async () => {
-      (error.props.onRetry as () => void)();
+      press('Retry');
       await Promise.resolve();
-      renderer.update(createElement(AgentSessionListScreen));
     });
-    expect(findTypeCount(renderer, 'QueryError')).toBe(0);
-    const rows = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
-    ).props.data as MockActiveSession[];
-    expect(rows.map(row => row.id)).toEqual(['matching']);
-    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(2);
+    await renderScreen();
+    expect(text()).not.toContain('Could not load active sessions');
+    const rows = requireNode('FlatList').props.data as ActiveSession[];
+    expect(rows.map(session => session.id)).toEqual(['matching']);
+    expect(headerAction('agents-open-filters').props.activeCount).toBe(2);
     expect(
-      renderer.root
-        .find(node => typeof node.type === 'string' && (node.type as string) === 'ScrollView')
-        .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Pressable')
+      requireNode('ScrollView').findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+      )
     ).toHaveLength(2);
   });
 
   it('filters the live list down to the applied repository', async () => {
-    sessionListState.activeSessions = [
-      { id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
-      { id: 'a2', organizationId: null, gitUrl: 'https://github.com/kilo/other.git' },
+    state.live.activeSessions = [
+      { ...row, id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
+      { ...row, id: 'a2', organizationId: null, gitUrl: 'https://github.com/kilo/other.git' },
     ];
-    const renderer = await renderScreen();
+    await renderScreen();
 
-    const filterButton = requireHeaderAction(renderer, 'agents-open-filters');
     act(() => {
-      (filterButton.props.onPress as () => void)();
+      headerAction('agents-open-filters').props.onPress();
     });
 
-    const modal = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'SessionFilterModal'
-    );
+    const modal = requireNode('SessionFilterModal');
     expect(modal.props.projectOptions).toHaveLength(2);
     act(() => {
       (modal.props.onApply as (filters: unknown) => void)({
@@ -637,24 +986,20 @@ describe('AgentSessionListScreen live tab', () => {
       });
     });
 
-    const list = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
-    );
-    expect((list.props.data as { id: string }[]).map(session => session.id)).toEqual(['a1']);
+    const list = requireNode('FlatList');
+    expect((list.props.data as ActiveSession[]).map(session => session.id)).toEqual(['a1']);
   });
 
   it('shows a clearable no-match state when every live row is filtered out', async () => {
-    sessionListState.activeSessions = [
-      { id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
+    state.live.activeSessions = [
+      { ...row, id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
     ];
     const renderer = await renderScreen();
 
     act(() => {
-      (requireHeaderAction(renderer, 'agents-open-filters').props.onPress as () => void)();
+      headerAction('agents-open-filters').props.onPress();
     });
-    const modal = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'SessionFilterModal'
-    );
+    const modal = requireNode('SessionFilterModal');
     act(() => {
       (modal.props.onApply as (filters: unknown) => void)({
         platformFilter: ['slack'],
@@ -663,278 +1008,168 @@ describe('AgentSessionListScreen live tab', () => {
       });
     });
 
-    const emptyState = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'EmptyState'
-    );
-    expect(emptyState.props.title).toBe('agents.sessionList.noMatches');
-    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(1);
-    expect(findTypeCount(renderer, 'ScrollView')).toBe(1);
+    const emptyState = renderer.root.findByType(EmptyState);
+    expect(emptyState.props.title).toBe('No sessions match');
+    expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
+    expect(nodes('ScrollView')).toHaveLength(1);
 
     const clearAction = emptyState.props.action as { props: { onPress: () => void } };
     act(() => {
       clearAction.props.onPress();
     });
-    expect(findTypeCount(renderer, 'FlatList')).toBe(1);
-    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(0);
-    expect(findTypeCount(renderer, 'ScrollView')).toBe(0);
+    expect(nodes('FlatList')).toHaveLength(1);
+    expect(headerAction('agents-open-filters').props.activeCount).toBe(0);
+    expect(nodes('ScrollView')).toHaveLength(0);
   });
+});
 
-  it('hides the FAB when there are no live rows', async () => {
-    const renderer = await renderScreen();
-    expect(
-      renderer.root.findAll(node => node.props.testID === 'agents-new-session-fab')
-    ).toHaveLength(0);
-  });
-
-  it('shows the FAB when live rows exist', async () => {
-    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
-    const renderer = await renderScreen();
-    expect(
-      renderer.root.findAll(node => node.props.testID === 'agents-new-session-fab')
-    ).toHaveLength(1);
-  });
+describe('Live list admission and lifecycle', () => {
+  it.each(['pending', 'failed'] as const)(
+    'admits personal creation while membership is %s',
+    async mode => {
+      state.boundary.orgs = undefined;
+      state.boundary.isResolving = mode === 'pending';
+      state.boundary.isError = mode === 'failed';
+      state.live.hasAcceptedSuccess = false;
+      await renderScreen();
+      press('New session');
+      expect(state.destination).toBe('/(app)/agent-chat/new');
+      expect(text()).toContain('Personal');
+    }
+  );
 
   it.each([
-    { count: 1, label: '1 LIVE' },
-    { count: 3, label: '3 LIVE' },
-    { count: 4, label: '4 LIVE' },
-    { count: 12, label: '12 LIVE' },
-  ])('shows $label above Agents for the full live list', async ({ count, label }) => {
-    sessionListState.activeSessions = Array.from({ length: count }, (_, index) => ({
-      id: `session-${index}`,
-      organizationId: null,
-    }));
-    const renderer = await renderScreen();
-
-    expect(headerOf(renderer).props.eyebrow).toBe(label);
-    expect(headerOf(renderer).props.title).toBe('tabs.agents');
-  });
-
-  it.each([
-    { state: 'loading', isLoading: true, orgLoaded: true },
-    { state: 'unknown organization', isLoading: false, orgLoaded: false },
-  ])('hides a cached count during $state', async ({ isLoading, orgLoaded }) => {
-    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
-    sessionListState.isLoading = isLoading;
-    orgState.isLoaded = orgLoaded;
-    const renderer = await renderScreen();
-
-    expect(headerOf(renderer).props.eyebrow).toBeUndefined();
-    expect(findTypeCount(renderer, 'FlatList')).toBe(1);
-  });
-
-  it('keeps the context and list unresolved until the organization restores', async () => {
-    orgState.isLoaded = false;
-    sessionListState.isLoading = false;
-    sessionListState.isError = false;
-    const renderer = await renderScreen();
-    expect(findTypeCount(renderer, 'EmptyState')).toBe(0);
-    expect(findTypeCount(renderer, 'Skeleton')).toBe(9);
-    const control = () =>
-      renderer.root.find(
-        node =>
-          (node.type as string) === 'Pressable' &&
-          node.props.accessibilityHint === 'profile.selectAccount'
+    'account pending',
+    'signed out',
+    'signing out',
+    'selection pending',
+    'membership paused',
+    'membership missing',
+    'permission denied',
+  ] as const)('suppresses protected rows for %s', async mode => {
+    state.live.activeSessions = [row];
+    state.organization.organizationId = 'org-1';
+    state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
+    if (mode === 'account pending') {
+      state.auth.isLoading = true;
+    }
+    if (mode === 'signed out') {
+      state.auth.token = undefined;
+    }
+    if (mode === 'signing out') {
+      state.auth.isSigningOut = true;
+    }
+    if (mode === 'selection pending') {
+      state.organization.isLoaded = false;
+    }
+    if (mode === 'membership paused') {
+      state.boundary.orgs = undefined;
+    }
+    if (mode === 'membership missing') {
+      state.boundary.orgs = [];
+    }
+    if (mode === 'permission denied') {
+      state.live.terminalError = { kind: 'non-retryable', error: { data: { code: 'FORBIDDEN' } } };
+    }
+    await renderScreen();
+    expect(nodes('FlatList')).toHaveLength(0);
+    expect(text()).not.toContain('Nothing running right now');
+    if (mode !== 'permission denied') {
+      expect(nodes('Pressable').some(node => node.props.testID === 'agents-new-session-fab')).toBe(
+        false
       );
-    expect(control().props.accessibilityState).toEqual({ busy: true, disabled: true });
-    expect(
-      renderer.root.findAll(node => (node.type as string) === 'Text').flatMap(node => node.children)
-    ).not.toContain('profile.personal');
-    orgState.organizationId = 'org-1';
-    orgState.isLoaded = true;
-    await act(() => {
-      renderer.update(createElement(AgentSessionListScreen));
-    });
-    expect(control().props.accessibilityLabel).toBe('Agents organization');
-    expect(control().props.accessibilityState).toEqual({ busy: false, disabled: false });
-    expect(requireHeaderAction(renderer, 'agents-view-history').props.accessibilityRole).toBe(
-      'button'
-    );
+      expect(text()).not.toContain('Engineering');
+    }
+    if (mode === 'membership paused') {
+      expect(listSkeletons()).toHaveLength(8);
+      expect(text()).not.toContain('Organization unavailable');
+    }
+    if (mode === 'membership missing' || mode === 'permission denied') {
+      expect(text()).toContain(
+        mode === 'permission denied' ? 'Access denied' : 'Organization unavailable'
+      );
+      expect(nodes('Pressable').some(node => node.props.accessibilityLabel === 'Retry')).toBe(
+        false
+      );
+    }
+    headerAction().props.onPress();
+    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
   });
 
-  it('renders skeletons while the live query is loading with no cached rows', async () => {
-    sessionListState.isLoading = true;
-    sessionListState.isError = false;
-    sessionListState.activeSessions = [];
-
-    const renderer = await renderScreen();
-
-    expect(findTypeCount(renderer, 'Skeleton')).toBe(8);
-    expect(findTypeCount(renderer, 'EmptyState')).toBe(0);
-    expect(findTypeCount(renderer, 'QueryError')).toBe(0);
-  });
-
-  it('renders the empty state when there are no live sessions', async () => {
-    const renderer = await renderScreen();
-    const emptyState = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'EmptyState'
-    );
-    expect(emptyState.props.title).toBe('home.noLiveSessions');
-    expect(emptyState.props.description).toBe('agents.sessionList.noSessionsYetDescription');
-    expect(findTypeCount(renderer, 'EmptyState')).toBe(1);
-    expect(findTypeCount(renderer, 'FlatList')).toBe(0);
-
-    const createAction = emptyState.props.action as {
-      type: string;
-      props: { onPress: () => void };
-    };
-    expect(createAction.type).toBe('Button');
-    createAction.props.onPress();
-    expect(routerPushSpy).toHaveBeenCalledWith('/(app)/agent-chat/new');
-  });
-
-  it('renders QueryError for a cold error with no cached rows', async () => {
-    sessionListState.isError = true;
-    const renderer = await renderScreen();
-
-    const queryError = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'QueryError'
-    );
-    expect(queryError.props.message).toBe('agents.sessionList.couldNotLoadActive');
-
-    const onRetry = queryError.props.onRetry as () => void;
-    onRetry();
-    expect(refetchSpy).toHaveBeenCalledTimes(1);
-
-    expect(findTypeCount(renderer, 'QueryError')).toBe(1);
-    expect(findTypeCount(renderer, 'FlatList')).toBe(0);
-    expect(
-      renderer.root.findAll(node => node.props.testID === 'agents-new-session-fab')
-    ).toHaveLength(0);
-  });
-
-  it('keeps cached rows mounted when a refetch fails', async () => {
-    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
-    sessionListState.isError = true;
-
-    const renderer = await renderScreen();
-
-    expect(findTypeCount(renderer, 'QueryError')).toBe(0);
-    const list = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
-    );
-    expect(list.props.data).toHaveLength(1);
-  });
-
-  it('passes a numeric attention revision as extraData to the live FlatList', async () => {
-    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
-
-    const renderer = await renderScreen();
-
-    const list = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
-    );
-    expect(typeof list.props.extraData).toBe('number');
-  });
-
-  it('announces a refresh failure once on a failed pull with cached rows', async () => {
-    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
-    refetchSpy.mockResolvedValue(false);
-
-    const renderer = await renderScreen();
-
-    const flatList = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
-    );
-    const refreshControl = flatList.props.refreshControl as {
-      props: { onRefresh: () => void };
-    };
-    act(() => {
-      refreshControl.props.onRefresh();
-    });
-    await act(async () => {
+  it('recovers membership through boundary Retry, scopes empty content, and drops old labels on a context change', async () => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.isError = true;
+    state.boundary.orgs = undefined;
+    await renderScreen();
+    expect(text()).toContain("Couldn't load your organizations");
+    state.boundaryRefetch.mockImplementation(async () => {
+      state.boundary.isError = false;
+      state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
       await Promise.resolve();
     });
-
-    expect(toastErrorSpy).toHaveBeenCalledTimes(1);
-    expect(toastErrorSpy).toHaveBeenCalledWith('common.couldNotRefresh');
-  });
-
-  it('does not announce on a successful pull with cached rows', async () => {
-    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
-    refetchSpy.mockResolvedValue(true);
-
-    const renderer = await renderScreen();
-
-    const flatList = renderer.root.find(
-      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
-    );
-    const refreshControl = flatList.props.refreshControl as {
-      props: { onRefresh: () => void };
-    };
-    act(() => {
-      refreshControl.props.onRefresh();
-    });
     await act(async () => {
+      press('Retry');
       await Promise.resolve();
     });
-
-    expect(toastErrorSpy).not.toHaveBeenCalled();
-  });
-
-  it('refetches live sessions on route focus', async () => {
     await renderScreen();
-
-    act(() => {
-      fireFocus();
-    });
-    expect(refetchSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it('refetches and invalidates the active-sessions tray on foreground while focused', async () => {
+    expect(text()).toContain('Engineering');
+    expect(text()).toContain('Nothing running right now');
+    press('New coding task');
+    expect(state.destination).toBe('/(app)/agent-chat/new?organizationId=org-1');
+    expect(state.refetch).not.toHaveBeenCalled();
+    state.organization.organizationId = 'org-2';
+    state.live.activeSessions = [row];
     await renderScreen();
-
-    act(() => {
-      fireFocus();
-    });
-    expect(refetchSpy).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      appState.emit('background');
-    });
-    act(() => {
-      appState.emit('active');
-    });
-
-    expect(refetchSpy).toHaveBeenCalledTimes(2);
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: [['activeSessions']] });
+    expect(text()).not.toContain('Engineering');
+    expect(nodes('FlatList')).toHaveLength(0);
   });
 
-  it('does not refetch or invalidate on foreground while unfocused', async () => {
-    focusState.current = false;
+  it('refreshes live sessions on focus and preserves foreground tray invalidation', async () => {
+    state.refetch.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      state.live.activeSessions = [row];
+      return true;
+    });
     await renderScreen();
-
+    expect(nodes('FlatList')).toHaveLength(0);
     act(() => {
-      appState.emit('background');
+      for (const effect of state.focusCallbacks) {
+        effect();
+      }
     });
-    act(() => {
-      appState.emit('active');
-    });
-
-    expect(refetchSpy).not.toHaveBeenCalled();
-    expect(invalidateQueries).not.toHaveBeenCalled();
-  });
-
-  it('does not refetch or invalidate on foreground after focus is lost post-mount', async () => {
     await renderScreen();
-
-    act(() => {
-      fireFocus();
+    expect(nodes('RemoteSessionRow')[0]?.props.session).toMatchObject({ title: 'Live task' });
+    state.refetch.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      state.live.activeSessions = [{ ...row, title: 'Foreground result' }];
+      return true;
     });
-    expect(refetchSpy).toHaveBeenCalledTimes(1);
-
-    // Blur the tab after mount WITHOUT re-rendering: a frozen (unfocused) tab
-    // does not re-render, so the AppState callback must read focus live.
-    focusState.current = false;
-
-    act(() => {
-      appState.emit('background');
+    act(foreground);
+    await renderScreen();
+    expect(nodes('RemoteSessionRow')[0]?.props.session).toMatchObject({
+      title: 'Foreground result',
     });
-    act(() => {
-      appState.emit('active');
-    });
-
-    expect(refetchSpy).toHaveBeenCalledTimes(1);
-    expect(invalidateQueries).not.toHaveBeenCalled();
+    expect(state.refetch).toHaveBeenCalledTimes(2);
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [['activeSessions']] });
   });
+
+  it.each([false, true])(
+    'does not refresh an unfocused tab, including post-mount blur=%s',
+    async blurAfterMount => {
+      state.refetch.mockImplementation(async () => {
+        await Promise.resolve();
+        state.live.activeSessions = [row];
+        return true;
+      });
+      state.focused = blurAfterMount;
+      await renderScreen();
+      state.focused = false;
+      act(foreground);
+      await renderScreen();
+      expect(text()).toContain('Nothing running right now');
+      expect(nodes('FlatList')).toHaveLength(0);
+      expect(state.refetch).not.toHaveBeenCalled();
+      expect(state.invalidate).not.toHaveBeenCalled();
+    }
+  );
 });

@@ -1642,7 +1642,8 @@
       "couldNotSearch": "تعذّر البحث في الجلسات",
       "completedWillAppear": "ستظهر الجلسات المكتملة هنا.",
       "noPastSessions": "لا توجد جلسات سابقة",
-      "live": "مباشر"
+      "live": "مباشر",
+      "updating": "جارٍ التحديث"
     },
     "sessionRow": {
       "deleteTitle": "حذف الجلسة؟",

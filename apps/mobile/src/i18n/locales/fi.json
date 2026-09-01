@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Istuntoja ei voitu hakea",
       "completedWillAppear": "Valmistuneet istunnot näkyvät tässä.",
       "noPastSessions": "Ei aiempia istuntoja",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Päivitetään"
     },
     "sessionRow": {
       "deleteTitle": "Poistetaanko istunto?",

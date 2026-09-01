@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Kon sessies nie soek nie",
       "completedWillAppear": "Voltooide sessies sal hier verskyn.",
       "noPastSessions": "Geen vorige sessies nie",
-      "live": "LEWEND"
+      "live": "LEWEND",
+      "updating": "Besig om op te dateer"
     },
     "sessionRow": {
       "deleteTitle": "Sessie verwyder?",

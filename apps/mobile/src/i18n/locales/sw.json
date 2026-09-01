@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Haikuweza kutafuta vikao",
       "completedWillAppear": "Vikao vilivyokamilika vitaonekana hapa.",
       "noPastSessions": "Hakuna vikao vya zamani",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Inasasisha"
     },
     "sessionRow": {
       "deleteTitle": "Futa kikao?",

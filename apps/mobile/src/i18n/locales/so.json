@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Lama raadin karin kalfadhiyada",
       "completedWillAppear": "Kalfadhiyada la dhammaystiray halkan ayay soo muuqan doonaan.",
       "noPastSessions": "Ma jiraan kalfadhiyo hore",
-      "live": "TOOS AH"
+      "live": "TOOS AH",
+      "updating": "Cusboonaysiinaya"
     },
     "sessionRow": {
       "deleteTitle": "Tirtir kalfadhiga?",

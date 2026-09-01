@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Ezin dira saioak bilatu",
       "completedWillAppear": "Amaitutako saioak hemen agertuko dira.",
       "noPastSessions": "Ez dago iraganeko saiorik",
-      "live": "ZUZENEAN"
+      "live": "ZUZENEAN",
+      "updating": "Eguneratzen"
     },
     "sessionRow": {
       "deleteTitle": "Ezabatu saioa?",

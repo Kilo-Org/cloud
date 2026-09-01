@@ -2072,7 +2072,8 @@
       "couldNotSearch": "Sessiyalarni qidirib bo'lmadi",
       "completedWillAppear": "Tugallangan sessiyalar shu yerda paydo bo'ladi.",
       "noPastSessions": "O'tgan sessiyalar yo'q",
-      "live": "JO'N"
+      "live": "JO'N",
+      "updating": "Yangilanmoqda"
     },
     "sessionRow": {
       "deleteTitle": "Sessiya o'chirilsinmi?",

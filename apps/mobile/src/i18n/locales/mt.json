@@ -2111,7 +2111,8 @@
       "couldNotSearch": "Ma setgħux jinstabu s-sessjonijiet",
       "completedWillAppear": "Is-sessjonijiet kompluti se jidhru hawn.",
       "noPastSessions": "L-ebda sessjoni tal-passat",
-      "live": "DIRETT"
+      "live": "DIRETT",
+      "updating": "Qed jaġġorna"
     },
     "sessionRow": {
       "deleteTitle": "Tħassar is-sessjoni?",

@@ -1630,7 +1630,8 @@
       "couldNotSearch": "Не вдалося виконати пошук сеансів",
       "completedWillAppear": "Завершені сеанси з'являться тут.",
       "noPastSessions": "Немає минулих сеансів",
-      "live": "НАЖИВО"
+      "live": "НАЖИВО",
+      "updating": "Оновлення"
     },
     "sessionRow": {
       "deleteTitle": "Видалити сеанс?",

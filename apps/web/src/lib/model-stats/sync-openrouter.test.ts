@@ -195,6 +195,94 @@ describe('syncOpenRouterModels with PostgreSQL', () => {
     }
   );
 
+  it('clears recommendation after preferred removal and keeps it cleared when additional enrollment is disabled', async () => {
+    const existing = await insertTestModelStats({
+      openrouterId: additionalId,
+      isActive: false,
+      benchmarks,
+    });
+    await db
+      .update(modelStats)
+      .set({ isStealth: true, isRecommended: false })
+      .where(eq(modelStats.id, existing.id));
+    const model = catalogModel();
+    const expectedResult = {
+      newModels: [],
+      updatedModels: [additionalId],
+      totalProcessed: 1,
+    };
+
+    expect(await syncOpenRouterModels([model], [additionalId], [additionalId])).toEqual(
+      expectedResult
+    );
+    expect(await readModel()).toMatchObject({
+      id: existing.id,
+      isActive: true,
+      isStealth: true,
+      isRecommended: true,
+      benchmarks,
+    });
+
+    await db.update(modelStats).set({ isActive: false }).where(eq(modelStats.id, existing.id));
+    const updated = { ...model, name: 'Removed from preferred' };
+    expect(await syncOpenRouterModels([updated], [], [additionalId])).toEqual(expectedResult);
+    expect(await readModel()).toMatchObject({
+      id: existing.id,
+      isActive: false,
+      isStealth: true,
+      isRecommended: false,
+      benchmarks,
+      openrouterData: updated,
+    });
+
+    const disabled = { ...updated, name: 'Additional enrollment disabled' };
+    expect(await syncOpenRouterModels([disabled], [])).toEqual(expectedResult);
+    expect(await readModel()).toMatchObject({
+      id: existing.id,
+      isActive: false,
+      isStealth: true,
+      isRecommended: false,
+      benchmarks,
+      openrouterData: disabled,
+    });
+  });
+
+  it('waits for remaining catalog writes before reporting a partial failure', async () => {
+    await insertTestModelStats({ openrouterId: preferredId });
+    await insertTestModelStats({ openrouterId: ordinaryId });
+    const events: string[] = [];
+    const error = new Error('Synthetic write failure');
+    const pendingStarted = Promise.withResolvers<void>();
+    const pendingWrite = Promise.withResolvers<void>();
+    const write = jest
+      .fn()
+      .mockRejectedValueOnce(error)
+      .mockImplementationOnce(async () => {
+        pendingStarted.resolve();
+        await pendingWrite.promise;
+        events.push('write');
+      });
+    jest.spyOn(db, 'update').mockReturnValue({
+      set: () => ({ where: write }),
+    } as unknown as ReturnType<typeof db.update>);
+
+    const completed = syncOpenRouterModels(
+      [catalogModel(preferredId), catalogModel(ordinaryId)],
+      [preferredId, ordinaryId]
+    ).catch(cause => {
+      events.push('failed');
+      return cause;
+    });
+    await pendingStarted.promise;
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(events).toEqual([]);
+
+    pendingWrite.resolve();
+    expect(await completed).toBe(error);
+    expect(events).toEqual(['write', 'failed']);
+  });
+
   it('never inserts an additional target without actual supplied catalog metadata', async () => {
     expect(await syncOpenRouterModels([catalogModel(unselectedId)], [], [additionalId])).toEqual({
       newModels: [],
@@ -212,7 +300,7 @@ describe('syncOpenRouterModels with PostgreSQL', () => {
     { isActive: true, isStealth: true, isRecommended: false },
     { isActive: true, isStealth: false, isRecommended: true },
     { isActive: null, isStealth: false, isRecommended: true },
-  ])('preserves additional-only manual flags %p while updating ordinary metadata', async flags => {
+  ])('preserves additional-only operator flags %p but clears recommendation', async flags => {
     const existing = await insertTestModelStats({
       openrouterId: additionalId,
       isActive: flags.isActive,
@@ -238,6 +326,7 @@ describe('syncOpenRouterModels with PostgreSQL', () => {
       expect(stored).toMatchObject({
         id: existing.id,
         ...flags,
+        isRecommended: false,
         name: supplied.name,
         description: supplied.description,
         slug: 'openai-gpt-5-1',

@@ -291,7 +291,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 ### Feature Flags
 
-- `ENKRYPT_SYNC_ENABLED` - Enables daily Enkrypt ingestion and its independent health monitor only when exactly `true`; defaults to disabled. Does not enable publication. Configure the API key and monitoring before enabling. [SERVER]
+- `ENKRYPT_SYNC_ENABLED` - Enables daily Enkrypt ingestion and mapped-model catalog enrollment only when exactly `true`; defaults to disabled. Does not enable publication. Configure the API key and an external monitor for the read-only health endpoint before enabling. [SERVER]
 - `ENKRYPT_PUBLICATION_ENABLED` - Exposes stored Enkrypt scores through public model catalogs and model-statistics endpoints only when exactly `true`; defaults to disabled. Does not enable ingestion. Keep disabled until redistribution approval and the release gates in [Enkrypt operations](docs/enkrypt-sync-operations.md) are satisfied. Disabling suppresses existing and cached scores after the updated deployment is serving traffic; previously delivered client responses cannot be recalled. [SERVER]
 - `KILOCLAW_BILLING_ENFORCEMENT` - Feature flag controlling KiloClaw billing enforcement. [SERVER]
 - `BRIEFING_DEBUG` - Enables verbose debug logging for the KiloClaw morning briefing plugin; checked in `services/kiloclaw/plugins/kiloclaw-morning-briefing/src/index.ts`. [SERVER]

@@ -114,7 +114,7 @@ export async function syncOpenRouterModels(
         id: existingStat.id,
         data: {
           // Note: NOT updating isActive - preserve user's setting
-          ...(additionalModelIdSet.has(updatedModelData.id) ? {} : { isRecommended }),
+          isRecommended,
           ...deriveModelStatsIdentity(updatedModelData.id),
           name: updatedModelData.name,
           description: updatedModelData.description,
@@ -148,7 +148,10 @@ export async function syncOpenRouterModels(
     );
   }
 
-  await Promise.all(operations);
+  const results = await Promise.allSettled(operations);
+  for (const result of results) {
+    if (result.status === 'rejected') throw result.reason;
+  }
 
   return {
     newModels,

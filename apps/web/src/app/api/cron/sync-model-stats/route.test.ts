@@ -26,6 +26,9 @@ jest.mock('@/lib/model-stats/sync-artificial-analysis', () => ({
 }));
 jest.mock('@/lib/model-stats/sync-openrouter', () => ({ syncOpenRouterModels: jest.fn() }));
 jest.mock('@/lib/model-stats/sync-internal-data', () => ({ syncInternalUsageStats: jest.fn() }));
+jest.mock('@/lib/model-stats/model-stats-cache', () => ({
+  invalidateModelStatsCache: jest.fn(),
+}));
 jest.mock('@/lib/model-stats/sync-enkrypt', () => ({ syncEnkryptBenchmarks: jest.fn() }));
 jest.mock('@/lib/ai-gateway/monitored-models', () => ({ getMonitoredModels: jest.fn() }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -41,6 +44,8 @@ import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
 import { syncArtificialAnalysisBenchmarks } from '@/lib/model-stats/sync-artificial-analysis';
 import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
 import { syncOpenRouterModels } from '@/lib/model-stats/sync-openrouter';
+import type { SyncOpenRouterResult } from '@/lib/model-stats/sync-openrouter';
+import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
 import { syncEnkryptBenchmarks } from '@/lib/model-stats/sync-enkrypt';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
@@ -80,6 +85,10 @@ function expectExistingSyncCalls() {
   expect(syncOpenRouterModels).toHaveBeenCalledTimes(1);
   expect(syncArtificialAnalysisBenchmarks).toHaveBeenCalledTimes(1);
   expect(syncInternalUsageStats).toHaveBeenCalledTimes(1);
+  expect(invalidateModelStatsCache).toHaveBeenCalledTimes(1);
+  expect(jest.mocked(invalidateModelStatsCache).mock.invocationCallOrder[0]).toBeLessThan(
+    mockEmitScheduledJobEvent.mock.invocationCallOrder[0]
+  );
 }
 
 describe('GET /api/cron/sync-model-stats', () => {
@@ -94,11 +103,17 @@ describe('GET /api/cron/sync-model-stats', () => {
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [monitoredModel] });
     jest.mocked(getEnhancedOpenRouterModels).mockResolvedValue({ data: [monitoredModel] });
     jest.mocked(getMonitoredModels).mockResolvedValue([monitoredModel.id]);
-    jest.mocked(syncOpenRouterModels).mockResolvedValue({
-      newModels: [monitoredModel.id],
-      updatedModels: [],
-      totalProcessed: 1,
-    });
+    jest.mocked(syncArtificialAnalysisBenchmarks).mockReset().mockResolvedValue(undefined);
+    jest.mocked(syncInternalUsageStats).mockReset().mockResolvedValue(undefined);
+    jest.mocked(invalidateModelStatsCache).mockReset();
+    jest
+      .mocked(syncOpenRouterModels)
+      .mockReset()
+      .mockResolvedValue({
+        newModels: [monitoredModel.id],
+        updatedModels: [],
+        totalProcessed: 1,
+      });
   });
 
   afterEach(() => {
@@ -129,6 +144,89 @@ describe('GET /api/cron/sync-model-stats', () => {
       updated_model_count: 0,
     });
     expectExistingSyncCalls();
+  });
+
+  it.each(['none', 'benchmarks', 'usage'] as const)(
+    'invalidates once after all syncs settle, before emitting or responding (failure: %s)',
+    async failure => {
+      const writes: string[] = [];
+      const catalogStarted = Promise.withResolvers<void>();
+      const catalogFinished = Promise.withResolvers<SyncOpenRouterResult>();
+      const usageStarted = Promise.withResolvers<void>();
+      const usageFinished = Promise.withResolvers<void>();
+      const error = new Error('Partial sync failure');
+      jest.mocked(syncOpenRouterModels).mockImplementationOnce(async () => {
+        catalogStarted.resolve();
+        const result = await catalogFinished.promise;
+        writes.push('catalog');
+        return result;
+      });
+      jest.mocked(syncArtificialAnalysisBenchmarks).mockImplementationOnce(async () => {
+        writes.push('benchmarks');
+        if (failure === 'benchmarks') throw error;
+      });
+      jest.mocked(syncInternalUsageStats).mockImplementationOnce(async () => {
+        usageStarted.resolve();
+        await usageFinished.promise;
+        writes.push('usage');
+        if (failure === 'usage') throw error;
+      });
+      jest.mocked(invalidateModelStatsCache).mockImplementationOnce(() => {
+        writes.push('invalidate');
+      });
+
+      const responsePromise = GET(request());
+      await catalogStarted.promise;
+      expect(syncArtificialAnalysisBenchmarks).not.toHaveBeenCalled();
+      expect(syncInternalUsageStats).not.toHaveBeenCalled();
+      expect(invalidateModelStatsCache).not.toHaveBeenCalled();
+      expect(mockEmitScheduledJobEvent).not.toHaveBeenCalled();
+
+      catalogFinished.resolve({
+        newModels: [monitoredModel.id],
+        updatedModels: [],
+        totalProcessed: 1,
+      });
+      await usageStarted.promise;
+      expect(writes).toEqual(['catalog', 'benchmarks']);
+      expect(invalidateModelStatsCache).not.toHaveBeenCalled();
+      expect(mockEmitScheduledJobEvent).not.toHaveBeenCalled();
+
+      usageFinished.resolve();
+      const response = await responsePromise;
+      expect(response.status).toBe(failure === 'none' ? 200 : 500);
+      expect(writes).toEqual(['catalog', 'benchmarks', 'usage', 'invalidate']);
+      expectExistingSyncCalls();
+      if (failure !== 'none') {
+        expect(await response.json()).toEqual({
+          success: false,
+          error: 'Failed to sync model stats',
+          message: error.message,
+        });
+        expect(buildScheduledJobFailureEvent).toHaveBeenCalledWith({ runId: 'run-id' }, error);
+      }
+    }
+  );
+
+  it('invalidates after a rejected catalog sync that may have partially written', async () => {
+    const error = new Error('Partial catalog failure');
+    jest.mocked(syncOpenRouterModels).mockRejectedValueOnce(error);
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Failed to sync model stats',
+      message: error.message,
+    });
+    expect(syncArtificialAnalysisBenchmarks).not.toHaveBeenCalled();
+    expect(syncInternalUsageStats).not.toHaveBeenCalled();
+    expect(invalidateModelStatsCache).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(invalidateModelStatsCache).mock.invocationCallOrder[0]).toBeLessThan(
+      mockEmitScheduledJobEvent.mock.invocationCallOrder[0]
+    );
+    expect(buildScheduledJobFailureEvent).toHaveBeenCalledWith({ runId: 'run-id' }, error);
   });
 
   it('does not enroll mapped or enhanced-only models when disabled, preserving the overlay', async () => {
@@ -259,6 +357,7 @@ describe('GET /api/cron/sync-model-stats', () => {
       expect(syncOpenRouterModels).not.toHaveBeenCalled();
       expect(syncArtificialAnalysisBenchmarks).not.toHaveBeenCalled();
       expect(syncInternalUsageStats).not.toHaveBeenCalled();
+      expect(invalidateModelStatsCache).not.toHaveBeenCalled();
       expect(mockEmitScheduledJobEvent).not.toHaveBeenCalled();
     }
   );
@@ -270,14 +369,25 @@ describe('GET /api/cron/sync-model-stats', () => {
     expect(createScheduledJobRun).not.toHaveBeenCalled();
     expect(getRawOpenRouterModels).not.toHaveBeenCalled();
     expect(syncOpenRouterModels).not.toHaveBeenCalled();
+    expect(invalidateModelStatsCache).not.toHaveBeenCalled();
   });
 
-  it.each([false, true])(
-    'emits a failure event with the existing error response (enabled: %s)',
-    async enabled => {
+  it.each([
+    [false, 'raw'],
+    [true, 'raw'],
+    [false, 'enhanced'],
+    [true, 'enhanced'],
+    [false, 'monitored'],
+    [true, 'monitored'],
+  ] as const)(
+    'emits a failure without invalidating when fetching fails before writes (enabled: %s, source: %s)',
+    async (enabled, source) => {
       mockEnabled = enabled;
       const error = new Error('upstream failed');
-      jest.mocked(getRawOpenRouterModels).mockRejectedValue(error);
+      if (source === 'raw') jest.mocked(getRawOpenRouterModels).mockRejectedValueOnce(error);
+      if (source === 'enhanced')
+        jest.mocked(getEnhancedOpenRouterModels).mockRejectedValueOnce(error);
+      if (source === 'monitored') jest.mocked(getMonitoredModels).mockRejectedValueOnce(error);
 
       const response = await GET(request());
 
@@ -297,6 +407,9 @@ describe('GET /api/cron/sync-model-stats', () => {
         exception_name: 'Error',
       });
       expect(syncOpenRouterModels).not.toHaveBeenCalled();
+      expect(syncArtificialAnalysisBenchmarks).not.toHaveBeenCalled();
+      expect(syncInternalUsageStats).not.toHaveBeenCalled();
+      expect(invalidateModelStatsCache).not.toHaveBeenCalled();
     }
   );
 });

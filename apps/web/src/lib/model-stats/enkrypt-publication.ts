@@ -8,6 +8,7 @@ import {
   type EnkryptPublishedBenchmark,
 } from '@kilocode/db/schema-types';
 import { fingerprintEnkryptScore } from './enkrypt-fingerprint';
+import { isModelStatsSnapshotFresh, type ModelStatsCacheMetadata } from './model-stats-cache';
 
 export function publishEnkryptBenchmark(
   value: unknown,
@@ -52,15 +53,16 @@ export function isEnkryptPublicModel(model: PublicModel): boolean {
 
 export function publishEnkryptModelStats<
   T extends PublicModel & Pick<ModelStats, 'benchmarks' | 'openrouterData'>,
->(stat: T, verification?: unknown) {
+>(stat: T, snapshot: ModelStatsCacheMetadata, verification?: unknown) {
   const openrouterData = { ...stat.openrouterData };
   if ('enkrypt' in openrouterData) delete openrouterData.enkrypt;
   const publishedStat = { ...stat, openrouterData };
   if (!stat.benchmarks) return publishedStat;
   const benchmarks = { ...stat.benchmarks };
   delete benchmarks.enkrypt;
-  const enkrypt = isEnkryptPublicModel(stat)
-    ? publishEnkryptBenchmark(stat.benchmarks.enkrypt, Date.now(), verification)
-    : undefined;
+  const enkrypt =
+    isModelStatsSnapshotFresh(snapshot) && isEnkryptPublicModel(stat)
+      ? publishEnkryptBenchmark(stat.benchmarks.enkrypt, Date.now(), verification)
+      : undefined;
   return { ...publishedStat, benchmarks: { ...benchmarks, ...(enkrypt && { enkrypt }) } };
 }

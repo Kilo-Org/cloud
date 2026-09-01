@@ -14,6 +14,7 @@ import {
 import { syncArtificialAnalysisBenchmarks } from '@/lib/model-stats/sync-artificial-analysis';
 import { syncOpenRouterModels } from '@/lib/model-stats/sync-openrouter';
 import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
+import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
 import { CRON_SECRET, ENKRYPT_SYNC_ENABLED } from '@/lib/config.server';
 import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
@@ -91,20 +92,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const syncResult = ENKRYPT_SYNC_ENABLED
-      ? await syncOpenRouterModels(allModels, monitoredModels, additionalModelIds)
-      : await syncOpenRouterModels(allModels, monitoredModels);
-    const { newModels, updatedModels, totalProcessed } = syncResult;
+    const catalogSync = ENKRYPT_SYNC_ENABLED
+      ? syncOpenRouterModels(allModels, monitoredModels, additionalModelIds)
+      : syncOpenRouterModels(allModels, monitoredModels);
+    const [catalogResult, ...otherResults] = await Promise.allSettled([
+      catalogSync,
+      catalogSync.then(() => syncArtificialAnalysisBenchmarks()),
+      catalogSync.then(() => syncInternalUsageStats()),
+    ]);
+    invalidateModelStatsCache();
+
+    if (catalogResult.status === 'rejected') throw catalogResult.reason;
+    for (const result of otherResults) {
+      if (result.status === 'rejected') throw result.reason;
+    }
+    const { newModels, updatedModels, totalProcessed } = catalogResult.value;
 
     console.log(
       `[sync-model-stats] Synced ${totalProcessed} models: ${newModels.length} new, ${updatedModels.length} updated`
     );
-
-    // Fetch and update Artificial Analysis benchmarks for ALL models with aaSlug
-    await syncArtificialAnalysisBenchmarks();
-
-    // Calculate and update internal usage statistics from Posthog
-    await syncInternalUsageStats();
 
     const duration = Date.now() - startTime;
     const summary = {

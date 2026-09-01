@@ -3,26 +3,74 @@ import { mockOpenRouterModels, createMockResponse } from './helpers/openrouter-m
 import { GET } from '../app/api/openrouter/models/route';
 import { GET as gatewayV1ModelsGET } from '../app/api/gateway/v1/models/route';
 import { GET as transcriptionModelsGET } from '../app/api/gateway/transcription-models/route';
-import { getRawOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
+import {
+  getEnhancedOpenRouterModels,
+  getRawOpenRouterModels,
+} from '@/lib/ai-gateway/providers/openrouter';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import type * as FreeModel from '@/lib/ai-gateway/is-free-model';
+import { getGatewayOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
+import type * as ModelSettings from '@/lib/ai-gateway/providers/model-settings';
+import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
+import type * as AutoRouting from '@/lib/ai-gateway/auto-routing-models';
+import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
+import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
+import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
+import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
+import type * as DirectByok from '@/lib/ai-gateway/providers/direct-byok';
+import { getEnkryptBenchmarks } from '@/lib/model-stats/enkrypt';
+import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import { NextRequest } from 'next/server';
 import { OpenRouterModelsResponseSchema } from '@/lib/organizations/organization-types';
-import { getEnkryptBenchmarks } from '@/lib/model-stats/enkrypt';
+import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
 import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
-import type * as Enkrypt from '@/lib/model-stats/enkrypt';
+import type { ModelStats } from '@kilocode/db/schema';
+import { GET as statsGET } from '@/app/api/models/stats/route';
+import { GET as statGET } from '@/app/api/models/stats/[slug]/route';
 import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type * as Byok from '@/lib/ai-gateway/byok';
 import { getTerminalBenchSummaries } from '@/lib/model-stats/terminal-bench';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
-import type { EnkryptBenchmark } from '@kilocode/db/schema-types';
+import type { EnkryptBenchmark, EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
 
-import type * as Config from '@/lib/config.server';
-
 let mockPublicationEnabled = true;
+let mockAuth: { user: { id: string } | null; organizationId: string | null };
+const mockRows = jest.fn<
+  Promise<ReadonlyMap<string, EnkryptBenchmark & { verification?: unknown; isStealth?: boolean }>>,
+  []
+>();
+
+jest.mock('@/lib/dotenvx', () => ({
+  getEnvVariable: () => '',
+  requireEnv: () => 'http://localhost',
+}));
+
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    select: jest.fn(() => {
+      const orderBy = async () =>
+        [...(await mockRows())].map(([id, benchmark]) => ({
+          stat: {
+            id,
+            openrouterId: id,
+            slug: id,
+            name: id,
+            isActive: true,
+            isStealth: benchmark.isStealth ?? false,
+            benchmarks: { enkrypt: benchmark },
+            openrouterData: {},
+          } as ModelStats,
+          verification: benchmark.verification,
+        }));
+      return { from: () => ({ orderBy, leftJoin: () => ({ orderBy }) }) };
+    }),
+  },
+  readDb: {},
+}));
 
 jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual<typeof Config>('@/lib/config.server'),
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
   },
@@ -35,11 +83,34 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 jest.mock('@/lib/user/server', () => ({
-  getUserFromAuth: jest.fn(async () => ({
-    user: { id: 'test-user-id' },
-    organizationId: null,
-  })),
+  getUserFromAuth: jest.fn(async () => mockAuth),
 }));
+
+jest.mock('@/lib/organizations/organization-models', () => ({
+  getAvailableModelsForOrganization: jest.fn(),
+}));
+
+jest.mock('@/lib/ai-gateway/is-free-model', () => {
+  const actual = jest.requireActual<typeof FreeModel>('@/lib/ai-gateway/is-free-model');
+  return { ...actual, isFreeModel: jest.fn(actual.isFreeModel) };
+});
+
+jest.mock('@/lib/ai-gateway/providers/model-settings', () => {
+  const actual = jest.requireActual<typeof ModelSettings>(
+    '@/lib/ai-gateway/providers/model-settings'
+  );
+  return { ...actual, getGatewayOpenCodeSettings: jest.fn(actual.getGatewayOpenCodeSettings) };
+});
+
+jest.mock('@/lib/ai-gateway/auto-routing-models', () => {
+  const actual = jest.requireActual<typeof AutoRouting>('@/lib/ai-gateway/auto-routing-models');
+  return { ...actual, addAutoRoutingModels: jest.fn(actual.addAutoRoutingModels) };
+});
+
+jest.mock('@/lib/ai-gateway/providers/direct-byok', () => {
+  const actual = jest.requireActual<typeof DirectByok>('@/lib/ai-gateway/providers/direct-byok');
+  return { ...actual, getDirectByokModelsForUser: jest.fn(actual.getDirectByokModelsForUser) };
+});
 
 jest.mock('@/lib/redis', () => ({
   redisClient: { get: jest.fn(async () => null) },
@@ -53,11 +124,15 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getVercelModelsMetadataFromDatabase: jest.fn(async () => ({})),
 }));
 
-jest.mock('@/lib/ai-gateway/byok', () => ({
-  ...jest.requireActual<typeof Byok>('@/lib/ai-gateway/byok'),
-  getBYOKforUser: jest.fn(async () => null),
-  getUserByokProviderIds: jest.fn(async () => []),
-}));
+jest.mock('@/lib/ai-gateway/byok', () => {
+  const actual = jest.requireActual<typeof Byok>('@/lib/ai-gateway/byok');
+  return {
+    ...actual,
+    addUserByokAvailability: jest.fn(actual.addUserByokAvailability),
+    getBYOKforUser: jest.fn(async () => null),
+    getUserByokProviderIds: jest.fn(async () => []),
+  };
+});
 
 jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () => ({
   listAvailableExperimentModels: jest.fn(async () => []),
@@ -74,11 +149,6 @@ jest.mock('@/lib/model-stats/terminal-bench', () => ({
   terminalBenchFor: jest.fn((summaries: Map<string, unknown>, id: string) => summaries.get(id)),
 }));
 
-jest.mock('@/lib/model-stats/enkrypt', () => ({
-  ...jest.requireActual<typeof Enkrypt>('@/lib/model-stats/enkrypt'),
-  getEnkryptBenchmarks: jest.fn(async () => new Map()),
-}));
-
 const enkryptBenchmark: EnkryptBenchmark = {
   model_name: 'Other Model',
   provider: 'Example Provider',
@@ -89,7 +159,7 @@ const enkryptBenchmark: EnkryptBenchmark = {
   ingestedAt: '2026-08-27T00:00:00.000Z',
   evaluatedAt: null,
 };
-const publishedEnkryptBenchmark = {
+const publishedEnkryptBenchmark: EnkryptPublishedBenchmark = {
   ...enkryptBenchmark,
   lastCheckedAt: enkryptBenchmark.ingestedAt,
   staleAfter: '2026-08-28T02:00:00.000Z',
@@ -103,12 +173,46 @@ function createTestRequest(path: string) {
 }
 
 const originalFetch = global.fetch;
+const realFreeModel = jest.requireActual<typeof FreeModel>('@/lib/ai-gateway/is-free-model');
+const realModelSettings = jest.requireActual<typeof ModelSettings>(
+  '@/lib/ai-gateway/providers/model-settings'
+);
+const realAutoRouting = jest.requireActual<typeof AutoRouting>(
+  '@/lib/ai-gateway/auto-routing-models'
+);
+const realByok = jest.requireActual<typeof Byok>('@/lib/ai-gateway/byok');
+const realDirectByok = jest.requireActual<typeof DirectByok>(
+  '@/lib/ai-gateway/providers/direct-byok'
+);
 
 beforeEach(() => {
   mockPublicationEnabled = true;
+  mockAuth = { user: { id: 'test-user-id' }, organizationId: null };
   jest.clearAllMocks();
-  jest.mocked(getEnkryptBenchmarks).mockResolvedValue(new Map());
+  jest.mocked(isFreeModel).mockReset().mockImplementation(realFreeModel.isFreeModel);
+  jest
+    .mocked(getGatewayOpenCodeSettings)
+    .mockReset()
+    .mockImplementation(realModelSettings.getGatewayOpenCodeSettings);
+  jest
+    .mocked(addAutoRoutingModels)
+    .mockReset()
+    .mockImplementation(realAutoRouting.addAutoRoutingModels);
+  jest
+    .mocked(addUserByokAvailability)
+    .mockReset()
+    .mockImplementation(realByok.addUserByokAvailability);
+  jest
+    .mocked(getDirectByokModelsForUser)
+    .mockReset()
+    .mockImplementation(realDirectByok.getDirectByokModelsForUser);
+  jest.mocked(getUserByokProviderIds).mockReset().mockResolvedValue([]);
+  jest.mocked(getAvailableModelsForOrganization).mockReset().mockResolvedValue(null);
+  jest.mocked(listAvailableExperimentModels).mockReset().mockResolvedValue([]);
+  invalidateModelStatsCache();
+  mockRows.mockReset().mockResolvedValue(new Map());
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt));
+  jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 describe('GET /api/openrouter/models', () => {
@@ -201,9 +305,7 @@ describe('GET /api/openrouter/models', () => {
   });
 
   test('retains Enkrypt scores in the response schema without changing Terminal Bench', async () => {
-    jest
-      .mocked(getEnkryptBenchmarks)
-      .mockResolvedValueOnce(new Map([['some-other-model', enkryptBenchmark]]));
+    jest.mocked(mockRows).mockResolvedValueOnce(new Map([['some-other-model', enkryptBenchmark]]));
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
@@ -219,9 +321,7 @@ describe('GET /api/openrouter/models', () => {
   });
 
   test('includes Enkrypt scores even when Terminal Bench has no publishable summary', async () => {
-    jest
-      .mocked(getEnkryptBenchmarks)
-      .mockResolvedValueOnce(new Map([['some-other-model', enkryptBenchmark]]));
+    jest.mocked(mockRows).mockResolvedValueOnce(new Map([['some-other-model', enkryptBenchmark]]));
     jest.mocked(getTerminalBenchSummaries).mockResolvedValueOnce(new Map());
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
@@ -241,7 +341,7 @@ describe('GET /api/openrouter/models', () => {
     if (!exclusiveModel) throw new Error('Expected a public Kilo-exclusive model fixture');
     const exclusiveBenchmark = { ...enkryptBenchmark, model_name: exclusiveModel.display_name };
     jest
-      .mocked(getEnkryptBenchmarks)
+      .mocked(mockRows)
       .mockResolvedValueOnce(
         new Map([
           [exclusiveModel.public_id, exclusiveBenchmark],
@@ -294,9 +394,7 @@ describe('GET /api/gateway/v1/models', () => {
   });
 
   test('retains Enkrypt and Terminal Bench in the gateway catalog response', async () => {
-    jest
-      .mocked(getEnkryptBenchmarks)
-      .mockResolvedValueOnce(new Map([['some-other-model', enkryptBenchmark]]));
+    jest.mocked(mockRows).mockResolvedValueOnce(new Map([['some-other-model', enkryptBenchmark]]));
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
@@ -322,7 +420,7 @@ describe('Enkrypt catalog publication boundaries', () => {
     async (path, handler) => {
       mockPublicationEnabled = false;
       jest
-        .mocked(getEnkryptBenchmarks)
+        .mocked(mockRows)
         .mockResolvedValue(
           new Map([
             ['some-other-model', enkryptBenchmark],
@@ -397,7 +495,7 @@ describe('Enkrypt catalog publication boundaries', () => {
 
   test('recomputes freshness and the kill switch on each response from the same cached snapshot', async () => {
     const cached = new Map([['some-other-model', enkryptBenchmark]]);
-    jest.mocked(getEnkryptBenchmarks).mockResolvedValue(cached);
+    jest.mocked(mockRows).mockResolvedValue(cached);
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
@@ -433,9 +531,7 @@ describe('Enkrypt catalog publication boundaries', () => {
       const checkedAt = '2026-08-30T00:00:00.000Z';
       const verification = { checkedAt, scoreHash: fingerprintEnkryptScore(enkryptBenchmark) };
       const snapshot = Object.freeze({ ...enkryptBenchmark, verification });
-      jest
-        .mocked(getEnkryptBenchmarks)
-        .mockResolvedValue(new Map([['some-other-model', snapshot]]));
+      jest.mocked(mockRows).mockResolvedValue(new Map([['some-other-model', snapshot]]));
       global.fetch = jest
         .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
         .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
@@ -455,7 +551,7 @@ describe('Enkrypt catalog publication boundaries', () => {
       expect(model?.enkrypt).toEqual(checked);
       expect(model?.enkrypt).not.toHaveProperty('verification');
       expect(model?.terminalBench).toEqual({ overallScore: 0.551, avgAttemptCostUsd: 53.37 });
-      expect(getEnkryptBenchmarks).toHaveBeenCalledTimes(1);
+      expect(mockRows).toHaveBeenCalledTimes(1);
 
       jest.mocked(Date.now).mockReturnValue(Date.parse(checked.staleAfter));
       const stale = OpenRouterModelsResponseSchema.parse(
@@ -479,9 +575,7 @@ describe('Enkrypt catalog publication boundaries', () => {
   test('withholds future snapshots and preserves missing upstream source', async () => {
     const withoutSource = { ...enkryptBenchmark };
     delete withoutSource.source;
-    jest
-      .mocked(getEnkryptBenchmarks)
-      .mockResolvedValue(new Map([['some-other-model', withoutSource]]));
+    jest.mocked(mockRows).mockResolvedValue(new Map([['some-other-model', withoutSource]]));
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
@@ -496,6 +590,328 @@ describe('Enkrypt catalog publication boundaries', () => {
     const future = OpenRouterModelsResponseSchema.parse(await futureResponse.json());
     for (const model of future.data) expect(model).not.toHaveProperty('enkrypt');
   });
+});
+
+describe('shared stats and catalog snapshot', () => {
+  function listStats() {
+    return statsGET(createTestRequest('/api/models/stats'));
+  }
+
+  function detailStats(slug = 'some-other-model') {
+    return statGET(createTestRequest('/api/models/stats/model'), {
+      params: Promise.resolve({ slug }),
+    });
+  }
+
+  function catalog() {
+    return GET(createTestRequest('/api/openrouter/models'));
+  }
+
+  beforeEach(() => {
+    mockRows.mockResolvedValue(new Map([['some-other-model', enkryptBenchmark]]));
+    global.fetch = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+  });
+
+  test('uses one real cache load for concurrent and sequential list, detail, and catalog responses', async () => {
+    const responses = await Promise.all(
+      Array.from({ length: 20 }, () => Promise.all([listStats(), detailStats(), catalog()]))
+    );
+    for (const [all, one, catalogResponse] of responses) {
+      expect((await all.json())[0].benchmarks.enkrypt).toEqual(publishedEnkryptBenchmark);
+      expect((await one.json()).benchmarks.enkrypt).toEqual(publishedEnkryptBenchmark);
+      const data = OpenRouterModelsResponseSchema.parse(await catalogResponse.json());
+      expect(data.data.find(model => model.id === 'some-other-model')?.enkrypt).toEqual(
+        publishedEnkryptBenchmark
+      );
+    }
+    for (let i = 0; i < 20; i++) await Promise.all([listStats(), detailStats(), catalog()]);
+    const missing = await Promise.all(
+      Array.from({ length: 100 }, (_, i) => detailStats(`missing-${i}`))
+    );
+    expect(missing.every(response => response.status === 404)).toBe(true);
+    expect(mockRows).toHaveBeenCalledTimes(1);
+  });
+
+  test('withholds expired eligibility in both stats and catalogs on repeated refresh failures', async () => {
+    await catalog();
+    jest.mocked(Date.now).mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt) + 300_000);
+    mockRows.mockRejectedValue(new Error('unavailable'));
+    for (let i = 0; i < 10; i++) {
+      const [all, one, catalogResponse] = await Promise.all([
+        listStats(),
+        detailStats(),
+        catalog(),
+      ]);
+      expect((await all.json())[0].benchmarks).not.toHaveProperty('enkrypt');
+      expect((await one.json()).benchmarks).not.toHaveProperty('enkrypt');
+      const data = OpenRouterModelsResponseSchema.parse(await catalogResponse.json());
+      expect(data.data.find(model => model.id === 'some-other-model')).not.toHaveProperty(
+        'enkrypt'
+      );
+    }
+    expect(mockRows).toHaveBeenCalledTimes(2);
+  });
+
+  test.each(['deadline', 'invalidation', 'disabled'] as const)(
+    'rechecks %s after an asynchronous sibling benchmark load',
+    async boundary => {
+      await listStats();
+      const entered = Promise.withResolvers<void>();
+      const pending =
+        Promise.withResolvers<Map<string, { overallScore: number; avgAttemptCostUsd: number }>>();
+      jest.mocked(getTerminalBenchSummaries).mockImplementationOnce(() => {
+        entered.resolve();
+        return pending.promise;
+      });
+      const response = catalog();
+      await entered.promise;
+      if (boundary === 'deadline') {
+        jest.mocked(Date.now).mockReturnValue(Date.now() + 300_000);
+      } else if (boundary === 'invalidation') {
+        invalidateModelStatsCache();
+      } else {
+        mockPublicationEnabled = false;
+      }
+      mockRows.mockRejectedValue(new Error('unavailable'));
+      pending.resolve(new Map());
+      const data = OpenRouterModelsResponseSchema.parse(await (await response).json());
+      expect(data.data.find(model => model.id === 'some-other-model')).not.toHaveProperty(
+        'enkrypt'
+      );
+      expect(mockRows).toHaveBeenCalledTimes(boundary === 'disabled' ? 1 : 2);
+    }
+  );
+});
+
+describe('final Enkrypt serialization boundaries', () => {
+  const stages = [
+    ['direct', 'free'],
+    ['direct', 'opencode'],
+    ['anonymous', 'autoRouting'],
+    ['anonymous', 'experiments'],
+    ['authenticated', 'autoRouting'],
+    ['authenticated', 'experiments'],
+    ['authenticated', 'byokModels'],
+    ['authenticated', 'byokProviders'],
+    ['authenticated', 'byokAvailability'],
+    ['organization', 'organization'],
+    ['organization', 'autoRouting'],
+  ] as const;
+  type Stage = (typeof stages)[number][1];
+  type Branch = (typeof stages)[number][0];
+
+  function pauseAt(stage: Stage) {
+    const entered = Promise.withResolvers<void>();
+    const released = Promise.withResolvers<void>();
+    async function pause() {
+      entered.resolve();
+      await released.promise;
+    }
+    switch (stage) {
+      case 'free':
+        jest.mocked(isFreeModel).mockImplementationOnce(async (...args) => {
+          await pause();
+          return realFreeModel.isFreeModel(...args);
+        });
+        break;
+      case 'opencode':
+        jest.mocked(getGatewayOpenCodeSettings).mockImplementationOnce(async (...args) => {
+          await pause();
+          return realModelSettings.getGatewayOpenCodeSettings(...args);
+        });
+        break;
+      case 'autoRouting':
+        jest.mocked(addAutoRoutingModels).mockImplementationOnce(async (...args) => {
+          await pause();
+          return realAutoRouting.addAutoRoutingModels(...args);
+        });
+        break;
+      case 'experiments':
+        jest.mocked(listAvailableExperimentModels).mockImplementationOnce(async () => {
+          await pause();
+          return [];
+        });
+        break;
+      case 'byokModels':
+        jest.mocked(getDirectByokModelsForUser).mockImplementationOnce(async (...args) => {
+          await pause();
+          return realDirectByok.getDirectByokModelsForUser(...args);
+        });
+        break;
+      case 'byokProviders':
+        jest.mocked(getUserByokProviderIds).mockImplementationOnce(async () => {
+          await pause();
+          return [];
+        });
+        break;
+      case 'byokAvailability':
+        jest.mocked(addUserByokAvailability).mockImplementationOnce(async (...args) => {
+          await pause();
+          return realByok.addUserByokAvailability(...args);
+        });
+        break;
+      case 'organization':
+        jest.mocked(getAvailableModelsForOrganization).mockImplementationOnce(async () => {
+          const data = await organizationModels();
+          await pause();
+          return data;
+        });
+    }
+    return { entered: entered.promise, release: released.resolve };
+  }
+
+  async function organizationModels(): Promise<OpenRouterModelsResponse> {
+    const response = await getEnhancedOpenRouterModels();
+    return { ...response, data: response.data.filter(model => model.id === 'some-other-model') };
+  }
+
+  function configureBranch(branch: Branch) {
+    if (branch === 'anonymous') mockAuth = { user: null, organizationId: null };
+    if (branch === 'organization') {
+      mockAuth = { user: { id: 'test-user-id' }, organizationId: 'test-org-id' };
+      jest.mocked(getAvailableModelsForOrganization).mockImplementation(organizationModels);
+    }
+  }
+
+  async function responseFor(branch: Branch) {
+    if (branch === 'direct') return getEnhancedOpenRouterModels();
+    const response = await GET(createTestRequest('/api/openrouter/models'));
+    expect(response.status).toBe(200);
+    return OpenRouterModelsResponseSchema.parse(await response.json());
+  }
+
+  beforeEach(() => {
+    mockRows.mockResolvedValue(new Map([['some-other-model', enkryptBenchmark]]));
+    global.fetch = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+  });
+
+  describe.each(['deadline', 'invalidation'] as const)('%s while awaiting enrichment', boundary => {
+    describe.each(['failure', 'hidden', 'verified'] as const)('refresh returns %s', refresh => {
+      test.each(stages)('%s response rechecks after %s', async (branch, stage) => {
+        configureBranch(branch);
+        await getEnkryptBenchmarks();
+        const pending = pauseAt(stage);
+        const response = responseFor(branch);
+        await pending.entered;
+        expect(mockRows).toHaveBeenCalledTimes(1);
+        if (boundary === 'deadline') jest.mocked(Date.now).mockReturnValue(Date.now() + 300_000);
+        else invalidateModelStatsCache();
+        const updated = { ...enkryptBenchmark, risk_score: 9 };
+        const verification = {
+          checkedAt: new Date(Date.now()).toISOString(),
+          scoreHash: fingerprintEnkryptScore(updated),
+        };
+        if (refresh === 'failure') mockRows.mockRejectedValue(new Error('unavailable'));
+        else
+          mockRows.mockResolvedValue(
+            new Map([
+              [
+                'some-other-model',
+                {
+                  ...updated,
+                  verification,
+                  isStealth: refresh === 'hidden',
+                },
+              ],
+            ])
+          );
+        pending.release();
+        const result = await response;
+        const model = result.data.find(model => model.id === 'some-other-model');
+        expect(model).toBeDefined();
+        if (refresh === 'verified') {
+          expect(model?.enkrypt).toMatchObject({
+            risk_score: 9,
+            lastCheckedAt: verification.checkedAt,
+            freshness: 'fresh',
+          });
+        } else expect(model).not.toHaveProperty('enkrypt');
+        expect(model?.terminalBench).toEqual({ overallScore: 0.551, avgAttemptCostUsd: 53.37 });
+        expect(mockRows).toHaveBeenCalledTimes(2);
+        for (const field of ['verification', 'scoreHash', 'observedAt', 'generation', 'entries']) {
+          expect(JSON.stringify(result)).not.toContain(field);
+        }
+        if (branch === 'organization') {
+          expect(getAvailableModelsForOrganization).toHaveBeenCalledWith('test-org-id', {
+            type: 'member',
+            kiloUserId: 'test-user-id',
+          });
+          expect(result.data.map(model => model.id)).toEqual(['some-other-model']);
+          expect(getDirectByokModelsForUser).not.toHaveBeenCalled();
+        }
+      });
+    });
+  });
+
+  test.each(stages)(
+    '%s response applies a kill switch during %s without another query',
+    async (branch, stage) => {
+      configureBranch(branch);
+      await getEnkryptBenchmarks();
+      const pending = pauseAt(stage);
+      const response = responseFor(branch);
+      await pending.entered;
+      mockPublicationEnabled = false;
+      pending.release();
+      const result = await response;
+      for (const model of result.data) expect(model).not.toHaveProperty('enkrypt');
+      expect(mockRows).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  test.each(['anonymous', 'authenticated', 'organization'] as const)(
+    'sanitizes appended %s models without changing availability',
+    async branch => {
+      configureBranch(branch);
+      const original = mockOpenRouterModels.data.find(model => model.id === 'some-other-model');
+      if (!original) throw new Error('Expected catalog fixture');
+      const experiment = {
+        ...original,
+        id: 'partner/experiment',
+        enkrypt: publishedEnkryptBenchmark,
+      };
+      const byok = {
+        ...original,
+        id: 'byok/provider/model',
+        canonical_slug: 'byok/provider/model',
+        hugging_face_id: '',
+        architecture: { ...original.architecture, modality: 'text->text', instruct_type: null },
+        top_provider: {
+          ...original.top_provider,
+          context_length: 1000,
+          max_completion_tokens: 100,
+        },
+        per_request_limits: null,
+        supported_parameters: ['temperature'],
+        default_parameters: {},
+        preferredIndex: undefined,
+        hasUserByokAvailable: true,
+        opencode: { ai_sdk_provider: 'openai-compatible' as const, variants: undefined },
+        enkrypt: publishedEnkryptBenchmark,
+      };
+      jest.mocked(listAvailableExperimentModels).mockResolvedValue([experiment]);
+      jest.mocked(getDirectByokModelsForUser).mockResolvedValue([byok]);
+      const appended = branch === 'anonymous' ? [experiment] : [experiment, byok];
+      if (branch === 'organization') {
+        jest
+          .mocked(getAvailableModelsForOrganization)
+          .mockResolvedValue({ data: [original, ...appended] });
+      }
+      const result = await responseFor(branch);
+      for (const { enkrypt: _enkrypt, ...expected } of appended) {
+        expect(result.data.find(model => model.id === expected.id)).toEqual(
+          OpenRouterModelsResponseSchema.parse({ data: [expected] }).data[0]
+        );
+      }
+      expect(experiment.enkrypt).toEqual(publishedEnkryptBenchmark);
+      expect(byok.enkrypt).toEqual(publishedEnkryptBenchmark);
+      expect(mockRows).toHaveBeenCalledTimes(1);
+    }
+  );
 });
 
 afterEach(() => {

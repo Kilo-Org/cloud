@@ -4,12 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import { ENKRYPT_API_KEY, ENKRYPT_SYNC_ENABLED } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
+import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
 import { enkrypt_sync_state, modelStats } from '@kilocode/db/schema';
-import {
-  EnkryptBenchmarkSchema,
-  EnkryptSyncCountsSchema,
-  EnkryptVerificationsSchema,
-} from '@kilocode/db/schema-types';
+import { EnkryptBenchmarkSchema, EnkryptVerificationsSchema } from '@kilocode/db/schema-types';
 import type {
   EnkryptBenchmark,
   EnkryptFailureCategory,
@@ -86,6 +83,7 @@ export async function syncEnkryptBenchmarks(): Promise<SyncEnkryptResult> {
   const attemptId = randomUUID();
   let stage: EnkryptFailureCategory = 'database';
   let counts: EnkryptSyncCounts | undefined;
+  let transactionStarted = false;
 
   try {
     const [started] = await db
@@ -155,7 +153,8 @@ export async function syncEnkryptBenchmarks(): Promise<SyncEnkryptResult> {
 
     stage = 'database';
     const acceptedCounts = counts;
-    return await db.transaction(async tx => {
+    transactionStarted = true;
+    const result = await db.transaction(async tx => {
       const [state] = await tx
         .select()
         .from(enkrypt_sync_state)
@@ -268,22 +267,22 @@ export async function syncEnkryptBenchmarks(): Promise<SyncEnkryptResult> {
             state.baseline_matched_count ?? 0,
             acceptedCounts.matchedCount
           ),
-          last_alert_at: null,
-          last_alert_reason: null,
         })
         .where(eq(enkrypt_sync_state.job_name, 'enkrypt'));
-      return { status: 'succeeded', ...successCounts, checkedAt };
+      return { status: 'succeeded' as const, ...successCounts, checkedAt };
     });
+    invalidateModelStatsCache();
+    return result;
   } catch (error) {
     const failure =
       error instanceof EnkryptSyncError
         ? new EnkryptSyncError(error.category, {
-            counts: error.counts ?? counts,
+            counts: error.counts,
             httpStatus: error.httpStatus,
           })
-        : new EnkryptSyncError(stage, { counts });
+        : new EnkryptSyncError(stage, { counts: transactionStarted ? undefined : counts });
     try {
-      const failed = await db
+      await db
         .update(enkrypt_sync_state)
         .set({
           last_outcome: 'failed',
@@ -297,42 +296,7 @@ export async function syncEnkryptBenchmarks(): Promise<SyncEnkryptResult> {
             eq(enkrypt_sync_state.attempt_id, attemptId),
             eq(enkrypt_sync_state.last_outcome, 'running')
           )
-        )
-        .returning({ attemptId: enkrypt_sync_state.attempt_id });
-      if (failed.length === 0) {
-        const [completed] = await db
-          .select({
-            counts: enkrypt_sync_state.last_success_counts,
-            checkedAt: enkrypt_sync_state.last_success_at,
-          })
-          .from(enkrypt_sync_state)
-          .where(
-            and(
-              eq(enkrypt_sync_state.job_name, 'enkrypt'),
-              eq(enkrypt_sync_state.attempt_id, attemptId),
-              eq(enkrypt_sync_state.last_outcome, 'succeeded')
-            )
-          );
-        const committedCounts = EnkryptSyncCountsSchema.safeParse(completed?.counts);
-        if (
-          committedCounts.success &&
-          committedCounts.data.matchedCount > 0 &&
-          committedCounts.data.updatedCount <= committedCounts.data.matchedCount &&
-          committedCounts.data.fetchedCount ===
-            committedCounts.data.rejectedCount +
-              committedCounts.data.matchedCount +
-              committedCounts.data.unmatchedCount +
-              committedCounts.data.ambiguousCount &&
-          completed?.checkedAt &&
-          Number.isFinite(Date.parse(completed.checkedAt))
-        ) {
-          return {
-            status: 'succeeded',
-            ...committedCounts.data,
-            checkedAt: new Date(completed.checkedAt).toISOString(),
-          };
-        }
-      }
+        );
     } catch {
       throw new EnkryptSyncError('database', { counts: failure.counts });
     }

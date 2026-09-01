@@ -6,6 +6,12 @@ import { fingerprintEnkryptScore } from './enkrypt-fingerprint';
 
 let mockPublicationEnabled = true;
 
+jest.mock('@/lib/drizzle', () => ({ db: {} }));
+
+function metadata() {
+  return { observedAt: Date.now(), generation: 0 };
+}
+
 jest.mock('@/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
@@ -227,7 +233,7 @@ describe('publishEnkryptModelStats', () => {
     Object.freeze(stored.benchmarks);
     Object.freeze(stored.benchmarks.enkrypt);
     Object.freeze(stored.openrouterData);
-    const result = publishEnkryptModelStats(stored);
+    const result = publishEnkryptModelStats(stored, metadata());
     expect(result.benchmarks).toEqual({ ...siblings, enkrypt: published });
     expect(result.openrouterData).toEqual({
       ...openrouterData,
@@ -239,7 +245,7 @@ describe('publishEnkryptModelStats', () => {
     expect(stored.openrouterData.enkrypt).toEqual(published);
     expect(stored.benchmarks.enkrypt).toEqual(benchmark);
     jest.mocked(Date.now).mockReturnValue(Date.parse(staleAfter));
-    expect(publishEnkryptModelStats(stored).benchmarks.enkrypt).toEqual({
+    expect(publishEnkryptModelStats(stored, metadata()).benchmarks.enkrypt).toEqual({
       ...published,
       freshness: 'stale',
     });
@@ -254,23 +260,23 @@ describe('publishEnkryptModelStats', () => {
       scoreHash: fingerprintEnkryptScore(benchmark),
     });
     const stored = stat();
-    expect(publishEnkryptModelStats(stored, verification).benchmarks).toEqual({
+    expect(publishEnkryptModelStats(stored, metadata(), verification).benchmarks).toEqual({
       ...siblings,
       enkrypt: { ...published, lastCheckedAt: checkedAt, staleAfter: '2026-08-31T02:00:00.000Z' },
     });
-    expect(publishEnkryptModelStats(stored).benchmarks.enkrypt).toEqual({
+    expect(publishEnkryptModelStats(stored, metadata()).benchmarks.enkrypt).toEqual({
       ...published,
       freshness: 'stale',
     });
     expect(stored.benchmarks.enkrypt).toEqual(benchmark);
     mockPublicationEnabled = false;
-    expect(publishEnkryptModelStats(stored, verification).benchmarks).toEqual(siblings);
+    expect(publishEnkryptModelStats(stored, metadata(), verification).benchmarks).toEqual(siblings);
   });
 
   it('strips stored and raw Enkrypt values while retaining all siblings when disabled', () => {
     mockPublicationEnabled = false;
     const stored = stat();
-    const result = publishEnkryptModelStats(stored);
+    const result = publishEnkryptModelStats(stored, metadata());
     expect(result.benchmarks).toEqual(siblings);
     expect(result.openrouterData).not.toHaveProperty('enkrypt');
     expect(result.openrouterData.terminalBench).toEqual(stored.openrouterData.terminalBench);
@@ -281,7 +287,7 @@ describe('publishEnkryptModelStats', () => {
   it.each([null, undefined])('strips raw Enkrypt even with %s benchmarks', benchmarks => {
     mockPublicationEnabled = false;
     const stored = { ...stat(), benchmarks };
-    const result = publishEnkryptModelStats(stored);
+    const result = publishEnkryptModelStats(stored, metadata());
     expect(result.benchmarks).toBe(benchmarks);
     expect(result.openrouterData).not.toHaveProperty('enkrypt');
     expect(stored.openrouterData.enkrypt).toEqual(published);
@@ -293,7 +299,7 @@ describe('publishEnkryptModelStats', () => {
     { isStealth: true },
     { openrouterId: 'kilo-internal/model' },
   ])('withholds all saved scores for nonpublic models %j', overrides => {
-    const result = publishEnkryptModelStats({ ...stat(), ...overrides });
+    const result = publishEnkryptModelStats({ ...stat(), ...overrides }, metadata());
     expect(result.benchmarks).toEqual(siblings);
     expect(result.openrouterData).not.toHaveProperty('enkrypt');
   });
@@ -301,8 +307,8 @@ describe('publishEnkryptModelStats', () => {
   it('omits invalid or future saved snapshots without affecting siblings', () => {
     const stored = stat();
     stored.benchmarks.enkrypt.ingestedAt = 'invalid';
-    expect(publishEnkryptModelStats(stored).benchmarks).toEqual(siblings);
+    expect(publishEnkryptModelStats(stored, metadata()).benchmarks).toEqual(siblings);
     stored.benchmarks.enkrypt.ingestedAt = new Date(ingestedAt + 1).toISOString();
-    expect(publishEnkryptModelStats(stored).benchmarks).toEqual(siblings);
+    expect(publishEnkryptModelStats(stored, metadata()).benchmarks).toEqual(siblings);
   });
 });

@@ -1,229 +1,182 @@
-import { afterEach, beforeEach, describe, test, expect, beforeAll } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { GET, dynamic, revalidate } from './route';
 import { NextRequest } from 'next/server';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { insertTestModelStats } from '@/tests/helpers/model-stats.helper';
-import { db } from '@/lib/drizzle';
-import { modelStats, type ModelStats } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
-import type { EnkryptBenchmark } from '@kilocode/db/schema-types';
-import { getEnkryptVerifications } from '@/lib/model-stats/enkrypt-verifications';
+import type { ModelStats } from '@kilocode/db/schema';
+import { getModelStatsSnapshot } from '@/lib/model-stats/model-stats-cache';
+import type * as Cache from '@/lib/model-stats/model-stats-cache';
 import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
 
-import type * as Config from '@/lib/config.server';
-
 let mockPublicationEnabled = true;
-
 jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual<typeof Config>('@/lib/config.server'),
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
   },
   ENKRYPT_SYNC_ENABLED: false,
 }));
-
-jest.mock('@/lib/model-stats/enkrypt-verifications', () => ({
-  getEnkryptVerifications: jest.fn(),
+jest.mock('@/lib/drizzle', () => ({ db: {} }));
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+jest.mock('@/lib/model-stats/model-stats-cache', () => ({
+  ...jest.requireActual<typeof Cache>('@/lib/model-stats/model-stats-cache'),
+  getModelStatsSnapshot: jest.fn(),
 }));
 
+const benchmark = {
+  model_name: 'Stats model',
+  provider: 'Provider',
+  source: null,
+  risk_score: 0,
+  bias_score: null,
+  ingestedAt: '2026-08-27T00:00:00.000Z',
+  evaluatedAt: null,
+};
+const published = {
+  ...benchmark,
+  lastCheckedAt: benchmark.ingestedAt,
+  staleAfter: '2026-08-28T02:00:00.000Z',
+  freshness: 'fresh',
+};
+const siblings = {
+  artificialAnalysis: { codingIndex: 75 },
+  kiloBench: { overallScore: 0.7, evals: {} },
+  futureBenchmark: { preserved: true },
+};
+let entries: Cache.ModelStatsCacheEntry[];
+
+function entry(
+  overrides: Partial<ModelStats> = {},
+  verification?: unknown
+): Cache.ModelStatsCacheEntry {
+  return {
+    stat: {
+      id: 'model-id',
+      slug: 'model',
+      openrouterId: 'provider/model',
+      name: 'Model',
+      isActive: true,
+      isStealth: false,
+      isFeatured: true,
+      isRecommended: true,
+      benchmarks: { ...siblings, enkrypt: benchmark },
+      openrouterData: {
+        name: 'Raw name',
+        enkrypt: published,
+        terminalBench: { overallScore: 0.7 },
+      },
+      ...overrides,
+    } as ModelStats,
+    verification,
+  };
+}
+
 beforeEach(() => {
-  jest.mocked(getEnkryptVerifications).mockReset().mockResolvedValue({});
+  mockPublicationEnabled = true;
+  entries = [entry()];
+  jest.spyOn(Date, 'now').mockReturnValue(Date.parse(benchmark.ingestedAt));
+  jest
+    .mocked(getModelStatsSnapshot)
+    .mockReset()
+    .mockImplementation(async () => ({
+      entries,
+      observedAt: Date.now(),
+      generation: 0,
+    }));
 });
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+function response(slug = 'model') {
+  return GET(new NextRequest('http://localhost/api/models/stats/model'), {
+    params: Promise.resolve({ slug }),
+  });
+}
+async function model() {
+  const result = await response();
+  expect(result.status).toBe(200);
+  expect(result.headers.get('Cache-Control')).toBe('no-store');
+  return result.json();
+}
 
 describe('GET /api/models/stats/[slug]', () => {
-  let testModelStat: Awaited<ReturnType<typeof insertTestModelStats>>;
-
-  beforeAll(async () => {
-    await insertTestUser();
-    testModelStat = await insertTestModelStats({
-      slug: 'test-model-slug',
-      name: 'Test Model',
-      openrouterId: 'openrouter/test-model',
-    });
-  });
-
-  test('should return model stats for valid slug', async () => {
-    const request = new NextRequest(`http://localhost:3000/api/models/stats/${testModelStat.slug}`);
-    const response = await GET(request, {
-      params: Promise.resolve({ slug: testModelStat.slug! }),
-    });
-
-    expect(response.status).toBe(200);
-
-    const data = await response.json();
-    expect(data.slug).toBe(testModelStat.slug);
-    expect(data.id).toBe(testModelStat.id);
-  });
-
-  test('should return 404 for non-existent slug', async () => {
-    const request = new NextRequest(
-      'http://localhost:3000/api/models/stats/non-existent-model-slug-12345'
-    );
-    const response = await GET(request, {
-      params: Promise.resolve({ slug: 'non-existent-model-slug-12345' }),
-    });
-
-    expect(response.status).toBe(404);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-
-    const data = await response.json();
-    expect(data).toHaveProperty('error');
-    expect(data.error).toContain('not found');
-  });
-
-  test('should include all expected fields for valid slug', async () => {
-    const request = new NextRequest(`http://localhost:3000/api/models/stats/${testModelStat.slug}`);
-    const response = await GET(request, {
-      params: Promise.resolve({ slug: testModelStat.slug! }),
-    });
-
-    const data = await response.json();
-
-    expect(data).toHaveProperty('id');
-    expect(data).toHaveProperty('openrouterId');
-    expect(data).toHaveProperty('slug');
-    expect(data).toHaveProperty('name');
-    expect(data).toHaveProperty('isActive');
-    expect(data).toHaveProperty('openrouterData');
-  });
-});
-
-describe('GET /api/models/stats/[slug] Enkrypt publication', () => {
-  const benchmark: EnkryptBenchmark = {
-    model_name: 'Stats model',
-    provider: 'Provider',
-    source: null,
-    risk_score: 0,
-    bias_score: null,
-    ingestedAt: '2026-08-27T00:00:00.000Z',
-    evaluatedAt: null,
-  };
-  const published = {
-    ...benchmark,
-    lastCheckedAt: benchmark.ingestedAt,
-    staleAfter: '2026-08-28T02:00:00.000Z',
-    freshness: 'fresh',
-  };
-  const siblings = {
-    artificialAnalysis: { codingIndex: 75 },
-    kiloBench: { overallScore: 0.7, evals: {} },
-    futureBenchmark: { preserved: true },
-  };
-
-  beforeEach(() => {
-    mockPublicationEnabled = true;
-    jest.spyOn(Date, 'now').mockReturnValue(Date.parse(benchmark.ingestedAt));
-  });
-
-  afterEach(() => {
-    mockPublicationEnabled = true;
-    jest.restoreAllMocks();
-  });
-
-  async function insertSnapshot(overrides: Partial<ModelStats> = {}) {
-    const stat = await insertTestModelStats({ benchmarks: { ...siblings, enkrypt: benchmark } });
-    const openrouterData = { ...stat.openrouterData, enkrypt: published };
-    const [stored] = await db
-      .update(modelStats)
-      .set({ openrouterData, ...overrides })
-      .where(eq(modelStats.id, stat.id))
-      .returning();
-    return stored;
-  }
-
-  async function responseFor(stat: ModelStats) {
-    if (!stat.slug) throw new Error('Expected a test model slug');
-    const response = await GET(
-      new NextRequest(`http://localhost:3000/api/models/stats/${stat.slug}`),
-      {
-        params: Promise.resolve({ slug: stat.slug }),
-      }
-    );
-    expect(response.status).toBe(200);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-    return response.json();
-  }
-
-  test('disables route caching so publication cannot be bypassed by a cached response', () => {
+  test('keeps dynamic no-store responses and selects the requested slug', async () => {
     expect(revalidate).toBe(0);
     expect(dynamic).toBe('force-dynamic');
+    entries.unshift(entry({ slug: 'other', id: 'other' }));
+    expect(await model()).toMatchObject({
+      id: 'model-id',
+      slug: 'model',
+      openrouterId: 'provider/model',
+      name: 'Model',
+      isActive: true,
+      isFeatured: true,
+      isStealth: false,
+      isRecommended: true,
+    });
+  });
+
+  test('returns a no-store 404 for a missing slug', async () => {
+    const result = await response('absent');
+    expect(result.status).toBe(404);
+    expect(result.headers.get('Cache-Control')).toBe('no-store');
+    expect(await result.json()).toEqual({ error: 'Model with slug "absent" not found' });
   });
 
   test.each([true, false])(
-    'publishes only gated snapshots with publication %s and sync disabled',
+    'gates scores with publication %s independently of sync',
     async enabled => {
       mockPublicationEnabled = enabled;
-      const stored = await insertSnapshot();
-      const result = await responseFor(stored);
-      expect(result.benchmarks).toEqual(enabled ? { ...siblings, enkrypt: published } : siblings);
-      expect(result.openrouterData).not.toHaveProperty('enkrypt');
-      expect(result.name).toBe(stored.name);
-      const [unchanged] = await db.select().from(modelStats).where(eq(modelStats.id, stored.id));
-      expect(unchanged).toEqual(stored);
+      const data = await model();
+      expect(data.benchmarks).toEqual(enabled ? { ...siblings, enkrypt: published } : siblings);
+      expect(data.openrouterData).toEqual({
+        name: 'Raw name',
+        terminalBench: { overallScore: 0.7 },
+      });
+      expect(entries[0].stat.benchmarks?.enkrypt).toEqual(benchmark);
+      expect(entries[0].stat.openrouterData).toHaveProperty('enkrypt');
     }
   );
 
-  test('recomputes freshness at the 26 hour boundary and applies the kill switch on the next response', async () => {
-    const stored = await insertSnapshot();
+  test('recomputes freshness from content time and applies the kill switch', async () => {
     jest.mocked(Date.now).mockReturnValue(Date.parse(published.staleAfter) - 1);
-    expect((await responseFor(stored)).benchmarks.enkrypt).toEqual(published);
+    expect((await model()).benchmarks.enkrypt).toEqual(published);
     jest.mocked(Date.now).mockReturnValue(Date.parse(published.staleAfter));
-    expect((await responseFor(stored)).benchmarks.enkrypt).toEqual({
-      ...published,
-      freshness: 'stale',
-    });
+    expect((await model()).benchmarks.enkrypt).toEqual({ ...published, freshness: 'stale' });
     mockPublicationEnabled = false;
-    expect((await responseFor(stored)).benchmarks).toEqual(siblings);
+    expect((await model()).benchmarks).toEqual(siblings);
   });
 
-  test('uses the slug model check once and retains siblings at the check-time boundary and kill switch', async () => {
-    const stored = await insertSnapshot();
+  test('uses only the slug check and never exposes hashes or cache metadata', async () => {
     const checkedAt = '2026-08-30T00:00:00.000Z';
     const verification = { checkedAt, scoreHash: fingerprintEnkryptScore(benchmark) };
-    jest.mocked(getEnkryptVerifications).mockResolvedValue({ [stored.openrouterId]: verification });
+    entries = [entry({}, verification), entry({ slug: 'other', openrouterId: 'other/model' })];
     jest.mocked(Date.now).mockReturnValue(Date.parse(checkedAt));
+    const data = await model();
     const checked = {
       ...published,
       lastCheckedAt: checkedAt,
       staleAfter: '2026-08-31T02:00:00.000Z',
     };
-    const result = await responseFor(stored);
-    expect(result.benchmarks).toEqual({ ...siblings, enkrypt: checked });
-    expect(result.openrouterData).not.toHaveProperty('enkrypt');
-    expect(JSON.stringify(result)).not.toContain(verification.scoreHash);
-    expect(getEnkryptVerifications).toHaveBeenCalledTimes(1);
-
+    expect(data.benchmarks.enkrypt).toEqual(checked);
+    for (const field of ['verification', 'scoreHash', 'observedAt', 'generation', 'entries']) {
+      expect(JSON.stringify(data)).not.toContain(field);
+    }
     jest.mocked(Date.now).mockReturnValue(Date.parse(checked.staleAfter) - 1);
-    expect((await responseFor(stored)).benchmarks.enkrypt).toEqual(checked);
+    expect((await model()).benchmarks.enkrypt).toEqual(checked);
     jest.mocked(Date.now).mockReturnValue(Date.parse(checked.staleAfter));
-    expect((await responseFor(stored)).benchmarks.enkrypt).toEqual({
-      ...checked,
-      freshness: 'stale',
-    });
-    mockPublicationEnabled = false;
-    expect((await responseFor(stored)).benchmarks).toEqual(siblings);
-    const [unchanged] = await db.select().from(modelStats).where(eq(modelStats.id, stored.id));
-    expect(unchanged).toEqual(stored);
+    expect((await model()).benchmarks.enkrypt).toEqual({ ...checked, freshness: 'stale' });
+    expect(entries[0].stat.benchmarks?.enkrypt).toEqual(benchmark);
   });
 
-  test('does not use a different model check to freshen missing or mismatched content', async () => {
-    const stored = await insertSnapshot();
+  test('does not freshen missing or mismatched checks with another row verification', async () => {
     const checkedAt = '2026-08-30T00:00:00.000Z';
     jest.mocked(Date.now).mockReturnValue(Date.parse(checkedAt));
-    jest.mocked(getEnkryptVerifications).mockResolvedValue({
-      'other/model': { checkedAt, scoreHash: fingerprintEnkryptScore(benchmark) },
-    });
-    expect((await responseFor(stored)).benchmarks.enkrypt).toEqual({
-      ...published,
-      freshness: 'stale',
-    });
-    jest.mocked(getEnkryptVerifications).mockResolvedValue({
-      [stored.openrouterId]: { checkedAt, scoreHash: '0'.repeat(64) },
-    });
-    expect((await responseFor(stored)).benchmarks.enkrypt).toEqual({
-      ...published,
-      freshness: 'stale',
-    });
+    entries = [
+      entry({ slug: 'other' }, { checkedAt, scoreHash: fingerprintEnkryptScore(benchmark) }),
+      entry(),
+    ];
+    expect((await model()).benchmarks.enkrypt).toEqual({ ...published, freshness: 'stale' });
+    entries = [entry({}, { checkedAt, scoreHash: '0'.repeat(64) })];
+    expect((await model()).benchmarks.enkrypt).toEqual({ ...published, freshness: 'stale' });
   });
 
   test.each([
@@ -238,33 +191,27 @@ describe('GET /api/models/stats/[slug] Enkrypt publication', () => {
         enkrypt: { ...benchmark, ingestedAt: '2026-08-27T00:00:00.001Z' },
       },
     },
-  ])('omits nonpublic or invalid stored snapshots %j', async overrides => {
-    const stored = await insertSnapshot(overrides);
-    const result = await responseFor(stored);
-    expect(result.benchmarks).toEqual(siblings);
-    expect(result.openrouterData).not.toHaveProperty('enkrypt');
+  ])('retains detail access but omits nonpublic or invalid scores %j', async overrides => {
+    entries = [entry(overrides)];
+    const data = await model();
+    expect(data.benchmarks).toEqual(siblings);
+    expect(data.openrouterData).not.toHaveProperty('enkrypt');
+    expect(data.isActive).toBe(entries[0].stat.isActive);
   });
 
-  test('strips raw saved scores even when no benchmark namespace exists', async () => {
-    mockPublicationEnabled = false;
-    const stored = await insertSnapshot({ benchmarks: null });
-    const result = await responseFor(stored);
-    expect(result.benchmarks).toBeNull();
-    expect(result.openrouterData).not.toHaveProperty('enkrypt');
+  test('strips raw scores with no benchmark namespace', async () => {
+    entries = [entry({ benchmarks: null })];
+    const data = await model();
+    expect(data.benchmarks).toBeNull();
+    expect(data.openrouterData).not.toHaveProperty('enkrypt');
   });
 
-  test('does not cache error responses', async () => {
-    jest.spyOn(db, 'select').mockImplementationOnce(() => {
-      throw new Error('test database failure');
-    });
+  test('returns a no-store 500 instead of 404 on cold load failure', async () => {
+    jest.mocked(getModelStatsSnapshot).mockRejectedValue(new Error('unavailable'));
     jest.spyOn(console, 'error').mockImplementation(() => {});
-    const response = await GET(
-      new NextRequest('http://localhost:3000/api/models/stats/test-error'),
-      {
-        params: Promise.resolve({ slug: 'test-error' }),
-      }
-    );
-    expect(response.status).toBe(500);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const result = await response('absent');
+    expect(result.status).toBe(500);
+    expect(result.headers.get('Cache-Control')).toBe('no-store');
+    expect(await result.json()).toEqual({ error: 'Failed to fetch model statistics' });
   });
 });

@@ -1,23 +1,20 @@
 # Enkrypt score ingestion operations
 
-This integration imports model-level benchmark metadata. It does not enforce request safety, change routing, add a UI, or establish that Kilo's serving providers were evaluated. The upstream `provider` and `source` remain evaluation provenance, not Kilo routing instructions.
+This integration adds benchmark metadata, not runtime safety enforcement, routing rules, or a UI. The upstream `provider` and `source` describe the evaluation provenance; they do not establish that Kilo's serving providers were evaluated.
 
-## Release status
+Code-review readiness is separate from production readiness. Keep ingestion and publication disabled until the relevant deployment, monitoring, and redistribution gates below are complete.
 
-Keep the integration in draft and both feature flags disabled until the release gates below are complete. API access does not establish permission to redistribute the scores. Redistribution approval, production scheduling, and an authenticated staging import have not been verified by the representative tests.
+## Controls and setup
 
-## Controls and deployment
+Both flags default to disabled; only the exact string `true` enables them.
 
-Both flags default to `false`; only the exact string `true` enables them.
+| Setting | Effect |
+|---|---|
+| `ENKRYPT_SYNC_ENABLED` | Enables ingestion and mapped-model enrollment in the existing catalog sync. Does not enable publication. |
+| `ENKRYPT_PUBLICATION_ENABLED` | Allows stored scores in public catalog/statistics responses. Does not enable ingestion. |
+| `ENKRYPT_API_KEY` | Server-side authentication for the public leaderboard endpoint. Never include its value in reports or logs. |
 
-| Ingestion flag | Publication flag | Behavior |
-|---|---|---|
-| `false` | `false` | No ingestion, no health alerts, and no published Enkrypt metadata. |
-| `true` | `false` | Ingest and monitor privately; public responses omit Enkrypt metadata. |
-| `false` | `true` | Stop ingestion but continue publishing retained scores with their freshness status. |
-| `true` | `true` | Ingest, monitor, and publish. Requires redistribution approval. |
-
-An operator must use the shared web-environment workflow described in [DEVELOPMENT.md](../DEVELOPMENT.md), not commit credentials or edit provider projects independently. For staging only:
+An operator must use the shared environment workflow in [DEVELOPMENT.md](../DEVELOPMENT.md). For staging only:
 
 ```sh
 pnpm web:env set ENKRYPT_API_KEY --only staging
@@ -25,130 +22,84 @@ pnpm web:env set ENKRYPT_SYNC_ENABLED --only staging
 pnpm web:env set ENKRYPT_PUBLICATION_ENABLED --only staging
 ```
 
-These commands are user-run and prompt for values. Keep publication disabled until approval; enabling staging ingestion does not require enabling publication. Apply all generated database migrations before enabling ingestion. They create a single operational-status row and add its latest per-model verification map, not a score-history store.
+These commands are user-run. Verify database isolation, apply the single consolidated Enkrypt migration, and run the protected catalog bootstrap before the first score sync. Keep publication disabled until redistribution is approved. Redeploy the intended environment after changing a key or flag; existing instances retain their previous configuration.
 
-Existing deployments retain their prior environment configuration. Redeploy the intended environment after changing a flag or key. Before staging writes, verify that its primary database and any read replica are isolated from production. Configuration and deployment of production are separate operator-approved release steps.
-
-To stop fetching and writing, set `ENKRYPT_SYNC_ENABLED=false` and redeploy. To suppress already-stored scores independently, set `ENKRYPT_PUBLICATION_ENABLED=false` and redeploy all serving web projects. Suppression covers model catalogs, the statistics list, and statistics detail endpoints; it does not delete stored snapshots. Publication checks run outside the five-minute database cache. Statistics responses are dynamic and `no-store`. Previously delivered client responses or old deployments still receiving traffic cannot be recalled by the new flag.
+To stop ingestion, disable `ENKRYPT_SYNC_ENABLED` and redeploy. To suppress already-stored scores independently, disable `ENKRYPT_PUBLICATION_ENABLED` across serving deployments. Suppression does not delete snapshots or recall responses already delivered to clients.
 
 ## Contract and identity
 
-The envelope must contain `status: "success"` and `data.scores` as an array. Each record is validated separately. Invalid records are rejected and counted without discarding unrelated valid records. Model and provider names must be nonempty strings; scores must be numeric, null, or absent according to the schema. Empty, null, and missing `source` metadata are retained without substituting a source.
+The response must contain `status: "success"` and a `data.scores` array. Records are validated independently: invalid records are counted and rejected without discarding unrelated valid records. Scores must be numeric, null, or absent as permitted by the schema. Empty, null, and missing source metadata remain unchanged.
 
-Only explicit, reviewed identity tuples are associated with catalog models. No provider-prefix guessing, source substitution, case folding, dated-model substitution, or free/reasoning-variant inheritance is performed. Conflicting mappings and multiple input records targeting one model are ambiguous and all affected records are skipped.
+Only explicit, reviewed identity tuples map to catalog IDs. Runtime matching does not infer provider prefixes, substitute sources, normalize names, or merge dated/free/reasoning variants. Duplicate or conflicting matches are skipped as ambiguous.
 
-The initial required set is:
+The required gate remains:
 
-| Enkrypt model | Provider | Source | Kilo model ID |
+| Model | Provider | Source | Catalog ID |
 |---|---|---|---|
 | `gpt-oss-120b` | `fireworks` | `OpenAI` | `openai/gpt-oss-120b` |
 | `glm-4.5` | `novita` | `zai-org` | `z-ai/glm-4.5` |
 | `Qwen3-8B` | `openai_compatible` | `qwen` | `qwen/qwen3-8b` |
 
-All three must match active, non-stealth existing `model_stats` rows. The score importer does not invent or activate catalog models. When ingestion is enabled, the existing six-hour catalog sync enrolls mapped models only if they are present in its already-fetched public catalog. Enkrypt-only enrollment does not recommend models or reactivate an operator-disabled model, and makes no extra provider request. Run the protected `GET /api/cron/sync-model-stats` once before the first Enkrypt sync in a fresh environment; subsequent runs maintain catalog readiness automatically.
+The existing six-hour catalog sync enrolls additional mapped models only from its public catalog. It does not reactivate additional-only models that an operator disabled. Recommendations remain derived from the monitored-model set, independently of Enkrypt enrollment.
 
-The four empty-source review fixtures still use a deliberately synthetic provider and remain unmatched as fixtures. Actual empty source values are supported by explicitly reviewed tuples. A dated GPT model must not be substituted with an undated catalog ID.
+Empty/all-rejected responses, zero matches, missing required models, or a matched count more than 20% below the highest successful count fail before score writes. An intentional reduction of the reviewed mapping set requires an operator-reviewed baseline adjustment.
 
-An empty response, all-rejected response, zero matches, missing required model, or a matched count more than 20% below the accepted baseline fails the coverage gate before score writes. The baseline is the highest successful matched-model count; failures never lower it. Deliberate reductions of the reviewed mapping set require an operator-reviewed baseline change rather than silently accepting lower coverage.
+## Efficient polling and freshness
 
-## Coverage reports
+The daily job normally makes one bounded public-leaderboard request. The endpoint currently advertises neither ETag nor Last-Modified validators, so conditional HTTP caching is not assumed.
 
-From the repository root:
+Validated content fingerprints determine whether a score changed. Changes use one bulk update; identical results cause zero model-row writes. Only the small operational-state row advances, retaining the latest verification time/hash per matched model. This is not a score-history store.
+
+| Field | Meaning |
+|---|---|
+| `ingestedAt` | First import or last change to score content/provenance; unchanged by identical polls. |
+| `evaluatedAt` | Always `null`: upstream evaluation time is unknown. |
+| `lastCheckedAt` | Latest successful check bound to this exact content hash; falls back to `ingestedAt` when verification is unavailable. |
+| `staleAfter` / `freshness` | Stale at 26 hours after `lastCheckedAt`, allowing two hours beyond the daily cadence. |
+
+A shared, single-flight, five-minute primary-database snapshot serves list, detail, and gateway lookups. Unknown slugs do not create cache entries. Freshness and publication eligibility are checked after asynchronous work, immediately before serialization; responses remain `no-store`.
+
+Failed refreshes may retain base model metadata, but an expired or invalidated snapshot cannot authorize Enkrypt publication. Provider outages can still expose last-known-good scores as stale when model eligibility remains verifiable. Administrative model changes and completed syncs invalidate the current instance's cache; other instances have the five-minute eligibility bound. Failed refreshes have a short retry cooldown.
+
+## Results and failures
+
+Successful runs return `checkedAt`, fetched/rejected/matched/unmatched/ambiguous/updated counts, and derived `unchangedCount`. Positive matched coverage with zero updates is healthy. Disabled runs are explicitly skipped and do not advance last success.
+
+The latest operational state, changed snapshots, and verification entries commit atomically. Failures preserve earlier successful data. Superseded attempts cannot overwrite a newer attempt's state.
+
+A database transport failure after a transaction starts has an uncertain commit outcome. The response omits commit counters rather than claiming zero writes; retrying is safe because content-identical scores are not rewritten. Inspect the health response and retry through the authenticated sync endpoint rather than manually editing scores.
+
+Errors use bounded categories such as `configuration`, `authentication`, `rate_limited`, `response_validation`, `coverage`, `database`, `timeout`, `network`, `upstream`, and `superseded`. Diagnostics never need credentials, authentication headers, raw provider responses, or original database exceptions.
+
+## Scheduling and monitoring
+
+| Endpoint | Owner and cadence |
+|---|---|
+| `GET /api/cron/sync-model-stats` | Existing six-hour catalog job; run once for initial bootstrap. |
+| `GET /api/cron/sync-enkrypt` | Daily at 04:00 UTC in the designated cron-owning deployment. |
+| `GET /api/cron/check-enkrypt-health` | Read-only probe polled by one independently scheduled external monitor. |
+
+All require the configured cron authorization header. Use a secret-aware client and keep header values out of public artifacts.
+
+The health probe returns HTTP 200 for healthy/disabled and HTTP 503 for failed, stale, never-successful, or unavailable state. It reads the primary database, reports the last successful run separately from the latest attempt, and becomes stale after 26 hours without success. It does not mutate database state or send notifications.
+
+The external monitor owns alert delivery, deduplication, recovery, and escalation. Configure it to alert on HTTP 503, timeouts, missing responses, and authentication failures, and test delivery before enabling ingestion. It must run independently of the application scheduler so it can detect scheduler-wide failures. There is no second application health cron or custom Slack delivery state.
+
+## Coverage evidence
 
 ```sh
 pnpm --filter web exec tsx --tsconfig tsconfig.scripts.json src/scripts/enkrypt-coverage.ts --examples
 pnpm --filter web exec tsx --tsconfig tsconfig.scripts.json src/scripts/enkrypt-coverage.ts --input /path/to/sanitized-response.json
 ```
 
-The tool reads Kilo's unauthenticated public catalog and reports matched, unmatched, ambiguous, and rejected records plus the required-model gate. It does not use the provider API key or a database. Reports omit score values but contain model identities; review them before publishing, particularly if the input contains nonpublic identities.
+Reports contain identities and classifications, not score values or credentials. Review them before publishing. Fixtures use synthetic metrics; authenticated local checks are not substitutes for staging validation or redistribution approval.
 
-The representative fixture contains seven review examples, with synthetic numeric/null scores and a clearly synthetic provider for the four incomplete identities. These examples yield **3 matched, 4 unmatched, 0 ambiguous, 0 rejected**, with all three required models present. Independent identity fixtures also cover the 70 explicitly reviewed mappings without storing live score values.
+## Follow-up release actions
 
-Authenticated local checks verified full-feed processing and publication of reviewed catalog matches. This verifies the local path only, not staging, production scheduling, or redistribution permission. Unmatched records are not assigned speculative identities.
-
-Attach the full report, its collection time, and the tested code revision to the release evidence. Do not attach credentials or unsanitized responses to a public PR.
-
-## Efficient recurring checks
-
-- Keep the daily check rather than repeatedly polling data that changes infrequently. The endpoint currently advertises neither ETag nor Last-Modified validators, so a normal run makes one bounded public-leaderboard GET rather than assuming conditional-request support.
-- Compare canonical validated score content, including its provenance, with the stored snapshot. Object key order, transport fields, and ingestion timestamps do not force a rewrite.
-- Write only new or changed snapshots using one parameterized bulk update. An unchanged run makes **zero `model_stats` updates** and preserves each model's `updatedAt` and snapshot `ingestedAt`.
-- Refresh only the small operational-state row on unchanged runs. Its verification map holds the latest checked time and content hash for each matched model, not a history of scores.
-- Cache verification reads for five minutes and load them once per request, not once per model. Freshness is still calculated when serializing the response.
-
-## Snapshot freshness
-
-Stored snapshots contain:
-
-- `ingestedAt`: first import or most recent change to validated score content or provenance, not the upstream evaluation time. Identical repeated results leave it unchanged.
-- `evaluatedAt: null`: evaluation time is unknown; the upstream contract does not supply it.
-
-Published snapshots also contain:
-
-- `lastCheckedAt`: the latest successful check whose content hash matches this exact snapshot; falls back to `ingestedAt` when no valid verification exists.
-- `staleAfter`: `lastCheckedAt` plus 26 hours, allowing two hours beyond the daily cadence.
-- `freshness`: `fresh` before that boundary and `stale` at or after it, computed when serializing each response rather than cached as a fixed value.
-
-Checks are bound to individual model content. Missing, rejected, or failed records do not acquire a newer verification time merely because other models succeeded. Failed transactions retain earlier verification entries and scores. Invalid, mismatched, or future-dated verification entries cannot make a snapshot fresh; internal content hashes are not exposed in catalog responses.
-
-Last-known-good scores remain publishable, marked stale when appropriate, until publication is disabled. A successful check confirms availability of the same data, not a recent evaluation. Future-dated or malformed snapshots are not published and require operator review; the importer fails closed rather than silently overwriting invalid stored data.
-
-## Operational state and counters
-
-`enkrypt_sync_state` contains one row for the latest operational state: attempt identity, timestamps, outcome, safe failure category, counters, accepted coverage baseline, delivered-alert suppression, and `verified_models` containing the latest checked time/content hash per model. Changed snapshots, verifications, and the successful state update commit in the same transaction. Failed or superseded runs cannot replace a newer successful run. No score values, payload bodies, credentials, or historical evaluations are stored in this status row.
-
-| Counter | Meaning |
-|---|---|
-| `fetchedCount` | Records in the received array, including rejected records. |
-| `rejectedCount` | Records rejected by record validation. |
-| `matchedCount` | Unambiguous accepted records mapped to distinct eligible models. |
-| `unmatchedCount` | Valid records with no reviewed identity or no eligible catalog target. |
-| `ambiguousCount` | Valid records involved in conflicting or duplicate-target matches. |
-| `updatedCount` | New or changed snapshots committed; unchanged matched models do not count as updates. |
-| `unchangedCount` | Success-response value derived as `matchedCount - updatedCount`; also emitted as `unchanged_count` in the successful job event. |
-
-For a classified complete array, fetched equals rejected plus matched plus unmatched plus ambiguous. Unknown counters remain absent/null after failures that occur before parsing; they are not invented as zero. Disabled runs are explicitly skipped and do not advance last success. A missing API key is reported as a configuration failure without performing a fetch or database write; the health endpoint independently reports that configuration condition.
-
-## Schedule, monitoring, and alerts
-
-- Catalog readiness: `GET /api/cron/sync-model-stats`, scheduled **every six hours**; mapped-model enrollment is enabled only with ingestion.
-- Daily ingestion: `GET /api/cron/sync-enkrypt`, scheduled at **04:00 UTC**.
-- Independent health check: `GET /api/cron/check-enkrypt-health`, scheduled **hourly at minute 30**.
-- Both endpoints require the configured `Authorization: Bearer <CRON_SECRET>` header. Use a secret-aware client; do not include actual header values in public reports or logs.
-
-A healthy sync responds with `status: "succeeded"`, `checkedAt`, and counters. Nonzero matched coverage with `updatedCount: 0` is a healthy unchanged check, not a failure; zero matched coverage still fails. Disabled ingestion responds with `status: "disabled"`. Failures return HTTP 500 with a bounded category and any known counters or numeric upstream status. Confirm the designated cron-owning deployment before enabling schedules in multiple web projects, to avoid redundant daily requests.
-
-The health endpoint uses the primary database, is `no-store`, and returns HTTP 200 for healthy/disabled or HTTP 503 for degraded, stale, never-successful, or unavailable state. It reports the last successful sync independently of the most recent attempt. No success within 26 hours is stale. A newly enabled installation with no success is unhealthy until its initial successful import.
-
-An unhealthy production health check sends a notification through the existing administrative Slack notification integration. Staging/local checks simulate delivery instead. Alerts with the same reason are suppressed for 24 hours only after delivery is recorded; recovery or a different failure reason re-arms delivery. Notification failures do not consume suppression. A database outage can prevent suppression from being recorded and may cause repeated alerts until recovery.
-
-Configure an independently scheduled external monitor to call the authenticated health endpoint and alert on HTTP 503, timeouts, missing responses, or authentication failure. The hourly job detects missed ingestion invocations, but cannot detect the scheduler stopping all jobs. Assign an operational owner, notification destination, and recovery policy before enabling ingestion. Verify actual delivery rather than assuming that checked-in schedules or webhook variables prove it works.
-
-Scheduled-job events use `web.sync_enkrypt` and `web.check_enkrypt_health`, with safe scalar categories, counters, timestamps, and run identifiers. Error reporting discards raw exceptions and response bodies. Useful failure categories are:
-
-| Category | Investigation |
-|---|---|
-| `configuration` | Check enabled flags and server-side key configuration. |
-| `authentication` | Check upstream access/expiry; rotate through the approved secret workflow. |
-| `rate_limited` | Inspect bounded retry outcomes and provider limits. |
-| `timeout`, `network`, `upstream` | Check provider availability and connectivity. |
-| `response_validation` | Review a privately obtained, sanitized contract sample. |
-| `coverage` | Inspect the identity-only report, required models, and accepted baseline. |
-| `database` | Check migration/application compatibility and database availability. |
-| `superseded` | A newer attempt owns the status row; inspect the newer run. |
-| `unexpected`, `monitor_error` | Investigate using safe run metadata; do not enable raw payload logging. |
-
-## Release checklist
-
-- [ ] Confirm permission to redistribute the selected fields through public catalog APIs, including any attribution or retention requirements.
-- [ ] Review a full sanitized response and produce the matched/unmatched/ambiguous/rejected report against the actual catalog.
-- [ ] Confirm the agreed three-model gate and review every additional mapping before adding it.
-- [ ] Apply all migrations, provision the key, and run the protected catalog bootstrap in an isolated staging environment; keep publication disabled initially.
-- [ ] Demonstrate an authenticated staging sync with all required models; an initially empty store should receive new snapshots. Repeat against unchanged data and verify zero snapshot writes, stable `ingestedAt`/`updatedAt`, advancing `lastCheckedAt`, and healthy monitoring.
-- [ ] After redistribution approval, enable staging publication and verify the three catalog records, preserved provenance, unknown evaluation dates, and freshness fields.
-- [ ] Verify repeated imports preserve sibling benchmarks; failures retain scores and last success while producing actionable categories.
-- [ ] Exercise stale/coverage-drop monitoring, notification delivery, suppression/recovery, and both independent disable controls.
-- [ ] Configure and test the external monitor, including scheduler-wide failure detection.
-- [ ] Verify the intended production cron registration, credentials, migration, monitor owner, and notification destination before production enablement.
-
-The representative examples and automated tests do not satisfy the unchecked live, deployment, or redistribution gates.
+- [ ] Resolve base-branch conflicts and regenerate the single migration against the final base before merging.
+- [ ] Obtain approval to redistribute the selected score fields, including attribution/retention requirements.
+- [ ] Provision staging configuration through the shared environment workflow, apply migrations, and bootstrap the catalog against an isolated database.
+- [ ] Run authenticated staging syncs; verify coverage, unchanged-row preservation, advancing `lastCheckedAt`, and published metadata after approval.
+- [ ] Verify provider failures retain prior scores, stale or unavailable eligibility suppresses publication, and both disable controls work.
+- [ ] Configure one external monitor; test alerts, recovery, scheduler-wide failure detection, and the notification destination with the operational owner.
+- [ ] Verify one production cron owner, deploy the approved revision, enable ingestion, and enable publication only after its approval gate is satisfied.

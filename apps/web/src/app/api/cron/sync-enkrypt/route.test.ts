@@ -296,6 +296,48 @@ describe('GET /api/cron/sync-enkrypt', () => {
     }
   );
 
+  it('omits unknown database outcome counts from HTTP and observability', async () => {
+    const failure = new EnkryptSyncError('database');
+    mockSync.mockRejectedValue(failure);
+    const response = await GET(request());
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      status: 'failed',
+      error: 'Failed to sync Enkrypt benchmarks',
+      category: 'database',
+    });
+    const event = jest.mocked(emitScheduledJobEvent).mock.calls[0]?.[0];
+    const context = jest.mocked(captureException).mock.calls[0]?.[1];
+    const tags = context && 'tags' in context ? context.tags : undefined;
+    expect(tags).toBeDefined();
+    for (const key of [...Object.keys(countMetadata), 'unchanged_count']) {
+      expect(event?.[key]).toBeUndefined();
+      expect(tags?.[key]).toBeUndefined();
+    }
+    expect(JSON.stringify(event)).not.toContain('updated_count');
+    expect(JSON.stringify(tags)).not.toContain('updated_count');
+    expect(jest.mocked(captureException).mock.calls[0]?.[0]).toHaveProperty('counts', undefined);
+    expectSanitized(failure);
+  });
+
+  it('retains known zero-update counts for rolled-back coverage and supersession', async () => {
+    const knownCounts = { ...counts, updatedCount: 0 };
+    for (const category of ['coverage', 'superseded'] as const) {
+      mockSync.mockRejectedValue(new EnkryptSyncError(category, { counts: knownCounts }));
+      const response = await GET(request());
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({
+        status: 'failed',
+        error: 'Failed to sync Enkrypt benchmarks',
+        category,
+        counts: knownCounts,
+      });
+      expect(emitScheduledJobEvent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ category, updated_count: 0 })
+      );
+    }
+  });
+
   it.each([99, 600, 429.5, NaN, Infinity, sensitive])(
     'omits invalid HTTP status %p',
     async httpStatus => {

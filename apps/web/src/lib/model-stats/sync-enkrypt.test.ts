@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { setTimeout } from 'node:timers/promises';
 import { db } from '@/lib/drizzle';
+import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
 import { insertTestModelStats } from '@/tests/helpers/model-stats.helper';
 import { ENKRYPT_REVIEWED_CASES, ENKRYPT_SCORE_EXAMPLES } from '@/tests/fixtures/enkrypt-scores';
 import { enkrypt_sync_state, modelStats } from '@kilocode/db/schema';
@@ -27,6 +28,7 @@ jest.mock('@/lib/config.server', () => ({
 }));
 
 jest.mock('node:timers/promises', () => ({ setTimeout: jest.fn() }));
+jest.mock('@/lib/model-stats/model-stats-cache', () => ({ invalidateModelStatsCache: jest.fn() }));
 jest.mock('./enkrypt-identity', () => {
   const actual = jest.requireActual<typeof EnkryptIdentity>('./enkrypt-identity');
   return { ...actual, matchEnkryptScores: jest.fn(actual.matchEnkryptScores) };
@@ -154,8 +156,6 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
         })
       ),
       baseline_matched_count: baseline,
-      last_alert_at: oldSuccessAt,
-      last_alert_reason: 'coverage',
     });
   }
 
@@ -181,6 +181,7 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
   beforeEach(async () => {
     mockEnabled = true;
     mockApiKey = 'test-key';
+    jest.mocked(invalidateModelStatsCache).mockReset();
     mockDelay.mockReset().mockResolvedValue(undefined);
     mockMatch
       .mockReset()
@@ -264,6 +265,7 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
             model => model.benchmarks?.enkrypt?.ingestedAt === oldSuccessAt
           )
         ).toBe(true);
+        expect(invalidateModelStatsCache).not.toHaveBeenCalled();
         inspected = true;
         return result;
       })
@@ -277,6 +279,7 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
     });
     if (result.status !== 'succeeded') throw new Error('Expected success');
     expect(inspected).toBe(true);
+    expect(invalidateModelStatsCache).toHaveBeenCalledTimes(1);
     expect(result).not.toHaveProperty('scores');
     expect(result).not.toHaveProperty('unmatchedModelNames');
     for (const stored of await readModels()) {
@@ -297,8 +300,6 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
       last_counts: successCounts,
       last_success_counts: successCounts,
       baseline_matched_count: 3,
-      last_alert_at: null,
-      last_alert_reason: null,
       attempt_id: expect.any(String),
     });
     expect(new Date(state.last_success_at ?? '').toISOString()).toBe(result.checkedAt);
@@ -306,7 +307,6 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
     expect(await getEnkryptSyncHealth()).toMatchObject({
       status: 'healthy',
       reason: null,
-      shouldAlert: false,
       counts: successCounts,
     });
     expect(mockFetch).toHaveBeenCalledWith('https://api.enkryptai.com/leaderboard/v2/scores', {
@@ -336,6 +336,7 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
       });
       if (result.status !== 'succeeded') throw new Error('Expected unchanged success');
       expect(result.checkedAt > first.checkedAt).toBe(true);
+      expect(invalidateModelStatsCache).toHaveBeenCalledTimes(attempt + 2);
       expect(await readModels()).toStrictEqual(before);
       const state = await readState();
       expect(state.attempt_id).not.toBe(firstState.attempt_id);
@@ -355,7 +356,6 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
         status: 'healthy',
         lastSuccessAt: result.checkedAt,
         counts: { ...successCounts, updatedCount: 0 },
-        shouldAlert: false,
       });
     }
     expect(queries).toEqual([]);
@@ -697,7 +697,6 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
     expect(await getEnkryptSyncHealth()).toMatchObject({
       status: 'healthy',
       counts,
-      shouldAlert: false,
     });
   });
 
@@ -830,7 +829,6 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
       expect(await getEnkryptSyncHealth()).toMatchObject({
         status: 'degraded',
         reason: category,
-        shouldAlert: true,
       });
       expect(await readModels()).toEqual(before);
     }
@@ -997,38 +995,69 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
     expect(await readModels()).toEqual(before);
   });
 
-  it('recovers committed success when the transaction acknowledgement fails', async () => {
-    await seedSuccess();
-    const transaction = db.transaction.bind(db);
-    jest.spyOn(db, 'transaction').mockImplementationOnce(async callback => {
-      await transaction(callback);
-      throw new Error('unsafe-marker lost commit acknowledgement');
-    });
+  it.each([false, true])(
+    'omits counts after a committed transaction loses acknowledgement with newer failure %s',
+    async newerFailure => {
+      await seedSuccess();
+      let committed: Awaited<ReturnType<typeof readState>> | undefined;
+      let latest: Awaited<ReturnType<typeof readState>> | undefined;
+      const transaction = db.transaction.bind(db);
+      const transactionSpy = jest
+        .spyOn(db, 'transaction')
+        .mockImplementationOnce(async callback => {
+          await transaction(callback);
+          committed = await readState();
+          if (newerFailure) {
+            mockFetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+            await expectFailure(syncEnkryptBenchmarks(), 'authentication');
+          }
+          latest = await readState();
+          throw new Error('unsafe-marker lost commit acknowledgement');
+        });
 
-    const result = await syncEnkryptBenchmarks();
-    expect(result).toMatchObject({ status: 'succeeded', ...successCounts });
-    if (result.status !== 'succeeded') throw new Error('Expected committed success');
-    expect(await readState()).toMatchObject({
-      last_outcome: 'succeeded',
-      last_failure_category: null,
-      last_counts: successCounts,
-      last_success_counts: successCounts,
-    });
-    const stored = await readModels();
-    expect(stored).toHaveLength(3);
-    for (const model of stored) {
-      expect(model.benchmarks?.enkrypt?.ingestedAt).toBe(result.checkedAt);
-      expect(model.benchmarks?.artificialAnalysis).toBeDefined();
+      const failure = await expectFailure(syncEnkryptBenchmarks(), 'database');
+      expect(failure.counts).toBeUndefined();
+      expect(invalidateModelStatsCache).not.toHaveBeenCalled();
+      if (!committed || !latest) throw new Error('Expected committed state');
+      expect(committed).toMatchObject({
+        last_outcome: 'succeeded',
+        last_failure_category: null,
+        last_counts: successCounts,
+        last_success_counts: successCounts,
+      });
+      expect(committed.last_success_at).not.toBe(oldSuccessAt);
+      expect(await readState()).toEqual(latest);
+      expect(latest).toMatchObject({
+        last_outcome: newerFailure ? 'failed' : 'succeeded',
+        last_failure_category: newerFailure ? 'authentication' : null,
+        last_success_at: committed.last_success_at,
+        last_success_counts: successCounts,
+        verified_models: committed.verified_models,
+      });
+      if (newerFailure) expect(latest.attempt_id).not.toBe(committed.attempt_id);
+      const stored = await readModels();
+      expect(stored).toHaveLength(3);
+      for (const model of stored) {
+        expect(model.benchmarks?.enkrypt?.ingestedAt).toBe(
+          new Date(committed.last_success_at ?? '').toISOString()
+        );
+        expect(model.benchmarks?.enkrypt?.risk_score).toBe(0);
+        expect(model.benchmarks?.artificialAnalysis).toBeDefined();
+      }
+      transactionSpy.mockRestore();
+      const queries = observeModelWrites();
+      expect(await syncEnkryptBenchmarks()).toMatchObject({
+        status: 'succeeded',
+        ...successCounts,
+        updatedCount: 0,
+      });
+      expect(await readModels()).toStrictEqual(stored);
+      expect(queries).toEqual([]);
+      expect(invalidateModelStatsCache).toHaveBeenCalledTimes(1);
     }
-    expect(await getEnkryptSyncHealth()).toMatchObject({
-      status: 'healthy',
-      lastSuccessAt: result.checkedAt,
-      counts: successCounts,
-      shouldAlert: false,
-    });
-  });
+  );
 
-  it('recovers a committed zero-change check when the transaction acknowledgement fails', async () => {
+  it('omits counts for a committed zero-change check with lost acknowledgement', async () => {
     await syncEnkryptBenchmarks();
     const before = await readModels();
     const previous = await readState();
@@ -1037,20 +1066,21 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
       await transaction(callback);
       throw new Error('unsafe-marker lost commit acknowledgement');
     });
-    const result = await syncEnkryptBenchmarks();
-    expect(result).toMatchObject({ status: 'succeeded', ...successCounts, updatedCount: 0 });
-    if (result.status !== 'succeeded') throw new Error('Expected committed unchanged check');
+    const failure = await expectFailure(syncEnkryptBenchmarks(), 'database');
+    expect(failure.counts).toBeUndefined();
     expect(await readModels()).toStrictEqual(before);
     const state = await readState();
     expect(state.last_outcome).toBe('succeeded');
     expect(state.last_failure_category).toBeNull();
     expect(state.verified_models).not.toEqual(previous.verified_models);
-    expect(new Date(state.last_success_at ?? '').toISOString()).toBe(result.checkedAt);
+    expect(state.last_success_at).not.toBe(previous.last_success_at);
+    expect(state.last_success_counts).toEqual({ ...successCounts, updatedCount: 0 });
     expect(await getEnkryptSyncHealth()).toMatchObject({
       status: 'healthy',
-      lastSuccessAt: result.checkedAt,
+      lastSuccessAt: new Date(state.last_success_at ?? '').toISOString(),
       counts: { ...successCounts, updatedCount: 0 },
     });
+    expect(invalidateModelStatsCache).toHaveBeenCalledTimes(1);
   });
 
   it('rolls back verification-only success without advancing the last good check', async () => {
@@ -1065,11 +1095,13 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
         throw new Error('unsafe-marker rejected commit');
       })
     );
-    await expectFailure(syncEnkryptBenchmarks(), 'database');
+    const failure = await expectFailure(syncEnkryptBenchmarks(), 'database');
+    expect(failure.counts).toBeUndefined();
     expect(await readModels()).toStrictEqual(before);
     expect(await readState()).toMatchObject({
       last_outcome: 'failed',
       last_failure_category: 'database',
+      last_counts: null,
       last_success_at: previous.last_success_at,
       last_success_counts: previous.last_success_counts,
       verified_models: previous.verified_models,
@@ -1164,13 +1196,15 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
         throw new Error('unsafe-marker SQL parameters');
       })
     );
-    await expectFailure(syncEnkryptBenchmarks(), 'database');
+    const failure = await expectFailure(syncEnkryptBenchmarks(), 'database');
+    expect(failure.counts).toBeUndefined();
+    expect(invalidateModelStatsCache).not.toHaveBeenCalled();
     const state = await readState();
     expect(state).toMatchObject({
       last_outcome: 'failed',
       last_failure_category: 'database',
       last_success_counts: successCounts,
-      last_counts: { ...successCounts, updatedCount: 0 },
+      last_counts: null,
       verified_models: previous.verified_models,
     });
     expect(new Date(state.last_success_at ?? '').toISOString()).toBe(oldSuccessAt);
@@ -1221,7 +1255,8 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
         }
         racedModels = await readModels();
       });
-      await expectFailure(syncEnkryptBenchmarks(), 'coverage');
+      const failure = await expectFailure(syncEnkryptBenchmarks(), 'coverage');
+      expect(failure.counts).toEqual({ ...successCounts, updatedCount: 0 });
       expect(queries).toHaveLength(1);
       expect(await readModels()).toStrictEqual(racedModels);
       expect(await readState()).toMatchObject({
@@ -1258,11 +1293,20 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
     jest.spyOn(db, 'select').mockImplementationOnce(() => {
       throw new Error('unsafe-marker SQL parameters');
     });
-    await expectFailure(syncEnkryptBenchmarks(), 'database');
+    const failure = await expectFailure(syncEnkryptBenchmarks(), 'database');
+    expect(failure.counts).toEqual({
+      fetchedCount: 7,
+      rejectedCount: 0,
+      matchedCount: 0,
+      unmatchedCount: 0,
+      ambiguousCount: 0,
+      updatedCount: 0,
+    });
     expect(await readState()).toMatchObject({
       last_outcome: 'failed',
       last_failure_category: 'database',
       last_success_at: null,
+      last_counts: failure.counts,
     });
   });
 
@@ -1288,6 +1332,50 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
       last_success_counts: successCounts,
     });
     expect(await readModels()).toEqual(before);
+  });
+
+  it('keeps unknown counts absent when the failure-status write also fails after commit', async () => {
+    await seedSuccess();
+    let committed: Awaited<ReturnType<typeof readState>> | undefined;
+    const transaction = db.transaction.bind(db);
+    jest.spyOn(db, 'transaction').mockImplementationOnce(async callback => {
+      await transaction(callback);
+      committed = await readState();
+      jest.spyOn(db, 'update').mockImplementationOnce(() => {
+        throw new Error('unsafe-marker failure-status write');
+      });
+      throw new Error('unsafe-marker lost commit acknowledgement');
+    });
+    const failure = await expectFailure(syncEnkryptBenchmarks(), 'database');
+    expect(failure.counts).toBeUndefined();
+    expect(await readState()).toEqual(committed);
+    expect(invalidateModelStatsCache).not.toHaveBeenCalled();
+  });
+
+  it('retains known zero-update counts if recording a coverage failure fails', async () => {
+    mockFetch.mockResolvedValueOnce(Response.json(envelope([])));
+    jest.spyOn(db, 'update').mockImplementationOnce(() => {
+      throw new Error('unsafe-marker failure-status write');
+    });
+    const failure = await expectFailure(syncEnkryptBenchmarks(), 'database');
+    expect(failure.counts).toEqual({
+      fetchedCount: 0,
+      rejectedCount: 0,
+      matchedCount: 0,
+      unmatchedCount: 0,
+      ambiguousCount: 0,
+      updatedCount: 0,
+    });
+    expect((await readState()).last_outcome).toBe('running');
+  });
+
+  it('does not repopulate counts omitted by a typed error', async () => {
+    mockMatch.mockImplementationOnce(() => {
+      throw new EnkryptSyncError('unexpected');
+    });
+    const failure = await expectFailure(syncEnkryptBenchmarks(), 'unexpected');
+    expect(failure.counts).toBeUndefined();
+    expect((await readState()).last_counts).toBeNull();
   });
 
   it('classifies an unexpected matcher error without persisting raw details', async () => {
@@ -1343,7 +1431,8 @@ describe('syncEnkryptBenchmarks with PostgreSQL', () => {
     const newerState = await readState();
     const before = await readModels();
     response.resolve(Response.json(ENKRYPT_SCORE_EXAMPLES));
-    await expectFailure(older, 'superseded');
+    const failure = await expectFailure(older, 'superseded');
+    expect(failure.counts).toEqual({ ...successCounts, updatedCount: 0 });
     expect(await readState()).toEqual(newerState);
     expect(await readModels()).toEqual(before);
   });

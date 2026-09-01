@@ -2,26 +2,31 @@ jest.mock('@/lib/config.server', () => ({
   get CRON_SECRET() {
     return mockCronSecret;
   },
+  get ENKRYPT_SYNC_ENABLED() {
+    return mockEnabled;
+  },
+  ENKRYPT_API_KEY: 'test-key',
 }));
 
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    select: jest.fn(() => ({ from: jest.fn(() => ({ where: mockRead })) })),
+    insert: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    transaction: jest.fn(),
+  },
+}));
 jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   ...jest.requireActual('@kilocode/worker-utils/scheduled-job-observability'),
-  createScheduledJobRun: jest.fn(options => ({
-    runId: 'run-id',
-    startedAt: 0,
-    ...options,
-  })),
+  createScheduledJobRun: jest.fn(options => ({ runId: 'run-id', startedAt: 0, ...options })),
   emitScheduledJobEvent: jest.fn(),
 }));
-
-jest.mock('@/lib/model-stats/enkrypt-status', () => ({
-  getEnkryptSyncHealth: jest.fn(),
-  recordEnkryptSyncAlert: jest.fn(),
-}));
-jest.mock('@/lib/slack/admin-notifications', () => ({
-  ...jest.requireActual('@/lib/slack/admin-notifications'),
-  sendAdminSlackNotification: jest.fn(),
-}));
+jest.mock('@/lib/model-stats/enkrypt-status', () => {
+  const actual = jest.requireActual<typeof EnkryptStatus>('@/lib/model-stats/enkrypt-status');
+  return { ...actual, getEnkryptSyncHealth: jest.fn(actual.getEnkryptSyncHealth) };
+});
+jest.mock('@/lib/slack/admin-notifications', () => ({ sendAdminSlackNotification: jest.fn() }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 import { NextRequest } from 'next/server';
@@ -31,46 +36,56 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { EnkryptFailureCategorySchema } from '@kilocode/db/schema-types';
-import { EnkryptSyncError } from '@/lib/model-stats/enkrypt-errors';
-import { getEnkryptSyncHealth, recordEnkryptSyncAlert } from '@/lib/model-stats/enkrypt-status';
-import type { EnkryptSyncHealth } from '@/lib/model-stats/enkrypt-status';
-import {
-  AdminSlackNotificationError,
-  sendAdminSlackNotification,
-} from '@/lib/slack/admin-notifications';
+import { db } from '@/lib/drizzle';
+import { getEnkryptSyncHealth } from '@/lib/model-stats/enkrypt-status';
+import type * as EnkryptStatus from '@/lib/model-stats/enkrypt-status';
+import { sendAdminSlackNotification } from '@/lib/slack/admin-notifications';
 import vercelConfig from '../../../../../vercel.json';
 import { GET, maxDuration } from './route';
 
 let mockCronSecret: string | undefined = 'cron-secret';
+let mockEnabled = true;
+const mockRead = jest.fn<Promise<unknown[]>, []>();
 const mockHealth = jest.mocked(getEnkryptSyncHealth);
-const mockRecord = jest.mocked(recordEnkryptSyncAlert);
-const mockSlack = jest.mocked(sendAdminSlackNotification);
 const sensitive = 'sensitive-header-body-SQL-parameters';
 const now = '2026-08-27T12:00:00.000Z';
+const checkedAt = '2026-08-27T11:00:00.000Z';
 const counts = {
   fetchedCount: 6,
   rejectedCount: 1,
   matchedCount: 2,
   unmatchedCount: 2,
   ambiguousCount: 1,
-  updatedCount: 2,
+  updatedCount: 0,
 };
-
-function health(overrides: Partial<EnkryptSyncHealth> = {}): EnkryptSyncHealth {
-  return {
-    status: 'stale',
-    reason: 'stale',
-    lastAttemptAt: '2026-08-26T04:00:00.000Z',
-    lastSuccessAt: '2026-08-26T04:00:00.000Z',
-    counts,
-    lastSuccessCounts: counts,
-    baselineMatchedCount: 2,
-    lastAlertAt: null,
-    lastAlertReason: null,
-    shouldAlert: true,
-    ...overrides,
-  };
-}
+const state = {
+  last_attempt_at: checkedAt,
+  last_completed_at: checkedAt,
+  last_success_at: checkedAt,
+  last_outcome: 'succeeded',
+  last_failure_category: null,
+  last_counts: counts,
+  last_success_counts: counts,
+  baseline_matched_count: 2,
+};
+const healthy = {
+  status: 'healthy',
+  reason: null,
+  lastAttemptAt: checkedAt,
+  lastSuccessAt: checkedAt,
+  counts,
+  lastSuccessCounts: counts,
+  baselineMatchedCount: 2,
+};
+const unavailable = {
+  status: 'unavailable',
+  reason: 'monitor_error',
+  lastAttemptAt: null,
+  lastSuccessAt: null,
+  counts: null,
+  lastSuccessCounts: null,
+  baselineMatchedCount: null,
+};
 
 function request(authorization = 'Bearer cron-secret') {
   return new NextRequest('http://localhost/api/cron/check-enkrypt-health', {
@@ -78,38 +93,36 @@ function request(authorization = 'Bearer cron-secret') {
   });
 }
 
-function expectSanitized(failure: unknown, category: string) {
-  const captured = jest.mocked(captureException).mock.calls[0]?.[0];
-  expect(captured).toBeInstanceOf(Error);
-  expect(captured).not.toBe(failure);
-  expect(captured).toHaveProperty('message', 'Enkrypt health check operation failed');
-  expect(captured).not.toHaveProperty('cause');
-  if (captured instanceof Error) expect(captured.stack).not.toContain(sensitive);
-  expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
-    tags: { endpoint: 'cron/check-enkrypt-health', category },
-  });
-  for (const calls of [
-    jest.mocked(captureException).mock.calls,
-    jest.mocked(emitScheduledJobEvent).mock.calls,
-    mockSlack.mock.calls,
-    mockRecord.mock.calls,
-  ]) {
-    expect(JSON.stringify(calls)).not.toContain(sensitive);
+function expectReadOnly() {
+  for (const method of ['insert', 'update', 'delete', 'transaction'] as const) {
+    expect(jest.spyOn(db, method)).not.toHaveBeenCalled();
   }
+  expect(sendAdminSlackNotification).not.toHaveBeenCalled();
+}
+
+function expectSafeObservability() {
+  expect(JSON.stringify(jest.mocked(captureException).mock.calls)).not.toContain(sensitive);
+  expect(JSON.stringify(jest.mocked(emitScheduledJobEvent).mock.calls)).not.toContain(sensitive);
 }
 
 describe('GET /api/cron/check-enkrypt-health', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockHealth.mockReset().mockResolvedValue(health());
-    mockRecord.mockReset().mockResolvedValue(undefined);
-    mockSlack.mockReset().mockResolvedValue(undefined);
+    mockRead.mockReset().mockResolvedValue([state]);
+    mockHealth
+      .mockReset()
+      .mockImplementation(
+        jest.requireActual<typeof EnkryptStatus>('@/lib/model-stats/enkrypt-status')
+          .getEnkryptSyncHealth
+      );
     mockCronSecret = 'cron-secret';
+    mockEnabled = true;
     jest.replaceProperty(process, 'env', { NODE_ENV: 'test', VERCEL_ENV: 'production' });
     jest.useFakeTimers().setSystemTime(new Date(now));
   });
 
   afterEach(() => {
+    expectReadOnly();
     jest.useRealTimers();
     jest.restoreAllMocks();
   });
@@ -127,8 +140,7 @@ describe('GET /api/cron/check-enkrypt-health', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(await response.json()).toEqual({ error: 'Unauthorized' });
     expect(mockHealth).not.toHaveBeenCalled();
-    expect(mockSlack).not.toHaveBeenCalled();
-    expect(mockRecord).not.toHaveBeenCalled();
+    expect(db.select).not.toHaveBeenCalled();
     expect(createScheduledJobRun).not.toHaveBeenCalled();
     expect(emitScheduledJobEvent).not.toHaveBeenCalled();
     expect(captureException).not.toHaveBeenCalled();
@@ -143,334 +155,179 @@ describe('GET /api/cron/check-enkrypt-health', () => {
 
   it.each([undefined, ''])('rejects an unconfigured secret %p', async secret => {
     mockCronSecret = secret;
-    const response = await GET(request(`Bearer ${secret}`));
-    expect(response.status).toBe(401);
+    expect((await GET(request(`Bearer ${secret}`))).status).toBe(401);
     expect(mockHealth).not.toHaveBeenCalled();
-    expect(mockSlack).not.toHaveBeenCalled();
-    expect(mockRecord).not.toHaveBeenCalled();
     expect(createScheduledJobRun).not.toHaveBeenCalled();
   });
 
-  it.each(['disabled', 'healthy'] as const)('returns 200 without alerts when %s', async status => {
-    const state = health({ status, reason: null, shouldAlert: false });
-    mockHealth.mockResolvedValue(state);
+  it('returns disabled without reading state', async () => {
+    mockEnabled = false;
     const response = await GET(request());
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
-    expect(await response.json()).toEqual({ ...state, delivery: 'not_needed' });
-    expect(mockHealth).toHaveBeenCalledTimes(1);
-    expect(mockHealth).toHaveBeenCalledWith();
-    expect(mockSlack).not.toHaveBeenCalled();
-    expect(mockRecord).not.toHaveBeenCalled();
-    expect(captureException).not.toHaveBeenCalled();
-    expect(emitScheduledJobEvent).toHaveBeenCalledTimes(1);
+    expect(await response.json()).toEqual({ ...unavailable, status: 'disabled', reason: null });
+    expect(db.select).not.toHaveBeenCalled();
     expect(emitScheduledJobEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        job_name: 'web.check_enkrypt_health',
-        outcome: 'succeeded',
-        status,
-        skipped: status === 'disabled',
-        delivery: 'not_needed',
-      })
+      expect.objectContaining({ outcome: 'succeeded', status: 'disabled', skipped: true })
     );
   });
 
-  it.each(['disabled', 'healthy'] as const)(
-    'never alerts on %s even if shouldAlert is inconsistent',
-    async status => {
-      mockHealth.mockResolvedValue(health({ status, shouldAlert: true }));
-      expect((await GET(request())).status).toBe(200);
-      expect(mockSlack).not.toHaveBeenCalled();
-      expect(mockRecord).not.toHaveBeenCalled();
-    }
-  );
-
-  it.each([
-    ...EnkryptFailureCategorySchema.options,
-    'stale' as const,
-    'never_succeeded' as const,
-    'monitor_error' as const,
-  ])('sends only a fixed message and safe aggregates for reason %s', async reason => {
-    mockHealth.mockResolvedValue(health({ status: 'degraded', reason }));
+  it('reports a zero-change successful check as healthy using only explicit primary fields', async () => {
     const response = await GET(request());
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
-    expect(await response.json()).toEqual({
-      ...health({ status: 'degraded', reason }),
-      delivery: 'sent',
-    });
+    expect(await response.json()).toEqual(healthy);
+    const fields = jest.mocked(db.select).mock.calls[0]?.[0];
+    expect(Object.keys(fields ?? {}).sort()).toEqual(Object.keys(state).sort());
+    expect(fields).not.toHaveProperty('verified_models');
+    expect(emitScheduledJobEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: 'succeeded', matched_count: 2, updated_count: 0 })
+    );
     expect(maxDuration).toBe(60);
-    expect(createScheduledJobRun).toHaveBeenCalledWith({
-      jobName: 'web.check_enkrypt_health',
-      environment: 'production',
-    });
-    expect(mockSlack).toHaveBeenCalledTimes(1);
-    expect(mockSlack).toHaveBeenCalledWith(
+  });
+
+  it.each(EnkryptFailureCategorySchema.options)(
+    'reports failed %s attempts as unhealthy',
+    async reason => {
+      mockRead.mockResolvedValue([
+        { ...state, last_outcome: 'failed', last_failure_category: reason },
+      ]);
+      const response = await GET(request());
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(await response.json()).toEqual({ ...healthy, status: 'degraded', reason });
+      expect(emitScheduledJobEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ outcome: 'failed', status: 'degraded', reason, updated_count: 0 })
+      );
+    }
+  );
+
+  it('reports a missed run at 26 hours even if a new attempt is running', async () => {
+    mockRead.mockResolvedValue([
       {
-        text: `Enkrypt synchronization health alert: ${reason}. Check the Enkrypt sync and health jobs.\n${JSON.stringify(
-          {
-            status: 'degraded',
-            lastAttemptAt: health().lastAttemptAt,
-            lastSuccessAt: health().lastSuccessAt,
-            counts,
-            lastSuccessCounts: counts,
-            baselineMatchedCount: 2,
-          }
-        )}`,
-        unfurl_links: false,
-        unfurl_media: false,
-      },
-      { requireConfigured: true }
-    );
-    expect(mockRecord).toHaveBeenCalledTimes(1);
-    expect(mockRecord).toHaveBeenCalledWith(reason, now);
-    expect(mockRecord.mock.invocationCallOrder[0]).toBeGreaterThan(
-      mockSlack.mock.invocationCallOrder[0]
-    );
-    expect(captureException).not.toHaveBeenCalled();
-    expect(emitScheduledJobEvent).toHaveBeenCalledTimes(1);
-    expect(emitScheduledJobEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        job_name: 'web.check_enkrypt_health',
-        outcome: 'failed',
-        status: 'degraded',
-        reason,
-        delivery: 'sent',
-        rejected_count: 1,
-        matched_count: 2,
-        last_success_at: health().lastSuccessAt,
-      })
-    );
-  });
-
-  it.each(['degraded', 'stale', 'never_succeeded', 'unavailable'] as const)(
-    'keeps %s unhealthy while duplicate alerts are suppressed',
-    async status => {
-      mockHealth.mockResolvedValue(
-        health({ status, shouldAlert: false, lastAlertAt: now, lastAlertReason: 'stale' })
-      );
-      const response = await GET(request());
-      expect(response.status).toBe(503);
-      expect(await response.json()).toMatchObject({ status, delivery: 'suppressed' });
-      expect(mockSlack).not.toHaveBeenCalled();
-      expect(mockRecord).not.toHaveBeenCalled();
-      expect(emitScheduledJobEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'failed', delivery: 'suppressed' })
-      );
-    }
-  );
-
-  it('does not alert without an allowlisted reason', async () => {
-    mockHealth.mockResolvedValue(health({ reason: null }));
-    const response = await GET(request());
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ delivery: 'suppressed' });
-    expect(mockSlack).not.toHaveBeenCalled();
-    expect(mockRecord).not.toHaveBeenCalled();
-  });
-
-  it.each<NodeJS.ProcessEnv>([
-    { NODE_ENV: 'test' },
-    { NODE_ENV: 'development' },
-    { NODE_ENV: 'production' },
-    { NODE_ENV: 'test', VERCEL_ENV: 'preview' },
-    { NODE_ENV: 'test', VERCEL_ENV: 'development' },
-    { NODE_ENV: 'test', VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'staging' },
-    { NODE_ENV: 'test', VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'preview' },
-    { NODE_ENV: 'test', VERCEL_ENV: 'production', VERCEL_TARGET_ENV: '' },
-  ])('never delivers or records alerts outside production: %p', async environment => {
-    jest.replaceProperty(process, 'env', environment);
-    const response = await GET(request());
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ status: 'stale', delivery: 'simulated' });
-    expect(mockSlack).not.toHaveBeenCalled();
-    expect(mockRecord).not.toHaveBeenCalled();
-    expect(emitScheduledJobEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ outcome: 'failed', delivery: 'simulated' })
-    );
-  });
-
-  it('uses the production target over the fallback environment', async () => {
-    jest.replaceProperty(process, 'env', {
-      NODE_ENV: 'test',
-      VERCEL_ENV: 'preview',
-      VERCEL_TARGET_ENV: 'production',
-    });
-    expect((await GET(request())).status).toBe(503);
-    expect(mockSlack).toHaveBeenCalledTimes(1);
-    expect(mockRecord).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([
-    { status: 'never_succeeded' as const, reason: 'never_succeeded' as const },
-    { status: 'unavailable' as const, reason: 'monitor_error' as const },
-  ])('allows alerts without state or database availability: %p', async state => {
-    mockHealth.mockResolvedValue(
-      health({
         ...state,
-        lastAttemptAt: null,
-        lastSuccessAt: null,
-        counts: null,
-        lastSuccessCounts: null,
-        baselineMatchedCount: null,
-      })
-    );
-    const response = await GET(request());
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ ...state, delivery: 'sent' });
-    expect(mockSlack).toHaveBeenCalledTimes(1);
-    expect(mockRecord).toHaveBeenCalledWith(state.reason, now);
-  });
-
-  it('captures the alert timestamp before delivery completes and records only afterward', async () => {
-    let completeDelivery: () => void = () => {
-      throw new Error('Slack delivery has not started');
-    };
-    mockSlack.mockImplementation(
-      () =>
-        new Promise<void>(resolve => {
-          completeDelivery = resolve;
-        })
-    );
-    const responsePromise = GET(request());
-    await Promise.resolve();
-    expect(mockSlack).toHaveBeenCalledTimes(1);
-    expect(mockRecord).not.toHaveBeenCalled();
-    jest.setSystemTime(new Date('2026-08-27T12:00:09.000Z'));
-    completeDelivery();
-    const response = await responsePromise;
-    expect(response.status).toBe(503);
-    expect(mockRecord).toHaveBeenCalledWith('stale', now);
-    expect(await response.json()).toMatchObject({ delivery: 'sent' });
-  });
-
-  it.each(['configuration', 'network', 'upstream'] as const)(
-    'sanitizes Slack %s failures without recording delivery',
-    async category => {
-      const failure = Object.assign(new AdminSlackNotificationError(category, 503), {
-        message: sensitive,
-        stack: sensitive,
-        cause: new Error(sensitive),
-        headers: sensitive,
-        body: sensitive,
-      });
-      mockSlack.mockRejectedValue(failure);
-      const response = await GET(request());
-      expect(response.status).toBe(503);
-      expect(await response.json()).toEqual({ ...health(), delivery: 'failed', category });
-      expect(mockRecord).not.toHaveBeenCalled();
-      expect(captureException).toHaveBeenCalledTimes(1);
-      expect(emitScheduledJobEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'failed', category, delivery: 'failed' })
-      );
-      expectSanitized(failure, category);
-    }
-  );
-
-  it.each([
-    new Error(sensitive),
-    { kind: 'configuration', message: sensitive, headers: sensitive },
-    Object.assign(new AdminSlackNotificationError('network'), { kind: sensitive }),
-  ])('maps unknown Slack failures to unexpected: %p', async failure => {
-    mockSlack.mockRejectedValue(failure);
+        last_attempt_at: now,
+        last_completed_at: null,
+        last_outcome: 'running',
+        last_counts: null,
+        last_success_at: '2026-08-26T10:00:00.000Z',
+      },
+    ]);
     const response = await GET(request());
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({
-      ...health(),
-      delivery: 'failed',
-      category: 'unexpected',
+      ...healthy,
+      status: 'stale',
+      reason: 'stale',
+      lastAttemptAt: now,
+      lastSuccessAt: '2026-08-26T10:00:00.000Z',
+      counts: null,
     });
-    expect(mockRecord).not.toHaveBeenCalled();
-    expectSanitized(failure, 'unexpected');
   });
 
-  it.each([
-    { failure: new EnkryptSyncError('database'), category: 'database' },
-    { failure: new Error(sensitive), category: 'unexpected' },
-  ])(
-    'does not claim recorded delivery when status recording fails: $category',
-    async ({ failure, category }) => {
-      Object.assign(failure, { message: sensitive, stack: sensitive, cause: new Error(sensitive) });
-      mockRecord.mockRejectedValue(failure);
-      const response = await GET(request());
-      expect(response.status).toBe(503);
-      expect(await response.json()).toEqual({ ...health(), delivery: 'failed', category });
-      expect(mockSlack).toHaveBeenCalledTimes(1);
-      expect(mockRecord).toHaveBeenCalledTimes(1);
-      expect(emitScheduledJobEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'failed', delivery: 'failed', category })
-      );
-      expectSanitized(failure, category);
-    }
-  );
-
-  it.each([
-    { failure: new EnkryptSyncError('database'), category: 'database' },
-    { failure: new Error(sensitive), category: 'unexpected' },
-  ])(
-    'reports thrown health reads as unavailable and still alerts: $category',
-    async ({ failure, category }) => {
-      mockHealth.mockRejectedValue(failure);
-      const response = await GET(request());
-      expect(response.status).toBe(503);
-      const body = await response.json();
-      expect(body).toMatchObject({
-        status: 'unavailable',
-        reason: 'monitor_error',
-        delivery: 'sent',
-        category,
-        lastSuccessAt: null,
-        counts: null,
-      });
-      expect(JSON.stringify(body)).not.toContain(sensitive);
-      expect(mockSlack).toHaveBeenCalledTimes(1);
-      expect(mockRecord).toHaveBeenCalledWith('monitor_error', now);
-      expectSanitized(failure, category);
-    }
-  );
-
-  it('strips unowned fields from HTTP, Slack, and scheduled metadata', async () => {
-    const state = {
-      ...health(),
-      counts: { ...counts, rawBody: sensitive },
-      lastSuccessCounts: { ...counts, sqlParameters: sensitive },
-      headers: sensitive,
-      upstreamMetadata: sensitive,
-    };
-    mockHealth.mockResolvedValue(state);
-    const response = await GET(request());
-    expect(await response.json()).toEqual({ ...health(), delivery: 'sent' });
-    expect(JSON.stringify(mockSlack.mock.calls)).not.toContain(sensitive);
-    expect(JSON.stringify(jest.mocked(emitScheduledJobEvent).mock.calls)).not.toContain(sensitive);
-  });
-
-  it.each([
-    { reason: sensitive },
-    { status: sensitive },
-    { lastSuccessAt: sensitive },
-    { lastAlertAt: sensitive },
-    { lastAlertReason: sensitive },
-    { counts: { ...counts, rejectedCount: sensitive } },
-    { lastSuccessCounts: { ...counts, matchedCount: -1 } },
-    { baselineMatchedCount: Infinity },
-  ])('fails closed on invalid health data without disclosing it: %p', async invalid => {
-    mockHealth.mockResolvedValue({ ...health(), ...invalid } as EnkryptSyncHealth);
+  it('reports a never-run job without creating state', async () => {
+    mockRead.mockResolvedValue([]);
     const response = await GET(request());
     expect(response.status).toBe(503);
-    const body = await response.json();
-    expect(body).toMatchObject({
-      status: 'unavailable',
-      reason: 'monitor_error',
-      delivery: 'sent',
+    expect(await response.json()).toEqual({
+      ...unavailable,
+      status: 'never_succeeded',
+      reason: 'never_succeeded',
     });
-    expect(JSON.stringify(body)).not.toContain(sensitive);
-    expectSanitized(invalid, 'unexpected');
   });
 
-  it('schedules an independent hourly health check and preserves daily 04:00 UTC ingestion', () => {
+  it.each(['sequential', 'concurrent'] as const)(
+    'keeps repeated %s polls identical and read-only',
+    async mode => {
+      const stale = { ...state, last_success_at: '2026-08-26T04:00:00.000Z' };
+      const before = structuredClone(stale);
+      mockRead.mockResolvedValue([stale]);
+      const responses =
+        mode === 'concurrent'
+          ? await Promise.all([GET(request()), GET(request())])
+          : [await GET(request()), await GET(request())];
+      const bodies = await Promise.all(responses.map(response => response.json()));
+      expect(bodies[0]).toEqual(bodies[1]);
+      expect(bodies[0]).toEqual({
+        ...healthy,
+        status: 'stale',
+        reason: 'stale',
+        lastSuccessAt: stale.last_success_at,
+      });
+      expect(responses.map(response => response.status)).toEqual([503, 503]);
+      expect(mockRead).toHaveBeenCalledTimes(2);
+      expect(stale).toEqual(before);
+    }
+  );
+
+  it.each([
+    { last_failure_category: sensitive },
+    { last_outcome: sensitive },
+    { last_success_at: sensitive },
+    { last_completed_at: 'infinity' },
+    { last_attempt_at: '2026-08-28T00:00:00.000Z' },
+    { last_counts: { ...counts, rejectedCount: sensitive } },
+    { last_success_counts: { ...counts, matchedCount: -1 } },
+    { last_success_counts: { ...counts, fetchedCount: 7 } },
+    { baseline_matched_count: Infinity },
+  ])('fails closed on malformed persisted data: %p', async invalid => {
+    mockRead.mockResolvedValue([{ ...state, ...invalid }]);
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual(unavailable);
+    expectSafeObservability();
+  });
+
+  it('strips unowned persisted fields before HTTP and observability', async () => {
+    mockRead.mockResolvedValue([
+      {
+        ...state,
+        last_attempt_at: '2026-08-27 11:00:00.000+00',
+        last_success_at: '2026-08-27 11:00:00.000+00',
+        last_counts: { ...counts, rawBody: sensitive },
+        last_success_counts: { ...counts, sqlParameters: sensitive },
+        verified_models: { raw: sensitive },
+        headers: sensitive,
+      },
+    ]);
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(healthy);
+    expectSafeObservability();
+  });
+
+  it('sanitizes database read failures', async () => {
+    mockRead.mockRejectedValue(new Error(sensitive));
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual(unavailable);
+    expectSafeObservability();
+  });
+
+  it('sanitizes unexpected helper exceptions without retaining the original', async () => {
+    const failure = Object.assign(new Error(sensitive), {
+      stack: sensitive,
+      cause: new Error(sensitive),
+    });
+    mockHealth.mockRejectedValue(failure);
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual(unavailable);
+    const captured = jest.mocked(captureException).mock.calls[0]?.[0];
+    expect(captured).toBeInstanceOf(Error);
+    expect(captured).not.toBe(failure);
+    expect(captured).toHaveProperty('message', 'Enkrypt health check operation failed');
+    expect(captured).not.toHaveProperty('cause');
+    if (captured instanceof Error) expect(captured.stack).not.toContain(sensitive);
+    expectSafeObservability();
+  });
+
+  it('leaves monitoring external while preserving daily 04:00 UTC ingestion and six-hour catalog sync', () => {
     expect(vercelConfig.crons.filter(cron => cron.path.includes('enkrypt'))).toEqual([
       { path: '/api/cron/sync-enkrypt', schedule: '0 4 * * *' },
-      { path: '/api/cron/check-enkrypt-health', schedule: '30 * * * *' },
+    ]);
+    expect(vercelConfig.crons.filter(cron => cron.path === '/api/cron/sync-model-stats')).toEqual([
+      { path: '/api/cron/sync-model-stats', schedule: '0 */6 * * *' },
     ]);
   });
 });

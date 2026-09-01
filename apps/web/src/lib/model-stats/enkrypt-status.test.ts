@@ -5,8 +5,7 @@ import type { NewEnkryptSyncState } from '@kilocode/db/schema';
 import { ENKRYPT_STALE_AFTER_MS, EnkryptFailureCategorySchema } from '@kilocode/db/schema-types';
 import type { EnkryptSyncCounts } from '@kilocode/db/schema-types';
 import { eq, sql } from 'drizzle-orm';
-import { EnkryptSyncError } from './enkrypt-errors';
-import { getEnkryptSyncHealth, recordEnkryptSyncAlert } from './enkrypt-status';
+import { getEnkryptSyncHealth } from './enkrypt-status';
 
 let mockEnabled = true;
 let mockApiKey: string | undefined = 'test-key';
@@ -31,6 +30,13 @@ const counts: EnkryptSyncCounts = {
   updatedCount: 3,
 };
 const iso = (at: number) => new Date(at).toISOString();
+const empty = {
+  lastAttemptAt: null,
+  lastSuccessAt: null,
+  counts: null,
+  lastSuccessCounts: null,
+  baselineMatchedCount: null,
+};
 
 describe('Enkrypt singleton health with PostgreSQL', () => {
   async function seed(overrides: Partial<NewEnkryptSyncState> = {}) {
@@ -48,12 +54,7 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
   }
 
   async function readState() {
-    const [state] = await db
-      .select()
-      .from(enkrypt_sync_state)
-      .where(eq(enkrypt_sync_state.job_name, 'enkrypt'));
-    if (!state) throw new Error('Expected singleton');
-    return state;
+    return db.select().from(enkrypt_sync_state).where(eq(enkrypt_sync_state.job_name, 'enkrypt'));
   }
 
   beforeEach(async () => {
@@ -68,44 +69,45 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
     await db.delete(enkrypt_sync_state).where(eq(enkrypt_sync_state.job_name, 'enkrypt'));
   });
 
-  it('is disabled without database access, validation, or alert recording', async () => {
+  it('is disabled without database access or validation', async () => {
     mockEnabled = false;
     const select = jest.spyOn(db, 'select');
-    const insert = jest.spyOn(db, 'insert');
-    const update = jest.spyOn(db, 'update');
-    expect(await getEnkryptSyncHealth()).toEqual({
-      status: 'disabled',
-      reason: null,
-      lastAttemptAt: null,
-      lastSuccessAt: null,
-      counts: null,
-      lastSuccessCounts: null,
-      baselineMatchedCount: null,
-      lastAlertAt: null,
-      lastAlertReason: null,
-      shouldAlert: false,
-    });
-    await recordEnkryptSyncAlert('invalid', 'invalid');
+    expect(await getEnkryptSyncHealth()).toEqual({ status: 'disabled', reason: null, ...empty });
     expect(select).not.toHaveBeenCalled();
-    expect(insert).not.toHaveBeenCalled();
-    expect(update).not.toHaveBeenCalled();
   });
 
-  it('reports never succeeded without creating an attempt or recording an undelivered alert', async () => {
+  it('reports never succeeded without creating state', async () => {
     const insert = jest.spyOn(db, 'insert');
     const update = jest.spyOn(db, 'update');
-    expect(await getEnkryptSyncHealth()).toMatchObject({
-      status: 'never_succeeded',
-      reason: 'never_succeeded',
-      lastAttemptAt: null,
-      lastSuccessAt: null,
-      shouldAlert: true,
-    });
-    expect(await getEnkryptSyncHealth()).toMatchObject({ shouldAlert: true, lastAlertAt: null });
+    const first = await getEnkryptSyncHealth();
+    expect(first).toEqual({ status: 'never_succeeded', reason: 'never_succeeded', ...empty });
+    expect(await getEnkryptSyncHealth()).toEqual(first);
     expect(insert).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
-    expect(await db.select().from(enkrypt_sync_state)).toEqual([]);
+    expect(await readState()).toEqual([]);
   });
+
+  it.each(['sequential', 'concurrent'] as const)(
+    'keeps repeated %s health reads identical without database writes',
+    async mode => {
+      await seed({ last_outcome: 'failed', last_failure_category: 'coverage' });
+      const before = await readState();
+      const writes = [
+        jest.spyOn(db, 'insert'),
+        jest.spyOn(db, 'update'),
+        jest.spyOn(db, 'delete'),
+        jest.spyOn(db, 'transaction'),
+      ];
+      const results =
+        mode === 'concurrent'
+          ? await Promise.all([getEnkryptSyncHealth(), getEnkryptSyncHealth()])
+          : [await getEnkryptSyncHealth(), await getEnkryptSyncHealth()];
+      expect(results[0]).toEqual(results[1]);
+      expect(results[0]).toMatchObject({ status: 'degraded', reason: 'coverage' });
+      expect(await readState()).toEqual(before);
+      for (const write of writes) expect(write).not.toHaveBeenCalled();
+    }
+  );
 
   it('normalizes PostgreSQL timestamps and returns only safe counts and health', async () => {
     await seed({
@@ -121,9 +123,6 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
       counts,
       lastSuccessCounts: counts,
       baselineMatchedCount: 3,
-      lastAlertAt: null,
-      lastAlertReason: null,
-      shouldAlert: false,
     });
   });
 
@@ -138,28 +137,25 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
         counts: checkedCounts,
         lastSuccessCounts: checkedCounts,
         lastSuccessAt: iso(now - hour),
-        shouldAlert: false,
       });
       jest.spyOn(Date, 'now').mockReturnValue(now - hour + ENKRYPT_STALE_AFTER_MS);
-      expect(await getEnkryptSyncHealth()).toMatchObject({ status: 'stale', shouldAlert: true });
+      expect(await getEnkryptSyncHealth()).toMatchObject({ status: 'stale', reason: 'stale' });
     }
   );
 
   it.each([
-    { age: ENKRYPT_STALE_AFTER_MS - 1, status: 'healthy', reason: null, shouldAlert: false },
-    { age: ENKRYPT_STALE_AFTER_MS, status: 'stale', reason: 'stale', shouldAlert: true },
-    { age: ENKRYPT_STALE_AFTER_MS + 1, status: 'stale', reason: 'stale', shouldAlert: true },
-  ])(
-    'uses the publication freshness boundary at age $age',
-    async ({ age, status, reason, shouldAlert }) => {
-      await seed({
-        last_attempt_at: iso(now - age),
-        last_completed_at: iso(now - age),
-        last_success_at: iso(now - age),
-      });
-      expect(await getEnkryptSyncHealth()).toMatchObject({ status, reason, shouldAlert });
-    }
-  );
+    { age: ENKRYPT_STALE_AFTER_MS - 1, status: 'healthy', reason: null },
+    { age: ENKRYPT_STALE_AFTER_MS, status: 'stale', reason: 'stale' },
+    { age: ENKRYPT_STALE_AFTER_MS + 1, status: 'stale', reason: 'stale' },
+  ])('uses the publication freshness boundary at age $age', async ({ age, status, reason }) => {
+    expect(ENKRYPT_STALE_AFTER_MS).toBe(26 * hour);
+    await seed({
+      last_attempt_at: iso(now - age),
+      last_completed_at: iso(now - age),
+      last_success_at: iso(now - age),
+    });
+    expect(await getEnkryptSyncHealth()).toMatchObject({ status, reason });
+  });
 
   it.each(EnkryptFailureCategorySchema.options)(
     'keeps first failure %s actionable rather than hiding it as never succeeded',
@@ -175,7 +171,6 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
         status: 'degraded',
         reason: category,
         lastSuccessAt: null,
-        shouldAlert: true,
       });
     }
   );
@@ -193,7 +188,6 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
         reason: category,
         counts: { ...counts, updatedCount: 0 },
         lastSuccessCounts: counts,
-        shouldAlert: true,
       });
     }
   );
@@ -204,20 +198,12 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
       last_outcome: 'failed',
       last_failure_category: 'coverage',
     });
-    expect(await getEnkryptSyncHealth()).toMatchObject({
-      status: 'stale',
-      reason: 'stale',
-      shouldAlert: true,
-    });
+    expect(await getEnkryptSyncHealth()).toMatchObject({ status: 'stale', reason: 'stale' });
     await db
       .update(enkrypt_sync_state)
       .set({ last_outcome: 'running', last_completed_at: null, last_failure_category: null })
       .where(eq(enkrypt_sync_state.job_name, 'enkrypt'));
-    expect(await getEnkryptSyncHealth()).toMatchObject({
-      status: 'stale',
-      reason: 'stale',
-      shouldAlert: true,
-    });
+    expect(await getEnkryptSyncHealth()).toMatchObject({ status: 'stale', reason: 'stale' });
   });
 
   it('does not treat a fresh running attempt as a new success', async () => {
@@ -239,30 +225,34 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
       .where(eq(enkrypt_sync_state.job_name, 'enkrypt'));
     expect(await getEnkryptSyncHealth()).toMatchObject({
       status: 'never_succeeded',
-      shouldAlert: true,
       lastSuccessAt: null,
     });
   });
 
+  it('retains unknown counts after a database failure without inventing zero updates', async () => {
+    await seed({ last_outcome: 'failed', last_failure_category: 'database', last_counts: null });
+    expect(await getEnkryptSyncHealth()).toMatchObject({
+      status: 'degraded',
+      reason: 'database',
+      counts: null,
+      lastSuccessCounts: counts,
+    });
+  });
+
   it.each([undefined, '', '  '])(
-    'reports missing key %# without disguising it as a healthy or never-run job',
+    'reports missing key %# without disguising it as healthy or never-run',
     async key => {
       mockApiKey = key;
+      expect(await getEnkryptSyncHealth()).toEqual({
+        status: 'degraded',
+        reason: 'configuration',
+        ...empty,
+      });
+      expect(await readState()).toEqual([]);
+      await seed();
       expect(await getEnkryptSyncHealth()).toMatchObject({
         status: 'degraded',
         reason: 'configuration',
-        shouldAlert: true,
-      });
-      await recordEnkryptSyncAlert('configuration', iso(now));
-      expect(await getEnkryptSyncHealth()).toMatchObject({
-        status: 'degraded',
-        reason: 'configuration',
-        shouldAlert: false,
-      });
-      expect(await readState()).toMatchObject({
-        last_attempt_at: null,
-        last_success_at: null,
-        last_outcome: null,
       });
     }
   );
@@ -272,47 +262,27 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
       throw new Error('unsafe-marker SQL parameters');
     });
     const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    const health = await getEnkryptSyncHealth();
-    expect(health).toEqual({
+    expect(await getEnkryptSyncHealth()).toEqual({
       status: 'unavailable',
       reason: 'monitor_error',
-      lastAttemptAt: null,
-      lastSuccessAt: null,
-      counts: null,
-      lastSuccessCounts: null,
-      baselineMatchedCount: null,
-      lastAlertAt: null,
-      lastAlertReason: null,
-      shouldAlert: true,
+      ...empty,
     });
-    expect(JSON.stringify(health)).not.toContain('unsafe-marker');
     expect(log).not.toHaveBeenCalled();
   });
 
-  it.each(['last_attempt_at', 'last_completed_at', 'last_success_at', 'last_alert_at'] as const)(
-    'fails closed for non-finite database timestamp %s',
-    async field => {
-      await seed({ [field]: 'infinity' });
-      expect(await getEnkryptSyncHealth()).toMatchObject({
-        status: 'unavailable',
-        reason: 'monitor_error',
-        counts: null,
-        shouldAlert: true,
-      });
-    }
-  );
-
-  it.each(['last_attempt_at', 'last_completed_at', 'last_success_at', 'last_alert_at'] as const)(
-    'fails closed for future database timestamp %s',
-    async field => {
-      await seed({ [field]: iso(now + 1) });
-      expect(await getEnkryptSyncHealth()).toMatchObject({
-        status: 'unavailable',
-        reason: 'monitor_error',
-        shouldAlert: true,
-      });
-    }
-  );
+  describe.each(['infinity', iso(now + 1)])('invalid timestamp %s', value => {
+    it.each(['last_attempt_at', 'last_completed_at', 'last_success_at'] as const)(
+      'fails closed for %s',
+      async field => {
+        await seed({ [field]: value });
+        expect(await getEnkryptSyncHealth()).toEqual({
+          status: 'unavailable',
+          reason: 'monitor_error',
+          ...empty,
+        });
+      }
+    );
+  });
 
   it('fails closed for an unknown database failure category', async () => {
     await seed({ last_outcome: 'failed' });
@@ -320,49 +290,10 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
       .update(enkrypt_sync_state)
       .set({ last_failure_category: sql`'unsafe-marker'` })
       .where(eq(enkrypt_sync_state.job_name, 'enkrypt'));
-    const health = await getEnkryptSyncHealth();
-    expect(health).toMatchObject({
+    expect(await getEnkryptSyncHealth()).toEqual({
       status: 'unavailable',
       reason: 'monitor_error',
-      shouldAlert: true,
-    });
-    expect(JSON.stringify(health)).not.toContain('unsafe-marker');
-  });
-
-  it('suppresses a delivered monitor error even when another persisted field is invalid', async () => {
-    await seed({ last_outcome: 'failed' });
-    await db
-      .update(enkrypt_sync_state)
-      .set({ last_failure_category: sql`'unsafe-marker'` })
-      .where(eq(enkrypt_sync_state.job_name, 'enkrypt'));
-    expect(await getEnkryptSyncHealth()).toMatchObject({
-      status: 'unavailable',
-      shouldAlert: true,
-    });
-    await recordEnkryptSyncAlert('monitor_error', iso(now));
-    expect(await getEnkryptSyncHealth()).toMatchObject({
-      status: 'unavailable',
-      reason: 'monitor_error',
-      shouldAlert: false,
-      lastAlertAt: iso(now),
-    });
-    jest.spyOn(Date, 'now').mockReturnValue(now + 24 * hour);
-    expect(await getEnkryptSyncHealth()).toMatchObject({
-      status: 'unavailable',
-      shouldAlert: true,
-    });
-  });
-
-  it('fails closed for an unknown alert reason', async () => {
-    await seed();
-    await db
-      .update(enkrypt_sync_state)
-      .set({ last_alert_reason: sql`'unsafe-marker'` })
-      .where(eq(enkrypt_sync_state.job_name, 'enkrypt'));
-    expect(await getEnkryptSyncHealth()).toMatchObject({
-      status: 'unavailable',
-      reason: 'monitor_error',
-      shouldAlert: true,
+      ...empty,
     });
   });
 
@@ -380,10 +311,10 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
     { last_success_counts: { ...counts, ambiguousCount: 1 } },
   ])('fails closed for inconsistent success or failure state %#', async overrides => {
     await seed(overrides);
-    expect(await getEnkryptSyncHealth()).toMatchObject({
+    expect(await getEnkryptSyncHealth()).toEqual({
       status: 'unavailable',
       reason: 'monitor_error',
-      shouldAlert: true,
+      ...empty,
     });
   });
 
@@ -395,10 +326,10 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
         last_counts: sql`${JSON.stringify({ ...counts, fetchedCount: 'unsafe-marker' })}::jsonb`,
       })
       .where(eq(enkrypt_sync_state.job_name, 'enkrypt'));
-    expect(await getEnkryptSyncHealth()).toMatchObject({
+    expect(await getEnkryptSyncHealth()).toEqual({
       status: 'unavailable',
-      counts: null,
-      shouldAlert: true,
+      reason: 'monitor_error',
+      ...empty,
     });
   });
 
@@ -414,70 +345,6 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
     expect(health.counts).toEqual(counts);
     expect(JSON.stringify(health)).not.toContain('unsafe-marker');
     expect(JSON.stringify(health)).not.toContain('risk_score');
-  });
-
-  it.each([
-    { age: 24 * hour - 1, shouldAlert: false },
-    { age: 24 * hour, shouldAlert: true },
-    { age: 24 * hour + 1, shouldAlert: true },
-  ])('suppresses the same reason for exactly 24 hours: $age', async ({ age, shouldAlert }) => {
-    await seed({
-      last_outcome: 'failed',
-      last_failure_category: 'coverage',
-      last_success_at: null,
-      last_success_counts: null,
-      baseline_matched_count: null,
-      last_alert_at: iso(now - age),
-      last_alert_reason: 'coverage',
-    });
-    expect(await getEnkryptSyncHealth()).toMatchObject({
-      status: 'degraded',
-      reason: 'coverage',
-      shouldAlert,
-    });
-  });
-
-  it('alerts immediately for a different failure category', async () => {
-    await seed({
-      last_outcome: 'failed',
-      last_failure_category: 'coverage',
-      last_alert_at: iso(now - 1),
-      last_alert_reason: 'authentication',
-    });
-    expect(await getEnkryptSyncHealth()).toMatchObject({ reason: 'coverage', shouldAlert: true });
-  });
-
-  it('rearms the same failure after a recovery even within the suppression window', async () => {
-    await seed({
-      last_outcome: 'failed',
-      last_failure_category: 'coverage',
-      last_alert_at: iso(now - 2 * hour),
-      last_alert_reason: 'coverage',
-    });
-    expect(await getEnkryptSyncHealth()).toMatchObject({ reason: 'coverage', shouldAlert: true });
-    await recordEnkryptSyncAlert('coverage', iso(now));
-    expect(await getEnkryptSyncHealth()).toMatchObject({ reason: 'coverage', shouldAlert: false });
-  });
-
-  it('writes only alert columns after delivery and never advances the successful import', async () => {
-    await seed({ last_outcome: 'failed', last_failure_category: 'coverage' });
-    const before = await readState();
-    const undelivered = await getEnkryptSyncHealth();
-    expect(undelivered.shouldAlert).toBe(true);
-    expect(await readState()).toEqual(before);
-    await recordEnkryptSyncAlert('coverage', iso(now));
-    const after = await readState();
-    expect(after).toEqual({
-      ...before,
-      last_alert_at: after.last_alert_at,
-      last_alert_reason: 'coverage',
-    });
-    expect(new Date(after.last_alert_at ?? '').toISOString()).toBe(iso(now));
-    expect(await getEnkryptSyncHealth()).toMatchObject({
-      shouldAlert: false,
-      lastAlertAt: iso(now),
-      reason: 'coverage',
-    });
   });
 
   it('enforces a single Enkrypt row in PostgreSQL', async () => {
@@ -504,79 +371,5 @@ describe('Enkrypt singleton health with PostgreSQL', () => {
         .where(eq(enkrypt_sync_state.job_name, 'enkrypt'))
     ).rejects.toThrow();
     expect(await getEnkryptSyncHealth()).toMatchObject({ status: 'healthy' });
-  });
-
-  it('records a delivered never-run alert without inventing any attempt or success', async () => {
-    await recordEnkryptSyncAlert('never_succeeded', iso(now));
-    expect(await readState()).toMatchObject({
-      job_name: 'enkrypt',
-      attempt_id: null,
-      last_attempt_at: null,
-      last_completed_at: null,
-      last_success_at: null,
-      last_outcome: null,
-      last_counts: null,
-      last_success_counts: null,
-      baseline_matched_count: null,
-      last_alert_reason: 'never_succeeded',
-    });
-    expect(await getEnkryptSyncHealth()).toMatchObject({
-      status: 'never_succeeded',
-      shouldAlert: false,
-      lastAlertAt: iso(now),
-    });
-  });
-
-  it('does not let a late alert overwrite a newer delivery', async () => {
-    await recordEnkryptSyncAlert('never_succeeded', iso(now));
-    const before = await readState();
-    await recordEnkryptSyncAlert('coverage', iso(now - 1));
-    expect(await readState()).toEqual(before);
-  });
-
-  it('does not let an old delivery suppress an alert after a newer recovery', async () => {
-    await seed({ last_outcome: 'failed', last_failure_category: 'coverage' });
-    const before = await readState();
-    await recordEnkryptSyncAlert('coverage', iso(now - 2 * hour));
-    expect(await readState()).toEqual(before);
-    expect(await getEnkryptSyncHealth()).toMatchObject({ reason: 'coverage', shouldAlert: true });
-  });
-
-  it('does not let an alert at the recovery timestamp suppress a later failure', async () => {
-    await seed({ last_outcome: 'failed', last_failure_category: 'coverage' });
-    const before = await readState();
-    await recordEnkryptSyncAlert('coverage', iso(now - hour));
-    expect(await readState()).toEqual(before);
-    expect(await getEnkryptSyncHealth()).toMatchObject({ reason: 'coverage', shouldAlert: true });
-  });
-
-  it.each([
-    ['unsafe-marker', iso(now)],
-    ['coverage', 'unsafe-marker'],
-    ['coverage', 'infinity'],
-  ])('rejects invalid alert input %# safely without database writes', async (reason, at) => {
-    const insert = jest.spyOn(db, 'insert');
-    await expect(recordEnkryptSyncAlert(reason, at)).rejects.toMatchObject({
-      category: 'unexpected',
-      message: 'Enkrypt synchronization failed',
-    });
-    expect(insert).not.toHaveBeenCalled();
-  });
-
-  it('sanitizes alert persistence failures without reporting successful recording', async () => {
-    jest.spyOn(db, 'insert').mockImplementationOnce(() => {
-      throw new Error('unsafe-marker SQL parameters');
-    });
-    const result = await recordEnkryptSyncAlert('coverage', iso(now)).catch(
-      (error: unknown) => error
-    );
-    expect(result).toBeInstanceOf(EnkryptSyncError);
-    expect(result).toMatchObject({
-      category: 'database',
-      message: 'Enkrypt synchronization failed',
-    });
-    expect(result).not.toHaveProperty('cause');
-    expect(JSON.stringify(result)).not.toContain('unsafe-marker');
-    expect(await db.select().from(enkrypt_sync_state)).toEqual([]);
   });
 });

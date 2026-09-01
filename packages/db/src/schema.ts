@@ -5224,11 +5224,6 @@ export type ModelStats = typeof modelStats.$inferSelect;
 export type NewModelStats = typeof modelStats.$inferInsert;
 
 export type EnkryptSyncOutcome = 'running' | 'succeeded' | 'failed';
-export type EnkryptSyncAlertReason =
-  | EnkryptFailureCategory
-  | 'stale'
-  | 'never_succeeded'
-  | 'monitor_error';
 
 export const enkrypt_sync_state = pgTable(
   'enkrypt_sync_state',
@@ -5244,8 +5239,6 @@ export const enkrypt_sync_state = pgTable(
     last_success_counts: jsonb('last_success_counts').$type<EnkryptSyncCounts>(),
     verified_models: jsonb('verified_models').$type<EnkryptVerifications>().notNull().default({}),
     baseline_matched_count: integer('baseline_matched_count'),
-    last_alert_at: timestamp('last_alert_at', { withTimezone: true, mode: 'string' }),
-    last_alert_reason: text('last_alert_reason').$type<EnkryptSyncAlertReason>(),
   },
   table => [
     check('enkrypt_sync_state_singleton', sql`${table.job_name} = 'enkrypt'`),

@@ -5,13 +5,18 @@ import {
   EnkryptPublishedBenchmarkSchema,
   EnkryptScoreSchema,
 } from '@kilocode/db/schema-types';
-import { ModelStatsBenchmarksSchema } from '@kilocode/db/schema';
-import { db, readDb } from '@/lib/drizzle';
-import { enkryptFor, getEnkryptBenchmarks, summarizeEnkrypt } from './enkrypt';
+import { ModelStatsBenchmarksSchema, type ModelStats } from '@kilocode/db/schema';
+import type * as Enkrypt from './enkrypt';
+import type { ModelStatsCacheEntry } from './model-stats-cache';
 import { fingerprintEnkryptScore } from './enkrypt-fingerprint';
 
 let mockPublicationEnabled = true;
 let mockSyncEnabled = false;
+const mockOrderBy = jest.fn<Promise<ModelStatsCacheEntry[]>, []>();
+const mockSelect = jest.fn(() => ({
+  from: () => ({ leftJoin: () => ({ orderBy: mockOrderBy }), orderBy: mockOrderBy }),
+}));
+const mockReplicaSelect = jest.fn();
 
 jest.mock('@/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
@@ -21,18 +26,9 @@ jest.mock('@/lib/config.server', () => ({
     return mockSyncEnabled;
   },
 }));
-
 jest.mock('@/lib/drizzle', () => ({
-  db: {
-    select: jest.fn(() => ({
-      from: jest.fn(() => ({ where: mockVerificationWhere })),
-    })),
-  },
-  readDb: {
-    select: jest.fn(() => ({
-      from: jest.fn(() => ({ where: mockWhere })),
-    })),
-  },
+  db: { select: mockSelect },
+  readDb: { select: mockReplicaSelect },
 }));
 
 const score = {
@@ -73,30 +69,34 @@ const scoreFields = [
   'nist_score',
   'owasp_score',
 ] as const;
-const identity = {
-  model_name: score.model_name,
-  provider: score.provider,
-  source: score.source,
-};
+const identity = { model_name: score.model_name, provider: score.provider, source: score.source };
 
-function row(overrides: Partial<Parameters<typeof summarizeEnkrypt>[0][number]> = {}) {
+function row(overrides: Partial<ModelStats> = {}, verification?: unknown): ModelStatsCacheEntry {
   return {
-    openrouterId: 'openai/model',
-    isActive: true,
-    isStealth: false,
-    benchmarks: { enkrypt: benchmark },
-    ...overrides,
+    stat: {
+      openrouterId: 'openai/model',
+      isActive: true,
+      isStealth: false,
+      benchmarks: { enkrypt: benchmark },
+      ...overrides,
+    } as ModelStats,
+    verification,
   };
 }
 
-const mockWhere = jest.fn<Promise<Parameters<typeof summarizeEnkrypt>[0]>, []>();
-const mockVerificationWhere = jest.fn<Promise<{ verified_models: unknown }[]>, []>();
+let enkryptFor: typeof Enkrypt.enkryptFor;
+let getEnkryptBenchmarks: typeof Enkrypt.getEnkryptBenchmarks;
+let publishEnkryptModels: typeof Enkrypt.publishEnkryptModels;
 
-beforeEach(() => {
+beforeEach(async () => {
+  jest.resetModules();
+  jest.clearAllMocks();
+  mockOrderBy.mockReset().mockResolvedValue([row()]);
   mockPublicationEnabled = true;
   mockSyncEnabled = false;
-  jest.clearAllMocks();
-  jest.spyOn(Date, 'now').mockReturnValue(Date.parse(benchmark.ingestedAt));
+  jest.useFakeTimers();
+  jest.setSystemTime(Date.parse(benchmark.ingestedAt));
+  ({ enkryptFor, getEnkryptBenchmarks, publishEnkryptModels } = await import('./enkrypt'));
 });
 
 afterEach(() => {
@@ -165,51 +165,43 @@ describe('Enkrypt schemas', () => {
     }
   );
 
-  it('rejects the legacy lastUpdated-only storage contract and unpublished response values', () => {
+  it('rejects legacy storage and unpublished response values', () => {
     expect(
       EnkryptBenchmarkSchema.safeParse({ ...score, lastUpdated: benchmark.ingestedAt }).success
     ).toBe(false);
     expect(EnkryptPublishedBenchmarkSchema.safeParse(benchmark).success).toBe(false);
-    expect(
-      EnkryptPublishedBenchmarkSchema.safeParse({ ...published, freshness: 'unknown' }).success
-    ).toBe(false);
-    expect(
-      EnkryptPublishedBenchmarkSchema.safeParse({ ...published, staleAfter: 'invalid' }).success
-    ).toBe(false);
-    expect(
-      EnkryptPublishedBenchmarkSchema.safeParse({ ...published, lastCheckedAt: 'invalid' }).success
-    ).toBe(false);
+    for (const override of [
+      { freshness: 'unknown' },
+      { staleAfter: 'invalid' },
+      { lastCheckedAt: 'invalid' },
+    ]) {
+      expect(EnkryptPublishedBenchmarkSchema.safeParse({ ...published, ...override }).success).toBe(
+        false
+      );
+    }
   });
 });
 
-describe('summarizeEnkrypt', () => {
-  it('caches an isolated storage namespace without publication metadata or Terminal Bench costs', () => {
-    expect(summarizeEnkrypt([row()])).toEqual(new Map([['openai/model', benchmark]]));
-  });
-
-  it('ignores malformed unrelated benchmark namespaces', () => {
-    const benchmarks = {
+describe('enkryptFor', () => {
+  it('ignores malformed unrelated namespaces and never includes Terminal Bench costs', async () => {
+    const benchmarks: unknown = {
       enkrypt: benchmark,
       kiloBench: { overallScore: 'invalid', evals: null },
-      artificialAnalysis: { liveCodeBench: null },
       futureBenchmark: 'unknown',
     };
-    expect(summarizeEnkrypt([row({ benchmarks })])).toEqual(new Map([['openai/model', benchmark]]));
+    mockOrderBy.mockResolvedValue([row({ benchmarks: benchmarks as ModelStats['benchmarks'] })]);
+    expect(enkryptFor(await getEnkryptBenchmarks(), 'openai/model')).toEqual(published);
   });
 
-  it('excludes internal and inactive rows while preserving active public scores', () => {
-    expect(
-      summarizeEnkrypt([
-        row(),
-        row({ openrouterId: 'kilo-internal/custom' }),
-        row({ openrouterId: 'inactive/model', isActive: false }),
-        row({ openrouterId: 'null-active/model', isActive: null }),
-      ])
-    ).toEqual(new Map([['openai/model', benchmark]]));
-  });
-
-  it('withholds previously stored scores for models marked stealth', () => {
-    expect(summarizeEnkrypt([row({ isStealth: true })])).toEqual(new Map());
+  it.each([
+    { openrouterId: 'kilo-internal/custom' },
+    { isActive: false },
+    { isActive: null },
+    { isStealth: true },
+  ])('withholds nonpublic rows %j', async overrides => {
+    const entry = row(overrides);
+    mockOrderBy.mockResolvedValue([entry]);
+    expect(enkryptFor(await getEnkryptBenchmarks(), entry.stat.openrouterId)).toBeUndefined();
   });
 
   it.each([
@@ -222,36 +214,43 @@ describe('summarizeEnkrypt', () => {
     { enkrypt: {} },
     { enkrypt: { ...benchmark, risk_score: '0' } },
     { enkrypt: { ...benchmark, ingestedAt: 'invalid' } },
-  ])('omits absent or malformed Enkrypt scores: %j', benchmarks => {
-    expect(summarizeEnkrypt([row({ benchmarks })]).size).toBe(0);
+  ])('omits absent or malformed Enkrypt scores: %j', async benchmarks => {
+    mockOrderBy.mockResolvedValue([row({ benchmarks: benchmarks as ModelStats['benchmarks'] })]);
+    expect(enkryptFor(await getEnkryptBenchmarks(), 'openai/model')).toBeUndefined();
   });
-});
 
-describe('enkryptFor', () => {
-  it('prefers an exact match over a safe gateway-prefixed fallback', () => {
+  it('prefers exact identity over a safe gateway-prefixed fallback', async () => {
     const exact = { ...benchmark, risk_score: 25 };
-    const benchmarks = new Map([
-      ['openai/model', benchmark],
-      ['kilo/openai/model', exact],
+    mockOrderBy.mockResolvedValue([
+      row(),
+      row({ openrouterId: 'kilo/openai/model', benchmarks: { enkrypt: exact } }),
+      row({ openrouterId: 'openai/other' }),
     ]);
-    expect(enkryptFor(benchmarks, 'openai/model')).toEqual(published);
-    expect(enkryptFor(benchmarks, 'kilo/openai/model')).toEqual({ ...published, risk_score: 25 });
-    expect(enkryptFor(new Map([['openai/model', benchmark]]), 'kilo/openai/model')).toEqual(
-      published
-    );
+    const snapshot = await getEnkryptBenchmarks();
+    expect(enkryptFor(snapshot, 'openai/model')).toEqual(published);
+    expect(enkryptFor(snapshot, 'kilo/openai/model')).toEqual({ ...published, risk_score: 25 });
+    expect(enkryptFor(snapshot, 'kilo/openai/other')).toEqual(published);
   });
 
-  it('withholds cached scores for exact and gateway-prefixed matches when publication is disabled', () => {
+  it('does not substitute a public fallback for an ineligible exact match', async () => {
+    mockOrderBy.mockResolvedValue([
+      row(),
+      row({ openrouterId: 'kilo/openai/model', isStealth: true }),
+    ]);
+    expect(enkryptFor(await getEnkryptBenchmarks(), 'kilo/openai/model')).toBeUndefined();
+  });
+
+  it('withholds warm scores immediately when publication is disabled', async () => {
+    const snapshot = await getEnkryptBenchmarks();
     mockPublicationEnabled = false;
-    const benchmarks = new Map([['openai/model', benchmark]]);
-    expect(enkryptFor(benchmarks, 'openai/model')).toBeUndefined();
-    expect(enkryptFor(benchmarks, 'kilo/openai/model')).toBeUndefined();
-    expect(benchmarks.get('openai/model')).toEqual(benchmark);
+    expect(enkryptFor(snapshot, 'openai/model')).toBeUndefined();
+    expect(enkryptFor(snapshot, 'kilo/openai/model')).toBeUndefined();
+    expect(snapshot?.entries[0].stat.benchmarks?.enkrypt).toEqual(benchmark);
   });
 
-  it('omits a future ingestion timestamp', () => {
-    jest.mocked(Date.now).mockReturnValue(Date.parse(benchmark.ingestedAt) - 1);
-    expect(enkryptFor(new Map([['openai/model', benchmark]]), 'openai/model')).toBeUndefined();
+  it('omits a future ingestion timestamp', async () => {
+    jest.setSystemTime(Date.parse(benchmark.ingestedAt) - 1);
+    expect(enkryptFor(await getEnkryptBenchmarks(), 'openai/model')).toBeUndefined();
   });
 
   it.each([
@@ -264,112 +263,91 @@ describe('enkryptFor', () => {
     'openai/model:free',
     'kilo/openai/model:free',
     'unknown/model',
-  ])('does not infer a score for %s', id => {
-    const benchmarks = new Map([
-      ['openai/model', benchmark],
-      ['special-model', benchmark],
+  ])('does not infer a score for %s', async id => {
+    mockOrderBy.mockResolvedValue([row(), row({ openrouterId: 'special-model' })]);
+    expect(enkryptFor(await getEnkryptBenchmarks(), id)).toBeUndefined();
+  });
+});
+
+describe('publishEnkryptModels', () => {
+  it('replaces raw scores without altering model order, availability, or cached rows', async () => {
+    const models = Object.freeze([
+      Object.freeze({
+        id: 'openai/model',
+        enkrypt: { untrusted: true },
+        hasUserByokAvailable: true,
+      }),
+      Object.freeze({
+        id: 'unmatched/model',
+        enkrypt: { untrusted: true },
+        hasUserByokAvailable: false,
+      }),
     ]);
-    expect(enkryptFor(benchmarks, id)).toBeUndefined();
+    const snapshot = await getEnkryptBenchmarks();
+    expect(publishEnkryptModels(models, snapshot)).toEqual([
+      { id: 'openai/model', enkrypt: published, hasUserByokAvailable: true },
+      { id: 'unmatched/model', hasUserByokAvailable: false },
+    ]);
+    expect(models[0].enkrypt).toEqual({ untrusted: true });
+    expect(snapshot?.entries[0].stat.benchmarks?.enkrypt).toEqual(benchmark);
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['disabled', 'expired', 'invalidated'] as const)(
+    'strips old annotations when %s',
+    async boundary => {
+      const snapshot = await getEnkryptBenchmarks();
+      const models = publishEnkryptModels([{ id: 'openai/model' }], snapshot);
+      if (boundary === 'disabled') mockPublicationEnabled = false;
+      else if (boundary === 'expired') jest.advanceTimersByTime(300_000);
+      else (await import('./model-stats-cache')).invalidateModelStatsCache();
+      expect(publishEnkryptModels(models, snapshot)).toEqual([{ id: 'openai/model' }]);
+      expect(models[0].enkrypt).toEqual(published);
+      expect(mockSelect).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('never annotates virtual auto models even if a matching stats row exists', async () => {
+    mockOrderBy.mockResolvedValue([row({ openrouterId: 'kilo-auto/org' })]);
+    const snapshot = await getEnkryptBenchmarks();
+    expect(publishEnkryptModels([{ id: 'kilo-auto/org', enkrypt: published }], snapshot)).toEqual([
+      { id: 'kilo-auto/org' },
+    ]);
   });
 });
 
 describe('getEnkryptBenchmarks', () => {
   it.each([true, false])(
-    'does not read the database when publication is disabled and sync is %s',
+    'does not query when publication is disabled and sync is %s',
     async enabled => {
       mockPublicationEnabled = false;
       mockSyncEnabled = enabled;
-      await expect(getEnkryptBenchmarks()).resolves.toEqual(new Map());
-      expect(readDb.select).not.toHaveBeenCalled();
-      expect(db.select).not.toHaveBeenCalled();
+      expect(await getEnkryptBenchmarks()).toBeNull();
+      expect(mockSelect).not.toHaveBeenCalled();
+      expect(mockReplicaSelect).not.toHaveBeenCalled();
     }
   );
 
-  it('joins five-minute raw caches per call and ages checks outside the caches without per-model queries', async () => {
-    jest.useFakeTimers();
+  it('recomputes check freshness without changing or exposing the shared snapshot', async () => {
     const checkedAt = '2026-08-30T00:00:00.000Z';
     const verification = { checkedAt, scoreHash: fingerprintEnkryptScore(benchmark) };
     const staleAfter = Date.parse(checkedAt) + ENKRYPT_STALE_AFTER_MS;
-    const checkedPublication = {
+    jest.setSystemTime(staleAfter - 1);
+    mockOrderBy.mockResolvedValue([row({}, verification), row({ openrouterId: 'openai/missing' })]);
+    const snapshot = await getEnkryptBenchmarks();
+    const checked = {
       ...published,
       lastCheckedAt: checkedAt,
       staleAfter: new Date(staleAfter).toISOString(),
     };
-    jest.setSystemTime(staleAfter - 1);
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    mockWhere.mockRejectedValueOnce(new Error('unavailable'));
-    mockVerificationWhere.mockResolvedValueOnce([
-      { verified_models: { 'openai/model': verification } },
-    ]);
-    await expect(getEnkryptBenchmarks()).resolves.toEqual(new Map());
-
-    const stored = [row(), row({ openrouterId: 'openai/missing' })];
-    mockWhere.mockResolvedValueOnce(stored);
-    const cached = await getEnkryptBenchmarks();
-    expect([...cached]).toEqual([
-      ['openai/model', { ...benchmark, verification }],
-      ['openai/missing', benchmark],
-    ]);
-    expect(enkryptFor(cached, 'openai/model')).toEqual(checkedPublication);
-    expect(enkryptFor(cached, 'kilo/openai/model')).toEqual(checkedPublication);
-    expect(enkryptFor(cached, 'openai/missing')).toEqual({ ...published, freshness: 'stale' });
-    expect(mockVerificationWhere).toHaveBeenCalledTimes(1);
-
+    expect(enkryptFor(snapshot, 'openai/model')).toEqual(checked);
+    expect(enkryptFor(snapshot, 'openai/missing')).toEqual({ ...published, freshness: 'stale' });
     jest.advanceTimersByTime(1);
-    expect(enkryptFor(await getEnkryptBenchmarks(), 'openai/model')).toEqual({
-      ...checkedPublication,
-      freshness: 'stale',
-    });
-    expect(mockWhere).toHaveBeenCalledTimes(2);
-    expect(mockVerificationWhere).toHaveBeenCalledTimes(1);
-    expect(cached.get('openai/model')).toEqual({ ...benchmark, verification });
-    expect(stored[0].benchmarks).toEqual({ enkrypt: benchmark });
-
-    mockPublicationEnabled = false;
-    await expect(getEnkryptBenchmarks()).resolves.toEqual(new Map());
-    expect(enkryptFor(cached, 'openai/model')).toBeUndefined();
-    expect(readDb.select).toHaveBeenCalledTimes(2);
-    expect(db.select).toHaveBeenCalledTimes(1);
-    mockPublicationEnabled = true;
-
-    jest.advanceTimersByTime(5 * 60 * 1000 - 2);
-    await expect(getEnkryptBenchmarks()).resolves.toEqual(cached);
-    expect(mockWhere).toHaveBeenCalledTimes(2);
-    expect(mockVerificationWhere).toHaveBeenCalledTimes(1);
-
-    jest.advanceTimersByTime(1);
-    mockWhere.mockRejectedValueOnce(new Error('unavailable'));
-    mockVerificationWhere.mockRejectedValueOnce(new Error('unavailable'));
-    const fallback = await getEnkryptBenchmarks();
-    expect(fallback).toEqual(cached);
-    expect(enkryptFor(fallback, 'openai/model')?.freshness).toBe('stale');
-    expect(mockWhere).toHaveBeenCalledTimes(3);
-    expect(mockVerificationWhere).toHaveBeenCalledTimes(2);
-
-    const nextCheck = new Date(Date.now()).toISOString();
-    mockWhere.mockRejectedValueOnce(new Error('unavailable'));
-    mockVerificationWhere.mockResolvedValueOnce([
-      {
-        verified_models: {
-          'openai/model': { ...verification, checkedAt: nextCheck },
-          'openai/missing': { checkedAt: nextCheck, scoreHash: '0'.repeat(64) },
-        },
-      },
-    ]);
-    const rechecked = await getEnkryptBenchmarks();
-    expect(enkryptFor(rechecked, 'openai/model')).toMatchObject({
-      ingestedAt: benchmark.ingestedAt,
-      lastCheckedAt: nextCheck,
-      freshness: 'fresh',
-      evaluatedAt: null,
-    });
-    expect(enkryptFor(rechecked, 'openai/missing')).toEqual({ ...published, freshness: 'stale' });
-    expect(enkryptFor(cached, 'openai/model')?.lastCheckedAt).toBe(checkedAt);
-    expect(mockVerificationWhere).toHaveBeenCalledTimes(3);
-
-    mockWhere.mockResolvedValueOnce([]);
-    await expect(getEnkryptBenchmarks()).resolves.toEqual(new Map());
-    expect(mockWhere).toHaveBeenCalledTimes(5);
-    expect(mockVerificationWhere).toHaveBeenCalledTimes(3);
+    expect(await getEnkryptBenchmarks()).toBe(snapshot);
+    expect(enkryptFor(snapshot, 'openai/model')).toEqual({ ...checked, freshness: 'stale' });
+    expect(snapshot?.entries[0].verification).toEqual(verification);
+    expect(snapshot?.entries[0].stat.benchmarks?.enkrypt).toEqual(benchmark);
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+    expect(mockReplicaSelect).not.toHaveBeenCalled();
   });
 });

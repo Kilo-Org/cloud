@@ -120,6 +120,7 @@ import { sum } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { revalidatePath } from 'next/cache';
+import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
 import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@/lib/stripe-client';
@@ -2078,6 +2079,7 @@ export const adminRouter = createTRPCRouter({
         })
         .returning();
 
+      invalidateModelStatsCache();
       revalidatePath('/api/models/stats');
 
       return newModel;
@@ -2099,6 +2101,7 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
+      invalidateModelStatsCache();
       revalidatePath('/api/models/stats');
 
       return updatedModel;
@@ -2126,6 +2129,7 @@ export const adminRouter = createTRPCRouter({
     }),
 
     bustCache: adminProcedure.mutation(() => {
+      invalidateModelStatsCache();
       revalidatePath('/api/models/stats');
       revalidatePath('/api/models/stats/[slug]', 'page');
       return { success: true, message: 'Cache busted successfully' };

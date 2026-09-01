@@ -3039,7 +3039,7 @@ describe('SandboxSession orchestration', () => {
   });
 
   it.each(['cloudflare', 'vercel'] as const)(
-    'applies fresh direct credentials before a warm prompt across eviction on %s',
+    'refreshes direct credentials without warm preparation across eviction on %s',
     async sandboxProvider => {
       const fixture = sessionFixture({
         workspace: { sandboxId: SANDBOX_ID, workspacePath: DIRECTORY, sandboxProvider },
@@ -3057,6 +3057,20 @@ describe('SandboxSession orchestration', () => {
       fixture.control.ensureReady.mockResolvedValue(ready);
       await fixture.admit('cold');
       await fixture.flush();
+      const coldPreparation = fixture.eventQueries.findByEntityPrefix('preparation/attempt/');
+      expect(coldPreparation.length).toBeGreaterThan(0);
+      expect(fixture.control.request).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'session.attach',
+          payload: {
+            ...initial,
+            preparation: {
+              attemptId: fixture.record('cold')?.preparationAttemptId,
+              triggerMessageId: 'cold',
+            },
+          },
+        })
+      );
       await fixture.outcome('cold', 'completed');
       await fixture.flush();
       fixture.reload();
@@ -3068,21 +3082,22 @@ describe('SandboxSession orchestration', () => {
       };
       fixture.control.ensureReady.mockResolvedValue({ ...ready, attachment: refreshed });
       fixture.control.request.mockClear();
+      orchestrationMocks.broadcast.mockClear();
       const attached = deferred<ResponseFrame>();
       delegateRequest(fixture, 'session.attach', () => attached.promise);
       await fixture.admit('warm');
       await fixture.flush();
+      expect(orchestrationMocks.broadcast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ stream_event_type: 'preparing' })
+      );
+      expect(fixture.eventQueries.findByEntityPrefix('preparation/attempt/')).toEqual(
+        coldPreparation
+      );
       expect(fixture.control.request).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({
           operation: 'session.attach',
           expectedWrapperInstanceId: RUNTIME_ID,
-          payload: {
-            ...refreshed,
-            preparation: {
-              attemptId: fixture.record('warm')?.preparationAttemptId,
-              triggerMessageId: 'warm',
-            },
-          },
+          payload: refreshed,
         })
       );
       expect(fixture.record('warm')).toMatchObject({ state: 'queued', unresolvedDispatch: true });
@@ -3098,8 +3113,57 @@ describe('SandboxSession orchestration', () => {
       });
       expect(fixture.record('warm')?.unresolvedDispatch).toBeUndefined();
       expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+      expect(orchestrationMocks.broadcast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ stream_event_type: 'preparing' })
+      );
+      expect(fixture.eventQueries.findByEntityPrefix('preparation/attempt/')).toEqual(
+        coldPreparation
+      );
+      expect(await fixture.snapshot()).toMatchObject({ preparationSnapshots: coldPreparation });
     }
   );
+
+  it('reports a failed warm credential refresh without preparation or prompt delivery', async () => {
+    const fixture = sessionFixture();
+    fixture.control.ensureReady.mockResolvedValue({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      attachment: {
+        ...ATTACHMENT,
+        kilo: { ...ATTACHMENT.kilo, containmentEnabled: false },
+      },
+    });
+    await fixture.admit('cold');
+    await fixture.flush();
+    await fixture.outcome('cold', 'completed');
+    await fixture.flush();
+    const coldPreparation = fixture.eventQueries.findByEntityPrefix('preparation/attempt/');
+    fixture.reload();
+    fixture.control.request.mockClear();
+    orchestrationMocks.broadcast.mockClear();
+    delegateRequest(fixture, 'session.attach', async () => controlFailure(false));
+    await fixture.admit('warm');
+    await fixture.flush();
+    expect(fixture.record('warm')).toMatchObject({
+      state: 'failed',
+      failedReason: 'attach_exhausted',
+    });
+    expect(fixture.control.request.mock.calls.map(([input]) => input.operation)).toEqual([
+      'session.attach',
+    ]);
+    expect(orchestrationMocks.broadcast).toHaveBeenCalledWith(
+      expect.objectContaining({ stream_event_type: 'cloud.message.failed' })
+    );
+    expect(orchestrationMocks.broadcast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ stream_event_type: 'preparing' })
+    );
+    expect(fixture.eventQueries.findByEntityPrefix('preparation/attempt/')).toEqual(
+      coldPreparation
+    );
+    expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+    expect(await fixture.snapshot()).toMatchObject({ preparationSnapshots: coldPreparation });
+  });
 
   it.each(['stop', 'expiry'] as const)(
     'retains ambiguous warm prompt ownership through direct reattachment and %s',

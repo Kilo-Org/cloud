@@ -556,6 +556,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     expect(stub.requests).toHaveLength(1);
     expect(stub.requests[0].method).toBe('POST');
     expect(stub.requests[0].pathname).toBe('/permission/perm_1/reply');
+    expect(stub.requests[0].directory).toBe('/workspace');
     expect(stub.requests[0].body).toEqual({ reply: 'once', interactive: true });
   });
 

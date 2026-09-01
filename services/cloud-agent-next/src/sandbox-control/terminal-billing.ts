@@ -1,10 +1,11 @@
 import { billingContextSchema } from '@kilocode/container-usage';
-import { isIsolatedSandboxId } from '../sandbox-id.js';
 import {
   SANDBOX_USAGE_SKUS,
   type SandboxClassName,
   type getSandboxBillingRuntimeStatus,
 } from '../container-usage-context.js';
+import { classifySandboxId, isIsolatedSandboxId } from '../sandbox-id.js';
+import { decodeCloudflareProviderRef } from './cloudflare-provider.js';
 
 export type SandboxTerminalAccessInput = {
   sessionId: string;
@@ -31,11 +32,19 @@ type TerminalBillingRuntimeInput = {
   runtime: SandboxBillingRuntimeStatus | undefined;
 };
 
-function expectedSandboxClassName(sandboxId: string): SandboxClassName {
-  if (sandboxId.startsWith('dind-')) return 'SandboxDIND';
-  if (sandboxId.startsWith('crv-')) return 'SandboxCodeReview';
-  if (sandboxId.startsWith('ses-')) return 'SandboxSmall';
-  return 'Sandbox';
+function expectedSandboxClassName(sandboxId: string): SandboxClassName | undefined {
+  switch (classifySandboxId(sandboxId)) {
+    case 'isolated-small':
+      return 'SandboxSmallContainment';
+    case 'code-review':
+      return 'SandboxCodeReviewContainment';
+    case 'isolated-standard':
+    case 'shared':
+    case 'legacy-shared':
+      return 'SandboxContainment';
+    default:
+      return undefined;
+  }
 }
 
 function expectedUsageService(sandboxClassName: SandboxClassName): string {
@@ -64,9 +73,11 @@ export function validateTerminalBillingRuntime(
   }
 
   const sandboxClassName = expectedSandboxClassName(input.sandboxId);
+  const providerRef = decodeCloudflareProviderRef(input.providerInstanceId);
   if (
+    sandboxClassName === undefined ||
+    providerRef?.sandboxId !== input.sandboxId ||
     runtime.sandboxClassName !== sandboxClassName ||
-    input.providerInstanceId !== input.sandboxId ||
     context.instanceId !== input.sandboxId ||
     context.service !== expectedUsageService(sandboxClassName) ||
     context.sku !== SANDBOX_USAGE_SKUS[sandboxClassName] ||

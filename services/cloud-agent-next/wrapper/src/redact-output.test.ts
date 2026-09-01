@@ -155,6 +155,18 @@ describe('known setup secret redaction', () => {
     expect(result).toContain('development');
   });
 
+  it('retains secrets from wrapper, attachment, and rebuilt worktree configurations', () => {
+    const configs = ['wrapper-auth-secret', 'attachment-auth-secret', 'guest-worktree-alias'].map(
+      key => ({
+        KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key } }),
+      })
+    );
+    const redact = createSecretRedactor(configs[0], configs[1], configs[2]);
+    expect(redact('wrapper-auth-secret attachment-auth-secret guest-worktree-alias ready')).toBe(
+      '[REDACTED] [REDACTED] [REDACTED] ready'
+    );
+  });
+
   it.each([1, 7, 2049])(
     'redacts split chunks of %i characters on interleaved output streams',
     chunkSize => {

@@ -45,6 +45,7 @@ export type VercelControlRestClient = {
   extendSessionTimeout: VercelSandboxRestClient['extendSessionTimeout'];
   stopSession: VercelSandboxRestClient['stopSession'];
   readFile: VercelSandboxRestClient['readFile'];
+  updateNetworkPolicy: VercelSandboxRestClient['updateNetworkPolicy'];
 };
 
 export function encodeVercelProviderRef(ref: VercelProviderRef): string {
@@ -91,6 +92,7 @@ export function createVercelProviderAdapter(deps: {
       stop: async () => 'retryable',
       ensureLeaseAtLeast: unavailable,
       logs: async () => 'Vercel sandbox runtime configuration is unavailable',
+      updateNetworkPolicy: unavailable,
     };
   }
   const restClient =
@@ -102,6 +104,10 @@ export function createVercelProviderAdapter(deps: {
       fetch,
     });
   const now = deps.now ?? Date.now;
+  const decodeOwnedProviderRef = (ref: string | null): VercelProviderRef | null => {
+    const parsed = decodeVercelProviderRef(ref);
+    return parsed?.sandboxName === deps.sandboxName ? parsed : null;
+  };
   const ensureBillingAdmission: ProviderAdapter['ensureBillingAdmission'] = async (
     _ref,
     billing
@@ -126,11 +132,12 @@ export function createVercelProviderAdapter(deps: {
         snapshotId: config.snapshotId,
         runtime: config.runtime,
         timeoutMs: config.initialTimeoutMs,
+        ...(intent.networkPolicy === undefined ? {} : { networkPolicy: intent.networkPolicy }),
       });
       return { providerRef: encodeVercelProviderRef(created.runtime) };
     },
     async launch(ref, env) {
-      const parsed = decodeVercelProviderRef(ref);
+      const parsed = decodeOwnedProviderRef(ref);
       if (!parsed) throw new Error('Invalid Vercel sandbox allocation');
       await restClient.executeCommand(parsed.sessionId, {
         command: 'sh',
@@ -146,7 +153,7 @@ export function createVercelProviderAdapter(deps: {
       });
     },
     async observe(ref, intent) {
-      const parsed = decodeVercelProviderRef(ref);
+      const parsed = decodeOwnedProviderRef(ref);
       try {
         if (parsed) {
           const { session } = await restClient.getSession(parsed.sessionId, parsed.sandboxName);
@@ -174,7 +181,7 @@ export function createVercelProviderAdapter(deps: {
       }
     },
     async stop(ref) {
-      const parsed = decodeVercelProviderRef(ref);
+      const parsed = decodeOwnedProviderRef(ref);
       if (parsed === null) return 'retryable';
       try {
         const session = await restClient.stopSession(parsed.sessionId, parsed.sandboxName);
@@ -185,7 +192,7 @@ export function createVercelProviderAdapter(deps: {
       }
     },
     async ensureLeaseAtLeast(ref, ms) {
-      const parsed = decodeVercelProviderRef(ref);
+      const parsed = decodeOwnedProviderRef(ref);
       if (parsed === null) return;
       const { session } = await restClient.getSession(parsed.sessionId, parsed.sandboxName);
       if (session.status !== 'running') return;
@@ -199,7 +206,7 @@ export function createVercelProviderAdapter(deps: {
       );
     },
     async logs(ref) {
-      const parsed = decodeVercelProviderRef(ref);
+      const parsed = decodeOwnedProviderRef(ref);
       if (parsed === null) return `vercel ${ref}`;
       try {
         const bytes = await withTimeout(
@@ -211,6 +218,19 @@ export function createVercelProviderAdapter(deps: {
       } catch {
         return `vercel ${parsed.sessionId} logs unavailable`;
       }
+    },
+    async updateNetworkPolicy(providerRef, networkPolicy) {
+      const parsed = decodeOwnedProviderRef(providerRef);
+      if (parsed === null) throw new Error('Invalid Vercel sandbox provider reference');
+      const session = await restClient.updateNetworkPolicy(
+        parsed.sessionId,
+        parsed.sandboxName,
+        networkPolicy
+      );
+      if (session.id !== parsed.sessionId || session.sourceSandboxName !== parsed.sandboxName) {
+        throw new Error('Vercel sandbox policy update returned a different session');
+      }
+      if (session.status !== 'running') throw new Error('Vercel sandbox session is not running');
     },
   };
 }

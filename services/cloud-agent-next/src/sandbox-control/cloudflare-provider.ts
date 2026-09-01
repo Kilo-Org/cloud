@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   configureSandboxBillingInput,
   ensureSandboxBillingAdmissionInput,
@@ -6,27 +7,71 @@ import {
   parseSandboxBillingInput,
 } from '../container-usage-context.js';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
+import { MANAGED_SCM_OUTBOUND_HANDLER } from '../sandbox-id.js';
 import type { SandboxInstance } from '../types.js';
 import { DEADLINE_MS } from './deadlines.js';
+import type { CreateIntent } from './physical-lifecycle.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
 
 const CONTROL_WRAPPER_PATH = '/usr/local/bin/kilocode-control-wrapper.js';
 const CONTROL_WRAPPER_LOG_PATH = '/tmp/kilocode-control-wrapper.log';
 
+const providerRefSchema = z
+  .object({
+    sandboxId: z.string().min(1).max(256),
+    containment: z.literal(true),
+    instanceId: z.string().min(1).max(128),
+  })
+  .strict();
+
+export type CloudflareProviderRef = z.infer<typeof providerRefSchema>;
+
+export function encodeCloudflareProviderRef(ref: CloudflareProviderRef): string {
+  return JSON.stringify(ref);
+}
+
+export function decodeCloudflareProviderRef(raw: string | null): CloudflareProviderRef | null {
+  if (raw === null) return null;
+  try {
+    const parsed = providerRefSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
 export type CloudflareSandboxHandle = SandboxInstance;
+
+type SandboxOptions = { containment: boolean };
 
 export function createCloudflareProviderAdapter(deps: {
   sandboxId: string;
-  getSandbox: (id: string) => CloudflareSandboxHandle;
-  destroy: (allocationId: string) => Promise<void>;
+  getSandbox: (id: string, options: SandboxOptions) => CloudflareSandboxHandle;
+  destroy: (allocationId: string, options: SandboxOptions) => Promise<void>;
 }): ProviderAdapter {
+  const decodeOwnedProviderRef = (
+    ref: string | null
+  ): { sandboxId: string; containment: boolean } | null => {
+    if (ref === deps.sandboxId) return { sandboxId: deps.sandboxId, containment: false };
+    const parsed = decodeCloudflareProviderRef(ref);
+    return parsed?.sandboxId === deps.sandboxId ? parsed : null;
+  };
+  const resolveProviderRef = (ref: string | null, intent?: CreateIntent | null): string | null => {
+    if (ref !== null || !intent) return ref;
+    const sandboxId = intent.allocationName ?? deps.sandboxId;
+    return intent.containment?.worktreeScoped
+      ? encodeCloudflareProviderRef({ sandboxId, containment: true, instanceId: intent.intentId })
+      : sandboxId;
+  };
   const ensureBillingAdmission: ProviderAdapter['ensureBillingAdmission'] = async (
     ref,
     billing
   ) => {
     if (!billing) return;
-    const input = parseSandboxBillingInput({ ...billing, sandboxId: ref });
-    const sandbox = deps.getSandbox(ref);
+    const parsed = decodeOwnedProviderRef(ref);
+    if (!parsed) throw new Error('Invalid Cloudflare sandbox allocation');
+    const input = parseSandboxBillingInput({ ...billing, sandboxId: parsed.sandboxId });
+    const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
     const blocked = await isSandboxBillingBlocked(sandbox, input.enforcementRequested);
     if (input.enforcementRequested || blocked) {
       const admission = await ensureSandboxBillingAdmissionInput(sandbox, input);
@@ -47,12 +92,22 @@ export function createCloudflareProviderAdapter(deps: {
     resumable: false,
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
-      const providerRef = intent.allocationName ?? deps.sandboxId;
+      const providerRef = encodeCloudflareProviderRef({
+        sandboxId: intent.allocationName ?? deps.sandboxId,
+        containment: true,
+        instanceId: intent.intentId,
+      });
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
     async launch(ref, env) {
-      await deps.getSandbox(ref).startProcess(`bun run ${CONTROL_WRAPPER_PATH}`, {
+      const parsed = decodeCloudflareProviderRef(ref);
+      if (!parsed || parsed.sandboxId !== deps.sandboxId) {
+        throw new Error('Invalid contained Cloudflare sandbox allocation');
+      }
+      const sandbox = deps.getSandbox(parsed.sandboxId, { containment: true });
+      await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);
+      await sandbox.startProcess(`bun run ${CONTROL_WRAPPER_PATH}`, {
         cwd: '/',
         env: {
           ...env,
@@ -62,10 +117,13 @@ export function createCloudflareProviderAdapter(deps: {
       });
     },
     async observe(ref, intent) {
-      const providerRef = ref ?? intent?.allocationName ?? (intent ? deps.sandboxId : undefined);
-      if (!providerRef) return { status: 'unknown' };
+      const providerRef = resolveProviderRef(ref, intent);
+      const parsed = decodeOwnedProviderRef(providerRef);
+      if (!parsed || !providerRef) return { status: 'unknown' };
       try {
-        const running = await isSandboxContainerRunning(deps.getSandbox(providerRef));
+        const running = await isSandboxContainerRunning(
+          deps.getSandbox(parsed.sandboxId, { containment: parsed.containment })
+        );
         const settling = intent && Date.now() < intent.createdAt + DEADLINE_MS.createSettle;
         return {
           status:
@@ -77,17 +135,21 @@ export function createCloudflareProviderAdapter(deps: {
       }
     },
     async stop(ref, intent) {
-      const providerRef = ref ?? intent?.allocationName ?? (intent ? deps.sandboxId : undefined);
-      if (!providerRef) return 'retryable';
+      const parsed = decodeOwnedProviderRef(resolveProviderRef(ref, intent));
+      if (!parsed) return 'retryable';
       try {
-        await deps.destroy(providerRef);
+        await deps.destroy(parsed.sandboxId, { containment: parsed.containment });
         return 'terminal';
       } catch {
         return 'retryable';
       }
     },
     async ensureLeaseAtLeast(ref, _ms) {
-      return deps.getSandbox(ref).renewActivityTimeout();
+      const parsed = decodeOwnedProviderRef(ref);
+      if (parsed === null) return;
+      return deps
+        .getSandbox(parsed.sandboxId, { containment: parsed.containment })
+        .renewActivityTimeout();
     },
     async logs(ref) {
       return `cloudflare ${ref}`;

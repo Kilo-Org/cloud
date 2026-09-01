@@ -2,6 +2,18 @@ import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-
 
 export type PhysicalState = 'stopped' | 'creating' | 'running' | 'stopping' | 'failed' | 'unknown';
 
+export type CredentialContainmentRequirements = {
+  kilocode: boolean;
+  github: boolean;
+  worktreeScoped?: true;
+};
+
+export const WORKTREE_CREDENTIAL_CONTAINMENT = {
+  kilocode: true,
+  github: true,
+  worktreeScoped: true,
+} satisfies CredentialContainmentRequirements;
+
 export type CreateIntent = {
   intentId: string;
   createdAt: number;
@@ -10,6 +22,7 @@ export type CreateIntent = {
     VercelSandboxRuntimeConfig,
     'projectId' | 'snapshotId' | 'runtimeBuildId' | 'runtime'
   >;
+  containment?: CredentialContainmentRequirements;
 };
 
 export type StopTombstone = {
@@ -25,6 +38,7 @@ export type PhysicalRecord = {
   createIntent: CreateIntent | null;
   stopTombstone: StopTombstone | null;
   resumable: boolean;
+  containment?: CredentialContainmentRequirements & { providerRef: string };
 };
 
 export type ObserveResult = 'active' | 'terminal' | 'unknown';
@@ -43,7 +57,8 @@ export function claimCreate(
   record: PhysicalRecord,
   intentId: string,
   now: number,
-  allocationName?: string
+  allocationName?: string,
+  containment?: CredentialContainmentRequirements
 ): PhysicalRecord {
   if (record.state !== 'stopped') {
     throw illegal('claimCreate', record.state);
@@ -51,7 +66,20 @@ export function claimCreate(
   return {
     ...record,
     state: 'creating',
-    createIntent: { intentId, createdAt: now, ...(allocationName ? { allocationName } : {}) },
+    createIntent: {
+      intentId,
+      createdAt: now,
+      ...(allocationName ? { allocationName } : {}),
+      ...(containment
+        ? {
+            containment: {
+              kilocode: containment.kilocode,
+              github: containment.github,
+              ...(containment.worktreeScoped ? { worktreeScoped: true } : {}),
+            },
+          }
+        : {}),
+    },
   };
 }
 
@@ -176,10 +204,21 @@ export function exhaustStopRetries(record: PhysicalRecord): PhysicalRecord {
 }
 
 function toRunning(record: PhysicalRecord, providerRef: string): PhysicalRecord {
+  const containment = record.createIntent?.containment;
   return {
     ...record,
     state: 'running',
     providerRef,
+    ...(containment
+      ? {
+          containment: {
+            kilocode: containment.kilocode,
+            github: containment.github,
+            ...(containment.worktreeScoped ? { worktreeScoped: true } : {}),
+            providerRef,
+          },
+        }
+      : {}),
   };
 }
 

@@ -1148,6 +1148,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         repositoryUuid: subject.repositoryUuid,
         repositoryFullName: subject.repositoryFullName,
         tokenDigest: await bitbucketTokenDigest(subject.token),
+        oauthCredentialId: subject.oauthCredentialId,
         outboundContainerId: params.outboundContainerId,
       });
       return {
@@ -1183,9 +1184,6 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     );
     if (upstream.failure) return { success: false, reason: upstream.failure };
 
-    // Re-resolve the current token and confirm the workspace/repo identity and
-    // token digest still match what the capability was issued for. A rotated
-    // token or a changed integration invalidates the capability.
     const resolved = await resolveBitbucketCapabilitySubject(this.env, {
       userId: claims.userId,
       orgId: claims.orgId,
@@ -1204,9 +1202,15 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     ) {
       return { success: false, reason: 'source_unavailable' };
     }
-    const currentDigest = await bitbucketTokenDigest(subject.token);
-    if (!timingSafeEqual(currentDigest, claims.tokenDigest)) {
-      return { success: false, reason: 'source_unavailable' };
+    if (claims.oauthCredentialId !== undefined) {
+      if (subject.oauthCredentialId !== claims.oauthCredentialId) {
+        return { success: false, reason: 'source_unavailable' };
+      }
+    } else {
+      const currentDigest = await bitbucketTokenDigest(subject.token);
+      if (!timingSafeEqual(currentDigest, claims.tokenDigest)) {
+        return { success: false, reason: 'source_unavailable' };
+      }
     }
     return {
       success: true,

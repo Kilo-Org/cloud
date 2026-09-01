@@ -5,25 +5,43 @@ import {
   parseSandboxBillingInput,
   type MeteredSandboxInstance,
 } from '../container-usage-context.js';
-import { deriveSandboxAllocationId } from '../sandbox-id.js';
-import { createCloudflareProviderAdapter } from './cloudflare-provider.js';
+import {
+  createCloudflareProviderAdapter,
+  decodeCloudflareProviderRef,
+  encodeCloudflareProviderRef,
+  type CloudflareSandboxHandle,
+} from './cloudflare-provider.js';
 import { DEADLINE_MS } from './deadlines.js';
+import { WORKTREE_CREDENTIAL_CONTAINMENT } from './physical-lifecycle.js';
+import { deriveSandboxAllocationId } from '../sandbox-id.js';
 
-function fakeSandbox(overrides: Partial<MeteredSandboxInstance> = {}): MeteredSandboxInstance {
+const PROVIDER_REF = encodeCloudflareProviderRef({
+  sandboxId: 'sbx_1',
+  containment: true,
+  instanceId: 'op_1',
+});
+
+function fakeSandbox(overrides: Partial<MeteredSandboxInstance> = {}): CloudflareSandboxHandle {
   return {
     renewActivityTimeout: () => undefined,
     destroy: async () => undefined,
     isContainerRunning: async () => true,
+    setOutboundHandler: async () => undefined,
     startProcess: async () => ({ id: 'proc_1' }),
     configureBilling: async () => undefined,
     isBillingBlocked: async () => false,
     ensureBillingAdmission: async () => ({ success: true }),
     ...overrides,
-  } as MeteredSandboxInstance;
+  } as unknown as CloudflareSandboxHandle;
 }
 
 const logicalId = 'ses-abcdef';
-const intent = { intentId: 'op_1', createdAt: 1_000, allocationName: 'ses-123abc' };
+const intent = {
+  intentId: 'op_1',
+  createdAt: 1_000,
+  allocationName: 'ses-123abc',
+  containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+};
 const billing = parseSandboxBillingInput({
   sandboxId: logicalId,
   subject: { type: 'user', id: 'owner_1' },
@@ -38,22 +56,29 @@ afterEach(() => vi.useRealTimers());
 describe('cloudflare provider adapter', () => {
   it('returns the physical identity without waking, then launches against that identity', async () => {
     const startProcess = vi.fn().mockResolvedValue({ id: 'proc_1' });
-    const getSandbox = vi.fn(() => fakeSandbox({ startProcess }));
+    const setOutboundHandler = vi.fn().mockResolvedValue(undefined);
+    const getSandbox = vi.fn(() => fakeSandbox({ startProcess, setOutboundHandler }));
     const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
+      sandboxId: intent.allocationName,
       getSandbox,
       destroy: async () => undefined,
     });
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId: intent.allocationName,
+      containment: true,
+      instanceId: intent.intentId,
+    });
     const created = await provider.create(intent);
-    expect(created).toEqual({ providerRef: intent.allocationName });
+    expect(created).toEqual({ providerRef });
     expect(getSandbox).not.toHaveBeenCalled();
     expect(startProcess).not.toHaveBeenCalled();
 
-    await provider.launch(intent.allocationName, {
+    await provider.launch(providerRef, {
       SANDBOX_CONTROL_URL: `wss://example.test/sandbox-control/${logicalId}`,
       SANDBOX_CONTROL_CREDENTIAL: 'test-credential',
     });
-    expect(getSandbox).toHaveBeenCalledWith(intent.allocationName);
+    expect(getSandbox).toHaveBeenCalledWith(intent.allocationName, { containment: true });
+    expect(setOutboundHandler).toHaveBeenCalledWith('managedScm');
     expect(startProcess).toHaveBeenCalledWith(
       'bun run /usr/local/bin/kilocode-control-wrapper.js',
       {
@@ -61,7 +86,7 @@ describe('cloudflare provider adapter', () => {
         env: {
           SANDBOX_CONTROL_URL: `wss://example.test/sandbox-control/${logicalId}`,
           SANDBOX_CONTROL_CREDENTIAL: 'test-credential',
-          PROVIDER_INSTANCE_ID: intent.allocationName,
+          PROVIDER_INSTANCE_ID: providerRef,
           WRAPPER_LOG_PATH: '/tmp/kilocode-control-wrapper.log',
         },
       }
@@ -76,7 +101,7 @@ describe('cloudflare provider adapter', () => {
       message: 'not enough credits',
     });
     const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
+      sandboxId: intent.allocationName,
       destroy: async () => undefined,
       getSandbox: () => fakeSandbox({ startProcess, ensureBillingAdmission }),
     });
@@ -93,7 +118,7 @@ describe('cloudflare provider adapter', () => {
     const sandbox = fakeSandbox({ startProcess });
     Reflect.deleteProperty(sandbox, 'ensureBillingAdmission');
     const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
+      sandboxId: intent.allocationName,
       destroy: async () => undefined,
       getSandbox: () => sandbox,
     });
@@ -116,12 +141,17 @@ describe('cloudflare provider adapter', () => {
       }),
     });
     const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
+      sandboxId: intent.allocationName,
       destroy: async () => undefined,
       getSandbox: () => sandbox,
     });
-    await provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } });
-    await provider.launch(intent.allocationName, {});
+    const created = await provider.create({
+      ...intent,
+      billing: { ...billing, enforcementRequested: false },
+    });
+    if (!('providerRef' in created)) throw new Error('Missing allocation');
+    expect(actions).toEqual(['attributed']);
+    await provider.launch(created.providerRef, {});
     expect(actions).toEqual(['attributed', 'started']);
     expect(configureBilling).toHaveBeenCalledWith({
       ...billing,
@@ -130,32 +160,181 @@ describe('cloudflare provider adapter', () => {
     });
   });
 
-  it('uses a distinct class-compatible allocation for create-stop-create', async () => {
-    const names: string[] = [];
-    const destroy = vi.fn(async () => undefined);
-    const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
-      destroy,
-      getSandbox: id => {
-        names.push(id);
-        return fakeSandbox();
-      },
+  it('awaits native outbound interception before exposing the wrapper control environment', async () => {
+    const installed = Promise.withResolvers<void>();
+    const actions: string[] = [];
+    const startProcess = vi.fn().mockImplementation(async () => {
+      actions.push('started');
+      return { id: 'proc_1' };
     });
-    const first = await deriveSandboxAllocationId(logicalId, 'first');
-    const second = await deriveSandboxAllocationId(logicalId, 'second');
-    await provider.create({ ...intent, allocationName: first });
-    await provider.launch(first, {});
-    await expect(provider.stop(first)).resolves.toBe('terminal');
-    await provider.create({ ...intent, intentId: 'second', allocationName: second });
-    await provider.launch(second, {});
-    expect(first).not.toBe(second);
-    expect(names).toEqual([first, second]);
-    expect(destroy).toHaveBeenCalledExactlyOnceWith(first);
-    expect(first).toMatch(/^ses-[a-f0-9]{48}$/);
-    expect(second).toMatch(/^ses-[a-f0-9]{48}$/);
+    const provider = createCloudflareProviderAdapter({
+      sandboxId: 'sbx_1',
+      destroy: async () => undefined,
+      getSandbox: () =>
+        fakeSandbox({
+          startProcess,
+          setOutboundHandler: vi.fn(async () => {
+            actions.push('installing');
+            await installed.promise;
+            actions.push('installed');
+          }),
+        }),
+    });
+    const launching = provider.launch(PROVIDER_REF, { PROVIDER_INSTANCE_ID: 'guest-supplied' });
+    expect(actions).toEqual(['installing']);
+    expect(startProcess).not.toHaveBeenCalled();
+    installed.resolve();
+    await launching;
+    expect(actions).toEqual(['installing', 'installed', 'started']);
+    expect(startProcess).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        env: expect.objectContaining({ PROVIDER_INSTANCE_ID: PROVIDER_REF }),
+      })
+    );
   });
 
-  it('observes a missing ref by its retained name without waking, and preserves settling uncertainty', async () => {
+  it.each(['setOutboundHandler', 'startProcess'] as const)(
+    'retains the exact contained allocation for native cleanup when %s fails',
+    async method => {
+      const startProcess = vi.fn().mockResolvedValue({ id: 'proc_1' });
+      const setOutboundHandler = vi.fn().mockResolvedValue(undefined);
+      const destroy = vi.fn(async () => undefined);
+      const getSandbox = vi.fn(() =>
+        fakeSandbox({
+          startProcess,
+          setOutboundHandler,
+          [method]: vi.fn().mockRejectedValue(new Error('startup failed')),
+        })
+      );
+      const provider = createCloudflareProviderAdapter({ sandboxId: 'sbx_1', getSandbox, destroy });
+      await expect(
+        provider.create({
+          intentId: 'op_1',
+          createdAt: 1000,
+          containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+        })
+      ).resolves.toEqual({ providerRef: PROVIDER_REF });
+      await expect(provider.launch(PROVIDER_REF, {})).rejects.toThrow('startup failed');
+      if (method === 'setOutboundHandler') expect(startProcess).not.toHaveBeenCalled();
+      await expect(provider.stop(PROVIDER_REF)).resolves.toBe('terminal');
+      expect(getSandbox).toHaveBeenCalledExactlyOnceWith('sbx_1', { containment: true });
+      expect(destroy).toHaveBeenCalledExactlyOnceWith('sbx_1', { containment: true });
+    }
+  );
+
+  it.each([
+    { ref: PROVIDER_REF, containment: true },
+    { ref: 'sbx_1', containment: false },
+  ])(
+    'observes, renews, and destroys only the encoded namespace without waking',
+    async ({ ref, containment }) => {
+      const isContainerRunning = vi.fn().mockResolvedValue(true);
+      const startProcess = vi.fn();
+      const setOutboundHandler = vi.fn();
+      const renewActivityTimeout = vi.fn();
+      const sdkDestroy = vi.fn();
+      const destroy = vi.fn(async () => undefined);
+      const getSandbox = vi.fn(() =>
+        fakeSandbox({
+          isContainerRunning,
+          startProcess,
+          setOutboundHandler,
+          renewActivityTimeout,
+          destroy: sdkDestroy,
+        })
+      );
+      const provider = createCloudflareProviderAdapter({ sandboxId: 'sbx_1', getSandbox, destroy });
+      await expect(provider.observe(ref)).resolves.toEqual({ status: 'active', providerRef: ref });
+      isContainerRunning.mockResolvedValue(false);
+      await expect(provider.observe(ref)).resolves.toEqual({
+        status: 'terminal',
+        providerRef: ref,
+      });
+      isContainerRunning.mockRejectedValue(new Error('inspection failed'));
+      await expect(provider.observe(ref)).resolves.toEqual({ status: 'unknown', providerRef: ref });
+      await provider.ensureLeaseAtLeast(ref, 360_000);
+      await expect(provider.stop(ref)).resolves.toBe('terminal');
+      expect(getSandbox).toHaveBeenCalledWith('sbx_1', { containment });
+      expect(destroy).toHaveBeenCalledWith('sbx_1', { containment });
+      expect(renewActivityTimeout).toHaveBeenCalledOnce();
+      expect(startProcess).not.toHaveBeenCalled();
+      expect(setOutboundHandler).not.toHaveBeenCalled();
+      expect(sdkDestroy).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps missing native destruction retryable without using SDK cleanup', async () => {
+    const sdkDestroy = vi.fn(async () => undefined);
+    const sandbox = fakeSandbox({ destroy: sdkDestroy });
+    const getSandbox = vi.fn(() => sandbox);
+    const provider = createCloudflareProviderAdapter({
+      sandboxId: 'sbx_1',
+      getSandbox,
+      destroy: () => forceDestroyControlPlaneSandbox(sandbox),
+    });
+    await expect(provider.stop(PROVIDER_REF)).resolves.toBe('retryable');
+    expect(sdkDestroy).not.toHaveBeenCalled();
+    expect(getSandbox).not.toHaveBeenCalled();
+  });
+
+  it('uses distinct class-compatible native allocations after confirmed cleanup', async () => {
+    const first = await deriveSandboxAllocationId(logicalId, 'first');
+    const second = await deriveSandboxAllocationId(logicalId, 'second');
+    const names: string[] = [];
+    const destroy = vi.fn(async () => undefined);
+    for (const [name, intentId] of [
+      [first, 'first'],
+      [second, 'second'],
+    ]) {
+      const provider = createCloudflareProviderAdapter({
+        sandboxId: name,
+        destroy,
+        getSandbox: id => {
+          names.push(id);
+          return fakeSandbox();
+        },
+      });
+      const created = await provider.create({ ...intent, allocationName: name, intentId });
+      if (!('providerRef' in created)) throw new Error('Missing allocation');
+      expect(decodeCloudflareProviderRef(created.providerRef)).toEqual({
+        sandboxId: name,
+        containment: true,
+        instanceId: intentId,
+      });
+      await provider.launch(created.providerRef, {});
+      if (name === first)
+        await expect(provider.stop(created.providerRef)).resolves.toBe('terminal');
+    }
+    expect(names).toEqual([first, second]);
+    expect(first).not.toBe(second);
+    expect(first).toMatch(/^ses-[a-f0-9]{48}$/);
+    expect(second).toMatch(/^ses-[a-f0-9]{48}$/);
+    expect(destroy).toHaveBeenCalledExactlyOnceWith(first, { containment: true });
+  });
+
+  it('uses the creation intent as the instance fence for each replacement', async () => {
+    const getSandbox = vi.fn(() => fakeSandbox());
+    const provider = createCloudflareProviderAdapter({
+      sandboxId: 'sbx_1',
+      getSandbox,
+      destroy: async () => undefined,
+    });
+    const first = await provider.create({ intentId: 'op_1', createdAt: 1_000 });
+    const second = await provider.create({ intentId: 'op_2', createdAt: 1_000 });
+
+    expect(first).toEqual({ providerRef: PROVIDER_REF });
+    expect(second).toEqual({
+      providerRef: encodeCloudflareProviderRef({
+        sandboxId: 'sbx_1',
+        containment: true,
+        instanceId: 'op_2',
+      }),
+    });
+    expect(first).not.toEqual(second);
+  });
+
+  it('observes a missing ref by its retained intent without waking, and preserves settling uncertainty', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(intent.createdAt);
     let running = true;
@@ -167,32 +346,76 @@ describe('cloudflare provider adapter', () => {
       })
     );
     const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
+      sandboxId: intent.allocationName,
       getSandbox,
       destroy: async () => undefined,
     });
+    const expectedRef = encodeCloudflareProviderRef({
+      sandboxId: intent.allocationName,
+      containment: true,
+      instanceId: intent.intentId,
+    });
     await expect(provider.observe(null, intent)).resolves.toEqual({
       status: 'active',
-      providerRef: intent.allocationName,
+      providerRef: expectedRef,
     });
     running = false;
     await expect(provider.observe(null, intent)).resolves.toEqual({
       status: 'unknown',
-      providerRef: intent.allocationName,
+      providerRef: expectedRef,
     });
     vi.setSystemTime(intent.createdAt + DEADLINE_MS.createSettle);
     await expect(provider.observe(null, intent)).resolves.toEqual({
       status: 'terminal',
-      providerRef: intent.allocationName,
+      providerRef: expectedRef,
     });
     await expect(provider.observe(null)).resolves.toEqual({ status: 'unknown' });
-    expect(getSandbox).toHaveBeenCalledWith(intent.allocationName);
+    expect(getSandbox).toHaveBeenCalledWith(intent.allocationName, { containment: true });
     expect(startProcess).not.toHaveBeenCalled();
   });
 
-  it('keeps failed observations unknown rather than treating them as physical death', async () => {
+  it('keeps historical null-reference cleanup in its original uncontained namespace', async () => {
+    const getSandbox = vi.fn(() => fakeSandbox());
+    const destroy = vi.fn(async () => undefined);
+    const provider = createCloudflareProviderAdapter({ sandboxId: logicalId, getSandbox, destroy });
+    const legacyIntent = { intentId: 'legacy', createdAt: 1000 };
+    await expect(provider.observe(null, legacyIntent)).resolves.toEqual({
+      status: 'active',
+      providerRef: logicalId,
+    });
+    await expect(provider.stop(null, legacyIntent)).resolves.toBe('terminal');
+    expect(getSandbox).toHaveBeenCalledExactlyOnceWith(logicalId, { containment: false });
+    expect(destroy).toHaveBeenCalledExactlyOnceWith(logicalId, { containment: false });
+  });
+
+  it('keeps unavailable or failed native lookups unknown', async () => {
+    const getSandbox = vi.fn(() => fakeSandbox({ isContainerRunning: undefined }));
     const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
+      sandboxId: 'sbx_1',
+      getSandbox,
+      destroy: async () => undefined,
+    });
+    await expect(provider.observe(PROVIDER_REF)).resolves.toEqual({
+      status: 'unknown',
+      providerRef: PROVIDER_REF,
+    });
+    getSandbox.mockImplementation(() => {
+      throw new Error('lookup failed');
+    });
+    await expect(provider.observe(PROVIDER_REF)).resolves.toEqual({
+      status: 'unknown',
+      providerRef: PROVIDER_REF,
+    });
+  });
+
+  it('keeps failed observations unknown rather than treating them as physical death', async () => {
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId: intent.allocationName,
+      containment: true,
+      instanceId: intent.intentId,
+    });
+    const provider = createCloudflareProviderAdapter({
+      sandboxId: intent.allocationName,
       destroy: async () => undefined,
       getSandbox: () =>
         fakeSandbox({
@@ -201,9 +424,9 @@ describe('cloudflare provider adapter', () => {
           },
         }),
     });
-    await expect(provider.observe(intent.allocationName)).resolves.toEqual({
+    await expect(provider.observe(providerRef)).resolves.toEqual({
       status: 'unknown',
-      providerRef: intent.allocationName,
+      providerRef,
     });
   });
 
@@ -211,59 +434,58 @@ describe('cloudflare provider adapter', () => {
     let running = true;
     const startProcess = vi.fn();
     const destroy = vi.fn().mockRejectedValue(new Error('provider unavailable'));
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId: intent.allocationName,
+      containment: true,
+      instanceId: intent.intentId,
+    });
     const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
+      sandboxId: intent.allocationName,
       destroy,
       getSandbox: () => fakeSandbox({ startProcess, isContainerRunning: async () => running }),
     });
-    await expect(provider.stop(intent.allocationName)).resolves.toBe('retryable');
-    await expect(provider.observe(intent.allocationName)).resolves.toEqual({
+    await expect(provider.stop(providerRef)).resolves.toBe('retryable');
+    await expect(provider.observe(providerRef)).resolves.toEqual({
       status: 'active',
-      providerRef: intent.allocationName,
+      providerRef,
     });
     running = false;
-    await expect(provider.observe(intent.allocationName)).resolves.toEqual({
+    await expect(provider.observe(providerRef)).resolves.toEqual({
       status: 'terminal',
-      providerRef: intent.allocationName,
+      providerRef,
     });
     expect(destroy).toHaveBeenCalledTimes(1);
     expect(startProcess).not.toHaveBeenCalled();
   });
 
-  it.each([
-    { ref: intent.allocationName, createIntent: intent, expected: intent.allocationName },
-    { ref: null, createIntent: intent, expected: intent.allocationName },
-    {
-      ref: null,
-      createIntent: { intentId: 'older-allocation', createdAt: 1_000 },
-      expected: logicalId,
-    },
-  ])(
-    'destroys allocation $expected through a raw namespace stub without SDK acquisition',
-    async ({ ref, createIntent, expected }) => {
-      const runtime = {
-        running: true,
-        async forceDestroyForControlPlane() {
-          this.running = false;
-        },
-      };
-      const namespace = { getByName: vi.fn((_id: string) => runtime) };
-      const getSandbox = vi.fn(() => {
-        throw new Error('SDK acquisition must not run during physical destruction');
-      });
-      const provider = createCloudflareProviderAdapter({
-        sandboxId: logicalId,
-        getSandbox,
-        destroy: id => forceDestroyControlPlaneSandbox(namespace.getByName(id)),
-      });
+  it('destroys allocation through a raw namespace stub without SDK acquisition', async () => {
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId: intent.allocationName,
+      containment: true,
+      instanceId: intent.intentId,
+    });
+    const runtime = {
+      running: true,
+      async forceDestroyForControlPlane() {
+        this.running = false;
+      },
+    };
+    const namespace = { getByName: vi.fn((_id: string) => runtime) };
+    const getSandbox = vi.fn(() => {
+      throw new Error('SDK acquisition must not run during physical destruction');
+    });
+    const provider = createCloudflareProviderAdapter({
+      sandboxId: intent.allocationName,
+      getSandbox,
+      destroy: (id, _opts) => forceDestroyControlPlaneSandbox(namespace.getByName(id)),
+    });
 
-      await expect(provider.stop(ref, createIntent)).resolves.toBe('terminal');
+    await expect(provider.stop(providerRef)).resolves.toBe('terminal');
 
-      expect(runtime.running).toBe(false);
-      expect(namespace.getByName).toHaveBeenCalledExactlyOnceWith(expected);
-      expect(getSandbox).not.toHaveBeenCalled();
-    }
-  );
+    expect(runtime.running).toBe(false);
+    expect(namespace.getByName).toHaveBeenCalledExactlyOnceWith(intent.allocationName);
+    expect(getSandbox).not.toHaveBeenCalled();
+  });
 
   it('does not destroy anything without a retained allocation identity', async () => {
     const destroy = vi.fn(async () => undefined);
@@ -276,42 +498,31 @@ describe('cloudflare provider adapter', () => {
     expect(getSandbox).not.toHaveBeenCalled();
   });
 
-  it('keeps a missing native capability retryable without falling back to SDK destruction', async () => {
-    const sdkDestroy = vi.fn(async () => undefined);
-    const sandbox = fakeSandbox({ destroy: sdkDestroy });
-    const getSandbox = vi.fn(() => sandbox);
-    const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
-      getSandbox,
-      destroy: () => forceDestroyControlPlaneSandbox(sandbox),
-    });
-
-    await expect(provider.stop(intent.allocationName)).resolves.toBe('retryable');
-
-    expect(sdkDestroy).not.toHaveBeenCalled();
-    expect(getSandbox).not.toHaveBeenCalled();
-  });
-
   it('does not interpret a lost native stop acknowledgement as terminal success', async () => {
     let running = true;
     const startProcess = vi.fn();
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId: intent.allocationName,
+      containment: true,
+      instanceId: intent.intentId,
+    });
     const destroy = vi.fn(async () => {
       running = false;
       throw new Error('Native destroy acknowledgement lost');
     });
     const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
+      sandboxId: intent.allocationName,
       destroy,
       getSandbox: () => fakeSandbox({ startProcess, isContainerRunning: async () => running }),
     });
 
-    await expect(provider.stop(intent.allocationName)).resolves.toBe('retryable');
-    await expect(provider.observe(intent.allocationName)).resolves.toEqual({
+    await expect(provider.stop(providerRef)).resolves.toBe('retryable');
+    await expect(provider.observe(providerRef)).resolves.toEqual({
       status: 'terminal',
-      providerRef: intent.allocationName,
+      providerRef,
     });
 
-    expect(destroy).toHaveBeenCalledExactlyOnceWith(intent.allocationName);
+    expect(destroy).toHaveBeenCalledExactlyOnceWith(intent.allocationName, { containment: true });
     expect(startProcess).not.toHaveBeenCalled();
   });
 
@@ -320,6 +531,11 @@ describe('cloudflare provider adapter', () => {
     async runningAfterIssuance => {
       vi.useFakeTimers();
       let running = true;
+      const providerRef = encodeCloudflareProviderRef({
+        sandboxId: intent.allocationName,
+        containment: true,
+        instanceId: intent.intentId,
+      });
       const acknowledgement = Promise.withResolvers<void>();
       const destroy = vi.fn(async () => {
         running = runningAfterIssuance;
@@ -328,12 +544,12 @@ describe('cloudflare provider adapter', () => {
       });
       const getSandbox = vi.fn(() => fakeSandbox({ isContainerRunning: async () => running }));
       const provider = createCloudflareProviderAdapter({
-        sandboxId: logicalId,
+        sandboxId: intent.allocationName,
         getSandbox,
         destroy,
       });
       const settled = vi.fn();
-      const stopping = provider.stop(intent.allocationName).then(settled);
+      const stopping = provider.stop(providerRef).then(settled);
       const timedOut = expect(
         withTimeout(stopping, DEADLINE_MS.stopAttempt, 'Native destroy acknowledgement timed out')
       ).rejects.toThrow('Native destroy acknowledgement timed out');
@@ -342,11 +558,11 @@ describe('cloudflare provider adapter', () => {
       await timedOut;
 
       expect(settled).not.toHaveBeenCalled();
-      expect(destroy).toHaveBeenCalledExactlyOnceWith(intent.allocationName);
+      expect(destroy).toHaveBeenCalledExactlyOnceWith(intent.allocationName, { containment: true });
       expect(getSandbox).not.toHaveBeenCalled();
-      await expect(provider.observe(intent.allocationName)).resolves.toEqual({
+      await expect(provider.observe(providerRef)).resolves.toEqual({
         status: runningAfterIssuance ? 'active' : 'terminal',
-        providerRef: intent.allocationName,
+        providerRef,
       });
       acknowledgement.resolve();
       await stopping;
@@ -355,33 +571,131 @@ describe('cloudflare provider adapter', () => {
   );
 
   it('propagates launch failure without losing the known allocation', async () => {
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId: intent.allocationName,
+      containment: true,
+      instanceId: intent.intentId,
+    });
     const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
+      sandboxId: intent.allocationName,
       destroy: async () => undefined,
       getSandbox: () =>
         fakeSandbox({ startProcess: vi.fn().mockRejectedValue(new Error('launch failed')) }),
     });
-    await expect(provider.create(intent)).resolves.toEqual({ providerRef: intent.allocationName });
-    await expect(provider.launch(intent.allocationName, {})).rejects.toThrow('launch failed');
-    await expect(provider.observe(intent.allocationName)).resolves.toEqual({
+    await expect(provider.create(intent)).resolves.toEqual({ providerRef });
+    await expect(provider.launch(providerRef, {})).rejects.toThrow('launch failed');
+    await expect(provider.observe(providerRef)).resolves.toEqual({
       status: 'active',
-      providerRef: intent.allocationName,
+      providerRef,
     });
   });
 
   it('renews the lease on the physical ref', async () => {
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId: intent.allocationName,
+      containment: true,
+      instanceId: intent.intentId,
+    });
     const renewed: string[] = [];
     const provider = createCloudflareProviderAdapter({
-      sandboxId: logicalId,
+      sandboxId: intent.allocationName,
       destroy: async () => undefined,
-      getSandbox: id =>
+      getSandbox: (id, _opts) =>
         fakeSandbox({
           renewActivityTimeout: () => {
             renewed.push(id);
           },
         }),
     });
-    await provider.ensureLeaseAtLeast(intent.allocationName, 360_000);
+    await provider.ensureLeaseAtLeast(providerRef, 360_000);
     expect(renewed).toEqual([intent.allocationName]);
+  });
+
+  it.each([
+    '',
+    'not-json',
+    'sbx_other',
+    JSON.stringify({ sandboxId: 'sbx_1', containment: true }),
+    JSON.stringify({ sandboxId: 'sbx_1', containment: false, instanceId: 'op_1' }),
+    encodeCloudflareProviderRef({
+      sandboxId: 'sbx_other',
+      containment: true,
+      instanceId: 'op_1',
+    }),
+  ])('never looks up a sandbox for malformed or cross-sandbox refs', async ref => {
+    const getSandbox = vi.fn(() => fakeSandbox());
+    const provider = createCloudflareProviderAdapter({
+      sandboxId: 'sbx_1',
+      getSandbox,
+      destroy: async () => undefined,
+    });
+
+    await expect(provider.observe(ref)).resolves.toEqual({ status: 'unknown' });
+    await expect(provider.stop(ref)).resolves.toBe('retryable');
+    await provider.ensureLeaseAtLeast(ref, 360_000);
+    await provider.logs(ref);
+
+    expect(getSandbox).not.toHaveBeenCalled();
+  });
+
+  it('treats a missing ref without an intent as unknown', async () => {
+    const getSandbox = vi.fn(() => fakeSandbox());
+    const provider = createCloudflareProviderAdapter({
+      sandboxId: 'sbx_1',
+      getSandbox,
+      destroy: async () => undefined,
+    });
+
+    await expect(provider.observe(null)).resolves.toEqual({ status: 'unknown' });
+    expect(getSandbox).not.toHaveBeenCalled();
+  });
+
+  it('keeps historical cleanup separate from a newly created containment instance', async () => {
+    const destroy = vi.fn().mockResolvedValue(undefined);
+    const getSandbox = vi.fn(() => fakeSandbox({ destroy }));
+    const provider = createCloudflareProviderAdapter({
+      sandboxId: 'sbx_1',
+      getSandbox,
+      destroy: async () => undefined,
+    });
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId: 'sbx_1',
+      containment: true,
+      instanceId: 'op_1',
+    });
+
+    const created = await provider.create({ intentId: 'op_1', createdAt: 1_000 });
+    expect(created).toEqual({ providerRef });
+  });
+});
+
+describe('cloudflare provider references', () => {
+  it('round-trips the containment namespace and exact creation intent', () => {
+    expect(decodeCloudflareProviderRef(PROVIDER_REF)).toEqual({
+      sandboxId: 'sbx_1',
+      containment: true,
+      instanceId: 'op_1',
+    });
+  });
+
+  it.each([
+    null,
+    '',
+    'sbx_1',
+    '{',
+    'null',
+    '[]',
+    '{}',
+    JSON.stringify({ sandboxId: 'sbx_1', containment: true }),
+    JSON.stringify({ sandboxId: 'sbx_1', containment: true, instanceId: '' }),
+    JSON.stringify({ sandboxId: 'sbx_1', containment: true, instanceId: 1 }),
+    JSON.stringify({ sandboxId: 'sbx_1', containment: 'true', instanceId: 'op_1' }),
+    JSON.stringify({ sandboxId: 'sbx_1', containment: false, instanceId: 'op_1' }),
+    JSON.stringify({ sandboxId: '', containment: true, instanceId: 'op_1' }),
+    JSON.stringify({ sandboxId: 'sbx_1', containment: true, instanceId: 'op_1', extra: true }),
+    JSON.stringify({ sandboxId: 'a'.repeat(257), containment: true, instanceId: 'op_1' }),
+    JSON.stringify({ sandboxId: 'sbx_1', containment: true, instanceId: 'a'.repeat(129) }),
+  ])('rejects incomplete or invalid encoded refs', ref => {
+    expect(decodeCloudflareProviderRef(ref)).toBeNull();
   });
 });

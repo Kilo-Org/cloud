@@ -3,6 +3,7 @@ import { getSandbox } from '@cloudflare/sandbox';
 import { withTimeout } from '@kilocode/worker-utils';
 import { z } from 'zod';
 import type { Env } from '../types.js';
+import { getSandboxProvider, type SessionMetadata } from './session-metadata.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import { logger } from '../logger.js';
 import {
@@ -24,6 +25,7 @@ import {
   sessionRequestIdentitySchema,
   wrapperInstanceIdSchema,
   type ResponseFrame,
+  type SessionAttachPayload,
   type SandboxHeartbeatPayload,
   type SessionEventIdentity,
   type SessionEventPayload,
@@ -50,6 +52,8 @@ import {
   observe,
   recordStopAttempt,
   sameAllocation,
+  WORKTREE_CREDENTIAL_CONTAINMENT,
+  type CredentialContainmentRequirements,
   type ObserveResult,
   type PhysicalRecord,
 } from '../sandbox-control/physical-lifecycle.js';
@@ -88,7 +92,17 @@ import {
   savePhysicalRecord,
   saveRouteTable,
   saveTransitionLog,
+  loadSessionCredentialGrants,
+  saveSessionCredentialGrants,
 } from '../sandbox-control/durable-state.js';
+import {
+  buildControlNetworkPolicy,
+  prepareSessionCredentials as prepareCredentials,
+  removeSessionCredentialMembership,
+  resolveSessionCredential,
+  type SessionCredentialGrant,
+} from '../sandbox-control/session-credentials.js';
+import { parseControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import { withDORetry } from '../utils/do-retry.js';
 import type {
   ProviderAdapter,
@@ -100,8 +114,15 @@ import {
   planReconciliation,
   shouldRearmReconciliation,
 } from '../sandbox-control/reconciliation.js';
-import { createCloudflareProviderAdapter } from '../sandbox-control/cloudflare-provider.js';
-import { createVercelProviderAdapter } from '../sandbox-control/vercel-provider.js';
+import {
+  createCloudflareProviderAdapter,
+  decodeCloudflareProviderRef,
+} from '../sandbox-control/cloudflare-provider.js';
+import {
+  createVercelProviderAdapter,
+  decodeVercelProviderRef,
+} from '../sandbox-control/vercel-provider.js';
+import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
   parseVercelSandboxRuntimeConfig,
   resolveVercelSandboxRuntimeConfig,
@@ -114,7 +135,11 @@ import {
   type SandboxBillingInput,
 } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
-import { deriveSandboxAllocationId, getSandboxNamespace } from '../sandbox-id.js';
+import {
+  deriveSandboxAllocationId,
+  getOutboundContainerId,
+  getSandboxNamespace,
+} from '../sandbox-id.js';
 import {
   validateTerminalBillingRuntime,
   type SandboxTerminalAccessInput,
@@ -130,6 +155,8 @@ const DIAGNOSTIC_BUNDLE_KEY = 'diagnostic_bundle';
 const PROVIDER_KIND_KEY = 'provider_kind';
 const BILLING_INPUT_KEY = 'billing_input';
 const ACQUISITION_RECEIPTS_KEY = 'acquisition_receipts';
+const CREDENTIAL_POLICY_DIRTY_KEY = 'credential_policy_dirty';
+const TERMINAL_CREDENTIAL_RENEWAL_WINDOW_MS = 60 * 60 * 1000;
 
 const sandboxAcquisitionSchema = z.object({
   id: z.string().min(1).max(128),
@@ -169,6 +196,7 @@ type TerminalRuntimeSnapshot = {
   physical: PhysicalRecord;
   provider: AgentSandboxProvider;
   route: SessionRoute;
+  grant: SessionCredentialGrant;
 };
 
 type TerminalRuntimeRejection = {
@@ -194,6 +222,7 @@ export class SandboxControl extends DurableObject<Env> {
   private readyConnectionId: string | null = null;
   private providerKind: AgentSandboxProvider = 'cloudflare';
   private readonly sessionForwardChains = new Map<string, Promise<void>>();
+  private credentialUpdates: Promise<void> = Promise.resolve();
   private provider: ProviderAdapter;
   private stopAttemptInFlight: {
     physical: PhysicalRecord;
@@ -212,6 +241,7 @@ export class SandboxControl extends DurableObject<Env> {
       new WebSocketRequestResponsePair(SANDBOX_CONTROL_AUTO_PING, SANDBOX_CONTROL_AUTO_PONG)
     );
     this.socketHandler = createSandboxControlSocketHandler(ctx, this.sandboxId, undefined, {
+      validateHandshake: providerInstanceId => this.validateHandshake(providerInstanceId),
       onHandshakeComplete: identity => this.onHandshakeComplete(identity),
       onReady: identity => this.onWrapperReady(identity),
       onHeartbeat: (payload, identity) => this.onHeartbeat(payload, identity),
@@ -466,14 +496,185 @@ export class SandboxControl extends DurableObject<Env> {
     return { quarantined: true };
   }
 
+  async prepareSessionCredentials(input: {
+    ownerId: string;
+    sessionId: string;
+  }): Promise<SessionAttachPayload> {
+    await this.initializeOwner(input.ownerId);
+    return this.withCredentialUpdate(() => this.prepareOwnedSessionCredentials(input));
+  }
+
+  private async prepareOwnedSessionCredentials(
+    input: { ownerId: string; sessionId: string },
+    terminal?: { access: SandboxTerminalAccessInput; runtime: TerminalRuntimeSnapshot },
+    deadlineAt?: number
+  ): Promise<SessionAttachPayload> {
+    if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+      throw new Error('Sandbox credential preparation expired');
+    }
+    const metadata = await this.readCredentialMetadata(input);
+    const provider = getSandboxProvider(metadata);
+    await this.pinProvider(provider);
+    const physical = await loadPhysicalRecord(this.ctx.storage);
+    if (!this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)) {
+      throw new Error('Sandbox credential containment is unavailable');
+    }
+    const outboundContainerId =
+      provider === 'cloudflare'
+        ? getOutboundContainerId(
+            this.env,
+            decodeCloudflareProviderRef(physical.providerRef)?.sandboxId ??
+              physical.createIntent?.allocationName ??
+              this.sandboxId,
+            { managedScmContainment: true }
+          )
+        : undefined;
+    const grants = await loadSessionCredentialGrants(this.ctx.storage);
+    const scopeId = metadata.workspace?.worktreeId ?? metadata.identity.sessionId;
+    const existing = grants.find(grant => grant.scopeId === scopeId);
+    const prepared = await prepareCredentials({
+      env: this.env,
+      metadata,
+      sandboxId: this.sandboxId,
+      ...(outboundContainerId ? { outboundContainerId } : {}),
+      ...(existing ? { existing } : {}),
+    });
+    if (
+      grants.some(
+        grant =>
+          grant.scopeId !== scopeId &&
+          (grant.directory === prepared.grant.directory ||
+            grant.members.some(
+              member =>
+                member.sessionId === metadata.identity.sessionId ||
+                member.kiloSessionId === metadata.auth.kiloSessionId
+            ))
+      )
+    ) {
+      throw new Error('Worktree credential scope mismatch');
+    }
+    const current = await this.readCredentialMetadata(input);
+    if (
+      JSON.stringify([current.identity, current.auth, current.repository, current.workspace]) !==
+      JSON.stringify([metadata.identity, metadata.auth, metadata.repository, metadata.workspace])
+    ) {
+      throw new Error('Session changed during credential preparation');
+    }
+    await this.ctx.storage.transaction(async () => {
+      const currentPhysical = await loadPhysicalRecord(this.ctx.storage);
+      if (
+        (deadlineAt !== undefined && Date.now() >= deadlineAt) ||
+        !sameAllocation(physical, currentPhysical) ||
+        !this.matchesContainment(currentPhysical, WORKTREE_CREDENTIAL_CONTAINMENT)
+      ) {
+        throw new Error('Sandbox changed during credential preparation');
+      }
+      if (terminal) {
+        const currentRuntime = await this.readTerminalRuntime(terminal.access, true);
+        if (
+          !currentRuntime.allowed ||
+          !this.sameTerminalRuntime(currentRuntime, terminal.runtime) ||
+          prepared.grant.scopeId !== terminal.runtime.grant.scopeId ||
+          prepared.grant.kilo.alias !== terminal.runtime.grant.kilo.alias
+        ) {
+          throw new Error('Terminal runtime changed during credential preparation');
+        }
+      }
+      const updated = [...grants.filter(grant => grant.scopeId !== scopeId), prepared.grant];
+      if (provider === 'vercel') await this.ctx.storage.put(CREDENTIAL_POLICY_DIRTY_KEY, true);
+      await saveSessionCredentialGrants(this.ctx.storage, updated);
+      if (provider === 'vercel') {
+        const deadlines = await loadDeadlines(this.ctx.storage);
+        const next = armDeadline(
+          deadlines,
+          'credentialExpiry',
+          Math.min(...updated.map(grant => grant.expiresAt))
+        );
+        await saveDeadlines(this.ctx.storage, next);
+        if (deadlines.credentialExpiry === undefined) {
+          await this.appendLog(deadlineTransition(Date.now(), 'credentialExpiry', 'armed'));
+        }
+        await this.scheduleAlarm(next);
+      }
+    });
+    return prepared.payload;
+  }
+
+  async resolveCredential(input: {
+    credential: string;
+    outboundContainerId: string;
+    url: string;
+    method: string;
+  }): Promise<{ credential: string; organizationId?: string } | null> {
+    return this.withCredentialUpdate(async () => {
+      try {
+        const alias = parseControlPlaneCredential(input.credential);
+        const physical = await loadPhysicalRecord(this.ctx.storage);
+        const native = decodeCloudflareProviderRef(physical.providerRef);
+        if (
+          alias?.sandboxId !== this.sandboxId ||
+          this.providerKind !== 'cloudflare' ||
+          physical.state !== 'running' ||
+          !native ||
+          input.outboundContainerId !==
+            getOutboundContainerId(this.env, native.sandboxId, { managedScmContainment: true })
+        ) {
+          return null;
+        }
+        if (!this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)) return null;
+        const ownerId = await this.requireOwner();
+        const grants = await loadSessionCredentialGrants(this.ctx.storage);
+        for (const grant of grants) {
+          const expected = alias.purpose === 'kilo' ? grant.kilo.alias : grant.scm?.alias;
+          if (
+            grant.userId !== ownerId ||
+            !expected ||
+            !(await sandboxCredentialMatchesHash(
+              input.credential,
+              await hashSandboxCredential(expected)
+            ))
+          ) {
+            continue;
+          }
+          const resolved = await resolveSessionCredential({ env: this.env, grant, ...input });
+          if (!resolved) return null;
+          return await this.ctx.storage.transaction(async () => {
+            const current = await loadPhysicalRecord(this.ctx.storage);
+            if (
+              current.providerRef !== physical.providerRef ||
+              !sameAllocation(current, physical) ||
+              !this.matchesContainment(current, WORKTREE_CREDENTIAL_CONTAINMENT) ||
+              Date.now() >= resolved.grant.expiresAt
+            ) {
+              return null;
+            }
+            await saveSessionCredentialGrants(
+              this.ctx.storage,
+              grants.map(value => (value.scopeId === grant.scopeId ? resolved.grant : value))
+            );
+            return {
+              credential: resolved.credential,
+              ...(alias.purpose === 'kilo'
+                ? { organizationId: resolved.organizationId ?? '' }
+                : {}),
+            };
+          });
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    });
+  }
+
   async ensureReady(input: {
     ownerId: string;
+    sessionId: string;
     provider?: AgentSandboxProvider;
-    kiloToken?: string;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;
-  }): Promise<SandboxControlStatus> {
+  }): Promise<SandboxControlStatus & { attachment?: SessionAttachPayload }> {
     const acquisition =
       input.acquisition === undefined
         ? undefined
@@ -512,18 +713,96 @@ export class SandboxControl extends DurableObject<Env> {
         physical = await this.observeCurrentProvider(physical);
       }
       if (nextEnsureReadyStep(physical.state, allowCreate) === 'create') {
-        const intentId = crypto.randomUUID();
-        const allocationName = await deriveSandboxAllocationId(this.sandboxId, intentId);
-        physical = await this.claimCreate(intentId, this.provider.resumable, allocationName);
-        creating = true;
+        physical = await this.withCredentialUpdate(async () => {
+          const current = await loadPhysicalRecord(this.ctx.storage, this.provider.resumable);
+          if (nextEnsureReadyStep(current.state, allowCreate) !== 'create') return current;
+          const intentId = crypto.randomUUID();
+          const allocationName = await deriveSandboxAllocationId(this.sandboxId, intentId);
+          const claimed = await this.claimCreate(
+            intentId,
+            this.provider.resumable,
+            allocationName,
+            WORKTREE_CREDENTIAL_CONTAINMENT
+          );
+          creating = true;
+          return claimed;
+        });
       }
     }
     const currentStatus = () =>
       acquisition ? this.acquisitionStatus(acquisition, physical) : this.getStatus();
+    if (creating) this.provider = this.createProviderAdapter(this.providerKind, physical);
+    if (physical.stopTombstone || (physical.state !== 'creating' && physical.state !== 'running')) {
+      return currentStatus();
+    }
+    if (!this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)) {
+      await this.beginStop('credential_containment_unavailable');
+      await this.recordStopAttempt();
+      return currentStatus();
+    }
+    if (!creating && physical.state === 'running' && physical.providerRef !== null) {
+      await withTimeout(
+        this.provider.ensureBillingAdmission(physical.providerRef, billing),
+        DEADLINE_MS.stopAttempt,
+        'Sandbox billing admission timed out'
+      );
+      const current = await loadPhysicalRecord(this.ctx.storage);
+      if (
+        !sameAllocation(current, physical) ||
+        current.providerRef !== physical.providerRef ||
+        current.state !== 'running' ||
+        current.stopTombstone
+      ) {
+        throw new Error('Sandbox runtime changed during billing admission');
+      }
+    }
+    const preparationDeadline = Math.min(
+      acquisition?.deadlineAt ?? Number.MAX_SAFE_INTEGER,
+      Date.now() + DEADLINE_MS.startup
+    );
+    let attachment: SessionAttachPayload;
+    try {
+      attachment = await withTimeout(
+        this.withCredentialUpdate(() =>
+          withTimeout(
+            this.prepareOwnedSessionCredentials(
+              { ownerId, sessionId: input.sessionId },
+              undefined,
+              preparationDeadline
+            ),
+            Math.max(1, preparationDeadline - Date.now()),
+            'Sandbox credential preparation timed out'
+          )
+        ),
+        Math.max(1, preparationDeadline - Date.now()),
+        'Sandbox credential preparation timed out'
+      );
+    } catch (error) {
+      const current = await loadPhysicalRecord(this.ctx.storage);
+      if (
+        creating &&
+        sameAllocation(current, physical) &&
+        !current.stopTombstone &&
+        (current.state === 'creating' || current.state === 'running')
+      ) {
+        await this.markFailed();
+      }
+      throw error;
+    }
     if (creating) {
       this.provider = this.createProviderAdapter(this.providerKind, physical);
       const intent = physical.createIntent;
       if (!intent) throw new Error('Sandbox create intent is unavailable');
+      const networkPolicy =
+        this.providerKind === 'vercel'
+          ? await this.withCredentialUpdate(async () =>
+              buildControlNetworkPolicy(
+                (await loadSessionCredentialGrants(this.ctx.storage)).filter(
+                  grant => grant.expiresAt > Date.now()
+                )
+              )
+            )
+          : undefined;
       const credential = generateSandboxCredential();
       const credentialHash = await hashSandboxCredential(credential);
       const beforeCreate = await loadPhysicalRecord(this.ctx.storage);
@@ -532,10 +811,15 @@ export class SandboxControl extends DurableObject<Env> {
       }
       await this.ctx.storage.put(CREDENTIAL_HASH_KEY, credentialHash);
       await this.appendLog(credentialTransition(Date.now(), 'issued'));
+      const provider = this.provider;
       try {
         if (acquisition) assertAcquisitionDeadline(acquisition);
         const created = await withTimeout(
-          this.provider.create({ ...intent, ...(billing ? { billing } : {}) }),
+          provider.create({
+            ...intent,
+            ...(billing ? { billing } : {}),
+            ...(networkPolicy ? { networkPolicy } : {}),
+          }),
           DEADLINE_MS.startup,
           'Sandbox allocation timed out'
         );
@@ -556,10 +840,7 @@ export class SandboxControl extends DurableObject<Env> {
           }
           if (acquisition) assertAcquisitionDeadline(acquisition);
           await withTimeout(
-            this.provider.launch(
-              created.providerRef,
-              this.wrapperLaunchEnv(credential, input.kiloToken)
-            ),
+            provider.launch(created.providerRef, this.wrapperLaunchEnv(credential)),
             DEADLINE_MS.startup,
             'Sandbox wrapper launch timed out'
           );
@@ -578,27 +859,25 @@ export class SandboxControl extends DurableObject<Env> {
           await this.markFailed();
         }
       }
-    } else if (
-      physical.state === 'running' &&
-      physical.providerRef !== null &&
-      !physical.stopTombstone
+    }
+    if (
+      this.providerKind === 'vercel' &&
+      (await loadPhysicalRecord(this.ctx.storage)).state === 'running'
     ) {
-      await withTimeout(
-        this.provider.ensureBillingAdmission(physical.providerRef, billing),
-        DEADLINE_MS.stopAttempt,
-        'Sandbox billing admission timed out'
-      );
+      await this.enforceWorktreeNetworkPolicy(ownerId);
+    }
+    const status = await this.ctx.storage.transaction(async () => {
       const current = await loadPhysicalRecord(this.ctx.storage);
       if (
         !sameAllocation(current, physical) ||
-        current.providerRef !== physical.providerRef ||
-        current.state !== 'running' ||
-        current.stopTombstone
+        (physical.providerRef !== null && current.providerRef !== physical.providerRef) ||
+        (acquisition && !(await this.bindAcquisition(acquisition, current)))
       ) {
-        throw new Error('Sandbox runtime changed during billing admission');
+        throw new Error('Sandbox allocation changed during readiness');
       }
-    }
-    return currentStatus();
+      return this.statusForPhysical(current);
+    });
+    return { ...status, attachment };
   }
 
   private async acquirePhysical(acquisition: SandboxAcquisition): Promise<{
@@ -613,7 +892,13 @@ export class SandboxControl extends DurableObject<Env> {
       if (physical.state !== 'stopped' || physical.stopTombstone) {
         return { physical, action: 'wait' };
       }
-      const next = claimCreate(physical, intentId, Date.now(), allocationName);
+      const next = claimCreate(
+        physical,
+        intentId,
+        Date.now(),
+        allocationName,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
       await this.persistPhysicalState(physical, next, 'demand');
       await this.bindAcquisition(acquisition, next);
       return { physical: next, action: 'create' };
@@ -670,23 +955,113 @@ export class SandboxControl extends DurableObject<Env> {
     });
   }
 
-  async attachSession(input: AttachSessionInput): Promise<SessionRoute> {
+  async updateNetworkPolicy(input: {
+    ownerId: string;
+    networkPolicy: VercelSandboxNetworkPolicy;
+    requiredContainment: CredentialContainmentRequirements;
+  }): Promise<void> {
     const ownerId = await this.requireOwner();
-    const table = await loadRouteTable(this.ctx.storage);
-    const result = attachRoute(table, input, ownerId);
-    await saveRouteTable(this.ctx.storage, result.table);
-    if (result.changed) {
-      await this.appendLog(
-        routeTransition(Date.now(), 'attach', input.sessionId, input.kiloSessionId)
-      );
+    if (ownerId !== input.ownerId) {
+      throw new Error('Sandbox owner mismatch');
     }
-    return result.route;
+    const providerKind = await this.ctx.storage.get<AgentSandboxProvider>(PROVIDER_KIND_KEY);
+    if (providerKind !== 'vercel') {
+      throw new Error('Sandbox network policy requires a Vercel provider');
+    }
+    const physical = await loadPhysicalRecord(this.ctx.storage);
+    if (physical.state !== 'running' || physical.providerRef === null) {
+      throw new Error('Sandbox network policy requires a running instance');
+    }
+    const providerRef = physical.providerRef;
+    if (!this.matchesProviderReference(physical, providerRef)) {
+      throw new Error('Sandbox network policy requires an exact provider reference');
+    }
+    if (
+      (!input.requiredContainment.kilocode && !input.requiredContainment.github) ||
+      !this.matchesContainment(physical, input.requiredContainment)
+    ) {
+      throw new Error('Sandbox credential containment mismatch');
+    }
+    const provider = this.provider;
+    if (!provider.updateNetworkPolicy) {
+      throw new Error('Sandbox provider does not support network policy updates');
+    }
+    await withTimeout(
+      provider.updateNetworkPolicy(providerRef, input.networkPolicy),
+      DEADLINE_MS.stopAttempt,
+      'Sandbox network policy update timed out'
+    );
+
+    const currentProviderKind = await this.ctx.storage.get<AgentSandboxProvider>(PROVIDER_KIND_KEY);
+    const currentPhysical = await loadPhysicalRecord(this.ctx.storage);
+    const currentOwnerId = await this.readOwner();
+    if (
+      currentProviderKind !== 'vercel' ||
+      currentOwnerId !== ownerId ||
+      currentPhysical.state !== 'running' ||
+      currentPhysical.providerRef !== providerRef ||
+      !this.matchesContainment(currentPhysical, input.requiredContainment)
+    ) {
+      throw new Error('Sandbox instance changed during network policy update');
+    }
+  }
+
+  async attachSession(input: AttachSessionInput): Promise<SessionRoute> {
+    return this.withCredentialUpdate(async () => {
+      const ownerId = await this.requireOwner();
+      const grants = await loadSessionCredentialGrants(this.ctx.storage);
+      const grant = grants.find(
+        value =>
+          value.userId === ownerId &&
+          value.directory === input.directory &&
+          value.expiresAt > Date.now() &&
+          value.members.some(
+            member =>
+              member.sessionId === input.sessionId && member.kiloSessionId === input.kiloSessionId
+          )
+      );
+      const worktreeId = grant?.scopeId.startsWith('worktree_') ? grant.scopeId : undefined;
+      if (!grant || worktreeId !== input.worktreeId) {
+        throw new Error('Session has no matching worktree credential grant');
+      }
+      const table = await loadRouteTable(this.ctx.storage);
+      const result = attachRoute(table, input, ownerId);
+      await saveRouteTable(this.ctx.storage, result.table);
+      if (result.changed) {
+        await this.appendLog(
+          routeTransition(Date.now(), 'attach', input.sessionId, input.kiloSessionId)
+        );
+      }
+      return result.route;
+    });
   }
 
   async detachSession(sessionId: string): Promise<{ existed: boolean }> {
-    const table = await loadRouteTable(this.ctx.storage);
-    const result = detachRoute(table, sessionId);
-    await saveRouteTable(this.ctx.storage, result.table);
+    const result = await this.withCredentialUpdate(async () => {
+      const table = await loadRouteTable(this.ctx.storage);
+      const detached = detachRoute(table, sessionId);
+      await saveRouteTable(this.ctx.storage, detached.table);
+      const grants = await loadSessionCredentialGrants(this.ctx.storage);
+      const credentialsChanged = grants.some(grant =>
+        grant.members.some(member => member.sessionId === sessionId)
+      );
+      if (credentialsChanged) {
+        if (this.providerKind === 'vercel') {
+          await this.ctx.storage.put(CREDENTIAL_POLICY_DIRTY_KEY, true);
+        }
+        await saveSessionCredentialGrants(
+          this.ctx.storage,
+          removeSessionCredentialMembership(grants, sessionId)
+        );
+      }
+      return detached;
+    });
+    if (
+      this.providerKind === 'vercel' &&
+      (await this.ctx.storage.get<boolean>(CREDENTIAL_POLICY_DIRTY_KEY))
+    ) {
+      await this.enforceWorktreeNetworkPolicy(await this.requireOwner());
+    }
     if (result.existed) {
       await this.appendLog(routeTransition(Date.now(), 'detach', sessionId));
     }
@@ -707,23 +1082,25 @@ export class SandboxControl extends DurableObject<Env> {
   async validateTerminalAccess(
     input: SandboxTerminalAccessInput
   ): Promise<SandboxTerminalAccessResult> {
-    const runtime = await this.readTerminalRuntime(input);
+    const runtime = await this.readTerminalRuntime(input, true);
     if (!runtime.allowed) return runtime;
 
     const enforced = isCloudAgentContainerBillingEnabled(this.env, {
       userId: input.ownerId,
       ...(input.organizationId ? { orgId: input.organizationId } : {}),
     });
-    if (!enforced) return { allowed: true };
+    if (!enforced) return this.renewTerminalCredentialLease(input, runtime);
     if (runtime.provider !== 'cloudflare') {
       return { allowed: false, reason: 'billing_policy_unavailable' };
     }
 
     let billing: SandboxTerminalAccessResult;
     try {
-      const allocationId = runtime.physical.providerRef;
+      const allocationId = decodeCloudflareProviderRef(runtime.physical.providerRef)?.sandboxId;
       if (!allocationId) return { allowed: false, reason: 'runtime_not_running' };
-      const namespace = getSandboxNamespace(this.env, allocationId);
+      const namespace = getSandboxNamespace(this.env, allocationId, {
+        managedScmContainment: true,
+      });
       const sandbox = getSandbox(namespace, allocationId);
       billing = validateTerminalBillingRuntime({
         access: input,
@@ -741,18 +1118,59 @@ export class SandboxControl extends DurableObject<Env> {
     }
     if (!billing.allowed) return billing;
 
-    const current = await this.readTerminalRuntime(input);
+    const current = await this.readTerminalRuntime(input, true);
     if (!current.allowed) return current;
-    if (
-      !this.sameConnection(current.connection, runtime.connection) ||
-      current.provider !== runtime.provider ||
-      current.physical.providerRef !== runtime.physical.providerRef ||
-      current.route.kiloSessionId !== runtime.route.kiloSessionId ||
-      current.route.directory !== runtime.route.directory
-    ) {
+    if (!this.sameTerminalRuntime(current, runtime)) {
       return { allowed: false, reason: 'runtime_changed' };
     }
-    return { allowed: true };
+    return this.renewTerminalCredentialLease(input, current);
+  }
+
+  private sameTerminalRuntime(
+    left: TerminalRuntimeSnapshot,
+    right: TerminalRuntimeSnapshot
+  ): boolean {
+    return (
+      this.sameConnection(left.connection, right.connection) &&
+      left.provider === right.provider &&
+      left.physical.providerRef === right.physical.providerRef &&
+      left.route.kiloSessionId === right.route.kiloSessionId &&
+      left.route.directory === right.route.directory &&
+      left.grant.scopeId === right.grant.scopeId &&
+      left.grant.kilo.alias === right.grant.kilo.alias
+    );
+  }
+
+  private async renewTerminalCredentialLease(
+    input: SandboxTerminalAccessInput,
+    runtime: TerminalRuntimeSnapshot
+  ): Promise<SandboxTerminalAccessResult> {
+    if (runtime.grant.expiresAt > Date.now() + TERMINAL_CREDENTIAL_RENEWAL_WINDOW_MS) {
+      return { allowed: true };
+    }
+    try {
+      await this.withCredentialUpdate(async () => {
+        const current = await this.readTerminalRuntime(input, true);
+        if (!current.allowed || !this.sameTerminalRuntime(current, runtime)) {
+          throw new Error('Terminal runtime changed before credential renewal');
+        }
+        if (current.grant.expiresAt > Date.now() + TERMINAL_CREDENTIAL_RENEWAL_WINDOW_MS) return;
+        await this.prepareOwnedSessionCredentials(
+          { ownerId: input.ownerId, sessionId: input.sessionId },
+          { access: input, runtime: current }
+        );
+      });
+      if (runtime.provider === 'vercel') {
+        await this.enforceWorktreeNetworkPolicy(input.ownerId);
+      }
+    } catch {
+      return { allowed: false, reason: 'credential_scope_unavailable' };
+    }
+    const current = await this.readTerminalRuntime(input);
+    if (!current.allowed) return current;
+    return this.sameTerminalRuntime(current, runtime)
+      ? { allowed: true }
+      : { allowed: false, reason: 'runtime_changed' };
   }
 
   async recordTerminalActivity(
@@ -809,11 +1227,12 @@ export class SandboxControl extends DurableObject<Env> {
   async claimCreate(
     intentId: string,
     resumable = false,
-    allocationName?: string
+    allocationName?: string,
+    containment?: CredentialContainmentRequirements
   ): Promise<PhysicalRecord> {
     return this.ctx.storage.transaction(async () => {
       const current = await loadPhysicalRecord(this.ctx.storage, resumable);
-      const next = claimCreate(current, intentId, Date.now(), allocationName);
+      const next = claimCreate(current, intentId, Date.now(), allocationName, containment);
       const vercel =
         this.providerKind === 'vercel' ? parseVercelSandboxRuntimeConfig(this.env) : undefined;
       if (vercel && next.createIntent) {
@@ -1019,24 +1438,138 @@ export class SandboxControl extends DurableObject<Env> {
       PROVIDER_KIND_KEY,
       BILLING_INPUT_KEY,
       ACQUISITION_RECEIPTS_KEY,
+      CREDENTIAL_POLICY_DIRTY_KEY,
     ]);
+  }
+
+  private withCredentialUpdate<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.credentialUpdates.then(operation);
+    this.credentialUpdates = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  }
+
+  private async readCredentialMetadata(input: {
+    ownerId: string;
+    sessionId: string;
+  }): Promise<SessionMetadata> {
+    if (typeof input.sessionId !== 'string' || !input.sessionId.startsWith('workspace_')) {
+      throw new Error('Control-plane session credentials are required');
+    }
+    const metadata = await withDORetry<
+      ReturnType<typeof getSandboxSessionStub>,
+      SessionMetadata | null
+    >(
+      () => getSandboxSessionStub(this.env, input.ownerId, input.sessionId),
+      stub => stub.getCredentialMetadata(),
+      'getCredentialMetadata'
+    );
+    if (
+      !metadata ||
+      metadata.identity.userId !== input.ownerId ||
+      metadata.identity.sessionId !== input.sessionId ||
+      metadata.workspace?.sandboxId !== this.sandboxId
+    ) {
+      throw new Error('Session credential ownership mismatch');
+    }
+    return metadata;
+  }
+
+  private async scheduleCredentialExpiry(grants: SessionCredentialGrant[]): Promise<void> {
+    const expiry = Math.min(...grants.map(grant => grant.expiresAt));
+    if (Number.isFinite(expiry)) {
+      await this.armDeadlineAndAlarm('credentialExpiry', expiry);
+    } else {
+      await this.cancelDeadlineAndAlarm('credentialExpiry');
+    }
+  }
+
+  private refreshWorktreeNetworkPolicy(ownerId: string): Promise<void> {
+    return this.withCredentialUpdate(async () => {
+      if (this.providerKind !== 'vercel') return;
+      await this.ctx.storage.put(CREDENTIAL_POLICY_DIRTY_KEY, true);
+      const physical = await loadPhysicalRecord(this.ctx.storage);
+      if (physical.state === 'stopped') {
+        await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
+        return;
+      }
+      if (physical.state !== 'running') {
+        throw new Error('Sandbox credential policy is unavailable');
+      }
+      const grants = await loadSessionCredentialGrants(this.ctx.storage);
+      const now = Date.now();
+      const authorized = grants.filter(grant => grant.preparedAt <= now && grant.expiresAt > now);
+      await this.updateNetworkPolicy({
+        ownerId,
+        networkPolicy: buildControlNetworkPolicy(authorized),
+        requiredContainment: WORKTREE_CREDENTIAL_CONTAINMENT,
+      });
+      await this.scheduleCredentialExpiry(authorized);
+      await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
+    });
+  }
+
+  private async enforceWorktreeNetworkPolicy(ownerId: string): Promise<void> {
+    const expected = await loadPhysicalRecord(this.ctx.storage);
+    try {
+      await this.refreshWorktreeNetworkPolicy(ownerId);
+    } catch {
+      let physical = await loadPhysicalRecord(this.ctx.storage);
+      if (
+        !sameAllocation(physical, expected) ||
+        (expected.providerRef !== null && physical.providerRef !== expected.providerRef)
+      ) {
+        return;
+      }
+      if (physical.state === 'running' || physical.state === 'creating') {
+        physical = await this.markFailed();
+      }
+      if (physical.state === 'failed') {
+        physical = await this.releaseIfAuthoritativelyDead(physical);
+      }
+      if (
+        this.providerKind === 'vercel' &&
+        physical.state === 'unknown' &&
+        physical.stopTombstone &&
+        physical.stopTombstone.attempts >= DEADLINE_MS.stopAttemptLadder.length &&
+        Date.now() >= physical.stopTombstone.createdAt + DEADLINE_MS.reconciliationWindow
+      ) {
+        const observed = await this.observeCurrentProvider(physical);
+        if (!sameAllocation(physical, observed)) return;
+        physical = observed;
+      }
+      if (physical.state !== 'stopped') {
+        throw new Error('Sandbox credential revocation is pending');
+      }
+    }
   }
 
   private createProviderAdapter(
     kind: AgentSandboxProvider,
     physical?: PhysicalRecord
   ): ProviderAdapter {
+    const allocationName = physical?.createIntent?.allocationName ?? this.sandboxId;
     if (kind === 'vercel') {
       return createVercelProviderAdapter({
-        sandboxName: this.sandboxId,
+        sandboxName: allocationName,
         config: resolveVercelSandboxRuntimeConfig(this.env, physical?.createIntent?.vercel),
       });
     }
     return createCloudflareProviderAdapter({
-      sandboxId: this.sandboxId,
-      getSandbox: id => getSandbox(getSandboxNamespace(this.env, id), id),
-      destroy: id =>
-        forceDestroyControlPlaneSandbox(getSandboxNamespace(this.env, id).getByName(id)),
+      sandboxId: allocationName,
+      getSandbox: (id, options) =>
+        getSandbox(
+          getSandboxNamespace(this.env, id, { managedScmContainment: options.containment }),
+          id
+        ),
+      destroy: (id, options) =>
+        forceDestroyControlPlaneSandbox(
+          getSandboxNamespace(this.env, id, {
+            managedScmContainment: options.containment,
+          }).getByName(id)
+        ),
     });
   }
 
@@ -1096,14 +1629,54 @@ export class SandboxControl extends DurableObject<Env> {
     return billing;
   }
 
-  private wrapperLaunchEnv(credential: string, kiloToken?: string): Record<string, string> {
+  private wrapperLaunchEnv(credential: string): Record<string, string> {
     return buildControlWrapperLaunchEnv({
       workerUrl: this.env.WORKER_URL,
       sandboxId: this.sandboxId,
       credential,
-      kiloToken,
-      kiloTargetEnv: this.env,
     });
+  }
+
+  private matchesProviderReference(physical: PhysicalRecord, providerRef: string): boolean {
+    if (physical.providerRef !== null && physical.providerRef !== providerRef) return false;
+    const allocationName = physical.createIntent?.allocationName ?? this.sandboxId;
+    if (this.providerKind === 'vercel') {
+      return decodeVercelProviderRef(providerRef)?.sandboxName === allocationName;
+    }
+    const native = decodeCloudflareProviderRef(providerRef);
+    return (
+      native?.sandboxId === allocationName &&
+      (!physical.createIntent || native.instanceId === physical.createIntent.intentId)
+    );
+  }
+
+  private matchesContainment(
+    physical: PhysicalRecord,
+    requiredContainment: CredentialContainmentRequirements
+  ): boolean {
+    if (physical.stopTombstone) return false;
+    if (physical.state === 'creating') {
+      const containment = physical.createIntent?.containment;
+      return (
+        containment !== undefined &&
+        containment.kilocode === requiredContainment.kilocode &&
+        containment.github === requiredContainment.github &&
+        containment.worktreeScoped === requiredContainment.worktreeScoped
+      );
+    }
+    if (physical.state !== 'running' || physical.providerRef === null) {
+      return false;
+    }
+    const referenceMatches = this.matchesProviderReference(physical, physical.providerRef);
+    const containment = physical.containment;
+    return (
+      referenceMatches &&
+      containment !== undefined &&
+      containment.providerRef === physical.providerRef &&
+      containment.kilocode === requiredContainment.kilocode &&
+      containment.github === requiredContainment.github &&
+      containment.worktreeScoped === requiredContainment.worktreeScoped
+    );
   }
 
   private async exhaustStop(): Promise<PhysicalRecord> {
@@ -1142,6 +1715,14 @@ export class SandboxControl extends DurableObject<Env> {
       await this.recordStopAttempt();
       return;
     }
+    if (id === 'credentialExpiry') {
+      try {
+        await this.enforceWorktreeNetworkPolicy(await this.requireOwner());
+      } catch {
+        await this.armDeadlineAndAlarm('credentialExpiry', Date.now() + DEADLINE_MS.reconciliation);
+      }
+      return;
+    }
     if (id === 'reconciliation') {
       const physical = await loadPhysicalRecord(this.ctx.storage);
       if (this.shouldSlowReap(physical)) {
@@ -1152,6 +1733,15 @@ export class SandboxControl extends DurableObject<Env> {
     }
   }
 
+  private async validateHandshake(providerInstanceId: string): Promise<boolean> {
+    const physical = await loadPhysicalRecord(this.ctx.storage);
+    return (
+      (this.providerKind !== 'vercel' || physical.state === 'running') &&
+      this.matchesProviderReference(physical, providerInstanceId) &&
+      this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)
+    );
+  }
+
   private async onHandshakeComplete(identity: SandboxControlConnectionIdentity): Promise<void> {
     const socketConnection = this.socketHandler.getConnectionIdentity();
     if (!socketConnection || !this.sameConnection(socketConnection, identity)) return;
@@ -1160,10 +1750,9 @@ export class SandboxControl extends DurableObject<Env> {
     if (
       physical.stopTombstone ||
       (physical.state !== 'running' && physical.state !== 'creating') ||
-      (physical.providerRef !== null && physical.providerRef !== identity.providerInstanceId) ||
-      (this.providerKind === 'cloudflare' &&
-        physical.createIntent?.allocationName !== undefined &&
-        physical.createIntent.allocationName !== identity.providerInstanceId)
+      (this.providerKind === 'vercel' && physical.state !== 'running') ||
+      !this.matchesProviderReference(physical, identity.providerInstanceId) ||
+      !this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)
     ) {
       this.socketHandler.closeAll('Sandbox runtime unavailable');
       return;
@@ -1555,7 +2144,8 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   private async readTerminalRuntime(
-    input: SandboxTerminalAccessInput
+    input: SandboxTerminalAccessInput,
+    allowExpiredCredentials = false
   ): Promise<TerminalRuntimeSnapshot | TerminalRuntimeRejection> {
     if (
       typeof input.sessionId !== 'string' ||
@@ -1571,10 +2161,11 @@ export class SandboxControl extends DurableObject<Env> {
       return { allowed: false, reason: 'invalid_terminal_access' };
     }
 
-    const [ownerId, routes, physical] = await Promise.all([
+    const [ownerId, routes, physical, grants] = await Promise.all([
       this.readOwner(),
       loadRouteTable(this.ctx.storage),
       loadPhysicalRecord(this.ctx.storage),
+      loadSessionCredentialGrants(this.ctx.storage),
     ]);
     if (ownerId !== input.ownerId) return { allowed: false, reason: 'owner_mismatch' };
     const route = routes.get(input.sessionId);
@@ -1584,6 +2175,24 @@ export class SandboxControl extends DurableObject<Env> {
     if (physical.state !== 'running' || physical.stopTombstone || physical.providerRef === null) {
       return { allowed: false, reason: 'runtime_not_running' };
     }
+    if (!this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)) {
+      return { allowed: false, reason: 'credential_containment_unavailable' };
+    }
+    const grant = grants.find(
+      grant =>
+        grant.userId === input.ownerId &&
+        grant.orgId === input.organizationId &&
+        grant.sandboxId === this.sandboxId &&
+        grant.provider === this.providerKind &&
+        grant.directory === route.directory &&
+        grant.preparedAt <= Date.now() &&
+        (allowExpiredCredentials || grant.expiresAt > Date.now()) &&
+        grant.members.some(
+          member =>
+            member.sessionId === input.sessionId && member.kiloSessionId === route.kiloSessionId
+        )
+    );
+    if (!grant) return { allowed: false, reason: 'credential_scope_unavailable' };
 
     const connection = this.readyWrapperRuntime();
     if (!connection) return { allowed: false, reason: 'runtime_not_ready' };
@@ -1594,7 +2203,7 @@ export class SandboxControl extends DurableObject<Env> {
       return { allowed: false, reason: 'wrapper_instance_mismatch' };
     }
 
-    return { allowed: true, connection, physical, provider: this.providerKind, route };
+    return { allowed: true, connection, physical, provider: this.providerKind, route, grant };
   }
 
   private connectionState(): ConnectionState {
@@ -1706,6 +2315,10 @@ export class SandboxControl extends DurableObject<Env> {
     const unavailable =
       to.stopTombstone !== null || (to.state !== 'creating' && to.state !== 'running');
     await savePhysicalRecord(this.ctx.storage, to);
+    if (to.state === 'stopped') {
+      await saveSessionCredentialGrants(this.ctx.storage, []);
+      await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
+    }
     if (changed) {
       await this.appendLog(
         physicalTransition(Date.now(), from.state, to.state, cause, to.providerRef)
@@ -1714,6 +2327,13 @@ export class SandboxControl extends DurableObject<Env> {
     const deadlines = await loadDeadlines(this.ctx.storage);
     let next = deadlines;
     if (to.state === 'creating') {
+      if (from.state === 'stopped') {
+        await this.ctx.storage.delete([
+          CREDENTIAL_HASH_KEY,
+          ACTIVE_WRAPPER_RUNTIME_KEY,
+          WRAPPER_READY_AT_KEY,
+        ]);
+      }
       next = { startup: (to.createIntent?.createdAt ?? Date.now()) + DEADLINE_MS.startup };
     } else if (to.state === 'running' && from.state === 'unknown' && !unavailable) {
       const id = this.connectionState() === 'ready' ? 'heartbeatExpiry' : 'wrapperReadiness';
@@ -1750,6 +2370,9 @@ export class SandboxControl extends DurableObject<Env> {
           }
         }
       }
+    }
+    if (to.state !== 'stopped' && deadlines.credentialExpiry !== undefined) {
+      next = armDeadline(next, 'credentialExpiry', deadlines.credentialExpiry);
     }
     await saveDeadlines(this.ctx.storage, next);
     await this.scheduleAlarm(next);

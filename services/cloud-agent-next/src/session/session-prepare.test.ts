@@ -336,6 +336,136 @@ describe('createSessionWithLedger admission ladder', () => {
     });
   });
 
+  describe.each([undefined, 'true', 'false', ''] as const)(
+    'workspace containment ignores CREDENTIAL_CONTAINMENT_ENABLED=%s',
+    flag => {
+      it.each([
+        {
+          repository: { type: 'github', repo: 'acme/repo' },
+          expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+        },
+        {
+          repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+          expected: { github: false, gitlab: true, bitbucket: false, kilocode: true },
+        },
+        {
+          repository: {
+            type: 'bitbucket',
+            url: 'https://bitbucket.org/acme/repo.git',
+            workspaceUuid: '123e4567-e89b-12d3-a456-426614174000',
+            repositoryUuid: '123e4567-e89b-12d3-a456-426614174001',
+          },
+          expected: { github: false, gitlab: false, bitbucket: true, kilocode: true },
+        },
+        {
+          repository: { type: 'git', url: 'https://example.com/acme/repo.git' },
+          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+        },
+      ] as const)(
+        'derives $repository.type containment from the allocated workspace ID',
+        async ({ repository, expected }) => {
+          generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+          const doStub = makeDoStub();
+          const ctx = makeContext(doStub);
+          if (flag !== undefined) ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = flag;
+
+          await runCreate(ctx, makeRequest({ repository }));
+
+          expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+            expect.objectContaining({
+              identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
+              workspace: expect.objectContaining({ credentialContainment: expected }),
+            })
+          );
+        }
+      );
+    }
+  );
+
+  it('keeps mandatory workspace containment when CREDENTIAL_CONTAINMENT_ENABLED=false', async () => {
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
+
+    await runCreate(
+      ctx,
+      makeRequest({ repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' } })
+    );
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
+        workspace: expect.objectContaining({
+          credentialContainment: {
+            github: false,
+            gitlab: true,
+            bitbucket: false,
+            kilocode: true,
+          },
+        }),
+      })
+    );
+  });
+
+  it('disables toggle containment for an agent ID when CREDENTIAL_CONTAINMENT_ENABLED=false', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
+
+    await runCreate(
+      ctx,
+      makeRequest({ repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' } })
+    );
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
+        workspace: expect.objectContaining({
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
+        }),
+      })
+    );
+  });
+
+  it.each([
+    {
+      sessionId: WORKSPACE_SESSION_ID,
+      expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+    },
+    {
+      sessionId: CLOUD_AGENT_SESSION_ID,
+      expected: { github: false, gitlab: false, bitbucket: false, kilocode: false },
+    },
+  ])(
+    'excludes devcontainers from toggle containment for $sessionId',
+    async ({ sessionId, expected }) => {
+      generateSessionIdMock.mockReturnValue(sessionId);
+      generateSandboxRoutingTargetMock.mockResolvedValueOnce({
+        kind: 'isolated',
+        sandboxId: 'dind-abcdef',
+      });
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+
+      await runCreate(ctx, makeRequest({ runtime: { devcontainer: true } }));
+
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspace: expect.objectContaining({
+            devcontainerRequested: true,
+            credentialContainment: expected,
+          }),
+        })
+      );
+    }
+  );
+
   it('routes and persists isolated Standard allocation for an agent session', async () => {
     const sandboxId = `istd-${'a'.repeat(48)}` as const;
     generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
@@ -1974,6 +2104,13 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
     });
     expect(recordOperationProgressMock.mock.calls[0]?.[2]).not.toHaveProperty('reportingCreatedAt');
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+        }),
+      })
+    );
   });
 
   it('rejects isolated Standard allocation for workspace sessions before external effects', async () => {
@@ -2439,33 +2576,58 @@ describe('createSessionWithLedger clone reconciliation', () => {
     expect(createSessionReportMock).not.toHaveBeenCalled();
   });
 
-  it('resumes a workspace clone with its persisted Vercel provider', async () => {
-    const request = cloneRequest();
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'takeover',
-      row: await cloneRow({ cloudAgentSessionId: WORKSPACE_SESSION_ID, sandboxProvider: 'vercel' }),
-    });
-    createCliSessionMock.mockResolvedValue({
-      status: 'ready',
-      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
-    });
-    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
-    const doStub = makeDoStub();
-    const ctx = makeContext(doStub);
+  it.each([
+    {
+      sessionId: WORKSPACE_SESSION_ID,
+      sandboxProvider: 'vercel',
+      controlPlaneIds: undefined,
+      expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+    },
+    {
+      sessionId: WORKSPACE_SESSION_ID,
+      sandboxProvider: 'cloudflare',
+      controlPlaneIds: '',
+      expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+    },
+    {
+      sessionId: CLOUD_AGENT_SESSION_ID,
+      sandboxProvider: 'cloudflare',
+      controlPlaneIds: USER_ID,
+      expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+    },
+  ])(
+    'resumes $sandboxProvider clone containment from the stored $sessionId, not current owner enrollment',
+    async ({ sessionId, sandboxProvider, controlPlaneIds, expected }) => {
+      const request = cloneRequest();
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'takeover',
+        row: await cloneRow({ cloudAgentSessionId: sessionId, sandboxProvider }),
+      });
+      createCliSessionMock.mockResolvedValue({
+        status: 'ready',
+        clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
+      });
+      getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+      ctx.env.CONTROL_PLANE_IDS = controlPlaneIds;
 
-    await expect(runCreate(ctx, request)).resolves.toEqual({
-      cloudAgentSessionId: WORKSPACE_SESSION_ID,
-      kiloSessionId: KILO_SESSION_ID,
-      replayed: true,
-    });
+      await expect(runCreate(ctx, request)).resolves.toEqual({
+        cloudAgentSessionId: sessionId,
+        kiloSessionId: KILO_SESSION_ID,
+        replayed: true,
+      });
 
-    expect(doStub.registerSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
-        workspace: expect.objectContaining({ sandboxProvider: 'vercel' }),
-      })
-    );
-  });
+      expect(doStub.registerSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({ sessionId }),
+          workspace: expect.objectContaining({ sandboxProvider, credentialContainment: expected }),
+        })
+      );
+      expect(generateSessionIdMock).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects an unsupported persisted sandbox provider when resuming a clone', async () => {
     const request = cloneRequest();

@@ -2,6 +2,9 @@
  * Unit tests for auto-commit branch protection and upstream branch bypass.
  */
 
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { createKiloClient } from '@kilocode/sdk';
 import { runAutoCommit, type AutoCommitOptions } from '../../../wrapper/src/auto-commit.js';
@@ -24,7 +27,13 @@ vi.mock('../../../wrapper/src/utils.js', async () => {
 });
 
 // Import mocked functions so we can configure per-test return values
-import { git, getCurrentBranch, hasGitUpstream } from '../../../wrapper/src/utils.js';
+import {
+  git,
+  getCurrentBranch,
+  hasGitUpstream,
+  logToFile,
+  withTimeoutAndAbort,
+} from '../../../wrapper/src/utils.js';
 
 const mockGetCurrentBranch = vi.mocked(getCurrentBranch);
 const mockHasGitUpstream = vi.mocked(hasGitUpstream);
@@ -456,6 +465,30 @@ describe('runAutoCommit', () => {
     );
   });
 
+  it('redacts explicit worktree profile credentials from finalization failures and logs', async () => {
+    const secret = 'explicit-profile-github-credential';
+    mockGetCurrentBranch.mockResolvedValue('feature/worktree');
+    mockGit
+      .mockResolvedValueOnce(ok(' M file.ts'))
+      .mockResolvedValueOnce(ok())
+      .mockResolvedValueOnce(ok('[feature/worktree abc1234] test commit'))
+      .mockResolvedValueOnce(ok('abc1234'))
+      .mockResolvedValueOnce({
+        stdout: '',
+        stderr: `remote: rejected credential ${secret}`,
+        exitCode: 1,
+      });
+    const { opts, events } = createOpts({ env: { GH_TOKEN: secret } });
+
+    await runAutoCommit(opts);
+
+    expect(
+      events.find(event => event.streamEventType === 'autocommit_completed')?.data.message
+    ).toContain('push failed');
+    expect(JSON.stringify(events)).not.toContain(secret);
+    expect(JSON.stringify(vi.mocked(logToFile).mock.calls)).not.toContain(secret);
+  });
+
   it('redacts authenticated GitHub remotes from push failure events', async () => {
     mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
     mockGit
@@ -474,8 +507,256 @@ describe('runAutoCommit', () => {
     await runAutoCommit(opts);
 
     const completed = events.find(e => e.streamEventType === 'autocommit_completed');
-    expect(completed?.data.message).toContain('x-access-token:***@github.com');
+    expect(completed?.data.message).toContain('https://[REDACTED]@github.com/acme/repo.git');
     expect(completed?.data.message).not.toContain('user-secret');
+  });
+
+  it('cancels queued auto-commit without releasing its predecessor or blocking other worktrees', async () => {
+    const workspacePath = '/workspace/shared';
+    const otherDirectory = '/workspace/other';
+    const dirty = new Set([workspacePath, otherDirectory]);
+    const pushing = Promise.withResolvers<void>();
+    const stopped = Promise.withResolvers<Utils.ExecResult>();
+    const controllers = [new AbortController(), new AbortController(), new AbortController()];
+    const first = createOpts({ workspacePath, signal: controllers[0].signal });
+    const cancelled = createOpts({ workspacePath, signal: controllers[1].signal });
+    const next = createOpts({ workspacePath, signal: controllers[2].signal });
+    const other = createOpts({ workspacePath: otherDirectory });
+    const pending: ReturnType<typeof runAutoCommit>[] = [];
+    let firstSettled = false;
+    let nextSettled = false;
+    mockGetCurrentBranch.mockResolvedValue('work');
+    mockGit.mockImplementation(async (args, options) => {
+      const directory = options?.cwd ?? '';
+      if (args[0] === 'status') return ok(dirty.has(directory) ? ' M result.txt\n' : '');
+      if (args[0] === 'commit') dirty.delete(directory);
+      if (args[0] === 'rev-parse') return ok('abc1234');
+      if (args[0] === 'push' && directory === workspacePath) {
+        pushing.resolve();
+        return stopped.promise;
+      }
+      return ok();
+    });
+    try {
+      const firstCommit = runAutoCommit(first.opts).then(result => {
+        firstSettled = true;
+        return result;
+      });
+      pending.push(firstCommit);
+      await pushing.promise;
+      const cancelledCommit = runAutoCommit(cancelled.opts);
+      pending.push(cancelledCommit);
+      controllers[1].abort(new Error('Queued finalization cancelled'));
+      expect(
+        await withTimeoutAndAbort(cancelledCommit, {
+          timeoutMs: 1_000,
+          timeoutMessage: 'Queued auto-commit cancellation waited for its predecessor',
+          abortMessage: 'Test cancelled',
+        })
+      ).toEqual({ success: false, error: 'Queued finalization cancelled' });
+      expect(cancelled.events).toEqual([
+        expect.objectContaining({
+          streamEventType: 'autocommit_completed',
+          data: expect.objectContaining({ success: false }),
+        }),
+      ]);
+      const nextCommit = runAutoCommit(next.opts).then(result => {
+        nextSettled = true;
+        return result;
+      });
+      const otherCommit = runAutoCommit(other.opts);
+      pending.push(nextCommit, otherCommit);
+      expect(
+        await withTimeoutAndAbort(otherCommit, {
+          timeoutMs: 1_000,
+          timeoutMessage: 'Unrelated worktree auto-commit was blocked',
+          abortMessage: 'Test cancelled',
+        })
+      ).toEqual({ success: true });
+      expect(firstSettled).toBe(false);
+      expect(nextSettled).toBe(false);
+      expect(next.events).toEqual([]);
+
+      controllers[0].abort(new Error('Running finalization cancelled'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(firstSettled).toBe(false);
+      expect(nextSettled).toBe(false);
+      stopped.resolve({ ...ok(), exitCode: 124, terminationReason: 'abort' });
+      await firstCommit;
+      expect(await nextCommit).toEqual({ success: true, skipped: true });
+      expect(cancelled.opts.kiloClient.generateCommitMessage).not.toHaveBeenCalled();
+      expect(next.opts.kiloClient.generateCommitMessage).not.toHaveBeenCalled();
+      expect(mockGetCurrentBranch.mock.calls.map(([directory]) => directory)).toEqual([
+        workspacePath,
+        otherDirectory,
+        workspacePath,
+      ]);
+    } finally {
+      for (const controller of controllers) controller.abort();
+      stopped.resolve({ ...ok(), exitCode: 124, terminationReason: 'abort' });
+      await Promise.allSettled(pending);
+      mockGit.mockReset();
+      mockGetCurrentBranch.mockReset();
+      mockHasGitUpstream.mockReset();
+    }
+  });
+
+  it('serializes same-worktree auto-commit through push and skips a clean sibling', async () => {
+    const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'shared-worktree-autocommit-'));
+    const workspacePath = path.join(root, 'workspace');
+    const remote = path.join(root, 'remote.git');
+    const home = path.join(root, 'home');
+    const env = { PATH: process.env.PATH, HOME: home };
+    const generating = Promise.withResolvers<void>();
+    const generated = Promise.withResolvers<{ message: string }>();
+    const pushing = Promise.withResolvers<void>();
+    const pushed = Promise.withResolvers<void>();
+    const controllers = [new AbortController(), new AbortController()];
+    const pending: ReturnType<typeof runAutoCommit>[] = [];
+    const first = createOpts({
+      workspacePath,
+      env,
+      messageId: 'first',
+      signal: controllers[0].signal,
+    });
+    const second = createOpts({
+      workspacePath,
+      env,
+      messageId: 'second',
+      signal: controllers[1].signal,
+    });
+    let secondSettled = false;
+    vi.mocked(first.opts.kiloClient.generateCommitMessage).mockImplementation(() => {
+      generating.resolve();
+      return generated.promise;
+    });
+    mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+    mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+    mockGit.mockImplementation(async (args, options) => {
+      if (args[0] === 'push') {
+        pushing.resolve();
+        await pushed.promise;
+      }
+      return actual.git(args, options);
+    });
+    const git = async (args: string[]) => {
+      const result = await actual.git(args, { cwd: workspacePath, env, inheritEnv: false });
+      expect(result.exitCode).toBe(0);
+      return result.stdout;
+    };
+    try {
+      await fs.mkdir(workspacePath);
+      await fs.mkdir(home);
+      await git(['init', '--bare', remote]);
+      await git(['init', '--initial-branch=work']);
+      await git(['config', 'user.name', 'Test Agent']);
+      await git(['config', 'user.email', 'test@example.com']);
+      await git(['config', 'commit.gpgsign', 'false']);
+      await git(['remote', 'add', 'origin', remote]);
+      await fs.writeFile(path.join(workspacePath, 'result.txt'), 'shared changes\n');
+
+      const firstCommit = runAutoCommit(first.opts);
+      pending.push(firstCommit);
+      await generating.promise;
+      const secondCommit = runAutoCommit(second.opts).then(result => {
+        secondSettled = true;
+        return result;
+      });
+      pending.push(secondCommit);
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(mockGetCurrentBranch).toHaveBeenCalledTimes(1);
+      expect(second.events).toEqual([]);
+      expect(secondSettled).toBe(false);
+
+      generated.resolve({ message: 'Commit shared changes' });
+      await pushing.promise;
+      expect(await git(['status', '--porcelain'])).toBe('');
+      expect(mockGetCurrentBranch).toHaveBeenCalledTimes(1);
+      expect(secondSettled).toBe(false);
+      pushed.resolve();
+      expect(await firstCommit).toEqual({ success: true });
+      expect(await secondCommit).toEqual({ success: true, skipped: true });
+      expect(second.events).toEqual([
+        expect.objectContaining({
+          streamEventType: 'autocommit_completed',
+          data: expect.objectContaining({ success: true, skipped: true, messageId: 'second' }),
+        }),
+      ]);
+      expect(await git(['--git-dir', remote, 'show', 'refs/heads/work:result.txt'])).toBe(
+        'shared changes\n'
+      );
+      expect(
+        (await git(['--git-dir', remote, 'rev-list', '--count', 'refs/heads/work'])).trim()
+      ).toBe('1');
+    } finally {
+      for (const controller of controllers) controller.abort();
+      generated.resolve({ message: 'Commit shared changes' });
+      pushed.resolve();
+      await Promise.allSettled(pending);
+      mockGit.mockReset();
+      mockGetCurrentBranch.mockReset();
+      mockHasGitUpstream.mockReset();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('commits and pushes with the isolated worktree environment instead of wrapper credentials', async () => {
+    const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'worktree-autocommit-'));
+    const workspacePath = path.join(root, 'workspace');
+    const remote = path.join(root, 'remote.git');
+    const home = path.join(root, 'home');
+    const report = path.join(root, 'hook-env.json');
+    const env = {
+      PATH: process.env.PATH,
+      HOME: home,
+      XDG_DATA_HOME: path.join(home, 'data'),
+      KILOCODE_TOKEN: 'guest-worktree-alias',
+      WORKTREE_ENV_REPORT: report,
+    };
+    vi.stubEnv('AUTOCOMMIT_PARENT_ONLY', 'wrapper-only-value');
+    mockGit.mockImplementation(actual.git);
+    mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+    mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+    try {
+      await fs.mkdir(workspacePath);
+      await fs.mkdir(home);
+      const git = async (args: string[]) => {
+        const result = await actual.git(args, { cwd: workspacePath, env, inheritEnv: false });
+        expect(result.exitCode).toBe(0);
+        return result.stdout;
+      };
+      await git(['init', '--bare', remote]);
+      await git(['init', '--initial-branch=work']);
+      await git(['config', 'user.name', 'Test Agent']);
+      await git(['config', 'user.email', 'test@example.com']);
+      await git(['config', 'commit.gpgsign', 'false']);
+      await git(['remote', 'add', 'origin', remote]);
+      await fs.writeFile(path.join(workspacePath, 'result.txt'), 'contained finalization\n');
+      const hook = `#!/bin/sh\nnode -e 'require("node:fs").writeFileSync(process.env.WORKTREE_ENV_REPORT, JSON.stringify({home:process.env.HOME,data:process.env.XDG_DATA_HOME,token:process.env.KILOCODE_TOKEN,parent:process.env.AUTOCOMMIT_PARENT_ONLY ?? null}))'\n`;
+      await fs.writeFile(path.join(workspacePath, '.git', 'hooks', 'pre-commit'), hook, {
+        mode: 0o755,
+      });
+      const { opts } = createOpts({ workspacePath, env });
+
+      await expect(runAutoCommit(opts)).resolves.toEqual({ success: true });
+      expect(JSON.parse(await fs.readFile(report, 'utf8'))).toEqual({
+        home,
+        data: env.XDG_DATA_HOME,
+        token: env.KILOCODE_TOKEN,
+        parent: null,
+      });
+      expect(await git(['--git-dir', remote, 'show', 'refs/heads/work:result.txt'])).toBe(
+        'contained finalization\n'
+      );
+    } finally {
+      vi.unstubAllEnvs();
+      mockGit.mockReset();
+      mockGetCurrentBranch.mockReset();
+      mockHasGitUpstream.mockReset();
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it('aborts the generation request on caller cancellation without staging, committing, or pushing', async () => {

@@ -1,10 +1,13 @@
 import type { BillingContext } from '@kilocode/container-usage';
 import { describe, expect, it } from 'vitest';
 import { SANDBOX_USAGE_SKUS, type SandboxClassName } from '../container-usage-context.js';
+import { encodeCloudflareProviderRef } from './cloudflare-provider.js';
 import {
   validateTerminalBillingRuntime,
   type SandboxTerminalAccessInput,
 } from './terminal-billing.js';
+
+const PROVIDER_CREATION_ID = 'd1b3a0a8-a0a4-48a3-ab59-4be8bd63ba9a';
 
 const access: SandboxTerminalAccessInput = {
   sessionId: 'workspace_session',
@@ -14,14 +17,14 @@ const access: SandboxTerminalAccessInput = {
 
 function context(overrides: Partial<BillingContext> = {}): BillingContext {
   return {
-    service: 'cloud-agent-next-sandbox-small',
+    service: 'cloud-agent-next-sandbox-small-containment',
     instanceId: 'ses-abcdef',
-    sku: SANDBOX_USAGE_SKUS.SandboxSmall,
+    sku: SANDBOX_USAGE_SKUS.SandboxSmallContainment,
     subject: { type: 'user', id: access.ownerId },
     actor: { type: 'user', id: access.ownerId },
     sessionId: access.sessionId,
     metadata: {
-      container_class: 'SandboxSmall',
+      container_class: 'SandboxSmallContainment',
       durable_object_id: 'durable-object-small',
       origin: 'cloud-agent',
     },
@@ -50,10 +53,16 @@ function billingInput(
   return {
     access: options.access ?? access,
     sandboxId,
-    providerInstanceId: options.providerInstanceId ?? sandboxId,
+    providerInstanceId:
+      options.providerInstanceId ??
+      encodeCloudflareProviderRef({
+        sandboxId,
+        containment: true,
+        instanceId: PROVIDER_CREATION_ID,
+      }),
     sandboxDurableObjectId: options.sandboxDurableObjectId ?? 'durable-object-small',
     runtime: {
-      sandboxClassName: options.sandboxClassName ?? 'SandboxSmall',
+      sandboxClassName: options.sandboxClassName ?? 'SandboxSmallContainment',
       running: options.running ?? true,
       blocked: options.blocked ?? false,
       context: options.context ?? context(),
@@ -62,7 +71,7 @@ function billingInput(
 }
 
 describe('validateTerminalBillingRuntime', () => {
-  it('accepts a measured isolated runtime attributed to the session owner', () => {
+  it('accepts a measured contained runtime attributed to the session owner', () => {
     expect(validateTerminalBillingRuntime(billingInput())).toEqual({ allowed: true });
   });
 
@@ -71,37 +80,43 @@ describe('validateTerminalBillingRuntime', () => {
       sandboxId: 'istd-abcdef',
       sandboxClassName: 'Sandbox' as const,
       service: 'cloud-agent-next-sandbox',
+      expected: { allowed: false, reason: 'billing_runtime_mismatch' },
     },
     {
       sandboxId: 'crv-abcdef',
-      sandboxClassName: 'SandboxCodeReview' as const,
-      service: 'cloud-agent-next-sandbox-code-review',
+      sandboxClassName: 'SandboxCodeReviewContainment' as const,
+      service: 'cloud-agent-next-sandbox-code-review-containment',
+      expected: { allowed: true },
     },
     {
-      sandboxId: 'dind-abcdef',
-      sandboxClassName: 'SandboxDIND' as const,
-      service: 'cloud-agent-next-sandbox-dind',
+      sandboxId: 'istd-abcdef',
+      sandboxClassName: 'SandboxContainment' as const,
+      service: 'cloud-agent-next-sandbox-containment',
+      expected: { allowed: true },
     },
-  ])('accepts measured $sandboxClassName attribution in its actual namespace', input => {
-    expect(
-      validateTerminalBillingRuntime(
-        billingInput({
-          sandboxId: input.sandboxId,
-          sandboxClassName: input.sandboxClassName,
-          context: context({
-            service: input.service,
-            instanceId: input.sandboxId,
-            sku: SANDBOX_USAGE_SKUS[input.sandboxClassName],
-            metadata: {
-              container_class: input.sandboxClassName,
-              durable_object_id: 'durable-object-small',
-              origin: 'cloud-agent',
-            },
-          }),
-        })
-      )
-    ).toEqual({ allowed: true });
-  });
+  ])(
+    'validates measured $sandboxClassName attribution against the containment namespace',
+    input => {
+      expect(
+        validateTerminalBillingRuntime(
+          billingInput({
+            sandboxId: input.sandboxId,
+            sandboxClassName: input.sandboxClassName,
+            context: context({
+              service: input.service,
+              instanceId: input.sandboxId,
+              sku: SANDBOX_USAGE_SKUS[input.sandboxClassName],
+              metadata: {
+                container_class: input.sandboxClassName,
+                durable_object_id: 'durable-object-small',
+                origin: 'cloud-agent',
+              },
+            }),
+          })
+        )
+      ).toEqual(input.expected);
+    }
+  );
 
   it('accepts an organization bot acting for the matching payer', () => {
     const organizationAccess = { ...access, organizationId: 'org_team', botId: 'bot_worker' };
@@ -119,30 +134,36 @@ describe('validateTerminalBillingRuntime', () => {
     ).toEqual({ allowed: true });
   });
 
-  it('accepts a shared runtime only without session attribution', () => {
-    const shared = billingInput({
-      sandboxId: 'org-abcdef',
-      sandboxClassName: 'Sandbox',
-      context: context({
-        service: 'cloud-agent-next-sandbox',
-        instanceId: 'org-abcdef',
-        sku: SANDBOX_USAGE_SKUS.Sandbox,
-        sessionId: undefined,
-        metadata: { container_class: 'Sandbox', durable_object_id: 'durable-object-small' },
-      }),
-    });
+  it.each(['org-abcdef', 'usr-abcdef', 'bot-abcdef', 'ubt-abcdef'])(
+    'accepts shared containment runtime %s only without session attribution',
+    sandboxId => {
+      const shared = billingInput({
+        sandboxId,
+        sandboxClassName: 'SandboxContainment',
+        context: context({
+          service: 'cloud-agent-next-sandbox-containment',
+          instanceId: sandboxId,
+          sku: SANDBOX_USAGE_SKUS.SandboxContainment,
+          sessionId: undefined,
+          metadata: {
+            container_class: 'SandboxContainment',
+            durable_object_id: 'durable-object-small',
+          },
+        }),
+      });
 
-    expect(validateTerminalBillingRuntime(shared)).toEqual({ allowed: true });
-    expect(
-      validateTerminalBillingRuntime({
-        ...shared,
-        runtime: {
-          ...shared.runtime,
-          context: { ...shared.runtime.context, sessionId: access.sessionId },
-        },
-      })
-    ).toEqual({ allowed: false, reason: 'billing_session_mismatch' });
-  });
+      expect(validateTerminalBillingRuntime(shared)).toEqual({ allowed: true });
+      expect(
+        validateTerminalBillingRuntime({
+          ...shared,
+          runtime: {
+            ...shared.runtime,
+            context: { ...shared.runtime.context, sessionId: access.sessionId },
+          },
+        })
+      ).toEqual({ allowed: false, reason: 'billing_session_mismatch' });
+    }
+  );
 
   it.each([
     {
@@ -194,13 +215,94 @@ describe('validateTerminalBillingRuntime', () => {
   });
 
   it.each([
+    { name: 'raw sandbox ID', providerInstanceId: 'ses-abcdef' },
+    { name: 'empty reference', providerInstanceId: '' },
+    { name: 'invalid JSON', providerInstanceId: '{' },
+    { name: 'JSON sandbox ID string', providerInstanceId: JSON.stringify('ses-abcdef') },
     {
-      name: 'sandbox class',
-      input: billingInput({ sandboxClassName: 'SandboxCodeReview' }),
+      name: 'uncontained reference',
+      providerInstanceId: JSON.stringify({
+        sandboxId: 'ses-abcdef',
+        containment: false,
+        instanceId: PROVIDER_CREATION_ID,
+      }),
     },
     {
-      name: 'provider instance',
-      input: billingInput({ providerInstanceId: 'ses-other' }),
+      name: 'reference without a creation identity',
+      providerInstanceId: JSON.stringify({ sandboxId: 'ses-abcdef', containment: true }),
+    },
+  ])('rejects $name instead of falling back to an uncontained runtime', input => {
+    expect(validateTerminalBillingRuntime(billingInput(input))).toEqual({
+      allowed: false,
+      reason: 'billing_runtime_mismatch',
+    });
+  });
+
+  it.each([
+    {
+      sandboxId: 'ses-abcdef',
+      sandboxClassName: 'SandboxSmall' as const,
+      service: 'cloud-agent-next-sandbox-small',
+    },
+    {
+      sandboxId: 'crv-abcdef',
+      sandboxClassName: 'SandboxCodeReview' as const,
+      service: 'cloud-agent-next-sandbox-code-review',
+    },
+    {
+      sandboxId: 'org-abcdef',
+      sandboxClassName: 'Sandbox' as const,
+      service: 'cloud-agent-next-sandbox',
+    },
+    {
+      sandboxId: 'dind-abcdef',
+      sandboxClassName: 'SandboxDIND' as const,
+      service: 'cloud-agent-next-sandbox-dind',
+    },
+    {
+      sandboxId: 'invalid-id',
+      sandboxClassName: 'SandboxContainment' as const,
+      service: 'cloud-agent-next-sandbox-containment',
+    },
+  ])('rejects $sandboxId in $sandboxClassName despite otherwise matching billing', input => {
+    expect(
+      validateTerminalBillingRuntime(
+        billingInput({
+          sandboxId: input.sandboxId,
+          sandboxClassName: input.sandboxClassName,
+          context: context({
+            service: input.service,
+            instanceId: input.sandboxId,
+            sku: SANDBOX_USAGE_SKUS[input.sandboxClassName],
+            ...(input.sandboxId.startsWith('org-') ? { sessionId: undefined } : {}),
+            metadata: {
+              container_class: input.sandboxClassName,
+              durable_object_id: 'durable-object-small',
+            },
+          }),
+        })
+      )
+    ).toEqual({ allowed: false, reason: 'billing_runtime_mismatch' });
+  });
+
+  it.each([
+    {
+      name: 'sandbox class',
+      input: billingInput({ sandboxClassName: 'SandboxCodeReviewContainment' }),
+    },
+    {
+      name: 'provider sandbox',
+      input: billingInput({
+        providerInstanceId: encodeCloudflareProviderRef({
+          sandboxId: 'ses-fedcba',
+          containment: true,
+          instanceId: PROVIDER_CREATION_ID,
+        }),
+      }),
+    },
+    {
+      name: 'creation identity used as the billing instance',
+      input: billingInput({ context: context({ instanceId: PROVIDER_CREATION_ID }) }),
     },
     {
       name: 'billing instance',
@@ -258,11 +360,31 @@ describe('validateTerminalBillingRuntime', () => {
     ).toEqual({ allowed: false, reason: 'billing_actor_mismatch' });
   });
 
-  it('rejects isolated attribution for a different session', () => {
+  it.each([
+    undefined,
+    { type: 'org' as const, id: 'org_other' },
+    { type: 'user' as const, id: access.ownerId },
+  ])('rejects a bot whose on-behalf-of attribution does not match the payer: %s', onBehalfOf => {
     expect(
       validateTerminalBillingRuntime(
-        billingInput({ context: context({ sessionId: 'workspace_other' }) })
+        billingInput({
+          access: { ...access, organizationId: 'org_team', botId: 'bot_worker' },
+          context: context({
+            subject: { type: 'org', id: 'org_team' },
+            actor: { type: 'bot', id: 'bot_worker' },
+            onBehalfOf,
+          }),
+        })
       )
-    ).toEqual({ allowed: false, reason: 'billing_session_mismatch' });
+    ).toEqual({ allowed: false, reason: 'billing_context_unavailable' });
   });
+
+  it.each([undefined, 'workspace_other'])(
+    'rejects isolated attribution without the requested session: %s',
+    sessionId => {
+      expect(
+        validateTerminalBillingRuntime(billingInput({ context: context({ sessionId }) }))
+      ).toEqual({ allowed: false, reason: 'billing_session_mismatch' });
+    }
+  );
 });

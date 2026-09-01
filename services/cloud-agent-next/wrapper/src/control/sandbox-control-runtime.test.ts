@@ -352,6 +352,35 @@ describe('startSandboxControlEventFeed', () => {
     expect(failures).toEqual([]);
   });
 
+  it('returns the underlying iterator when a worktree stops consuming its feed', async () => {
+    const abort = new AbortController();
+    let closed = false;
+    const failures: unknown[] = [];
+    async function* stream(): AsyncGenerator<unknown> {
+      try {
+        yield { payload: { type: 'server.connected' } };
+        yield { payload: { type: 'session.created' } };
+      } finally {
+        closed = true;
+      }
+    }
+    await startSandboxControlEventFeed({
+      signal: abort.signal,
+      open: async () => ({ stream: stream() }),
+      consume: async events => {
+        for await (const event of events) {
+          expect(event).toEqual({ payload: { type: 'server.connected' } });
+          abort.abort();
+          break;
+        }
+      },
+      onUnexpectedClose: error => failures.push(error),
+    });
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    expect(closed).toBe(true);
+    expect(failures).toEqual([]);
+  });
+
   it('rejects when the global feed subscription fails', async () => {
     const abort = new AbortController();
     let consumed = false;

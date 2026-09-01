@@ -11,6 +11,7 @@ import {
   sessionTerminalResizePayloadSchema,
   type ResponseFrame,
 } from '../shared/sandbox-control-protocol.js';
+import type { sandboxControlRpc } from './control-rpc.js';
 import {
   createSandboxTerminalLifecycle,
   SANDBOX_SESSION_LIFECYCLE_KEY,
@@ -76,16 +77,16 @@ function createFixture(
     workspace: {
       sandboxId: SANDBOX_ID,
       sandboxProvider: 'cloudflare',
-      ...(options.containment
-        ? {
+      ...(options.containment === undefined
+        ? {}
+        : {
             credentialContainment: {
-              github: true,
+              github: options.containment,
               gitlab: false,
               bitbucket: false,
-              kilocode: false,
+              kilocode: options.containment,
             },
-          }
-        : {}),
+          }),
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -118,10 +119,14 @@ function createFixture(
     if (input.operation === 'session.detach') return response({ detached: true });
     return response({ connected: true });
   });
+  type TerminalControl = ReturnType<typeof sandboxControlRpc>;
   const control = {
-    ensureReady: vi.fn(async () => ({
-      connection: 'ready' as const,
-      physical: 'running' as const,
+    prepareSessionCredentials: vi.fn<TerminalControl['prepareSessionCredentials']>(async () => ({
+      directory: DIRECTORY,
+    })),
+    ensureReady: vi.fn<TerminalControl['ensureReady']>(async () => ({
+      connection: 'ready',
+      physical: 'running',
     })),
     getStatus: vi.fn(async () => ({
       connection: 'ready' as const,
@@ -140,6 +145,7 @@ function createFixture(
         allowed: true,
       })
     ),
+    updateNetworkPolicy: vi.fn(async () => undefined),
     request,
   };
   const closeTerminalBridge = vi.fn();
@@ -207,9 +213,26 @@ describe('SandboxSession terminal lifecycle', () => {
     });
   });
 
+  it.each([undefined, false, true])(
+    'allows verified contained terminals with legacy containment metadata %s',
+    async containment => {
+      const fixture = createFixture({ containment });
+
+      await expect(
+        fixture.lifecycle.createTerminal({ operationId: FIRST_OPERATION_ID })
+      ).resolves.toMatchObject({ success: true, data: { pty: { id: 'pty_1', cwd: DIRECTORY } } });
+      expect(fixture.control.validateTerminalAccess).toHaveBeenCalledWith({
+        sessionId: SESSION_ID,
+        ownerId: 'user_1',
+        wrapperInstanceId: WRAPPER_INSTANCE_ID,
+      });
+      expect(fixture.control.ensureReady).not.toHaveBeenCalled();
+      expect(fixture.control.prepareSessionCredentials).not.toHaveBeenCalled();
+    }
+  );
+
   it.each([
     [{ platform: 'code-review' }, 'interactive Cloud Agent sessions'],
-    [{ containment: true }, 'credential containment'],
     [{ terminalCapable: false }, 'does not support terminals'],
   ])('permanently rejects unsupported terminal access', async (options, reason) => {
     const fixture = createFixture(options);
@@ -224,8 +247,12 @@ describe('SandboxSession terminal lifecycle', () => {
     expect(fixture.control.ensureReady).not.toHaveBeenCalled();
   });
 
-  it('verifies trusted billing attribution before creating a shell', async () => {
-    const fixture = createFixture({ organizationId: 'org_1', botId: 'bot_1' });
+  it('verifies trusted billing attribution before creating a contained shell', async () => {
+    const fixture = createFixture({
+      containment: true,
+      organizationId: 'org_1',
+      botId: 'bot_1',
+    });
     fixture.control.validateTerminalAccess.mockResolvedValue({
       allowed: false,
       reason: 'billing_context_unavailable',

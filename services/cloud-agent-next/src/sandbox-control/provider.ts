@@ -1,4 +1,5 @@
 import type { SandboxBillingInput } from '../container-usage-context.js';
+import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { CreateIntent, ObserveResult } from './physical-lifecycle.js';
 
 export type { ObserveResult };
@@ -15,6 +16,7 @@ export function observeFromWrapperObservation(status: WrapperObservationStatus):
 
 export type ProviderCreateIntent = CreateIntent & {
   billing?: SandboxBillingInput;
+  networkPolicy?: VercelSandboxNetworkPolicy;
 };
 
 export type ProviderObservation = {
@@ -31,6 +33,10 @@ export type ProviderAdapter = {
   stop(ref: string | null, intent?: CreateIntent | null): Promise<StopResult>;
   ensureLeaseAtLeast(ref: string, ms: number): Promise<void>;
   logs(ref: string): Promise<string>;
+  updateNetworkPolicy?(
+    providerRef: string,
+    networkPolicy: VercelSandboxNetworkPolicy
+  ): Promise<void>;
 };
 
 export type MemoryProviderAdapter = ProviderAdapter & {

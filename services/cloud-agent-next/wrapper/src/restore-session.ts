@@ -39,6 +39,7 @@ type SnapshotDiff = {
 };
 
 export type RestoreSessionOptions = {
+  env?: NodeJS.ProcessEnv;
   importTimeoutMs?: number;
   importTerminationGraceMs?: number;
   signal?: AbortSignal;
@@ -97,17 +98,62 @@ function tryUnlink(filePath: string): void {
   }
 }
 
-function resolveKilocodeToken(): string | undefined {
-  if (process.env.KILOCODE_TOKEN) {
-    return process.env.KILOCODE_TOKEN;
+function resolveKilocodeToken(env: NodeJS.ProcessEnv): string | undefined {
+  if (env.KILOCODE_TOKEN) {
+    return env.KILOCODE_TOKEN;
   }
 
-  const tokenFile = process.env.KILOCODE_TOKEN_FILE;
+  const tokenFile = env.KILOCODE_TOKEN_FILE;
   if (!tokenFile) {
     return undefined;
   }
 
   return fs.readFileSync(tokenFile, 'utf8').replace(/[\r\n]+$/, '');
+}
+
+export async function seedSessionIngestRegistration(
+  kiloSessionId: string,
+  env: NodeJS.ProcessEnv,
+  signal?: AbortSignal
+): Promise<void> {
+  signal?.throwIfAborted();
+  if (
+    kiloSessionId.length === 0 ||
+    kiloSessionId.length > 128 ||
+    /[^A-Za-z0-9_-]/.test(kiloSessionId)
+  ) {
+    throw new Error('Invalid Kilo session ID for ingest registration');
+  }
+  const dataHome = env.XDG_DATA_HOME;
+  if (
+    !dataHome ||
+    !path.isAbsolute(dataHome) ||
+    ['\0', '\r', '\n'].some(char => dataHome.includes(char))
+  ) {
+    throw new Error('Ingest registration requires an explicit absolute XDG_DATA_HOME');
+  }
+
+  const directory = path.join(dataHome, 'kilo', 'storage', 'session_share');
+  await fs.promises.mkdir(directory, { recursive: true, mode: 0o700 });
+  signal?.throwIfAborted();
+  const temporaryPath = path.join(directory, `.${kiloSessionId}.${crypto.randomUUID()}.tmp`);
+  const file = await fs.promises.open(temporaryPath, 'wx', 0o600);
+  try {
+    try {
+      signal?.throwIfAborted();
+      await fs.promises.writeFile(
+        file,
+        JSON.stringify({ id: kiloSessionId, ingestPath: `/api/session/${kiloSessionId}/ingest` }),
+        { encoding: 'utf8', signal }
+      );
+    } finally {
+      await file.close();
+    }
+    signal?.throwIfAborted();
+    await fs.promises.rename(temporaryPath, path.join(directory, `${kiloSessionId}.json`));
+  } finally {
+    await fs.promises.rm(temporaryPath, { force: true });
+  }
 }
 
 type SnapshotInfoValidation = 'valid' | 'empty' | 'missing' | 'invalid';
@@ -450,7 +496,8 @@ async function sanitizeSnapshotWithJq(
   snapshotPath: string,
   filter: string,
   logLabel: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<boolean> {
   const tempPath = tokenSanitizationTempPath(snapshotPath);
   try {
@@ -459,6 +506,7 @@ async function sanitizeSnapshotWithJq(
       stdout: 'pipe',
       stderr: 'ignore',
       signal,
+      env,
     });
     const writeOutput = proc.stdout.pipeTo(Writable.toWeb(fs.createWriteStream(tempPath)));
     const exitCode = await proc.exited;
@@ -479,9 +527,19 @@ async function sanitizeSnapshotWithJq(
   }
 }
 
-async function sanitizeSnapshot(snapshotPath: string, signal?: AbortSignal): Promise<void> {
+async function sanitizeSnapshot(
+  snapshotPath: string,
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
+): Promise<void> {
   if (
-    await sanitizeSnapshotWithJq(snapshotPath, JQ_SANITIZE_SNAPSHOT_FILTER, 'sanitization', signal)
+    await sanitizeSnapshotWithJq(
+      snapshotPath,
+      JQ_SANITIZE_SNAPSHOT_FILTER,
+      'sanitization',
+      signal,
+      env
+    )
   ) {
     log('snapshot sanitized');
     return;
@@ -506,7 +564,8 @@ const JQ_EXTRACT_DIFFS_FILTER =
  */
 export async function extractDiffs(
   snapshotPath: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<SnapshotDiff[] | null> {
   signal?.throwIfAborted();
   try {
@@ -514,6 +573,7 @@ export async function extractDiffs(
       stdout: 'pipe',
       stderr: 'ignore',
       signal,
+      env,
     });
     const exitCode = await proc.exited;
     signal?.throwIfAborted();
@@ -583,13 +643,15 @@ async function runGitApply(
   workspacePath: string,
   patchFile: string,
   extraArgs: string[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<{ exitCode: number; stderr: string }> {
   const proc = Bun.spawn(['git', 'apply', ...extraArgs, '--whitespace=nowarn', patchFile], {
     cwd: workspacePath,
     stdout: 'pipe',
     stderr: 'pipe',
     signal,
+    env,
   });
   const stderr = await new Response(proc.stderr).text();
   const exitCode = await proc.exited;
@@ -599,7 +661,8 @@ async function runGitApply(
 async function applyPatch(
   workspacePath: string,
   diff: SnapshotDiff,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<boolean> {
   if (!diff.patch) return false;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-session-diff-'));
@@ -607,7 +670,7 @@ async function applyPatch(
   try {
     signal?.throwIfAborted();
     fs.writeFileSync(file, diff.patch);
-    const threeWay = await runGitApply(workspacePath, file, ['--3way'], signal);
+    const threeWay = await runGitApply(workspacePath, file, ['--3way'], signal, env);
     signal?.throwIfAborted();
     if (threeWay.exitCode === 0) return true;
     log(
@@ -621,6 +684,7 @@ async function applyPatch(
       stdout: 'pipe',
       stderr: 'pipe',
       signal,
+      env,
     });
     const resetStderr = await new Response(reset.stderr).text();
     const resetExitCode = await reset.exited;
@@ -632,7 +696,7 @@ async function applyPatch(
       return false;
     }
 
-    const plain = await runGitApply(workspacePath, file, [], signal);
+    const plain = await runGitApply(workspacePath, file, [], signal, env);
     signal?.throwIfAborted();
     if (plain.exitCode === 0) {
       log(`git apply fallback succeeded file=${diff.file}`);
@@ -697,17 +761,18 @@ export async function restoreSession(
   }
   const downloaded = !filePath;
   const importTimeoutMs = options.importTimeoutMs ?? KILO_IMPORT_TIMEOUT_MS;
+  const env = options.env ?? process.env;
 
   try {
     log(
-      `starting kiloSessionId=${kiloSessionId} workspace=${workspacePath} input=${downloaded ? 'downloaded' : 'provided'} tmpPath=${tmpPath} home=${process.env.HOME ?? '(unset)'}`
+      `starting kiloSessionId=${kiloSessionId} workspace=${workspacePath} input=${downloaded ? 'downloaded' : 'provided'} tmpPath=${tmpPath} home=${env.HOME ?? '(unset)'}`
     );
 
     if (!filePath) {
-      const ingestUrl = process.env.KILO_SESSION_INGEST_URL;
+      const ingestUrl = env.KILO_SESSION_INGEST_URL;
       let token: string | undefined;
       try {
-        token = resolveKilocodeToken();
+        token = resolveKilocodeToken(env);
       } catch {
         return fail('failed to read KILOCODE_TOKEN_FILE', null, 'download');
       }
@@ -795,15 +860,17 @@ export async function restoreSession(
       }
     }
 
-    await sanitizeSnapshot(tmpPath, options.signal);
+    await sanitizeSnapshot(tmpPath, options.signal, env);
 
     // ---- Step 2: Run kilo import ----
     const importStartedAt = Date.now();
     log(
-      `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
+      `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
     );
     const importResult = await runProcess('kilo', ['import', tmpPath], {
       cwd: workspacePath,
+      env,
+      inheritEnv: false,
       timeoutMs: importTimeoutMs,
       signal: options.signal,
       terminationGraceMs: options.importTerminationGraceMs,
@@ -812,7 +879,7 @@ export async function restoreSession(
 
     if (isTimeoutTermination(importResult)) {
       log(
-        `kilo import finished outcome=timeout kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs} timeoutMs=${importTimeoutMs}`
+        `kilo import finished outcome=timeout kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs} timeoutMs=${importTimeoutMs}`
       );
       return fail(
         `kilo import timed out after ${importTimeoutMs}ms`,
@@ -825,7 +892,7 @@ export async function restoreSession(
 
     if (importResult.exitCode !== 0) {
       log(
-        `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+        `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
       );
       return fail(
         `kilo import failed exitCode=${importResult.exitCode}`,
@@ -836,13 +903,13 @@ export async function restoreSession(
       );
     }
     log(
-      `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+      `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
     );
 
     // ---- Step 3: Apply diffs ----
     // Extract diffs in a subprocess so the full snapshot JSON is never loaded
     // into this process's heap — only the small diff array crosses the boundary.
-    const uniqueDiffs = await extractDiffs(tmpPath, options.signal);
+    const uniqueDiffs = await extractDiffs(tmpPath, options.signal, env);
     if (uniqueDiffs === null) {
       return fail('failed to parse snapshot JSON', null, 'diffs');
     }
@@ -868,7 +935,7 @@ export async function restoreSession(
       options.signal?.throwIfAborted();
       if (diff.patch) {
         try {
-          if (await applyPatch(workspacePath, diff, options.signal)) {
+          if (await applyPatch(workspacePath, diff, options.signal, env)) {
             applied++;
           } else {
             skipped++;

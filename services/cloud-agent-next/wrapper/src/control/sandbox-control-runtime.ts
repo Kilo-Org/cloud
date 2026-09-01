@@ -117,15 +117,19 @@ export async function startSandboxControlEventFeed(
   signal.addEventListener('abort', () => clearInterval(freshnessTimer), { once: true });
 
   async function* establishedFeed(): AsyncGenerator<unknown> {
-    yield first.value;
-    while (!signal.aborted) {
-      const next = await iterator.next();
-      if (signal.aborted || next.done) return;
-      if (isFeedConnectedEvent(next.value)) {
-        throw new Error('Kilo global event feed reconnected with a delivery gap');
+    try {
+      yield first.value;
+      while (!signal.aborted) {
+        const next = await iterator.next();
+        if (signal.aborted || next.done) return;
+        if (isFeedConnectedEvent(next.value)) {
+          throw new Error('Kilo global event feed reconnected with a delivery gap');
+        }
+        lastEventAt = now();
+        yield next.value;
       }
-      lastEventAt = now();
-      yield next.value;
+    } finally {
+      await iterator.return?.();
     }
   }
 

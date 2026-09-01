@@ -1,9 +1,7 @@
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
-import { resolveGitHubTokenForRepo } from '../services/git-token-service-client.js';
 import { readProfileBundle } from '../session-profile.js';
-import type { GitTokenService } from '../types.js';
 import { getSessionWorkspacePath } from '../workspace.js';
 
 function rejectReservedControlRuntimeEnvironment(
@@ -21,14 +19,6 @@ export function validateControlSessionOptions(metadata: Pick<SessionMetadata, 'p
   const profile = readProfileBundle(metadata);
   rejectReservedControlRuntimeEnvironment(profile.envVars);
   rejectReservedControlRuntimeEnvironment(profile.encryptedSecrets);
-  if (
-    Object.keys(profile.envVars ?? {}).length ||
-    Object.keys(profile.encryptedSecrets ?? {}).length
-  ) {
-    throw new Error(
-      'Custom profile environment variables and secrets are not supported by control-plane sessions'
-    );
-  }
 }
 
 function gitFromMetadata(
@@ -85,21 +75,4 @@ export function buildSessionAttachPayload(
     ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
     ...(preparation ? { preparation } : {}),
   };
-}
-
-export async function fillAttachGitToken(
-  metadata: SessionMetadata,
-  payload: SessionAttachPayload,
-  env: { GIT_TOKEN_SERVICE?: GitTokenService }
-): Promise<SessionAttachPayload> {
-  if (!payload.git || payload.git.token) return payload;
-  const repository = metadata.repository;
-  if (repository?.type !== 'github') return payload;
-  const resolved = await resolveGitHubTokenForRepo(env, {
-    githubRepo: repository.repo,
-    userId: metadata.identity.userId,
-    ...(metadata.identity.orgId ? { orgId: metadata.identity.orgId } : {}),
-  });
-  if (!resolved.success) return payload;
-  return { ...payload, git: { ...payload.git, token: resolved.value.token } };
 }

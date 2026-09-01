@@ -42,6 +42,11 @@ import {
 } from './session-directories';
 import { withKiloRequestDeadline } from './sandbox-control-runtime';
 import { ControlTerminalRuntimeError, type ControlTerminalRuntime } from './terminal-runtime.js';
+import {
+  WorktreeKiloRuntimeError,
+  type WorktreeKiloRuntime,
+  type WorktreeKiloRuntimes,
+} from './worktree-runtime.js';
 
 export type HandlerSessionSnapshot = {
   kiloSessionId: string;
@@ -61,7 +66,7 @@ export type OwnedSessionTask = TaskIdentity & {
 };
 
 export type HandlerDeps = {
-  kiloClient?: WrapperKiloClient;
+  kiloRuntimes?: WorktreeKiloRuntimes;
   version: string;
   kiloReady: boolean;
   sessions: HandlerSessionSnapshot[];
@@ -223,6 +228,7 @@ export async function handleControlRequest(
     deps.onShutdown?.();
     await cancelControlTasks(deps, 'Sandbox shutting down');
     deps.terminalRuntime?.shutdown();
+    deps.kiloRuntimes?.shutdown();
     return ok({ shuttingDown: true });
   }
   if (!SESSION_OPERATION_SET.has(operation)) {
@@ -308,8 +314,20 @@ function missingKilo(): ControlHandlerResult {
   return fail('not_ready', 'Kilo is not ready', true);
 }
 
+function sessionKiloRuntime(
+  session: SessionRequestIdentity,
+  deps: HandlerDeps
+): WorktreeKiloRuntime | undefined {
+  if (
+    directoryForSession(session.kiloSessionId) !== session.directory ||
+    rootForSession(session.kiloSessionId) !== session.kiloSessionId
+  )
+    return undefined;
+  return deps.kiloRuntimes?.get(session.directory);
+}
+
 function terminalFailure(error: unknown): ControlHandlerResult {
-  if (error instanceof ControlTerminalRuntimeError) {
+  if (error instanceof ControlTerminalRuntimeError || error instanceof WorktreeKiloRuntimeError) {
     return fail(error.code, error.message, error.retryable);
   }
   return fail('not_ready', 'Terminal request failed', isKiloServerUnreachableError(error));
@@ -339,24 +357,13 @@ async function handleAttach(
     deps,
     async owned => {
       const result = await (deps.applyAttach ?? applySessionAttach)(session, parsed.data, {
-        kiloClient: deps.kiloClient,
+        kiloRuntimes: deps.kiloRuntimes,
         signal: owned.signal,
+        ...(deps.terminalRuntime ? { terminalRuntime: deps.terminalRuntime } : {}),
         ...(deps.emitPreparing ? { emitPreparing: deps.emitPreparing } : {}),
       });
       if (owned.signal.aborted) {
         return fail('not_ready', 'Session attachment cancelled', true);
-      }
-      if (
-        result.ok &&
-        deps.terminalRuntime &&
-        (parsed.data.directory ?? session.directory) === session.directory &&
-        (parsed.data.snapshotIdentity ?? session.kiloSessionId) === session.kiloSessionId
-      ) {
-        try {
-          deps.terminalRuntime.rememberAttachedSession(session);
-        } catch (error) {
-          return terminalFailure(error);
-        }
       }
       return result;
     }
@@ -379,10 +386,12 @@ async function handleDetach(
     if (!result.ok && task.kind !== 'preparation') return result;
   }
   try {
-    await deps.terminalRuntime?.detachSession(session);
+    deps.kiloRuntimes?.detach(session);
+    const terminalCleanup = deps.terminalRuntime?.detachSession(session);
     forgetAttachedRoot(session.kiloSessionId, session.directory);
     const index = deps.sessions.findIndex(item => item.kiloSessionId === session.kiloSessionId);
     if (index !== -1) deps.sessions.splice(index, 1);
+    await terminalCleanup;
     return ok({ detached: true });
   } catch (error) {
     return terminalFailure(error);
@@ -442,8 +451,8 @@ function handlePrompt(
   payload: unknown,
   deps: HandlerDeps
 ): ControlHandlerResult {
-  const kiloClient = deps.kiloClient;
-  if (!kiloClient) return missingKilo();
+  const runtime = sessionKiloRuntime(session, deps);
+  if (!runtime) return missingKilo();
   const parsed = sessionPromptPayloadSchema.safeParse(payload);
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
   const request = parsed.data;
@@ -475,8 +484,14 @@ function handlePrompt(
     }
     return fail('not_ready', 'Session has work in progress', true);
   }
-  startSessionTask(session, { kind: 'execution', messageId: request.messageId }, deps, task =>
-    executePrompt(task, request, kiloClient, deps)
+  startSessionTask(
+    session,
+    { kind: 'execution', messageId: request.messageId },
+    {
+      ...deps,
+      signal: deps.signal ? AbortSignal.any([deps.signal, runtime.signal]) : runtime.signal,
+    },
+    task => executePrompt(task, request, runtime, deps)
   );
   return ok({ messageId: request.messageId, status: 'accepted' });
 }
@@ -537,10 +552,11 @@ async function summarizeOwnedSession(
 async function executePrompt(
   task: OwnedSessionTask,
   request: SessionPromptPayload,
-  kiloClient: WrapperKiloClient,
+  runtime: WorktreeKiloRuntime,
   deps: HandlerDeps
 ): Promise<ControlHandlerResult> {
   const { session, signal } = task;
+  const { kiloClient, env } = runtime;
   const { messageId, turn, agent } = request;
   let outcome: SessionMessageOutcome;
   let result = ok({});
@@ -617,6 +633,7 @@ async function executePrompt(
         const committed = await (deps.runAutoCommit ?? runAutoCommit)({
           workspacePath: session.directory,
           kiloClient,
+          env,
           messageId: completion?.info.id ?? messageId,
           signal,
           onEvent: event => emitFinalizationEvent(session, event, deps),
@@ -719,7 +736,7 @@ async function handlePermissionResolve(
   payload: unknown,
   deps: HandlerDeps
 ): Promise<ControlHandlerResult> {
-  const kiloClient = deps.kiloClient;
+  const kiloClient = sessionKiloRuntime(session, deps)?.kiloClient;
   if (!kiloClient) return missingKilo();
   const parsed = sessionPermissionResolvePayloadSchema.safeParse(payload);
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
@@ -755,7 +772,7 @@ async function handleQuestionResolve(
   payload: unknown,
   deps: HandlerDeps
 ): Promise<ControlHandlerResult> {
-  const kiloClient = deps.kiloClient;
+  const kiloClient = sessionKiloRuntime(session, deps)?.kiloClient;
   if (!kiloClient) return missingKilo();
   const parsed = sessionQuestionResolvePayloadSchema.safeParse(payload);
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
@@ -791,7 +808,7 @@ async function handleSync(
   payload: unknown,
   deps: HandlerDeps
 ): Promise<ControlHandlerResult> {
-  const kiloClient = deps.kiloClient;
+  const kiloClient = sessionKiloRuntime(session, deps)?.kiloClient;
   if (!kiloClient) return missingKilo();
   if (!sessionSyncPayloadSchema.safeParse(payload).success) {
     return fail('protocol_error', 'Invalid payload', false);

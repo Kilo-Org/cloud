@@ -185,12 +185,29 @@ describe('BitbucketAuthorizationService', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns a decrypted token only for an active selected workspace', async () => {
+  it('returns a decrypted token and credential identity only for an active selected workspace', async () => {
     await expect(service().getAuthorization({ userId: 'user-1' })).resolves.toMatchObject({
       status: 'available',
       token: 'access-token',
       integrationId: 'integration-1',
+      credentialId: 'credential-1',
       workspace: { slug: 'acme' },
+    });
+  });
+
+  it('does not return a revoked OAuth credential identity', async () => {
+    const row = activeRow();
+    database.row = {
+      ...row,
+      credential: {
+        ...row.credential,
+        revoked_at: new Date().toISOString(),
+        revocation_reason: 'refresh_token_rejected',
+      },
+    };
+
+    await expect(service().getAuthorization({ userId: 'user-1' })).resolves.toEqual({
+      status: 'reconnect_required',
     });
   });
 
@@ -324,7 +341,11 @@ describe('BitbucketAuthorizationService', () => {
       BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS
     );
 
-    expect(result).toMatchObject({ status: 'available', token: 'next-access-token' });
+    expect(result).toMatchObject({
+      status: 'available',
+      token: 'next-access-token',
+      credentialId: 'credential-1',
+    });
     expect(database.locks).toBe(1);
     const rotation = database.updates.find(update => 'access_token_encrypted' in update);
     expect(JSON.parse(String(rotation?.access_token_encrypted))).toMatchObject({

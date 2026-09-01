@@ -1,7 +1,14 @@
 import { Buffer } from 'node:buffer';
 import { ContainerProxy } from '@cloudflare/sandbox';
+import { z } from 'zod';
 import { logger } from './logger.js';
 import { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
+import {
+  isControlPlaneCredential,
+  parseControlPlaneCredential,
+  type ControlCredentialPurpose,
+} from './sandbox-control/managed-credential.js';
+import { withDORetry } from './utils/do-retry.js';
 import type { GitTokenService } from './types.js';
 import { MeteredSandbox } from './container-usage.js';
 import type { SandboxClassName } from './container-usage-context.js';
@@ -17,6 +24,28 @@ const GITLAB_CAPABILITY_PREFIXES = ['kgl1.', 'kgl2.'];
 const KILO_CAPABILITY_PREFIXES = ['kka1.'];
 const BITBUCKET_CAPABILITY_PREFIXES = ['kbb1.'];
 const MAX_KILO_SESSION_BOOTSTRAP_BYTES = 16_000;
+const CONTROL_CREDENTIAL_CAPABILITY_PREFIXES = {
+  kilo: 'kka1.',
+  github: 'kgh2.',
+  gitlab: 'kgl2.',
+  bitbucket: 'kbb1.',
+} satisfies Record<ControlCredentialPurpose, string>;
+
+const resolvedControlCredentialSchema = z
+  .object({
+    credential: z.string().min(1),
+    organizationId: z.string().optional(),
+  })
+  .strict();
+
+type ControlCredentialResolutionBinding = {
+  resolveCredential(input: {
+    credential: string;
+    outboundContainerId: string;
+    url: string;
+    method: string;
+  }): Promise<unknown>;
+};
 
 type GitHubTokenRedemptionBinding = Pick<GitTokenService, 'redeemGitHubSessionCapability'>;
 type GitLabTokenRedemptionBinding = Pick<GitTokenService, 'redeemGitLabSessionCapability'>;
@@ -275,6 +304,12 @@ function supportsBitbucketSessionCapabilityRedemption(
 }
 
 function classifyCapability(capability: string): AuthorizationExtraction {
+  if (isControlPlaneCredential(capability)) {
+    const parsed = parseControlPlaneCredential(capability);
+    return parsed
+      ? { type: 'capability', value: { provider: parsed.purpose, capability } }
+      : { type: 'unsupported_capability' };
+  }
   if (GITHUB_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
     return { type: 'capability', value: { provider: 'github', capability } };
   }
@@ -292,29 +327,49 @@ function classifyCapability(capability: string): AuthorizationExtraction {
     : NO_AUTHORIZATION_CAPABILITY;
 }
 
-function extractGitCapability(authorization: string | null): AuthorizationExtraction {
-  if (!authorization) return NO_AUTHORIZATION_CAPABILITY;
-  const match = /^Basic[ \t]+(.+)$/i.exec(authorization);
-  if (!match) return NO_AUTHORIZATION_CAPABILITY;
-  const encodedCredential = match[1];
-  if (!encodedCredential) return NO_AUTHORIZATION_CAPABILITY;
-  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encodedCredential)) return NO_AUTHORIZATION_CAPABILITY;
+function parseGitAuthorization(authorization: string | null): {
+  prefix: string;
+  username: string;
+  password: string;
+  canonical: boolean;
+} | null {
+  if (!authorization) return null;
+  const match = /^(Basic[ \t]+)(.+)$/i.exec(authorization);
+  if (!match) return null;
+  const encodedCredential = match[2];
   const decodedCredential = Buffer.from(encodedCredential, 'base64');
-  if (decodedCredential.toString('base64') !== encodedCredential)
-    return NO_AUTHORIZATION_CAPABILITY;
   const credential = decodedCredential.toString('utf8');
   const separator = credential.indexOf(':');
-  if (separator === -1) return NO_AUTHORIZATION_CAPABILITY;
-  const username = credential.slice(0, separator);
-  const extraction = classifyCapability(credential.slice(separator + 1));
+  return {
+    prefix: match[1],
+    username: separator === -1 ? credential : credential.slice(0, separator),
+    password: separator === -1 ? '' : credential.slice(separator + 1),
+    canonical:
+      separator !== -1 &&
+      /^[A-Za-z0-9+/]+={0,2}$/.test(encodedCredential) &&
+      decodedCredential.toString('base64') === encodedCredential,
+  };
+}
+
+function extractGitCapability(authorization: string | null): AuthorizationExtraction {
+  const git = parseGitAuthorization(authorization);
+  if (!git) return NO_AUTHORIZATION_CAPABILITY;
+  if (
+    isControlPlaneCredential(git.username) ||
+    (!git.canonical && isControlPlaneCredential(git.password))
+  ) {
+    return { type: 'unsupported_capability' };
+  }
+  if (!git.canonical) return NO_AUTHORIZATION_CAPABILITY;
+  const extraction = classifyCapability(git.password);
   if (extraction.type !== 'capability') return extraction;
-  if (username === 'x-access-token' && extraction.value.provider === 'github') {
+  if (git.username === 'x-access-token' && extraction.value.provider === 'github') {
     return extraction;
   }
-  if (username === 'oauth2' && extraction.value.provider === 'gitlab') {
+  if (git.username === 'oauth2' && extraction.value.provider === 'gitlab') {
     return extraction;
   }
-  if (username === 'x-token-auth' && extraction.value.provider === 'bitbucket') {
+  if (git.username === 'x-token-auth' && extraction.value.provider === 'bitbucket') {
     return extraction;
   }
   return { type: 'unsupported_capability' };
@@ -777,6 +832,99 @@ async function handleManagedBitbucketOutbound(
   return response;
 }
 
+function supportsControlCredentialResolution(
+  service: unknown
+): service is ControlCredentialResolutionBinding {
+  return (
+    typeof service === 'object' &&
+    service !== null &&
+    'resolveCredential' in service &&
+    typeof service.resolveCredential === 'function'
+  );
+}
+
+function sanitizedCredentialResolutionError(error: unknown): Error {
+  return Object.assign(new Error('Control-plane authorization unavailable'), {
+    retryable: error instanceof Error && 'retryable' in error && error.retryable === true,
+  });
+}
+
+async function handleControlPlaneOutbound(
+  request: Request,
+  env: Cloudflare.Env,
+  capability: RedeemableAuthorization,
+  ctx: ManagedScmOutboundContext
+): Promise<Response> {
+  const parsed = parseControlPlaneCredential(capability.capability);
+  const namespace = env.SANDBOX_CONTROL;
+  if (!parsed || !namespace) {
+    return new Response('SCM authorization unavailable', { status: 502 });
+  }
+
+  try {
+    const resolved = resolvedControlCredentialSchema.safeParse(
+      await withDORetry(
+        () => {
+          try {
+            return namespace.getByName(parsed.sandboxId);
+          } catch (error) {
+            throw sanitizedCredentialResolutionError(error);
+          }
+        },
+        async stub => {
+          try {
+            if (!supportsControlCredentialResolution(stub)) return null;
+            return await stub.resolveCredential({
+              credential: capability.capability,
+              outboundContainerId: ctx.containerId,
+              url: request.url,
+              method: request.method,
+            });
+          } catch (error) {
+            throw sanitizedCredentialResolutionError(error);
+          }
+        },
+        'resolveControlPlaneCredential'
+      )
+    );
+    if (!resolved.success) {
+      return new Response('SCM authorization unavailable', { status: 502 });
+    }
+    const { credential, organizationId } = resolved.data;
+    const expectedPrefix = CONTROL_CREDENTIAL_CAPABILITY_PREFIXES[parsed.purpose];
+    if (
+      !credential.startsWith(expectedPrefix) ||
+      credential.length === expectedPrefix.length ||
+      /\s/.test(credential)
+    ) {
+      return new Response('SCM authorization unavailable', { status: 502 });
+    }
+
+    const headers = new Headers(request.headers);
+    const authorization = headers.get('Authorization');
+    const git = parseGitAuthorization(authorization);
+    const api = /^((?:token|Bearer)[ \t]+)(.+)$/i.exec(authorization ?? '');
+    if (git?.canonical && git.password === capability.capability) {
+      headers.set(
+        'Authorization',
+        `${git.prefix}${Buffer.from(`${git.username}:${credential}`).toString('base64')}`
+      );
+    } else if (api?.[2] === capability.capability) {
+      headers.set('Authorization', `${api[1]}${credential}`);
+    }
+    if (headers.get('PRIVATE-TOKEN')?.trim() === capability.capability) {
+      headers.set('PRIVATE-TOKEN', credential);
+    }
+    if (parsed.purpose === 'kilo') {
+      headers.set('x-kilocode-organizationid', organizationId ?? '');
+    }
+    headers.set('Host', new URL(request.url).host);
+    return await handleManagedScmOutbound(new Request(request, { headers }), env, ctx);
+  } catch {
+    return new Response('SCM authorization unavailable', { status: 502 });
+  }
+}
+
 export function handleManagedScmOutbound(
   request: Request,
   env: Cloudflare.Env,
@@ -829,6 +977,9 @@ export function handleManagedScmOutbound(
   }
   const capability = authorizationCapability ?? gitLabPrivateTokenCapability;
   if (!capability) return fetch(request);
+  if (isControlPlaneCredential(capability.capability)) {
+    return handleControlPlaneOutbound(request, env, capability, ctx);
+  }
   if (capability.provider === 'github') {
     return handleManagedGitHubOutbound(request, env, capability, ctx.containerId);
   }

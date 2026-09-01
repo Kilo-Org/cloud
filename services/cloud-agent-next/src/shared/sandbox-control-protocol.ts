@@ -198,6 +198,20 @@ export const sessionAttachPayloadSchema = z
     snapshotIdentity: z.string().min(1).max(512).optional(),
     directory: z.string().min(1).max(1024).optional(),
     branch: z.string().min(1).max(256).optional(),
+    kilo: z
+      .object({
+        scopeId: z.string().min(1).max(256),
+        token: z.string().min(1).max(4096),
+        targets: z
+          .object({
+            backendBaseUrl: z.string().url(),
+            providerBaseUrl: z.string().url(),
+            sessionIngestBaseUrl: z.string().url(),
+          })
+          .strict(),
+      })
+      .strict()
+      .optional(),
     git: z
       .object({
         url: z.string().min(1).max(2048),

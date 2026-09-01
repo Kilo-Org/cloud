@@ -8,7 +8,6 @@ import { Toaster } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppUnlockAnnouncements } from '@/components/app-unlock-screen';
-import { DevSessionInjector } from '@/components/dev-session-injector';
 import { OfflineBanner } from '@/components/offline-banner';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 import { AuthProvider } from '@/lib/auth/auth-context';
@@ -34,7 +33,6 @@ export function AppRootProviders({
         <QueryClientProvider client={queryClient}>
           <QueryClientNativeLifecycle />
           <AuthProvider>
-            {__DEV__ ? <DevSessionInjector /> : null}
             <AppUnlockProvider
               promptMessage={languageReady ? t('preferences.biometricUnlock') : null}
             >
